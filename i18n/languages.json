@@ -31,6 +31,7 @@
         "gallery": "Gallery",
         "tools": "Tools",
         "agents": "Agent",
+        "translation": "Translation status",
         "pages": "Pages",
         "guide_note": "This is the short version of the standard: what it takes to read and write RNL files. It is not normative; where it differs from the text below, the text below prevails. The same guide is part of the [skill package for AI agents]({agents}).",
         "principles_note": "These are the principles of RNL, the text of [`spec/rich-netlist.md`](https://github.com/rich-netlist/rnl/blob/main/spec/rich-netlist.md), shown here to be read with the standard. They are not a part of the standard and are not tied to a version of it; the standard refers to them as “Principles”. The English text is authoritative.",

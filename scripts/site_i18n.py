@@ -62,6 +62,10 @@ class Languages:
         entries = config["languages"]
         self.entries = {entry["code"]: entry for entry in entries}  # as written, without English's keys
         self.codes = [entry["code"] for entry in entries]
+        # the languages shown in the menus and chosen for a browser: English and those `published`; one that
+        # is `incubating`, or has no status yet, is built for previews and tests only (decision 0015)
+        self.published = [code for code in self.codes
+                          if code == config["default"] or self.entries[code].get("status") == "published"]
         if (self.default != "en" or self.legacy not in self.codes or "en" not in self.codes
                 or len(set(self.codes)) != len(self.codes)
                 or any(not re.fullmatch(r"[a-z]{2,3}(?:-[a-z0-9]+)*", code) for code in self.codes)):
@@ -274,7 +278,8 @@ class Languages:
         locale = self.locales[code]
         title = self.message(code, "language_menu")
         links = []
-        for target in self.codes:
+        # the published languages, and the page's own when it is incubating
+        for target in [c for c in self.codes if c in self.published or c == code]:
             item = self.locales[target]
             current = ' aria-current="true"' if target == code else ""
             links.append(f'<a href="{escape(href(target), quote=True)}" hreflang="{item["html_lang"]}" '

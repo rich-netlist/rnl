@@ -15,7 +15,7 @@ export default function setup() {
   // The third locale exists only in an OS temp directory, never in the published artifact.
   const temp = mkdtempSync(join(tmpdir(), 'rnl-site-i18n-'));
   const config = JSON.parse(readFileSync(join(root, 'i18n/languages.json'), 'utf8'));
-  config.languages.push({ code: 'ja', name: '日本語', names: { en: 'Japanese' }, short: 'JA' });
+  config.languages.push({ code: 'ja', name: '日本語', names: { en: 'Japanese' }, short: 'JA', status: 'published' });
   const configPath = join(temp, 'languages.json');
   writeFileSync(configPath, JSON.stringify(config));
   mkdirSync(join(temp, 'ja', 'site'), { recursive: true });

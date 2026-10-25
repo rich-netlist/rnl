@@ -21,7 +21,7 @@ spec.loader.exec_module(build)
 
 def third_language():
     config = json.loads(CONFIG.read_text(encoding="utf-8"))
-    config["languages"].append({"code": "ja", "name": "日本語", "short": "JA"})
+    config["languages"].append({"code": "ja", "name": "日本語", "short": "JA", "status": "published"})
     return config
 
 
@@ -84,6 +84,37 @@ class Localization(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory, patch.object(build, "ROOT", Path(directory)), \
                 patch.object(build, "git_text", return_value='<!-- timeline-summary\n{"en":"English only."}\n-->'):
             self.assertEqual(build.release_summary("spec-0.4-r1"), {"en": "English only."})
+
+    def test_an_incubating_language_is_built_only_on_demand_and_offered_nowhere(self):
+        config = third_language()
+        del config["languages"][-1]["status"]  # no status: incubating, as a language not yet reviewed
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        registry = Languages(config, catalogs=third_messages(directory.name))
+        self.assertEqual(registry.published, ["en", "zh"])
+        self.assertNotIn('data-language="ja"', registry.menu("en", lambda target: target))
+        self.assertIn('data-language="ja" aria-current="true"', registry.menu("ja", lambda target: target))
+        with patch.object(build, "I18N", registry), patch.object(build, "has_linux_release", return_value=False), \
+                patch.object(build, "LANGS", [(code, code + "/") for code in registry.codes]), \
+                patch.object(build, "CODES", registry.codes), patch.object(build, "DIRS", {c: c + "/" for c in registry.codes}):
+            published, everything = build.build(None), build.build(None, incubating=True)
+        self.assertFalse(any(path.startswith("ja/") for path in published))
+        self.assertIn("ja/index.html", everything)
+        self.assertNotIn('"ja"', published["index.html"])  # the root never leads to it
+        self.assertNotIn('data-language="ja"', everything["en/index.html"])
+
+    def test_the_translation_status_page_and_the_footer_link_to_it(self):
+        with patch.object(build, "has_linux_release", return_value=False):
+            result = build.build(None)
+        page = result["en/translation.html"]
+        self.assertIn('<div class="ts-report" lang="en">', page)  # the report in English, as its texts are
+        self.assertIn("<code>site-pages</code>", page)
+        self.assertIn("<h3>Not counted</h3>", page)
+        self.assertIn('<span lang="zh-CN">中文</span>', result["zh/translation.html"])
+        for lang, label in (("en", "Translation status"), ("zh", "翻译进度")):
+            for name in build.PAGES:
+                if name != "translation.html":
+                    self.assertIn(f'<a href="translation.html">{label}</a>', result[f"{lang}/{name}"], (lang, name))
 
     def test_the_build_refuses_translations_in_the_registry_and_the_timeline(self):
         config = third_language()
@@ -252,9 +283,10 @@ class Catalogs(unittest.TestCase):
             self.assertNotIn("（訳）", index)  # shown in English: its one translated text too
             self.assertIn("A netlist you can simulate", index)
             self.assertIn('<html lang="ja" data-locale="ja">', index)
-            for lang in ("en", "zh"):
-                for name in build.PAGES:
-                    self.assertNotIn("translation-notice", page(lang, name), (lang, name))
+            # English, the source, has none; how complete the repository's Chinese is, which a release in
+            # English alone changes until it is translated, is not this test's concern
+            for name in build.PAGES:
+                self.assertNotIn("translation-notice", page("en", name), name)
 
 
 if __name__ == "__main__":
