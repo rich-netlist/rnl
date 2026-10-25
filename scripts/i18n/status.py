@@ -379,6 +379,7 @@ def dictionary(p: Project, s: dict) -> Surface:
             before |= dictionaries(p, s, p.at_base(rel), rel)
         except json.JSONDecodeError as e:
             out.errors.append(f"{rel}: not valid JSON: {e}")
+    units = {name: texts for name, texts in units.items() if name not in s.get("keep", [])}  # English only
     out.total = len(units)
     for lang in p.langs(s):
         st = out.langs[lang] = Lang()

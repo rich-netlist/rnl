@@ -120,9 +120,9 @@ for (const theme of ['light', 'dark']) for (const width of [1440, 390]) {
       const notice = page.locator('.translation-notice');
       await expect(notice).toHaveCount(1);
       await expect(notice).toBeVisible();
-      await expect(notice).toHaveAttribute('lang', 'ja');
+      await expect(notice).toHaveAttribute('lang', 'en'); // as every notice of the system (decision 0015)
       await expect(notice).toHaveClass(partial ? /\bis-partial\b/ : /^wrap translation-notice$/);
-      await expect(notice).toContainText(partial ? 'Parts of this page are not yet available in 日本語' : 'This page is not yet available in 日本語');
+      await expect(notice).toContainText(partial ? 'Parts of this page are not yet available in Japanese' : 'This page is not yet available in Japanese');
       await expect(notice.locator('a')).toHaveAttribute('href', /i18n\/README\.md$/);
       // below the hero, before the page's first part, and within the width of the page
       const box = await notice.boundingBox();
