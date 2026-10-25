@@ -3,11 +3,12 @@ import { m } from "./i18n.js";
 // (manifest.js), which says the entry, the pool in its order, the formats chosen, the level shown,
 // the desktop's PATH and the Library's settings. Download Project (web) and Save Project (desktop)
 // write one; Open Project reads one back: its files go in the Library, and its entry opens as it was.
-import { inform, modal } from "./dialog.js";
+import { form, inform, modal } from "./dialog.js";
 import { changes, fileText, hasBuffer } from "./edits.js";
 import { confirmLeave, note } from "./editor.js";
 import { chosenFormat } from "./formats.js";
-import { showLevel } from "./manifest-bar.js";
+import { showLevel, showManifestLevel } from "./manifest-bar.js";
+import { currentDisplay, displayBox, offerDisplay } from "./display.js";
 import { libraryFiles } from "./library-files.js";
 import { checkManifest, loadManifest, PROJECT_MANIFEST, writeManifest } from "./manifest.js";
 import { currentSource, isLoading, openSource } from "./open.js";
@@ -135,9 +136,20 @@ async function projectZip(contents) {
     catch (error) { throw new Error(`${e.path}: ${error.message || error}`); }
   }
   const manifest = await writeManifest({ archive: true, entry: contents.entry, files, pool: contents.pool, formats: contents.formats,
-    level: contents.level, paths: contents.paths, settings: contents.settings });
+    level: contents.level, paths: contents.paths, settings: contents.settings, display: contents.display });
   const json = `${JSON.stringify(manifest, null, 2)}\n`;
   return libraryZip([{ path: PROJECT_MANIFEST, read: () => json }, ...files.map((f) => ({ path: f.path, read: () => f.bytes }))]);
+}
+
+/**
+ * Ask, before a project or a manifest of links is written, whether to write the display settings
+ * shown into it: those settings, {} for none, or null when the user cancels.
+ */
+async function askDisplay(title, action) {
+  const { row, box } = displayBox();
+  const keep = await form({ title, text: "", parts: [row], action, answer: () => box.checked });
+  if (keep === null) return null;
+  return keep ? currentDisplay() : {};
 }
 
 /** File > Download Project (web) or Save Project (desktop). */
@@ -148,6 +160,9 @@ export async function saveProject() {
   let preparing = false;
   try {
     const contents = projectContents();
+    const display = await askDisplay(title, shell.platform === "web" ? "Download" : "Save");
+    if (display === null) return;
+    contents.display = display;
     const saved = await shell.saveProject(`${contents.name}.zip`, async () => {
       preparing = true;
       note(m("Preparing project ZIP…"), 0);
@@ -194,7 +209,11 @@ export async function openProject() {
     if (!(await setProjectFiles(items, read.formats, read.settings))) return;
     setSidebar(true);
     setPane("files");
-    if (await openSource(source, false, undefined, false, null, null, true)) await showLevel(read.level);
+    if (await openSource(source, false, undefined, false, null, null, true)) {
+      await showLevel(read.level);
+      const files = new Set(Object.keys(read.files).map((path) => path.replace(/\\/g, "/")));
+      await offerDisplay(read.display, picked.name, read.displayIgnored, (path) => files.has(path.replace(/\\/g, "/")));
+    }
   } catch (error) {
     await inform({ title: m("Open Project"), paragraphs: [m`Could not open the project: ${error.message || error}`] });
   } finally {
@@ -236,6 +255,8 @@ export async function downloadManifest() {
     if (local.length) {
       throw new Error(m`${local.slice(0, 3).map((e) => e.name).join(", ")}${local.length > 3 ? "…" : ""} has no address on the web. Download Project keeps such files.`);
     }
+    const display = await askDisplay(title, "Download");
+    if (display === null) return;
     note(m("Fetching the library's files again…"), 0);
     const files = [];
     for (const e of contents.entries) {
@@ -250,7 +271,7 @@ export async function downloadManifest() {
       files.push({ path: e.name, bytes, url });
     }
     const manifest = await writeManifest({ entry: contents.entry, files, pool: contents.pool, formats: contents.formats, level: contents.level,
-      settings: contents.settings, id: contents.name });
+      settings: contents.settings, display, id: contents.name });
     await shell.saveManifest(`${contents.name}.json`, `${JSON.stringify(manifest, null, 2)}\n`);
     note(m`Downloaded the manifest of ${files.length} files.`);
   } catch (error) {
@@ -281,7 +302,13 @@ export async function openManifest() {
     try { json = JSON.parse(picked.text); }
     catch { throw new Error(m`${picked.name} is not JSON.`); }
     checkManifest(json);
-    await openSource(shell.sourceFromManifestJson(json, picked.name), false);
+    const source = shell.sourceFromManifestJson(json, picked.name);
+    if (await openSource(source, false)) {
+      await showManifestLevel(source);
+      const external = source.external;
+      await offerDisplay(external?.display, picked.name, external?.displayIgnored,
+        (path) => !!external && (path in external.files || external.pool.includes(path)));
+    }
   } catch (error) {
     await inform({ title: m("Load Manifest"), paragraphs: [m`Could not load the manifest: ${error.message || error}`] });
   } finally {

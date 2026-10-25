@@ -44,6 +44,19 @@ function apply(value) {
 }
 export function startNetlistColors() { apply(normalized(load(KEY, null))); }
 
+/** The colour scheme shown, by the names of COLOR_FIELDS. */
+export const currentColors = () => ({ ...current });
+
+/** The user's own colour scheme again, as the settings keep it (display.js). */
+export function showOwnColors() {
+  apply(normalized(load(KEY, null)));
+}
+
+/** Show `colors`, some of the scheme's by their names, over the scheme shown, not kept in the settings (display.js). */
+export function showColors(colors) {
+  apply(normalized({ ...current, ...colors }));
+}
+
 export async function netlistColors() {
   if (busy) return;
   busy = true;

@@ -26,9 +26,17 @@ function unzip(file) {
     file], { maxBuffer: 32 << 20 });
   return JSON.parse(out.toString());
 }
-async function project(page, action = () => page.evaluate(() => { window.viewer.command('save-project'); })) {
+/** Answer the question a save asks first: whether to write the display settings shown, then `button`. */
+async function answer(page, { write = false, button = 'Download' } = {}) {
+  const box = page.locator('#write-display');
+  await box.waitFor();
+  if (write) await box.check();
+  await page.getByRole('dialog').getByRole('button', { name: button, exact: true }).click();
+}
+async function project(page, { write = false } = {}) {
   const download = page.waitForEvent('download');
-  await action();
+  await page.evaluate(() => { window.viewer.command('save-project'); });
+  await answer(page, { write });
   // a dialog instead of the download says why
   const dialog = page.getByRole('dialog');
   const result = await Promise.race([download, dialog.waitFor().then(async () => { throw new Error(await dialog.innerText()); })]);
@@ -200,6 +208,7 @@ test('Download Project uses the save picker, captures edits before it waits and 
     window.viewer.command('save-project');
     window.viewer.command('save-project');
   });
+  await answer(page);
   await expect.poll(() => page.evaluate(() => window.pickerCalls)).toBe(1);
   await page.locator('#source textarea:visible').fill('* later typing\n.end\n');
   await page.evaluate(() => window.finishPicker());
@@ -219,18 +228,26 @@ test('canceling the save picker reads nothing, and an unreadable file fails with
   await ready(page);
   let downloads = 0;
   page.on('download', () => downloads++);
-  await page.evaluate(async () => {
+  await page.evaluate(() => {
     window.showSaveFilePicker = async () => { throw new DOMException('Canceled', 'AbortError'); };
-    await window.viewer.command('save-project');
+    window.viewer.command('save-project');
   });
-  expect(downloads).toBe(0);
+  await answer(page);
   await expect(page.getByRole('dialog')).toHaveCount(0);
+  expect(downloads).toBe(0);
+  // cancelling the question saves nothing either
+  await page.evaluate(() => { window.viewer.command('save-project'); });
+  await page.locator('#write-display').waitFor();
+  await page.getByRole('dialog').getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  expect(downloads).toBe(0);
   await page.evaluate(async () => {
     window.showSaveFilePicker = undefined;
     const { restorePool } = await import('./pool.js');
     await restorePool([{ path: '/missing.inc', name: 'missing.inc', source: {}, read: () => { throw Error('removed file'); } }]);
     window.viewer.command('save-project');
   });
+  await answer(page);
   const dialog = page.getByRole('dialog', { name: 'Download Project', exact: true });
   await expect(dialog).toContainText('/missing.inc: removed file');
   await expect(page.locator('#note')).not.toContainText('Preparing');
@@ -306,6 +323,7 @@ test('Download Manifest gives the files by their addresses, which Load Manifest 
   const document = await page.evaluate(() => window.viewer.doc);
   const download = page.waitForEvent('download');
   await page.evaluate(() => { window.viewer.command('download-manifest'); });
+  await answer(page);
   const result = await download;
   expect(result.suggestedFilename()).toBe('04-hierarchy.json');
   const saved = path.join(test.info().outputDir, result.suggestedFilename());
