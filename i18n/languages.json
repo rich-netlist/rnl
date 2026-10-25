@@ -99,6 +99,21 @@
         "display": "\"IBM Plex Sans Condensed\", \"Noto Sans SC\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
         "mono": "\"IBM Plex Mono\", \"Cascadia Mono\", \"SFMono-Regular\", Consolas, \"Noto Sans SC\", monospace"
       }
+    },
+    {
+      "code": "es",
+      "name": "Español",
+      "short": "ES",
+      "html_lang": "es",
+      "matches": [
+        "es"
+      ],
+      "status": "incubating",
+      "names": {
+        "en": "Spanish",
+        "viewer": "Español"
+      },
+      "nav_breakpoint": 1080
     }
   ]
 }
