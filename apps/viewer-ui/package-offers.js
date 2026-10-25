@@ -1,5 +1,5 @@
 // Missing named dependencies are searched after display, without delaying a build or editing.
-import { append, m, setText } from './i18n.js';
+import { append, m, setText, tr } from './i18n.js';
 import { decide, modal } from './dialog.js';
 import { editing } from './editor.js';
 import { currentSource, isLoading } from './open.js';
@@ -48,7 +48,7 @@ export async function offerMissingPackages(built, source, signal) {
     const choice = await decide({ title: m('Public Packages Found'), signal,
       paragraphs: [m('The following explicitly referenced packages are available in the public library:'), list,
         m('Add them to Library and reload the current circuit? Pending edits will be kept.')],
-      action: 'Add to Library' });
+      action: tr('Add to Library') });
     if (!valid()) return;
     for (const { key } of matches) seen.add(key);
     offered.set(source, seen);

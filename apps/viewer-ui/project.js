@@ -1,4 +1,4 @@
-import { m } from "./i18n.js";
+import { m, tr } from "./i18n.js";
 // Projects: the files of the Library in one ZIP archive with their manifest, rnl-project.json
 // (manifest.js), which says the entry, the pool in its order, the formats chosen, the level shown,
 // the desktop's PATH and the Library's settings. Download Project (web) and Save Project (desktop)
@@ -160,7 +160,7 @@ export async function saveProject() {
   let preparing = false;
   try {
     const contents = projectContents();
-    const display = await askDisplay(title, shell.platform === "web" ? "Download" : "Save");
+    const display = await askDisplay(title, shell.platform === "web" ? tr("Download") : tr("Save"));
     if (display === null) return;
     contents.display = display;
     const saved = await shell.saveProject(`${contents.name}.zip`, async () => {

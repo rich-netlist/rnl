@@ -164,7 +164,8 @@ class Messages(Repository):
     def test_the_scan_finds_every_form_and_pairs_a_changed_text_with_its_old_entry(self):
         self.surfaces(self.SURFACE)
         self.write("ui/a.js", 'x = m("Open File");\ny = m`Open ${name} now ${m`and ${k} more`}`;\n'
-                              "z = m('It\\'s here\\u2026');\nw = m`Line\\nbreak`;\n")
+                              "z = m('It\\'s here\\u2026');\nw = m`Line\\nbreak`;\n"
+                              'const LABELS = [tr("Keep"), tr(\'Drop\')]; v = m("{0} lines", n);\n')
         self.write("ui/commands.json", json.dumps({"menus": [{"label": "&File", "items": [
             {"id": "language-en", "label": "English"}, {"id": "quit", "label": "&Quit"}]}]}))
         self.write("ui/index.html", '<html><head><title>RNL Viewer</title></head><body><h1>RNL Viewer</h1>'
@@ -176,7 +177,7 @@ class Messages(Repository):
         p, s = self.survey()
         found = status.scan_viewer(p, self.SURFACE["source"])
         for text in ("Open File", "Open {0} now {1}", "and {0} more", "It's here…", "Line\nbreak", "&File", "&Quit",
-                     "Close the panel", "Drop a netlist here", "Export Image"):
+                     "Close the panel", "Drop a netlist here", "Export Image", "Keep", "Drop", "{0} lines"):
             self.assertIn(text, found)
         self.assertNotIn("English", found)
         self.assertNotIn("not this", found)

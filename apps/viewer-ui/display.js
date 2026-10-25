@@ -1,4 +1,4 @@
-import { append, m, setText } from "./i18n.js";
+import { append, m, setText, tr } from "./i18n.js";
 // A manifest's display settings (manifest.js `display`): the view of its level, the background, the
 // colour scheme, whether usages and current directions are shown, and the grid. A manifest only
 // proposes them: the page lists those it has and applies the ones the user ticks. They hold while a
@@ -111,8 +111,8 @@ export async function offerDisplay(display, name, ignored = [], has = () => fals
     title: m("Display Settings"),
     text: m("The manifest proposes these display settings. Those you keep apply while a file of it is shown; your own settings do not change."),
     parts: boxes.map((b) => b.row),
-    action: "Apply Selected",
-    cancel: "Don't Apply",
+    action: tr("Apply Selected"),
+    cancel: tr("Don't Apply"),
     answer: () => new Set(boxes.filter((b) => b.box.checked).map((b) => b.key)),
   });
   const scope = { display, keys: keys || new Set(), has };

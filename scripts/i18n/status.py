@@ -432,7 +432,8 @@ def scan_viewer(p: Project, source: dict) -> dict[str, str]:
         rel, text = p.rel(path), read(path)
         for m in re.finditer(r"\bm`", text):  # each m`…`, the ones nested in another's ${…} too
             add(template(text, m.end())[0], rel)
-        for m in re.finditer(r"\bm\(\s*(\"(?:[^\"\\]|\\.)*\"|'(?:[^'\\]|\\.)*')\s*[,)]", text):
+        # m("…"), and tr("…"), which marks a text that m() translates where it is shown (i18n.js)
+        for m in re.finditer(r"\b(?:m|tr)\(\s*(\"(?:[^\"\\]|\\.)*\"|'(?:[^'\\]|\\.)*')\s*[,)]", text):
             add(js_string(m.group(1)), rel)
     if source.get("commands") and (p.root / source["commands"]).is_file():
         rel = source["commands"]

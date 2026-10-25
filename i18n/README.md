@@ -110,7 +110,8 @@ Anyone may update a translation at any time, in a pull request of its own. A pul
 | Step | What it gives | State |
 | --- | --- | --- |
 | 1 | This folder, the report, stamps on `README.zh.md` and `site/src/llms.zh.txt` | done |
-| 2 | The viewers: every text found by the scan, the catalog in `i18n/<lang>/viewer.json`, the language menu from `languages.json`. Until then the viewers have only English and Chinese, and the scan does not find the texts passed to `m()` through a variable | to come |
+| 2a | The viewers: every text of the interface written where the scan finds it, `tr()` marking those that reach `m()` through a variable; counts as whole phrases; the entries the interface no longer has removed | done |
+| 2b | The viewers: the catalog in `i18n/<lang>/viewer.json`, the language menu from `languages.json`, a manifest's title in any language. Until then the viewers have only English and Chinese | to come |
 | 3a | The site reads the catalogs in `i18n/<lang>/site/` and checks their format; a page under 80% translated is shown in English, and every page not wholly translated says so ([site/README.md](../site/README.md#adding-a-language)) | done |
 | 3b–3d | The site: Chinese moved out of `site/src/` into `i18n/zh/site/`, with the timeline, the shared messages and the summaries of the packages; `incubating` respected; a page of this report. Until then the site builds and publishes the pages of every registered language | to come |
 | 4 | The standard: a stale Chinese chapter reported rather than stopping the build, with a notice on its page; the fixed phrases of Annex A in `i18n/<lang>/spec.json`; translations of the standard in further languages; stamps on the short guide and the principles | to come |

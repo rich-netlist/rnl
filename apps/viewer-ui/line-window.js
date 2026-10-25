@@ -204,7 +204,7 @@ export class LineWindow {
       this.empty.className = "placeholder";
       this.el.append(this.empty);
     }
-    setText(this.empty, m(this.semanticsOnly ? "No semantic RNL lines in this file." : "No lines match these filters."));
+    setText(this.empty, this.semanticsOnly ? m("No semantic RNL lines in this file.") : m("No lines match these filters."));
     this.empty.hidden = !this.filtered || count !== 0;
     const first = this.virtual ? Math.min(Math.max(0, count - 1), Math.max(0, Math.floor((source.scrollTop - 4) / this.height) - OVERSCAN)) : 0;
     const last = this.virtual ? Math.min(count - 1, Math.ceil((source.scrollTop + source.clientHeight) / this.height) + OVERSCAN) : count - 1;
