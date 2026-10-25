@@ -232,10 +232,11 @@ pub async fn save_solved_copy(
         None => dialog,
     };
     let one = one_file(&run);
-    let title = crate::menu::text(
-        window.app_handle(),
-        if one { "Save Solved Copy As" } else { "Save the Solved Files Into a Folder" },
-    );
+    let title = if one {
+        crate::menu::text(window.app_handle(), "Save Solved Copy As")
+    } else {
+        crate::menu::text(window.app_handle(), "Save the Solved Files Into a Folder")
+    };
     let dialog = dialog.set_title(title);
     let chosen = tauri::async_runtime::spawn_blocking(move || {
         if one {

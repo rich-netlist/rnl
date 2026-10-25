@@ -1,4 +1,4 @@
-import { append, m, setText } from "./i18n.js";
+import { append, m, setText, tr } from "./i18n.js";
 // Help > Check for Updates, on a platform whose shell has `version` and `browse` (the desktop): the
 // newest release of the viewer on GitHub against the version that runs, in a dialog that offers to
 // open the release's page. It looks only when the user asks, never by itself. The shell says the
@@ -53,7 +53,7 @@ export async function checkForUpdates() {
         heading(m`RNL Viewer ${newest.version} is available.`),
         m`This is version ${running}. The release's page on GitHub has its installers and what changed.`,
       ],
-      action: "Open Release Page",
+      action: tr("Open Release Page"),
     });
     if (open) openPage(newest.url);
     return;

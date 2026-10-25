@@ -1,4 +1,4 @@
-import { append, m, setAttr, setText } from "./i18n.js";
+import { append, m, setAttr, setText, tr } from "./i18n.js";
 // Dialogs in the page's style, for what a shell asks of the user: one of a list, such as the netlist
 // to open; a line of text, such as a URL; several values at once, such as the grid's settings; a
 // message, such as the About box; a message with a button that acts, such as one that opens a
@@ -106,7 +106,7 @@ export function choose({ title, text, items, filter = false, action = "Open" }) 
  *   "OK" by default.
  * @returns {Promise<string | null>} The text, or null when the dialog is cancelled.
  */
-export function ask({ title, text, value = "", placeholder = "", action = "OK", check = () => null }) {
+export function ask({ title, text, value = "", placeholder = "", action = tr("OK"), check = () => null }) {
   const d = frame(title, text, action);
   const box = textBox("text", placeholder);
   box.value = value;

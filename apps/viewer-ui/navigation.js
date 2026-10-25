@@ -1,4 +1,4 @@
-import { m } from "./i18n.js";
+import { m, tr } from "./i18n.js";
 // Every user action that changes the displayed circuit MUST go through navigate().
 // Rendering/rebuilding a document is not navigation. Targets carry a source, a hierarchy path,
 // and optionally an object to select; Shift sends that same target to another viewer.
@@ -69,7 +69,7 @@ async function newWindow(visit) {
   // Desktop sessions re-read disk. Pending editor text never becomes a new window's input.
   if (shell.platform === "desktop" && Object.keys(changes(true)).length &&
       await decide({ title: m("New Window"), paragraphs: [m("The new window reads files from disk and will not see the unsaved changes here.")],
-        action: "Open Anyway", cancel: "Cancel" }) !== "Open Anyway") return;
+        action: tr("Open Anyway"), cancel: "Cancel" }) !== "Open Anyway") return;
   const session = {
     ...visit,
     pool: poolSnapshot(),

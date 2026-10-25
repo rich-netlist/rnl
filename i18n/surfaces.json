@@ -126,7 +126,7 @@
       "translation": {"zh": "apps/viewer-ui/locales/zh-CN.json", "*": "i18n/{lang}/viewer.json"},
       "keep": ["RNL Viewer"],
       "owner": "viewer",
-      "notes": "The scan finds the texts written in m(\"…\"), m`…`, the labels of commands.json, the static text of index.html and the desktop app's menu::text(…, \"…\"). Texts passed to m() through a variable are not found until step 2 of decision 0015 marks them; until then the catalog has entries the scan does not find."
+      "notes": "The scan finds the texts written in m(\"…\"), m`…`, tr(\"…\") (a text that m() translates where it is shown, through a variable), the labels of commands.json, the static text of index.html and the desktop app's menu::text(…, \"…\"). Every text of the interface is written in one of these forms, so a catalog entry the scan does not find is one the interface no longer has."
     },
     {
       "id": "viewer-other",
