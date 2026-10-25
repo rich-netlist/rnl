@@ -730,3 +730,139 @@ fn an_orientation_given_is_written_r0_too() {
     let r = rnl_view::interpret(entry("spice"), Some("spice"), &files, &Options::default()).unwrap();
     assert!(r.diagnostics().iter().all(|d| d.severity != Severity::Error), "{:?}", r.diagnostics());
 }
+
+/// A package of the tests of parameters: a definition that draws nothing, with a parameter of each
+/// kind of literal, and three of analog-canvas-extensions 0.2 as that package writes them.
+const PARAMS_PACKAGE: &str = r#"@RNL(type="header") { @VERSION("0.3"); @PACKAGE(name="params-test", version="0.1")}
+@RNL {
+  $NOTE = @DEFINE(roles=[["dev", "instance"]], parameters=[["s", ""], ["n", 1], ["on", false], ["pts", []]]) {};
+  $CANVAS_NAME = @DEFINE(roles=[["part", "instance"]], parameters=["name"]) {};
+  $CANVAS_LABEL = @DEFINE(roles=["label"], parameters=["bind", "parameter", "show_value"]) {};
+  $CANVAS_PARAMETER_TEXT = @DEFINE(roles=[["part", "instance"]], parameters=["name", "text"]) {}
+}
+"#;
+
+/// What `usages` write into a netlist of R1, placed so that it has its labels, with PARAMS_PACKAGE
+/// used; the errors of reading it back, and the snapshot's objects of its level.
+fn written_with_params(usages: Value) -> (String, Vec<String>, Vec<Value>) {
+    let mut ops = vec![
+        json!({"level": "file", "op": "use-package", "name": "params-test", "version": "0.1"}),
+        json!({"level": "file", "op": "set", "object": "#R1", "at": [0, 0]}),
+    ];
+    ops.extend(usages.as_array().unwrap().iter().cloned());
+    let out = write(&request("spice", "* params\nR1 a 0 1k\n.end\n", Value::Array(ops))).unwrap();
+    let mut files = MemoryProvider::new().with(entry("spice"), &out).with("pkgs/params-test.rnl", PARAMS_PACKAGE);
+    files.package_dirs.push("pkgs".into());
+    let r = rnl_view::interpret(entry("spice"), Some("spice"), &files, &Options::default()).unwrap();
+    let errors = r.diagnostics().iter().filter(|d| d.severity == Severity::Error).map(|d| d.message.clone()).collect();
+    let parts = rnl_view::Parts { drawing: false, host: false, model: true };
+    let s = rnl_view::snapshot(entry("spice"), &files, &rnl_view::BuildOptions::default(), parts).unwrap();
+    let s = serde_json::to_value(s).unwrap();
+    (out, errors, s["levels"][0]["model"]["objects"].as_array().unwrap().clone())
+}
+
+/// A JSON value with every number as a float, as the snapshot gives numbers: `7` and `7.0` are one
+/// number to a reader of JSON.
+fn floats(v: &Value) -> Value {
+    match v {
+        Value::Number(n) => json!(n.as_f64().unwrap()),
+        Value::Array(a) => Value::Array(a.iter().map(floats).collect()),
+        Value::Object(o) => Value::Object(o.iter().map(|(k, v)| (k.clone(), floats(v))).collect()),
+        v => v.clone(),
+    }
+}
+
+#[test]
+fn a_usage_is_written_with_its_parameters_and_reads_them_back_as_given() {
+    // each kind of literal, a string with a quote and a character outside ASCII, numbers that a
+    // millionth would round, and lists, nested and empty, in an order other than the definition's
+    let params = json!({
+        "pts": [1, "a", [true, -0.5], []],
+        "s": "1MegΩ \"q\"",
+        "n": 1.0e-9,
+        "on": true,
+    });
+    let (out, errors, objects) = written_with_params(json!([
+        {"level": "file", "op": "add-usage", "name": "%u", "definition": "$NOTE", "attach": {"dev": "#R1"}, "params": params},
+        {"level": "file", "op": "add-usage", "name": "%big", "definition": "$NOTE", "attach": {"dev": "#R1"},
+         "params": {"n": -123456789.125, "s": ""}},
+    ]));
+    assert!(
+        out.contains(r#"*   $NOTE @ATTACH(pts=[1, "a", [true, -0.5], []], s="1MegΩ ""q""", n=0.000000001, on=true) #R1(dev) => %u"#),
+        "{out}"
+    );
+    assert!(errors.is_empty(), "{out}\n{errors:?}");
+    let object = |id: &str| objects.iter().find(|o| o["id"] == id).unwrap_or_else(|| panic!("no {id}: {objects:?}"));
+    assert_eq!(object("%u")["params"], floats(&params), "{out}");
+    assert_eq!(object("%big")["params"], json!({"n": -123456789.125, "s": ""}), "{out}");
+}
+
+#[test]
+fn the_parameters_of_a_definition_from_a_package_read_back_as_given() {
+    // the definitions of meaning only that Analog Canvas writes: one on a part, one on a label
+    let label = json!({"bind": "parameter", "parameter": "w", "show_value": false});
+    let (out, errors, objects) = written_with_params(json!([
+        {"level": "file", "op": "add-usage", "name": "%n", "definition": "$CANVAS_NAME", "attach": {"part": "#R1"}, "params": {"name": "M1"}},
+        {"level": "file", "op": "add-usage", "name": "%l", "definition": "$CANVAS_LABEL", "attach": {"label": "#R1::name"}, "params": label},
+        {"level": "file", "op": "add-usage", "definition": "$CANVAS_PARAMETER_TEXT", "attach": {"part": "#R1"}, "params": {"name": "r", "text": "1MegΩ"}},
+    ]));
+    assert!(out.contains(r#"*   $CANVAS_NAME @ATTACH(name="M1") #R1(part) => %n"#), "{out}");
+    assert!(
+        out.contains(
+            r#"*   $CANVAS_LABEL @ATTACH(bind="parameter", parameter="w", show_value=false) #R1::name(label) => %l"#
+        ),
+        "{out}"
+    );
+    assert!(errors.is_empty(), "{out}\n{errors:?}");
+    let object = |id: &str| objects.iter().find(|o| o["id"] == id).unwrap_or_else(|| panic!("no {id}: {objects:?}"));
+    assert_eq!(object("%n")["params"], json!({"name": "M1"}));
+    assert_eq!(object("%l")["params"], label);
+    assert_eq!(object("%l")["attach"], json!({"label": "#R1::name"}));
+    let text = objects.iter().find(|o| o["definition"] == "$CANVAS_PARAMETER_TEXT").unwrap();
+    assert_eq!(text["params"], json!({"name": "r", "text": "1MegΩ"}));
+}
+
+#[test]
+fn a_parameter_the_definition_lacks_fails_as_a_written_one_does() {
+    let usage = json!({"level": "file", "op": "add-usage", "name": "%u", "definition": "$CANVAS_NAME",
+                       "attach": {"part": "#R1"}, "params": {"nmae": "M1"}});
+    let (out, errors, _) = written_with_params(json!([usage]));
+    assert!(out.contains(r#"*   $CANVAS_NAME @ATTACH(nmae="M1") #R1(part) => %u"#), "{out}");
+    // the same statement written by hand, read the same way
+    let mut files = MemoryProvider::new()
+        .with(
+            entry("spice"),
+            "* params\nR1 a 0 1k\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"params-test\", version=\"0.1\")}\n\
+             * @RNL { #R1 @PLACE(0, 0); $CANVAS_NAME @ATTACH(nmae=\"M1\") #R1(part) => %u }\n.end\n",
+        )
+        .with("pkgs/params-test.rnl", PARAMS_PACKAGE);
+    files.package_dirs.push("pkgs".into());
+    let r = rnl_view::interpret(entry("spice"), Some("spice"), &files, &Options::default()).unwrap();
+    let by_hand: Vec<String> =
+        r.diagnostics().iter().filter(|d| d.severity == Severity::Error).map(|d| d.message.clone()).collect();
+    assert!(!by_hand.is_empty());
+    assert_eq!(errors, by_hand, "{out}");
+}
+
+#[test]
+fn parameters_that_a_record_cannot_hold_are_refused() {
+    let usage = |params: Value| {
+        request(
+            "spice",
+            "* params\nR1 a 0 1k\n.end\n",
+            json!([{"level": "file", "op": "add-usage", "definition": "$NOTE", "attach": {"dev": "#R1"}, "params": params}]),
+        )
+    };
+    let refused =
+        "op 0 (add-usage): `params` `s` is not a string without a line break, a number, a boolean or a list of them";
+    for params in [json!({"s": "two\nlines"}), json!({"s": null}), json!({"s": {"a": 1}}), json!({"s": [1, {"a": 1}]})]
+    {
+        assert_eq!(write(&usage(params.clone())).unwrap_err(), refused, "{params}");
+    }
+    assert_eq!(write(&usage(json!([1]))).unwrap_err(), "op 0 (add-usage): `params` is not an object");
+    // none, or an empty object, writes no parentheses
+    for params in [json!({}), Value::Null] {
+        let out = write(&usage(params)).unwrap();
+        assert!(out.contains("*   $NOTE @ATTACH #R1(dev)\n"), "{out}");
+    }
+}
