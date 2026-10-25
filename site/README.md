@@ -47,7 +47,17 @@ This check applies to English, so it does not reject another locale's CJK transl
 
 ### Adding a language
 
-English is the site's only core language, and every other language, Chinese included, is a translation ([decision 0015](../docs/decisions/0015-english-is-the-only-core-language.md)). That decision moves the translations of the pages out of `src/` into catalogs in `i18n/<lang>/site/`, in a later step; until then they are written as below. [`i18n/README.md`](../i18n/README.md) covers every surface of the project, and `python scripts/i18n/status.py --lang <lang>` shows what a language has.
+English is the site's only core language, and every other language, Chinese included, is a translation ([decision 0015](../docs/decisions/0015-english-is-the-only-core-language.md)). [`i18n/README.md`](../i18n/README.md) covers every surface of the project, and `python scripts/i18n/status.py --lang <lang>` shows what a language has.
+
+A translation of a group comes from the block beside its English, such as `<zh>…</zh>`, or else from the catalog of its source file: `i18n/<lang>/site/<path under src/>.json`, such as `i18n/ja/site/index.html.json` or `i18n/ja/site/assets/intro.js.json`, an object keyed by the English of each group with its runs of white space as one space:
+
+```json
+{"Same task, two ways.": "同じことを二通りに。", "Introduction": null}
+```
+
+A text is the translation, `null` one not made yet, `""` one left out on purpose. A translation keeps the placeholders, tags and links of its English, and has no more straight quotes and backslashes than it, since a group may stand in a script's string; `build.py` fails on a catalog that does not. Decision 0015 moves the Chinese blocks of `src/` into such catalogs in a later step; until then they stay beside the English, and a third language writes catalogs, not blocks.
+
+A page that a language has not wholly translated says so, below its hero, where each page has its `{{translation-notice}}` marker: the groups of the page and of the scripts it loads are counted. Under 80% (`SHOWN_IN_ENGLISH_BELOW` in [`scripts/site_i18n.py`](../scripts/site_i18n.py)) the page is shown in English, with the scripts that only it loads, under the notice that it is not yet in that language; from 80% it is shown translated, with the English where a translation is missing, under a quieter notice that parts of it are not. The notices are the messages `not_translated`, `partly_translated` and `help_translate` of the registry, and link to `i18n/README.md`. An English page, and one wholly translated, has none.
 
 Add one entry to `languages` in [`i18n/languages.json`](../i18n/languages.json), for example:
 
@@ -57,9 +67,7 @@ Add one entry to `languages` in [`i18n/languages.json`](../i18n/languages.json),
 
 This creates `ja/` pages, adds Japanese to every menu and browser-language negotiation,
 and inherits English interface messages, fonts and content. Add translations progressively,
-before the English block, such as `<ja>紹介</ja><en>Introduction</en>`. There is no need to
-add an empty Japanese block to every existing group. An explicit empty block stays empty;
-it means intentional omission, rather than missing translation. Translations of shared UI
+in its catalogs as above; there is no need to list every group. Translations of shared UI
 messages go in the entry's `messages`; font settings and `nav_breakpoint` can be overridden.
 Timeline dictionaries follow the same rule: `en` is required, other registered codes are optional.
 

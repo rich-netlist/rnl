@@ -86,7 +86,7 @@
       "translation": {"*": "i18n/{lang}/site/{path}.json"},
       "inline": ["zh"],
       "owner": "site",
-      "notes": "Chinese is still written in the source files, in <zh> blocks; step 3 of decision 0015 moves it to i18n/zh/site/."
+      "notes": "A translation is the block beside the English, else the entry of i18n/{lang}/site/{path}.json, as site/build.py reads them. Chinese is still written in the source files, in <zh> blocks, until steps 3b-3d of decision 0015 move it to i18n/zh/site/. The timeline is counted in site-timeline."
     },
     {
       "id": "site-messages",
