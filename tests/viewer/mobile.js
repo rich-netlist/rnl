@@ -73,10 +73,7 @@ export class Fingers {
     const lifted = this.down.slice(kept).map((p, i) => [kept + i, p]);
     this.down = this.down.slice(0, kept);
     // the protocol lifts the fingers a touchEnd names, and keeps the others down
-    if (this.real) {
-      const touchPoints = lifted.map(([id, p]) => ({ x: p.x, y: p.y, id }));
-      return this.cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints });
-    }
+    if (this.real) return this.touch("touchEnd", lifted.map(([id, p]) => ({ x: p.x, y: p.y, id })));
     await this.synthetic("pointerup", lifted);
   }
 
@@ -115,8 +112,16 @@ export class Fingers {
 
   /** A touchStart or touchMove of all the fingers down; the protocol presses those it has not seen. */
   send(type) {
-    const touchPoints = this.down.map((p, id) => ({ x: p.x, y: p.y, id }));
-    return this.cdp.send("Input.dispatchTouchEvent", { type, touchPoints });
+    return this.touch(type, this.down.map((p, id) => ({ x: p.x, y: p.y, id })));
+  }
+
+  /**
+   * A touch event through the protocol, and a wait until the page has had it: Chromium hands a move
+   * to the page with the next animation frame, after the call has returned.
+   */
+  async touch(type, touchPoints) {
+    await this.cdp.send("Input.dispatchTouchEvent", { type, touchPoints });
+    await this.page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
   }
 
   synthetic(type, fingers) {
@@ -165,13 +170,19 @@ function between(a, b, t) {
   return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
 }
 
-/** The page tests' `test`, with `fingers` too, ready before the page opens. */
+/**
+ * The page tests' `test`, with `fingers` too: set up for every test, before its hooks open the page,
+ * as WebKit's capture of the test's pointers has to be in the page from its start.
+ */
 export const test = base.extend({
-  fingers: async ({ page, browserName }, use) => {
-    const fingers = new Fingers(page, browserName);
-    await fingers.setUp();
-    await use(fingers);
-  },
+  fingers: [
+    async ({ page, browserName }, use) => {
+      const fingers = new Fingers(page, browserName);
+      await fingers.setUp();
+      await use(fingers);
+    },
+    { auto: true },
+  ],
 });
 
 /**

@@ -16,7 +16,7 @@ function near(a, b, px) {
 }
 
 test.describe("on a phone", () => {
-  test.beforeEach(async ({ fingers, viewer }) => {
+  test.beforeEach(async ({ viewer }) => {
     await viewer.open("04-hierarchy");
   });
 
@@ -159,7 +159,7 @@ test.describe("on a phone", () => {
 test.describe("on a laptop with a touch screen", () => {
   test.use({ isMobile: false, hasTouch: true, viewport: { width: 1200, height: 800 }, deviceScaleFactor: 1 });
 
-  test.beforeEach(async ({ fingers, viewer }) => {
+  test.beforeEach(async ({ viewer }) => {
     await viewer.open("04-hierarchy");
   });
 
