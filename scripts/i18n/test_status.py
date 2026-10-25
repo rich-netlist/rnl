@@ -267,7 +267,7 @@ class TheRepository(unittest.TestCase):
     def test_files_of_a_new_language_and_the_cli(self):
         p = status.Project(status.ROOT)
         listed = "\n".join(status.files(p, "zh"))
-        self.assertIn("README.zh.md", listed)
+        self.assertIn("site/src/llms.zh.txt", listed)
         self.assertIn("spec/0.3/zh/ch01.md", listed)
         r = subprocess.run([sys.executable, str(HERE / "status.py"), "check"], capture_output=True, text=True,
                            encoding="utf-8")

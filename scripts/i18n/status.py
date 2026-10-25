@@ -5,7 +5,7 @@
     python scripts/i18n/status.py files ja             the files of one language, whether they exist yet or not
     python scripts/i18n/status.py check                format errors fail; missing and stale translations are reported
     python scripts/i18n/status.py report --markdown    the table and the details as Markdown (--json for data)
-    python scripts/i18n/status.py stamp README.zh.md   record that a translated document is in line with its source
+    python scripts/i18n/status.py stamp site/src/llms.zh.txt   record that a translated document is in line with its source
 
 The surfaces are listed in i18n/surfaces.json and the languages in i18n/languages.json. English is the
 source of every surface; every other language is a translation, which is reported but never required.
