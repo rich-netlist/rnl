@@ -1,7 +1,7 @@
 # 0015. English is the only core language; every other language, Chinese included, is a translation
 
 - Date: 2026-10-25
-- Status: accepted; point 8 amended on 2026-10-25: the notices are in English
+- Status: accepted; point 8 amended on 2026-10-25: the notices are in English; points 3 and 9 amended on 2026-10-25: the READMEs are in English only
 
 ## Context
 
@@ -24,7 +24,7 @@ The user asked that the project now plan for keeping its languages up over time,
 2. **Every other language is a translation, Chinese included.** A translation follows the English, kept in the places below, and wherever it has no text the English is shown. Chinese is treated like any other language. It keeps no place of its own beside the English in source files: the Chinese text of the site's pages and timeline moves out of `site/src/`, and the viewers' catalog moves to `i18n/zh/`, both in steps that leave what users see unchanged.
 3. **A language has four places**, listed for every surface in [`i18n/surfaces.json`](../../i18n/surfaces.json); `python scripts/i18n/status.py files LANG` prints them:
    - `i18n/<lang>/`: catalogs keyed by the English text, for the viewers (`viewer.json`), the site (`site/<path under site/src>.json`) and the fixed phrases of the standard (`spec.json`), and the language's glossary;
-   - whole documents beside their source, named `<name>.<lang>.<ext>`, such as `README.zh.md`;
+   - whole documents beside their source, named `<name>.<lang>.<ext>`, such as `spec/rnl-0.3-guide.zh.md`;
    - the standard's chapters, in `spec/<version>/<lang>/`;
    - an alias package, `libraries/standard/<series>/rnl-<lang>.rnl`. Alias packages are part of the language (16.5 of the standard), not translations of the interface; whether a language has one is decided with the standard. `rnl-zh` is not affected by this decision.
 4. **[`i18n/languages.json`](../../i18n/languages.json) is the one list of languages.** It was `site/languages.json`. A language is `published`, shown in the language menus of the site and the viewers, or `incubating`, built and tested but not shown.
@@ -41,7 +41,7 @@ The user asked that the project now plan for keeping its languages up over time,
 9. **Not translated**:
    - the diagnostics of the core and the command line, whose wording and language the standard leaves open (7.6), and the command line's usage text;
    - the skill package, which is in English only;
-   - the developer documents: `docs/`, the READMEs of the crates, apps and packages, and `CONTRIBUTING.md`;
+   - the documentation of the repositories: the README of rnl, rich-netlist/rnl-packages and rich-netlist/rnl-gallery, and the developer documents, `docs/`, the READMEs of the crates, apps and packages, and `CONTRIBUTING.md`. After step 5 the user asked whether the READMEs and similar texts of the repositories should return to English too, and decided that their Chinese versions be removed: the three `README.zh.md` are gone, and a README keeps no translation beside it;
    - the bodies of release notes, whose one-sentence timeline summary may be translated;
    - comments in code and in package files;
    - the tags of the gallery.
@@ -53,7 +53,7 @@ The user asked that the project now plan for keeping its languages up over time,
 
 - [`i18n/README.md`](../../i18n/README.md) is the entry for maintainers of a language: what there is to translate, how far each language is, how to add or update one. `python scripts/i18n/status.py` gives the table, and the workflow `i18n.yml` writes it into the summary of every pull request.
 - The work is done in steps. Each step leaves what users see unchanged, but for the notices of point 8.
-  1. The registry, the list of surfaces, the report and this record. Stamps on `README.zh.md` and `site/src/llms.zh.txt`.
+  1. The registry, the list of surfaces, the report and this record. Stamps on `README.zh.md`, removed later (point 9), and `site/src/llms.zh.txt`.
   2. The viewers: every interface text found by the scan, the catalog in `i18n/zh/viewer.json`, the language menu built from the registry.
   3. The site: the Chinese text out of `site/src/` into `i18n/zh/site/`, the notices of point 8 and a page of the translation status.
   4. The standard: Chinese no longer has to be in line for the build to pass; stale chapters get the notice of point 7; the fixed phrases move to `i18n/zh/spec.json`; stamps on the short guide and the principles.

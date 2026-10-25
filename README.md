@@ -1,7 +1,5 @@
 # Rich Netlist (RNL)
 
-English | [中文](README.zh.md)
-
 RNL is written in the comments of a circuit netlist. It describes how the circuit is drawn as a schematic and what its parts mean, while the netlist alone defines the circuit. This repository holds the language standard and its toolkit: a portable runtime, a solver, the `rnl` command, a desktop viewer and a web viewer, the standard symbol library, and a skill package for AI agents. An editor that moves devices by dragging is not built yet.
 
 **Website: [rich-netlist.github.io/rnl](https://rich-netlist.github.io/rnl/en/)**, with an [introduction for circuit designers](https://rich-netlist.github.io/rnl/en/), a [tour of the language](https://rich-netlist.github.io/rnl/en/language.html), the [language standard 0.3](https://rich-netlist.github.io/rnl/en/spec/0.3/), the [standard packages](https://rich-netlist.github.io/rnl/en/packages.html) with every symbol drawn, and the [viewers](https://rich-netlist.github.io/rnl/en/tools.html): one [in the browser](https://rich-netlist.github.io/rnl/viewer/) and one to download for Windows. Every page is also in Chinese.

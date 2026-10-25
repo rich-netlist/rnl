@@ -59,16 +59,6 @@
       "notes": "Stamped from step 4 of decision 0015, as the short guide."
     },
     {
-      "id": "readme",
-      "title": "The repository's README",
-      "kind": "document",
-      "source": "README.md",
-      "translation": "README.{lang}.md",
-      "stamp": "repo",
-      "structure": "position",
-      "owner": "i18n"
-    },
-    {
       "id": "llms",
       "title": "llms.txt, the plain-text entry for agents",
       "kind": "document",
@@ -181,14 +171,6 @@
       "notes": "A record of the immutable catalog has its English summary, from metadata.json of rnl-packages; the translations are in summaries/<lang>.json beside the catalog, keyed by the English, outside the records (decision 0012). The four 0.1 records also keep the Chinese they were published with. Read with --online."
     },
     {
-      "id": "external-readmes",
-      "title": "READMEs of rnl-gallery and rnl-packages",
-      "kind": "untracked",
-      "where": "README.zh.md beside README.md in rich-netlist/rnl-gallery and rich-netlist/rnl-packages",
-      "owner": "i18n",
-      "notes": "Each README.zh.md starts with the stamp of its README.md, from step 5 of decision 0015, that tells when it falls behind; they are not read here."
-    },
-    {
       "id": "diagnostics",
       "title": "Diagnostics of the core and the command line, and its usage text",
       "kind": "not-translated",
@@ -202,9 +184,9 @@
     },
     {
       "id": "developer-documents",
-      "title": "docs/, the READMEs of crates, apps, packages and scripts, CONTRIBUTING.md",
+      "title": "The READMEs of the repositories, docs/, the READMEs of crates, apps, packages and scripts, CONTRIBUTING.md",
       "kind": "not-translated",
-      "reason": "Documents for developers, in English only, docs/rnl-toolchain-architecture.md included."
+      "reason": "In English only: the READMEs of rnl, rnl-packages and rnl-gallery keep no translation beside them (decision 0015, point 9), and the documents for developers, docs/rnl-toolchain-architecture.md included."
     },
     {
       "id": "release-note-bodies",

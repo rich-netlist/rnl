@@ -128,7 +128,7 @@
   "Repository": "代码仓库",
   "Download it from the releases page and extract it on the Virtuoso host; Cadence’s own exporters and their licences are needed there.": "在发布页下载，解包到装 Virtuoso 的主机上；需要该主机上 Cadence 自带的导出程序和许可。",
   "Install and use": "安装与使用",
-  "The steps, the menus and the options are in its README (<a href=\"https://github.com/rich-netlist/rnl-virtuoso/blob/main/README.zh.md\">also in Chinese</a>).": "安装步骤、菜单用法和选项都写在它的 README 里（<a href=\"https://github.com/rich-netlist/rnl-virtuoso/blob/main/README.zh.md\">中文</a>）。",
+  "The steps, the menus and the options are in its README.": "安装步骤、菜单用法和选项都写在它的 README 里。",
   "06 · Toolchain": "06 · 工具链",
   "The RNL toolchain: read, solve, draw, edit.": "RNL 工具链：读、解、画、改。",
   "The toolchain keeps “understanding RNL” and “turning intent into coordinates” in separate modules: you can view a drawing without a solver and solve only when needed. What exists today: the runtime, the host adapters, the renderer and the command line, the two viewers above, and a first version of the solver, in <code>rnl solve</code> and the desktop viewer. Pick a path to see how data flows; click a module to see what it does.": "工具链把“读懂 RNL”和“把意图变成坐标”分成独立模块：没有求解器也能看图，需要时再求解。已经有的有：运行库、宿主适配器、渲染器和命令行，上面的两个查看器，还有求解器的第一版，在 <code>rnl solve</code> 和桌面版查看器里。选一条路径看数据怎么流动，点一个模块看它做什么。",

@@ -38,7 +38,7 @@ Four places, the same for every language:
 | What | Where | Example |
 | --- | --- | --- |
 | Catalogs of short texts and of the site's pages, keyed by the English | `i18n/<lang>/` | `i18n/ja/viewer.json`, `i18n/ja/site/index.html.json` |
-| Whole documents | beside their source, `<name>.<lang>.<ext>` | `README.ja.md`, `spec/rnl-0.3-guide.ja.md`, `site/src/llms.ja.txt` |
+| Whole documents | beside their source, `<name>.<lang>.<ext>` | `spec/rnl-0.3-guide.ja.md`, `site/src/llms.ja.txt` |
 | The standard's chapters | `spec/<version>/<lang>/` | `spec/0.3/ja/ch01.md` |
 | An alias package, so that files can be written with the language's own words | `libraries/standard/<series>/rnl-<lang>.rnl` | `libraries/standard/0.3/rnl-zh.rnl` |
 
@@ -69,13 +69,13 @@ Chinese is moving to the same places in steps (below); `surfaces.json` names whe
 **A whole document** starts with the source it was translated from and the start of that source's SHA-256, its line ends as LF:
 
 ```text
-<!-- translated from README.md sha256:6dc587e50141 -->
+<!-- translated from site/src/llms.txt sha256:7d09a86edc40 -->
 ```
 
 The line is not shown on GitHub or on the site. Once a translation is in line with its source again:
 
 ```bash
-python scripts/i18n/status.py stamp README.ja.md
+python scripts/i18n/status.py stamp site/src/llms.ja.txt
 ```
 
 `--as-of COMMIT` stamps it with the source as it is in that commit instead, such as the one that last changed the translation. The chapters of the standard keep their own stamp, `<!-- translated from en/ch01.md sha256:… -->`, written by `python scripts/spec/build.py --stamp`.
@@ -111,7 +111,7 @@ Anyone may update a translation at any time, in a pull request of its own. A pul
 
 | Step | What it gives | State |
 | --- | --- | --- |
-| 1 | This folder, the report, stamps on `README.zh.md` and `site/src/llms.zh.txt` | done |
+| 1 | This folder, the report, stamps on `README.zh.md` (since removed: the READMEs are in English only) and `site/src/llms.zh.txt` | done |
 | 2a | The viewers: every text of the interface written where the scan finds it, `tr()` marking those that reach `m()` through a variable; counts as whole phrases; the entries the interface no longer has removed | done |
 | 2b | The viewers: the catalog in `i18n/<lang>/viewer.json`, the language menu from `languages.json`, a manifest's title in any language, public packages' summaries in English alone; a pseudo language in the page's tests | done |
 | 3a | The site reads the catalogs in `i18n/<lang>/site/` and checks their format; a page under 80% translated is shown in English, and every page not wholly translated says so ([site/README.md](../site/README.md#adding-a-language)) | done |
@@ -119,7 +119,7 @@ Anyone may update a translation at any time, in a pull request of its own. A pul
 | 3c | The site: the Chinese of the timeline and of the shared messages moved into `i18n/zh/site/timeline.json.json` and `messages.json`, the releases' summaries in English alone; the build refuses a translation written in `languages.json` or `site/src/timeline.json` | done |
 | 3d | The site: `incubating` respected; a page of this report. Until then the site builds and publishes the pages of every registered language | to come |
 | 4 | The standard: a stale Chinese chapter reported rather than stopping the build, with a notice on its page; the fixed phrases of Annex A in `i18n/<lang>/spec.json`; translations of the standard in further languages; stamps on the short guide and the principles | to come |
-| 5 | rnl-packages: the summaries of new records in English alone, their translations in `summaries/<lang>.json` outside the immutable records, read by the site's gallery and the report; rnl-gallery: a warning for a translation left as it was when its entry's English changed; their `README.zh.md` stamped | done |
+| 5 | rnl-packages: the summaries of new records in English alone, their translations in `summaries/<lang>.json` outside the immutable records, read by the site's gallery and the report; rnl-gallery: a warning for a translation left as it was when its entry's English changed | done |
 
 Until step 3d, register a new language in `languages.json` only once it may be shown, as the site builds and publishes the pages of every language registered there.
 
@@ -129,7 +129,7 @@ Until step 3d, register a new language in `languages.json` only once it may be s
 
 - the diagnostics of the core and the command line, whose wording and language the standard leaves open (7.6), and the command line's usage text;
 - the skill package for agents;
-- the documents for developers (`docs/`, the READMEs of the crates, apps and packages, `CONTRIBUTING.md`);
+- the repositories' documentation: the READMEs of rnl, rnl-packages and rnl-gallery, with no translation beside them, and the documents for developers (`docs/`, the READMEs of the crates, apps and packages, `CONTRIBUTING.md`);
 - the bodies of release notes: only their one-sentence summary for the timeline is translated;
 - comments in code and in package files, and the tags of the gallery.
 
