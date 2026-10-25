@@ -6,7 +6,7 @@ English is the project's only core language ([decision 0015](../docs/decisions/0
 
 | File | Content |
 | --- | --- |
-| [`languages.json`](languages.json) | The one list of languages: code, native name, HTML language, how browsers' languages match it, fonts, the site's shared messages, and `status`, `published` or `incubating` |
+| [`languages.json`](languages.json) | The one list of languages: code, native name, HTML language, how browsers' languages match it, fonts, the English of the site's shared messages, and `status`, `published` or `incubating` |
 | [`surfaces.json`](surfaces.json) | Every kind of text there is to translate, a *surface*: where its English is, where each language's translation goes, and the texts that are not translated, with the reason |
 | [`../scripts/i18n/status.py`](../scripts/i18n/status.py) | The report: how far each language is in each surface, what is missing, what is stale |
 | `<lang>/` | The catalogs of one language (from the later steps below) |
@@ -41,6 +41,8 @@ Four places, the same for every language:
 | Whole documents | beside their source, `<name>.<lang>.<ext>` | `README.ja.md`, `spec/rnl-0.3-guide.ja.md`, `site/src/llms.ja.txt` |
 | The standard's chapters | `spec/<version>/<lang>/` | `spec/0.3/ja/ch01.md` |
 | An alias package, so that files can be written with the language's own words | `libraries/standard/<series>/rnl-<lang>.rnl` | `libraries/standard/0.3/rnl-zh.rnl` |
+
+The catalogs of the site are named after the file of their English, `i18n/<lang>/site/<path under site/src/>.json`, such as `timeline.json.json` for the timeline and the releases' summaries; the shared messages of `languages.json` are in `i18n/<lang>/site/messages.json`, keyed by their names, such as `intro`, rather than by their English.
 
 An alias package is part of the language (16.5 of the standard), not a translation of an interface; whether a language has one is decided with the standard.
 
@@ -114,11 +116,12 @@ Anyone may update a translation at any time, in a pull request of its own. A pul
 | 2b | The viewers: the catalog in `i18n/<lang>/viewer.json`, the language menu from `languages.json`, a manifest's title in any language, public packages' summaries in English alone; a pseudo language in the page's tests | done |
 | 3a | The site reads the catalogs in `i18n/<lang>/site/` and checks their format; a page under 80% translated is shown in English, and every page not wholly translated says so ([site/README.md](../site/README.md#adding-a-language)) | done |
 | 3b | The site: the Chinese of `site/src/`, the summaries of the packages among it, moved into `i18n/zh/site/`; the build refuses a translation written beside the English | done |
-| 3c–3d | The site: the timeline's and the shared messages' Chinese moved; `incubating` respected; a page of this report. Until then the site builds and publishes the pages of every registered language | to come |
+| 3c | The site: the Chinese of the timeline and of the shared messages moved into `i18n/zh/site/timeline.json.json` and `messages.json`, the releases' summaries in English alone; the build refuses a translation written in `languages.json` or `site/src/timeline.json` | done |
+| 3d | The site: `incubating` respected; a page of this report. Until then the site builds and publishes the pages of every registered language | to come |
 | 4 | The standard: a stale Chinese chapter reported rather than stopping the build, with a notice on its page; the fixed phrases of Annex A in `i18n/<lang>/spec.json`; translations of the standard in further languages; stamps on the short guide and the principles | to come |
 | 5 | rnl-packages: summaries in further languages outside the immutable records; rnl-gallery: a warning for an entry whose English changed alone | to come |
 
-Until step 3, register a new language in `languages.json` only once it may be shown, as the site builds and publishes the pages of every language registered there.
+Until step 3d, register a new language in `languages.json` only once it may be shown, as the site builds and publishes the pages of every language registered there.
 
 ## Not translated
 

@@ -383,12 +383,25 @@ def dictionary(p: Project, s: dict) -> Surface:
     out.total = len(units)
     for lang in p.langs(s):
         st = out.langs[lang] = Lang()
+        # a translation beside its English in the data, else in the surface's catalog: by the English, or by
+        # the name of the text, as messages.json keys the shared messages
+        rel = p.translation(s, lang) if s.get("translation") else None
+        data = catalog(p, rel, out.errors) if rel else {}
+        try:
+            old_data = json.loads(p.at_base(rel) or "{}") if rel else {}
+        except json.JSONDecodeError:
+            old_data = {}
+
+        def found(name, texts, data):
+            text = data.get(name if s.get("catalog_key") == "name" else norm(texts["en"]))
+            return {**texts, lang: text} if lang not in texts and isinstance(text, str) else texts
         for name, texts in units.items():
+            texts = found(name, texts, data)
             if lang not in texts:
                 st.findings.append(Finding("missing", name, short(texts["en"])))
                 continue
             st.done += 1
-            old = before.get(name)
+            old = before.get(name) and found(name, before[name], old_data)
             if old and norm(old["en"]) != norm(texts["en"]) and norm(old.get(lang, "")) == norm(texts[lang]):
                 st.stale += 1
                 st.findings.append(Finding("changed", name, f"the English changed from {short(old['en'], 50)!r} to "
@@ -730,6 +743,8 @@ def files(p: Project, lang: str) -> list[str]:
                 out.append(f"{s['id']}: written beside the English in {', '.join(s['source'])}")
                 continue
             paths = [p.translation(s, lang, path=p.rel(f).removeprefix("site/src/")) for f in p.files(s["source"])]
+        elif s["kind"] == "dictionary" and s.get("translation"):
+            paths = [p.translation(s, lang)]
         elif s["kind"] == "dictionary":
             out.append(f"{s['id']}: the \"{lang}\" of the dictionaries in {', '.join([s['source']] if isinstance(s['source'], str) else s['source'])}")
             continue

@@ -18,7 +18,8 @@ The site also publishes the skill package for agents, at `skill/`, and `llms.txt
 Pages are built from one source in `src/`, using the locale registry in
 [`i18n/languages.json`](../i18n/languages.json), the project's one list of languages, and [`scripts/site_i18n.py`](../scripts/site_i18n.py).
 The registry owns language codes, native names, URL directories, browser-language matching, fonts,
-navigation breakpoints and shared interface messages, including those of the language-standard pages.
+navigation breakpoints and the English of the shared interface messages, including those of the
+language-standard pages.
 
 English is the site's only core language, and every other language, Chinese included, is a translation ([decision 0015](../docs/decisions/0015-english-is-the-only-core-language.md)). `src/` holds the English, each text a group that the build translates:
 
@@ -66,9 +67,12 @@ Add one entry to `languages` in [`i18n/languages.json`](../i18n/languages.json),
 
 This creates `ja/` pages, adds Japanese to every menu and browser-language negotiation,
 and inherits English interface messages, fonts and content. Add translations progressively,
-in its catalogs as above; there is no need to list every group. Translations of shared UI
-messages go in the entry's `messages`; font settings and `nav_breakpoint` can be overridden.
-Timeline dictionaries follow the same rule: `en` is required, other registered codes are optional.
+in its catalogs as above; there is no need to list every group. Translations of the shared UI
+messages go in `i18n/<lang>/site/messages.json`, keyed by the names of the messages in the
+registry's English, such as `{"intro": "…"}`; font settings and `nav_breakpoint` can be overridden
+in the entry. The timeline's texts and the releases' summaries are translated in
+`i18n/<lang>/site/timeline.json.json`, keyed by their English as the pages' catalogs are. The
+build refuses a translation written in the registry or beside the English of `src/timeline.json`.
 
 The `standard` field selects an existing standard-document language; it defaults to `en`.
 A new site locale therefore links to the English standard until a translated standard is
@@ -106,7 +110,9 @@ repository's `viewer-v*`, `spec-*-r*` and `core-v*` tags. Shanghai dates come fr
 times (commit times for lightweight tags), and only the latest published milestone gets
 `class="now"`. The existing timeline elements, styles and Next entries are retained.
 
-Release notes carry a one-sentence `timeline-summary` JSON block with English and optional translations; the
+Release notes carry a one-sentence `timeline-summary` JSON block in English, translated in
+`i18n/<lang>/site/timeline.json.json` with the texts of `src/timeline.json` (notes released
+earlier keep the translations written in them); the
 [release checklist and template](../release-notes/README.md) define the paths and format.
 Manual milestones can claim tags to override or combine them, and hold non-release events
 with their actual PR merge timestamps and source links. Old release summaries can be
@@ -123,7 +129,7 @@ publication, and checks notes changes. The Stage text stays unchanged in this up
 - **Groups.** Each standard-series directory and each public package selected from the latest catalog is a group in the left navigation. The build writes its `kind`: `libraries/standard/*` is `standard`, `libraries/pdk/*` is `pdk`, and other directories are `extension`. The navigation lists standard series (newest first, with 0.2 marked read-only), extensions, then PDKs. A group expands to its packages and an All entry. Search filters group and package names without changing how symbols are searched. The `series`, `package` and `q` query parameters keep shared and earlier links working; group and package selections also support browser Back and Forward. A package is known by the name and version its header record declares; what it references and the order in which using it brings packages in come from its `USE-PACKAGE`s, and the packages `rnl-std` brings in are the ones every netlist has by default. Adding a directory or a file needs no change to the page code.
 - **Statements.** [`gallery/package-file.mjs`](gallery/package-file.mjs) splits each record of a package file into its statements and sorts them by their first tokens: symbols, styles, definitions, sets, rules (symbol, style, text and set rules) and definitions attached to sets. It is not an interpreter; what a statement means and how a symbol looks come from the core.
 - **Symbols.** Every symbol a package defines with a `$` name is drawn by the core as WebAssembly, the one the web viewer runs: the build writes a netlist with a subcircuit for each symbol, in which one instance is drawn with the symbol at the origin, and asks the core for the drawing and the snapshot of every level, with the package files of `libraries/` in the request, so that they are drawn as they are there whatever the core bundles. The labels a symbol fills with `${…}` show their keys, such as `name` and `value`. The pins, their directions and the box come from the core; the labels of the pins and the texts of the labels, from the text. Each pin is marked on the picture with its terminal number and the arrow of the direction it points, where its wire leaves, such as `1↑`. The names of the terminals, which the picture does not show, are listed under it when the comment right before a symbol starts with them, as `d g s b; from Analog Canvas nmos`. All symbols are drawn at the same scale, and the page shows or hides the pins, the box and the labels on demand. A thumbnail, as in the table of symbol rules, is framed on the symbol alone and scaled to fit.
-- **What each package is for**: a sentence in both languages in `SUMMARY` in [`src/assets/gallery.js`](src/assets/gallery.js), for every version of a package, or for one version where they differ, as for `rnl-std-fill 0.3`; a package without one shows the comment its file starts with.
+- **What each package is for**: an English sentence in `SUMMARY` in [`src/assets/gallery.js`](src/assets/gallery.js), translated in the catalog of that script, for every version of a package, or for one version where they differ, as for `rnl-std-fill 0.3`; a package without one shows the comment its file starts with.
 - **Problems.** A package file the core reports errors or warnings for, a symbol it reports them for while drawing, or one whose pins it gives differently from the text, is listed by the build, as a warning annotation in GitHub Actions, and marked on the page. The build fails only when the core cannot read a gallery's netlist or draws no level for a symbol.
 
 The data is scripts that the page loads with `<script>`, `index.js` and one file per group, so that the page also works opened from the disk.

@@ -76,7 +76,9 @@ class Languages:
             locale["short"] = entry.get("short", entry["name"])
             locale["standard"] = entry.get("standard", self.default)
             locale["fonts"] = {**fallback["fonts"], **entry.get("fonts", {})}
-            locale["messages"] = {**fallback["messages"], **entry.get("messages", {})}
+            # the shared messages: English's in the registry, a translation's in its catalog messages.json
+            messages = {key: text for key, text in self.catalog(code, "messages").items() if isinstance(text, str)}
+            locale["messages"] = {**fallback["messages"], **entry.get("messages", {}), **messages}
             if (not locale["name"] or not isinstance(locale["nav_breakpoint"], int)
                     or locale["nav_breakpoint"] < 320
                     or not re.fullmatch(r"[A-Za-z0-9-]+", locale["html_lang"])
@@ -135,6 +137,17 @@ class Languages:
                 data = None
             self._catalogs[code, path] = data if isinstance(data, dict) else {}
         return self._catalogs[code, path]
+
+    def with_catalog(self, values, path):
+        """A dictionary {language: text} with the translations that the catalog of `path` has for its English,
+        where it has none of its own."""
+        found = dict(values)
+        for code in self.codes:
+            if code != self.default and code not in found:
+                text = self.catalog(code, path).get(norm(values[self.default]))
+                if isinstance(text, str):
+                    found[code] = text
+        return found
 
     def parts(self, group):
         """{language: text} of a translation group, and the context its English names, or ""."""
