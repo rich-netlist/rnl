@@ -1,5 +1,5 @@
 {
-  "The host’s comment prefix. SPICE uses * in column 1, Spectre // or *, followed by a space; the RNL itself does not depend on the netlist format.": "호스트 넷리스트의 주석 접두사입니다. SPICE는 1열의 *를, Spectre는 // 또는 * 뒤에 공백 하나를 씁니다. RNL 내용 자체는 넷리스트 형식에 좌우되지 않습니다.",
+  "The host’s comment prefix. SPICE uses * in column 1, Spectre // or *, followed by a space; the RNL itself does not depend on the netlist format.": "호스트 넷리스트의 주석 접두사입니다. SPICE는 1열에 *를, Spectre는 // 또는 *를 쓰며, 그 뒤에 공백 하나를 둡니다. RNL 내용 자체는 넷리스트 형식에 좌우되지 않습니다.",
   "Record entry. Only content in a legal comment that starts with @RNL is RNL.": "레코드 시작 표시입니다. 적법한 주석 안에서 @RNL로 시작하는 내용만 RNL로 인식됩니다.",
   "The record header applies to every statement inside. author says who wrote it; the solver’s records have type=\"generated\" and priority high.": "레코드 헤더는 내부의 모든 구문에 적용됩니다. author는 작성자를 나타내며, 솔버가 생성한 레코드는 type=\"generated\"와 우선순위 high를 가집니다.",
   "The record’s content goes in braces, with statements separated by semicolons; even a single statement needs the braces.": "레코드 본문은 중괄호 안에 적고 각 구문은 세미콜론으로 구분합니다. 구문이 하나뿐이어도 중괄호가 필요합니다.",
@@ -76,7 +76,7 @@
   "Points, wires, text, primitives, constraints, usages and sets; the bodies applied by AS and ATTACH are expanded. Selections are not evaluated yet.": "점, 배선, 텍스트, 도형 요소, 제약, 용례, 집합을 생성하고 AS와 ATTACH로 적용된 정의 본문을 전개합니다. 선택식은 아직 평가하지 않습니다.",
   "Symbols": "심볼 배정",
   "SET-SYMBOL takes effect in order: the standard package’s rules first, the file’s after; what is written directly on an object beats what a rule gives.": "SET-SYMBOL이 순서대로 적용됩니다. 표준 패키지 규칙이 먼저, 파일에 적힌 구문이 나중에 적용되며, 객체에 직접 지정한 심볼이 규칙보다 우선합니다.",
-  "Generate": "규칙 생성",
+  "Generate": "규칙에 따른 생성",
   "AS and ATTACH applied to selections run once per object, at each level, such as the standard package adding a ground for every unwired ground terminal.": "선택 결과를 대상으로 하는 AS와 ATTACH가 각 레벨에서 객체마다 한 번씩 실행됩니다. 표준 패키지가 배선되지 않은 접지 단자마다 접지 심볼을 붙이는 과정이 여기서 일어납니다.",
   "New symbols": "새 객체 심볼 배정",
   "The same symbol queue runs again for the objects just generated.": "방금 생성된 객체들에 대해 동일한 심볼 배정 대기열을 한 번 더 실행합니다.",
@@ -99,7 +99,7 @@
   "Subcircuit ota5t defines its own appearance: a triangular block symbol whose pins name ports in <code>terminal</code>. With <code># @SET-SYMBOL</code> inside the subcircuit, XU1 one level up uses it automatically. The top level states only XU1’s position, which nets to draw as wires and a note; the supply, bias source and load capacitor have no positions, so the solver places them, and the standard package adds the grounds.": "서브서킷 ota5t가 자신의 외관을 직접 정의합니다. 핀의 <code>terminal</code>에 포트 이름을 적은 삼각형 블록 심볼입니다. 서브서킷 안에 <code># @SET-SYMBOL</code>을 적어 두면 상위 레벨의 XU1이 자동으로 이 심볼을 사용합니다. 최상위 레벨에는 XU1의 위치, 배선으로 그릴 넷, 어노테이션 텍스트만 적혀 있으며 전원, 바이어스원, 부하 커패시터는 위치가 없어 솔버가 배치하고 접지 심볼은 표준 패키지가 추가합니다.",
   "Local coordinates · y up": "지역 좌표 · y 위쪽",
   "Replay the fill": "자동 보충 다시 재생",
-  "Not one line of the file is about grounds: for every unwired terminal on net 0, the standard package adds a ground on a short wire (gray). V1’s negative terminal already has <code>$GROUND @ATTACH #V1:2</code>, a ground drawn right on the pin, so the fill skips it. The unwired gate gets a port from a rule in the file: <code>$PORT_STUB</code> is a definition written here, with a wire and two constraints.": "파일에는 접지에 관한 구문이 한 줄도 없습니다. 넷 0에 연결된 배선 없는 단자마다 표준 패키지가 짧은 배선(회색) 끝에 접지를 하나씩 추가합니다. V1의 음극 단자에는 이미 <code>$GROUND @ATTACH #V1:2</code>가 적혀 있어 핀 바로 위에 접지가 그려지므로 자동 보충에서 건너뜁니다. 배선되지 않은 게이트에는 파일 내 규칙이 포트를 붙입니다. 여기서 <code>$PORT_STUB</code>은 배선 하나와 제약 두 개를 담아 직접 작성한 일반 정의입니다.",
+  "Not one line of the file is about grounds: for every unwired terminal on net 0, the standard package adds a ground on a short wire (gray). V1’s negative terminal already has <code>$GROUND @ATTACH #V1:2</code>, a ground drawn right on the pin, so the fill skips it. The unwired gate gets a port from a rule in the file: <code>$PORT_STUB</code> is a definition written here, with a wire and two constraints.": "파일에는 접지에 관한 구문이 한 줄도 없습니다. 넷 0에 연결된 배선 없는 단자마다 표준 패키지가 짧은 배선(회색) 끝에 접지를 하나씩 추가합니다. V1의 음극 단자에는 이미 <code>$GROUND @ATTACH #V1:2</code>가 적혀 있어 핀 위치에 직접 접지가 그려지므로 자동 보충에서 건너뜁니다. 배선되지 않은 게이트에는 파일 내 규칙이 포트를 붙입니다. 여기서 <code>$PORT_STUB</code>은 배선 하나와 제약 두 개를 담아 직접 작성한 일반 정의입니다.",
   "2 errors": "오류 2개",
   "1 conflict": "충돌 1건",
   "Three records: the designer’s semantics, the solver’s coordinates (high) and the editor’s later changes (high, written after). A bad statement disables only itself; a conflict is not an error, and priority, then order, decides which fact stays. Hover over a diagnostic above to see which line and which device it points to.": "세 개의 레코드가 함께 있습니다: 설계자가 적은 의미 구조, 솔버가 계산한 좌표(high), 그리고 편집기가 나중에 추가한 수정 사항(high, 뒤에 작성됨). 잘못된 구문은 자기 자신만 무효화하며, 충돌은 오류가 아니라 우선순위와 작성 순서에 따라 어느 사실을 남길지 결정됩니다. 위의 진단 항목에 마우스를 올려 어느 줄과 어느 소자를 가리키는지 확인해 보세요."

@@ -4,12 +4,12 @@
   "Skip to content": "본문으로 건너뛰기",
   "Switch color theme": "색상 테마 전환",
   "Translation status": "번역 현황",
-  "English is the source of every text of RNL; every other language, Chinese included, is a translation that follows it.": "RNL의 모든 텍스트는 영문이 원본이며, 중국어를 비롯한 다른 모든 언어는 영문을 따르는 번역본입니다.",
   "This report was made from <a href=\"https://github.com/rich-netlist/rnl/blob/main/i18n/surfaces.json\">the list of what there is to translate</a> when the site was built; every pull request gets the same one. To translate a language or bring one up to date, start from <a href=\"https://github.com/rich-netlist/rnl/blob/main/i18n/README.md\">i18n/README.md</a>.": "이 보고서는 사이트를 빌드할 때 <a href=\"https://github.com/rich-netlist/rnl/blob/main/i18n/surfaces.json\">번역 대상 목록</a>을 바탕으로 생성되며, 모든 풀 리퀘스트에서도 동일하게 생성됩니다. 새로운 언어를 번역하거나 기존 번역을 최신 상태로 업데이트하려면 <a href=\"https://github.com/rich-netlist/rnl/blob/main/i18n/README.md\">i18n/README.md</a>부터 확인하세요.",
   "How far each language is": "언어별 진행률",
   "The report is in English, as the texts it counts are. A missing translation shows the English; a stale one was made from an English text that has changed since.": "이 보고서는 집계 대상 원문과 마찬가지로 영어로 표시됩니다. 번역이 누락된 항목은 영문 원문이 그대로 표시되며, stale(오래됨)로 표시된 항목은 번역 이후 영문 원문이 변경된 경우입니다.",
   "Machine translation and AI models may make a first draft; a language is shown once a native speaker has reviewed it.": "초안은 기계 번역이나 AI 모델로 작성할 수 있으며, 원어민의 검수를 거친 뒤 사이트에 공개됩니다.",
   "See also": "함께 보기",
   "Decision 0015: English is the only core language": "결정 0015: 영어만 유일한 코어 언어로 유지",
-  "Introduction": "소개"
+  "Introduction": "소개",
+  "English is the source of every text of RNL; every other language is a translation that follows it.": "RNL의 모든 텍스트는 영문이 원본이며, 다른 모든 언어는 영문을 따르는 번역본입니다."
 }

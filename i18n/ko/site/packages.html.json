@@ -1,6 +1,6 @@
 {
   "RNL standard packages · Rich Netlist": "RNL 표준 패키지 · Rich Netlist",
-  "The standard packages of Rich Netlist (RNL): what each package is for and the text that defines it, every symbol as it is drawn with its pins and box, and the rules that give elements their symbols.": "Rich Netlist(RNL)의 표준 패키지: 각 패키지의 용도와 정의 원문, 핀과 선택 상자를 포함해 실제로 그려진 모든 심볼, 그리고 소자에 심볼을 배정하는 규칙을 소개합니다.",
+  "The standard packages of Rich Netlist (RNL): what each package is for and the text that defines it, every symbol as it is drawn with its pins and box, and the rules that give elements their symbols.": "Rich Netlist(RNL)의 표준 패키지: 각 패키지의 용도와 정의 원문, 핀과 경계 상자를 포함해 실제로 그려진 모든 심볼, 그리고 소자에 심볼을 배정하는 규칙을 소개합니다.",
   "Skip to content": "본문으로 건너뛰기",
   "On this page": "이 페이지 목차",
   "Switch color theme": "색상 테마 전환",
@@ -24,7 +24,7 @@
   "Search by name": "이름으로 검색",
   "Show on the symbols": "심볼 위에 표시",
   "Pins": "핀",
-  "Box": "선택 상자",
+  "Box": "경계 상자",
   "Labels": "라벨",
   "Origin": "원점",
   "Loading…": "불러오는 중…",
