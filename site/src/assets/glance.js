@@ -18,7 +18,7 @@
     inst: ['<en>#M1, #M2</en>', '<en>References instances in the netlist. Everything starting with # is a netlist object; RNL references it and never creates it.</en>'],
     role: ['<en>(in_p), (in_n)</en>', '<en>Roles: parentheses right after an object say which role of the definition it fills. A statement marks every role or none; without marks, objects fill the roles in order.</en>'],
     kw: ['@AS', '<en>Keyword: AS applies the definition after it to the objects before it, meaning they form a differential pair together. A statement has at most one keyword.</en>'],
-    def: ['$DIFFERENTIAL_PAIR', '<en>Definition: $DIFFERENTIAL_PAIR comes from the standard package and has roles but no drawing: it says what something is, not how to draw it.</en>'],
+    def: ['$DIFFERENTIAL_PAIR', '<en>Definition: $DIFFERENTIAL_PAIR comes from the standard package. It has roles and a body that puts the tail under the middle of the pair, at low priority, but no symbol: it says what something is, and leaves how to draw it to the layout.</en>'],
     semi: [';', '<en>A semicolon ends the statement. Each statement takes effect, or fails, on its own.</en>']
   };
 
@@ -364,7 +364,7 @@
           timers.push(setTimeout(function () { rows.forEach(function (r) { r.classList.remove('is-hot'); }); }, 900 + 2 * 1300 + 900));
         }
         $('#ex-replay').addEventListener('click', replay);
-        cap.innerHTML = '<en>Not one line of the file is about grounds: for every unwired terminal on net 0, the standard package adds a ground on a short wire (gray). V1’s negative terminal already has <code>$GROUND @ATTACH #V1:2</code>, a ground drawn right on the pin, so the fill skips it. The unwired gate gets a port from a rule in the file: <code>$PORT_STUB</code> is a definition written here, with a wire and two constraints.</en>';
+        cap.innerHTML = '<en>The file has one line about grounds: V1’s negative terminal has <code>$GROUND @ATTACH #V1:2</code>, a ground drawn right on the pin. For every other unwired terminal on net 0, the standard package adds a ground on a short wire (gray); it skips V1’s, which has one. The unwired gate gets a port from a rule in the file: <code>$PORT_STUB</code> is a definition written here, with a wire and two constraints.</en>';
       },
       e5: function () {
         file.textContent = 'ota5t.sp';
