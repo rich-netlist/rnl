@@ -34,7 +34,7 @@
   "The top level and each subcircuit are drawings of their own, shown one at a time; drag to move, scroll to zoom. Double-click a subcircuit instance to open its drawing; Backspace goes back up.": "顶层与各个子电路分别为独立原理图，每次显示一层；拖动可平移画面，滚轮可缩放。双击子电路元件即可进入其原理图；按 Backspace 键返回上一层。",
   "The netlist text": "网表文本",
   "The netlist and the files it includes, with the RNL records and the netlist’s statements highlighted; statements that do not take effect have a soft background. While a subcircuit is drawn, the text outside its definition is dimmed, and entering the subcircuit brings the start of its definition into view.": "网表及其引入的文件，并高亮显示 RNL 记录与网表语句；未生效的语句带有柔和底色。当绘制某个子电路时，其定义范围外的文本会变暗；进入该子电路时，会自动滚动至其定义开头。",
-  "Problems": "“问题”面板",
+  "Problems": "问题",
   "Errors, warnings and hints are listed below the text; click one to see its line. The line numbers of those lines are colored too.": "错误、警告与提示列于文本下方；点击任一项即可跳至对应行，有问题的行号也会标上颜色。",
   "Hierarchy": "层级结构",
   "The tree of instances under the top level, and below it every subcircuit by name, grouped by initial, with a search box; pick one to open its drawing.": "上方为从顶层展开的元件树，下方为按名称首字母分组的所有子电路索引，并附有搜索框；点击任一项即可打开其原理图。",
