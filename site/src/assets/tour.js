@@ -631,7 +631,7 @@
       view.setScene(teeScene(shared), { animate: animate, duration: 400 });
       cap.innerHTML = shared
         ? '<en>Both wires share the point object %j, so they join; the dot is drawn explicitly by $JUNCTION, and renderers never add one on their own. The grounds come from the standard package.</en>'
-        : '<en>The two (6, 0) are two point objects that merely share coordinates: RC’s wire is not joined. The drawing looks almost the same and means something else; write one named point to join them.</en>';
+        : '<en>The two (6, 0) are separate point objects that merely share coordinates: RC’s wire is not joined. The drawing looks almost the same, but means something different; use one named point to join them.</en>';
     }
     PG.initSeg($('#tee-seg'), 'data-v', function (v) { show(v === 'shared', true); });
     show(true, false);
@@ -856,7 +856,7 @@
           if (e < 0) { out += esc(src.slice(i)); i = n; break; }
           var key = src.slice(i + 2, e).replace(/^#/, '');
           if (Object.prototype.hasOwnProperty.call(M1_ATTR, key)) out += '<span class="ref">' + esc(M1_ATTR[key]) + '</span>';
-          else { out += '<span class="bad">' + esc(src.slice(i, e + 1)) + '</span>'; warn.push('<en>M1 has no property ' + esc(key) + ': the text fails</en>'); }
+          else { out += '<span class="bad">' + esc(src.slice(i, e + 1)) + '</span>'; warn.push(PG.fill('<en>M1 has no property {key}: the text fails</en>', { key: esc(key) })); }
           i = e + 1;
           continue;
         }
@@ -900,7 +900,7 @@
             continue;
           }
           out += '<span class="bad">' + esc(BS + name) + '</span>';
-          warn.push('<en>unknown command \\' + esc(name) + ': shown as written</en>');
+          warn.push(PG.fill('<en>unknown command \\{name}: shown as written</en>', { name: esc(name) }));
           i = j;
           continue;
         }
@@ -1126,7 +1126,7 @@
         boxes[k].classList.toggle('is-free', !(k ? fixed2 : fixed1));
       });
       function desc(n, fixed, v) {
-        return fixed ? n + ' x = ' + v : '<en>' + n + '’s x is left to the solver</en>';
+        return fixed ? n + ' x = ' + v : PG.fill('<en>{n}’s x is left to the solver</en>', { n: n });
       }
       cap.innerHTML = desc('M1', fixed1, xs1[0]) + '<en>; </en>' + desc('M2', fixed2, xs2[0]) + '<en>.</en>' +
         (fixed1 && fixed2 && xs1[0] === xs2[0] ? ' <en>They are aligned, and the DISTANCE is dropped.</en>' : '');

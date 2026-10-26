@@ -81,7 +81,7 @@
         <p class="eyebrow"><span>RICH NETLIST · AGENT SKILL</span><span class="chip chip-ok"><en>RNL 0.3 · packages 0.3</en></span></p>
         <h1 id="agents-title" class="tour-h1"><en>For agents</en></h1>
         <p class="thesis"><en>Download the skill package, and your agent can read, write, check and draw RNL.</en></p>
-        <p class="lead"><en>RNL writes the drawing of a schematic into the comments of a SPICE or Spectre netlist, and the netlist alone still defines the circuit. The skill package is a folder in the Agent Skills format: a short guide to the language, a reference to the standard packages, the tools to check and draw files, and examples that all read with <code>rnl check</code>. This page says how to get it and install it; the plain-text entry that an agent reads is <a href="../llms.txt">llms.txt</a>.</en></p>
+        <p class="lead"><en>RNL writes the drawing of a schematic into the comments of a SPICE or Spectre netlist, and the netlist alone still defines the circuit. The skill package is a folder in the Agent Skills format containing a short guide to the language, a reference for the standard packages, instructions for using the tools to check and draw files, and examples validated with <code>rnl check</code>. This page explains how to download and install it; the plain-text entry for agents is <a href="../llms.txt">llms.txt</a>.</en></p>
         <div class="cta">
           <a class="btn btn-primary" href="../skill/rnl-skill.zip"><svg class="ico"><use href="#i-download"/></svg><en>Download rnl-skill.zip</en></a>
           <a class="btn" href="<en>../llms.txt</en>"><svg class="ico"><use href="#i-file"/></svg>llms.txt</a>
@@ -94,7 +94,7 @@
         <div><dt><en>Language</en></dt><dd>RNL 0.3</dd></div>
         <div><dt><en>Packages</en></dt><dd><en>Series 0.3</en></dd></div>
         <div><dt><en>Download</en></dt><dd><span class="mono">rnl-skill.zip</span></dd></div>
-        <div><dt><en>Licence</en></dt><dd>MIT · CC-BY-4.0 · CC0-1.0</dd></div>
+        <div><dt><en>License</en></dt><dd>MIT · CC-BY-4.0 · CC0-1.0</dd></div>
       </dl>
     </div>
   </div>
@@ -106,9 +106,9 @@
   <ul>
     <li><a href="#tell"><en>One sentence</en></a></li>
     <li><a href="#install"><en>Install</en></a></li>
-    <li><a href="#files"><en>What is in it</en></a></li>
+    <li><a href="#files"><en>Package contents</en></a></li>
     <li><a href="#tools"><en>Check and draw</en></a></li>
-    <li><a href="#facts"><en>Versions and licence</en></a></li>
+    <li><a href="#facts"><en>Versions and license</en></a></li>
   </ul>
 </nav>
 <main id="main" class="page-content">
@@ -172,8 +172,8 @@
 <section id="files" class="sheet">
   <div class="wrap">
     <header class="sheet-head">
-      <p class="sheet-no"><en>03 · What is in it</en></p>
-      <h2><en>A short guide, a generated reference, <span class="mk">and examples that read.</span></en></h2>
+      <p class="sheet-no"><en>03 · Package contents</en></p>
+      <h2><en>A short guide, a generated reference, <span class="mk">and validated examples.</span></en></h2>
       <p class="lead"><en>Every file reads as plain text. The reference is generated from the files of the standard packages, so it stays in step with them, and every SPICE or Spectre example in the package is read by <code>rnl check</code> in CI.</en></p>
     </header>
 
@@ -186,7 +186,7 @@
         </li>
         <li>
           <a class="dl-file" href="../skill/rnl/references/language.md"><svg class="ico"><use href="#i-file"/></svg><span><b><en>Short guide to the language</en></b><code>references/language.md</code></span></a>
-          <p><en>All that reading and writing a file of RNL 0.3 takes: the shape of a file, statements, objects and references, definitions, layout, wires, text, packages. The same guide is also a section of the <a href="spec/0.3/">page of the language standard 0.3</a>.</en></p>
+          <p><en>Everything needed to read and write an RNL 0.3 file: file structure, statements, objects and references, definitions, layout, wires, text and packages. The same guide also appears on the <a href="spec/0.3/">RNL 0.3 language standard page</a>.</en></p>
         </li>
         <li>
           <a class="dl-file" href="../skill/rnl/references/packages.md"><svg class="ico"><use href="#i-layers"/></svg><span><b><en>The standard packages</en></b><code>references/packages.md</code></span></a>
@@ -194,7 +194,7 @@
         </li>
         <li>
           <a class="dl-file" href="../skill/rnl/references/tools.md"><svg class="ico"><use href="#i-cpu"/></svg><span><b><en>Check and draw</en></b><code>references/tools.md</code></span></a>
-          <p><en>The <code>rnl</code> command built from source, the npm package <code>@rich-netlist/runtime</code>, the web viewer and the desktop viewer, how to use each, with a complete checking script.</en></p>
+          <p><en>How to use the prebuilt or source-built <code>rnl</code> command, the npm package <code>@rich-netlist/runtime</code>, the web viewer and the desktop viewer, with a complete checking script.</en></p>
         </li>
         <li>
           <a class="dl-file" href="../skill/rnl/examples/ota5t.sp"><svg class="ico"><use href="#i-netlist"/></svg><span><b><en>Example: structure only</en></b><code>examples/ota5t.sp</code></span></a>
@@ -205,8 +205,8 @@
           <p><en>The same circuit with every object placed, and the wires, ports, grounds and supplies written, which <code>rnl render</code> draws completely.</en></p>
         </li>
         <li>
-          <a class="dl-file" href="../skill/rnl/LICENSE.md"><svg class="ico"><use href="#i-shield"/></svg><span><b><en>Licences</en></b><code>LICENSE.md</code></span></a>
-          <p><en>Which licence each file is under, and the full texts (<code>LICENSES/</code>).</en></p>
+          <a class="dl-file" href="../skill/rnl/LICENSE.md"><svg class="ico"><use href="#i-shield"/></svg><span><b><en>Licenses</en></b><code>LICENSE.md</code></span></a>
+          <p><en>Which license each file is under, and the full texts (<code>LICENSES/</code>).</en></p>
         </li>
       </ul>
     </div>
@@ -219,7 +219,7 @@
     <header class="sheet-head">
       <p class="sheet-no"><en>04 · Check and draw</en></p>
       <h2><en>Check what you write. <span class="mk">Use the first tool you can run.</span></en></h2>
-      <p class="lead"><en>The four tools are one core, so they read a file the same way. An agent can run the first two itself; the other two are for a person. The details and the commands are in <a href="../skill/rnl/references/tools.md"><code>references/tools.md</code></a>.</en></p>
+      <p class="lead"><en>All four tools share one core, so they read a file the same way. An agent can run the first two directly for checking and rendering; the two viewers are for interactive inspection (and an agent can also install and launch the desktop viewer when requested). Full details and commands are in <a href="../skill/rnl/references/tools.md"><code>references/tools.md</code></a>.</en></p>
     </header>
     <div class="facts tools-facts tools-four">
       <div class="fact">
@@ -246,13 +246,13 @@
 <section id="facts" class="sheet">
   <div class="wrap">
     <header class="sheet-head">
-      <p class="sheet-no"><en>05 · Versions and licence</en></p>
-      <h2><en>It follows main, <span class="mk">and each file says its licence.</span></en></h2>
+      <p class="sheet-no"><en>05 · Versions and license</en></p>
+      <h2><en>It follows main, <span class="mk">and each file says its license.</span></en></h2>
     </header>
     <ul class="rules">
-      <li><b><en>Versions</en></b><span><en>The skill follows language 0.3 (revision 1) and the standard packages of series 0.3. Both the language and the toolkit are still drafts, and versions 0.x make no promise of compatibility: a file of 0.2 has other names and is read with the series 0.2.</en></span></li>
+      <li><b><en>Versions</en></b><span><en>The skill follows language 0.3 (revision 2) and the standard packages of series 0.3. Both the language and the toolkit are still drafts, and versions 0.x make no promise of compatibility: 0.2 files use different names and are read with the series 0.2 packages.</en></span></li>
       <li><b><en>Kept in step</en></b><span><en>The zip and the files are written again whenever the site is published, so they are always the current <code>main</code>. The reference is generated from the package files, the guide is kept with the standard, and the examples are read by <code>rnl check</code> in CI.</en></span></li>
-      <li><b><en>Licence</en></b><span><en>SKILL.md and the tool notes are MIT, the guide to the language is CC-BY-4.0 (credit the source when you reuse it), and the reference to the packages and the examples are CC0-1.0. The package holds no code and no fonts. The terms are in <code>LICENSE.md</code> and <code>LICENSES/</code> in the package.</en></span></li>
+      <li><b><en>License</en></b><span><en>SKILL.md and the tool notes are MIT, the guide to the language is CC-BY-4.0 (credit the source when you reuse it), and the reference to the packages and the examples are CC0-1.0. The package holds no code and no fonts. The terms are in <code>LICENSE.md</code> and <code>LICENSES/</code> in the package.</en></span></li>
       <li><b><en>Found a mistake</en></b><span><en>Where the skill or the guide differs from the <a href="spec/0.3/">standard</a>, the standard prevails; please report it on <a href="https://github.com/rich-netlist/rnl/issues">GitHub</a>.</en></span></li>
     </ul>
   </div>
