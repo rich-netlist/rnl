@@ -7,6 +7,9 @@
     python scripts/i18n/status.py report --markdown    the table and the details as Markdown (--json for data)
     python scripts/i18n/status.py stamp site/src/llms.zh.txt   record that a translated document is in line with its source
 
+A language's glossary, i18n/<lang>/glossary.json, gives how it renders RNL's English terms (decision 0016);
+texts that use a variant it lists under "avoid" are reported, never failing the check.
+
 The surfaces are listed in i18n/surfaces.json and the languages in i18n/languages.json. English is the
 source of every surface; every other language is a translation, which is reported but never required.
 --base REF also compares with REF, as a pull request does with its base: an English text that changed
@@ -36,7 +39,8 @@ sys.path.insert(0, str(ROOT / "scripts" / "spec"))
 import site_i18n  # noqa: E402
 import spectools  # noqa: E402
 
-KINDS = ("document", "inline", "dictionary", "messages", "aliases", "external", "untracked", "not-translated")
+KINDS = ("document", "inline", "dictionary", "messages", "aliases", "external", "glossary", "untracked", "not-translated")
+GLOSSARY_KINDS = ("rnl", "circuit", "command", "general")
 UNITS = {"document": "file", "inline": "text", "dictionary": "text", "messages": "text", "aliases": "word",
          "external": "text"}
 # the first line of a translated document: the source it was made from, by the start of its SHA-256
@@ -72,7 +76,7 @@ def short(text: str, n: int = 70) -> str:
 
 @dataclass
 class Finding:
-    state: str  # missing, stale, changed, unstamped, unused, differs
+    state: str  # missing, stale, changed, unstamped, unused, differs, variant
     where: str
     text: str = ""
 
@@ -651,8 +655,71 @@ def external(p: Project, s: dict) -> Surface:
     return out
 
 
+# --- glossaries: how each language renders RNL's English terms (decision 0016) ---------------------------
+
+def glossary_errors(rel: str, data) -> list[str]:
+    if not isinstance(data, dict) or not isinstance(data.get("terms"), list):
+        return [f"{rel}: an object with a list of terms"]
+    errors = []
+    for i, t in enumerate(data["terms"]):
+        where = f"{rel}: terms[{i}]"
+        if not isinstance(t, dict) or not all(isinstance(t.get(k), str) and t[k] for k in ("en", "term")):
+            errors.append(f"{where}: en and term are texts")
+            continue
+        if t.get("kind") not in GLOSSARY_KINDS:
+            errors.append(f"{where} ({t['en']}): kind is one of {', '.join(GLOSSARY_KINDS)}")
+        avoid = t.get("avoid", [])
+        if not isinstance(avoid, list) or not all(isinstance(a, str) and a for a in avoid) or t["term"] in avoid:
+            errors.append(f"{where} ({t['en']}): avoid is a list of variants other than the term")
+    return errors
+
+
+def glossary(p: Project, s: dict) -> Surface:
+    """Report the catalog texts whose English has a term of the language's glossary and whose translation
+    uses a variant the glossary says to avoid. Only a malformed glossary is an error."""
+    out = Surface(s["id"], s["title"], s["kind"])
+    english = p.config["languages"][0]["messages"]
+    for lang in p.langs(s):
+        path = p.root / p.translation(s, lang)
+        if not path.is_file():
+            continue  # a language need not have one yet
+        st = out.langs[lang] = Lang()
+        try:
+            data = json.loads(read(path))
+        except ValueError as e:
+            out.errors.append(f"{p.rel(path)}: {e}")
+            continue
+        errors = glossary_errors(p.rel(path), data)
+        out.errors += errors
+        if errors:
+            continue
+        st.done = len(data["terms"])
+        checks = []
+        for t in data["terms"]:
+            if t.get("avoid"):
+                words = "|".join(re.escape(w.strip()) for w in t["en"].split(" / "))
+                checks.append((re.compile(rf"(?<![A-Za-z])(?:{words})(?:e?s)?(?![A-Za-z])", re.I), t))
+        for f in sorted((p.root / "i18n" / lang).rglob("*.json")):
+            if f == path:
+                continue
+            try:
+                catalog = json.loads(read(f))
+            except ValueError:
+                continue  # its own surface reports it
+            rel = p.rel(f)
+            for key, text in catalog.items() if isinstance(catalog, dict) else ():
+                if not isinstance(text, str):
+                    continue
+                en = english.get(key, "") if f.name == "messages.json" else key.split("|", 1)[-1]
+                for pattern, t in checks:
+                    used = [a for a in t["avoid"] if a in text and t["term"] not in text]
+                    if used and pattern.search(en):
+                        st.findings.append(Finding("variant", rel, f"{t['en']}: {'/'.join(used)} for {t['term']}, in {short(en, 50)!r}"))
+    return out
+
+
 ADAPTERS = {"document": documents, "inline": inline, "dictionary": dictionary, "messages": messages,
-            "aliases": aliases, "external": external}
+            "aliases": aliases, "external": external, "glossary": glossary}
 
 
 def survey(p: Project) -> list[Surface]:
@@ -677,6 +744,8 @@ def cell(surface: Surface, lang: str) -> str:
     st = surface.langs.get(lang)
     if st is None:
         return ""
+    if surface.kind == "glossary":
+        return f"{st.done} terms" + (f", {len(st.findings)} variants used" if st.findings else "")
     text = f"{st.done}/{surface.total}"
     return text + (f", {st.stale} stale" if st.stale else "")
 
@@ -697,7 +766,7 @@ def details(surface: Surface, lang: str, markdown: bool = False) -> list[str]:
     if st is None:
         return []
     out = []
-    for state in ("stale", "changed", "missing", "differs", "unstamped", "unused"):
+    for state in ("stale", "changed", "missing", "differs", "unstamped", "unused", "variant"):
         found = [f for f in st.findings if f.state == state]
         if not found:
             continue
@@ -760,7 +829,7 @@ def files(p: Project, lang: str) -> list[str]:
         elif s["kind"] == "dictionary":
             out.append(f"{s['id']}: the \"{lang}\" of the dictionaries in {', '.join([s['source']] if isinstance(s['source'], str) else s['source'])}")
             continue
-        elif s["kind"] in ("messages", "aliases"):
+        elif s["kind"] in ("messages", "aliases", "glossary"):
             paths = [p.translation(s, lang)]
         elif s["kind"] == "external":
             out.append(f"{s['id']}: in {s['repository']}")

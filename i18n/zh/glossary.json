@@ -1,0 +1,1506 @@
+{
+ "language": "zh",
+ "about": "Terms of this language's translations: the English term, its rendering here, and variants not to use. English terms are the only normative ones (decision 0016); this list is a convention for translating and talking about RNL, not part of the standard. kind: rnl (a term of RNL), circuit (of circuit design), command (a command or label of an interface), general.",
+ "terms": [
+  {
+   "en": "alias",
+   "term": "代称",
+   "kind": "rnl"
+  },
+  {
+   "en": "alias package",
+   "term": "代称包",
+   "kind": "rnl"
+  },
+  {
+   "en": "apply",
+   "sense": "definition",
+   "term": "套用",
+   "kind": "rnl"
+  },
+  {
+   "en": "bend",
+   "term": "拐点",
+   "avoid": [
+    "转折"
+   ],
+   "kind": "rnl"
+  },
+  {
+   "en": "body",
+   "term": "定义体",
+   "kind": "rnl",
+   "alias": true
+  },
+  {
+   "en": "bounding box / box",
+   "sense": "the box of a symbol",
+   "term": "边界框",
+   "kind": "rnl"
+  },
+  {
+   "en": "bounding box / box",
+   "sense": "the rectangle around an ellipse",
+   "term": "外接框",
+   "kind": "rnl"
+  },
+  {
+   "en": "brace",
+   "term": "花括号",
+   "kind": "rnl"
+  },
+  {
+   "en": "branch",
+   "sense": "wire routing",
+   "term": "分叉",
+   "avoid": [
+    "支线"
+   ],
+   "kind": "rnl"
+  },
+  {
+   "en": "bundle",
+   "term": "叠画",
+   "kind": "rnl",
+   "note": "rnl-zh: @叠画 is @BUNDLE.",
+   "alias": true
+  },
+  {
+   "en": "comment",
+   "term": "注释",
+   "kind": "rnl"
+  },
+  {
+   "en": "constraint",
+   "term": "约束",
+   "kind": "rnl"
+  },
+  {
+   "en": "coordinate",
+   "term": "坐标",
+   "kind": "rnl"
+  },
+  {
+   "en": "core",
+   "term": "核心",
+   "kind": "rnl"
+  },
+  {
+   "en": "crossing",
+   "sense": "wires",
+   "term": "交叉",
+   "avoid": [
+    "交错",
+    "相交"
+   ],
+   "kind": "rnl"
+  },
+  {
+   "en": "definition",
+   "term": "定义",
+   "kind": "rnl"
+  },
+  {
+   "en": "diagnostic",
+   "term": "诊断",
+   "kind": "rnl"
+  },
+  {
+   "en": "drawing",
+   "sense": "the schematic as a whole",
+   "term": "原理图",
+   "kind": "rnl"
+  },
+  {
+   "en": "drawing",
+   "sense": "the drawing shown, its canvas",
+   "term": "图面",
+   "avoid": [
+    "图形"
+   ],
+   "kind": "rnl"
+  },
+  {
+   "en": "drawing layer",
+   "term": "绘制层",
+   "kind": "rnl"
+  },
+  {
+   "en": "dropped",
+   "sense": "fact status",
+   "term": "丢弃",
+   "kind": "rnl"
+  },
+  {
+   "en": "evaluate",
+   "sense": "RNL runtime",
+   "term": "求值",
+   "kind": "rnl"
+  },
+  {
+   "en": "fact",
+   "term": "事实",
+   "kind": "rnl"
+  },
+  {
+   "en": "fill-in",
+   "term": "补位",
+   "kind": "rnl",
+   "alias": true
+  },
+  {
+   "en": "free text",
+   "term": "自由文本",
+   "avoid": [
+    "自由文字"
+   ],
+   "kind": "rnl"
+  },
+  {
+   "en": "header record",
+   "term": "头段记录",
+   "kind": "rnl",
+   "note": "Short: 头段."
+  },
+  {
+   "en": "hierarchy",
+   "term": "层级",
+   "kind": "rnl",
+   "note": "level and hierarchy are both 层级."
+  },
+  {
+   "en": "horizontal",
+   "term": "横",
+   "kind": "rnl",
+   "note": "The name of a routing mode; 横向 as an adjective."
+  },
+  {
+   "en": "index",
+   "term": "下标",
+   "kind": "rnl"
+  },
+  {
+   "en": "instance",
+   "term": "元件",
+   "kind": "rnl",
+   "note": "The role kind; rnl-zh: 元件 is instance.",
+   "alias": true
+  },
+  {
+   "en": "junction / junction dot",
+   "term": "交汇圆点",
+   "avoid": [
+    "交接圆点"
+   ],
+   "kind": "rnl",
+   "note": "The point itself: 交汇点."
+  },
+  {
+   "en": "kept",
+   "sense": "fact status",
+   "term": "保留",
+   "avoid": [
+    "纳入"
+   ],
+   "kind": "rnl"
+  },
+  {
+   "en": "key",
+   "sense": "TEXT identifier",
+   "term": "key",
+   "avoid": [
+    "引用名 key",
+    "键名"
+   ],
+   "kind": "rnl"
+  },
+  {
+   "en": "label",
+   "term": "标签",
+   "kind": "rnl"
+  },
+  {
+   "en": "layout",
+   "term": "布局",
+   "kind": "rnl"
+  },
+  {
+   "en": "level",
+   "term": "层级",
+   "kind": "rnl"
+  },
+  {
+   "en": "manifest",
+   "term": "清单",
+   "kind": "rnl"
+  },
+  {
+   "en": "mirrored pair",
+   "sense": "the structure, a mirrored pair",
+   "term": "镜像对",
+   "kind": "rnl"
+  },
+  {
+   "en": "mirrored pair",
+   "sense": "the symmetry",
+   "term": "镜像对称",
+   "kind": "rnl"
+  },
+  {
+   "en": "name",
+   "term": "名称",
+   "avoid": [
+    "名字"
+   ],
+   "kind": "rnl",
+   "note": "The Chinese standard says 名字; the catalogs keep 名称."
+  },
+  {
+   "en": "net",
+   "term": "网络",
+   "kind": "rnl"
+  },
+  {
+   "en": "netlist",
+   "term": "网表",
+   "kind": "rnl"
+  },
+  {
+   "en": "netlist body",
+   "term": "网表正文",
+   "kind": "rnl"
+  },
+  {
+   "en": "objective",
+   "term": "目标",
+   "kind": "rnl"
+  },
+  {
+   "en": "orientation code",
+   "term": "朝向码",
+   "kind": "rnl",
+   "alias": true
+  },
+  {
+   "en": "package",
+   "term": "包",
+   "kind": "rnl",
+   "note": "rnl-zh spells it 包.",
+   "alias": true
+  },
+  {
+   "en": "phase",
+   "term": "阶段",
+   "kind": "rnl"
+  },
+  {
+   "en": "pin",
+   "term": "引脚",
+   "kind": "rnl"
+  },
+  {
+   "en": "port",
+   "term": "端口",
+   "kind": "rnl"
+  },
+  {
+   "en": "primitive",
+   "term": "图元",
+   "kind": "rnl"
+  },
+  {
+   "en": "priority",
+   "term": "优先级",
+   "kind": "rnl"
+  },
+  {
+   "en": "private parts",
+   "term": "部件",
+   "kind": "rnl"
+  },
+  {
+   "en": "queue",
+   "term": "队列",
+   "kind": "rnl"
+  },
+  {
+   "en": "record",
+   "term": "记录",
+   "kind": "rnl"
+  },
+  {
+   "en": "record header",
+   "term": "记录头",
+   "kind": "rnl"
+  },
+  {
+   "en": "role",
+   "term": "角色",
+   "kind": "rnl"
+  },
+  {
+   "en": "routing / route",
+   "sense": "the router's work",
+   "term": "布线",
+   "kind": "rnl"
+  },
+  {
+   "en": "routing / route",
+   "sense": "the path of a drawn wire",
+   "term": "走线",
+   "kind": "rnl"
+  },
+  {
+   "en": "schematic",
+   "term": "原理图",
+   "kind": "rnl"
+  },
+  {
+   "en": "selection",
+   "term": "筛选",
+   "avoid": [
+    "选择"
+   ],
+   "kind": "rnl",
+   "note": "The owner's choice. For the RNL selection only; choosing in the interface stays 选择."
+  },
+  {
+   "en": "set",
+   "term": "集合",
+   "kind": "rnl"
+  },
+  {
+   "en": "solver",
+   "term": "求解器",
+   "kind": "rnl"
+  },
+  {
+   "en": "standard package",
+   "term": "标准包",
+   "kind": "rnl"
+  },
+  {
+   "en": "standard series",
+   "term": "标准系列",
+   "kind": "rnl"
+  },
+  {
+   "en": "statement",
+   "term": "语句",
+   "kind": "rnl"
+  },
+  {
+   "en": "structure",
+   "term": "结构",
+   "kind": "rnl"
+  },
+  {
+   "en": "subject",
+   "term": "主语",
+   "kind": "rnl"
+  },
+  {
+   "en": "symbol",
+   "term": "符号",
+   "kind": "rnl"
+  },
+  {
+   "en": "terminal",
+   "term": "端子",
+   "kind": "rnl"
+  },
+  {
+   "en": "text",
+   "sense": "the text of a file or netlist",
+   "term": "文本",
+   "kind": "rnl"
+  },
+  {
+   "en": "text",
+   "sense": "text drawn in a schematic (@TEXT, labels)",
+   "term": "文字",
+   "kind": "rnl"
+  },
+  {
+   "en": "union",
+   "term": "并集",
+   "kind": "rnl"
+  },
+  {
+   "en": "usage",
+   "term": "用例",
+   "kind": "rnl",
+   "note": "rnl-zh: 用例 is usage.",
+   "alias": true
+  },
+  {
+   "en": "verb",
+   "term": "谓语",
+   "kind": "rnl"
+  },
+  {
+   "en": "vertical",
+   "term": "竖",
+   "kind": "rnl",
+   "note": "The name of a routing mode; 竖向 as an adjective."
+  },
+  {
+   "en": "wire",
+   "term": "导线",
+   "kind": "rnl",
+   "note": "rnl-zh: @导线 is @WIRE.",
+   "alias": true
+  },
+  {
+   "en": "bias source",
+   "term": "偏置源",
+   "kind": "circuit"
+  },
+  {
+   "en": "bulk",
+   "term": "衬底",
+   "kind": "circuit"
+  },
+  {
+   "en": "bus",
+   "term": "总线",
+   "kind": "circuit"
+  },
+  {
+   "en": "cascade",
+   "term": "级联",
+   "kind": "circuit"
+  },
+  {
+   "en": "common-emitter stage",
+   "term": "共射放大级",
+   "kind": "circuit"
+  },
+  {
+   "en": "connectivity",
+   "term": "连接关系",
+   "kind": "circuit",
+   "note": "电气连接 where the English says electrical."
+  },
+  {
+   "en": "D flip-flop",
+   "term": "D 触发器",
+   "kind": "circuit"
+  },
+  {
+   "en": "device",
+   "term": "器件",
+   "kind": "circuit"
+  },
+  {
+   "en": "differential pair",
+   "term": "差分对",
+   "kind": "circuit",
+   "alias": true
+  },
+  {
+   "en": "diode",
+   "term": "二极管",
+   "kind": "circuit"
+  },
+  {
+   "en": "drain",
+   "term": "漏极",
+   "kind": "circuit"
+  },
+  {
+   "en": "five-transistor OTA",
+   "term": "五管 OTA",
+   "kind": "circuit"
+  },
+  {
+   "en": "function / signal-flow block",
+   "term": "功能模块",
+   "kind": "circuit",
+   "note": "A block of a signal flow: 信号流模块."
+  },
+  {
+   "en": "gate",
+   "term": "栅极",
+   "kind": "circuit"
+  },
+  {
+   "en": "ground",
+   "sense": "the ground net",
+   "term": "地",
+   "kind": "circuit"
+  },
+  {
+   "en": "ground",
+   "sense": "the ground symbol",
+   "term": "接地",
+   "kind": "circuit"
+  },
+  {
+   "en": "logic gate",
+   "term": "逻辑门",
+   "kind": "circuit"
+  },
+  {
+   "en": "magnitude response",
+   "term": "幅频响应",
+   "kind": "circuit"
+  },
+  {
+   "en": "no-connect mark",
+   "term": "不连接标记",
+   "kind": "circuit"
+  },
+  {
+   "en": "passive part",
+   "term": "无源器件",
+   "avoid": [
+    "无源元件"
+   ],
+   "kind": "circuit",
+   "note": "元件 is the instance."
+  },
+  {
+   "en": "PDK",
+   "sense": "expanded name",
+   "term": "工艺库",
+   "kind": "circuit"
+  },
+  {
+   "en": "primitive",
+   "sense": "Spectre device",
+   "term": "内置器件",
+   "avoid": [
+    "内置元件"
+   ],
+   "kind": "circuit",
+   "note": "元件 is the instance."
+  },
+  {
+   "en": "signal",
+   "term": "信号",
+   "kind": "circuit"
+  },
+  {
+   "en": "simulation / simulate",
+   "term": "仿真",
+   "kind": "circuit"
+  },
+  {
+   "en": "simulator",
+   "term": "仿真器",
+   "kind": "circuit"
+  },
+  {
+   "en": "tail / tail transistor",
+   "term": "尾管",
+   "avoid": [
+    "尾电流管"
+   ],
+   "kind": "circuit",
+   "alias": true
+  },
+  {
+   "en": "transconductor",
+   "term": "跨导放大器",
+   "kind": "circuit"
+  },
+  {
+   "en": "transistor",
+   "term": "晶体管",
+   "kind": "circuit"
+  },
+  {
+   "en": "Add PATH",
+   "term": "添加 PATH",
+   "kind": "command"
+  },
+  {
+   "en": "Always",
+   "sense": "file association",
+   "term": "始终",
+   "kind": "command"
+  },
+  {
+   "en": "Apply and Exit Editing",
+   "term": "应用并退出编辑",
+   "kind": "command"
+  },
+  {
+   "en": "Auto Include",
+   "term": "自动引入",
+   "avoid": [
+    "Auto Include"
+   ],
+   "kind": "command"
+  },
+  {
+   "en": "Clear Cache",
+   "term": "清空缓存",
+   "kind": "command"
+  },
+  {
+   "en": "Collapse",
+   "term": "折叠",
+   "kind": "command"
+  },
+  {
+   "en": "double tap",
+   "term": "双击",
+   "kind": "command"
+  },
+  {
+   "en": "eject",
+   "sense": "disk image",
+   "term": "推出",
+   "kind": "command"
+  },
+  {
+   "en": "Exclude",
+   "sense": "Library command",
+   "term": "排除",
+   "avoid": [
+    "移出"
+   ],
+   "kind": "command"
+  },
+  {
+   "en": "Exit / quit",
+   "sense": "application or editing",
+   "term": "退出",
+   "kind": "command"
+  },
+  {
+   "en": "Find",
+   "sense": "text search",
+   "term": "查找",
+   "kind": "command"
+  },
+  {
+   "en": "Fit to Window",
+   "term": "适应窗口",
+   "kind": "command"
+  },
+  {
+   "en": "Get Info",
+   "sense": "macOS",
+   "term": "显示简介",
+   "kind": "command"
+  },
+  {
+   "en": "Help",
+   "sense": "menu",
+   "term": "帮助",
+   "kind": "command"
+  },
+  {
+   "en": "Markdown",
+   "sense": "single file",
+   "term": "Markdown 合订本",
+   "kind": "command"
+  },
+  {
+   "en": "More info",
+   "sense": "Windows SmartScreen",
+   "term": "更多信息",
+   "kind": "command"
+  },
+  {
+   "en": "Open Anyway",
+   "sense": "macOS",
+   "term": "仍要打开",
+   "kind": "command"
+  },
+  {
+   "en": "Open URL",
+   "term": "打开 URL",
+   "avoid": [
+    "打开网址"
+   ],
+   "kind": "command"
+  },
+  {
+   "en": "Open With",
+   "sense": "macOS",
+   "term": "打开方式",
+   "kind": "command"
+  },
+  {
+   "en": "Open With",
+   "sense": "Windows",
+   "term": "打开方式",
+   "kind": "command"
+  },
+  {
+   "en": "Overwrite",
+   "sense": "file",
+   "term": "覆盖",
+   "kind": "command"
+  },
+  {
+   "en": "Problems",
+   "sense": "panel",
+   "term": "问题",
+   "avoid": [
+    "问题列表",
+    "问题面板"
+   ],
+   "kind": "command",
+   "note": "As the viewer's tab: the “问题” panel."
+  },
+  {
+   "en": "Reload",
+   "term": "重新加载",
+   "avoid": [
+    "刷新"
+   ],
+   "kind": "command"
+  },
+  {
+   "en": "Replace",
+   "sense": "file",
+   "term": "替换",
+   "kind": "command"
+  },
+  {
+   "en": "Reset",
+   "term": "重置",
+   "kind": "command"
+  },
+  {
+   "en": "Save As",
+   "term": "另存为",
+   "kind": "command"
+  },
+  {
+   "en": "Save Solved Copy As",
+   "term": "求解副本另存为",
+   "avoid": [
+    "另存求解副本"
+   ],
+   "kind": "command",
+   "note": "As the viewer's menu."
+  },
+  {
+   "en": "scroll",
+   "term": "滚动",
+   "kind": "command"
+  },
+  {
+   "en": "Search",
+   "term": "搜索",
+   "avoid": [
+    "查找"
+   ],
+   "kind": "command",
+   "note": "Search; Find (in the netlist) is 查找."
+  },
+  {
+   "en": "Trash",
+   "sense": "macOS",
+   "term": "废纸篓",
+   "kind": "command"
+  },
+  {
+   "en": "Undo",
+   "term": "撤销",
+   "kind": "command"
+  },
+  {
+   "en": "uninstall",
+   "term": "卸载",
+   "kind": "command"
+  },
+  {
+   "en": "address",
+   "sense": "web location",
+   "term": "地址",
+   "kind": "general"
+  },
+  {
+   "en": "append",
+   "sense": "record/text",
+   "term": "追加",
+   "kind": "general"
+  },
+  {
+   "en": "application",
+   "sense": "program",
+   "term": "应用程序",
+   "kind": "general",
+   "note": "Short: 应用."
+  },
+  {
+   "en": "apply",
+   "sense": "UI changes",
+   "term": "应用",
+   "avoid": [
+    "套用"
+   ],
+   "kind": "general",
+   "note": "Applying changes in the interface; 套用 is applying a definition."
+  },
+  {
+   "en": "archive",
+   "sense": "compressed file",
+   "term": "压缩包",
+   "kind": "general"
+  },
+  {
+   "en": "batch",
+   "term": "批量",
+   "kind": "general"
+  },
+  {
+   "en": "binary",
+   "term": "二进制",
+   "kind": "general"
+  },
+  {
+   "en": "build / rebuild",
+   "sense": "software",
+   "term": "构建",
+   "avoid": [
+    "编译"
+   ],
+   "kind": "general",
+   "note": "编译 only where the English says compile."
+  },
+  {
+   "en": "built-in / bundled",
+   "sense": "built in",
+   "term": "内置",
+   "kind": "general"
+  },
+  {
+   "en": "built-in / bundled",
+   "sense": "comes with, bundled",
+   "term": "随附",
+   "kind": "general"
+  },
+  {
+   "en": "Bézier curve",
+   "term": "贝塞尔曲线",
+   "kind": "general"
+  },
+  {
+   "en": "cache",
+   "term": "缓存",
+   "kind": "general"
+  },
+  {
+   "en": "catalog",
+   "sense": "public packages",
+   "term": "目录",
+   "avoid": [
+    "目录清单"
+   ],
+   "kind": "general"
+  },
+  {
+   "en": "centering / center",
+   "term": "居中",
+   "kind": "general"
+  },
+  {
+   "en": "character",
+   "term": "字符",
+   "kind": "general"
+  },
+  {
+   "en": "checksum",
+   "term": "校验和",
+   "avoid": [
+    "校验值"
+   ],
+   "kind": "general",
+   "note": "The SHA-256 value itself is a 散列值."
+  },
+  {
+   "en": "chip",
+   "term": "芯片",
+   "kind": "general"
+  },
+  {
+   "en": "click",
+   "sense": "single click",
+   "term": "点击",
+   "kind": "general"
+  },
+  {
+   "en": "clone",
+   "sense": "repository",
+   "term": "克隆",
+   "kind": "general"
+  },
+  {
+   "en": "code",
+   "sense": "program code",
+   "term": "代码",
+   "kind": "general"
+  },
+  {
+   "en": "code review",
+   "term": "代码评审",
+   "kind": "general"
+  },
+  {
+   "en": "code signing",
+   "sense": "code signing",
+   "term": "代码签名",
+   "kind": "general"
+  },
+  {
+   "en": "code signing",
+   "sense": "ad-hoc signed",
+   "term": "临时签名",
+   "kind": "general"
+  },
+  {
+   "en": "Color picker",
+   "term": "取色器",
+   "kind": "general"
+  },
+  {
+   "en": "column",
+   "term": "列",
+   "kind": "general"
+  },
+  {
+   "en": "command line / CLI",
+   "term": "命令行",
+   "kind": "general",
+   "note": "CLI stays in names, such as the CLI guide."
+  },
+  {
+   "en": "configure / configuration",
+   "term": "配置",
+   "kind": "general"
+  },
+  {
+   "en": "control",
+   "sense": "UI",
+   "term": "控件",
+   "kind": "general"
+  },
+  {
+   "en": "copy",
+   "sense": "action",
+   "term": "复制",
+   "kind": "general"
+  },
+  {
+   "en": "copyright",
+   "term": "版权",
+   "kind": "general"
+  },
+  {
+   "en": "create",
+   "sense": "objects",
+   "term": "创建",
+   "kind": "general"
+  },
+  {
+   "en": "desktop viewer",
+   "term": "桌面版查看器",
+   "kind": "general",
+   "note": "Short: 桌面版."
+  },
+  {
+   "en": "detect",
+   "sense": "format",
+   "term": "检测",
+   "kind": "general"
+  },
+  {
+   "en": "dialog",
+   "term": "对话框",
+   "kind": "general"
+  },
+  {
+   "en": "disk",
+   "term": "磁盘",
+   "kind": "general"
+  },
+  {
+   "en": "disk image",
+   "term": "磁盘映像",
+   "kind": "general"
+  },
+  {
+   "en": "document",
+   "sense": "loaded text",
+   "term": "文档",
+   "kind": "general"
+  },
+  {
+   "en": "drag",
+   "sense": "dragging a device or the view",
+   "term": "拖动",
+   "avoid": [
+    "拖拽"
+   ],
+   "kind": "general"
+  },
+  {
+   "en": "drag",
+   "sense": "dragging files into the window",
+   "term": "拖放",
+   "kind": "general"
+  },
+  {
+   "en": "entry",
+   "sense": "gallery item",
+   "term": "条目",
+   "kind": "general"
+  },
+  {
+   "en": "executable",
+   "term": "可执行文件",
+   "kind": "general"
+  },
+  {
+   "en": "exit code",
+   "term": "退出码",
+   "kind": "general"
+  },
+  {
+   "en": "Explorer",
+   "sense": "Windows",
+   "term": "文件资源管理器",
+   "kind": "general"
+  },
+  {
+   "en": "extension",
+   "term": "扩展",
+   "kind": "general"
+  },
+  {
+   "en": "extract / unpack",
+   "term": "解压",
+   "kind": "general"
+  },
+  {
+   "en": "fetch",
+   "sense": "files",
+   "term": "获取",
+   "kind": "general"
+  },
+  {
+   "en": "field",
+   "term": "字段",
+   "kind": "general"
+  },
+  {
+   "en": "fill",
+   "sense": "graphics",
+   "term": "填充",
+   "kind": "general"
+  },
+  {
+   "en": "generate",
+   "term": "生成",
+   "kind": "general"
+  },
+  {
+   "en": "hash",
+   "term": "散列值",
+   "avoid": [
+    "校验值"
+   ],
+   "kind": "general",
+   "note": "hash stays in code and field names."
+  },
+  {
+   "en": "hexadecimal",
+   "term": "十六进制",
+   "kind": "general"
+  },
+  {
+   "en": "highlight",
+   "term": "高亮",
+   "kind": "general"
+  },
+  {
+   "en": "host adapter",
+   "term": "宿主适配器",
+   "kind": "general",
+   "note": "Short: 适配器."
+  },
+  {
+   "en": "idle",
+   "term": "空闲",
+   "kind": "general"
+  },
+  {
+   "en": "image",
+   "sense": "an exported image",
+   "term": "图像",
+   "kind": "general"
+  },
+  {
+   "en": "image",
+   "sense": "a picture, a screenshot",
+   "term": "图片",
+   "kind": "general"
+  },
+  {
+   "en": "include",
+   "sense": "files / Library operation",
+   "term": "引入",
+   "avoid": [
+    "include"
+   ],
+   "kind": "general",
+   "note": "include stays as it is in code and RNL syntax."
+  },
+  {
+   "en": "Initials",
+   "sense": "index",
+   "term": "首字母索引",
+   "kind": "general"
+  },
+  {
+   "en": "interactive",
+   "term": "交互式",
+   "kind": "general"
+  },
+  {
+   "en": "interpreter",
+   "term": "解释器",
+   "kind": "general"
+  },
+  {
+   "en": "job",
+   "sense": "background preload",
+   "term": "任务",
+   "kind": "general"
+  },
+  {
+   "en": "language model",
+   "term": "大语言模型",
+   "kind": "general"
+  },
+  {
+   "en": "Library",
+   "term": "资源库",
+   "avoid": [
+    "Library"
+   ],
+   "kind": "general"
+  },
+  {
+   "en": "licence / license",
+   "sense": "the license, a document (MIT License)",
+   "term": "许可证",
+   "avoid": [
+    "许可协议"
+   ],
+   "kind": "general"
+  },
+  {
+   "en": "licence / license",
+   "sense": "the permission it grants",
+   "term": "许可",
+   "kind": "general"
+  },
+  {
+   "en": "load",
+   "sense": "software",
+   "term": "加载",
+   "avoid": [
+    "刷新"
+   ],
+   "kind": "general"
+  },
+  {
+   "en": "match",
+   "sense": "a search result",
+   "term": "匹配",
+   "kind": "general"
+  },
+  {
+   "en": "match",
+   "sense": "a filter's state",
+   "term": "符合",
+   "kind": "general"
+  },
+  {
+   "en": "memory",
+   "term": "内存",
+   "kind": "general"
+  },
+  {
+   "en": "menu bar",
+   "term": "菜单栏",
+   "kind": "general"
+  },
+  {
+   "en": "metadata",
+   "term": "元数据",
+   "kind": "general"
+  },
+  {
+   "en": "mobile device",
+   "term": "移动设备",
+   "kind": "general"
+  },
+  {
+   "en": "module",
+   "sense": "software",
+   "term": "模块",
+   "kind": "general"
+  },
+  {
+   "en": "navigation",
+   "term": "导航",
+   "kind": "general"
+  },
+  {
+   "en": "npm preview",
+   "term": "预览包",
+   "kind": "general"
+  },
+  {
+   "en": "open source",
+   "term": "开源",
+   "kind": "general"
+  },
+  {
+   "en": "optimization / optimize",
+   "term": "优化",
+   "kind": "general"
+  },
+  {
+   "en": "parse / parsing",
+   "term": "解析",
+   "kind": "general"
+  },
+  {
+   "en": "pattern",
+   "sense": "wildcard matching",
+   "term": "通配模式",
+   "kind": "general"
+  },
+  {
+   "en": "pipe",
+   "term": "管道",
+   "kind": "general"
+  },
+  {
+   "en": "portable",
+   "term": "便携版",
+   "kind": "general"
+  },
+  {
+   "en": "preload",
+   "term": "预加载",
+   "kind": "general"
+  },
+  {
+   "en": "preprocessing",
+   "term": "预处理",
+   "kind": "general"
+  },
+  {
+   "en": "project",
+   "term": "工程",
+   "kind": "general",
+   "note": "A project of the viewers; its file may be called 工程包."
+  },
+  {
+   "en": "project",
+   "sense": "software/repository",
+   "term": "项目",
+   "kind": "general"
+  },
+  {
+   "en": "public package",
+   "term": "公开包",
+   "avoid": [
+    "公共包"
+   ],
+   "kind": "general"
+  },
+  {
+   "en": "read-only",
+   "term": "只读",
+   "kind": "general"
+  },
+  {
+   "en": "real-time / live",
+   "term": "实时",
+   "kind": "general"
+  },
+  {
+   "en": "recursive",
+   "term": "递归",
+   "kind": "general"
+  },
+  {
+   "en": "release notes",
+   "term": "发布说明",
+   "kind": "general"
+  },
+  {
+   "en": "render",
+   "term": "渲染",
+   "kind": "general",
+   "note": "绘制 or 绘图 where the English says draw."
+  },
+  {
+   "en": "repository",
+   "term": "仓库",
+   "kind": "general"
+  },
+  {
+   "en": "roadmap",
+   "term": "路线图",
+   "kind": "general"
+  },
+  {
+   "en": "roll back",
+   "term": "回滚",
+   "kind": "general"
+  },
+  {
+   "en": "router",
+   "term": "布线器",
+   "kind": "general"
+  },
+  {
+   "en": "row",
+   "term": "行",
+   "kind": "general"
+  },
+  {
+   "en": "runtime",
+   "term": "运行库",
+   "kind": "general"
+  },
+  {
+   "en": "screenshot",
+   "term": "截图",
+   "kind": "general"
+  },
+  {
+   "en": "session",
+   "term": "同一次运行",
+   "kind": "general"
+  },
+  {
+   "en": "side panel / sidebar",
+   "term": "侧边栏",
+   "avoid": [
+    "侧栏",
+    "侧边面板"
+   ],
+   "kind": "general"
+  },
+  {
+   "en": "Skip to content",
+   "term": "跳至主要内容",
+   "avoid": [
+    "跳至正文"
+   ],
+   "kind": "general"
+  },
+  {
+   "en": "software package",
+   "term": "包",
+   "kind": "general"
+  },
+  {
+   "en": "source",
+   "sense": "program source",
+   "term": "源码",
+   "kind": "general"
+  },
+  {
+   "en": "source file",
+   "term": "源文件",
+   "kind": "general"
+  },
+  {
+   "en": "standard library",
+   "term": "标准库",
+   "kind": "general"
+  },
+  {
+   "en": "Status",
+   "sense": "introduction section",
+   "term": "现状",
+   "kind": "general",
+   "note": "Progress is 进展."
+  },
+  {
+   "en": "status bar",
+   "term": "状态栏",
+   "kind": "general"
+  },
+  {
+   "en": "string",
+   "term": "字符串",
+   "kind": "general"
+  },
+  {
+   "en": "temporary",
+   "sense": "clipboard/cache",
+   "term": "临时",
+   "kind": "general"
+  },
+  {
+   "en": "Terminal",
+   "sense": "OS application",
+   "term": "终端",
+   "kind": "general"
+  },
+  {
+   "en": "thumbnail",
+   "term": "缩略图",
+   "kind": "general"
+  },
+  {
+   "en": "timeline",
+   "term": "时间线",
+   "kind": "general"
+  },
+  {
+   "en": "timeout",
+   "term": "超时",
+   "kind": "general"
+  },
+  {
+   "en": "tooltip",
+   "term": "提示框",
+   "kind": "general"
+  },
+  {
+   "en": "user",
+   "term": "用户",
+   "kind": "general"
+  },
+  {
+   "en": "view",
+   "sense": "UI region noun",
+   "term": "视图",
+   "kind": "general"
+  },
+  {
+   "en": "viewer",
+   "term": "查看器",
+   "kind": "general"
+  },
+  {
+   "en": "web viewer",
+   "term": "网页版查看器",
+   "kind": "general",
+   "note": "Short: 网页版."
+  },
+  {
+   "en": "word list",
+   "term": "词表",
+   "kind": "general"
+  }
+ ]
+}

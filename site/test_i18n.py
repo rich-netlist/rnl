@@ -118,6 +118,18 @@ class Localization(unittest.TestCase):
                 if name != "translation.html":
                     self.assertIn(f'<a href="translation.html">{label}</a>', result[f"{lang}/{name}"], (lang, name))
 
+    def test_the_glossary_pages_and_the_notice_that_english_terms_are_normative(self):
+        with patch.object(build, "has_linux_release", return_value=False):
+            result = build.build(None)
+        self.assertIn('<a href="../zh/glossary.html">Chinese', result["en/glossary.html"])
+        page = result["zh/glossary.html"]
+        self.assertIn('<div class="gs-report" lang="en">', page)
+        self.assertIn('<td lang="zh-CN" class="gs-term">导线</td>', page)
+        for name in build.PAGES:  # every page of a language with a glossary links to it, in English
+            self.assertIn('<div class="terms-notice" lang="en">', result[f"zh/{name}"], name)
+            self.assertIn('<a href="glossary.html">Glossary</a>', result[f"zh/{name}"], name)
+            self.assertNotIn("terms-notice", result[f"en/{name}"], name)
+
     def test_the_build_refuses_translations_in_the_registry_and_the_timeline(self):
         config = third_language()
         config["languages"][-1]["messages"] = {"intro": "ホーム"}
