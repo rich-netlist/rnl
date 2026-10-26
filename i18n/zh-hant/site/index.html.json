@@ -73,7 +73,7 @@
   "Owned by RNL": "由 RNL 描述",
   "Understanding and presentation; it references, never rewrites": "理解與呈現；僅引用而不改寫",
   "Structure<small>differential pair with its tail, current mirror</small>": "結構<small>差動對及其尾端電晶體、電流鏡</small>",
-  "Intent<small>symmetry, centering, order, current direction</small>": "意圖<small>對稱、置中、上下順序、電流方向</small>",
+  "Intent<small>symmetry, centering, order, current direction</small>": "意圖<small>對稱、置中、順序、電流方向</small>",
   "Drawing<small>positions, orientations, wires</small>": "畫法<small>位置、朝向、連線</small>",
   "Display elements<small>supply, ground and port symbols, only for display</small>": "顯示元素<small>電源、接地、連接埠等僅供顯示的符號</small>",
   "Hidden in comments": "藏於註解中",
@@ -234,10 +234,8 @@
   "Those are each tool’s own graphical formats, stored apart from the netlist. RNL is attached to the netlist, and any tool that supports it can read it; viewers ship no component library either, because symbols are themselves defined in RNL.": "那些是各工具專屬的圖形格式，與網表分開儲存。RNL 則直接附著在網表上，任何支援 RNL 的工具都能讀取；檢視器也不內建元件庫，因為符號本身就是以 RNL 定義的。",
   "Why does AI come up so often?": "為什麼經常提到 AI？",
   "Language models are good at reading and writing text such as netlists. RNL makes the drawing text too, so a model can write it directly and edit it in place. In the first writing trial, 11 models wrote 264 runs from a reference, and most produced usable RNL. Free text between statements helps people read, but it never changes what machines understand.": "大型語言模型非常擅長讀寫像網表這樣的純文字。RNL 將原理圖畫法也變成純文字，讓模型能直接產生並就地修改。在第一輪編寫測試中，11 個模型根據參考文件執行了 264 次生成，絕大多數皆產出了可用的 RNL。敘述之間穿插的自由文字有助於人類閱讀，但不會改變機器解讀的語義。",
-  "Can RNL be written in Chinese?": "可以用中文編寫 RNL 嗎？",
-  "Yes. Keywords and the names in the standard package have Chinese aliases; write <code>@USE-ALIASES(name=\"rnl-zh\", version=\"0.3\")</code> in the file’s header record and use them, as in <code lang=\"zh-CN\">#M1 @位于(10, 20)</code>. An alias is only another spelling: the two can be mixed, and machines read exactly the same thing; the header record itself is always read in standard spelling.": "可以。關鍵字與標準套件中的名稱皆提供中文代稱；只要在檔案的檔頭記錄中寫入 <code>@USE-ALIASES(name=\"rnl-zh\", version=\"0.3\")</code> 即可使用，例如 <code lang=\"zh-CN\">#M1 @位于(10, 20)</code>。代稱只是另一種拼寫方式：中英文寫法可以混用，機器讀取到的語義完全相同；檔頭記錄本身則一律依標準英文拼寫讀取。",
   "Can I use it now?": "現在就可以使用嗎？",
-  "For looking at drawings and editing the text, yes: the <a href=\"tools.html\">viewers</a> open a netlist with RNL in the browser or on Windows and Linux, draw the parts that have coordinates, and edit the text and draw it again. Laying out has just begun: the solver has a first version, with which <code>rnl solve</code> and the desktop viewer place the parts that give intent without coordinates, the desktop viewer as a preview. The web viewer does not solve yet, so it does not draw those parts and lists them in its Not drawn view. There is no editor for dragging devices yet.": "若要檢視原理圖與編輯文字，現在就能使用：<a href=\"tools.html\">檢視器</a>可在瀏覽器或 Windows、Linux 與 macOS 上開啟帶有 RNL 的網表、繪出有座標的部分，並支援編輯文字後重新繪圖。自動佈局剛起步：求解器已推出第一版，<code>rnl solve</code> 與桌面版檢視器可用它為僅寫意圖而無座標的部分排列位置（桌面版檢視器以預覽方式顯示）。網頁版檢視器目前尚不支援求解，因此不會繪出未指定位置的部分，而是將它們列在「未繪製（Not drawn）」檢視中。以拖曳方式編輯元件的圖形編輯器則尚在規劃中。",
+  "For looking at drawings and editing the text, yes: the <a href=\"tools.html\">viewers</a> open a netlist with RNL in the browser or on Windows and Linux, draw the parts that have coordinates, and edit the text and draw it again. Laying out has just begun: the solver has a first version, with which <code>rnl solve</code> and the desktop viewer place the parts that give intent without coordinates, the desktop viewer as a preview. The web viewer does not solve yet, so it does not draw those parts and lists them in its Not drawn view. There is no editor for dragging devices yet.": "若要檢視原理圖與編輯文字，現在就能使用：<a href=\"tools.html\">檢視器</a>可在瀏覽器或 Windows 與 Linux 上開啟帶有 RNL 的網表、繪出有座標的部分，並支援編輯文字後重新繪圖。自動佈局剛起步：求解器已推出第一版，<code>rnl solve</code> 與桌面版檢視器可用它為僅寫意圖而無座標的部分排列位置（桌面版檢視器以預覽方式顯示）。網頁版檢視器目前尚不支援求解，因此不會繪出未指定位置的部分，而是將它們列在「未繪製（Not drawn）」檢視中。目前尚無可拖曳元件的編輯器。",
   "06 · Next": "06 · 下一步",
   "What the language looks like, nine sections and a few examples, all hands-on": "探索語言全貌：九個章節與多個範例，皆可親手操作體驗",
   "Standard": "語言標準",
@@ -260,5 +258,7 @@
   "Tools:": "工具：",
   "the web and desktop viewers": "網頁版與桌面版檢視器",
   "Roadmap:": "發展藍圖：",
-  "; the layout-solver and interpreter prototypes are in a research repository that is not public yet": "；佈局求解器與直譯器原型位於尚未公開的研究儲存庫中"
+  "; the layout-solver and interpreter prototypes are in a research repository that is not public yet": "；佈局求解器與直譯器原型位於尚未公開的研究儲存庫中",
+  "Can RNL be written in other languages?": "可以用其他語言編寫 RNL 嗎？",
+  "Keywords and the names in the standard package can have aliases, other spellings in the style of another language. A file declares a few with <code>@ALIAS</code> in its header record, or loads an alias package, a language’s aliases collected in one package file, with <code>@USE-ALIASES(name=…, version=…)</code>, or with <code>path=…</code> for one of its own. The standard series has one so far, Chinese, <code>rnl-zh</code>, which comes with the tools: write <code>@USE-ALIASES(name=\"rnl-zh\", version=\"0.3\")</code> in the header record and use its aliases, as in <code lang=\"zh-CN\">#M1 @位于(10, 20)</code>. An alias is only another spelling: the two can be mixed, and machines read exactly the same thing; the header record itself is always read in standard spelling.": "關鍵字與標準套件中的名稱可以有別名，也就是符合另一種語言習慣的其他拼寫方式。檔案可在檔頭記錄中用 <code>@ALIAS</code> 宣告幾個別名，或用 <code>@USE-ALIASES(name=…, version=…)</code> 載入別名套件（將某種語言的別名集中於一個套件檔案中），也可用 <code>path=…</code> 載入自訂的別名套件。標準系列目前只有一個別名套件，即隨工具提供的中文套件 <code>rnl-zh</code>：在檔頭記錄中寫入 <code>@USE-ALIASES(name=\"rnl-zh\", version=\"0.3\")</code> 即可使用其中的別名，例如 <code lang=\"zh-CN\">#M1 @位于(10, 20)</code>。別名只是另一種拼寫方式：兩種寫法可以混用，機器讀取到的內容完全相同；檔頭記錄本身則一律依標準拼寫讀取。"
 }
