@@ -93,7 +93,9 @@ class Localization(unittest.TestCase):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         registry = Languages(config, catalogs=third_messages(directory.name))
-        self.assertEqual(registry.published, ["en", "zh"])
+        self.assertNotIn("ja", registry.published)
+        self.assertEqual(registry.published, [e["code"] for e in config["languages"]
+                                              if e["code"] == config["default"] or e.get("status") == "published"])
         self.assertNotIn('data-language="ja"', registry.menu("en", lambda target: target))
         self.assertIn('data-language="ja" aria-current="true"', registry.menu("ja", lambda target: target))
         with patch.object(build, "I18N", registry), patch.object(build, "has_linux_release", return_value=False), \
@@ -112,8 +114,10 @@ class Localization(unittest.TestCase):
         self.assertIn('<div class="ts-report" lang="en">', page)  # the report in English, as its texts are
         self.assertIn("<code>site-pages</code>", page)
         self.assertIn("<h3>Not counted</h3>", page)
-        self.assertIn('<span lang="zh-CN">中文</span>', result["zh/translation.html"])
-        for lang, label in (("en", "Translation status"), ("zh", "翻译进度")):
+        zh = build.I18N.locales["zh"]
+        self.assertIn(f'<span lang="{zh["html_lang"]}">{zh["name"]}</span>', result["zh/translation.html"])
+        for lang in ("en", "zh"):
+            label = build.I18N.message(lang, "translation")
             for name in build.PAGES:
                 if name != "translation.html":
                     self.assertIn(f'<a href="translation.html">{label}</a>', result[f"{lang}/{name}"], (lang, name))
@@ -121,7 +125,7 @@ class Localization(unittest.TestCase):
     def test_the_glossary_pages_and_the_notice_that_english_terms_are_normative(self):
         with patch.object(build, "has_linux_release", return_value=False):
             result = build.build(None)
-        self.assertIn('<a href="../zh/glossary.html">Chinese', result["en/glossary.html"])
+        self.assertIn(f'<a href="../zh/glossary.html">{build.I18N.english_name("zh")}', result["en/glossary.html"])
         page = result["zh/glossary.html"]
         self.assertIn('<div class="gs-report" lang="en">', page)
         self.assertIn('<td lang="zh-CN" class="gs-term">导线</td>', page)
@@ -289,7 +293,7 @@ class Catalogs(unittest.TestCase):
         self.assertIn(">Help translate it</a>", english)
         self.assertIn("i18n/README.md", english)
         plain = Languages(third_language())
-        self.assertIn("not yet available in Chinese", plain.notice("zh", 0, 10))
+        self.assertIn(f"not yet available in {plain.english_name('zh')}", plain.notice("zh", 0, 10))
         self.assertIn("not yet available in 日本語", plain.notice("ja", 0, 10))  # no English name: its own
 
     def test_whole_site_of_a_language_with_catalogs_only(self):

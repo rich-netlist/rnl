@@ -479,11 +479,11 @@ mod tests {
         Shown::Submenu("Side P&anels".into(), entries)
     }
 
+    /// English, and each language the registry publishes, by its name in itself (build.rs)
     fn languages() -> Shown {
-        Shown::Submenu(
-            "&Language".into(),
-            vec![check("language-en", "English", None), check("language-zh", "简体中文", None)],
-        )
+        let mut items = vec![check("language-en", "English", None)];
+        items.extend(UI_LANGUAGES.iter().map(|(lang, _, name, _, _)| check(&format!("language-{lang}"), name, None)));
+        Shown::Submenu("&Language".into(), items)
     }
 
     /// The Edit menu (decision 0011): switching the text to edit, a check item, and applying its

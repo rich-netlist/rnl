@@ -1,5 +1,5 @@
 import { test, expect } from '../viewer.js';
-import { zh, zhMenu } from '../zh.js';
+import { zh, zhMenu, translated, uiLanguages, repository } from '../zh.js';
 
 const language = (page, lang) => page.evaluate(lang => window.viewer.command(`language-${lang}`), lang);
 
@@ -180,23 +180,19 @@ test('a language whose catalog cannot be read is left out, and the page starts w
   await viewer.open('04-hierarchy');
   await expect(page.locator('html')).toHaveAttribute('lang','en');
   // in English, naming the language in English, whatever the interface's language (decision 0015)
-  await expect(page.locator('#note')).toHaveText('The interface could not load Chinese; it is offered in the other languages.');
-  await expect(page.locator('.menu-item[data-id^="language-"]')).toHaveCount(1);
+  const chinese = uiLanguages(repository).find((l) => l.code === 'zh-CN').english;
+  await expect(page.locator('#note')).toHaveText(`The interface could not load ${chinese}; it is offered in the other languages.`);
+  // English and every other language but the one that failed
+  await expect(page.locator('.menu-item[data-id^="language-"]')).toHaveCount(uiLanguages(repository).length - 1);
   await expect(page.locator('#tab-files')).toHaveAccessibleName('Library');
 });
 
 test('a system language takes the language that fits it longest, whatever the order of the list', async ({page,viewer}) => {
-  // Traditional Chinese after Simplified Chinese, as a registry lists them: zh-TW is not Simplified's zh
+  // Traditional Chinese after Simplified Chinese, as the registry lists them: zh-TW is not Simplified's zh
   await page.addInitScript(() => Object.defineProperty(Navigator.prototype, 'languages', { get: () => ['zh-TW','en-US'], configurable: true }));
-  await page.route('**/locales/languages.json', async (route) => {
-    const languages = await (await route.fetch()).json();
-    await route.fulfill({ json: [...languages, { code: 'zh-Hant', lang: 'zh-hant', name: '繁體中文', english: 'Traditional Chinese',
-      matches: ['zh-tw', 'zh-hk', 'zh-mo', 'zh-hant'] }] });
-  });
-  await page.route('**/locales/zh-Hant.json', (route) => route.fulfill({ json: { 'Library': '資源庫' } }));
   await viewer.open('04-hierarchy');
   await expect(page.locator('html')).toHaveAttribute('lang','zh-Hant');
-  await expect(page.locator('#tab-files')).toHaveAccessibleName('資源庫');
+  await expect(page.locator('#tab-files')).toHaveAccessibleName(translated('zh-hant', 'Library'));
 });
 
 test('without the list of languages the page starts in English alone (decision 0015)', async ({page,viewer}) => {
