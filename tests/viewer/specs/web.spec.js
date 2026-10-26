@@ -920,7 +920,11 @@ test("the core's labels are clicked and marked, the pointer shows names, and a c
   });
   const labels = doc.levels[0].hits.filter((h) => h.kind === "label");
   expect(labels.map((h) => h.id).sort()).toEqual(["#C1::name", "#C1::value", "#R1::name", "#R1::value", "#R2::name", "#R2::value", "a text"]);
-  expect(labels.filter((h) => h.objects.length === 0).map((h) => h.id)).toEqual(["a text"]);
+  // R1's first terminal's label stands for the net of its pin, as the pin does
+  const terminal = labels.find((h) => h.id === "a text");
+  expect(terminal.objects.map((o) => doc.objects[o].name)).toEqual(["a"]);
+  expect(terminal.objects).toEqual(doc.levels[0].hits.find((h) => h.kind === "pin" && h.objects.includes(terminal.objects[0])).objects);
+  expect(labels.filter((h) => h.objects.length === 0)).toEqual([]);
   /** The page point of a point of the drawing, in its pixels. */
   const point = ([u, v]) =>
     page.evaluate(
