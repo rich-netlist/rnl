@@ -1,6 +1,7 @@
 // Labels on the drawing (apps/viewer-ui/drawing.js, hits.js): a click on a label is a click on the
-// object it is attached to, an instance or a net; a label of something that cannot be selected, such
-// as a terminal, does nothing; and the labels attached to the selected object are marked with it.
+// object it is attached to, an instance or a net, and a terminal's for the nets of its pin, as a
+// click on the pin; and the labels attached to the selected object are marked with it, a net's
+// terminal labels too. (A terminal no pin draws has no label on the drawing: rnl-view's tests.)
 // Both platforms run the same page; the fixture "pick" has R1, R2 and C1 with their name and value
 // labels, and a text attached to R1's first terminal.
 
@@ -35,21 +36,32 @@ for (const [platform, query] of Object.entries(PLATFORMS)) {
       }
     });
 
-    test("the cursor says that a label can be clicked, and that one of nothing cannot", async ({ page, viewer }) => {
-      const p = await viewer.labelWhere("#C1::value");
-      await page.mouse.move(p.x, p.y);
-      await expect(page.locator("#canvas")).toHaveClass(/over-object/);
-      const q = await viewer.labelWhere("a text");
-      await page.mouse.move(q.x, q.y);
+    test("the cursor says that a label can be clicked, a terminal's too", async ({ page, viewer }) => {
+      for (const id of ["#C1::value", "a text"]) {
+        const p = await viewer.labelWhere(id);
+        await page.mouse.move(p.x, p.y);
+        await expect(page.locator("#canvas")).toHaveClass(/over-object/);
+      }
+      const empty = await viewer.empty();
+      await page.mouse.move(empty.x, empty.y);
       await expect(page.locator("#canvas")).not.toHaveClass(/over-object/);
     });
 
-    test("a label of something that cannot be selected does nothing, the selection stays", async ({ page, viewer }) => {
-      await viewer.click("C1");
-      await viewer.selected(`instance C1 in ${TOP}`);
+    test("a terminal's label selects the net of its pin, as a click on the pin does, and the net marks it", async ({ page, viewer }) => {
+      // the pin of R1's first terminal, on net a
+      await viewer.click("a", "pin");
+      await viewer.selected(`net a in ${TOP}`);
+      const pin = { lines: await viewer.markedLines(), places: await viewer.markedPlaces() };
+      await expect(marks(page)).toHaveCount(1);
+      expect(await viewer.selectedGroups()).toContain("a text");
+      await page.keyboard.press("Escape");
+      await viewer.selected(null);
       const p = await viewer.labelWhere("a text");
       await page.mouse.click(p.x, p.y);
-      await viewer.selected(`instance C1 in ${TOP}`);
+      await viewer.selected(`net a in ${TOP}`);
+      expect({ lines: await viewer.markedLines(), places: await viewer.markedPlaces() }).toEqual(pin);
+      await expect(marks(page)).toHaveCount(1);
+      await expect(page.locator('#canvas g[data-id="a text"] text').first()).toHaveCSS('fill', 'rgb(232, 89, 12)');
       // an empty place of the drawing clears the selection, as before
       const empty = await viewer.empty();
       await page.mouse.click(empty.x, empty.y);

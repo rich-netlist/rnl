@@ -1,5 +1,5 @@
 // The real desktop shell's native drop callback, with only the Tauri bridge mocked.
-import { expect, test } from "../viewer.js";
+import { dialogGone, expect, test } from "../viewer.js";
 
 async function nativeDrop(page, viewer, fixture = "04-hierarchy") {
   await viewer.open(fixture, { platform: "desktop" });
@@ -79,6 +79,7 @@ test("a drop asks before leaving unapplied edits, and Cancel retains the text", 
   const dialog = page.locator("dialog.dialog");
   await expect(dialog).toContainText("open another file");
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await dialogGone(page);
   await page.evaluate(() => window.dropDone);
   expect(await viewer.builds()).toBe(builds);
   await expect(area).toHaveValue(edited);
@@ -109,6 +110,7 @@ test("unsupported files show an explanation and a busy viewer ignores drops", as
   await deliver(page, "drop", ["C:\\notes.txt"]);
   await expect(page.locator("dialog.dialog")).toContainText("Drop a netlist or RNL package file");
   await page.getByRole("button", { name: "Close", exact: true }).click();
+  await dialogGone(page);
   await page.evaluate(() => window.dropDone);
   await page.evaluate(() => { document.body.classList.add("busy"); window.nativeInvokes = []; });
   await deliver(page, "enter", ["C:\\new.sp"]);
@@ -130,6 +132,7 @@ test("the file-association entry explains both builds and opens Settings only af
   await expect(dialog).toContainText(".netlist");
   await expect(dialog).toContainText("standalone EXE");
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await dialogGone(page);
   expect(await page.evaluate(() => window.defaultAppsCalls)).toBe(0);
   await page.evaluate(() => { void window.viewer.command("file-associations"); });
   await dialog.getByRole("button", { name: "Open Default Apps", exact: true }).click();

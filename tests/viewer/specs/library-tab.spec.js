@@ -1,7 +1,7 @@
 import { showSource } from "../viewer.js";
 import fs from "node:fs";
 import path from "node:path";
-import { test, expect } from "../viewer.js";
+import { dialogGone, test, expect } from "../viewer.js";
 
 const group = (page, key) => page.locator(`.lib-group[data-group=${JSON.stringify(key)}]`);
 const files = (page) => group(page, "files");
@@ -112,6 +112,7 @@ for (const platform of ["desktop", "web"]) {
     await files(page).locator(".pool-open").click();
     await expect(dialog(page).locator(".dialog-title")).toHaveText("Changes Not Saved");
     await dialog(page).getByRole("button", { name: "Cancel", exact: true }).click();
+    await dialogGone(page);
     await expect(temp).toHaveClass(/current/);
     await files(page).locator(".pool-open").click();
     await viewer.build(() => dialog(page).getByRole("button", { name: platform === "desktop" ? "Don't Save" : "Discard Changes", exact: true }).click());

@@ -232,6 +232,9 @@ pub enum TextTarget {
     Wire(usize),
     /// The net of this displayed name.
     Net(String),
+    /// The pin at this index of the symbol of the item at this index of `LevelView::items`: for a
+    /// text attached to a terminal, which stands for the nets of its pin, as the pin does.
+    Pin(usize, usize),
 }
 
 #[derive(Clone, Debug)]
@@ -242,8 +245,8 @@ pub struct TextView {
     /// The id of the object it is attached to; None for a text at a point.
     pub attach: Option<String>,
     /// What a click on it stands for in the drawing: where the object it is attached to is drawn,
-    /// or its net. None for a text at a point, and for one attached to an object that is not drawn
-    /// as an item or a wire (a terminal, a point).
+    /// its net, or for a terminal the pin it is drawn at. None for a text at a point, and for one
+    /// attached to an object that is not drawn as an item, a wire or a pin of one.
     pub target: Option<TextTarget>,
     /// The key of a label, such as "name".
     pub key: Option<String>,

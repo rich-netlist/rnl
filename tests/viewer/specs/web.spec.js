@@ -1,4 +1,4 @@
-import { showSource } from "../viewer.js";
+import { dialogGone, showSource } from "../viewer.js";
 // Smoke tests of the web viewer (apps/web): the site that build.mjs makes with the samples, served by
 // serve.mjs, with the web shell and the real core as WebAssembly in its Worker. It opens netlists by
 // URL, files set on its file inputs, a folder and dropped files, and each Document is the one
@@ -920,7 +920,11 @@ test("the core's labels are clicked and marked, the pointer shows names, and a c
   });
   const labels = doc.levels[0].hits.filter((h) => h.kind === "label");
   expect(labels.map((h) => h.id).sort()).toEqual(["#C1::name", "#C1::value", "#R1::name", "#R1::value", "#R2::name", "#R2::value", "a text"]);
-  expect(labels.filter((h) => h.objects.length === 0).map((h) => h.id)).toEqual(["a text"]);
+  // R1's first terminal's label stands for the net of its pin, as the pin does
+  const terminal = labels.find((h) => h.id === "a text");
+  expect(terminal.objects.map((o) => doc.objects[o].name)).toEqual(["a"]);
+  expect(terminal.objects).toEqual(doc.levels[0].hits.find((h) => h.kind === "pin" && h.objects.includes(terminal.objects[0])).objects);
+  expect(labels.filter((h) => h.objects.length === 0)).toEqual([]);
   /** The page point of a point of the drawing, in its pixels. */
   const point = ([u, v]) =>
     page.evaluate(
@@ -1066,7 +1070,7 @@ test('automatic package offers wait for an existing manual Library download',asy
   await expect.poll(()=>!!downloadRequest).toBe(true);
   // Allow a full automatic-offer polling interval while the manual download stays blocked.
   await page.evaluate(()=>new Promise(resolve=>setTimeout(resolve,350)));
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await dialogGone(page);
   await downloadRequest.fallback();
   const prompt=page.getByRole('dialog',{name:'Public Packages Found'});
   await expect(prompt).toBeVisible();
@@ -1097,7 +1101,7 @@ test('public package offers choose the newest unpinned version and remember Canc
   await expect(prompt.locator('li')).toHaveText(['offer-test 0.2']);
   await prompt.getByRole('button',{name:'Cancel',exact:true}).click();
   await opened(page,()=>page.evaluate(()=>window.viewer.command('reload-library')));
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await dialogGone(page);
   await expect(page.locator('.package-hint button')).toHaveText('Include');
 });
 
@@ -1111,7 +1115,7 @@ test('unresolved symbols do not offer packages and delayed catalog results canno
   await opened(page,()=>page.locator('#file-input').setInputFiles(packageFile(plain,'other.sp')));
   await pending.fulfill({json:catalog});
   await page.evaluate(async()=>{await (await import('./shells/web.js')).default.publicPackages();});
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await dialogGone(page);
   await expect(page.locator('.package-hint')).toHaveCount(0);
   await page.locator('#tab-files').click();
   await expect(page.getByRole('button',{name:'Exclude offer-test 0.1',exact:true})).toHaveCount(0);
@@ -1131,9 +1135,9 @@ test('a stalled public catalog times out after ten seconds while viewing and edi
   await opened(page,()=>page.keyboard.press('Control+q'));
   expect(await page.evaluate(()=>window.viewer.doc.files[0].text)).toContain('* typed while offline');
   await expect(page.locator('#public-package-status')).toContainText('timed out after 10 seconds',{timeout:15000});
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await dialogGone(page);
   await pending.fulfill({json:catalog}).catch(()=>{});
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await dialogGone(page);
 });
 
 test("Include File resolves a package with a different filename and Exclude removes it from search", async ({ page }) => {
@@ -1185,6 +1189,7 @@ test("a missing published Canvas package offers Include and rebuilds; other vers
   const prompt = page.getByRole('dialog', { name: 'Public Packages Found' });
   await expect(prompt).toBeVisible();
   await prompt.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await dialogGone(page);
   if (process.env.RNL_PACKAGE_SCREENSHOTS && info.project.name === "chromium") {
     await page.screenshot({ path: path.join(process.env.RNL_PACKAGE_SCREENSHOTS, "web-missing-canvas-include.png") });
   }

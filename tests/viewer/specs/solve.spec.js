@@ -4,7 +4,7 @@
 // Preview showing the file as written; and a copy saved through the shell. The web shows none of it.
 // The solver's options, Solve > Settings, are in solve-settings.spec.js.
 
-import { expect, test } from "../viewer.js";
+import { dialogGone, expect, test } from "../viewer.js";
 
 const DESKTOP = { platform: "desktop" };
 const T4 = "T4-miller-conflicts";
@@ -119,17 +119,20 @@ test.describe("on the desktop", () => {
     await page.evaluate(() => window.viewer.command("solve-save"));
     await expect(dialog(page)).toContainText("Run Solve › Solve (F9) first");
     await dialog(page).getByRole("button", { name: "Close" }).click();
+    await dialogGone(page);
     expect(await viewer.calls("saveSolved")).toEqual([]);
     await solve(page);
     await page.keyboard.press("Control+Shift+S");
     await expect(dialog(page)).toContainText("Saved the solved copy as /copies/solved.sp.");
     await expect(dialog(page)).toContainText("The files that were opened are unchanged.");
     await dialog(page).getByRole("button", { name: "Close" }).click();
+    await dialogGone(page);
     // a place refused, as over a file that was read, says why
     await page.evaluate(() => (window.fakeShell.saveFail = "a copy is never saved over a file that was read"));
     await page.evaluate(() => window.viewer.command("solve-save"));
     await expect(dialog(page)).toContainText("The copy was not saved: a copy is never saved over a file that was read");
     await dialog(page).getByRole("button", { name: "Close" }).click();
+    await dialogGone(page);
     expect(await viewer.calls("saveSolved")).toHaveLength(2);
   });
 
@@ -138,6 +141,7 @@ test.describe("on the desktop", () => {
     await page.evaluate(() => window.viewer.command("solve"));
     await expect(dialog(page)).toContainText("The netlist could not be solved: cannot read lib.inc");
     await dialog(page).getByRole("button", { name: "Close" }).click();
+    await dialogGone(page);
     await expect(page.locator("#preview-badge")).toBeHidden();
     await expect(page.locator("#tab-solve")).toBeVisible();
   });

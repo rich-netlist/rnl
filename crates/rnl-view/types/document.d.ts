@@ -229,8 +229,9 @@ export type Hit = {
   /**
    * "box": a symbol, given by its top-left and bottom-right corners; "pin": a pin, one point;
    * "wire": a wire, its vertices; "label": a label of an object, given by its top-left and
-   * bottom-right corners, which stands for what that object stands for, and for nothing when
-   * it is not an instance, a bundle, a usage, a wire or a net.
+   * bottom-right corners, which stands for what that object stands for: for a terminal, the nets
+   * of its pin, as the pin does; and for nothing when it is not an instance, a bundle, a usage, a
+   * wire, a net or a terminal drawn at a pin with a net.
    */
   kind: string,
   /**
