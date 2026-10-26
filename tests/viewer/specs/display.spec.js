@@ -54,10 +54,13 @@ test('Download Project writes the display settings when asked; Open Project offe
   expect(manifest.display.view.center).toHaveLength(2);
   expect(manifest.display.view.scale).toBeGreaterThan(0);
 
-  // a new page, with the user's own settings: light, no currents
-  await page.goto(`${process.env.RNL_WEB_URL}/index.html`);
+  // a new page, with the user's own settings: light, no currents. The storage is cleared from a file of
+  // the site that starts nothing, not from the viewer reloaded right after its load event: it was then
+  // still starting (its language list, catalogs and core Worker in flight), and that reload has been
+  // seen to get no answer in WebKit, until the test timed out
+  await page.goto(`${process.env.RNL_WEB_URL}/about.json`);
   await page.evaluate(() => { localStorage.clear(); });
-  await page.reload();
+  await page.goto(`${process.env.RNL_WEB_URL}/index.html`);
   const chooser = page.waitForEvent('filechooser');
   await page.getByRole('menuitem', { name: 'File', exact: true }).click();
   await page.locator('[data-id="open-project"]').click();
