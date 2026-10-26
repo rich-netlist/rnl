@@ -7,9 +7,9 @@ Choose a checker or renderer for validation, and a viewer when the user wants to
 | a shell on Windows x64, Linux x86_64 or macOS | the `rnl` command, downloaded from a core Release (or built from source) | diagnostics with line numbers, SVG drawings, JSON of the model; the most complete |
 | Node 18 or later and a network | the npm package `@rich-netlist/runtime` | the same core as WebAssembly: a Document with diagnostics and an SVG for each level |
 | a person with a browser | the web viewer <https://rich-netlist.github.io/rnl/viewer/> | the drawing, the text and the problems list, with nothing to install |
-| Windows or Linux with a desktop session | the [desktop viewer downloads](https://rich-netlist.github.io/rnl/en/tools.html#desktop) | the same page in an app that reads local files, edits/saves text and solves as a preview; an agent can launch it with the netlist path |
+| Windows, Linux or macOS with a desktop session | the [desktop viewer downloads](https://rich-netlist.github.io/rnl/en/tools.html#desktop) | the same page in an app that reads local files, edits/saves text and solves as a preview; an agent can launch it with the netlist path |
 
-All four are the same core, so they read a file the same way. The language is a draft that changes between versions (0.x makes no promise of compatibility), and so does the toolkit. Core releases use `core-vX.Y.Z`: the CLI and npm package share X.Y.Z, independently of Viewer and language versions. Historical npm previews used `runtime-v0.1.0-preview.N`. Until the first core version and npm dist-tag are chosen, install an exact published npm version rather than assuming `next` or `latest`.
+All four are the same core, so they read a file the same way. The language is a draft that changes between versions (0.x makes no promise of compatibility), and so does the toolkit. Core releases use `core-vX.Y.Z`: the CLI and npm package share X.Y.Z, independently of Viewer and language versions. Historical npm previews used `runtime-v0.1.0-preview.N`. The npm dist-tag `latest` follows the latest core release; install an exact version to pin one.
 
 ## Optional inspection overlays
 
@@ -66,8 +66,8 @@ manually maintained full-standard copy in this skill.
 
 ### Download a ready-to-run CLI
 
-After the first core release, these fixed links follow the latest core Release. Before it,
-use the source build below. The archives contain the executable, MIT, CC0 and OFL licences
+These fixed links follow the latest core release; the source build below gives a
+specific revision. The archives contain the executable, MIT, CC0 and OFL licences
 and a font-metrics copyright notice. They need no Rust installation.
 
 | Platform | Archive |
@@ -199,7 +199,7 @@ process.exit(errors || document.failed ? 1 : 0);
 
 ## The web viewer
 
-<https://rich-netlist.github.io/rnl/viewer/> is a static page with the core as WebAssembly; nothing you open is sent anywhere. A person opens a file with File › Open, drops files or a folder on the page, pastes with File › Load from Clipboard (Ctrl+Shift+V), or gives an address: `?url=ADDRESS` in the page's address opens a netlist on a web server, with the files it includes fetched relative to it, when the server allows it (CORS). It draws each level, lists the problems under the text (click one to see its line), and edits the text: Edit › Edit Text, then Apply Changes; Save downloads the file shown. Its samples are the conformance corpus, such as <https://rich-netlist.github.io/rnl/viewer/?url=samples/cases/03-five-transistor-ota.sp>.
+<https://rich-netlist.github.io/rnl/viewer/> is a static page with the core as WebAssembly; nothing you open is sent anywhere. A person opens a file with File › Open File..., drops files or a folder on the page, pastes with File › Load from Clipboard (Ctrl+Shift+V), or gives an address: `?url=ADDRESS` in the page's address opens a netlist on a web server, with the files it includes fetched relative to it, when the server allows it (CORS). It draws each level, lists the problems under the text (click one to see its line), and edits the text: Edit › Edit Text, then Apply Changes; Save downloads the file shown. Its samples are the conformance corpus, such as <https://rich-netlist.github.io/rnl/viewer/?url=samples/cases/03-five-transistor-ota.sp>.
 
 ### Links that open a specific netlist
 

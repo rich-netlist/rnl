@@ -24,7 +24,7 @@
         "en": "Toolkit 0.1: web and desktop viewers"
       },
       "description": {
-        "en": "The runtime, the SPICE and Spectre adapters, the renderer and the <code>rnl</code> command; <a href=\"tools.html\">the web viewer</a> goes online and the Windows desktop viewer 0.1.0 is released. They open a netlist with RNL and draw what has coordinates."
+        "en": "Initial release of the runtime, the SPICE and Spectre adapters, the renderer, and the <code>rnl</code> command; <a href=\"tools.html\">the web viewer</a> goes online and the Windows desktop viewer 0.1.0 is released. They open a netlist with RNL and draw placed objects."
       },
       "url": "tools.html",
       "link_label": {
@@ -56,7 +56,7 @@
         "en": "Language standard 0.3, revisions 1 and 2"
       },
       "description": {
-        "en": "The solver must write back every decision it makes, so that a viewer that does not solve draws what it drew: objects that no name reaches have numbers, and the routes of automatic wires are written back. The standard series 0.3 spells its names out in full; the <a href=\"spec/0.3/\">formal standard</a> comes with a Chinese version, and files of 0.2 still read."
+        "en": "The solver must write back every layout decision it makes, so that a viewer without a solver renders the same schematic: unnamed objects can be referenced by number, and automatically routed wire paths are written back. Standard package series 0.3 spells out definition and symbol names in full; the <a href=\"spec/0.3/\">formal standard</a> includes a Chinese translation, and version 0.2 files remain supported."
       },
       "url": "spec/0.3/",
       "link_label": {
@@ -191,7 +191,7 @@
       "id": "complete-viewer-api",
       "date": "2026-10-20T15:21:45Z",
       "title": {
-        "en": "Open the complete Viewer from another site"
+        "en": "Open the full web viewer from another site"
       },
       "description": {
         "en": "The complete Viewer and embedded mode share an import API for netlists, URLs and exact public-package versions. Other sites can open or reuse a Viewer tab and cancel superseded imports."
@@ -234,7 +234,7 @@
         "en": "The solver’s objectives, second version"
       },
       "description": {
-        "en": "Planned: the names of the standard package move out of the solver into its configuration, so that in a file of 0.3 the objectives for current direction, ground direction and signal flow have something to act on."
+        "en": "Planned: move the standard package’s names out of hardcoded solver logic into its configuration, so the current-direction, ground-direction and signal-flow objectives work on 0.3 files."
       }
     }
   ]

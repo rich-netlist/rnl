@@ -63,7 +63,9 @@ pub async fn export_svg(
             rnl_view::LibraryProvider { files: &layered, index: &index, enabled: auto_include.unwrap_or(false) };
         let doc = rnl_view::build(&entry, &provider, &options)?;
         let shown = doc.levels.get(level).filter(|l| l.title == title).ok_or_else(|| {
-            format!("the level {title} is not where the document shown has it: open the file again and export")
+            format!(
+                "level {title} has changed since the document was loaded: reload or reopen the file and export again"
+            )
         })?;
         rnl_view::overlays::svg(shown, &overlays)
     })

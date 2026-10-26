@@ -276,7 +276,7 @@
       } else if (old) {
         state.entries = old;
         render();
-        notice(fill('<en>The latest gallery cannot be read right now; this is what was read last time.</en>'), 'warn');
+        notice(fill('<en>The latest gallery cannot be loaded right now; showing the cached copy from your last visit.</en>'), 'warn');
       } else {
         main.textContent = '';
         var p = el('p', 'gl-status cg-notice cg-error');

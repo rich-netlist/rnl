@@ -163,7 +163,7 @@
       <div class="hd-out hd-view panel">
         <div class="ph"><svg class="ico"><use href="#i-eye"/></svg><span class="ph-title"><en>RNL viewer</en></span><span class="ph-right"><span class="chip chip-rnl" id="hero-view-chip"><en>Netlist + RNL</en></span></span></div>
         <div class="fig"><svg id="hero-svg" role="img" aria-label="<en>RC low-pass schematic drawn from the same file</en>"></svg></div>
-        <p class="cap"><en>The schematic drawn from the same file: source on the left, load on the right, the net name from RNL; the standard package adds the ground symbols without a line written.</en></p>
+        <p class="cap"><en>The schematic drawn from the same file: source on the left, load on the right, and the net label from RNL; the standard package adds the ground symbols automatically.</en></p>
       </div>
       <p class="hero-note"><svg class="ico"><use href="#i-info"/></svg><span id="hero-note-text"></span></p>
     </div>
@@ -180,7 +180,7 @@
     <li><a href="#vision"><en>Vision</en></a></li>
     <li><a href="#scenes"><en>Scenarios</en></a></li>
     <li><a href="#status"><en>Status</en></a></li>
-    <li><a href="#next"><en>For the details, go to these pages.</en></a></li>
+    <li><a href="#next"><en>Next</en></a></li>
   </ul>
 </nav>
 <main id="main" class="page-content">
@@ -210,7 +210,7 @@
       </li>
       <li>
         <span class="brief-k"><svg class="ico"><use href="#i-flask"/></svg><en>Status</en></span>
-        <p><en>The language has been consolidated into standard 0.3. The toolkit reads netlists and draws what has coordinates, in a web viewer and a desktop viewer, which now edit the text too; the solver has a first version, and the desktop viewer solves with it, as a preview.</en></p>
+        <p><en>Language standard 0.3 is released. The web and desktop viewers read netlists, draw placed objects, and edit the text; a first version of the solver runs in the CLI and as a preview in the desktop viewer.</en></p>
         <a href="#status"><en>Progress →</en></a>
       </li>
     </ol>
@@ -228,7 +228,7 @@
 
     <blockquote class="motto">
       <p><en><span class="m-host">The native netlist defines the circuit;</span> <span class="m-rnl">Rich Netlist describes how to understand and present that circuit.</span> Semantic description can exist without geometry, and geometry can be refined step by step, but neither may redefine the circuit.</en></p>
-      <cite><en>RNL principles draft · Scope and guiding statement</en></cite>
+      <cite><en>RNL Principles · 1. Positioning and overview</en></cite>
     </blockquote>
 
     <div class="owners" id="owners">
@@ -291,7 +291,7 @@
   <div class="wrap">
     <header class="sheet-head">
       <p class="sheet-no"><en>02 · Why</en></p>
-      <h2><en>Netlists and schematics each miss half.</en></h2>
+      <h2><en>Netlists and schematics each miss half the picture.</en></h2>
       <p class="lead"><en>Simulation runs on netlists; understanding a circuit takes a schematic. Designers switch between the two every day, and each falls short somewhere.</en></p>
     </header>
 
@@ -365,7 +365,7 @@
       </div>
       <div class="fix">
         <div class="fix-fig"><svg id="fix-air" role="img" aria-label="<en>Five-transistor OTA placed from connectivity alone: airwires crossing everywhere</en>"></svg></div>
-        <div class="fix-body"><h4><en>Generate automatically</en></h4><p><en>It knows the connections but not the structure: everything is wired, yet you cannot tell which two transistors form a pair.</en></p></div>
+        <div class="fix-body"><h4><en>Generate automatically</en></h4><p><en>An auto-layout tool knows the connections but not the structure: everything is wired, yet you cannot tell which two transistors form a pair.</en></p></div>
       </div>
       <div class="fix">
         <div class="fix-fig">
@@ -666,7 +666,7 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><en>The netlis
     <header class="sheet-head">
       <p class="sheet-no"><en>05 · Status</en></p>
       <h2><en>Where things stand.</en></h2>
-      <p class="lead"><en>The language is released as standard 0.3; <a href="tools.html">the web and desktop viewers</a> read netlists, draw them and edit the text, and the solver has a first version. Below are the latest released milestones and what comes next; every one is on the full timeline.</en></p>
+      <p class="lead"><en>The language is released as standard 0.3; <a href="tools.html">the web and desktop viewers</a> read netlists, draw them and edit the text, and the solver has a first version. Below are the latest released milestones and what comes next; all released milestones are on the full timeline.</en></p>
     </header>
     <div class="status-grid">
       <ol class="tl">
@@ -696,15 +696,15 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><en>The netlis
         </details>
         <details>
           <summary><en>Why does AI come up so often?</en><svg class="ico"><use href="#i-next"/></svg></summary>
-          <p><en>Language models are good at reading and writing text such as netlists. RNL makes the drawing text too, so a model can write it directly and edit it in place. In the first writing trial, 11 models wrote 264 runs from a reference, and most produced usable RNL. Free text between statements helps people read, but it never changes what machines understand.</en></p>
+          <p><en>Language models are good at reading and writing text such as netlists. RNL makes the drawing text too, so a model can write it directly and edit it in place. In an initial benchmark, 11 models generated 264 RNL samples from a reference, and 228 of them passed the prototype checker without errors. Free text between statements helps people read, but it never changes what machines understand.</en></p>
         </details>
         <details>
           <summary><en>Can RNL be written in other languages?</en><svg class="ico"><use href="#i-next"/></svg></summary>
-          <p><en>Keywords and the names in the standard package can have aliases, other spellings in the style of another language. A file declares a few with <code>@ALIAS</code> in its header record, or loads an alias package, a language’s aliases collected in one package file, with <code>@USE-ALIASES(name=…, version=…)</code>, or with <code>path=…</code> for one of its own. The standard series has one so far, Chinese, <code>rnl-zh</code>, which comes with the tools: write <code>@USE-ALIASES(name="rnl-zh", version="0.3")</code> in the header record and use its aliases, as in <code lang="zh-CN">#M1 @位于(10, 20)</code>. An alias is only another spelling: the two can be mixed, and machines read exactly the same thing; the header record itself is always read in standard spelling.</en></p>
+          <p><en>Keywords and standard-package names can have aliases in another language. In its header record, a file can declare individual aliases with <code>@ALIAS</code> or load an alias package—a package file collecting aliases for a language—using <code>@USE-ALIASES(name=…, version=…)</code> (or <code>path=…</code> for a custom file). Standard series 0.3 includes one bundled alias package so far, Chinese (<code>rnl-zh</code>): write <code>@USE-ALIASES(name="rnl-zh", version="0.3")</code> in the header record to use aliases such as <code lang="zh-CN">#M1 @位于(10, 20)</code>. An alias is simply an alternate spelling: standard and alias spellings can be mixed freely, and machines read the exact same statements; the header record itself always uses standard spelling.</en></p>
         </details>
         <details>
           <summary><en>Can I use it now?</en><svg class="ico"><use href="#i-next"/></svg></summary>
-          <p><en>For looking at drawings and editing the text, yes: the <a href="tools.html">viewers</a> open a netlist with RNL in the browser or on Windows, Linux and macOS, draw the parts that have coordinates, and edit the text and draw it again. Laying out has just begun: the solver has a first version, with which <code>rnl solve</code> and the desktop viewer place the parts that give intent without coordinates, the desktop viewer as a preview. The web viewer does not solve yet, so it does not draw those parts and lists them in its Not drawn view. There is no editor for dragging devices yet.</en></p>
+          <p><en>For viewing schematics and editing netlist text, yes: the <a href="tools.html">viewers</a> open netlists with RNL in the browser or on Windows, Linux and macOS, draw placed objects, and let you edit the text and re-render. Automatic layout is at an early stage: a first version of the solver is available in <code>rnl solve</code> and as a preview in the desktop viewer to place objects specified only by intent. The web viewer does not run the solver yet, so it leaves unplaced objects undrawn and lists them in its Not drawn view. Graphical drag-and-drop editing is not yet available.</en></p>
         </details>
       </div>
     </div>
@@ -746,7 +746,7 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><en>The netlis
         <li><en>Toolchain architecture: </en><a href="https://github.com/rich-netlist/rnl/blob/main/docs/rnl-toolchain-architecture.md"><code>docs/rnl-toolchain-architecture.md</code></a></li>
         <li><en>Standard packages: </en><a href="packages.html"><en>the gallery</en></a><en>, every symbol as drawn and the text that defines it</en></li>
         <li><en>Tools: </en><a href="tools.html"><en>the web and desktop viewers</en></a></li>
-        <li><en>Roadmap: </en><a href="https://github.com/rich-netlist/rnl/blob/main/docs/roadmap.md"><code>docs/roadmap.md</code></a><en>; the layout-solver and interpreter prototypes are in a research repository that is not public yet</en></li>
+        <li><en>Roadmap: </en><a href="https://github.com/rich-netlist/rnl/blob/main/docs/roadmap.md"><code>docs/roadmap.md</code></a><en>; the runtime and layout solver live in <code>crates/</code> in this repository</en></li>
         <li><a href="translation.html">{{nav-translation}}</a></li>
       </ul>
     </div>

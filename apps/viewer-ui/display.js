@@ -27,7 +27,7 @@ function items(display) {
   const out = [];
   if (display.background) out.push({ key: "background", label: m`Background: ${display.background === "dark" ? m("dark") : m("light")}` });
   const colors = Object.keys(display.colors || {}).filter((name) => colourNames.has(name));
-  if (colors.length) out.push({ key: "colors", label: m`Colour scheme: ${colors.length} of its colours` });
+  if (colors.length) out.push({ key: "colors", label: m`Color scheme: ${colors.length} of its colors` });
   if (typeof display.usages === "boolean") out.push({ key: "usages", label: m`Usages: ${shownOrHidden(display.usages)}` });
   if (typeof display.currents === "boolean") out.push({ key: "currents", label: m`Current directions: ${shownOrHidden(display.currents)}` });
   if (display.grid) out.push({ key: "grid", label: display.grid === "none" ? m("Grid: none") : display.grid === "dots" ? m("Grid: dots") : m("Grid: lines") });
@@ -109,7 +109,7 @@ export async function offerDisplay(display, name, ignored = [], has = () => fals
   });
   const keys = await form({
     title: m("Display Settings"),
-    text: m("The manifest proposes these display settings. Those you keep apply while a file of it is shown; your own settings do not change."),
+    text: m("The manifest includes these display settings. Selected settings apply while viewing this manifest without changing your saved preferences."),
     parts: boxes.map((b) => b.row),
     action: tr("Apply Selected"),
     cancel: tr("Don't Apply"),
@@ -143,7 +143,7 @@ export function displayBox() {
   box.type = "checkbox";
   box.id = "write-display";
   const text = document.createElement("span");
-  setText(text, m("Also write the current view, background, colour scheme, usages, current directions and grid"));
+  setText(text, m("Also write the current view, background, color scheme, usages, current directions and grid"));
   append(row, box, text);
   return { row, box };
 }

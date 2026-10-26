@@ -19,7 +19,7 @@
       st: ['chip', '<en>Existing formats</en>']
     },
     adapter: {
-      nm: '<en>Host adapters</en>', sub: 'Host adapters',
+      nm: '<en>Host adapter</en>', sub: 'Host adapter',
       role: '<en>Understands netlist dialects.</en>',
       li: [
         '<en>Finds the comment lines where RNL can be written safely</en>',
@@ -47,7 +47,7 @@
       li: [
         '<en>Input: the effective model of one circuit level from the runtime, that is, semantics, constraints and priorities</en>',
         '<en>Output: complete positions, orientations and routing for that level, as one record with type="generated" and priority high</en>',
-        '<en>Delivers better results as it computes, and can be cancelled at any time</en>',
+        '<en>Delivers better results as it computes, and can be canceled at any time</en>',
         '<en>Same input and same work budget give exactly the same result</en>'
       ],
       form: '<en>rnl-solver (pure Rust, compiles to WASM); @rich-netlist/solver</en>',

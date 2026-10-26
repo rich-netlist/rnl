@@ -217,7 +217,7 @@ export async function loadClipboard() {
   const title = m("Load from Clipboard");
   let text;
   try {
-    if (!navigator.clipboard || !navigator.clipboard.readText) throw new Error(m("the browser does not let the page read it"));
+    if (!navigator.clipboard || !navigator.clipboard.readText) throw new Error(m("the browser does not allow this page to read the clipboard"));
     text = await navigator.clipboard.readText();
   } catch (e) {
     const why = (e instanceof Error && e.message ? e.message : String(e)).replace(/\.$/, "");
@@ -247,7 +247,7 @@ function preview(title, text) {
   setText(box, lines.slice(0, PREVIEW_LINES).join("\n"));
   const size = document.createElement("p");
   size.className = "dialog-note";
-  const more = lines.length > PREVIEW_LINES ? m`; the first ${PREVIEW_LINES} are shown` : "";
+  const more = lines.length > PREVIEW_LINES ? m`; first ${PREVIEW_LINES} lines shown` : "";
   const n = lines.length, c = text.length;
   setText(size, m`${n === 1 ? m("{0} line", n) : m("{0} lines", n)}, ${c === 1 ? m("{0} character", c) : m("{0} characters", c)}${more}.`);
   const set = document.createElement("fieldset");
@@ -269,7 +269,7 @@ function preview(title, text) {
   });
   const alone = document.createElement("p");
   alone.className = "dialog-note";
-  setText(alone, m("It is read alone, as clipboard.sp, .scs or .rnl: files that it includes are missing."));
+  setText(alone, m("Opened without a folder as clipboard.sp, .scs or .rnl; included files are looked up in Library (and in PATH in the desktop viewer)."));
   return form({
     title,
     parts: [warning, box, size, set, alone],

@@ -1,7 +1,7 @@
 // Prepare line data and lexical checkpoints without constructing offscreen DOM. Syntax state is
 // retained across continued host statements and multi-line RNL comments, so any row can render alone.
 import { hostLine, mark, rnlRange } from "./syntax.js";
-import { m, setAttr } from "./i18n.js";
+import { m, setAttr, tr } from "./i18n.js";
 
 export function lineModel(file, f, allSpans, dialect) {
   const texts = file.text.split(/\r?\n/);
@@ -156,8 +156,8 @@ function leadingCarrier(text) {
 }
 
 const FAIL_TITLE = {
-  failed: "Failed: this does not take effect (see Problems)",
-  overridden: "Overridden: another statement wins this conflict (7.5)",
+  failed: tr("Failed: this does not take effect (see Problems)"),
+  overridden: tr("Overridden: superseded by a higher-priority statement (7.5)"),
 };
 
 function lineElement(text, n, cls, obj, fail) {
@@ -182,7 +182,7 @@ function lineElement(text, n, cls, obj, fail) {
       if (cls[i]) s.className = `s-${cls[i]}`;
       if (fail[i]) {
         s.classList.add(`x-${fail[i]}`);
-        s.title = FAIL_TITLE[fail[i]];
+        s.title = m(FAIL_TITLE[fail[i]]);
       }
       if (obj[i]) {
         s.classList.add("obj");

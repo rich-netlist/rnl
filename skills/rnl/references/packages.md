@@ -21,12 +21,12 @@ Using a package other than `rnl-std`, in the header record (the standard 16.2, 1
 | `rnl-std` 0.3 (implicit) | `rnl-std-core`, `rnl-std-fill`, `rnl-std-structures` | The standard package, used at the root of every netlist by default. It only references other packages and has no content of its own. |
 | `rnl-std-basic` 0.3 | – | The symbols of passive parts, sources, switches, transmission lines, virtual elements and marks; the definitions of the virtual and drawing-only parts, the ground and supply stubs, and the rules that draw them. |
 | `rnl-std-core` 0.3 | `rnl-std-style`, `rnl-std-basic`, `rnl-std-semiconductors`, `rnl-std-spice`, `rnl-std-spectre` | The smallest collection: styles, symbols and the rules that give them, enough to draw the netlist and nothing more — no grounds, supplies or port tags filled in. |
-| `rnl-std-fill` 0.3 | `rnl-std-basic` | The automatic fill: a ground or supply for every unwired pin on such a net; a port tag for every port net but the ground and supply nets, which have their grounds and supplies already; and the grounds of a ground net other than 0, such as vss, drawn with the name of the net under them. And the sets a file edits. |
+| `rnl-std-fill` 0.3 | `rnl-std-basic` | Automatic fill rules: adds a ground or supply symbol for every unwired terminal on a ground or supply net, adds a port tag for every port net except ground and supply nets, and draws the net name under ground symbols on non-0 ground nets such as vss. Also defines the sets a file can edit. |
 | `rnl-std-full` 0.3 | `rnl-std`, `rnl-std-functional`, `rnl-std-rf`, `rnl-std-logic`, `rnl-std-signal-flow` | rnl-std with the four domain packages: functional, rf, logic and signal-flow. |
 | `rnl-std-functional` 0.3 | – | Function blocks: op-amps, comparators, amplifiers, transconductors, ADC, DAC. |
 | `rnl-std-logic` 0.3 | – | Logic gates, buffer, inverter, D flip-flops, and the drawing-only delay cell. |
 | `rnl-std-no-labels` 0.3 | – | Turns off the default labels of the standard symbols, for files that write all their labels themselves. |
-| `rnl-std-rf` 0.3 | – | RF parts: the centre-tapped inductor and the T-coil. |
+| `rnl-std-rf` 0.3 | – | RF parts: the center-tapped inductor and the T-coil. |
 | `rnl-std-semiconductors` 0.3 | – | The symbols of diodes, MOS transistors, BJTs and JFETs. |
 | `rnl-std-signal-flow` 0.3 | – | Signal-flow blocks: adder and multiplier, and the drawing-only integrator, discrete-time integrator, quantizer and unit delay. |
 | `rnl-std-spectre` 0.3 | `rnl-std-basic`, `rnl-std-semiconductors` | The symbol rules of Spectre netlists: primitives by master, instances of model cards by model type. |

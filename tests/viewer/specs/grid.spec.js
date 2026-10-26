@@ -193,7 +193,7 @@ test("the settings dialog sets the style, a spacing, the major lines and the axe
   await units.fill("2");
   await major.fill("1");
   await major.press("Enter");
-  await expect(dialog.locator(".dialog-error")).toHaveText(/A major line comes every 2 to 100 lines/);
+  await expect(dialog.locator(".dialog-error")).toHaveText(/Major line interval must be a whole number from 2 to 100/);
   await major.fill("4");
   await dialog.getByRole("checkbox", { name: "Axes through the origin" }).check();
   await major.press("Enter");

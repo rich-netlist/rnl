@@ -104,7 +104,7 @@ test("the checks refuse what a manifest must not hold", () => {
   assert.equal(checkManifest(manifest({ base: "http://localhost:8080/design/" })).base, "http://localhost:8080/design/");
   assert.equal(checkManifest(manifest({ base: "http://127.0.0.1/design/" })).base, "http://127.0.0.1/design/");
   refused({ id: "../x" }, /id must be/);
-  refused({ entry: "../top.scs" }, /leaves the manifest.s files/);
+  refused({ entry: "../top.scs" }, /must be a relative path within the manifest/);
   refused({ entry: "/top.scs" }, /not a relative path/);
   refused({ entry: "missing.scs" }, /not among the manifest's files/);
   refused({ files: [...manifest().files, manifest().files[0]] }, /twice/);
@@ -114,18 +114,18 @@ test("the checks refuse what a manifest must not hold", () => {
   refused({ files: [file("top.scs"), { ...file(".packages/x/1/x.rnl"), url: "file:///x.rnl" }], pool: [] }, /not an https address/);
   refused({ formats: { "missing.scs": "spectre" } }, /not among the manifest's files/);
   refused({ formats: { "top.scs": 3 } }, /not a format's name/);
-  refused({ paths: [{ path: "../lib" }] }, /leaves the manifest's files/);
+  refused({ paths: [{ path: "../lib" }] }, /must be a relative path within the manifest/);
   refused({ settings: { autoInclude: "yes" } }, /autoInclude/);
   // without a base, every file needs a url, unless the manifest is in an archive
   const unaddressed = manifest({ base: undefined });
-  assert.throws(() => checkManifest(unaddressed), /no url, and the manifest no base/);
+  assert.throws(() => checkManifest(unaddressed), /has no "url" field and the manifest has no "base" URL/);
   assert.equal(checkManifest(unaddressed, { archive: true }).files.length, 5);
   // a caller that holds less gives smaller limits: a web page's project
   assert.throws(() => checkManifest(unaddressed, { archive: true, limits: { projectBytes: 10 } }), /bytes, more than 10\./);
   // an id is not needed: the entry's name is it then
   assert.equal(checkManifest(manifest({ id: undefined, entry: "top.scs" })).id, "top");
   refused({ pool: ["lib/none.rnl"] }, /not among the manifest's files/);
-  refused({ pool: ["lib/../top.scs"] }, /leaves the manifest.s files/);
+  refused({ pool: ["lib/../top.scs"] }, /must be a relative path within the manifest/);
   refused({ pool: ["lib/pdk.rnl", "lib/pdk.rnl"] }, /pool lists a file twice/);
   // no pool is an empty one
   assert.deepEqual(checkManifest(manifest({ pool: undefined })).pool, []);
@@ -158,7 +158,7 @@ test("writeManifest gives a manifest that reads back to the same files", async (
   assert.equal(read.files["/top/cells/amp.scs"], FILES["cells/amp.scs"]);
   assert.deepEqual(read.formats, { "/top/top.scs": "spectre" });
   // a manifest of links needs a url for every file
-  await assert.rejects(writeManifest({ entry: "top.scs", files: [{ path: "top.scs", bytes: encode("x") }] }), /no url/);
+  await assert.rejects(writeManifest({ entry: "top.scs", files: [{ path: "top.scs", bytes: encode("x") }] }), /has no "url" field/);
   const links = await writeManifest({ entry: "top.scs", files: [{ path: "top.scs", bytes: encode("x"), url: "https://example.test/top.scs" }] });
   assert.equal(links.files[0].url, "https://example.test/top.scs");
 });

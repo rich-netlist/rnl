@@ -129,7 +129,7 @@ async function levelSvg() {
     source: currentSource(), edits: changes(true) });
   const parsed = new DOMParser().parseFromString(text, "image/svg+xml");
   const svg = parsed.documentElement;
-  if (svg.nodeName !== "svg") throw new Error(m("The core gave no drawing for this level."));
+  if (svg.nodeName !== "svg") throw new Error(m("No drawing is available for this level."));
   asShown(svg, choices);
   await embeddedFonts(svg);
   return svg;

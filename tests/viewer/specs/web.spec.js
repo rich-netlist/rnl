@@ -1201,7 +1201,7 @@ test("a missing published Canvas package offers Include and rebuilds; other vers
     await page.screenshot({ path: path.join(process.env.RNL_PACKAGE_SCREENSHOTS, "web-library-standard-builtins.png") });
   }
   await opened(page, () => page.locator("#file-input").setInputFiles({ name: "canvas-newer.sp", mimeType: "text/plain", buffer: Buffer.from(source.toString().replace('version="0.1"', 'version="99.0"')) }));
-  await expect(page.locator(".package-hint")).toContainText("Look for it in File › Include Public Package…");
+  await expect(page.locator(".package-hint")).toContainText("Look for it in File › Include Public Package...");
   await expect(page.locator(".package-hint button")).toHaveCount(0);
 });
 

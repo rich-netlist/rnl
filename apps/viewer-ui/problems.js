@@ -57,7 +57,7 @@ function packageHint(d, version) {
   if (!missing) return null;
   const li = document.createElement("li");
   li.className = "diag hint package-hint";
-  const message = span("msg", m("Look for it in File › Include Public Package…"));
+  const message = span("msg", m("Look for it in File › Include Public Package..."));
   append(li, span("sev", "hint"), message);
   if (shell.platform === "desktop") {
     setText(message, m("Add the package file to Library or a PATH directory; public packages are listed on the website's "));
