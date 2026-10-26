@@ -74,7 +74,7 @@
     'SELECT-USAGE': ['<en>Selects the usages of a definition, looking inward; without a definition, all usages.</en>', 'among the usages at each level in # and below, @SELECT-USAGE of $DIFFERENTIAL_PAIR => they have @PRIORITY("disabled")'],
     'SELECT-ANCESTOR-USAGE': ['<en>Selects the usages that have these objects as members, looking outward.</en>', 'among the usages containing #M1, @SELECT-ANCESTOR-USAGE of $DIFFERENTIAL_PAIR => named %dp_set'],
     'ADD-TO': ['<en>Adds members to a named set, such as vdd to the supply nets, so the standard package adds supply symbols for it.</en>', '&vdd @ADD-TO $SUPPLY_NET_SET'],
-    'REMOVE-FROM': ['<en>Removes members from a named set, such as no net name under the grounds on vss.</en>', '&vss @REMOVE-FROM $NAMED_GROUND_NET_SET'],
+    'REMOVE-FROM': ['<en>Removes members from a named set—for example, removing vss from $NAMED_GROUND_NET_SET so its ground symbols do not show the net name.</en>', '&vss @REMOVE-FROM $NAMED_GROUND_NET_SET'],
     'UNION': ['<en>A union without duplicates.</en>', '%u_set = %a_set and %b_set @UNION'],
     'VERSION': ['<en>The language version of the file. Only in the header record; without it, the tool’s default version applies.</en>', '* @RNL(type="header") { @VERSION("0.3")}'],
     'ALIAS': ['<en>Declares another spelling (an alias) for a standard word or a $ name, alias first. Only in the header record.</en>', /*zh-CN*/'@ALIAS("@位于", "@PLACE")'/*/zh-CN*/],

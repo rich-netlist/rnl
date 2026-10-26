@@ -149,7 +149,7 @@ test('gallery: when the data cannot be read', async ({ page, context }) => {
   await page.evaluate(index => localStorage.setItem('rnl-gallery-index', index), INDEX);
   await page.reload();
   await expect(page.locator('.cg-card')).toHaveCount(3);
-  await expect(page.locator('.cg-warn')).toContainText('last time');
+  await expect(page.locator('.cg-warn')).toContainText('cached copy from your last visit');
 });
 
 test('gallery: a newer format of the data asks for a reload, an empty list says so', async ({ page }) => {

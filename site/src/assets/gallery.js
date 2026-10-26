@@ -30,13 +30,13 @@
     'rnl-std-spice': '<en>The symbol rules of SPICE netlists: by element letter first, then by model type.</en>',
     'rnl-std-spectre': '<en>The symbol rules of Spectre netlists: primitives by master, instances of model cards by model type.</en>',
     'rnl-std-fill': '<en>The automatic fill: a ground or supply for every unwired pin on such a net, a port tag for every port net; and the sets a file edits.</en>',
-    'rnl-std-fill 0.3': '<en>The automatic fill: a ground or supply for every unwired pin on such a net; a port tag for every port net but the ground and supply nets, which have their grounds and supplies already; and the grounds of a ground net other than 0, such as vss, drawn with the name of the net under them. And the sets a file edits.</en>',
+    'rnl-std-fill 0.3': '<en>Automatic fill rules: adds a ground or supply symbol for every unwired terminal on a ground or supply net, adds a port tag for every port net except ground and supply nets, and draws the net name under ground symbols on non-0 ground nets such as vss. Also defines the sets a file can edit.</en>',
     'rnl-std-semantics': '<en>Semantic definitions, such as a differential pair or a current mirror: roles only, nothing drawn.</en>',
-    'rnl-std-layout': '<en>Layout definitions: a mirrored pair, a tail centred under a pair, the direction of signal flow.</en>',
+    'rnl-std-layout': '<en>Layout definitions: a mirrored pair, a tail centered under a pair, the direction of signal flow.</en>',
     'rnl-std-structures': '<en>Structures: differential pair, current mirror, branch, chain, cascade, mirrored, flow and more. Some carry a default drawing, all of priority low: what the author writes comes first, and PRIORITY on a usage turns it off.</en>',
     'rnl-std-full': '<en>rnl-std with the four domain packages: functional, rf, logic and signal-flow.</en>',
     'rnl-std-functional': '<en>Function blocks: op-amps, comparators, amplifiers, transconductors, ADC, DAC.</en>',
-    'rnl-std-rf': '<en>RF parts: the centre-tapped inductor and the T-coil.</en>',
+    'rnl-std-rf': '<en>RF parts: the center-tapped inductor and the T-coil.</en>',
     'rnl-std-logic': '<en>Logic gates, buffer, inverter, D flip-flops, and the drawing-only delay cell.</en>',
     'rnl-std-signal-flow': '<en>Signal-flow blocks: adder and multiplier, and the drawing-only integrator, discrete-time integrator, quantizer and unit delay.</en>',
     'rnl-std-no-labels': '<en>Turns off the default labels of the standard symbols, for files that write all their labels themselves.</en>',
@@ -137,7 +137,7 @@
       : named ? pins.map(function (p) {
         return '<span class="gl-pin">' + esc(terminalText(p)) + '<i>' + esc(p.label || p.name || '') + '</i></span>';
       }).join('') : '';
-    var warn = s.problems && s.problems.length ? '<svg class="ico gl-warn" aria-label="<en>The build noted something</en>"><use href="#i-warn"/></svg>' : '';
+    var warn = s.problems && s.problems.length ? '<svg class="ico gl-warn" aria-label="<en>Build warning</en>"><use href="#i-warn"/></svg>' : '';
     var label = fill('<en>{s}, {n} pins</en>', { s: s.name, n: pins.length }) + pins.map(function (p) {
       return fill('<en>; terminal {t}{m} pointing {d}</en>', { t: terminalText(p), m: p.label || p.name ? ' ' + (p.label || p.name) + ' ' : ' ', d: DIRS[p.dir] || '?' });
     }).join('');
