@@ -1376,6 +1376,8 @@ button.pool-open:hover { text-decoration: underline; }
   .enter-badge svg { width: 20px; height: 20px; }
 }
 .menu-list.scrolls { overflow-y: auto; }
+/* the icon of an entry, in the colour of its text: the globe of the Language submenu */
+.menu-icon { flex: none; width: 14px; height: 14px; margin-right: 6px; vertical-align: -2px; fill: none; stroke: currentColor; stroke-width: 1.2; stroke-linecap: round; }
 
 /*
  * A mobile browser flashes what a finger presses that takes clicks or focus: the drawing, the whole

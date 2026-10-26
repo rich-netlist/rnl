@@ -140,11 +140,29 @@ function entry(item) {
   return b;
 }
 
+/** The pictures an entry can have, by the name the command table gives (`icon`), as SVG. */
+const ICONS = {
+  // a globe: the Language submenu, which a user who reads none of the interface looks for
+  globe: '<circle cx="8" cy="8" r="6.2"/><ellipse cx="8" cy="8" rx="2.7" ry="6.2"/><path d="M1.8 8h12.4M2.8 4.9h10.4M2.8 11.1h10.4"/>',
+};
+
+/** An icon of the table, as an element for an entry. */
+function icon(name) {
+  const el = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  el.setAttribute("class", "menu-icon");
+  el.setAttribute("viewBox", "0 0 16 16");
+  el.setAttribute("aria-hidden", "true");
+  el.innerHTML = ICONS[name] || "";
+  return el;
+}
+
 /** A submenu's entry, with the submenu's list next to it. */
 function submenu(item) {
   const el = document.createElement("div");
   el.className = "menu-sub";
   const b = button(item.label, "menuitem");
+  // in the label, not beside it: an entry is a grid of a check, its label and its keys
+  if (item.icon) b.children[1].prepend(icon(item.icon));
   b.classList.add("opens");
   b.setAttribute("aria-haspopup", "menu");
   b.setAttribute("aria-expanded", "false");

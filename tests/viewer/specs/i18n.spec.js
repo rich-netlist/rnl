@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { test, expect } from '../viewer.js';
 import { zh, zhMenu, translated, uiLanguages, repository } from '../zh.js';
 
@@ -201,4 +202,38 @@ test('without the list of languages the page starts in English alone (decision 0
   await expect(page.locator('html')).toHaveAttribute('lang','en');
   await expect(page.locator('#note')).toContainText("The interface's languages could not be loaded");
   await expect(page.locator('.menu-item[data-id^="language-"]')).toHaveCount(1);
+});
+
+// a catalog's text of an English one, as the page shows it: English when the catalog has none
+const own = (lang, english) => {
+  const catalog = JSON.parse(readFileSync(new URL(`../../../i18n/${lang}/viewer.json`, import.meta.url), 'utf8'));
+  return typeof catalog[english] === 'string' ? catalog[english] : english;
+};
+const plain = (text) => text.split('\t')[0].replace('&', '');
+
+test('the Language submenu has a globe, and it and the View menu keep an English word in every other language (decision 0015)', async ({page,viewer}) => {
+  await viewer.open('04-hierarchy');
+  // the menu that holds the globe: the View menu, whatever its language
+  const view = page.locator('#menubar .menu').filter({ has: page.locator('.menu-icon') }).locator('.menu-title');
+  const sub = page.locator('.menu-item.opens').filter({ has: page.locator('.menu-icon') });
+  const check = async (viewText, languageText, lang) => {
+    await expect(view.locator('.label'), lang).toHaveText(viewText);
+    await view.click();
+    await expect(sub.locator('.label'), lang).toHaveText(languageText);
+    await expect(sub.locator('.menu-icon'), lang).toHaveCount(1);
+    // the names of the languages are as they were: each in its own writing, with no English added
+    await sub.hover();
+    for (const l of uiLanguages(repository)) await expect(viewer.menuItem(`language-${l.lang}`).locator('.label'), `${lang}: ${l.lang}`).toHaveText(l.name);
+    await page.keyboard.press('Escape');
+  };
+  // English: the labels as they were, and the globe
+  await check('View', 'Language', 'en');
+  for (const l of uiLanguages(repository).slice(1)) {
+    await language(page, l.lang);
+    await expect(page.locator('html')).toHaveAttribute('lang', l.code);
+    // the English words come from the table, not from the catalog: the catalog's own words are what is before them
+    await check(`${plain(own(l.lang, '&View'))} (View)`, `${plain(own(l.lang, '&Language'))} (Language)`, l.lang);
+  }
+  await language(page, 'en');
+  await check('View', 'Language', 'en again');
 });
