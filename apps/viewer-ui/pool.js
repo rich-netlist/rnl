@@ -474,7 +474,7 @@ export async function startPool() {
   $("include-library").addEventListener("click", () => includeFiles("library"));
   $("add-path").hidden = !shell.pathPackages;
   setText($("path-note"), shell.pathPackages ? m`Settings: ${settingsPath}`
-    : m("Browsers cannot search local directories. Include files or folders above; the file pool lasts until this page closes."));
+    : m("Browsers cannot search local directories. Include files or folders above; Library files remain until this tab closes."));
   $("add-path-subfolders").hidden = !shell.pathPackages;
   $("add-path").addEventListener("click", () => addPath(false));
   $("add-path-subfolders").addEventListener("click", () => addPath(true));

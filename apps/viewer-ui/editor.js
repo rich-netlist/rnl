@@ -230,13 +230,13 @@ export async function toggleEdit() {
   if (modal()) return;
   if (!editing) {
     if (!doc) {
-      await inform({ title: m("Edit Text"), paragraphs: [m("Open a netlist first: File › Open (Ctrl+O).")] });
+      await inform({ title: m("Edit Text"), paragraphs: [m("Open a netlist first: File › Open File (Ctrl+O).")] });
       return;
     }
     if (previewing()) {
       await inform({
         title: m("Edit Text"),
-        paragraphs: [m("A solve is shown as a preview, which is not edited. Solve › Close Preview shows the netlist again.")],
+        paragraphs: [m("Cannot edit while viewing a solve preview. Choose Solve › Close Preview to return to the netlist.")],
       });
       return;
     }
@@ -374,7 +374,7 @@ export async function saveAs(encoding = "preserve") {
   if (fileShown !== 0) {
     await inform({
       title,
-      paragraphs: [m("Save As saves the netlist that was opened, the first file. An included file is saved where it is with File › Save.")],
+      paragraphs: [m("Save As only saves the top-level netlist file. To save changes to an included file in place, use File › Save.")],
     });
     return false;
   }

@@ -506,16 +506,12 @@ mod tests {
                 switch,
                 apply,
                 item("discard-edits", "&Discard Changes", None),
-                item("find-text", if tabbed { "&Find in Netlist…\tCtrl+F" } else { "&Find in Netlist…" }, None),
+                item("find-text", if tabbed { "&Find in Netlist...\tCtrl+F" } else { "&Find in Netlist..." }, None),
                 Shown::Separator,
                 item("descend", if tabbed { "Open &Subcircuit\tE" } else { "Open &Subcircuit" }, None),
                 item(
                     "descend-new-window",
-                    if tabbed {
-                        "Open Subcircuit in New &Window…\tShift+E"
-                    } else {
-                        "Open Subcircuit in New &Window…"
-                    },
+                    if tabbed { "Open Subcircuit in New &Window\tShift+E" } else { "Open Subcircuit in New &Window" },
                     None,
                 ),
                 item("ascend", if tabbed { "&Up to Parent Level\tCtrl+E" } else { "&Up to Parent Level" }, None),
@@ -580,7 +576,7 @@ mod tests {
                     item("reload", "&Reload\tF5", None),
                     item("reload-library", "Reload &Library", None),
                     check("toggle-auto-include", "&Auto Include", None),
-                    item("memory-cache", "Memory &Cache…", None),
+                    item("memory-cache", "Memory &Cache...", None),
                     Shown::Separator,
                     item("save", "&Save\tCtrl+S", None),
                     item("save-as", "Save &As...", None),
@@ -641,7 +637,7 @@ mod tests {
                     item("reload", "&Reload", Some("F5")),
                     item("reload-library", "Reload &Library", None),
                     check("toggle-auto-include", "&Auto Include", None),
-                    item("memory-cache", "Memory &Cache…", None),
+                    item("memory-cache", "Memory &Cache...", None),
                     Shown::Separator,
                     item("save", "&Save", Some("CmdOrCtrl+S")),
                     item("save-as", "Save &As...", None),

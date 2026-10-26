@@ -41,9 +41,9 @@ for (const platform of ["desktop", "web"]) {
     await expect(files(page).locator(".current")).toHaveAttribute("aria-current", "true");
     await expect(files(page).locator(".pool-row")).toHaveCount(1);
     if (platform === "web") {
-      await expect(page.locator("#include-library")).toHaveText("Include Public Package…");
+      await expect(page.locator("#include-library")).toHaveText("Include Public Package...");
       await viewer.menuTitle("File").click();
-      await expect(viewer.menuItem("include-library")).toHaveText("Include Public Package…");
+      await expect(viewer.menuItem("include-library")).toHaveText("Include Public Package...");
       await page.keyboard.press("Escape");
       await expect(page.locator("#add-path")).toBeHidden();
       await expect(page.locator(".lib-path")).toHaveCount(0);

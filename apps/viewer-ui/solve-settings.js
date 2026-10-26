@@ -191,7 +191,7 @@ export async function settings() {
     const kept = v.error ? null : textOf(differences(defaults, v));
     const flag = kept && kept.hintsForLow ? " --report" : "";
     const option = kept && kept.options ? ` --solver-options "${kept.options}"` : "";
-    setText(asText, !kept ? "" : flag || option ? m`As rnl solve takes them: rnl solve${flag}${option}` : m("The defaults of rnl solve."));
+    setText(asText, !kept ? "" : flag || option ? m`Equivalent CLI command: rnl solve${flag}${option}` : m("The defaults of rnl solve."));
   };
   for (const type of ["input", "change", "click"]) fields.el.addEventListener(type, showText);
   restore.addEventListener("click", showText);
@@ -285,8 +285,8 @@ function fieldsOf(defaults) {
   grid.line.insertBefore(noGrid.caption, grid.line.children[1]);
   noGrid.input.addEventListener("change", () => (grid.input.disabled = noGrid.input.checked));
   const beam = numberField(m("Beam"), { step: "1", min: "1", hint: m("variants of each group the search keeps") });
-  const candidates = numberField(m("Candidates"), { step: "1", hint: m("the search makes at most as many over a level") });
-  const expansions = numberField(m("Router cells"), { step: "1", hint: m("the router expands at most as many for one net") });
+  const candidates = numberField(m("Candidates"), { step: "1", hint: m("maximum candidate placements evaluated per level") });
+  const expansions = numberField(m("Router cells"), { step: "1", hint: m("maximum router cells expanded per net") });
   const hints = checkField(m("Seek every conflict group of the facts of priority low"));
   const hintsNote = span("settings-hint", m("Only the report changes, and it can take far longer."));
   const objectives = objectiveRows(defaults.names);
@@ -334,12 +334,12 @@ function fieldsOf(defaults) {
         hints_for_low: hints.input.checked,
       };
       const bad = [
-        ["time_limit", m("The time limit is a number of seconds, or no limit.")],
-        ["tolerance", m("The tolerance is a number.")],
-        ["grid", m("The grid is a number, or no rounding.")],
-        ["beam", m("The beam is a whole number.")],
-        ["candidates", m("The candidates are a whole number.")],
-        ["astar_expansions", m("The router cells are a whole number.")],
+        ["time_limit", m("Time limit must be a number of seconds, or no limit.")],
+        ["tolerance", m("Tolerance must be a number.")],
+        ["grid", m("Grid must be a number, or no rounding.")],
+        ["beam", m("Beam must be a positive whole number.")],
+        ["candidates", m("Candidates must be a whole number.")],
+        ["astar_expansions", m("Router cells must be a whole number.")],
       ].find(([k]) => v[k] === null);
       if (bad) return { error: bad[1] };
       const rows = objectives.read();
@@ -360,7 +360,7 @@ function objectiveRows(names) {
   el.className = "objectives";
   const note = document.createElement("p");
   note.className = "dialog-note";
-  setText(note, m`${m`${m("The solver ranks the placements by these, the first level first. Objectives together in a level add up ")}${m("with their weights; a placement whose level is no further than its tolerance from the best counts as equal ")}`}${m("to it, and the next level decides among those. An objective that is off is not computed.")}`);
+  setText(note, m("The solver ranks valid placements by these objective tiers from top to bottom. Objectives combined in the same tier are summed by weight; placements within the tier's tolerance of the best score tie and are broken by the next tier. Disabled objectives are skipped."));
   const list = document.createElement("ol");
   list.className = "objective-list";
   append(el, note, list);
@@ -383,9 +383,9 @@ function objectiveRows(names) {
     append(label, on, name);
     const together = checkField(m("with the one above"));
     together.caption.classList.add("objective-together");
-    setAttr(together.caption, "title", m("Put it in the level of the objective above: they add up"));
-    const weight = numberInput("1", m("weight"), m("Its weight in the level"));
-    const tolerance = numberInput("any", m("equal within"), m("The tolerance of the level: how far from the best a value counts as equal to it"));
+    setAttr(together.caption, "title", m("Put it in the tier of the objective above: they add up"));
+    const weight = numberInput("1", m("weight"), m("Its weight in the tier"));
+    const tolerance = numberInput("any", m("equal within"), m("The tolerance of the tier: how far from the best a value counts as equal to it"));
     const up = moveButton(m("Move up"), "↑", r.name);
     const down = moveButton(m("Move down"), "↓", r.name);
     const moves = span("objective-moves", "");
@@ -461,7 +461,7 @@ function objectiveRows(names) {
       const leader = r.on && !(r.together && anyOn);
       r.el.classList.toggle("off", !r.on);
       setText(r.badge, !r.on ? m("off") : leader ? String(++level) : "+");
-      setAttr(r.badge, "title", !r.on ? m("Not computed") : leader ? m`Level ${level}` : m("Added to the level above"));
+      setAttr(r.badge, "title", !r.on ? m("Not computed") : leader ? m`Tier ${level}` : m("Added to the tier above"));
       r.together_.caption.hidden = !(r.on && anyOn);
       r.weight_.input.disabled = !r.on;
       r.tolerance_.caption.hidden = !leader;
@@ -487,10 +487,10 @@ function objectiveRows(names) {
         // the weight counts where an objective is on, and the tolerance where it begins a level
         const leader = r.on && !(r.together && anyOn);
         if (r.on && (r.weight.trim() === "" || !Number.isInteger(weight))) {
-          return { error: m`The weight of ${r.name} is a whole number.` };
+          return { error: m`Weight of ${r.name} must be a whole number.` };
         }
         if (leader && (r.tolerance.trim() === "" || !Number.isFinite(tolerance))) {
-          return { error: m`The tolerance of the level of ${r.name} is a number.` };
+          return { error: m`Tolerance of ${r.name}'s tier must be a number.` };
         }
         out.push({ name: r.name, on: r.on, together: r.together, weight: r.on ? weight : 1, tolerance: leader ? tolerance : 0 });
         anyOn = anyOn || r.on;

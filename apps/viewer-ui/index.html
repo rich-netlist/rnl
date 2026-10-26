@@ -113,7 +113,7 @@ if (new URLSearchParams(location.search).get("embed") !== "1") document.addEvent
         <button id="tab-hierarchy" type="button" role="tab" aria-controls="pane-hierarchy" aria-selected="false" aria-keyshortcuts="3"><span class="tab-key" aria-hidden="true">3</span>Hierarchy</button>
         <button id="tab-symbol" type="button" role="tab" aria-controls="pane-symbol" aria-selected="false" aria-keyshortcuts="4"><span class="tab-key" aria-hidden="true">4</span>Symbol</button>
         <button id="tab-usages" type="button" role="tab" aria-controls="pane-usages" aria-selected="false" aria-keyshortcuts="5"><span class="tab-key" aria-hidden="true">5</span>Usage</button>
-        <button id="tab-unplaced" type="button" role="tab" aria-controls="pane-unplaced" aria-selected="false" aria-keyshortcuts="6" title="The objects of the level shown that are not drawn: those with no position, and devices no symbol can be chosen for"><span class="tab-key" aria-hidden="true">6</span>Not drawn<span id="unplaced-tab-count" class="tab-count"></span></button>
+        <button id="tab-unplaced" type="button" role="tab" aria-controls="pane-unplaced" aria-selected="false" aria-keyshortcuts="6" title="Objects in the current level that are not drawn: unplaced objects and devices without a matching symbol"><span class="tab-key" aria-hidden="true">6</span>Not drawn<span id="unplaced-tab-count" class="tab-count"></span></button>
         <button id="tab-solve" type="button" role="tab" aria-controls="pane-solve" aria-selected="false" aria-keyshortcuts="7" hidden><span class="tab-key" aria-hidden="true">7</span>Solve</button>
       </nav>
       <button id="hide-sidebar" class="icon" type="button" title="Hide the side panel (Ctrl+B)" aria-label="Hide the side panel">&#x2039;</button>
@@ -123,7 +123,7 @@ if (new URLSearchParams(location.search).get("embed") !== "1") document.addEvent
       <div class="pool-actions">
         <button id="include-file" type="button">Include File…</button>
         <button id="include-folder" type="button">Include Folder…</button>
-        <button id="include-library" type="button" hidden>Include Public Package…</button>
+        <button id="include-library" type="button" hidden>Include Public Package...</button>
         <button id="add-path" type="button" hidden>Add PATH…</button>
         <button id="add-path-subfolders" type="button" hidden>Add PATH with Sub-folders…</button>
       </div>
@@ -232,7 +232,7 @@ if (new URLSearchParams(location.search).get("embed") !== "1") document.addEvent
       <button id="show-sidebar" class="icon" type="button" title="Show the side panel (Ctrl+B)" aria-label="Show the side panel">&#x203A;</button>
       <nav id="level-path" class="level-path" aria-label="Hierarchy path"><span id="level-name" class="level-name"></span></nav>
       <span id="level-kind" class="level-kind"></span>
-      <span id="preview-badge" class="preview-badge" hidden title="Solve › Close Preview shows the file as written; Solve › Save Solved Copy As saves the solve elsewhere">Solved preview: the files are unchanged</span>
+      <span id="preview-badge" class="preview-badge" hidden title="Solve › Close Preview returns to the original netlist; Solve › Save Solved Copy As saves the solved netlist to a new location">Solved preview: the files are unchanged</span>
       <button id="preview-close" class="preview-close" type="button" hidden>Close Preview</button>
       <button id="up" class="up-button" type="button" hidden title="Up to the parent level (Ctrl+E or Backspace)">
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3 2.5 6.5 6 10M2.5 6.5H10a3.5 3.5 0 0 1 3.5 3.5V13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -243,7 +243,7 @@ if (new URLSearchParams(location.search).get("embed") !== "1") document.addEvent
     <div id="manifest-bar" class="manifest-bar" role="note" aria-label="Where these files come from" hidden></div>
     <div id="canvas" class="canvas" tabindex="-1">
       <canvas id="grid" class="grid" aria-hidden="true"></canvas>
-      <p id="empty" class="empty">Open a SPICE or Spectre netlist with File &#x203A; Open (Ctrl+O).<br>Drag to move the view, scroll to zoom, click a symbol or a wire to find it in the netlist.</p>
+      <p id="empty" class="empty">Open a SPICE or Spectre netlist with File &#x203A; Open File (Ctrl+O).<br>Drag to move the view, scroll to zoom, click a symbol or a wire to find it in the netlist.</p>
       <button id="enter-badge" class="enter-badge" type="button" hidden title="Open the subcircuit (E, Enter, or double-click; Shift opens a new window)" aria-label="Open the subcircuit">
         <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 5.5 10 10M10 6.5V10H6.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
@@ -256,7 +256,7 @@ if (new URLSearchParams(location.search).get("embed") !== "1") document.addEvent
   <span id="note" class="note" role="status" hidden></span>
   <span id="status" class="status"></span>
   <span id="solve-status" class="solve-status" hidden><span id="solve-step"></span><button id="solve-cancel" class="solve-cancel" type="button" hidden>Cancel</button></span>
-  <span id="pointer" class="pointer" title="Where the pointer is on the drawing, in units with y up"></span>
+  <span id="pointer" class="pointer" title="Pointer coordinates in drawing units (+y is up)"></span>
   <span id="zoom" class="zoom"></span>
   <button id="show-in-netlist" class="page-link" type="button" disabled>View in Netlist</button>
   <button id="show-in-drawing" class="page-link" type="button" disabled>View in Drawing</button>

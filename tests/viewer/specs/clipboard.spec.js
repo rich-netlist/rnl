@@ -110,7 +110,7 @@ test("the preview shows the first 200 lines of a long text, and says how long it
   const shown = await dialog(page).locator(".clip-preview").textContent();
   expect(shown.split("\n")).toEqual(["* long", ...lines].slice(0, 200));
   await expect(dialog(page).locator(".dialog-note").first()).toHaveText(
-    `251 lines, ${text.length} characters; the first 200 are shown.`,
+    `251 lines, ${text.length} characters; first 200 lines shown.`,
   );
 });
 
