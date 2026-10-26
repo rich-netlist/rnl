@@ -92,7 +92,7 @@
   "' + n + '’s x is left to the solver": "' + n + ' のx座標はソルバーに委ねられます",
   ".": "。",
   "They are aligned, and the DISTANCE is dropped.": "2つは同じx座標に整列し、DISTANCEは破棄されます。",
-  "This is the header record: the file’s first record, outside any subcircuit, at most one. It is always read in standard spelling, without aliases.": "これはヘッダーレコードです。どのサブサーキットの内部にも入らない位置に、ファイル内で最初のレコードとして高々1つだけ記述します。常に別名を使わない標準の表記で読み取られます。",
+  "This is the header record: the file’s first record, outside any subcircuit, at most one. It is always read in standard spelling, without aliases.": "これはヘッダーレコードです。ファイルの最初、どのサブサーキットよりも外側に高々1つだけ記述します。常に別名を使わない標準の表記で読み取られます。",
   "The language version of the file. Without it the tool’s default version applies, and tools add it when they save the file.": "ファイルが使用する言語バージョンです。省略時はツールのデフォルトバージョンが適用され、ツールがファイルを保存する際に補われます。",
   "Loads an alias package. rnl-zh gives Chinese spellings to keywords, parameter names and the names in the standard package, so later records may mix both. version= says which version: without it the newest found is used, and a later version could change how the file reads.": "別名パッケージを読み込みます。rnl-zhはキーワード、パラメータ名、標準パッケージ内の名称に中国語の別名を与えるため、以降のレコードでは英語と中国語の表記を混在させることができます。version=はバージョンを指定します（省略時は見つかった最新版が使われ、将来のバージョンで解釈が変わる可能性があります）。",
   "Names the terminals of devices the netlist does not define: instances whose name matches XM* and model matches sky130_fd_pr__nfet_* get the terminals d, g, s and b, in order.": "ネットリスト内で定義されていない素子に端子名を付与します。名前がXM*に一致し、モデルがsky130_fd_pr__nfet_*に一致するインスタンスに、順番にd、g、s、bという端子名が与えられます。",
