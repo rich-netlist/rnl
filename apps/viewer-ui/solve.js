@@ -133,7 +133,7 @@ function hookProgress() {
   progressHooked = true;
   shell.onSolveProgress((step) => {
     if (!running) return;
-    const again = step.again ? m(", again, as raised to 0.3") : "";
+    const again = step.again ? m(", again after the upgrade to RNL 0.3") : "";
     status(m`Solving ${step.title} (${step.level + 1} of ${step.levels}${again})…`, true);
   });
 }

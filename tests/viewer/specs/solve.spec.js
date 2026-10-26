@@ -87,7 +87,7 @@ test.describe("on the desktop", () => {
     await page.evaluate(() => window.fakeShell.step({ level: 0, levels: 2, title: "amp", again: false }));
     await expect(page.locator("#solve-step")).toHaveText("Solving amp (1 of 2)…");
     await page.evaluate(() => window.fakeShell.step({ level: 1, levels: 2, title: "top.sp", again: true }));
-    await expect(page.locator("#solve-step")).toHaveText("Solving top.sp (2 of 2, again, as raised to 0.3)…");
+    await expect(page.locator("#solve-step")).toHaveText("Solving top.sp (2 of 2, again after the upgrade to RNL 0.3)…");
     await page.locator("#solve-cancel").click();
     expect(await viewer.calls("cancelSolve")).toEqual([[]]);
     await expect(page.locator("#solve-step")).toHaveText("The solve was canceled; the netlist is shown as it was.");
