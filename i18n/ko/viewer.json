@@ -291,7 +291,7 @@
   "Open": "열기",
   "Drop a netlist or RNL package file (.sp, .spi, .spice, .cir, .ckt, .net, .netlist, .inc, .lib, .scs or .rnl).": "넷리스트 또는 RNL 패키지 파일(.sp, .spi, .spice, .cir, .ckt, .net, .netlist, .inc, .lib, .scs, .rnl)을 끌어다 놓으세요.",
   "Replace them?": "기존 파일을 덮어쓰시겠습니까?",
-  "Replace": "덮어쓰기",
+  "Replace": "바꾸기",
   "The netlist to open in {0}:": "{0}에서 열 넷리스트 선택:",
   "Public packages unavailable ({0}). Built-in standard packages remain available.": "공개 패키지를 사용할 수 없습니다({0}). 내장 표준 패키지는 계속 사용할 수 있습니다.",
   "The dropped files could not be read: {0}": "끌어다 놓은 파일을 읽을 수 없습니다: {0}",

@@ -115,9 +115,11 @@ test.describe("on the web", () => {
     const en = "https://rich-netlist.github.io/rnl/en/tools.html";
     expect(await shown(["en-US", "zh-CN"])).toEqual([[en]]);
     expect(await shown(["zh-CN", "en-US"])).toEqual([[zh]]);
-    expect(await shown(["de-DE", "en-GB", "zh-TW"])).toEqual([[en]]);
-    // without either, English, the site's default
-    expect(await shown(["fr-FR"])).toEqual([[en]]);
+    // languages the project does not offer are passed over; without any it does, English, the site's default
+    const offered = (tag) => uiLanguages(repository).some((l) => l.matches.some((m) => tag.toLowerCase().startsWith(m)));
+    expect(offered("pt-BR") || offered("it-IT")).toBe(false);
+    expect(await shown(["pt-BR", "en-GB", "zh-TW"])).toEqual([[en]]);
+    expect(await shown(["it-IT"])).toEqual([[en]]);
   });
 
   test("a click opens a menu, pointing switches it, and Escape or a click on its title closes it", async ({ page, viewer }) => {
