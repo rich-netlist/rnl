@@ -4,7 +4,7 @@
 // takes it, which the shell can ask the solver to check. The fake shell's defaults are those of the
 // solver at the time of writing; the page is tested against their shape.
 
-import { expect, test } from "../viewer.js";
+import { dialogGone, expect, test } from "../viewer.js";
 
 const DESKTOP = { platform: "desktop" };
 const T4 = "T4-miller-conflicts";
@@ -97,6 +97,7 @@ test.describe("on the desktop", () => {
     await expect(asText(page)).toHaveText("The defaults of rnl solve.");
     // Cancel keeps nothing, and a solve gets the defaults
     await dialog(page).getByRole("button", { name: "Cancel" }).click();
+    await dialogGone(page);
     expect(await viewer.stored("solve-options")).toBeNull();
     expect(await solved(page, viewer)).toEqual({ options: "", hintsForLow: false });
   });
@@ -247,6 +248,7 @@ test.describe("on the desktop", () => {
     await expect(objective(page, "crossings").getByLabel("equal within")).toBeVisible();
     await expect(objective(page, "area").getByLabel("equal within")).toBeVisible();
     await dialog(page).getByRole("button", { name: "Cancel" }).click();
+    await dialogGone(page);
     // Cancel kept the first order
     expect((await viewer.stored("solve-options")).objectives[8].items[0].name).toBe("crossings");
   });
@@ -296,6 +298,7 @@ test.describe("on the desktop", () => {
     await open(page);
     await expect(field(page, "Beam")).toHaveValue("6");
     await dialog(page).getByRole("button", { name: "Cancel" }).click();
+    await dialogGone(page);
     expect(await solved(page, viewer)).toEqual({ options: "beam=6", hintsForLow: false });
     // a time limit kept by the menu item that the settings replaced still counts, until they are kept
     await page.evaluate(() => {
