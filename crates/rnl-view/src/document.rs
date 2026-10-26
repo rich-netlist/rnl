@@ -269,8 +269,9 @@ pub struct Child {
 pub struct Hit {
     /// "box": a symbol, given by its top-left and bottom-right corners; "pin": a pin, one point;
     /// "wire": a wire, its vertices; "label": a label of an object, given by its top-left and
-    /// bottom-right corners, which stands for what that object stands for, and for nothing when
-    /// it is not an instance, a bundle, a usage, a wire or a net.
+    /// bottom-right corners, which stands for what that object stands for: for a terminal, the nets
+    /// of its pin, as the pin does; and for nothing when it is not an instance, a bundle, a usage, a
+    /// wire, a net or a terminal drawn at a pin with a net.
     pub kind: &'static str,
     /// In SVG pixels, y down.
     pub points: Vec<[f64; 2]>,
@@ -772,7 +773,8 @@ impl<'a> Index<'a> {
                 name: None,
             });
         }
-        // a label stands for what it is attached to, and for nothing when that cannot be selected:
+        // a label stands for what it is attached to (a terminal's for its pin's nets), and for
+        // nothing when that cannot be selected:
         // a click on it is then not a click on whatever is under it. with_page_ids gives each
         // text its own groups, including labels of repeated unnamed usages.
         let boxes = rnl_render::text_boxes(lv, &render);
@@ -784,6 +786,14 @@ impl<'a> Index<'a> {
                     lv.wires.get(*i).map(|w| w.nets.iter().map(|n| self.net(lv.level, n)).collect()).unwrap_or_default()
                 }
                 Some(TextTarget::Net(n)) => vec![self.net(lv.level, n)],
+                // a terminal's label stands for its pin's nets, as the pin does, and for nothing
+                // when the pin has none
+                Some(TextTarget::Pin(i, k)) => lv
+                    .items
+                    .get(*i)
+                    .and_then(|it| it.pin_nets.get(*k))
+                    .map(|nets| nets.iter().map(|n| self.net(lv.level, n)).collect())
+                    .unwrap_or_default(),
                 None => Vec::new(),
             };
             hits.push(Hit {
@@ -1198,17 +1208,49 @@ C1 b 0 1p
         assert!((of("R1"), of("C1")) == (2, 2) || (of("R1"), of("C1")) == (2, 1), "{labels:?}");
         assert!(labels.iter().all(|h| h.points.len() == 2 && h.points[0][0] < h.points[1][0]));
         assert!(labels.iter().all(|h| h.points[0][1] < h.points[1][1]));
-        // a label of something that cannot be selected stands for nothing, and is still a hit
-        let nothing: Vec<&&Hit> = labels.iter().filter(|h| h.objects.is_empty()).collect();
-        assert_eq!(nothing.len(), 1, "{labels:?}");
+        // a terminal's label stands for its pin's nets, as a click on the pin does
+        let pin = level.hits.iter().find(|h| h.kind == "pin" && names(h) == ["a"]).expect("R1's first pin");
+        let terminal: Vec<&&Hit> = labels.iter().filter(|h| names(h) == ["a"]).collect();
+        assert_eq!(terminal.len(), 1, "{labels:?}");
+        assert_eq!(terminal[0].objects, pin.objects);
+        assert!(labels.iter().all(|h| !h.objects.is_empty()), "{labels:?}");
         // a label's group is in the SVG, and its box is around the text
         let svg = level.svg.as_deref().unwrap();
-        for h in labels.iter().filter(|h| !h.objects.is_empty()) {
+        for h in &labels {
             let id = h.id.as_deref().unwrap();
             assert!(svg.contains(&format!("data-id=\"{id}\"")), "{id}");
         }
         // none of it changes the other hits
         assert_eq!(level.hits.iter().filter(|h| h.kind == "box").count(), 2);
+    }
+
+    #[test]
+    fn a_terminal_that_no_pin_draws_has_no_label_to_click() {
+        // the symbol draws a pin for R1's first terminal only: the second is not drawn, nor is its
+        // label, so nothing on the drawing stands for it; the first's label stands for its pin's net
+        let text = "* a terminal without a pin
+R1 a b 1k
+* @RNL(type=\"header\") { @VERSION(\"0.2\")}
+* @RNL {
+*   $ONE = @DEFINE-SYMBOL { (0, 0) @PIN(terminal=1); @LINE {(0, 0) (0, 2)} };
+*   #R1 @SET-SYMBOL $ONE;
+*   #R1 @PLACE(0, 0);
+*   #R1:1 @TEXT(\"one\", dx=2);
+*   #R1:2 @TEXT(\"two\", dx=-2)
+* }
+.end
+";
+        let files = rnl_runtime::source::MemoryProvider::new().with("a.sp", text);
+        let d = crate::build("a.sp", &files, &BuildOptions::default()).unwrap();
+        let level = &d.levels[0];
+        let names = |h: &Hit| h.objects.iter().map(|o| d.objects[*o].name.as_str()).collect::<Vec<_>>();
+        let pins: Vec<&Hit> = level.hits.iter().filter(|h| h.kind == "pin").collect();
+        assert_eq!(pins.iter().map(|h| names(h)).collect::<Vec<_>>(), [["a"]], "{pins:?}");
+        // the symbol has no labels of its own: the labels are the terminals'
+        let terminals: Vec<&Hit> = level.hits.iter().filter(|h| h.kind == "label").collect();
+        assert_eq!(terminals.iter().map(|h| names(h)).collect::<Vec<_>>(), [["a"]], "{terminals:?}");
+        assert_eq!(terminals[0].objects, pins[0].objects);
+        assert!(!level.svg.as_deref().unwrap().contains(">two<"));
     }
 
     #[test]
