@@ -159,7 +159,7 @@
   "The new window reads files from disk and will not see the unsaved changes here.": "新窗口会从磁盘读取文件，不会包含此处尚未保存的变更。",
   "Open Anyway": "仍要打开",
   "Cancel": "取消",
-  "{0} color picker": "{0} 取色器",
+  "{0} color picker": "{0}取色器",
   "Could not save color scheme: {0}": "无法保存配色方案：{0}",
   "Component objects (#)": "元件对象（#）",
   "Net objects (&)": "网络对象 (&)",

@@ -63,8 +63,8 @@ test("desktop: a directory with more sub-folders than are searched says so", asy
   await huge.locator(".lib-toggle").click();
   await expect(huge.locator(".lib-warning")).toHaveText("Only the first 500 sub-folders are searched; add deeper folders as PATH entries of their own.");
   await page.evaluate(() => window.viewer.command("language-zh"));
-  await expect(page.locator("#add-path-subfolders")).toHaveText("添加 PATH（含子目录）…");
-  await expect(huge.locator(".lib-deep")).toHaveText("含子目录");
+  await expect(page.locator("#add-path-subfolders")).toHaveText("添加 PATH（含子文件夹）…");
+  await expect(huge.locator(".lib-deep")).toHaveText("含子文件夹");
 });
 
 test("web: there is no PATH, so neither Add PATH button shows", async ({ page, viewer }) => {

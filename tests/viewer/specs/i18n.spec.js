@@ -17,7 +17,7 @@ for (const platform of ['web', 'desktop']) {
     expect(await page.evaluate(() => window.keptDoc===window.viewer.doc && window.keptSvg===document.querySelector('#canvas > svg'))).toBe(true);
     expect(await viewer.builds()).toBe(builds);
     await page.keyboard.press('1');
-    await expect(page.locator('#include-file')).toHaveText('加入文件…');
+    await expect(page.locator('#include-file')).toHaveText('引入文件…');
     await expect(page.locator('.lib-title').first()).toHaveText('文件');
     await language(page,'en');
     await expect(page.locator('.lib-title').first()).toHaveText('Files');
@@ -54,14 +54,14 @@ test('language changes keep unsaved editor content, selection and the translated
   await language(page,'zh');
   await expect(area).toHaveValue('* Library Save Cancel <b>plain text</b>\n.end');
   expect(await area.evaluate(el=>[el.selectionStart,el.selectionEnd])).toEqual([3,10]);
-  await expect(page.locator('#edit-state')).toHaveText('修改尚未应用');
+  await expect(page.locator('#edit-state')).toHaveText('变更尚未应用');
   await page.evaluate(()=>window.viewer.command('discard-edits'));
   const dialog=page.locator('dialog.dialog');
-  await expect(dialog).toContainText('放弃尚未应用的修改');
+  await expect(dialog).toContainText('放弃尚未应用的变更');
   await dialog.getByRole('button',{name:'取消',exact:true}).click();
   await expect(area).toBeVisible();
   await page.evaluate(()=>window.viewer.command('discard-edits'));
-  await dialog.getByRole('button',{name:'放弃修改',exact:true}).click();
+  await dialog.getByRole('button',{name:'放弃变更',exact:true}).click();
   await expect(area).toHaveCount(0);
   expect(await viewer.calls('save')).toEqual([]);
 });
