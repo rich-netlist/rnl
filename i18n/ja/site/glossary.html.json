@@ -1,0 +1,14 @@
+{
+  "Glossary · Rich Netlist": "用語集 · Rich Netlist",
+  "How each language renders the English terms of RNL, which are the normative ones.": "規範となるRNLの英語用語に対する各言語の訳語一覧。",
+  "Skip to content": "本文へスキップ",
+  "Switch color theme": "カラーテーマを切り替え",
+  "Glossary": "用語集",
+  "The English terms of RNL are the only normative ones; every language keeps its own way of rendering them.": "RNLでは英語の用語のみが規範であり、各言語はそれぞれの訳語の対応表を定めています。",
+  "A glossary is not part of the standard: it is a convention for translating RNL and for talking about it, kept in <a href=\"https://github.com/rich-netlist/rnl/tree/main/i18n\">i18n/&lt;lang&gt;/glossary.json</a>. Where a translation is unclear, the English term decides. To change a rendering, open a pull request.": "用語集は言語標準の一部ではなく、RNLを翻訳したり議論したりするための規約であり、<a href=\"https://github.com/rich-netlist/rnl/tree/main/i18n\">i18n/&lt;lang&gt;/glossary.json</a>で管理されています。訳語に曖昧さがある場合は英語の用語が優先されます。訳語を変更するにはプルリクエストを作成してください。",
+  "Terms": "用語一覧",
+  "RNL’s terms, such as record, usage and fill-in, are defined by the English standard; a language’s glossary only says how it writes them.": "レコード、適用オブジェクト、自動補完といったRNLの用語は英語の言語標準によって定義されており、各言語の用語集はそれらをどう表記するかのみを定めています。",
+  "See also": "関連項目",
+  "Decision 0016: English terms are normative": "決定記録 0016：英語の用語を規範とする",
+  "The standard": "言語標準"
+}

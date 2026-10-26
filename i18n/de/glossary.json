@@ -198,8 +198,7 @@
   {
    "en": "level",
    "term": "Ebene",
-   "kind": "rnl",
-   "note": "An objective's level in the solver settings is Stufe."
+   "kind": "rnl"
   },
   {
    "en": "manifest",
@@ -389,6 +388,15 @@
    "en": "text",
    "sense": "text drawn in a schematic (@TEXT, labels)",
    "term": "Text",
+   "kind": "rnl"
+  },
+  {
+   "en": "tier",
+   "sense": "solver objectives",
+   "term": "Stufe",
+   "avoid": [
+    "Ebene"
+   ],
    "kind": "rnl"
   },
   {
@@ -646,6 +654,12 @@
    "en": "Help",
    "sense": "menu",
    "term": "Hilfe",
+   "kind": "command"
+  },
+  {
+   "en": "Library",
+   "sense": "panel",
+   "term": "Bibliothek",
    "kind": "command"
   },
   {

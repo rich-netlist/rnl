@@ -211,8 +211,7 @@
   {
    "en": "level",
    "term": "レベル",
-   "kind": "rnl",
-   "note": "The viewer also calls a solver objective's rank レベル."
+   "kind": "rnl"
   },
   {
    "en": "manifest",
@@ -415,6 +414,15 @@
    "term": "テキスト",
    "kind": "rnl",
    "note": "Style properties say 文字 (文字色, 文字サイズ)."
+  },
+  {
+   "en": "tier",
+   "sense": "solver objectives",
+   "term": "ティア",
+   "avoid": [
+    "レベル"
+   ],
+   "kind": "rnl"
   },
   {
    "en": "union",
@@ -665,6 +673,12 @@
    "en": "Help",
    "sense": "menu",
    "term": "ヘルプ",
+   "kind": "command"
+  },
+  {
+   "en": "Library",
+   "sense": "panel",
+   "term": "ライブラリ",
    "kind": "command"
   },
   {

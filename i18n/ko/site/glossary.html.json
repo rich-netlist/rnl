@@ -1,0 +1,14 @@
+{
+  "Glossary · Rich Netlist": "용어집 · Rich Netlist",
+  "How each language renders the English terms of RNL, which are the normative ones.": "규범적 기준인 RNL 영문 용어를 각 언어에서 어떻게 옮기는지 정리한 목록입니다.",
+  "Skip to content": "본문으로 건너뛰기",
+  "Switch color theme": "색상 테마 전환",
+  "Glossary": "용어집",
+  "The English terms of RNL are the only normative ones; every language keeps its own way of rendering them.": "RNL에서는 영문 용어만이 유일한 규범적 기준이며, 각 언어는 이를 옮기는 자체적인 표기법을 둡니다.",
+  "A glossary is not part of the standard: it is a convention for translating RNL and for talking about it, kept in <a href=\"https://github.com/rich-netlist/rnl/tree/main/i18n\">i18n/&lt;lang&gt;/glossary.json</a>. Where a translation is unclear, the English term decides. To change a rendering, open a pull request.": "용어집은 표준의 일부가 아니라 RNL을 번역하고 논의하기 위한 관례로, <a href=\"https://github.com/rich-netlist/rnl/tree/main/i18n\">i18n/&lt;lang&gt;/glossary.json</a>에 보관됩니다. 번역의 의미가 모호할 때는 영문 용어를 기준으로 삼습니다. 번역어를 변경하려면 풀 리퀘스트를 열어 주세요.",
+  "Terms": "용어",
+  "RNL’s terms, such as record, usage and fill-in, are defined by the English standard; a language’s glossary only says how it writes them.": "레코드, 용례, 자동 보충 같은 RNL 용어의 정의는 영문 표준이 규정하며, 각 언어의 용어집은 해당 언어에서 그 용어들을 어떻게 표기하는지만 나타냅니다.",
+  "See also": "함께 보기",
+  "Decision 0016: English terms are normative": "결정 0016: 영문 용어만 규범적 기준으로 삼음",
+  "The standard": "언어 표준"
+}
