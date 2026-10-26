@@ -836,8 +836,13 @@ impl Interp<'_> {
             if drawable_att && layer == Layer::Middle {
                 layer = self.layer_of(s, att);
             }
-            let target = match self.o(att) {
+            let target = match self.o(att).clone() {
                 ObjData::Net { .. } => Some(TextTarget::Net(self.net_display(att))),
+                // a terminal stands for the pin of the item it is drawn at, as a click on the pin does
+                ObjData::Term { owner, .. } => item_of
+                    .get(&owner)
+                    .copied()
+                    .and_then(|i| self.pin_for(s, owner, att).map(|k| TextTarget::Pin(i, k))),
                 _ => item_of
                     .get(&att)
                     .map(|&i| TextTarget::Item(i))
