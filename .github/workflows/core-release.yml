@@ -127,20 +127,17 @@ jobs:
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/core-v')
         working-directory: packages/runtime/dist
         run: npm publish --dry-run --access public
-      # The browsers' system packages come from the runner's Ubuntu mirror, which stalled for most of an hour
-      # twice on 2026-10-23: apt gives up on a stalled download after 30 s and retries, and a hung install
-      # fails after 20 minutes.
-      - name: Install the browser for the smoke test
+      - name: Install the packages of the smoke test
         working-directory: packages/runtime/smoke
-        timeout-minutes: 20
-        run: |
-          sudo tee /etc/apt/apt.conf.d/80-rnl-network <<'CONF'
-          Acquire::Retries "5";
-          Acquire::http::Timeout "30";
-          Acquire::https::Timeout "30";
-          CONF
-          npm ci --no-audit --no-fund
-          npx playwright install --with-deps chromium
+        run: npm ci --no-audit --no-fund
+      # The browser and its system packages: cached, with a time limit and one retry from another mirror
+      # (the Ubuntu mirror stalled for most of an hour several times on 2026-10-23, 24 and 26).
+      - name: Install the browser for the smoke test
+        timeout-minutes: 25
+        uses: ./.github/actions/install-playwright
+        with:
+          working-directory: packages/runtime/smoke
+          browsers: chromium
       - name: Smoke-test the packed package with Vite
         working-directory: packages/runtime/smoke
         env:
