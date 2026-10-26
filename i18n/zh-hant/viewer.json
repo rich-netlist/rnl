@@ -451,7 +451,7 @@
   "Show the objects that are not drawn": "顯示未繪製的物件",
   "Every object of this level has a position.": "此層級的所有物件皆已指定位置。",
   "No object matches.": "找不到符合的物件。",
-  "This object is written in a record, not in a statement": "此物件寫在記錄中，而非敘述中",
+  "This object is written in a record, not in a statement": "此物件定義於 RNL 記錄中，無對應的網表敘述",
   "The latest version could not be looked up: {0}.": "無法查詢最新版本：{0}。",
   "RNL Viewer {0} is available.": "RNL Viewer {0} 已推出。",
   "This is version {0}. The release's page on GitHub has its installers and what changed.": "目前版本為 {0}。可前往 GitHub 發布頁面下載安裝程式並查看更新內容。",
