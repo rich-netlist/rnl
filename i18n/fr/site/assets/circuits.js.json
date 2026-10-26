@@ -7,6 +7,6 @@
   "{n} entries": "{n} entrées",
   "of {t}": "sur {t}",
   "The gallery’s data is newer than this page. Reload the page.": "Les données de la galerie sont plus récentes que cette page. Rechargez la page.",
-  "The latest gallery cannot be read right now; this is what was read last time.": "La dernière version de la galerie ne peut pas être lue pour le moment ; voici ce qui a été lu la dernière fois.",
+  "The latest gallery cannot be loaded right now; showing the cached copy from your last visit.": "La dernière version de la galerie ne peut pas être chargée pour le moment ; affichage de la copie en cache issue de votre dernière visite.",
   "The gallery cannot be read right now. The list is on GitHub:": "La galerie ne peut pas être lue pour le moment. La liste se trouve sur GitHub :"
 }

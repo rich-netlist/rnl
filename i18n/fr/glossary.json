@@ -107,12 +107,9 @@
   {
    "en": "drawing",
    "sense": "the drawing shown, its canvas",
-   "term": "schéma",
-   "avoid": [
-    "dessin"
-   ],
+   "term": "dessin",
    "kind": "rnl",
-   "note": "Several texts say sur le dessin for the canvas."
+   "note": "Several existing texts use schéma, the word for schematic."
   },
   {
    "en": "drawing layer",
@@ -204,8 +201,7 @@
   {
    "en": "level",
    "term": "niveau",
-   "kind": "rnl",
-   "note": "Also niveau for a rank of solver objectives."
+   "kind": "rnl"
   },
   {
    "en": "manifest",
@@ -318,9 +314,6 @@
    "en": "routing / route",
    "sense": "the router's work",
    "term": "routage",
-   "avoid": [
-    "tracé"
-   ],
    "kind": "rnl",
    "note": "1 text says tracés for the solver's routing output."
   },
@@ -395,6 +388,15 @@
    "en": "text",
    "sense": "text drawn in a schematic (@TEXT, labels)",
    "term": "texte",
+   "kind": "rnl"
+  },
+  {
+   "en": "tier",
+   "sense": "solver objectives",
+   "term": "palier",
+   "avoid": [
+    "niveau"
+   ],
    "kind": "rnl"
   },
   {
@@ -640,6 +642,12 @@
    "en": "Help",
    "sense": "menu",
    "term": "Aide",
+   "kind": "command"
+  },
+  {
+   "en": "Library",
+   "sense": "panel",
+   "term": "Bibliothèque",
    "kind": "command"
   },
   {
