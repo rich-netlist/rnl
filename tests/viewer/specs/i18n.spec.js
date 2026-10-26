@@ -237,3 +237,24 @@ test('the Language submenu has a globe, and it and the View menu keep an English
   await language(page, 'en');
   await check('View', 'Language', 'en again');
 });
+
+// the first start walks the browser's list of languages in its order and takes the first that is offered, as
+// the site's root does; a saved choice comes first; the language is the registry's first published one
+const other = uiLanguages(repository)[1];
+const tag = other.matches[0];
+for (const { name, list, saved, expected } of [
+  { name: `[it-IT, ${tag}] takes ${other.lang}, the first of the list that is offered`, list: ['it-IT', tag], expected: other.code },
+  { name: `[it-IT, ${tag}-XX] takes ${other.lang}: a region is the language's`, list: ['it-IT', `${tag}-XX`], expected: other.code },
+  { name: '[it-IT] is English: nothing in the list is offered', list: ['it-IT'], expected: 'en' },
+  { name: `[it-IT, en-US, ${tag}] is English, the first of the list that is offered`, list: ['it-IT', 'en-US', tag], expected: 'en' },
+  { name: `[${tag}] with English saved is English: the saved choice comes first`, list: [tag], saved: 'en', expected: 'en' },
+]) {
+  test(`the language of the first start: ${name}`, async ({page,viewer}) => {
+    await page.addInitScript(([languages, saved]) => {
+      Object.defineProperty(Navigator.prototype, 'languages', { get: () => languages, configurable: true });
+      if (saved) localStorage.setItem('language', JSON.stringify(saved));
+    }, [list, saved ?? null]);
+    await viewer.open('04-hierarchy');
+    await expect(page.locator('html')).toHaveAttribute('lang', expected);
+  });
+}
