@@ -2,6 +2,7 @@
 // group added with sub-folders, its listing through the shell, the setting that keeps it, and the
 // note when a directory has more sub-folders than are searched.
 import { test, expect } from "../viewer.js";
+import { zh } from "../zh.js";
 
 const group = (page, key) => page.locator(`.lib-group[data-group=${JSON.stringify(key)}]`);
 const stored = (page, key) => page.evaluate((key) => JSON.parse(sessionStorage.getItem("fake-settings"))[key], key);
@@ -63,8 +64,8 @@ test("desktop: a directory with more sub-folders than are searched says so", asy
   await huge.locator(".lib-toggle").click();
   await expect(huge.locator(".lib-warning")).toHaveText("Only the first 500 sub-folders are searched; add deeper folders as PATH entries of their own.");
   await page.evaluate(() => window.viewer.command("language-zh"));
-  await expect(page.locator("#add-path-subfolders")).toHaveText("添加 PATH（含子目录）…");
-  await expect(huge.locator(".lib-deep")).toHaveText("含子目录");
+  await expect(page.locator("#add-path-subfolders")).toHaveText(zh("Add PATH with Sub-folders…"));
+  await expect(huge.locator(".lib-deep")).toHaveText(zh("with sub-folders"));
 });
 
 test("web: there is no PATH, so neither Add PATH button shows", async ({ page, viewer }) => {

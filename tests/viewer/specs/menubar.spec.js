@@ -4,6 +4,7 @@
 // native menu the page shows no bar and tells the shell the marks.
 
 import { expect, test } from "../viewer.js";
+import { zhMenu } from "../zh.js";
 
 const TOP = "04-hierarchy.sp";
 
@@ -105,7 +106,7 @@ test.describe("on the web", () => {
         Object.defineProperty(Navigator.prototype, "languages", { get: () => list, configurable: true });
       }, languages);
       await viewer.open("04-hierarchy");
-      await viewer.menuTitle(languages[0].startsWith("zh") ? "帮助" : "Help").click();
+      await viewer.menuTitle(languages[0].startsWith("zh") ? zhMenu("&Help") : "Help").click();
       await viewer.menuItem("desktop-viewer").click();
       await expect(page.locator("#menubar .menu-list:visible")).toHaveCount(0);
       return viewer.calls("browse");

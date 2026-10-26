@@ -13,6 +13,7 @@ import path from "node:path";
 import { expect, test } from "@playwright/test";
 import { PICK, root, UNCALLED } from "../fixtures.js";
 import { publicPackageDir, publicPackagesAvailable } from "../../../scripts/packages.mjs";
+import { zh } from "../zh.js";
 const hasPublicPackages = publicPackagesAvailable();
 test.beforeEach(async ({ page }) => {
   await page.route("https://rich-netlist.github.io/rnl-packages/**", route => route.abort());
@@ -982,7 +983,7 @@ test("the text edited and applied is built by the core as rnl view builds the sa
   const [download] = await Promise.all([page.waitForEvent("download"), page.keyboard.press("Control+s")]);
   expect(download.suggestedFilename()).toBe("parts.inc");
   expect(fs.readFileSync(await download.path(), "utf8")).toBe(editedParts);
-  await expect(page.locator("#note")).toHaveText("已下载 parts.inc。");
+  await expect(page.locator("#note")).toHaveText(zh("Downloaded {0}.", "parts.inc"));
   await expect(page.locator('dialog.dialog')).toHaveCount(0);
   await page.evaluate(() => window.viewer.command('language-en'));
   await expect(page.locator("#note")).toHaveText("Downloaded parts.inc.");

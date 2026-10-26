@@ -3,6 +3,7 @@
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
+import { zhMenu } from '../zh.js';
 
 test.skip(!process.env.RNL_WEB_URL, 'the web site is not built');
 
@@ -99,7 +100,7 @@ test('the File menu has Export Image with Export SVG and Export PNG, in both lan
   await open(page);
   for (const [file, image, svg, png, shot] of [
     ['File', 'Export Image', 'Export SVG...', 'Export PNG...', 'export-menu-en.png'],
-    ['文件(F)', '导出图像(G)', '导出 SVG(S)...', '导出 PNG(P)...', 'export-menu-zh.png'],
+    [zhMenu('&File'), zhMenu('Export Ima&ge'), zhMenu('Export &SVG...'), zhMenu('Export &PNG...'), 'export-menu-zh.png'],
   ]) {
     if (file !== 'File') await page.evaluate(() => window.viewer.command('language-zh'));
     await page.getByRole('menuitem', { name: file, exact: true }).click();

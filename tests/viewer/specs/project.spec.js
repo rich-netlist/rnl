@@ -6,6 +6,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { zhMenu } from '../zh.js';
 
 test.skip(!process.env.RNL_WEB_URL, 'the web site is not built');
 
@@ -73,11 +74,11 @@ test('the File menu offers the project and manifest commands, in both languages,
   await expect(page.locator('[data-id="download-library"]')).toHaveCount(0);
   await page.keyboard.press('Escape');
   await page.evaluate(() => window.viewer.command('language-zh'));
-  await page.getByRole('menuitem', { name: '文件(F)', exact: true }).click();
-  await expect(page.locator('[data-id="open-project"]')).toHaveText('打开工程(T)...');
-  await expect(page.locator('[data-id="load-manifest"]')).toHaveText('加载清单(M)...');
-  await expect(page.locator('[data-id="save-project"]')).toHaveText('下载工程(J)...');
-  await expect(page.locator('[data-id="download-manifest"]')).toHaveText('下载清单(N)...');
+  await page.getByRole('menuitem', { name: zhMenu('&File'), exact: true }).click();
+  await expect(page.locator('[data-id="open-project"]')).toHaveText(zhMenu('Open Projec&t...'));
+  await expect(page.locator('[data-id="load-manifest"]')).toHaveText(zhMenu('Load &Manifest...'));
+  await expect(page.locator('[data-id="save-project"]')).toHaveText(zhMenu('Download Pro&ject...'));
+  await expect(page.locator('[data-id="download-manifest"]')).toHaveText(zhMenu('Download Ma&nifest...'));
   if (process.env.RNL_REVIEW_DIR && test.info().project.name === 'chromium') {
     await page.screenshot({ path: path.join(process.env.RNL_REVIEW_DIR, 'project-menu-zh.png') });
   }

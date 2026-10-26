@@ -2,6 +2,7 @@
 // netlist shown includes, the menu of the core's formats, the choice that every build is given, and
 // where the choice is kept.
 import { test, expect } from "../viewer.js";
+import { zh } from "../zh.js";
 
 const group = (page, key) => page.locator(`.lib-group[data-group=${JSON.stringify(key)}]`);
 const menu = (page) => page.locator(".format-menu");
@@ -130,9 +131,9 @@ test("format labels follow the language", async ({ page, viewer }) => {
   await page.locator("#tab-files").click();
   await page.evaluate(() => window.viewer.command("language-zh"));
   const chip = page.locator(".pool-row.current .format-chip");
-  await expect(chip).toHaveAttribute("title", "解析格式：自动判断");
+  await expect(chip).toHaveAttribute("title", zh("Parse format: detected automatically"));
   await chip.click();
-  await expect(menu(page).getByRole("menuitemradio").first()).toHaveAccessibleName("自动（SPICE）");
+  await expect(menu(page).getByRole("menuitemradio").first()).toHaveAccessibleName(zh("Automatic ({0})", "SPICE"));
 });
 
 // RNL_REVIEW_DIR saves Chromium's screenshots of the Library's format chips and menu there, in light
