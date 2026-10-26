@@ -3,6 +3,10 @@ import { readFileSync, mkdirSync } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// English and the languages the registry publishes, as the language menu offers them
+const registry = JSON.parse(readFileSync(new URL('../../i18n/languages.json', import.meta.url), 'utf8'));
+const offered = registry.languages.filter(entry => entry.code === registry.default || entry.status === 'published').length;
+
 for (const language of ['zh', 'en']) for (const theme of ['light', 'dark']) for (const width of [1440, 390]) {
   test(`language menu: ${language} ${theme} ${width}px`, async ({ page }, info) => {
     await page.setViewportSize({ width, height: 720 });
@@ -10,7 +14,7 @@ for (const language of ['zh', 'en']) for (const theme of ['light', 'dark']) for 
     await page.goto(`/${language}/`);
     const menu = page.locator('.language-menu');
     const summary = menu.locator('summary');
-    await expect(menu.locator('[data-lang-link]')).toHaveCount(2);
+    await expect(menu.locator('[data-lang-link]')).toHaveCount(offered);
     await expect(menu.locator('[aria-current]')).toHaveAttribute('data-language', language);
     await summary.focus();
     await page.keyboard.press('Enter');
@@ -106,7 +110,7 @@ test('third locale inherits English content and switches without changing source
   await expect(page.locator('.ai-notice a').nth(1)).toHaveAttribute('href', 'glossary.html');
   await expect(page.locator('#status .tl')).toContainText('Release notes');
   await page.locator('.language-menu > summary').click();
-  await expect(page.locator('[data-lang-link]')).toHaveCount(3);
+  await expect(page.locator('[data-lang-link]')).toHaveCount(offered + 1);  // and the fixture's Japanese
   await page.locator('[data-language="zh"]').click();
   await expect(page).toHaveURL(/\/i18n-fixture\/zh\/\?review=1#status$/);
   await expect(page.locator('.ai-notice')).toHaveCount(0);

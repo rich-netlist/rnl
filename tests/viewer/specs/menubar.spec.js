@@ -4,7 +4,7 @@
 // native menu the page shows no bar and tells the shell the marks.
 
 import { expect, test } from "../viewer.js";
-import { zhMenu } from "../zh.js";
+import { zhMenu, uiLanguages, repository } from "../zh.js";
 
 const TOP = "04-hierarchy.sp";
 
@@ -85,7 +85,7 @@ test.describe("on the web", () => {
         items: [
           "Fit to WindowF", "Zoom InCtrl++", "Zoom OutCtrl+-", "Color Scheme...",
           "Background", "Light", "Dark",
-          "Grid", "Show GridG", "", "None", "Dots", "Lines", "", "Axes", "", "Grid Settings...", "Show Names on Hover", "Show UsagesCtrl+R", "Show Current DirectionsShift+R", "Language", "English", "简体中文", "",
+          "Grid", "Show GridG", "", "None", "Dots", "Lines", "", "Axes", "", "Grid Settings...", "Show Names on Hover", "Show UsagesCtrl+R", "Show Current DirectionsShift+R", "Language", ...uiLanguages(repository).map((l) => l.name), "",
           "Side Panels", "Library1", "Netlist2", "Hierarchy3", "Symbol4", "Usage5", "Not Drawn6", "", "Hide",
         ],
       },
@@ -436,7 +436,7 @@ test.describe("with a native menu", () => {
       ["toggle-netlist", true], ["toggle-problems", true], ["toggle-edit", false],
       ["toggle-grid", true], ["grid-none", false], ["grid-dots", true], ["grid-lines", false], ["grid-axes", false],
       ["toggle-hover-names", true], ["toggle-usages", true], ["toggle-currents", false],
-      ["language-en", true], ["language-zh", false],
+      ...uiLanguages(repository).map((l, i) => [`language-${l.lang}`, i === 0]),
       ["toggle-auto-include", true],
     ];
     expect(await viewer.calls("setCheck")).toEqual(expect.arrayContaining(marks));
