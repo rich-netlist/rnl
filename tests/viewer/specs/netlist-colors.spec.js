@@ -95,8 +95,8 @@ for (const platform of ['web', 'desktop']) {
     await page.evaluate(()=>window.viewer.command('language-zh'));
     await page.evaluate(()=> { window.viewer.command('netlist-colors'); });
     await expect(page.getByRole('dialog')).toHaveAccessibleName('配色方案');
-    await expect(page.getByLabel('元件对象 (#)',{exact:true})).toBeVisible();
-    await expect(page.getByLabel('字符串调色板',{exact:true})).toBeVisible();
+    await expect(page.getByLabel('元件对象（#）',{exact:true})).toBeVisible();
+    await expect(page.getByLabel('字符串取色器',{exact:true})).toBeVisible();
     await page.getByRole('button',{name:'恢复默认值',exact:true}).click();
     await page.screenshot({path:info.outputPath('netlist-colors-dialog.png')});
     await page.getByRole('button',{name:'保存',exact:true}).click();

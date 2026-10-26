@@ -130,7 +130,7 @@ test("format labels follow the language", async ({ page, viewer }) => {
   await page.locator("#tab-files").click();
   await page.evaluate(() => window.viewer.command("language-zh"));
   const chip = page.locator(".pool-row.current .format-chip");
-  await expect(chip).toHaveAttribute("title", "解析格式：自动判断");
+  await expect(chip).toHaveAttribute("title", "解析格式：自动检测");
   await chip.click();
   await expect(menu(page).getByRole("menuitemradio").first()).toHaveAccessibleName("自动（SPICE）");
 });
