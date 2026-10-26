@@ -13,7 +13,7 @@
   "<b>Netlist</b>: a 10 nF capacitor from out to ground; the standard package adds its ground symbol too.": "<b>网表</b>：从 out 接到地的 10 nF 电容；其接地符号同样由标准包自动补上。",
   "<b>Simulation command</b>: sweep from 10 Hz to 1 MHz. The viewer does not need it to draw.": "<b>仿真指令</b>：从 10 Hz 扫频至 1 MHz。查看器绘图时不需要这一行。",
   "<b>Start of an RNL record</b>. To the simulator, this is just a comment line starting with *.": "<b>RNL 记录开始</b>。在仿真器眼中，这只是一行以 * 开头的注释。",
-  "<b>RNL</b>: V1, R1 and C1 follow the signal flow, left to right by default. “are treated” is free text, there only so the line reads as a sentence; machines skip it.": "<b>RNL</b>：V1、R1 与 C1 按信号流向排列，默认为由左至右。“are treated”是自由文字，仅为了让这行读起来像完整的句子；机器会跳过它。",
+  "<b>RNL</b>: V1, R1 and C1 follow the signal flow, left to right by default. “are treated” is free text, there only so the line reads as a sentence; machines skip it.": "<b>RNL</b>：V1、R1 与 C1 按信号流向排列，默认为由左至右。“are treated”是自由文本，仅为了让这行读起来像完整的句子；机器会跳过它。",
   "<b>RNL</b>: R1 turns 90° counterclockwise and lies flat.": "<b>RNL</b>：R1 逆时针旋转 90°，水平放置。",
   "<b>RNL</b>: label net out as V<sub>out</sub>; <code>_{…}</code> makes a subscript.": "<b>RNL</b>：将网络 out 标示为 V<sub>out</sub>；<code>_{…}</code> 用于生成下标。",
   "<b>End of the RNL record</b>.": "<b>RNL 记录结束</b>。",
