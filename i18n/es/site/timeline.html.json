@@ -5,7 +5,7 @@
   "Switch color theme": "Cambiar tema de color",
   "Timeline": "Cronología",
   "The <a href=\"./#status\">introduction</a> shows only the latest few, and what comes next.": "La <a href=\"./#status\">introducción</a> muestra solo los más recientes y lo que viene a continuación.",
-  "The dates are Shanghai dates. Each release links to its notes on GitHub.": "Las fechas corresponden al huso horario de Shanghái. Cada versión enlaza con sus notas en GitHub.",
+  "Dates are in Shanghai time (UTC+8). Each release links to its release notes on GitHub.": "Las fechas están en la hora de Shanghái (UTC+8). Cada versión enlaza con sus notas de publicación en GitHub.",
   "See also": "Véase también",
   "Introduction": "Introducción",
   "All releases on GitHub": "Todas las versiones en GitHub"

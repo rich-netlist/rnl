@@ -203,8 +203,7 @@
   {
    "en": "level",
    "term": "레벨",
-   "kind": "rnl",
-   "note": "An objective's level in the solver settings is 단계."
+   "kind": "rnl"
   },
   {
    "en": "manifest",
@@ -399,6 +398,15 @@
    "term": "텍스트",
    "kind": "rnl",
    "note": "A style's text color and size are 글자 색상, 글자 크기."
+  },
+  {
+   "en": "tier",
+   "sense": "solver objectives",
+   "term": "단계",
+   "avoid": [
+    "레벨"
+   ],
+   "kind": "rnl"
   },
   {
    "en": "union",
@@ -653,6 +661,12 @@
    "kind": "command"
   },
   {
+   "en": "Library",
+   "sense": "panel",
+   "term": "라이브러리",
+   "kind": "command"
+  },
+  {
    "en": "More info",
    "sense": "Windows SmartScreen",
    "term": "추가 정보",
@@ -701,9 +715,12 @@
   {
    "en": "Replace",
    "sense": "file",
-   "term": "덮어쓰기",
+   "term": "바꾸기",
    "kind": "command",
-   "note": "The viewer's Replace button says 덮어쓰기, the same word as Overwrite."
+   "note": "The viewer's Replace button still says 덮어쓰기.",
+   "avoid": [
+    "덮어쓰기"
+   ]
   },
   {
    "en": "Reset",
