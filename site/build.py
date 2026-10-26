@@ -437,8 +437,11 @@ def glossary_html(code):
                 continue
             data = json.loads(path.read_text(encoding="utf-8"))
             own = f'<span lang="{I18N.locales[other]["html_lang"]}">{escape(I18N.locales[other]["name"])}</span>'
+            # its English name, where the registry gives one, and its own, marked with its language
+            english = I18N.english_name(other)
+            name = own if english == I18N.locales[other]["name"] else f"{escape(english)} {own}"
             draft = " · draft" if data.get("draft") else ""
-            rows.append(f'<li><a href="../{other}/glossary.html">{escape(I18N.english_name(other))} {own}</a>'
+            rows.append(f'<li><a href="../{other}/glossary.html">{name}</a>'
                         f' <small>{len(data["terms"])} terms{draft}</small></li>')
         return (f'<div class="gs-report" lang="en"><p class="lead">Each language’s glossary gives, for every English term, '
                 f'its rendering, the variants it does not use and a note.</p>\n<ul class="gs-languages">{"".join(rows)}</ul></div>')
