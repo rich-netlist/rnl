@@ -718,6 +718,16 @@ body[data-background="dark"] .unplaced-row .thumb { background: var(--drawing-ba
   font-variant-numeric: tabular-nums;
 }
 .diag .more { grid-column: 2; color: var(--muted); }
+/*
+ * The names of the severities of another language may be wider than the 58 px of the first column
+ * (advertencia, avertissement): where subgrid is supported, the list is a grid of its own, whose
+ * first column is as wide as the widest name of any row, and each row takes its columns from it.
+ */
+@supports (grid-template-columns: subgrid) {
+  .diags { display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: 8px; }
+  .diag { grid-column: 1 / -1; grid-template-columns: subgrid; }
+  .diags > :not(.diag) { grid-column: 1 / -1; }
+}
 .diags .nothing { padding: 6px 10px; color: var(--muted); }
 .diagnostics-more { padding: 6px 10px; }
 .diagnostics-more button { color: var(--muted); text-align: left; }
