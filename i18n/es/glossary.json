@@ -1,0 +1,763 @@
+{
+ "language": "es",
+ "about": "Terms of this language's translations: the English term, its rendering here, and variants not to use. English terms are the only normative ones (decision 0016); this list is a convention for translating and talking about RNL, not part of the standard. kind: rnl (a term of RNL), circuit (of circuit design), command (a command or label of an interface), general.",
+ "draft": true,
+ "terms": [
+  {
+   "en": "alias",
+   "term": "alias",
+   "kind": "rnl",
+   "note": "The Spanish word alias, invariable in the plural."
+  },
+  {
+   "en": "alias package",
+   "term": "paquete de alias",
+   "kind": "rnl"
+  },
+  {
+   "en": "apply",
+   "sense": "definition",
+   "term": "aplicar",
+   "kind": "rnl"
+  },
+  {
+   "en": "bend",
+   "term": "codo",
+   "kind": "rnl"
+  },
+  {
+   "en": "body",
+   "term": "cuerpo",
+   "kind": "rnl"
+  },
+  {
+   "en": "bounding box / box",
+   "sense": "the box of a symbol",
+   "term": "marco",
+   "kind": "rnl"
+  },
+  {
+   "en": "bounding box / box",
+   "sense": "the rectangle around an ellipse",
+   "term": "cuadro delimitador",
+   "kind": "rnl",
+   "note": "One text; the box of a symbol is marco."
+  },
+  {
+   "en": "brace",
+   "term": "llave",
+   "kind": "rnl"
+  },
+  {
+   "en": "branch",
+   "sense": "wire routing",
+   "term": "ramificación",
+   "avoid": [
+    "derivación"
+   ],
+   "kind": "rnl",
+   "note": "1 text uses derivación."
+  },
+  {
+   "en": "bundle",
+   "term": "agrupación",
+   "kind": "rnl"
+  },
+  {
+   "en": "comment",
+   "term": "comentario",
+   "kind": "rnl"
+  },
+  {
+   "en": "constraint",
+   "term": "restricción",
+   "kind": "rnl"
+  },
+  {
+   "en": "coordinate",
+   "term": "coordenada",
+   "kind": "rnl"
+  },
+  {
+   "en": "core",
+   "term": "núcleo",
+   "kind": "rnl"
+  },
+  {
+   "en": "crossing",
+   "sense": "wires",
+   "term": "cruce",
+   "kind": "rnl"
+  },
+  {
+   "en": "definition",
+   "term": "definición",
+   "kind": "rnl"
+  },
+  {
+   "en": "diagnostic",
+   "term": "diagnóstico",
+   "kind": "rnl"
+  },
+  {
+   "en": "drawing",
+   "sense": "the schematic as a whole",
+   "term": "dibujo",
+   "avoid": [
+    "esquema"
+   ],
+   "kind": "rnl",
+   "note": "1 text renders a textbook drawing as esquema, the word for schematic."
+  },
+  {
+   "en": "drawing",
+   "sense": "the drawing shown, its canvas",
+   "term": "dibujo",
+   "kind": "rnl"
+  },
+  {
+   "en": "drawing layer",
+   "term": "capa de dibujo",
+   "kind": "rnl"
+  },
+  {
+   "en": "dropped",
+   "sense": "fact status",
+   "term": "descartado",
+   "kind": "rnl"
+  },
+  {
+   "en": "evaluate",
+   "sense": "RNL runtime",
+   "term": "evaluar",
+   "kind": "rnl"
+  },
+  {
+   "en": "fact",
+   "term": "hecho",
+   "kind": "rnl"
+  },
+  {
+   "en": "fill-in",
+   "term": "relleno",
+   "kind": "rnl"
+  },
+  {
+   "en": "free text",
+   "term": "texto libre",
+   "kind": "rnl"
+  },
+  {
+   "en": "header record",
+   "term": "registro de encabezado",
+   "kind": "rnl"
+  },
+  {
+   "en": "hierarchy",
+   "term": "jerarquía",
+   "kind": "rnl"
+  },
+  {
+   "en": "horizontal",
+   "term": "horizontal",
+   "kind": "rnl"
+  },
+  {
+   "en": "index",
+   "term": "índice",
+   "kind": "rnl"
+  },
+  {
+   "en": "instance",
+   "term": "instancia",
+   "kind": "rnl"
+  },
+  {
+   "en": "junction / junction dot",
+   "term": "punto de unión",
+   "kind": "rnl",
+   "note": "The junction itself: unión."
+  },
+  {
+   "en": "kept",
+   "sense": "fact status",
+   "term": "conservado",
+   "kind": "rnl"
+  },
+  {
+   "en": "key",
+   "sense": "TEXT identifier",
+   "term": "clave",
+   "kind": "rnl",
+   "note": "The parameter itself stays key."
+  },
+  {
+   "en": "label",
+   "term": "etiqueta",
+   "kind": "rnl"
+  },
+  {
+   "en": "layout",
+   "term": "disposición",
+   "kind": "rnl"
+  },
+  {
+   "en": "level",
+   "term": "nivel",
+   "kind": "rnl"
+  },
+  {
+   "en": "manifest",
+   "term": "manifiesto",
+   "kind": "rnl"
+  },
+  {
+   "en": "mirrored pair",
+   "sense": "the structure, a mirrored pair",
+   "term": "par reflejado",
+   "avoid": [
+    "par en espejo"
+   ],
+   "kind": "rnl",
+   "note": "1 viewer text uses pares en espejo."
+  },
+  {
+   "en": "mirrored pair",
+   "sense": "the symmetry",
+   "term": "simetría",
+   "kind": "rnl"
+  },
+  {
+   "en": "name",
+   "term": "nombre",
+   "kind": "rnl"
+  },
+  {
+   "en": "net",
+   "term": "red",
+   "kind": "rnl"
+  },
+  {
+   "en": "netlist",
+   "term": "netlist",
+   "kind": "rnl",
+   "note": "Kept in English, masculine: el netlist."
+  },
+  {
+   "en": "netlist body",
+   "term": "cuerpo del netlist",
+   "kind": "rnl"
+  },
+  {
+   "en": "objective",
+   "term": "objetivo",
+   "kind": "rnl"
+  },
+  {
+   "en": "orientation code",
+   "term": "código de orientación",
+   "kind": "rnl"
+  },
+  {
+   "en": "package",
+   "term": "paquete",
+   "kind": "rnl"
+  },
+  {
+   "en": "phase",
+   "term": "fase",
+   "kind": "rnl"
+  },
+  {
+   "en": "pin",
+   "term": "pin",
+   "kind": "rnl",
+   "note": "Plural pines; a symbol's lead is patilla."
+  },
+  {
+   "en": "port",
+   "term": "puerto",
+   "kind": "rnl"
+  },
+  {
+   "en": "primitive",
+   "term": "primitiva",
+   "kind": "rnl"
+  },
+  {
+   "en": "priority",
+   "term": "prioridad",
+   "kind": "rnl"
+  },
+  {
+   "en": "private parts",
+   "term": "partes privadas",
+   "kind": "rnl"
+  },
+  {
+   "en": "queue",
+   "term": "cola",
+   "kind": "rnl"
+  },
+  {
+   "en": "record",
+   "term": "registro",
+   "kind": "rnl"
+  },
+  {
+   "en": "record header",
+   "term": "encabezado del registro",
+   "kind": "rnl"
+  },
+  {
+   "en": "role",
+   "term": "rol",
+   "kind": "rnl"
+  },
+  {
+   "en": "routing / route",
+   "sense": "the router's work",
+   "term": "trazado",
+   "kind": "rnl",
+   "note": "The router itself is enrutador."
+  },
+  {
+   "en": "routing / route",
+   "sense": "the path of a drawn wire",
+   "term": "trazado",
+   "avoid": [
+    "ruta"
+   ],
+   "kind": "rnl",
+   "note": "1 text says las rutas de los cables automáticos."
+  },
+  {
+   "en": "schematic",
+   "term": "esquema",
+   "kind": "rnl"
+  },
+  {
+   "en": "selection",
+   "term": "selección",
+   "kind": "rnl"
+  },
+  {
+   "en": "set",
+   "term": "conjunto",
+   "kind": "rnl"
+  },
+  {
+   "en": "solver",
+   "term": "solucionador",
+   "kind": "rnl"
+  },
+  {
+   "en": "standard package",
+   "term": "paquete estándar",
+   "kind": "rnl"
+  },
+  {
+   "en": "standard series",
+   "term": "serie estándar",
+   "kind": "rnl"
+  },
+  {
+   "en": "statement",
+   "term": "sentencia",
+   "kind": "rnl"
+  },
+  {
+   "en": "structure",
+   "term": "estructura",
+   "kind": "rnl"
+  },
+  {
+   "en": "subject",
+   "term": "sujeto",
+   "kind": "rnl"
+  },
+  {
+   "en": "symbol",
+   "term": "símbolo",
+   "kind": "rnl"
+  },
+  {
+   "en": "terminal",
+   "term": "terminal",
+   "kind": "rnl"
+  },
+  {
+   "en": "text",
+   "sense": "the text of a file or netlist",
+   "term": "texto",
+   "kind": "rnl"
+  },
+  {
+   "en": "text",
+   "sense": "text drawn in a schematic (@TEXT, labels)",
+   "term": "texto",
+   "kind": "rnl"
+  },
+  {
+   "en": "union",
+   "term": "unión",
+   "kind": "rnl"
+  },
+  {
+   "en": "usage",
+   "term": "uso",
+   "kind": "rnl"
+  },
+  {
+   "en": "verb",
+   "term": "verbo",
+   "kind": "rnl"
+  },
+  {
+   "en": "vertical",
+   "term": "vertical",
+   "kind": "rnl"
+  },
+  {
+   "en": "wire",
+   "term": "cable",
+   "kind": "rnl"
+  },
+  {
+   "en": "bias source",
+   "term": "fuente de polarización",
+   "kind": "circuit"
+  },
+  {
+   "en": "bulk",
+   "term": "sustrato",
+   "kind": "circuit"
+  },
+  {
+   "en": "bus",
+   "term": "bus",
+   "kind": "circuit",
+   "note": "Plural buses."
+  },
+  {
+   "en": "cascade",
+   "term": "cascada",
+   "kind": "circuit"
+  },
+  {
+   "en": "common-emitter stage",
+   "term": "etapa en emisor común",
+   "kind": "circuit"
+  },
+  {
+   "en": "connectivity",
+   "term": "conectividad",
+   "kind": "circuit"
+  },
+  {
+   "en": "D flip-flop",
+   "term": "biestable D",
+   "kind": "circuit",
+   "note": "Glossed once as flip-flop D."
+  },
+  {
+   "en": "device",
+   "term": "dispositivo",
+   "kind": "circuit"
+  },
+  {
+   "en": "differential pair",
+   "term": "par diferencial",
+   "kind": "circuit"
+  },
+  {
+   "en": "diode",
+   "term": "diodo",
+   "kind": "circuit"
+  },
+  {
+   "en": "drain",
+   "term": "drenador",
+   "kind": "circuit"
+  },
+  {
+   "en": "five-transistor OTA",
+   "term": "OTA de cinco transistores",
+   "kind": "circuit"
+  },
+  {
+   "en": "function / signal-flow block",
+   "term": "bloque funcional",
+   "kind": "circuit",
+   "note": "A block of a signal flow: bloque de flujo de señal."
+  },
+  {
+   "en": "gate",
+   "term": "puerta",
+   "kind": "circuit"
+  },
+  {
+   "en": "ground",
+   "sense": "the ground net",
+   "term": "tierra",
+   "kind": "circuit"
+  },
+  {
+   "en": "ground",
+   "sense": "the ground symbol",
+   "term": "tierra",
+   "kind": "circuit"
+  },
+  {
+   "en": "logic gate",
+   "term": "puerta lógica",
+   "kind": "circuit"
+  },
+  {
+   "en": "magnitude response",
+   "term": "respuesta en magnitud",
+   "kind": "circuit"
+  },
+  {
+   "en": "no-connect mark",
+   "term": "marca de no conexión",
+   "kind": "circuit"
+  },
+  {
+   "en": "passive part",
+   "term": "componente pasivo",
+   "kind": "circuit"
+  },
+  {
+   "en": "primitive",
+   "sense": "Spectre device",
+   "term": "primitiva",
+   "kind": "circuit",
+   "note": "Same word as the drawing primitive; one text."
+  },
+  {
+   "en": "signal",
+   "term": "señal",
+   "kind": "circuit"
+  },
+  {
+   "en": "simulation / simulate",
+   "term": "simulación",
+   "kind": "circuit"
+  },
+  {
+   "en": "simulator",
+   "term": "simulador",
+   "kind": "circuit"
+  },
+  {
+   "en": "tail / tail transistor",
+   "term": "cola",
+   "kind": "circuit",
+   "note": "The transistor: transistor de cola."
+  },
+  {
+   "en": "transconductor",
+   "term": "transconductor",
+   "kind": "circuit"
+  },
+  {
+   "en": "transistor",
+   "term": "transistor",
+   "kind": "circuit"
+  },
+  {
+   "en": "Add PATH",
+   "term": "Añadir PATH",
+   "kind": "command"
+  },
+  {
+   "en": "Always",
+   "sense": "file association",
+   "term": "Siempre",
+   "kind": "command"
+  },
+  {
+   "en": "Apply and Exit Editing",
+   "term": "Aplicar y salir de la edición",
+   "kind": "command"
+  },
+  {
+   "en": "Auto Include",
+   "term": "Inclusión automática",
+   "kind": "command"
+  },
+  {
+   "en": "Clear Cache",
+   "term": "Vaciar caché",
+   "kind": "command"
+  },
+  {
+   "en": "Collapse",
+   "term": "Plegar",
+   "kind": "command",
+   "note": "Its opposite is desplegar."
+  },
+  {
+   "en": "double tap",
+   "term": "tocar dos veces",
+   "kind": "command"
+  },
+  {
+   "en": "eject",
+   "sense": "disk image",
+   "term": "expulsar",
+   "kind": "command"
+  },
+  {
+   "en": "Exclude",
+   "sense": "Library command",
+   "term": "Excluir",
+   "kind": "command"
+  },
+  {
+   "en": "Exit / quit",
+   "sense": "application or editing",
+   "term": "Salir",
+   "avoid": [
+    "cerrar la aplicación"
+   ],
+   "kind": "command",
+   "note": "1 text says Cmd+Q cierra la aplicación."
+  },
+  {
+   "en": "Find",
+   "sense": "text search",
+   "term": "Buscar",
+   "kind": "command",
+   "note": "Menu: Buscar en el netlist; Search is also buscar."
+  },
+  {
+   "en": "Fit to Window",
+   "term": "Ajustar a la ventana",
+   "kind": "command"
+  },
+  {
+   "en": "Get Info",
+   "sense": "macOS",
+   "term": "Obtener información",
+   "kind": "command"
+  },
+  {
+   "en": "Help",
+   "sense": "menu",
+   "term": "Ayuda",
+   "kind": "command"
+  },
+  {
+   "en": "Markdown",
+   "sense": "single file",
+   "term": "Markdown",
+   "kind": "command",
+   "note": "Kept as Markdown; the chapter archive is Markdown, por capítulos."
+  },
+  {
+   "en": "More info",
+   "sense": "Windows SmartScreen",
+   "term": "Más información",
+   "kind": "command"
+  },
+  {
+   "en": "Open Anyway",
+   "sense": "macOS",
+   "term": "Abrir igualmente",
+   "kind": "command",
+   "note": "The viewer's own New Window button is Abrir de todos modos."
+  },
+  {
+   "en": "Open URL",
+   "term": "Abrir URL",
+   "kind": "command"
+  },
+  {
+   "en": "Open With",
+   "sense": "macOS",
+   "term": "Abrir con",
+   "kind": "command"
+  },
+  {
+   "en": "Open With",
+   "sense": "Windows",
+   "term": "Abrir con",
+   "kind": "command"
+  },
+  {
+   "en": "Overwrite",
+   "sense": "file",
+   "term": "Sobrescribir",
+   "kind": "command"
+  },
+  {
+   "en": "Problems",
+   "sense": "panel",
+   "term": "Problemas",
+   "kind": "command"
+  },
+  {
+   "en": "Reload",
+   "term": "Recargar",
+   "kind": "command"
+  },
+  {
+   "en": "Replace",
+   "sense": "file",
+   "term": "Reemplazar",
+   "avoid": [
+    "sobrescribir"
+   ],
+   "kind": "command",
+   "note": "1 text says a place that would sobrescriba a file read."
+  },
+  {
+   "en": "Reset",
+   "term": "Restablecer",
+   "kind": "command"
+  },
+  {
+   "en": "Save As",
+   "term": "Guardar como",
+   "kind": "command"
+  },
+  {
+   "en": "Save Solved Copy As",
+   "term": "Guardar copia resuelta como",
+   "kind": "command"
+  },
+  {
+   "en": "scroll",
+   "term": "desplazarse",
+   "kind": "command",
+   "note": "Scroll to zoom is usar la rueda."
+  },
+  {
+   "en": "Search",
+   "term": "buscar",
+   "avoid": [
+    "explorar"
+   ],
+   "kind": "command",
+   "note": "1 text says browsers cannot explorar local directories."
+  },
+  {
+   "en": "Trash",
+   "sense": "macOS",
+   "term": "Papelera",
+   "kind": "command"
+  },
+  {
+   "en": "Undo",
+   "term": "Deshacer",
+   "kind": "command"
+  },
+  {
+   "en": "uninstall",
+   "term": "desinstalar",
+   "kind": "command"
+  }
+ ]
+}
