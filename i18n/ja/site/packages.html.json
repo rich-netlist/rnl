@@ -1,6 +1,6 @@
 {
   "RNL standard packages · Rich Netlist": "RNL 標準パッケージ · Rich Netlist",
-  "The standard packages of Rich Netlist (RNL): what each package is for and the text that defines it, every symbol as it is drawn with its pins and box, and the rules that give elements their symbols.": "Rich Netlist（RNL）の標準パッケージ：各パッケージの用途と定義の原文、ピンと選択枠を含めて描画されたすべてのシンボル、および素子にシンボルを割り当てるルール。",
+  "The standard packages of Rich Netlist (RNL): what each package is for and the text that defines it, every symbol as it is drawn with its pins and box, and the rules that give elements their symbols.": "Rich Netlist（RNL）の標準パッケージ：各パッケージの用途と定義の原文、ピンと外接枠を含めて描画されたすべてのシンボル、および素子にシンボルを割り当てるルール。",
   "Skip to content": "本文へスキップ",
   "On this page": "このページの目次",
   "Switch color theme": "カラーテーマを切り替え",
@@ -24,7 +24,7 @@
   "Search by name": "名前で検索",
   "Show on the symbols": "シンボル上に表示",
   "Pins": "ピン",
-  "Box": "選択枠",
+  "Box": "外接枠",
   "Labels": "ラベル",
   "Origin": "原点",
   "Loading…": "読み込み中…",
