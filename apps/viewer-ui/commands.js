@@ -199,6 +199,17 @@ function offered(item) {
 }
 
 /**
+ * A menu's or submenu's text: its label translated and, when the interface is not in English, the
+ * English word the table gives it (`english`) after it in parentheses, so that the Language submenu,
+ * and the View menu that holds it, can be found by a user who reads none of the interface. The word
+ * is no text of the catalogs: the same in every language.
+ */
+function named(item) {
+  const text = translate(item.label);
+  return item.english && locale() !== "en" ? `${text} (${item.english})` : text;
+}
+
+/**
  * The entries of a menu or a submenu that this platform shows: the items it offers, the submenus
  * that have any, each as { label, items }, and a separator ("-") only between two entries.
  */
@@ -210,7 +221,7 @@ function entries(items) {
       gap = shown.length > 0;
       continue;
     }
-    const entry = item.items ? { label: translate(item.label), items: entries(item.items) } : { ...item, label: translate(item.label) };
+    const entry = item.items ? { label: named(item), icon: item.icon, items: entries(item.items) } : { ...item, label: translate(item.label) };
     if (entry.items ? entry.items.length === 0 : !offered(item)) continue;
     if (gap) shown.push("-");
     shown.push(entry);
@@ -221,7 +232,7 @@ function entries(items) {
 
 /** The menus with the entries this platform shows, and no menu left without any. */
 export function menus() {
-  return table.menus.map((m) => ({ label: translate(m.label), items: entries(m.items) })).filter((m) => m.items.length > 0);
+  return table.menus.map((m) => ({ label: named(m), items: entries(m.items) })).filter((m) => m.items.length > 0);
 }
 
 /** The commands among a menu's items, those of its submenus too. */
