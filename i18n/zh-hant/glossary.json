@@ -1,0 +1,1419 @@
+{
+ "language": "zh-hant",
+ "about": "Terms of this language's translations: the English term, its rendering here, and variants not to use. English terms are the only normative ones (decision 0016); this list is a convention for translating and talking about RNL, not part of the standard. kind: rnl (a term of RNL), circuit (of circuit design), command (a command or label of an interface), general.",
+ "terms": [
+  {
+   "en": "alias",
+   "term": "別名",
+   "kind": "rnl"
+  },
+  {
+   "en": "alias package",
+   "term": "別名套件",
+   "kind": "rnl"
+  },
+  {
+   "en": "apply",
+   "sense": "definition",
+   "term": "套用",
+   "avoid": [
+    "附加"
+   ],
+   "kind": "rnl"
+  },
+  {
+   "en": "bend",
+   "term": "轉折點",
+   "kind": "rnl",
+   "note": "Short: 轉折."
+  },
+  {
+   "en": "body",
+   "term": "定義本體",
+   "kind": "rnl"
+  },
+  {
+   "en": "bounding box / box",
+   "sense": "the box of a symbol",
+   "term": "邊界框",
+   "kind": "rnl"
+  },
+  {
+   "en": "bounding box / box",
+   "sense": "the rectangle around an ellipse",
+   "term": "外接框",
+   "kind": "rnl"
+  },
+  {
+   "en": "brace",
+   "term": "大括號",
+   "kind": "rnl"
+  },
+  {
+   "en": "branch",
+   "sense": "wire routing",
+   "term": "分支",
+   "kind": "rnl"
+  },
+  {
+   "en": "bundle",
+   "term": "疊畫",
+   "avoid": [
+    "束集"
+   ],
+   "kind": "rnl",
+   "note": "The owner's choice: a bundle is not a set in general."
+  },
+  {
+   "en": "comment",
+   "term": "註解",
+   "kind": "rnl"
+  },
+  {
+   "en": "constraint",
+   "term": "約束",
+   "kind": "rnl"
+  },
+  {
+   "en": "coordinate",
+   "term": "座標",
+   "kind": "rnl"
+  },
+  {
+   "en": "core",
+   "term": "核心",
+   "kind": "rnl"
+  },
+  {
+   "en": "crossing",
+   "sense": "wires",
+   "term": "交叉",
+   "avoid": [
+    "交錯"
+   ],
+   "kind": "rnl"
+  },
+  {
+   "en": "definition",
+   "term": "定義",
+   "kind": "rnl"
+  },
+  {
+   "en": "diagnostic",
+   "term": "診斷",
+   "kind": "rnl"
+  },
+  {
+   "en": "drawing",
+   "sense": "the schematic as a whole",
+   "term": "原理圖",
+   "kind": "rnl"
+  },
+  {
+   "en": "drawing",
+   "sense": "the drawing shown, its canvas",
+   "term": "圖面",
+   "kind": "rnl"
+  },
+  {
+   "en": "drawing layer",
+   "term": "繪圖圖層",
+   "kind": "rnl"
+  },
+  {
+   "en": "dropped",
+   "sense": "fact status",
+   "term": "捨棄",
+   "kind": "rnl"
+  },
+  {
+   "en": "evaluate",
+   "sense": "RNL runtime",
+   "term": "評估",
+   "kind": "rnl"
+  },
+  {
+   "en": "fact",
+   "term": "事實",
+   "kind": "rnl"
+  },
+  {
+   "en": "fill-in",
+   "term": "自動補齊",
+   "kind": "rnl"
+  },
+  {
+   "en": "free text",
+   "term": "自由文字",
+   "kind": "rnl"
+  },
+  {
+   "en": "header record",
+   "term": "檔頭記錄",
+   "kind": "rnl",
+   "note": "Short: 檔頭."
+  },
+  {
+   "en": "hierarchy",
+   "term": "階層",
+   "kind": "rnl"
+  },
+  {
+   "en": "horizontal",
+   "term": "水平",
+   "kind": "rnl"
+  },
+  {
+   "en": "index",
+   "term": "索引",
+   "kind": "rnl"
+  },
+  {
+   "en": "instance",
+   "term": "實例",
+   "avoid": [
+    "元件"
+   ],
+   "kind": "rnl"
+  },
+  {
+   "en": "junction / junction dot",
+   "term": "交接圓點",
+   "kind": "rnl",
+   "note": "The point itself: 交接點."
+  },
+  {
+   "en": "kept",
+   "sense": "fact status",
+   "term": "保留",
+   "avoid": [
+    "納入"
+   ],
+   "kind": "rnl"
+  },
+  {
+   "en": "key",
+   "sense": "TEXT identifier",
+   "term": "key",
+   "kind": "rnl"
+  },
+  {
+   "en": "label",
+   "term": "標籤",
+   "kind": "rnl"
+  },
+  {
+   "en": "layout",
+   "term": "佈局",
+   "kind": "rnl"
+  },
+  {
+   "en": "level",
+   "term": "層級",
+   "kind": "rnl"
+  },
+  {
+   "en": "manifest",
+   "term": "清單",
+   "kind": "rnl"
+  },
+  {
+   "en": "mirrored pair",
+   "sense": "the structure, a mirrored pair",
+   "term": "鏡像對",
+   "kind": "rnl"
+  },
+  {
+   "en": "mirrored pair",
+   "sense": "the symmetry",
+   "term": "鏡像對稱",
+   "kind": "rnl"
+  },
+  {
+   "en": "name",
+   "term": "名稱",
+   "kind": "rnl"
+  },
+  {
+   "en": "net",
+   "term": "網路",
+   "kind": "rnl"
+  },
+  {
+   "en": "netlist",
+   "term": "網表",
+   "kind": "rnl"
+  },
+  {
+   "en": "netlist body",
+   "term": "網表本文",
+   "kind": "rnl"
+  },
+  {
+   "en": "objective",
+   "term": "目標",
+   "kind": "rnl"
+  },
+  {
+   "en": "orientation code",
+   "term": "朝向代碼",
+   "kind": "rnl"
+  },
+  {
+   "en": "package",
+   "term": "套件",
+   "kind": "rnl"
+  },
+  {
+   "en": "phase",
+   "term": "階段",
+   "kind": "rnl"
+  },
+  {
+   "en": "pin",
+   "term": "接腳",
+   "kind": "rnl"
+  },
+  {
+   "en": "port",
+   "term": "連接埠",
+   "kind": "rnl"
+  },
+  {
+   "en": "primitive",
+   "term": "圖元",
+   "kind": "rnl"
+  },
+  {
+   "en": "priority",
+   "term": "優先順序",
+   "kind": "rnl"
+  },
+  {
+   "en": "private parts",
+   "term": "組件",
+   "kind": "rnl"
+  },
+  {
+   "en": "queue",
+   "term": "佇列",
+   "kind": "rnl"
+  },
+  {
+   "en": "record",
+   "term": "記錄",
+   "kind": "rnl"
+  },
+  {
+   "en": "record header",
+   "term": "記錄標頭",
+   "kind": "rnl"
+  },
+  {
+   "en": "role",
+   "term": "角色",
+   "kind": "rnl"
+  },
+  {
+   "en": "routing / route",
+   "term": "走線",
+   "kind": "rnl"
+  },
+  {
+   "en": "schematic",
+   "term": "原理圖",
+   "kind": "rnl"
+  },
+  {
+   "en": "selection",
+   "term": "篩選",
+   "kind": "rnl"
+  },
+  {
+   "en": "set",
+   "term": "集合",
+   "kind": "rnl"
+  },
+  {
+   "en": "solver",
+   "term": "求解器",
+   "kind": "rnl"
+  },
+  {
+   "en": "standard package",
+   "term": "標準套件",
+   "kind": "rnl"
+  },
+  {
+   "en": "standard series",
+   "term": "標準系列",
+   "kind": "rnl"
+  },
+  {
+   "en": "statement",
+   "term": "敘述",
+   "kind": "rnl"
+  },
+  {
+   "en": "structure",
+   "term": "結構",
+   "kind": "rnl"
+  },
+  {
+   "en": "subject",
+   "term": "主詞",
+   "kind": "rnl"
+  },
+  {
+   "en": "symbol",
+   "term": "符號",
+   "kind": "rnl"
+  },
+  {
+   "en": "terminal",
+   "term": "端子",
+   "kind": "rnl"
+  },
+  {
+   "en": "text",
+   "term": "文字",
+   "kind": "rnl",
+   "note": "Both senses, as is usual in Taiwan; 純文字, 文字檔."
+  },
+  {
+   "en": "union",
+   "term": "聯集",
+   "kind": "rnl"
+  },
+  {
+   "en": "usage",
+   "term": "用例",
+   "avoid": [
+    "用法"
+   ],
+   "kind": "rnl",
+   "note": "The owner's choice: 用法 is too easily read as \"way of use\"."
+  },
+  {
+   "en": "verb",
+   "term": "動詞",
+   "kind": "rnl"
+  },
+  {
+   "en": "vertical",
+   "term": "垂直",
+   "kind": "rnl"
+  },
+  {
+   "en": "wire",
+   "term": "連線",
+   "kind": "rnl"
+  },
+  {
+   "en": "bias source",
+   "term": "偏壓源",
+   "kind": "circuit"
+  },
+  {
+   "en": "bulk",
+   "term": "基體",
+   "kind": "circuit"
+  },
+  {
+   "en": "bus",
+   "term": "匯流排",
+   "kind": "circuit"
+  },
+  {
+   "en": "cascade",
+   "term": "串級",
+   "kind": "circuit"
+  },
+  {
+   "en": "common-emitter stage",
+   "term": "共射極放大級",
+   "kind": "circuit"
+  },
+  {
+   "en": "connectivity",
+   "term": "連接關係",
+   "kind": "circuit",
+   "note": "電氣連接 where the English says electrical."
+  },
+  {
+   "en": "D flip-flop",
+   "term": "D 型正反器",
+   "kind": "circuit"
+  },
+  {
+   "en": "device",
+   "term": "器件",
+   "avoid": [
+    "元件"
+   ],
+   "kind": "circuit",
+   "note": "The owner's choice, as 元件 clashes with the Simplified 元件 (instance)."
+  },
+  {
+   "en": "differential pair",
+   "term": "差動對",
+   "kind": "circuit"
+  },
+  {
+   "en": "diode",
+   "term": "二極體",
+   "kind": "circuit"
+  },
+  {
+   "en": "drain",
+   "term": "汲極",
+   "kind": "circuit"
+  },
+  {
+   "en": "five-transistor OTA",
+   "term": "五電晶體 OTA",
+   "kind": "circuit"
+  },
+  {
+   "en": "function / signal-flow block",
+   "term": "功能方塊",
+   "kind": "circuit",
+   "note": "A block of a signal flow: 訊號流方塊."
+  },
+  {
+   "en": "gate",
+   "term": "閘極",
+   "kind": "circuit"
+  },
+  {
+   "en": "ground",
+   "term": "接地",
+   "kind": "circuit",
+   "note": "Both the net and the symbol, as is usual in Taiwan."
+  },
+  {
+   "en": "logic gate",
+   "term": "邏輯閘",
+   "kind": "circuit"
+  },
+  {
+   "en": "magnitude response",
+   "term": "振幅頻率響應",
+   "kind": "circuit"
+  },
+  {
+   "en": "no-connect mark",
+   "term": "未連接標記",
+   "kind": "circuit"
+  },
+  {
+   "en": "passive part",
+   "term": "被動元件",
+   "kind": "circuit"
+  },
+  {
+   "en": "PDK",
+   "sense": "expanded name",
+   "term": "製程設計套件",
+   "kind": "circuit"
+  },
+  {
+   "en": "primitive",
+   "sense": "Spectre device",
+   "term": "基本元件",
+   "kind": "circuit"
+  },
+  {
+   "en": "signal",
+   "term": "訊號",
+   "kind": "circuit"
+  },
+  {
+   "en": "simulation / simulate",
+   "term": "模擬",
+   "kind": "circuit"
+  },
+  {
+   "en": "simulator",
+   "term": "模擬器",
+   "kind": "circuit"
+  },
+  {
+   "en": "tail / tail transistor",
+   "term": "尾端電晶體",
+   "kind": "circuit",
+   "note": "Short: 尾端."
+  },
+  {
+   "en": "transconductor",
+   "term": "轉導放大器",
+   "kind": "circuit"
+  },
+  {
+   "en": "transistor",
+   "term": "電晶體",
+   "kind": "circuit"
+  },
+  {
+   "en": "Add PATH",
+   "term": "新增 PATH",
+   "kind": "command"
+  },
+  {
+   "en": "Always",
+   "sense": "file association",
+   "term": "一律使用",
+   "kind": "command"
+  },
+  {
+   "en": "Apply and Exit Editing",
+   "term": "套用並結束編輯",
+   "kind": "command"
+  },
+  {
+   "en": "Auto Include",
+   "term": "自動引入",
+   "kind": "command"
+  },
+  {
+   "en": "Clear Cache",
+   "term": "清除快取",
+   "kind": "command"
+  },
+  {
+   "en": "Collapse",
+   "term": "收合",
+   "kind": "command"
+  },
+  {
+   "en": "double tap",
+   "term": "點兩下",
+   "kind": "command"
+  },
+  {
+   "en": "eject",
+   "sense": "disk image",
+   "term": "退出",
+   "kind": "command"
+  },
+  {
+   "en": "Exclude",
+   "sense": "Library command",
+   "term": "排除",
+   "kind": "command"
+  },
+  {
+   "en": "Exit / quit",
+   "sense": "application or editing",
+   "term": "結束",
+   "kind": "command"
+  },
+  {
+   "en": "Find",
+   "sense": "text search",
+   "term": "尋找",
+   "kind": "command"
+  },
+  {
+   "en": "Fit to Window",
+   "term": "縮放至視窗大小",
+   "kind": "command"
+  },
+  {
+   "en": "Get Info",
+   "sense": "macOS",
+   "term": "取得資訊",
+   "kind": "command"
+  },
+  {
+   "en": "Help",
+   "sense": "menu",
+   "term": "說明",
+   "kind": "command"
+  },
+  {
+   "en": "Markdown",
+   "sense": "single file",
+   "term": "Markdown 單一檔案",
+   "kind": "command"
+  },
+  {
+   "en": "More info",
+   "sense": "Windows SmartScreen",
+   "term": "其他資訊",
+   "kind": "command"
+  },
+  {
+   "en": "Open Anyway",
+   "sense": "macOS",
+   "term": "強制打開",
+   "kind": "command"
+  },
+  {
+   "en": "Open URL",
+   "term": "開啟 URL",
+   "kind": "command"
+  },
+  {
+   "en": "Open With",
+   "sense": "macOS",
+   "term": "打開檔案的應用程式",
+   "kind": "command"
+  },
+  {
+   "en": "Open With",
+   "sense": "Windows",
+   "term": "開啟檔案",
+   "kind": "command"
+  },
+  {
+   "en": "Overwrite",
+   "sense": "file",
+   "term": "覆寫",
+   "kind": "command"
+  },
+  {
+   "en": "Problems",
+   "sense": "panel",
+   "term": "問題清單",
+   "kind": "command"
+  },
+  {
+   "en": "Reload",
+   "term": "重新載入",
+   "kind": "command"
+  },
+  {
+   "en": "Replace",
+   "sense": "file",
+   "term": "取代",
+   "kind": "command"
+  },
+  {
+   "en": "Reset",
+   "term": "重設",
+   "kind": "command"
+  },
+  {
+   "en": "Save As",
+   "term": "另存新檔",
+   "avoid": [
+    "另存為"
+   ],
+   "kind": "command",
+   "note": "As in Windows; with UTF-8: 以 UTF-8 另存新檔."
+  },
+  {
+   "en": "Save Solved Copy As",
+   "term": "另存求解副本",
+   "avoid": [
+    "將求解副本另存為"
+   ],
+   "kind": "command",
+   "note": "As the viewer's menu; with UTF-8: 以 UTF-8 另存求解副本."
+  },
+  {
+   "en": "scroll",
+   "term": "捲動",
+   "kind": "command"
+  },
+  {
+   "en": "Search",
+   "term": "搜尋",
+   "kind": "command"
+  },
+  {
+   "en": "Trash",
+   "sense": "macOS",
+   "term": "垃圾桶",
+   "kind": "command"
+  },
+  {
+   "en": "Undo",
+   "term": "復原",
+   "kind": "command"
+  },
+  {
+   "en": "uninstall",
+   "term": "解除安裝",
+   "kind": "command"
+  },
+  {
+   "en": "address",
+   "sense": "web location",
+   "term": "網址",
+   "kind": "general"
+  },
+  {
+   "en": "append",
+   "sense": "record/text",
+   "term": "附加",
+   "kind": "general"
+  },
+  {
+   "en": "application",
+   "sense": "program",
+   "term": "應用程式",
+   "kind": "general",
+   "note": "Short: 程式."
+  },
+  {
+   "en": "apply",
+   "sense": "UI changes",
+   "term": "套用",
+   "kind": "general"
+  },
+  {
+   "en": "archive",
+   "sense": "compressed file",
+   "term": "壓縮檔",
+   "kind": "general"
+  },
+  {
+   "en": "batch",
+   "term": "批次",
+   "kind": "general"
+  },
+  {
+   "en": "binary",
+   "term": "二進位",
+   "kind": "general"
+  },
+  {
+   "en": "build / rebuild",
+   "sense": "software",
+   "term": "建置",
+   "kind": "general"
+  },
+  {
+   "en": "built-in / bundled",
+   "sense": "built in",
+   "term": "內建",
+   "kind": "general"
+  },
+  {
+   "en": "built-in / bundled",
+   "sense": "comes with, bundled",
+   "term": "內含",
+   "kind": "general"
+  },
+  {
+   "en": "Bézier curve",
+   "term": "貝茲曲線",
+   "kind": "general"
+  },
+  {
+   "en": "cache",
+   "term": "快取",
+   "kind": "general"
+  },
+  {
+   "en": "catalog",
+   "sense": "public packages",
+   "term": "目錄",
+   "kind": "general"
+  },
+  {
+   "en": "centering / center",
+   "term": "置中",
+   "kind": "general"
+  },
+  {
+   "en": "character",
+   "term": "字元",
+   "kind": "general"
+  },
+  {
+   "en": "checksum",
+   "term": "總和檢查碼",
+   "avoid": [
+    "驗證"
+   ],
+   "kind": "general",
+   "note": "The SHA-256 value itself is a 雜湊值."
+  },
+  {
+   "en": "chip",
+   "term": "晶片",
+   "kind": "general"
+  },
+  {
+   "en": "click",
+   "sense": "single click",
+   "term": "點選",
+   "avoid": [
+    "點擊"
+   ],
+   "kind": "general"
+  },
+  {
+   "en": "clone",
+   "sense": "repository",
+   "term": "複製",
+   "kind": "general"
+  },
+  {
+   "en": "code",
+   "sense": "program code",
+   "term": "程式碼",
+   "kind": "general"
+  },
+  {
+   "en": "code review",
+   "term": "程式碼審查",
+   "kind": "general"
+  },
+  {
+   "en": "code signing",
+   "sense": "code signing",
+   "term": "程式碼簽署",
+   "kind": "general"
+  },
+  {
+   "en": "code signing",
+   "sense": "ad-hoc signed",
+   "term": "臨時簽署",
+   "kind": "general"
+  },
+  {
+   "en": "Color picker",
+   "term": "選色器",
+   "kind": "general"
+  },
+  {
+   "en": "column",
+   "term": "欄",
+   "kind": "general",
+   "note": "In Traditional Chinese a column is 欄 and a row 列."
+  },
+  {
+   "en": "command line / CLI",
+   "term": "命令列",
+   "kind": "general",
+   "note": "CLI stays in names, such as the CLI guide."
+  },
+  {
+   "en": "configure / configuration",
+   "sense": "configuring, settings",
+   "term": "設定",
+   "kind": "general"
+  },
+  {
+   "en": "configure / configuration",
+   "sense": "a configurable (custom) choice",
+   "term": "自訂",
+   "kind": "general"
+  },
+  {
+   "en": "control",
+   "sense": "UI",
+   "term": "控制項",
+   "kind": "general"
+  },
+  {
+   "en": "copy",
+   "sense": "action",
+   "term": "複製",
+   "avoid": [
+    "拷貝"
+   ],
+   "kind": "general"
+  },
+  {
+   "en": "copyright",
+   "term": "著作權",
+   "kind": "general"
+  },
+  {
+   "en": "create",
+   "sense": "objects",
+   "term": "建立",
+   "kind": "general"
+  },
+  {
+   "en": "desktop viewer",
+   "term": "桌面版檢視器",
+   "kind": "general",
+   "note": "Short: 桌面版."
+  },
+  {
+   "en": "detect",
+   "sense": "format",
+   "term": "偵測",
+   "kind": "general"
+  },
+  {
+   "en": "dialog",
+   "term": "對話方塊",
+   "kind": "general"
+  },
+  {
+   "en": "disk",
+   "term": "磁碟",
+   "kind": "general"
+  },
+  {
+   "en": "disk image",
+   "term": "磁碟映像",
+   "kind": "general"
+  },
+  {
+   "en": "document",
+   "sense": "loaded text",
+   "term": "文件",
+   "kind": "general"
+  },
+  {
+   "en": "drag",
+   "sense": "dragging a device or the view",
+   "term": "拖曳",
+   "kind": "general"
+  },
+  {
+   "en": "drag",
+   "sense": "dragging files into the window",
+   "term": "拖放",
+   "kind": "general"
+  },
+  {
+   "en": "entry",
+   "sense": "gallery item",
+   "term": "項目",
+   "kind": "general"
+  },
+  {
+   "en": "executable",
+   "term": "執行檔",
+   "kind": "general"
+  },
+  {
+   "en": "exit code",
+   "term": "結束代碼",
+   "avoid": [
+    "狀態碼"
+   ],
+   "kind": "general"
+  },
+  {
+   "en": "Explorer",
+   "sense": "Windows",
+   "term": "檔案總管",
+   "kind": "general"
+  },
+  {
+   "en": "extension",
+   "term": "擴充",
+   "kind": "general"
+  },
+  {
+   "en": "extract / unpack",
+   "term": "解壓縮",
+   "kind": "general"
+  },
+  {
+   "en": "fetch",
+   "sense": "files",
+   "term": "擷取",
+   "kind": "general"
+  },
+  {
+   "en": "field",
+   "term": "欄位",
+   "kind": "general"
+  },
+  {
+   "en": "fill",
+   "sense": "graphics",
+   "term": "填色",
+   "avoid": [
+    "填滿"
+   ],
+   "kind": "general"
+  },
+  {
+   "en": "generate",
+   "term": "產生",
+   "kind": "general"
+  },
+  {
+   "en": "hash",
+   "term": "雜湊值",
+   "kind": "general",
+   "note": "hash stays in code and field names."
+  },
+  {
+   "en": "hexadecimal",
+   "term": "十六進位",
+   "kind": "general"
+  },
+  {
+   "en": "highlight",
+   "term": "醒目顯示",
+   "kind": "general"
+  },
+  {
+   "en": "host adapter",
+   "term": "宿主配接器",
+   "kind": "general",
+   "note": "Short: 配接器."
+  },
+  {
+   "en": "idle",
+   "term": "閒置",
+   "kind": "general"
+  },
+  {
+   "en": "image",
+   "sense": "an exported image",
+   "term": "影像",
+   "kind": "general"
+  },
+  {
+   "en": "image",
+   "sense": "a picture, a screenshot",
+   "term": "圖片",
+   "kind": "general"
+  },
+  {
+   "en": "include",
+   "sense": "files / Library operation",
+   "term": "引入",
+   "kind": "general"
+  },
+  {
+   "en": "Initials",
+   "sense": "index",
+   "term": "字首索引",
+   "kind": "general"
+  },
+  {
+   "en": "interactive",
+   "term": "互動式",
+   "kind": "general"
+  },
+  {
+   "en": "interpreter",
+   "term": "直譯器",
+   "kind": "general"
+  },
+  {
+   "en": "job",
+   "sense": "background preload",
+   "term": "工作",
+   "kind": "general"
+  },
+  {
+   "en": "language model",
+   "term": "大型語言模型",
+   "kind": "general"
+  },
+  {
+   "en": "Library",
+   "term": "資源庫",
+   "kind": "general"
+  },
+  {
+   "en": "licence / license",
+   "sense": "the license, a document",
+   "term": "授權條款",
+   "kind": "general"
+  },
+  {
+   "en": "licence / license",
+   "sense": "the permission it grants",
+   "term": "授權",
+   "kind": "general"
+  },
+  {
+   "en": "load",
+   "sense": "software",
+   "term": "載入",
+   "kind": "general"
+  },
+  {
+   "en": "match",
+   "sense": "search result",
+   "term": "符合",
+   "kind": "general"
+  },
+  {
+   "en": "memory",
+   "term": "記憶體",
+   "kind": "general"
+  },
+  {
+   "en": "menu bar",
+   "term": "選單列",
+   "kind": "general"
+  },
+  {
+   "en": "metadata",
+   "term": "中繼資料",
+   "kind": "general"
+  },
+  {
+   "en": "mobile device",
+   "term": "行動裝置",
+   "kind": "general"
+  },
+  {
+   "en": "module",
+   "sense": "software",
+   "term": "模組",
+   "kind": "general"
+  },
+  {
+   "en": "navigation",
+   "term": "導覽",
+   "kind": "general"
+  },
+  {
+   "en": "npm preview",
+   "term": "預覽版",
+   "avoid": [
+    "預覽套件"
+   ],
+   "kind": "general"
+  },
+  {
+   "en": "open source",
+   "term": "開放原始碼",
+   "kind": "general"
+  },
+  {
+   "en": "optimization / optimize",
+   "term": "最佳化",
+   "kind": "general"
+  },
+  {
+   "en": "parse / parsing",
+   "term": "剖析",
+   "kind": "general"
+  },
+  {
+   "en": "pattern",
+   "sense": "wildcard matching",
+   "term": "萬用字元模式",
+   "kind": "general"
+  },
+  {
+   "en": "pipe",
+   "term": "管線",
+   "kind": "general"
+  },
+  {
+   "en": "portable",
+   "term": "可攜版",
+   "kind": "general"
+  },
+  {
+   "en": "preload",
+   "term": "預先載入",
+   "kind": "general"
+  },
+  {
+   "en": "preprocessing",
+   "term": "前處理",
+   "kind": "general"
+  },
+  {
+   "en": "project",
+   "term": "專案",
+   "kind": "general"
+  },
+  {
+   "en": "project",
+   "sense": "software/repository",
+   "term": "專案",
+   "kind": "general"
+  },
+  {
+   "en": "public package",
+   "term": "公開套件",
+   "kind": "general"
+  },
+  {
+   "en": "read-only",
+   "term": "唯讀",
+   "kind": "general"
+  },
+  {
+   "en": "real-time / live",
+   "term": "即時",
+   "kind": "general"
+  },
+  {
+   "en": "recursive",
+   "term": "遞迴",
+   "kind": "general"
+  },
+  {
+   "en": "release notes",
+   "term": "版本資訊",
+   "kind": "general"
+  },
+  {
+   "en": "render",
+   "term": "渲染",
+   "kind": "general",
+   "note": "繪製 or 繪圖 where the English says draw."
+  },
+  {
+   "en": "repository",
+   "term": "儲存庫",
+   "kind": "general"
+  },
+  {
+   "en": "roadmap",
+   "term": "發展藍圖",
+   "kind": "general"
+  },
+  {
+   "en": "roll back",
+   "term": "還原",
+   "kind": "general"
+  },
+  {
+   "en": "router",
+   "term": "走線器",
+   "kind": "general"
+  },
+  {
+   "en": "row",
+   "term": "列",
+   "kind": "general",
+   "note": "In Traditional Chinese a row is 列 and a column 欄; Simplified is the other way: 行 and 列."
+  },
+  {
+   "en": "runtime",
+   "term": "執行階段程式庫",
+   "kind": "general"
+  },
+  {
+   "en": "screenshot",
+   "term": "截圖",
+   "kind": "general",
+   "note": "螢幕截圖 in full."
+  },
+  {
+   "en": "session",
+   "term": "同一次工作階段",
+   "kind": "general"
+  },
+  {
+   "en": "side panel / sidebar",
+   "term": "側邊欄",
+   "avoid": [
+    "側邊面板"
+   ],
+   "kind": "general"
+  },
+  {
+   "en": "Skip to content",
+   "term": "跳至主要內容",
+   "kind": "general"
+  },
+  {
+   "en": "software package",
+   "term": "套件",
+   "kind": "general"
+  },
+  {
+   "en": "source",
+   "sense": "program source",
+   "term": "原始碼",
+   "kind": "general",
+   "note": "原始碼 for a program's source; 來源 for a source in general (one source of truth)."
+  },
+  {
+   "en": "source file",
+   "term": "原始檔",
+   "kind": "general"
+  },
+  {
+   "en": "standard library",
+   "term": "標準程式庫",
+   "kind": "general"
+  },
+  {
+   "en": "Status",
+   "sense": "introduction section",
+   "term": "現況",
+   "kind": "general",
+   "note": "Progress is 進度."
+  },
+  {
+   "en": "status bar",
+   "term": "狀態列",
+   "kind": "general"
+  },
+  {
+   "en": "string",
+   "term": "字串",
+   "kind": "general"
+  },
+  {
+   "en": "temporary",
+   "sense": "clipboard/cache",
+   "term": "暫存",
+   "kind": "general"
+  },
+  {
+   "en": "Terminal",
+   "sense": "OS application",
+   "term": "終端機",
+   "kind": "general"
+  },
+  {
+   "en": "thumbnail",
+   "term": "縮圖",
+   "kind": "general"
+  },
+  {
+   "en": "timeline",
+   "term": "時間軸",
+   "kind": "general"
+  },
+  {
+   "en": "timeout",
+   "term": "逾時",
+   "kind": "general"
+  },
+  {
+   "en": "tooltip",
+   "term": "工具提示",
+   "kind": "general"
+  },
+  {
+   "en": "user",
+   "term": "使用者",
+   "kind": "general"
+  },
+  {
+   "en": "view",
+   "sense": "UI region noun",
+   "term": "檢視",
+   "avoid": [
+    "檢視畫面",
+    "畫面"
+   ],
+   "kind": "general"
+  },
+  {
+   "en": "viewer",
+   "term": "檢視器",
+   "kind": "general"
+  },
+  {
+   "en": "web viewer",
+   "term": "網頁版檢視器",
+   "kind": "general",
+   "note": "Short: 網頁版."
+  },
+  {
+   "en": "word list",
+   "term": "詞彙表",
+   "kind": "general"
+  }
+ ]
+}

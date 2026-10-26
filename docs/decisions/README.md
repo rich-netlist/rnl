@@ -22,4 +22,5 @@ Decisions made before this log started, including those from the first architect
 | [0012](0012-public-packages-use-an-immutable-catalog.md) | Optional public packages use a separate repository and an immutable catalog | accepted; implementation under review; its bilingual summaries are changed by [0015](0015-english-is-the-only-core-language.md) |
 | [0013](0013-independent-release-lines.md) | Core, Viewer and language standard have independent releases; latest belongs to core | accepted; initial versions and npm dist-tag pending |
 | [0014](0014-inspection-overlay-geometry.md) | Shared inspection overlay geometry, with frontend styling and optional SVG export | proposed; implementation under review |
-| [0015](0015-english-is-the-only-core-language.md) | English is the only core language; every other language, Chinese included, is a translation | accepted; implemented in steps |
+| [0015](0015-english-is-the-only-core-language.md) | English is the only core language; every other language, Chinese included, is a translation | accepted; implemented in steps; points 3 and 7 amended by [0016](0016-english-terms-are-normative-each-language-keeps-a-glossary.md) |
+| [0016](0016-english-terms-are-normative-each-language-keeps-a-glossary.md) | The English terms are the only normative ones; each language keeps its own glossary | proposed |

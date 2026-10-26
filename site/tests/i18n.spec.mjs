@@ -101,7 +101,9 @@ test('third locale inherits English content and switches without changing source
   // translated by AI: a notice under the top bar, in English, with a link to report an error on this page
   await expect(page.locator('.ai-notice')).toHaveAttribute('lang', 'en');
   await expect(page.locator('.ai-notice')).toContainText('Translated from English by AI; it may contain errors.');
-  await expect(page.locator('.ai-notice a')).toHaveAttribute('href', /^https:\/\/github\.com\/rich-netlist\/rnl\/issues\/new\?labels=translation&title=Translation%20%28Japanese%29%3A%20index\.html&/);
+  await expect(page.locator('.ai-notice a').first()).toHaveAttribute('href', /^https:\/\/github\.com\/rich-netlist\/rnl\/issues\/new\?labels=translation&title=Translation%20%28Japanese%29%3A%20index\.html&/);
+  // and, as the language has a glossary, that the English terms are normative, with a link to it (decision 0016)
+  await expect(page.locator('.ai-notice a').nth(1)).toHaveAttribute('href', 'glossary.html');
   await expect(page.locator('#status .tl')).toContainText('Release notes');
   await page.locator('.language-menu > summary').click();
   await expect(page.locator('[data-lang-link]')).toHaveCount(3);

@@ -255,15 +255,25 @@ class Languages:
         """The notice at the top of every page of a language translated by AI and not yet reviewed by a
         native speaker, `"ai_translated": true` in its entry, or "": that the page was translated from
         English by AI and may contain errors, with a link that opens an issue about this page. In English,
-        as every notice about translation itself (decision 0015)."""
-        if code == self.default or not self.entries[code].get("ai_translated"):
+        as every notice about translation itself (decision 0015). A language with a glossary also says there,
+        reviewed or not, that the English terms are the normative ones, with a link to its glossary page
+        (decision 0016)."""
+        if code == self.default:
             return ""
+        terms = ""
+        if any((folder / code / "glossary.json").is_file() for folder in self.catalogs):
+            terms = (f'{escape(self.message(self.default, "terms_normative"))} '
+                     f'<a href="glossary.html">{escape(self.message(self.default, "glossary"))}</a>')
+        if not self.entries[code].get("ai_translated"):
+            return (f'\n<div class="terms-notice" lang="{self.locales[self.default]["html_lang"]}"><p class="wrap">'
+                    f'<svg class="ico"><use href="#i-info"/></svg><span>{terms}</span></p></div>') if terms else ""
         title = f"Translation ({self.english_name(code)}): {page}"
         body = f"Page: {SITE_URL}{code}/{page}\n\nWhat is wrong, and what it should say:\n"
         url = f"{ISSUE_URL}?labels=translation&title={quote(title)}&body={quote(body)}"
         return (f'\n<div class="ai-notice" lang="{self.locales[self.default]["html_lang"]}"><p class="wrap">'
                 f'<svg class="ico"><use href="#i-info"/></svg><span>{escape(self.message(self.default, "ai_translated"))} '
-                f'<a href="{escape(url, quote=True)}">{escape(self.message(self.default, "report_issue"))}</a></span></p></div>')
+                f'<a href="{escape(url, quote=True)}">{escape(self.message(self.default, "report_issue"))}</a>'
+                f'{" · " + terms if terms else ""}</span></p></div>')
 
     def markup(self, values, html=False):
         self.text(values, self.default)

@@ -101,9 +101,10 @@ PAGES = {
     "agents.html": None,
     "timeline.html": None,
     "translation.html": None,
+    "glossary.html": None,
 }
 # Pages added after the Chinese pages moved to zh/ have no old address at the root.
-NEW_PAGES = ("agents.html", "gallery.html", "timeline.html", "translation.html")
+NEW_PAGES = ("agents.html", "gallery.html", "timeline.html", "translation.html", "glossary.html")
 
 GROUP = I18N.group
 CJK = re.compile("[%s]" % "".join("%s-%s" % (chr(a), chr(b)) for a, b in
@@ -129,6 +130,10 @@ TIMELINE = "{{timeline}}"
 TIMELINE_FULL = "{{timeline-full}}"
 # translation.html: the report of scripts/i18n/status.py, how far each language is (decision 0015)
 TRANSLATION_STATUS = "{{translation-status}}"
+# glossary.html: the language's glossary, i18n/<lang>/glossary.json (decision 0016); in English, the list of them
+GLOSSARY = "{{glossary}}"
+GLOSSARY_KINDS = (("rnl", "Terms of RNL"), ("circuit", "Circuit design"), ("command", "Commands and labels"),
+                  ("general", "General words"))
 # The homepage shows this many of the latest published entries; timeline.html has all of them.
 HOME_ENTRIES = 3
 # Release dates are modern Asia/Shanghai dates (UTC+08:00, without DST).
@@ -420,6 +425,52 @@ def translation_status_html(online=False):
             f'<h3>Not counted</h3>\n<ul class="ts-others">{others}</ul></div>')
 
 
+def glossary_html(code):
+    """The table of glossary.html in one language: its glossary's terms by kind, the English term first; in
+    English, the languages that have a glossary. The headings and notes are in English, as the glossary's
+    notes are; the renderings are marked with their language."""
+    if code == I18N.default:
+        rows = []
+        for other in CODES:
+            path = ROOT / "i18n" / other / "glossary.json"
+            if other == I18N.default or not path.is_file():
+                continue
+            data = json.loads(path.read_text(encoding="utf-8"))
+            own = f'<span lang="{I18N.locales[other]["html_lang"]}">{escape(I18N.locales[other]["name"])}</span>'
+            # its English name, where the registry gives one, and its own, marked with its language
+            english = I18N.english_name(other)
+            name = own if english == I18N.locales[other]["name"] else f"{escape(english)} {own}"
+            draft = " · draft" if data.get("draft") else ""
+            rows.append(f'<li><a href="../{other}/glossary.html">{name}</a>'
+                        f' <small>{len(data["terms"])} terms{draft}</small></li>')
+        return (f'<div class="gs-report" lang="en"><p class="lead">Each language’s glossary gives, for every English term, '
+                f'its rendering, the variants it does not use and a note.</p>\n<ul class="gs-languages">{"".join(rows)}</ul></div>')
+    path = ROOT / "i18n" / code / "glossary.json"
+    if not path.is_file():
+        return '<div class="gs-report" lang="en"><p class="lead">This language has no glossary yet.</p></div>'
+    data = json.loads(path.read_text(encoding="utf-8"))
+    lang = I18N.locales[code]["html_lang"]
+    draft = ('<p class="note">A first draft, taken from the translations as they are; not yet reviewed.</p>'
+             if data.get("draft") else "")
+    parts = []
+    for kind, title in GLOSSARY_KINDS:
+        terms = [t for t in data["terms"] if t.get("kind") == kind]
+        if not terms:
+            continue
+        comma = "、" if lang.startswith("zh") or lang.startswith("ja") else ", "
+
+        def row(t):
+            sense = f'<small>{escape(t["sense"])}</small>' if t.get("sense") else ""
+            return (f'<tr><th scope="row">{escape(t["en"])}{sense}</th><td lang="{lang}" class="gs-term">{escape(t["term"])}</td>'
+                    f'<td lang="{lang}" class="gs-avoid">{escape(comma.join(t.get("avoid", [])))}</td>'
+                    f'<td>{escape(t.get("note", ""))}</td></tr>')
+        rows = "".join(row(t) for t in terms)
+        parts.append(f'<h3>{escape(title)} <small>{len(terms)}</small></h3>\n<div class="matrix-wrap"><table class="matrix gs-table">'
+                     f'<thead><tr><th scope="col">English</th><th scope="col">Here</th><th scope="col">Not used</th>'
+                     f'<th scope="col">Note</th></tr></thead><tbody>{rows}</tbody></table></div>')
+    return f'<div class="gs-report" lang="en">{draft}\n' + "\n".join(parts) + '</div>'
+
+
 def has_linux_release(version):
     """Only link Linux files when the selected tag includes the Linux bundle configuration.
     Earlier Windows-only tags must keep working even after this site change is deployed."""
@@ -608,7 +659,8 @@ def build_language(files, index, version, linux=False, macos=False):
                   "language-menu": I18N.menu(code, lambda target: "../" + target + "/" + ("" if page == "index.html" else page)),
                   "spec-root": "spec/" if I18N.standard(code) == code else "../" + I18N.standard(code) + "/spec/",
                   "translation-notice": I18N.notice(code, *counts[page]),
-                  "ai-translation-notice": I18N.ai_notice(code, page)}
+                  "ai-translation-notice": I18N.ai_notice(code, page),
+                  "glossary": glossary_html(code) if page == "glossary.html" else ""}
         tokens.update({"nav-" + key: escape(I18N.message(code, key))
                        for key in ("intro", "tour", "spec", "packages", "gallery", "tools", "agents", "pages", "translation")})
         for key, value in tokens.items():
@@ -751,6 +803,8 @@ def build(version=None, incubating=False, online=False):
     files["timeline.html"] = files["timeline.html"].replace(TIMELINE_FULL, timeline_html(full=True))
     if files["translation.html"].count(TRANSLATION_STATUS) != 1:
         raise BuildError("src/translation.html needs exactly one {{translation-status}} marker")
+    if files["glossary.html"].count(GLOSSARY) != 1:
+        raise BuildError("src/glossary.html needs exactly one {{glossary}} marker")
     files["translation.html"] = files["translation.html"].replace(TRANSLATION_STATUS, translation_status_html(online))
     ex = examples()
     errors = []

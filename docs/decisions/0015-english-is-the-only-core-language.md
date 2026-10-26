@@ -1,7 +1,7 @@
 # 0015. English is the only core language; every other language, Chinese included, is a translation
 
 - Date: 2026-10-25
-- Status: accepted; point 8 amended on 2026-10-25: the notices are in English; points 3 and 9 amended on 2026-10-25: the READMEs are in English only; point 8 amended on 2026-10-25: a language translated by AI may be shown with a notice
+- Status: accepted; point 8 amended on 2026-10-25: the notices are in English; points 3 and 9 amended on 2026-10-25: the READMEs are in English only; point 8 amended on 2026-10-25: a language translated by AI may be shown with a notice; points 3 and 7 amended by [decision 0016](0016-english-terms-are-normative-each-language-keeps-a-glossary.md): the English terms are the only normative ones, and each language keeps its own glossary
 
 ## Context
 

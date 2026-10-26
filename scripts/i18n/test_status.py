@@ -253,6 +253,35 @@ class Aliases(Repository):
         self.assertEqual(s["alias"].langs["ja"].done, 0)
 
 
+class Glossaries(Repository):
+    SURFACE = {"id": "glossary", "title": "G", "kind": "glossary", "translation": "i18n/{lang}/glossary.json"}
+
+    def test_a_variant_to_avoid_is_reported_where_the_english_has_the_term(self):
+        self.surfaces(self.SURFACE)
+        self.write("i18n/zh/glossary.json", json.dumps({"language": "zh", "terms": [
+            {"en": "package", "term": "包", "avoid": ["套件"], "kind": "rnl"},
+            {"en": "wire", "term": "导线", "kind": "rnl"}]}, ensure_ascii=False))
+        self.write("i18n/zh/viewer.json", json.dumps({"Open Packages": "打开套件", "Open the kit": "打开套件",
+                                                      "Packages and wires": "包和导线", "Untranslated package": None},
+                                                     ensure_ascii=False))
+        self.write("i18n/zh/site/messages.json", json.dumps({"tools": "工具套件"}, ensure_ascii=False))
+        _, s = self.survey()
+        zh = s["glossary"].langs["zh"]
+        self.assertEqual(zh.done, 2)
+        self.assertEqual([(f.where, f.text.split(",")[0]) for f in zh.findings],
+                         [("i18n/zh/viewer.json", "package: 套件 for 包")])
+        self.assertNotIn("ja", s["glossary"].langs)  # a language need not have a glossary
+        self.assertEqual(s["glossary"].errors, [])
+
+    def test_a_malformed_glossary_is_an_error(self):
+        self.surfaces(self.SURFACE)
+        self.write("i18n/zh/glossary.json", json.dumps({"terms": [
+            {"en": "package", "term": "包", "kind": "noun"}, {"en": "wire", "term": "导线", "avoid": ["导线"], "kind": "rnl"},
+            {"term": "网络", "kind": "rnl"}]}, ensure_ascii=False))
+        _, s = self.survey()
+        self.assertEqual(len(s["glossary"].errors), 3, s["glossary"].errors)
+
+
 class TheRepository(unittest.TestCase):
     """The repository's own registry and surfaces."""
 

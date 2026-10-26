@@ -102,6 +102,12 @@ language is: the build fills its `{{translation-status}}` marker with the report
 its heading and introduction are translated as any page's. With `--online`, as Pages CI builds it,
 the report also counts the entries of rnl-gallery and the summaries of rnl-packages.
 
+[`glossary.html`](src/glossary.html) shows, in each language, how it renders RNL's English terms: the build
+fills its `{{glossary}}` marker from `i18n/<lang>/glossary.json`, and in English with the list of the
+languages' glossaries ([decision 0016](../docs/decisions/0016-english-terms-are-normative-each-language-keeps-a-glossary.md)).
+Every page of a language that has a glossary says under its top bar, in English, that the English terms are
+the normative ones, with a link to it; for a language translated by AI, the same line ends its AI notice.
+
 `RNL_SITE_LANGUAGES=/absolute/path/languages.json` selects a temporary registry for local
 checks; its catalogs are those beside it, then those of `i18n/`. Browser tests generate a third-locale fixture in an OS temporary directory and
 remove it afterwards; it is never included in the deployed site. Set `RNL_I18N_SCREENSHOTS`

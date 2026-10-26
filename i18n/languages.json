@@ -74,7 +74,9 @@
         "partly_translated": "Parts of this page are not yet available in {language}; they are shown in English.",
         "help_translate": "Help translate it",
         "ai_translated": "Translated from English by AI; it may contain errors.",
-        "report_issue": "Report an issue"
+        "report_issue": "Report an issue",
+        "terms_normative": "The English terms are the normative ones.",
+        "glossary": "Glossary"
       }
     },
     {
