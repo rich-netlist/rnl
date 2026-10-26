@@ -6,6 +6,9 @@ import { fileURLToPath } from 'node:url';
 // English and the languages the registry publishes, as the language menu offers them
 const registry = JSON.parse(readFileSync(new URL('../../i18n/languages.json', import.meta.url), 'utf8'));
 const offered = registry.languages.filter(entry => entry.code === registry.default || entry.status === 'published').length;
+// whether a published language matches a browser language
+const offers = tag => registry.languages.some(entry => entry.status === 'published'
+  && (entry.matches || [entry.code]).some(m => tag.toLowerCase().startsWith(m)));
 
 for (const language of ['zh', 'en']) for (const theme of ['light', 'dark']) for (const width of [1440, 390]) {
   test(`language menu: ${language} ${theme} ${width}px`, async ({ page }, info) => {
@@ -25,7 +28,8 @@ for (const language of ['zh', 'en']) for (const theme of ['light', 'dark']) for 
     await expect(menu).not.toHaveAttribute('open');
     await expect(summary).toBeFocused();
     await summary.click();
-    await page.locator('.hero h1').click();
+    // an outside click, at the left edge of the title, which the open menu does not cover however long it is
+    await page.locator('.hero h1').click({ position: { x: 4, y: 4 } });
     await expect(menu).not.toHaveAttribute('open');
     await summary.click();
     expect(await menu.locator('.language-options').evaluate(el => {
@@ -96,7 +100,9 @@ async function serveFixture(page) {
 
 test('third locale inherits English content and switches without changing source templates', async ({ page }) => {
   await serveFixture(page);
-  await page.addInitScript(() => Object.defineProperty(navigator, 'languages', { value: ['fr-FR', 'ja-JP'] }));
+  // a language the site does not offer first, then the fixture's Japanese
+  expect(offers('pt-BR')).toBe(false);
+  await page.addInitScript(() => Object.defineProperty(navigator, 'languages', { value: ['pt-BR', 'ja-JP'] }));
   await page.goto('/i18n-fixture/?review=1#status');
   await expect(page).toHaveURL(/\/i18n-fixture\/ja\/\?review=1#status$/);
   await expect(page.locator('html')).toHaveAttribute('lang', 'ja');
@@ -164,8 +170,9 @@ for (const theme of ['light', 'dark']) for (const width of [1440, 390]) {
 }
 
 test('unsupported browser languages fall back to English, including with blocked storage', async ({ page }) => {
+  expect(offers('pt-BR') || offers('it-IT')).toBe(false);
   await page.addInitScript(() => {
-    Object.defineProperty(navigator, 'languages', { value: ['fr-FR', 'de-DE'] });
+    Object.defineProperty(navigator, 'languages', { value: ['pt-BR', 'it-IT'] });
     Object.defineProperty(window, 'localStorage', { get() { throw new Error('Storage blocked'); } });
   });
   await page.goto('/?review=1#status');
