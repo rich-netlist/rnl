@@ -1,0 +1,756 @@
+{
+ "language": "ko",
+ "about": "Terms of this language's translations: the English term, its rendering here, and variants not to use. English terms are the only normative ones (decision 0016); this list is a convention for translating and talking about RNL, not part of the standard. kind: rnl (a term of RNL), circuit (of circuit design), command (a command or label of an interface), general.",
+ "draft": true,
+ "terms": [
+  {
+   "en": "alias",
+   "term": "별칭",
+   "kind": "rnl"
+  },
+  {
+   "en": "alias package",
+   "term": "별칭 패키지",
+   "kind": "rnl"
+  },
+  {
+   "en": "apply",
+   "sense": "definition",
+   "term": "적용",
+   "kind": "rnl"
+  },
+  {
+   "en": "bend",
+   "term": "꺾임점",
+   "kind": "rnl",
+   "note": "Counts and solver objectives say 꺾임 (꺾임 횟수, 꺾임 위치)."
+  },
+  {
+   "en": "body",
+   "term": "본문",
+   "kind": "rnl",
+   "note": "정의 본문 where it could be read as the netlist body."
+  },
+  {
+   "en": "bounding box / box",
+   "sense": "the box of a symbol",
+   "term": "경계 상자",
+   "kind": "rnl"
+  },
+  {
+   "en": "bounding box / box",
+   "sense": "the rectangle around an ellipse",
+   "term": "외접 상자",
+   "kind": "rnl"
+  },
+  {
+   "en": "brace",
+   "term": "중괄호",
+   "kind": "rnl"
+  },
+  {
+   "en": "branch",
+   "sense": "wire routing",
+   "term": "분기",
+   "avoid": [
+    "분기선"
+   ],
+   "kind": "rnl"
+  },
+  {
+   "en": "bundle",
+   "term": "번들",
+   "kind": "rnl"
+  },
+  {
+   "en": "comment",
+   "term": "주석",
+   "kind": "rnl"
+  },
+  {
+   "en": "constraint",
+   "term": "제약",
+   "kind": "rnl",
+   "note": "Also 제약 조건 in running text."
+  },
+  {
+   "en": "coordinate",
+   "term": "좌표",
+   "kind": "rnl"
+  },
+  {
+   "en": "core",
+   "term": "코어",
+   "kind": "rnl"
+  },
+  {
+   "en": "crossing",
+   "sense": "wires",
+   "term": "교차",
+   "kind": "rnl"
+  },
+  {
+   "en": "definition",
+   "term": "정의",
+   "kind": "rnl"
+  },
+  {
+   "en": "diagnostic",
+   "term": "진단",
+   "kind": "rnl"
+  },
+  {
+   "en": "drawing",
+   "sense": "the schematic as a whole",
+   "term": "도면",
+   "kind": "rnl",
+   "note": "A few texts say 회로도 (schematic) or 작도 (for drawing-only cells)."
+  },
+  {
+   "en": "drawing",
+   "sense": "the drawing shown, its canvas",
+   "term": "도면",
+   "kind": "rnl"
+  },
+  {
+   "en": "drawing layer",
+   "term": "그리기 레이어",
+   "kind": "rnl"
+  },
+  {
+   "en": "dropped",
+   "sense": "fact status",
+   "term": "버려짐",
+   "kind": "rnl",
+   "note": "As a verb: 버려지다."
+  },
+  {
+   "en": "evaluate",
+   "sense": "RNL runtime",
+   "term": "평가",
+   "kind": "rnl"
+  },
+  {
+   "en": "fact",
+   "term": "사실",
+   "kind": "rnl"
+  },
+  {
+   "en": "fill-in",
+   "term": "자동 보충",
+   "kind": "rnl"
+  },
+  {
+   "en": "free text",
+   "term": "자유 텍스트",
+   "kind": "rnl"
+  },
+  {
+   "en": "header record",
+   "term": "헤더 레코드",
+   "kind": "rnl",
+   "note": "Short: 헤더."
+  },
+  {
+   "en": "hierarchy",
+   "term": "계층",
+   "kind": "rnl",
+   "note": "Also 계층 구조."
+  },
+  {
+   "en": "horizontal",
+   "term": "수평",
+   "kind": "rnl"
+  },
+  {
+   "en": "instance",
+   "term": "인스턴스",
+   "kind": "rnl",
+   "note": "1 text says 소자 (device) for an instance."
+  },
+  {
+   "en": "junction / junction dot",
+   "term": "접합점",
+   "kind": "rnl"
+  },
+  {
+   "en": "kept",
+   "sense": "fact status",
+   "term": "유지됨",
+   "avoid": [
+    "채택됨"
+   ],
+   "kind": "rnl",
+   "note": "The tour and the language page say 채택(됨); the viewer says 유지됨."
+  },
+  {
+   "en": "key",
+   "sense": "TEXT identifier",
+   "term": "key",
+   "kind": "rnl",
+   "note": "Kept in English as the parameter name."
+  },
+  {
+   "en": "label",
+   "term": "라벨",
+   "kind": "rnl"
+  },
+  {
+   "en": "layout",
+   "term": "레이아웃",
+   "kind": "rnl"
+  },
+  {
+   "en": "level",
+   "term": "레벨",
+   "kind": "rnl",
+   "note": "An objective's level in the solver settings is 단계."
+  },
+  {
+   "en": "manifest",
+   "term": "매니페스트",
+   "kind": "rnl"
+  },
+  {
+   "en": "mirrored pair",
+   "sense": "the structure, a mirrored pair",
+   "term": "대칭쌍",
+   "kind": "rnl",
+   "note": "The viewer's objective says 거울 대칭쌍."
+  },
+  {
+   "en": "mirrored pair",
+   "sense": "the symmetry",
+   "term": "대칭",
+   "kind": "rnl",
+   "note": "Mirror images: 좌우 거울 대칭."
+  },
+  {
+   "en": "name",
+   "term": "이름",
+   "kind": "rnl"
+  },
+  {
+   "en": "net",
+   "term": "넷",
+   "kind": "rnl"
+  },
+  {
+   "en": "netlist",
+   "term": "넷리스트",
+   "kind": "rnl"
+  },
+  {
+   "en": "netlist body",
+   "term": "넷리스트 본문",
+   "kind": "rnl"
+  },
+  {
+   "en": "objective",
+   "term": "최적화 목표",
+   "kind": "rnl",
+   "note": "Short: 목표."
+  },
+  {
+   "en": "orientation code",
+   "term": "방향 코드",
+   "kind": "rnl"
+  },
+  {
+   "en": "package",
+   "term": "패키지",
+   "kind": "rnl"
+  },
+  {
+   "en": "phase",
+   "term": "단계",
+   "kind": "rnl",
+   "note": "As a heading: 적용 단계."
+  },
+  {
+   "en": "pin",
+   "term": "핀",
+   "kind": "rnl"
+  },
+  {
+   "en": "port",
+   "term": "포트",
+   "kind": "rnl"
+  },
+  {
+   "en": "primitive",
+   "term": "도형 요소",
+   "kind": "rnl"
+  },
+  {
+   "en": "priority",
+   "term": "우선순위",
+   "kind": "rnl"
+  },
+  {
+   "en": "private parts",
+   "term": "내부 전용 부품",
+   "kind": "rnl"
+  },
+  {
+   "en": "queue",
+   "term": "대기열",
+   "kind": "rnl"
+  },
+  {
+   "en": "record",
+   "term": "레코드",
+   "kind": "rnl"
+  },
+  {
+   "en": "record header",
+   "term": "레코드 헤더",
+   "kind": "rnl"
+  },
+  {
+   "en": "role",
+   "term": "역할",
+   "kind": "rnl"
+  },
+  {
+   "en": "routing / route",
+   "sense": "the router's work",
+   "term": "라우팅",
+   "kind": "rnl",
+   "note": "What it computes, the paths of the wires, is 배선 경로."
+  },
+  {
+   "en": "routing / route",
+   "sense": "the path of a drawn wire",
+   "term": "경로",
+   "kind": "rnl",
+   "note": "배선 경로 where the wire has to be named."
+  },
+  {
+   "en": "schematic",
+   "term": "회로도",
+   "kind": "rnl"
+  },
+  {
+   "en": "selection",
+   "term": "선택식",
+   "avoid": [
+    "조건부 선택"
+   ],
+   "kind": "rnl",
+   "note": "Headings say 선택 (집합과 선택), the word for choosing in the interface."
+  },
+  {
+   "en": "set",
+   "term": "집합",
+   "kind": "rnl"
+  },
+  {
+   "en": "solver",
+   "term": "솔버",
+   "kind": "rnl"
+  },
+  {
+   "en": "standard package",
+   "term": "표준 패키지",
+   "kind": "rnl"
+  },
+  {
+   "en": "standard series",
+   "term": "표준 시리즈",
+   "kind": "rnl"
+  },
+  {
+   "en": "statement",
+   "term": "구문",
+   "kind": "rnl",
+   "note": "1 text says 선언문 for the statement that declares an instance."
+  },
+  {
+   "en": "structure",
+   "term": "구조",
+   "kind": "rnl"
+  },
+  {
+   "en": "subject",
+   "term": "주어",
+   "kind": "rnl"
+  },
+  {
+   "en": "symbol",
+   "term": "심볼",
+   "kind": "rnl"
+  },
+  {
+   "en": "terminal",
+   "term": "단자",
+   "kind": "rnl"
+  },
+  {
+   "en": "text",
+   "sense": "the text of a file or netlist",
+   "term": "텍스트",
+   "kind": "rnl",
+   "note": "The text that defines a package or symbol is 정의 원문; the formal standard is 본문."
+  },
+  {
+   "en": "text",
+   "sense": "text drawn in a schematic (@TEXT, labels)",
+   "term": "텍스트",
+   "kind": "rnl",
+   "note": "A style's text color and size are 글자 색상, 글자 크기."
+  },
+  {
+   "en": "union",
+   "term": "합집합",
+   "kind": "rnl"
+  },
+  {
+   "en": "usage",
+   "term": "용례",
+   "kind": "rnl",
+   "note": "The language page adds the English once: 용례(usage)."
+  },
+  {
+   "en": "verb",
+   "term": "서술어",
+   "kind": "rnl"
+  },
+  {
+   "en": "vertical",
+   "term": "수직",
+   "kind": "rnl"
+  },
+  {
+   "en": "wire",
+   "term": "배선",
+   "kind": "rnl"
+  },
+  {
+   "en": "bias source",
+   "term": "바이어스원",
+   "kind": "circuit"
+  },
+  {
+   "en": "bulk",
+   "term": "바디",
+   "kind": "circuit",
+   "note": "Written 바디(bulk) in both texts."
+  },
+  {
+   "en": "bus",
+   "term": "버스",
+   "kind": "circuit"
+  },
+  {
+   "en": "cascade",
+   "term": "캐스케이드",
+   "kind": "circuit",
+   "note": "Written 캐스케이드(cascade), the structure's name."
+  },
+  {
+   "en": "common-emitter stage",
+   "term": "공통 이미터 증폭단",
+   "kind": "circuit"
+  },
+  {
+   "en": "connectivity",
+   "term": "연결 관계",
+   "kind": "circuit"
+  },
+  {
+   "en": "D flip-flop",
+   "term": "D 플립플롭",
+   "kind": "circuit"
+  },
+  {
+   "en": "device",
+   "term": "소자",
+   "kind": "circuit"
+  },
+  {
+   "en": "differential pair",
+   "term": "차동쌍",
+   "kind": "circuit"
+  },
+  {
+   "en": "diode",
+   "term": "다이오드",
+   "kind": "circuit"
+  },
+  {
+   "en": "drain",
+   "term": "드레인",
+   "kind": "circuit"
+  },
+  {
+   "en": "five-transistor OTA",
+   "term": "5트랜지스터 OTA",
+   "kind": "circuit"
+  },
+  {
+   "en": "function / signal-flow block",
+   "term": "기능 블록",
+   "kind": "circuit",
+   "note": "A block of a signal flow: 신호 흐름 블록."
+  },
+  {
+   "en": "gate",
+   "term": "게이트",
+   "kind": "circuit"
+  },
+  {
+   "en": "ground",
+   "sense": "the ground net",
+   "term": "접지",
+   "kind": "circuit"
+  },
+  {
+   "en": "ground",
+   "sense": "the ground symbol",
+   "term": "접지 심볼",
+   "kind": "circuit",
+   "note": "Short: 접지."
+  },
+  {
+   "en": "logic gate",
+   "term": "논리 게이트",
+   "kind": "circuit"
+  },
+  {
+   "en": "magnitude response",
+   "term": "크기 응답",
+   "kind": "circuit"
+  },
+  {
+   "en": "no-connect mark",
+   "term": "미연결 표시",
+   "kind": "circuit"
+  },
+  {
+   "en": "passive part",
+   "term": "수동 소자",
+   "kind": "circuit"
+  },
+  {
+   "en": "primitive",
+   "sense": "Spectre device",
+   "term": "기본 소자",
+   "kind": "circuit"
+  },
+  {
+   "en": "signal",
+   "term": "신호",
+   "kind": "circuit"
+  },
+  {
+   "en": "simulation / simulate",
+   "term": "시뮬레이션",
+   "kind": "circuit"
+  },
+  {
+   "en": "simulator",
+   "term": "시뮬레이터",
+   "kind": "circuit"
+  },
+  {
+   "en": "tail / tail transistor",
+   "term": "꼬리 트랜지스터",
+   "avoid": [
+    "꼬리 전류원",
+    "꼬리 소자"
+   ],
+   "kind": "circuit",
+   "note": "Texts: 꼬리 트랜지스터 4, 꼬리 전류원 4, 꼬리 소자 2, bare 꼬리 4."
+  },
+  {
+   "en": "transconductor",
+   "term": "트랜스컨덕터",
+   "kind": "circuit"
+  },
+  {
+   "en": "transistor",
+   "term": "트랜지스터",
+   "kind": "circuit"
+  },
+  {
+   "en": "Add PATH",
+   "term": "PATH 추가",
+   "kind": "command"
+  },
+  {
+   "en": "Always",
+   "sense": "file association",
+   "term": "항상",
+   "kind": "command"
+  },
+  {
+   "en": "Apply and Exit Editing",
+   "term": "적용 후 편집 종료",
+   "kind": "command"
+  },
+  {
+   "en": "Auto Include",
+   "term": "자동 포함",
+   "kind": "command"
+  },
+  {
+   "en": "Clear Cache",
+   "term": "캐시 비우기",
+   "kind": "command"
+  },
+  {
+   "en": "Collapse",
+   "term": "접기",
+   "kind": "command"
+  },
+  {
+   "en": "double tap",
+   "term": "두 번 탭",
+   "kind": "command"
+  },
+  {
+   "en": "eject",
+   "sense": "disk image",
+   "term": "추출",
+   "kind": "command",
+   "note": "As in macOS: 디스크 이미지를 추출."
+  },
+  {
+   "en": "Exclude",
+   "sense": "Library command",
+   "term": "제외",
+   "kind": "command"
+  },
+  {
+   "en": "Exit / quit",
+   "sense": "application or editing",
+   "term": "종료",
+   "kind": "command"
+  },
+  {
+   "en": "Find",
+   "sense": "text search",
+   "term": "찾기",
+   "kind": "command",
+   "note": "As the viewer's menu: 넷리스트에서 찾기."
+  },
+  {
+   "en": "Fit to Window",
+   "term": "창에 맞춤",
+   "kind": "command"
+  },
+  {
+   "en": "Get Info",
+   "sense": "macOS",
+   "term": "정보 가져오기",
+   "kind": "command"
+  },
+  {
+   "en": "Help",
+   "sense": "menu",
+   "term": "도움말",
+   "kind": "command"
+  },
+  {
+   "en": "More info",
+   "sense": "Windows SmartScreen",
+   "term": "추가 정보",
+   "kind": "command"
+  },
+  {
+   "en": "Open Anyway",
+   "sense": "macOS",
+   "term": "그래도 열기",
+   "kind": "command"
+  },
+  {
+   "en": "Open URL",
+   "term": "URL 열기",
+   "kind": "command"
+  },
+  {
+   "en": "Open With",
+   "sense": "macOS",
+   "term": "다음으로 열기",
+   "kind": "command"
+  },
+  {
+   "en": "Open With",
+   "sense": "Windows",
+   "term": "연결 프로그램",
+   "kind": "command"
+  },
+  {
+   "en": "Overwrite",
+   "sense": "file",
+   "term": "덮어쓰기",
+   "kind": "command"
+  },
+  {
+   "en": "Problems",
+   "sense": "panel",
+   "term": "문제 목록",
+   "kind": "command"
+  },
+  {
+   "en": "Reload",
+   "term": "새로고침",
+   "kind": "command"
+  },
+  {
+   "en": "Replace",
+   "sense": "file",
+   "term": "덮어쓰기",
+   "kind": "command",
+   "note": "The viewer's Replace button says 덮어쓰기, the same word as Overwrite."
+  },
+  {
+   "en": "Reset",
+   "term": "초기화",
+   "kind": "command"
+  },
+  {
+   "en": "Save As",
+   "term": "다른 이름으로 저장",
+   "kind": "command"
+  },
+  {
+   "en": "Save Solved Copy As",
+   "term": "풀이 결과 사본 다른 이름으로 저장",
+   "kind": "command",
+   "note": "As the viewer's menu."
+  },
+  {
+   "en": "scroll",
+   "term": "스크롤",
+   "kind": "command"
+  },
+  {
+   "en": "Search",
+   "term": "검색",
+   "kind": "command",
+   "note": "Find (in the netlist) is 찾기."
+  },
+  {
+   "en": "Trash",
+   "sense": "macOS",
+   "term": "휴지통",
+   "kind": "command"
+  },
+  {
+   "en": "Undo",
+   "term": "실행 취소",
+   "kind": "command"
+  },
+  {
+   "en": "uninstall",
+   "term": "삭제",
+   "avoid": [
+    "제거"
+   ],
+   "kind": "command",
+   "note": "The macOS steps say 삭제 (2 texts); the Linux step says 제거."
+  }
+ ]
+}

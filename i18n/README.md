@@ -48,6 +48,19 @@ The catalogs of the site are named after the file of their English, `i18n/<lang>
 
 An alias package is part of the language (16.5 of the standard), not a translation of an interface; whether a language has one is decided with the standard.
 
+**A glossary**, `i18n/<lang>/glossary.json`, gives how the language renders RNL's English terms ([decision 0016](../docs/decisions/0016-english-terms-are-normative-each-language-keeps-a-glossary.md)). The English terms are the only normative ones; a glossary is a convention for translating and talking about RNL, not part of the standard, and two languages' glossaries are independent. The site shows it as `glossary.html` in that language, and every translated page links to it.
+
+```json
+{"language": "zh", "terms": [
+  {"en": "usage", "term": "用例", "kind": "rnl", "note": "rnl-zh: 用例 is usage."},
+  {"en": "selection", "term": "筛选", "avoid": ["选择"], "kind": "rnl"}
+]}
+```
+
+- `en`, the English term, and `term`, its rendering, are required; `sense` tells apart the senses of one English term; `avoid` lists variants not to use; `kind` is `rnl`, `circuit`, `command` or `general`; `note` is optional. A draft says `"draft": true`.
+- Follow the glossary when translating; where a term seems wrong, change the glossary in the same pull request.
+- The first occurrence of an RNL term in a page or document carries its English in brackets, as in 用例（usage）.
+
 Chinese is moving to the same places in steps (below); `surfaces.json` names where it is now, and `status.py files zh` lists it.
 
 ## Formats
@@ -90,7 +103,7 @@ python scripts/i18n/status.py stamp site/src/llms.ja.txt
 - a placeholder the English does not have, a changed shortcut, a second access key;
 - markup that `scripts/site_i18n.py` does not read;
 - a document whose first line looks like a stamp but is not one, or names another source;
-- `languages.json` or `surfaces.json` themselves malformed.
+- `languages.json`, `surfaces.json` or a glossary themselves malformed.
 
 It reports, without failing:
 
@@ -99,6 +112,7 @@ It reports, without failing:
 - entries of a catalog that the English no longer has;
 - documents whose headings, lists, tables or code differ from their source;
 - on a pull request, an English text that changed while the translation beside it did not.
+- a catalog text that uses a variant its language's glossary lists under `avoid`, where its English has the term.
 
 ## Adding a language, or bringing one up to date
 

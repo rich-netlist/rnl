@@ -1,0 +1,14 @@
+{
+  "Glossary · Rich Netlist": "术语表 · Rich Netlist",
+  "How each language renders the English terms of RNL, which are the normative ones.": "各语言怎样译写 RNL 的英文术语；英文术语才是规范。",
+  "Skip to content": "跳到正文",
+  "Switch color theme": "切换配色",
+  "Glossary": "术语表",
+  "The English terms of RNL are the only normative ones; every language keeps its own way of rendering them.": "RNL 的英文术语是唯一的规范术语；每种语言各有自己的译法。",
+  "A glossary is not part of the standard: it is a convention for translating RNL and for talking about it, kept in <a href=\"https://github.com/rich-netlist/rnl/tree/main/i18n\">i18n/&lt;lang&gt;/glossary.json</a>. Where a translation is unclear, the English term decides. To change a rendering, open a pull request.": "术语表不属于标准，只是翻译和交流 RNL 时的约定，存放在 <a href=\"https://github.com/rich-netlist/rnl/tree/main/i18n\">i18n/&lt;lang&gt;/glossary.json</a>。译文有歧义时，以英文术语为准。要修改某个译法，请提交 pull request。",
+  "Terms": "术语",
+  "RNL’s terms, such as record, usage and fill-in, are defined by the English standard; a language’s glossary only says how it writes them.": "RNL 的术语，如 record（记录）、usage（用例）、fill-in（补位），由英文标准定义；各语言的术语表只说明它们在该语言里怎样写。",
+  "See also": "另见",
+  "Decision 0016: English terms are normative": "决定 0016：英文术语是规范",
+  "The standard": "语言标准"
+}
