@@ -1,4 +1,4 @@
-import { expect, test } from "../viewer.js";
+import { dialogGone, expect, test } from "../viewer.js";
 
 const panes = ["files", "netlist", "hierarchy", "symbol", "usages", "unplaced", "solve"];
 
@@ -184,6 +184,7 @@ test("digits preserve text input, modifiers, dialogs and IME composition", async
   await page.keyboard.type("134567");
   await expect(page.locator("#pane-netlist")).toBeVisible();
   await dialog.getByRole("button", { name: "Close" }).click();
+  await dialogGone(page);
 });
 
 test("digits switch from lists and the symbol viewer, and native menu commands open panes", async ({ page, viewer }) => {

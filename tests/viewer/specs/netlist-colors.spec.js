@@ -1,4 +1,4 @@
-import {expect, test} from '../viewer.js';
+import {dialogGone, expect, test} from '../viewer.js';
 import { zh } from '../zh.js';
 
 const defaults = {
@@ -65,7 +65,7 @@ for (const platform of ['web', 'desktop']) {
     await expect(box(page,'highlight')).toBeFocused();
     await expect(box(page,'highlight')).toHaveAttribute('aria-invalid','true');
     await page.keyboard.press('Escape');
-    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await dialogGone(page);
     await expect(page.locator('#source .s-host').first()).toHaveCSS('color',rgb(defaults.component));
     await expect(page.locator('#source')).toHaveCSS('background-color',rgb(defaults.background));
     expect(await page.evaluate(() => window.viewer.doc===window.colorDoc && document.querySelector('#canvas > svg')===window.colorSvg)).toBe(true);
@@ -80,7 +80,7 @@ for (const platform of ['web', 'desktop']) {
     await box(page,'highlight').fill('#087F8C');
     await box(page,'free').fill('#775533');
     await page.getByRole('button',{name:'Save',exact:true}).click();
-    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await dialogGone(page);
     const custom={...defaults,net:'#102030',highlight:'#087F8C',free:'#775533'};
     await expect.poll(()=>stored(page,platform)).toEqual(custom);
     await page.reload(); await viewer.started(); await viewer.idle();

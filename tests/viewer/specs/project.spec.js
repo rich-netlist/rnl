@@ -2,6 +2,7 @@
 // links, Download / Load Manifest. Download Project replaced Download Library; its archive keeps
 // what that one kept, the Library's own files and the edits, with a manifest, rnl-project.json.
 import { test, expect } from '@playwright/test';
+import { dialogGone } from '../viewer.js';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -234,13 +235,13 @@ test('canceling the save picker reads nothing, and an unreadable file fails with
     window.viewer.command('save-project');
   });
   await answer(page);
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await dialogGone(page);
   expect(downloads).toBe(0);
   // cancelling the question saves nothing either
   await page.evaluate(() => { window.viewer.command('save-project'); });
   await page.locator('#write-display').waitFor();
   await page.getByRole('dialog').getByRole('button', { name: 'Cancel', exact: true }).click();
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await dialogGone(page);
   expect(downloads).toBe(0);
   await page.evaluate(async () => {
     window.showSaveFilePicker = undefined;
@@ -300,6 +301,7 @@ test('Open Project refuses an archive without a manifest, and one whose file doe
   const dialog = page.getByRole('dialog', { name: 'Open Project', exact: true });
   await expect(dialog).toContainText('plain.zip is not a project: it has no rnl-project.json.');
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+  await dialogGone(page);
   const tampered = path.join(test.info().outputDir, 'tampered.zip');
   execFileSync('python', ['-c', [
     'import sys,zipfile,json,hashlib',
@@ -308,6 +310,7 @@ test('Open Project refuses an archive without a manifest, and one whose file doe
   await choose(page, 'open-project', 'project-input', tampered);
   await expect(dialog).toContainText('top.sp does not match the SHA-256 the manifest lists.');
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+  await dialogGone(page);
   // a project larger than the web's WebAssembly core holds is for the desktop viewer
   const large = path.join(test.info().outputDir, 'large.zip');
   execFileSync('python', ['-c', [

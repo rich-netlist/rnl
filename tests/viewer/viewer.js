@@ -6,6 +6,14 @@ import { expect, test as base } from "@playwright/test";
 
 export { expect };
 
+/**
+ * Wait until no dialog of the page is left, to send it a command. A dialog closed is no longer
+ * `open`, so a check by role (`getByRole("dialog")`) says it is gone at once; but the page counts it
+ * closed, and takes commands again, only when its `close` event has run and removed it
+ * (dialog.js: `modal()`), and a command sent before is dropped. This waits for the element to go.
+ */
+export const dialogGone = (page) => expect(page.locator("dialog.dialog")).toHaveCount(0);
+
 /** Source navigation used by tests of editing/scroll state; UI navigation is covered separately. */
 export const showSource = (page, file) => page.evaluate(async file => {
   const f = typeof file === 'number' ? file : window.viewer.doc.files.findIndex(f => f.name.endsWith(file));
