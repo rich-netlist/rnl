@@ -208,7 +208,7 @@
   "The schematic and the netlist each keep their own copy of the connections. Change one and the other may go stale; a line that looks connected in the drawing may not be connected in the netlist.": "原理图与网表各自维护一份连接关系。修改其中一边时，另一边可能未同步更新；图面上看起来相连的线，在网表里未必真的接在一起。",
   "net a": "网络 a",
   "net b": "网络 b",
-  "<tspan x=\"132\" dy=\"-6\">crossing</tspan><tspan x=\"132\" dy=\"17\">≠ connection</tspan>": "<tspan x=\"132\" dy=\"-6\">交叉</tspan><tspan x=\"132\" dy=\"17\">≠ 相连</tspan>",
+  "<tspan x=\"132\" dy=\"-6\">crossing</tspan><tspan x=\"132\" dy=\"17\">≠ connection</tspan>": "交叉 ≠ 相连",
   "Connectivity is defined only by the netlist. RNL can only reference devices and nets, never add or remove devices or connections; two lines crossing, or endpoints landing on each other, never become a connection. Drawn wires work the same way: they join only where they share a point or a terminal.": "电气连接完全由网表定义。RNL 仅能引用器件与网络，绝不增删器件或连接；图面上两条线交叉或端点重合，绝不会变成电气连接。绘制的导线也是如此：唯有共用同一个点对象或端子时才视为相接。",
   "The circuit has one source of truth: the netlist.": "电路只有一个唯一真相来源：就是网表。",
   "…<small>other tools</small>": "…<small>其他工具</small>",

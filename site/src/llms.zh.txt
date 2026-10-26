@@ -1,4 +1,4 @@
-<!-- translated from site/src/llms.txt sha256:7d09a86edc40 -->
+<!-- translated from site/src/llms.txt sha256:df722387bf91 -->
 # RNL（Rich Netlist）
 
 > RNL 把原理图的画法写进 SPICE 或 Spectre 网表的注释里（`@RNL` 记录），网表本身就是原理图的源文件。这个文件告诉 AI agent 怎样安装 RNL skill（一个教会 agent 读、写、检查和绘制 RNL 0.3 的文件夹），以及别的东西在哪里。English: {{site}}llms.txt
@@ -35,7 +35,7 @@ Windows PowerShell：
 - `rnl` 命令：从最新的核心版本（{{github}}/releases/latest）下载 Windows、Linux 或 macOS 的压缩包，或者从源码构建（Rust 1.85 或更新）：`git clone {{github}}`，然后 `cargo build --release -p rnl-cli`；`rnl check FILE` 打印诊断，有错误时退出码为 1，`rnl render FILE -o DIR` 为每个绘制层级写一张 SVG。
 - npm 包 `@rich-netlist/runtime`（`npm i @rich-netlist/runtime`，Node 18 或更新）：同一个核心，编译成 WebAssembly；完整的检查脚本在 references/tools.md。
 - 网页版查看器，给有浏览器的人：{{site}}viewer/
-- Windows 和 Linux 桌面版查看器：{{github}}/releases 里最新的 `viewer-v…` 版本
+- Windows、Linux 和 macOS 桌面版查看器：{{github}}/releases 里最新的 `viewer-v…` 版本
 
 ## 语言和标准包
 
