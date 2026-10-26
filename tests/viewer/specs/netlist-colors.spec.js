@@ -1,4 +1,5 @@
 import {expect, test} from '../viewer.js';
+import { zh } from '../zh.js';
 
 const defaults = {
   component: '#2275E2', net: '#A01008', rnl: '#E1FEE9', keyword: '#000000', definition: '#2B7800',
@@ -94,12 +95,12 @@ for (const platform of ['web', 'desktop']) {
     expect(await stored(page,platform)).toEqual(custom);
     await page.evaluate(()=>window.viewer.command('language-zh'));
     await page.evaluate(()=> { window.viewer.command('netlist-colors'); });
-    await expect(page.getByRole('dialog')).toHaveAccessibleName('配色方案');
-    await expect(page.getByLabel('元件对象（#）',{exact:true})).toBeVisible();
-    await expect(page.getByLabel('字符串取色器',{exact:true})).toBeVisible();
-    await page.getByRole('button',{name:'恢复默认值',exact:true}).click();
+    await expect(page.getByRole('dialog')).toHaveAccessibleName(zh('Color Scheme'));
+    await expect(page.getByLabel(zh('Component objects (#)'),{exact:true})).toBeVisible();
+    await expect(page.getByLabel(zh('{0} color picker',zh('Strings')),{exact:true})).toBeVisible();
+    await page.getByRole('button',{name:zh('Restore Defaults'),exact:true}).click();
     await page.screenshot({path:info.outputPath('netlist-colors-dialog.png')});
-    await page.getByRole('button',{name:'保存',exact:true}).click();
+    await page.getByRole('button',{name:zh('Save'),exact:true}).click();
     await expect.poll(()=>stored(page,platform)).toEqual(defaults);
     await page.reload(); await viewer.started(); await viewer.idle();
     await expect(page.locator('#source .s-net').first()).toHaveCSS('color',rgb(defaults.net));

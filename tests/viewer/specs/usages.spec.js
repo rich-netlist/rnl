@@ -1,4 +1,5 @@
 import { expect, test } from "../viewer.js";
+import { zh } from "../zh.js";
 
 const row = (page, name) => page.locator('.usage-row').filter({ has: page.getByRole('button', { name, exact: true }) });
 const frame = (page, id) => page.locator(`#canvas .usage-frame[data-usage="${id}"]`);
@@ -32,8 +33,8 @@ for (const platform of ['desktop', 'web']) {
     await page.locator('.usage-palette [data-color="#9c36b5"]').click();
     await expect(frame(page, pair.object).locator(':scope > rect')).toHaveAttribute('stroke', '#9c36b5');
     await page.evaluate(() => window.viewer.command('language-zh'));
-    await expect(page.locator('#tab-usages')).toHaveAccessibleName('用例');
-    await expect(page.getByLabel('颜色', { exact: true })).toBeVisible();
+    await expect(page.locator('#tab-usages')).toHaveAccessibleName(zh('Usage'));
+    await expect(page.getByLabel(zh('Color'), { exact: true })).toBeVisible();
     await viewer.build(() => page.keyboard.press('F5'));
     await expect(frame(page, (await usage(page, '%pair1')).object).locator(':scope > rect')).toHaveAttribute('stroke', '#9c36b5');
     await page.evaluate(async () => {
