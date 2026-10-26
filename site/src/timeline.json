@@ -234,7 +234,7 @@
         "en": "The solver’s objectives, second version"
       },
       "description": {
-        "en": "Planned: the names of the standard package move out of the solver into its configuration, so that in a file of 0.3 the objectives for current direction, ground direction and signal flow have something to act on."
+        "en": "Planned: move the standard package’s names out of hardcoded solver logic into its configuration, so the current-direction, ground-direction and signal-flow objectives work on 0.3 files."
       }
     }
   ]

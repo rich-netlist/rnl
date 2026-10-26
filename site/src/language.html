@@ -296,7 +296,7 @@
     </ul>
 
     <h3 class="sub-h"><en>Four common slips</en></h3>
-    <p class="sub-lead"><en>A reference inside free text is still a reference, while a name without its prefix becomes free text. The messages below come from the RNL prototype’s checker.</en></p>
+    <p class="sub-lead"><en>A reference inside free text is still a reference, while a name without its prefix becomes free text.</en></p>
     <div class="pits">
       <div class="pit"><code data-hl='#M1 #M2 M3 @ALIGN("y")'></code><p class="pit-msg"><svg class="ico"><use href="#i-warn"/></svg><span><en>The free text M3 has the same name as instance #M3; is a prefix missing?</en></span></p><p><en>M3 has no #, so it is free text: only M1 and M2 are aligned.</en></p></div>
       <div class="pit"><code data-hl="Unlike #M2, #M1 @PLACE(x=0)"></code><p class="pit-msg ok"><svg class="ico"><use href="#i-info"/></svg><span><en>No message: this is perfectly valid.</en></span></p><p><en>#M2 is an object even inside the “explanation”: PLACE receives two objects and places each, so M2 also lands on x = 0. Put mere remarks in /* */.</en></p></div>
