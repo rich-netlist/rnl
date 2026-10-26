@@ -28,7 +28,7 @@
   "The channel, drawn with <code>linestyle=\"bold\"</code>. How thick that is comes from the style, so a new theme needs no symbol changes.": "通道，以 <code>linestyle=\"bold\"</code> 加粗繪製。實際線寬由樣式決定，因此切換主題時無須修改符號。",
   "The drain lead, ending on the drain pin at (0, 2).": "汲極引線，終點落在 (0, 2) 的汲極接腳上。",
   "The source lead.": "源極引線。",
-  "A closed polyline with <code>fill=\"linecolor\"</code> is filled with the line color: this is the NMOS arrow.": "首尾相接的封閉折線加上 <code>fill=\"linecolor\"</code> 會以線條顏色填滿：這是 NMOS 的箭頭。",
+  "A closed polyline with <code>fill=\"linecolor\"</code> is filled with the line color: this is the NMOS arrow.": "首尾相接的封閉折線加上 <code>fill=\"linecolor\"</code> 會以線條顏色填色：這是 NMOS 的箭頭。",
   "A lone <code>?</code> means the instance drawn with this symbol: its name (<code>${name}</code>) is shown next to it.": "單獨的 <code>?</code> 代表使用此符號繪製的實例：在它旁邊顯示其名稱（<code>${name}</code>）。",
   "A <b>rule</b>: every instance whose model is nch uses this symbol. It is evaluated on the level it is written in, and once more on each level below.": "一條<b>規則</b>：所有模型為 nch 的實例皆使用此符號。它會在所在層級評估一次，並在下方每一層級各評估一次。",
   "Hover over any line on the left to see which stroke of the symbol it draws.": "將游標懸停在左側任意一行上，即可查看它繪製出符號中的哪一筆。",
