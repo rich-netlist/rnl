@@ -139,7 +139,7 @@
       "matches": [
         "ja"
       ],
-      "status": "incubating",
+      "status": "published",
       "ai_translated": true,
       "names": {
         "en": "Japanese",
@@ -161,7 +161,7 @@
       "matches": [
         "ko"
       ],
-      "status": "incubating",
+      "status": "published",
       "ai_translated": true,
       "names": {
         "en": "Korean",
@@ -183,7 +183,7 @@
       "matches": [
         "es"
       ],
-      "status": "incubating",
+      "status": "published",
       "ai_translated": true,
       "names": {
         "en": "Spanish",
@@ -199,7 +199,7 @@
       "matches": [
         "fr"
       ],
-      "status": "incubating",
+      "status": "published",
       "ai_translated": true,
       "names": {
         "en": "French",
@@ -215,7 +215,7 @@
       "matches": [
         "de"
       ],
-      "status": "incubating",
+      "status": "published",
       "ai_translated": true,
       "names": {
         "en": "German",

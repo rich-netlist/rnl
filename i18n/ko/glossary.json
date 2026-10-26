@@ -717,7 +717,6 @@
    "sense": "file",
    "term": "바꾸기",
    "kind": "command",
-   "note": "The viewer's Replace button still says 덮어쓰기.",
    "avoid": [
     "덮어쓰기"
    ]

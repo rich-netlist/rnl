@@ -110,7 +110,9 @@ test('third locale inherits English content and switches without changing source
   await expect(page.locator('.ai-notice a').nth(1)).toHaveAttribute('href', 'glossary.html');
   await expect(page.locator('#status .tl')).toContainText('Release notes');
   await page.locator('.language-menu > summary').click();
-  await expect(page.locator('[data-lang-link]')).toHaveCount(offered + 1);  // and the fixture's Japanese
+  // the fixture's Japanese in place of the repository's own, if that is published
+  const japanese = registry.languages.some(entry => entry.code === 'ja' && entry.status === 'published');
+  await expect(page.locator('[data-lang-link]')).toHaveCount(offered + (japanese ? 0 : 1));
   await page.locator('[data-language="zh"]').click();
   await expect(page).toHaveURL(/\/i18n-fixture\/zh\/\?review=1#status$/);
   await expect(page.locator('.ai-notice')).toHaveCount(0);
