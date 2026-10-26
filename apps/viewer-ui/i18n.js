@@ -38,9 +38,17 @@ export function translate(key, values = []) {
 export const locale = () => language;
 /** The languages offered, English first, each { code, lang, name, matches }. */
 export const uiLanguages = () => languages;
-/** The language the browser or the system asks for first, if it is offered, else English. */
-export function preferredLanguage(wanted = navigator.languages) {
-  return languageFor(wanted?.[0])?.code || "en";
+/**
+ * The language the browser or the system asks for, by its list of languages in its order: the first
+ * of them that is offered, else English; as the site's root does (site/build.py), so that a browser
+ * set to [it, de] gets German in both, not English in the viewer for want of Italian.
+ */
+export function preferredLanguage(wanted = navigator.languages?.length ? navigator.languages : [navigator.language]) {
+  for (const tag of wanted || []) {
+    const found = languageFor(tag);
+    if (found) return found.code;
+  }
+  return "en";
 }
 /** The language offered that a browser or system language, such as "zh-TW", asks for, or undefined: of
  * those whose `matches` fit it, the one that fits it longest, in whatever order the registry lists them,

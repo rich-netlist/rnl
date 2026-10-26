@@ -59,16 +59,6 @@
       "notes": "Stamped from step 4 of decision 0015, as the short guide."
     },
     {
-      "id": "llms",
-      "title": "llms.txt, the plain-text entry for agents",
-      "kind": "document",
-      "source": "site/src/llms.txt",
-      "translation": "site/src/llms.{lang}.txt",
-      "stamp": "repo",
-      "owner": "site",
-      "notes": "Published as llms.txt and <lang>/llms.txt by scripts/skill/build.py, which leaves the stamp out."
-    },
-    {
       "id": "site-pages",
       "title": "Pages of the site, with the scripts of their demos and the summaries of the standard packages",
       "kind": "inline",
@@ -189,6 +179,12 @@
       "title": "The skill package for agents, skills/rnl/",
       "kind": "not-translated",
       "reason": "Read by agents, and in English only; its guide to the language is a copy of the English short guide."
+    },
+    {
+      "id": "llms",
+      "title": "llms.txt, the plain-text entry for agents, site/src/llms.txt",
+      "kind": "not-translated",
+      "reason": "Read by agents, and in English only, like the skill package it points to; the owner had its Chinese version removed."
     },
     {
       "id": "developer-documents",

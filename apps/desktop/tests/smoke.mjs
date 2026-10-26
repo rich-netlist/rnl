@@ -470,9 +470,13 @@ async function drive(app, port, profile, t0, session) {
   chooseItem(app.pid, at("language-zh"));
   await until("Chinese UI", () => page.evaluate(`document.documentElement.lang === 'zh-CN' && window.viewer.checked('language-zh')`));
   const catalog = uiCatalog(root, "zh-CN");
+  // the View menu and its Language submenu have their English word after the translation (`english`)
+  const english = new Map();
+  const words = (items) => { for (const item of items) if (item !== "-" && item.items) { if (item.english) english.set(item.label, item.english); words(item.items); } };
+  words(table.menus);
   const translatedMenu = items => items.map(item => {
     const [label, keys] = item.text.split('\t');
-    return { ...item, text: (catalog[label] || label) + (keys ? '\t' + keys : ''),
+    return { ...item, text: (catalog[label] || label) + (english.has(label) ? ` (${english.get(label)})` : '') + (keys ? '\t' + keys : ''),
       ...(item.items ? {items: translatedMenu(item.items)} : {}) };
   });
   same(nativeMenu(app.pid), translatedMenu(tableMenus({...marks, "language-en":false, "language-zh":true})), "Chinese native menu");

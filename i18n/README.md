@@ -40,7 +40,7 @@ Four places, the same for every language:
 | What | Where | Example |
 | --- | --- | --- |
 | Catalogs of short texts and of the site's pages, keyed by the English | `i18n/<lang>/` | `i18n/ja/viewer.json`, `i18n/ja/site/index.html.json` |
-| Whole documents | beside their source, `<name>.<lang>.<ext>` | `spec/rnl-0.3-guide.ja.md`, `site/src/llms.ja.txt` |
+| Whole documents | beside their source, `<name>.<lang>.<ext>` | `spec/rnl-0.3-guide.ja.md`, `spec/rich-netlist.ja.md` |
 | The standard's chapters | `spec/<version>/<lang>/` | `spec/0.3/ja/ch01.md` |
 | An alias package, so that files can be written with the language's own words | `libraries/standard/<series>/rnl-<lang>.rnl` | `libraries/standard/0.3/rnl-zh.rnl` |
 
@@ -84,13 +84,13 @@ Chinese is moving to the same places in steps (below); `surfaces.json` names whe
 **A whole document** starts with the source it was translated from and the start of that source's SHA-256, its line ends as LF:
 
 ```text
-<!-- translated from site/src/llms.txt sha256:7d09a86edc40 -->
+<!-- translated from spec/rnl-0.3-guide.md sha256:7d09a86edc40 -->
 ```
 
 The line is not shown on GitHub or on the site. Once a translation is in line with its source again:
 
 ```bash
-python scripts/i18n/status.py stamp site/src/llms.ja.txt
+python scripts/i18n/status.py stamp spec/rnl-0.3-guide.ja.md
 ```
 
 `--as-of COMMIT` stamps it with the source as it is in that commit instead, such as the one that last changed the translation. The chapters of the standard keep their own stamp, `<!-- translated from en/ch01.md sha256:… -->`, written by `python scripts/spec/build.py --stamp`.
@@ -127,7 +127,7 @@ Anyone may update a translation at any time, in a pull request of its own. A pul
 
 | Step | What it gives | State |
 | --- | --- | --- |
-| 1 | This folder, the report, stamps on `README.zh.md` (since removed: the READMEs are in English only) and `site/src/llms.zh.txt` | done |
+| 1 | This folder, the report, stamps on `README.zh.md` (since removed: the READMEs are in English only) and `site/src/llms.zh.txt` (since removed: `llms.txt` is in English only) | done |
 | 2a | The viewers: every text of the interface written where the scan finds it, `tr()` marking those that reach `m()` through a variable; counts as whole phrases; the entries the interface no longer has removed | done |
 | 2b | The viewers: the catalog in `i18n/<lang>/viewer.json`, the language menu from `languages.json`, a manifest's title in any language, public packages' summaries in English alone; a pseudo language in the page's tests | done |
 | 3a | The site reads the catalogs in `i18n/<lang>/site/` and checks their format; a page under 80% translated is shown in English, and every page not wholly translated says so ([site/README.md](../site/README.md#adding-a-language)) | done |

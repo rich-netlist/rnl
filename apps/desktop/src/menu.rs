@@ -33,6 +33,11 @@ struct TableMenu {
     /// Whether it lists the languages: its items, English, and then each of [`UI_LANGUAGES`].
     #[serde(default)]
     languages: bool,
+    /// An English word that follows its translated label, in parentheses, when the interface is not
+    /// in English: on the View menu and its Language submenu, so that a user who reads none of the
+    /// interface finds the way back. The table's `icon` is the page's alone: a submenu has none here.
+    #[serde(default)]
+    english: Option<String>,
 }
 
 /// A menu entry: a submenu, which has entries of its own, a command, or `"-"` for a separator.
@@ -224,10 +229,37 @@ static CATALOGS: LazyLock<HashMap<&str, HashMap<String, String>>> = LazyLock::ne
         .collect()
 });
 
+/// The English word that follows the translated label of a menu or a submenu, by its label in the
+/// table (`english` of commands.json): the same in every language, and no text of the catalogs.
+static ENGLISH_WORDS: LazyLock<HashMap<String, String>> = LazyLock::new(|| {
+    fn collect(menu: &TableMenu, words: &mut HashMap<String, String>) {
+        if let Some(word) = &menu.english {
+            words.insert(menu.label.clone(), word.clone());
+        }
+        for entry in &menu.items {
+            if let Entry::Submenu(inner) = entry {
+                collect(inner, words);
+            }
+        }
+    }
+    let table: Table = serde_json::from_str(COMMANDS).expect("commands.json is a command table");
+    let mut words = HashMap::new();
+    for menu in &table.menus {
+        collect(menu, &mut words);
+    }
+    words
+});
+
 fn translated(language: &str, source: &str) -> String {
     let (label, keys) = source.split_once('\t').map_or((source, None), |(a, b)| (a, Some(b)));
-    let label = CATALOGS.get(language).and_then(|catalog| catalog.get(label)).map_or(label, String::as_str);
-    keys.map_or_else(|| label.to_string(), |keys| format!("{label}\t{keys}"))
+    let mut text =
+        CATALOGS.get(language).and_then(|catalog| catalog.get(label)).map_or(label, String::as_str).to_string();
+    if language != "en" {
+        if let Some(word) = ENGLISH_WORDS.get(label) {
+            text = format!("{text} ({word})");
+        }
+    }
+    keys.map_or_else(|| text.clone(), |keys| format!("{text}\t{keys}"))
 }
 
 /// Change labels in place: command IDs, accelerators, enabled state and check marks stay intact.
@@ -418,6 +450,25 @@ mod tests {
         assert_eq!(translated("zh-CN", "&Open File...\tCtrl+O"), "打开文件(&O)...\tCtrl+O");
         assert_eq!(translated("en", "&Open File...\tCtrl+O"), "&Open File...\tCtrl+O");
         assert_eq!(translated("zh-CN", "untranslated"), "untranslated");
+    }
+
+    #[test]
+    fn the_view_and_language_menus_have_their_english_word_in_every_other_language() {
+        // the word is the table's, the translation the catalog's; English has the label as it is
+        assert_eq!(translated("en", "&Language"), "&Language");
+        assert_eq!(translated("en", "&View"), "&View");
+        assert!(!UI_LANGUAGES.is_empty());
+        for (_, code, _, _, _) in UI_LANGUAGES {
+            let catalog = &CATALOGS[code];
+            for (label, word) in [("&Language", "Language"), ("&View", "View")] {
+                let own = catalog.get(label).map_or(label, String::as_str);
+                assert_eq!(translated(code, label), format!("{own} ({word})"), "{code} {label}");
+            }
+            // another menu, and a command's keys, are as they were
+            assert_eq!(translated(code, "&Edit"), catalog.get("&Edit").map_or("&Edit", String::as_str));
+            let own = catalog.get("&Open File...").map_or("&Open File...", String::as_str);
+            assert_eq!(translated(code, "&Open File...\tCtrl+O"), format!("{own}\tCtrl+O"));
+        }
     }
 
     #[test]

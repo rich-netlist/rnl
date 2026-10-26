@@ -52,8 +52,6 @@ RULE = re.compile(r'#\s*@SELECT-INSTANCE\((\w+)="([^"]*)"\)\s*=>\s*@SET-SYMBOL\s
 ALIAS = re.compile(r'@ALIAS\("([^"]+)",\s*"([^"]+)"\)')
 PACKAGE = re.compile(r'@PACKAGE\(name="([^"]+)",\s*version="([^"]+)"\)')
 COUNTS = re.compile(r"(\d+) errors?, (\d+) warnings?, (\d+) hints?")
-# the first line of a translation: the source it was made from (decision 0015, scripts/i18n/status.py)
-TRANSLATED_FROM = re.compile(r"^<!-- translated from \S+ sha256:[0-9a-f]{12} -->\r?\n")
 
 
 class Failed(Exception):
@@ -349,7 +347,7 @@ def check_links() -> list[str]:
 def check_site_texts() -> list[str]:
     """The pages and the llms.txt of the site name every file of the package, so they cannot fall behind it."""
     errors = []
-    for name in ("agents.html", "llms.txt", "llms.zh.txt"):
+    for name in ("agents.html", "llms.txt"):
         text = read(SITE_SRC / name)
         errors += [f"site/src/{name} does not name {f}" for f in skill_files()
                    if not f.startswith("LICENSES/") and f != "LICENSE.md" and f not in text]
@@ -442,7 +440,7 @@ def sha256(p: Path) -> str:
 
 def build_site(site: Path) -> None:
     """Add to a built site: skill/rnl-skill.zip, the files of the package as plain text under skill/rnl/, a manifest and
-    the hashes, and the pointer for agents, llms.txt (English) and zh/llms.txt (Chinese)."""
+    the hashes, and the pointer for agents, llms.txt, in English only."""
     skill = site / "skill"
     shutil.rmtree(skill, ignore_errors=True)
     for f in skill_files():
@@ -457,11 +455,9 @@ def build_site(site: Path) -> None:
     (skill / "manifest.json").write_text(json.dumps(manifest, indent=1) + "\n", encoding="utf-8", newline="\n")
     sums = [f"{sha256(skill / 'rnl-skill.zip')}  rnl-skill.zip"] + [f"{e['sha256']}  {SKILL.name}/{e['path']}" for e in manifest["files"]]
     (skill / "SHA256SUMS.txt").write_text("\n".join(sums) + "\n", encoding="utf-8", newline="\n")
-    for src, dest in (("llms.txt", site / "llms.txt"), ("llms.zh.txt", site / "zh" / "llms.txt")):
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        text = TRANSLATED_FROM.sub("", read(SITE_SRC / src))
-        dest.write_text(text.replace("{{site}}", SITE_URL).replace("{{github}}", GITHUB), encoding="utf-8", newline="\n")
-    print(f"wrote {skill} ({len(manifest['files'])} files and rnl-skill.zip), {site / 'llms.txt'} and {site / 'zh' / 'llms.txt'}")
+    text = read(SITE_SRC / "llms.txt")
+    (site / "llms.txt").write_text(text.replace("{{site}}", SITE_URL).replace("{{github}}", GITHUB), encoding="utf-8", newline="\n")
+    print(f"wrote {skill} ({len(manifest['files'])} files and rnl-skill.zip) and {site / 'llms.txt'}")
 
 
 def main(argv: list[str]) -> int:

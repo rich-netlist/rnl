@@ -52,6 +52,7 @@
     },
     {
       "label": "&View",
+      "english": "View",
       "items": [
         { "id": "fit", "label": "&Fit to Window", "keys": ["F", "0"] },
         { "id": "zoom-in", "label": "Zoom &In", "keys": ["Ctrl+=", "Ctrl++"], "shown": "Ctrl++" },
@@ -83,6 +84,8 @@
         { "id": "toggle-currents", "label": "Show Current &Directions", "keys": ["Shift+R"], "check": true, "page": true },
         {
           "label": "&Language",
+          "english": "Language",
+          "icon": "globe",
           "languages": true,
           "items": [
             { "id": "language-en", "label": "English", "check": true, "radio": true }
