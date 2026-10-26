@@ -4,12 +4,12 @@
   "Skip to content": "Zum Inhalt springen",
   "Switch color theme": "Farbschema wechseln",
   "Translation status": "Übersetzungsstatus",
-  "English is the source of every text of RNL; every other language, Chinese included, is a translation that follows it.": "Englisch ist die Quelle jedes Textes von RNL; jede andere Sprache, einschließlich Chinesisch, ist eine Übersetzung, die dem Englischen folgt.",
   "This report was made from <a href=\"https://github.com/rich-netlist/rnl/blob/main/i18n/surfaces.json\">the list of what there is to translate</a> when the site was built; every pull request gets the same one. To translate a language or bring one up to date, start from <a href=\"https://github.com/rich-netlist/rnl/blob/main/i18n/README.md\">i18n/README.md</a>.": "Dieser Bericht wurde beim Erstellen der Website aus <a href=\"https://github.com/rich-netlist/rnl/blob/main/i18n/surfaces.json\">der Liste der zu übersetzenden Inhalte</a> generiert; jeder Pull Request erhält denselben Bericht. Um eine Sprache neu zu übersetzen oder zu aktualisieren, beginnen Sie bei <a href=\"https://github.com/rich-netlist/rnl/blob/main/i18n/README.md\">i18n/README.md</a>.",
   "How far each language is": "Fortschritt nach Sprache",
   "The report is in English, as the texts it counts are. A missing translation shows the English; a stale one was made from an English text that has changed since.": "Der Bericht selbst ist wie die gezählten Ausgangstexte auf Englisch. Fehlt eine Übersetzung, wird das Englische angezeigt; als „stale“ (veraltet) markierte Übersetzungen basieren auf einem inzwischen geänderten englischen Text.",
   "Machine translation and AI models may make a first draft; a language is shown once a native speaker has reviewed it.": "Maschinelle Übersetzung und KI-Modelle können einen ersten Entwurf erstellen; freigeschaltet wird eine Sprache, sobald sie von Muttersprachlern geprüft wurde.",
   "See also": "Siehe auch",
   "Decision 0015: English is the only core language": "Entscheidung 0015: Englisch ist die einzige Kernsprache",
-  "Introduction": "Einführung"
+  "Introduction": "Einführung",
+  "English is the source of every text of RNL; every other language is a translation that follows it.": "Englisch ist die Quelle jedes Textes von RNL; jede andere Sprache ist eine Übersetzung, die dem Englischen folgt."
 }
