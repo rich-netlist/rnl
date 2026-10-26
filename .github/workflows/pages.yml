@@ -137,12 +137,12 @@ jobs:
 
       # The RNL skill package, for agents: site/dist/skill/rnl-skill.zip, the files of the package as plain
       # text under site/dist/skill/rnl/, a manifest and the hashes, and the plain-text entry that agents look
-      # for, site/dist/llms.txt (English) and site/dist/zh/llms.txt (Chinese), which the page for agents,
+      # for, site/dist/llms.txt, in English only, which the page for agents,
       # agents.html, links. The package is checked by skill.yml.
       - name: Build the skill package for agents
         run: python3 scripts/skill/build.py --site site/dist
 
-      # The web viewer, one copy for both languages: the core as WebAssembly, the page of
+      # The web viewer, one copy for every language: the core as WebAssembly, the page of
       # apps/viewer-ui with its web fonts, and the conformance corpus as samples.
       - name: Install Rust with the WebAssembly target
         id: rust
@@ -183,7 +183,7 @@ jobs:
         if: steps.fonts.outputs.cache-hit != 'true'
         run: pip install fonttools brotli && python scripts/fonts.py web
       # writes apps/web/dist/, including libraries/*.rnl, index.json and bundled.json,
-      # and puts it at site/dist/viewer/, where the pages of both languages link
+      # and puts it at site/dist/viewer/, where the pages of every language link
       - name: Build the web viewer, with samples and the package library
         run: |
           node --test apps/web/*.test.mjs

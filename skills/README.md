@@ -28,7 +28,7 @@ bridge skill separately as described by that companion.
 
 The package is not a web page (`site/`), and not the standard (`spec/`): it is a folder an agent installs as it is, and `skills/<name>/` is where such folders are kept in repositories that publish them, so that a person can copy one and a tool can find it. The site's pages are built from it, not the other way round.
 
-The package is in English only: its files, the guide and the reference to the packages. The site's pages and `llms.txt` are in both languages.
+The package is in English only: its files, the guide and the reference to the packages. The site's pages are translated into several languages.
 
 ## What is written and what is generated
 
@@ -54,7 +54,7 @@ What `--site DIR` writes into the built site:
 | `skill/rnl-skill.zip` | The package as a zip with the folder `rnl/` in it, so that unpacking it into a skills directory leaves `rnl/SKILL.md`; the same bytes for the same files. |
 | `skill/rnl/…` | Each file of the package as it is, readable as plain text. |
 | `skill/manifest.json`, `skill/SHA256SUMS.txt` | Each file with its address, size and SHA-256, and the hashes of the zip and the files. |
-| `llms.txt`, `zh/llms.txt` | The plain-text entry for agents, in English and in Chinese, from [`site/src/llms.txt`](../site/src/llms.txt) and [`site/src/llms.zh.txt`](../site/src/llms.zh.txt). |
+| `llms.txt` | The plain-text entry for agents, in English, from [`site/src/llms.txt`](../site/src/llms.txt). |
 
 ## Licences
 

@@ -1,7 +1,6 @@
 {
   "For agents · Rich Netlist": "에이전트 안내 · Rich Netlist",
   "The entry for AI agents: download the RNL skill package, and an agent knows how to read, write, check and draw RNL 0.3.": "AI 에이전트를 위한 시작점: RNL 스킬 패키지를 다운로드하면 에이전트가 RNL 0.3을 읽고, 쓰고, 검사하고, 그리는 방법을 익힙니다.",
-  "../llms.txt": "../llms.txt",
   "Skip to content": "본문으로 건너뛰기",
   "On this page": "이 페이지 목차",
   "Switch color theme": "색상 테마 전환",
@@ -30,7 +29,7 @@
   "Claude Code, or any agent that can read a web page and write files: it reads llms.txt, learns where to download the skill package and where to unpack it, and then follows <code>SKILL.md</code> to read and write RNL.": "Claude Code처럼 웹 페이지를 읽고 파일을 쓸 수 있는 에이전트라면 llms.txt를 읽어 스킬 패키지를 어디서 받아 어디에 풀어야 하는지 파악한 뒤, <code>SKILL.md</code>의 안내에 따라 RNL을 읽고 씁니다.",
   "Read https://rich-netlist.github.io/rnl/llms.txt, install the RNL skill it describes, and then help me with my RNL netlist.": "https://rich-netlist.github.io/rnl/llms.txt 를 읽고 거기에 설명된 RNL 스킬을 설치한 다음, 내 RNL 넷리스트 작업을 도와줘.",
   "Copy": "복사",
-  "<a href=\"../llms.txt\">llms.txt</a> is the plain text meant for agents: how to install, which files the package has, how to check files, where the standard is. The English text is at <a href=\"../llms.txt\">/rnl/llms.txt</a> and a Chinese one at <a href=\"../zh/llms.txt\">/rnl/zh/llms.txt</a>; both say the same.": "<a href=\"../llms.txt\">llms.txt</a>는 에이전트가 읽도록 작성된 일반 텍스트로, 설치 방법, 패키지 내 파일 목록, 파일 검사 방법, 언어 표준 위치를 안내합니다. 영문본은 <a href=\"../llms.txt\">/rnl/llms.txt</a>에, 중국어본은 <a href=\"../zh/llms.txt\">/rnl/zh/llms.txt</a>에 있으며 두 문서의 내용은 같습니다.",
+  "<a href=\"../llms.txt\">llms.txt</a> is the plain text meant for agents: how to install, which files the package has, how to check files, where the standard is. It is in English, at <a href=\"../llms.txt\">/rnl/llms.txt</a>.": "<a href=\"../llms.txt\">llms.txt</a>는 에이전트가 읽도록 작성된 일반 텍스트로, 설치 방법, 패키지 내 파일 목록, 파일 검사 방법, 언어 표준 위치를 안내합니다. 영문으로 작성되어 있으며 <a href=\"../llms.txt\">/rnl/llms.txt</a>에 있습니다.",
   "02 · Install": "02 · 설치",
   "Unpack it where your agent keeps skills. <span class=\"mk\">You get rnl/SKILL.md.</span>": "에이전트가 스킬을 보관하는 위치에 압축을 푸세요. <span class=\"mk\">rnl/SKILL.md가 생성됩니다.</span>",
   "The skill is the folder <code>rnl/</code>. Claude Code keeps personal skills in <code>~/.claude/skills/</code>, where every project sees them, and a project’s own in <code>.claude/skills/</code>; other agents have a directory of their own, as their documentation says. The commands below unpack the zip into Claude Code’s personal directory.": "스킬은 <code>rnl/</code> 폴더입니다. Claude Code는 모든 프로젝트에서 쓸 수 있는 개인 스킬을 <code>~/.claude/skills/</code>에 두고 프로젝트별 스킬은 <code>.claude/skills/</code>에 둡니다. 다른 에이전트도 각자의 문서에 안내된 전용 디렉터리를 사용합니다. 아래 명령은 zip 파일을 Claude Code의 개인 스킬 디렉터리에 압축 해제합니다.",

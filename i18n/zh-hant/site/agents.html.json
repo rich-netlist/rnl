@@ -1,7 +1,6 @@
 {
   "For agents · Rich Netlist": "給 agent · Rich Netlist",
   "The entry for AI agents: download the RNL skill package, and an agent knows how to read, write, check and draw RNL 0.3.": "AI agent 專用入口：下載 RNL skill 套件，讓 agent 掌握讀、寫、檢查與繪製 RNL 0.3 的方法。",
-  "../llms.txt": "../llms.txt",
   "Skip to content": "跳至主要內容",
   "On this page": "本頁目錄",
   "Switch color theme": "切換色彩主題",
@@ -30,7 +29,7 @@
   "Claude Code, or any agent that can read a web page and write files: it reads llms.txt, learns where to download the skill package and where to unpack it, and then follows <code>SKILL.md</code> to read and write RNL.": "無論是 Claude Code，或任何能讀取網頁並寫入檔案的 agent：只要讀取 llms.txt，就能得知從何處下載 skill 套件、解壓縮至何處，接著依照 <code>SKILL.md</code> 讀寫 RNL。",
   "Read https://rich-netlist.github.io/rnl/llms.txt, install the RNL skill it describes, and then help me with my RNL netlist.": "請讀取 https://rich-netlist.github.io/rnl/llms.txt，安裝其中說明的 RNL skill，接著協助我處理 RNL 網表。",
   "Copy": "複製",
-  "<a href=\"../llms.txt\">llms.txt</a> is the plain text meant for agents: how to install, which files the package has, how to check files, where the standard is. The English text is at <a href=\"../llms.txt\">/rnl/llms.txt</a> and a Chinese one at <a href=\"../zh/llms.txt\">/rnl/zh/llms.txt</a>; both say the same.": "<a href=\"../llms.txt\">llms.txt</a> 是專為 agent 準備的純文字入口：說明如何安裝、套件包含哪些檔案、如何檢查檔案，以及語言標準的位置。英文版位於 <a href=\"../llms.txt\">/rnl/llms.txt</a>，中文版位於 <a href=\"../zh/llms.txt\">/rnl/zh/llms.txt</a>；兩者內容一致。",
+  "<a href=\"../llms.txt\">llms.txt</a> is the plain text meant for agents: how to install, which files the package has, how to check files, where the standard is. It is in English, at <a href=\"../llms.txt\">/rnl/llms.txt</a>.": "<a href=\"../llms.txt\">llms.txt</a> 是專為 agent 準備的純文字入口：說明如何安裝、套件包含哪些檔案、如何檢查檔案，以及語言標準的位置。該檔案為英文，位於 <a href=\"../llms.txt\">/rnl/llms.txt</a>。",
   "02 · Install": "02 · 安裝",
   "Unpack it where your agent keeps skills. <span class=\"mk\">You get rnl/SKILL.md.</span>": "解壓縮至 agent 存放 skill 的目錄，<span class=\"mk\">即可取得 rnl/SKILL.md。</span>",
   "The skill is the folder <code>rnl/</code>. Claude Code keeps personal skills in <code>~/.claude/skills/</code>, where every project sees them, and a project’s own in <code>.claude/skills/</code>; other agents have a directory of their own, as their documentation says. The commands below unpack the zip into Claude Code’s personal directory.": "此 skill 即為 <code>rnl/</code> 資料夾。Claude Code 將個人 skill 存放在 <code>~/.claude/skills/</code>（所有專案皆可使用），而專案專屬的 skill 則放在 <code>.claude/skills/</code>；其他 agent 各有其存放目錄，請參閱各自的說明文件。下方指令會將 zip 解壓縮至 Claude Code 的個人目錄。",

@@ -1,7 +1,6 @@
 {
   "For agents · Rich Netlist": "エージェント向け · Rich Netlist",
   "The entry for AI agents: download the RNL skill package, and an agent knows how to read, write, check and draw RNL 0.3.": "AIエージェント向けの入口：RNLスキルパッケージをダウンロードすれば、エージェントはRNL 0.3の読み書き・検証・描画を行えるようになります。",
-  "../llms.txt": "../llms.txt",
   "Skip to content": "本文へスキップ",
   "On this page": "このページの目次",
   "Switch color theme": "カラーテーマを切り替え",
@@ -30,7 +29,7 @@
   "Claude Code, or any agent that can read a web page and write files: it reads llms.txt, learns where to download the skill package and where to unpack it, and then follows <code>SKILL.md</code> to read and write RNL.": "Claude Codeをはじめ、Webページの読み取りとファイルの書き込みができる任意のエージェントに対応しています。エージェントはllms.txtを読み取り、スキルパッケージのダウンロード先と展開先を把握した上で、<code>SKILL.md</code>に従ってRNLを読み書きします。",
   "Read https://rich-netlist.github.io/rnl/llms.txt, install the RNL skill it describes, and then help me with my RNL netlist.": "https://rich-netlist.github.io/rnl/llms.txt を読み取り、そこに記載されているRNLスキルをインストールした上で、私のRNLネットリストの作業を手伝ってください。",
   "Copy": "コピー",
-  "<a href=\"../llms.txt\">llms.txt</a> is the plain text meant for agents: how to install, which files the package has, how to check files, where the standard is. The English text is at <a href=\"../llms.txt\">/rnl/llms.txt</a> and a Chinese one at <a href=\"../zh/llms.txt\">/rnl/zh/llms.txt</a>; both say the same.": "<a href=\"../llms.txt\">llms.txt</a>はエージェント向けに用意されたプレーンテキストで、インストール手順、パッケージ内のファイル構成、ファイルの検証方法、言語標準の場所が記されています。英語版は<a href=\"../llms.txt\">/rnl/llms.txt</a>、中国語版は<a href=\"../zh/llms.txt\">/rnl/zh/llms.txt</a>にあり、どちらも同じ内容です。",
+  "<a href=\"../llms.txt\">llms.txt</a> is the plain text meant for agents: how to install, which files the package has, how to check files, where the standard is. It is in English, at <a href=\"../llms.txt\">/rnl/llms.txt</a>.": "<a href=\"../llms.txt\">llms.txt</a>はエージェント向けに用意されたプレーンテキストで、インストール手順、パッケージ内のファイル構成、ファイルの検証方法、言語標準の場所が記されています。英語で書かれており、<a href=\"../llms.txt\">/rnl/llms.txt</a>にあります。",
   "02 · Install": "02 · インストール",
   "Unpack it where your agent keeps skills. <span class=\"mk\">You get rnl/SKILL.md.</span>": "エージェントがスキルを保存するディレクトリに展開すると、<span class=\"mk\">rnl/SKILL.md が配置されます。</span>",
   "The skill is the folder <code>rnl/</code>. Claude Code keeps personal skills in <code>~/.claude/skills/</code>, where every project sees them, and a project’s own in <code>.claude/skills/</code>; other agents have a directory of their own, as their documentation says. The commands below unpack the zip into Claude Code’s personal directory.": "スキル本体は<code>rnl/</code>フォルダです。Claude Codeでは個人用スキル（すべてのプロジェクトから参照可能）を<code>~/.claude/skills/</code>に、プロジェクト固有のスキルを<code>.claude/skills/</code>に配置します。他のエージェントでもそれぞれのドキュメントに従ったディレクトリに配置してください。以下のコマンドはzipをClaude Codeの個人用ディレクトリに展開します。",
