@@ -1,6 +1,6 @@
 # site
 
-Six static pages, in Chinese and English, for circuit designers who have not worked on EDA tooling:
+Static pages, in English and translated into several languages, for circuit designers who have not worked on EDA tooling:
 
 - `index.html`, the introduction: what RNL is, the problem it addresses, the goal, before/after scenarios, where things stand (the released milestones and what comes next, with an FAQ), and the ways on to the other pages. It is short on purpose; what it once held has moved ([Sections that moved](#sections-that-moved)).
 - `language.html`, the language tour: the language at a glance (the anatomy of a statement, the keyword families, how a level takes effect), nine hands-on sections on the parts of the language the introduction does not unpack (standard sentences and Chinese, definitions, the standard package's defaults, sets and selections, wires, text, orientation, priority, the header record), and a few examples.
@@ -10,7 +10,7 @@ Six static pages, in Chinese and English, for circuit designers who have not wor
 - `timeline.html`, the full timeline: every release and milestone, the latest first, linked from the end of the homepage's short timeline and not one of the menu's tabs ([The timeline](#the-timeline)).
 - `packages.html`, the gallery of the standard packages: every package in [`libraries/`](../libraries/README.md), with what it is for, what it references and its text, every symbol as the core draws it, with its pins and box, and the rules that give elements their symbols ([The gallery](#the-gallery-of-the-standard-packages)).
 
-The site also publishes the skill package for agents, at `skill/`, and `llms.txt`, at `llms.txt` and `zh/llms.txt`; the web viewer itself, at `viewer/` ([`apps/web`](../apps/web/README.md)), one copy that the pages of both languages link to, with the conformance corpus as its samples; the pages of the language standard, at `zh/spec/<version>/` and `en/spec/<version>/` for each version, such as `zh/spec/0.3/`, with the short guide to the language as their first section and the principles of RNL as their last; and the gallery's data, at `gallery/`. [`pages.yml`](../.github/workflows/pages.yml) adds them to what `build.py` writes.
+The site also publishes the skill package for agents, at `skill/`, and `llms.txt`, at `llms.txt`, in English only; the web viewer itself, at `viewer/` ([`apps/web`](../apps/web/README.md)), one copy that the pages of every language link to, with the conformance corpus as its samples; the pages of the language standard, at `zh/spec/<version>/` and `en/spec/<version>/` for each version, such as `zh/spec/0.3/`, with the short guide to the language as their first section and the principles of RNL as their last; and the gallery's data, at `gallery/`. [`pages.yml`](../.github/workflows/pages.yml) adds them to what `build.py` writes.
 
 **Status:** an explainer, not a specification. The RNL snippets follow the language standard 0.3 and the standard series 0.3 ([`spec/`](../spec/README.md), [`libraries/standard/0.3`](../libraries/standard/README.md)); the pages say so and link to the standard. Every file the pages show reads with `rnl check` in 0.3 without errors, but for the ones that show errors on purpose, and every statement they show reads within a netlist that has its objects. Layouts in the drawings are placed by hand, not produced by a solver, with the pins where the series 0.3 puts them; the symbols of the gallery are drawn by the core.
 
@@ -152,7 +152,7 @@ publication, and checks notes changes. The Stage text stays unchanged in this up
 
 ## The gallery of the standard packages
 
-`packages.html` shows what [`gallery/build.mjs`](gallery/build.mjs) writes into `site/dist/gallery/` from the built-in standard series and the latest [public package catalog](https://rich-netlist.github.io/rnl-packages/catalog.json). The page is built by `build.py` like the others; its data is not, and is the same for both languages.
+`packages.html` shows what [`gallery/build.mjs`](gallery/build.mjs) writes into `site/dist/gallery/` from the built-in standard series and the latest [public package catalog](https://rich-netlist.github.io/rnl-packages/catalog.json). The page is built by `build.py` like the others; its data is not, and is the same for every language.
 
 - **Groups.** Each standard-series directory and each public package selected from the latest catalog is a group in the left navigation. The build writes its `kind`: `libraries/standard/*` is `standard`, `libraries/pdk/*` is `pdk`, and other directories are `extension`. The navigation lists standard series (newest first, with 0.2 marked read-only), extensions, then PDKs. A group expands to its packages and an All entry. Search filters group and package names without changing how symbols are searched. The `series`, `package` and `q` query parameters keep shared and earlier links working; group and package selections also support browser Back and Forward. A package is known by the name and version its header record declares; what it references and the order in which using it brings packages in come from its `USE-PACKAGE`s, and the packages `rnl-std` brings in are the ones every netlist has by default. Adding a directory or a file needs no change to the page code.
 - **Statements.** [`gallery/package-file.mjs`](gallery/package-file.mjs) splits each record of a package file into its statements and sorts them by their first tokens: symbols, styles, definitions, sets, rules (symbol, style, text and set rules) and definitions attached to sets. It is not an interpreter; what a statement means and how a symbol looks come from the core.
@@ -184,9 +184,9 @@ for the mark at the frame's edge when needed. Compared with the previous frames,
 `agents.html` and the files it links make the entry for AI agents. The page is built by `build.py` like the others, from `src/agents.html`, with its own `assets/agents.css` and `assets/agents.js` (the copy buttons of the sentence to give an agent and of the commands); like the gallery it has no single-file version, and it has no old address at the root of the site (`NEW_PAGES`). What it links is not written by `build.py` but by [`scripts/skill/build.py --site`](../skills/README.md), which `pages.yml` runs:
 
 - `skill/rnl-skill.zip`, the RNL skill package of [`skills/rnl/`](../skills/rnl/SKILL.md) in the Agent Skills format, and each of its files as plain text under `skill/rnl/`, with `skill/manifest.json` and `skill/SHA256SUMS.txt`;
-- `llms.txt` and `zh/llms.txt`, the plain-text entry that agents look for: what RNL is, how to download and unpack the skill, the files it holds, how to check and draw files, and where the standard is. They are [`src/llms.txt`](src/llms.txt) and [`src/llms.zh.txt`](src/llms.zh.txt) with `{{site}}` and `{{github}}` filled in, and every address in them is absolute.
+- `llms.txt`, the plain-text entry that agents look for, in English only: what RNL is, how to download and unpack the skill, the files it holds, how to check and draw files, and where the standard is. It is [`src/llms.txt`](src/llms.txt) with `{{site}}` and `{{github}}` filled in, and every address in it is absolute.
 
-The page and both `llms` files name every file of the package, so that they cannot fall behind it: `scripts/skill/build.py --check` fails when one does not. The short guide to the language, which the package holds as `references/language.md`, is also the first section of the page of the standard 0.3 ([`scripts/spec`](../scripts/spec/README.md#the-short-guide)); the top bar of every page, of the standard's too, links "Agent".
+The page and `llms.txt` name every file of the package, so that they cannot fall behind it: `scripts/skill/build.py --check` fails when one does not. The short guide to the language, which the package holds as `references/language.md`, is also the first section of the page of the standard 0.3 ([`scripts/spec`](../scripts/spec/README.md#the-short-guide)); the top bar of every page, of the standard's too, links "Agent".
 
 ## Building and viewing
 
@@ -254,13 +254,12 @@ node --test site/gallery/package-file.test.mjs   # the tests of reading package 
 
 | Output in `site/dist/` | Content |
 | --- | --- |
-| `zh/index.html`, `zh/language.html`, `zh/tools.html`, `zh/packages.html`, `zh/agents.html`, `zh/assets/` | Chinese pages |
-| `en/index.html`, `en/language.html`, `en/tools.html`, `en/packages.html`, `en/agents.html`, `en/assets/` | English pages |
-| `index.html` | The root of the site: it leads to `zh/` when the browser's first language is Chinese, and to `en/` otherwise or without scripts ([Addresses](#addresses)). |
+| `<code>/index.html`, `<code>/language.html`, `<code>/tools.html`, … and `<code>/assets/` | The pages of each published language of `i18n/languages.json`, in its own folder: English in `en/`, the others such as `zh/` or `ja/` |
+| `index.html` | The root of the site: it leads to the language saved last, else to the first of the browser's languages that the site offers, else to `en/`, and to `en/` without scripts ([Addresses](#addresses)). |
 | `language.html`, `tools.html`, `packages.html`, `rnl-*-standalone.html` | The old addresses of the Chinese pages, which were at the root until 2026-10-18 ([Addresses](#addresses)): each leads to the same page under `zh/`. |
-| `gallery/` | The gallery's data, for both languages: `index.js`, the groups, and one script per group, such as `standard-0.2.js`. Not written by `build.py`: `pages.yml` writes it with `node site/gallery/build.mjs`, after building the web viewer and so the core. |
+| `gallery/` | The gallery's data, for every language: `index.js`, the groups, and one script per group, such as `standard-0.2.js`. Not written by `build.py`: `pages.yml` writes it with `node site/gallery/build.mjs`, after building the web viewer and so the core. |
 | `zh/spec/<version>/`, `en/spec/<version>/`, and `zh/spec/`, `en/spec/` | The language standard: for each version in `spec/`, one page per language with its PDF and Markdown downloads, and next to it the pages that compare it with each earlier version, such as `compare-0.2.html`; `zh/spec/` and `en/spec/` lead to the newest version, which the top bar links to. The old addresses of the Chinese pages of 0.2, `spec/0.2/` and `spec/`, lead to them, and the downloads are copied there. Not written by `build.py`: [`pages.yml`](../.github/workflows/pages.yml) adds them with `python scripts/spec/build.py --site site/dist` ([decision 0007](../docs/decisions/0007-publishing-the-standard.md)). |
-| `skill/`, `llms.txt`, `zh/llms.txt` | The skill package for agents as a zip and as plain-text files, and the plain-text entry for agents, in English and in Chinese ([For agents](#for-agents)). Not written by `build.py`: `pages.yml` adds them with `python3 scripts/skill/build.py --site site/dist`. |
+| `skill/`, `llms.txt` | The skill package for agents as a zip and as plain-text files, and the plain-text entry for agents, in English ([For agents](#for-agents)). Not written by `build.py`: `pages.yml` adds them with `python3 scripts/skill/build.py --site site/dist`. |
 | `viewer/` | The web viewer with its samples, one copy for every language, its interface in each published language of `i18n/languages.json` that has a catalog of the viewers, chosen in its own menu. Not written by `build.py`: `pages.yml` builds it with `node apps/web/build.mjs --samples` and copies `apps/web/dist/` here. |
 | `zh/rnl-intro-standalone.html`, `zh/rnl-language-standalone.html`, `zh/rnl-tools-standalone.html`, and the same under `en/` | Single-file pages with the styles and scripts inlined; their links to the other pages, the languages and the web viewer point to the published site |
 
@@ -281,7 +280,7 @@ The same under `/rnl/en/`. The section of the principles is made by [`scripts/sp
 
 ### Addresses
 
-Both languages sit one level below the root, `zh/` and `en/`, alike. The root, `index.html`, leads to `zh/` when the browser's first language (`navigator.languages[0]`, else `navigator.language`) is Chinese, `zh` or `zh-…` such as `zh-CN`, `zh-TW` or `zh-Hans`, and to `en/` otherwise, keeping the query and the section of the address; without scripts, a refresh in `<noscript>` leads to `en/`, and the page links both. It names `zh/` and `en/` as its alternates (`hreflang`), `en/` as the default (`x-default`). Until 2026-10-18 the Chinese pages were at the root; their old addresses still work, since GitHub Pages has no redirects of its own: each is a page that leads to the new address with the query and the section of the old one, at once by a script, or by a refresh where scripts do not run. The pages of the standard keep theirs the same way ([`scripts/spec`](../scripts/spec/README.md)), and the downloads of 0.2 are copies at their old addresses, since no page can stand in for a PDF.
+Each language sits one level below the root in a folder of its own, `en/`, `zh/`, `ja/` and so on, alike. The root, `index.html`, leads to the language chosen last, else to the first of the browser's languages (`navigator.languages`, else `navigator.language`) that the site offers, by the `matches` of `i18n/languages.json`, else to `en/`, keeping the query and the section of the address; without scripts, a refresh in `<noscript>` leads to `en/`, and the page links every language. It names each language's folder as an alternate (`hreflang`), `en/` as the default (`x-default`). Until 2026-10-18 the Chinese pages were at the root; their old addresses still work, since GitHub Pages has no redirects of its own: each is a page that leads to the new address with the query and the section of the old one, at once by a script, or by a refresh where scripts do not run. The pages of the standard keep theirs the same way ([`scripts/spec`](../scripts/spec/README.md)), and the downloads of 0.2 are copies at their old addresses, since no page can stand in for a PDF.
 
 | Old address | New address |
 | --- | --- |
@@ -301,7 +300,7 @@ Both languages sit one level below the root, `zh/` and `en/`, alike. The root, `
 | `src/tools.html` | Page of the tools: structure and text, with the blocks that depend on the desktop viewer's release |
 | `src/packages.html` | Gallery of the standard packages: structure and text; the gallery itself is drawn by `gallery.js` from the data |
 | `src/agents.html` | The entry for AI agents: structure and text |
-| `src/llms.txt`, `src/llms.zh.txt` | The plain-text entry for agents, English and Chinese, which `scripts/skill/build.py --site` writes to `llms.txt` and `zh/llms.txt` |
+| `src/llms.txt` | The plain-text entry for agents, in English, which `scripts/skill/build.py --site` writes to `llms.txt` |
 | `src/assets/agents.css`, `src/assets/agents.js` | Styles and copy buttons of the page for agents, on top of `intro.css` and `common.js` |
 | `src/gallery.html` | The circuit gallery: structure and text |
 | `src/assets/circuits.js`, `src/assets/circuits.css` | The circuit gallery: reading rnl-gallery's index, the cards, the search; their styles on top of `gallery.css` |
@@ -325,11 +324,11 @@ Both languages sit one level below the root, `zh/` and `en/`, alike. The root, `
 
 The symbols are drawn for this page and contain no Analog Canvas material. Like other paths outside `spec/`, `docs/`, and the data directories, this directory is licensed under [MIT](../LICENSE).
 
-Public package names, versions, kinds and bilingual descriptions come from the catalog; source links point to rnl-packages. Every download is verified against SHA-256. `gallery/catalog-provenance.json` records the catalog URL and raw SHA-256 used for the build. `RNL_PACKAGE_CATALOG` can select another catalog URL or a local file. Browser tests use the locked local catalog generated by `python scripts/packages.py fixture`, then the Pages job restores the production gallery before deployment. The Pages workflow rebuilds main daily at 02:17 UTC and supports workflow_dispatch; see CONTRIBUTING.md for GitHub's inactivity limit.
+Public package names, versions, kinds and descriptions, in English with their translations from `summaries/<lang>.json`, come from the catalog; source links point to rnl-packages. Every download is verified against SHA-256. `gallery/catalog-provenance.json` records the catalog URL and raw SHA-256 used for the build. `RNL_PACKAGE_CATALOG` can select another catalog URL or a local file. Browser tests use the locked local catalog generated by `python scripts/packages.py fixture`, then the Pages job restores the production gallery before deployment. The Pages workflow rebuilds main daily at 02:17 UTC and supports workflow_dispatch; see CONTRIBUTING.md for GitHub's inactivity limit.
 
 ## CLI downloads and release versions
 
-The bilingual tools page has a command-line download section with fixed
+The tools page has a command-line download section with fixed
 `releases/latest/download/rnl-TARGET.zip` or `.tar.gz` links and `SHA256SUMS.txt`.
 Latest belongs to the core (`core-vX.Y.Z`); these links become available at its first release.
 Viewer links continue to use the latest stable `viewer-v*` tag selected by `build.py`,
