@@ -5,6 +5,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { publicPackagesAvailable, publicPackageText } from "../../../scripts/packages.mjs";
+import { zh } from "../zh.js";
 
 test.skip(!process.env.RNL_WEB_URL, "the site is not built: RNL_WEB=0");
 const base = process.env.RNL_WEB_URL;
@@ -421,9 +422,9 @@ test("Chinese browser language labels controls", async ({ browser }) => {
   const context = await browser.newContext({ locale: "zh-CN" });
   const page = await context.newPage();
   const frame = await start(page);
-  await expect(frame.locator("#embed-fit")).toHaveAttribute("aria-label", "适应窗口");
-  await expect(frame.locator("#embed-zoom-in")).toHaveAttribute("title", "放大");
-  await expect(frame.locator("#embed-zoom-out")).toHaveAttribute("title", "缩小");
+  await expect(frame.locator("#embed-fit")).toHaveAttribute("aria-label", zh("Fit to window"));
+  await expect(frame.locator("#embed-zoom-in")).toHaveAttribute("title", zh("Zoom in"));
+  await expect(frame.locator("#embed-zoom-out")).toHaveAttribute("title", zh("Zoom out"));
   await context.close();
 });
 

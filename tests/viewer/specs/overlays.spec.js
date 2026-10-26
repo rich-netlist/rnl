@@ -4,6 +4,7 @@ import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {expect, test} from '../viewer.js';
 import {root} from '../fixtures.js';
+import { zhMenu } from '../zh.js';
 
 for (const platform of ['web', 'desktop']) {
   test(`${platform}: current switch starts off and persists independently of usages`, async ({page, viewer}) => {
@@ -121,7 +122,7 @@ for (const platform of ['web', 'desktop']) {
           await page.screenshot({path: path.join(review, `viewer-${platform}-${lang}-${theme}.png`)});
           for (const file of ['usage-current.svg','usage-current.cell.svg']) fs.copyFileSync(path.join(dir,file), path.join(review,file));
           if (platform === 'web') {
-            await viewer.menuTitle(lang === 'zh' ? '视图' : 'View').click();
+            await viewer.menuTitle(lang === 'zh' ? zhMenu('&View') : 'View').click();
             await expect(viewer.menuItem('toggle-currents')).toHaveAttribute('aria-checked','true');
             await page.screenshot({path: path.join(review, `viewer-menu-${lang}-${theme}.png`)});
             await page.keyboard.press('Escape');
