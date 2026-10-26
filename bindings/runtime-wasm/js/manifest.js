@@ -104,7 +104,7 @@ function relativePath(path, what) {
     throw new ManifestError(`${what} is not a relative path: ${JSON.stringify(path)}`, typeof path === "string" ? path : null);
   }
   if (path.split("/").some((part) => part === "" || part === "." || part === "..")) {
-    throw new ManifestError(`${what} leaves the manifest's files or has an empty part: ${JSON.stringify(path)}`, path);
+    throw new ManifestError(`${what} must be a relative path within the manifest without empty segments: ${JSON.stringify(path)}`, path);
   }
   return path;
 }
@@ -162,7 +162,7 @@ export function checkManifest(manifest, { archive = false, limits = {} } = {}) {
     if (file.url !== undefined && (typeof file.url !== "string" || !address(file.url))) {
       throw new ManifestError(`${path} has a url that is not an https address: ${JSON.stringify(file.url)}`, path);
     }
-    if (!archive && file.url === undefined && base === undefined) throw new ManifestError(`${path} has no url, and the manifest no base.`, path);
+    if (!archive && file.url === undefined && base === undefined) throw new ManifestError(`Entry ${path} has no "url" field and the manifest has no "base" URL.`, path);
     return { path, sha256: file.sha256.toLowerCase(), size: file.size, ...(file.url !== undefined && { url: file.url }) };
   });
   const listed = new Set(files.map((file) => file.path));

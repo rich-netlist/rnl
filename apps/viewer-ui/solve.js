@@ -54,7 +54,7 @@ export async function solve() {
   if (!shell || !shell.solve || running || modal() || isLoading()) return;
   const source = shown ? shown.source : currentSource();
   if (!source || !doc) {
-    await inform({ title: m("Solve"), paragraphs: [m("Open a netlist first: File › Open (Ctrl+O).")] });
+    await inform({ title: m("Solve"), paragraphs: [m("Open a netlist first: File › Open File (Ctrl+O).")] });
     return;
   }
   hookProgress();
@@ -77,7 +77,7 @@ export async function solve() {
     status(m`Solved: ${levels}, ${facts}. A preview: the files are unchanged.${later}`, false);
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    if (message === CANCELLED) status(m("The solve was cancelled; the netlist is shown as it was."), false);
+    if (message === CANCELLED) status(m("The solve was canceled; the netlist is shown as it was."), false);
     else {
       status("", false);
       await inform({ title: m("Solve"), paragraphs: [m`The netlist could not be solved: ${message}`] });
@@ -116,7 +116,7 @@ export async function saveSolved(encoding = "preserve") {
   if (!shell || !shell.saveSolved || modal()) return;
   const title = m("Save Solved Copy");
   if (!shown) {
-    await inform({ title, paragraphs: [m("Solve the netlist first: Solve › Solve (F9) shows the solve, and this saves it.")] });
+    await inform({ title, paragraphs: [m("Run Solve › Solve (F9) first to generate a solved netlist before saving.")] });
     return;
   }
   try {
@@ -193,7 +193,7 @@ const STATUS_ORDER = ["failed", "discarded", "undecided", "kept"];
 const STATUS_WORDS = { failed: tr("failed"), discarded: tr("discarded"), undecided: tr("undecided"), kept: tr("kept") };
 const STATUS_COUNTS = { failed: tr("{0} failed"), discarded: tr("{0} discarded"), undecided: tr("{0} undecided") };
 const STATUS_HEADINGS = {
-  failed: m("Failed: they contradict themselves (8.5, 7.6)"),
+  failed: m("Failed: contradictory facts (8.5, 7.6)"),
   discarded: m("Discarded in the order of 8.5"),
   undecided: m("Undecided within the time limit (8.5)"),
   kept: m("Kept"),
@@ -227,11 +227,11 @@ function renderReport(report) {
       });
       group(section, STATUS_HEADINGS[status], items, status !== "kept");
     }
-    group(section, m("Statements whose facts took part in discarding (8.5)"), level.statements.map((s) => line("solve-line", [span("msg", s.text)], s.at)));
+    group(section, m("Statements involved in discarding low-priority facts (8.5)"), level.statements.map((s) => line("solve-line", [span("msg", s.text)], s.at)));
     group(section, m("Errors"), level.errors.map((e) => plain(e, "solve-line error")));
     group(section, m("Warnings"), level.warnings.map((w) => plain(w, "solve-line warning")));
-    group(section, m("What the record cannot hold"), level.unsolved.map((u) => plain(u)));
-    group(section, m("ROUTEs left in parts"), level.unrouted.map((u) => plain(u)));
+    group(section, m("Items not representable in the @RNL record"), level.unsolved.map((u) => plain(u)));
+    group(section, m("Partially routed nets (split ROUTEs)"), level.unrouted.map((u) => plain(u)));
     group(section, m("Notes"), level.notes.map((n) => plain(n)), false);
     append(box, section);
   }

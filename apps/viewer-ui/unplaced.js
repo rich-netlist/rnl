@@ -131,7 +131,7 @@ function row(i, q) {
   const located = u.objects.length > 0 && doc.objects[u.objects[0]].lines !== null;
   el.classList.toggle("located", located);
   el.classList.toggle("undrawn", Boolean(u.reason));
-  setAttr(el, "title", located ? m("Show in the netlist") : m("This object is written in a record, not in a statement"));
+  setAttr(el, "title", located ? m("Show in the netlist") : m("Defined in an @RNL record rather than a netlist statement"));
   append(el, thumbnail(u));
   const name = span("name", "");
   const at = q ? u.name.toLowerCase().indexOf(q) : -1;

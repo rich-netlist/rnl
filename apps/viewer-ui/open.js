@@ -247,7 +247,7 @@ function preview(title, text) {
   setText(box, lines.slice(0, PREVIEW_LINES).join("\n"));
   const size = document.createElement("p");
   size.className = "dialog-note";
-  const more = lines.length > PREVIEW_LINES ? m`; the first ${PREVIEW_LINES} are shown` : "";
+  const more = lines.length > PREVIEW_LINES ? m`; first ${PREVIEW_LINES} lines shown` : "";
   const n = lines.length, c = text.length;
   setText(size, m`${n === 1 ? m("{0} line", n) : m("{0} lines", n)}, ${c === 1 ? m("{0} character", c) : m("{0} characters", c)}${more}.`);
   const set = document.createElement("fieldset");

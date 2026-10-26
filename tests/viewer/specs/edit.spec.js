@@ -202,7 +202,7 @@ test.describe("on the desktop", () => {
     await expect(page.locator("#solve-step")).not.toContainText("Changes not applied yet are not in it.");
     expect(await checked(page, "toggle-edit")).toBe(false);
     await page.evaluate(() => window.viewer.command("toggle-edit"));
-    await expect(dialog(page)).toContainText("A solve is shown as a preview");
+    await expect(dialog(page)).toContainText("Cannot edit while viewing a solve preview");
     await answer(page, "Close");
     // closing the preview shows the netlist again, and the changes are still there to apply
     await viewer.build(() => page.locator("#preview-close").click());
@@ -400,7 +400,7 @@ test.describe("saving", () => {
     await showSource(page, "lib.inc");
     await type(page, `* a comment\n${await text(page)}`);
     await page.evaluate(() => window.viewer.command("save-as"));
-    await expect(dialog(page)).toContainText("Save As saves the netlist that was opened, the first file");
+    await expect(dialog(page)).toContainText("Save As only saves the top-level netlist file");
     await answer(page, "Close");
     await showSource(page, "04-hierarchy.sp");
     await page.evaluate(() => window.viewer.command("save-as"));

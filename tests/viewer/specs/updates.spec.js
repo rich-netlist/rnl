@@ -66,7 +66,7 @@ test.describe("on the desktop", () => {
     const dialog = page.locator("dialog.dialog");
     await expect(dialog.locator(".dialog-title")).toHaveText("Check for Updates");
     await expect(dialog.locator(".dialog-name")).toHaveText("RNL Viewer 0.2.0 is available.");
-    await expect(dialog).toContainText("This is version 0.1.0.");
+    await expect(dialog).toContainText("You are running version 0.1.0.");
     await expect(dialog.getByRole("button")).toHaveText(["Cancel", "Open Release Page"]);
     expect(asked).toEqual([API]);
     expect(await viewer.calls("version")).toEqual([[]]);
@@ -106,15 +106,15 @@ test.describe("on the desktop", () => {
   });
 
   test("without an answer, with an error, or with no release of the viewer, it links to the releases", async ({ page, viewer }) => {
-    const lookup = "The latest version could not be looked up: ";
+    const lookup = "Could not check for the latest version: ";
     const cases = [
       [(route) => route.abort("internetdisconnected"), `${lookup}GitHub could not be reached.`],
-      [json({ message: "Server Error" }, 500), new RegExp(`^${lookup}GitHub answered 500\\b.*\\.$`)],
+      [json({ message: "Server Error" }, 500), new RegExp(`^${lookup}GitHub returned 500\\b.*\\.$`)],
       [
         json({ message: "API rate limit exceeded" }, 403, { "x-ratelimit-remaining": "0" }),
-        `${lookup}GitHub takes no more requests from this network for a while.`,
+        `${lookup}GitHub API rate limit exceeded; please try again later.`,
       ],
-      [json({ message: "Not Found" }), `${lookup}GitHub's answer is not a list of releases.`],
+      [json({ message: "Not Found" }), `${lookup}GitHub's response is not a list of releases.`],
       [json([release("spec-0.2-r1"), release("viewer-v0.5.0", { prerelease: true })]), "GitHub lists no release of RNL Viewer yet."],
     ];
     let answer = null;

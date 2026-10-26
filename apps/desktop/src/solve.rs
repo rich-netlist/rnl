@@ -273,7 +273,10 @@ fn said(w: &rnl_cli::solve::Writing, to: &Path) -> String {
     } else {
         let mut s = format!("Saved {} into {}", n(w.written.len(), "solved file", "solved files"), to.display());
         if !w.copied.is_empty() {
-            s.push_str(&format!(", with {} read beside them", n(w.copied.len(), "other file", "other files")));
+            s.push_str(&format!(
+                ", along with {} copied alongside them",
+                n(w.copied.len(), "other file", "other files")
+            ));
         }
         s.push('.');
         s

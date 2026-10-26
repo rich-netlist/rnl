@@ -90,7 +90,7 @@ test.describe("on the desktop", () => {
     await expect(page.locator("#solve-step")).toHaveText("Solving top.sp (2 of 2, again, as raised to 0.3)…");
     await page.locator("#solve-cancel").click();
     expect(await viewer.calls("cancelSolve")).toEqual([[]]);
-    await expect(page.locator("#solve-step")).toHaveText("The solve was cancelled; the netlist is shown as it was.");
+    await expect(page.locator("#solve-step")).toHaveText("The solve was canceled; the netlist is shown as it was.");
     await expect(page.locator("#solve-cancel")).toBeHidden();
     await expect(page.locator("#preview-badge")).toBeHidden();
     expect(await page.evaluate(() => window.viewer.doc.files[0].text)).toBe(before);
@@ -117,7 +117,7 @@ test.describe("on the desktop", () => {
   test("a copy is saved through the shell, of a solve shown alone", async ({ page, viewer }) => {
     // before a solve: nothing to save
     await page.evaluate(() => window.viewer.command("solve-save"));
-    await expect(dialog(page)).toContainText("Solve the netlist first");
+    await expect(dialog(page)).toContainText("Run Solve › Solve (F9) first");
     await dialog(page).getByRole("button", { name: "Close" }).click();
     expect(await viewer.calls("saveSolved")).toEqual([]);
     await solve(page);

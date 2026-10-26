@@ -348,11 +348,11 @@ test('Download Manifest refuses files chosen from the computer, and changes not 
   await ready(page);
   await page.evaluate(() => { window.viewer.command('download-manifest'); });
   const dialog = page.getByRole('dialog', { name: 'Download Manifest', exact: true });
-  await expect(dialog).toContainText('local.sp has no address on the web. Download Project keeps such files.');
+  await expect(dialog).toContainText('Local files have no web URL (local.sp). Use Download Project to save them in a ZIP archive.');
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
   await page.goto(`${process.env.RNL_WEB_URL}/index.html?url=samples/cases/04-hierarchy.sp`);
   await ready(page);
   await page.evaluate(async () => (await import('./edits.js')).setText(window.viewer.doc.files[0].path, '* changed\n.end\n'));
   await page.evaluate(() => { window.viewer.command('download-manifest'); });
-  await expect(dialog).toContainText('changes that are not saved');
+  await expect(dialog).toContainText('cannot include unsaved edits');
 });

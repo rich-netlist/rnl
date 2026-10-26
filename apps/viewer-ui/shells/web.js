@@ -342,8 +342,8 @@ async function fetchBytes(href, again) {
     }
     return { bytes, url: response.url };
   } catch {
-    if (stop.signal.aborted) return { why: `the server sent nothing for ${STALL / 1000} seconds` };
-    return { why: "the server did not answer, or it does not let this page read the file (CORS)" };
+    if (stop.signal.aborted) return { why: `the server did not respond for ${STALL / 1000} seconds` };
+    return { why: "the server did not respond, or blocked cross-origin access (CORS)" };
   } finally {
     clearTimeout(timer);
   }
@@ -441,7 +441,7 @@ function chooseEntry(files, dir, folder) {
     if (entries.length === 1) return Promise.resolve(entries[0]);
     if (offered.length === 1) return Promise.resolve(offered[0]);
   }
-  let text = m("Several of the files could be the netlist to open. Which one?");
+  let text = m("Select the top-level netlist to open:");
   if (folder !== null) text = folder ? m`The netlist to open in ${folder}:` : m("The netlist to open:");
   return choose({
     title: folder === null ? m("Open") : m("Open Folder"),
@@ -495,7 +495,7 @@ function publicPackages() {
     return packages;
   }).catch((error) => {
     libraryIndex = null;
-    window.dispatchEvent(new CustomEvent("public-package-status", { detail: m`Public packages unavailable: ${error.message} Built-in standard packages remain available.` }));
+    window.dispatchEvent(new CustomEvent("public-package-status", { detail: m`Public packages unavailable (${error.message}). Built-in standard packages remain available.` }));
     throw error;
   });
   return libraryIndex;
@@ -504,7 +504,7 @@ function publicPackages() {
 async function includeLibrary() {
   const catalog = await publicPackages();
   const packages = latestPackages(catalog);
-  const selected = await choose({ title: m("Include Public Package"), text: m("Choose a package to add to the file pool."),
+  const selected = await choose({ title: m("Include Public Package"), text: m("Choose a package to add to the Library."),
     items: packages.map((p) => ({ label: `${p.name} ${p.version} — ${p.description}`, value: p })), filter: true });
   if (!selected) return [];
   return includePackage(selected);
@@ -1057,10 +1057,10 @@ export default {
   async exportSvg({ doc: shown, level, title, overlays }) {
     const request = builtRequests.get(shown);
     const worker = candidates.get(shown) ?? core;
-    if (!request || !worker) throw new Error("This document was not built in this page: open it again and export.");
+    if (!request || !worker) throw new Error("This document was not loaded in this page. Reopen the file and export again.");
     const built = await worker.build({ ...request, lazy_unplaced: false, overlays });
     const svg = built.levels[level]?.title === title ? built.levels[level].svg : null;
-    if (!svg) throw new Error(`The level ${title} is not where the document shown has it: open it again and export.`);
+    if (!svg) throw new Error(`Level ${title} has changed since the document was loaded. Reload or reopen the file and export again.`);
     return svg;
   },
   /** Export Image: the image, as a download. */

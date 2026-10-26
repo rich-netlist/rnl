@@ -250,10 +250,10 @@ export async function downloadManifest() {
     const contents = projectContents();
     const source = currentSource();
     const items = librarySnapshot().items.filter((item) => !item.builtin);
-    if (Object.keys(changes(false)).length) throw new Error(m("The library has changes that are not saved. Download Project keeps them."));
+    if (Object.keys(changes(false)).length) throw new Error(m("A manifest only links to URLs and cannot include unsaved edits. Use Download Project to save a ZIP archive with your changes."));
     const local = contents.entries.filter((e) => !addressOf(e.path, items, source));
     if (local.length) {
-      throw new Error(m`${local.slice(0, 3).map((e) => e.name).join(", ")}${local.length > 3 ? "…" : ""} has no address on the web. Download Project keeps such files.`);
+      throw new Error(m`Local files have no web URL (${local.slice(0, 3).map((e) => e.name).join(", ")}${local.length > 3 ? "…" : ""}). Use Download Project to save them in a ZIP archive.`);
     }
     const display = await askDisplay(title, "Download");
     if (display === null) return;

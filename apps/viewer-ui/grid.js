@@ -276,7 +276,7 @@ async function askSettings() {
         return wrong(m`The spacing is a number of units above 0 and at most ${MAX_SPACING}.`, units);
       }
       const every = Number(major.value);
-      if (!VALID.major(every)) return wrong(m`A major line comes every 2 to ${MAX_MAJOR} lines, a whole number.`, major);
+      if (!VALID.major(every)) return wrong(m`Major line interval must be a whole number from 2 to ${MAX_MAJOR}.`, major);
       const style = styles.find((r) => r.checked).value;
       return { shown: style !== "none", ...(style !== "none" && { style }), spacing, major: every, axes: axes.checked };
     },

@@ -64,7 +64,7 @@ test('Download Project writes the display settings when asked; Open Project offe
   await (await chooser).setFiles(saved);
   await expect(dialog(page)).toBeVisible();
   await expect(dialog(page).locator('.display-setting')).toHaveText([
-    'Background: dark', 'Colour scheme: 1 of its colours', 'Usages: shown', 'Current directions: shown', 'Grid: lines', 'View: the part of the level it shows',
+    'Background: dark', 'Color scheme: 1 of its colors', 'Usages: shown', 'Current directions: shown', 'Grid: lines', 'View: the part of the level it shows',
   ]);
   if (process.env.RNL_REVIEW_DIR && test.info().project.name === 'chromium') {
     await page.screenshot({ path: path.join(process.env.RNL_REVIEW_DIR, 'display-settings-dialog.png') });
