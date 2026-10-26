@@ -66,7 +66,7 @@
   "unknown command \\\\' + esc(name) + ': shown as written": "未知的命令 \\\\' + esc(name) + '：依原樣顯示",
   ";": "；",
   "No warnings": "無警告",
-  "unchanged": "保持原樣",
+  "unchanged": "不旋轉",
   "90° counterclockwise": "逆時針旋轉 90°",
   "turned 180°": "旋轉 180°",
   "270° counterclockwise, i.e. 90° clockwise": "逆時針旋轉 270°（即順時針 90°）",
