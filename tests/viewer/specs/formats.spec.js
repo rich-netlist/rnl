@@ -64,7 +64,8 @@ test("the format menu follows the keys and closes on Escape or a click elsewhere
   await expect(menu(page).getByRole("menuitemradio", { name: "SPICE", exact: true })).toBeFocused();
   await page.keyboard.press("ArrowUp");
   await page.keyboard.press("ArrowUp");
-  await expect(menu(page).getByRole("menuitemradio", { name: "Spectre", exact: true })).toBeFocused();
+  // from Automatic, Up goes round to the last format
+  await expect(menu(page).getByRole("menuitemradio", { name: "Text", exact: true })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(menu(page)).toHaveCount(0);
   await expect(chip).toBeFocused();
