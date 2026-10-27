@@ -124,7 +124,7 @@ function Shoot-Page($process, $page, $file, [string[]]$forward) {
       $log += ($texts -join " | ")
       # a license page's check box comes before its Next
       foreach ($agree in @("I accept the terms in the License Agreement", "I accept the terms")) {
-        $box = $texts | Where-Object { $_ -like "*$agree*" }
+        $box = $texts | Where-Object { $_.Replace("&", "") -like "*$agree*" }
         if ($box) { [InstallerUi]::Press($w, $box.Replace("&", "")) | Out-Null }
       }
       foreach ($name in $forward) { if ([InstallerUi]::Press($w, $name)) { break } }
