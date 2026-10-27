@@ -14,6 +14,8 @@ export function lineModel(file, f, allSpans, dialect, plain = false) {
     return starts.get(n)(c);
   };
   const rnl = new Map(), spans = new Map(), failed = new Map();
+  // the text of a package file outside its records is prose, which no netlist rule reads
+  const packageFile = file.format === "rnl";
   const semantics = new Set((file.semantics || []).map(n => n - 1));
   const includes = new Map();
   for (const link of file.includes || []) {
@@ -46,7 +48,7 @@ export function lineModel(file, f, allSpans, dialect, plain = false) {
         if (r.first) { state.comment = false; state.stack = ""; }
         rnlRange(text, r.from, Math.min(r.to, text.length), r.first, cls, state);
       }
-    } else joined = hostLine(text, cls, !!(flags & 1) || /^\s*\+/.test(text), null);
+    } else if (!packageFile) joined = hostLine(text, cls, !!(flags & 1) || /^\s*\+/.test(text), null);
     return { cls, flags: (joined ? 1 : 0) | (state.comment ? 2 : 0), stack: state.stack };
   }
   const states = new Uint8Array(texts.length);

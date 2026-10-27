@@ -259,8 +259,6 @@ function span(className, text) {
   return el;
 }
 
-const isPackage = (path) => /\.rnl$/i.test(path || "");
-
 /**
  * The format chip of the file at `path`: the format it is read in, muted while it reads by default and
  * solid when the user chose it, which opens the menu of the core's formats. A file that the document
@@ -360,7 +358,7 @@ function fileRow(item, kind) {
   open.className = "pool-open";
   setAttr(open, "aria-label", m`Open ${item.name}`);
   append(row, open);
-  if ((kind === "files" || kind === "path") && !isPackage(item.path)) append(row, formatChip(item.path, item.name));
+  if (kind === "files" || kind === "path") append(row, formatChip(item.path, item.name));
   if (kind === "builtin" || kind === "temporary" || kind === "external") {
     append(row, span("pool-badge", kind === "temporary" ? m("temporary · not searched") : m("read only")));
   } else if (kind === "files") {

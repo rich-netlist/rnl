@@ -43,6 +43,7 @@
   "subcircuit": "subcircuito",
   "file level": "nivel de archivo",
   "Nothing on this level has a position yet, so nothing is drawn.": "Ningún objeto de este nivel tiene posición todavía, por lo que no se dibuja nada.",
+  "RNL package": "Paquete RNL",
   "Text": "Texto",
   "This file is not a netlist. It is shown as text.": "Este archivo no es un netlist. Se muestra como texto.",
   "This level has no objects, so nothing is drawn.": "Este nivel no tiene objetos, por lo que no se dibuja nada.",

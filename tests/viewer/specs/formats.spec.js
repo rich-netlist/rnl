@@ -113,7 +113,7 @@ test("web: a file the shell cannot name again keeps its choice only while the pa
   expect(await lastFormats(page)).toEqual({});
 });
 
-test("desktop: a PATH netlist shows the format the shell detects; packages have no chip", async ({ page, viewer }) => {
+test("desktop: a PATH netlist and a package show the format the shell detects", async ({ page, viewer }) => {
   await viewer.open(null, { platform: "desktop", pool: "1" });
   await page.evaluate(() => {
     localStorage.setItem("search-paths", JSON.stringify(["/pdk"]));
@@ -123,10 +123,10 @@ test("desktop: a PATH netlist shows the format the shell detects; packages have 
   await page.locator("#tab-files").click();
   const pdk = group(page, "path:/pdk");
   await pdk.locator(".lib-toggle").click();
-  await expect(pdk.locator(".format-chip")).toHaveText(["Spectre", "Spectre"]);
-  await expect(pdk.locator(".pool-row", { hasText: "std.rnl" }).locator(".format-chip")).toHaveCount(0);
+  await expect(pdk.locator(".format-chip")).toHaveText(["Spectre", "Spectre", "RNL package"]);
+  await expect(pdk.locator(".pool-row", { hasText: "std.rnl" }).locator(".format-chip")).toHaveText("RNL package");
   const calls = await page.evaluate(() => window.fakeShell.calls.filter((c) => c[0] === "detectFormat").map((c) => c[1]));
-  expect(calls.sort()).toEqual(["/pdk/cells.scs", "/pdk/models.lib"]);
+  expect(calls.sort()).toEqual(["/pdk/cells.scs", "/pdk/models.lib", "/pdk/std.rnl"]);
 });
 
 test("format labels follow the language", async ({ page, viewer }) => {
