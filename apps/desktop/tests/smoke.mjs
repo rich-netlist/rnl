@@ -782,9 +782,10 @@ async function drive(app, port, profile, t0, session) {
   console.log(`The Not drawn list asked the app for the drawings of its ${thumbs} rows, which the Document did not carry`);
 
   await filePoolSmoke(page);
-  if (expectPackages) await publicPackagesSmoke(page, expectPackages);
   await nativeDropSmoke(page, app.pid);
   await independentNavigationSmoke(page);
+  // last: it opens a file and a dialog of its own
+  if (expectPackages) await publicPackagesSmoke(page, expectPackages);
   same(page.errors, [], "the page's errors");
 }
 

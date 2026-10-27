@@ -174,7 +174,10 @@ try {
   await execute('return new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true))));');
   fs.writeFileSync(path.join(output, `${path.basename(exe)}-cjk-after.png`), Buffer.from(await request('GET', `/session/${session}/screenshot`),'base64'));
   if (expectPackages) {
-    // the public packages: found without a network when bundled, reported missing with a hint when not
+    // the public packages: found without a network when bundled, reported missing with a hint when not; the
+    // step before left the page in Chinese, and the hint is told in English
+    await execute('window.viewer.command("language-en");');
+    await execute('return new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true))));');
     const top = path.join(temp, "use-eda-style.sp");
     fs.writeFileSync(top, ["* a file that uses a public package", '* @RNL(type="header") { @VERSION("0.3"); @USE-PACKAGE(name="eda-style", version="0.1") }', "R1 a 0 1k", ".end", ""].join("\n"));
     const info = await execute("return import('./shell.js').then((m) => m.shell.bundledPackages());");
