@@ -2,7 +2,7 @@
 import { viewerChannel } from "./window-session.js";
 import { shell } from "./shell.js";
 import { sourceFromManifest, sourceFromUrl } from "./shells/web.js";
-import { API_FEATURES, MAX_OPEN_BYTES } from "./viewer-api-contract.js";
+import { API_FEATURES, EMBED_FEATURES, MAX_OPEN_BYTES } from "./viewer-api-contract.js";
 
 function validateOpen(message) {
   const bytes = new TextEncoder().encode(JSON.stringify(message)).byteLength;
@@ -73,7 +73,7 @@ export function startViewerApi({ version, opener = false, begin = () => null, op
     try { Promise.resolve(command(message)).catch(error => send("error", { message: String(error.message || error) })); }
     catch (error) { send("error", { message: String(error.message || error) }); }
   });
-  send("ready", { version, features: API_FEATURES.filter(f => opener || f !== "opener"), maxOpenBytes: MAX_OPEN_BYTES });
+  send("ready", { version, features: [...API_FEATURES.filter(f => opener || f !== "opener"), ...(opener ? [] : EMBED_FEATURES)], maxOpenBytes: MAX_OPEN_BYTES });
   window.addEventListener("pagehide", stop, { once: true });
   return { send, open: receiveOpen };
 }

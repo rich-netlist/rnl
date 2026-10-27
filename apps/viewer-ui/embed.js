@@ -12,6 +12,7 @@ import { startViewerApi } from "./viewer-api.js";
 import { viewerChannel } from "./window-session.js";
 import { current, doc, path, setDoc } from "./state.js";
 import { backTo, enterRow, enterRoot } from "./subcircuits.js";
+import { showOverlays } from "./usages.js";
 import { $, span, svgElement } from "./util.js";
 import { startLoading, nextPaint } from "./loading.js";
 import { m, setText, setAttr } from "./i18n.js";
@@ -193,6 +194,8 @@ export async function startEmbed() {
     const grid = params.get("grid");
     setGrid({ shown: grid === "dots" || grid === "lines", style: grid === "lines" ? "lines" : "dots" });
     setHoverNames(params.get("names") !== "0");
+    // an embedded drawing starts without the usage frames and with the current directions, unless the address says otherwise
+    showOverlays({ usages: params.get("usages") === "1", currents: params.get("currents") !== "0" });
     window.addEventListener("viewer-level", updateLevel);
     api = startViewerApi({ version, open, onError: message => error(message.replace(/^Could not open the netlist: /, "")), begin(signal) {
       const operation = beginOpenOperation();
@@ -206,6 +209,12 @@ export async function startEmbed() {
           case "fit": fit(); break;
           case "background":
             if (message.value === "light" || message.value === "dark") setBackground(message.value);
+            break;
+          case "usages":
+            if (typeof message.value === "boolean") showOverlays({ usages: message.value });
+            break;
+          case "currents":
+            if (typeof message.value === "boolean") showOverlays({ currents: message.value });
             break;
           default: break;
         }

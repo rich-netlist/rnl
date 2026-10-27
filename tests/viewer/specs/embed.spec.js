@@ -622,3 +622,73 @@ test("public packages: versions coexist at their canonical catalog paths", async
   expect(result.paths).toEqual(['/library/eda-symbol/eda-symbol.rnl', '/library/eda-symbol/0.2/eda-symbol.rnl']);
   expect(result.errors).toEqual([]);
 });
+
+const usageCurrent = fs.readFileSync(new URL("../inputs/usage-current.sp", import.meta.url), "utf8");
+const frames = (frame) => frame.locator("#canvas .usage-frame");
+const arrows = (frame) => frame.locator("#canvas .current-arrow");
+async function openUsageCurrent(page, count = 1) {
+  await send(page, { type: "open", name: "usage-current.sp", text: usageCurrent });
+  await waitMessage(page, "loaded", count);
+}
+
+test("an embedded drawing starts without the usage frames and with the current directions; ready tells they are known", async ({ page }) => {
+  // the user's own settings of the complete viewer are neither read nor written
+  const frame = await start(page, {}, { seed: { "usages-shown": true, "currents-shown": false } });
+  expect((await messages(page, "ready"))[0].features).toEqual(expect.arrayContaining(["usages", "currents"]));
+  await openUsageCurrent(page);
+  await expect(arrows(frame)).toHaveCount(7);
+  await expect(frames(frame)).toHaveCount(0);
+  expect(await frame.evaluate(() => window.storageCalls)).toEqual([]);
+  expect(await page.evaluate(() => JSON.stringify({ ...localStorage }) === window.storedBefore)).toBe(true);
+});
+
+test("usages=1 and currents=0 turn the defaults over, for this page only", async ({ page, browserName }) => {
+  const frame = await start(page, { usages: "1", currents: "0" }, { seed: { "usages-shown": false, "currents-shown": true } });
+  await openUsageCurrent(page);
+  await expect(frames(frame).first()).toBeVisible();
+  await expect(arrows(frame)).toHaveCount(0);
+  expect(await frame.evaluate(() => window.storageCalls)).toEqual([]);
+  expect(await page.evaluate(() => JSON.stringify({ ...localStorage }) === window.storedBefore)).toBe(true);
+  // another open keeps them
+  await openUsageCurrent(page, 2);
+  await expect(frames(frame).first()).toBeVisible();
+  await expect(arrows(frame)).toHaveCount(0);
+  await screenshot(page, "embed-usages-1-currents-0.png", browserName);
+});
+
+test("usages=0 and currents=1 are the defaults; other values are no choice", async ({ page }) => {
+  const frame = await start(page, { usages: "0", currents: "1" });
+  await openUsageCurrent(page);
+  await expect(frames(frame)).toHaveCount(0);
+  await expect(arrows(frame)).toHaveCount(7);
+  await frame.goto(`${base}/?embed=1&usages=yes&currents=no`);
+  await waitMessage(page, "ready", 2);
+  await send(page, { type: "open", name: "usage-current.sp", text: usageCurrent });
+  await waitMessage(page, "loaded", 2);
+  await expect(frames(frame)).toHaveCount(0);
+  await expect(arrows(frame)).toHaveCount(7);
+});
+
+test("usages and currents messages switch the usage frames and the current directions, on and off, without a reload", async ({ page }) => {
+  const frame = await start(page, {}, { seed: { "usages-shown": false, "currents-shown": true } });
+  await openUsageCurrent(page);
+  await expect(arrows(frame)).toHaveCount(7);
+  await expect(frames(frame)).toHaveCount(0);
+  await send(page, { type: "usages", value: true });
+  await expect(frames(frame).first()).toBeVisible();
+  await send(page, { type: "currents", value: false });
+  await expect(arrows(frame)).toHaveCount(0);
+  await send(page, { type: "usages", value: false });
+  await expect(frames(frame)).toHaveCount(0);
+  await send(page, { type: "currents", value: true });
+  await expect(arrows(frame)).toHaveCount(7);
+  // a value that is no boolean changes nothing
+  await send(page, { type: "usages", value: "1" });
+  await send(page, { type: "currents", value: 0 });
+  await send(page, { type: "fit" });
+  await expect(frames(frame)).toHaveCount(0);
+  await expect(arrows(frame)).toHaveCount(7);
+  expect(await messages(page, "error")).toEqual([]);
+  expect(await frame.evaluate(() => window.storageCalls)).toEqual([]);
+  expect(await page.evaluate(() => JSON.stringify({ ...localStorage }) === window.storedBefore)).toBe(true);
+});
