@@ -86,7 +86,7 @@
     st('ord', 'M5 M1 M3 ov:ord');
     st('cur', 'M5 ov:cur');
     add('r1', '* }');
-    add('d0', '* @RNL(author="agent") {');
+    add('d0', '* @RNL(type="generated") {');
     add('d1', '*   #M1 @PLACE(12, 8) => @ORIENT("R0");  #M2 @PLACE(28, 8) => @ORIENT("MY");', 'M1 M2');
     add('d2', '*   #M3 @PLACE(12, 16) => @ORIENT("MY");  #M4 @PLACE(28, 16) => @ORIENT("R0");', 'M3 M4');
     add('d3', '*   #M5 @PLACE(20, 0);  %ja = (16, 16);  %jb = (12, 12);', 'M5');

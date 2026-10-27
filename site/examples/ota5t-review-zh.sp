@@ -21,7 +21,7 @@ M5 tail vbias vss  vss nch W=4u L=1u
 *   {#M5 #M1 #M3} 按 @顺序("从下到上") 排列;
 *   #M5:d 有 @电流("流入")
 * }
-* @RNL(author="agent") {
+* @RNL(type="generated") {
 *   #M1 @PLACE(12, 8) => @ORIENT("R0");  #M2 @PLACE(28, 8) => @ORIENT("MY");
 *   #M3 @PLACE(12, 16) => @ORIENT("MY");  #M4 @PLACE(28, 16) => @ORIENT("R0");
 *   #M5 @PLACE(20, 0);  %ja = (16, 16);  %jb = (12, 12);

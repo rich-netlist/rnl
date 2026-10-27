@@ -330,7 +330,6 @@
   "Traditional EDA look": "传统 EDA 样式",
   "01 · What RNL is": "01 · RNL 是什么",
   "An example: a five-transistor OTA": "一个例子：五管运放",
-  "This is the kind of file an agent writes with the RNL skill: the netlist with its structures, intent and drawing. A person reviews it by what the agent declared, not by reading the netlist line by line: pick an item of the checklist or a statement of the file.": "这是 agent 用 RNL skill 写出的那种文件：网表，加上它的结构、意图和画法。人按 agent 声明的内容来审，不用逐行读网表：点审查清单的一条，或文件里的一条语句。",
   "Read the file as": "把文件读作",
   "Look of the drawing": "图的样式",
   "Standard look": "标准样式",
@@ -340,5 +339,6 @@
   "Say which devices form a differential pair or a current mirror, what is symmetric, where the current flows. These statements are what a reader takes from a schematic, and they stay in the file however the drawing changes.": "写下哪些器件是差分对、电流镜，什么要对称，电流往哪流。这些语句正是读者从原理图里读到的东西，画法怎么变，它们都留在文件里。",
   "The netlist fixes what the circuit is; packages decide how it looks, much as HTML carries content and CSS its style. The same file, with the public packages <code>eda-symbol</code> and <code>eda-style</code> included, takes the look of a traditional EDA schematic, and the circuit does not change. <a href=\"#example\">Switch the look in the example.</a>": "网表定下电路是什么，包决定它看起来怎样，就像 HTML 管内容、CSS 管样式。同一个文件引入公开的 <code>eda-symbol</code> 和 <code>eda-style</code>，就是传统 EDA 原理图的样子，电路一个字不变。<a href=\"#example\">在例子里切换样式。</a>",
   "Design a five-transistor OTA for me.": "帮我设计一个五管 OTA。",
-  "The agent writes the structures and the drawing along with the circuit. A person opens it in a viewer and reviews what it declared: the pair, the mirror, the symmetry, the order.": "agent 写电路时，把结构和画法一起写出来。人在查看器里打开，审它声明的内容：差分对、电流镜、对称、次序。"
+  "The agent writes the structures and the drawing along with the circuit. A person opens it in a viewer and reviews what it declared: the pair, the mirror, the symmetry, the order.": "agent 写电路时，把结构和画法一起写出来。人在查看器里打开，审它声明的内容：差分对、电流镜、对称、次序。",
+  "This is the kind of file an agent writes with the RNL skill: the netlist with its structures, intent and drawing. A person reviews it by what the agent declared, not by reading the netlist line by line: pick an item of the checklist or a statement of the file. Exact positions and wires can be written back into the file by a solver or a model.": "这是 agent 用 RNL skill 写出的那种文件：网表，加上它的结构、意图和画法。人按 agent 声明的内容来审，不用逐行读网表：点审查清单的一条，或文件里的一条语句。精确的位置和导线可以由求解器或模型写回文件。"
 }
