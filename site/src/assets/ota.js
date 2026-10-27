@@ -214,6 +214,7 @@
     var svg = null;
     function draw() {
       stage.innerHTML = LOOKS.looks[look].svg;
+      stage.classList.toggle('is-black', look === 'eda');   /* the traditional look is drawn on black, as in the EDA tools */
       svg = stage.querySelector('svg');
       svg.setAttribute('role', 'img');
       svg.setAttribute('aria-label', look === 'eda' ? 'Five-transistor OTA in the traditional EDA look' : 'Five-transistor OTA');
@@ -277,6 +278,17 @@
       rows.forEach(function (r) { r.classList.remove('is-hot', 'is-dev'); });
       cap.innerHTML = mode === 'sim' ? SIM : DEFAULT;
       Array.prototype.forEach.call(list.children, function (li) { li.classList.remove('is-on'); });
+    }
+    /* the caption is as tall as the tallest text it shows, so that picking an item does not move the page under the pointer */
+    function fitCaption() {
+      var keep = cap.innerHTML, tallest = 0;
+      cap.style.minHeight = '0';
+      [DEFAULT, SIM].concat(Object.keys(CAPS).map(function (k) { return CAPS[k]; })).forEach(function (t) {
+        cap.innerHTML = t;
+        tallest = Math.max(tallest, cap.offsetHeight);
+      });
+      cap.innerHTML = keep;
+      cap.style.minHeight = tallest + 'px';
     }
     function show(item, quiet) { if (mode !== 'viewer') setView('viewer'); cur = item; mark(item, quiet); }
     function leave() { if (pinned) show(pinned, true); else clear(); }
@@ -366,6 +378,9 @@
     draw();
     renderCode();
     clear();
+    fitCaption();
+    global.addEventListener('resize', function () { clearTimeout(fitCaption.t); fitCaption.t = setTimeout(fitCaption, 150); });
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitCaption);
   }
 
   global.RNLOta = { init: init, lines: lines, ITEMS: ITEMS, T: T, TZ: TZ, FILES: FILES };

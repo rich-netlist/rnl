@@ -1594,6 +1594,11 @@ html[lang="zh-CN"] .tour-h1 { font-family: var(--f-body); font-weight: 900; lett
 .rv-fig.is-sim #rv-look { visibility: hidden; }
 .rv-stage { --hl: #1f4fd8; background: #fff; padding: 6px 10px; line-height: 0; }
 .rv-stage[hidden], .rv-sim[hidden] { display: none; }
+/* the traditional EDA look on black: the package's dark ink (wires, dots, texts) turns light, its green and red stay as it defines them */
+.rv-stage.is-black { --hl: #82a6ff; background: #000; }
+.rv-stage.is-black svg [stroke="#1d1d1f"] { stroke: #dcdcdc; }
+.rv-stage.is-black svg [fill="#1d1d1f"] { fill: #dcdcdc; }
+.rv-stage.is-black svg.has-lit g[data-id]:not(.is-lit), .rv-stage.is-black svg.has-lit > rect { opacity: .42; }
 .rv-stage svg { display: block; width: 100%; height: auto; max-height: 520px; margin: 0 auto; }
 .rv-stage svg g[data-id] { transition: opacity .15s; }
 .rv-stage svg.has-lit g[data-id]:not(.is-lit), .rv-stage svg.has-lit > rect { opacity: .2; }
