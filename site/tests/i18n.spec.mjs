@@ -203,6 +203,8 @@ for (const language of registry.languages.filter(entry => entry.code === registr
 
     await page.goto(`/${language}/index.html`);
     expect(await marked.count() > 0).toBe(examples);
+    // a step whose file has RNL records: the netlist alone is the same in every style
+    await page.locator('#jr-steps button[data-i="2"]').click();
     await styles('#jr-style', '#jr-code');
 
     await page.goto(`/${language}/language.html`);
