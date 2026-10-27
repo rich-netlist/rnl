@@ -20,17 +20,19 @@ rnl catalog [options]             print the symbols, definitions and sets of the
 rnl strip-generated FILE -o OUT   write FILE without its type="generated" records
 rnl write REQUEST.json -o OUT     write an edit transaction's ops into its netlist
 
-FILE is a SPICE netlist, a Spectre netlist (.scs) or a package file (.rnl); catalog takes none.
+FILE is a SPICE netlist, a Spectre netlist (.scs) or a package file (.rnl), which is checked on its
+own; catalog takes none. A package file is one of the format rnl: a .rnl file, or a file of another
+suffix whose first record, at the start of a line, is a header record with @PACKAGE.
 options:
   --path DIR          search packages and bare include filenames here; repeatable
-  --package-dir DIR   look for packages in DIR as well (16.2); repeatable
+  --package-dir DIR   look for packages in DIR as well (16.2), its .rnl files; repeatable
   --no-std            do not use the standard package at the root (16.3)
   --std-version V     use rnl-std V at the root, whatever the files' language version, such as 0.2
                       to read a file of 0.3 with the series 0.2; a version pinned in a header
                       record still comes first (16.3), and V not found is an error only for the
                       files that do not pin one. rnl solve does not take it
   --no-generated      read the netlist without its type="generated" records, as a solver does (2.8)
-  --dialect NAME      spice, spectre or text, instead of guessing from the file
+  --dialect NAME      spice, spectre, rnl or text, instead of guessing from the file
 view options:
   --primitives        give each level's primitives, in scene units with y up
   --no-svg            leave out each level's SVG
@@ -145,7 +147,7 @@ See the [roadmap](../../docs/roadmap.md) for planned work.
 
 `rnl check top.sp --path ./models --path ./packages` searches both packages and bare include filenames. `--package-dir DIR` remains package-only. Both options participate in package directory order as written on the command line; only `--path` participates in include fallback. These options work for checks, rendering, views, previews and solving.
 
-Includes are first resolved relative to the file containing the include. Only a filename without directory components falls back to `--path`, in order, with a hint naming the file used; explicit relative and absolute paths keep their previous meaning. Within each package directory, try `<name>.rnl`, then `<version>/<name>.rnl`, then scan the other `.rnl` files. Package names and versions always come from the `PACKAGE` header, and a conventional filename with a mismatching header warns. Filenames need not match package names. Version selection follows 16.2 and copies of the same version use the first directory. User directories precede bundled packages, including user replacements of `rnl-std` (16.3). The include fallback and filename preference are tool behavior, not changes to the language standard.
+Includes are first resolved relative to the file containing the include. Only a filename without directory components falls back to `--path`, in order, with a hint naming the file used; explicit relative and absolute paths keep their previous meaning. Within each package directory, try `<name>.rnl`, then `<version>/<name>.rnl`, then scan the other `.rnl` files. Package names and versions always come from the `PACKAGE` header, and a conventional filename with a mismatching header warns. Filenames need not match package names, but a package directory, and `--path` as one, is searched for its `.rnl` files only: a package file of another suffix is found by name when `--format PATH=rnl` sets it, before the package directories, and a `.rnl` file set to another format is no package. A package file is of the format `rnl` (`rnl formats`), which a `.rnl` file has, and a file of another suffix whose first record starts a line, as no netlist's can, and is a header record with PACKAGE: `rnl check acme.pkg` checks it on its own as `rnl check acme.rnl` does, and a file set to `rnl` whose header has no PACKAGE is an error (16.2). A netlist that includes a package file does not read it: the include is an error, as a package file is not loaded with `.include` (2.7). Version selection follows 16.2 and copies of the same version use the first directory. User directories precede bundled packages, including user replacements of `rnl-std` (16.3). The include fallback and filename preference are tool behavior, not changes to the language standard.
 
 
 `rnl solve FILE -o DIR --profile OUT.json` writes optional timing observations separately

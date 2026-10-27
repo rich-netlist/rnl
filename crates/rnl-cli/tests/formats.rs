@@ -52,6 +52,7 @@ fn the_formats_are_listed_spice_first() {
     let want = [
         FormatInfo { name: "spice".into(), title: "SPICE".into(), extensions: vec![], fallback: true },
         FormatInfo { name: "spectre".into(), title: "Spectre".into(), extensions: vec!["scs".into()], fallback: false },
+        FormatInfo { name: "rnl".into(), title: "RNL package".into(), extensions: vec!["rnl".into()], fallback: false },
         FormatInfo {
             name: "text".into(),
             title: "Text".into(),
@@ -321,7 +322,7 @@ fn an_unknown_format_fails_the_build_and_a_file_not_read_is_left_alone() {
     let files = MemoryProvider::new().with("/w/top.sp", TOP).with("/w/cells.scs", CELLS);
     let options = BuildOptions { formats: set(&[("/w/cells.scs", "verilog")]), ..BuildOptions::default() };
     let err = rnl_view::build("/w/top.sp", &files, &options).unwrap_err();
-    assert_eq!(err, "unknown format \"verilog\" for /w/cells.scs; the formats are spice, spectre, text");
+    assert_eq!(err, "unknown format \"verilog\" for /w/cells.scs; the formats are spice, spectre, rnl, text");
     let d = build("/w/top.sp", &files, &[("/w/elsewhere.inc", "spectre"), ("/w/./sub/../cells.scs", "spice")]);
     assert_eq!(formats_of(&d)[1].1, Some("spice"));
 }
@@ -433,7 +434,7 @@ fn the_command_line_sets_formats_and_lists_them() {
     let (code, _, err) = rnl(&["check", &top, "--format", &format!("{cells}=verilog")]);
     assert_eq!(
         (code, err.trim()),
-        (2, format!("rnl: unknown format \"verilog\" for {cells}; the formats are spice, spectre, text").as_str())
+        (2, format!("rnl: unknown format \"verilog\" for {cells}; the formats are spice, spectre, rnl, text").as_str())
     );
     // a path the netlist does not read sets nothing, and is warned of, by its path made absolute
     // as FILE is
@@ -572,4 +573,149 @@ fn check_of_a_verilog_a_file_prints_the_hint_and_succeeds() {
     let (code, out, _) = rnl(&["check", &va, "--format", &format!("{va}=spice")]);
     assert_eq!(code, 0, "{out}");
     assert!(out.contains("not in the supported SPICE subset"), "{out}");
+}
+
+/// A package file as 2.7 shows one: its first record, at the start of a line, a header record with
+/// PACKAGE; then a remark and a record.
+const ACME: &str = "@RNL(type=\"header\") { @VERSION(\"0.3\"); @PACKAGE(name=\"acme\", version=\"1.0\")}\n\n\
+                    ACME house style: NMOS symbol and its rule.\n@RNL {\n  $NMOS_ACME = @DEFINE-SYMBOL {\n    $NMOS;\n    \
+                    ? @TEXT(\"${name}\", key=\"name\") => @PLACE(-2.5, 1.5)\n  };\n  \
+                    # @SELECT-INSTANCE(type=\"nmos\") => @SET-SYMBOL $NMOS_ACME\n}\n";
+
+/// A netlist that uses the package `acme` by name.
+const USES_ACME: &str =
+    "* top\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"acme\", version=\"1.0\")}\nR1 a 0 1k\n.end\n";
+
+/// The diagnostics of a Document that are not hints.
+fn loud(d: &Document) -> Vec<(&str, &str, u32, &str)> {
+    said(d).into_iter().filter(|x| x.0 != "hint").collect()
+}
+
+#[test]
+fn a_package_file_is_one_by_its_suffix_or_its_first_record() {
+    assert_eq!(rnl_view::detect_format("/w/acme.rnl", ""), "rnl");
+    assert_eq!(rnl_view::detect_format("/w/ACME.RNL", "* t\nR1 a 0 1k\n"), "rnl");
+    assert_eq!(rnl_view::detect_format("/w/acme.pkg", ACME), "rnl");
+    assert_eq!(rnl_view::detect_format("/w/acme.txt", &format!("ACME's package\n{ACME}")), "rnl");
+    // a netlist's records are in comments; a header without PACKAGE is no package's
+    assert_eq!(rnl_view::detect_format("/w/top.sp", &format!("* top\n* {ACME}")), "spice");
+    assert_eq!(rnl_view::detect_format("/w/top.sp", "@RNL(type=\"header\") { @VERSION(\"0.3\")}\n"), "spice");
+    assert_eq!(rnl_view::detect_format("/w/.rnl", ""), "spice");
+}
+
+#[test]
+fn a_package_file_of_any_suffix_opened_is_checked_on_its_own() {
+    for name in ["acme.rnl", "acme.pkg"] {
+        let path = format!("/w/{name}");
+        let files = MemoryProvider::new().with(&path, ACME);
+        let d = build(&path, &files, &[]);
+        assert_eq!((d.dialect.as_str(), formats_of(&d)), ("rnl", vec![(name, Some("rnl"), Some("rnl"))]));
+        assert!(loud(&d).is_empty(), "{name}: {:?}", loud(&d));
+        // its records, as a package file's: every line a carrier (2.7)
+        assert_eq!(d.files[0].records.len(), 2, "{name}");
+        assert!(d.levels.iter().all(|l| l.unplaced.is_empty()));
+    }
+}
+
+#[test]
+fn a_file_set_to_rnl_is_a_package_and_one_without_package_is_an_error() {
+    // a netlist set to rnl is checked as a package file: its header has no PACKAGE (16.2)
+    let net = "* t\nR1 a 0 1k\n.end\n";
+    let files = MemoryProvider::new().with("/w/top.sp", net).with("/w/top.rnl", net);
+    let d = build("/w/top.sp", &files, &[("/w/top.sp", "rnl")]);
+    assert_eq!((d.dialect.as_str(), formats_of(&d)), ("rnl", vec![("top.sp", Some("rnl"), Some("spice"))]));
+    assert_eq!(
+        loud(&d),
+        [("error", "top.sp", 1, "top.sp has no header record with @PACKAGE and is not a package (2.7, 16.2)")]
+    );
+    // so is a `.rnl` file by default; set to SPICE, it is read as a netlist, as the user chose
+    let d = build("/w/top.rnl", &files, &[]);
+    assert_eq!((d.dialect.as_str(), errors(&d).len()), ("rnl", 1));
+    let d = build("/w/top.rnl", &files, &[("/w/top.rnl", "spice")]);
+    assert_eq!((d.dialect.as_str(), formats_of(&d)), ("spice", vec![("top.rnl", Some("spice"), Some("rnl"))]));
+    assert!(loud(&d).is_empty(), "{:?}", loud(&d));
+    assert_eq!(d.objects.iter().filter(|o| o.kind == "instance").map(|o| o.name.as_str()).collect::<Vec<_>>(), ["R1"]);
+    // and the dialect of the opened file
+    let options = BuildOptions { dialect: Some("rnl".into()), ..BuildOptions::default() };
+    let d = rnl_view::build("/w/top.sp", &files, &options).unwrap();
+    assert_eq!((d.dialect.as_str(), errors(&d).len()), ("rnl", 1));
+    assert_eq!(rnl_view::entry_format("/w/top.sp", Some("rnl"), &set(&[]), &files), Ok("rnl"));
+    assert_eq!(rnl_view::entry_format("/w/top.rnl", None, &set(&[("/w/top.rnl", "spice")]), &files), Ok("spice"));
+}
+
+#[test]
+fn a_package_set_to_rnl_is_found_by_name_whatever_its_suffix() {
+    let not_found = |d: &Document| errors(d).iter().any(|e| e.contains("acme"));
+    // a package directory is searched for its `.rnl` files only
+    let mut files = MemoryProvider::new().with("/w/top.sp", USES_ACME).with("/pk/acme.pkg", ACME);
+    files.package_dirs.push("/pk".into());
+    let d = build("/w/top.sp", &files, &[]);
+    assert!(not_found(&d), "{:?}", said(&d));
+    // set to rnl, it is found, before the package directories
+    let d = build("/w/top.sp", &files, &[("/pk/acme.pkg", "rnl")]);
+    assert!(loud(&d).is_empty(), "{:?}", loud(&d));
+    // a file of the Library, too, wherever it is
+    let paths = ["/lib/acme.pkg".to_string()];
+    let lib = MemoryProvider::new().with("/w/top.sp", USES_ACME).with("/lib/acme.pkg", ACME);
+    let pool = FilePool { files: &lib, paths: &paths };
+    assert!(not_found(&build("/w/top.sp", &pool, &[])));
+    assert!(loud(&build("/w/top.sp", &pool, &[("/lib/acme.pkg", "rnl")])).is_empty());
+    // a `.rnl` file set to another format is no package
+    let mut files = MemoryProvider::new().with("/w/top.sp", USES_ACME).with("/pk/acme.rnl", ACME);
+    files.package_dirs.push("/pk".into());
+    assert!(loud(&build("/w/top.sp", &files, &[])).is_empty());
+    assert!(not_found(&build("/w/top.sp", &files, &[("/pk/acme.rnl", "spice")])));
+}
+
+#[test]
+fn a_package_file_that_a_netlist_includes_is_not_read_and_the_include_is_an_error() {
+    // a package file is not loaded with `.include` (2.7): SPICE's `.include` and Spectre's `include`
+    // keep it as text; by its suffix, or by its first record
+    for (top, text, name) in [
+        ("/w/top.sp", "* top\n.include \"acme.rnl\"\nR1 a 0 1k\n.end\n", "acme.rnl"),
+        ("/w/top.scs", "// top\ninclude \"acme.pkg\"\nR1 (a 0) resistor r=1k\n", "acme.pkg"),
+    ] {
+        let files = MemoryProvider::new().with(top, text).with(&format!("/w/{name}"), ACME);
+        let d = build(top, &files, &[]);
+        let main = &top[3..];
+        assert_eq!(formats_of(&d)[1], (name, Some("rnl"), Some("rnl")), "{top}");
+        let message =
+            format!("`{name}` is a package file and is not loaded with an include (2.7); USE-PACKAGE finds it (16.2)");
+        assert_eq!(loud(&d), [("error", main, 2, message.as_str())], "{top}");
+        assert!(d.files[1].records.is_empty());
+        assert_eq!(
+            d.objects.iter().filter(|o| o.kind == "instance").map(|o| o.name.as_str()).collect::<Vec<_>>(),
+            ["R1"]
+        );
+        // set for it, it is read with that format
+        let d = build(top, &files, &[(&format!("/w/{name}"), "spice")]);
+        assert_eq!(formats_of(&d)[1], (name, Some("spice"), Some("rnl")));
+        assert!(!errors(&d).iter().any(|e| e.contains("package file")));
+    }
+}
+
+#[test]
+fn check_of_a_package_file_of_any_suffix() {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("rnl-formats-package");
+    std::fs::create_dir_all(&dir).unwrap();
+    let file = |name: &str, text: &str| {
+        std::fs::write(dir.join(name), text).unwrap();
+        rnl_cli::path_str(&dir.join(name))
+    };
+    let (rnl_file, pkg) = (file("acme.rnl", ACME), file("acme.pkg", ACME));
+    let (code, by_suffix, _) = rnl(&["check", &rnl_file]);
+    assert_eq!(code, 0, "{by_suffix}");
+    let (code, out, err) = rnl(&["check", &pkg]);
+    assert_eq!((code, out.as_str(), err.as_str()), (0, by_suffix.replace("acme.rnl", "acme.pkg").as_str(), ""));
+    assert!(out.ends_with("0 errors, 0 warnings, 0 hints\n"), "{out}");
+    // a netlist finds it by name when it is set to rnl, and is not warned of as a file it does not read
+    let top = file("top.sp", USES_ACME);
+    let (code, out, _) = rnl(&["check", &top]);
+    assert_eq!(code, 1, "{out}");
+    let (code, out, err) = rnl(&["check", &top, "--format", &format!("{pkg}=rnl")]);
+    assert_eq!((code, err.as_str()), (0, ""), "{out}");
+    // a netlist set to rnl has no PACKAGE
+    let (code, out, _) = rnl(&["check", &top, "--format", &format!("{top}=rnl")]);
+    assert_eq!(code, 1);
+    assert!(out.contains("top.sp has no header record with @PACKAGE and is not a package (2.7, 16.2)"), "{out}");
 }

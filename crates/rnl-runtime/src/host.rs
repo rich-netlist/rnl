@@ -8,6 +8,7 @@
 //! be of several dialects; names compare by the rules of the file they are written in.
 
 pub mod format;
+pub mod package;
 pub mod text;
 
 use std::collections::{HashMap, HashSet};
@@ -335,6 +336,12 @@ impl HostDocument {
     /// Whether the files of the document are of more than one dialect.
     pub fn mixed(&self) -> bool {
         self.file_dialects.values().any(|d| d.name != self.dialect.name)
+    }
+
+    /// Whether the file `file`, by its name in the document, is a package file (2.7): one read in
+    /// the RNL package format, as a package file checked on its own is ([`crate::check_package`]).
+    pub fn is_package(&self, file: &str) -> bool {
+        self.rules(file).name == package::NAME
     }
 
     /// The format a file was read with, by its name in the document.

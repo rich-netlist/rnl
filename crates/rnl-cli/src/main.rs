@@ -28,24 +28,29 @@ const USAGE: &str = "usage:
   rnl strip-generated FILE -o OUT [options] write FILE without its type=\"generated\" records
   rnl write REQUEST.json -o OUT     write an edit transaction's ops into its netlist
 
-FILE is a SPICE netlist, a Spectre netlist (.scs) or a package file (.rnl); catalog and formats take none.
+FILE is a SPICE netlist, a Spectre netlist (.scs) or a package file (.rnl), which is checked on its
+own; catalog and formats take none. A package file is one of the format rnl: a .rnl file, or a file
+of another suffix whose first record, at the start of a line, is a header record with @PACKAGE.
 A file whose suffix marks a hardware description language (.va, .vams, .v, .vh, .sv, .svh, .vhd,
 .vhdl) is not a netlist: its format is text, and it is not read, unless a format is set for it.
 options:
   --path DIR          search packages and bare include filenames here; repeatable
-  --package-dir DIR   look for packages in DIR as well (16.2); repeatable
+  --package-dir DIR   look for packages in DIR as well (16.2), its .rnl files; repeatable
   --no-std            do not use the standard package at the root (16.3)
   --std-version V     use rnl-std V at the root, whatever the files' language version, such as 0.2
                       to read a file of 0.3 with the series 0.2; a version pinned in a header
                       record still comes first (16.3), and V not found is an error only for the
                       files that do not pin one. rnl solve does not take it
   --no-generated      read the netlist without its type=\"generated\" records, as a solver does (2.8)
-  --dialect NAME      the format of FILE, spice, spectre or text, instead of guessing from it
-  --format PATH=NAME  read the file PATH with the format NAME, spice, spectre or text; repeatable.
+  --dialect NAME      the format of FILE, spice, spectre, rnl or text, instead of guessing from it
+  --format PATH=NAME  read the file PATH with the format NAME, spice, spectre, rnl or text; repeatable.
                       PATH is relative to the current directory or absolute, as FILE may be; one
                       that the netlist does not read is warned of. A file given none is read by its own
                       suffix and first lines, a .scs file or one with simulator lang=spectre as
-                      Spectre, a .va file and the like as text, and FILE by --dialect before them
+                      Spectre, a package file as rnl, a .va file and the like as text, and FILE by
+                      --dialect before them. A file set to rnl is a package that USE-PACKAGE finds
+                      by name, before those of --package-dir, whatever its suffix; FILE set to rnl
+                      is checked as a package file, an error when its header has no @PACKAGE
 view options:
   --primitives        give each level's primitives, in scene units with y up
   --no-svg            leave out each level's SVG
@@ -186,7 +191,7 @@ fn parse_args() -> Result<Args, String> {
             "--no-std" => std = false,
             "--std-version" => std_version = Some(it.next().ok_or("--std-version needs a version, such as 0.2")?),
             "--no-generated" => generated = false,
-            "--dialect" => dialect = Some(it.next().ok_or("--dialect needs spice, spectre or text")?),
+            "--dialect" => dialect = Some(it.next().ok_or("--dialect needs spice, spectre, rnl or text")?),
             "--format" => {
                 let set = it.next().ok_or("--format needs PATH=NAME, such as models.inc=spectre")?;
                 let (path, name) =
@@ -314,9 +319,9 @@ fn format_path(path: &str, file: &std::path::Path) -> String {
     rnl_cli::path_str(&p)
 }
 
-/// Check the `--format`s before a command reads FILE: an unknown format name is an error, a package
-/// file (`.rnl`) included, and each path that FILE's netlist does not read is warned of, as it
-/// sets nothing.
+/// Check the `--format`s before a command reads FILE: an unknown format name is an error, and each
+/// path that FILE's netlist does not read is warned of, as it sets nothing, but for one set to `rnl`,
+/// a package that USE-PACKAGE finds by name. A package file FILE reads no other file.
 fn check_formats(args: &Args, provider: &FsProvider) -> Result<(), String> {
     if args.formats.is_empty() || matches!(args.command.as_str(), "catalog" | "formats" | "write") {
         return Ok(());
@@ -325,8 +330,9 @@ fn check_formats(args: &Args, provider: &FsProvider) -> Result<(), String> {
     if let Some((path, name)) = args.formats.iter().find(|(_, name)| !names.contains(name)) {
         return Err(format!("unknown format \"{name}\" for {path}; the formats are {}", names.join(", ")));
     }
-    let package = args.file.extension().is_some_and(|e| e.eq_ignore_ascii_case("rnl"));
-    let read: Vec<String> = if package {
+    let format =
+        rnl_view::entry_format(&args.file.to_string_lossy(), args.dialect.as_deref(), &args.formats, provider)?;
+    let read: Vec<String> = if format == rnl_runtime::host::package::NAME {
         Vec::new()
     } else {
         let mut sink = Sink::new();
@@ -343,7 +349,7 @@ fn check_formats(args: &Args, provider: &FsProvider) -> Result<(), String> {
             .map(|l| provider.path_key(&rnl_runtime::source::normalize(&l.path)))
             .collect()
     };
-    for (path, name) in &args.formats {
+    for (path, name) in args.formats.iter().filter(|(_, name)| *name != rnl_runtime::host::package::NAME) {
         let key = provider.path_key(&rnl_runtime::source::normalize(path));
         if !read.contains(&key) {
             eprintln!("rnl: warning: --format {path}={name}: {} reads no such file", args.file.display());

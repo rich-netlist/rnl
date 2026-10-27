@@ -412,10 +412,7 @@ impl<'p> Interp<'p> {
     pub fn new_package(path: &str, provider: &'p dyn Provider, options: &Options) -> Interp<'p> {
         let name = crate::host::file_name(path).to_string();
         let main = Level::new(LevelKind::File, &name, &name, path);
-        let doc = HostDocument::new(
-            main,
-            crate::host::Dialect { name: "none".into(), case_sensitive: false, ground_aliases: Vec::new() },
-        );
+        let doc = HostDocument::new(main, crate::host::format::Format::dialect(&crate::host::package::Package));
         let mut it = Interp::blank(doc, provider, options, Sink::new(), NumberRun::default());
         let mut u = Unit::new(UnitKind::Level, &name);
         u.level = Some(0);

@@ -28,7 +28,7 @@ for (const platform of ["desktop", "web"]) {
     expect(await lastFormats(page)).toEqual({});
 
     await include.click();
-    await expect(menu(page).locator(".format-label")).toHaveText(["Automatic (SPICE)", "SPICE", "Spectre", "Text"]);
+    await expect(menu(page).locator(".format-label")).toHaveText(["Automatic (SPICE)", "SPICE", "Spectre", "RNL package", "Text"]);
     await expect(menu(page).getByRole("menuitemradio", { name: "Automatic (SPICE)" })).toHaveAttribute("aria-checked", "true");
     await expect(menu(page).getByRole("menuitemradio", { name: "Automatic (SPICE)" })).toBeFocused();
     await viewer.build(() => menu(page).getByRole("menuitemradio", { name: "Spectre", exact: true }).click());
@@ -66,6 +66,8 @@ test("the format menu follows the keys and closes on Escape or a click elsewhere
   await page.keyboard.press("ArrowUp");
   // from Automatic, Up goes round to the last format
   await expect(menu(page).getByRole("menuitemradio", { name: "Text", exact: true })).toBeFocused();
+  await page.keyboard.press("ArrowUp");
+  await expect(menu(page).getByRole("menuitemradio", { name: "RNL package", exact: true })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(menu(page)).toHaveCount(0);
   await expect(chip).toBeFocused();

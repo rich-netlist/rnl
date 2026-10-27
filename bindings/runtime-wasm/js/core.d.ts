@@ -42,7 +42,7 @@ export interface Request {
   /** Applied overrides, by canonical library path. */
   library_edits?: Record<string, string>;
   /** The format of the entry, instead of guessing it from the entry. */
-  dialect?: "spice" | "spectre" | "text";
+  dialect?: "spice" | "spectre" | "rnl" | "text";
   /**
    * The format set for files, by path as in `files`: only those the user set, each a name of
    * `FormatInfo.name`. A file not among them is read by its own suffix and first lines. An unknown

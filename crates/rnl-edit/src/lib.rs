@@ -90,13 +90,20 @@ pub fn entry(dialect: &str) -> &'static str {
 /// An op that cannot be written refuses the whole request, with the reason.
 pub fn write(request: &WriteRequest) -> Result<String, String> {
     let dialect = request.dialect.as_str();
-    // the format of a file that is not a netlist, such as a Verilog-A model: RNL is not written into it
-    if dialect == rnl_runtime::host::text::NAME {
+    // the formats of the files that are not netlists, a Verilog-A model or a package file (2.7): this
+    // writer does not write into them
+    let (text, package) = (rnl_runtime::host::text::NAME, rnl_runtime::host::package::NAME);
+    if dialect == text {
         return Err(
             "dialect \"text\" is that of a file that is not a netlist; RNL is written only into a netlist".into()
         );
     }
-    let formats: Vec<_> = rnl_view::formats().into_iter().filter(|f| f.name != rnl_runtime::host::text::NAME).collect();
+    if dialect == package {
+        return Err("dialect \"rnl\" is that of a package file (2.7), which is not a netlist; RNL is written \
+                    here only into a netlist"
+            .into());
+    }
+    let formats: Vec<_> = rnl_view::formats().into_iter().filter(|f| f.name != text && f.name != package).collect();
     if !formats.iter().any(|f| f.name == dialect) {
         let names: Vec<&str> = formats.iter().map(|f| f.name.as_str()).collect();
         return Err(format!("dialect \"{dialect}\" is not {}", names.join(" or ")));

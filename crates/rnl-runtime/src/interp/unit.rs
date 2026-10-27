@@ -1803,7 +1803,7 @@ impl Interp<'_> {
         self.read_unit(id);
         if self.units[id].header_record.is_none() || self.units[id].pkg_name.is_empty() {
             self.sink.error(
-                format!("{fname} has no @PACKAGE and is not a package (2.7)"),
+                format!("{fname} has no header record with @PACKAGE and is not a package (2.7, 16.2)"),
                 Some(Loc::line(fname.clone(), 1)),
             );
             self.units[id].ok = false;
