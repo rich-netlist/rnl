@@ -44,7 +44,7 @@ A project, a gallery design and a manifest of links have one manifest format, fo
 
 - **Download Project** (web) and **Save Project** (desktop) write the archive. The desktop's files lose the directory all of them are in, so that includes between them resolve where the project is opened.
 - **Open Project** reads the archive, checks every file against the manifest, and makes the project's pool the Library's files, with the formats and settings it gives; its entry opens at its level. The web keeps the files under `/<name>/` in the page; the desktop asks for a folder to write them in, starting where the archive is, and asks before replacing files there; its Save Project then offers to save to the archive it opened. Opening a project does not change the desktop's PATH.
-- **Display settings.** A manifest may propose display settings, `display`: the view of its `level` (`{ "fit": true }`, or `{ "center": [x, y], "scale": k }` in the drawing's units and pixels per unit), the `background` (`light` or `dark`), `colors` of the colour scheme by their names, whether `usages` and `currents` are shown, and the `grid` (`none`, `dots` or `lines`). `?manifest=`, Load Manifest and Open Project list those it has, each with a box ticked, and apply the ones kept: they hold while a file of the manifest (or of the project) is shown, go back to your own settings for another file and come back, unasked, with a file of it again; they are never written into your settings, and a setting you change meanwhile is yours. The view is set when the manifest is opened. A setting this viewer does not know is told and kept. Download Project, Save Project and Download Manifest ask whether to write the display settings shown into it. Embedded viewers do not apply them.
+- **Display settings.** A manifest may propose display settings, `display`: the view of its `level` (`{ "fit": true }`, or `{ "center": [x, y], "scale": k }` in the drawing's units and pixels per unit), the `background` (`light` or `dark`), `colors` of the colour scheme by their names, whether `usages` and `currents` are shown, and the `grid` (`none`, `dots` or `lines`). `?manifest=`, Load Manifest and Open Project list those it has, each with a box ticked, and apply the ones kept: they hold while a file of the manifest (or of the project) is shown, go back to your own settings for another file and come back, unasked, with a file of it again; they are never written into your settings, and a setting you change meanwhile is yours. The view is set when the manifest is opened. A setting this viewer does not know is told and kept. Download Project, Save Project and Download Manifest ask whether to write the display settings shown into it. Embedded viewers do not apply them: to hide the usage frames or show the current directions of an embedded drawing, use the `usages` and `currents` parameters or messages.
 - A project's archive holds at most 5000 files and 1 GiB, and a file may be larger than a fetched manifest allows. The web opens projects of at most 256 MB, as its WebAssembly core holds a project's texts several times over; a larger one is to be opened in the desktop viewer.
 
 ## Touch and small screens
@@ -149,6 +149,8 @@ or native settings. The ordinary web viewer and desktop viewer keep their usual 
 | `background` | `light`, `dark` | `light` | Drawing background, as in View › Background; also colours the floating controls. |
 | `grid` | `dots`, `lines`, `off` | `off` | Canvas grid. |
 | `names` | `1`, `0` | `1` | Show names on hover. |
+| `usages` | `1`, `0` | `0` | Show the usage frames, as View › Show Usages. An embedded drawing starts without them; an embedding page that was written when they were shown writes `usages=1`. The complete viewer's default is unchanged. |
+| `currents` | `1`, `0` | `1` | Show the current directions, as View › Show Current Directions. `0` starts without them. The complete viewer's default is unchanged. |
 | `origin` | An exact origin, e.g. `https://example.com` | Any origin | Accept messages only from this origin and reply to it. |
 
 Send object messages to the iframe's `contentWindow`, each with `rnl: 1`:
@@ -159,6 +161,8 @@ Send object messages to the iframe's `contentWindow`, each with `rnl: 1`:
 | `level` | `name` | Display that level. |
 | `fit` | None | Fit the drawing to the iframe. |
 | `background` | `value`: `light` or `dark` | Change this page's drawing and floating controls' background without saving a user preference. |
+| `usages` | `value`: `true` or `false` | Show or hide the usage frames of this page, without saving a user preference. |
+| `currents` | `value`: `true` or `false` | Show or hide the current directions of this page, without saving a user preference. |
 
 The iframe sends these messages to `window.parent`, also with `rnl: 1`:
 
@@ -233,7 +237,8 @@ text and metadata. Larger messages return an error naming the actual and maximum
 they are never truncated. Existing calls without the new fields, including the site's Logo
 easter egg, keep their existing behavior.
 
-`ready.features` advertises `requestId` and `packages`, plus `opener` in complete API mode.
+`ready.features` advertises `requestId` and `packages`, plus `opener` in complete API mode and `usages` and `currents` for an embedded
+canvas, which takes the messages of those names; a page can check for them to know that the viewer it embeds does.
 `viewer-api.json` publishes the supported complete-Viewer features and size limit, using the
 same constants as `ready`. Callers can check it to report an old complete Viewer promptly:
 versions predating this API emit no `ready` at all. In a complete Viewer, an incoming `open`
