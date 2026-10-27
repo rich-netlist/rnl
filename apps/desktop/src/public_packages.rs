@@ -2,8 +2,9 @@
 //!
 //! The viewer never downloads a package. A build of the release that bundles them has them as files in
 //! a folder `public-packages`: beside the program (the installers, and the zip of the single executable
-//! with packages, which has the folder beside the executable), among its resources (the macOS and Linux
-//! bundles), or in `/usr/share/rnl-viewer` (a Debian package). Nothing is copied or written: the program
+//! with packages, which has the folder beside the executable), beside the AppImage that is run (the zip
+//! of the AppImage with packages), among its resources (the macOS bundle), or in `/usr/share/rnl-viewer`
+//! (the Debian package of the public packages). Nothing is copied or written: the program
 //! alone, as the plain single executable is, has none. The folder is `<name>/<version>/…` for each
 //! package, whose `<name>` is a directory of the search path that package lookup reads (16.2), a lock
 //! file `public-packages.json`, and the licences. They are searched after the user's own PATH
@@ -33,8 +34,10 @@ fn find(app: &AppHandle) -> Option<PathBuf> {
     }
     let beside = std::env::current_exe().ok().as_deref().and_then(Path::parent).map(|d| d.join(DIR));
     let resources = app.path().resource_dir().ok().map(|d| d.join(DIR));
+    // the AppImage's own executable is inside it, in a mount that goes away: its file is named by APPIMAGE
+    let appimage = std::env::var_os("APPIMAGE").map(PathBuf::from).and_then(|f| f.parent().map(|d| d.join(DIR)));
     let system = PathBuf::from("/usr/share/rnl-viewer").join(DIR);
-    [resources, beside, Some(system)].into_iter().flatten().find(|dir| usable(dir))
+    [resources, beside, appimage, Some(system)].into_iter().flatten().find(|dir| usable(dir))
 }
 
 /// Whether `dir` is a folder of public packages: it has a lock file.

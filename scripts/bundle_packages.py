@@ -5,8 +5,10 @@
           the catalog's SHA-256, with the licence files of the repository, into a directory and a lock
           file beside them, public-packages.json: what the viewer shows as the versions it bundles
   check   a directory against its lock file
-  zip     the zip of the single-file Windows viewer with the packages: the same executable and the
-          directory as `public-packages/` beside it, which is where the viewer looks for them
+  zip     the zip of the single-file Windows viewer, or of the AppImage, with the packages: the same
+          file and the directory as `public-packages/` beside it, which is where the viewer looks
+  deb     the Debian package of the public packages, which puts them in /usr/share/rnl-viewer,
+          where the viewer of its own Debian package looks for them
   wix     the WiX fragment of the MSI that has the directory's files as a feature of its own, "Public
           packages", which the user may leave out (PUBLICPACKAGES=0 on the command line leaves it out too),
           and the Tauri configuration that names the fragment, to give to `tauri build --config`
@@ -127,9 +129,40 @@ def make_zip(exe, directory, out):
         for source, name in entries:
             info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
             info.compress_type = zipfile.ZIP_DEFLATED
-            info.external_attr = 0o644 << 16
+            info.external_attr = (0o100755 if source == exe else 0o100644) << 16
             z.writestr(info, source.read_bytes())
     print(f'Wrote {out}: {exe.name} and {len(entries) - 1} files of {directory} as {top}/public-packages/')
+
+
+def make_deb(directory, version, out):
+    """The Debian package `rnl-viewer-public-packages` of the files of `directory`; it needs dpkg-deb."""
+    import shutil
+    import subprocess
+    import tempfile
+    check(directory)
+    with tempfile.TemporaryDirectory() as tmp:
+        tree = Path(tmp) / 'tree'
+        shutil.copytree(directory, tree / 'usr/share/rnl-viewer/public-packages')
+        (tree / 'DEBIAN').mkdir()
+        size = sum(p.stat().st_size for p in directory.rglob('*') if p.is_file()) // 1024 + 1
+        lines = [
+            'Package: rnl-viewer-public-packages',
+            f'Version: {version}',
+            'Section: electronics',
+            'Priority: optional',
+            'Architecture: all',
+            f'Installed-Size: {size}',
+            'Maintainer: Rich Netlist <noreply@github.com>',
+            'Homepage: https://rich-netlist.github.io/rnl-packages/',
+            'Description: Public packages for RNL Viewer, found without a network',
+            ' The packages of the rnl-packages site, in the versions of this release of RNL Viewer:',
+            ' extensions, symbol and style libraries and PDKs that a netlist uses with @USE-PACKAGE.',
+            ' They are installed in /usr/share/rnl-viewer, where RNL Viewer looks for them. RNL Viewer',
+            ' never downloads packages itself.',
+        ]
+        (tree / 'DEBIAN/control').write_text('\n'.join(lines) + '\n', encoding='utf-8', newline='\n')
+        subprocess.run(['dpkg-deb', '--root-owner-group', '--build', str(tree), str(out)], check=True)
+    print(f'Wrote {out}')
 
 
 def wix(directory, out):
@@ -194,12 +227,18 @@ def main():
     z.add_argument('--exe', type=Path, required=True)
     z.add_argument('--packages', type=Path, required=True)
     z.add_argument('--out', type=Path, required=True)
+    d = sub.add_parser('deb')
+    d.add_argument('--dir', type=Path, required=True)
+    d.add_argument('--version', required=True)
+    d.add_argument('--out', type=Path, required=True)
     w = sub.add_parser('wix')
     w.add_argument('--dir', type=Path, required=True)
     w.add_argument('--out', type=Path, required=True)
     args = ap.parse_args()
     if args.command == 'wix':
         wix(args.dir, args.out)
+    elif args.command == 'deb':
+        make_deb(args.dir, args.version, args.out)
     elif args.command == 'fetch':
         fetch(args.out, args.catalog)
     elif args.command == 'check':
