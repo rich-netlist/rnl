@@ -2,6 +2,7 @@ import { append, m, setAttr } from "./i18n.js";
 // An independent viewport for SVG produced by the RNL renderer. Like the main viewer, pan and
 // zoom change drawing coordinates, never CSS scale; each embedded view owns its input and lifetime.
 import { svgElement } from './util.js';
+import { TOUCH_CLICK_MS, touchGestures } from './touch-gestures.js';
 
 export function svgViewer(container, svg, scale) {
   const extent = svg.getAttribute('viewBox').split(/[\s,]+/).map(Number);
@@ -31,6 +32,10 @@ export function svgViewer(container, svg, scale) {
     view = {x: view.x+x/view.k-x/k, y: view.y+y/view.k-y/k, k};
     paint();
   };
+  // a finger drags the view and two fingers pinch it, as on the drawing (the same code); a double tap fits it
+  const gestures = touchGestures({
+    element: container, view: () => view, setView: (v) => { view = v; paint(); }, min: 0.02, max: 50, onDoubleTap: fit,
+  });
   const observer = new ResizeObserver(() => {
     const w = container.clientWidth, h = container.clientHeight;
     if (!w || !h) return;
@@ -64,19 +69,28 @@ export function svgViewer(container, svg, scale) {
   }, {signal, passive:false});
   container.addEventListener('pointerdown', e => {
     e.stopPropagation();
-    if (e.target.closest('button') || e.button !== 0 || !view) return;
+    if (e.target.closest('button')) return;
+    if (e.pointerType === 'touch') { gestures.down(e); return; }
+    if (e.button !== 0 || !view) return;
     e.preventDefault(); container.focus({preventScroll:true});
     press = {x:e.clientX, y:e.clientY, view:{...view}};
     container.setPointerCapture(e.pointerId); container.classList.add('panning');
   }, {signal});
   container.addEventListener('pointermove', e => {
+    if (e.pointerType === 'touch') { gestures.move(e); return; }
     if (!press) return;
     view = {...press.view, x:press.view.x-(e.clientX-press.x)/press.view.k,
       y:press.view.y-(e.clientY-press.y)/press.view.k}; paint();
   }, {signal});
   const end = () => { press = null; container.classList.remove('panning'); };
-  for (const type of ['pointerup','pointercancel','lostpointercapture','blur']) container.addEventListener(type,end,{signal});
-  container.addEventListener('dblclick', e => { e.stopPropagation(); if (!e.target.closest('button')) fit(); }, {signal});
+  for (const type of ['pointerup','pointercancel','lostpointercapture','blur']) {
+    container.addEventListener(type, e => { if (e.pointerType === 'touch') gestures.up(e, type !== 'pointerup'); else end(); }, {signal});
+  }
+  // a double click the browser makes of two taps is left out: the double tap fitted the view itself
+  container.addEventListener('dblclick', e => {
+    e.stopPropagation();
+    if (!e.target.closest('button') && performance.now() - gestures.touchedAt() >= TOUCH_CLICK_MS) fit();
+  }, {signal});
   container.addEventListener('keydown', e => {
     if (e.ctrlKey || e.metaKey || e.altKey || e.target.closest('button')) return;
     if (['0','f','F'].includes(e.key)) { e.preventDefault(); e.stopPropagation(); fit(); }
