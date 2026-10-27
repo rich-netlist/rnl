@@ -730,6 +730,7 @@ impl Interp<'_> {
             && self.units[u].header_record.is_none()
             && level_kind == Some(LevelKind::File)
             && self.units[u].level == Some(0)
+            && self.doc.dialect.name != crate::host::text::NAME
         {
             // the header record may be left out; tools write it when they save the file (16.1, TR5)
             let file = self.doc.levels[0].file.clone();
