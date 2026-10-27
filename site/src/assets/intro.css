@@ -1605,8 +1605,13 @@ html[lang="zh-CN"] .tour-h1 { font-family: var(--f-body); font-weight: 900; lett
 .rv-note .axis { stroke-width: 1.6; stroke-dasharray: 6 5; }
 .rv-note .head { fill: var(--hl); stroke: none; }
 .rv-note text { fill: var(--hl); stroke: none; font: 600 15px var(--f-mono); }
-.rv-sim { flex: 1; display: grid; place-items: center; min-height: 300px; padding: 20px; background: var(--panel-2); }
-.rv-sim-note { display: flex; gap: 10px; align-items: center; margin: 0; font-size: 14px; color: var(--ink-3); }
+.rv-sim { flex: 1; min-height: 300px; padding: 12px 16px; background: var(--panel); }
+.rv-sim-h { display: flex; gap: 8px; align-items: center; margin: 0 0 6px; font-size: 14px; font-weight: 600; color: var(--ink); }
+.rv-sim-h .ico { color: var(--signal); }
+.rv-sim-m { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 13.5px; color: var(--ink-2); }
+.rv-sim-m b { color: var(--ink); font-weight: 600; }
+.rv-sim-n { margin: 8px 0 0; font-size: 13px; line-height: 1.55; color: var(--ink-3); }
+.rv-sim-n code { font-size: 12px; }
 .rv-fig .jr-cap { min-height: 92px; }
 .code.is-sim .cl.is-rnl { background: none; box-shadow: none; }
 .code.is-sim .cl.is-rnl .tx { opacity: .36; }

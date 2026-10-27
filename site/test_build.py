@@ -215,6 +215,10 @@ class SiteExamples(unittest.TestCase):
         # the core's drawings were made from other files than these: the examples were changed and not drawn again
         errors = build.check_ota(files, dict(ex, **{"ota5t-review.sp": ex["ota5t-review.sp"].replace("W=4u L=0.5u", "W=5u L=0.5u")}))
         self.assertTrue(any("render-examples" in e for e in errors), errors)
+        # the simulation was run on a testbench that is not the example's present text
+        self.assertEqual(build.check_sim(files, ex), [])
+        errors = build.check_sim(files, dict(ex, **{"ota5t-review.sp": ex["ota5t-review.sp"].replace("W=4u L=0.5u", "W=5u L=0.5u")}))
+        self.assertTrue(any("ota5t-review-tb.sp" in e for e in errors), errors)
         errors = build.check_ota(files, dict(ex, **{"ota5t-review-eda.sp": ex["ota5t-review-eda.sp"].replace("W=4u L=0.5u", "W=5u L=0.5u")}))
         self.assertTrue(any("ota5t-review-eda.sp" in e for e in errors), errors)
 

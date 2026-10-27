@@ -12,5 +12,10 @@
   "<b>Intent</b>: two mirrored pairs about one axis. The standard package’s definition puts each pair at one height, mirror images about the axis; a tool that draws from it keeps the symmetry.": "<b>意图</b>：两对器件关于同一条轴镜像。标准包里的定义让每一对等高、关于轴互为镜像；按它来画的工具会保持对称。",
   "<b>Intent</b>: the tail at the bottom, the pair above it, the load on top. A drawing that follows it reads as a schematic usually does.": "<b>意图</b>：尾管在最下，对管在上，负载在最上。按它画出的图，读起来就是常见的原理图样子。",
   "<b>Intent</b>: where the current flows. The tail current runs from the top to the bottom of the circuit.": "<b>意图</b>：电流往哪流。尾电流从电路的上面流到下面。",
-  "A simulator reads the lines that are not dimmed: the netlist. Every RNL line starts with <code>*</code>, so for the simulator it is a comment; nothing has to be stripped before it runs.": "仿真器读的是没有变暗的那些行：网表。每一行 RNL 都以 <code>*</code> 开头，对仿真器来说就是注释，运行前什么都不用去掉。"
+  "A simulator reads the lines that are not dimmed: the netlist. Every RNL line starts with <code>*</code>, so for the simulator it is a comment; nothing has to be stripped before it runs.": "仿真器读的是没有变暗的那些行：网表。每一行 RNL 都以 <code>*</code> 开头，对仿真器来说就是注释，运行前什么都不用去掉。",
+  "AC response from": "交流响应，来自",
+  "Low-frequency gain": "低频增益",
+  "−3 dB at": "−3 dB 点在",
+  "Unity gain at": "单位增益频率",
+  "One volt of differential input and a 1 pF load, simulated from the netlist lines of the file; the RNL lines are comments to the simulator.": "1 V 差分输入、1 pF 负载，由文件里的网表行仿真得到；RNL 行对仿真器来说是注释。"
 }

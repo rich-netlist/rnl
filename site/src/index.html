@@ -159,9 +159,9 @@
       <p class="lead"><en>Rich Netlist (RNL) is not a new netlist format. It is a layer of description written in the comments of existing netlists: which structures the devices form, what the designer intends, and how the drawing should look.</en></p>
     </header>
 
-    <span id="journey"></span><!-- the old address of the example: links to #journey keep working -->
+    <!-- #journey, the old address of the example, is on the lead below: links to it keep working -->
     <h3 class="sub-h" id="example"><en>An example: a five-transistor OTA</en></h3>
-    <p class="sub-lead"><en>This is the kind of file an agent writes with the RNL skill: the netlist with its structures, intent and drawing. A person reviews it by what the agent declared, not by reading the netlist line by line: pick an item of the checklist or a statement of the file.</en></p>
+    <p class="sub-lead" id="journey"><en>This is the kind of file an agent writes with the RNL skill: the netlist with its structures, intent and drawing. A person reviews it by what the agent declared, not by reading the netlist line by line: pick an item of the checklist or a statement of the file.</en></p>
 
     <div class="review" id="review">
       <div class="rv-code panel">
@@ -187,7 +187,7 @@
           </span></span></div>
         <div class="rv-stage" id="rv-stage"></div>
         <div class="rv-sim" id="rv-sim" hidden>
-          <p class="rv-sim-note"><svg class="ico"><use href="#i-wave"/></svg><en>Simulation result: not in this sample yet.</en></p>
+          <div class="rv-simplot" id="rv-simplot"></div>
         </div>
         <p class="jr-cap" id="rv-cap" aria-live="polite"></p>
       </div>
@@ -705,6 +705,7 @@ M5 tail vbias vss vss nch W=4u L=1u
 <script src="assets/rnl-code.js"></script>
 <script src="assets/scenes.js"></script>
 <script src="assets/ota-looks.js"></script>
+<script src="assets/ota-sim.js"></script>
 <script src="assets/ota.js"></script>
 <script src="assets/languages.js"></script>
 <script src="assets/common.js"></script>

@@ -334,7 +334,6 @@
   "Read the file as": "把文件读作",
   "Look of the drawing": "图的样式",
   "Standard look": "标准样式",
-  "Simulation result: not in this sample yet.": "仿真结果：这个样例里还没有。",
   "02 · Problem": "02 · 问题",
   "Drawing a schematic stroke by stroke is hard for language models, and the results vary widely from one model to another.": "一笔一笔画原理图，对语言模型很难，而且不同模型的结果差别很大。",
   "RNL’s approach: no separate file; write the meaning and the drawing into the netlist itself.": "RNL 的做法：不另起文件，把语义和画法写进网表本身。",

@@ -604,7 +604,7 @@ def check_examples(files, ex):
             continue
         if "ota5t_tb.sp" in ex and line not in ex["ota5t_tb.sp"]:
             errors.append("examples/ota5t_tb.sp: missing %r from E2_LINES in src/assets/scenes.js" % line)
-    return errors + check_ota(files, ex)
+    return errors + check_ota(files, ex) + check_sim(files, ex)
 
 
 OTA_FILES = {"bare": "ota5t-review-bare.sp", "en": "ota5t-review.sp", "zh": "ota5t-review-zh.sp", "eda": "ota5t-review-eda.sp"}
@@ -664,6 +664,27 @@ def check_ota(files, ex):
         want = hashlib.sha256(ex[name].encode("utf-8")).hexdigest()
         if not m or m.group(1) != name or not want.startswith(m.group(2)):
             errors.append("src/assets/ota-looks.js: the %s look is not drawn from the present examples/%s; run node site/render-examples.mjs" % (look, name))
+    return errors
+
+
+SIM = HERE / "sim" / "ota5t-review-tb.sp"
+
+
+def check_sim(files, ex):
+    """The simulation beside the example: site/sim/ota5t-review-tb.sp is the example file with a testbench, and the
+    result in src/assets/ota-sim.js (a Spectre run, site/sim/make-result.py; Spectre is not in CI) is that of the present
+    testbench."""
+    result = files.get("assets/ota-sim.js", "")
+    if not SIM.is_file() or "ota5t-review.sp" not in ex or not result:
+        return []
+    errors = []
+    tb = SIM.read_text(encoding="utf-8").replace("\r\n", "\n")
+    lines = ex["ota5t-review.sp"].split("\n")
+    if lines[-2:] != [".end", ""] or not tb.startswith("\n".join(lines[:-2]) + "\n"):
+        errors.append("site/sim/ota5t-review-tb.sp: does not start with the lines of examples/ota5t-review.sp (without .end)")
+    m = re.search(r'"sha256":"([0-9a-f]+)"', result)
+    if not m or not hashlib.sha256(tb.encode("utf-8")).hexdigest().startswith(m.group(1)):
+        errors.append("src/assets/ota-sim.js: not the result of the present site/sim/ota5t-review-tb.sp; run the testbench and site/sim/make-result.py")
     return errors
 
 

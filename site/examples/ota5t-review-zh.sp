@@ -1,6 +1,6 @@
 * Five-transistor OTA
-.model nch nmos level=1 vto=0.5
-.model pch pmos level=1 vto=-0.5
+.model nch nmos level=1 vto=0.5 kp=100u lambda=0.05
+.model pch pmos level=1 vto=-0.5 kp=100u lambda=0.05
 * @RNL(type="header") { @VERSION("0.3"); @USE-ALIASES(name="rnl-zh", version="0.3")}
 .subckt ota5t inp inn out vdd vss vbias
 M1 x    inp   tail vss nch W=2u L=0.5u

@@ -64,8 +64,8 @@
     function st(id, r) { add(id, '*   ' + (k === 2 ? TZ[id] : T[id][k]), r); }
     function dev(id, t) { add(id.toLowerCase(), t, id, { dev: id }); }
     add('h0', '* Five-transistor OTA');
-    add('h1', '.model nch nmos level=1 vto=0.5');
-    add('h2', '.model pch pmos level=1 vto=-0.5');
+    add('h1', '.model nch nmos level=1 vto=0.5 kp=100u lambda=0.05');
+    add('h2', '.model pch pmos level=1 vto=-0.5 kp=100u lambda=0.05');
     add('h3', '* @RNL(type="header") { @VERSION("0.3")' + (k === 2 ? '; @USE-ALIASES(name="rnl-zh", version="0.3")' : '') + (look === 'eda' ? PACKAGES : '') + '}', '', look === 'eda' ? { cls: 'is-diff' } : null);
     add('h4', '.subckt ota5t inp inn out vdd vss vbias', 'PI PN PO PB');
     dev('M1', 'M1 x    inp   tail vss nch W=2u L=0.5u');
@@ -153,6 +153,53 @@
     ord: arrow(0, 40, 0, -290) + label(10, -296, '@ORDER', 'start'),
     cur: arrow(266, -56, 266, -36) + label(258, -42, 'I', 'end')
   };
+
+  /* The simulator's answer: the AC response of the testbench from the Spectre run (ota-sim.js, site/sim/make-result.py) */
+  function fmtHz(f) {
+    var u = f >= 1e9 ? [1e9, ' GHz'] : f >= 1e6 ? [1e6, ' MHz'] : f >= 1e3 ? [1e3, ' kHz'] : [1, ' Hz'];
+    var v = f / u[0];
+    return (v >= 100 ? v.toFixed(0) : v.toPrecision(2)).replace(/\.0$/, '') + u[1];
+  }
+  function drawSim(el) {
+    var R = global.RNLOtaSim;
+    if (!el || !R) return;
+    var W = 520, H = 372, L = 46, Rr = 10, lx0 = Math.log10(R.freq[0]), lx1 = Math.log10(R.freq[R.freq.length - 1]);
+    function X(f) { return L + (Math.log10(f) - lx0) / (lx1 - lx0) * (W - L - Rr); }
+    var panels = [
+      { y0: 22, y1: 170, lo: -60, hi: 50, ticks: [-60, -40, -20, 0, 20, 40], data: R.gain_db, unit: 'dB' },
+      { y0: 214, y1: 330, lo: -135, hi: 0, ticks: [-135, -90, -45, 0], data: R.phase_deg, unit: '°' }
+    ];
+    var s = '<svg class="bode" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="AC response from Spectre: gain and phase of the OTA">';
+    var d, i;
+    panels.forEach(function (p) {
+      function Y(v) { return p.y1 - (v - p.lo) / (p.hi - p.lo) * (p.y1 - p.y0); }
+      for (d = Math.ceil(lx0); d <= lx1; d++) {
+        var x = X(Math.pow(10, d));
+        s += '<line class="bd-grid" x1="' + x + '" x2="' + x + '" y1="' + p.y0 + '" y2="' + p.y1 + '"/>';
+      }
+      p.ticks.forEach(function (v) {
+        s += '<line class="bd-grid" x1="' + L + '" x2="' + (W - Rr) + '" y1="' + Y(v) + '" y2="' + Y(v) + '"/>' +
+          '<text class="bd-t" x="' + (L - 6) + '" y="' + (Y(v) + 3.5) + '" text-anchor="end">' + v + '</text>';
+      });
+      s += '<text class="bd-t" x="' + (L - 6) + '" y="' + (p.y0 - 8) + '" text-anchor="end">' + p.unit + '</text>';
+      var pts = R.freq.map(function (f, k) { return X(f).toFixed(1) + ' ' + Math.max(p.y0, Math.min(p.y1, Y(p.data[k]))).toFixed(1); });
+      s += '<path class="bd-curve" d="M' + pts.join(' L') + '"/>';
+    });
+    [0, 2, 4, 6, 8, 10].forEach(function (e) {
+      if (e < lx0 || e > lx1) return;
+      var lab = e === 0 ? '1' : e === 2 ? '100' : e === 4 ? '10k' : e === 6 ? '1M' : e === 8 ? '100M' : '10G';
+      s += '<text class="bd-t" x="' + X(Math.pow(10, e)) + '" y="' + (panels[1].y1 + 15) + '" text-anchor="middle">' + lab + '</text>';
+    });
+    s += '<text class="bd-t" x="' + (W - Rr) + '" y="' + (H - 4) + '" text-anchor="end">Hz</text></svg>';
+    var dc = R.gain_db[0], f3 = 0, f0 = 0;
+    for (i = 0; i < R.freq.length; i++) {
+      if (!f3 && R.gain_db[i] <= dc - 3) f3 = R.freq[i];
+      if (!f0 && R.gain_db[i] <= 0) f0 = R.freq[i];
+    }
+    el.innerHTML = '<p class="rv-sim-h"><svg class="ico"><use href="#i-wave"/></svg><span><en>AC response from</en> ' + R.simulator + ' ' + R.version.replace(/^(\d+\.\d+\.\d+).*/, '$1') + '</span></p>' + s +
+      '<ul class="rv-sim-m"><li><en>Low-frequency gain</en> <b>' + dc.toFixed(1) + ' dB</b></li><li><en>−3 dB at</en> <b>' + fmtHz(f3) + '</b></li><li><en>Unity gain at</en> <b>' + fmtHz(f0) + '</b></li></ul>' +
+      '<p class="rv-sim-n"><en>One volt of differential input and a 1 pF load, simulated from the netlist lines of the file; the RNL lines are comments to the simulator.</en> <code>' + R.analysis + '</code></p>';
+  }
 
   function init() {
     var PG = global.RNLPage, LOOKS = global.RNLOtaLooks;
@@ -315,6 +362,7 @@
     }
     if (viewSeg) PG.initSeg(viewSeg, 'data-view', setView);
 
+    drawSim(document.getElementById('rv-simplot'));
     draw();
     renderCode();
     clear();
