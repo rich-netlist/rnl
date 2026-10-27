@@ -3,7 +3,9 @@
 import { hostLine, mark, rnlRange } from "./syntax.js";
 import { m, setAttr, tr } from "./i18n.js";
 
-export function lineModel(file, f, allSpans, dialect) {
+/** The lines of `file`, number `f` of the document; with `plain` as text with no reading of it as a netlist. */
+export function lineModel(file, f, allSpans, dialect, plain = false) {
+  if (plain) file = { ...file, records: [], failed: [], semantics: [], includes: [] };
   const texts = file.text.split(/\r?\n/);
   if (texts.length > 1 && texts.at(-1) === "") texts.pop();
   const starts = new Map();
@@ -34,6 +36,7 @@ export function lineModel(file, f, allSpans, dialect) {
   }
   function syntax(i, flags, stack = "") {
     const text = texts[i], cls = new Array(text.length).fill("");
+    if (plain) return { cls, flags: 0, stack: "" };
     const state = { comment: !!(flags & 2), stack };
     let joined = false;
     if (i === 0 && f === 0 && dialect === "spice") mark(cls, 0, text.length, "comment");
