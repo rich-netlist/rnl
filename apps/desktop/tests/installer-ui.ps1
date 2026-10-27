@@ -32,6 +32,7 @@ public static class InstallerUi {
   [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc p, IntPtr l);
   [DllImport("user32.dll")] static extern bool EnumChildWindows(IntPtr parent, EnumProc p, IntPtr l);
   [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr SendMessageTimeout(IntPtr h, int msg, IntPtr w, StringBuilder l, uint flags, uint timeout, out IntPtr result);
+  [DllImport("user32.dll", EntryPoint = "SendMessageTimeoutW")] static extern IntPtr SendMessageTimeoutLong(IntPtr h, int msg, IntPtr w, IntPtr l, uint flags, uint timeout, out IntPtr result);
   [DllImport("user32.dll")] static extern bool PostMessage(IntPtr h, int msg, IntPtr w, IntPtr l);
   [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
   [DllImport("user32.dll")] static extern bool IsWindowEnabled(IntPtr h);
@@ -81,6 +82,18 @@ public static class InstallerUi {
       bmp.Save(path, ImageFormat.Png);
     }
   }
+  /// Check the check box whose text, without its &, is `name`, unless it is checked (clicking again would clear it).
+  public static void Check(IntPtr top, string name) {
+    EnumChildWindows(top, (h, l) => {
+      if (IsWindowVisible(h) && string.Equals(Text(h).Replace("&", "").Trim(), name, StringComparison.OrdinalIgnoreCase)) {
+        IntPtr state;
+        if (SendMessageTimeoutLong(h, 0x00F0, IntPtr.Zero, IntPtr.Zero, 2, 500, out state) != IntPtr.Zero && state == IntPtr.Zero) // BM_GETCHECK
+          PostMessage(h, 0x00F5, IntPtr.Zero, IntPtr.Zero);
+        return false;
+      }
+      return true;
+    }, IntPtr.Zero);
+  }
   public static void Shot(IntPtr top, string path) {
     SetForegroundWindow(top);
     RECT r; GetWindowRect(top, out r);
@@ -125,7 +138,7 @@ function Shoot-Page($process, $page, $file, [string[]]$forward) {
       # a license page's check box comes before its Next
       foreach ($agree in @("I accept the terms in the License Agreement", "I accept the terms")) {
         $box = $texts | Where-Object { $_.Replace("&", "") -like "*$agree*" }
-        if ($box) { [InstallerUi]::Press($w, $box.Replace("&", "")) | Out-Null }
+        if ($box) { [InstallerUi]::Check($w, $box.Replace("&", "")) }
       }
       foreach ($name in $forward) { if ([InstallerUi]::Press($w, $name)) { break } }
     }
