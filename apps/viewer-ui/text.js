@@ -8,6 +8,8 @@ import { current, doc, selected } from "./state.js";
 import { clearEditors, editing, refreshEditing, renderEditors, revealInEditor, showEditor } from "./editor.js";
 import { clearSelection, select } from "./selection.js";
 import { descend, opens } from "./subcircuits.js";
+import { isPlainText } from "./formats.js";
+import { sourcePath } from "./source-path.js";
 import { lineModel } from "./text-lines.js";
 import { LineWindow } from "./line-window.js";
 import { TextFind } from "./text-find.js";
@@ -26,6 +28,7 @@ export let fileViews = []; // per file: a LineWindow with text data, rendered ro
 let lineOwners = []; // per file: line number -> the instance whose statement it is
 let pendingReveal = null; // a line to bring into view once the text pane is shown
 let scope = null; // the definition of the subcircuit drawn: { f, from, to }, its file and lines
+let plainFiles = []; // per file: whether it is shown as plain text, being no netlist
 let notDrawn = []; // per file: line number -> why its statement is not drawn
 const find = new TextFind(() => fileViews[fileShown], n => revealLine(fileShown, n, false));
 
@@ -148,15 +151,17 @@ export function renderFiles(shown = 0) {
     for (let n = a; n <= b; n++) lineOwners[f].set(n, k);
   });
   fileName.hidden = !doc.files.length;
+  // a file that is no netlist is plain text: none of the reading of it as one is shown in it
+  plainFiles = doc.files.map((file) => isPlainText(sourcePath(doc, file)));
   const spans = doc.files.map(() => []), folds = doc.files.map(() => []);
-  for (const span of doc.spans) spans[span.file]?.push(span);
+  for (const span of doc.spans) if (!plainFiles[span.file]) spans[span.file]?.push(span);
   for (const level of doc.levels) if (level.lines) {
     const [f, from, to] = level.lines;
-    folds[f]?.push([from, to]);
+    if (!plainFiles[f]) folds[f]?.push([from, to]);
   }
   doc.files.forEach((file, f) => {
     const dialect = doc.dialect;
-    const view = new LineWindow(source, () => lineModel(file, f, spans[f], dialect), (el, n) => decorateLine(f, n, el), folds[f]);
+    const view = new LineWindow(source, () => lineModel(file, f, spans[f], dialect, plainFiles[f]), (el, n) => decorateLine(f, n, el), folds[f]);
     Object.assign(view, sourceFilters());
     fileViews.push(view);
     append(source, view.el);
@@ -249,6 +254,7 @@ export function markUnplaced(i) {
       const lines = doc.objects[o].lines;
       if (!lines) continue;
       const [f, from, to] = lines;
+      if (plainFiles[f]) continue;
       for (let n = from; n <= to; n++) notDrawn[f]?.set(n, u.reason ? m`Not drawn: ${u.reason}` : m("Not drawn: it has no position yet"));
     }
   }

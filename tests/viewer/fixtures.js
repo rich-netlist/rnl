@@ -21,6 +21,8 @@ export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "
 export const FILES = {
   "15-chinese": "tests/conformance/cases/15-chinese.sp",
   "usage-current": "tests/viewer/inputs/usage-current.sp",
+  "verilog-a": "tests/viewer/inputs/resistor.va",
+  "verilog": "tests/viewer/inputs/inverter.v",
   "wire-labels": "tests/viewer/inputs/wire-labels.sp",
   "usage-inspector": "tests/viewer/inputs/usage-inspector.sp",
   "usage-anonymous": "tests/viewer/inputs/usage-anonymous.sp",

@@ -1,0 +1,12 @@
+// A resistor in Verilog-A
+`include "disciplines.vams"
+`include "constants.vams"
+
+module resistor(p, n);
+  inout p, n;
+  electrical p, n;
+  parameter real r = 1k from (0:inf);
+  analog begin
+    V(p, n) <+ r * I(p, n);
+  end
+endmodule
