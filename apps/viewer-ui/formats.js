@@ -3,6 +3,7 @@
 // for the files without a choice the core's own default (SourceFile.default_format). The formats
 // themselves are the core's list (Document.formats), which the page never writes out itself.
 import { shell } from "./shell.js";
+import { sourcePath } from "./source-path.js";
 import { load, save } from "./util.js";
 
 const KEY = "file-formats";
@@ -33,7 +34,8 @@ export const formatInfo = (name) => list.find((f) => f.name === name);
 // spice, which reads any file it is not told otherwise, and spectre, so that its format does not say that
 // a file is none; its suffix does. A list of these, not of netlists, so that a netlist with any other suffix
 // (.txt, .sub, .cdl) is still shown as one.
-const NOT_NETLISTS = new Set(["va", "vams", "v", "vh", "sv", "svh", "vhd", "vhdl"]);
+// Kept in one place, to be replaced by the core's own verdict on a file when it gives one.
+export const NOT_NETLIST_SUFFIXES = new Set(["va", "vams", "v", "vh", "sv", "svh", "vhd", "vhdl"]);
 
 /**
  * Whether the file at `path` is shown as plain text: it has the suffix of a file that is no netlist,
@@ -45,8 +47,11 @@ export function isPlainText(path, url = null) {
   if (chosenFormat(path, url) !== undefined) return false;
   const name = path.split(/[\\/]/).pop();
   const dot = name.lastIndexOf(".");
-  return dot > 0 && NOT_NETLISTS.has(name.slice(dot + 1).toLowerCase());
+  return dot > 0 && NOT_NETLIST_SUFFIXES.has(name.slice(dot + 1).toLowerCase());
 }
+
+/** Whether `file`, a file of the Document `doc`, is shown as plain text (`isPlainText`). */
+export const isPlainFile = (doc, file) => isPlainText(sourcePath(doc, file));
 
 /**
  * The user's choice for the file at `path`, or undefined when it reads by default; `url`, the file's

@@ -8,8 +8,7 @@ import { current, doc, selected } from "./state.js";
 import { clearEditors, editing, refreshEditing, renderEditors, revealInEditor, showEditor } from "./editor.js";
 import { clearSelection, select } from "./selection.js";
 import { descend, opens } from "./subcircuits.js";
-import { isPlainText } from "./formats.js";
-import { sourcePath } from "./source-path.js";
+import { isPlainFile } from "./formats.js";
 import { lineModel } from "./text-lines.js";
 import { LineWindow } from "./line-window.js";
 import { TextFind } from "./text-find.js";
@@ -152,7 +151,7 @@ export function renderFiles(shown = 0) {
   });
   fileName.hidden = !doc.files.length;
   // a file that is no netlist is plain text: none of the reading of it as one is shown in it
-  plainFiles = doc.files.map((file) => isPlainText(sourcePath(doc, file)));
+  plainFiles = doc.files.map((file) => isPlainFile(doc, file));
   const spans = doc.files.map(() => []), folds = doc.files.map(() => []);
   for (const span of doc.spans) if (!plainFiles[span.file]) spans[span.file]?.push(span);
   for (const level of doc.levels) if (level.lines) {

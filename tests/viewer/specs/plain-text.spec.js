@@ -4,6 +4,9 @@
 // shown as before; a file the user chose a parse format for in the Library is read as a netlist again.
 
 import { expect, test } from "../viewer.js";
+import { repository, translated, uiLanguages, zh } from "../zh.js";
+
+const NOTICE = "This file is not a netlist. It is shown as text.";
 
 /** What the text pane of the file shown marks as a netlist: highlighted pieces, objects' places, undrawn lines. */
 function reading(page) {
@@ -31,14 +34,27 @@ for (const [fixture, name] of [["verilog-a", "resistor.va"], ["verilog", "invert
     // the core's reading is told where it is told: in the problems, which the lines still mark
     expect(await page.evaluate(() => window.viewer.doc.diagnostics.length)).toBeGreaterThan(0);
     await expect(page.locator("#problems")).toContainText("SPICE subset");
+    // the drawing area says so, instead of that nothing has a position
+    await expect(page.locator("#empty")).toHaveText(NOTICE);
   });
 }
+
+test("the notice of the drawing area is in every language of the interface, and follows the language", async ({ page, viewer }) => {
+  for (const { lang } of uiLanguages(repository)) if (lang !== "en") expect(translated(lang, NOTICE), lang).not.toBe("");
+  await viewer.open("verilog-a");
+  await page.evaluate(() => window.viewer.command("language-zh"));
+  await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
+  // the language is kept for the next start
+  await viewer.open("verilog-a");
+  await expect(page.locator("#empty")).toHaveText(zh(NOTICE));
+});
 
 test("a netlist is highlighted as before", async ({ page, viewer }) => {
   await viewer.open("04-hierarchy");
   const shown = await reading(page);
   expect(shown.highlighted).toBeGreaterThan(10);
   expect(shown.places).toBeGreaterThan(0);
+  await expect(page.locator("#empty")).toBeHidden();
 });
 
 test("a file with a parse format chosen for it in the Library is read as a netlist", async ({ page, viewer }) => {
