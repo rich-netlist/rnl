@@ -118,6 +118,18 @@ class Inline(Repository):
         self.assertEqual(s["pages"].langs["zh"].done, 1)
         self.assertEqual(s["pages"].langs["ja"].done, 1)  # null is not yet translated; the key's spaces are folded
 
+    def test_a_group_the_pages_of_a_language_leave_out_needs_no_translation(self):
+        self.surfaces(self.SURFACE)
+        self.write("site/src/index.html", "<p><!--zh--><en>Three ways</en><!--/zh--><!--not-zh--><en>Two ways</en><!--/not-zh--></p>\n")
+        self.write("i18n/zh/site/index.html.json", json.dumps({"Three ways": "三种写法"}))
+        self.write("i18n/ja/site/index.html.json", json.dumps({"Two ways": "2つの書き方", "Three ways": "3つの書き方"}))
+        _, s = self.survey()
+        self.assertEqual(s["pages"].total, 2)
+        self.assertEqual((s["pages"].langs["zh"].done, s["pages"].langs["ja"].done), (2, 2))
+        self.assertEqual([f.state for f in s["pages"].langs["zh"].findings], [])
+        # a translation of what the language's pages leave out is not used
+        self.assertEqual([f.state for f in s["pages"].langs["ja"].findings], ["unused"])
+
     def test_markup_errors_and_new_placeholders(self):
         self.surfaces(self.SURFACE)
         self.write("site/src/index.html", "<p><zh>交叉 {n} 处 {m}</zh><en>{n} crossings</en></p>\n<p><zh>x</zh></p>\n")

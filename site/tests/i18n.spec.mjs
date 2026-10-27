@@ -178,3 +178,50 @@ test('unsupported browser languages fall back to English, including with blocked
   await page.goto('/?review=1#status');
   await expect(page).toHaveURL(/\/en\/\?review=1#status$/);
 });
+
+// RNL written with the Chinese alias package is shown on the pages of Simplified Chinese only: the other
+// languages' pages have no Chinese writing style, no Chinese example and no Chinese sample.
+const chinese = registry.languages.find(entry => (entry.html_lang || entry.code) === 'zh-CN').code;
+const han = /[\u3400-\u9fff\uf900-\ufaff]/;
+for (const language of registry.languages.filter(entry => entry.code === registry.default || entry.status === 'published').map(entry => entry.code)) {
+  const examples = language === chinese;
+  test(`Chinese examples are ${examples ? '' : 'not '}on the ${language} pages`, async ({ page }) => {
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    // content marked as Chinese, apart from the language menu's name of the language
+    const marked = page.locator('body [lang="zh-CN"]:not([data-lang-link])');
+    // the code a writing style shows has Chinese only in the Chinese style
+    async function styles(seg, code) {
+      const buttons = page.locator(`${seg} button`);
+      await expect(page.locator(`${seg} [data-style="zh"]`)).toHaveCount(examples ? 1 : 0);
+      for (let i = 0; i < await buttons.count(); i++) {
+        await buttons.nth(i).click();
+        const zh = await buttons.nth(i).getAttribute('data-style') === 'zh';
+        expect(han.test(await page.locator(code).textContent()), `${seg} ${i}`).toBe(zh);
+      }
+    }
+
+    await page.goto(`/${language}/index.html`);
+    expect(await marked.count() > 0).toBe(examples);
+    await styles('#jr-style', '#jr-code');
+
+    await page.goto(`/${language}/language.html`);
+    expect(await marked.count() > 0).toBe(examples);
+    await expect(page.locator('.ways .way')).toHaveCount(examples ? 3 : 2);
+    expect(han.test((await page.locator('.ways code').allTextContents()).join(' '))).toBe(examples);
+    await styles('#lab-style', '#lab-line');
+    await styles('#file-style', '#file-code');
+    for (const keyword of ['@AS', '@ALIAS']) {
+      await page.locator('#fams .kw', { hasText: new RegExp(`^${keyword}$`) }).click();
+      await expect(page.locator('#kw-card h4')).toHaveText(keyword);
+      expect(await page.locator('#kw-card [lang="zh-CN"]').count() > 0).toBe(examples && keyword === '@AS');
+      // that a header keyword has no alias is said only where the others show theirs
+      await expect(page.locator('#kw-card .chip-mute')).toHaveCount(examples && keyword === '@ALIAS' ? 1 : 0);
+      expect(han.test(await page.locator('#kw-card').evaluate(card => [...card.querySelectorAll('.minicode, code')].map(c => c.textContent).join(' ')))).toBe(examples);
+    }
+
+    await page.goto(`/${language}/tools.html`);
+    await expect(page.locator('a[href*="samples/cases/15-chinese.sp"]')).toHaveCount(examples ? 1 : 0);
+    expect(errors).toEqual([]);
+  });
+}

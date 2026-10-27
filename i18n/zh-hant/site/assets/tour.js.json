@@ -7,7 +7,7 @@
   "A ground is added on net c, at (24, 38), and named %g0. =&gt; hands each part’s result to the next.": "在網路 c 的 (24, 38) 處加上一個接地符號，並命名為 %g0。=&gt; 會將前一段的結果傳遞給後一段。",
   "On this level and on every level below, instances of model nch are drawn with $NMOS. This is a rule, evaluated once per level.": "在本層級及下方所有層級中，模型為 nch 的實例皆以 $NMOS 繪製。這是一條規則，會在每個層級各評估一次。",
   "Net n1 has a wire running through R1’s terminal 2, the point %j and R2’s terminal 1, in that order.": "網路 n1 有一條連線，依序經過 R1 的 2 號端子、點 %j 與 R2 的 1 號端子。",
-  "en": "zh",
+  "en": "en",
   "same row": "同一列（同高）",
   "equal steps around the axis": "對稱軸兩側等距",
   "M1 on the left": "M1 在左",

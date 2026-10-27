@@ -188,9 +188,10 @@
     u13: ['{#M5 #M1 #M3} @ORDER("bottom-to-top");', '{#M5 #M1 #M3} are in @ORDER("bottom-to-top");'],
     u14: ['#M5:d @CURRENT("in")', '#M5:d has @CURRENT("in")']
   };
-  /* zh: the Chinese standard sentences, written with the alias package rnl-zh; shown on every page */
+  /* zh: the Chinese standard sentences, written with the alias package rnl-zh; only the Chinese pages have them */
+  var UZ = {};
   /*zh-CN*/
-  var UZ = {
+  UZ = {
     u1: '%dp1 = #M1(正输入)、#M2(负输入) 和 #M5(尾管) @视作 $"差分对";',
     u2: '%cm1 = #M3(参考管) 和 #M4(输出管) @视作 $"电流镜"',
     u4: '{#M1 #M2 #M5} @使用符号 $NMOS;',
