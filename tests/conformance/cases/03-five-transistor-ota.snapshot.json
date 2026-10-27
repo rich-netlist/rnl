@@ -236,7 +236,25 @@
           {
             "id": "&inp",
             "global": false,
-            "port": false
+            "port": false,
+            "usages": [
+              {
+                "id": "%pi",
+                "definition": "$IOPORT",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&inp",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 53,
+                "source": "written",
+                "state": "in-effect"
+              }
+            ]
           },
           {
             "id": "&tail",
@@ -246,22 +264,198 @@
           {
             "id": "&0",
             "global": true,
-            "port": false
+            "port": false,
+            "usages": [
+              {
+                "id": "@rnl-std-virtual.rnl:52:9#1",
+                "definition": "$GND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 52,
+                "source": "body",
+                "made_in": "%gs_M5_3",
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-virtual.rnl:52:9#2",
+                "definition": "$GND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 52,
+                "source": "body",
+                "made_in": "%gs_M6_3",
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-virtual.rnl:52:9#3",
+                "definition": "$GND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 52,
+                "source": "body",
+                "made_in": "%gs_CL_2",
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-virtual.rnl:52:9#4",
+                "definition": "$GND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 52,
+                "source": "body",
+                "made_in": "%gs_Vdd_2",
+                "state": "in-effect"
+              }
+            ]
           },
           {
             "id": "&out",
             "global": false,
-            "port": false
+            "port": false,
+            "usages": [
+              {
+                "id": "%po",
+                "definition": "$IOPORT",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&out",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 55,
+                "source": "written",
+                "state": "in-effect"
+              }
+            ]
           },
           {
             "id": "&inn",
             "global": false,
-            "port": false
+            "port": false,
+            "usages": [
+              {
+                "id": "%pn",
+                "definition": "$IOPORT",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&inn",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 54,
+                "source": "written",
+                "state": "in-effect"
+              }
+            ]
           },
           {
             "id": "&vdd",
             "global": false,
-            "port": false
+            "port": false,
+            "usages": [
+              {
+                "id": "@rnl-std-virtual.rnl:58:9#1",
+                "definition": "$SUPPLY",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&vdd",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 58,
+                "source": "body",
+                "made_in": "%ss_M3_3",
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-virtual.rnl:58:9#2",
+                "definition": "$SUPPLY",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&vdd",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 58,
+                "source": "body",
+                "made_in": "%ss_M4_3",
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-virtual.rnl:58:9#3",
+                "definition": "$SUPPLY",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&vdd",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 58,
+                "source": "body",
+                "made_in": "%ss_Ib_1",
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-virtual.rnl:58:9#4",
+                "definition": "$SUPPLY",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&vdd",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 58,
+                "source": "body",
+                "made_in": "%ss_Vdd_1",
+                "state": "in-effect"
+              }
+            ]
           },
           {
             "id": "&bias",
@@ -421,6 +615,88 @@
                   "&tail"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "%dp",
+                "definition": "$DIFFPAIR",
+                "roles": [
+                  {
+                    "role": "in_p",
+                    "set": false,
+                    "member": "#M1",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 21,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "@03-five-transistor-ota.sp:24:5",
+                "definition": "$MATCHED",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "#M1",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 24,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "@03-five-transistor-ota.sp:28:5",
+                "definition": "$MIRROR_PAIR",
+                "roles": [
+                  {
+                    "role": "a",
+                    "set": false,
+                    "member": "#M1",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 28,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "%tc",
+                "definition": "$TAIL_CENTER",
+                "roles": [
+                  {
+                    "role": "a",
+                    "set": false,
+                    "member": "#M1",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 30,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "@03-five-transistor-ota.sp:31:5",
+                "definition": "$FLOW",
+                "roles": [
+                  {
+                    "role": "path",
+                    "set": true,
+                    "member": "#M1",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 31,
+                "source": "written",
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -494,6 +770,88 @@
                   "&tail"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "%dp",
+                "definition": "$DIFFPAIR",
+                "roles": [
+                  {
+                    "role": "in_n",
+                    "set": false,
+                    "member": "#M2",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 21,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "@03-five-transistor-ota.sp:24:5",
+                "definition": "$MATCHED",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "#M2",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 24,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "@03-five-transistor-ota.sp:28:5",
+                "definition": "$MIRROR_PAIR",
+                "roles": [
+                  {
+                    "role": "b",
+                    "set": false,
+                    "member": "#M2",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 28,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "%tc",
+                "definition": "$TAIL_CENTER",
+                "roles": [
+                  {
+                    "role": "b",
+                    "set": false,
+                    "member": "#M2",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 30,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "@03-five-transistor-ota.sp:31:5",
+                "definition": "$FLOW",
+                "roles": [
+                  {
+                    "role": "path",
+                    "set": true,
+                    "member": "#M2",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 31,
+                "source": "written",
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -558,6 +916,56 @@
                 "nets": [
                   "&vdd"
                 ]
+              }
+            ],
+            "usages": [
+              {
+                "id": "%cm",
+                "definition": "$CURRENT_MIRROR",
+                "roles": [
+                  {
+                    "role": "ref",
+                    "set": false,
+                    "member": "#M3",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 22,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "@03-five-transistor-ota.sp:29:5",
+                "definition": "$MIRROR_PAIR",
+                "roles": [
+                  {
+                    "role": "a",
+                    "set": false,
+                    "member": "#M3",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 29,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "%ss_M3_3",
+                "definition": "$SUPPLY_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#M3:3",
+                    "terminal": "s"
+                  }
+                ],
+                "file": 0,
+                "line": 72,
+                "source": "solver",
+                "state": "in-effect"
               }
             ]
           },
@@ -624,6 +1032,56 @@
                   "&vdd"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "%cm",
+                "definition": "$CURRENT_MIRROR",
+                "roles": [
+                  {
+                    "role": "out",
+                    "set": false,
+                    "member": "#M4",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 22,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "@03-five-transistor-ota.sp:29:5",
+                "definition": "$MIRROR_PAIR",
+                "roles": [
+                  {
+                    "role": "b",
+                    "set": false,
+                    "member": "#M4",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 29,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "%ss_M4_3",
+                "definition": "$SUPPLY_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#M4:3",
+                    "terminal": "s"
+                  }
+                ],
+                "file": 0,
+                "line": 73,
+                "source": "solver",
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -688,6 +1146,56 @@
                 "nets": [
                   "&0"
                 ]
+              }
+            ],
+            "usages": [
+              {
+                "id": "%is",
+                "definition": "$INPUT_STAGE",
+                "roles": [
+                  {
+                    "role": "tail",
+                    "set": false,
+                    "member": "#M5",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 23,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "%tc",
+                "definition": "$TAIL_CENTER",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#M5",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 30,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "%gs_M5_3",
+                "definition": "$GND_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#M5:3",
+                    "terminal": "s"
+                  }
+                ],
+                "file": 0,
+                "line": 68,
+                "source": "solver",
+                "state": "in-effect"
               }
             ]
           },
@@ -754,6 +1262,24 @@
                   "&0"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "%gs_M6_3",
+                "definition": "$GND_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#M6:3",
+                    "terminal": "s"
+                  }
+                ],
+                "file": 0,
+                "line": 69,
+                "source": "solver",
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -805,6 +1331,24 @@
                 "nets": [
                   "&bias"
                 ]
+              }
+            ],
+            "usages": [
+              {
+                "id": "%ss_Ib_1",
+                "definition": "$SUPPLY_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#Ib:1",
+                    "terminal": "p"
+                  }
+                ],
+                "file": 0,
+                "line": 74,
+                "source": "solver",
+                "state": "in-effect"
               }
             ]
           },
@@ -858,6 +1402,40 @@
                   "&0"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "@03-five-transistor-ota.sp:31:5",
+                "definition": "$FLOW",
+                "roles": [
+                  {
+                    "role": "path",
+                    "set": true,
+                    "member": "#CL",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 31,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "%gs_CL_2",
+                "definition": "$GND_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#CL:2",
+                    "terminal": "n"
+                  }
+                ],
+                "file": 0,
+                "line": 70,
+                "source": "solver",
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -910,6 +1488,40 @@
                   "&0"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "%gs_Vdd_2",
+                "definition": "$GND_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#Vdd:2",
+                    "terminal": "n"
+                  }
+                ],
+                "file": 0,
+                "line": 71,
+                "source": "solver",
+                "state": "in-effect"
+              },
+              {
+                "id": "%ss_Vdd_1",
+                "definition": "$SUPPLY_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#Vdd:1",
+                    "terminal": "p"
+                  }
+                ],
+                "file": 0,
+                "line": 75,
+                "source": "solver",
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -936,7 +1548,25 @@
               "value": "R0",
               "source": null
             },
-            "pins": []
+            "pins": [],
+            "usages": [
+              {
+                "id": "%is",
+                "definition": "$INPUT_STAGE",
+                "roles": [
+                  {
+                    "role": "pair",
+                    "set": false,
+                    "member": "%dp",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 23,
+                "source": "written",
+                "state": "in-effect"
+              }
+            ]
           },
           {
             "id": "%cm",

@@ -13,6 +13,8 @@ rnl check FILE [options]          print the diagnostics; exit 1 on errors
 rnl render FILE -o DIR [options]  write one SVG per drawing level
 rnl dump FILE [options]           print the effective model and diagnostics as JSON
 rnl view FILE [options]           print the Document a viewer shows, as JSON
+rnl explain FILE REF [options]    print the usages the object REF is a member of, such as #M1, &vdd,
+                                  #M5:d or %dp1, written as RNL refers to it
 rnl problem FILE [options]        print what a solver reads of each level, with its hash, as JSON
 rnl solve FILE -o DIR [options]   solve each drawing level and write its record of the solver back
 rnl snapshot FILE [options]       print the editor interface's snapshot, as JSON
@@ -78,6 +80,23 @@ check reads a package file, with --no-std and --std-version):
 write:
   REQUEST.json is {"dialect", "netlist", "author", "ops"}, the ops as the editor interface
   draft writes them; --dialect (spice by default) and --author NAME give the fields it leaves out
+```
+
+`explain` prints the usages that the object REF is a member of. REF is written as RNL refers to the object: `#M1`, `&vdd`, `#M5:d` or `#M5:1` for a terminal, `%dp1`, or `@file:line:col` for a usage without a name. It is looked for in every level, or only in the level `--level TITLE` names; each level that has it is printed in turn. There is one line for each usage, with these fields:
+- the roles the object fills, a set role in braces and a terminal's name after its role;
+- the usage;
+- its definition;
+- where the statement is;
+- where the usage comes from: `written`, a rule (with its package and place), the body of a definition (`body of %vdd1`), or `written back by a solver`;
+- its state: `in effect`, `failed`, `overridden` or `disabled`, with the reason.
+
+The usages that contain that usage follow, indented, up the chain. An application that failed, and so made no usage, is listed with its error. A REF that names no object is an error that lists up to five close names. `--json` prints the same as `rnl-view`'s `MemberOf` entries, each with `outer`, the usages that contain it. The lists are [`rnl-view`'s](../rnl-view/README.md#the-usages-of-an-object) `Object.usages`. On the five-transistor OTA of the site's examples:
+
+```text
+$ rnl explain site/examples/ota5t.sp '#M1'
+#M1 in ota5t: 2 usages
+  in_p · %dp1 · $DIFFERENTIAL_PAIR · ota5t.sp:12 · written · in effect
+  a · %sym12 · $MIRRORED · ota5t.sp:19 · written · in effect
 ```
 
 `snapshot` prints the snapshot of [`rnl-view`](../rnl-view/README.md#snapshots): the host circuit and the model of each drawing level, by ids a transaction can write back. `catalog` prints the catalog of [`rnl-view`](../rnl-view/README.md#catalog): the symbols, with their pins, boxes and labels, the ordinary definitions and the sets of the bundled packages and of those in the directories `--package-dir` gives, each package file read as `rnl check PACKAGE.rnl` reads it; of each name the newest version, every version with `--all-versions`, and only the names `--package` gives, when it gives any. It is the catalog the WebAssembly core gives for a catalog request. `write` writes the ops into the netlist with [`rnl-edit`](../rnl-edit/README.md) and saves the result as OUT, reading the netlist under the name of OUT when the request names no `file`, so that a Spectre netlist saved without the `.scs` suffix gets its header where Spectre reads it (2.2); `rnl check OUT` then says how it reads.

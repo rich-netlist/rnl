@@ -19,6 +19,8 @@ const USAGE: &str = "usage:
   rnl render FILE -o DIR [options]  write one SVG per drawing level
   rnl dump FILE [options]           print the effective model and diagnostics as JSON
   rnl view FILE [options]           print the Document a viewer shows, as JSON
+  rnl explain FILE REF [options]    print the usages the object REF is a member of, such as #M1, &vdd,
+                                    #M5:d or %dp1, written as RNL refers to it
   rnl problem FILE [options]        print what a solver reads of each level, with its hash, as JSON
   rnl solve FILE -o DIR [options]   solve each drawing level and write its record of the solver back
   rnl preview FILE [options]        print the solve as the desktop viewer previews it, as JSON; writes nothing
@@ -88,6 +90,14 @@ solve options (the levels are read without their type=\"generated\" records; -o 
 saving options (solve and strip-generated only):
   --encoding MODE     preserve (default) or utf8; UTF-8 adds a BOM only to protect leading U+FEFF
                       copied includes that are not rewritten retain their original bytes
+explain options:
+  --level TITLE       look for REF only in the level with this title: a subcircuit name, or the
+                      file name; otherwise in every level, each that has it in turn
+  --json              print the usages as JSON
+  one line for each usage: the roles the object fills · the usage · its definition · where it is
+  written · where it comes from (written, a rule, a definition's body, written back by a solver) ·
+  in effect, failed, overridden or disabled, with the reason; the usages that contain it follow,
+  indented. A failed application, which made no usage, is listed too
 snapshot options:
   --parts LIST        the parts to give, of drawing, host and model; host,model by default
 catalog options (the packages are those of --package-dir and the bundled ones, each read as rnl
@@ -127,6 +137,9 @@ struct Args {
     packages: Vec<String>,
     all_versions: bool,
     encoding: OutputEncoding,
+    /// `explain`'s REF, and `--json`.
+    reference: Option<String>,
+    json: bool,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -135,7 +148,8 @@ fn parse_args() -> Result<Args, String> {
     if command == "-h" || command == "--help" {
         return Err(USAGE.into());
     }
-    let mut file = None;
+    let mut positional = Vec::new();
+    let mut json = false;
     let mut out = None;
     let mut package_dirs = Vec::new();
     let mut search_paths = Vec::new();
@@ -211,11 +225,25 @@ fn parse_args() -> Result<Args, String> {
             "--parts" => parts = Some(it.next().ok_or("--parts needs a list, such as host,model")?),
             "--package" => packages.push(it.next().ok_or("--package needs a name, such as rnl-std-basic")?),
             "--all-versions" => all_versions = true,
+            "--json" => json = true,
             "--encoding" => encoding = Some(it.next().ok_or("--encoding needs preserve or utf8")?.parse()?),
             _ if a.starts_with("--encoding=") => encoding = Some(a[11..].parse()?),
             _ if a.starts_with('-') => return Err(format!("unknown option {a}\n{USAGE}")),
-            _ => file = Some(PathBuf::from(a)),
+            _ => positional.push(a),
         }
+    }
+    // explain takes FILE and REF; another command FILE, the last one given
+    let reference = if command == "explain" {
+        if positional.len() != 2 {
+            return Err(format!("rnl explain takes FILE and REF, such as rnl explain top.sp '#M1'\n{USAGE}"));
+        }
+        positional.pop()
+    } else {
+        None
+    };
+    let file = positional.pop().map(PathBuf::from);
+    if json && command != "explain" {
+        return Err("--json is an option of explain".into());
     }
     if profile.is_some() && command != "solve" {
         return Err("--profile is an option of solve".into());
@@ -262,6 +290,8 @@ fn parse_args() -> Result<Args, String> {
         packages,
         all_versions,
         encoding: encoding.unwrap_or_default(),
+        reference,
+        json,
     })
 }
 
@@ -428,6 +458,27 @@ fn run(args: &Args) -> Result<ExitCode, String> {
             };
             let doc = rnl_view::build(&args.file.to_string_lossy(), &provider, &options)?;
             println!("{}", serde_json::to_string_pretty(&doc).unwrap());
+            Ok(ExitCode::SUCCESS)
+        }
+        "explain" => {
+            let options = BuildOptions {
+                dialect: args.dialect.clone(),
+                formats: args.formats.clone(),
+                runtime: options(args),
+                svg: false,
+                primitives: false,
+                status: false,
+            };
+            let doc = rnl_view::build(&args.file.to_string_lossy(), &provider, &options)?;
+            let reference = args.reference.as_deref().unwrap_or_default();
+            let found = rnl_cli::explain::find(&doc, reference, args.level.as_deref())?;
+            if args.json {
+                println!("{}", serde_json::to_string_pretty(&rnl_cli::explain::json(&doc, &found)).unwrap());
+            } else {
+                for line in rnl_cli::explain::lines(&doc, &found) {
+                    println!("{line}");
+                }
+            }
             Ok(ExitCode::SUCCESS)
         }
         "snapshot" => {

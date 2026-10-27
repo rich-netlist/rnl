@@ -174,6 +174,19 @@ pub struct Scene {
     pub busy: HashSet<(ObjId, usize)>,
     pub hinted: HashSet<ObjId>,
     pub dropped: usize,
+    /// The applications of definitions in the level's records that failed, in the order found.
+    pub failed_usages: Vec<FailedApplication>,
+}
+
+/// An application of a definition that failed and made no usage ([`crate::model::FailedUsage`]).
+#[derive(Clone, Debug)]
+pub struct FailedApplication {
+    pub name: Option<String>,
+    pub definition: Option<ObjId>,
+    pub roles: Vec<(Option<String>, ObjId)>,
+    /// The record and the statement's first and last offset in it.
+    pub stmt: (Option<RecId>, usize, usize),
+    pub diag: Option<DiagId>,
 }
 
 impl Scene {
@@ -250,6 +263,7 @@ impl Scene {
             busy: HashSet::new(),
             hinted: HashSet::new(),
             dropped: 0,
+            failed_usages: Vec::new(),
         }
     }
 }

@@ -333,7 +333,11 @@ impl Interp<'_> {
                     }
                 }
             }
+            let (origin, parent, disabled) = self.usage_origin(s, o, ids);
             out.push(ObjectInfo {
+                origin,
+                parent,
+                disabled,
                 usage_has_drawing: drawn_usages.contains(&o),
                 source: match self.o(o) {
                     ObjData::Usage(u) => u.site.as_ref().and_then(|c| {
@@ -370,6 +374,51 @@ impl Interp<'_> {
             .map(|p| PointInfo { id: ids[p].clone(), at: self.xy(s, *p), junction: junction_at.contains(p) })
             .collect();
         (out, points)
+    }
+
+    /// Where a usage comes from, the usage it is made in, by id, and whether it is disabled, its own
+    /// priority or that of a usage it is made in being "disabled" (14.8); for another object,
+    /// written, none and not.
+    fn usage_origin(&self, s: SceneId, o: ObjId, ids: &HashMap<ObjId, String>) -> (UsageOrigin, Option<String>, bool) {
+        let ObjData::Usage(u) = self.o(o) else { return (UsageOrigin::Written, None, false) };
+        let mut disabled = false;
+        let mut at = Some(o);
+        while let Some(a) = at {
+            let u = self.usage(a);
+            disabled |= u.priority == Some(Priority::Disabled);
+            at = u.parent;
+        }
+        let parent = u.parent.map(|p| self.ref_id(s, p, ids));
+        let origin = match &u.site {
+            _ if u.parent.is_some() => UsageOrigin::Body,
+            Some(site) if u.generated => UsageOrigin::Rule {
+                package: self.units[site.unit].pkg().to_string(),
+                at: self.rec_loc(site.rec, u.off).unwrap_or_else(|| crate::diag::Loc::line(String::new(), 0)),
+            },
+            Some(site) if site.header.type_ == "generated" => UsageOrigin::Solver,
+            _ => UsageOrigin::Written,
+        };
+        (origin, parent, disabled)
+    }
+
+    /// The applications of definitions in the level's records that failed ([`FailedUsage`]).
+    fn failed_usages(&mut self, s: SceneId, ids: &HashMap<ObjId, String>) -> Vec<FailedUsage> {
+        let failed = self.scenes[s].failed_usages.clone();
+        failed
+            .into_iter()
+            .filter_map(|f| {
+                let (rec, a, b) = f.stmt;
+                let source = (self.rec_loc(rec, a)?, self.rec_loc(rec, b.saturating_sub(1))?);
+                let roles = f.roles.iter().map(|(r, o)| (r.clone(), self.attached(s, *o, ids))).collect();
+                Some(FailedUsage {
+                    id: f.name.map(|n| format!("%{}", quoted(&n))),
+                    definition: f.definition.map(|d| self.label(d)),
+                    roles,
+                    source,
+                    reason: f.diag.map(|d| self.sink.get(d).message.clone()).unwrap_or_default(),
+                })
+            })
+            .collect()
     }
 
     fn style_of(&self, s: SceneId, o: ObjId) -> Style {
@@ -706,6 +755,7 @@ impl Interp<'_> {
         let prim_ids = self.unique_ids(s, &prims, &ids);
         ids.extend(prim_ids);
         let (objects, points) = self.objects_of(s, &objs, &named_points, &ids);
+        let failed_usages = self.failed_usages(s, &ids);
         let mut terminal_names = vec![Vec::new(); level.instances.len()];
         for i in self.scenes[s].insts.clone() {
             let ObjData::Inst { idx, .. } = *self.o(i) else { continue };
@@ -949,6 +999,7 @@ impl Interp<'_> {
             unplaced_symbols,
             objects,
             points,
+            failed_usages,
             terminal_names,
             block_symbol: self.block_symbol_of(lv),
             packages,

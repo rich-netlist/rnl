@@ -20,7 +20,7 @@ use rnl_runtime::{Interpretation, Options};
 use serde::Serialize;
 use serde_json::{Map, Value};
 
-use crate::document::{Diagnostic, Document};
+use crate::document::{Diagnostic, Document, RoleOf, RuleAt};
 use crate::primitive::{self, Run};
 
 /// The version of the snapshot's shape.
@@ -164,6 +164,45 @@ pub struct HostNet {
     pub id: String,
     pub global: bool,
     pub port: bool,
+    /// The usages it is a member of in the level ([`UsageOf`]); only for a net that is in some.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(test, ts(as = "Option<Vec<UsageOf>>", optional))]
+    pub usages: Vec<UsageOf>,
+}
+
+/// A usage an object is a member of, in the object's level, by the usage's id: what the Document
+/// gives as `Object::usages` (`MemberOf`). The usage's own object view lists the usages it is a
+/// member of in turn: the chain upward.
+#[derive(Serialize, Debug, Clone)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct UsageOf {
+    /// The usage's id, as its object view has it: `%dp1`, `@file:line:col`. A failed application,
+    /// which made no usage, has the name it binds, or where it is written.
+    pub id: String,
+    /// Its definition, such as `$DIFFERENTIAL_PAIR`; empty when a failed statement names none.
+    pub definition: String,
+    /// The roles the object fills in it.
+    pub roles: Vec<RoleOf>,
+    /// The statement that applies the definition: its file, by index in `files` when it is one of
+    /// them, and its first line.
+    pub file: Option<usize>,
+    pub line: u32,
+    /// "written", "solver", "rule" or "body", as `MemberOf::source`.
+    pub source: String,
+    /// For a usage a rule made: the rule's package and where the rule is written.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
+    pub rule: Option<RuleAt>,
+    /// For a usage the body of a definition made: the usage whose definition it is, by id.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
+    pub made_in: Option<String>,
+    /// "in-effect", "failed", "overridden" or "disabled", as `MemberOf::state`.
+    pub state: String,
+    /// Why it failed or was overridden.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
+    pub reason: Option<String>,
 }
 
 /// What the RNL makes of a level. Coordinates are scene units, y up.
@@ -306,6 +345,11 @@ pub struct ObjectView {
     pub orient: Slot<String>,
     /// The symbol's pins where they are drawn, when it has a symbol and a position.
     pub pins: Vec<PinView>,
+    /// The usages it is a member of in the level, with the roles it fills, those of its terminals
+    /// too for an instance ([`UsageOf`]); only for an object that is in some.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(test, ts(as = "Option<Vec<UsageOf>>", optional))]
+    pub usages: Vec<UsageOf>,
 }
 
 #[derive(Serialize, Debug)]
@@ -459,8 +503,10 @@ pub(crate) fn snapshot(r: &Interpretation, document: Document, parts: Parts, opt
                 file: file_index.get(host_level.file.as_str()).copied(),
                 line: if host_level.kind == LevelKind::Subckt { host_level.line } else { 0 },
                 status: dl.status.clone(),
-                host: parts.host.then(|| host(&r.doc, lv)),
-                model: parts.model.then(|| level_model(&r.doc, lv)),
+                host: parts.host.then(|| host(&r.doc, lv, &usages_of(&r.doc, &document, lv.level, &file_index))),
+                model: parts
+                    .model
+                    .then(|| level_model(&r.doc, lv, &usages_of(&r.doc, &document, lv.level, &file_index))),
             }
         })
         .collect();
@@ -541,7 +587,47 @@ fn host_nets(doc: &HostDocument, lv: usize) -> Vec<(String, String)> {
     out
 }
 
-fn host(doc: &HostDocument, lv: &LevelView) -> HostLevel {
+/// The usages each object of a level is a member of ([`UsageOf`]), by the object's id in the
+/// snapshot: `#M1`, `%dp1`, and a net by its key in the level.
+fn usages_of(
+    doc: &HostDocument,
+    document: &Document,
+    level: usize,
+    files: &HashMap<&str, usize>,
+) -> HashMap<String, Vec<UsageOf>> {
+    let level_file = &doc.levels[level].file;
+    document
+        .objects
+        .iter()
+        .filter(|o| o.level == level && !o.usages.is_empty())
+        .map(|o| {
+            let key = match o.kind {
+                "instance" => format!("#{}", quoted(&o.name)),
+                "net" => doc.net_key_in(level, &o.name, level_file),
+                _ => o.name.clone(),
+            };
+            let list = o
+                .usages
+                .iter()
+                .map(|m| UsageOf {
+                    id: m.id.clone(),
+                    definition: m.definition.clone(),
+                    roles: m.roles.clone(),
+                    file: m.file.as_deref().and_then(|f| files.get(f).copied()),
+                    line: m.line,
+                    source: m.source.to_string(),
+                    rule: m.rule.clone(),
+                    made_in: m.made_in.clone(),
+                    state: m.state.to_string(),
+                    reason: m.reason.clone(),
+                })
+                .collect();
+            (key, list)
+        })
+        .collect()
+}
+
+fn host(doc: &HostDocument, lv: &LevelView, usages: &HashMap<String, Vec<UsageOf>>) -> HostLevel {
     let level = &doc.levels[lv.level];
     let nets = host_nets(doc, lv.level);
     let net_id = |written: &str, file: &str| {
@@ -578,6 +664,7 @@ fn host(doc: &HostDocument, lv: &LevelView) -> HostLevel {
                 id: format!("&{}", quoted(shown)),
                 global: doc.is_global(lv.level, key),
                 port: port_keys.contains(key),
+                usages: usages.get(key).cloned().unwrap_or_default(),
             })
             .collect(),
     }
@@ -678,7 +765,7 @@ fn attached(a: &Attach) -> Value {
     }
 }
 
-fn level_model(doc: &HostDocument, lv: &LevelView) -> LevelModel {
+fn level_model(doc: &HostDocument, lv: &LevelView, usages: &HashMap<String, Vec<UsageOf>>) -> LevelModel {
     let symbols = symbol_refs(doc, lv);
     let symbol_id = |s: &SymbolInfo| symbols.iter().find(|(info, _)| info == s).map(|(_, r)| r.id.clone());
     let net_id = |shown: &str| format!("&{}", quoted(shown));
@@ -704,6 +791,7 @@ fn level_model(doc: &HostDocument, lv: &LevelView) -> LevelModel {
                 .iter()
                 .map(|p| PinView { terminals: p.terminals.clone(), at: xy(p.at), dir: p.dir, nets: p.nets.clone() })
                 .collect(),
+            usages: usages.get(&o.id).cloned().unwrap_or_default(),
         })
         .collect();
     let points = lv
@@ -892,7 +980,13 @@ R2 a vdd! 2k
         );
         // a name that needs quotes is quoted; 0 is global
         assert_eq!(host["instances"][1]["terminals"][1]["net"], "&\"vdd!\"");
-        let nets = host["nets"].as_array().unwrap();
+        // each net without the usages it is in, which the ground of the netlist has
+        let nets: Vec<Value> = host["nets"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|n| json!({"id": n["id"], "global": n["global"], "port": n["port"]}))
+            .collect();
         assert!(nets.contains(&json!({"id": "&\"vdd!\"", "global": false, "port": false})), "{nets:?}");
         assert!(nets.contains(&json!({"id": "&0", "global": true, "port": false})), "{nets:?}");
         assert_eq!(s["levels"][1]["host"]["ports"], json!(["&in", "&out", "&VSS"]));
