@@ -23,6 +23,7 @@ export const FILES = {
   "usage-current": "tests/viewer/inputs/usage-current.sp",
   "verilog-a": "tests/viewer/inputs/resistor.va",
   "verilog": "tests/viewer/inputs/inverter.v",
+  "package-pkg": "tests/viewer/inputs/acme.pkg",
   "wire-labels": "tests/viewer/inputs/wire-labels.sp",
   "usage-inspector": "tests/viewer/inputs/usage-inspector.sp",
   "usage-anonymous": "tests/viewer/inputs/usage-anonymous.sp",
@@ -352,6 +353,10 @@ export function writeFixtures(rnl, dir) {
   // a Verilog-A file read as SPICE, as the user can set it, and a netlist that includes one
   const va = "tests/viewer/inputs/resistor.va";
   fs.writeFileSync(path.join(dir, "verilog-a-spice.json"), execFileSync(rnl, ["view", va, "--format", `${va}=spice`],
+    { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 }));
+  // a package file of another suffix, as the core read it before the format rnl: as SPICE
+  const pkg = "tests/viewer/inputs/acme.pkg";
+  fs.writeFileSync(path.join(dir, "package-pkg-spice.json"), execFileSync(rnl, ["view", pkg, "--format", `${pkg}=spice`],
     { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 }));
   fs.copyFileSync(path.join(root, va), path.join(dir, "resistor.va"));
   fs.writeFileSync(path.join(dir, "includes-verilog-a.sp"), [

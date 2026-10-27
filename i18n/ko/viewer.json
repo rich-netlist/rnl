@@ -43,6 +43,7 @@
   "subcircuit": "서브서킷",
   "file level": "파일 레벨",
   "Nothing on this level has a position yet, so nothing is drawn.": "이 레벨에는 아직 위치가 지정된 객체가 없어 아무것도 그려지지 않았습니다.",
+  "RNL package": "RNL 패키지",
   "Text": "텍스트",
   "This file is not a netlist. It is shown as text.": "이 파일은 넷리스트가 아닙니다. 텍스트로 표시합니다.",
   "This level has no objects, so nothing is drawn.": "이 레벨에는 객체가 없어 아무것도 그려지지 않았습니다.",

@@ -38,14 +38,29 @@ export const formatInfo = (name) => list.find((f) => f.name === name);
  */
 export const isPlainFile = (file) => file.format === TEXT;
 
-// the names of the formats are no words to translate, but "text" is one
+// the names of the formats are no words to translate, but "text" and "RNL package" are
 const TEXT = "text";
-const TITLES = new Map([[TEXT, m("Text")]]);
+const RNL = "rnl";
+const TITLES = new Map([[TEXT, m("Text")], [RNL, m("RNL package")]]);
 
 /** The title of the format named `name` as the menus show it: the core's, or the translation of the word it is. */
 export function formatTitle(name) {
   return TITLES.get(name) ?? formatInfo(name)?.title ?? name;
 }
+
+/**
+ * The format the core reads a file of that suffix in, by the suffixes its formats list; undefined when no
+ * format names it (the core looks into the file too). Before the list is known, `.rnl` is a package's.
+ */
+function suffixFormat(path) {
+  const ext = /\.([^./\\]+)$/.exec(path || "")?.[1].toLowerCase();
+  if (!ext) return undefined;
+  if (!list.length) return ext === "rnl" ? RNL : undefined;
+  return list.find((f) => f.extensions?.includes(ext))?.name;
+}
+
+/** Whether the file at `path` is a package: of the format the user chose for it, else of the one its suffix gives. */
+export const isPackagePath = (path) => (chosenFormat(path) ?? suffixFormat(path)) === RNL;
 
 /**
  * The user's choice for the file at `path`, or undefined when it reads by default; `url`, the file's

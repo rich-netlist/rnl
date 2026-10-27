@@ -95,6 +95,5 @@ test("the format Text and the notice are in every language of the interface and 
   const chip = page.locator('.lib-group[data-group="files"] .pool-row.current .format-chip');
   await expect(chip).toHaveText(zh("Text"));
   await chip.click();
-  // the core's title of the RNL package format, not translated yet
-  await expect(page.locator(".format-menu .format-label")).toHaveText([zh("Automatic ({0})", zh("Text")), "SPICE", "Spectre", "RNL package", zh("Text")]);
+  await expect(page.locator(".format-menu .format-label")).toHaveText([zh("Automatic ({0})", zh("Text")), "SPICE", "Spectre", zh("RNL package"), zh("Text")]);
 });

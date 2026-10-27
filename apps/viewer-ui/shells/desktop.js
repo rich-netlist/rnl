@@ -5,7 +5,7 @@ import { m, tr } from "../i18n.js";
 import { flushSettings, load } from "../util.js";
 import { choose, decide, inform, modal } from "../dialog.js";
 import { sourcePath } from "../source-path.js";
-import { fileFormats } from "../formats.js";
+import { fileFormats, isPackagePath } from "../formats.js";
 
 let pool = [];
 let poolReady = Promise.resolve();
@@ -63,7 +63,7 @@ export default {
     const paths = items.filter((item) => !item.builtin).map((item) => item.path);
     // PATH packages retain the provider's per-directory precedence. Netlists may also resolve
     // bare includes; both kinds enter the subcircuit index, independently of package lookup.
-    pool = items.filter((item) => !item.builtin && (!item.searchPath || !/\.rnl$/i.test(item.path))).map((item) => item.path);
+    pool = items.filter((item) => !item.builtin && (!item.searchPath || !isPackagePath(item.path))).map((item) => item.path);
     poolReady = poolReady.catch(() => {}).then(() => invoke("update_library", { pool: paths, reload, refresh, formats: fileFormats() }));
     return poolReady;
   },

@@ -1,0 +1,9 @@
+@RNL(type="header") {
+  @VERSION("0.3");
+  @PACKAGE(name="acme-styles", version="1.0")
+}
+Styles of the Acme designs: a coloured outline for a sensitive pair, and one for its guard.
+@RNL {
+  $sensitive = @DEFINE-STYLE(linecolor="#c62828") {};
+  $guard = @DEFINE-STYLE(linecolor="#1565c0") {}
+}
