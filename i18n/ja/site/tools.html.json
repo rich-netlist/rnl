@@ -127,6 +127,7 @@
   "Download it from the releases page and extract it on the Virtuoso host; Cadence’s own exporters and their licenses are needed there.": "リリースページからダウンロードし、Virtuosoが動作するホスト上で展開してください（そのホスト上にCadence標準のエクスポータとライセンスが必要です）。",
   "Install and use": "インストールと使い方",
   "The steps, the menus and the options are in its README.": "導入手順、メニュー操作、オプションの詳細はREADMEに記載されています。",
+  "An RNL case actually exported from Virtuoso.": "Virtuosoから実際にエクスポートしたRNLの実例です。",
   "06 · Toolchain": "06 · ツールチェーン",
   "The RNL toolchain: read, solve, draw, edit.": "RNLツールチェーン：読む・解く・描く・編集する。",
   "The toolchain keeps “understanding RNL” and “turning intent into coordinates” in separate modules: you can view a drawing without a solver and solve only when needed. What exists today: the runtime, the host adapters, the renderer and the command line, the two viewers above, and a first version of the solver, in <code>rnl solve</code> and the desktop viewer. Pick a path to see how data flows; click a module to see what it does.": "ツールチェーンでは「RNLを解釈する部分」と「設計意図を座標に変える部分」を独立したモジュールに分離しています。そのため、ソルバーなしでも図面を閲覧でき、必要なときだけソルバーを実行できます。現在揃っているもの：ランタイム、ホストアダプタ、レンダラー、コマンドライン、上記の2つのビューア、そして<code>rnl solve</code>とデスクトップビューアに搭載されたソルバーの第1版です。パスを選んでデータの流れを確認し、各モジュールをクリックして役割を見てみてください。",

@@ -129,6 +129,7 @@
   "Download it from the releases page and extract it on the Virtuoso host; Cadence’s own exporters and their licenses are needed there.": "从发布页下载并解压至运行 Virtuoso 的主机上；需配合该主机上 Cadence 自带的导出程序及其许可使用。",
   "Install and use": "安装与使用",
   "The steps, the menus and the options are in its README.": "安装步骤、菜单操作与各项选项均详列于其 README 中。",
+  "An RNL case actually exported from Virtuoso.": "一个从 Virtuoso 实际导出的 RNL 案例",
   "06 · Toolchain": "06 · 工具链",
   "The RNL toolchain: read, solve, draw, edit.": "RNL 工具链：读取、求解、绘图、编辑。",
   "The toolchain keeps “understanding RNL” and “turning intent into coordinates” in separate modules: you can view a drawing without a solver and solve only when needed. What exists today: the runtime, the host adapters, the renderer and the command line, the two viewers above, and a first version of the solver, in <code>rnl solve</code> and the desktop viewer. Pick a path to see how data flows; click a module to see what it does.": "工具链将“读懂 RNL”与“将意图转换为坐标”拆分为独立模块：无需求解器即可查看原理图，仅在需要时才执行求解。目前已完成的部分包含：运行库、宿主适配器、渲染器与命令行、上述两款查看器，以及内置于 <code>rnl solve</code> 与桌面版查看器中的第一版求解器。选择上方路径可查看数据流向；点击任一模块可查看其职责。",
