@@ -480,7 +480,8 @@ export async function startPool() {
   $("include-library").hidden = !shell.includeLibrary;
   $("include-library").addEventListener("click", () => includeFiles("library"));
   $("add-path").hidden = !shell.pathPackages;
-  setText($("path-note"), shell.pathPackages ? m`Settings: ${settingsPath}`
+  // the desktop's settings file; a shell with no settings file says nothing of it, rather than "null"
+  setText($("path-note"), shell.pathPackages ? (settingsPath ? m`Settings: ${settingsPath}` : "")
     : m("Browsers cannot search local directories. Include files or folders above; Library files remain until this tab closes."));
   $("add-path-subfolders").hidden = !shell.pathPackages;
   $("add-path").addEventListener("click", () => addPath(false));
