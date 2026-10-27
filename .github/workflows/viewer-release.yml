@@ -1,8 +1,8 @@
 # Builds the desktop viewer of apps/desktop for Windows and Linux and releases it: on Windows, a single
 # executable, a zip of the same with the public packages in a folder beside it, an NSIS installer for the
 # current user and an MSI for the machine; the installers carry the public packages as a part of their
-# own, which the user chooses. On Linux: the AppImage, a zip of it with the public packages in a folder
-# beside it, a Debian package and a small one of the public packages; on macOS two disk images for each
+# own, which the user chooses. On Linux: the AppImage and a second one with the public packages among its
+# resources, a Debian package and a small one of the public packages; on macOS two disk images for each
 # architecture, the second with the packages among the app's resources. The Tauri command
 # line that apps/desktop/package.json pins builds them on GitHub's Windows runner, whose MSVC
 # toolchain links the WebView2 loader into the executable. The workflow checks that the executable
@@ -282,7 +282,7 @@ jobs:
       - name: Install the Tauri command line
         working-directory: apps/desktop
         run: npm ci
-      # what the zip of the AppImage and the small Debian package carry (see the Windows job)
+      # what the AppImage with them and the small Debian package carry (see the Windows job)
       - name: Fetch the public packages
         run: python scripts/bundle_packages.py fetch --out "$RUNNER_TEMP/public-packages"
       - name: Build the AppImage and Debian package
@@ -300,12 +300,29 @@ jobs:
           cp "$built/appimage/RNL Viewer_${VERSION}_amd64.AppImage" "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-linux-x86_64.AppImage"
           cp "$built/deb/RNL Viewer_${VERSION}_amd64.deb" "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-linux-x86_64.deb"
           chmod +x "$RUNNER_TEMP/assets/"*.AppImage
-          # the public packages: a Debian package of their own, which puts them in /usr/share/rnl-viewer, and a zip
-          # of the AppImage with them in a folder beside it, where the AppImage looks (APPIMAGE names its file)
+          # the public packages: a Debian package of their own, which puts them in /usr/share/rnl-viewer
           python scripts/bundle_packages.py deb --dir "$RUNNER_TEMP/public-packages" --version "$VERSION" \
             --out "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-linux-public-packages.deb"
-          python scripts/bundle_packages.py zip --exe "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-linux-x86_64.AppImage" \
-            --packages "$RUNNER_TEMP/public-packages" --out "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-with-packages-linux-x86_64.zip"
+          cd "$RUNNER_TEMP/assets"
+          sha256sum RNL-Viewer-* > SHA256SUMS.txt
+      # compiled once, bundled twice: the packages among the AppImage's resources, where it looks for them
+      - name: Bundle the AppImage again with the public packages
+        working-directory: apps/desktop
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: |
+          python3 - <<'PY'
+          import json, os
+          temp = os.environ['RUNNER_TEMP']
+          config = {'bundle': {'resources': {'LICENSE.txt': 'LICENSE.txt', temp + '/public-packages': 'public-packages'}}}
+          open(temp + '/with-packages.conf.json', 'w').write(json.dumps(config))
+          PY
+          npx tauri bundle --bundles appimage --config "$RUNNER_TEMP/with-packages.conf.json"
+          cp "target/release/bundle/appimage/RNL Viewer_${VERSION}_amd64.AppImage" "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-with-packages-linux-x86_64.AppImage"
+          chmod +x "$RUNNER_TEMP/assets/"*.AppImage
+          # it is another file than the first, with the packages inside
+          ! cmp -s "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-with-packages-linux-x86_64.AppImage" "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-linux-x86_64.AppImage"
           cd "$RUNNER_TEMP/assets"
           sha256sum RNL-Viewer-* > SHA256SUMS.txt
       - name: Smoke-test the AppImage in its own directory
@@ -320,8 +337,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/single"
           cp "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-linux-x86_64.AppImage" "$RUNNER_TEMP/single/"
           dbus-run-session -- xvfb-run -a node apps/desktop/tests/linux-smoke.mjs --packages without --exe "$RUNNER_TEMP/single/RNL-Viewer-$VERSION-linux-x86_64.AppImage"
-      # the zip unpacked: the same AppImage, which finds the folder beside it
-      - name: Smoke-test the zip of the AppImage with the public packages
+      - name: Smoke-test the AppImage with the public packages in its own directory
         timeout-minutes: 5
         env:
           VERSION: ${{ steps.version.outputs.version }}
@@ -331,11 +347,8 @@ jobs:
           APPIMAGE_EXTRACT_AND_RUN: "1"
         run: |
           mkdir -p "$RUNNER_TEMP/single-with"
-          unzip -q "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-with-packages-linux-x86_64.zip" -d "$RUNNER_TEMP/single-with"
-          folder="$RUNNER_TEMP/single-with/RNL-Viewer-$VERSION-with-packages-linux-x86_64"
-          test -f "$folder/public-packages/public-packages.json"
-          cmp "$folder/RNL-Viewer-$VERSION-linux-x86_64.AppImage" "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-linux-x86_64.AppImage"
-          dbus-run-session -- xvfb-run -a node apps/desktop/tests/linux-smoke.mjs --packages with --exe "$folder/RNL-Viewer-$VERSION-linux-x86_64.AppImage"
+          cp "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-with-packages-linux-x86_64.AppImage" "$RUNNER_TEMP/single-with/"
+          dbus-run-session -- xvfb-run -a node apps/desktop/tests/linux-smoke.mjs --packages with --exe "$RUNNER_TEMP/single-with/RNL-Viewer-$VERSION-with-packages-linux-x86_64.AppImage"
       - name: Install the Debian package, smoke-test it and uninstall it
         timeout-minutes: 5
         env:

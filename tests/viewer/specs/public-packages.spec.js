@@ -12,6 +12,7 @@ const BUNDLED = ["analog-canvas-extensions 0.4", "eda-style 0.1", "eda-symbol 0.
 const strings = [
   "Public packages (bundled)", "Public &Packages...", "Public Packages", "This build does not bundle the public packages.",
   "The desktop viewer never downloads packages itself.", "Look for it in Help › Public Packages.", "release page", "rnl-packages site",
+  "The bundled packages are under CC0-1.0, as rnl-packages declares; their licences are in the LICENSES folder beside them.",
 ];
 
 test("a build that bundles the public packages lists them in a read-only group of the Library, after the PATH", async ({ page, viewer }) => {
@@ -49,6 +50,7 @@ test("Help > Public Packages names the bundled packages, where they come from an
   const text = await dialog(page).innerText();
   expect(text).toContain(`This build bundles ${BUNDLED.join(", ")}.`);
   expect(text).toContain("found without a network");
+  expect(text).toContain("The bundled packages are under CC0-1.0, as rnl-packages declares");
   expect(text).toContain("A download without them is on the release page.");
   expect(text).toContain("The packages come from the rnl-packages site.");
   expect(text).toContain("add the folder to the PATH in the Library");
@@ -68,6 +70,7 @@ test("Help > Public Packages in the build without them says so and points to the
   expect(text).toContain("This build does not bundle the public packages.");
   expect(text).toContain("A download with the public packages bundled is on the release page, next to this one.");
   expect(text).not.toContain("This build bundles");
+  expect(text).not.toContain("CC0-1.0");
 });
 
 test("the web viewer has no Help > Public Packages: it offers File > Include Public Package", async ({ page, viewer }) => {

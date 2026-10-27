@@ -119,6 +119,7 @@ class Bundling(unittest.TestCase):
         self.assertTrue((out / 'a/0.2/README.md').is_file())
         self.assertFalse((out / 'a/0.1').exists())
         self.assertTrue((out / 'LICENSES/MIT.txt').is_file())
+        self.assertTrue((out / 'LICENSES/REUSE.toml').is_file())
         bundle.check(out)
         # a changed file is refused before anything is written
         (self.source / 'README.md').write_bytes(b'tampered')

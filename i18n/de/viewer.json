@@ -247,6 +247,7 @@
   "Public packages are RNL packages published on the rnl-packages site: extensions, symbol and style libraries and PDKs, which a netlist uses with @USE-PACKAGE.": "Öffentliche Pakete sind RNL-Pakete, die auf der Seite rnl-packages veröffentlicht werden: Erweiterungen, Symbol- und Stilbibliotheken und PDKs, die eine Netzliste mit @USE-PACKAGE verwendet.",
   "This build bundles {0}. They are found without a network, as a group of their own in the Library, and searched after the directories of your own PATH.": "Diese Version enthält {0}. Sie werden ohne Netzwerk gefunden, stehen als eigene Gruppe in der Bibliothek und werden nach den Verzeichnissen Ihres eigenen PATH durchsucht.",
   "This build does not bundle the public packages.": "Diese Version enthält die öffentlichen Pakete nicht.",
+  "The bundled packages are under CC0-1.0, as rnl-packages declares; their licences are in the LICENSES folder beside them.": "Die mitgelieferten Pakete stehen unter CC0-1.0, wie rnl-packages es erklärt; ihre Lizenzen liegen im Ordner LICENSES daneben.",
   "They are the latest versions when this release was made, and change only with a new release of the viewer. A download without them is on the ": "Es sind die neuesten Versionen zum Zeitpunkt dieser Veröffentlichung; sie ändern sich nur mit einer neuen Version des Viewers. Ein Download ohne sie steht auf der ",
   "release page": "Release-Seite",
   "A download with the public packages bundled is on the ": "Ein Download mit den mitgelieferten öffentlichen Paketen steht auf der ",

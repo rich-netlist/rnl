@@ -29,6 +29,8 @@ export async function bundledPackagesHelp() {
     bundled.bundled
       ? m`This build bundles ${list}. They are found without a network, as a group of their own in the Library, and searched after the directories of your own PATH.`
       : m("This build does not bundle the public packages."),
+    // what rnl-packages declares in its REUSE.toml, which the build carries beside the packages (LICENSES/)
+    ...(bundled.bundled ? [m("The bundled packages are under CC0-1.0, as rnl-packages declares; their licences are in the LICENSES folder beside them.")] : []),
     bundled.bundled
       ? linked(m("They are the latest versions when this release was made, and change only with a new release of the viewer. A download without them is on the "), m("release page"), RELEASES, ".")
       : linked(m("A download with the public packages bundled is on the "), m("release page"), RELEASES, m(", next to this one.")),

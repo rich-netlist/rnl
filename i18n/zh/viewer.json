@@ -247,6 +247,7 @@
   "Public packages are RNL packages published on the rnl-packages site: extensions, symbol and style libraries and PDKs, which a netlist uses with @USE-PACKAGE.": "公开包是发布在 rnl-packages 网站上的 RNL 包：扩展、符号库和样式库，以及 PDK，网表用 @USE-PACKAGE 使用它们。",
   "This build bundles {0}. They are found without a network, as a group of their own in the Library, and searched after the directories of your own PATH.": "此版本内置了 {0}。它们无需网络即可找到，在资源库中单独成组，并在你自己的 PATH 目录之后搜索。",
   "This build does not bundle the public packages.": "此版本没有内置公开包。",
+  "The bundled packages are under CC0-1.0, as rnl-packages declares; their licences are in the LICENSES folder beside them.": "内置的包按 rnl-packages 的声明采用 CC0-1.0；它们的许可证在旁边的 LICENSES 文件夹里。",
   "They are the latest versions when this release was made, and change only with a new release of the viewer. A download without them is on the ": "它们是制作此发行版时的最新版本，只随 Viewer 的新发行版更新。不带它们的下载在",
   "release page": "发行页面",
   "A download with the public packages bundled is on the ": "内置了公开包的下载在",

@@ -247,6 +247,7 @@
   "Public packages are RNL packages published on the rnl-packages site: extensions, symbol and style libraries and PDKs, which a netlist uses with @USE-PACKAGE.": "공개 패키지는 rnl-packages 사이트에 공개된 RNL 패키지입니다. 확장, 심볼·스타일 라이브러리, PDK가 있으며 넷리스트가 @USE-PACKAGE로 사용합니다.",
   "This build bundles {0}. They are found without a network, as a group of their own in the Library, and searched after the directories of your own PATH.": "이 빌드에는 {0}이(가) 포함되어 있습니다. 네트워크 없이 찾을 수 있고, 라이브러리에 별도의 그룹으로 표시되며, 사용자 PATH의 디렉터리 다음에 검색됩니다.",
   "This build does not bundle the public packages.": "이 빌드에는 공개 패키지가 포함되어 있지 않습니다.",
+  "The bundled packages are under CC0-1.0, as rnl-packages declares; their licences are in the LICENSES folder beside them.": "번들 패키지는 rnl-packages가 선언한 대로 CC0-1.0입니다. 라이선스는 옆의 LICENSES 폴더에 있습니다.",
   "They are the latest versions when this release was made, and change only with a new release of the viewer. A download without them is on the ": "이 릴리스를 만들 때의 최신 버전이며, 뷰어의 새 릴리스에서만 바뀝니다. 공개 패키지가 없는 다운로드는 ",
   "release page": "릴리스 페이지",
   "A download with the public packages bundled is on the ": "공개 패키지가 포함된 다운로드는 ",

@@ -36,7 +36,8 @@ ROOT = Path(__file__).resolve().parents[1]
 LOCK = 'public-packages.json'
 LICENSE_SOURCE = 'https://raw.githubusercontent.com/rich-netlist/rnl-packages/main/'
 # the licence files of the repository of the packages: the text of each licence its files carry
-LICENSE_FILES = ['LICENSE', 'LICENSES/MIT.txt', 'LICENSES/CC0-1.0.txt']
+# REUSE.toml says which licence covers what: packages/** are CC0-1.0, everything else MIT
+LICENSE_FILES = ['LICENSE', 'REUSE.toml', 'LICENSES/MIT.txt', 'LICENSES/CC0-1.0.txt']
 
 
 def version_key(version):
