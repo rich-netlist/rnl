@@ -24,6 +24,7 @@ const params = new URLSearchParams(location.search);
 const FORMATS = [
   { name: "spice", title: "SPICE", extensions: [], fallback: true },
   { name: "spectre", title: "Spectre", extensions: ["scs"], fallback: false },
+  { name: "text", title: "Text", extensions: ["va", "vams", "v", "vh", "sv", "svh", "vhd", "vhdl"], fallback: false },
 ];
 const detect = (path) => (/\.scs$/i.test(path) ? "spectre" : "spice");
 const platform = params.get("platform") === "desktop" ? "desktop" : "web";

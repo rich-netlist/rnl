@@ -1,6 +1,6 @@
 // A file that is no netlist, Verilog-A or Verilog, opened as the document, is shown in the text pane as
-// plain text: the core reads it as SPICE, as it reads any file, and its problems are listed, but none of
-// that reading shows in the text (colours, the marks of objects and of what is not drawn). A netlist is
+// plain text: the core does not read it, and its one hint says so; nothing in the text is marked as a
+// netlist's (colours, the marks of objects and of what is not drawn). A netlist is
 // shown as before; a file the user chose a parse format for in the Library is read as a netlist again.
 
 import { expect, test } from "../viewer.js";
@@ -22,7 +22,7 @@ function reading(page) {
   });
 }
 
-for (const [fixture, name] of [["verilog-a", "resistor.va"], ["verilog", "inverter.v"]]) {
+for (const [fixture, name, language] of [["verilog-a", "resistor.va", "Verilog-A"], ["verilog", "inverter.v", "Verilog"]]) {
   test(`${name} is shown as plain text, while the core's problems are still listed`, async ({ page, viewer }) => {
     await viewer.open(fixture);
     await expect(page.locator("#source-file")).toHaveText(name);
@@ -33,7 +33,8 @@ for (const [fixture, name] of [["verilog-a", "resistor.va"], ["verilog", "invert
     await expect(viewer.line(1).locator(".code")).toContainText("in Verilog");
     // the core's reading is told where it is told: in the problems, which the lines still mark
     expect(await page.evaluate(() => window.viewer.doc.diagnostics.length)).toBeGreaterThan(0);
-    await expect(page.locator("#problems")).toContainText("SPICE subset");
+    await expect(page.locator("#problems")).toContainText(`\`${name}\` is not a netlist (${language}); it is not read`);
+    await expect(page.locator("#problems")).not.toContainText("SPICE subset");
     // the drawing area says so, instead of that nothing has a position
     await expect(page.locator("#empty")).toHaveText(NOTICE);
   });

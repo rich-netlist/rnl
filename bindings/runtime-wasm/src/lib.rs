@@ -796,7 +796,7 @@ C1 a 0 1p
         assert_eq!(v["document"]["files"][1]["format"], "spectre");
         assert!(v["document"]["levels"].as_array().unwrap().iter().any(|l| l["title"] == "amp"));
         let v = answer(json!({ "entry": "/w/top.sp", "files": files, "formats": { "/w/cells.scs": "cdl" } }));
-        assert_eq!(v["error"], "unknown format \"cdl\" for /w/cells.scs; the formats are spice, spectre");
+        assert_eq!(v["error"], "unknown format \"cdl\" for /w/cells.scs; the formats are spice, spectre, text");
         // the list, and the format of files by path and text
         let v =
             answer(json!({ "formats": { "detect": { "/w/a.inc": "* a\n", "/w/b.lib": "simulator lang=spectre\n" } } }));
@@ -819,6 +819,23 @@ C1 a 0 1p
         assert!(!build(json!({})));
         update(json!({ "/lib/cells.scs": "spice" }));
         assert!(build(json!({ "/lib/cells.scs": "spice" })));
+    }
+
+    #[test]
+    fn a_verilog_a_file_is_text_and_not_read() {
+        // the build gives the core's verdict: the format "text", and one hint instead of SPICE's warnings
+        let files = json!({ "/w/res.va": "module res(p, n);\n  electrical p, n;\n  analog V(p, n) <+ 1k * I(p, n);\nendmodule\n" });
+        let v = answer(json!({ "entry": "/w/res.va", "files": files }));
+        let d = &v["document"];
+        assert_eq!(
+            (&d["dialect"], &d["files"][0]["format"], &d["files"][0]["default_format"]),
+            (&json!("text"), &json!("text"), &json!("text"))
+        );
+        let said: Vec<(&Value, &Value)> =
+            d["diagnostics"].as_array().unwrap().iter().map(|x| (&x["severity"], &x["message"])).collect();
+        assert_eq!(said, [(&json!("hint"), &json!("`res.va` is not a netlist (Verilog-A); it is not read"))]);
+        let v = answer(json!({ "formats": { "detect": { "/w/res.va": "", "/w/top.sp": "" } } }));
+        assert_eq!(v["formats"]["detected"], json!({ "/w/res.va": "text", "/w/top.sp": "spice" }));
     }
 
     #[test]

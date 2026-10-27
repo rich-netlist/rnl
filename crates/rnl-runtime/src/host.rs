@@ -8,6 +8,7 @@
 //! be of several dialects; names compare by the rules of the file they are written in.
 
 pub mod format;
+pub mod text;
 
 use std::collections::{HashMap, HashSet};
 

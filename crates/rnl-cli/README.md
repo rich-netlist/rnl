@@ -30,7 +30,7 @@ options:
                       record still comes first (16.3), and V not found is an error only for the
                       files that do not pin one. rnl solve does not take it
   --no-generated      read the netlist without its type="generated" records, as a solver does (2.8)
-  --dialect NAME      spice or spectre, instead of guessing from the file
+  --dialect NAME      spice, spectre or text, instead of guessing from the file
 view options:
   --primitives        give each level's primitives, in scene units with y up
   --no-svg            leave out each level's SVG

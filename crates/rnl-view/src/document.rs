@@ -36,7 +36,8 @@ pub struct Document {
     pub path: String,
     /// Its file name, for the title bar.
     pub name: String,
-    /// The format of the main file, "spice" or "spectre".
+    /// The format of the main file, "spice" or "spectre"; or "text" for a file that is not a
+    /// netlist, such as a Verilog-A model, which is not read.
     pub dialect: String,
     /// The formats a file can be read with, as `rnl_view::formats` lists them.
     pub formats: Vec<FormatInfo>,
@@ -307,6 +308,7 @@ pub struct SourceFile {
     /// The file as shown: relative to the opened file's directory when it is inside it.
     pub name: String,
     /// The format the file was read with, a name of `Document::formats`; none for a package file.
+    /// "text" for a file that is not a netlist, such as a Verilog-A model: its text, not read.
     pub format: Option<String>,
     /// The format the file is read with when none is set for it, as a frontend shows its
     /// automatic choice; none for a package file.

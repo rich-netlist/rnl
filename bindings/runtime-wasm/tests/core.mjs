@@ -328,10 +328,10 @@ test("a catalog request lists the packages, through the core and through the Wor
 });
 
 test("a formats request lists the formats and detects files, through the core and through the Worker", async () => {
-  const request = { formats: { detect: { "/w/a.inc": "* a\n", "/w/b.lib": "simulator lang=spectre\n" } } };
+  const request = { formats: { detect: { "/w/a.inc": "* a\n", "/w/b.lib": "simulator lang=spectre\n", "/w/m.va": "module m;\nendmodule\n" } } };
   const f = core.formats(request);
-  assert.deepEqual(f.list.map((x) => [x.name, x.title, x.fallback]), [["spice", "SPICE", true], ["spectre", "Spectre", false]]);
-  assert.deepEqual(f.detected, { "/w/a.inc": "spice", "/w/b.lib": "spectre" });
+  assert.deepEqual(f.list.map((x) => [x.name, x.title, x.fallback]), [["spice", "SPICE", true], ["spectre", "Spectre", false], ["text", "Text", false]]);
+  assert.deepEqual(f.detected, { "/w/a.inc": "spice", "/w/b.lib": "spectre", "/w/m.va": "text" });
   // a build that sets a file's format is a build, not a formats request
   const files = {
     "/w/top.sp": '* top\n.include "cells.scs"\nX1 a 0 amp\n.end\n',

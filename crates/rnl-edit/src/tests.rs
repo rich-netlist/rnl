@@ -185,6 +185,18 @@ fn long_statements_break_at_spaces_outside_strings_and_brackets() {
 }
 
 #[test]
+fn an_edit_on_a_file_that_is_not_a_netlist_is_refused() {
+    // a Verilog-A model, which the core reads as text: a viewer's edit of it carries that dialect
+    let va = "module res(p, n);\n  electrical p, n;\n  analog V(p, n) <+ 1k * I(p, n);\nendmodule\n";
+    let ops = json!([{"level": "file:res.va", "op": "add-text", "at": [0, 0], "markup": "x"}]);
+    let r = WriteRequest { file: Some("res.va".into()), ..request("text", va, ops) };
+    assert_eq!(
+        write(&r).unwrap_err(),
+        "dialect \"text\" is that of a file that is not a netlist; RNL is written only into a netlist"
+    );
+}
+
+#[test]
 fn refusals_name_the_op() {
     let refused = |ops: Value| write(&request("spice", RC, ops)).unwrap_err();
     assert_eq!(

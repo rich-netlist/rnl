@@ -29,6 +29,8 @@ const USAGE: &str = "usage:
   rnl write REQUEST.json -o OUT     write an edit transaction's ops into its netlist
 
 FILE is a SPICE netlist, a Spectre netlist (.scs) or a package file (.rnl); catalog and formats take none.
+A file whose suffix marks a hardware description language (.va, .vams, .v, .vh, .sv, .svh, .vhd,
+.vhdl) is not a netlist: its format is text, and it is not read, unless a format is set for it.
 options:
   --path DIR          search packages and bare include filenames here; repeatable
   --package-dir DIR   look for packages in DIR as well (16.2); repeatable
@@ -38,12 +40,12 @@ options:
                       record still comes first (16.3), and V not found is an error only for the
                       files that do not pin one. rnl solve does not take it
   --no-generated      read the netlist without its type=\"generated\" records, as a solver does (2.8)
-  --dialect NAME      the format of FILE, spice or spectre, instead of guessing from it
-  --format PATH=NAME  read the file PATH with the format NAME, spice or spectre; repeatable. PATH is
-                      relative to the current directory or absolute, as FILE may be; one that the
-                      netlist does not read is warned of. A file given none is read by its own
+  --dialect NAME      the format of FILE, spice, spectre or text, instead of guessing from it
+  --format PATH=NAME  read the file PATH with the format NAME, spice, spectre or text; repeatable.
+                      PATH is relative to the current directory or absolute, as FILE may be; one
+                      that the netlist does not read is warned of. A file given none is read by its own
                       suffix and first lines, a .scs file or one with simulator lang=spectre as
-                      Spectre, and FILE by --dialect before them
+                      Spectre, a .va file and the like as text, and FILE by --dialect before them
 view options:
   --primitives        give each level's primitives, in scene units with y up
   --no-svg            leave out each level's SVG
@@ -184,7 +186,7 @@ fn parse_args() -> Result<Args, String> {
             "--no-std" => std = false,
             "--std-version" => std_version = Some(it.next().ok_or("--std-version needs a version, such as 0.2")?),
             "--no-generated" => generated = false,
-            "--dialect" => dialect = Some(it.next().ok_or("--dialect needs spice or spectre")?),
+            "--dialect" => dialect = Some(it.next().ok_or("--dialect needs spice, spectre or text")?),
             "--format" => {
                 let set = it.next().ok_or("--format needs PATH=NAME, such as models.inc=spectre")?;
                 let (path, name) =

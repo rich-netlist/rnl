@@ -11,8 +11,9 @@ use rnl_runtime::source::{normalize, Provider};
 use serde::Serialize;
 
 /// The formats, in the order a frontend lists them: SPICE, the format of a file no other claims,
-/// first.
-pub(crate) static FORMATS: [&dyn Format; 2] = [&rnl_host_spice::Spice, &rnl_host_spectre::Spectre];
+/// first, and text, that of a file that is not a netlist, last.
+pub(crate) static FORMATS: [&dyn Format; 3] =
+    [&rnl_host_spice::Spice, &rnl_host_spectre::Spectre, &rnl_runtime::host::text::Text];
 
 /// A format a file can be read with, as `formats` lists them.
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
@@ -48,7 +49,8 @@ fn index(name: &str) -> Option<usize> {
 
 /// The format a file is read with when none is set for it, by its path and its text: the first
 /// that claims it, else SPICE. A `.scs` file, or one with a `simulator lang=spectre` among its first
-/// 50 lines, as the PDKs write their model libraries, is Spectre.
+/// 50 lines, as the PDKs write their model libraries, is Spectre; a file whose suffix marks a
+/// hardware description language, such as `.va`, is text, which is not read.
 pub fn detect_format(path: &str, text: &str) -> &'static str {
     FORMATS[detected(path, text)].name()
 }

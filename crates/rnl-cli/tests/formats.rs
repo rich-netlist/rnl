@@ -52,6 +52,12 @@ fn the_formats_are_listed_spice_first() {
     let want = [
         FormatInfo { name: "spice".into(), title: "SPICE".into(), extensions: vec![], fallback: true },
         FormatInfo { name: "spectre".into(), title: "Spectre".into(), extensions: vec!["scs".into()], fallback: false },
+        FormatInfo {
+            name: "text".into(),
+            title: "Text".into(),
+            extensions: ["va", "vams", "v", "vh", "sv", "svh", "vhd", "vhdl"].map(String::from).to_vec(),
+            fallback: false,
+        },
     ];
     assert_eq!(rnl_view::formats(), want);
     // a Document lists them too
@@ -315,7 +321,7 @@ fn an_unknown_format_fails_the_build_and_a_file_not_read_is_left_alone() {
     let files = MemoryProvider::new().with("/w/top.sp", TOP).with("/w/cells.scs", CELLS);
     let options = BuildOptions { formats: set(&[("/w/cells.scs", "verilog")]), ..BuildOptions::default() };
     let err = rnl_view::build("/w/top.sp", &files, &options).unwrap_err();
-    assert_eq!(err, "unknown format \"verilog\" for /w/cells.scs; the formats are spice, spectre");
+    assert_eq!(err, "unknown format \"verilog\" for /w/cells.scs; the formats are spice, spectre, text");
     let d = build("/w/top.sp", &files, &[("/w/elsewhere.inc", "spectre"), ("/w/./sub/../cells.scs", "spice")]);
     assert_eq!(formats_of(&d)[1].1, Some("spice"));
 }
@@ -427,7 +433,7 @@ fn the_command_line_sets_formats_and_lists_them() {
     let (code, _, err) = rnl(&["check", &top, "--format", &format!("{cells}=verilog")]);
     assert_eq!(
         (code, err.trim()),
-        (2, format!("rnl: unknown format \"verilog\" for {cells}; the formats are spice, spectre").as_str())
+        (2, format!("rnl: unknown format \"verilog\" for {cells}; the formats are spice, spectre, text").as_str())
     );
     // a path the netlist does not read sets nothing, and is warned of, by its path made absolute
     // as FILE is
@@ -443,4 +449,127 @@ fn the_command_line_sets_formats_and_lists_them() {
     assert_eq!(code, 0);
     let list: serde_json::Value = serde_json::from_str(&out).unwrap();
     assert_eq!(list, serde_json::to_value(rnl_view::formats()).unwrap());
+}
+
+/// A Verilog-A model, which SPICE would read as elements outside its subset.
+const MODEL_VA: &str = "`include \"disciplines.vams\"\n// @RNL { (0,0) @TEXT(\"not a record\") }\n\
+                        module res(p, n);\n  inout p, n;\n  electrical p, n;\n  parameter real r = 1k;\n\
+                        analog begin\n    V(p, n) <+ r * I(p, n);\n  end\nendmodule\n";
+
+/// Each diagnostic of a Document: its severity, file, line and message.
+fn said(d: &Document) -> Vec<(&str, &str, u32, &str)> {
+    d.diagnostics.iter().map(|x| (x.severity, x.file.as_str(), x.line, x.message.as_str())).collect()
+}
+
+#[test]
+fn a_file_of_a_hardware_description_language_is_text() {
+    for (path, language) in [
+        ("m/res.va", "Verilog-A"),
+        ("RES.VA", "Verilog-A"),
+        ("res.vams", "Verilog-AMS"),
+        ("top.v", "Verilog"),
+        ("defs.vh", "Verilog"),
+        ("top.sv", "SystemVerilog"),
+        ("defs.svh", "SystemVerilog"),
+        ("top.vhd", "VHDL"),
+        ("top.vhdl", "VHDL"),
+    ] {
+        assert_eq!(rnl_view::detect_format(path, "* t\nR1 a 0 1k\n"), "text", "{path}");
+        assert_eq!(rnl_runtime::host::text::language(path), Some(language), "{path}");
+    }
+    // by its suffix only: a suffix alone, or one of a directory, is not one
+    for path in [".va", "va", "dir.va/top.sp", "top.vams.sp", "top.vo"] {
+        assert_eq!(rnl_view::detect_format(path, "* t\n"), "spice", "{path}");
+    }
+}
+
+#[test]
+fn a_verilog_a_file_opened_is_not_read_and_says_so_once() {
+    let files = MemoryProvider::new().with("/w/res.va", MODEL_VA);
+    let d = build("/w/res.va", &files, &[]);
+    assert_eq!((d.dialect.as_str(), formats_of(&d)), ("text", vec![("res.va", Some("text"), Some("text"))]));
+    // one hint, at its first line: no SPICE warnings, no hint of a missing header record
+    assert_eq!(said(&d), [("hint", "res.va", 1, "`res.va` is not a netlist (Verilog-A); it is not read")]);
+    // its text is kept, nothing of it read: no element, no record
+    assert_eq!(d.files[0].text, MODEL_VA);
+    assert!(d.files[0].records.is_empty());
+    assert_eq!(d.levels.len(), 1);
+    assert!(d.objects.is_empty(), "{:?}", d.objects.iter().map(|o| &o.name).collect::<Vec<_>>());
+    assert!(d.levels[0].unplaced.is_empty());
+    // the snapshot names its format too
+    let parts = Parts { drawing: false, host: false, model: false };
+    let s = serde_json::to_value(rnl_view::snapshot("/w/res.va", &files, &BuildOptions::default(), parts).unwrap())
+        .unwrap();
+    assert_eq!(s["dialect"], "text");
+}
+
+#[test]
+fn a_format_given_for_a_verilog_a_file_reads_it() {
+    let files = MemoryProvider::new().with("/w/res.va", MODEL_VA);
+    // set for the file: read as SPICE, which it is not, and warned of as SPICE warns
+    let d = build("/w/res.va", &files, &[("/w/res.va", "spice")]);
+    assert_eq!((d.dialect.as_str(), formats_of(&d)[0]), ("spice", ("res.va", Some("spice"), Some("text"))));
+    assert!(d.diagnostics.iter().any(|x| x.message.contains("not in the supported SPICE subset")), "{:?}", said(&d));
+    assert!(!d.diagnostics.iter().any(|x| x.message.contains("is not a netlist")));
+    // the dialect of the opened file, too
+    let options = BuildOptions { dialect: Some("spice".into()), ..BuildOptions::default() };
+    let d = rnl_view::build("/w/res.va", &files, &options).unwrap();
+    assert_eq!(formats_of(&d)[0], ("res.va", Some("spice"), Some("spice")));
+    // and any file can be set to text: a netlist then is not read either
+    let files = MemoryProvider::new().with("/w/top.sp", "* t\nR1 a 0 1k\n");
+    let d = build("/w/top.sp", &files, &[("/w/top.sp", "text")]);
+    assert_eq!(formats_of(&d)[0], ("top.sp", Some("text"), Some("spice")));
+    assert_eq!(said(&d), [("hint", "top.sp", 1, "`top.sp` is read as text, not as a netlist; it is not read")]);
+    assert!(d.objects.is_empty());
+}
+
+#[test]
+fn a_verilog_a_file_that_a_netlist_includes_is_kept_as_text() {
+    // SPICE's `.include` and Spectre's `include` follow it, and read nothing of it: the hint is at
+    // the include; Spectre's `ahdl_include` does not follow it (host_regions.rs)
+    for (top, text) in [
+        ("/w/top.sp", "* top\n.include \"res.va\"\nR1 a 0 1k\n.end\n"),
+        ("/w/top.scs", "// top\ninclude \"res.va\"\nR1 (a 0) resistor r=1k\n"),
+    ] {
+        let files = MemoryProvider::new().with(top, text).with("/w/res.va", MODEL_VA);
+        let d = build(top, &files, &[]);
+        let main = &top[3..];
+        let format = if main.ends_with(".sp") { "spice" } else { "spectre" };
+        assert_eq!(
+            formats_of(&d),
+            [(main, Some(format), Some(format)), ("res.va", Some("text"), Some("text"))],
+            "{top}"
+        );
+        assert_eq!(d.files[0].includes.len(), 1);
+        let notes: Vec<_> = said(&d).into_iter().filter(|x| x.0 != "hint" || x.3.contains("res.va")).collect();
+        assert_eq!(notes, [("hint", main, 2, "`res.va` is not a netlist (Verilog-A); it is not read")], "{top}");
+        assert_eq!(
+            d.objects.iter().filter(|o| o.kind == "instance").map(|o| o.name.as_str()).collect::<Vec<_>>(),
+            ["R1"]
+        );
+        assert!(d.files[1].records.is_empty());
+        // set for it, it is read with that format
+        let d = build(top, &files, &[("/w/res.va", "spice")]);
+        assert_eq!(formats_of(&d)[1], ("res.va", Some("spice"), Some("text")));
+    }
+}
+
+#[test]
+fn check_of_a_verilog_a_file_prints_the_hint_and_succeeds() {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("rnl-formats-text");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("res.va"), MODEL_VA).unwrap();
+    let va = rnl_cli::path_str(&dir.join("res.va"));
+    let (code, out, err) = rnl(&["check", &va]);
+    assert_eq!(code, 0, "{out}{err}");
+    assert_eq!(
+        out,
+        "hint res.va:1: `res.va` is not a netlist (Verilog-A); it is not read
+0 errors, 0 warnings, 1 hints
+"
+    );
+    // a format set for it reads it as SPICE, with SPICE's warnings
+    let (code, out, _) = rnl(&["check", &va, "--format", &format!("{va}=spice")]);
+    assert_eq!(code, 0, "{out}");
+    assert!(out.contains("not in the supported SPICE subset"), "{out}");
 }
