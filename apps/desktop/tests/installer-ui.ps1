@@ -16,7 +16,7 @@ if (Test-Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\RNL Vie
   throw "RNL Viewer is installed for this user: this script leaves it be, and runs on a machine that has none."
 }
 New-Item -ItemType Directory -Force $Out | Out-Null
-Add-Type -ReferencedAssemblies System.Drawing -TypeDefinition @'
+Add-Type -ReferencedAssemblies System.Drawing, System.Windows.Forms -TypeDefinition @'
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -28,7 +28,8 @@ public static class InstallerUi {
   [StructLayout(LayoutKind.Sequential)] struct RECT { public int Left, Top, Right, Bottom; }
   [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc p, IntPtr l);
   [DllImport("user32.dll")] static extern bool EnumChildWindows(IntPtr parent, EnumProc p, IntPtr l);
-  [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr SendMessageTimeout(IntPtr h, int msg, IntPtr w, StringBuilder l, uint flags, uint timeout, out IntPtr result);
+  [DllImport("user32.dll")] static extern bool PostMessage(IntPtr h, int msg, IntPtr w, IntPtr l);
   [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
   [DllImport("user32.dll")] static extern bool IsWindowEnabled(IntPtr h);
   [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
@@ -37,7 +38,11 @@ public static class InstallerUi {
   [DllImport("user32.dll")] static extern bool PrintWindow(IntPtr h, IntPtr hdc, uint flags);
   [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
 
-  static string Text(IntPtr h) { var s = new StringBuilder(1024); GetWindowText(h, s, s.Capacity); return s.ToString(); }
+  // WM_GETTEXT with a time limit: a window that is busy, as an installer is while it runs a page's code, must not stop us
+  static string Text(IntPtr h) {
+    var s = new StringBuilder(1024); IntPtr r;
+    return SendMessageTimeout(h, 0x000D, (IntPtr)s.Capacity, s, 2 | 8, 500, out r) == IntPtr.Zero ? "" : s.ToString(); // SMTO_ABORTIFHUNG | SMTO_BLOCK
+  }
 
   /// The visible top-level windows of a process, the newest dialog first as the system lists them.
   public static List<IntPtr> Windows(uint pid) {
@@ -57,12 +62,21 @@ public static class InstallerUi {
     EnumChildWindows(top, (h, l) => {
       var t = Text(h).Replace("&", "").Replace(">", "").Replace("<", "").Trim();
       if (!done && IsWindowVisible(h) && IsWindowEnabled(h) && string.Equals(t, name, StringComparison.OrdinalIgnoreCase)) {
-        SendMessage(h, 0x00F5, IntPtr.Zero, IntPtr.Zero); // BM_CLICK
+        PostMessage(h, 0x00F5, IntPtr.Zero, IntPtr.Zero); // BM_CLICK, posted: its page may show a box that waits for an answer
         done = true;
       }
       return !done;
     }, IntPtr.Zero);
     return done;
+  }
+  /// The whole screen, for when a page does not come.
+  public static void Screen(string path) {
+    var b = System.Windows.Forms.Screen.PrimaryScreen.Bounds;
+    using (var bmp = new Bitmap(b.Width, b.Height))
+    using (var g = Graphics.FromImage(bmp)) {
+      g.CopyFromScreen(b.Left, b.Top, 0, 0, bmp.Size);
+      bmp.Save(path, ImageFormat.Png);
+    }
   }
   public static void Shot(IntPtr top, string path) {
     SetForegroundWindow(top);
@@ -113,10 +127,13 @@ function Shoot-Page($process, $page, $file, [string[]]$forward) {
       foreach ($name in $forward) { if ([InstallerUi]::Press($w, $name)) { break } }
     }
     if ($shot) { break }
-    Start-Sleep -Milliseconds 500
+    # a page takes a moment to come, and a second click on the old one would pass over the page we want
+    Start-Sleep -Milliseconds 1500
   }
   if (-not $shot) {
     Write-Host ("pages seen:`n" + ($log | Select-Object -Last 12 | ForEach-Object { "  " + $_ }) -join "`n")
+    $log | Set-Content (Join-Path $Out "pages-seen.txt")
+    try { [InstallerUi]::Screen((Join-Path $Out "screen-when-the-page-did-not-come.png")) } catch { Write-Host "no screen picture: $_" }
     if (-not $process.HasExited) { Stop-Process -Id $process.Id -Force }
     throw "The page with '$page' did not come."
   }
