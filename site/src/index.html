@@ -428,7 +428,7 @@
       <p class="sheet-no"><en>03 · Advantages</en></p>
       <h2><en>What you get from writing the meaning down.</en></h2>
     </header>
-    <div class="facts four">
+    <div class="facts five">
       <div class="fact">
         <h3><svg class="ico"><use href="#i-asterisk"/></svg><en>Meaning first</en></h3>
         <p><en>Say which devices form a differential pair or a current mirror, what is symmetric, where the current flows. Schematics follow well-known conventions, so the meaning carries most of the drawing; add positions and wires only where you want them.</en></p>
@@ -445,6 +445,25 @@
         <h3><svg class="ico"><use href="#i-globe"/></svg><en>Open</en></h3>
         <p><en>A public standard and symbol libraries, open-source tools, a viewer that opens in the browser.</en></p>
       </div>
+      <div class="fact">
+        <h3><svg class="ico"><use href="#i-layers"/></svg><en>Circuit apart from style</en></h3>
+        <p><en>The netlist fixes what the circuit is; packages decide how it looks, as HTML carries the content and CSS its style. Include other packages and the same file looks different; the circuit does not change.</en></p>
+      </div>
+    </div>
+
+    <h3 class="sub-h" id="styles"><en>The same file, two looks</en></h3>
+    <p class="sub-lead"><en>Both drawings are made by the RNL core from the same op-amp file. The second adds two lines to the file’s header, which include the public packages <code>eda-symbol</code> and <code>eda-style</code> (0.1): the symbols and the style of a traditional EDA look. The devices, the connections and the meaning stay as they were.</en></p>
+    <div class="looks">
+      <figure class="look panel">
+        <div class="ph"><svg class="ico"><use href="#i-eye"/></svg><span class="ph-title"><en>Standard packages</en></span><span class="ph-right"><a class="chip" href="../viewer/?url=samples/site/opamp2.sp" target="_blank" rel="noopener"><en>Open in viewer</en></a></span></div>
+        <img src="assets/opamp-standard.svg" alt="<en>The op-amp drawn by the RNL core with the standard packages</en>" loading="lazy">
+        <figcaption><en><code>opamp2.sp</code>, as the core draws it with the standard packages.</en></figcaption>
+      </figure>
+      <figure class="look panel">
+        <div class="ph"><svg class="ico"><use href="#i-eye"/></svg><span class="ph-title"><en>Traditional EDA look</en></span><span class="ph-right"><a class="chip" href="../viewer/?url=samples/site/opamp2-eda.sp" target="_blank" rel="noopener"><en>Open in viewer</en></a></span></div>
+        <img src="assets/opamp-eda.svg" alt="<en>The same op-amp drawn by the RNL core with the packages eda-symbol and eda-style</en>" loading="lazy">
+        <figcaption><en><code>opamp2-eda.sp</code> differs from it by the two lines that include the packages: <code>@USE-PACKAGE(name="eda-symbol", version="0.1"); @USE-PACKAGE(name="eda-style", version="0.1")</code>. The viewer offers to include them when it opens the file.</en></figcaption>
+      </figure>
     </div>
   </div>
 </section>

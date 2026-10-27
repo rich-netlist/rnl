@@ -1634,6 +1634,14 @@ html[lang="zh-CN"] .tour-h1 { font-family: var(--f-body); font-weight: 900; lett
 .cl.is-dev { background: var(--signal-2); box-shadow: inset 3px 0 0 color-mix(in srgb, var(--signal) 55%, transparent); }
 .cl.is-hot.is-rnl { background: var(--signal-2); }
 .facts.four { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 0; }
+.facts.five { grid-template-columns: repeat(6, minmax(0, 1fr)); margin-top: 0; }
+.facts.five .fact { grid-column: span 2; }
+.facts.five .fact:nth-child(n+4) { grid-column: span 3; }
+.looks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
+.look { margin: 0; display: flex; flex-direction: column; }
+.look img { display: block; width: 100%; height: auto; background: #fff; border-top: 1px solid var(--line); }
+.look figcaption { padding: 12px 16px 14px; font-size: 14px; line-height: 1.6; color: var(--ink-2); border-top: 1px dashed var(--line); }
+.look figcaption code { font-size: 12.5px; color: var(--markup); background: var(--markup-2); padding: 1px 6px; border-radius: 4px; overflow-wrap: anywhere; }
 .facts.ai-points { margin-top: 0; }
 .eco { list-style: none; margin: 0 0 8px; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
 .eco a { display: grid; gap: 6px; align-content: start; height: 100%; padding: 16px 18px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); text-decoration: none; color: var(--ink); }
@@ -1646,11 +1654,14 @@ html[lang="zh-CN"] .tour-h1 { font-family: var(--f-body); font-weight: 900; lett
   .rv-code { order: 2; }
   .rv-code .code { min-height: 0; max-height: 380px; }
   .facts.four, .eco { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .facts.five { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .facts.five .fact, .facts.five .fact:nth-child(n+4) { grid-column: auto; }
+  .looks { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 640px) {
   .rv-legend { grid-template-columns: 1fr; }
   .rv-item { grid-template-columns: 1fr; gap: 2px; }
-  .facts.four, .eco { grid-template-columns: 1fr; }
+  .facts.four, .facts.five, .eco { grid-template-columns: 1fr; }
 }
 
 {{locale-css}}

@@ -209,6 +209,11 @@ class SiteExamples(unittest.TestCase):
             self.assertIn(old, ex[name])
             errors = build.check_opamp(files, dict(ex, **{name: ex[name].replace(old, new)}))
             self.assertTrue(any(where in e for e in errors), (where, errors))
+        # the core's drawings were made from other files than these: the examples were changed and not drawn again
+        errors = build.check_opamp(files, dict(ex, **{"opamp2.sp": ex["opamp2.sp"].replace("W=10u", "W=12u")}))
+        self.assertTrue(any("render-examples" in e for e in errors), errors)
+        errors = build.check_opamp(files, dict(ex, **{"opamp2-eda.sp": ex["opamp2-eda.sp"].replace("W=10u", "W=12u")}))
+        self.assertTrue(any("opamp2-eda.sp" in e for e in errors), errors)
 
 
 if __name__ == "__main__":

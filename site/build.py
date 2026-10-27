@@ -65,6 +65,7 @@ from base64 import b64encode
 from datetime import date, datetime, timedelta, timezone
 from functools import lru_cache
 from html import escape
+import hashlib
 import importlib.util
 import json
 import os
@@ -642,6 +643,20 @@ def check_opamp(files, ex):
         for name, text in (("opamp2.sp", en), ("opamp2-zh.sp", zh)):
             if "#%s @PLACE(%s, %s)" % (dev, x, y) not in text:
                 errors.append("examples/%s: missing '#%s @PLACE(%s, %s)' from PLACE in src/assets/opamp.js" % (name, dev, x, y))
+    # the same file with the two public packages, and the core's drawings of the two, which say which file they are of
+    header = '* @RNL(type="header") { @VERSION("0.3")}'
+    eda = header.replace('@VERSION("0.3")', '@VERSION("0.3"); @USE-PACKAGE(name="eda-symbol", version="0.1"); @USE-PACKAGE(name="eda-style", version="0.1")')
+    if "opamp2-eda.sp" in ex and ex["opamp2-eda.sp"] != en.replace(header, eda):
+        errors.append("examples/opamp2-eda.sp: is not examples/opamp2.sp with the USE-PACKAGE lines of eda-symbol and eda-style in its header")
+    for svg, name in (("opamp-standard.svg", "opamp2.sp"), ("opamp-eda.svg", "opamp2-eda.sp")):
+        path = SRC / "assets" / svg
+        if name not in ex or not path.is_file():
+            errors.append("src/assets/%s: missing; node site/render-examples.mjs draws it" % svg)
+            continue
+        m = re.search(r"from site/examples/(\S+) sha256:([0-9a-f]+)", path.read_text(encoding="utf-8"))
+        want = hashlib.sha256(ex[name].encode("utf-8")).hexdigest()
+        if not m or m.group(1) != name or not want.startswith(m.group(2)):
+            errors.append("src/assets/%s: not drawn from the present examples/%s; run node site/render-examples.mjs" % (svg, name))
     for dev, x, y, o in re.findall(r"(\w+):\s*\[(-?\d+),\s*(-?\d+),\s*'(\w+)'\]", block(r"var VIRT = \{(.*?)\};")):
         for name, text in (("opamp2.sp", en), ("opamp2-zh.sp", zh)):
             if "@PLACE(%s, %s)" % (x, y) not in text:
@@ -666,7 +681,15 @@ def check_examples_rnl(rnl):
     with tempfile.TemporaryDirectory() as tmp:
         for idx, path in enumerate(sorted(EXAMPLES.glob("*.sp"))):
             rel = "examples/" + path.name
-            chk = subprocess.run([str(rnl), "check", str(path)], capture_output=True, text=True, encoding="utf-8")
+            # a file that includes public packages (USE-PACKAGE) finds them in the locked copies
+            # (python scripts/packages.py download)
+            paths = []
+            for name, version in re.findall(r'@USE-PACKAGE\(name="([\w-]+)", version="([\d.]+)"\)', path.read_text(encoding="utf-8")):
+                folder = ROOT / ".rnl-packages" / name / version
+                if not folder.is_dir():
+                    errors.append("%s: the package %s %s is not in .rnl-packages/: run python scripts/packages.py download" % (rel, name, version))
+                paths += ["--path", str(folder)]
+            chk = subprocess.run([str(rnl), "check", str(path), *paths], capture_output=True, text=True, encoding="utf-8")
             m = COUNTS.search(chk.stdout)
             if not m:
                 errors.append("%s: rnl check printed no summary:\n%s%s" % (rel, chk.stdout, chk.stderr))
@@ -677,7 +700,7 @@ def check_examples_rnl(rnl):
                               % (rel, n_err, n_warn, "\n".join(
                                   l for l in chk.stdout.splitlines() if l.startswith(("error", "warning")))))
             out_dir = Path(tmp) / str(idx)
-            rnd = subprocess.run([str(rnl), "render", str(path), "--out", str(out_dir)],
+            rnd = subprocess.run([str(rnl), "render", str(path), "--out", str(out_dir), *paths],
                                  capture_output=True, text=True, encoding="utf-8")
             if rnd.returncode != 0 or not list(out_dir.glob("*.svg")):
                 errors.append("%s: rnl render failed:\n%s%s" % (rel, rnd.stdout, rnd.stderr))

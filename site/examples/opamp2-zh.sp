@@ -60,12 +60,12 @@ MB ibias ibias vss vss nch W=10u L=1u
 *   %jv = (18, 0);  %jy = (18, -9);  %jz = (45, -9);
 *   &ibias @WIRE(mode="horizontal-vertical") {#MB:d #MB:g};
 *   &ibias @WIRE {#MB:g %jv #M5:g};
-*   &ibias @WIRE {%jv %jy %jz #M7:g};
+*   &ibias @WIRE {%jv %jy %jz};  &ibias @WIRE(mode="vertical-horizontal") {%jz #M7:g};
 *   $JUNCTION @ATTACH {%ja %jb %jo %j6 %jt %jq %jv};
 *   %pi = $IO_PORT @ATTACH &inp;  %pi @PLACE(5, 8);  &inp @WIRE {#M1:g %pi:p};
 *   %pn = $IO_PORT @ATTACH &inn;  %pn @PLACE(37, 8) => @ORIENT("MY");  &inn @WIRE {#M2:g %pn:p};
 *   %po = $IO_PORT @ATTACH &out;  %po @PLACE(58, 12) => @ORIENT("MY");  &out @WIRE {%jq %po:p};
-*   %pb = $IO_PORT @ATTACH &ibias;  %pb @PLACE(5, 2);  &ibias @WIRE {%pb:p #MB:d};
+*   %pb = $IO_PORT @ATTACH &ibias;  %pb @PLACE(5, 2);  &ibias @WIRE(mode="horizontal-vertical") {%pb:p #MB:d};
 *   %vdd1 = $SUPPLY_STUB @ATTACH #M3:s;  %vdd1::s @PLACE(12, 20);
 *   %vdd2 = $SUPPLY_STUB @ATTACH #M4:s;  %vdd2::s @PLACE(32, 20);
 *   %vdd3 = $SUPPLY_STUB @ATTACH #M6:s;  %vdd3::s @PLACE(48, 24);

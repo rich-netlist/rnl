@@ -333,5 +333,15 @@
   "Simulate and verify: a simulator reads the netlist and skips the RNL comments.": "仿真和验证：仿真器读网表，跳过 RNL 注释。",
   "06 · Status": "06 · 现状",
   "Language models are good at reading and writing text such as netlists. RNL makes the circuit’s structure, intent and drawing text too, so an agent writes a circuit and its meaning in one file, and people review the structures and intent it declared in a viewer instead of reading the netlist line by line. Free text between statements helps people read, but it never changes what machines understand.": "语言模型擅长读写网表这样的文本。RNL 把电路的结构、意图和画法也变成文本，所以 agent 能在一份文件里写出电路和它的语义，人在查看器里审它声明的结构和意图，不用逐行读网表。语句之间的自由文字帮助人阅读，但从不改变机器理解的内容。",
-  "07 · Next": "07 · 下一步"
+  "07 · Next": "07 · 下一步",
+  "Circuit apart from style": "电路与样式分开",
+  "The netlist fixes what the circuit is; packages decide how it looks, as HTML carries the content and CSS its style. Include other packages and the same file looks different; the circuit does not change.": "网表定下电路是什么，包决定它长什么样，就像 HTML 管内容、CSS 管样式。换上别的包，同一份文件看起来就不一样；电路本身不变。",
+  "The same file, two looks": "同一份文件，两种样子",
+  "Both drawings are made by the RNL core from the same op-amp file. The second adds two lines to the file’s header, which include the public packages <code>eda-symbol</code> and <code>eda-style</code> (0.1): the symbols and the style of a traditional EDA look. The devices, the connections and the meaning stay as they were.": "两幅图都是 RNL 核心根据同一份运放文件画出来的。第二幅只在文件头多了两行，引入公开的包 <code>eda-symbol</code> 和 <code>eda-style</code>（0.1）：传统 EDA 的符号和样式。器件、连接和含义都没有变。",
+  "Standard packages": "标准包",
+  "The op-amp drawn by the RNL core with the standard packages": "RNL 核心用标准包画出的运放",
+  "<code>opamp2.sp</code>, as the core draws it with the standard packages.": "<code>opamp2.sp</code>，核心用标准包画出的样子。",
+  "Traditional EDA look": "传统 EDA 样式",
+  "The same op-amp drawn by the RNL core with the packages eda-symbol and eda-style": "RNL 核心用 eda-symbol 和 eda-style 两个包画出的同一个运放",
+  "<code>opamp2-eda.sp</code> differs from it by the two lines that include the packages: <code>@USE-PACKAGE(name=\"eda-symbol\", version=\"0.1\"); @USE-PACKAGE(name=\"eda-style\", version=\"0.1\")</code>. The viewer offers to include them when it opens the file.": "<code>opamp2-eda.sp</code> 与它只差引入这两个包的两行：<code>@USE-PACKAGE(name=\"eda-symbol\", version=\"0.1\"); @USE-PACKAGE(name=\"eda-style\", version=\"0.1\")</code>。查看器打开这个文件时会提示引入它们。"
 }

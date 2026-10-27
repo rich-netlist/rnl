@@ -16,14 +16,14 @@
   var BOX = [-3.5, -12.5, 64.5, 27.5];
 
   var SPEC = {
-    M1: { sym: 'nmos', label: 'M1', value: 'W/L 40u/1u', valueOpt: true },
-    M2: { sym: 'nmos', label: 'M2', value: 'W/L 40u/1u', valueOpt: true },
-    M3: { sym: 'pmos', label: 'M3', value: 'W/L 20u/1u', valueOpt: true },
-    M4: { sym: 'pmos', label: 'M4', value: 'W/L 20u/1u', valueOpt: true },
-    M5: { sym: 'nmos', label: 'M5', value: 'W/L 20u/1u', valueOpt: true },
-    M6: { sym: 'pmos', label: 'M6', value: 'W/L 200u/1u', valueOpt: true },
-    M7: { sym: 'nmos', label: 'M7', value: 'W/L 100u/1u', valueOpt: true },
-    MB: { sym: 'nmos', label: 'MB', value: 'W/L 10u/1u', valueOpt: true },
+    M1: { sym: 'nmos', label: 'M1', value: 'nch', val: [1.3, -1.9, 'start'] },
+    M2: { sym: 'nmos', label: 'M2', value: 'nch', val: [-1.3, -1.9, 'end'] },
+    M3: { sym: 'pmos', label: 'M3', value: 'pch', val: [-1.3, -1.9, 'end'] },
+    M4: { sym: 'pmos', label: 'M4', value: 'pch', val: [1.3, -1.9, 'start'] },
+    M5: { sym: 'nmos', label: 'M5', value: 'nch', val: [1.3, -1.9, 'start'] },
+    M6: { sym: 'pmos', label: 'M6', value: 'pch', val: [1.3, -1.9, 'start'] },
+    M7: { sym: 'nmos', label: 'M7', value: 'nch', val: [1.3, -1.9, 'start'] },
+    MB: { sym: 'nmos', label: 'MB', value: 'nch', val: [-1.3, -1.9, 'end'] },
     RZ: { sym: 'res', label: 'RZ', value: '2k' },
     CC: { sym: 'cap', label: 'CC', value: '1p' },
     P_inp: { sym: 'port', label: 'inp', virtual: true },
