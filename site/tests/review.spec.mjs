@@ -1,7 +1,9 @@
 import { test, expect } from '../../tests/viewer/node_modules/@playwright/test/index.mjs';
 
-// The example of the introduction: an op-amp that is reviewed by what it says. Picking an item of the checklist, or a
-// statement of the file, lights up the devices it is about in the drawing and their lines in the netlist.
+// The example of the introduction: a five-transistor OTA that is reviewed by what it says. Picking an item of the
+// checklist, or a statement of the file, lights up the devices it is about in the drawing (the RNL core's own drawing)
+// and their lines in the netlist. The look switch swaps one core drawing for the other; the simulator view dims the
+// RNL lines.
 test.beforeEach(async ({ page }) => {
   await page.route('https://rich-netlist.github.io/**', route => route.abort());
   await page.addInitScript(() => localStorage.setItem('rnl-intro-theme', 'light'));
@@ -11,38 +13,87 @@ for (const language of ['en', 'zh']) {
   test(`review: an item lights up its devices, its statements and their lines, ${language}`, async ({ page }) => {
     await page.goto(`/${language}/index.html`);
     const items = page.locator('#rv-items .rv-item');
-    await expect(items).toHaveCount(7);
-    const lit = page.locator('#rv-svg .sc-dev.is-hl');
+    await expect(items).toHaveCount(5);
+    const lit = page.locator('#rv-stage svg [data-dev].is-lit');
+    const devices = new Set();
+    const litDevices = async () => new Set(await lit.evaluateAll(els => els.map(el => el.getAttribute('data-dev'))));
     const hot = page.locator('#rv-code .cl.is-hot'), devs = page.locator('#rv-code .cl.is-dev');
     await expect(lit).toHaveCount(0);
 
     // the differential pair: M1, M2 and the tail M5, in the drawing and in the netlist, and its statement
     await items.nth(0).hover();
-    await expect(lit).toHaveCount(3);
+    expect([...await litDevices()].sort()).toEqual(['M1', 'M2', 'M5']);
     await expect(devs).toHaveCount(3);
     await expect(hot).toHaveCount(1);
     await expect(hot).toContainText('$DIFFERENTIAL_PAIR');
-    await expect(page.locator('#rv-svg .sc-dev.is-hl[data-ref="M5"]')).toHaveCount(1);
+    await expect(page.locator('#rv-stage .rv-note.is-on')).toHaveCount(1);
     // leaving clears it; a click keeps it
     await page.mouse.move(5, 5);
     await expect(lit).toHaveCount(0);
-    await items.nth(3).click();
-    await expect(items.nth(3)).toHaveAttribute('aria-pressed', 'true');
+    await items.nth(1).click();
+    await expect(items.nth(1)).toHaveAttribute('aria-pressed', 'true');
     await page.mouse.move(5, 5);
-    await expect(lit).toHaveCount(3);
-    await expect(page.locator('#rv-code .cl.is-hot')).toContainText('$MILLER_COMPENSATION');
-    await items.nth(3).click();
+    expect([...await litDevices()].sort()).toEqual(['M3', 'M4']);
+    await expect(page.locator('#rv-code .cl.is-hot')).toContainText('$CURRENT_MIRROR');
+    await items.nth(1).click();
     await expect(lit).toHaveCount(0);
 
     // a statement of the file picks its item
-    await page.locator('#rv-code .cl', { hasText: '$CURRENT_MIRROR' }).first().hover();
-    await expect(lit).toHaveCount(2);
+    await page.locator('#rv-code .cl', { hasText: '@ORDER' }).first().hover();
+    expect([...await litDevices()].sort()).toEqual(['M1', 'M3', 'M5']);
     // the symmetry: two statements, the four devices and the axis
-    await items.nth(4).hover();
-    await expect(lit).toHaveCount(4);
+    await items.nth(2).hover();
+    expect([...await litDevices()].sort()).toEqual(['M1', 'M2', 'M3', 'M4']);
     await expect(hot).toHaveCount(3);
+    devices.clear();
+
+    // a device of the drawing marks its lines in the file
+    await page.mouse.move(5, 5);
+    await page.locator('#rv-stage svg [data-dev="M2"]').first().hover();
+    await expect(page.locator('#rv-code .cl.is-hot').first()).toContainText('M2');
   });
 }
+
+test('review: the look switch redraws the same circuit with the packages, the file shows what changed', async ({ page }) => {
+  await page.goto('/en/index.html');
+  const stage = page.locator('#rv-stage svg');
+  const devices = async () => [...new Set(await page.locator('#rv-stage svg [data-dev]').evaluateAll(els => els.map(el => el.getAttribute('data-dev'))))].sort();
+  const standard = await stage.innerHTML();
+  const names = await devices();
+  expect(names).toEqual(expect.arrayContaining(['M1', 'M2', 'M3', 'M4', 'M5', 'PB', 'PI', 'PN', 'PO', 'VDD', 'VSS']));
+  await expect(page.locator('#rv-code')).not.toContainText('@USE-PACKAGE');
+  await expect(page.locator('#rv-open')).toHaveAttribute('href', /ota5t-review\.sp/);
+
+  await page.locator('#rv-look [data-look="eda"]').click();
+  expect(await stage.innerHTML()).not.toBe(standard);
+  expect(await devices()).toEqual(names);
+  await expect(page.locator('#rv-code .cl.is-diff')).toContainText('@USE-PACKAGE(name="eda-symbol", version="0.1")');
+  await expect(page.locator('#rv-code .cl.is-diff')).toContainText('@USE-PACKAGE(name="eda-style", version="0.1")');
+  await expect(page.locator('#rv-open')).toHaveAttribute('href', /ota5t-review-eda\.sp/);
+  // the review works in this look too
+  await page.locator('#rv-items .rv-item').nth(0).hover();
+  await expect(page.locator('#rv-stage svg [data-dev].is-lit').first()).toBeVisible();
+
+  await page.locator('#rv-look [data-look="standard"]').click();
+  expect(await stage.innerHTML()).toBe(standard);
+  await expect(page.locator('#rv-code .cl.is-diff')).toHaveCount(0);
+});
+
+test('review: the simulator view dims the RNL lines', async ({ page }) => {
+  await page.goto('/en/index.html');
+  const rnl = page.locator('#rv-code .cl.is-rnl .tx').first();
+  await expect(rnl).toHaveCSS('opacity', '1');
+  await page.locator('#rv-view [data-view="sim"]').click();
+  await expect(page.locator('#rv-code')).toHaveClass(/is-sim/);
+  await expect(rnl).not.toHaveCSS('opacity', '1');
+  await expect(page.locator('#rv-stage')).toBeHidden();
+  await expect(page.locator('#rv-sim')).toBeVisible();
+  await expect(page.locator('#rv-cap')).toContainText('comment');
+  // picking an item goes back to the viewer
+  await page.locator('#rv-items .rv-item').nth(0).hover();
+  await expect(page.locator('#rv-stage')).toBeVisible();
+  await expect(rnl).toHaveCSS('opacity', '1');
+});
 
 test('review: the writing style of the file, Chinese sentences only on the Chinese page', async ({ page }) => {
   const han = /[一-鿿]/;
@@ -51,6 +102,7 @@ test('review: the writing style of the file, Chinese sentences only on the Chine
   await page.locator('#rv-style [data-style="bare"]').click();
   await expect(page.locator('#rv-code')).not.toContainText('treated');
   await expect(page.locator('#rv-code')).toContainText('%dp1 = #M1(in_p) #M2(in_n) #M5(tail) @AS $DIFFERENTIAL_PAIR;');
+  await expect(page.locator('#rv-open')).toHaveAttribute('href', /ota5t-review-bare\.sp/);
   await page.locator('#rv-style [data-style="en"]').click();
   await expect(page.locator('#rv-code')).toContainText('treated @AS $DIFFERENTIAL_PAIR;');
   expect(han.test(await page.locator('#rv-code').textContent())).toBe(false);
@@ -61,18 +113,19 @@ test('review: the writing style of the file, Chinese sentences only on the Chine
   await expect(page.locator('#rv-code')).toContainText('@视作 $"差分对";');
   // the checklist is in the page's own language, whatever the style of the file
   expect(han.test(await page.locator('#rv-items').textContent())).toBe(true);
-  // the statements are in English again (the note about the lines left out is the page's own text)
   await page.locator('#rv-style [data-style="en"]').click();
   expect(han.test(await page.locator('#rv-code .cl', { hasText: '$DIFFERENTIAL_PAIR' }).textContent())).toBe(false);
-  await expect(page.locator('#rv-code .cl', { hasText: '$DIFFERENTIAL_PAIR' })).toContainText('treated @AS');
 });
 
-test('review: the drawing has every device of the file and nothing is wider than the screen', async ({ page }) => {
-  for (const width of [1200, 390]) {
-    await page.setViewportSize({ width, height: 900 });
-    await page.goto('/en/index.html');
-    await expect(page.locator('#rv-svg .sc-dev:not(.is-virt)')).toHaveCount(10);
-    await expect(page.locator('#rv-svg .sc-dev.is-virt')).toHaveCount(10);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
-  }
+test('review: the file and the drawing are in one row on a wide screen, and nothing is wider than the screen', async ({ page }) => {
+  await page.setViewportSize({ width: 1200, height: 900 });
+  await page.goto('/en/index.html');
+  const code = await page.locator('.rv-code').boundingBox(), figure = await page.locator('#rv-figure').boundingBox();
+  expect(Math.abs(code.y - figure.y)).toBeLessThan(2);
+  expect(figure.x).toBeGreaterThan(code.x + code.width - 2);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1200);
+  await page.setViewportSize({ width: 390, height: 900 });
+  await page.goto('/en/index.html');
+  await expect(page.locator('#rv-stage svg')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });

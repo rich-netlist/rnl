@@ -106,7 +106,7 @@ for (const lang of ["zh", "en"]) {
     await expect(panel.locator("iframe")).toHaveCount(0);
     expect(requests.filter(url => new URL(url).pathname.includes("/viewer/"))).toEqual([]);
     const beforeRequests = [...requests];
-    const beforeDemo = await documentTop(page.locator("#hero-demo"));
+    const beforeDemo = await documentTop(page.locator("#what"));
     const beforeThesis = await documentTop(page.locator(".thesis"));
     const beforeHeading = await page.locator("#hero-title").boundingBox();
     const originalLogo = await button.boundingBox();
@@ -127,7 +127,7 @@ for (const lang of ["zh", "en"]) {
     await expect(frame.locator("body")).toHaveAttribute("data-background", "light");
     expect(await frame.evaluate(() => window.viewer.grid.shown)).toBe(false);
     expect(await documentTop(page.locator(".thesis"))).toBeCloseTo(beforeThesis, 1);
-    expect(await documentTop(page.locator("#hero-demo"))).toBeCloseTo(beforeDemo, 1);
+    expect(await documentTop(page.locator("#what"))).toBeCloseTo(beforeDemo, 1);
     const textSizes = await frame.evaluate(() => [...document.querySelectorAll("#canvas > svg text")]
       .map(text => ({ name: text.textContent, size: parseFloat(getComputedStyle(text).fontSize) })));
     expect(textSizes.find(text => text.name === "RNL").size).toBeGreaterThan(textSizes.find(text => text.name === "logo by RNL").size * 3);
@@ -155,7 +155,7 @@ for (const lang of ["zh", "en"]) {
     await expect(panel).toBeHidden();
     await expect(page.locator("#hero-title")).toBeVisible();
     await expect(button).toBeFocused();
-    expect(await documentTop(page.locator("#hero-demo"))).toBeCloseTo(beforeDemo, 1);
+    expect(await documentTop(page.locator("#what"))).toBeCloseTo(beforeDemo, 1);
     await button.click();
     expect(await frame.evaluate(() => window.logoMarker)).toBe("reused");
     await expect(panel.locator("iframe")).toHaveCount(1);

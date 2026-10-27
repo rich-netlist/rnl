@@ -41,7 +41,7 @@ test('the homepage and the tour keep their viewer links in a new tab when a scri
   const link = page.locator('#rv-open');
   await expect(link).toHaveAttribute('target', '_blank');
   await page.locator('#rv-style [data-style="zh"]').click();
-  await expect(link).toHaveAttribute('href', /opamp2-zh\.sp/);
+  await expect(link).toHaveAttribute('href', /ota5t-review-zh\.sp/);
   await expect(link).toHaveAttribute('target', '_blank');
   await page.goto('/en/language.html');
   await expect(page.locator('#file-open')).toHaveAttribute('target', '_blank');

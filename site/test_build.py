@@ -177,12 +177,12 @@ class SiteExamples(unittest.TestCase):
     def test_examples_are_published_and_linked_in_both_languages(self):
         with patch.object(build, "has_linux_release", return_value=False):
             pages = build.build(None)
-        for name in ("ota5t.sp", "ota5t-zh.sp", "ota5t-edits.sp", "ota5t_tb.sp", "opamp2.sp", "opamp2-zh.sp"):
+        for name in ("ota5t.sp", "ota5t-zh.sp", "ota5t-edits.sp", "ota5t_tb.sp", "ota5t-review.sp", "ota5t-review-bare.sp", "ota5t-review-zh.sp", "ota5t-review-eda.sp"):
             self.assertIn(f"examples/{name}", pages)
         for lang, label in (("zh", "在查看器中打开"), ("en", "Open in viewer")):
-            self.assertIn(f'href="../viewer/?url=samples/site/opamp2.sp" target="_blank" rel="noopener">{label}</a>', pages[f"{lang}/index.html"])
+            self.assertIn(f'href="../viewer/?url=samples/site/ota5t-review.sp" target="_blank" rel="noopener">{label}</a>', pages[f"{lang}/index.html"])
             self.assertIn(
-                f'href="{build.SITE_URL}viewer/?url=samples/site/opamp2.sp" target="_blank" rel="noopener">{label}</a>',
+                f'href="{build.SITE_URL}viewer/?url=samples/site/ota5t-review.sp" target="_blank" rel="noopener">{label}</a>',
                 pages[f"{lang}/rnl-intro-standalone.html"],
             )
             self.assertIn(f'href="../viewer/?url=samples/site/ota5t.sp" target="_blank" rel="noopener">{label}</a>', pages[f"{lang}/language.html"])
@@ -196,24 +196,27 @@ class SiteExamples(unittest.TestCase):
         errors = build.check_examples(files, drifted)
         self.assertTrue(any("L_SYM" in e for e in errors), errors)
 
-    def test_check_examples_detects_drift_between_the_opamp_and_its_files(self):
+    def test_check_examples_detects_drift_between_the_ota_and_its_files(self):
         files = build.sources()
         ex = build.examples()
-        self.assertEqual(build.check_opamp(files, ex), [])
-        # a coordinate, a statement of the English file, one of the Chinese file, a line of the netlist
+        self.assertEqual(build.check_ota(files, ex), [])
+        # a statement of the English file, one of the notation, one of the Chinese file, a line of the netlist
         for name, old, new, where in (
-                ("opamp2.sp", "#M6 @PLACE(48, 20)", "#M6 @PLACE(50, 20)", "PLACE"),
-                ("opamp2.sp", "%flow = {#M1 #M2 #M6} treated @AS $FLOW;", "%flow = {#M1 #M2} treated @AS $FLOW;", "T[fl]"),
-                ("opamp2-zh.sp", "#M5:d 有 @电流(\"流入\");", "#M5:d 有 @电流(\"流出\");", "TZ[i5]"),
-                ("opamp2.sp", "RZ n1 nz 2k", "RZ n1 nz 4k", "lines")):
+                ("ota5t-review.sp", "%cm1 = #M3(ref) and #M4(out) treated @AS $CURRENT_MIRROR;", "%cm1 = #M3(ref) and #M4(out) treated @AS $MIRRORED;", "T[cm1]"),
+                ("ota5t-review-bare.sp", "{#M5 #M1 #M3} @ORDER(\"bottom-to-top\");", "{#M5 #M1 #M3} @ORDER(\"top-to-bottom\");", "T[ord]"),
+                ("ota5t-review-zh.sp", "#M5:d 有 @电流(\"流入\")", "#M5:d 有 @电流(\"流出\")", "TZ[cur]"),
+                ("ota5t-review.sp", "M5 tail vbias vss  vss nch W=4u L=1u", "M5 tail vbias vss  vss nch W=8u L=1u", "lines")):
             self.assertIn(old, ex[name])
-            errors = build.check_opamp(files, dict(ex, **{name: ex[name].replace(old, new)}))
+            errors = build.check_ota(files, dict(ex, **{name: ex[name].replace(old, new)}))
             self.assertTrue(any(where in e for e in errors), (where, errors))
+        # a line that the script does not have
+        errors = build.check_ota(files, dict(ex, **{"ota5t-review.sp": ex["ota5t-review.sp"].replace("* }\n.ends", "* }\n* one more line\n.ends")}))
+        self.assertTrue(any("one more line" in e for e in errors), errors)
         # the core's drawings were made from other files than these: the examples were changed and not drawn again
-        errors = build.check_opamp(files, dict(ex, **{"opamp2.sp": ex["opamp2.sp"].replace("W=10u", "W=12u")}))
+        errors = build.check_ota(files, dict(ex, **{"ota5t-review.sp": ex["ota5t-review.sp"].replace("W=4u L=0.5u", "W=5u L=0.5u")}))
         self.assertTrue(any("render-examples" in e for e in errors), errors)
-        errors = build.check_opamp(files, dict(ex, **{"opamp2-eda.sp": ex["opamp2-eda.sp"].replace("W=10u", "W=12u")}))
-        self.assertTrue(any("opamp2-eda.sp" in e for e in errors), errors)
+        errors = build.check_ota(files, dict(ex, **{"ota5t-review-eda.sp": ex["ota5t-review-eda.sp"].replace("W=4u L=0.5u", "W=5u L=0.5u")}))
+        self.assertTrue(any("ota5t-review-eda.sp" in e for e in errors), errors)
 
 
 if __name__ == "__main__":

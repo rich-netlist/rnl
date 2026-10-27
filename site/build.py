@@ -546,13 +546,13 @@ def examples():
             for path in sorted(EXAMPLES.iterdir()) if path.suffix == ".sp"}
 
 
-SAMPLES_SITE = re.compile(r"(?:samples/site/|')((?:ota5t|opamp2)[\w.-]*\.sp)")
+SAMPLES_SITE = re.compile(r"(?:samples/site/|')(ota5t[\w.-]*\.sp)")
 COUNTS = re.compile(r"(\d+) errors?, (\d+) warnings?, (\d+) hints?")
 
 
 def check_examples(files, ex):
     """Check that every samples/site/<name>.sp referenced in src/ exists in site/examples/, and that
-    the 5T OTA netlist excerpts and coordinates in src/assets/scenes.js, and the op-amp's in src/assets/opamp.js,
+    the 5T OTA netlist excerpts and coordinates in src/assets/scenes.js, and the example's in src/assets/ota.js,
     stay in step with them."""
     errors = []
     linked = {m.group(1) for text in files.values() for m in SAMPLES_SITE.finditer(text)}
@@ -604,63 +604,66 @@ def check_examples(files, ex):
             continue
         if "ota5t_tb.sp" in ex and line not in ex["ota5t_tb.sp"]:
             errors.append("examples/ota5t_tb.sp: missing %r from E2_LINES in src/assets/scenes.js" % line)
-    return errors + check_opamp(files, ex)
+    return errors + check_ota(files, ex)
 
 
-def check_opamp(files, ex):
-    """The op-amp of the introduction: the lines and the coordinates in src/assets/opamp.js are those of
-    examples/opamp2.sp (the English sentences and the notation) and examples/opamp2-zh.sp (the Chinese ones)."""
-    script = files.get("assets/opamp.js", "")
-    if not script or "opamp2.sp" not in ex or "opamp2-zh.sp" not in ex:
+OTA_FILES = {"bare": "ota5t-review-bare.sp", "en": "ota5t-review.sp", "zh": "ota5t-review-zh.sp", "eda": "ota5t-review-eda.sp"}
+
+
+def check_ota(files, ex):
+    """The OTA of the introduction: the lines in src/assets/ota.js are those of the four files
+    examples/ota5t-review*.sp (the notation, the English sentences, the Chinese ones, and the English file with the two
+    public packages), and src/assets/ota-looks.js holds the core's drawings of the present text of the standard and
+    the package files."""
+    script = files.get("assets/ota.js", "")
+    if not script or any(name not in ex for name in OTA_FILES.values()):
         return []
     errors = []
-    en, zh = ex["opamp2.sp"], ex["opamp2-zh.sp"]
+    bare, en, zh, eda = (ex[OTA_FILES[k]] for k in ("bare", "en", "zh", "eda"))
 
     def block(pattern):
         m = re.search(pattern, script, re.S)
         if not m:
-            errors.append("src/assets/opamp.js: missing %s" % pattern)
+            errors.append("src/assets/ota.js: missing %s" % pattern)
             return ""
         return m.group(1)
 
-    for key, bare, sentence in re.findall(r"(\w+):\s*\['([^']+)',\s*'([^']+)'\]", block(r"var T = \{(.*?)\n  \};")):
-        if sentence not in en:
-            errors.append("examples/opamp2.sp: missing %r from T[%s] in src/assets/opamp.js" % (sentence, key))
+    for key, notation, sentence in re.findall(r"(\w+):\s*\['([^']+)',\s*'([^']+)'\]", block(r"var T = \{(.*?)\n  \};")):
+        for name, text, want in (("ota5t-review-bare.sp", bare, notation), ("ota5t-review.sp", en, sentence)):
+            if want not in text:
+                errors.append("examples/%s: missing %r from T[%s] in src/assets/ota.js" % (name, want, key))
     for key, text in re.findall(r"(\w+):\s*'([^']+)'", block(r"TZ = \{(.*?)\n  \};")):
         if text not in zh:
-            errors.append("examples/opamp2-zh.sp: missing %r from TZ[%s] in src/assets/opamp.js" % (text, key))
-    lines = re.findall(r"add\('\w+', '([^'<]+)'", script)
-    lines += [text for _, text in re.findall(r"dev\('(\w+)', '([^']+)'\)", script)]
-    for line in lines:
-        for name, text in (("opamp2.sp", en), ("opamp2-zh.sp", zh)):
-            if line not in text:
-                errors.append("examples/%s: missing %r from the lines of src/assets/opamp.js" % (name, line))
-    for header in re.findall(r"add\('h3', k === 2 \? '([^']+)' : '([^']+)'\)", script):
-        for line, text in zip(header[::-1], (en, zh)):
-            if line not in text:
-                errors.append("examples/opamp2*.sp: missing the header %r of src/assets/opamp.js" % line)
-    for dev, x, y, o in re.findall(r"(\w+):\s*\[(-?\d+),\s*(-?\d+),\s*'(\w+)'\]", block(r"var PLACE = \{(.*?)\};")):
-        for name, text in (("opamp2.sp", en), ("opamp2-zh.sp", zh)):
-            if "#%s @PLACE(%s, %s)" % (dev, x, y) not in text:
-                errors.append("examples/%s: missing '#%s @PLACE(%s, %s)' from PLACE in src/assets/opamp.js" % (name, dev, x, y))
+            errors.append("examples/ota5t-review-zh.sp: missing %r from TZ[%s] in src/assets/ota.js" % (text, key))
+    # the fixed lines of the file are the same in the four files, and every line of a file is in the script
+    fixed = re.findall(r"add\('\w+', '([^']+)'", script)
+    fixed += [text for _, text in re.findall(r"dev\('(\w+)', '([^']+)'\)", script)]
+    fixed = [line for line in fixed if '@RNL(type="header")' not in line]   # built from its parts, checked below
+    for line in fixed:
+        for name in OTA_FILES.values():
+            if line not in ex[name].split("\n"):
+                errors.append("examples/%s: missing the line %r of src/assets/ota.js" % (name, line))
+    statements = {t for pair in re.findall(r"\w+:\s*\['([^']+)',\s*'([^']+)'\]", block(r"var T = \{(.*?)\n  \};")) for t in pair}
+    statements |= set(re.findall(r"\w+:\s*'([^']+)'", block(r"TZ = \{(.*?)\n  \};")))
+    for name, text in (("ota5t-review-bare.sp", bare), ("ota5t-review.sp", en), ("ota5t-review-zh.sp", zh)):
+        for line in text.split("\n"):
+            if not line.strip() or '@RNL(type="header")' in line:
+                continue
+            if line not in fixed and not (line.startswith("*   ") and line[4:] in statements):
+                errors.append("examples/%s: the line %r is not among the lines of src/assets/ota.js" % (name, line))
     # the same file with the two public packages, and the core's drawings of the two, which say which file they are of
     header = '* @RNL(type="header") { @VERSION("0.3")}'
-    eda = header.replace('@VERSION("0.3")', '@VERSION("0.3"); @USE-PACKAGE(name="eda-symbol", version="0.1"); @USE-PACKAGE(name="eda-style", version="0.1")')
-    if "opamp2-eda.sp" in ex and ex["opamp2-eda.sp"] != en.replace(header, eda):
-        errors.append("examples/opamp2-eda.sp: is not examples/opamp2.sp with the USE-PACKAGE lines of eda-symbol and eda-style in its header")
-    for svg, name in (("opamp-standard.svg", "opamp2.sp"), ("opamp-eda.svg", "opamp2-eda.sp")):
-        path = SRC / "assets" / svg
-        if name not in ex or not path.is_file():
-            errors.append("src/assets/%s: missing; node site/render-examples.mjs draws it" % svg)
-            continue
-        m = re.search(r"from site/examples/(\S+) sha256:([0-9a-f]+)", path.read_text(encoding="utf-8"))
+    packages = '; @USE-PACKAGE(name="eda-symbol", version="0.1"); @USE-PACKAGE(name="eda-style", version="0.1")'
+    if eda != en.replace(header, header.replace('")}', '")' + packages + "}")):
+        errors.append("examples/ota5t-review-eda.sp: is not examples/ota5t-review.sp with the USE-PACKAGE lines of eda-symbol and eda-style in its header")
+    if packages not in script:
+        errors.append("src/assets/ota.js: PACKAGES is not the USE-PACKAGE lines of examples/ota5t-review-eda.sp")
+    looks = files.get("assets/ota-looks.js", "")
+    for look, name in (("standard", "ota5t-review.sp"), ("eda", "ota5t-review-eda.sp")):
+        m = re.search(r'"%s": \{\s*"file": "([^"]+)",\s*"sha256": "([0-9a-f]+)"' % look, looks)
         want = hashlib.sha256(ex[name].encode("utf-8")).hexdigest()
         if not m or m.group(1) != name or not want.startswith(m.group(2)):
-            errors.append("src/assets/%s: not drawn from the present examples/%s; run node site/render-examples.mjs" % (svg, name))
-    for dev, x, y, o in re.findall(r"(\w+):\s*\[(-?\d+),\s*(-?\d+),\s*'(\w+)'\]", block(r"var VIRT = \{(.*?)\};")):
-        for name, text in (("opamp2.sp", en), ("opamp2-zh.sp", zh)):
-            if "@PLACE(%s, %s)" % (x, y) not in text:
-                errors.append("examples/%s: no @PLACE(%s, %s) for %s of VIRT in src/assets/opamp.js" % (name, x, y, dev))
+            errors.append("src/assets/ota-looks.js: the %s look is not drawn from the present examples/%s; run node site/render-examples.mjs" % (look, name))
     return errors
 
 

@@ -203,7 +203,7 @@ for (const language of registry.languages.filter(entry => entry.code === registr
 
     await page.goto(`/${language}/index.html`);
     expect(await marked.count() > 0).toBe(examples);
-    // the op-amp's file has RNL records: the netlist alone is the same in every style
+    // the example file has RNL records: the netlist alone is the same in every style
     await styles('#rv-style', '#rv-code');
 
     await page.goto(`/${language}/language.html`);
