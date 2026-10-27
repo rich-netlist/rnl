@@ -80,6 +80,7 @@
           ]
         },
         { "id": "toggle-hover-names", "label": "Show &Names on Hover", "check": true },
+        { "id": "toggle-hover-roles", "label": "Show &Roles on Hover", "check": true },
         { "id": "toggle-usages", "label": "Show &Usages", "keys": ["Ctrl+R"], "check": true },
         { "id": "toggle-currents", "label": "Show Current &Directions", "keys": ["Shift+R"], "check": true, "page": true },
         {

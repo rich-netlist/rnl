@@ -9,6 +9,7 @@ const tip = $("hover-tip");
 const GAP_X = 14; // pixels from the pointer to the box, to the right
 const GAP_Y = 18; // and below
 let on = true;
+let roles = false;
 let tipSize = null;
 const forgetSize = () => { tipSize = null; };
 window.addEventListener('resize', forgetSize);
@@ -26,6 +27,18 @@ export function setHoverNames(shown) {
   save("hover-names", on);
   setCheck("toggle-hover-names", on);
   if (!on) hideTip();
+}
+
+/** Whether the box also says, of an object that is in a usage, as which role (View > Show Roles on Hover). */
+export function hoverRolesOn() {
+  return roles;
+}
+
+/** Show or hide the role of an object in the box beside the pointer, and keep the choice. */
+export function setHoverRoles(shown) {
+  roles = shown;
+  save("hover-roles", roles);
+  setCheck("toggle-hover-roles", roles);
 }
 
 /** Show `text` beside the window point (x, y), moving the box if it is already shown. */

@@ -201,6 +201,23 @@ button.icon { padding: 0 6px; font-size: 16px; line-height: 20px; color: var(--m
 .usage-roles td:first-child { font-weight: 600; }
 .usage-source { overflow: auto; padding: 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; font-size: 12px; }
 .usage-source-file { color: var(--muted); font-size: 12px; }
+/* the usages of the selected object, in the place of a usage's details: a row for each, the usages it is a member of in turn under it */
+.usage-membership-list { list-style: none; margin: 0; padding: 0; }
+.usage-membership-row { padding: 6px 4px 6px calc(4px + var(--depth, 0) * 16px); border-bottom: 1px solid var(--line); }
+.usage-membership-row.nested { border-left: 2px solid var(--line); margin-left: 4px; }
+.usage-membership-row:hover, .usage-membership-row:focus-within { background: var(--select-line); }
+.usage-membership-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+.membership-role { font-weight: 600; overflow-wrap: anywhere; }
+.membership-id { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; text-align: left; overflow-wrap: anywhere; }
+button.membership-id { cursor: pointer; text-decoration: underline dotted; }
+.membership-definition { color: var(--muted); overflow-wrap: anywhere; }
+.usage-membership-detail { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; margin-top: 2px; font-size: 12px; color: var(--muted); }
+.membership-where { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; cursor: pointer; }
+.membership-state { font-weight: 600; }
+.membership-reason { flex-basis: 100%; overflow-wrap: anywhere; }
+/* a usage that is not in effect is greyed, with its state and its reason */
+.usage-membership-row.greyed .membership-role, .usage-membership-row.greyed .membership-id, .usage-membership-row.greyed .membership-definition { opacity: 0.55; }
+.usage-membership-row.greyed .membership-id { text-decoration: line-through; }
 .usage-more { margin: 4px 26px; color: var(--accent); }
 .canvas svg .usage-muted [stroke] { stroke: var(--usage-muted-stroke); }
 .canvas svg .usage-muted [fill] { fill: var(--usage-muted-fill); }
@@ -1267,9 +1284,9 @@ button.pool-open:hover { text-decoration: underline; }
 /* the hover colour of every button would leave its light text on a light ground */
 .format-chip.chosen:hover:not(:disabled) { background: var(--accent); }
 .format-chip:disabled { cursor: default; opacity: 0.6; }
-.format-menu { position: fixed; z-index: 30; display: flex; flex-direction: column; min-width: 140px; padding: 4px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); box-shadow: 0 4px 14px rgb(0 0 0 / 18%); }
-.format-item { padding: 5px 10px 5px 24px; border: 0; border-radius: 4px; background: transparent; color: inherit; text-align: left; cursor: pointer; position: relative; }
-.format-item:hover, .format-item:focus-visible { background: var(--select-text); outline: none; }
+.format-menu, .context-menu { position: fixed; z-index: 30; display: flex; flex-direction: column; min-width: 140px; padding: 4px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); box-shadow: 0 4px 14px rgb(0 0 0 / 18%); }
+.format-item, .context-item { padding: 5px 10px 5px 24px; border: 0; border-radius: 4px; background: transparent; color: inherit; text-align: left; cursor: pointer; position: relative; }
+.format-item:hover, .format-item:focus-visible, .context-item:hover, .context-item:focus-visible { background: var(--select-text); outline: none; }
 .format-check { position: absolute; left: 8px; }
 .pool-include { display: flex; align-items: center; gap: 6px; padding: 3px 10px 3px 42px; font-size: 12px; }
 .pool-include-name { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; direction: rtl; text-align: left; color: var(--muted); }

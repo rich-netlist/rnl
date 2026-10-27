@@ -11,7 +11,8 @@ import { colourDrawing } from "./background.js";
 import { paintGrid } from "./grid.js";
 import { updateHierarchy } from "./hierarchy.js";
 import { boxAt, hitsAt, nameOf, objectsOf } from "./hits.js";
-import { hideTip, hoverNamesOn, showTip } from "./hover.js";
+import { hideTip, hoverNamesOn, hoverRolesOn, showTip } from "./hover.js";
+import { roleNote } from "./usage-table.js";
 import { closePicker, openPicker } from "./picker.js";
 import { clearSelection, select } from "./selection.js";
 import { descend, opens, updatePath } from "./subcircuits.js";
@@ -437,8 +438,10 @@ function pointOut(e, point) {
   const { hits } = hitsAt(doc && doc.levels[current], view, point);
   canvas.classList.toggle("over-object", hits.length > 0 || usageAt(point) !== null);
   const name = hoverNamesOn() ? nameOf(doc, hits[0]) : null;
-  if (name === null) hideTip();
-  else showTip(name, e.clientX, e.clientY);
+  if (name === null) { hideTip(); return; }
+  // with View > Show Roles on Hover, the role of the object in its first usage follows its name
+  const note = hoverRolesOn() ? roleNote(doc, hits[0].objects[0]) : null;
+  showTip(note === null ? name : `${name} · ${note}`, e.clientX, e.clientY);
 }
 // a finger that lifts names nothing: a finger does not hover
 const touchUp = (e, cancelled) => { gestures.up(e, cancelled); hideTip(); };

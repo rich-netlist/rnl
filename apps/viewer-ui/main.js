@@ -5,6 +5,7 @@ import { append, m, setText, startI18n } from "./i18n.js";
 // drawing and the text. Each part is a module of its own (README.md); this one starts the page.
 
 import { startPool } from "./pool.js";
+import "./usage-menu.js";
 import { startPreload } from "./preload.js";
 import { startUsages } from "./usages.js";
 import { startNetlistColors } from "./netlist-colors.js";
@@ -13,7 +14,7 @@ import { command, isChecked, runStartupShortcuts, setCheck, startCommands } from
 import { closeRequested, note } from "./editor.js";
 import { dirtyPaths, unappliedPaths } from "./edits.js";
 import { gridState, setGrid } from "./grid.js";
-import { setHoverNames } from "./hover.js";
+import { setHoverNames, setHoverRoles } from "./hover.js";
 import { showMenuBar } from "./menubar.js";
 import { openSource } from "./open.js";
 import { showManifestLevel } from "./manifest-bar.js";
@@ -67,6 +68,7 @@ async function start() {
     axes: load("grid-axes", false),
   });
   setHoverNames(load("hover-names", true));
+  setHoverRoles(load("hover-roles", false));
   {
     const li = document.createElement("li");
     li.className = "nothing";
