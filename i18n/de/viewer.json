@@ -43,6 +43,7 @@
   "subcircuit": "Teilschaltung",
   "file level": "Dateiebene",
   "Nothing on this level has a position yet, so nothing is drawn.": "Auf dieser Ebene hat noch kein Objekt eine Position, daher wird nichts gezeichnet.",
+  "This file is not a netlist. It is shown as text.": "Diese Datei ist keine Netzliste. Sie wird als Text angezeigt.",
   "This level has no objects, so nothing is drawn.": "Diese Ebene enthält keine Objekte, daher wird nichts gezeichnet.",
   "Text of {0}": "Text von {0}",
   "Downloaded {0}.": "{0} heruntergeladen.",
