@@ -31,6 +31,13 @@ const FORMATS = [
 const detect = (path, text = "") => (/\.scs$/i.test(path) ? "spectre"
   : /\.rnl$/i.test(path) || /^@RNL\(type="header"\)\s*\{[^}]*@PACKAGE\(/.test(text) ? "rnl" : "spice");
 const platform = params.get("platform") === "desktop" ? "desktop" : "web";
+const NO_PACKAGES = { bundled: false, catalog: "", fetched: "", packages: [], licenses: [] };
+const BUNDLED_PACKAGES = {
+  bundled: true, catalog: "https://rich-netlist.github.io/rnl-packages/catalog.json", fetched: "2026-10-27",
+  packages: [["analog-canvas-extensions", "0.4", "extension"], ["eda-style", "0.1", "extension"], ["eda-symbol", "0.1", "extension"], ["pdk-sky130", "0.1", "pdk"]]
+    .map(([name, version, kind]) => ({ name, version, kind, path: `/app/public-packages/${name}/${version}/${name}.rnl` })),
+  licenses: ["/app/public-packages/LICENSES/MIT.txt"],
+};
 
 /** A source: a fixture, by its name or as { name, fixture }; null for nothing. */
 const source = (s) => (s === null || s === undefined ? null : typeof s === "string" ? { name: s, fixture: s } : s);
@@ -297,6 +304,8 @@ export default {
   platform,
   nativeMenu: platform === "desktop",
   formats: async () => { fake.calls.push(["formats"]); return FORMATS; },
+  // the desktop's bundled public packages (public_packages.rs): `bundled=1` in the address is a build that has them
+  ...(platform === "desktop" ? { bundledPackages: async () => (params.has("bundled") ? BUNDLED_PACKAGES : NO_PACKAGES) } : {}),
   // given the text of the file too, as the shells give it to the core: that of the fixture a Library file is of
   detectFormat: async (path) => {
     fake.calls.push(["detectFormat", path]);

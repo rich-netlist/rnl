@@ -3,14 +3,18 @@
 // nothing of it is left: its files, its shortcuts, its entry among the installed apps and, for the
 // NSIS installer, its own registry key. Node 22 or later, with no dependencies.
 //
-//   node apps/desktop/tests/installers.mjs --nsis SETUP [--dir DIR] [--no-smoke]
-//   node apps/desktop/tests/installers.mjs --msi PACKAGE [--no-smoke]
+//   node apps/desktop/tests/installers.mjs --nsis SETUP [--dir DIR] [--no-smoke] [--packages with|without]
+//   node apps/desktop/tests/installers.mjs --msi PACKAGE [--no-smoke] [--packages with|without]
 //
 // The NSIS installer installs for the current user, into DIR or else a new temporary directory, and
 // needs no administrator rights; the test stops when RNL Viewer is installed for the user already,
 // so as to leave that installation be. The MSI installs for the machine, into Program Files, and
 // needs administrator rights, as GitHub's runners have; the test stops when RNL Viewer is installed
-// there already. --no-smoke leaves out the smoke test.
+// there already. --no-smoke leaves out the smoke test. --packages says whether the installation
+// is made with the public packages, which an installer that carries them offers, as a part of its
+// own (the NSIS installer's /PACKAGES=0, the MSI's PUBLICPACKAGES=0): the test checks that the
+// packages are there or not, that the smoke test finds them or not, and that the uninstaller takes
+// them away.
 
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -211,10 +215,27 @@ async function until(what, done) {
 /** The paths among these that are there. */
 const present = (paths) => paths.filter((p) => fs.existsSync(p));
 
+/** Whether the installation is to have the public packages, "with" or "without"; unchecked when not given. */
+const packages = (() => {
+  const value = option("--packages");
+  if (value !== undefined && value !== "with" && value !== "without") throw new Error("--packages takes with or without.");
+  return value;
+})();
+
+/** The installed public packages are there, or not, as asked. */
+function checkPackages(dir) {
+  if (!packages) return;
+  const folder = path.join(dir, "public-packages");
+  if (packages === "without") return same(fs.existsSync(folder), false, "the public packages in an installation made without them");
+  for (const file of ["public-packages.json", "eda-style/0.1/eda-style.rnl", "LICENSES/MIT.txt"]) {
+    check(fs.existsSync(path.join(folder, file)), `${file} is not among the installed public packages.`);
+  }
+}
+
 /** Smoke-test the installed app, unless --no-smoke. */
 function tryApp(exe) {
   if (process.argv.includes("--no-smoke")) return;
-  const r = spawnSync(process.execPath, [path.join(here, "smoke.mjs"), "--exe", exe], { cwd: root, stdio: "inherit" });
+  const r = spawnSync(process.execPath, [path.join(here, "smoke.mjs"), "--exe", exe, ...(packages ? ["--packages", packages] : [])], { cwd: root, stdio: "inherit" });
   check(r.status === 0, "The smoke test of the installed app failed.");
 }
 
@@ -256,11 +277,13 @@ async function nsis(setup) {
   const defaults = associationDefaults("HKCU");
 
   console.log(`installing ${setup} into ${dir}`);
-  same(run(setup, `/S /D=${dir}`), 0, "the installer's exit code");
+  // /D= goes last; /PACKAGES=0 leaves the public packages out, and without it they are installed
+  same(run(setup, `/S ${packages === "without" ? "/PACKAGES=0 " : ""}/D=${dir}`), 0, "the installer's exit code");
   await installed(
     () => {
       console.log(`installed: ${fs.readdirSync(dir).join(", ")}`);
       for (const file of [EXE, "uninstall.exe", "LICENSE.txt"]) check(fs.existsSync(path.join(dir, file)), `${file} was not installed.`);
+      checkPackages(dir);
       const entry = registry(USER_ENTRY);
       check(entry !== null, `There is no ${USER_ENTRY}.`);
       same([entry.DisplayName, entry.DisplayVersion, entry.Publisher], [NAME, VERSION, PUBLISHER], "the entry among the installed apps");
@@ -293,11 +316,13 @@ async function msi(pkg) {
   const log = path.join(os.tmpdir(), "rnl-viewer-msi.log");
 
   console.log(`installing ${pkg}, logging to ${log}`);
-  same(run("msiexec", `/i "${pkg}" /qn /norestart /l*v "${log}"`), 0, "msiexec's exit code");
+  // the feature Public packages is installed unless PUBLICPACKAGES=0 leaves it out
+  same(run("msiexec", `/i "${pkg}" /qn /norestart${packages === "without" ? " PUBLICPACKAGES=0" : ""} /l*v "${log}"`), 0, "msiexec's exit code");
   await installed(
     () => {
       console.log(`installed: ${fs.readdirSync(dir).join(", ")}`);
       for (const file of [EXE, "LICENSE.txt"]) check(fs.existsSync(path.join(dir, file)), `${file} was not installed.`);
+      checkPackages(dir);
       same(machineEntries(), [{ name: NAME, version: VERSION, publisher: PUBLISHER }], "the entry among the installed apps");
       same(present(shortcuts), shortcuts, "the shortcuts in the Start menu and on the desktop");
       checkAssociations("HKLM", path.join(dir, EXE), defaults);

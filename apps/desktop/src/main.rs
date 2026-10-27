@@ -22,6 +22,7 @@ mod menu;
 mod pool;
 mod preload;
 mod project;
+mod public_packages;
 mod session;
 mod settings;
 mod solve;
@@ -424,6 +425,10 @@ fn main() {
         .manage(Core::new())
         .manage(library::Library::default())
         .manage(startup)
+        .setup(|app| {
+            public_packages::init(app.handle());
+            Ok(())
+        })
         .menu(menu::menu)
         .on_menu_event(|app, event| match event.id().as_ref() {
             "exit" => request_exit(app),
@@ -466,6 +471,7 @@ fn main() {
             pool::dropped_files,
             pool::bundled_files,
             pool::path_packages,
+            public_packages::public_packages,
             export::export_svg,
             export::save_image,
             project::read_bytes,

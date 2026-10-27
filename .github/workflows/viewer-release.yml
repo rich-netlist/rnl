@@ -1,5 +1,6 @@
 # Builds the desktop viewer of apps/desktop for Windows and Linux and releases it: on Windows, a single
-# executable, an NSIS installer for the current user and an MSI for the machine. The Tauri command
+# executable, the same with the public packages, an NSIS installer for the current user and an MSI for the
+# machine; the installers carry the public packages as a part of their own, which the user chooses. The Tauri command
 # line that apps/desktop/package.json pins builds them on GitHub's Windows runner, whose MSVC
 # toolchain links the WebView2 loader into the executable. The workflow checks that the executable
 # imports no WebView2Loader.dll, smoke-tests it alone in a directory, and installs both installers,
@@ -90,11 +91,22 @@ jobs:
       - name: Install the Tauri command line
         working-directory: apps/desktop
         run: npm ci
+      # the latest version of each package of the catalog of rnl-packages, every file checked against the
+      # catalog's SHA-256, with the licences and a lock file: what the installers offer, and the single
+      # executable with packages carries. The viewer never downloads them; they change with a release.
+      - name: Fetch the public packages
+        run: |
+          python scripts/bundle_packages.py fetch --out "$RUNNER_TEMP/public-packages"
+          # the MSI's feature of them, which Tauri takes as a fragment and a configuration
+          python scripts/bundle_packages.py wix --dir "$RUNNER_TEMP/public-packages" --out "$RUNNER_TEMP/public-packages-wix"
       # cargo build --release with Tauri's custom-protocol feature, as for production, then the
-      # installers, for which the bundler downloads NSIS and WiX
+      # installers, for which the bundler downloads NSIS and WiX. One build: the program is compiled once,
+      # and the installers take the folder of the packages that RNL_PUBLIC_PACKAGES_DIR names
       - name: Build the app and its installers
         working-directory: apps/desktop
-        run: npx tauri build
+        env:
+          RNL_PUBLIC_PACKAGES_DIR: ${{ runner.temp }}\public-packages
+        run: npx tauri build --config "$RUNNER_TEMP/public-packages-wix/public-packages.conf.json"
 
       # dumpbin lists the imports; the Visual Studio installer's vswhere finds it
       - name: The executable does not import WebView2Loader.dll
@@ -122,6 +134,10 @@ jobs:
           Copy-Item "$built\bundle\nsis\RNL Viewer_$($env:VERSION)_x64-setup.exe" "$out\$name-setup.exe"
           Copy-Item "$built\bundle\msi\RNL Viewer_$($env:VERSION)_x64_en-US.msi" "$out\$name.msi"
           Copy-Item "$built\rnl-viewer.exe" "$out\$name.exe"
+          # the same program with the packages after it: compiled once, assembled twice
+          python scripts/bundle_packages.py append --exe "$built\rnl-viewer.exe" --packages "$env:RUNNER_TEMP\public-packages" `
+            --out "$out\RNL-Viewer-$env:VERSION-with-packages-windows-x64.exe"
+          if ($LASTEXITCODE -ne 0) { throw "The single executable with the public packages could not be made." }
           $sums = Get-ChildItem $out -File | Sort-Object Name | ForEach-Object {
             "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)"
           }
@@ -148,18 +164,39 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/single"
           cp "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-windows-x64.exe" "$RUNNER_TEMP/single/"
-          node apps/desktop/tests/smoke.mjs --exe "$RUNNER_TEMP/single/RNL-Viewer-$VERSION-windows-x64.exe"
+          node apps/desktop/tests/smoke.mjs --packages without --exe "$RUNNER_TEMP/single/RNL-Viewer-$VERSION-windows-x64.exe"
+      # alone in a directory too: it copies the packages at its end to its data folder, and finds them there
+      - name: Smoke-test the single executable with the public packages
+        timeout-minutes: 10
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/single-with"
+          cp "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-with-packages-windows-x64.exe" "$RUNNER_TEMP/single-with/"
+          node apps/desktop/tests/smoke.mjs --packages with --exe "$RUNNER_TEMP/single-with/RNL-Viewer-$VERSION-with-packages-windows-x64.exe"
       - name: Install with the NSIS installer for the user, smoke-test the app and uninstall it
         timeout-minutes: 10
         env:
           VERSION: ${{ steps.version.outputs.version }}
-        run: node apps/desktop/tests/installers.mjs --nsis "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-windows-x64-setup.exe"
+        run: node apps/desktop/tests/installers.mjs --packages with --nsis "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-windows-x64-setup.exe"
+      # the same installer told to leave the public packages out, as its page of that part does when unchecked
+      - name: Install with the NSIS installer without the public packages, smoke-test the app and uninstall it
+        timeout-minutes: 10
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: node apps/desktop/tests/installers.mjs --packages without --nsis "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-windows-x64-setup.exe"
       # the runner is an administrator, as the MSI's installation for the machine needs
       - name: Install the MSI for the machine, smoke-test the app and uninstall it
         timeout-minutes: 10
         env:
           VERSION: ${{ steps.version.outputs.version }}
-        run: node apps/desktop/tests/installers.mjs --msi "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-windows-x64.msi"
+        run: node apps/desktop/tests/installers.mjs --packages with --msi "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-windows-x64.msi"
+      # the same MSI with its feature of the public packages left out: PUBLICPACKAGES=0
+      - name: Install the MSI for the machine without the public packages, smoke-test the app and uninstall it
+        timeout-minutes: 10
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: node apps/desktop/tests/installers.mjs --packages without --msi "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-windows-x64.msi"
       - name: Measure the Windows font-fix package sizes
         if: inputs.measure_font_sizes
         env:
@@ -380,7 +417,7 @@ jobs:
             find "$dir" -maxdepth 1 -type f ! -name SHA256SUMS.txt -exec cp {} assets/ \;
           done
           cd assets
-          test "$(find . -maxdepth 1 -type f | wc -l)" -eq 7
+          test "$(find . -maxdepth 1 -type f | wc -l)" -eq 8
           sha256sum RNL-Viewer-* > SHA256SUMS.txt
           sha256sum --check SHA256SUMS.txt
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
