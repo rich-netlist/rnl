@@ -36,8 +36,8 @@ pub struct Document {
     pub path: String,
     /// Its file name, for the title bar.
     pub name: String,
-    /// The format of the main file, "spice" or "spectre"; or "text" for a file that is not a
-    /// netlist, such as a Verilog-A model, which is not read.
+    /// The format of the main file, "spice" or "spectre"; "rnl" for a package file, checked on its
+    /// own; or "text" for a file that is not a netlist, such as a Verilog-A model, which is not read.
     pub dialect: String,
     /// The formats a file can be read with, as `rnl_view::formats` lists them.
     pub formats: Vec<FormatInfo>,
@@ -307,11 +307,12 @@ pub struct SourceFile {
     pub path: String,
     /// The file as shown: relative to the opened file's directory when it is inside it.
     pub name: String,
-    /// The format the file was read with, a name of `Document::formats`; none for a package file.
-    /// "text" for a file that is not a netlist, such as a Verilog-A model: its text, not read.
+    /// The format the file was read with, a name of `Document::formats`: "rnl" for a package file
+    /// checked on its own, and for one a netlist includes, which is not read; "text" for a file that
+    /// is not a netlist, such as a Verilog-A model: its text, not read.
     pub format: Option<String>,
     /// The format the file is read with when none is set for it, as a frontend shows its
-    /// automatic choice; none for a package file.
+    /// automatic choice.
     pub default_format: Option<String>,
     pub text: String,
     /// Where each record is: first line, first column, last line, last column (1-based, inclusive).
@@ -387,7 +388,7 @@ pub(crate) fn document(
 
     // A package checked on its own has no host sources. Still expose the opened package's
     // text, including its record ranges, so the Files tab can open built-ins read-only.
-    let package_doc = if r.doc.sources.is_empty() && r.doc.dialect.name == "none" {
+    let package_doc = if r.doc.sources.is_empty() && r.doc.dialect.name == rnl_runtime::host::package::NAME {
         let mut source_doc = r.doc.clone();
         if let Some((name, text)) = r.sources.iter().find(|(name, _)| name == &source_doc.main().file) {
             source_doc.sources.push((name.clone(), text.clone()));

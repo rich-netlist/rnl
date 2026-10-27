@@ -796,7 +796,7 @@ C1 a 0 1p
         assert_eq!(v["document"]["files"][1]["format"], "spectre");
         assert!(v["document"]["levels"].as_array().unwrap().iter().any(|l| l["title"] == "amp"));
         let v = answer(json!({ "entry": "/w/top.sp", "files": files, "formats": { "/w/cells.scs": "cdl" } }));
-        assert_eq!(v["error"], "unknown format \"cdl\" for /w/cells.scs; the formats are spice, spectre, text");
+        assert_eq!(v["error"], "unknown format \"cdl\" for /w/cells.scs; the formats are spice, spectre, rnl, text");
         // the list, and the format of files by path and text
         let v =
             answer(json!({ "formats": { "detect": { "/w/a.inc": "* a\n", "/w/b.lib": "simulator lang=spectre\n" } } }));
@@ -836,6 +836,29 @@ C1 a 0 1p
         assert_eq!(said, [(&json!("hint"), &json!("`res.va` is not a netlist (Verilog-A); it is not read"))]);
         let v = answer(json!({ "formats": { "detect": { "/w/res.va": "", "/w/top.sp": "" } } }));
         assert_eq!(v["formats"]["detected"], json!({ "/w/res.va": "text", "/w/top.sp": "spice" }));
+    }
+
+    #[test]
+    fn a_package_file_of_any_suffix_is_checked_on_its_own() {
+        // the build gives the format "rnl" for it, by its first record; set to rnl, a file is found by
+        // name as a package, whatever its suffix
+        let package = "@RNL(type=\"header\") { @VERSION(\"0.3\"); @PACKAGE(name=\"acme\", version=\"1.0\")}\n@RNL {}\n";
+        let v = answer(json!({ "entry": "/w/acme.pkg", "files": { "/w/acme.pkg": package } }));
+        let d = &v["document"];
+        assert_eq!(
+            (&d["dialect"], &d["files"][0]["format"], &d["files"][0]["default_format"]),
+            (&json!("rnl"), &json!("rnl"), &json!("rnl"))
+        );
+        assert_eq!(d["diagnostics"], json!([]));
+        let top = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"acme\", version=\"1.0\")}\nR1 a 0 1k\n.end\n";
+        let files = json!({ "/w/top.sp": top, "/lib/acme.pkg": package });
+        let errors = |v: &Value| {
+            let all = v["document"]["diagnostics"].as_array().unwrap().clone();
+            all.into_iter().filter(|x| x["severity"] == "error").count()
+        };
+        assert_eq!(errors(&answer(json!({ "entry": "/w/top.sp", "files": files }))), 1);
+        let set = json!({ "entry": "/w/top.sp", "files": files, "formats": { "/lib/acme.pkg": "rnl" } });
+        assert_eq!(errors(&answer(set)), 0);
     }
 
     #[test]

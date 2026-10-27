@@ -197,6 +197,23 @@ fn an_edit_on_a_file_that_is_not_a_netlist_is_refused() {
 }
 
 #[test]
+fn an_edit_on_a_package_file_is_refused_and_a_netlist_named_rnl_is_written() {
+    let package = "@RNL(type=\"header\") { @VERSION(\"0.3\"); @PACKAGE(name=\"acme\", version=\"1.0\")}\n";
+    let ops = json!([{"level": "file:acme.pkg", "op": "add-text", "at": [0, 0], "markup": "x"}]);
+    let r = WriteRequest { file: Some("acme.pkg".into()), ..request("rnl", package, ops) };
+    assert_eq!(
+        write(&r).unwrap_err(),
+        "dialect \"rnl\" is that of a package file (2.7), which is not a netlist; RNL is written here only into a netlist"
+    );
+    // a netlist saved under a `.rnl` name, read as SPICE as the request says, is carried in comments
+    let ops = json!([{"level": "subckt:rc_lowpass", "op": "set", "object": "#R1", "at": [0, 0]}]);
+    let r = WriteRequest { file: Some("rc.rnl".into()), ..request("spice", RC, ops) };
+    let out = write(&r).unwrap();
+    assert!(out.contains("\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\n"), "{out}");
+    assert!(out.contains("\n* @RNL(author="), "{out}");
+}
+
+#[test]
 fn refusals_name_the_op() {
     let refused = |ops: Value| write(&request("spice", RC, ops)).unwrap_err();
     assert_eq!(

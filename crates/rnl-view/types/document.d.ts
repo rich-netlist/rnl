@@ -20,8 +20,8 @@ export type Document = {
    */
   name: string,
   /**
-   * The format of the main file, "spice" or "spectre"; or "text" for a file that is not a
-   * netlist, such as a Verilog-A model, which is not read.
+   * The format of the main file, "spice" or "spectre"; "rnl" for a package file, checked on its
+   * own; or "text" for a file that is not a netlist, such as a Verilog-A model, which is not read.
    */
   dialect: string,
   /**
@@ -351,13 +351,14 @@ export type SourceFile = {
    */
   name: string,
   /**
-   * The format the file was read with, a name of `Document::formats`; none for a package file.
-   * "text" for a file that is not a netlist, such as a Verilog-A model: its text, not read.
+   * The format the file was read with, a name of `Document::formats`: "rnl" for a package file
+   * checked on its own, and for one a netlist includes, which is not read; "text" for a file that
+   * is not a netlist, such as a Verilog-A model: its text, not read.
    */
   format: string | null,
   /**
    * The format the file is read with when none is set for it, as a frontend shows its
-   * automatic choice; none for a package file.
+   * automatic choice.
    */
   default_format: string | null,
   text: string,

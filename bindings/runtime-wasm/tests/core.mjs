@@ -328,10 +328,13 @@ test("a catalog request lists the packages, through the core and through the Wor
 });
 
 test("a formats request lists the formats and detects files, through the core and through the Worker", async () => {
-  const request = { formats: { detect: { "/w/a.inc": "* a\n", "/w/b.lib": "simulator lang=spectre\n", "/w/m.va": "module m;\nendmodule\n" } } };
+  // a package file by its suffix, or by its first record, a header with PACKAGE at the start of a line
+  const pkg = '@RNL(type="header") { @VERSION("0.3"); @PACKAGE(name="p", version="1.0")}\n';
+  const detect = { "/w/a.inc": "* a\n", "/w/b.lib": "simulator lang=spectre\n", "/w/m.va": "module m;\nendmodule\n", "/w/p.rnl": "", "/w/p.pkg": pkg };
+  const request = { formats: { detect } };
   const f = core.formats(request);
-  assert.deepEqual(f.list.map((x) => [x.name, x.title, x.fallback]), [["spice", "SPICE", true], ["spectre", "Spectre", false], ["text", "Text", false]]);
-  assert.deepEqual(f.detected, { "/w/a.inc": "spice", "/w/b.lib": "spectre", "/w/m.va": "text" });
+  assert.deepEqual(f.list.map((x) => [x.name, x.title, x.fallback]), [["spice", "SPICE", true], ["spectre", "Spectre", false], ["rnl", "RNL package", false], ["text", "Text", false]]);
+  assert.deepEqual(f.detected, { "/w/a.inc": "spice", "/w/b.lib": "spectre", "/w/m.va": "text", "/w/p.rnl": "rnl", "/w/p.pkg": "rnl" });
   // a build that sets a file's format is a build, not a formats request
   const files = {
     "/w/top.sp": '* top\n.include "cells.scs"\nX1 a 0 amp\n.end\n',

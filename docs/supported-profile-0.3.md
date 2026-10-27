@@ -62,6 +62,15 @@ is distinguished from the 24 cases of 0.3 and dedicated 0.3 regression tests.
   definition expansion is separately limited to 64 active symbol bodies, including
   fragment dependencies; hitting that limit fails the active chain and leaves
   subsequent independent definitions usable.
+- A package file (2.7) is a file of the format `rnl`, "RNL package": a `.rnl` file, the suggested
+  suffix, and a file of another suffix whose first record starts a line, as no netlist's can, and
+  is a header record with PACKAGE. One opened is checked on its own whatever its suffix; one set
+  to `rnl` whose header has no PACKAGE is an error (16.2), and a `.rnl` file set to SPICE or
+  Spectre is read as a netlist. Lookup by name (16.2) searches a package directory for its `.rnl`
+  files only; a file of another suffix is a package found by name when a frontend sets it to `rnl`,
+  as the viewer's Library and the CLI's `--format PATH=rnl` do. A package file that a netlist
+  includes is not read, and the include is an error, as a package file is not loaded with
+  `.include` (2.7).
 
 ### Non-ASCII host-comment compatibility (3.1)
 

@@ -116,11 +116,12 @@ impl LibraryIndex {
         let mut definitions = Vec::new();
         let mut sectioned = HashSet::new();
         let mut dependencies = HashMap::from([(path.to_string(), fingerprint(&text))]);
-        if !path.to_ascii_lowercase().ends_with(".rnl") {
+        // a library file is read on its own, by its format, its first line a statement; a package
+        // file defines no subcircuit
+        let set = crate::formats::known_formats(formats, files);
+        let main = crate::formats::main_format(path, &text, None, &set, files);
+        if crate::formats::name(main.0) != rnl_runtime::host::package::NAME {
             let mut sink = Sink::new();
-            // a library file is read on its own, by its format, its first line a statement
-            let set = crate::formats::known_formats(formats, files);
-            let main = crate::formats::main_format(path, &text, None, &set, files);
             let doc =
                 crate::formats::with(main, &set, files, |f| Reading::read(path, files, &mut sink, f, &[], false))?;
             for (id, lv) in doc.levels.iter().enumerate() {

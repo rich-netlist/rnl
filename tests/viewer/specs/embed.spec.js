@@ -561,7 +561,8 @@ test("public packages: foreign library URLs and includes bypass the catalog", as
     return { opened, files: doc.files, errors: doc.diagnostics.filter(d => d.severity === 'error') };
   }, foreign);
   expect(result.opened.text).toBe(include);
-  expect(result.errors).toEqual([]);
+  // a `.rnl` file is a package file, which an include does not load (2.7): its text is fetched and kept
+  expect(result.errors.map((d) => d.message)).toEqual(["`x.rnl` is a package file and is not loaded with an include (2.7); USE-PACKAGE finds it (16.2)"]);
   expect(result.files).toEqual(expect.arrayContaining([expect.objectContaining({ text: expect.stringContaining('Rexternal') })]));
   expect(requests.filter(url => url === '/libraries/x.rnl')).toHaveLength(2);
   expect(catalogs).toBe(0);

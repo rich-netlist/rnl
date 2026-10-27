@@ -24,9 +24,10 @@ const params = new URLSearchParams(location.search);
 const FORMATS = [
   { name: "spice", title: "SPICE", extensions: [], fallback: true },
   { name: "spectre", title: "Spectre", extensions: ["scs"], fallback: false },
+  { name: "rnl", title: "RNL package", extensions: ["rnl"], fallback: false },
   { name: "text", title: "Text", extensions: ["va", "vams", "v", "vh", "sv", "svh", "vhd", "vhdl"], fallback: false },
 ];
-const detect = (path) => (/\.scs$/i.test(path) ? "spectre" : "spice");
+const detect = (path) => (/\.scs$/i.test(path) ? "spectre" : /\.rnl$/i.test(path) ? "rnl" : "spice");
 const platform = params.get("platform") === "desktop" ? "desktop" : "web";
 
 /** A source: a fixture, by its name or as { name, fixture }; null for nothing. */
@@ -327,7 +328,7 @@ export default {
     // the formats a core gives: each host file's default and, where the build was given one, the choice
     document.formats ??= FORMATS;
     for (const file of document.files) {
-      if (file.format === null || /\.rnl$/i.test(file.path)) { file.format = file.default_format = null; continue; }
+      if (file.format === null) { file.default_format = null; continue; }
       file.default_format ??= file.format ?? detect(file.path);
       file.format = formats[sourcePath(document, file)] ?? file.default_format;
     }
