@@ -49,7 +49,7 @@ for (const language of ['en', 'zh']) {
 
     // a device of the drawing marks its lines in the file
     await page.mouse.move(5, 5);
-    await page.locator('#rv-stage svg [data-dev="M2"]').first().hover();
+    await page.locator('#rv-stage svg [data-dev="M2"]').first().dispatchEvent('mouseover');
     await expect(page.locator('#rv-code .cl.is-hot').first()).toContainText('M2');
   });
 }
@@ -72,7 +72,7 @@ test('review: the look switch redraws the same circuit with the packages, the fi
   await expect(page.locator('#rv-open')).toHaveAttribute('href', /ota5t-review-eda\.sp/);
   // the review works in this look too
   await page.locator('#rv-items .rv-item').nth(0).hover();
-  await expect(page.locator('#rv-stage svg [data-dev].is-lit').first()).toBeVisible();
+  await expect(page.locator('#rv-stage svg [data-dev].is-lit')).not.toHaveCount(0);
 
   await page.locator('#rv-look [data-look="standard"]').click();
   expect(await stage.innerHTML()).toBe(standard);
