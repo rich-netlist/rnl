@@ -1,0 +1,21 @@
+{
+  "then the wires, junctions, ports, supplies and grounds: 38 more lines in the whole file": "接着是导线、交汇点、端口、电源和地：整份文件里还有 38 行",
+  "<b>M1</b> and <b>M2</b> are the input differential pair; <b>M5</b> is its tail current source.": "<b>M1</b>、<b>M2</b> 是输入差分对；<b>M5</b> 是它的尾电流源。",
+  "<b>M3</b> and <b>M4</b> are a current mirror: the load of the first stage.": "<b>M3</b>、<b>M4</b> 是电流镜：第一级的负载。",
+  "<b>MB</b> sets the bias: its current is mirrored to the tail <b>M5</b> and to the second stage’s load <b>M7</b>.": "<b>MB</b> 设定偏置：它的电流被镜像给尾管 <b>M5</b> 和第二级的负载 <b>M7</b>。",
+  "The second stage <b>M6</b> is compensated by <b>RZ</b> and <b>CC</b>: Miller compensation.": "第二级 <b>M6</b> 由 <b>RZ</b> 和 <b>CC</b> 补偿：米勒补偿。",
+  "provisional": "暂定",
+  "The first stage is symmetric: <b>M1</b> and <b>M2</b>, and <b>M3</b> and <b>M4</b>, are mirror images about one axis.": "第一级是对称的：<b>M1</b> 与 <b>M2</b>、<b>M3</b> 与 <b>M4</b>，各自关于同一条轴镜像。",
+  "The signal flows from left to right: the input pair, then the second stage.": "信号从左往右流：先是输入对管，再到第二级。",
+  "Currents run from top to bottom: through <b>M5</b>, <b>M6</b> and <b>M7</b>.": "电流从上往下：流经 <b>M5</b>、<b>M6</b>、<b>M7</b>。",
+  "structure": "结构",
+  "intent": "意图",
+  "Pick a statement in the file or an item of the checklist: the devices it is about light up in the drawing and in the netlist. Nothing here needs the netlist to be read line by line.": "在文件里点一条语句，或点审查清单的一条：它涉及的器件会在图里和网表里亮起来。这里不需要逐行读网表。",
+  "<b>Structure</b>: <code>$DIFFERENTIAL_PAIR</code> says which devices form the pair and which is its tail. The standard package’s definition puts the tail under the middle of the pair.": "<b>结构</b>：<code>$DIFFERENTIAL_PAIR</code> 说明哪些器件构成差分对、哪个是它的尾管。标准包里的定义会把尾管放在差分对正中间的下方。",
+  "<b>Structure</b>: <code>$CURRENT_MIRROR</code> says which device is the reference and which one copies it: here the load of the first stage.": "<b>结构</b>：<code>$CURRENT_MIRROR</code> 说明哪个器件是参考、哪个复制它的电流：这里是第一级的负载。",
+  "<b>Structure</b>: one mirror, one reference and two outputs: <code>{#M5 #M7}</code> is a set of devices that copy the same bias current.": "<b>结构</b>：一个镜像，一个参考，两个输出：<code>{#M5 #M7}</code> 是复制同一份偏置电流的一组器件。",
+  "<b>Provisional</b>: the standard packages do not yet have a definition for Miller compensation, so the file defines <code>$MILLER_COMPENSATION</code> itself and says so. It is replaced when the standard has one; the rest of the file does not change.": "<b>暂定</b>：标准包还没有米勒补偿的定义，所以文件自己定义了 <code>$MILLER_COMPENSATION</code>，并且写明了这一点。等标准有了就换成标准的，文件的其余部分不用改。",
+  "<b>Intent</b>: the signal path runs left to right. The drawing follows it: input pair, then the second stage.": "<b>意图</b>：信号通路从左往右。图按它来画：先是输入对管，再到第二级。",
+  "<b>Intent</b>: where the current flows in these branches. The tail and the second stage run from top to bottom.": "<b>意图</b>：这些支路里电流往哪流。尾管和第二级都是从上往下。",
+  "<b>Intent</b>: two mirrored pairs about one axis. A tool that draws from it keeps the symmetry: the standard package’s definition puts each pair at one height, mirror images about the axis.": "<b>意图</b>：两对器件关于同一条轴镜像。按它来画的工具会保持对称：标准包里的定义让每一对等高，关于轴互为镜像。"
+}

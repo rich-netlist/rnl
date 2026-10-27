@@ -106,7 +106,7 @@ test('third locale inherits English content and switches without changing source
   await page.goto('/i18n-fixture/?review=1#status');
   await expect(page).toHaveURL(/\/i18n-fixture\/ja\/\?review=1#status$/);
   await expect(page.locator('html')).toHaveAttribute('lang', 'ja');
-  await expect(page.locator('.hero')).toContainText('A netlist you can simulate');
+  await expect(page.locator('.hero')).toContainText('The circuit source file for the AI era');
   await expect(page.locator('nav.pages a').first()).toHaveText('ホーム');
   // translated by AI: a notice under the top bar, in English, with a link to report an error on this page
   await expect(page.locator('.ai-notice')).toHaveAttribute('lang', 'en');
@@ -150,7 +150,7 @@ for (const theme of ['light', 'dark']) for (const width of [1440, 390]) {
       expect(box.x).toBeGreaterThanOrEqual(0);
       expect(box.x + box.width).toBeLessThanOrEqual(width);
       if (partial) await expect(page.locator('.hero h1')).toContainText('（訳）');
-      else await expect(page.locator('.hero')).toContainText('A netlist you can simulate');
+      else await expect(page.locator('.hero')).toContainText('The circuit source file for the AI era');
       if (process.env.RNL_I18N_SCREENSHOTS && info.project.name === 'chromium') {
         mkdirSync(process.env.RNL_I18N_SCREENSHOTS, { recursive: true });
         await page.evaluate(() => document.fonts.ready);
@@ -203,9 +203,8 @@ for (const language of registry.languages.filter(entry => entry.code === registr
 
     await page.goto(`/${language}/index.html`);
     expect(await marked.count() > 0).toBe(examples);
-    // a step whose file has RNL records: the netlist alone is the same in every style
-    await page.locator('#jr-steps button[data-i="2"]').click();
-    await styles('#jr-style', '#jr-code');
+    // the op-amp's file has RNL records: the netlist alone is the same in every style
+    await styles('#rv-style', '#rv-code');
 
     await page.goto(`/${language}/language.html`);
     expect(await marked.count() > 0).toBe(examples);

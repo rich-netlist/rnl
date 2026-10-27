@@ -545,13 +545,14 @@ def examples():
             for path in sorted(EXAMPLES.iterdir()) if path.suffix == ".sp"}
 
 
-SAMPLES_SITE = re.compile(r"(?:samples/site/|')(ota5t[\w.-]*\.sp)")
+SAMPLES_SITE = re.compile(r"(?:samples/site/|')((?:ota5t|opamp2)[\w.-]*\.sp)")
 COUNTS = re.compile(r"(\d+) errors?, (\d+) warnings?, (\d+) hints?")
 
 
 def check_examples(files, ex):
     """Check that every samples/site/<name>.sp referenced in src/ exists in site/examples/, and that
-    the 5T OTA netlist excerpts and coordinates in src/assets/scenes.js stay in step with them."""
+    the 5T OTA netlist excerpts and coordinates in src/assets/scenes.js, and the op-amp's in src/assets/opamp.js,
+    stay in step with them."""
     errors = []
     linked = {m.group(1) for text in files.values() for m in SAMPLES_SITE.finditer(text)}
     have = set(ex)
@@ -573,18 +574,17 @@ def check_examples(files, ex):
     for bare, en in re.findall(r"u\d+:\s*\['([^']+)',\s*'([^']+)'\]", block(r"var U = \{(.*?)\n  \};")):
         if "ota5t-edits.sp" in ex and bare not in ex["ota5t-edits.sp"]:
             errors.append("examples/ota5t-edits.sp: missing %r from U in src/assets/scenes.js" % bare)
-        for target in ("ota5t.sp", "ota5t-resolved.sp"):
+        for target in ("ota5t.sp",):
             if target in ex and en not in ex[target]:
                 errors.append("examples/%s: missing %r from U in src/assets/scenes.js" % (target, en))
     for zh in re.findall(r"u\d+:\s*'([^']+)'", block(r"var UZ = \{(.*?)\n  \};")):
         if "ota5t-zh.sp" in ex and zh not in ex["ota5t-zh.sp"]:
             errors.append("examples/ota5t-zh.sp: missing %r from UZ in src/assets/scenes.js" % zh)
     for line in re.findall(r"add\('(?:[hm]\d+|end)',\s*'([^']+)'", scenes):
-        for target in ("ota5t.sp", "ota5t-zh.sp", "ota5t-edits.sp", "ota5t-resolved.sp", "ota5t_tb.sp"):
+        for target in ("ota5t.sp", "ota5t-zh.sp", "ota5t-edits.sp", "ota5t_tb.sp"):
             if target in ex and line not in ex[target]:
                 errors.append("examples/%s: missing %r from otaCode in src/assets/scenes.js" % (target, line))
-    for tbl_name, targets in (("L_SYM", ("ota5t.sp", "ota5t-zh.sp", "ota5t-edits.sp")),
-                              ("L_RESOLVED", ("ota5t-resolved.sp",))):
+    for tbl_name, targets in (("L_SYM", ("ota5t.sp", "ota5t-zh.sp", "ota5t-edits.sp")),):
         for dev, x, y, o in re.findall(r"(M\d):\s*\[(-?\d+),\s*(-?\d+),\s*'(\w+)'\]",
                                        block(r"var %s = \{(.*?)\};" % tbl_name)):
             stmt = ('#%s @PLACE(%s, %s);' % (dev, x, y) if dev == "M5" and o == "R0"
@@ -603,6 +603,49 @@ def check_examples(files, ex):
             continue
         if "ota5t_tb.sp" in ex and line not in ex["ota5t_tb.sp"]:
             errors.append("examples/ota5t_tb.sp: missing %r from E2_LINES in src/assets/scenes.js" % line)
+    return errors + check_opamp(files, ex)
+
+
+def check_opamp(files, ex):
+    """The op-amp of the introduction: the lines and the coordinates in src/assets/opamp.js are those of
+    examples/opamp2.sp (the English sentences and the notation) and examples/opamp2-zh.sp (the Chinese ones)."""
+    script = files.get("assets/opamp.js", "")
+    if not script or "opamp2.sp" not in ex or "opamp2-zh.sp" not in ex:
+        return []
+    errors = []
+    en, zh = ex["opamp2.sp"], ex["opamp2-zh.sp"]
+
+    def block(pattern):
+        m = re.search(pattern, script, re.S)
+        if not m:
+            errors.append("src/assets/opamp.js: missing %s" % pattern)
+            return ""
+        return m.group(1)
+
+    for key, bare, sentence in re.findall(r"(\w+):\s*\['([^']+)',\s*'([^']+)'\]", block(r"var T = \{(.*?)\n  \};")):
+        if sentence not in en:
+            errors.append("examples/opamp2.sp: missing %r from T[%s] in src/assets/opamp.js" % (sentence, key))
+    for key, text in re.findall(r"(\w+):\s*'([^']+)'", block(r"TZ = \{(.*?)\n  \};")):
+        if text not in zh:
+            errors.append("examples/opamp2-zh.sp: missing %r from TZ[%s] in src/assets/opamp.js" % (text, key))
+    lines = re.findall(r"add\('\w+', '([^'<]+)'", script)
+    lines += [text for _, text in re.findall(r"dev\('(\w+)', '([^']+)'\)", script)]
+    for line in lines:
+        for name, text in (("opamp2.sp", en), ("opamp2-zh.sp", zh)):
+            if line not in text:
+                errors.append("examples/%s: missing %r from the lines of src/assets/opamp.js" % (name, line))
+    for header in re.findall(r"add\('h3', k === 2 \? '([^']+)' : '([^']+)'\)", script):
+        for line, text in zip(header[::-1], (en, zh)):
+            if line not in text:
+                errors.append("examples/opamp2*.sp: missing the header %r of src/assets/opamp.js" % line)
+    for dev, x, y, o in re.findall(r"(\w+):\s*\[(-?\d+),\s*(-?\d+),\s*'(\w+)'\]", block(r"var PLACE = \{(.*?)\};")):
+        for name, text in (("opamp2.sp", en), ("opamp2-zh.sp", zh)):
+            if "#%s @PLACE(%s, %s)" % (dev, x, y) not in text:
+                errors.append("examples/%s: missing '#%s @PLACE(%s, %s)' from PLACE in src/assets/opamp.js" % (name, dev, x, y))
+    for dev, x, y, o in re.findall(r"(\w+):\s*\[(-?\d+),\s*(-?\d+),\s*'(\w+)'\]", block(r"var VIRT = \{(.*?)\};")):
+        for name, text in (("opamp2.sp", en), ("opamp2-zh.sp", zh)):
+            if "@PLACE(%s, %s)" % (x, y) not in text:
+                errors.append("examples/%s: no @PLACE(%s, %s) for %s of VIRT in src/assets/opamp.js" % (name, x, y, dev))
     return errors
 
 

@@ -177,12 +177,12 @@ class SiteExamples(unittest.TestCase):
     def test_examples_are_published_and_linked_in_both_languages(self):
         with patch.object(build, "has_linux_release", return_value=False):
             pages = build.build(None)
-        for name in ("ota5t.sp", "ota5t-zh.sp", "ota5t-edits.sp", "ota5t-resolved.sp", "ota5t_tb.sp"):
+        for name in ("ota5t.sp", "ota5t-zh.sp", "ota5t-edits.sp", "ota5t_tb.sp", "opamp2.sp", "opamp2-zh.sp"):
             self.assertIn(f"examples/{name}", pages)
         for lang, label in (("zh", "在查看器中打开"), ("en", "Open in viewer")):
-            self.assertIn(f'href="../viewer/?url=samples/site/ota5t.sp" target="_blank" rel="noopener">{label}</a>', pages[f"{lang}/index.html"])
+            self.assertIn(f'href="../viewer/?url=samples/site/opamp2.sp" target="_blank" rel="noopener">{label}</a>', pages[f"{lang}/index.html"])
             self.assertIn(
-                f'href="{build.SITE_URL}viewer/?url=samples/site/ota5t.sp" target="_blank" rel="noopener">{label}</a>',
+                f'href="{build.SITE_URL}viewer/?url=samples/site/opamp2.sp" target="_blank" rel="noopener">{label}</a>',
                 pages[f"{lang}/rnl-intro-standalone.html"],
             )
             self.assertIn(f'href="../viewer/?url=samples/site/ota5t.sp" target="_blank" rel="noopener">{label}</a>', pages[f"{lang}/language.html"])
@@ -195,6 +195,20 @@ class SiteExamples(unittest.TestCase):
         drifted = dict(ex, **{"ota5t.sp": ex["ota5t.sp"].replace("#M1 @PLACE(12, 8)", "#M1 @PLACE(14, 8)")})
         errors = build.check_examples(files, drifted)
         self.assertTrue(any("L_SYM" in e for e in errors), errors)
+
+    def test_check_examples_detects_drift_between_the_opamp_and_its_files(self):
+        files = build.sources()
+        ex = build.examples()
+        self.assertEqual(build.check_opamp(files, ex), [])
+        # a coordinate, a statement of the English file, one of the Chinese file, a line of the netlist
+        for name, old, new, where in (
+                ("opamp2.sp", "#M6 @PLACE(48, 20)", "#M6 @PLACE(50, 20)", "PLACE"),
+                ("opamp2.sp", "%flow = {#M1 #M2 #M6} treated @AS $FLOW;", "%flow = {#M1 #M2} treated @AS $FLOW;", "T[fl]"),
+                ("opamp2-zh.sp", "#M5:d 有 @电流(\"流入\");", "#M5:d 有 @电流(\"流出\");", "TZ[i5]"),
+                ("opamp2.sp", "RZ n1 nz 2k", "RZ n1 nz 4k", "lines")):
+            self.assertIn(old, ex[name])
+            errors = build.check_opamp(files, dict(ex, **{name: ex[name].replace(old, new)}))
+            self.assertTrue(any(where in e for e in errors), (where, errors))
 
 
 if __name__ == "__main__":

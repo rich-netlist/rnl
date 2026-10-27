@@ -165,7 +165,7 @@ class Localization(unittest.TestCase):
                 self.assertNotIn('<en>', html)
                 self.assertNotRegex(html, r'\{\{[a-z][a-z-]*\}\}')
             intro = (directory / "dist/ja/index.html").read_text(encoding="utf-8")
-            self.assertIn('A netlist you can simulate', intro)
+            self.assertIn('The circuit source file for the AI era', intro)
             self.assertIn('href="../en/spec/"', intro)
             self.assertIn('href="../en/spec/0.3/"', intro)
             single = (directory / "dist/ja/rnl-intro-standalone.html").read_text(encoding="utf-8")
@@ -353,7 +353,7 @@ class Catalogs(unittest.TestCase):
             index = page("ja", "index.html")
             self.assertIn('class="wrap translation-notice" lang="en"', index)
             self.assertNotIn("（訳）", index)  # shown in English: its one translated text too
-            self.assertIn("A netlist you can simulate", index)
+            self.assertIn("The circuit source file for the AI era", index)
             self.assertIn('<html lang="ja" data-locale="ja">', index)
             # English, the source, has none; how complete the repository's Chinese is, which a release in
             # English alone changes until it is translated, is not this test's concern
