@@ -98,7 +98,8 @@ impl Settings {
     }
 
     /// The PATH directories in order, each followed by its sub-folders when it was added with them
-    /// (`search-paths-subfolders`), as package and include lookup searches them.
+    /// (`search-paths-subfolders`), as package and include lookup searches them. The public packages that
+    /// this build bundles are searched for packages only, after these (`public_packages::provider`).
     pub fn paths(&self) -> Result<Vec<PathBuf>, String> {
         let state = self.0.lock().map_err(|e| e.to_string())?;
         let values = &state.as_ref().ok_or("settings have not been loaded")?.1;

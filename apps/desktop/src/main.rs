@@ -22,6 +22,7 @@ mod menu;
 mod pool;
 mod preload;
 mod project;
+mod public_packages;
 mod session;
 mod settings;
 mod solve;
@@ -33,7 +34,6 @@ use std::sync::Mutex;
 
 use core_thread::Core;
 use files::{Edits, Saved, SavedFile};
-use rnl_cli::FsProvider;
 use rnl_view::UnplacedDrawing;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow, WindowEvent};
 use tauri_plugin_dialog::DialogExt;
@@ -138,7 +138,7 @@ async fn open_document(
             };
             let entry = path.to_string_lossy().into_owned();
             let held = files::held(&entry, &edits.unwrap_or_default());
-            let disk = FsProvider::new(&paths).with_search_paths(&paths);
+            let disk = crate::public_packages::provider(&paths);
             let disk = rnl_runtime::source::FilePool { files: &disk, paths: &pool };
             let layered = files::layered(&held, &disk);
             let index = library.with_edits(&held, &layered);
@@ -191,7 +191,7 @@ async fn open_text(
         core.run(move |drawn| {
             let entry = format!("/{name}");
             let held = files::held_text(&entry, &text, &edits.unwrap_or_default());
-            let disk = FsProvider::new(&paths).with_search_paths(&paths);
+            let disk = crate::public_packages::provider(&paths);
             let disk = rnl_runtime::source::FilePool { files: &disk, paths: &pool };
             let files = files::layered(&held, &disk);
             let index = library.with_edits(&held, &files);
@@ -424,6 +424,10 @@ fn main() {
         .manage(Core::new())
         .manage(library::Library::default())
         .manage(startup)
+        .setup(|app| {
+            public_packages::init(app.handle());
+            Ok(())
+        })
         .menu(menu::menu)
         .on_menu_event(|app, event| match event.id().as_ref() {
             "exit" => request_exit(app),
@@ -466,6 +470,7 @@ fn main() {
             pool::dropped_files,
             pool::bundled_files,
             pool::path_packages,
+            public_packages::public_packages,
             export::export_svg,
             export::save_image,
             project::read_bytes,

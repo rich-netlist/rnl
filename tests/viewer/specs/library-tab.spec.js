@@ -8,17 +8,16 @@ const files = (page) => group(page, "files");
 const builtin = (page) => group(page, "builtin");
 const dialog = (page) => page.locator("dialog.dialog");
 
-test("desktop: missing public package keeps its error and offers the website in the system browser", async ({ page, viewer }, info) => {
+test("desktop: a missing public package keeps its error and points to Help › Public Packages, with no download", async ({ page, viewer }, info) => {
   await viewer.open("missing-canvas-package", { platform: "desktop", pool: "1" });
   await expect(page.locator(".diag.error .msg")).toContainText(["package analog-canvas-extensions 0.1 cannot be found"]);
   const hint = page.locator(".package-hint");
-  await expect(hint).toContainText("Add the package file to Library or a PATH directory");
-  await expect(hint.getByRole("link")).toHaveAttribute("href", "https://rich-netlist.github.io/rnl/en/packages.html");
+  await expect(hint).toContainText("Look for it in Help › Public Packages.");
+  await expect(hint.getByRole("link")).toHaveCount(0);
+  await expect(hint.getByRole("button")).toHaveCount(0);
   if (process.env.RNL_PACKAGE_SCREENSHOTS && info.project.name === "chromium") {
     await page.screenshot({ path: path.join(process.env.RNL_PACKAGE_SCREENSHOTS, "desktop-missing-canvas-hint.png") });
   }
-  await hint.getByRole("link").click();
-  expect(await page.evaluate(() => window.fakeShell.calls)).toContainEqual(["browse", "https://rich-netlist.github.io/rnl/en/packages.html"]);
 });
 
 async function paste(page, viewer, text) {

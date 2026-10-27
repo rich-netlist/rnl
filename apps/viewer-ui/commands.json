@@ -125,6 +125,7 @@
       "items": [
         { "id": "shortcuts", "label": "&Keyboard Shortcuts..." },
         { "id": "desktop-viewer", "label": "&Desktop Viewer...", "platforms": ["web"] },
+        { "id": "public-packages", "label": "Public &Packages...", "platforms": ["desktop"] },
         { "id": "check-updates", "label": "Check for &Updates...", "platforms": ["desktop"] },
         "-",
         { "id": "about", "label": "&About RNL Viewer" }

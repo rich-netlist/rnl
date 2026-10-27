@@ -38,11 +38,13 @@
       "nsis": {
         "installMode": "currentUser",
         "languages": ["English", "SimpChinese"],
-        "installerHooks": "nsis-hooks.nsh"
+        "installerHooks": "nsis-hooks.nsh",
+        "template": "nsis/installer.nsi"
       },
       "wix": {
         "language": "en-US",
-        "upgradeCode": "e063e79a-593d-5622-8b1a-cbc027a3628a"
+        "upgradeCode": "e063e79a-593d-5622-8b1a-cbc027a3628a",
+        "template": "wix/main.wxs"
       }
     }
   }

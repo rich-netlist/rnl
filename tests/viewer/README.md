@@ -93,6 +93,8 @@ before/after demo screenshots in that directory (Chromium only).
 
 `rnl-package-format.spec.js` checks that a package file is one by its format: opened as `inputs/acme.pkg` it is highlighted as RNL, with its prose plain, and a Library row of a package, `.pkg` or `.rnl`, has a format chip whose menu sets it to RNL package or to another format; `isPackagePath` tells by the user's choice, else by the suffix the core's formats list; the title is in every language's catalog.
 
+`public-packages.spec.js` checks the desktop's bundled public packages, with the fake shell's `bundled=1` for a build that has them: the Library's read-only group after the PATH, its absence in the build without them, Help > Public Packages in both and its links, the web viewer's lack of it, and the texts in every language's catalog.
+
 `plain-text.spec.js` opens a Verilog-A file and a Verilog file as the document (`inputs/resistor.va`, `inputs/inverter.v`), which the core gives the format text and reads none of, with one hint: the text pane shows them with no highlighting, object places, marks, not-drawn greying or folds, and the drawing area says the file is no netlist; a netlist is highlighted as before; a Verilog-A file set to SPICE is a netlist again; one that a netlist includes is plain text in its own tab; the format Text and the notice are in every language's catalog.
 
 `virtual-text.spec.js` exercises offscreen diagnostics/selection/scope, multiline highlighting,

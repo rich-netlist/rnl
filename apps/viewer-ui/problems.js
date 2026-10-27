@@ -60,12 +60,8 @@ function packageHint(d, version) {
   const message = span("msg", m("Look for it in File › Include Public Package..."));
   append(li, span("sev", "hint"), message);
   if (shell.platform === "desktop") {
-    setText(message, m("Add the package file to Library or a PATH directory; public packages are listed on the website's "));
-    const link = document.createElement("a");
-    link.href = "https://rich-netlist.github.io/rnl/en/packages.html";
-    setText(link, m("Packages page"));
-    link.addEventListener("click", (e) => { e.preventDefault(); shell.browse?.(link.href); });
-    append(message, link, ".");
+    // the desktop downloads no package: the bundled ones are in the Library, the others are added by hand
+    setText(message, m("Look for it in Help › Public Packages."));
   } else if (shell.publicPackages) {
     shell.publicPackages().then((packages) => {
       if (version !== renderVersion || !li.isConnected) return;

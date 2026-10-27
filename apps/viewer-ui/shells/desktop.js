@@ -54,6 +54,8 @@ export default {
   loadSettings: (legacy) => invoke("load_settings", { legacy }),
   saveSetting: (key, value) => invoke("save_setting", { key, value }),
   bundledFiles: () => invoke("bundled_files"),
+  // the public packages this build bundles, found without a network (public_packages.rs)
+  bundledPackages: () => invoke("public_packages"),
   include: async (kind) => (await invoke("pick_pool", { kind })).map((path) => ({ path, name: path, source: file(path) })),
   pickPath: () => invoke("pick_pool", { kind: "path" }).then((paths) => paths[0] || null),
   // a PATH directory's files, with those of its sub-folders when it was added with them

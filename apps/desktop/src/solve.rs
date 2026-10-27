@@ -12,7 +12,6 @@ use serde_json::json;
 
 use rnl_cli::preview::{one_file, preview, save_copy_with_encoding, Copy, Report, StoppableClock};
 use rnl_cli::solve::{Progress, SolveOptions};
-use rnl_cli::FsProvider;
 use rnl_solver::{SolverOptions, OBJECTIVES};
 use rnl_view::Document;
 use serde::{Deserialize, Serialize};
@@ -153,7 +152,7 @@ pub async fn solve_preview(
             !running.load(Ordering::Relaxed)
         };
         let clock = StoppableClock::new(running.clone());
-        let disk = FsProvider::new(&paths).with_search_paths(&paths);
+        let disk = crate::public_packages::provider(&paths);
         let disk = rnl_runtime::source::FilePool { files: &disk, paths: &pool };
         match (path, name, text) {
             (Some(path), _, _) => {

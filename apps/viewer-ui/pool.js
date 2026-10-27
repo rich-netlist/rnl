@@ -14,6 +14,7 @@ import { chooseFormat, chosenFormat, formatInfo, formatList, formatTitle, setFor
 import { sourcePath } from "./source-path.js";
 
 let items = [];
+let bundledPackages = []; // the desktop's bundled public packages: { name, version, kind, path }
 let temporary = null;
 let currentPath = null;
 let changing = false;
@@ -359,7 +360,7 @@ function fileRow(item, kind) {
   setAttr(open, "aria-label", m`Open ${item.name}`);
   append(row, open);
   if (kind === "files" || kind === "path") append(row, formatChip(item.path, item.name));
-  if (kind === "builtin" || kind === "temporary" || kind === "external") {
+  if (kind === "builtin" || kind === "temporary" || kind === "external" || kind === "public") {
     append(row, span("pool-badge", kind === "temporary" ? m("temporary · not searched") : m("read only")));
   } else if (kind === "files") {
     append(row, button(m("Exclude"), () => update(() => { items = items.filter((i) => i !== item); }), m`Exclude ${item.name}`));
@@ -444,6 +445,12 @@ function render() {
     }));
     append(groups, group(`path:${dir}`, dir, files, "path", { index, all, deep: deep.has(dir) }));
   });
+  // the public packages this build bundles, read only, searched after the PATH directories above
+  if (bundledPackages.length) {
+    const files = bundledPackages.map((p) => ({ path: p.path, name: `${p.name} ${p.version}`,
+      source: { path: p.path, name: p.path, library: true, readonly: true } }));
+    append(groups, group("public", m("Public packages (bundled)"), files, "public"));
+  }
   if (external && shell.externalFile) {
     const root = `/${external.id}/`;
     const files = Object.keys(external.files).sort().map((path) => ({ path, name: path.slice(root.length), source: shell.externalFile(external, path) }));
@@ -461,6 +468,8 @@ export async function startPool() {
   const listing = shell.formats?.().then(setFormatList, () => {});
   if (shell.pathPackages) await listing;
   $("auto-include").addEventListener("change", (e) => toggleAutoInclude(e.target.checked));
+  // the desktop's bundled public packages, in a group of their own; none in the build without them
+  if (shell.bundledPackages) bundledPackages = await shell.bundledPackages().then((info) => info.packages || [], () => []);
   if (shell.bundledFiles) {
     const bundled = await shell.bundledFiles();
     items = Object.entries(bundled).map(([path, text]) => ({ path, name: path.replace("<bundled>/", ""), builtin: true,
@@ -471,7 +480,8 @@ export async function startPool() {
   $("include-library").hidden = !shell.includeLibrary;
   $("include-library").addEventListener("click", () => includeFiles("library"));
   $("add-path").hidden = !shell.pathPackages;
-  setText($("path-note"), shell.pathPackages ? m`Settings: ${settingsPath}`
+  // the desktop's settings file; a shell with no settings file says nothing of it, rather than "null"
+  setText($("path-note"), shell.pathPackages ? (settingsPath ? m`Settings: ${settingsPath}` : "")
     : m("Browsers cannot search local directories. Include files or folders above; Library files remain until this tab closes."));
   $("add-path-subfolders").hidden = !shell.pathPackages;
   $("add-path").addEventListener("click", () => addPath(false));

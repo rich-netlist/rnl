@@ -603,6 +603,7 @@ mod tests {
             "&Help".to_string(),
             vec![
                 item("shortcuts", "&Keyboard Shortcuts...", None),
+                item("public-packages", "Public &Packages...", None),
                 updates,
                 Shown::Separator,
                 Shown::About("&About RNL Viewer".into()),

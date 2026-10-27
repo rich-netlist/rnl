@@ -1,5 +1,9 @@
 # Builds the desktop viewer of apps/desktop for Windows and Linux and releases it: on Windows, a single
-# executable, an NSIS installer for the current user and an MSI for the machine. The Tauri command
+# executable, a zip of the same with the public packages in a folder beside it, an NSIS installer for the
+# current user and an MSI for the machine; the installers carry the public packages as a part of their
+# own, which the user chooses. On Linux: the AppImage and a second one with the public packages among its
+# resources, a Debian package and a small one of the public packages; on macOS two disk images for each
+# architecture, the second with the packages among the app's resources. The Tauri command
 # line that apps/desktop/package.json pins builds them on GitHub's Windows runner, whose MSVC
 # toolchain links the WebView2 loader into the executable. The workflow checks that the executable
 # imports no WebView2Loader.dll, smoke-tests it alone in a directory, and installs both installers,
@@ -90,11 +94,22 @@ jobs:
       - name: Install the Tauri command line
         working-directory: apps/desktop
         run: npm ci
+      # the latest version of each package of the catalog of rnl-packages, every file checked against the
+      # catalog's SHA-256, with the licences and a lock file: what the installers offer, and the single
+      # executable with packages carries. The viewer never downloads them; they change with a release.
+      - name: Fetch the public packages
+        run: |
+          python scripts/bundle_packages.py fetch --out "$RUNNER_TEMP/public-packages"
+          # the MSI's feature of them, which Tauri takes as a fragment and a configuration
+          python scripts/bundle_packages.py wix --dir "$RUNNER_TEMP/public-packages" --out "$RUNNER_TEMP/public-packages-wix"
       # cargo build --release with Tauri's custom-protocol feature, as for production, then the
-      # installers, for which the bundler downloads NSIS and WiX
+      # installers, for which the bundler downloads NSIS and WiX. One build: the program is compiled once,
+      # and the installers take the folder of the packages that RNL_PUBLIC_PACKAGES_DIR names
       - name: Build the app and its installers
         working-directory: apps/desktop
-        run: npx tauri build
+        env:
+          RNL_PUBLIC_PACKAGES_DIR: ${{ runner.temp }}\public-packages
+        run: npx tauri build --config "$RUNNER_TEMP/public-packages-wix/public-packages.conf.json"
 
       # dumpbin lists the imports; the Visual Studio installer's vswhere finds it
       - name: The executable does not import WebView2Loader.dll
@@ -122,6 +137,10 @@ jobs:
           Copy-Item "$built\bundle\nsis\RNL Viewer_$($env:VERSION)_x64-setup.exe" "$out\$name-setup.exe"
           Copy-Item "$built\bundle\msi\RNL Viewer_$($env:VERSION)_x64_en-US.msi" "$out\$name.msi"
           Copy-Item "$built\rnl-viewer.exe" "$out\$name.exe"
+          # the same executable with the packages in a folder beside it, in a zip: compiled once, assembled twice
+          python scripts/bundle_packages.py zip --exe "$out\$name.exe" --packages "$env:RUNNER_TEMP\public-packages" `
+            --out "$out\RNL-Viewer-$env:VERSION-with-packages-windows-x64.zip"
+          if ($LASTEXITCODE -ne 0) { throw "The zip of the single executable with the public packages could not be made." }
           $sums = Get-ChildItem $out -File | Sort-Object Name | ForEach-Object {
             "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)"
           }
@@ -148,18 +167,63 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/single"
           cp "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-windows-x64.exe" "$RUNNER_TEMP/single/"
-          node apps/desktop/tests/smoke.mjs --exe "$RUNNER_TEMP/single/RNL-Viewer-$VERSION-windows-x64.exe"
+          node apps/desktop/tests/smoke.mjs --packages without --exe "$RUNNER_TEMP/single/RNL-Viewer-$VERSION-windows-x64.exe"
+      # the zip unpacked: the same executable, which finds the folder of the packages beside it
+      - name: Smoke-test the zip of the single executable with the public packages
+        timeout-minutes: 10
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/single-with"
+          python -m zipfile -e "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-with-packages-windows-x64.zip" "$RUNNER_TEMP/single-with"
+          folder="$RUNNER_TEMP/single-with/RNL-Viewer-$VERSION-with-packages-windows-x64"
+          test -f "$folder/public-packages/public-packages.json"
+          cmp "$folder/RNL-Viewer-$VERSION-windows-x64.exe" "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-windows-x64.exe"
+          node apps/desktop/tests/smoke.mjs --packages with --exe "$folder/RNL-Viewer-$VERSION-windows-x64.exe"
       - name: Install with the NSIS installer for the user, smoke-test the app and uninstall it
         timeout-minutes: 10
         env:
           VERSION: ${{ steps.version.outputs.version }}
-        run: node apps/desktop/tests/installers.mjs --nsis "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-windows-x64-setup.exe"
+        run: node apps/desktop/tests/installers.mjs --packages with --nsis "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-windows-x64-setup.exe"
+      # the same installer told to leave the public packages out, as its page of that part does when unchecked
+      - name: Install with the NSIS installer without the public packages, smoke-test the app and uninstall it
+        timeout-minutes: 10
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: node apps/desktop/tests/installers.mjs --packages without --nsis "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-windows-x64-setup.exe"
       # the runner is an administrator, as the MSI's installation for the machine needs
       - name: Install the MSI for the machine, smoke-test the app and uninstall it
         timeout-minutes: 10
         env:
           VERSION: ${{ steps.version.outputs.version }}
-        run: node apps/desktop/tests/installers.mjs --msi "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-windows-x64.msi"
+        run: node apps/desktop/tests/installers.mjs --packages with --msi "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-windows-x64.msi"
+      # the same MSI with its feature of the public packages left out: PUBLICPACKAGES=0
+      - name: Install the MSI for the machine without the public packages, smoke-test the app and uninstall it
+        timeout-minutes: 10
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: node apps/desktop/tests/installers.mjs --packages without --msi "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-windows-x64.msi"
+      # only in a rehearsal by hand: pictures of the pages of the installers where the public packages are
+      # chosen. The installers are started with their windows, clicked to those pages and cancelled; nothing
+      # is installed. A failure here does not fail the release's checks.
+      - name: Pictures of the installers' pages of the public packages
+        if: github.event_name == 'workflow_dispatch'
+        continue-on-error: true
+        timeout-minutes: 12
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File apps/desktop/tests/installer-ui.ps1 \
+            -Nsis "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-windows-x64-setup.exe" \
+            -Msi "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-windows-x64.msi" \
+            -Out "$RUNNER_TEMP/installer-ui"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always() && github.event_name == 'workflow_dispatch'
+        with:
+          name: rnl-viewer-installer-ui
+          path: ${{ runner.temp }}/installer-ui/
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Measure the Windows font-fix package sizes
         if: inputs.measure_font_sizes
         env:
@@ -218,6 +282,9 @@ jobs:
       - name: Install the Tauri command line
         working-directory: apps/desktop
         run: npm ci
+      # what the AppImage with them and the small Debian package carry (see the Windows job)
+      - name: Fetch the public packages
+        run: python scripts/bundle_packages.py fetch --out "$RUNNER_TEMP/public-packages"
       - name: Build the AppImage and Debian package
         working-directory: apps/desktop
         env:
@@ -233,6 +300,29 @@ jobs:
           cp "$built/appimage/RNL Viewer_${VERSION}_amd64.AppImage" "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-linux-x86_64.AppImage"
           cp "$built/deb/RNL Viewer_${VERSION}_amd64.deb" "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-linux-x86_64.deb"
           chmod +x "$RUNNER_TEMP/assets/"*.AppImage
+          # the public packages: a Debian package of their own, which puts them in /usr/share/rnl-viewer
+          python scripts/bundle_packages.py deb --dir "$RUNNER_TEMP/public-packages" --version "$VERSION" \
+            --out "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-linux-public-packages.deb"
+          cd "$RUNNER_TEMP/assets"
+          sha256sum RNL-Viewer-* > SHA256SUMS.txt
+      # compiled once, bundled twice: the packages among the AppImage's resources, where it looks for them
+      - name: Bundle the AppImage again with the public packages
+        working-directory: apps/desktop
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: |
+          python3 - <<'PY'
+          import json, os
+          temp = os.environ['RUNNER_TEMP']
+          config = {'bundle': {'resources': {'LICENSE.txt': 'LICENSE.txt', temp + '/public-packages': 'public-packages'}}}
+          open(temp + '/with-packages.conf.json', 'w').write(json.dumps(config))
+          PY
+          npx tauri bundle --bundles appimage --config "$RUNNER_TEMP/with-packages.conf.json"
+          cp "target/release/bundle/appimage/RNL Viewer_${VERSION}_amd64.AppImage" "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-with-packages-linux-x86_64.AppImage"
+          chmod +x "$RUNNER_TEMP/assets/"*.AppImage
+          # it is another file than the first, with the packages inside
+          ! cmp -s "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-with-packages-linux-x86_64.AppImage" "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-linux-x86_64.AppImage"
           cd "$RUNNER_TEMP/assets"
           sha256sum RNL-Viewer-* > SHA256SUMS.txt
       - name: Smoke-test the AppImage in its own directory
@@ -246,7 +336,19 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/single"
           cp "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-linux-x86_64.AppImage" "$RUNNER_TEMP/single/"
-          dbus-run-session -- xvfb-run -a node apps/desktop/tests/linux-smoke.mjs --exe "$RUNNER_TEMP/single/RNL-Viewer-$VERSION-linux-x86_64.AppImage"
+          dbus-run-session -- xvfb-run -a node apps/desktop/tests/linux-smoke.mjs --packages without --exe "$RUNNER_TEMP/single/RNL-Viewer-$VERSION-linux-x86_64.AppImage"
+      - name: Smoke-test the AppImage with the public packages in its own directory
+        timeout-minutes: 5
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          FONTCONFIG_FILE: ${{ github.workspace }}/apps/desktop/tests/fontconfig-no-cjk.conf
+          RNL_NO_SYSTEM_CJK: "1"
+          SMOKE_OUTPUT_DIR: ${{ runner.temp }}/smoke-linux
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: |
+          mkdir -p "$RUNNER_TEMP/single-with"
+          cp "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-with-packages-linux-x86_64.AppImage" "$RUNNER_TEMP/single-with/"
+          dbus-run-session -- xvfb-run -a node apps/desktop/tests/linux-smoke.mjs --packages with --exe "$RUNNER_TEMP/single-with/RNL-Viewer-$VERSION-with-packages-linux-x86_64.AppImage"
       - name: Install the Debian package, smoke-test it and uninstall it
         timeout-minutes: 5
         env:
@@ -263,7 +365,13 @@ jobs:
           trap 'sudo apt-get remove -y "$package"' EXIT
           sudo apt-get install -y --no-install-recommends "$deb"
           test -f "/usr/share/applications/RNL Viewer.desktop"
-          dbus-run-session -- xvfb-run -a node apps/desktop/tests/linux-smoke.mjs --exe /usr/bin/rnl-viewer
+          dbus-run-session -- xvfb-run -a node apps/desktop/tests/linux-smoke.mjs --packages without --exe /usr/bin/rnl-viewer
+          # the Debian package of the public packages: found in /usr/share/rnl-viewer, and gone with its removal
+          sudo apt-get install -y "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-linux-public-packages.deb"
+          test -f /usr/share/rnl-viewer/public-packages/public-packages.json
+          dbus-run-session -- xvfb-run -a node apps/desktop/tests/linux-smoke.mjs --packages with --exe /usr/bin/rnl-viewer
+          sudo apt-get remove -y rnl-viewer-public-packages
+          test ! -e /usr/share/rnl-viewer/public-packages
           sudo apt-get remove -y "$package"
           trap - EXIT
           test ! -e /usr/bin/rnl-viewer
@@ -317,6 +425,8 @@ jobs:
           python-version: "3.12"
       - name: Write the pinned web fonts
         run: pip install fonttools==4.58.0 brotli==1.2.0 && python scripts/fonts.py web
+      - name: Fetch the public packages
+        run: python3 scripts/bundle_packages.py fetch --out "$RUNNER_TEMP/public-packages"
       - name: Build the ad-hoc signed app and DMG
         working-directory: apps/desktop
         env:
@@ -344,13 +454,49 @@ jobs:
         timeout-minutes: 12
         env:
           SMOKE_OUTPUT_DIR: ${{ runner.temp }}/smoke-macos
-        run: node apps/desktop/tests/macos-smoke.mjs --app "$RUNNER_TEMP/installed/RNL Viewer.app"
+        run: node apps/desktop/tests/macos-smoke.mjs --packages without --app "$RUNNER_TEMP/installed/RNL Viewer.app"
+      # compiled once, bundled twice: the packages among the app's resources, where it looks for them; the app is
+      # signed again (ad hoc) by the bundler, and its image is installed from and checked as the first one was
+      - name: Bundle the app and DMG again with the public packages
+        working-directory: apps/desktop
+        env:
+          APPLE_SIGNING_IDENTITY: "-"
+          VERSION: ${{ steps.version.outputs.version }}
+          ARCH: ${{ matrix.arch }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          temp = os.environ['RUNNER_TEMP']
+          config = {'bundle': {'resources': {'LICENSE.txt': 'LICENSE.txt', temp + '/public-packages': 'public-packages'}}}
+          open(temp + '/with-packages.conf.json', 'w').write(json.dumps(config))
+          PY
+          rm -f target/$TARGET/release/bundle/dmg/*.dmg
+          npx tauri bundle --target $TARGET --bundles app,dmg --config "$RUNNER_TEMP/with-packages.conf.json"
+          mkdir -p "$RUNNER_TEMP/installed-with" "$RUNNER_TEMP/dmg-with"
+          cp target/$TARGET/release/bundle/dmg/*.dmg "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-with-packages-macos-$ARCH.dmg"
+          printf 'Y\n' | hdiutil attach "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-with-packages-macos-$ARCH.dmg" -nobrowse -readonly -mountpoint "$RUNNER_TEMP/dmg-with"
+          trap 'hdiutil detach "$RUNNER_TEMP/dmg-with"' EXIT
+          ditto "$RUNNER_TEMP/dmg-with/RNL Viewer.app" "$RUNNER_TEMP/installed-with/RNL Viewer.app"
+          hdiutil detach "$RUNNER_TEMP/dmg-with"
+          trap - EXIT
+          codesign --verify --deep --strict --verbose=2 "$RUNNER_TEMP/installed-with/RNL Viewer.app"
+          cd "$RUNNER_TEMP/assets"
+          shasum -a 256 RNL-Viewer-* > SHA256SUMS.txt
+          shasum -a 256 --check SHA256SUMS.txt
+      - name: Smoke-test the installed Mac app with the public packages
+        timeout-minutes: 12
+        env:
+          SMOKE_OUTPUT_DIR: ${{ runner.temp }}/smoke-macos-with-packages
+        run: node apps/desktop/tests/macos-smoke.mjs --packages with --app "$RUNNER_TEMP/installed-with/RNL Viewer.app"
       - name: Keep the macOS smoke evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: rnl-viewer-macos-${{ matrix.arch }}-smoke
-          path: ${{ runner.temp }}/smoke-macos/
+          path: |
+            ${{ runner.temp }}/smoke-macos/
+            ${{ runner.temp }}/smoke-macos-with-packages/
           if-no-files-found: error
           retention-days: 14
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -380,7 +526,7 @@ jobs:
             find "$dir" -maxdepth 1 -type f ! -name SHA256SUMS.txt -exec cp {} assets/ \;
           done
           cd assets
-          test "$(find . -maxdepth 1 -type f | wc -l)" -eq 7
+          test "$(find . -maxdepth 1 -type f | wc -l)" -eq 12
           sha256sum RNL-Viewer-* > SHA256SUMS.txt
           sha256sum --check SHA256SUMS.txt
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

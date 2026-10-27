@@ -16,11 +16,13 @@
 // after, so that each run starts from the defaults. The app is stopped by its process ID. The test fails at once when the app exits, and
 // a step fails when the page stops answering. Node 22 or later, with no dependencies.
 //
-//   node apps/desktop/tests/smoke.mjs [--port PORT] [--no-build | --exe PATH]
+//   node apps/desktop/tests/smoke.mjs [--port PORT] [--no-build | --exe PATH] [--packages with|without]
 //
 // PORT is the DevTools port, any free one by default; --no-build starts the app as it was built;
 // --exe starts the app at PATH instead, such as a release build or an installed app, and builds
-// nothing.
+// nothing. --packages says whether the app bundles the public packages: with, it finds eda-style
+// without a network and lists the bundled ones in the Library and in Help > Public Packages; without,
+// it reports the package missing and points to Help > Public Packages.
 
 import { execFileSync, spawn } from "node:child_process";
 import fs from "node:fs";
@@ -67,6 +69,13 @@ function setSettingsAside() {
     if (fs.existsSync(kept)) fs.renameSync(kept, releaseSettings);
   };
 }
+/** What the app is expected to bundle of the public packages, "with" or "without"; unchecked when not given. */
+const expectPackages = (() => {
+  const i = process.argv.indexOf("--packages");
+  const value = i >= 0 ? process.argv[i + 1] : undefined;
+  if (value !== undefined && value !== "with" && value !== "without") throw new Error("--packages takes with or without.");
+  return value;
+})();
 const TIMEOUT = 60_000; // the first start of WebView2 on a fresh machine can be slow
 
 if (process.platform !== "win32") {
@@ -775,6 +784,8 @@ async function drive(app, port, profile, t0, session) {
   await filePoolSmoke(page);
   await nativeDropSmoke(page, app.pid);
   await independentNavigationSmoke(page);
+  // last: it opens a file and a dialog of its own
+  if (expectPackages) await publicPackagesSmoke(page, expectPackages);
   same(page.errors, [], "the page's errors");
 }
 
@@ -850,6 +861,57 @@ async function newWindowSmoke(app, page, at) {
 }
 
 /** Exercise the real desktop shell and native core; replace only the OS chooser's selection. */
+/**
+ * The public packages: the app that bundles them finds eda-style, a file that uses it, without a network,
+ * and shows them in the Library and in Help > Public Packages; the app that does not reports the package
+ * missing with a hint to Help > Public Packages, and bundles nothing. Neither downloads anything.
+ */
+async function publicPackagesSmoke(page, mode) {
+  const work = path.dirname(netlist);
+  const top = path.join(work, "use-eda-style.sp");
+  fs.writeFileSync(top, ["* a file that uses a public package", '* @RNL(type="header") { @VERSION("0.3"); @USE-PACKAGE(name="eda-style", version="0.1") }', "R1 a 0 1k", ".end", ""].join("\n"));
+  const info = await page.evaluate(`(async () => {
+    const { shell } = await import('./shell.js');
+    window.fetched = [];
+    const original = window.fetch;
+    window.fetch = (...args) => { window.fetched.push(String(args[0]?.url ?? args[0])); return original.apply(window, args); };
+    return await shell.bundledPackages();
+  })()`);
+  await page.evaluate(`(async () => {
+    const { openSource } = await import('./open.js');
+    await openSource({ path: ${JSON.stringify(top)}, name: 'use-eda-style.sp' }, false);
+    const head = document.getElementById('problems-head');
+    if (head.getAttribute('aria-expanded') === 'false') head.click();
+  })()`);
+  const missing = await page.evaluate(`window.viewer.doc.diagnostics.some(d => d.message.includes('eda-style') && d.message.includes('cannot be found'))`);
+  await page.evaluate("document.getElementById('tab-files').click()");
+  const group = await page.evaluate(`(() => {
+    const g = document.querySelector('[data-group="public"]');
+    return g ? [...g.querySelectorAll('.pool-open')].map((b) => b.textContent) : null;
+  })()`);
+  await page.evaluate("window.viewer.command('public-packages')");
+  const dialog = await until("the Help > Public Packages dialog", () => page.evaluate(`document.querySelector('dialog.dialog[open], dialog.dialog')?.innerText || ''`));
+  await page.evaluate("document.querySelector('dialog.dialog button')?.click()");
+  if (mode === "with") {
+    check(info.bundled, `the build with the public packages bundles none: ${JSON.stringify(info)}`);
+    const names = info.packages.map((p) => `${p.name} ${p.version}`);
+    check(names.includes("eda-style 0.1"), `the bundled packages are ${names.join(", ")}`);
+    check(!missing, "eda-style 0.1 is bundled, and was reported missing");
+    same(group, names, "the Library's group of the bundled packages");
+    check(dialog.includes(`This build bundles ${names.join(", ")}.`), `Help > Public Packages: ${dialog}`);
+    console.log(`The public packages are bundled and found without a network: ${names.join(", ")}`);
+  } else {
+    check(!info.bundled && info.packages.length === 0, `the build without the public packages bundles ${JSON.stringify(info)}`);
+    check(missing, "eda-style 0.1 is not bundled, and was not reported missing");
+    same(group, null, "the Library's group of the bundled packages");
+    const hint = await page.evaluate(`document.querySelector('.package-hint .msg')?.textContent`);
+    same(hint, "Look for it in Help › Public Packages.", "the hint of the missing package");
+    check(dialog.includes("This build does not bundle the public packages."), `Help > Public Packages: ${dialog}`);
+    console.log("The public packages are not bundled: the package is reported missing, with a hint to Help > Public Packages");
+  }
+  same(await page.evaluate("window.fetched.filter((u) => !/^(blob|data):/.test(u) && !u.startsWith(location.origin) && !u.startsWith('http://ipc.localhost'))"), [], "what the app fetched from elsewhere");
+}
+
 async function filePoolSmoke(page) {
   const work = path.dirname(netlist);
   const parts = path.join(work, "pool");
@@ -922,7 +984,7 @@ async function filePoolSmoke(page) {
     if (head.getAttribute('aria-expanded') === 'false') head.click();
   })()`);
   await until("the native missing-package hint", () => page.evaluate(`
-    document.querySelector('.package-hint a')?.href === 'https://rich-netlist.github.io/rnl/en/packages.html'
+    document.querySelector('.package-hint .msg')?.textContent === 'Look for it in Help › Public Packages.'
       && window.viewer.doc.diagnostics.some(d => d.message.includes('package analog-canvas-extensions 0.1 cannot be found'))`));
   same(await page.evaluate(`document.querySelectorAll('[data-group="builtin"] .pool-open').length`), 25,
     "the native built-in library contains both standard series");

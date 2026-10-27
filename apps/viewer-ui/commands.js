@@ -22,6 +22,7 @@ import { doc, selected } from "./state.js";
 import { findInSource } from "./text.js";
 import { ascend, descend, opens } from "./subcircuits.js";
 import { checkForUpdates } from "./updates.js";
+import { bundledPackagesHelp } from "./bundled-packages.js";
 import { fileAssociations } from "./file-associations.js";
 import { memoryCache } from "./memory-cache.js";
 import { toggleUsages, toggleCurrents } from "./usages.js";
@@ -145,6 +146,7 @@ export function command(id, options = {}) {
     case "solve-save-utf8": saveSolved("utf8"); break;
     case "solve-settings": settings(); break;
     case "check-updates": checkForUpdates(); break;
+    case "public-packages": bundledPackagesHelp(); break;
     case "about": about(); break;
     case "desktop-viewer": toolsPage(); break;
     default: break;

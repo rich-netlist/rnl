@@ -20,6 +20,7 @@
  * @property {(dir: string) => Promise<string[]>} [pathPackages] Package and netlist paths in a desktop PATH directory.
  * @property {(source: Source) => object} [poolItem] A web source's entry as a searchable file.
  * @property {() => Promise<Array<{name: string, title: string, extensions: string[], fallback: boolean}>>} [formats] The core's parse formats, in its order, for the Library's format menus before a Document lists them.
+ * @property {() => Promise<{ bundled: boolean, catalog: string, fetched: string, packages: Array<{ name: string, version: string, kind: string, path: string }>, licenses: string[] }>} [bundledPackages] The public packages that this build bundles (desktop): none in the build without them; they are found without a network.
  * @property {(path: string) => Promise<string>} [detectFormat] The format the core detects for a Library file that the document shown does not read.
  * @property {(path: string) => string} [formatKey] The key a file's format choice is kept by: its path folded where the platform ignores case, or the address of a file a server served.
  * @property {(path: string) => boolean} [keepsFormat] Whether a format chosen for the file is kept in the settings; otherwise only while the page is open. True when absent.

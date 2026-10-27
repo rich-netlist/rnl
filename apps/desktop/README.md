@@ -142,6 +142,17 @@ msiexec /i RNL-Viewer-0.1.3-windows-x64.msi /qn
 msiexec /x RNL-Viewer-0.1.3-windows-x64.msi /qn
 ```
 
+## Public packages
+
+The public packages are the packages of the [rnl-packages](https://rich-netlist.github.io/rnl-packages/) site (extensions, symbol and style libraries, PDKs). The desktop viewer **never downloads** them, so that its functions stay offline: a build of a release that **bundles** them has the latest version of each, as they were when the release was made, and finds them without a network; they change only with a new release. The version of each is in `public-packages.json` beside them, which Help > Public Packages shows, with the licences of the site's files, `LICENSES/`.
+
+- **Where.** A folder `public-packages`, `<name>/<version>/…` for each package and the lock file, beside the program (the installers, and the zip of the single executable with packages), among the resources (the macOS and Linux bundles), or in `/usr/share/rnl-viewer` (a Debian package) (`public_packages.rs`). The viewer writes and copies nothing: the plain single executable has no folder beside it, and so no packages. Each `<name>` directory is a directory of the search path that package lookup reads (16.2); they are searched after the user's own PATH directories, for packages only (no bare include is looked for in them), and read only.
+- **In the app.** The Library has them as a read-only group of its own, *Public packages (bundled)*, after the PATH groups; Help > Public Packages says what they are, whether the build bundles them and which versions, that the other kind of download exists, where they come from, how to add a downloaded folder to the PATH by hand, and that the viewer never downloads. A missing package's hint in Problems points there. The web viewer is unchanged: its File > Include Public Package downloads on request.
+- **Windows.** The NSIS installer and the MSI are one file each and carry the packages as a part the user chooses: the installer's page *Public packages* (a check box, on by default), and the MSI's feature *Public packages* in its feature tree (on by default); silently, `/PACKAGES=0` and `PUBLICPACKAGES=0` leave them out. The single executable stays the bare `RNL-Viewer-X.Y.Z-windows-x64.exe`; the one with the packages is the zip `RNL-Viewer-X.Y.Z-with-packages-windows-x64.zip`, with the same executable and the folder `public-packages/` beside it, compiled once and assembled twice.
+- **Linux.** Two AppImages, `RNL-Viewer-X.Y.Z-linux-x86_64.AppImage` and `RNL-Viewer-X.Y.Z-with-packages-linux-x86_64.AppImage`, from one compile: the second is made by bundling the compiled app again (`tauri bundle`) with the packages among its resources. The Debian way of choosing at install time is a second, small package, `RNL-Viewer-X.Y.Z-linux-public-packages.deb` (`rnl-viewer-public-packages`), which puts them in `/usr/share/rnl-viewer/public-packages`, where the program of the first package looks; removing it takes them away.
+- **macOS.** A disk image holds the app and is dragged into Applications, with no install step to choose in, so there are two for each architecture: `…-macos-ARCH.dmg` and `…-with-packages-macos-ARCH.dmg`, the second made by bundling the compiled app again (`tauri bundle`) with the packages among its resources, `Contents/Resources/public-packages`. Both are signed ad hoc by the bundler.
+- **How it is built.** `python scripts/bundle_packages.py fetch --out DIR` writes the folder, every file checked against the catalog's SHA-256, and the lock file; `RNL_PUBLIC_PACKAGES_DIR=DIR npx tauri build --config <out>/public-packages.conf.json` gives it to the NSIS installer (the environment variable) and the MSI (the configuration, which `bundle_packages.py wix --dir DIR --out <out>` writes with the WiX fragment of the files); `bundle_packages.py zip` makes the zip of the single executable with packages. Without them a build is as it was, with no page or feature. The pages of the two installers are in a copy of Tauri's own templates, [`nsis/installer.nsi`](nsis/installer.nsi) and [`wix/main.wxs`](wix/main.wxs), of the Tauri CLI that `package.json` pins (tauri-bundler 2.10.1), with the changes marked `RNL`; look at the differences from the new version's templates when the CLI is updated. `RNL_PUBLIC_PACKAGES` names a folder of packages for a test or a build put together by hand.
+
 ## Releasing
 
 See [the three release lines](../../docs/releases.md) for version ownership and manual `candidate_tag` mismatch rehearsals. First-release versions remain subject to the user's decision.
@@ -154,15 +165,20 @@ See [the three release lines](../../docs/releases.md) for version ownership and 
 
 The workflow stops when the tag is not the app's version or the notes are missing. On Windows it builds with MSVC, checks with `dumpbin` that the executable imports no `WebView2Loader.dll`, smoke-tests the executable alone in a directory, installs each installer silently, smoke-tests the installed app and uninstalls it. On Linux it builds the AppImage and deb, smoke-tests the AppImage alone in a directory under Xvfb, installs the deb, smoke-tests `/usr/bin/rnl-viewer`, uninstalls it and checks that the binary and desktop entry are gone. The tests use a D-Bus session, software rendering and isolated profiles, and keep screenshots as Actions artifacts.
 
-After all platforms succeed, the workflow verifies each platform's checksums and writes one combined `SHA256SUMS.txt`. The GitHub release *RNL Viewer X.Y.Z* contains eight files:
+After all platforms succeed, the workflow verifies each platform's checksums and writes one combined `SHA256SUMS.txt`. The GitHub release *RNL Viewer X.Y.Z* contains thirteen files:
 
 - `RNL-Viewer-X.Y.Z-windows-x64-setup.exe`
 - `RNL-Viewer-X.Y.Z-windows-x64.msi`
 - `RNL-Viewer-X.Y.Z-windows-x64.exe`
+- `RNL-Viewer-X.Y.Z-with-packages-windows-x64.zip`
 - `RNL-Viewer-X.Y.Z-linux-x86_64.AppImage`
 - `RNL-Viewer-X.Y.Z-linux-x86_64.deb`
+- `RNL-Viewer-X.Y.Z-with-packages-linux-x86_64.AppImage`
+- `RNL-Viewer-X.Y.Z-linux-public-packages.deb`
 - `RNL-Viewer-X.Y.Z-macos-arm64.dmg`
+- `RNL-Viewer-X.Y.Z-with-packages-macos-arm64.dmg`
 - `RNL-Viewer-X.Y.Z-macos-x86_64.dmg`
+- `RNL-Viewer-X.Y.Z-with-packages-macos-x86_64.dmg`
 - `SHA256SUMS.txt`
 
 The release uses `--latest=false`; the repository's latest belongs to the core (`core-vX.Y.Z`), so the viewer's releases are told apart by their tags. A version with a prerelease part, such as `0.2.0-rc.1`, makes a prerelease, which Check for Updates passes over. Run by hand from the Actions tab on a branch, the workflow builds and checks all platforms and keeps the platform artifacts and combined eight-file artifact; it never publishes. Before pushing a release tag, run it on the intended commit, check every build job and the combined checksums, inspect the Linux screenshots, and confirm the versions and notes above. The site only links Linux files when the selected release tag contains the Linux bundle configuration, so earlier Windows-only releases keep valid download links.

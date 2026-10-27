@@ -5,7 +5,6 @@ use std::io::Read;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 
-use rnl_cli::FsProvider;
 use rnl_runtime::source::{FilePool, LibraryLookup, Provider};
 use tauri::State;
 
@@ -158,7 +157,7 @@ pub async fn preload_document(
             return Ok("full".into());
         }
         let priority = BackgroundPriority::new();
-        let disk = FsProvider::new(&paths).with_search_paths(&paths);
+        let disk = crate::public_packages::provider(&paths);
         let disk = FilePool { files: &disk, paths: &pool };
         let held = rnl_view::MemoryProvider::new();
         let files = crate::files::layered(&held, &disk);
