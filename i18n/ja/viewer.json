@@ -43,6 +43,7 @@
   "subcircuit": "サブサーキット",
   "file level": "ファイルレベル",
   "Nothing on this level has a position yet, so nothing is drawn.": "このレベルにはまだ位置が指定されたオブジェクトがないため、何も描画されません。",
+  "Text": "テキスト",
   "This file is not a netlist. It is shown as text.": "このファイルはネットリストではありません。テキストとして表示しています。",
   "This level has no objects, so nothing is drawn.": "このレベルにはオブジェクトがないため、何も描画されません。",
   "Text of {0}": "{0} のテキスト",

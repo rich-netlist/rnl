@@ -349,6 +349,16 @@ export function writeFixtures(rnl, dir) {
     fs.writeFileSync(path.join(dir, `${name}.json`), view(rnl, file, root));
   }
 
+  // a Verilog-A file read as SPICE, as the user can set it, and a netlist that includes one
+  const va = "tests/viewer/inputs/resistor.va";
+  fs.writeFileSync(path.join(dir, "verilog-a-spice.json"), execFileSync(rnl, ["view", va, "--format", `${va}=spice`],
+    { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 }));
+  fs.copyFileSync(path.join(root, va), path.join(dir, "resistor.va"));
+  fs.writeFileSync(path.join(dir, "includes-verilog-a.sp"), [
+    "* A netlist that includes a Verilog-A model", '.include "resistor.va"', "R1 in out 1k", "C1 out 0 1n",
+    "* @RNL { #R1 @PLACE(0, 0); #C1 @PLACE(6, 0) }", ".end", ""].join("\n"));
+  fs.writeFileSync(path.join(dir, "includes-verilog-a.json"), view(rnl, "includes-verilog-a.sp", dir));
+
   const changed = path.join(dir, "changed");
   fs.mkdirSync(changed, { recursive: true });
   const cases = path.join(root, "tests/conformance/cases");

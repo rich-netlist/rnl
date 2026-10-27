@@ -10,7 +10,7 @@ import { navigate } from "./navigation.js";
 import { $, load, save, settingsPath } from "./util.js";
 import { showManifestBar } from "./manifest-bar.js";
 import { displayFollows } from "./display.js";
-import { chooseFormat, chosenFormat, formatInfo, formatList, setFormatList } from "./formats.js";
+import { chooseFormat, chosenFormat, formatInfo, formatList, formatTitle, setFormatList } from "./formats.js";
 import { sourcePath } from "./source-path.js";
 
 let items = [];
@@ -276,10 +276,10 @@ function formatChip(path, name) {
   chip.className = "format-chip";
   chip.dataset.format = current || "";
   chip.classList.toggle("chosen", !!chosen);
-  setText(chip, formatInfo(current)?.title || current || "…");
+  setText(chip, formatTitle(current) || "…");
   setAttr(chip, "aria-haspopup", "menu");
   setAttr(chip, "title", chosen ? m("Parse format: chosen by you") : m("Parse format: detected automatically"));
-  setAttr(chip, "aria-label", m`Parse format of ${name}: ${formatInfo(current)?.title || current || ""}`);
+  setAttr(chip, "aria-label", m`Parse format of ${name}: ${formatTitle(current) || ""}`);
   chip.disabled = !formatList().length || (!shown && !auto);
   chip.addEventListener("click", () => formatMenu(chip, path, chosen, auto));
   if (!shown && !detected.has(path) && shell.detectFormat) {
@@ -303,7 +303,7 @@ function formatMenu(chip, path, chosen, auto) {
     if ((name || undefined) === chosen) return;
     update(async () => { await chooseFormat(path, name); });
   };
-  const entries = [[null, m`Automatic (${formatInfo(auto)?.title || auto || "?"})`], ...formatList().map((f) => [f.name, f.title])];
+  const entries = [[null, m`Automatic (${formatTitle(auto) || "?"})`], ...formatList().map((f) => [f.name, formatTitle(f.name)])];
   for (const [name, label] of entries) {
     const item = document.createElement("button");
     item.type = "button";

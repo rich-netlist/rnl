@@ -43,6 +43,7 @@
   "subcircuit": "子电路",
   "file level": "文件层级",
   "Nothing on this level has a position yet, so nothing is drawn.": "此层级中尚无任何对象指定位置，因此未绘制任何内容。",
+  "Text": "文本",
   "This file is not a netlist. It is shown as text.": "此文件不是网表，按文本显示。",
   "This level has no objects, so nothing is drawn.": "此层级没有任何对象，因此未绘制任何内容。",
   "Text of {0}": "{0} 的文本",
