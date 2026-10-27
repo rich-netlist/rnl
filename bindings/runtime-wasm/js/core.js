@@ -17,7 +17,7 @@
  * @property {Record<string, string>} [files] The texts of the workspace by path, the entry's among them.
  * @property {string[]} [package_dirs] The directories, among the paths of `files`, whose packages are
  *   found by name.
- * @property {"spice" | "spectre"} [dialect] The format of the entry, instead of guessing it from the entry.
+ * @property {"spice" | "spectre" | "text"} [dialect] The format of the entry, instead of guessing it from the entry.
  * @property {Record<string, string>} [formats] The format set for files, by path as in `files`: only
  *   those the user set. A file not among them is read by its own suffix and first lines; an unknown
  *   name fails the build. The library index reads its files with them too.

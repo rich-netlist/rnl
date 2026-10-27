@@ -28,7 +28,7 @@ for (const platform of ["desktop", "web"]) {
     expect(await lastFormats(page)).toEqual({});
 
     await include.click();
-    await expect(menu(page).locator(".format-label")).toHaveText(["Automatic (SPICE)", "SPICE", "Spectre"]);
+    await expect(menu(page).locator(".format-label")).toHaveText(["Automatic (SPICE)", "SPICE", "Spectre", "Text"]);
     await expect(menu(page).getByRole("menuitemradio", { name: "Automatic (SPICE)" })).toHaveAttribute("aria-checked", "true");
     await expect(menu(page).getByRole("menuitemradio", { name: "Automatic (SPICE)" })).toBeFocused();
     await viewer.build(() => menu(page).getByRole("menuitemradio", { name: "Spectre", exact: true }).click());
