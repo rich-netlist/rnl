@@ -1,15 +1,16 @@
 # TRIAL, for the branch claude/desktop-bundled-packages only; deleted before it is merged. Pictures of the pages
 # of the Windows installers where the public packages are chosen (apps/desktop/tests/installer-ui.ps1), taken from
-# the Windows files of a run of viewer-release.yml, so that the script can be tried without building the viewer again.
+# the Windows files of the last successful run of viewer-release.yml on the branch, so that the script can be tried
+# without building the viewer again. A push of the script or of this file runs it (a new workflow cannot be
+# dispatched before it is on the default branch).
 name: Installer pages (trial)
 
 on:
-  workflow_dispatch:
-    inputs:
-      run_id:
-        description: "The run of viewer-release.yml whose Windows files are used"
-        type: string
-        required: true
+  push:
+    branches: [claude/desktop-bundled-packages]
+    paths:
+      - "apps/desktop/tests/installer-ui.ps1"
+      - ".github/workflows/installer-ui-trial.yml"
 
 permissions:
   contents: read
@@ -27,8 +28,9 @@ jobs:
       - name: The installers of the run
         env:
           GH_TOKEN: ${{ github.token }}
-          RUN_ID: ${{ inputs.run_id }}
         run: |
+          RUN_ID=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow viewer-release.yml --branch claude/desktop-bundled-packages --status success --limit 1 --json databaseId --jq '.[0].databaseId')
+          echo "the files of run $RUN_ID"
           version=$(python -c "import json; print(json.load(open('apps/desktop/tauri.conf.json'))['version'])")
           gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" -n "rnl-viewer-$version-windows-x64" -D "$RUNNER_TEMP/assets"
           ls -la "$RUNNER_TEMP/assets"
