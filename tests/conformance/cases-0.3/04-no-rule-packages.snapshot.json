@@ -57,7 +57,43 @@
           {
             "id": "&0",
             "global": true,
-            "port": false
+            "port": false,
+            "usages": [
+              {
+                "id": "@rnl-std-virtual.rnl:52:9#1",
+                "definition": "$GND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 52,
+                "source": "body",
+                "made_in": "@rnl-std-fill.rnl:28:3#1",
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-virtual.rnl:52:9#2",
+                "definition": "$GND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 52,
+                "source": "body",
+                "made_in": "@rnl-std-fill.rnl:28:3#2",
+                "state": "in-effect"
+              }
+            ]
           }
         ]
       },
@@ -143,6 +179,29 @@
                   "&0"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "@rnl-std-fill.rnl:28:3#1",
+                "definition": "$GND_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#I0:2",
+                    "terminal": "n"
+                  }
+                ],
+                "file": null,
+                "line": 27,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 28
+                },
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -194,6 +253,29 @@
                 "nets": [
                   "&0"
                 ]
+              }
+            ],
+            "usages": [
+              {
+                "id": "@rnl-std-fill.rnl:28:3#2",
+                "definition": "$GND_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#R0:2",
+                    "terminal": "n"
+                  }
+                ],
+                "file": null,
+                "line": 27,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 28
+                },
+                "state": "in-effect"
               }
             ]
           },
@@ -415,12 +497,58 @@
           {
             "id": "&p",
             "global": false,
-            "port": true
+            "port": true,
+            "usages": [
+              {
+                "id": "@rnl-std-fill.rnl:37:3#1",
+                "definition": "$IOPORT",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&p",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 37,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 37
+                },
+                "state": "in-effect"
+              }
+            ]
           },
           {
             "id": "&n",
             "global": false,
-            "port": true
+            "port": true,
+            "usages": [
+              {
+                "id": "@rnl-std-fill.rnl:37:3#2",
+                "definition": "$IOPORT",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&n",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 37,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 37
+                },
+                "state": "in-effect"
+              }
+            ]
           }
         ]
       },

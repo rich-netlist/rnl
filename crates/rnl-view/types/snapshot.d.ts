@@ -163,7 +163,86 @@ export type HostNet = {
   id: string,
   global: boolean,
   port: boolean,
+  /**
+   * The usages it is a member of in the level ([`UsageOf`]); only for a net that is in some.
+   */
+  usages?: Array<UsageOf>,
 };
+
+/**
+ * A usage an object is a member of, in the object's level, by the usage's id: what the Document
+ * gives as `Object::usages` (`MemberOf`). The usage's own object view lists the usages it is a
+ * member of in turn: the chain upward.
+ */
+export type UsageOf = {
+  /**
+   * The usage's id, as its object view has it: `%dp1`, `@file:line:col`. A failed application,
+   * which made no usage, has the name it binds, or where it is written.
+   */
+  id: string,
+  /**
+   * Its definition, such as `$DIFFERENTIAL_PAIR`; empty when a failed statement names none.
+   */
+  definition: string,
+  /**
+   * The roles the object fills in it.
+   */
+  roles: Array<RoleOf>,
+  /**
+   * The statement that applies the definition: its file, by index in `files` when it is one of
+   * them, and its first line.
+   */
+  file: number | null,
+  line: number,
+  /**
+   * "written", "solver", "rule" or "body", as `MemberOf::source`.
+   */
+  source: string,
+  /**
+   * For a usage a rule made: the rule's package and where the rule is written.
+   */
+  rule?: RuleAt,
+  /**
+   * For a usage the body of a definition made: the usage whose definition it is, by id.
+   */
+  made_in?: string,
+  /**
+   * "in-effect", "failed", "overridden" or "disabled", as `MemberOf::state`.
+   */
+  state: string,
+  /**
+   * Why it failed or was overridden.
+   */
+  reason?: string,
+};
+
+/**
+ * A role an object fills in a usage.
+ */
+export type RoleOf = {
+  /**
+   * The role, such as `in_p`.
+   */
+  role: string,
+  /**
+   * The role is a set role (9.4), and the object one of its members.
+   */
+  set: boolean,
+  /**
+   * How the role names the object, as the snapshot writes ids: `#M1`, `#M5:1` for a terminal of
+   * an instance by its number, `&vdd`, `%dp1`, `%g1:p` for a terminal of a usage.
+   */
+  member: string,
+  /**
+   * For a terminal: its name, such as `d`, when it has one; its number otherwise.
+   */
+  terminal: string | null,
+};
+
+/**
+ * Where a rule is written.
+ */
+export type RuleAt = { package: string, file: string, line: number };
 
 /**
  * What the RNL makes of a level. Coordinates are scene units, y up.
@@ -345,6 +424,11 @@ export type ObjectView = {
    * The symbol's pins where they are drawn, when it has a symbol and a position.
    */
   pins: Array<PinView>,
+  /**
+   * The usages it is a member of in the level, with the roles it fills, those of its terminals
+   * too for an instance ([`UsageOf`]); only for an object that is in some.
+   */
+  usages?: Array<UsageOf>,
 };
 
 export type PinView = {

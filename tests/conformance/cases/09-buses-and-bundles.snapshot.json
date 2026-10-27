@@ -200,7 +200,94 @@
           {
             "id": "&0",
             "global": true,
-            "port": false
+            "port": false,
+            "usages": [
+              {
+                "id": "@rnl-std-virtual.rnl:52:9#1",
+                "definition": "$GND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 52,
+                "source": "body",
+                "made_in": "%gs_RL3_2",
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-virtual.rnl:52:9#2",
+                "definition": "$GND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 52,
+                "source": "body",
+                "made_in": "%gs_RL2_2",
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-virtual.rnl:52:9#3",
+                "definition": "$GND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 52,
+                "source": "body",
+                "made_in": "%gs_RL1_2",
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-virtual.rnl:52:9#4",
+                "definition": "$GND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 52,
+                "source": "body",
+                "made_in": "%gs_RL0_2",
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-virtual.rnl:52:9#5",
+                "definition": "$GND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 52,
+                "source": "body",
+                "made_in": "%gs_V1_2",
+                "state": "in-effect"
+              }
+            ]
           }
         ]
       },
@@ -542,6 +629,24 @@
                   "&0"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "%gs_RL3_2",
+                "definition": "$GND_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#\"RL<3>\":2",
+                    "terminal": "n"
+                  }
+                ],
+                "file": 0,
+                "line": 75,
+                "source": "solver",
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -593,6 +698,24 @@
                 "nets": [
                   "&0"
                 ]
+              }
+            ],
+            "usages": [
+              {
+                "id": "%gs_RL2_2",
+                "definition": "$GND_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#\"RL<2>\":2",
+                    "terminal": "n"
+                  }
+                ],
+                "file": 0,
+                "line": 76,
+                "source": "solver",
+                "state": "in-effect"
               }
             ]
           },
@@ -646,6 +769,24 @@
                   "&0"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "%gs_RL1_2",
+                "definition": "$GND_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#\"RL<1>\":2",
+                    "terminal": "n"
+                  }
+                ],
+                "file": 0,
+                "line": 77,
+                "source": "solver",
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -698,6 +839,24 @@
                   "&0"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "%gs_RL0_2",
+                "definition": "$GND_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#\"RL<0>\":2",
+                    "terminal": "n"
+                  }
+                ],
+                "file": 0,
+                "line": 78,
+                "source": "solver",
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -749,6 +908,24 @@
                 "nets": [
                   "&0"
                 ]
+              }
+            ],
+            "usages": [
+              {
+                "id": "%gs_V1_2",
+                "definition": "$GND_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#V1:2",
+                    "terminal": "n"
+                  }
+                ],
+                "file": 0,
+                "line": 79,
+                "source": "solver",
+                "state": "in-effect"
               }
             ]
           },
@@ -2114,17 +2291,86 @@
           {
             "id": "&d",
             "global": false,
-            "port": true
+            "port": true,
+            "usages": [
+              {
+                "id": "@rnl-std-fill.rnl:37:3#1",
+                "definition": "$IOPORT",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&d",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 37,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 37
+                },
+                "state": "in-effect"
+              }
+            ]
           },
           {
             "id": "&clk",
             "global": false,
-            "port": true
+            "port": true,
+            "usages": [
+              {
+                "id": "@rnl-std-fill.rnl:37:3#2",
+                "definition": "$IOPORT",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&clk",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 37,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 37
+                },
+                "state": "in-effect"
+              }
+            ]
           },
           {
             "id": "&q",
             "global": false,
-            "port": true
+            "port": true,
+            "usages": [
+              {
+                "id": "@rnl-std-fill.rnl:37:3#3",
+                "definition": "$IOPORT",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&q",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 37,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 37
+                },
+                "state": "in-effect"
+              }
+            ]
           }
         ]
       },
@@ -2501,7 +2747,30 @@
           {
             "id": "&clk",
             "global": false,
-            "port": true
+            "port": true,
+            "usages": [
+              {
+                "id": "@rnl-std-fill.rnl:37:3",
+                "definition": "$IOPORT",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&clk",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 37,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 37
+                },
+                "state": "in-effect"
+              }
+            ]
           },
           {
             "id": "&\"Q<3>\"",

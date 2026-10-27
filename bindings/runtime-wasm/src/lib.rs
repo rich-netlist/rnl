@@ -1031,6 +1031,22 @@ R1 a 0 1k
     }
 
     #[test]
+    fn the_snapshot_gives_each_object_the_usages_it_is_in() {
+        let text = "* t\nR1 a b 1k\nR2 b c 1k\n* @RNL {\n*   $PAIR = @DEFINE(roles=[\"left\", \"right\"]) {};\n\
+                    *   %p = #R1(left) #R2(right) @AS $PAIR\n* }\n.end\n";
+        let v = answer(json!({ "entry": "/w/a.sp", "files": { "/w/a.sp": text }, "parts": { "model": true } }));
+        let objects = v["snapshot"]["levels"][0]["model"]["objects"].as_array().unwrap().clone();
+        let r2 = objects.iter().find(|o| o["id"] == "#R2").unwrap();
+        assert_eq!(
+            r2["usages"],
+            json!([{
+                "id": "%p", "definition": "$PAIR", "file": 0, "line": 6, "source": "written", "state": "in-effect",
+                "roles": [{ "role": "right", "set": false, "member": "#R2", "terminal": null }]
+            }])
+        );
+    }
+
+    #[test]
     fn a_catalog_request_answers_the_catalog() {
         let v = answer(json!({ "catalog": {} }));
         let keys: Vec<&str> = v.as_object().unwrap().keys().map(String::as_str).collect();
