@@ -129,6 +129,7 @@
   "Download it from the releases page and extract it on the Virtuoso host; Cadence’s own exporters and their licenses are needed there.": "릴리스 페이지에서 다운로드하여 Virtuoso가 설치된 호스트에 압축을 푸세요. 해당 호스트에 Cadence 자체 내보내기 도구와 라이선스가 있어야 합니다.",
   "Install and use": "설치 및 사용법",
   "The steps, the menus and the options are in its README.": "설치 절차와 메뉴 설명, 상세 옵션은 저장소의 README에 정리되어 있습니다.",
+  "An RNL case actually exported from Virtuoso.": "Virtuoso에서 실제로 내보낸 RNL 예제입니다.",
   "06 · Toolchain": "06 · 툴체인",
   "The RNL toolchain: read, solve, draw, edit.": "RNL 툴체인: 읽기, 풀기, 그리기, 편집하기.",
   "The toolchain keeps “understanding RNL” and “turning intent into coordinates” in separate modules: you can view a drawing without a solver and solve only when needed. What exists today: the runtime, the host adapters, the renderer and the command line, the two viewers above, and a first version of the solver, in <code>rnl solve</code> and the desktop viewer. Pick a path to see how data flows; click a module to see what it does.": "툴체인은 “RNL을 해석하는 일”과 “설계 의도를 좌표로 바꾸는 일”을 별도의 모듈로 분리합니다. 덕분에 솔버 없이도 도면을 열어볼 수 있고 필요할 때만 솔버를 실행할 수 있습니다. 현재 구현된 모듈은 런타임, 호스트 어댑터, 렌더러, 명령줄 도구, 앞서 소개한 두 뷰어, 그리고 <code>rnl solve</code>와 데스크톱 뷰어에 탑재된 첫 번째 버전의 솔버입니다. 사용 경로를 선택해 데이터 흐름을 살펴보고 각 모듈을 클릭해 역할을 확인해 보세요.",
