@@ -27,7 +27,9 @@ const FORMATS = [
   { name: "rnl", title: "RNL package", extensions: ["rnl"], fallback: false },
   { name: "text", title: "Text", extensions: ["va", "vams", "v", "vh", "sv", "svh", "vhd", "vhdl"], fallback: false },
 ];
-const detect = (path) => (/\.scs$/i.test(path) ? "spectre" : /\.rnl$/i.test(path) ? "rnl" : "spice");
+// as the core detects (rnl_view::detect_format): by the suffix, and a package by its header record with PACKAGE
+const detect = (path, text = "") => (/\.scs$/i.test(path) ? "spectre"
+  : /\.rnl$/i.test(path) || /^@RNL\(type="header"\)\s*\{[^}]*@PACKAGE\(/.test(text) ? "rnl" : "spice");
 const platform = params.get("platform") === "desktop" ? "desktop" : "web";
 
 /** A source: a fixture, by its name or as { name, fixture }; null for nothing. */
@@ -295,7 +297,14 @@ export default {
   platform,
   nativeMenu: platform === "desktop",
   formats: async () => { fake.calls.push(["formats"]); return FORMATS; },
-  detectFormat: async (path) => { fake.calls.push(["detectFormat", path]); return fake.detected[path] ?? detect(path); },
+  // given the text of the file too, as the shells give it to the core: that of the fixture a Library file is of
+  detectFormat: async (path) => {
+    fake.calls.push(["detectFormat", path]);
+    if (fake.detected[path]) return fake.detected[path];
+    const fixture = (fake.includes || []).find((item) => item.path === path)?.source?.fixture;
+    const text = fixture ? (await (await fetch(`/fixtures/${encodeURIComponent(fixture)}.json`)).json()).files[0].text : "";
+    return detect(path, text);
+  },
   keepsFormat: () => fake.keepsFormat,
   ...(platform === "desktop" ? { version, ...solving } : {}),
   async initial() {
@@ -329,7 +338,7 @@ export default {
     document.formats ??= FORMATS;
     for (const file of document.files) {
       if (file.format === null) { file.default_format = null; continue; }
-      file.default_format ??= file.format ?? detect(file.path);
+      file.default_format ??= file.format ?? detect(file.path, file.text);
       file.format = formats[sourcePath(document, file)] ?? file.default_format;
     }
     if (!fake.carry) {

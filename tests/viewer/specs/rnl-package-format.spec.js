@@ -34,33 +34,55 @@ test("a package file opened under another suffix is a package: the format, the h
   await expect(page.locator("#problems")).toContainText("No errors, warnings or hints");
 });
 
-test("a package file has a format chip in the Library: a .pkg can be set to RNL package, a .rnl to another format", async ({ page, viewer }) => {
+test("a .pkg with a PACKAGE header gets the automatic format RNL package: a muted chip, and the menu says Automatic (RNL package)", async ({ page, viewer }) => {
   await viewer.open("04-hierarchy", { pool: "1" });
   await page.evaluate(() => {
-    window.fakeShell.detected["/lib/acme.pkg"] = "spice"; // by its suffix, before the core reads into it
-    window.fakeShell.includes = ["acme.pkg", "styles.rnl"].map((name) => ({ path: `/lib/${name}`, name, source: { name: "04-hierarchy", fixture: "04-hierarchy" } }));
+    // acme.pkg is the package of the fixture package-pkg; the shell gives the core its text, which says what it is
+    window.fakeShell.includes = [{ path: "/lib/acme.pkg", name: "acme.pkg", source: { name: "acme.pkg", fixture: "package-pkg" } }];
+  });
+  await page.locator("#tab-files").click();
+  await viewer.build(() => page.locator("#include-file").click());
+  const chip = group(page, "files").locator('.pool-row[data-path="/lib/acme.pkg"] .format-chip');
+  await expect(chip).toHaveText(TITLE);
+  await expect(chip).not.toHaveClass(/chosen/);
+  await chip.click();
+  await expect(menu(page).locator(".format-label")).toHaveText([`Automatic (${TITLE})`, "SPICE", "Spectre", TITLE, "Text"]);
+  await expect(menu(page).getByRole("menuitemradio", { name: `Automatic (${TITLE})` })).toHaveAttribute("aria-checked", "true");
+  // set by hand to SPICE, the chip is solid; Automatic gives the package back
+  await viewer.build(() => menu(page).getByRole("menuitemradio", { name: "SPICE", exact: true }).click());
+  await expect(chip).toHaveText("SPICE");
+  await expect(chip).toHaveClass(/chosen/);
+  expect(await page.evaluate(() => window.fakeShell.buildFormats.at(-1))).toEqual({ "/lib/acme.pkg": "spice" });
+  await chip.click();
+  await viewer.build(() => menu(page).getByRole("menuitemradio", { name: `Automatic (${TITLE})` }).click());
+  await expect(chip).toHaveText(TITLE);
+  await expect(chip).not.toHaveClass(/chosen/);
+});
+
+test("a package file is told by its format in the Library: a .rnl can be set to another format, a file of any suffix to RNL package", async ({ page, viewer }) => {
+  await viewer.open("04-hierarchy", { pool: "1" });
+  await page.evaluate(() => {
+    window.fakeShell.includes = ["styles.rnl", "notes.dat"].map((name) => ({ path: `/lib/${name}`, name, source: { name: "04-hierarchy", fixture: "04-hierarchy" } }));
   });
   await page.locator("#tab-files").click();
   await viewer.build(() => page.locator("#include-file").click());
   const files = group(page, "files");
-  const pkg = files.locator('.pool-row[data-path="/lib/acme.pkg"] .format-chip');
   const rnl = files.locator('.pool-row[data-path="/lib/styles.rnl"] .format-chip');
-  await expect(pkg).toHaveText("SPICE");
+  const dat = files.locator('.pool-row[data-path="/lib/notes.dat"] .format-chip');
+  // a .rnl is a package by its suffix, any other file a netlist unless its header says it is a package
   await expect(rnl).toHaveText(TITLE);
   await expect(rnl).not.toHaveClass(/chosen/);
-  // the menu offers the format, between Spectre and Text
-  await pkg.click();
-  await expect(menu(page).locator(".format-label")).toHaveText(["Automatic (SPICE)", "SPICE", "Spectre", TITLE, "Text"]);
+  await expect(dat).toHaveText("SPICE");
+  await dat.click();
   await viewer.build(() => menu(page).getByRole("menuitemradio", { name: TITLE, exact: true }).click());
-  await expect(pkg).toHaveText(TITLE);
-  await expect(pkg).toHaveClass(/chosen/);
-  expect(await page.evaluate(() => window.fakeShell.buildFormats.at(-1))).toEqual({ "/lib/acme.pkg": "rnl" });
-  // a .rnl that is no package for its user
+  await expect(dat).toHaveText(TITLE);
+  await expect(dat).toHaveClass(/chosen/);
+  expect(await page.evaluate(() => window.fakeShell.buildFormats.at(-1))).toEqual({ "/lib/notes.dat": "rnl" });
   await rnl.click();
   await viewer.build(() => menu(page).getByRole("menuitemradio", { name: "SPICE", exact: true }).click());
   await expect(rnl).toHaveText("SPICE");
   await expect(rnl).toHaveClass(/chosen/);
-  expect(await page.evaluate(() => window.fakeShell.buildFormats.at(-1))).toEqual({ "/lib/acme.pkg": "rnl", "/lib/styles.rnl": "spice" });
+  expect(await page.evaluate(() => window.fakeShell.buildFormats.at(-1))).toEqual({ "/lib/notes.dat": "rnl", "/lib/styles.rnl": "spice" });
 });
 
 test("a package is told by its format: the user's choice, else the suffix the core's formats list", async ({ page, viewer }) => {
