@@ -16,6 +16,9 @@ if (Test-Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\RNL Vie
   throw "RNL Viewer is installed for this user: this script leaves it be, and runs on a machine that has none."
 }
 New-Item -ItemType Directory -Force $Out | Out-Null
+# the paths as Windows writes them: msiexec does not take the forward slashes that a shell may leave in one
+if ($Nsis) { $Nsis = (Resolve-Path $Nsis).Path }
+if ($Msi) { $Msi = (Resolve-Path $Msi).Path }
 Add-Type -ReferencedAssemblies System.Drawing, System.Windows.Forms -TypeDefinition @'
 using System;
 using System.Collections.Generic;
