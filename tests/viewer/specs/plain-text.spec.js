@@ -1,9 +1,9 @@
-// A file that is no netlist, Verilog-A or Verilog, opened as the document, is shown in the text pane as
-// plain text: the core reads it as SPICE, as it reads any file, and its problems are listed, but none of
-// that reading shows in the text (colours, the marks of objects and of what is not drawn). A netlist is
-// shown as before; a file the user chose a parse format for in the Library is read as a netlist again.
+// A file that is no netlist, Verilog-A or Verilog, has the format text for the core, which does not read it
+// (one hint says so); the text pane shows it as plain text and the drawing area says it is no netlist. The
+// viewer takes the core's verdict, the file's format: a file the user sets to Text is plain too, and a
+// Verilog-A file set to SPICE is a netlist again. A netlist is shown as before.
 
-import { expect, test } from "../viewer.js";
+import { expect, showSource, test } from "../viewer.js";
 import { repository, translated, uiLanguages, zh } from "../zh.js";
 
 const NOTICE = "This file is not a netlist. It is shown as text.";
@@ -16,38 +16,34 @@ function reading(page) {
       highlighted: file.querySelectorAll('.code [class*="s-"]').length,
       places: file.querySelectorAll("[data-obj]").length,
       notDrawn: file.querySelectorAll(".ln.not-drawn").length,
+      marked: file.querySelectorAll(".ln.d-error, .ln.d-warning").length,
       folds: file.querySelectorAll(".fold-toggle").length,
       lines: file.querySelectorAll(".ln").length,
     };
   });
 }
 
-for (const [fixture, name] of [["verilog-a", "resistor.va"], ["verilog", "inverter.v"]]) {
-  test(`${name} is shown as plain text, while the core's problems are still listed`, async ({ page, viewer }) => {
+for (const [fixture, name, kind] of [["verilog-a", "resistor.va", "Verilog-A"], ["verilog", "inverter.v", "Verilog"]]) {
+  test(`${name} is text for the core and is shown as plain text, with one hint and nothing not drawn`, async ({ page, viewer }) => {
     await viewer.open(fixture);
     await expect(page.locator("#source-file")).toHaveText(name);
     const shown = await reading(page);
     expect(shown.lines).toBeGreaterThan(3);
-    expect(shown).toMatchObject({ highlighted: 0, places: 0, notDrawn: 0, folds: 0 });
-    // the text itself is whole
+    expect(shown).toMatchObject({ highlighted: 0, places: 0, notDrawn: 0, marked: 0, folds: 0 });
     await expect(viewer.line(1).locator(".code")).toContainText("in Verilog");
-    // the core's reading is told where it is told: in the problems, which the lines still mark
-    expect(await page.evaluate(() => window.viewer.doc.diagnostics.length)).toBeGreaterThan(0);
-    await expect(page.locator("#problems")).toContainText("SPICE subset");
-    // the drawing area says so, instead of that nothing has a position
+    const doc = await page.evaluate(() => ({ dialect: window.viewer.doc.dialect, format: window.viewer.doc.files[0].format,
+      diagnostics: window.viewer.doc.diagnostics.map((d) => `${d.severity}: ${d.message}`) }));
+    expect(doc).toMatchObject({ dialect: "text", format: "text" });
+    expect(doc.diagnostics).toHaveLength(1);
+    expect(doc.diagnostics[0]).toContain(`is not a netlist (${kind}); it is not read`);
+    // only that hint is listed; nothing is called not drawn, in the tab, in the status bar or by the drawing area
+    await expect(page.locator("#problems")).toContainText("is not a netlist");
+    await expect(page.locator("#problems")).not.toContainText("SPICE subset");
+    await expect(page.locator("#unplaced-tab-count")).toHaveText("");
+    await expect(page.locator(".statusbar")).not.toContainText("Not drawn");
     await expect(page.locator("#empty")).toHaveText(NOTICE);
   });
 }
-
-test("the notice of the drawing area is in every language of the interface, and follows the language", async ({ page, viewer }) => {
-  for (const { lang } of uiLanguages(repository)) if (lang !== "en") expect(translated(lang, NOTICE), lang).not.toBe("");
-  await viewer.open("verilog-a");
-  await page.evaluate(() => window.viewer.command("language-zh"));
-  await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
-  // the language is kept for the next start
-  await viewer.open("verilog-a");
-  await expect(page.locator("#empty")).toHaveText(zh(NOTICE));
-});
 
 test("a netlist is highlighted as before", async ({ page, viewer }) => {
   await viewer.open("04-hierarchy");
@@ -57,16 +53,47 @@ test("a netlist is highlighted as before", async ({ page, viewer }) => {
   await expect(page.locator("#empty")).toBeHidden();
 });
 
-test("a file with a parse format chosen for it in the Library is read as a netlist", async ({ page, viewer }) => {
-  await viewer.open("verilog-a");
-  expect(await reading(page)).toMatchObject({ highlighted: 0 });
-  await page.evaluate(async () => {
-    const { chooseFormat } = await import("./formats.js");
-    const { sourcePath } = await import("./source-path.js");
-    const { renderFiles } = await import("./text.js");
-    const doc = window.viewer.doc;
-    await chooseFormat(sourcePath(doc, doc.files[0]), "spice", { session: true });
-    renderFiles();
-  });
+test("a Verilog-A file set to SPICE in the Library is a netlist again, and Text sets a netlist to plain text", async ({ page, viewer }) => {
+  await viewer.open("verilog-a", { pool: "1" });
+  await page.locator("#tab-files").click();
+  const chip = page.locator('.lib-group[data-group="files"] .pool-row.current .format-chip');
+  await expect(chip).toHaveText("Text");
+  await chip.click();
+  await expect(page.locator(".format-menu .format-label")).toHaveText(["Automatic (Text)", "SPICE", "Spectre", "Text"]);
+  await page.evaluate(() => { window.fakeShell.next = "verilog-a-spice"; });
+  await viewer.build(() => page.locator(".format-menu").getByRole("menuitemradio", { name: "SPICE", exact: true }).click());
+  await page.locator("#tab-netlist").click();
+  expect(await page.evaluate(() => window.viewer.doc.files[0].format)).toBe("spice");
   await expect.poll(async () => (await reading(page)).highlighted).toBeGreaterThan(0);
+  await expect(page.locator("#empty")).not.toHaveText(NOTICE);
+});
+
+test("a Verilog-A file that a netlist includes is plain text in its own tab, and the netlist is not", async ({ page, viewer }) => {
+  await viewer.open("includes-verilog-a");
+  expect(await page.evaluate(() => window.viewer.doc.files.map((f) => `${f.name}:${f.format}`))).toEqual(["includes-verilog-a.sp:spice", "resistor.va:text"]);
+  expect((await reading(page)).highlighted).toBeGreaterThan(0);
+  await expect(page.locator("#empty")).toBeHidden();
+  await showSource(page, "resistor.va");
+  await expect(page.locator("#source-file")).toHaveText("resistor.va");
+  expect(await reading(page)).toMatchObject({ highlighted: 0, places: 0, notDrawn: 0, folds: 0 });
+  // the hint is at the include line
+  const hint = await page.evaluate(() => window.viewer.doc.diagnostics.find((d) => d.message.includes("not a netlist")));
+  expect(hint).toMatchObject({ line: 2 });
+});
+
+test("the format Text and the notice are in every language of the interface and follow the language", async ({ page, viewer }) => {
+  for (const { lang } of uiLanguages(repository)) {
+    if (lang === "en") continue;
+    expect(translated(lang, NOTICE), lang).not.toBe("");
+    expect(translated(lang, "Text"), lang).not.toBe("");
+  }
+  await viewer.open("verilog-a", { pool: "1" });
+  await page.evaluate(() => window.viewer.command("language-zh"));
+  await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
+  await expect(page.locator("#empty")).toHaveText(zh(NOTICE));
+  await page.locator("#tab-files").click();
+  const chip = page.locator('.lib-group[data-group="files"] .pool-row.current .format-chip');
+  await expect(chip).toHaveText(zh("Text"));
+  await chip.click();
+  await expect(page.locator(".format-menu .format-label")).toHaveText([zh("Automatic ({0})", zh("Text")), "SPICE", "Spectre", zh("Text")]);
 });

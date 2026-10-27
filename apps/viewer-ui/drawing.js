@@ -8,7 +8,6 @@ import { append, m, setAttr, setText } from "./i18n.js";
 
 import { current, doc, selected, setCurrent, setPath } from "./state.js";
 import { colourDrawing } from "./background.js";
-import { isPlainFile } from "./formats.js";
 import { paintGrid } from "./grid.js";
 import { updateHierarchy } from "./hierarchy.js";
 import { boxAt, hitsAt, nameOf, objectsOf } from "./hits.js";
@@ -118,8 +117,8 @@ export function showLevel(i, keptView) {
  * the netlist's other levels are in the Hierarchy.
  */
 function emptyMessage(lv) {
-  // the core read a file that is no netlist as SPICE, and its objects are not a drawing to wait for
-  if (doc.files.length && isPlainFile(doc, doc.files[0])) return m("This file is not a netlist. It is shown as text.");
+  // the file opened is no netlist, which the core does not read
+  if (doc.dialect === "text") return m("This file is not a netlist. It is shown as text.");
   if (lv.unplaced.length > 0) return m("Nothing on this level has a position yet, so nothing is drawn.");
   const none = m("This level has no objects, so nothing is drawn.");
   return doc.levels.length > 1 ? m`${none} The subcircuits of this netlist are in the Hierarchy.` : none;
