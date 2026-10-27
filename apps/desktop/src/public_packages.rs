@@ -47,9 +47,16 @@ pub fn root() -> Option<&'static Path> {
     ROOT.get().and_then(|r| r.as_deref())
 }
 
-/// The directories of the bundled packages, one for each package, in the order of their names: what
-/// the search path gets after the user's own directories.
-pub fn dirs() -> Vec<PathBuf> {
+/// The provider of files for a build: the user's PATH directories (`paths`) for packages and for bare includes,
+/// and after them the directories of the bundled public packages for packages only, so that no bare include is
+/// looked for in them, nor named among the places that were searched.
+pub fn provider(paths: &[PathBuf]) -> rnl_cli::FsProvider {
+    let packages: Vec<PathBuf> = paths.iter().cloned().chain(dirs()).collect();
+    rnl_cli::FsProvider::new(&packages).with_search_paths(paths)
+}
+
+/// The directories of the bundled packages, one for each package, in the order of their names.
+fn dirs() -> Vec<PathBuf> {
     root().map(directories).unwrap_or_default()
 }
 

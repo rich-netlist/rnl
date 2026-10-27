@@ -4,7 +4,6 @@
 
 use std::path::PathBuf;
 
-use rnl_cli::FsProvider;
 use tauri::ipc::{InvokeBody, Request};
 use tauri::{Manager, State, WebviewWindow};
 use tauri_plugin_dialog::DialogExt;
@@ -55,7 +54,7 @@ pub async fn export_svg(
             }
             _ => return Err("export_svg needs a path, or a name and a text".to_string()),
         };
-        let disk = FsProvider::new(&paths).with_search_paths(&paths);
+        let disk = crate::public_packages::provider(&paths);
         let disk = rnl_runtime::source::FilePool { files: &disk, paths: &pool };
         let layered = files::layered(&held, &disk);
         let index = library.with_edits(&held, &layered);
