@@ -60,8 +60,6 @@
   "The samples come from RNL’s conformance corpus and are published with the web viewer. Click one and the viewer opens it.": "これらのサンプルはRNLの適合性テストコーパスからの抜粋で、Webビューアとともに公開されています。クリックするとビューアで開きます。",
   "sample|Hierarchy": "階層",
   "A two-stage buffer: a drawing for each subcircuit, drawn as a block symbol one level up, and a file it includes.": "2段バッファ：各サブサーキットの回路図と、1つ上のレベルでブロックシンボルとして描画される様子、およびインクルードされるファイル。",
-  "Chinese": "中国語表記",
-  "A five-transistor OTA written with the Chinese alias package rnl-zh, with Chinese labels in the drawing.": "中国語の別名パッケージrnl-zhを使って記述された5トランジスタOTA（図中のラベルも中国語）。",
   "Line styles": "線種（ラインスタイル）",
   "Every line style on every kind of shape: dashed, dotted, bold and double lines on rectangles, circles, ellipses, arcs and curves, and on a wire.": "あらゆる図形における各種の線種：矩形、円、楕円、円弧、曲線、および配線における破線、点線、太線、二重線。",
   "Your files stay in the browser": "ファイルはブラウザ内から出ません",

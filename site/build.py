@@ -12,9 +12,12 @@ in English; an empty translation remains empty. The shared scripts/site_i18n.py 
 menus, fonts and locale output. The build checks that
 - groups have an English source, no translation beside it and no duplicate, stray or nested
   language tags;
-- the English pages contain no Chinese characters, apart from Chinese content meant for every page:
-  elements marked lang="zh-CN", and in scripts the blocks between /*zh-CN*/ and /*/zh-CN*/ (RNL
-  written with the Chinese alias package, for example).
+- the English pages contain no Chinese characters, and no page has content marked as written in
+  another language than its own or English, apart from the names of the languages (in the language
+  menu, for example). Content for one language only, such as RNL written with the Chinese alias
+  package, is between <!--zh-CN--> and <!--/zh-CN--> in a page and between /*zh-CN*/ and /*/zh-CN*/
+  in a script, and only the pages of that language have it; what the others say instead is between
+  <!--not-zh-CN--> and <!--/not-zh-CN--> (scripts/site_i18n.py).
 
 The page of the tools links to the files of the desktop viewer's newest release. Its version comes
 from the newest tag viewer-vX.Y.Z of the repository (a tag with anything after the version, such as
@@ -109,8 +112,9 @@ NEW_PAGES = ("agents.html", "gallery.html", "timeline.html", "translation.html",
 GROUP = I18N.group
 CJK = re.compile("[%s]" % "".join("%s-%s" % (chr(a), chr(b)) for a, b in
                                   [(0x3000, 0x303F), (0x3400, 0x9FFF), (0xF900, 0xFAFF), (0xFF00, 0xFFEF)]))
-ZH_ELEMENT = re.compile(r"<(\w+)\b[^>]*\blang=\"(?!en(?:-|\"))[^\"]*\"[^>]*>.*?</\1>", re.S)
-ZH_BLOCK = re.compile(r"/\*zh-CN\*/.*?/\*/zh-CN\*/", re.S)
+# An element marked as written in some language, with none inside: its name, the language and its content
+MARKED = re.compile(r"<(\w+)\b[^>]*?\blang=\"([^\"]*)\"[^>]*>((?:(?!\blang=\").)*?)</\1>", re.S)
+LANG_ATTRIBUTE = re.compile(r"\blang=\"([^\"]*)\"")
 
 STYLE_TAG = re.compile(r'<link rel="stylesheet" href="assets/([\w.-]+\.css)">')
 SCRIPT_TAG = re.compile(r'<script src="assets/([\w.-]+\.js)"></script>')
@@ -502,12 +506,28 @@ def localize(text, index):
     return I18N.localize(text, CODES[index])
 
 
-def check_leaks(text, name):
-    """The English source must mark intentionally quoted non-English content."""
-    masked = ZH_BLOCK.sub(blank, ZH_ELEMENT.sub(blank, text))
+def check_leaks(text, name, code):
+    """A page in one language has no content marked as written in another, apart from the names of the
+    languages, and an English page no Chinese characters: the content for one language only must be in
+    its blocks (scripts/site_i18n.py)."""
+    names = {locale["html_lang"]: locale["name"] for locale in I18N.locales.values()}
+
+    def language_name(m):
+        return m.group(2) in names and re.sub(r"<[^>]*>|✓", "", m.group(3)).strip() == names[m.group(2)]
+    masked = MARKED.sub(lambda m: blank(m) if language_name(m) else m.group(0), text)
     lines = masked.split("\n")
-    bad = sorted({line_of(masked, m.start()) for m in CJK.finditer(masked)})
-    return ["%s:%d: Chinese text on a non-Chinese page: %s" % (name, n, lines[n - 1].strip()[:100]) for n in bad]
+    errors = []
+    if name.split(" ")[0].endswith(".html"):
+        allowed = {I18N.locales[code]["html_lang"], I18N.locales[I18N.default]["html_lang"]}
+        for m in LANG_ATTRIBUTE.finditer(masked):
+            if m.group(1) in names and m.group(1) not in allowed:
+                n = line_of(masked, m.start())
+                errors.append("%s:%d: content marked lang=\"%s\" on a page in another language: %s"
+                              % (name, n, m.group(1), lines[n - 1].strip()[:100]))
+    if code == I18N.default:
+        bad = sorted({line_of(masked, m.start()) for m in CJK.finditer(masked)})
+        errors += ["%s:%d: Chinese text on an English page: %s" % (name, n, lines[n - 1].strip()[:100]) for n in bad]
+    return errors
 
 
 def sources():
@@ -648,6 +668,7 @@ def build_language(files, index, version, linux=False, macos=False):
     less translated than site_i18n.SHOWN_IN_ENGLISH_BELOW is shown in English, with the scripts only
     it loads, and every page not wholly translated says so (decision 0015)."""
     code, prefix = LANGS[index]
+    files = {path: I18N.only(text, code) for path, text in files.items()}
     counts = coverage(files, code)
     english = {page for page, (done, total) in counts.items() if done < SHOWN_IN_ENGLISH_BELOW * total}
     _, own = page_scripts(files)
@@ -668,9 +689,8 @@ def build_language(files, index, version, linux=False, macos=False):
         if I18N.standard(code) != code:
             out[page] = re.sub(r'(\shref=")spec/', r'\1../' + I18N.standard(code) + '/spec/', out[page])
     errors = []
-    if code == I18N.default:
-        for path, text in out.items():
-            errors += check_leaks(text, "%s (%s)" % (path, code))
+    for path, text in out.items():
+        errors += check_leaks(text, "%s (%s)" % (path, code), code)
     if errors:
         raise BuildError("\n".join(errors))
     out = {path: release(text, version, linux, macos) for path, text in out.items()}

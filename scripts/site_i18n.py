@@ -6,6 +6,9 @@ A translation may also come from the catalog of its source file, <registry folde
 under site/src>.json, keyed by the English with its runs of white space as one space; the block
 beside the English comes first (decision 0015, i18n/README.md). Where one English text is said in two
 ways, its block names a context, <en ctx=NAME>, and the catalog's key is NAME|English.
+Content meant for one language's pages only, such as RNL written with the Chinese alias package, sits
+between <!--zh-CN--> and <!--/zh-CN--> in a page and between /*zh-CN*/ and /*/zh-CN*/ in a script, named
+by the language's html_lang; what its pages say instead, between <!--not-zh-CN--> and <!--/not-zh-CN-->.
 """
 from collections import Counter
 from urllib.parse import quote
@@ -104,6 +107,11 @@ class Languages:
         translated = "|".join(block(code) for code in self.codes if code != self.default)
         self.group = re.compile(rf"(?:(?:{translated})\s*)*{block(self.default)}", re.S)
         self.block = re.compile(rf"<({tags}){CONTEXT}>({body})</\1>", re.S)
+        # Content for the pages of one language only, named by its html_lang: <!--zh-CN-->…<!--/zh-CN--> in a
+        # page, /*zh-CN*/…/*/zh-CN*/ in a script; <!--not-zh-CN-->…<!--/not-zh-CN--> for the pages of the others.
+        marks = "|".join(sorted({re.escape(locale["html_lang"]) for locale in self.locales.values()}, key=len, reverse=True))
+        self.only_mark = re.compile(rf"<!--/?((?:not-)?(?:{marks}))-->|/\*/?((?:not-)?(?:{marks}))\*/")
+        self.only_block = re.compile(rf"<!--((?:not-)?({marks}))-->(.*?)<!--/\1-->|/\*((?:not-)?({marks}))\*/(.*?)/\*/\4\*/", re.S)
 
     def text(self, values, code):
         """A missing dictionary entry falls back; an explicit empty string stays empty."""
@@ -125,7 +133,29 @@ class Languages:
         rest = self.group.sub(lambda m: re.sub(r"[^\n]", " ", m.group()), text)
         for match in self.tag.finditer(rest):
             errors.append(f"{name}:{rest.count(chr(10), 0, match.start()) + 1}: {match.group()} outside a translation group ending in <en>…</en>")
+        for match in self.only_block.finditer(text):
+            if self.only_mark.search(match.group(3) if match.group(1) else match.group(6)):
+                errors.append(f"{name}:{text.count(chr(10), 0, match.start()) + 1}: a block for some languages only inside another")
+        rest = self.only_block.sub(lambda m: re.sub(r"[^\n]", " ", m.group()), text)
+        for match in self.only_mark.finditer(rest):
+            errors.append(f"{name}:{rest.count(chr(10), 0, match.start()) + 1}: {match.group()} without its other end")
         return errors
+
+    def hidden(self, text, code):
+        """The spans (start, end) of a text's blocks for other languages than one, which its pages leave out."""
+        own = self.locales[code]["html_lang"]
+        spans = []
+        for m in self.only_block.finditer(text):
+            mark, lang = (m.group(1), m.group(2)) if m.group(1) else (m.group(4), m.group(5))
+            if (lang == own) == mark.startswith("not-"):
+                spans.append(m.span())
+        return spans
+
+    def only(self, text, code):
+        """The text as the pages of one language have it: its blocks for that language without their marks,
+        its blocks for others left out."""
+        hidden = set(self.hidden(text, code))
+        return self.only_block.sub(lambda m: "" if m.span() in hidden else (m.group(3) if m.group(1) else m.group(6)), text)
 
     def catalog_path(self, code, path):
         # a language takes its catalogs from the first folder that has a folder of its own, else from the

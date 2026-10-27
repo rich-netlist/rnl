@@ -271,9 +271,14 @@ def inline(p: Project, s: dict) -> Surface:
     out = Surface(s["id"], s["title"], s["kind"])
     files = p.files(s["source"])
     units = []
+    hidden = {lang: set() for lang in p.langs(s)}  # {language: the units in blocks for other languages}
     for path in files:
         rel, text = p.rel(path), read(path)
         out.errors += p.registry.errors(text, rel)
+        starts = [m.start() for m in p.registry.group.finditer(text)]
+        for lang in hidden:
+            spans = p.registry.hidden(text, lang)
+            hidden[lang] |= {len(units) + i for i, start in enumerate(starts) if any(a <= start < b for a, b in spans)}
         units += [(rel, line, blocks, context) for line, blocks, context in groups(p, text)]
     out.total = len(units)
     beside = s.get("inline", [])
@@ -282,7 +287,8 @@ def inline(p: Project, s: dict) -> Surface:
         for path in files:  # the catalogs, read as scripts/site_i18n.py reads them for the build
             source = p.rel(path).removeprefix("site/src/")
             out.errors += p.registry.catalog_errors(lang, source)
-            english = {p.registry.key(blocks, context) for rel, _, blocks, context in units if rel == p.rel(path)}
+            english = {p.registry.key(blocks, context) for i, (rel, _, blocks, context) in enumerate(units)
+                       if rel == p.rel(path) and i not in hidden[lang]}
             data = p.registry.catalog(lang, source)
             unused = [key for key in data if key not in english]
             for key in unused:
@@ -294,7 +300,10 @@ def inline(p: Project, s: dict) -> Surface:
                                                                        f"the English of {short(key, 50)!r}, translated {short(data[key], 30)!r}"))
                 else:
                     st.findings.append(Finding("unused", p.rel(path), f"{short(key)!r} is not in the source"))
-        for rel, line, blocks, context in units:
+        for i, (rel, line, blocks, context) in enumerate(units):
+            if i in hidden[lang]:  # the pages of this language leave it out: nothing to translate
+                st.done += 1
+                continue
             text = p.registry.translation(blocks, lang, rel.removeprefix("site/src/"), context)
             if text is None:
                 st.findings.append(Finding("missing", f"{rel}:{line}", short(blocks["en"])))

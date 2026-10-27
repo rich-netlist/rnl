@@ -50,9 +50,7 @@ A translation is in the catalog of the group's source file, `i18n/<lang>/site/<p
 
 `build.py` refuses a translation written beside the English, such as `<zh>…</zh><en>…</en>`: [`scripts/i18n/migrate_site.py`](../scripts/i18n/migrate_site.py) moves such blocks into the catalogs, as it moved the Chinese of `src/` in step 3b of decision 0015, keeping every page as it was.
 
-The English source still checks for accidentally leaked Chinese. Intentionally quoted text
-uses an HTML `lang` attribute; Chinese examples in scripts use `/*zh-CN*/` and `/*/zh-CN*/`.
-This check applies to English, so it does not reject another locale's CJK translations.
+RNL written with the Chinese alias package `rnl-zh`, such as the Chinese writing style of the tours, is shown on the Simplified Chinese pages only. In a page it sits between `<!--zh-CN-->` and `<!--/zh-CN-->`, in a script between `/*zh-CN*/` and `/*/zh-CN*/`, named by the language's `html_lang`; what the other languages' pages say instead sits between `<!--not-zh-CN-->` and `<!--/not-zh-CN-->`. The translation status counts only what a language's pages show. The build checks that the English pages have no Chinese characters, and that no page has content marked (`lang`) as written in another language than its own or English, apart from the names of the languages in the menus; so it does not reject another locale's CJK translations.
 
 ### Adding a language
 

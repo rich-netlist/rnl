@@ -212,6 +212,34 @@ class Catalogs(unittest.TestCase):
             self.assertEqual(registry.localize(text, "en", "page.html"), "Yes|Yes|Yes")
             self.assertEqual(registry.coverage(text, "ja", "page.html"), (2, 3))
 
+    def test_content_for_the_pages_of_one_language_only(self):
+        registry = build.I18N
+        chinese = next(code for code, locale in registry.locales.items() if locale["html_lang"] == "zh-CN")
+        others = [code for code in registry.codes if code != chinese]
+        text = ('<p><!--zh-CN--><en>Sentences and Chinese</en><!--/zh-CN--><!--not-zh-CN--><en>Sentences</en><!--/not-zh-CN--></p>'
+                '<script>var UZ = {};\n/*zh-CN*/UZ = {u1: "差分对"};/*/zh-CN*/</script>')
+        self.assertEqual(registry.errors(text, "page.html"), [])
+        self.assertEqual(registry.only(text, chinese),
+                         '<p><en>Sentences and Chinese</en></p><script>var UZ = {};\nUZ = {u1: "差分对"};</script>')
+        for code in others:
+            self.assertEqual(registry.only(text, code), '<p><en>Sentences</en></p><script>var UZ = {};\n</script>')
+        self.assertEqual(registry.coverage(registry.only(text, others[0]), others[0]), (int(others[0] == "en"), 1))
+        self.assertIn("without its other end", "\n".join(registry.errors("<!--zh-CN--><p>x</p>", "page.html")))
+        self.assertIn("inside another", "\n".join(registry.errors(
+            "<!--zh-CN--><!--not-zh-CN-->x<!--/not-zh-CN--><!--/zh-CN-->", "page.html")))
+
+    def test_the_build_finds_content_of_another_language_outside_its_blocks(self):
+        chinese = next(code for code, locale in build.I18N.locales.items() if locale["html_lang"] == "zh-CN")
+        other = next(code for code in build.I18N.codes if code not in (chinese, build.I18N.default))
+        menu = f'<a href="../{chinese}/" lang="zh-CN" data-lang-link>{build.I18N.locales[chinese]["name"]}<span aria-hidden="true"></span></a>'
+        example = '<code lang="zh-CN">#M1 @位于(10, 20)</code>'
+        for code in (build.I18N.default, other):
+            self.assertEqual(build.check_leaks(f"<nav>{menu}</nav>", f"index.html ({code})", code), [])
+            self.assertTrue(build.check_leaks(f"<p>{example}</p>", f"index.html ({code})", code))
+        self.assertEqual(build.check_leaks(f"<p>{example}</p>", f"index.html ({chinese})", chinese), [])
+        # an English page has no Chinese at all, in a script either
+        self.assertTrue(build.check_leaks("var UZ = {u1: '差分对'};", f"assets/scenes.js ({build.I18N.default})", build.I18N.default))
+
     def test_malformed_catalogs_and_what_is_only_other(self):
         with tempfile.TemporaryDirectory() as directory:
             registry = self.registry(Path(directory), {

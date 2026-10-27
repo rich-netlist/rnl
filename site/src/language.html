@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title><en>RNL language tour · Rich Netlist</en></title>
-<meta name="description" content="<en>An interactive tour of Rich Netlist (RNL) language standard 0.3: standard sentences and Chinese, definitions, the standard package’s defaults, sets and selections, wires, text, orientation, priority and the header.</en>">
+<meta name="description" content="<!--zh-CN--><en>An interactive tour of Rich Netlist (RNL) language standard 0.3: standard sentences and Chinese, definitions, the standard package’s defaults, sets and selections, wires, text, orientation, priority and the header.</en><!--/zh-CN--><!--not-zh-CN--><en>An interactive tour of Rich Netlist (RNL) language standard 0.3: standard sentences, definitions, the standard package’s defaults, sets and selections, wires, text, orientation, priority and the header.</en><!--/not-zh-CN-->">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="{{font-href}}">
@@ -79,7 +79,7 @@
     <p class="lead"><en>The introduction covers why RNL exists; this tour shows what the language looks like, then covers the rules of <a href="spec/0.3/">language standard 0.3</a> that the introduction does not unpack. Every example has been checked with the toolkit’s <code>rnl check</code> without errors, except those with deliberate errors; the drawings are laid out by hand for this page.</en></p>
     <ol class="tour-map">
       <li><a href="#glance"><span class="n">T0</span><b><en>At a glance</en></b><span><en>Anatomy of a statement, keyword families, how a level takes effect</en></span></a></li>
-      <li><a href="#sentences"><span class="n">T1</span><b><en>Sentences</en></b><span><en>Notation, standard sentences and Chinese</en></span></a></li>
+      <li><a href="#sentences"><span class="n">T1</span><b><en>Sentences</en></b><span><!--zh-CN--><en>Notation, standard sentences and Chinese</en><!--/zh-CN--><!--not-zh-CN--><en>Notation and standard sentences</en><!--/not-zh-CN--></span></a></li>
       <li><a href="#definitions"><span class="n">T2</span><b><en>Definitions</en></b><span><en>AS and ATTACH; write your own</en></span></a></li>
       <li><a href="#defaults"><span class="n">T3</span><b><en>Defaults</en></b><span><en>What you get by writing nothing</en></span></a></li>
       <li><a href="#sets"><span class="n">T4</span><b><en>Sets and selections</en></b><span><en>Spreading, selecting, once per level</en></span></a></li>
@@ -98,7 +98,7 @@
   <p class="toc-title"><en>Contents</en></p>
   <ul>
     <li><a href="#glance"><en>At a glance</en></a></li>
-    <li><a href="#sentences"><en>Statements read as facts: notation, sentences, Chinese.</en></a></li>
+    <li><a href="#sentences"><!--zh-CN--><en>Statements read as facts: notation, sentences, Chinese.</en><!--/zh-CN--><!--not-zh-CN--><en>Statements read as facts: notation and sentences.</en><!--/not-zh-CN--></a></li>
     <li><a href="#definitions"><en>AS says what things are; ATTACH says what is added to them.</en></a></li>
     <li><a href="#defaults"><en>Write nothing, and it still draws.</en></a></li>
     <li><a href="#sets"><en>Sets spread one level; selections are rules.</en></a></li>
@@ -142,13 +142,15 @@
       <div class="an-tip" id="an-tip"><span class="k"><en>Tip</en></span><span><en>Hover over any part, or press Tab to step through them.</en></span></div>
     </div>
 
-    <h3 class="sub-h"><en>Three ways to write one statement</en></h3>
-    <p class="sub-lead"><en>Free text is only for people, so one statement can be bare notation, or a standard sentence in English or in Chinese. Machines read exactly the same thing, and tools can convert between the styles either way.</en></p>
+    <!--zh-CN--><h3 class="sub-h"><en>Three ways to write one statement</en></h3>
+    <p class="sub-lead"><en>Free text is only for people, so one statement can be bare notation, or a standard sentence in English or in Chinese. Machines read exactly the same thing, and tools can convert between the styles either way.</en></p><!--/zh-CN-->
+    <!--not-zh-CN--><h3 class="sub-h"><en>Two ways to write one statement</en></h3>
+    <p class="sub-lead"><en>Free text is only for people, so one statement can be bare notation or a standard sentence. Machines read exactly the same thing, and tools can convert between the styles either way.</en></p><!--/not-zh-CN-->
     <div class="ways">
       <div class="way"><span class="k"><en>Notation</en></span><code data-hl="%dp1 = #M1(in_p) #M2(in_n) @AS $DIFFERENTIAL_PAIR;"></code></div>
       <div class="way"><span class="k"><en>English</en></span><code data-hl="%dp1 = #M1(in_p) and #M2(in_n) treated @AS $DIFFERENTIAL_PAIR;"></code></div>
-      <div class="way"><span class="k"><en>Chinese</en></span><code lang="zh-CN" data-hl='%dp1 = #M1(正输入) 和 #M2(负输入) @视作 $"差分对";'></code></div>
-      <p class="way-note"><svg class="ico"><use href="#i-info"/></svg><span><en>For Chinese, load the alias package rnl-zh in the header record at the top of the file: </en><code data-hl='* @RNL(type="header") { @VERSION("0.3"); @USE-ALIASES(name="rnl-zh", version="0.3")}'></code></span></p>
+      <!--zh-CN--><div class="way"><span class="k"><en>Chinese</en></span><code lang="zh-CN" data-hl='%dp1 = #M1(正输入) 和 #M2(负输入) @视作 $"差分对";'></code></div>
+      <p class="way-note"><svg class="ico"><use href="#i-info"/></svg><span><en>For Chinese, load the alias package rnl-zh in the header record at the top of the file: </en><code data-hl='* @RNL(type="header") { @VERSION("0.3"); @USE-ALIASES(name="rnl-zh", version="0.3")}'></code></span></p><!--/zh-CN-->
     </div>
 
     <h3 class="sub-h"><en>Reference sigils</en></h3>
@@ -179,7 +181,7 @@
     </div>
 
     <h3 class="sub-h"><en>Keyword families</en></h3>
-    <p class="sub-lead"><en>The <span id="kw-count">46</span> keywords fall into nine families. Click one to see what it does, its standard sentence and its Chinese form.</en></p>
+    <p class="sub-lead"><!--zh-CN--><en>The <span id="kw-count">46</span> keywords fall into nine families. Click one to see what it does, its standard sentence and its Chinese form.</en><!--/zh-CN--><!--not-zh-CN--><en>The <span id="kw-count">46</span> keywords fall into nine families. Click one to see what it does and its standard sentence.</en><!--/not-zh-CN--></p>
     <div class="kwfam">
       <div class="fams" id="fams"></div>
       <div class="panel kw-card" id="kw-card" aria-live="polite"></div>
@@ -253,7 +255,7 @@
 
     <a class="tour-cta" href="language.html">
       <span class="tour-cta-ico"><svg class="ico"><use href="#i-book"/></svg></span>
-      <span class="tour-cta-body"><b><en>Language tour</en></b><span><en>Nine hands-on sections: sentences and Chinese, definitions, the standard package’s defaults, sets and selections, wires, text, orientation, priority and the header.</en></span></span>
+      <span class="tour-cta-body"><b><en>Language tour</en></b><span><!--zh-CN--><en>Nine hands-on sections: sentences and Chinese, definitions, the standard package’s defaults, sets and selections, wires, text, orientation, priority and the header.</en><!--/zh-CN--><!--not-zh-CN--><en>Nine hands-on sections: sentences, definitions, the standard package’s defaults, sets and selections, wires, text, orientation, priority and the header.</en><!--/not-zh-CN--></span></span>
       <svg class="ico tour-cta-arrow"><use href="#i-arrow"/></svg>
     </a>
   </div>
@@ -264,7 +266,7 @@
   <div class="wrap">
     <header class="sheet-head">
       <p class="sheet-no"><en>T1 · Sentences</en></p>
-      <h2><en>Statements read as facts: notation, sentences, Chinese.</en></h2>
+      <h2><!--zh-CN--><en>Statements read as facts: notation, sentences, Chinese.</en><!--/zh-CN--><!--not-zh-CN--><en>Statements read as facts: notation and sentences.</en><!--/not-zh-CN--></h2>
       <p class="lead"><en>Machines read only the notation: references starting with # &amp; % $, keywords starting with @, parameters in parentheses, braces, semicolons and =&gt;. The words between them are free text, there or not. The standard sentences give every keyword its words, so statements of one kind read the same everywhere; the Chinese alias package turns the same sentences into Chinese.</en></p>
     </header>
 
@@ -275,7 +277,7 @@
           <span class="seg" id="lab-style" role="group" aria-label="<en>Writing style</en>">
             <button type="button" data-style="bare" aria-pressed="false"><en>Notation</en></button>
             <button type="button" data-style="en" aria-pressed="true"><en>English</en></button>
-            <button type="button" data-style="zh" aria-pressed="false"><en>Chinese</en></button>
+            <!--zh-CN--><button type="button" data-style="zh" aria-pressed="false"><en>Chinese</en></button><!--/zh-CN-->
           </span>
           <label class="toggle"><input type="checkbox" id="lab-machine"><span><en>Machine view</en></span></label>
         </div>
@@ -305,13 +307,13 @@
     </div>
 
     <h3 class="sub-h"><en>A whole file</en></h3>
-    <p class="sub-lead"><en>The five-transistor OTA from the introduction, showing the complete file at Step 2. In Chinese, the header record gains an @USE-ALIASES line; every other statement matches the English one for one.</en></p>
+    <p class="sub-lead"><!--zh-CN--><en>The five-transistor OTA from the introduction, showing the complete file at Step 2. In Chinese, the header record gains an @USE-ALIASES line; every other statement matches the English one for one.</en><!--/zh-CN--><!--not-zh-CN--><en>The five-transistor OTA from the introduction, showing the complete file at Step 2.</en><!--/not-zh-CN--></p>
     <div class="panel">
       <div class="ph"><svg class="ico"><use href="#i-file"/></svg><span class="ph-title">ota5t.sp</span><span class="ph-right">
         <span class="seg" id="file-style" role="group" aria-label="<en>Writing style</en>">
           <button type="button" data-style="bare" aria-pressed="false"><en>Notation</en></button>
           <button type="button" data-style="en" aria-pressed="false"><en>English</en></button>
-          <button type="button" data-style="zh" aria-pressed="true"><en>Chinese</en></button>
+          <!--zh-CN--><button type="button" data-style="zh" aria-pressed="true"><en>Chinese</en></button><!--/zh-CN-->
         </span>
         <a class="chip" id="file-open" href="../viewer/?url=samples/site/ota5t.sp" target="_blank" rel="noopener"><en>Open in viewer</en></a></span></div>
       <div class="code" id="file-code"></div>

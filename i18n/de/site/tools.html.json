@@ -60,8 +60,6 @@
   "The samples come from RNL’s conformance corpus and are published with the web viewer. Click one and the viewer opens it.": "Die Beispiele stammen aus dem Konformitätskorpus von RNL und werden zusammen mit dem Web-Viewer veröffentlicht. Klicken Sie eines an, um es im Viewer zu öffnen.",
   "sample|Hierarchy": "Hierarchie",
   "A two-stage buffer: a drawing for each subcircuit, drawn as a block symbol one level up, and a file it includes.": "Ein zweistufiger Puffer: eine eigene Zeichnung für jede Teilschaltung, eine Ebene höher als Blocksymbol dargestellt, sowie eine eingebundene Datei.",
-  "Chinese": "Chinesisch",
-  "A five-transistor OTA written with the Chinese alias package rnl-zh, with Chinese labels in the drawing.": "Ein Fünf-Transistor-OTA, geschrieben mit dem chinesischen Alias-Paket rnl-zh und mit chinesischen Beschriftungen in der Zeichnung.",
   "Line styles": "Linienstile",
   "Every line style on every kind of shape: dashed, dotted, bold and double lines on rectangles, circles, ellipses, arcs and curves, and on a wire.": "Jeder Linienstil auf jeder Grundform: gestrichelte, gepunktete, fette und doppelte Linien auf Rechtecken, Kreisen, Ellipsen, Kreisbögen und Kurven sowie auf einer Leitung.",
   "Your files stay in the browser": "Ihre Dateien bleiben im Browser",

@@ -52,9 +52,10 @@
     { k: 'WIRE', bare: '&n1 @WIRE {#R1:2 %j #R2:1}', en: 'net &n1 has a @WIRE connecting {#R1:2 %j #R2:1}',
       fact: '<en>Net n1 has a wire running through R1’s terminal 2, the point %j and R2’s terminal 1, in that order.</en>' }
   ];
-  /* The same statements as Chinese standard sentences, with the alias package rnl-zh; shown on every page */
+  /* The same statements as Chinese standard sentences, with the alias package rnl-zh; only the Chinese pages have them */
+  var LAB_ZH = [];
   /*zh-CN*/
-  var LAB_ZH = [
+  LAB_ZH = [
     '#M1 @位于(10, 20)',
     '{#M1 #M2} @对齐("y")，即 y 坐标相同',
     '{#M1 #M2 #M3} 按 @顺序("从左到右") 排列',

@@ -77,7 +77,7 @@
     'REMOVE-FROM': ['<en>Removes members from a named set—for example, removing vss from $NAMED_GROUND_NET_SET so its ground symbols do not show the net name.</en>', '&vss @REMOVE-FROM $NAMED_GROUND_NET_SET'],
     'UNION': ['<en>A union without duplicates.</en>', '%u_set = %a_set and %b_set @UNION'],
     'VERSION': ['<en>The language version of the file. Only in the header record; without it, the tool’s default version applies.</en>', '* @RNL(type="header") { @VERSION("0.3")}'],
-    'ALIAS': ['<en>Declares another spelling (an alias) for a standard word or a $ name, alias first. Only in the header record.</en>', /*zh-CN*/'@ALIAS("@位于", "@PLACE")'/*/zh-CN*/],
+    'ALIAS': ['<en>Declares another spelling (an alias) for a standard word or a $ name, alias first. Only in the header record.</en>'/*zh-CN*/, '@ALIAS("@位于", "@PLACE")'/*/zh-CN*/],
     'USE-ALIASES': ['<en>Loads an alias package, such as the Chinese package rnl-zh. Only in the header record.</en>', '@USE-ALIASES(name="rnl-zh", version="0.3")'],
     'DEVICE': ['<en>Names the terminals of devices the netlist does not define, such as PDK devices, so #XM1:d works. Only in the header record.</en>', '@DEVICE(name="XM*", model="sky130_fd_pr__nfet_*", terminals=["d", "g", "s", "b"])'],
     'USE-PACKAGE': ['<en>Uses a package: a set of symbols, styles, definitions and rules, such as a company’s drawing style.</en>', '@USE-PACKAGE(name="acme-style", version="1.2")'],
@@ -85,9 +85,11 @@
   };
 
   /* The Chinese standard sentence and alias of each keyword, from the alias package rnl-zh. The header
-     keywords have none: the header record is always read in standard spelling. Shown on every page. */
+     keywords have none: the header record is always read in standard spelling. Only the Chinese pages
+     have them. */
+  var KW_ZH = {};
   /*zh-CN*/
-  var KW_ZH = {
+  KW_ZH = {
     'PLACE': ['#M1 @位于(10, 20)', '@位于'],
     'ORIENT': ['#M2 @朝向("MY")，即左右镜像', '@朝向'],
     'LAYER': ['#C1 处于 @图层("底")', '@图层'],
@@ -181,9 +183,10 @@
       card.innerHTML = '<h4>@' + k + '</h4>' +
         '<div class="kw-chips"><span class="chip chip-rnl">' + fam + '</span>' +
         (zh ? '<span class="chip" title="rnl-zh"><span class="muted"><en>Chinese alias</en></span> <code lang="zh-CN">' + zh[1] + '</code></span>' :
-          '<span class="chip chip-mute"><en>The header is read in standard spelling, without aliases</en></span>') + '</div>' +
+          // the header keywords, where the pages show the aliases
+          Object.keys(KW_ZH).length ? '<span class="chip chip-mute"><en>The header is read in standard spelling, without aliases</en></span>' : '') + '</div>' +
         '<p>' + info[0] + '</p>' +
-        '<div class="kw-ex"><span class="kw-ex-k"><en>Standard sentence</en></span><div class="minicode">' + C.hlAuto(info[1]) + '</div></div>' +
+        (info[1] ? '<div class="kw-ex"><span class="kw-ex-k"><en>Standard sentence</en></span><div class="minicode">' + C.hlAuto(info[1]) + '</div></div>' : '') +
         (zh ? '<div class="kw-ex"><span class="kw-ex-k"><en>Chinese (rnl-zh)</en></span><div class="minicode" lang="zh-CN">' + C.hlAuto(zh[0]) + '</div></div>' : '');
     }
     kws.forEach(function (b) { b.addEventListener('click', function () { pick(b); }); });

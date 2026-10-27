@@ -430,7 +430,7 @@
     </div>
 
     <h3 class="sub-h" id="journey"><en>From a netlist to a good drawing</en></h3>
-    <p class="sub-lead"><en>The same five-transistor OTA, with a few more RNL lines at each step. The file is on the left, the viewer’s drawing on the right; hover over a line to see which part of the drawing it controls. Above the file you can switch the writing style between bare notation, English sentences and Chinese sentences; machines read exactly the same statements.</en></p>
+    <p class="sub-lead"><!--zh-CN--><en>The same five-transistor OTA, with a few more RNL lines at each step. The file is on the left, the viewer’s drawing on the right; hover over a line to see which part of the drawing it controls. Above the file you can switch the writing style between bare notation, English sentences and Chinese sentences; machines read exactly the same statements.</en><!--/zh-CN--><!--not-zh-CN--><en>The same five-transistor OTA, with a few more RNL lines at each step. The file is on the left, the viewer’s drawing on the right; hover over a line to see which part of the drawing it controls. Above the file you can switch the writing style between bare notation and English sentences; machines read exactly the same statements.</en><!--/not-zh-CN--></p>
     <div class="journey">
       <div class="jr-steps" id="jr-steps" role="tablist" aria-label="<en>Steps</en>">
         <button type="button" role="tab" data-i="0"><span class="n">STEP 0</span><span class="t"><en ctx=step-0>Netlist only</en></span></button>
@@ -446,7 +446,7 @@
             <span class="seg" id="jr-style" role="group" aria-label="<en>Writing style</en>">
               <button type="button" data-style="bare" aria-pressed="false"><en>Notation</en></button>
               <button type="button" data-style="en" aria-pressed="true"><en>English</en></button>
-              <button type="button" data-style="zh" aria-pressed="false"><en>Chinese</en></button>
+              <!--zh-CN--><button type="button" data-style="zh" aria-pressed="false"><en>Chinese</en></button><!--/zh-CN-->
             </span>
             <a class="chip" id="jr-open" href="../viewer/?url=samples/site/ota5t.sp" target="_blank" rel="noopener"><en>Open in viewer</en></a></span></div>
           <div class="code" id="jr-code"></div>
@@ -700,7 +700,7 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><en>The netlis
         </details>
         <details>
           <summary><en>Can RNL be written in other languages?</en><svg class="ico"><use href="#i-next"/></svg></summary>
-          <p><en>Keywords and standard-package names can have aliases in another language. In its header record, a file can declare individual aliases with <code>@ALIAS</code> or load an alias package—a package file collecting aliases for a language—using <code>@USE-ALIASES(name=…, version=…)</code> (or <code>path=…</code> for a custom file). Standard series 0.3 includes one bundled alias package so far, Chinese (<code>rnl-zh</code>): write <code>@USE-ALIASES(name="rnl-zh", version="0.3")</code> in the header record to use aliases such as <code lang="zh-CN">#M1 @位于(10, 20)</code>. An alias is simply an alternate spelling: standard and alias spellings can be mixed freely, and machines read the exact same statements; the header record itself always uses standard spelling.</en></p>
+          <p><!--zh-CN--><en>Keywords and standard-package names can have aliases in another language. In its header record, a file can declare individual aliases with <code>@ALIAS</code> or load an alias package—a package file collecting aliases for a language—using <code>@USE-ALIASES(name=…, version=…)</code> (or <code>path=…</code> for a custom file). Standard series 0.3 includes one bundled alias package so far, Chinese (<code>rnl-zh</code>): write <code>@USE-ALIASES(name="rnl-zh", version="0.3")</code> in the header record to use aliases such as <code lang="zh-CN">#M1 @位于(10, 20)</code>. An alias is simply an alternate spelling: standard and alias spellings can be mixed freely, and machines read the exact same statements; the header record itself always uses standard spelling.</en><!--/zh-CN--><!--not-zh-CN--><en>Keywords and standard-package names can have aliases in another language. In its header record, a file can declare individual aliases with <code>@ALIAS</code> or load an alias package—a package file collecting aliases for a language—using <code>@USE-ALIASES(name=…, version=…)</code> (or <code>path=…</code> for a custom file). Standard series 0.3 includes one bundled alias package so far, Chinese (<code>rnl-zh</code>): write <code>@USE-ALIASES(name="rnl-zh", version="0.3")</code> in the header record to use its aliases. An alias is simply an alternate spelling: standard and alias spellings can be mixed freely, and machines read the exact same statements; the header record itself always uses standard spelling.</en><!--/not-zh-CN--></p>
         </details>
         <details>
           <summary><en>Can I use it now?</en><svg class="ico"><use href="#i-next"/></svg></summary>

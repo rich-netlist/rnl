@@ -60,8 +60,6 @@
   "The samples come from RNL’s conformance corpus and are published with the web viewer. Click one and the viewer opens it.": "這些範例來自 RNL 的一致性測試語料庫，隨網頁版檢視器一併發布。點選任一範例即可在檢視器中開啟。",
   "sample|Hierarchy": "階層結構",
   "A two-stage buffer: a drawing for each subcircuit, drawn as a block symbol one level up, and a file it includes.": "兩級緩衝器：每個子電路各有一張原理圖，在上一層繪製為方塊符號，並包含一個引入（include）的檔案。",
-  "Chinese": "中文寫法",
-  "A five-transistor OTA written with the Chinese alias package rnl-zh, with Chinese labels in the drawing.": "使用中文別名套件 rnl-zh 編寫的五電晶體 OTA，圖面上的標籤亦為中文。",
   "Line styles": "線條樣式",
   "Every line style on every kind of shape: dashed, dotted, bold and double lines on rectangles, circles, ellipses, arcs and curves, and on a wire.": "各種幾何圖形上的每一種線型：在矩形、圓形、橢圓、圓弧、曲線以及連線上繪製虛線、點線、粗線與雙線。",
   "Your files stay in the browser": "你的檔案只留在瀏覽器中",
