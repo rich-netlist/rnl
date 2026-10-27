@@ -1,6 +1,7 @@
 # Builds the desktop viewer of apps/desktop for Windows and Linux and releases it: on Windows, a single
-# executable, the same with the public packages, an NSIS installer for the current user and an MSI for the
-# machine; the installers carry the public packages as a part of their own, which the user chooses. The Tauri command
+# executable, a zip of the same with the public packages in a folder beside it, an NSIS installer for the
+# current user and an MSI for the machine; the installers carry the public packages as a part of their
+# own, which the user chooses. The Tauri command
 # line that apps/desktop/package.json pins builds them on GitHub's Windows runner, whose MSVC
 # toolchain links the WebView2 loader into the executable. The workflow checks that the executable
 # imports no WebView2Loader.dll, smoke-tests it alone in a directory, and installs both installers,
@@ -134,10 +135,10 @@ jobs:
           Copy-Item "$built\bundle\nsis\RNL Viewer_$($env:VERSION)_x64-setup.exe" "$out\$name-setup.exe"
           Copy-Item "$built\bundle\msi\RNL Viewer_$($env:VERSION)_x64_en-US.msi" "$out\$name.msi"
           Copy-Item "$built\rnl-viewer.exe" "$out\$name.exe"
-          # the same program with the packages after it: compiled once, assembled twice
-          python scripts/bundle_packages.py append --exe "$built\rnl-viewer.exe" --packages "$env:RUNNER_TEMP\public-packages" `
-            --out "$out\RNL-Viewer-$env:VERSION-with-packages-windows-x64.exe"
-          if ($LASTEXITCODE -ne 0) { throw "The single executable with the public packages could not be made." }
+          # the same executable with the packages in a folder beside it, in a zip: compiled once, assembled twice
+          python scripts/bundle_packages.py zip --exe "$out\$name.exe" --packages "$env:RUNNER_TEMP\public-packages" `
+            --out "$out\RNL-Viewer-$env:VERSION-with-packages-windows-x64.zip"
+          if ($LASTEXITCODE -ne 0) { throw "The zip of the single executable with the public packages could not be made." }
           $sums = Get-ChildItem $out -File | Sort-Object Name | ForEach-Object {
             "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)"
           }
@@ -165,15 +166,18 @@ jobs:
           mkdir -p "$RUNNER_TEMP/single"
           cp "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-windows-x64.exe" "$RUNNER_TEMP/single/"
           node apps/desktop/tests/smoke.mjs --packages without --exe "$RUNNER_TEMP/single/RNL-Viewer-$VERSION-windows-x64.exe"
-      # alone in a directory too: it copies the packages at its end to its data folder, and finds them there
-      - name: Smoke-test the single executable with the public packages
+      # the zip unpacked: the same executable, which finds the folder of the packages beside it
+      - name: Smoke-test the zip of the single executable with the public packages
         timeout-minutes: 10
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           mkdir -p "$RUNNER_TEMP/single-with"
-          cp "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-with-packages-windows-x64.exe" "$RUNNER_TEMP/single-with/"
-          node apps/desktop/tests/smoke.mjs --packages with --exe "$RUNNER_TEMP/single-with/RNL-Viewer-$VERSION-with-packages-windows-x64.exe"
+          python -m zipfile -e "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-with-packages-windows-x64.zip" "$RUNNER_TEMP/single-with"
+          folder="$RUNNER_TEMP/single-with/RNL-Viewer-$VERSION-with-packages-windows-x64"
+          test -f "$folder/public-packages/public-packages.json"
+          cmp "$folder/RNL-Viewer-$VERSION-windows-x64.exe" "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-windows-x64.exe"
+          node apps/desktop/tests/smoke.mjs --packages with --exe "$folder/RNL-Viewer-$VERSION-windows-x64.exe"
       - name: Install with the NSIS installer for the user, smoke-test the app and uninstall it
         timeout-minutes: 10
         env:

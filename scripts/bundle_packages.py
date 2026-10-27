@@ -5,31 +5,24 @@
           the catalog's SHA-256, with the licence files of the repository, into a directory and a lock
           file beside them, public-packages.json: what the viewer shows as the versions it bundles
   check   a directory against its lock file
-  append  a copy of an executable with a directory's files after it, for the single-file Windows
-          viewer that bundles the packages: the viewer finds them at its own end (see below)
+  zip     the zip of the single-file Windows viewer with the packages: the same executable and the
+          directory as `public-packages/` beside it, which is where the viewer looks for them
   wix     the WiX fragment of the MSI that has the directory's files as a feature of its own, "Public
           packages", which the user may leave out (PUBLICPACKAGES=0 on the command line leaves it out too),
           and the Tauri configuration that names the fragment, to give to `tauri build --config`
 
 The directory is `<name>/<version>/<files of the package>`, as the viewer searches it (each `<name>`
 directory is one directory of its PATH, whose `<version>/<name>.rnl` the package lookup finds, 16.2).
-Nothing here is for the viewer to run: it never downloads a package. They change only with a new
-release of the viewer.
-
-An executable with packages ends with their archive: the files one after another, then a JSON index of
-`{path, offset, size}` with the offsets in the archive, then a footer of 40 bytes, `RNLPKG01`, the
-index's length and the archive's length (u64 each, little endian) and the first 16 hex digits of the
-archive's SHA-256, by which the viewer keeps the copy it makes of them. apps/desktop/src/public_packages.rs
-reads it.
+Nothing here is for the viewer to run: it never downloads a package, and copies none anywhere. They
+change only with a new release of the viewer.
 """
 import argparse
 import datetime
-import hashlib
 import json
 import os
-import struct
 import sys
 import xml.sax.saxutils
+import zipfile
 import urllib.error
 import urllib.request
 from pathlib import Path, PurePosixPath
@@ -39,8 +32,6 @@ import packages  # noqa: E402  (the catalog's reading and checks, and its URL)
 
 ROOT = Path(__file__).resolve().parents[1]
 LOCK = 'public-packages.json'
-MAGIC = b'RNLPKG01'
-FOOTER = 40
 LICENSE_SOURCE = 'https://raw.githubusercontent.com/rich-netlist/rnl-packages/main/'
 # the licence files of the repository of the packages: the text of each licence its files carry
 LICENSE_FILES = ['LICENSE', 'LICENSES/MIT.txt', 'LICENSES/CC0-1.0.txt']
@@ -123,27 +114,22 @@ def check(directory):
     print(f'ok: {len(lock["packages"])} packages as {LOCK} says')
 
 
-def archive(directory):
-    """The files of a directory as the viewer reads them at the end of an executable, with their footer."""
-    names = sorted(str(p.relative_to(directory).as_posix()) for p in directory.rglob('*') if p.is_file())
-    body, index = bytearray(), []
-    for name in names:
-        raw = (directory / name).read_bytes()
-        index.append({'path': name, 'offset': len(body), 'size': len(raw)})
-        body += raw
-    table = json.dumps(index, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
-    payload = bytes(body) + table
-    ident = hashlib.sha256(payload).hexdigest()[:16].encode('ascii')
-    return payload + MAGIC + struct.pack('<QQ', len(table), len(payload)) + ident
+def make_zip(exe, directory, out):
+    """A zip of the executable and the directory as `public-packages/` beside it, in a folder named as the zip is.
 
-
-def append(exe, directory, out):
+    The files have no time and the same order and permissions, so that the same files make the same zip.
+    """
     check(directory)
-    data = exe.read_bytes()
-    if data.endswith(MAGIC) or MAGIC in data[-FOOTER:]:
-        raise ValueError(f'{exe} has packages already')
-    out.write_bytes(data + archive(directory))
-    print(f'Wrote {out}: {exe.name} and {len(list(directory.rglob("*")))} paths of {directory}')
+    top = out.stem
+    entries = [(exe, f'{top}/{exe.name}')]
+    entries += [(p, f'{top}/public-packages/{p.relative_to(directory).as_posix()}') for p in sorted(directory.rglob('*')) if p.is_file()]
+    with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as z:
+        for source, name in entries:
+            info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = 0o644 << 16
+            z.writestr(info, source.read_bytes())
+    print(f'Wrote {out}: {exe.name} and {len(entries) - 1} files of {directory} as {top}/public-packages/')
 
 
 def wix(directory, out):
@@ -204,10 +190,10 @@ def main():
     f.add_argument('--catalog', default=os.environ.get('RNL_PACKAGE_CATALOG', packages.CATALOG_URL))
     c = sub.add_parser('check')
     c.add_argument('directory', type=Path)
-    a = sub.add_parser('append')
-    a.add_argument('--exe', type=Path, required=True)
-    a.add_argument('--packages', type=Path, required=True)
-    a.add_argument('--out', type=Path, required=True)
+    z = sub.add_parser('zip')
+    z.add_argument('--exe', type=Path, required=True)
+    z.add_argument('--packages', type=Path, required=True)
+    z.add_argument('--out', type=Path, required=True)
     w = sub.add_parser('wix')
     w.add_argument('--dir', type=Path, required=True)
     w.add_argument('--out', type=Path, required=True)
@@ -219,7 +205,7 @@ def main():
     elif args.command == 'check':
         check(args.directory)
     else:
-        append(args.exe, args.packages, args.out)
+        make_zip(args.exe, args.packages, args.out)
 
 
 if __name__ == '__main__':

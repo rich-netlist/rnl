@@ -1,9 +1,9 @@
 import hashlib
 import json
 from pathlib import Path
-import struct
 import tempfile
 import unittest
+import zipfile
 from unittest.mock import patch
 import bundle_packages as bundle
 import packages
@@ -57,29 +57,26 @@ class Bundling(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'missing'):
             bundle.check(out)
 
-    def test_the_archive_ends_with_its_footer_and_its_index_gives_each_file(self):
+    def test_the_zip_has_the_executable_and_the_packages_beside_it_and_is_the_same_every_time(self):
         out = self.folder()
-        data = bundle.archive(out)
-        self.assertEqual(data[-40:-32], b'RNLPKG01')
-        table, payload = struct.unpack('<QQ', data[-32:-16])
-        self.assertEqual(payload, len(data) - 40)
-        index = json.loads(data[-40 - table:-40])
-        body = data[:payload - table]
-        found = {e['path']: body[e['offset']:e['offset'] + e['size']] for e in index}
-        self.assertEqual(found, {**self.files, bundle.LOCK: (out / bundle.LOCK).read_bytes()})
-        self.assertEqual(data[-16:], sha(data[:payload]).encode()[:16])
-
-    def test_append_makes_a_copy_that_ends_with_the_archive_and_refuses_one_that_has_it(self):
-        out = self.folder()
-        exe = self.root / 'viewer.exe'
+        exe = self.root / 'RNL-Viewer-0.5.1-windows-x64.exe'
         exe.write_bytes(b'MZ program')
-        with_packages = self.root / 'with.exe'
-        bundle.append(exe, out, with_packages)
-        self.assertTrue(with_packages.read_bytes().startswith(b'MZ program'))
-        self.assertEqual(with_packages.read_bytes()[-40:-32], b'RNLPKG01')
-        self.assertEqual(exe.read_bytes(), b'MZ program')
-        with self.assertRaisesRegex(ValueError, 'packages already'):
-            bundle.append(with_packages, out, self.root / 'twice.exe')
+        first, second = self.root / 'RNL-Viewer-0.5.1-with-packages-windows-x64.zip', self.root / 'again' / 'RNL-Viewer-0.5.1-with-packages-windows-x64.zip'
+        second.parent.mkdir()
+        bundle.make_zip(exe, out, first)
+        bundle.make_zip(exe, out, second)
+        with zipfile.ZipFile(first) as z:
+            top = 'RNL-Viewer-0.5.1-with-packages-windows-x64/'
+            names = z.namelist()
+            self.assertEqual(names[0], top + exe.name)
+            self.assertEqual(z.read(names[0]), b'MZ program')
+            packages_files = {n[len(top + 'public-packages/'):]: z.read(n) for n in names[1:]}
+            self.assertEqual(packages_files, {**self.files, bundle.LOCK: (out / bundle.LOCK).read_bytes()})
+        self.assertEqual(first.read_bytes(), second.read_bytes())
+        # a folder that is not as its lock says makes no zip
+        (out / 'LICENSES/MIT.txt').write_bytes(b'changed')
+        with self.assertRaisesRegex(ValueError, 'SHA-256 differs'):
+            bundle.make_zip(exe, out, self.root / 'bad.zip')
 
     def test_the_wix_fragment_has_a_component_per_file_and_a_feature_that_leaves_with_publicpackages_0(self):
         out = self.folder()
