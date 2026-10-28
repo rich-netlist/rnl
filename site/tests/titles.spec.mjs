@@ -1,6 +1,6 @@
 import { test, expect } from "../../tests/viewer/node_modules/@playwright/test/index.mjs";
 
-const pages = ["language.html", "packages.html", "tools.html", "agents.html",
+const pages = ["language.html", "packages.html", "gallery.html", "tools.html", "agents.html", "timeline.html", "translation.html",
   "rnl-language-standalone.html", "rnl-tools-standalone.html"];
 
 for (const lang of ["zh", "en"]) {

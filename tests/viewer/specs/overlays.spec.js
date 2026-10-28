@@ -4,6 +4,7 @@ import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {expect, test} from '../viewer.js';
 import {root} from '../fixtures.js';
+import { zhMenu } from '../zh.js';
 
 for (const platform of ['web', 'desktop']) {
   test(`${platform}: current switch starts off and persists independently of usages`, async ({page, viewer}) => {
@@ -26,6 +27,29 @@ for (const platform of ['web', 'desktop']) {
     await expect(page.locator('.current-arrow')).toHaveCount(4);
     await page.evaluate(() => window.viewer.command('toggle-currents'));
     await expect(page.locator('.current-arrow')).toHaveCount(0);
+  });
+
+  test(`${platform}: Shift+R shows and hides the current directions; R alone and typing do not`, async ({page, viewer}) => {
+    await viewer.open('usage-current', {platform});
+    await page.locator('#canvas').click({position: {x: 5, y: 5}});
+    await page.keyboard.press('Shift+R');
+    await expect(page.locator('.current-arrow')).toHaveCount(7);
+    expect(await page.evaluate(() => window.viewer.checked('toggle-currents'))).toBe(true);
+    await page.keyboard.press('r');
+    await expect(page.locator('.current-arrow')).toHaveCount(7);
+    await page.keyboard.press('Shift+R');
+    await expect(page.locator('.current-arrow')).toHaveCount(0);
+    // a capital R typed in the netlist's find box is text
+    await page.keyboard.press('2');
+    await page.keyboard.press('Control+f');
+    await expect(page.locator('#netlist-query')).toBeFocused();
+    await page.keyboard.press('Shift+R');
+    await expect(page.locator('#netlist-query')).toHaveValue('R');
+    await expect(page.locator('.current-arrow')).toHaveCount(0);
+    if (platform === 'web') {
+      await viewer.menuTitle('View').click();
+      await expect(page.locator('.menu-item[data-id="toggle-currents"]')).toContainText('Shift+R');
+    }
   });
 
   test(`${platform}: Viewer projects core frames and current paths exactly like CLI`, async ({page, viewer}, info) => {
@@ -98,7 +122,7 @@ for (const platform of ['web', 'desktop']) {
           await page.screenshot({path: path.join(review, `viewer-${platform}-${lang}-${theme}.png`)});
           for (const file of ['usage-current.svg','usage-current.cell.svg']) fs.copyFileSync(path.join(dir,file), path.join(review,file));
           if (platform === 'web') {
-            await viewer.menuTitle(lang === 'zh' ? '视图' : 'View').click();
+            await viewer.menuTitle(lang === 'zh' ? zhMenu('&View') : 'View').click();
             await expect(viewer.menuItem('toggle-currents')).toHaveAttribute('aria-checked','true');
             await page.screenshot({path: path.join(review, `viewer-menu-${lang}-${theme}.png`)});
             await page.keyboard.press('Escape');

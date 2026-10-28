@@ -1,0 +1,227 @@
+{
+  "default": "en",
+  "legacy": "zh",
+  "languages": [
+    {
+      "code": "en",
+      "name": "English",
+      "short": "EN",
+      "html_lang": "en",
+      "matches": [
+        "en"
+      ],
+      "standard": "en",
+      "nav_breakpoint": 960,
+      "fonts": {
+        "google": "IBM+Plex+Sans:wght@400;500;600;700",
+        "body": "\"IBM Plex Sans\", system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif",
+        "display": "\"IBM Plex Sans Condensed\", \"IBM Plex Sans\", \"Arial Narrow\", sans-serif",
+        "mono": "\"IBM Plex Mono\", \"Cascadia Mono\", \"SFMono-Regular\", Consolas, monospace"
+      },
+      "messages": {
+        "contents": "Contents",
+        "on_this_page": "On this page",
+        "zip_label": "Markdown, chapters",
+        "md_label": "Markdown",
+        "sums_label": "SHA-256 checksums",
+        "intro": "Introduction",
+        "tour": "Language tour",
+        "spec": "Standard",
+        "packages": "Packages",
+        "gallery": "Gallery",
+        "tools": "Tools",
+        "agents": "Agent",
+        "translation": "Translation status",
+        "pages": "Pages",
+        "guide_note": "This is the short version of the standard: what it takes to read and write RNL files. It is not normative; where it differs from the text below, the text below prevails. The same guide is part of the [skill package for AI agents]({agents}).",
+        "principles_note": "These are the principles of RNL, the text of [`spec/rich-netlist.md`](https://github.com/rich-netlist/rnl/blob/main/spec/rich-netlist.md), shown here to be read with the standard. They are not a part of the standard and are not tied to a version of it; the standard refers to them as “Principles”. The English text is authoritative.",
+        "kicker": "Rich Netlist language standard",
+        "theme_dark": "Switch to dark theme",
+        "theme_light": "Switch to light theme",
+        "foot": "The text of the standard is licensed under CC-BY-4.0. The English text is normative.",
+        "files": "Files",
+        "file": "File",
+        "content": "Content",
+        "versions": "Versions: ",
+        "label": "Version {v} · {state} ({date}, {commit})",
+        "released": "revision {n}",
+        "after": "revision {n} + later changes",
+        "draft": "not released",
+        "dirty": " + uncommitted changes",
+        "compare": "compare with {w}",
+        "compare_title": "RNL {v} compared with {w}",
+        "compared": "Compared with {label}:",
+        "added": "added",
+        "removed": "removed",
+        "list_changed": "Changed",
+        "list_added": "Added",
+        "list_removed": "Removed",
+        "front": "beginning",
+        "annex": "Annex {a}",
+        "changes": "Changes",
+        "prev": "Previous change",
+        "next": "Next change",
+        "only": "Only what changed",
+        "language_menu": "Choose language",
+        "timeline_viewer": "Desktop viewer {version}",
+        "timeline_core": "RNL core {version}",
+        "timeline_spec": "Language standard {series}, revision {revision}",
+        "timeline_notes": "Release notes",
+        "timeline_range": "{start} to {end}",
+        "timeline_next": "Next",
+        "timeline_all": "Full timeline",
+        "not_translated": "This page is not yet available in {language}; it is shown in English.",
+        "partly_translated": "Parts of this page are not yet available in {language}; they are shown in English.",
+        "help_translate": "Help translate it",
+        "ai_translated": "Translated from English by AI; it may contain errors.",
+        "report_issue": "Report an issue",
+        "terms_normative": "The English terms are the normative ones.",
+        "glossary": "Glossary"
+      }
+    },
+    {
+      "code": "de",
+      "name": "Deutsch",
+      "short": "DE",
+      "html_lang": "de",
+      "matches": [
+        "de"
+      ],
+      "status": "published",
+      "ai_translated": true,
+      "names": {
+        "en": "German",
+        "viewer": "Deutsch"
+      },
+      "nav_breakpoint": 1080
+    },
+    {
+      "code": "es",
+      "name": "Español",
+      "short": "ES",
+      "html_lang": "es",
+      "matches": [
+        "es"
+      ],
+      "status": "published",
+      "ai_translated": true,
+      "names": {
+        "en": "Spanish",
+        "viewer": "Español"
+      },
+      "nav_breakpoint": 1080
+    },
+    {
+      "code": "fr",
+      "name": "Français",
+      "short": "FR",
+      "html_lang": "fr",
+      "matches": [
+        "fr"
+      ],
+      "status": "published",
+      "ai_translated": true,
+      "names": {
+        "en": "French",
+        "viewer": "Français"
+      },
+      "nav_breakpoint": 1080
+    },
+    {
+      "code": "ja",
+      "name": "日本語",
+      "short": "日本語",
+      "html_lang": "ja",
+      "matches": [
+        "ja"
+      ],
+      "status": "published",
+      "ai_translated": true,
+      "names": {
+        "en": "Japanese",
+        "viewer": "日本語"
+      },
+      "nav_breakpoint": 760,
+      "fonts": {
+        "google": "Noto+Sans+JP:wght@400;500;700;900",
+        "body": "\"Noto Sans JP\", \"Hiragino Sans\", \"Yu Gothic UI\", \"Meiryo\", system-ui, sans-serif",
+        "display": "\"IBM Plex Sans Condensed\", \"Noto Sans JP\", \"Hiragino Sans\", \"Yu Gothic UI\", \"Meiryo\", sans-serif",
+        "mono": "\"IBM Plex Mono\", \"Cascadia Mono\", \"SFMono-Regular\", Consolas, \"Noto Sans JP\", monospace"
+      }
+    },
+    {
+      "code": "ko",
+      "name": "한국어",
+      "short": "한국어",
+      "html_lang": "ko",
+      "matches": [
+        "ko"
+      ],
+      "status": "published",
+      "ai_translated": true,
+      "names": {
+        "en": "Korean",
+        "viewer": "한국어"
+      },
+      "nav_breakpoint": 760,
+      "fonts": {
+        "google": "Noto+Sans+KR:wght@400;500;700;900",
+        "body": "\"Noto Sans KR\", \"Apple SD Gothic Neo\", \"Malgun Gothic\", system-ui, sans-serif",
+        "display": "\"IBM Plex Sans Condensed\", \"Noto Sans KR\", \"Apple SD Gothic Neo\", \"Malgun Gothic\", sans-serif",
+        "mono": "\"IBM Plex Mono\", \"Cascadia Mono\", \"SFMono-Regular\", Consolas, \"Noto Sans KR\", monospace"
+      }
+    },
+    {
+      "code": "zh",
+      "name": "简体中文",
+      "short": "简中",
+      "html_lang": "zh-CN",
+      "matches": [
+        "zh"
+      ],
+      "standard": "zh",
+      "status": "published",
+      "codes": {
+        "viewer": "zh-CN"
+      },
+      "names": {
+        "en": "Simplified Chinese",
+        "viewer": "简体中文"
+      },
+      "nav_breakpoint": 760,
+      "fonts": {
+        "google": "Noto+Sans+SC:wght@400;500;700;900",
+        "body": "\"Noto Sans SC\", \"PingFang SC\", \"Hiragino Sans GB\", \"Microsoft YaHei\", system-ui, sans-serif",
+        "display": "\"IBM Plex Sans Condensed\", \"Noto Sans SC\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+        "mono": "\"IBM Plex Mono\", \"Cascadia Mono\", \"SFMono-Regular\", Consolas, \"Noto Sans SC\", monospace"
+      }
+    },
+    {
+      "code": "zh-hant",
+      "name": "繁體中文",
+      "short": "繁中",
+      "html_lang": "zh-Hant",
+      "matches": [
+        "zh-tw",
+        "zh-hk",
+        "zh-mo",
+        "zh-hant"
+      ],
+      "status": "published",
+      "codes": {
+        "viewer": "zh-Hant"
+      },
+      "names": {
+        "en": "Traditional Chinese",
+        "viewer": "繁體中文"
+      },
+      "nav_breakpoint": 760,
+      "fonts": {
+        "google": "Noto+Sans+TC:wght@400;500;700;900",
+        "body": "\"Noto Sans TC\", \"PingFang TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
+        "display": "\"IBM Plex Sans Condensed\", \"Noto Sans TC\", \"PingFang TC\", \"Microsoft JhengHei\", sans-serif",
+        "mono": "\"IBM Plex Mono\", \"Cascadia Mono\", \"SFMono-Regular\", Consolas, \"Noto Sans TC\", monospace"
+      }
+    }
+  ]
+}

@@ -20,9 +20,14 @@ export type Document = {
    */
   name: string,
   /**
-   * "spice" or "spectre".
+   * The format of the main file, "spice" or "spectre"; "rnl" for a package file, checked on its
+   * own; or "text" for a file that is not a netlist, such as a Verilog-A model, which is not read.
    */
   dialect: string,
+  /**
+   * The formats a file can be read with, as `rnl_view::formats` lists them.
+   */
+  formats: Array<FormatInfo>,
   levels: Array<Level>,
   diagnostics: Array<Diagnostic>,
   /**
@@ -225,8 +230,9 @@ export type Hit = {
   /**
    * "box": a symbol, given by its top-left and bottom-right corners; "pin": a pin, one point;
    * "wire": a wire, its vertices; "label": a label of an object, given by its top-left and
-   * bottom-right corners, which stands for what that object stands for, and for nothing when
-   * it is not an instance, a bundle, a usage, a wire or a net.
+   * bottom-right corners, which stands for what that object stands for: for a terminal, the nets
+   * of its pin, as the pin does; and for nothing when it is not an instance, a bundle, a usage, a
+   * wire, a net or a terminal drawn at a pin with a net.
    */
   kind: string,
   /**
@@ -344,6 +350,17 @@ export type SourceFile = {
    * The file as shown: relative to the opened file's directory when it is inside it.
    */
   name: string,
+  /**
+   * The format the file was read with, a name of `Document::formats`: "rnl" for a package file
+   * checked on its own, and for one a netlist includes, which is not read; "text" for a file that
+   * is not a netlist, such as a Verilog-A model: its text, not read.
+   */
+  format: string | null,
+  /**
+   * The format the file is read with when none is set for it, as a frontend shows its
+   * automatic choice.
+   */
+  default_format: string | null,
   text: string,
   /**
    * Where each record is: first line, first column, last line, last column (1-based, inclusive).
@@ -362,6 +379,28 @@ export type SourceInclude = {
    * Index in Document.files.
    */
   file: number,
+};
+
+/**
+ * A format a file can be read with, as `formats` lists them.
+ */
+export type FormatInfo = {
+  /**
+   * Its name, as settings and requests give it, such as "spice".
+   */
+  name: string,
+  /**
+   * Its name as shown, such as "SPICE".
+   */
+  title: string,
+  /**
+   * The suffixes of the files it reads when none is set, lower case and without the dot.
+   */
+  extensions: Array<string>,
+  /**
+   * The format of a file that no other format claims: exactly one has it.
+   */
+  fallback: boolean,
 };
 
 export type Object = {
@@ -387,7 +426,99 @@ export type Object = {
    * `Document::levels`.
    */
   opens: number | null,
+  /**
+   * The usages it is a member of in its level, each with the roles it fills: those of its
+   * terminals too for an instance, and those a failed application names, with their state. In
+   * the order of the level's usages, then of the failed applications.
+   */
+  usages: Array<MemberOf>,
 };
+
+/**
+ * A usage an object is a member of, in the object's level ([`super::Object::usages`]). The usage's
+ * own entry in `Document::objects` lists the usages it is a member of in turn: the chain upward.
+ */
+export type MemberOf = {
+  /**
+   * The usage, an index into `Document::objects`; none for an application that failed, which
+   * made no usage.
+   */
+  usage: number | null,
+  /**
+   * Its id: `%dp1`, or for one without a name of its own, where the statement that made it is,
+   * `@file:line:col`.
+   */
+  id: string,
+  /**
+   * Its definition, such as `$DIFFERENTIAL_PAIR`; empty when a failed statement names none.
+   */
+  definition: string,
+  /**
+   * The roles the object fills in it, in the order of the definition.
+   */
+  roles: Array<RoleOf>,
+  /**
+   * Where the statement that applies the definition is: its file, as `Usage::file` names it,
+   * and its first line.
+   */
+  file: string | null,
+  line: number,
+  /**
+   * Where the usage comes from: "written", a statement of the document's records; "solver", a
+   * record a solver wrote back (`type="generated"`, 2.8); "rule", a rule of a package or of the
+   * document (10.5), which `rule` names; "body", the body of the definition that the usage
+   * `made_in` applies (9.4).
+   */
+  source: string,
+  /**
+   * For a usage a rule made: the rule's package, empty for the document's own, and where the
+   * rule is written.
+   */
+  rule: RuleAt | null,
+  /**
+   * For a usage the body of a definition made: the usage whose definition it is, by id.
+   */
+  made_in: string | null,
+  /**
+   * "in-effect"; "failed", the application failed and made no usage (7.2); "overridden", a fact
+   * its statement writes lost a conflict to one of higher priority (8.5); "disabled", its
+   * priority, or that of the usage it is made in, is "disabled" (14.8), and its facts are left
+   * out.
+   */
+  state: string,
+  /**
+   * Why it failed or was overridden: the message of the diagnostic.
+   */
+  reason: string | null,
+};
+
+/**
+ * A role an object fills in a usage.
+ */
+export type RoleOf = {
+  /**
+   * The role, such as `in_p`.
+   */
+  role: string,
+  /**
+   * The role is a set role (9.4), and the object one of its members.
+   */
+  set: boolean,
+  /**
+   * How the role names the object, as the snapshot writes ids: `#M1`, `#M5:1` for a terminal of
+   * an instance by its number, `&vdd`, `%dp1`, `%g1:p` for a terminal of a usage.
+   */
+  member: string,
+  /**
+   * For a terminal: its name, such as `d`, when it has one; its number otherwise.
+   */
+  terminal: string | null,
+};
+
+/**
+ * Where a rule is written.
+ */
+export type RuleAt = { package: string, file: string, line: number };
 
 export type Span = {
   object: number,

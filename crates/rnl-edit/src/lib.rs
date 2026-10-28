@@ -90,8 +90,23 @@ pub fn entry(dialect: &str) -> &'static str {
 /// An op that cannot be written refuses the whole request, with the reason.
 pub fn write(request: &WriteRequest) -> Result<String, String> {
     let dialect = request.dialect.as_str();
-    if dialect != "spice" && dialect != "spectre" {
-        return Err(format!("dialect \"{dialect}\" is not spice or spectre"));
+    // the formats of the files that are not netlists, a Verilog-A model or a package file (2.7): this
+    // writer does not write into them
+    let (text, package) = (rnl_runtime::host::text::NAME, rnl_runtime::host::package::NAME);
+    if dialect == text {
+        return Err(
+            "dialect \"text\" is that of a file that is not a netlist; RNL is written only into a netlist".into()
+        );
+    }
+    if dialect == package {
+        return Err("dialect \"rnl\" is that of a package file (2.7), which is not a netlist; RNL is written \
+                    here only into a netlist"
+            .into());
+    }
+    let formats: Vec<_> = rnl_view::formats().into_iter().filter(|f| f.name != text && f.name != package).collect();
+    if !formats.iter().any(|f| f.name == dialect) {
+        let names: Vec<&str> = formats.iter().map(|f| f.name.as_str()).collect();
+        return Err(format!("dialect \"{dialect}\" is not {}", names.join(" or ")));
     }
     let ops: Vec<LevelOp> = request.ops.iter().enumerate().map(|(k, v)| ops::parse(k, v)).collect::<Result<_, _>>()?;
 
@@ -111,6 +126,11 @@ pub fn write(request: &WriteRequest) -> Result<String, String> {
     let mut packages: Vec<String> = Vec::new();
     let mut levels: BTreeMap<LevelId, Vec<String>> = BTreeMap::new();
     let mut first_op: BTreeMap<LevelId, usize> = BTreeMap::new();
+    // the styles of `set` and `add-usage`: one definition in each level for the styles of the same
+    // properties and values, first in its record, numbered over the whole request, so that a level
+    // hides no style of a level above it (6.8) and each level reads the same on its own
+    let mut styles: BTreeMap<LevelId, Vec<(Vec<String>, String, String)>> = BTreeMap::new();
+    let mut next_style = 1;
     for (k, lop) in ops.iter().enumerate() {
         if let Op::UsePackage { name, version, path } = &lop.op {
             let p = form::use_package(name, version.as_deref(), path.as_deref());
@@ -121,7 +141,24 @@ pub fn write(request: &WriteRequest) -> Result<String, String> {
         }
         let id = lop.level.as_deref().unwrap_or_default();
         let level = find_level(&doc, &file, id).map_err(|why| format!("op {k} ({}): {why}", lop.op.name()))?;
-        levels.entry(level).or_default().extend(form::statements(&lop.op));
+        let style = match &lop.op {
+            Op::Set { style, .. } | Op::AddUsage { style, .. } if !style.is_empty() => {
+                let defined = styles.entry(level).or_default();
+                let mut key: Vec<String> = style.iter().map(|(p, v)| format!("{p}={v:?}")).collect();
+                key.sort();
+                Some(match defined.iter().find(|(k, ..)| *k == key) {
+                    Some((_, name, _)) => name.clone(),
+                    None => {
+                        let name = format!("$style{next_style}");
+                        next_style += 1;
+                        defined.push((key, name.clone(), form::define_style(&name, style)));
+                        name
+                    }
+                })
+            }
+            _ => None,
+        };
+        levels.entry(level).or_default().extend(form::statements(&lop.op, style.as_deref()));
         first_op.entry(level).or_insert(k);
     }
     // a record goes at the end of a level, or before a region written to be encrypted that the end
@@ -160,7 +197,9 @@ pub fn write(request: &WriteRequest) -> Result<String, String> {
     let mut order: Vec<LevelId> = levels.keys().copied().collect();
     order.sort_by_key(|lv| std::cmp::Reverse(at[lv]));
     for lv in order {
-        let record = record(&request.author, &levels[&lv], carrier_at(&doc, &file, &text, at[&lv]));
+        let mut statements: Vec<String> = styles.get(&lv).into_iter().flatten().map(|(.., d)| d.clone()).collect();
+        statements.extend(levels[&lv].iter().cloned());
+        let record = record(&request.author, &statements, carrier_at(&doc, &file, &text, at[&lv]));
         text = append_record(&doc, lv, &text, &record);
     }
     Ok(text)

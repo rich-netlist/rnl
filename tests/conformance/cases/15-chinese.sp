@@ -1,7 +1,7 @@
 * Five-transistor OTA written in the Chinese style
-*! 中文风格的 RNL（2026-10-12，D16、D17）：头段记录用 @USE-ALIASES 加载标准代称包 rnl-zh（头段记录本身照标准写法）；关键字、参数名、枚举值、
-*! 标准包的 $ 名字（$"差分对"）和普通定义里的角色名、参数名、局部名（#M1(正输入)、@附着(间距=3)、%tc::"中点"）都写中文代称，枚举值的代称经参数传进定义体（$"信号流向" 的方向）；
-*! 自己的普通定义直接用中文角色名，不加引号；参数按位置写的在前、写名字的在后；ATTACH 的定义写在关键字前面；全角逗号后的 `@` 前空一格（`， @`），`=> 记作 %x` 仍是命名。
+*! RNL in Chinese style (2026-10-12, D16, D17): the header record loads the standard alias package rnl-zh with @USE-ALIASES (the header record itself in the standard spelling); keywords, parameter names, enumerated values,
+*! the $ names of the standard package ($"差分对") and the role, parameter and local names of ordinary definitions (#M1(正输入), @附着(间距=3), %tc::"中点") are all written as Chinese aliases, and an alias of an enumerated value passes through a parameter into a definition's body (the direction of $"信号流向");
+*! one's own ordinary definitions use Chinese role names directly, unquoted; parameters by position come before those by name; the definition of an ATTACH is written before the keyword; after a full-width comma the `@` has a space before it (`， @`), and `=> 记作 %x` is still a name.
 .model nch nmos level=1
 .model pch pmos level=1
 M1 x inp tail vss nch w=4u l=0.5u

@@ -36,6 +36,11 @@
   !insertmacro UPDATEFILEASSOC
 !macroend
 
+; The public packages that the installer put beside the program, when it was told to, go with it.
+!macro NSIS_HOOK_PREUNINSTALL
+  RMDir /r "$INSTDIR\public-packages"
+!macroend
+
 ; Uninstalling leaves nothing behind. Tauri's uninstaller keeps the install location, under
 ; Software\<publisher>\<product>, unless "Delete the application data" is checked, which a silent
 ; uninstall cannot do; an update, which runs the uninstaller with /UPDATE, still keeps it for the

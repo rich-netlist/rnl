@@ -3,6 +3,7 @@ import { append, m, setText } from "./i18n.js";
 
 import { current, doc, selected, setSelected } from "./state.js";
 import { paintDrawingSelection } from "./drawing.js";
+import { kindName } from "./picker.js";
 import { goTo, opens } from "./subcircuits.js";
 import { paintSourceSelection } from "./text.js";
 import { $ } from "./util.js";
@@ -11,6 +12,7 @@ import { usageSelection } from "./usages.js";
 
 const canvas = $("canvas");
 const source = $("source");
+const touch = matchMedia("(pointer: coarse)");
 
 /**
  * Select an object. `from` is "drawing", "source", "reload", "ascend" or "list" (an object not
@@ -37,9 +39,11 @@ export function select(o, from, options) {
   const b = document.createElement("b");
   setText(b, obj.name);
   if (opens(o) !== null) {
-    append(sel, b, m` instance of ${doc.levels[obj.opens].title} in ${obj.level_title} · E or Enter opens it; Shift opens a new window`);
+    append(sel, b, touch.matches
+      ? m` instance of ${doc.levels[obj.opens].title} in ${obj.level_title} · a double tap opens it`
+      : m` instance of ${doc.levels[obj.opens].title} in ${obj.level_title} · E or Enter opens it; Shift opens a new window`);
   } else {
-    append(sel, b, m` ${m(obj.kind)} in ${obj.level_title}`);
+    append(sel, b, m` ${kindName(obj.kind)} in ${obj.level_title}`);
   }
 }
 

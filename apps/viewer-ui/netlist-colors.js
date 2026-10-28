@@ -1,21 +1,24 @@
-// One netlist palette, independent of the UI theme and the drawing's colours.
-import { append, m, setAttr, setText } from "./i18n.js";
+// One netlist palette, independent of the UI theme and the drawing's colours, and beside its
+// selection highlight the drawing's second one: the colour of a selected subcircuit instance, which
+// can be opened. The drawing lightens it on a dark background, as it does its first highlight.
+import { append, m, setAttr, setText, tr } from "./i18n.js";
 import { form, inform } from "./dialog.js";
 import { load, save } from "./util.js";
 
 export const COLOR_FIELDS = [
-  ["component", "Component objects (#)", "#2275E2"],
-  ["net", "Net objects (&)", "#A01008"],
-  ["rnl", "RNL region background", "#E1FEE9"],
-  ["keyword", "RNL keywords", "#000000"],
-  ["definition", "Definition objects ($)", "#2B7800"],
-  ["local", "Local objects (%)", "#4B21E4"],
-  ["string", "Strings", "#895D7C"],
-  ["parameter", "Parameters and roles", "#1D4781"],
-  ["free", "Free text", "#6B6B6B"],
-  ["text", "Other text", "#000000"],
-  ["background", "Netlist background", "#FFFFFF"],
-  ["highlight", "Selection highlight", "#E8590C"],
+  ["component", tr("Component objects (#)"), "#2275E2"],
+  ["net", tr("Net objects (&)"), "#A01008"],
+  ["rnl", tr("RNL region background"), "#E1FEE9"],
+  ["keyword", tr("RNL keywords"), "#000000"],
+  ["definition", tr("Definition objects ($)"), "#2B7800"],
+  ["local", tr("Local objects (%)"), "#4B21E4"],
+  ["string", tr("Strings"), "#895D7C"],
+  ["parameter", tr("Parameters and roles"), "#1D4781"],
+  ["free", tr("Free text"), "#6B6B6B"],
+  ["text", tr("Other text"), "#000000"],
+  ["background", tr("Netlist background"), "#FFFFFF"],
+  ["highlight", tr("Selection highlight"), "#E8590C"],
+  ["subcircuit", tr("Subcircuit selection highlight (drawing)"), "#C2255C"],
 ];
 export const DEFAULT_COLORS = Object.freeze(Object.fromEntries(COLOR_FIELDS.map(([key, , value]) => [key, value])));
 const KEY = "netlist-colors";
@@ -29,9 +32,30 @@ function normalized(value) {
 }
 function apply(value) {
   current = { ...value };
-  for (const [key, color] of Object.entries(current)) document.documentElement.style.setProperty(`--netlist-${key}`, color);
+  const root = document.documentElement.style;
+  for (const [key, color] of Object.entries(current)) root.setProperty(`--netlist-${key}`, color);
+  // The drawing's subcircuit colour and its fill; the stylesheet's own when the default is kept.
+  if (current.subcircuit === DEFAULT_COLORS.subcircuit) { root.removeProperty("--sub"); root.removeProperty("--sub-fill"); }
+  else {
+    root.setProperty("--sub", current.subcircuit);
+    root.setProperty("--sub-fill", `color-mix(in srgb, ${current.subcircuit} 6%, transparent)`);
+  }
+  window.dispatchEvent(new Event("highlight-colors"));
 }
 export function startNetlistColors() { apply(normalized(load(KEY, null))); }
+
+/** The colour scheme shown, by the names of COLOR_FIELDS. */
+export const currentColors = () => ({ ...current });
+
+/** The user's own colour scheme again, as the settings keep it (display.js). */
+export function showOwnColors() {
+  apply(normalized(load(KEY, null)));
+}
+
+/** Show `colors`, some of the scheme's by their names, over the scheme shown, not kept in the settings (display.js). */
+export function showColors(colors) {
+  apply(normalized({ ...current, ...colors }));
+}
 
 export async function netlistColors() {
   if (busy) return;

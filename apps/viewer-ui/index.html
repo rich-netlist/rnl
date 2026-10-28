@@ -26,6 +26,75 @@ body.starting > #app, body.starting > .menubar, body.starting > .statusbar { vis
 <link id="viewer-fonts" rel="preload" as="style" href="fonts/fonts.css">
 </head>
 <body class="starting">
+<script>
+// ?debug=keys: a corner of the page lists the last keys and focus changes, what each key reached
+// and why the page ran no command for it (window.rnlKeyNote, which the page's handlers call). The
+// listeners are on window in the capture phase, before anything of the page or an extension in it.
+if (new URLSearchParams(location.search).get("debug") === "keys") (function () {
+  var keys = [], focus = [];
+  var name = function (el) {
+    if (!el) return "none";
+    if (el === window) return "window";
+    if (el === document) return "document";
+    if (el.nodeType !== 1) return el.nodeName;
+    return el.tagName.toLowerCase() + (el.id ? "#" + el.id : "") + (el.classList.length ? "." + el.classList[0] : "") +
+      (el.getAttribute("role") ? "[" + el.getAttribute("role") + "]" : "");
+  };
+  var panel = document.createElement("pre");
+  panel.id = "key-debug";
+  panel.setAttribute("style", "position:fixed;right:8px;bottom:8px;z-index:2147483647;max-width:min(720px,calc(100vw - 16px));" +
+    "max-height:60vh;overflow:auto;margin:0;padding:8px 10px;font:11px/1.45 ui-monospace,Consolas,monospace;" +
+    "white-space:pre-wrap;color:#111;background:rgba(255,255,230,.96);border:1px solid #aa8;border-radius:6px;");
+  var show = function () {
+    var lines = ["keys (newest first) - focus now: " + name(document.activeElement) + ", page has focus: " + document.hasFocus() +
+      ", starting: " + document.body.classList.contains("starting")];
+    keys.forEach(function (k) {
+      lines.push(k.time + " key=" + JSON.stringify(k.key) + " code=" + k.code + (k.mods ? " " + k.mods : "") + (k.repeat ? " repeat" : "") +
+        "\n    target=" + k.target + " active=" + k.active + " focus=" + k.focus + " prevented=" + k.prevented +
+        "\n    " + (k.notes.length ? k.notes.join("; ") : "reached no handler of the page"));
+    });
+    lines.push("focus changes (newest first):");
+    focus.forEach(function (f) { lines.push("  " + f); });
+    panel.textContent = lines.join("\n");
+  };
+  var stamp = function () { return new Date().toISOString().slice(11, 23); };
+  window.rnlKeyNote = function (event, what) {
+    for (var i = 0; i < keys.length; i++) if (keys[i].event === event) { keys[i].notes.push(what); show(); return; }
+  };
+  window.addEventListener("keydown", function (e) {
+    var k = { event: e, time: stamp(), key: e.key, code: e.code, repeat: e.repeat, target: name(e.target),
+      active: name(document.activeElement), focus: document.hasFocus(), prevented: "?", notes: [],
+      mods: ["ctrlKey", "metaKey", "altKey", "shiftKey"].filter(function (m) { return e[m]; }).map(function (m) { return m.slice(0, -3); }).join("+") };
+    keys.unshift(k);
+    keys.length = Math.min(keys.length, 10);
+    setTimeout(function () { k.prevented = e.defaultPrevented; show(); });
+    show();
+  }, true);
+  ["focus", "blur"].forEach(function (type) {
+    window.addEventListener(type, function (e) {
+      focus.unshift(stamp() + " " + type + " " + name(e.target));
+      focus.length = Math.min(focus.length, 10);
+      show();
+    }, true);
+  });
+  document.body.append(panel);
+  show();
+})();
+</script>
+<script>
+// Panel number keys pressed before startup.js runs, which on a slow network can take seconds: it
+// adopts them (startup.js), and the last usable one runs once the viewer has started.
+window.rnlEarlyKeys = [];
+window.rnlEarlyKeyListener = function (event) {
+  if (event.defaultPrevented || event.isComposing || event.keyCode === 229 ||
+      event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || !/^[1-7]$/.test(event.key)) return;
+  if (!(event.target instanceof Element) || event.target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"]), dialog')) return;
+  window.rnlEarlyKeys.push(event.key);
+  event.preventDefault();
+  if (window.rnlKeyNote) window.rnlKeyNote(event, "kept before startup.js ran");
+};
+if (new URLSearchParams(location.search).get("embed") !== "1") document.addEventListener("keydown", window.rnlEarlyKeyListener);
+</script>
 <div id="startup" class="startup" role="status" aria-label="Loading RNL Viewer">
   <strong>RNL Viewer</strong>
   <small id="startup-version"></small>
@@ -44,7 +113,7 @@ body.starting > #app, body.starting > .menubar, body.starting > .statusbar { vis
         <button id="tab-hierarchy" type="button" role="tab" aria-controls="pane-hierarchy" aria-selected="false" aria-keyshortcuts="3"><span class="tab-key" aria-hidden="true">3</span>Hierarchy</button>
         <button id="tab-symbol" type="button" role="tab" aria-controls="pane-symbol" aria-selected="false" aria-keyshortcuts="4"><span class="tab-key" aria-hidden="true">4</span>Symbol</button>
         <button id="tab-usages" type="button" role="tab" aria-controls="pane-usages" aria-selected="false" aria-keyshortcuts="5"><span class="tab-key" aria-hidden="true">5</span>Usage</button>
-        <button id="tab-unplaced" type="button" role="tab" aria-controls="pane-unplaced" aria-selected="false" aria-keyshortcuts="6" title="The objects of the level shown that are not drawn: those with no position, and devices no symbol can be chosen for"><span class="tab-key" aria-hidden="true">6</span>Not drawn<span id="unplaced-tab-count" class="tab-count"></span></button>
+        <button id="tab-unplaced" type="button" role="tab" aria-controls="pane-unplaced" aria-selected="false" aria-keyshortcuts="6" title="Objects in the current level that are not drawn: unplaced objects and devices without a matching symbol"><span class="tab-key" aria-hidden="true">6</span>Not drawn<span id="unplaced-tab-count" class="tab-count"></span></button>
         <button id="tab-solve" type="button" role="tab" aria-controls="pane-solve" aria-selected="false" aria-keyshortcuts="7" hidden><span class="tab-key" aria-hidden="true">7</span>Solve</button>
       </nav>
       <button id="hide-sidebar" class="icon" type="button" title="Hide the side panel (Ctrl+B)" aria-label="Hide the side panel">&#x2039;</button>
@@ -54,8 +123,9 @@ body.starting > #app, body.starting > .menubar, body.starting > .statusbar { vis
       <div class="pool-actions">
         <button id="include-file" type="button">Include File…</button>
         <button id="include-folder" type="button">Include Folder…</button>
-        <button id="include-library" type="button" hidden>Include Public Package…</button>
-        <button id="add-path" type="button" hidden>Add PATH Directory…</button>
+        <button id="include-library" type="button" hidden>Include Public Package...</button>
+        <button id="add-path" type="button" hidden>Add PATH…</button>
+        <button id="add-path-subfolders" type="button" hidden>Add PATH with Sub-folders…</button>
       </div>
       <p class="pool-note">Files here are searched for packages and includes, in this order.</p>
       <div id="library-groups" class="library-groups"></div>
@@ -66,7 +136,8 @@ body.starting > #app, body.starting > .menubar, body.starting > .statusbar { vis
       <div class="netlist-head">
       <div id="file-bar" class="file-bar">
         <span id="netlist-file" class="netlist-file path-text" hidden></span>
-        <div class="netlist-options">
+        <button id="netlist-options-button" class="netlist-options-button" type="button" aria-expanded="false" aria-controls="netlist-options">Options</button>
+        <div id="netlist-options" class="netlist-options">
         <span id="edit-state" class="edit-state" role="status" hidden></span>
         <button id="apply-edits" class="apply-edits" type="button" hidden title="Apply the text and exit editing (Ctrl+Enter)">Apply and Exit Editing</button>
         <label class="auto-include-toggle" title="Automatically include uniquely defined missing subcircuits from the Library; report each automatic include in Problems">
@@ -161,7 +232,7 @@ body.starting > #app, body.starting > .menubar, body.starting > .statusbar { vis
       <button id="show-sidebar" class="icon" type="button" title="Show the side panel (Ctrl+B)" aria-label="Show the side panel">&#x203A;</button>
       <nav id="level-path" class="level-path" aria-label="Hierarchy path"><span id="level-name" class="level-name"></span></nav>
       <span id="level-kind" class="level-kind"></span>
-      <span id="preview-badge" class="preview-badge" hidden title="Solve › Close Preview shows the file as written; Solve › Save Solved Copy As saves the solve elsewhere">Solved preview: the files are unchanged</span>
+      <span id="preview-badge" class="preview-badge" hidden title="Solve › Close Preview returns to the original netlist; Solve › Save Solved Copy As saves the solved netlist to a new location">Solved preview: the files are unchanged</span>
       <button id="preview-close" class="preview-close" type="button" hidden>Close Preview</button>
       <button id="up" class="up-button" type="button" hidden title="Up to the parent level (Ctrl+E or Backspace)">
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3 2.5 6.5 6 10M2.5 6.5H10a3.5 3.5 0 0 1 3.5 3.5V13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -169,9 +240,10 @@ body.starting > #app, body.starting > .menubar, body.starting > .statusbar { vis
       </button>
       <div id="path-menu" class="path-menu" role="menu" aria-label="The levels in between" hidden></div>
     </div>
+    <div id="manifest-bar" class="manifest-bar" role="note" aria-label="Where these files come from" hidden></div>
     <div id="canvas" class="canvas" tabindex="-1">
       <canvas id="grid" class="grid" aria-hidden="true"></canvas>
-      <p id="empty" class="empty">Open a SPICE or Spectre netlist with File &#x203A; Open (Ctrl+O).<br>Drag to move the view, scroll to zoom, click a symbol or a wire to find it in the netlist.</p>
+      <p id="empty" class="empty">Open a SPICE or Spectre netlist with File &#x203A; Open File (Ctrl+O).<br>Drag to move the view, scroll to zoom, click a symbol or a wire to find it in the netlist.</p>
       <button id="enter-badge" class="enter-badge" type="button" hidden title="Open the subcircuit (E, Enter, or double-click; Shift opens a new window)" aria-label="Open the subcircuit">
         <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 5.5 10 10M10 6.5V10H6.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
@@ -184,9 +256,15 @@ body.starting > #app, body.starting > .menubar, body.starting > .statusbar { vis
   <span id="note" class="note" role="status" hidden></span>
   <span id="status" class="status"></span>
   <span id="solve-status" class="solve-status" hidden><span id="solve-step"></span><button id="solve-cancel" class="solve-cancel" type="button" hidden>Cancel</button></span>
-  <span id="pointer" class="pointer" title="Where the pointer is on the drawing, in units with y up"></span>
+  <span id="pointer" class="pointer" title="Pointer coordinates in drawing units (+y is up)"></span>
   <span id="zoom" class="zoom"></span>
+  <button id="show-in-netlist" class="page-link" type="button" disabled>View in Netlist</button>
+  <button id="show-in-drawing" class="page-link" type="button" disabled>View in Drawing</button>
 </footer>
+<nav id="page-switch" class="page-switch" role="tablist" aria-label="Pages">
+  <button id="page-drawing" type="button" role="tab" aria-selected="true">Schematic</button>
+  <button id="page-panel" type="button" role="tab" aria-selected="false">Panel</button>
+</nav>
 <div id="hover-tip" class="hover-tip" role="tooltip" hidden></div>
 <div id="pick-list" class="pick-list" role="listbox" tabindex="-1" aria-label="Objects at this point" hidden></div>
 <script type="module" src="startup.js"></script>

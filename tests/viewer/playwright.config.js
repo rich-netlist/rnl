@@ -9,6 +9,11 @@
 // would only add load. It depends on the three others, so it runs after them and alone, and does not
 // slow down their tests on a busy machine. `--project long --no-deps` runs it on its own.
 //
+// The mobile tests, specs/mobile*.spec.js, run in projects of their own, on a phone: mobile-chromium
+// as a Pixel 7 in Chromium, whose touch goes through the DevTools protocol, and mobile-webkit as an
+// iPhone 15 in WebKit; a test may hold the phone lying down, or be a tablet. The three browsers'
+// projects leave them out, and they leave out the rest.
+//
 // The web viewer's smoke tests (specs/web.spec.js) need its site: Playwright builds it with the
 // samples and serves it before the tests, on the port RNL_WEB_PORT names or a free one, and the
 // tests find it at RNL_WEB_URL. A command line that names spec files, none of them web.spec.js,
@@ -29,6 +34,8 @@ const channel = process.env.RNL_CHANNEL || undefined;
 const viewport = { width: 1200, height: 800 };
 // the file of the long netlist's test, which runs in a project of its own
 const LONG = /long\.spec\.js$/;
+// the files of the mobile tests, which run in projects of their own
+const MOBILE = /mobile[^/\\]*\.spec\.js$/;
 
 /** A port on 127.0.0.1 that nothing listens on. */
 function freePort() {
@@ -77,9 +84,11 @@ export default defineConfig({
       }
     : undefined,
   projects: [
-    { name: "chromium", use: { ...devices["Desktop Chrome"], channel, viewport }, testIgnore: LONG },
-    { name: "firefox", use: { ...devices["Desktop Firefox"], viewport }, testIgnore: [LONG, /embed\.spec\.js$/] },
-    { name: "webkit", use: { ...devices["Desktop Safari"], viewport }, testIgnore: LONG },
+    { name: "chromium", use: { ...devices["Desktop Chrome"], channel, viewport }, testIgnore: [LONG, MOBILE] },
+    { name: "firefox", use: { ...devices["Desktop Firefox"], viewport }, testIgnore: [LONG, MOBILE, /embed\.spec\.js$/] },
+    { name: "webkit", use: { ...devices["Desktop Safari"], viewport }, testIgnore: [LONG, MOBILE] },
+    { name: "mobile-chromium", use: { ...devices["Pixel 7"], channel }, testMatch: MOBILE },
+    { name: "mobile-webkit", use: { ...devices["iPhone 15"] }, testMatch: MOBILE },
     {
       name: "long",
       use: { ...devices["Desktop Chrome"], channel, viewport },

@@ -3,6 +3,11 @@
   "bundle": {
     "targets": ["appimage", "deb"],
     "category": "DeveloperTool",
-    "shortDescription": "Open, draw and solve Rich Netlist circuits"
+    "shortDescription": "Open, draw and solve Rich Netlist circuits",
+    "linux": {
+      "deb": {
+        "recommends": ["fonts-noto-cjk"]
+      }
+    }
   }
 }

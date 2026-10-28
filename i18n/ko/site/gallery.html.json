@@ -1,0 +1,21 @@
+{
+  "RNL gallery · Rich Netlist": "RNL 갤러리 · Rich Netlist",
+  "Circuit examples drawn with RNL: open any entry in the web viewer. The gallery is maintained on GitHub, and new entries appear within minutes of being merged.": "RNL로 그린 회로도 예제 모음입니다. 원하는 항목을 웹 뷰어에서 바로 열어볼 수 있습니다. 갤러리는 GitHub에서 관리되며 새로운 항목이 병합되면 몇 분 안에 반영됩니다.",
+  "Skip to content": "본문으로 건너뛰기",
+  "On this page": "이 페이지 목차",
+  "Switch color theme": "색상 테마 전환",
+  "Gallery": "갤러리",
+  "Some RNL examples, published under their own licenses.": "각자의 라이선스에 따라 공개된 RNL 예제 모음입니다.",
+  "How to contribute": "기여 방법",
+  "Gallery navigation": "갤러리 탐색",
+  "Search the gallery": "갤러리 검색",
+  "Search titles, descriptions and authors": "제목, 설명, 작성자 검색",
+  "Filter by tag": "태그로 필터링",
+  "Loading…": "불러오는 중…",
+  "This page needs JavaScript to show the gallery. The list is in the <a href=\"https://github.com/rich-netlist/rnl-gallery/tree/main/entries\">rnl-gallery repository on GitHub</a>.": "갤러리를 표시하려면 JavaScript가 필요합니다. 목록은 <a href=\"https://github.com/rich-netlist/rnl-gallery/tree/main/entries\">GitHub의 rnl-gallery 저장소</a>에서 확인할 수 있습니다.",
+  "This page reads the index and the thumbnails from <a href=\"https://rich-netlist.github.io/rnl-gallery/\">rnl-gallery’s GitHub Pages</a>. Each design is under the license of its own repository.": "이 페이지는 <a href=\"https://rich-netlist.github.io/rnl-gallery/\">rnl-gallery의 GitHub Pages</a>에서 인덱스와 썸네일을 읽어옵니다. 각 설계는 해당 저장소의 라이선스를 따릅니다.",
+  "See also": "함께 보기",
+  "Web viewer": "웹 뷰어",
+  "Packages": "패키지",
+  "The rnl-gallery repository": "rnl-gallery 저장소"
+}

@@ -46,6 +46,7 @@ use unit::{Header, Place, Unit, UnitKind};
 pub enum Memo {
     Val(ObjId),
     LocalRef,
+    OwnLevel,
 }
 
 /// The members of a unit that are rules, in order, with the unit's numbers of members and rules
@@ -411,10 +412,7 @@ impl<'p> Interp<'p> {
     pub fn new_package(path: &str, provider: &'p dyn Provider, options: &Options) -> Interp<'p> {
         let name = crate::host::file_name(path).to_string();
         let main = Level::new(LevelKind::File, &name, &name, path);
-        let doc = HostDocument::new(
-            main,
-            crate::host::Dialect { name: "none".into(), case_sensitive: false, ground_aliases: Vec::new() },
-        );
+        let doc = HostDocument::new(main, crate::host::format::Format::dialect(&crate::host::package::Package));
         let mut it = Interp::blank(doc, provider, options, Sink::new(), NumberRun::default());
         let mut u = Unit::new(UnitKind::Level, &name);
         u.level = Some(0);
@@ -567,9 +565,11 @@ impl<'p> Interp<'p> {
             let r =
                 self.eval_member_at(w.u, w.m.rec, w.m.k, w.m.embedded, &w.m.m, Some(s), w.m.header.clone(), None, "");
             // a selection whose scope is this level's host objects is just empty below (10.3);
-            // the 10.5 warning is for the other roles of a generating AS or ATTACH
+            // the 10.5 warning is for the other roles of a generating AS or ATTACH, not for any
+            // other rule, which is a statement for the objects it selects (10.4)
             if matches!(r, Err(Stop::LocalRef))
                 && self.units[w.u].level != Some(lv)
+                && self.generation_rule(&w.m.m, w.u)
                 && !self.scoped_selection(&w.m.m, w.u)
             {
                 let at = w.m.m.segments.first().map(|sg| sg.start).unwrap_or(w.m.m.start);
@@ -632,6 +632,14 @@ impl<'p> Interp<'p> {
         ms
     }
 
+    /// Whether a rule is a generation rule: one that applies a definition with AS or ATTACH (10.4).
+    fn generation_rule(&self, m: &crate::syntax::Member, u: UnitId) -> bool {
+        m.segments
+            .iter()
+            .filter_map(|sg| sg.call.as_ref())
+            .any(|c| matches!(self.kw(&c.kw, u).as_str(), "AS" | "ATTACH"))
+    }
+
     fn scoped_selection(&self, m: &crate::syntax::Member, u: UnitId) -> bool {
         let Some(seg) = m.segments.first() else { return false };
         let Some(call) = &seg.call else { return false };
@@ -649,17 +657,16 @@ impl<'p> Interp<'p> {
             if self.units[u].scope_records.is_empty() {
                 continue;
             }
-            let below: HashSet<String> = self
+            let below: Vec<usize> = self
                 .doc
                 .descendants(lv)
-                .iter()
-                .map(|d| &self.doc.levels[*d])
-                .filter(|l| l.kind == LevelKind::Subckt)
-                .map(|l| self.doc.key(&l.name))
+                .into_iter()
+                .filter(|d| self.doc.levels[*d].kind == LevelKind::Subckt)
                 .collect();
             for (rec, _ast, header) in self.units[u].scope_records.clone() {
                 let target = header.scope.clone().unwrap_or_default();
-                if !below.contains(&self.doc.key(&target)) {
+                // each subcircuit by the rules of the file it is written in
+                if !below.iter().any(|&d| self.doc.names_level(d, &target)) {
                     let loc = self.rec_loc(Some(rec), 0);
                     self.sink.error(format!("scope=\"{target}\" finds no subcircuit below this level: the statements of the record fail (2.6)"), loc);
                     let n = self.recs[rec].text.chars().count();

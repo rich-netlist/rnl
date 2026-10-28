@@ -403,9 +403,11 @@ impl Interp<'_> {
         let file = self.doc.file_level(level);
         let lv = &self.doc.levels[file];
         let text = self.doc.source(&lv.file).unwrap_or("");
+        // each file by the dialect of its own format, also when a file of another includes it
+        let dialect = &self.doc.rules(&lv.file).name;
         match lv.section_lines {
-            Some(lines) => section_dialect(&self.doc.dialect.name, text, lines),
-            None => file_dialect(&self.doc.dialect.name, &lv.path, text, file == 0),
+            Some(lines) => section_dialect(dialect, text, lines),
+            None => file_dialect(dialect, &lv.path, text, file == 0),
         }
     }
 

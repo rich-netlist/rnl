@@ -12,7 +12,6 @@ use serde_json::json;
 
 use rnl_cli::preview::{one_file, preview, save_copy_with_encoding, Copy, Report, StoppableClock};
 use rnl_cli::solve::{Progress, SolveOptions};
-use rnl_cli::FsProvider;
 use rnl_solver::{SolverOptions, OBJECTIVES};
 use rnl_view::Document;
 use serde::{Deserialize, Serialize};
@@ -129,12 +128,17 @@ pub async fn solve_preview(
     text: Option<String>,
     settings: Option<Settings>,
     edits: Option<Edits>,
+    formats: Option<crate::formats::Formats>,
 ) -> Result<Solved, String> {
     let paths = preferences.paths()?;
     let library = library.snapshot()?;
     let pool = pool.unwrap_or_default();
     let in_memory = path.is_none();
-    let options = SolveOptions { solver: settings.unwrap_or_default().solver()?, ..SolveOptions::default() };
+    let options = SolveOptions {
+        solver: settings.unwrap_or_default().solver()?,
+        formats: formats.unwrap_or_default(),
+        ..SolveOptions::default()
+    };
     let stop = Arc::new(AtomicBool::new(false));
     if let Some(before) = solves.running.lock().map_err(|e| e.to_string())?.replace(stop.clone()) {
         before.store(true, Ordering::Relaxed);
@@ -148,7 +152,7 @@ pub async fn solve_preview(
             !running.load(Ordering::Relaxed)
         };
         let clock = StoppableClock::new(running.clone());
-        let disk = FsProvider::new(&paths).with_search_paths(&paths);
+        let disk = crate::public_packages::provider(&paths);
         let disk = rnl_runtime::source::FilePool { files: &disk, paths: &pool };
         match (path, name, text) {
             (Some(path), _, _) => {
@@ -227,10 +231,11 @@ pub async fn save_solved_copy(
         None => dialog,
     };
     let one = one_file(&run);
-    let title = crate::menu::text(
-        window.app_handle(),
-        if one { "Save Solved Copy As" } else { "Save the Solved Files Into a Folder" },
-    );
+    let title = if one {
+        crate::menu::text(window.app_handle(), "Save Solved Copy As")
+    } else {
+        crate::menu::text(window.app_handle(), "Save the Solved Files Into a Folder")
+    };
     let dialog = dialog.set_title(title);
     let chosen = tauri::async_runtime::spawn_blocking(move || {
         if one {
@@ -267,7 +272,10 @@ fn said(w: &rnl_cli::solve::Writing, to: &Path) -> String {
     } else {
         let mut s = format!("Saved {} into {}", n(w.written.len(), "solved file", "solved files"), to.display());
         if !w.copied.is_empty() {
-            s.push_str(&format!(", with {} read beside them", n(w.copied.len(), "other file", "other files")));
+            s.push_str(&format!(
+                ", along with {} copied alongside them",
+                n(w.copied.len(), "other file", "other files")
+            ));
         }
         s.push('.');
         s

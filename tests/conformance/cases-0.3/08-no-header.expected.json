@@ -767,12 +767,6 @@
       "severity": "hint",
       "file": "08-no-header.sp",
       "line": 2,
-      "col": 4
-    },
-    {
-      "severity": "hint",
-      "file": "08-no-header.sp",
-      "line": 2,
       "col": 0
     },
     {

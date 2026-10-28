@@ -4,6 +4,7 @@
 
 pub mod codec;
 pub mod dump;
+pub mod explain;
 pub mod preview;
 pub mod problem;
 pub mod profile;
@@ -14,6 +15,7 @@ pub mod solve;
 pub const CORE_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const BUILD_COMMIT: &str = env!("RNL_BUILD_COMMIT");
 
+use std::collections::BTreeMap;
 use std::path::Path;
 
 use rnl_runtime::diag::Sink;
@@ -44,4 +46,15 @@ pub fn interpret_file(
     options: &Options,
 ) -> Result<Interpretation, String> {
     rnl_view::interpret(&file.to_string_lossy(), dialect, provider, options)
+}
+
+/// [`interpret_file`], with the formats set for files by path (`rnl_view::BuildOptions::formats`).
+pub fn interpret_file_with(
+    file: &Path,
+    dialect: Option<&str>,
+    formats: &BTreeMap<String, String>,
+    provider: &dyn Provider,
+    options: &Options,
+) -> Result<Interpretation, String> {
+    rnl_view::interpret_with(&file.to_string_lossy(), dialect, formats, provider, options)
 }

@@ -10,19 +10,21 @@ import { startUsages } from "./usages.js";
 import { startNetlistColors } from "./netlist-colors.js";
 import { setBackground } from "./background.js";
 import { command, isChecked, runStartupShortcuts, setCheck, startCommands } from "./commands.js";
-import { closeRequested } from "./editor.js";
+import { closeRequested, note } from "./editor.js";
 import { dirtyPaths, unappliedPaths } from "./edits.js";
 import { gridState, setGrid } from "./grid.js";
 import { setHoverNames } from "./hover.js";
 import { showMenuBar } from "./menubar.js";
 import { openSource } from "./open.js";
+import { showManifestLevel } from "./manifest-bar.js";
+import { offerDisplay } from "./display.js";
 import { restoreSession } from "./navigation.js";
 import {
-  setIndexHeight, setPane, setProblems, setProblemsHeight, setShowFailed, setSidebar, setSidebarWidth,
+  setIndexHeight, setPane, setProblems, setProblemsHeight, setShowFailed, setSidebar, setSidebarWidth, phone, lowPhone,
 } from "./panels.js";
 import { loadShell } from "./shell.js";
 import { startSolvePanel } from "./solve.js";
-import { finishStartup, stylesReady } from "./startup.js";
+import { finishStartup, revealViewer, stylesReady } from "./startup.js";
 import { current, doc, path, selected } from "./state.js";
 import { renderUnplaced } from "./unplaced.js";
 import { setSemanticsOnly, setRnlOnly } from "./text.js";
@@ -34,7 +36,8 @@ async function start() {
   const shell = await loadShell();
   await startSettings(shell);
   startNetlistColors();
-  await startI18n(shell, load("language", null), value => save("language", value));
+  const unavailable = await startI18n(shell, load("language", null), value => save("language", value));
+  if (unavailable) note(unavailable, 12000); // a language left out, as its catalog could not be read; in English
   if (shell.embed) {
     const { startEmbed } = await import("./embed.js");
     await startEmbed();
@@ -44,8 +47,9 @@ async function start() {
   startUsages();
   setSidebarWidth(load("sidebar-width", 420));
   setProblemsHeight(load("problems-height", 180));
-  setSidebar(load("sidebar-shown", true));
-  setProblems(load("problems-shown", true));
+  // a phone starts on the drawing's page; the side panel's is a tap away
+  setSidebar(phone.matches ? false : load("sidebar-shown", true));
+  setProblems(lowPhone.matches ? false : load("problems-shown", true), !lowPhone.matches);
   startSolvePanel();
   setPane(load("side-pane", "netlist"));
   setShowFailed(load("show-failed", true));
@@ -72,6 +76,7 @@ async function start() {
   renderUnplaced();
 
   await startCommands();
+  // the Library's files, without waiting for the core to index them (each build waits for that)
   await startPool();
   startPreload();
   if (!shell.nativeMenu) showMenuBar(true);
@@ -82,9 +87,24 @@ async function start() {
     await startFullViewerApi();
     return;
   }
+  // The panels, the menus, their keys and the ways to open a file work from here. The core
+  // (WebAssembly on the web, slow where a browser runs it without JIT) and the first document
+  // follow, the document with its own loading stages, so a panel key never waits for them.
+  void revealViewer(runStartupShortcuts);
   const session = await shell.initialSession?.();
   if (session) await restoreSession(session);
-  else await openSource(await shell.initial(), false);
+  else {
+    const initial = await shell.initial();
+    await openSource(initial, false);
+    // files opened by a manifest open on the level it, or the address, names
+    if (initial?.external) {
+      await showManifestLevel(initial);
+      // and the display settings it proposes, which the user chooses to apply or not
+      const external = initial.external;
+      await offerDisplay(external.display, initial.manifest || external.id, external.displayIgnored,
+        (path) => path in external.files || external.pool.includes(path));
+    }
+  }
 }
 
 // a shell may reject with a plain message, as Tauri's invoke does

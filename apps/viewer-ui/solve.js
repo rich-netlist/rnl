@@ -1,4 +1,4 @@
-import { append, m, setAttr, setText } from "./i18n.js";
+import { append, m, setAttr, setText, tr } from "./i18n.js";
 // The Solve menu of the desktop viewer (decision 0010): the netlist shown solved as `rnl solve`
 // solves it, without its records of the solver, by the shell on a thread of its own, with its
 // progress and a Cancel button in the status bar; the result drawn as a preview over the file,
@@ -54,7 +54,7 @@ export async function solve() {
   if (!shell || !shell.solve || running || modal() || isLoading()) return;
   const source = shown ? shown.source : currentSource();
   if (!source || !doc) {
-    await inform({ title: m("Solve"), paragraphs: [m("Open a netlist first: File › Open (Ctrl+O).")] });
+    await inform({ title: m("Solve"), paragraphs: [m("Open a netlist first: File › Open File (Ctrl+O).")] });
     return;
   }
   hookProgress();
@@ -71,10 +71,13 @@ export async function solve() {
     const r = solved.report;
     const discarded = r.levels.reduce((n, l) => n + l.facts.filter((f) => f.status !== "kept").length, 0);
     const later = unappliedPaths().length > 0 ? m(" Changes not applied yet are not in it.") : "";
-    status(m`Solved: ${r.levels.length} ${r.levels.length === 1 ? "level" : "levels"}, ${discarded} ${discarded === 1 ? "fact" : "facts"} not kept. A preview: the files are unchanged.${later}`, false);
+    // counts as whole phrases, which a language words as it counts (apps/viewer-ui/README.md)
+    const levels = r.levels.length === 1 ? m("1 level") : m`${r.levels.length} levels`;
+    const facts = discarded === 1 ? m("1 fact not kept") : m`${discarded} facts not kept`;
+    status(m`Solved: ${levels}, ${facts}. A preview: the files are unchanged.${later}`, false);
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    if (message === CANCELLED) status(m("The solve was cancelled; the netlist is shown as it was."), false);
+    if (message === CANCELLED) status(m("The solve was canceled; the netlist is shown as it was."), false);
     else {
       status("", false);
       await inform({ title: m("Solve"), paragraphs: [m`The netlist could not be solved: ${message}`] });
@@ -113,7 +116,7 @@ export async function saveSolved(encoding = "preserve") {
   if (!shell || !shell.saveSolved || modal()) return;
   const title = m("Save Solved Copy");
   if (!shown) {
-    await inform({ title, paragraphs: [m("Solve the netlist first: Solve › Solve (F9) shows the solve, and this saves it.")] });
+    await inform({ title, paragraphs: [m("Run Solve › Solve (F9) first to generate a solved netlist before saving.")] });
     return;
   }
   try {
@@ -130,7 +133,7 @@ function hookProgress() {
   progressHooked = true;
   shell.onSolveProgress((step) => {
     if (!running) return;
-    const again = step.again ? m(", again, as raised to 0.3") : "";
+    const again = step.again ? m(", again after the upgrade to RNL 0.3") : "";
     status(m`Solving ${step.title} (${step.level + 1} of ${step.levels}${again})…`, true);
   });
 }
@@ -186,8 +189,11 @@ function group(parent, heading, items, open = true) {
 }
 
 const STATUS_ORDER = ["failed", "discarded", "undecided", "kept"];
+// what became of a fact (8.5), as a line and a count name it
+const STATUS_WORDS = { failed: tr("failed"), discarded: tr("discarded"), undecided: tr("undecided"), kept: tr("kept") };
+const STATUS_COUNTS = { failed: tr("{0} failed"), discarded: tr("{0} discarded"), undecided: tr("{0} undecided") };
 const STATUS_HEADINGS = {
-  failed: m("Failed: they contradict themselves (8.5, 7.6)"),
+  failed: m("Failed: contradictory facts (8.5, 7.6)"),
   discarded: m("Discarded in the order of 8.5"),
   undecided: m("Undecided within the time limit (8.5)"),
   kept: m("Kept"),
@@ -215,17 +221,17 @@ function renderReport(report) {
     for (const status of STATUS_ORDER) {
       const facts = level.facts.filter((f) => f.status === status);
       const items = facts.map((f) => {
-        const parts = [span("st", m(status)), span("msg", f.text)];
+        const parts = [span("st", m(STATUS_WORDS[status])), span("msg", f.text)];
         if (f.why) parts.push(span("more", f.why));
         return line(`solve-line fact ${status}`, parts, f.at);
       });
       group(section, STATUS_HEADINGS[status], items, status !== "kept");
     }
-    group(section, m("Statements whose facts took part in discarding (8.5)"), level.statements.map((s) => line("solve-line", [span("msg", s.text)], s.at)));
+    group(section, m("Statements involved in discarding low-priority facts (8.5)"), level.statements.map((s) => line("solve-line", [span("msg", s.text)], s.at)));
     group(section, m("Errors"), level.errors.map((e) => plain(e, "solve-line error")));
     group(section, m("Warnings"), level.warnings.map((w) => plain(w, "solve-line warning")));
-    group(section, m("What the record cannot hold"), level.unsolved.map((u) => plain(u)));
-    group(section, m("ROUTEs left in parts"), level.unrouted.map((u) => plain(u)));
+    group(section, m("Items not representable in the @RNL record"), level.unsolved.map((u) => plain(u)));
+    group(section, m("Partially routed nets (split ROUTEs)"), level.unrouted.map((u) => plain(u)));
     group(section, m("Notes"), level.notes.map((n) => plain(n)), false);
     append(box, section);
   }
@@ -234,7 +240,7 @@ function renderReport(report) {
   const n = (s) => report.levels.reduce((k, l) => k + l.facts.filter((f) => f.status === s).length, 0);
   for (const [s, cls] of [["failed", "n-error"], ["discarded", "n-warning"], ["undecided", "n-warning"]]) {
     const k = n(s);
-    if (k) append(counts, span(cls, m`${k} ${m(s)}`));
+    if (k) append(counts, span(cls, m(STATUS_COUNTS[s], k)));
   }
   if (counts.childElementCount === 0) append(counts, span("none", m("every fact kept")));
 }

@@ -1,0 +1,14 @@
+{
+  "Glossary · Rich Netlist": "Glossar · Rich Netlist",
+  "How each language renders the English terms of RNL, which are the normative ones.": "Wie jede Sprache die englischen Begriffe von RNL wiedergibt, die allein normativ sind.",
+  "Skip to content": "Zum Inhalt springen",
+  "Switch color theme": "Farbschema wechseln",
+  "Glossary": "Glossar",
+  "The English terms of RNL are the only normative ones; every language keeps its own way of rendering them.": "Die englischen Begriffe von RNL sind die einzig normativen; jede Sprache pflegt ihre eigene Art, sie wiederzugeben.",
+  "A glossary is not part of the standard: it is a convention for translating RNL and for talking about it, kept in <a href=\"https://github.com/rich-netlist/rnl/tree/main/i18n\">i18n/&lt;lang&gt;/glossary.json</a>. Where a translation is unclear, the English term decides. To change a rendering, open a pull request.": "Ein Glossar ist nicht Teil des Standards: Es ist eine Konvention für die Übersetzung von RNL und das Gespräch darüber, gepflegt in <a href=\"https://github.com/rich-netlist/rnl/tree/main/i18n\">i18n/&lt;lang&gt;/glossary.json</a>. Wo eine Übersetzung unklar ist, gibt der englische Begriff den Ausschlag. Um eine Wiedergabe zu ändern, eröffnen Sie einen Pull Request.",
+  "Terms": "Begriffe",
+  "RNL’s terms, such as record, usage and fill-in, are defined by the English standard; a language’s glossary only says how it writes them.": "Die Begriffe von RNL – wie Eintrag, Anwendung und Ergänzung – werden durch den englischen Standard definiert; das Glossar einer Sprache gibt lediglich an, wie sie dort benannt werden.",
+  "See also": "Siehe auch",
+  "Decision 0016: English terms are normative": "Entscheidung 0016: Englische Begriffe sind normativ",
+  "The standard": "Der Standard"
+}

@@ -25,7 +25,7 @@ You keep the copyright in your contribution. By submitting it, you license it un
 | Path | Your contribution is licensed under |
 | --- | --- |
 | `spec/`, `docs/` | CC-BY-4.0 |
-| `libraries/`, `tests/`, `examples/` | CC0-1.0, which waives your rights as far as the law allows |
+| `libraries/`, `tests/` | CC0-1.0, which waives your rights as far as the law allows |
 | Everything else, including code | MIT |
 
 By submitting a contribution you also confirm that you have the right to license it this way. No separate sign-off or contributor agreement is required.
@@ -38,10 +38,12 @@ When you add files or change licensing, run [`reuse lint`](https://reuse.softwar
 
 When you change the Rust crates, `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` and `cargo test --workspace` must pass. When a change is meant to alter the results of the [conformance corpus](tests/conformance/README.md), write its expected files again with `RNL_BLESS=1`, or `RNL_BLESS_0_3=1` for the cases of 0.3, and review the difference.
 
-When you change the pages of the site, edit `site/src/` and provide an English source with optional translations, as described in [`site/README.md`](site/README.md). Missing translations fall back to English; `python site/build.py --check` must pass. Locale identities, shared interface messages and fonts live in `site/languages.json`.
+When you change the pages of the site, edit the English in `site/src/`; translations are in `i18n/<lang>/site/`, as described in [`site/README.md`](site/README.md). Missing translations fall back to English; `python site/build.py --check` must pass. Locale identities, fonts and the English of the shared interface messages live in `i18n/languages.json`.
 
-Every Viewer, standard or core release needs an English `timeline-summary`, with translations when available, in its release
-notes before tagging; see the [summary template and checklist](release-notes/README.md).
+English is the project's only core language ([decision 0015](docs/decisions/0015-english-is-the-only-core-language.md)): new content of any kind may be published in English alone, and every other language is a translation that follows it. A change to English text need not change any translation. `python scripts/i18n/status.py` shows how far each language is and which translations fell behind, and [`i18n/README.md`](i18n/README.md) describes where translations go and how they are checked.
+
+Every Viewer, standard or core release needs a `timeline-summary` in English in its release notes before tagging; its
+translations follow in `i18n/<lang>/site/timeline.json.json`; see the [summary template and checklist](release-notes/README.md).
 The homepage is generated from tags plus `site/src/timeline.json`; add non-release milestones
 there with the actual merge time and source link. Manual entries can override or combine tags.
 

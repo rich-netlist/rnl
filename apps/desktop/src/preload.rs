@@ -5,7 +5,6 @@ use std::io::Read;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 
-use rnl_cli::FsProvider;
 use rnl_runtime::source::{FilePool, LibraryLookup, Provider};
 use tauri::State;
 
@@ -87,6 +86,9 @@ impl Provider for Limited<'_> {
         self.remaining.set(self.remaining.get() - text.len());
         Some(text)
     }
+    fn path_key(&self, path: &str) -> String {
+        self.files.path_key(path)
+    }
     fn package_files(&self) -> Vec<String> {
         self.files.package_files()
     }
@@ -112,6 +114,8 @@ fn read_bounded(reader: impl Read, limit: usize) -> std::io::Result<Option<Strin
 }
 
 #[tauri::command]
+// Tauri injects the managed state alongside the separate IPC arguments.
+#[allow(clippy::too_many_arguments)]
 pub async fn preload_document(
     core: State<'_, Core>,
     settings: State<'_, Settings>,
@@ -120,6 +124,7 @@ pub async fn preload_document(
     pool: Vec<String>,
     auto_include: bool,
     ticket: u64,
+    formats: Option<crate::formats::Formats>,
 ) -> Result<String, String> {
     if !settings.preload_enabled()? {
         return Ok("disabled".into());
@@ -132,14 +137,16 @@ pub async fn preload_document(
     let paths = settings.paths()?;
     let limit = settings.cache_limit()?;
     let library = library.snapshot()?;
+    let formats = formats.unwrap_or_default();
     tauri::async_runtime::spawn_blocking(move || {
         if !enough_memory() {
             return Ok("paused".into());
         }
         let entry = std::path::absolute(&path).map_err(|e| e.to_string())?.to_string_lossy().into_owned();
-        let key = entry.clone();
+        let (key, chosen) = (entry.clone(), formats.clone());
         // A speculative snapshot must never restore an older global cache budget.
-        let (cached, room) = core.run(move |cache| (cache.contains(&key, auto_include), cache.room().min(limit)))?;
+        let (cached, room) =
+            core.run(move |cache| (cache.contains(&key, auto_include, &chosen), cache.room().min(limit)))?;
         if !running.control.current(running.generation) {
             return Ok("cancelled".into());
         }
@@ -150,7 +157,7 @@ pub async fn preload_document(
             return Ok("full".into());
         }
         let priority = BackgroundPriority::new();
-        let disk = FsProvider::new(&paths).with_search_paths(&paths);
+        let disk = crate::public_packages::provider(&paths);
         let disk = FilePool { files: &disk, paths: &pool };
         let held = rnl_view::MemoryProvider::new();
         let files = crate::files::layered(&held, &disk);
@@ -161,7 +168,7 @@ pub async fn preload_document(
             remaining: Cell::new((room / 8).min(8 * 1024 * 1024)),
             exceeded: Cell::new(false),
         };
-        let prepared = Prepared::build(&entry, &limited);
+        let prepared = Prepared::build(&entry, &limited, &formats);
         let exceeded = limited.exceeded.get();
         drop(priority); // Restore the async runtime's pool thread before it accepts another job.
         if !running.control.current(running.generation) {

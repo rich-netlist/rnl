@@ -82,7 +82,77 @@
           {
             "id": "&0",
             "global": true,
-            "port": false
+            "port": false,
+            "usages": [
+              {
+                "id": "@rnl-std-basic.rnl:458:9#1",
+                "definition": "$GROUND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 458,
+                "source": "body",
+                "made_in": "@rnl-std-fill.rnl:28:3#1",
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-basic.rnl:458:9#2",
+                "definition": "$GROUND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 458,
+                "source": "body",
+                "made_in": "@rnl-std-fill.rnl:28:3#2",
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-basic.rnl:458:9#3",
+                "definition": "$GROUND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 458,
+                "source": "body",
+                "made_in": "@rnl-std-fill.rnl:28:3#3",
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-basic.rnl:458:9#4",
+                "definition": "$GROUND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 458,
+                "source": "body",
+                "made_in": "@rnl-std-fill.rnl:28:3#4",
+                "state": "in-effect"
+              }
+            ]
           },
           {
             "id": "&d2",
@@ -191,6 +261,72 @@
                   "&0"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "@12-self-contradicting-distance.sp:13:5",
+                "definition": "$DP_LAYOUT",
+                "roles": [
+                  {
+                    "role": "in_p",
+                    "set": false,
+                    "member": "#M1",
+                    "terminal": null
+                  },
+                  {
+                    "role": "in_n",
+                    "set": false,
+                    "member": "#M1",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 13,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-fill.rnl:28:3#1",
+                "definition": "$GROUND_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#M1:3",
+                    "terminal": "s"
+                  }
+                ],
+                "file": null,
+                "line": 28,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 28
+                },
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-fill.rnl:28:3#2",
+                "definition": "$GROUND_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#M1:4",
+                    "terminal": "b"
+                  }
+                ],
+                "file": null,
+                "line": 28,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 28
+                },
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -268,6 +404,50 @@
                 "nets": [
                   "&0"
                 ]
+              }
+            ],
+            "usages": [
+              {
+                "id": "@rnl-std-fill.rnl:28:3#3",
+                "definition": "$GROUND_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#M2:3",
+                    "terminal": "s"
+                  }
+                ],
+                "file": null,
+                "line": 28,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 28
+                },
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-fill.rnl:28:3#4",
+                "definition": "$GROUND_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#M2:4",
+                    "terminal": "b"
+                  }
+                ],
+                "file": null,
+                "line": 28,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 28
+                },
+                "state": "in-effect"
               }
             ]
           },

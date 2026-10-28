@@ -730,6 +730,7 @@ impl Interp<'_> {
             && self.units[u].header_record.is_none()
             && level_kind == Some(LevelKind::File)
             && self.units[u].level == Some(0)
+            && self.doc.dialect.name != crate::host::text::NAME
         {
             // the header record may be left out; tools write it when they save the file (16.1, TR5)
             let file = self.doc.levels[0].file.clone();
@@ -1237,7 +1238,7 @@ impl Interp<'_> {
                 || alias.chars().count() < 2
                 || orig.chars().count() < 2
             {
-                return bad(self, "the alias and the original of a name both carry `$`, such as @ALIAS(\"$差分对\", \"$DIFFPAIR\") (16.5)".into());
+                return bad(self, "the alias and the original of a name both carry `$`, such as @ALIAS(\"$DP\", \"$DIFFERENTIAL_PAIR\") (16.5)".into());
             }
             if alias == orig {
                 return bad(self, format!("the alias {alias} is the same as the original (16.5)"));
@@ -1802,7 +1803,7 @@ impl Interp<'_> {
         self.read_unit(id);
         if self.units[id].header_record.is_none() || self.units[id].pkg_name.is_empty() {
             self.sink.error(
-                format!("{fname} has no @PACKAGE and is not a package (2.7)"),
+                format!("{fname} has no header record with @PACKAGE and is not a package (2.7, 16.2)"),
                 Some(Loc::line(fname.clone(), 1)),
             );
             self.units[id].ok = false;
@@ -1892,7 +1893,21 @@ impl Interp<'_> {
             let above = self.doc.ancestors(lv);
             for (depth, a) in above.iter().enumerate() {
                 let au = self.level_unit[*a];
-                let Some(ks) = self.units[au].scope_index.get(&key).cloned() else { continue };
+                // the records whose scope= names it, by the rules of the file it is written in:
+                // in a netlist of one dialect, those of its key
+                let ks: Vec<usize> = if self.doc.mixed() {
+                    let records = &self.units[au].scope_records;
+                    let named = |i: &usize| records[*i].2.scope.as_deref().is_some_and(|t| self.doc.names_level(lv, t));
+                    let mut ks: Vec<usize> =
+                        self.units[au].scope_index.values().flatten().copied().filter(named).collect();
+                    ks.sort_unstable();
+                    ks
+                } else {
+                    match self.units[au].scope_index.get(&key) {
+                        Some(ks) => ks.clone(),
+                        None => continue,
+                    }
+                };
                 let place = -((above.len() - depth) as i64);
                 for i in ks {
                     let (rec, ast, header) = self.units[au].scope_records[i].clone();

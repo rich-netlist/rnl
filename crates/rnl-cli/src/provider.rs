@@ -55,6 +55,15 @@ impl Provider for FsProvider {
     fn include_candidates(&self, name: &str) -> Vec<String> {
         self.search_paths.iter().map(|d| path_str(&d.join(name))).collect()
     }
+
+    /// On Windows and macOS, whose file systems ignore case, in lower case.
+    fn path_key(&self, path: &str) -> String {
+        if cfg!(any(windows, target_os = "macos")) {
+            path.to_lowercase()
+        } else {
+            path.to_string()
+        }
+    }
 }
 
 /// Direct files and one level of version directories, sorted for reproducible fallback order.

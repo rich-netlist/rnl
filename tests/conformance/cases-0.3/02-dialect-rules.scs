@@ -1,8 +1,8 @@
 // The rule package of the other dialect, dropped by the dialect of each file
-*! 0.3 版的文件不用另一种方言的规则包（16.3）：这个 .scs 文件是 Spectre 方言，不用 rnl-std-spice；它 include 的 02-dialect-rules-sp.inc 是 SPICE 方言，不用 rnl-std-spectre。
-*! 标准包是工具自带的 0.3 系列：0.3 版的文件隐式用它（16.3）。rnl-std-spice 按元件字母给 R*、I* 符号，rnl-std-spectre 按 master 给 resistor、isource 符号。
-*! I0 是子电路 cell 的实例，Virtuoso 常这样起名；SPICE 的规则包去掉了，它不再画成电流源。R0 按 master 画成电阻。
-*! 文件中间的 simulator lang=spice 不改变文件的方言：子电路 mid 里按 SPICE 写的电流源 I3 也不按 SPICE 的规则（元件字母）画：适配器给它 Spectre 里对应的 master isource，所以按 Spectre 的规则画成电流源。spsub 里的 I1、R1 按 SPICE 的规则画。
+*! A file of version 0.3 does not use the rule package of the other dialect (16.3): this .scs file is in the Spectre dialect and does not use rnl-std-spice; the 02-dialect-rules-sp.inc it includes is in the SPICE dialect and does not use rnl-std-spectre.
+*! The standard packages are the 0.3 series that comes with the tool: a file of version 0.3 uses it implicitly (16.3). rnl-std-spice gives R* and I* their symbols by element letter, rnl-std-spectre gives resistor and isource theirs by master.
+*! I0 is an instance of the subcircuit cell, a name Virtuoso often gives; with the SPICE rule package left out, it is no longer drawn as a current source. R0 is drawn as a resistor by its master.
+*! A simulator lang=spice in the middle of the file does not change the file's dialect: the current source I3 written in SPICE in the subcircuit mid is not drawn by the SPICE rules (element letter) either: the adapter gives it the corresponding Spectre master isource, so the Spectre rules draw it as a current source. I1 and R1 in spsub are drawn by the SPICE rules.
 simulator lang=spectre
 // @RNL(type="header") { @VERSION("0.3")}
 subckt cell (p n)

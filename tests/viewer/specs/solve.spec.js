@@ -4,7 +4,7 @@
 // Preview showing the file as written; and a copy saved through the shell. The web shows none of it.
 // The solver's options, Solve > Settings, are in solve-settings.spec.js.
 
-import { expect, test } from "../viewer.js";
+import { dialogGone, expect, test } from "../viewer.js";
 
 const DESKTOP = { platform: "desktop" };
 const T4 = "T4-miller-conflicts";
@@ -43,6 +43,7 @@ test.describe("on the desktop", () => {
     expect(await solves(viewer)).toEqual([[T4, { options: "", hintsForLow: false }]]);
     expect(await viewer.builds()).toBe(builds);
     await expect(page.locator("#preview-badge")).toHaveText("Solved preview: the files are unchanged");
+    await expect(page.locator("#solve-step")).toHaveText(/^Solved: (1 level|\d+ levels), (1 fact|\d+ facts) not kept\. A preview: the files are unchanged\./);
     await expect(page.locator("#preview-close")).toBeVisible();
     // the Document shown is the solve's: the text has the record of the solver
     expect(await page.evaluate(() => window.viewer.doc.files[0].text.includes('@RNL(type="generated"'))).toBe(true);
@@ -86,10 +87,10 @@ test.describe("on the desktop", () => {
     await page.evaluate(() => window.fakeShell.step({ level: 0, levels: 2, title: "amp", again: false }));
     await expect(page.locator("#solve-step")).toHaveText("Solving amp (1 of 2)…");
     await page.evaluate(() => window.fakeShell.step({ level: 1, levels: 2, title: "top.sp", again: true }));
-    await expect(page.locator("#solve-step")).toHaveText("Solving top.sp (2 of 2, again, as raised to 0.3)…");
+    await expect(page.locator("#solve-step")).toHaveText("Solving top.sp (2 of 2, again after the upgrade to RNL 0.3)…");
     await page.locator("#solve-cancel").click();
     expect(await viewer.calls("cancelSolve")).toEqual([[]]);
-    await expect(page.locator("#solve-step")).toHaveText("The solve was cancelled; the netlist is shown as it was.");
+    await expect(page.locator("#solve-step")).toHaveText("The solve was canceled; the netlist is shown as it was.");
     await expect(page.locator("#solve-cancel")).toBeHidden();
     await expect(page.locator("#preview-badge")).toBeHidden();
     expect(await page.evaluate(() => window.viewer.doc.files[0].text)).toBe(before);
@@ -116,19 +117,22 @@ test.describe("on the desktop", () => {
   test("a copy is saved through the shell, of a solve shown alone", async ({ page, viewer }) => {
     // before a solve: nothing to save
     await page.evaluate(() => window.viewer.command("solve-save"));
-    await expect(dialog(page)).toContainText("Solve the netlist first");
+    await expect(dialog(page)).toContainText("Run Solve › Solve (F9) first");
     await dialog(page).getByRole("button", { name: "Close" }).click();
+    await dialogGone(page);
     expect(await viewer.calls("saveSolved")).toEqual([]);
     await solve(page);
     await page.keyboard.press("Control+Shift+S");
     await expect(dialog(page)).toContainText("Saved the solved copy as /copies/solved.sp.");
     await expect(dialog(page)).toContainText("The files that were opened are unchanged.");
     await dialog(page).getByRole("button", { name: "Close" }).click();
+    await dialogGone(page);
     // a place refused, as over a file that was read, says why
     await page.evaluate(() => (window.fakeShell.saveFail = "a copy is never saved over a file that was read"));
     await page.evaluate(() => window.viewer.command("solve-save"));
     await expect(dialog(page)).toContainText("The copy was not saved: a copy is never saved over a file that was read");
     await dialog(page).getByRole("button", { name: "Close" }).click();
+    await dialogGone(page);
     expect(await viewer.calls("saveSolved")).toHaveLength(2);
   });
 
@@ -137,6 +141,7 @@ test.describe("on the desktop", () => {
     await page.evaluate(() => window.viewer.command("solve"));
     await expect(dialog(page)).toContainText("The netlist could not be solved: cannot read lib.inc");
     await dialog(page).getByRole("button", { name: "Close" }).click();
+    await dialogGone(page);
     await expect(page.locator("#preview-badge")).toBeHidden();
     await expect(page.locator("#tab-solve")).toBeVisible();
   });

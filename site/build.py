@@ -1,18 +1,23 @@
-"""Build the static project site in the locales registered in site/languages.json.
+"""Build the static project site in the locales registered in i18n/languages.json.
 
-In src/, English text and its available translations are written side by side:
+The pages in src/ are written in English, with each text to translate marked:
 
-    <zh>网表定义电路</zh><en>The netlist defines the circuit</en>
+    <en>The netlist defines the circuit</en>
 
-The same markup is used in HTML text, in attribute values and in JavaScript strings. Only
-whitespace may separate the blocks of a group. Optional translations precede the required English
-block, which ends the group. An absent translation falls back to English; an explicit empty block
-remains empty. The shared scripts/site_i18n.py registry generates menus, fonts and locale output.
-The build checks that
-- groups have an English source and no duplicate, stray or nested language tags;
-- the English pages contain no Chinese characters, apart from Chinese content meant for every page:
-  elements marked lang="zh-CN", and in scripts the blocks between /*zh-CN*/ and /*/zh-CN*/ (RNL
-  written with the Chinese alias package, for example).
+The same markup is used in HTML text, in attribute values and in JavaScript strings. The
+translations are in the catalogs of i18n/<lang>/site/, one for each file, such as index.html.json,
+keyed by the English (decision 0015); timeline.json.json has those of the timeline and of the
+releases' summaries, and messages.json the shared messages. A text without a translation is shown
+in English; an empty translation remains empty. The shared scripts/site_i18n.py registry generates
+menus, fonts and locale output. The build checks that
+- groups have an English source, no translation beside it and no duplicate, stray or nested
+  language tags;
+- the English pages contain no Chinese characters, and no page has content marked as written in
+  another language than its own or English, apart from the names of the languages (in the language
+  menu, for example). Content for one language only, such as RNL written with the Chinese alias
+  package, is between <!--zh-CN--> and <!--/zh-CN--> in a page and between /*zh-CN*/ and /*/zh-CN*/
+  in a script, and only the pages of that language have it; what the others say instead is between
+  <!--not-zh-CN--> and <!--/not-zh-CN--> (scripts/site_i18n.py).
 
 The page of the tools links to the files of the desktop viewer's newest release. Its version comes
 from the newest tag viewer-vX.Y.Z of the repository (a tag with anything after the version, such as
@@ -48,11 +53,19 @@ Usage, from the repository root (standard library only, and git for the tags):
     python site/build.py --viewer-version 0.1.0   link the files of this release of the desktop
                                       viewer, whatever the tags say; "none" for no release yet
     python site/build.py --check --rnl PATH       also check and render site/examples/*.sp with rnl
+    python site/build.py --incubating             also build the languages that are not published yet
+    python site/build.py --online                 the translation status also reads rnl-gallery and rnl-packages
+
+A language is shown, in the menus and to the browsers that ask for it, once i18n/languages.json says it
+is `published`; one that is `incubating`, or has no status, is built only with --incubating, for a
+preview or a test, and its own pages list it in their menu (decision 0015).
 """
 import argparse
 from base64 import b64encode
 from datetime import date, datetime, timedelta, timezone
+from functools import lru_cache
 from html import escape
+import importlib.util
 import json
 import os
 import re
@@ -66,7 +79,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 sys.path.insert(0, str(ROOT / "scripts"))
-from site_i18n import LANGUAGES as I18N  # noqa: E402
+from site_i18n import LANGUAGES as I18N, SHOWN_IN_ENGLISH_BELOW  # noqa: E402
 SRC = HERE / "src"
 EXAMPLES = HERE / "examples"
 DEFAULT_OUT = HERE / "dist"
@@ -87,16 +100,21 @@ PAGES = {
     "language.html": "rnl-language-standalone.html",
     "tools.html": "rnl-tools-standalone.html",
     "packages.html": None,
+    "gallery.html": None,
     "agents.html": None,
+    "timeline.html": None,
+    "translation.html": None,
+    "glossary.html": None,
 }
 # Pages added after the Chinese pages moved to zh/ have no old address at the root.
-NEW_PAGES = ("agents.html",)
+NEW_PAGES = ("agents.html", "gallery.html", "timeline.html", "translation.html", "glossary.html")
 
 GROUP = I18N.group
 CJK = re.compile("[%s]" % "".join("%s-%s" % (chr(a), chr(b)) for a, b in
                                   [(0x3000, 0x303F), (0x3400, 0x9FFF), (0xF900, 0xFAFF), (0xFF00, 0xFFEF)]))
-ZH_ELEMENT = re.compile(r"<(\w+)\b[^>]*\blang=\"(?!en(?:-|\"))[^\"]*\"[^>]*>.*?</\1>", re.S)
-ZH_BLOCK = re.compile(r"/\*zh-CN\*/.*?/\*/zh-CN\*/", re.S)
+# An element marked as written in some language, with none inside: its name, the language and its content
+MARKED = re.compile(r"<(\w+)\b[^>]*?\blang=\"([^\"]*)\"[^>]*>((?:(?!\blang=\").)*?)</\1>", re.S)
+LANG_ATTRIBUTE = re.compile(r"\blang=\"([^\"]*)\"")
 
 STYLE_TAG = re.compile(r'<link rel="stylesheet" href="assets/([\w.-]+\.css)">')
 SCRIPT_TAG = re.compile(r'<script src="assets/([\w.-]+\.js)"></script>')
@@ -113,6 +131,15 @@ RELEASE_MARK = re.compile(r"<!--/?(?:no-)?(?:(?:linux|macos)-)?release-->")
 FIELD = re.compile(r"\{\{(viewer-[a-z-]+)\}\}")
 FIELDS = ("viewer-version", "viewer-tag")
 TIMELINE = "{{timeline}}"
+TIMELINE_FULL = "{{timeline-full}}"
+# translation.html: the report of scripts/i18n/status.py, how far each language is (decision 0015)
+TRANSLATION_STATUS = "{{translation-status}}"
+# glossary.html: the language's glossary, i18n/<lang>/glossary.json (decision 0016); in English, the list of them
+GLOSSARY = "{{glossary}}"
+GLOSSARY_KINDS = (("rnl", "Terms of RNL"), ("circuit", "Circuit design"), ("command", "Commands and labels"),
+                  ("general", "General words"))
+# The homepage shows this many of the latest published entries; timeline.html has all of them.
+HOME_ENTRIES = 3
 # Release dates are modern Asia/Shanghai dates (UTC+08:00, without DST).
 SHANGHAI = timezone(timedelta(hours=8))
 RELEASE_VERSION = r"\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?"
@@ -231,18 +258,38 @@ def timeline_events(data, tags, summary=release_summary):
     return sorted(events, key=lambda event: (event["stamp"], event["id"]))
 
 
-def timeline_html(data=None, tags=None):
+def translations_beside(value, path):
+    """The places in `value`, the data of a timeline, of the dictionaries with a translation beside their English."""
+    if isinstance(value, dict):
+        if isinstance(value.get(I18N.default), str):
+            return [path] if set(value) - {I18N.default} else []
+        return [found for key, v in value.items() for found in translations_beside(v, f"{path}.{key}")]
+    if isinstance(value, list):
+        return [found for i, v in enumerate(value)
+                for found in translations_beside(v, f"{path}[{v.get('id', i) if isinstance(v, dict) else i}]")]
+    return []
+
+
+def timeline_html(data=None, tags=None, full=False):
+    """The rows of the timeline: for the homepage, its latest published entries, a link to the full timeline and
+    what comes next; for timeline.html (`full`), every published entry, the latest first."""
     if data is None:
         try:
             data = json.loads((SRC / "timeline.json").read_text(encoding="utf-8"))
         except (OSError, ValueError) as error:
             raise BuildError(f"src/timeline.json: {error}") from error
+        beside = translations_beside(data, "src/timeline.json")
+        if beside:
+            raise BuildError("\n".join(f"{where}: a translation written beside the English: translations go into "
+                                       f"i18n/<lang>/site/timeline.json.json, keyed by the English" for where in beside))
     events = timeline_events(data, timeline_tags() if tags is None else tags)
     if not events:
         raise BuildError("The timeline has no published milestones")
 
     def localized(values, html=False):
-        return I18N.markup(values, html)
+        # translations of the timeline's texts, its milestones' and the releases' summaries, are in the
+        # catalog of timeline.json (decision 0015); released notes may still carry their own
+        return I18N.markup(I18N.with_catalog(values, "timeline.json"), html)
 
     def link(event):
         url = event.get("url")
@@ -254,16 +301,22 @@ def timeline_html(data=None, tags=None):
         return f' <a href="{escape(url, quote=True)}">{localized(labels)}</a>'
 
     rows = []
-    for index, event in enumerate(events):
+    shown = events if full else events[-HOME_ENTRIES:]
+    for event in shown:
         day = event["stamp"].date().isoformat()
         if event.get("start_date"):
             start = timeline_date(event["start_date"]).date().isoformat()
             day = localized({code: I18N.message(code, "timeline_range", start=start, end=day) for code in CODES})
-        current = ' class="now"' if index == len(events) - 1 else ""
+        current = ' class="now"' if event is events[-1] else ""
         # Handwritten descriptions retain their reviewed inline links/code. Release summaries are plain text.
         description = localized(event.get("summary", event.get("description")), html="summary" not in event)
         rows.append(f'        <li{current}><time>{day}</time><b>{localized(event["title"])}</b>'
                     f'<p>{description}{link(event)}</p></li>')
+    if full:
+        return "\n".join(reversed(rows))
+    if len(shown) < len(events):
+        rows.append('        <li class="tl-more"><a href="timeline.html">'
+                    + localized({code: I18N.message(code, "timeline_all") for code in CODES}) + '</a></li>')
     rows.append('        <li class="tl-sep">' + localized({code: I18N.message(code, "timeline_next") for code in CODES}) + '</li>')
     for event in data.get("next", []):
         title = localized(localized_values(event["title"], "next milestone title"))
@@ -329,6 +382,99 @@ def newest_viewer_release():
     return "%d.%d.%d" % max(versions) if versions else None
 
 
+@lru_cache(maxsize=None)
+def translation_survey(online=False):
+    """scripts/i18n/status.py's survey of the repository, once a build: (its module, project, surfaces)."""
+    spec = importlib.util.spec_from_file_location("i18n_status", ROOT / "scripts/i18n/status.py")
+    status = sys.modules[spec.name] = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(status)
+    project = status.Project(ROOT, online=online)
+    return status, project, status.survey(project)
+
+
+def translation_status_html(online=False):
+    """The report of translation.html: a table of the surfaces counted, a column for each language but
+    English, and the surfaces that are not counted, with why. In English, as its texts are, in every
+    language: titles and notes come from i18n/surfaces.json."""
+    status, project, surfaces = translation_survey(online)
+    langs = project.languages
+    def name(code):
+        # its English name, where the registry gives one, and its own, marked with its language
+        own = f'<span lang="{I18N.locales[code]["html_lang"]}">{escape(I18N.locales[code]["name"])}</span>'
+        english = I18N.english_name(code)
+        return own if english == I18N.locales[code]["name"] else f"{escape(english)} {own}"
+    head = "".join(f'<th scope="col">{name(code)}<small>{escape(project.state(code))}</small></th>' for code in langs)
+
+    def cell(surface, code):
+        st = surface.langs.get(code)
+        if not surface.checked:
+            return '<td class="ts-none">not read here</td>'
+        if st is None:
+            return '<td class="ts-none">—</td>'
+        share = st.done / surface.total if surface.total else 1
+        stale = f'<small class="ts-stale">{st.stale} stale</small>' if st.stale else ""
+        return (f'<td><span class="ts-count">{st.done} / {surface.total}</span>{stale}'
+                f'<span class="ts-bar" aria-hidden="true"><i style="width:{share * 100:.0f}%"></i></span></td>')
+    rows = "".join(f'<tr><th scope="row">{escape(s.title)}<small><code>{escape(s.id)}</code>, '
+                   f'{escape(status.UNITS[s.kind])}s</small></th>{"".join(cell(s, code) for code in langs)}</tr>'
+                   for s in surfaces if s.kind in status.UNITS)
+    sentence = lambda note: note if note.endswith((".", "!", "?")) else note + "."
+    others = "".join(f'<li><b>{escape(s.title)}</b>: {escape(" ".join(sentence(n) for n in s.notes if n))}</li>'
+                     for s in surfaces if s.kind not in status.UNITS)
+    errors = project.errors + [e for s in surfaces for e in s.errors]
+    problems = (f'<p class="note ts-errors">Format errors: {escape("; ".join(errors))}</p>' if errors else "")
+    return (f'<div class="ts-report" lang="en">{problems}\n'
+            f'<div class="matrix-wrap"><table class="matrix ts-table"><thead><tr><th scope="col">Surface</th>{head}</tr></thead>'
+            f'<tbody>{rows}</tbody></table></div>\n'
+            f'<h3>Not counted</h3>\n<ul class="ts-others">{others}</ul></div>')
+
+
+def glossary_html(code):
+    """The table of glossary.html in one language: its glossary's terms by kind, the English term first; in
+    English, the languages that have a glossary. The headings and notes are in English, as the glossary's
+    notes are; the renderings are marked with their language."""
+    if code == I18N.default:
+        rows = []
+        for other in CODES:
+            path = ROOT / "i18n" / other / "glossary.json"
+            if other == I18N.default or not path.is_file():
+                continue
+            data = json.loads(path.read_text(encoding="utf-8"))
+            own = f'<span lang="{I18N.locales[other]["html_lang"]}">{escape(I18N.locales[other]["name"])}</span>'
+            # its English name, where the registry gives one, and its own, marked with its language
+            english = I18N.english_name(other)
+            name = own if english == I18N.locales[other]["name"] else f"{escape(english)} {own}"
+            draft = " · draft" if data.get("draft") else ""
+            rows.append(f'<li><a href="../{other}/glossary.html">{name}</a>'
+                        f' <small>{len(data["terms"])} terms{draft}</small></li>')
+        return (f'<div class="gs-report" lang="en"><p class="lead">Each language’s glossary gives, for every English term, '
+                f'its rendering, the variants it does not use and a note.</p>\n<ul class="gs-languages">{"".join(rows)}</ul></div>')
+    path = ROOT / "i18n" / code / "glossary.json"
+    if not path.is_file():
+        return '<div class="gs-report" lang="en"><p class="lead">This language has no glossary yet.</p></div>'
+    data = json.loads(path.read_text(encoding="utf-8"))
+    lang = I18N.locales[code]["html_lang"]
+    draft = ('<p class="note">A first draft, taken from the translations as they are; not yet reviewed.</p>'
+             if data.get("draft") else "")
+    parts = []
+    for kind, title in GLOSSARY_KINDS:
+        terms = [t for t in data["terms"] if t.get("kind") == kind]
+        if not terms:
+            continue
+        comma = "、" if lang.startswith("zh") or lang.startswith("ja") else ", "
+
+        def row(t):
+            sense = f'<small>{escape(t["sense"])}</small>' if t.get("sense") else ""
+            return (f'<tr><th scope="row">{escape(t["en"])}{sense}</th><td lang="{lang}" class="gs-term">{escape(t["term"])}</td>'
+                    f'<td lang="{lang}" class="gs-avoid">{escape(comma.join(t.get("avoid", [])))}</td>'
+                    f'<td>{escape(t.get("note", ""))}</td></tr>')
+        rows = "".join(row(t) for t in terms)
+        parts.append(f'<h3>{escape(title)} <small>{len(terms)}</small></h3>\n<div class="matrix-wrap"><table class="matrix gs-table">'
+                     f'<thead><tr><th scope="col">English</th><th scope="col">Here</th><th scope="col">Not used</th>'
+                     f'<th scope="col">Note</th></tr></thead><tbody>{rows}</tbody></table></div>')
+    return f'<div class="gs-report" lang="en">{draft}\n' + "\n".join(parts) + '</div>'
+
+
 def has_linux_release(version):
     """Only link Linux files when the selected tag includes the Linux bundle configuration.
     Earlier Windows-only tags must keep working even after this site change is deployed."""
@@ -360,12 +506,28 @@ def localize(text, index):
     return I18N.localize(text, CODES[index])
 
 
-def check_leaks(text, name):
-    """The English source must mark intentionally quoted non-English content."""
-    masked = ZH_BLOCK.sub(blank, ZH_ELEMENT.sub(blank, text))
+def check_leaks(text, name, code):
+    """A page in one language has no content marked as written in another, apart from the names of the
+    languages, and an English page no Chinese characters: the content for one language only must be in
+    its blocks (scripts/site_i18n.py)."""
+    names = {locale["html_lang"]: locale["name"] for locale in I18N.locales.values()}
+
+    def language_name(m):
+        return m.group(2) in names and re.sub(r"<[^>]*>|✓", "", m.group(3)).strip() == names[m.group(2)]
+    masked = MARKED.sub(lambda m: blank(m) if language_name(m) else m.group(0), text)
     lines = masked.split("\n")
-    bad = sorted({line_of(masked, m.start()) for m in CJK.finditer(masked)})
-    return ["%s:%d: Chinese text on a non-Chinese page: %s" % (name, n, lines[n - 1].strip()[:100]) for n in bad]
+    errors = []
+    if name.split(" ")[0].endswith(".html"):
+        allowed = {I18N.locales[code]["html_lang"], I18N.locales[I18N.default]["html_lang"]}
+        for m in LANG_ATTRIBUTE.finditer(masked):
+            if m.group(1) in names and m.group(1) not in allowed:
+                n = line_of(masked, m.start())
+                errors.append("%s:%d: content marked lang=\"%s\" on a page in another language: %s"
+                              % (name, n, m.group(1), lines[n - 1].strip()[:100]))
+    if code == I18N.default:
+        bad = sorted({line_of(masked, m.start()) for m in CJK.finditer(masked)})
+        errors += ["%s:%d: Chinese text on an English page: %s" % (name, n, lines[n - 1].strip()[:100]) for n in bad]
+    return errors
 
 
 def sources():
@@ -479,25 +641,56 @@ def check_examples_rnl(rnl):
     return errors
 
 
+def page_scripts(files):
+    """{page: the paths of the scripts it loads}, and {script: its page} for each script only one page loads."""
+    loads = {page: ["assets/" + name for name in SCRIPT_TAG.findall(files[page]) if "assets/" + name in files]
+             for page in PAGES}
+    users = {}
+    for page, scripts in loads.items():
+        for script in scripts:
+            users.setdefault(script, []).append(page)
+    return loads, {script: pages[0] for script, pages in users.items() if len(pages) == 1}
+
+
+def coverage(files, code):
+    """{page: (translated, all)} of the text groups a page shows in one language, its scripts' with its own."""
+    loads, _ = page_scripts(files)
+    found = {}
+    for page, scripts in loads.items():
+        counts = [I18N.coverage(files[path], code, path) for path in [page, *scripts]]
+        found[page] = (sum(c[0] for c in counts), sum(c[1] for c in counts))
+    return found
+
+
 def build_language(files, index, version, linux=False, macos=False):
     """Return {relative path: text} for one language, including the standalone pages. Both kinds
-    of release block are checked for Chinese before the ones that do not apply are dropped."""
+    of release block are checked for Chinese before the ones that do not apply are dropped. A page
+    less translated than site_i18n.SHOWN_IN_ENGLISH_BELOW is shown in English, with the scripts only
+    it loads, and every page not wholly translated says so (decision 0015)."""
     code, prefix = LANGS[index]
-    out = {path: localize(text, index) for path, text in files.items()}
+    files = {path: I18N.only(text, code) for path, text in files.items()}
+    counts = coverage(files, code)
+    english = {page for page, (done, total) in counts.items() if done < SHOWN_IN_ENGLISH_BELOW * total}
+    _, own = page_scripts(files)
+    out = {path: I18N.localize(text, code, path, english=(path if path in PAGES else own.get(path)) in english)
+           for path, text in files.items()}
     out = {path: text.replace("{{locale-css}}", I18N.css(code)) for path, text in out.items()}
     for page in PAGES:
         tokens = {"html-lang": I18N.locales[code]["html_lang"], "locale-code": code, "font-href": escape(I18N.font_url(code), quote=True),
                   "language-menu": I18N.menu(code, lambda target: "../" + target + "/" + ("" if page == "index.html" else page)),
-                  "spec-root": "spec/" if I18N.standard(code) == code else "../" + I18N.standard(code) + "/spec/"}
-        tokens.update({"nav-" + key: escape(I18N.message(code, key)) for key in ("intro", "tour", "spec", "packages", "tools", "agents", "pages")})
+                  "spec-root": "spec/" if I18N.standard(code) == code else "../" + I18N.standard(code) + "/spec/",
+                  "translation-notice": I18N.notice(code, *counts[page]),
+                  "ai-translation-notice": I18N.ai_notice(code, page),
+                  "glossary": glossary_html(code) if page == "glossary.html" else ""}
+        tokens.update({"nav-" + key: escape(I18N.message(code, key))
+                       for key in ("intro", "tour", "spec", "packages", "gallery", "tools", "agents", "pages", "translation")})
         for key, value in tokens.items():
             out[page] = out[page].replace("{{" + key + "}}", value)
         if I18N.standard(code) != code:
             out[page] = re.sub(r'(\shref=")spec/', r'\1../' + I18N.standard(code) + '/spec/', out[page])
     errors = []
-    if code == I18N.default:
-        for path, text in out.items():
-            errors += check_leaks(text, "%s (%s)" % (path, code))
+    for path, text in out.items():
+        errors += check_leaks(text, "%s (%s)" % (path, code), code)
     if errors:
         raise BuildError("\n".join(errors))
     out = {path: release(text, version, linux, macos) for path, text in out.items()}
@@ -557,20 +750,22 @@ def redirect(target, lang, text):
 
 
 def home():
-    """Choose a saved locale, then the browser's supported preferences, then English."""
-    choices = sorted([(match, code) for code in CODES for match in I18N.locales[code]["matches"]],
+    """Choose a saved locale, then the browser's supported preferences, then English: among the published
+    languages, as an incubating one is not offered."""
+    codes = I18N.published
+    choices = sorted([(match, code) for code in codes for match in I18N.locales[code]["matches"]],
                      key=lambda item: len(item[0]), reverse=True)
     alternates = "\n".join(f'<link rel="alternate" hreflang="{I18N.locales[code]["html_lang"]}" href="{SITE_URL}{DIRS[code]}">'
-                           for code in CODES)
+                           for code in codes)
     links = " · ".join(f'<a href="{DIRS[code]}" hreflang="{I18N.locales[code]["html_lang"]}" lang="{I18N.locales[code]["html_lang"]}">{escape(I18N.locales[code]["name"])}</a>'
-                       for code in CODES)
+                       for code in codes)
     return f'''<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>Rich Netlist (RNL)</title>
 {alternates}
 <link rel="alternate" hreflang="x-default" href="{SITE_URL}{HOME}">
 <script>
-var codes = {json.dumps(CODES)}, choices = {json.dumps(choices)}, selected;
+var codes = {json.dumps(codes)}, choices = {json.dumps(choices)}, selected;
 try {{ selected = localStorage.getItem('rnl-site-language'); }} catch (error) {{}}
 if (codes.indexOf(selected) === -1) {{
   var preferences = navigator.languages || [navigator.language || ''];
@@ -602,21 +797,45 @@ def redirects():
             continue
         for name in (page, single):
             if name and name != "index.html":
-                out[name] = redirect(MOVED + name, I18N.locales[I18N.legacy]["html_lang"], "这一页已移到 " + MOVED + name)
+                out[name] = redirect(MOVED + name, "en", "This page has moved to " + MOVED + name)
     return out
 
 
-def build(version=None):
-    """Build every page in every language, with the files of the desktop viewer's release `version`,
-    or None for no release yet, and the pages at the root that lead to them."""
+def build(version=None, incubating=False, online=False):
+    """Build every page in every published language, and with `incubating` in the others too, with the
+    files of the desktop viewer's release `version`, or None for no release yet, and the pages at the
+    root that lead to them. `online` lets the report of translation.html read what other repositories
+    publish."""
     files = sources()
+    errors = [f"src/{path}: a translation written beside the English: translations go into i18n/<lang>/site/{path}.json; "
+              f"python scripts/i18n/migrate_site.py moves them there" for path, text in files.items()
+              if any(len(I18N.parts(m.group())[0]) > 1 for m in GROUP.finditer(text))]
+    errors += [f"i18n/languages.json: the shared messages of {code} written in the registry: translations go into "
+               f"i18n/{code}/site/messages.json" for code, entry in I18N.entries.items()
+               if code != I18N.default and entry.get("messages")]
+    if errors:
+        raise BuildError("\n".join(errors))
     if files["index.html"].count(TIMELINE) != 1:
         raise BuildError("src/index.html needs exactly one {{timeline}} marker")
     files["index.html"] = files["index.html"].replace(TIMELINE, timeline_html())
+    if files["timeline.html"].count(TIMELINE_FULL) != 1:
+        raise BuildError("src/timeline.html needs exactly one {{timeline-full}} marker")
+    files["timeline.html"] = files["timeline.html"].replace(TIMELINE_FULL, timeline_html(full=True))
+    if files["translation.html"].count(TRANSLATION_STATUS) != 1:
+        raise BuildError("src/translation.html needs exactly one {{translation-status}} marker")
+    if files["glossary.html"].count(GLOSSARY) != 1:
+        raise BuildError("src/glossary.html needs exactly one {{glossary}} marker")
+    files["translation.html"] = files["translation.html"].replace(TRANSLATION_STATUS, translation_status_html(online))
     ex = examples()
     errors = []
     for path, text in files.items():
         errors += check_groups(text, "src/" + path) + check_release(text, "src/" + path)
+        errors += [e for code in CODES for e in I18N.catalog_errors(code, path)]
+    for page in PAGES:
+        if files[page].count("{{translation-notice}}") != 1:
+            errors.append("src/%s needs exactly one {{translation-notice}} marker, after its hero" % page)
+        if files[page].count("</header>{{ai-translation-notice}}") != 1:
+            errors.append("src/%s needs exactly one {{ai-translation-notice}} marker, right after its top bar" % page)
     errors += check_examples(files, ex)
     if errors:
         raise BuildError("\n".join(errors))
@@ -624,6 +843,8 @@ def build(version=None):
     linux = has_linux_release(version)
     macos = has_macos_release(version)
     for index, (code, prefix) in enumerate(LANGS):
+        if code not in I18N.published and not incubating:
+            continue
         for path, text in build_language(files, index, version, linux, macos).items():
             result[prefix + path] = text
         # Brand images are copied verbatim; only prose and scripts need localization.
@@ -654,23 +875,17 @@ def write(result, out):
             target.write_text(text, encoding="utf-8", newline="\n")
 
 
-GUIDE = """RNL introduction pages / RNL 介绍页
+GUIDE = """RNL introduction pages
 
-rnl-intro/ is the complete site: open rnl-intro/zh/index.html (Chinese) or rnl-intro/en/index.html
-(English), or upload the folder to any static host, where its root leads to the pages in the
-browser's language.
+rnl-intro/ is the complete site: open rnl-intro/en/index.html, or the index.html in the folder of
+another language, such as rnl-intro/zh/index.html, or upload the folder to any static host, where
+its root leads to the pages in the browser's language.
 .nojekyll makes GitHub Pages publish it as is.
 language.html next to each index.html is the language tour, tools.html the page of the viewers, and
 packages.html the gallery of the standard packages; the web viewer itself, the pages of the standard
 and the gallery's data are published with the site, not packed here.
 The *-standalone.html files in each language folder are single files with everything inlined.
 Fonts load from Google Fonts; offline, system fonts are used and the pages still work.
-
-rnl-intro/ 是完整站点：打开 rnl-intro/zh/index.html（中文）或 rnl-intro/en/index.html（英文），
-或把整个目录上传到任意静态主机，根目录按浏览器语言跳到中文页或英文页；.nojekyll 让 GitHub Pages 原样发布。每个 index.html 旁边的
-language.html 是语言导览，tools.html 是查看器的介绍页，packages.html 是标准包图库；网页版查看器本身、
-语言标准的网页和图库的数据随网站发布，不在这个包里。各语言目录里的 *-standalone.html 是内联了全部样式和脚本的单文件版。
-字体从 Google Fonts 加载，离线时退回系统字体，页面照常可用。
 """
 
 
@@ -696,6 +911,10 @@ def main():
                          "newest tag viewer-vX.Y.Z; none for no release yet")
     ap.add_argument("--rnl", metavar="PATH",
                     help="also check and render site/examples/*.sp with this rnl command")
+    ap.add_argument("--incubating", action="store_true",
+                    help="also build the pages of the languages not yet published, for a preview or a test")
+    ap.add_argument("--online", action="store_true",
+                    help="let the translation status read what rnl-gallery and rnl-packages publish")
     args = ap.parse_args()
     for stream in (sys.stdout, sys.stderr):
         stream.reconfigure(errors="backslashreplace")
@@ -708,7 +927,8 @@ def main():
     else:
         ap.error("--viewer-version takes a version such as 0.1.0, or none")
     try:
-        result = build(version)
+        # a check reads every language, published or not
+        result = build(version, incubating=args.incubating or args.check, online=args.online)
         if args.rnl is not None:
             rnl = find_rnl(args.rnl)
             rnl_errors = check_examples_rnl(rnl)
@@ -729,6 +949,9 @@ def main():
     write(result, out)
     print("built %d files into %s (%d text groups)" % (len(result), out, groups))
     for code, prefix in LANGS:
+        if code not in I18N.published and not args.incubating:
+            print("  %s: not built, as it is not published (--incubating builds it)" % code)
+            continue
         for page in PAGES:
             print("  %s: %s" % (code, out / prefix / page))
     print("  the root uses a saved language or supported browser preferences, falling back to %s; "

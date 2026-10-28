@@ -7,20 +7,31 @@
         { "id": "open", "label": "&Open File...", "keys": ["Ctrl+O"] },
         { "id": "include-file", "label": "&Include File..." },
         { "id": "include-folder", "label": "Include &Folder..." },
-        { "id": "include-library", "label": "Include Public &Package…", "platforms": ["web"] },
+        { "id": "include-library", "label": "Include Public &Package...", "platforms": ["web"] },
         { "id": "open-url", "label": "Open &URL...", "platforms": ["web"] },
+        { "id": "open-project", "label": "Open Projec&t..." },
+        { "id": "load-manifest", "label": "Load &Manifest...", "platforms": ["web"] },
         { "id": "load-clipboard", "label": "Load from &Clipboard...", "keys": ["Ctrl+Shift+V"] },
         { "id": "reload", "label": "&Reload", "keys": ["F5"] },
         { "id": "reload-library", "label": "Reload &Library" },
         { "id": "toggle-auto-include", "label": "&Auto Include", "check": true },
-        { "id": "memory-cache", "label": "Memory &Cache…", "platforms": ["desktop"] },
+        { "id": "memory-cache", "label": "Memory &Cache...", "platforms": ["desktop"] },
         "-",
         { "id": "save", "label": "&Save", "keys": ["Ctrl+S"], "platforms": ["desktop"] },
         { "id": "save", "label": "&Download File", "keys": ["Ctrl+S"], "platforms": ["web"] },
-        { "id": "download-library", "label": "Download Librar&y", "platforms": ["web"] },
+        { "id": "save-project", "label": "Download Pro&ject...", "platforms": ["web"] },
+        { "id": "download-manifest", "label": "Download Ma&nifest...", "platforms": ["web"] },
         { "id": "save-as", "label": "Save &As...", "platforms": ["desktop"] },
         { "id": "save-utf8", "label": "Save Changes Using UTF-8", "platforms": ["desktop"] },
         { "id": "save-as-utf8", "label": "Save As UTF-8...", "platforms": ["desktop"] },
+        { "id": "save-project", "label": "Save Pro&ject...", "platforms": ["desktop"] },
+        {
+          "label": "Export Ima&ge",
+          "items": [
+            { "id": "export-svg", "label": "Export &SVG..." },
+            { "id": "export-png", "label": "Export &PNG..." }
+          ]
+        },
         "-",
         { "id": "file-associations", "label": "File &Associations...", "platforms": ["desktop"], "windowsOnly": true },
         { "id": "exit", "label": "E&xit", "platforms": ["desktop"] }
@@ -32,15 +43,16 @@
         { "id": "toggle-edit", "label": "&Edit Text", "keys": ["Control+Q"], "shown": "Ctrl+Q", "check": true },
         { "id": "apply-edits", "label": "&Apply and Exit Editing", "keys": ["Ctrl+Enter"] },
         { "id": "discard-edits", "label": "&Discard Changes" },
-        { "id": "find-text", "label": "&Find in Netlist…", "keys": ["Ctrl+F"], "page": true },
+        { "id": "find-text", "label": "&Find in Netlist...", "keys": ["Ctrl+F"], "page": true },
         "-",
         { "id": "descend", "label": "Open &Subcircuit", "keys": ["E", "Enter"], "page": true },
-        { "id": "descend-new-window", "label": "Open Subcircuit in New &Window…", "keys": ["Shift+E", "Shift+Enter"], "page": true },
+        { "id": "descend-new-window", "label": "Open Subcircuit in New &Window", "keys": ["Shift+E", "Shift+Enter"], "page": true },
         { "id": "ascend", "label": "&Up to Parent Level", "keys": ["Ctrl+E", "Backspace"], "page": true }
       ]
     },
     {
       "label": "&View",
+      "english": "View",
       "items": [
         { "id": "fit", "label": "&Fit to Window", "keys": ["F", "0"] },
         { "id": "zoom-in", "label": "Zoom &In", "keys": ["Ctrl+=", "Ctrl++"], "shown": "Ctrl++" },
@@ -69,12 +81,14 @@
         },
         { "id": "toggle-hover-names", "label": "Show &Names on Hover", "check": true },
         { "id": "toggle-usages", "label": "Show &Usages", "keys": ["Ctrl+R"], "check": true },
-        { "id": "toggle-currents", "label": "Show Current &Directions", "check": true },
+        { "id": "toggle-currents", "label": "Show Current &Directions", "keys": ["Shift+R"], "check": true, "page": true },
         {
           "label": "&Language",
+          "english": "Language",
+          "icon": "globe",
+          "languages": true,
           "items": [
-            { "id": "language-en", "label": "English", "check": true, "radio": true },
-            { "id": "language-zh", "label": "简体中文", "check": true, "radio": true }
+            { "id": "language-en", "label": "English", "check": true, "radio": true }
           ]
         },
         "-",
@@ -111,6 +125,7 @@
       "items": [
         { "id": "shortcuts", "label": "&Keyboard Shortcuts..." },
         { "id": "desktop-viewer", "label": "&Desktop Viewer...", "platforms": ["web"] },
+        { "id": "public-packages", "label": "Public &Packages...", "platforms": ["desktop"] },
         { "id": "check-updates", "label": "Check for &Updates...", "platforms": ["desktop"] },
         "-",
         { "id": "about", "label": "&About RNL Viewer" }

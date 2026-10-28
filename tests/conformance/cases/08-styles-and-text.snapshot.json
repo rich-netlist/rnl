@@ -96,7 +96,43 @@
           {
             "id": "&0",
             "global": true,
-            "port": false
+            "port": false,
+            "usages": [
+              {
+                "id": "@rnl-std-virtual.rnl:52:9#1",
+                "definition": "$GND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 52,
+                "source": "body",
+                "made_in": "%gs_Vin_2",
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-virtual.rnl:52:9#2",
+                "definition": "$GND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 52,
+                "source": "body",
+                "made_in": "%gs_X1_1",
+                "state": "in-effect"
+              }
+            ]
           },
           {
             "id": "&inn",
@@ -252,6 +288,13 @@
             ],
             "definition": null,
             "attach": null,
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            },
             "symbol": {
               "value": "$VSRC",
               "source": null
@@ -294,6 +337,24 @@
                   "&0"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "%gs_Vin_2",
+                "definition": "$GND_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#Vin:2",
+                    "terminal": "n"
+                  }
+                ],
+                "file": 0,
+                "line": 64,
+                "source": "solver",
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -304,6 +365,13 @@
             ],
             "definition": null,
             "attach": null,
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#9a9a9a",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#9a9a9a"
+            },
             "symbol": {
               "value": "a symbol",
               "source": null
@@ -356,6 +424,13 @@
             ],
             "definition": null,
             "attach": null,
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#c62828",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#c62828"
+            },
             "symbol": {
               "value": "$RES",
               "source": null
@@ -408,6 +483,13 @@
             ],
             "definition": null,
             "attach": null,
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            },
             "symbol": {
               "value": "$OPAMP",
               "source": null
@@ -463,6 +545,24 @@
                   "&out"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "%gs_X1_1",
+                "definition": "$GND_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#X1:1",
+                    "terminal": "inp"
+                  }
+                ],
+                "file": 0,
+                "line": 65,
+                "source": "solver",
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -472,6 +572,13 @@
             "definition": "$JUNCTION",
             "attach": {
               "p": "%ji"
+            },
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
             },
             "symbol": {
               "value": "$JUNCTION_DOT",
@@ -498,6 +605,13 @@
             "attach": {
               "p": "%jo"
             },
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            },
             "symbol": {
               "value": "$JUNCTION_DOT",
               "source": null
@@ -523,6 +637,13 @@
             "attach": {
               "t": "#Vin:2"
             },
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            },
             "symbol": {
               "value": null,
               "source": null
@@ -547,6 +668,13 @@
             "definition": "$GND",
             "attach": {
               "p": "&0"
+            },
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
             },
             "symbol": {
               "value": "$GROUND",
@@ -587,6 +715,13 @@
             "attach": {
               "t": "#X1:1"
             },
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            },
             "symbol": {
               "value": null,
               "source": null
@@ -611,6 +746,13 @@
             "definition": "$GND",
             "attach": {
               "p": "&0"
+            },
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
             },
             "symbol": {
               "value": "$GROUND",
@@ -1760,22 +1902,110 @@
           {
             "id": "&inp",
             "global": false,
-            "port": true
+            "port": true,
+            "usages": [
+              {
+                "id": "@rnl-std-fill.rnl:37:3#1",
+                "definition": "$IOPORT",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&inp",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 37,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 37
+                },
+                "state": "in-effect"
+              }
+            ]
           },
           {
             "id": "&inn",
             "global": false,
-            "port": true
+            "port": true,
+            "usages": [
+              {
+                "id": "@rnl-std-fill.rnl:37:3#2",
+                "definition": "$IOPORT",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&inn",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 37,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 37
+                },
+                "state": "in-effect"
+              }
+            ]
           },
           {
             "id": "&out",
             "global": false,
-            "port": true
+            "port": true,
+            "usages": [
+              {
+                "id": "@rnl-std-fill.rnl:37:3#3",
+                "definition": "$IOPORT",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&out",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 37,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 37
+                },
+                "state": "in-effect"
+              }
+            ]
           },
           {
             "id": "&0",
             "global": true,
-            "port": false
+            "port": false,
+            "usages": [
+              {
+                "id": "@rnl-std-virtual.rnl:52:9",
+                "definition": "$GND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 52,
+                "source": "body",
+                "made_in": "%gs_E1_2",
+                "state": "in-effect"
+              }
+            ]
           }
         ]
       },
@@ -1819,6 +2049,13 @@
             ],
             "definition": null,
             "attach": null,
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            },
             "symbol": {
               "value": "$VCVS",
               "source": null
@@ -1887,6 +2124,24 @@
                   "&inn"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "%gs_E1_2",
+                "definition": "$GND_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#E1:2",
+                    "terminal": "n"
+                  }
+                ],
+                "file": 0,
+                "line": 13,
+                "source": "solver",
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -1896,6 +2151,13 @@
             "definition": "$GND_STUB",
             "attach": {
               "t": "#E1:2"
+            },
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
             },
             "symbol": {
               "value": null,
@@ -1921,6 +2183,13 @@
             "definition": "$GND",
             "attach": {
               "p": "&0"
+            },
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
             },
             "symbol": {
               "value": "$GROUND",
@@ -1961,6 +2230,13 @@
             "attach": {
               "p": "&inp"
             },
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            },
             "symbol": {
               "value": "$PORT_TAG",
               "source": null
@@ -2000,6 +2276,13 @@
             "attach": {
               "p": "&inn"
             },
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            },
             "symbol": {
               "value": "$PORT_TAG",
               "source": null
@@ -2038,6 +2321,13 @@
             "definition": "$IOPORT",
             "attach": {
               "p": "&out"
+            },
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
             },
             "symbol": {
               "value": "$PORT_TAG",

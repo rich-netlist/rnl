@@ -108,6 +108,18 @@ fn literal(v: &Literal) -> String {
         Literal::Str(s) => quote(s),
         Literal::Num(n) => num(*n),
         Literal::Bool(b) => b.to_string(),
+        Literal::List(items) => format!("[{}]", items.iter().map(literal).collect::<Vec<_>>().join(", ")),
+    }
+}
+
+/// A usage's parameter as the snapshot reads it back: a number exactly, in the shortest form that
+/// reads back the same, never `-0`; a list in brackets.
+fn parameter(v: &Literal) -> String {
+    match v {
+        Literal::Num(n) if *n == 0.0 => "0".into(),
+        Literal::Num(n) => format!("{n}"),
+        Literal::List(items) => format!("[{}]", items.iter().map(parameter).collect::<Vec<_>>().join(", ")),
+        _ => literal(v),
     }
 }
 
@@ -150,33 +162,47 @@ fn pin(p: &PinOp) -> String {
     format!("{} @PIN({})", point(p.at), params.join(", "))
 }
 
-/// The facts of a position: `@PLACE` and `@ORIENT`, the default orientation R0 left out.
+/// The facts of a position: `@PLACE` and `@ORIENT`. An orientation given is written, R0 too: without
+/// an ORIENT the orientation is the solver's to choose (11.2), not R0.
 fn placed(at: &Option<Point>, orient: &Option<String>) -> Vec<String> {
     let mut out = Vec::new();
     if let Some(p) = at {
         out.push(format!("@PLACE{}", point(*p)));
     }
-    if let Some(o) = orient.as_deref().filter(|o| *o != "R0") {
+    if let Some(o) = orient {
         out.push(format!("@ORIENT({})", quote(o)));
     }
     out
 }
 
-/// The statements of a level op, in order (`use-package` writes none: it goes into the header).
-pub fn statements(op: &Op) -> Vec<String> {
+/// A style (9.3) of the properties given, in their order, with no base style.
+pub fn define_style(name: &str, props: &[(String, Literal)]) -> String {
+    let props: Vec<String> = props.iter().map(|(k, v)| format!("{}={}", role_name(k), literal(v))).collect();
+    format!("{name} = @DEFINE-STYLE({}) {{}}", props.join(", "))
+}
+
+/// The statements of a level op, in order (`use-package` writes none: it goes into the header);
+/// `style` names the style that the op's `style` is defined as in its level.
+pub fn statements(op: &Op, style: Option<&str>) -> Vec<String> {
     match op {
-        Op::Set { object, symbol, at, orient } => {
+        Op::Set { object, symbol, at, orient, .. } => {
             let mut facts: Vec<String> = symbol.iter().map(|s| format!("@SET-SYMBOL {s}")).collect();
+            facts.extend(style.map(|s| format!("@SET-STYLE {s}")));
             facts.extend(placed(at, orient));
             vec![format!("{object} {}", facts.join(" => "))]
         }
-        Op::AddUsage { name, definition, attach, symbol, at, orient } => {
+        Op::AddUsage { name, definition, attach, params, symbol, at, orient, .. } => {
             // each object with the role it fills, so that the roles are those of the request
-            // whatever order it writes them in, and a role the definition lacks fails (9.4)
+            // whatever order it writes them in, and a role the definition lacks fails (9.4); the
+            // parameters by name, so that one the definition lacks fails as well
             let roles: Vec<String> =
                 attach.iter().map(|(role, a)| format!("{}({})", given(a), role_name(role))).collect();
-            let mut parts = vec![format!("{definition} @ATTACH {}", roles.join(" "))];
+            let params: Vec<String> =
+                params.iter().map(|(k, v)| format!("{}={}", role_name(k), parameter(v))).collect();
+            let params = if params.is_empty() { String::new() } else { format!("({})", params.join(", ")) };
+            let mut parts = vec![format!("{definition} @ATTACH{params} {}", roles.join(" "))];
             parts.extend(symbol.iter().map(|s| format!("@SET-SYMBOL {s}")));
+            parts.extend(style.map(|s| format!("@SET-STYLE {s}")));
             parts.extend(placed(at, orient));
             parts.extend(name.iter().cloned());
             vec![parts.join(" => ")]

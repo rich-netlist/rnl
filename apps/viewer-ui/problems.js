@@ -1,4 +1,4 @@
-import { append, m, setAttr, setText } from "./i18n.js";
+import { append, m, setAttr, setText, tr } from "./i18n.js";
 // The problems list: the errors, warnings and hints, the most serious first; clicking one shows
 // its line in the text. The line numbers of the lines they are on are coloured.
 
@@ -57,15 +57,11 @@ function packageHint(d, version) {
   if (!missing) return null;
   const li = document.createElement("li");
   li.className = "diag hint package-hint";
-  const message = span("msg", m("Look for it in File › Include Public Package…"));
+  const message = span("msg", m("Look for it in File › Include Public Package..."));
   append(li, span("sev", "hint"), message);
   if (shell.platform === "desktop") {
-    setText(message, m("Add the package file to Library or a PATH directory; public packages are listed on the website's "));
-    const link = document.createElement("a");
-    link.href = "https://rich-netlist.github.io/rnl/en/packages.html";
-    setText(link, m("Packages page"));
-    link.addEventListener("click", (e) => { e.preventDefault(); shell.browse?.(link.href); });
-    append(message, link, ".");
+    // the desktop downloads no package: the bundled ones are in the Library, the others are added by hand
+    setText(message, m("Look for it in Help › Public Packages."));
   } else if (shell.publicPackages) {
     shell.publicPackages().then((packages) => {
       if (version !== renderVersion || !li.isConnected) return;
@@ -108,17 +104,21 @@ export function renderDiagnostics(list) {
   const counts = $("counts");
   counts.replaceChildren();
   const n = (s) => list.filter((d) => d.severity === s).length;
-  for (const [s, one, many] of [["error", "error", "errors"], ["warning", "warning", "warnings"], ["hint", "hint", "hints"]]) {
+  for (const [s, one, many] of [["error", tr("{0} error"), tr("{0} errors")], ["warning", tr("{0} warning"), tr("{0} warnings")],
+    ["hint", tr("{0} hint"), tr("{0} hints")]]) {
     const k = n(s);
-    if (k) append(counts, span(`n-${s}`, m`${k} ${m(k === 1 ? one : many)}`));
+    if (k) append(counts, span(`n-${s}`, m(k === 1 ? one : many, k)));
   }
   if (list.length === 0) append(counts, span("none", m("none")));
 }
 
+// the levels of diagnostics (7.6), as a row names them
+const SEVERITY = { error: tr("error"), warning: tr("warning"), hint: tr("hint") };
+
 function diagnosticRow(d) {
   const li = document.createElement("li");
   li.className = `diag ${d.severity}`;
-  append(li, span("sev", m(d.severity)), span("msg", d.message));
+  append(li, span("sev", m(SEVERITY[d.severity] ?? d.severity)), span("msg", d.message));
   if (d.file) {
     const loc = span("loc", `${d.file}:${d.line}${d.col ? `:${d.col}` : ""}`);
     if (d.full_path) setAttr(loc, "title", d.full_path);

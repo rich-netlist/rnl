@@ -17,15 +17,25 @@ pub struct LevelOp {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Op {
-    /// Facts about a host object: its symbol, position and orientation.
-    Set { object: String, symbol: Option<String>, at: Option<Point>, orient: Option<String> },
+    /// Facts about a host object: its symbol, style, position and orientation. The style is its
+    /// properties (9.3), written as a DEFINE-STYLE that a SET-STYLE gives the object (11.3).
+    Set {
+        object: String,
+        symbol: Option<String>,
+        style: Vec<(String, Literal)>,
+        at: Option<Point>,
+        orient: Option<String>,
+    },
     /// A usage of a definition (9.4), attached to objects or points: each role by its name, with
-    /// what it is given, in the order the request writes them.
+    /// what it is given, in the order the request writes them; and the parameters it writes, in the
+    /// order given; and its style, as for `Set`.
     AddUsage {
         name: Option<String>,
         definition: String,
         attach: Vec<(String, Attach)>,
+        params: Vec<(String, Literal)>,
         symbol: Option<String>,
+        style: Vec<(String, Literal)>,
         at: Option<Point>,
         orient: Option<String>,
     },
@@ -131,12 +141,14 @@ pub enum Vertex {
     At(Point),
 }
 
-/// A style property's value.
+/// A literal (3.7): the value of a style property or of a graphic's parameter, a string, a number
+/// or a truth value; the value of a usage's parameter may also be a list of them.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
     Str(String),
     Num(f64),
     Bool(bool),
+    List(Vec<Literal>),
 }
 
 /// The content of a text: markup as written (13.6), or lines of runs as the Document gives them.
@@ -180,7 +192,7 @@ pub fn parse(k: usize, value: &Value) -> Result<LevelOp, String> {
     let kind = obj.get("op").and_then(Value::as_str).ok_or_else(|| format!("op {k}: no \"op\""))?;
     // fields of the draft that this writer does not write yet: refused rather than left out
     let later: &[&str] = match kind {
-        "set" | "add-usage" => &["style", "layer"],
+        "set" | "add-usage" => &["layer"],
         "add-wire" => &["layer"],
         _ => &[],
     };
@@ -188,8 +200,8 @@ pub fn parse(k: usize, value: &Value) -> Result<LevelOp, String> {
         return Err(fail(kind, format!("`{f}` is not written yet")));
     }
     let allowed: &[&str] = match kind {
-        "set" => &["object", "symbol", "at", "orient"],
-        "add-usage" => &["name", "definition", "attach", "symbol", "at", "orient"],
+        "set" => &["object", "symbol", "style", "at", "orient"],
+        "add-usage" => &["name", "definition", "attach", "params", "symbol", "style", "at", "orient"],
         "add-point" => &["name", "at", "junction"],
         "add-wire" => &["name", "nets", "via", "mode", "style"],
         "add-text" => {
@@ -219,11 +231,14 @@ pub fn parse(k: usize, value: &Value) -> Result<LevelOp, String> {
             let op = Op::Set {
                 object: r.string("object")?,
                 symbol: r.opt_string("symbol")?,
+                style: r.style()?,
                 at: r.opt_point("at")?,
                 orient: r.opt_string("orient")?,
             };
-            if let Op::Set { symbol: None, at: None, orient: None, .. } = op {
-                return Err(fail(kind, "nothing to set: no `symbol`, `at` or `orient`".into()));
+            if let Op::Set { symbol: None, at: None, orient: None, style, .. } = &op {
+                if style.is_empty() {
+                    return Err(fail(kind, "nothing to set: no `symbol`, `style`, `at` or `orient`".into()));
+                }
             }
             op
         }
@@ -231,7 +246,9 @@ pub fn parse(k: usize, value: &Value) -> Result<LevelOp, String> {
             name: r.opt_string("name")?,
             definition: r.string("definition")?,
             attach: r.attach()?,
+            params: r.params()?,
             symbol: r.opt_string("symbol")?,
+            style: r.style()?,
             at: r.opt_point("at")?,
             orient: r.opt_string("orient")?,
         },
@@ -447,6 +464,32 @@ impl Reader<'_> {
                         &format!("vertex {n} is not one of {{terminal}}, {{point}}, {{usage, role}}, {{at}}"),
                     )
                 })
+            })
+            .collect()
+    }
+
+    /// A usage's parameters: each a string, a number, a truth value or a list of them, as the
+    /// snapshot gives them back (`ObjectView.params`). A string with a line break is refused: it
+    /// would end the comment that carries the record.
+    fn params(&self) -> Result<Vec<(String, Literal)>, String> {
+        fn value(v: &Value) -> Option<Literal> {
+            Some(match v {
+                Value::String(s) if !s.contains(['\n', '\r']) => Literal::Str(s.clone()),
+                Value::Bool(b) => Literal::Bool(*b),
+                Value::Number(n) => Literal::Num(n.as_f64()?),
+                Value::Array(a) => Literal::List(a.iter().map(value).collect::<Option<_>>()?),
+                _ => return None,
+            })
+        }
+        let Some(v) = self.obj.get("params").filter(|v| !v.is_null()) else { return Ok(Vec::new()) };
+        let map = v.as_object().ok_or_else(|| self.fail("params", "is not an object"))?;
+        map.iter()
+            .map(|(name, v)| match value(v) {
+                Some(lit) => Ok((name.clone(), lit)),
+                None => Err(self.fail(
+                    "params",
+                    &format!("`{name}` is not a string without a line break, a number, a boolean or a list of them"),
+                )),
             })
             .collect()
     }

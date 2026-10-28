@@ -194,7 +194,7 @@ fn holds_tokens(tail: &str) -> bool {
 /// Where the reading is in SPICE mode, `//` is no comment: [`carrier_at`] gives the marker of a
 /// record written at a line.
 pub fn carrier(doc: &HostDocument, file: &str, text: &str) -> &'static str {
-    if file.to_lowercase().ends_with(".rnl") {
+    if doc.is_package(file) {
         return "";
     }
     let lines: Vec<&str> = text.lines().collect();
@@ -210,7 +210,7 @@ pub fn carrier(doc: &HostDocument, file: &str, text: &str) -> &'static str {
             }
         }
     }
-    let spectre_mode = doc.dialect.name == "spectre"
+    let spectre_mode = doc.rules(file).name == "spectre"
         && (file.to_lowercase().ends_with(".scs")
             || text.lines().take(5).any(|l| l.trim().to_lowercase().starts_with("simulator") && l.contains("spectre")));
     if spectre_mode {
@@ -378,7 +378,7 @@ pub fn applies_to(doc: &HostDocument, written_in: LevelId, rec: &Record, level: 
         Some(target) => {
             let lv = &doc.levels[level];
             lv.kind == LevelKind::Subckt
-                && doc.key(&lv.name) == doc.key(&target)
+                && doc.names_level(level, &target)
                 && doc.ancestors(level).contains(&written_in)
         }
     }
@@ -620,7 +620,7 @@ fn file_records<'a>(
 /// written at its file level, `at` or the one that reads `file` ([`file_records`], 2.8); a package
 /// file has a header by rule (16.2) and gives none.
 fn first_header<'a>(doc: &'a HostDocument, file: &str, at: Option<LevelId>) -> Option<&'a Record> {
-    if file.to_lowercase().ends_with(".rnl") {
+    if doc.is_package(file) {
         return None;
     }
     let (top, records) = file_records(doc, file, at);
@@ -690,7 +690,7 @@ fn header_edits(
     version: &str,
 ) -> (Vec<Edit>, &'static str) {
     let marker = carrier(doc, file, text);
-    if file.to_lowercase().ends_with(".rnl") {
+    if doc.is_package(file) {
         return (Vec::new(), marker);
     }
     match first_header(doc, file, at) {
@@ -736,7 +736,7 @@ fn new_header(
 /// same rules. A file that has a header record, or where none can be written, comes back as it
 /// is, and so does a package file. `text` is the text whose positions the document gives.
 pub fn add_header(doc: &HostDocument, file: &str, text: &str, record: impl FnOnce(&'static str) -> String) -> String {
-    if file.to_lowercase().ends_with(".rnl") || records_of(doc, file).iter().any(|(_, r)| record_type(r) == "header") {
+    if doc.is_package(file) || records_of(doc, file).iter().any(|(_, r)| record_type(r) == "header") {
         return text.to_string();
     }
     let marker = carrier(doc, file, text);
@@ -778,7 +778,7 @@ pub fn raise_version(doc: &HostDocument, text: &str, levels: &[(LevelId, bool)])
 /// be raised.
 fn raise_edit(doc: &HostDocument, level: LevelId, text: &str, pin: bool) -> Option<Edit> {
     let file = &doc.levels[level].file;
-    if file.to_lowercase().ends_with(".rnl") {
+    if doc.is_package(file) {
         return None;
     }
     let pinned = if pin { format!("; {PIN_STD_0_2}") } else { String::new() };
@@ -1048,7 +1048,7 @@ fn top(doc: &HostDocument, file: &str, at: Option<LevelId>, text: &str, marker: 
     }
     let lines = Lines::new(text);
     let main = doc.levels.first().is_some_and(|l| l.file == file);
-    let spectre = doc.dialect.name == "spectre";
+    let spectre = doc.rules(file).name == "spectre";
     let mut marker = marker;
     if spectre && marker == "//" && !file.to_lowercase().ends_with(".scs") {
         match after_spectre_switch(&lines, usize::from(main)) {
@@ -1113,6 +1113,31 @@ mod tests {
     /// .unprot` regions; with `//`, a Spectre reader, whose `*` lines carry as well, with `protect …
     /// unprotect` regions, and in SPICE mode from the start of a file that is not a .scs file, or
     /// from a `simulator lang=spice`, up to a `simulator lang=spectre`.
+    /// `d` with the file `file` read in the RNL package format.
+    fn as_package(d: &HostDocument, file: &str) -> HostDocument {
+        let mut d = d.clone();
+        d.file_dialects.insert(file.into(), crate::host::format::Format::dialect(&crate::host::package::Package));
+        d
+    }
+
+    #[test]
+    fn a_package_file_is_one_of_the_package_format_whatever_its_suffix() {
+        // a `.rnl` file read as a netlist, as a user may choose, is carried in comments and gets a
+        // header; a package file of another suffix gets neither (2.7)
+        let net = "* t\nR1 a b 1k\n.end\n";
+        let header = "* @RNL(type=\"header\") { @VERSION(\"0.3\")}";
+        assert_eq!(
+            with_header(&doc(net, "a.rnl", "*"), "a.rnl", net, "0.3"),
+            format!("* t\n{header}\nR1 a b 1k\n.end\n")
+        );
+        let package = "@RNL(type=\"header\") { @VERSION(\"0.3\"); @PACKAGE(name=\"acme\")}\n@RNL {}\n";
+        let d = as_package(&doc(package, "acme.pkg", "*"), "acme.pkg");
+        assert_eq!(carrier(&d, "acme.pkg", package), "");
+        assert_eq!(with_header(&d, "acme.pkg", package, "0.3"), package);
+        assert_eq!(add_header(&d, "acme.pkg", package, |_| "@RNL {}".into()), package);
+        assert_eq!(raise_version(&d, package, &[(0, false)]), (package.to_string(), vec![false]));
+    }
+
     fn doc(text: &str, file: &str, marker: &str) -> HostDocument {
         let mut main = Level::new(LevelKind::File, file, file, file);
         main.circuit = true;
@@ -1281,7 +1306,7 @@ mod tests {
             with_header(&d, "a.scs", net, "0.2"),
             "// t\n// @RNL(type=\"header\") { @VERSION(\"0.2\")}\nR1 (a b) resistor r=1k\n"
         );
-        assert_eq!(with_header(&d, "p.rnl", "@RNL {}\n", "0.2"), "@RNL {}\n");
+        assert_eq!(with_header(&as_package(&d, "p.rnl"), "p.rnl", "@RNL {}\n", "0.2"), "@RNL {}\n");
     }
 
     #[test]
@@ -1624,7 +1649,7 @@ mod tests {
         // a file that has a header record, and a package file, come back as they are
         let with = "* t\n* @RNL(type=\"header\") {}\n.end\n";
         assert_eq!(add_header(&doc(with, "a.sp", "*"), "a.sp", with, record), with);
-        assert_eq!(add_header(&d, "p.rnl", "@RNL {}\n", record), "@RNL {}\n");
+        assert_eq!(add_header(&as_package(&d, "p.rnl"), "p.rnl", "@RNL {}\n", record), "@RNL {}\n");
     }
 
     #[test]
@@ -1659,6 +1684,7 @@ mod tests {
         // a package file, a header that is not the first record, and one in a region written to be
         // encrypted are not raised
         let package = d.add_level(Level::new(LevelKind::File, "p.rnl", "p.rnl", "p.rnl"), Some(0));
+        let d = as_package(&d, "p.rnl");
         assert_eq!(raise_version(&d, "@RNL {}\n", &[(package, true)]), ("@RNL {}\n".to_string(), vec![false]));
         let late = "* t\n* @RNL {#R1}\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n.end\n";
         assert_eq!(raise(&doc(late, "a.sp", "*"), late, true), None);

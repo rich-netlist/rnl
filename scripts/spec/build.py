@@ -438,7 +438,7 @@ def page_meta(lang: str, title: str, language_path: str, site_root: str) -> dict
             "locale-css": I18N.css(lang), "language-css": i18n_asset("languages.css"),
             "language-script": i18n_asset("languages.js"),
             "site-root": site_root, "intro-label": L["intro"], "tour-label": L["tour"], "spec-label": L["spec"],
-            "packages-label": L["packages"], "tools-label": L["tools"], "agents-label": L["agents"],
+            "packages-label": L["packages"], "gallery-label": L["gallery"], "on-this-page-label": L["on_this_page"], "tools-label": L["tools"], "agents-label": L["agents"],
             "pages-label": L["pages"],
             "kicker": L["kicker"],
             "theme-label": L["theme_dark"],

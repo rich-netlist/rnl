@@ -5,6 +5,7 @@ use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
 use rnl_runtime::diag::{Loc, Sink};
+use rnl_runtime::host::format::Reading;
 use rnl_runtime::host::{HostDocument, LevelKind};
 use rnl_runtime::source::{normalize, LibraryDefinition, LibraryLookup, MemoryProvider, Provider};
 
@@ -24,6 +25,12 @@ pub struct LibraryIndex {
     imports: BTreeMap<String, Arc<Entry>>,
     names: Arc<HashMap<String, Vec<LibraryDefinition>>>,
     dirty: bool,
+    /// The formats set for files by path ([`crate::BuildOptions::formats`]), that the library
+    /// files and their includes are read with ([`LibraryIndex::set_formats`]).
+    formats: BTreeMap<String, String>,
+    /// The paths whose format changed since the last update, as set: the entries that read them
+    /// are read again, the paths compared by the key of the files they are read from.
+    reformat: Vec<String>,
 }
 
 fn fingerprint(text: &str) -> u64 {
@@ -33,6 +40,34 @@ fn fingerprint(text: &str) -> u64 {
 }
 
 impl LibraryIndex {
+    /// Read the library files with the formats set for files by path, as a build reads them
+    /// ([`crate::BuildOptions::formats`]); call it before [`LibraryIndex::update`]. The files whose
+    /// format changed, and those that read them, are read again at the next update. A format name
+    /// that is not known leaves its file as if none were set.
+    pub fn set_formats(&mut self, formats: BTreeMap<String, String>) {
+        if formats == self.formats {
+            return;
+        }
+        let changed = formats.keys().chain(self.formats.keys()).filter(|p| formats.get(*p) != self.formats.get(*p));
+        let changed: Vec<String> = changed.map(|p| normalize(&p.replace('\\', "/"))).collect();
+        self.reformat.extend(changed);
+        self.formats = formats;
+    }
+
+    /// Drop the entries that read a file whose format changed ([`LibraryIndex::set_formats`]),
+    /// its path and theirs compared by [`Provider::path_key`] of `files`.
+    fn drop_reformatted(&mut self, files: &dyn Provider) {
+        if self.reformat.is_empty() {
+            return;
+        }
+        let keys: HashSet<String> = self.reformat.drain(..).map(|p| files.path_key(&p)).collect();
+        let reads = |entry: &Entry| entry.dependencies.keys().any(|p| keys.contains(&files.path_key(p)));
+        let count = self.entries.len() + self.imports.len();
+        self.entries.retain(|_, entry| !reads(entry));
+        self.imports.retain(|_, entry| !reads(entry));
+        self.dirty |= count != self.entries.len() + self.imports.len();
+    }
+
     /// Replacing an existing Library item also invalidates roots that include that item.
     pub fn invalidate(&mut self, paths: &[String]) {
         let paths: HashSet<_> = paths.iter().map(|p| normalize(p)).collect();
@@ -47,6 +82,7 @@ impl LibraryIndex {
     /// Only new files are read normally. Reload reads every file, packages included. Failed reads
     /// remove stale definitions and are reported to the caller; subsequent updates may retry them.
     pub fn update(&mut self, paths: &[String], files: &dyn Provider, reload: bool) -> Vec<String> {
+        self.drop_reformatted(files);
         let paths: HashSet<_> = paths.iter().map(|p| normalize(p)).collect();
         let count = self.entries.len();
         self.entries.retain(|p, _| paths.contains(p));
@@ -56,7 +92,7 @@ impl LibraryIndex {
             if !reload && self.entries.contains_key(path) {
                 continue;
             }
-            match Self::entry(path, files) {
+            match Self::entry(path, files, &self.formats) {
                 Some(entry) => {
                     self.dirty = true;
                     self.entries.insert(path.clone(), Arc::new(entry));
@@ -75,18 +111,19 @@ impl LibraryIndex {
         errors
     }
 
-    fn entry(path: &str, files: &dyn Provider) -> Option<Entry> {
+    fn entry(path: &str, files: &dyn Provider, formats: &BTreeMap<String, String>) -> Option<Entry> {
         let text = files.read(path)?;
         let mut definitions = Vec::new();
         let mut sectioned = HashSet::new();
         let mut dependencies = HashMap::from([(path.to_string(), fingerprint(&text))]);
-        if !path.to_ascii_lowercase().ends_with(".rnl") {
+        // a library file is read on its own, by its format, its first line a statement; a package
+        // file defines no subcircuit
+        let set = crate::formats::known_formats(formats, files);
+        let main = crate::formats::main_format(path, &text, None, &set, files);
+        if crate::formats::name(main.0) != rnl_runtime::host::package::NAME {
             let mut sink = Sink::new();
-            let doc = if super::is_spectre(path, &text, None) {
-                rnl_host_spectre::read_library(path, files, &mut sink)
-            } else {
-                rnl_host_spice::read_library(path, files, &mut sink)
-            }?;
+            let doc =
+                crate::formats::with(main, &set, files, |f| Reading::read(path, files, &mut sink, f, &[], false))?;
             for (id, lv) in doc.levels.iter().enumerate() {
                 let source = normalize(&lv.path);
                 if let std::collections::hash_map::Entry::Vacant(entry) = dependencies.entry(source) {
@@ -125,7 +162,7 @@ impl LibraryIndex {
                 .get(path)
                 .cloned()
                 .or_else(|| (!reload).then(|| self.imports.get(path).cloned()).flatten())
-                .or_else(|| Self::entry(path, files).map(Arc::new));
+                .or_else(|| Self::entry(path, files, &self.formats).map(Arc::new));
             if let Some(entry) = entry {
                 imports.insert(path.clone(), entry);
             }
@@ -185,7 +222,7 @@ impl LibraryIndex {
             })
             .collect();
         for path in &changed {
-            if let Some(entry) = Self::entry(path, files) {
+            if let Some(entry) = Self::entry(path, files, &self.formats) {
                 out.entries.insert(path.clone(), Arc::new(entry));
             } else {
                 out.entries.remove(path);
@@ -242,6 +279,9 @@ impl Provider for LibraryProvider<'_> {
     fn auto_include(&self) -> Option<&dyn LibraryLookup> {
         self.enabled.then_some(self.index)
     }
+    fn path_key(&self, path: &str) -> String {
+        self.files.path_key(path)
+    }
 }
 
 /// First resolve normal includes. Add uniquely indexed library files until no new dependency can
@@ -267,7 +307,9 @@ pub(crate) fn resolve(
         for lv in &doc.levels {
             for inst in &lv.instances {
                 let Some(model) = inst.model.as_deref() else { continue };
-                if !inst.is_subckt || doc.subckt(model).is_some() {
+                // a name some definition has, or more than one, is no subcircuit to look for
+                let found = doc.subckt_candidates(model, doc.rules(&inst.file).case_sensitive);
+                if !inst.is_subckt || !found.is_empty() {
                     continue;
                 }
                 let key = if inst.case_sensitive { model.to_string() } else { model.to_lowercase() };
@@ -291,12 +333,23 @@ pub(crate) fn resolve(
                     }
                     let definitions = index.definitions(&def.path);
                     let mut own: HashMap<String, LibraryDefinition> = HashMap::new();
+                    // in a netlist whose files are of several formats, a library definition, whose
+                    // format the index does not keep, clashes with any of the same name in any case:
+                    // one format or the other may find both, and nothing is to change what a
+                    // reference finds without saying so
+                    let mixed = doc.mixed();
+                    let key_of = |name: &str| if mixed { name.to_lowercase() } else { doc.key(name) };
                     let conflict = definitions.iter().find(|d| {
-                        let key = doc.key(&d.name);
-                        let present = doc.subckt(&d.name).is_some_and(|id| {
-                            let existing = &doc.levels[id];
+                        let key = key_of(&d.name);
+                        let other_place = |id: &usize| {
+                            let existing = &doc.levels[*id];
                             normalize(&existing.path) != d.file || existing.line != d.line
-                        });
+                        };
+                        let present = if mixed {
+                            doc.subckt_candidates(&d.name, false).iter().any(other_place)
+                        } else {
+                            doc.subckt(&d.name).as_ref().is_some_and(other_place)
+                        };
                         let other = reserved.get(&key).or_else(|| own.get(&key));
                         let duplicate = other.is_some_and(|other| other.file != d.file || other.line != d.line);
                         own.insert(key, (*d).clone());
@@ -308,7 +361,7 @@ pub(crate) fn resolve(
                         approved.insert(def.path.clone());
                         automatic.push((model.to_string(), def.source.clone(), loc));
                         for d in definitions {
-                            reserved.insert(doc.key(&d.name), d);
+                            reserved.insert(key_of(&d.name), d);
                         }
                         if !next.contains(&def.path) {
                             next.push(def.path.clone());

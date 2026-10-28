@@ -141,12 +141,58 @@
           {
             "id": "&a",
             "global": false,
-            "port": true
+            "port": true,
+            "usages": [
+              {
+                "id": "@rnl-std-fill.rnl:40:3#1",
+                "definition": "$IO_PORT",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&a",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 40,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 40
+                },
+                "state": "in-effect"
+              }
+            ]
           },
           {
             "id": "&b",
             "global": false,
-            "port": true
+            "port": true,
+            "usages": [
+              {
+                "id": "@rnl-std-fill.rnl:40:3#2",
+                "definition": "$IO_PORT",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&b",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 40,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 40
+                },
+                "state": "in-effect"
+              }
+            ]
           }
         ]
       },
@@ -223,6 +269,24 @@
                 "nets": [
                   "&b"
                 ]
+              }
+            ],
+            "usages": [
+              {
+                "id": "@13-numbering-order.sp:25:5",
+                "definition": "$TAP",
+                "roles": [
+                  {
+                    "role": "dev",
+                    "set": false,
+                    "member": "#R1",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 25,
+                "source": "written",
+                "state": "in-effect"
               }
             ]
           },

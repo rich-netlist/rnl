@@ -174,6 +174,19 @@ pub struct Scene {
     pub busy: HashSet<(ObjId, usize)>,
     pub hinted: HashSet<ObjId>,
     pub dropped: usize,
+    /// The applications of definitions in the level's records that failed, in the order found.
+    pub failed_usages: Vec<FailedApplication>,
+}
+
+/// An application of a definition that failed and made no usage ([`crate::model::FailedUsage`]).
+#[derive(Clone, Debug)]
+pub struct FailedApplication {
+    pub name: Option<String>,
+    pub definition: Option<ObjId>,
+    pub roles: Vec<(Option<String>, ObjId)>,
+    /// The record and the statement's first and last offset in it.
+    pub stmt: (Option<RecId>, usize, usize),
+    pub diag: Option<DiagId>,
 }
 
 impl Scene {
@@ -250,16 +263,18 @@ impl Scene {
             busy: HashSet::new(),
             hinted: HashSet::new(),
             dropped: 0,
+            failed_usages: Vec::new(),
         }
     }
 }
 
-/// A net name condition: `*` patterns against the net, otherwise the same node (6.3, 10.1).
-pub(crate) fn name_match(it: &Interp, pattern: &str, key: &str) -> bool {
+/// A net name condition on a net of the level `level`: `*` patterns against the net, otherwise the
+/// same node (6.3, 10.1), by the rules of the level's file.
+pub(crate) fn name_match(it: &Interp, level: LevelId, pattern: &str, key: &str) -> bool {
     if pattern.contains('*') {
-        glob(pattern, key, it.doc.dialect.case_sensitive)
+        glob(pattern, key, it.doc.level_rules(level).case_sensitive)
     } else {
-        key == it.doc.net_key(pattern)
+        key == it.doc.net_key_in(level, pattern, &it.doc.levels[level].file)
     }
 }
 
@@ -290,7 +305,7 @@ impl Interp<'_> {
         let n = self.doc.levels[level].instances.len();
         for idx in 0..n {
             let o = self.new_obj(ObjData::Inst { scene: s, idx, bundle: None });
-            let key = self.doc.key(&self.doc.levels[level].instances[idx].name);
+            let key = self.doc.key_in(level, &self.doc.levels[level].instances[idx].name);
             self.scenes[s].insts.push(o);
             self.scenes[s].inst_keys.insert(key, o);
         }
@@ -299,16 +314,34 @@ impl Interp<'_> {
             self.net_obj(s, &p);
         }
         for idx in 0..n {
-            let nodes = self.doc.levels[level].instances[idx].nodes.clone();
+            let inst = &self.doc.levels[level].instances[idx];
+            let (nodes, file) = (inst.nodes.clone(), inst.file.clone());
             for nd in nodes {
-                self.net_obj(s, &nd);
+                self.net_obj_in(s, &nd, &file);
             }
         }
         s
     }
 
+    /// The net `name` of the scene `s`, written in the scene's own file, as its ports and its
+    /// records are.
     pub(crate) fn net_obj(&mut self, s: SceneId, name: &str) -> ObjId {
-        let key = self.doc.net_key(name);
+        let file = self.doc.levels[self.scenes[s].level].file.clone();
+        self.net_obj_in(s, name, &file)
+    }
+
+    /// The node `node` of a host instance of the scene `s`: the net it is on.
+    fn inst_net(&mut self, s: SceneId, inst: ObjId, node: &str) -> ObjId {
+        let file = self.inst_of(inst).file.clone();
+        self.net_obj_in(s, node, &file)
+    }
+
+    /// The net `name` of the scene `s`, as the file `written` writes it: its key is by the rules of
+    /// the scene's file, its ground by those of `written` ([`HostDocument::net_key_in`]).
+    ///
+    /// [`HostDocument::net_key_in`]: crate::host::HostDocument::net_key_in
+    pub(crate) fn net_obj_in(&mut self, s: SceneId, name: &str, written: &str) -> ObjId {
+        let key = self.doc.net_key_in(self.scenes[s].level, name, written);
         if let Some(&o) = self.scenes[s].net_keys.get(&key) {
             return o;
         }
@@ -320,11 +353,12 @@ impl Interp<'_> {
     }
 
     pub(crate) fn scene_inst(&self, s: SceneId, name: &str) -> Option<ObjId> {
-        self.scenes[s].inst_keys.get(&self.doc.key(name)).copied()
+        self.scenes[s].inst_keys.get(&self.doc.key_in(self.scenes[s].level, name)).copied()
     }
 
     pub(crate) fn scene_net(&self, s: SceneId, name: &str) -> Option<ObjId> {
-        self.scenes[s].net_keys.get(&self.doc.net_key(name)).copied()
+        let level = self.scenes[s].level;
+        self.scenes[s].net_keys.get(&self.doc.net_key_in(level, name, &self.doc.levels[level].file)).copied()
     }
 
     pub(crate) fn inst_of(&self, id: ObjId) -> &crate::host::Instance {
@@ -345,10 +379,8 @@ impl Interp<'_> {
     pub(crate) fn term_names(&mut self, s: SceneId, inst: ObjId) -> Vec<String> {
         let i = self.inst_of(inst).clone();
         if i.is_subckt {
-            if let Some(m) = &i.model {
-                if let Some(sub) = self.doc.subckt(m) {
-                    return self.doc.levels[sub].ports.clone();
-                }
+            if let Some(sub) = self.doc.subckt_of(&i) {
+                return self.doc.levels[sub].ports.clone();
             }
         }
         self.device_pins(s, &i).unwrap_or_default()
@@ -490,7 +522,7 @@ impl Interp<'_> {
         match self.o(owner).clone() {
             ObjData::Inst { .. } => {
                 let node = self.inst_of(owner).nodes[index as usize - 1].clone();
-                return Ok(self.net_obj(s, &node));
+                return Ok(self.inst_net(s, owner, &node));
             }
             ObjData::LevelObj { .. } => {
                 let lv = self.scenes[s].level;
@@ -503,7 +535,7 @@ impl Interp<'_> {
                     // A heterogeneous bundle is still valid (11.8). A shorter member has no
                     // corresponding terminal, so it contributes no net to this bundle pin.
                     if let Some(node) = self.inst_of(m).nodes.get(index as usize - 1).cloned() {
-                        nets.push(self.net_obj(s, &node));
+                        nets.push(self.inst_net(s, m, &node));
                     }
                 }
                 let Some(&first) = nets.first() else {
@@ -541,12 +573,12 @@ impl Interp<'_> {
                 .iter()
                 .filter_map(|m| {
                     let node = self.inst_of(*m).nodes.get(index as usize - 1).cloned()?;
-                    Some(self.net_obj(s, &node))
+                    Some(self.inst_net(s, *m, &node))
                 })
                 .collect(),
             ObjData::Inst { .. } => {
                 let node = self.inst_of(owner).nodes[index as usize - 1].clone();
-                vec![self.net_obj(s, &node)]
+                vec![self.inst_net(s, owner, &node)]
             }
             ObjData::LevelObj { .. } => {
                 let lv = self.scenes[s].level;
@@ -580,6 +612,7 @@ impl Interp<'_> {
             failed: false,
             site: None,
             off: 0,
+            direct: None,
         });
         self.scenes[s].keytexts.insert((obj, key.to_string()), k);
         k
@@ -744,9 +777,12 @@ impl Interp<'_> {
                 }
                 if let Some(k) = &key {
                     let kt = self.scene_keytext(s, att, k);
-                    if let ObjData::KeyText { layers, site: ks, generated: g, .. } = self.om(kt) {
+                    if let ObjData::KeyText { layers, site: ks, generated: g, direct, .. } = self.om(kt) {
                         // its place in the order of writing, where a later segment is later (5.5)
                         layers.push((order_pos(&at, &ctx.segments), items, style));
+                        if !generated {
+                            *direct = site.clone().map(|c| (c, 0));
+                        }
                         *ks = site;
                         *g = generated;
                     }
@@ -1310,7 +1346,7 @@ impl Interp<'_> {
                         let net = net.to_string();
                         let nets = self.tnets(s, t);
                         let ok = nets.iter().any(|n| match self.o(*n) {
-                            ObjData::Net { key, .. } => name_match(self, &net, key),
+                            ObjData::Net { key, .. } => name_match(self, self.scenes[s].level, &net, key),
                             _ => false,
                         });
                         if !ok {
@@ -1366,7 +1402,9 @@ impl Interp<'_> {
                     }
                 };
                 let lv = self.scenes[s].level;
-                let ports: Vec<String> = self.doc.levels[lv].ports.iter().map(|p| self.doc.net_key(p)).collect();
+                let file = &self.doc.levels[lv].file;
+                let ports: Vec<String> =
+                    self.doc.levels[lv].ports.iter().map(|p| self.doc.net_key_in(lv, p, file)).collect();
                 let ends = if params.contains_key("wired") { self.wire_ends(s) } else { HashMap::new() };
                 let mut out = Vec::new();
                 for n in cands {
@@ -1375,7 +1413,7 @@ impl Interp<'_> {
                         _ => continue,
                     };
                     if let Some(name) = params.get("name").and_then(Lit::str) {
-                        if !name_match(self, name, &key) {
+                        if !name_match(self, lv, name, &key) {
                             continue;
                         }
                     }
@@ -1385,7 +1423,7 @@ impl Interp<'_> {
                         }
                     }
                     if let Some(g) = params.get("global").and_then(Lit::boolean) {
-                        if (key == "0" || self.doc.globals.contains(&key)) != g {
+                        if self.doc.is_global(lv, &key) != g {
                             continue;
                         }
                     }
@@ -1427,7 +1465,7 @@ impl Interp<'_> {
                     if let Some(net) = params.get("net").and_then(Lit::str) {
                         let ok = nets
                             .iter()
-                            .any(|n| matches!(self.o(*n), ObjData::Net { key, .. } if name_match(self, net, key)));
+                            .any(|n| matches!(self.o(*n), ObjData::Net { key, .. } if name_match(self, self.scenes[s].level, net, key)));
                         if !ok {
                             continue;
                         }

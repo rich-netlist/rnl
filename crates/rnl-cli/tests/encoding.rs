@@ -197,21 +197,31 @@ fn strip_generated_uses_actual_disk_or_bundled_origin_not_the_display_name() {
     assert_eq!(std::fs::read(&output).unwrap(), expected.as_bytes());
 
     // A real file with the same displayed basename is still a Latin-1 disk source.
-    // This .rnl name intentionally holds host text to simulate a disk shadow. strip-generated
-    // uses host carriers; a package itself cannot contain generated records. The ordinary
-    // comment prefix must survive removal. Exercise this on every platform, not only Unix.
+    // This .rnl name intentionally holds host text to simulate a disk shadow, read as SPICE as the
+    // user sets it: a .rnl file is a package file by default, which has no generated records.
+    // strip-generated uses host carriers. The ordinary comment prefix must survive removal.
+    // Exercise this on every platform, not only Unix.
     let physical = dir.join("rnl-std.rnl");
     let disk = b"* caf\xe9\r\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\r\n* retained note\r\n";
     let with_generated = [disk.strip_suffix(b"\r\n").unwrap(), b" @RNL(type=\"generated\") { }\r\n"].concat();
     std::fs::write(&physical, &with_generated).unwrap();
     let result = Command::new(env!("CARGO_BIN_EXE_rnl"))
-        .args(["strip-generated", physical.to_str().unwrap(), "-o", output.to_str().unwrap()])
+        .args(["strip-generated", physical.to_str().unwrap(), "-o", output.to_str().unwrap(), "--dialect", "spice"])
         .output()
         .unwrap();
     assert!(result.status.success(), "{}", String::from_utf8_lossy(&result.stderr));
     assert_eq!(std::fs::read(&output).unwrap(), disk);
     let result = Command::new(env!("CARGO_BIN_EXE_rnl"))
-        .args(["strip-generated", physical.to_str().unwrap(), "-o", output.to_str().unwrap(), "--encoding", "utf8"])
+        .args([
+            "strip-generated",
+            physical.to_str().unwrap(),
+            "-o",
+            output.to_str().unwrap(),
+            "--encoding",
+            "utf8",
+            "--dialect",
+            "spice",
+        ])
         .output()
         .unwrap();
     assert!(result.status.success(), "{}", String::from_utf8_lossy(&result.stderr));
@@ -227,14 +237,23 @@ fn strip_generated_uses_actual_disk_or_bundled_origin_not_the_display_name() {
         std::fs::write(&shadow, &with_generated).unwrap();
         let result = Command::new(env!("CARGO_BIN_EXE_rnl"))
             .current_dir(&dir)
-            .args(["strip-generated", entry, "-o", output.to_str().unwrap()])
+            .args(["strip-generated", entry, "-o", output.to_str().unwrap(), "--dialect", "spice"])
             .output()
             .unwrap();
         assert!(result.status.success(), "{}", String::from_utf8_lossy(&result.stderr));
         assert_eq!(std::fs::read(&output).unwrap(), disk);
         let result = Command::new(env!("CARGO_BIN_EXE_rnl"))
             .current_dir(&dir)
-            .args(["strip-generated", entry, "-o", output.to_str().unwrap(), "--encoding", "utf8"])
+            .args([
+                "strip-generated",
+                entry,
+                "-o",
+                output.to_str().unwrap(),
+                "--encoding",
+                "utf8",
+                "--dialect",
+                "spice",
+            ])
             .output()
             .unwrap();
         assert!(result.status.success(), "{}", String::from_utf8_lossy(&result.stderr));

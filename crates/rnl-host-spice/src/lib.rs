@@ -11,12 +11,13 @@
 
 pub mod regions;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use rnl_runtime::diag::{Loc, Sink};
-use rnl_runtime::host::{file_name, Dialect, HostDocument, Instance, Level, LevelId, LevelKind};
+use rnl_runtime::host::format::{Card, FileRead, Format, Formats, Reading};
+use rnl_runtime::host::{Dialect, HostDocument, Instance, Level, LevelId, LevelKind};
 use rnl_runtime::records::{scan_run, CarrierLine};
-use rnl_runtime::source::{dirname, normalize, relative_to, resolve_include, Provider};
+use rnl_runtime::source::Provider;
 
 /// A record in a region written to be encrypted (2.2).
 const PROTECTED: &str = "RNL between `.prot` and `.unprot` is read, but it is gone once the region is encrypted (2.2)";
@@ -530,30 +531,55 @@ struct Pending {
     text: String,
 }
 
-/// Reads a SPICE document.
-pub struct Reader<'a> {
-    provider: &'a dyn Provider,
-    pub sink: &'a mut Sink,
-    pub doc: HostDocument,
+/// The SPICE format: the adapter of the SPICE family (2.1). It is the format of a file that no
+/// other format claims, and claims none itself.
+pub struct Spice;
+
+/// What the SPICE format keeps across its files while they are read.
+#[derive(Default)]
+struct State {
+    /// The type of each `.model` card, by lower case name ([`register_model`]).
     models: HashMap<String, String>,
-    /// The [`Level::name_key`]s of each level's instances, to find a name defined twice without
-    /// looking through the level's instances.
-    names: HashMap<LevelId, HashSet<String>>,
+    /// The elements whose nodes wait for the model names: level, index, plain tokens.
     unresolved: Vec<(LevelId, usize, Vec<String>)>,
-    main_dir: String,
 }
 
-impl<'a> Reader<'a> {
-    /// A file's name in the document: relative to the main file's directory when it is in it or
-    /// below, the root included, else its path.
-    fn display(&self, path: &str) -> String {
-        let p = normalize(path);
-        match relative_to(&p, &self.main_dir) {
-            Some(rest) => rest.to_string(),
-            None => p,
-        }
+impl Format for Spice {
+    fn name(&self) -> &'static str {
+        "spice"
     }
 
+    fn title(&self) -> &'static str {
+        "SPICE"
+    }
+
+    fn extensions(&self) -> &'static [&'static str] {
+        &[]
+    }
+
+    fn dialect(&self) -> Dialect {
+        dialect()
+    }
+
+    fn claims(&self, _path: &str, _text: &str) -> bool {
+        false
+    }
+
+    fn read_file(&self, cx: &mut Reading, file: &FileRead) {
+        Reader { cx }.read_file(file.path, file.level, file.circ, file.main, file.stack, file.section);
+    }
+
+    fn finish(&self, cx: &mut Reading) {
+        finish(cx);
+    }
+}
+
+/// Reads the SPICE files of a reading.
+struct Reader<'r, 'a> {
+    cx: &'r mut Reading<'a>,
+}
+
+impl Reader<'_, '_> {
     #[allow(clippy::too_many_arguments)]
     fn new_level(
         &mut self,
@@ -568,7 +594,7 @@ impl<'a> Reader<'a> {
         let mut lv = Level::new(kind, name, file, path);
         lv.circuit = circuit;
         lv.line = line;
-        self.doc.add_level(lv, Some(parent))
+        self.cx.doc.add_level(lv, Some(parent))
     }
 
     /// Read one host file into `level`; elements outside subcircuits go to `circ` (6.1).
@@ -582,12 +608,12 @@ impl<'a> Reader<'a> {
         stack: &[String],
         section: Option<&str>,
     ) {
-        let Some(text) = self.provider.read(path) else {
+        let Some(text) = self.cx.provider.read(path) else {
             return;
         };
-        let fname = self.display(path);
-        if !self.doc.sources.iter().any(|(f, _)| *f == fname) {
-            self.doc.sources.push((fname.clone(), text.clone()));
+        let fname = self.cx.display(path);
+        if !self.cx.doc.sources.iter().any(|(f, _)| *f == fname) {
+            self.cx.doc.sources.push((fname.clone(), text.clone()));
         }
         let lines: Vec<&str> = text.lines().collect();
         let mut cur = level;
@@ -613,18 +639,18 @@ impl<'a> Reader<'a> {
             let stripped = raw.trim();
             let low = stripped.to_lowercase();
             if !compatibility_hint {
-                compatibility_hint = hint_comment_compatibility(raw, false, &fname, no, self.sink);
+                compatibility_hint = hint_comment_compatibility(raw, false, &fname, no, self.cx.sink);
             }
             if no == 1 {
                 if raw.contains("@RNL") {
-                    self.sink.warning(
+                    self.cx.sink.warning(
                         "the first line of a file is a title and is not read as RNL (2.2)",
                         Some(Loc::line(&fname, 1)),
                     );
                 }
                 // Encryption pragmas are meaningful even on a file's first comment line.
                 if raw.trim_start().starts_with("//") {
-                    regions.skip(raw, no, false, main, &fname, self.sink);
+                    regions.skip(raw, no, false, main, &fname, self.cx.sink);
                 }
                 if main || raw.starts_with('*') {
                     continue;
@@ -632,7 +658,8 @@ impl<'a> Reader<'a> {
             }
             if ended {
                 if raw.contains("@RNL") {
-                    self.sink
+                    self.cx
+                        .sink
                         .warning("RNL after `.end` of the main file is not read (2.2)", Some(Loc::line(&fname, no)));
                 }
                 continue;
@@ -645,10 +672,10 @@ impl<'a> Reader<'a> {
                 let is_endl = toks.first().is_some_and(|t| t.eq_ignore_ascii_case(".endl"));
                 if let Some((name, start)) = &skip_lib {
                     if is_endl && toks.get(1).is_none_or(|t| t.eq_ignore_ascii_case(name)) {
-                        self.doc.unselected_sections.push((level, *start, no));
+                        self.cx.doc.unselected_sections.push((level, *start, no));
                         skip_lib = None;
                     } else if raw.contains("@RNL") {
-                        self.sink.warning(
+                        self.cx.sink.warning(
                             "RNL in a `.lib` section that is not selected is not read (2.2)",
                             Some(Loc::line(&fname, no)),
                         );
@@ -657,16 +684,16 @@ impl<'a> Reader<'a> {
                 }
                 if is_lib && toks.len() == 2 && section.is_some_and(|s| s.eq_ignore_ascii_case(toks[1])) {
                     in_section = true;
-                    self.doc.levels[level].section_lines.get_or_insert((no, 0));
+                    self.cx.doc.levels[level].section_lines.get_or_insert((no, 0));
                 } else if raw.contains("@RNL") {
-                    self.sink.warning(
+                    self.cx.sink.warning(
                         "RNL outside the selected `.lib` section is not read (2.2)",
                         Some(Loc::line(&fname, no)),
                     );
                 }
                 continue;
             }
-            if regions.skip(raw, no, false, main, &fname, self.sink) {
+            if regions.skip(raw, no, false, main, &fname, self.cx.sink) {
                 self.flush_run(&mut run, &fname, cur);
                 subckt_more = None;
                 if let Some(p) = pending.take() {
@@ -677,17 +704,17 @@ impl<'a> Reader<'a> {
             if let Some(rest) = raw.strip_prefix('*') {
                 if rest.trim().is_empty() || rest.starts_with(' ') {
                     if (pending.is_some() || subckt_more.is_some()) && continued.after(&lines, idx) {
-                        self.sink.warning(COMMENT_IN_A_STATEMENT, Some(Loc::line(&fname, no)));
+                        self.cx.sink.warning(COMMENT_IN_A_STATEMENT, Some(Loc::line(&fname, no)));
                     }
                     if protect.is_some() && rest.contains("@RNL") {
-                        self.sink.warning(PROTECTED, Some(Loc::line(&fname, no)));
+                        self.cx.sink.warning(PROTECTED, Some(Loc::line(&fname, no)));
                     }
                     run.push(CarrierLine { line: no, content: rest.to_string(), col: 1 });
                     continue;
                 }
                 self.flush_run(&mut run, &fname, cur);
                 if raw.contains("@RNL") {
-                    self.sink.warning(
+                    self.cx.sink.warning(
                         "no space after the comment marker: this line is not a carrier and its @RNL is not a record entry (2.2)",
                         Some(Loc::line(&fname, no)),
                     );
@@ -700,7 +727,7 @@ impl<'a> Reader<'a> {
                 continue;
             }
             if raw.contains("@RNL") && !stripped.starts_with('+') {
-                self.sink.warning(
+                self.cx.sink.warning(
                     "@RNL in an end-of-line comment or a host statement is host text (2.2)",
                     Some(Loc::line(&fname, no)),
                 );
@@ -712,7 +739,7 @@ impl<'a> Reader<'a> {
                 } else if let Some(sub) = subckt_more {
                     let toks = subckt_tokens(cont);
                     let (ports, params) = subckt_ports(&toks.iter().map(String::as_str).collect::<Vec<_>>());
-                    self.doc.levels[sub].ports.extend(ports);
+                    self.cx.doc.levels[sub].ports.extend(ports);
                     if params {
                         subckt_more = None;
                     }
@@ -727,14 +754,14 @@ impl<'a> Reader<'a> {
             if first == ".end" {
                 if main {
                     ended = true;
-                    self.doc.levels[level].end_line = no;
+                    self.cx.doc.levels[level].end_line = no;
                 }
                 continue;
             }
             if first == ".endl" {
                 if section.is_some() {
                     in_section = false;
-                    self.doc.levels[level].close_section(no);
+                    self.cx.doc.levels[level].close_section(no);
                 }
                 continue;
             }
@@ -744,7 +771,7 @@ impl<'a> Reader<'a> {
             }
             if first == ".unprot" || first == ".unprotect" {
                 if let Some(start) = protect.take() {
-                    self.doc.protected.push((fname.clone(), start, no));
+                    self.cx.doc.protected.push((fname.clone(), start, no));
                 }
                 continue;
             }
@@ -756,7 +783,7 @@ impl<'a> Reader<'a> {
                     skip_lib = Some((toks[1].to_string(), no));
                 } else if toks.len() >= 3 {
                     let file = unquote(toks[1]);
-                    self.include(&file, Some(toks[2]), no, &fname, path, cur, circ, stack, true);
+                    self.cx.include(&file, Some(toks[2]), no, &fname, path, cur, circ, stack, true);
                 }
                 continue;
             }
@@ -766,17 +793,16 @@ impl<'a> Reader<'a> {
                 let name = toks.get(1).copied().unwrap_or("?");
                 let sub = self.new_level(LevelKind::Subckt, name, &fname, path, cur, true, no);
                 let (ports, params) = subckt_ports(&toks[2.min(toks.len())..]);
-                self.doc.levels[sub].ports = ports;
+                self.cx.doc.levels[sub].ports = ports;
                 subckt_more = (!params).then_some(sub);
-                let key = self.doc.key(name);
-                self.doc.subckts.insert(key, sub);
+                self.cx.doc.add_subckt(sub);
                 sub_stack.push((cur, circ));
                 cur = sub;
                 circ = sub;
                 continue;
             }
             if first == ".ends" {
-                self.doc.levels[cur].end_line = no;
+                self.cx.doc.levels[cur].end_line = no;
                 if let Some((c, k)) = sub_stack.pop() {
                     cur = c;
                     circ = k;
@@ -789,71 +815,36 @@ impl<'a> Reader<'a> {
         if let Some(p) = pending.take() {
             self.statement(&p.text, p.line, &fname, path, cur, circ, stack);
         }
-        self.doc.excluded.extend(regions.finish(&fname, lines.len() as u32 + 1, self.sink));
+        let excluded = regions.finish(&fname, lines.len() as u32 + 1, self.cx.sink);
+        self.cx.doc.excluded.extend(excluded);
         if let Some((_, start)) = skip_lib {
-            self.doc.unselected_sections.push((level, start, lines.len() as u32 + 1));
+            self.cx.doc.unselected_sections.push((level, start, lines.len() as u32 + 1));
         }
         if let Some(start) = protect {
-            self.doc.protected.push((fname.clone(), start, lines.len() as u32 + 1));
+            self.cx.doc.protected.push((fname.clone(), start, lines.len() as u32 + 1));
         }
         if !sub_stack.is_empty() {
-            self.sink.error("a subcircuit has no `.ends`", Some(Loc::line(&fname, lines.len() as u32)));
+            self.cx.sink.error("a subcircuit has no `.ends`", Some(Loc::line(&fname, lines.len() as u32)));
         }
-        if let Some(name) = section.filter(|_| self.doc.levels[level].section_lines.is_none()) {
-            self.sink.error(
+        if let Some(name) = section.filter(|_| self.cx.doc.levels[level].section_lines.is_none()) {
+            self.cx.sink.error(
                 format!("the selected library section {name} was not found; no records can be written there (2.2)"),
                 Some(Loc::line(&fname, 1)),
             );
         }
-        if self.doc.levels[level].end_line == 0 {
-            self.doc.levels[level].end_line = lines.len() as u32 + 1;
+        if self.cx.doc.levels[level].end_line == 0 {
+            self.cx.doc.levels[level].end_line = lines.len() as u32 + 1;
         }
-        self.doc.levels[level].close_section(lines.len() as u32 + 1);
+        self.cx.doc.levels[level].close_section(lines.len() as u32 + 1);
     }
 
     fn flush_run(&mut self, run: &mut Vec<CarrierLine>, fname: &str, level: LevelId) {
         if run.is_empty() {
             return;
         }
-        let recs = scan_run(run, fname, self.sink);
-        self.doc.levels[level].records.extend(recs);
+        let recs = scan_run(run, fname, self.cx.sink);
+        self.cx.doc.levels[level].records.extend(recs);
         run.clear();
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn include(
-        &mut self,
-        target: &str,
-        section: Option<&str>,
-        no: u32,
-        fname: &str,
-        path: &str,
-        cur: LevelId,
-        circ: LevelId,
-        stack: &[String],
-        explicit: bool,
-    ) {
-        let full = resolve_include(self.provider, path, target, self.sink, Loc::line(fname, no));
-        let key = format!("{}#{}", full, section.unwrap_or("").to_lowercase());
-        if stack.contains(&key) {
-            self.sink.error(format!("the include of {target} forms a cycle"), Some(Loc::line(fname, no)));
-            return;
-        }
-        if self.provider.read(&full).is_none() {
-            self.sink.error(format!("the included file {target} cannot be found"), Some(Loc::line(fname, no)));
-            return;
-        }
-        let display = self.display(&full);
-        let name = match section {
-            Some(s) => format!("{} ({s})", file_name(&display)),
-            None => file_name(&display).to_string(),
-        };
-        let child = self.new_level(LevelKind::File, &name, &display, &full, cur, false, no);
-        self.doc.levels[child].section = section.map(String::from);
-        self.doc.levels[child].include_site = explicit.then(|| Loc::line(fname, no));
-        let mut st = stack.to_vec();
-        st.push(key);
-        self.read_file(&full, child, circ, false, &st, section);
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -876,35 +867,44 @@ impl<'a> Reader<'a> {
         if first.starts_with(".inc") {
             if let Some(target) = body.split_whitespace().nth(1) {
                 let target = unquote(target);
-                self.include(&target, None, no, fname, path, cur, circ, stack, true);
+                self.cx.include(&target, None, no, fname, path, cur, circ, stack, true);
             }
             return;
         }
         if first == ".model" {
-            register_model(&mut self.models, &body);
+            let models = &mut self.cx.state::<State>().models;
+            let before: Vec<String> = card_names(&body);
+            register_model(models, &body);
+            let cards: Vec<(String, Option<String>)> =
+                before.into_iter().map(|n| (n.clone(), models.get(&n.to_lowercase()).cloned())).collect();
+            for (k, (name, mtype)) in cards.into_iter().enumerate() {
+                let card =
+                    Card { name, mtype, format: "spice", case_sensitive: false, file: fname.to_string(), line: no };
+                // the card's own name stands for an earlier card of it; a base name keeps the first
+                self.cx.add_card(card, k == 0);
+            }
             return;
         }
         if first == ".global" {
             for t in body.split_whitespace().skip(1) {
-                let k = self.doc.net_key(t);
-                self.doc.globals.insert(k);
+                self.cx.doc.add_global(t, fname);
             }
             return;
         }
         if body.starts_with('.') {
             return;
         }
-        let Some(el) = parse_element(&body, fname, no, self.sink) else {
+        let Some(el) = parse_element(&body, fname, no, self.cx.sink) else {
             return;
         };
-        if !self.doc.levels[circ].circuit {
+        if !self.cx.doc.levels[circ].circuit {
             return;
         }
         // the include or section the line was read through (2.8)
-        let file_level = self.doc.file_level(cur);
-        let lv = &mut self.doc.levels[circ];
-        if !self.names.entry(circ).or_default().insert(lv.name_key(&el.inst.name)) {
-            self.sink.error(format!("element {} is defined twice", el.inst.name), Some(Loc::line(fname, no)));
+        let file_level = self.cx.doc.file_level(cur);
+        let lv = &mut self.cx.doc.levels[circ];
+        if !self.cx.names.entry(circ).or_default().insert(lv.name_key(&el.inst.name)) {
+            self.cx.sink.error(format!("element {} is defined twice", el.inst.name), Some(Loc::line(fname, no)));
             return;
         }
         let mut inst = el.inst;
@@ -914,9 +914,26 @@ impl<'a> Reader<'a> {
         lv.instances.push(inst);
         if needs {
             let k = lv.instances.len() - 1;
-            self.unresolved.push((circ, k, el.plain));
+            self.cx.state::<State>().unresolved.push((circ, k, el.plain));
         }
     }
+}
+
+/// The names a `.model` card registers ([`register_model`]): its own, and the base name of a
+/// binned model, `pch` of `pch.1`; none for a card too short to register.
+pub fn card_names(card: &str) -> Vec<String> {
+    let toks: Vec<&str> = card.split(|c: char| c.is_whitespace() || c == '(').filter(|t| !t.is_empty()).collect();
+    if toks.len() < 3 {
+        return Vec::new();
+    }
+    let name = toks[1].to_string();
+    let mut out = vec![name.clone()];
+    if let Some((base, bin)) = name.rsplit_once('.') {
+        if !base.is_empty() && !bin.is_empty() && bin.chars().all(|c| c.is_ascii_digit()) {
+            out.push(base.to_string());
+        }
+    }
+    out
 }
 
 fn unquote(s: &str) -> String {
@@ -971,6 +988,7 @@ pub fn read_library(path: &str, provider: &dyn Provider, sink: &mut Sink) -> Opt
     read_as(path, provider, sink, &[], false)
 }
 
+/// Read every file of the netlist with the SPICE format.
 fn read_as(
     path: &str,
     provider: &dyn Provider,
@@ -978,36 +996,55 @@ fn read_as(
     includes: &[String],
     main_file: bool,
 ) -> Option<HostDocument> {
-    let path = normalize(path);
-    provider.read(&path)?;
-    let main_dir = dirname(&path);
-    let fname = file_name(&path).to_string();
-    let mut main = Level::new(LevelKind::File, fname.clone(), fname, path.clone());
-    main.circuit = true;
-    let doc = HostDocument::new(main, dialect());
-    let mut r =
-        Reader { provider, sink, doc, models: HashMap::new(), names: HashMap::new(), unresolved: Vec::new(), main_dir };
-    r.read_file(&path, 0, 0, main_file, &[format!("{path}#")], None);
-    let fname = file_name(&path);
-    for extra in includes {
-        r.include(extra, None, 1, fname, &path, 0, 0, &[format!("{path}#")], false);
-    }
-    finish(&mut r.doc, &r.models, std::mem::take(&mut r.unresolved));
-    Some(r.doc)
+    let list: [&dyn Format; 1] = [&Spice];
+    let formats = Formats { list: &list, choose: &|_, _, _| (0, 0) };
+    Reading::read(path, provider, sink, &formats, includes, main_file)
 }
 
-/// After every file is read: nodes of M and Q, model types (10.1).
-fn finish(doc: &mut HostDocument, models: &HashMap<String, String>, unresolved: Vec<(LevelId, usize, Vec<String>)>) {
-    for (lv, k, plain) in unresolved {
-        resolve_nodes(&mut doc.levels[lv].instances[k], &plain, models);
-    }
-    for lv in &mut doc.levels {
-        for inst in &mut lv.instances {
-            // a type the adapter gave (a transmission line) stands; else the model card's
-            if !inst.is_subckt && inst.mtype.is_none() {
-                inst.mtype = inst.model.as_ref().and_then(|m| models.get(&m.to_lowercase()).cloned());
+/// After every file is read: nodes of M and Q, model types (10.1), for the elements of the SPICE
+/// files. When files of other formats have model cards too, a model name is any card's, found as
+/// [`Reading::card`] finds it.
+fn finish(cx: &mut Reading) {
+    let State { models, unresolved } = std::mem::take(cx.state::<State>());
+    // the elements of the files of other formats are theirs to finish
+    let others = cx.others("spice");
+    if !cx.foreign_cards("spice") {
+        for (lv, k, plain) in unresolved {
+            resolve_nodes(&mut cx.doc.levels[lv].instances[k], &plain, &models);
+        }
+        for lv in &mut cx.doc.levels {
+            for inst in lv.instances.iter_mut().filter(|i| !others.contains(&i.file)) {
+                // a type the adapter gave (a transmission line) stands; else the model card's
+                if !inst.is_subckt && inst.mtype.is_none() {
+                    inst.mtype = inst.model.as_ref().and_then(|m| models.get(&m.to_lowercase()).cloned());
+                }
             }
         }
+        return;
+    }
+    // the names of the cards of every format, to tell nodes from a model name by
+    let mut names: HashMap<String, String> = HashMap::new();
+    for (_, _, plain) in &unresolved {
+        for t in plain.iter().filter(|t| cx.is_card(t)) {
+            names.insert(t.to_lowercase(), String::new());
+        }
+    }
+    for (lv, k, plain) in unresolved {
+        resolve_nodes(&mut cx.doc.levels[lv].instances[k], &plain, &names);
+    }
+    let mut typed = Vec::new();
+    for (l, lv) in cx.doc.levels.iter().enumerate() {
+        for (k, inst) in lv.instances.iter().enumerate() {
+            if !inst.is_subckt && inst.mtype.is_none() && inst.model.is_some() && !others.contains(&inst.file) {
+                typed.push((l, k));
+            }
+        }
+    }
+    for (l, k) in typed {
+        let inst = &cx.doc.levels[l].instances[k];
+        let (m, loc) = (inst.model.clone().unwrap_or_default(), Loc::line(&inst.file, inst.line));
+        let mtype = cx.card(&m, false, loc).one().and_then(|c| c.mtype);
+        cx.doc.levels[l].instances[k].mtype = mtype;
     }
 }
 

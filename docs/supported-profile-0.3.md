@@ -62,6 +62,15 @@ is distinguished from the 24 cases of 0.3 and dedicated 0.3 regression tests.
   definition expansion is separately limited to 64 active symbol bodies, including
   fragment dependencies; hitting that limit fails the active chain and leaves
   subsequent independent definitions usable.
+- A package file (2.7) is a file of the format `rnl`, "RNL package": a `.rnl` file, the suggested
+  suffix, and a file of another suffix whose first record starts a line, as no netlist's can, and
+  is a header record with PACKAGE. One opened is checked on its own whatever its suffix; one set
+  to `rnl` whose header has no PACKAGE is an error (16.2), and a `.rnl` file set to SPICE or
+  Spectre is read as a netlist. Lookup by name (16.2) searches a package directory for its `.rnl`
+  files only; a file of another suffix is a package found by name when a frontend sets it to `rnl`,
+  as the viewer's Library and the CLI's `--format PATH=rnl` do. A package file that a netlist
+  includes is not read, and the include is an error, as a package file is not loaded with
+  `.include` (2.7).
 
 ### Non-ASCII host-comment compatibility (3.1)
 
@@ -157,6 +166,40 @@ remains the central work list; the matrices provide source and regression anchor
 | --- | --- | --- |
 | Deferred to 0.4 | **Bundle terminal correspondence (11.8).** Heterogeneous members continue to use first-member terminal ordinals. | The crash is fixed. Name-versus-position correspondence is explicitly left to language 0.4 clarification; these fixes preserve current behavior. |
 | P3 | **Optional-value coverage.** Several optional values and negative combinations still lack dedicated behavioral assertions. | F-05 vocabulary parity is now maintained in CI; it does not establish complete semantic conformance or exhaust the cross product of parameters and contexts. |
+
+## Deliberate departures from the text of 0.3
+
+The user decided these for the core, ahead of the language; the published 0.3 text is unchanged,
+and the language line takes them up for 0.4.
+
+1. **Each file in its own format** (core 0.4.0,
+   [#199](https://github.com/rich-netlist/rnl/pull/199),
+   [#204](https://github.com/rich-netlist/rnl/pull/204)). Each file of a netlist is read by the
+   adapter of its own format, SPICE or Spectre, set by path or detected by the file's suffix and
+   first lines; the main file does not decide it for the files it includes.
+   - 16.3 says the files of a SPICE netlist are all of the SPICE dialect: a `.scs` file that a
+     SPICE netlist includes is now read as Spectre.
+   - The table of 2.2 counts a file that a Spectre netlist includes, with no `.scs` suffix and no
+     `simulator lang=spectre` at its start, as Spectre's SPICE mode: it is now read by the SPICE
+     adapter, so its names ignore case, `gnd` is ground and its elements name no Spectre primitive.
+   - Names that compare across files of two formats (3.6) follow a rule the text does not have: by
+     case only when both the reference and the definition compare names so, a definition spelt as
+     written first, more than one an error.
+2. **A rule's TEXT where it has no drawing meaning** (core 0.4.1). A TEXT that a rule gives what a
+   selection reaches (10.4), landing on a usage without a symbol or a terminal without a pin, does
+   nothing and gives no diagnostic; 13.3 says it fails. A TEXT written for the object itself still
+   fails. It is what 8.3 says of SET-STYLE on a semantic usage, and for the same reason: the rules of
+   `rnl-std-no-labels`, `# @SELECT-USAGE => @TEXT("", key="name")` and the like, reach the usages
+   of structures such as `$MIRRORED`, which have no symbol, and failed in every file that uses the
+   package and writes a structure.
+3. **A file that is not a netlist** (the core after 0.5.3). A file whose format is not set and
+   whose suffix marks a hardware description language, `.va`, `.vams`, `.v`, `.vh`, `.sv`, `.svh`,
+   `.vhd` or `.vhdl`, is of the format text: it is kept as text and not read, records included,
+   and a hint says so, at its include or, opened, at its first line. 16.3 reads every file of a
+   SPICE netlist in the SPICE dialect, which read a Verilog-A model as elements that are not in the
+   SPICE subset. A file that SPICE's `.include` or Spectre's `include` names is followed and kept
+   so; Spectre's `ahdl_include` and `hdl_include` are still not followed. A format set for the
+   file, or the dialect given for the opened file, still decides.
 
 ## Decisions and standard questions
 

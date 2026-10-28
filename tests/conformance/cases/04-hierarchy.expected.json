@@ -3121,12 +3121,5 @@
       "unplaced": []
     }
   ],
-  "diagnostics": [
-    {
-      "severity": "hint",
-      "file": "04-hierarchy.sp",
-      "line": 3,
-      "col": 4
-    }
-  ]
+  "diagnostics": []
 }

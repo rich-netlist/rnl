@@ -98,16 +98,7 @@ test("the same request gives the same Document every time", async () => {
   for (let k = 0; k < 6; k++) assert.deepEqual(core.build(request), first);
   assert.deepEqual(
     first.diagnostics.map(({ severity, file, line, col, message }) => [severity, file, line, col, message]),
-    [
-      [
-        "hint",
-        "16-ties.sp",
-        2,
-        4,
-        "non-ASCII characters in host comments have not been verified for the simulator/version used by this generic adapter; check compatibility before simulation (3.1)",
-      ],
-      ["error", "16-ties.sp", 32, 21, "$ABCZ cannot be found, did you mean $ABCV? (6.6)"],
-    ],
+    [["error", "16-ties.sp", 32, 21, "$ABCZ cannot be found, did you mean $ABCV? (6.6)"]],
   );
 });
 
@@ -331,6 +322,31 @@ test("a catalog request lists the packages, through the core and through the Wor
     assert.deepEqual(await worker.catalog({ catalog: {} }), c);
     assert.deepEqual(await worker.catalog(own), core.catalog(own));
     await assert.rejects(worker.catalog({ catalog: { all_versions: "yes" } }), /^Error: the request is not valid: /);
+  } finally {
+    worker.terminate();
+  }
+});
+
+test("a formats request lists the formats and detects files, through the core and through the Worker", async () => {
+  // a package file by its suffix, or by its first record, a header with PACKAGE at the start of a line
+  const pkg = '@RNL(type="header") { @VERSION("0.3"); @PACKAGE(name="p", version="1.0")}\n';
+  const detect = { "/w/a.inc": "* a\n", "/w/b.lib": "simulator lang=spectre\n", "/w/m.va": "module m;\nendmodule\n", "/w/p.rnl": "", "/w/p.pkg": pkg };
+  const request = { formats: { detect } };
+  const f = core.formats(request);
+  assert.deepEqual(f.list.map((x) => [x.name, x.title, x.fallback]), [["spice", "SPICE", true], ["spectre", "Spectre", false], ["rnl", "RNL package", false], ["text", "Text", false]]);
+  assert.deepEqual(f.detected, { "/w/a.inc": "spice", "/w/b.lib": "spectre", "/w/m.va": "text", "/w/p.rnl": "rnl", "/w/p.pkg": "rnl" });
+  // a build that sets a file's format is a build, not a formats request
+  const files = {
+    "/w/top.sp": '* top\n.include "cells.scs"\nX1 a 0 amp\n.end\n',
+    "/w/cells.scs": "simulator lang=spectre\nsubckt amp (p n)\nR1 (p n) resistor r=1k\nends amp\n",
+  };
+  const d = core.build({ entry: "/w/top.sp", files, formats: { "/w/cells.scs": "spice" } });
+  assert.deepEqual(d.files.map((x) => [x.format, x.default_format]), [["spice", "spice"], ["spice", "spectre"]]);
+  assert.deepEqual(d.formats, f.list);
+  assert.throws(() => core.formats(untitled), /the request is not a formats request/);
+  const worker = startCore();
+  try {
+    assert.deepEqual(await worker.formats(request), f);
   } finally {
     worker.terminate();
   }

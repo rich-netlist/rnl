@@ -1,4 +1,6 @@
+import { readFileSync } from 'node:fs';
 import { test, expect } from '../viewer.js';
+import { zh, zhMenu, translated, uiLanguages, repository } from '../zh.js';
 
 const language = (page, lang) => page.evaluate(lang => window.viewer.command(`language-${lang}`), lang);
 
@@ -10,20 +12,20 @@ for (const platform of ['web', 'desktop']) {
     const code = await page.locator('#source .ln .code').allTextContents();
     await language(page,'zh');
     await expect(page.locator('html')).toHaveAttribute('lang','zh-CN');
-    await expect(page.getByRole('tab',{name:'网表',exact:true})).toBeVisible();
-    await expect(page.locator('#tab-files')).toHaveAccessibleName('资源库');
+    await expect(page.getByRole('tab',{name:zh('Netlist'),exact:true})).toBeVisible();
+    await expect(page.locator('#tab-files')).toHaveAccessibleName(zh('Library'));
     await expect(page.locator('#tab-files .tab-key')).toHaveText('1');
     expect(await page.locator('#source .ln .code').allTextContents()).toEqual(code);
     expect(await page.evaluate(() => window.keptDoc===window.viewer.doc && window.keptSvg===document.querySelector('#canvas > svg'))).toBe(true);
     expect(await viewer.builds()).toBe(builds);
     await page.keyboard.press('1');
-    await expect(page.locator('#include-file')).toHaveText('加入文件…');
-    await expect(page.locator('.lib-title').first()).toHaveText('文件');
+    await expect(page.locator('#include-file')).toHaveText(zh('Include File…'));
+    await expect(page.locator('.lib-title').first()).toHaveText(zh('Files'));
     await language(page,'en');
     await expect(page.locator('.lib-title').first()).toHaveText('Files');
     await language(page,'zh');
     await viewer.open('symbol-inspector', {platform});
-    await expect(page.locator('#tab-netlist')).toHaveAccessibleName('网表');
+    await expect(page.locator('#tab-netlist')).toHaveAccessibleName(zh('Netlist'));
     await language(page,'en');
     await expect(page.locator('#tab-netlist')).toHaveAccessibleName('Netlist');
   });
@@ -35,8 +37,8 @@ test('the web Language submenu changes language and keeps IDs, checks and shortc
   await page.locator('.menu-item.opens',{hasText:'Language'}).hover();
   await viewer.menuItem('language-zh').click();
   await expect(page.locator('html')).toHaveAttribute('lang','zh-CN');
-  await viewer.menuTitle('视图').click();
-  await page.locator('.menu-item.opens',{hasText:'语言'}).hover();
+  await viewer.menuTitle(zhMenu('&View')).click();
+  await page.locator('.menu-item.opens',{hasText:zh('Language')}).hover();
   await expect(viewer.menuItem('language-zh')).toHaveAttribute('aria-checked','true');
   await expect(viewer.menuItem('language-en')).toHaveAttribute('aria-checked','false');
   await viewer.menuItem('language-en').click();
@@ -54,14 +56,14 @@ test('language changes keep unsaved editor content, selection and the translated
   await language(page,'zh');
   await expect(area).toHaveValue('* Library Save Cancel <b>plain text</b>\n.end');
   expect(await area.evaluate(el=>[el.selectionStart,el.selectionEnd])).toEqual([3,10]);
-  await expect(page.locator('#edit-state')).toHaveText('修改尚未应用');
+  await expect(page.locator('#edit-state')).toHaveText(zh('Changes not applied yet'));
   await page.evaluate(()=>window.viewer.command('discard-edits'));
   const dialog=page.locator('dialog.dialog');
-  await expect(dialog).toContainText('放弃尚未应用的修改');
-  await dialog.getByRole('button',{name:'取消',exact:true}).click();
+  await expect(dialog).toContainText(zh('Discard the changes that have not been applied and exit editing?'));
+  await dialog.getByRole('button',{name:zh('Cancel'),exact:true}).click();
   await expect(area).toBeVisible();
   await page.evaluate(()=>window.viewer.command('discard-edits'));
-  await dialog.getByRole('button',{name:'放弃修改',exact:true}).click();
+  await dialog.getByRole('button',{name:zh('Discard Changes'),exact:true}).click();
   await expect(area).toHaveCount(0);
   expect(await viewer.calls('save')).toEqual([]);
 });
@@ -78,7 +80,7 @@ test('parser and solver messages stay verbatim while UI headings and counters ch
   await page.waitForFunction(()=>document.body.classList.contains('preview')&&!document.body.classList.contains('solving'));
   const report = await page.locator('.solve-line .msg, .solve-line .more, .solve-summary').allTextContents();
   const heading=page.locator('.solve-group summary').first();
-  await expect(heading).toContainText('文件');
+  await expect(heading).toContainText(zh('Files'));
   await language(page,'en');
   await expect(heading).toContainText('Files');
   expect(await page.locator('.solve-line .msg, .solve-line .more, .solve-summary').allTextContents()).toEqual(report);
@@ -89,7 +91,7 @@ test('translated dialogs preserve child controls and validation; filenames are n
   await language(page,'zh');
   await page.evaluate(()=>window.viewer.command('grid-settings'));
   const dialog=page.locator('dialog.dialog');
-  await expect(dialog).toContainText('网格设置');
+  await expect(dialog).toContainText(zh('Grid Settings'));
   const inputs=await dialog.locator('input').count();
   await page.evaluate(async()=>{ const {setLanguage}=await import('./i18n.js'); await setLanguage('en'); });
   await expect(dialog).toContainText('Grid Settings');
@@ -105,13 +107,13 @@ test('translated dialogs preserve child controls and validation; filenames are n
     const value={text:container.textContent,html:container.querySelector('b'),raw:raw.textContent};
     container.remove();return value;
   });
-  expect(result).toEqual({text:'保存Save打开 <b>Library</b>',html:null,raw:'Save'});
+  expect(result).toEqual({text:`${zh('Save')}Save${zh('Open {0}','<b>Library</b>')}`,html:null,raw:'Save'});
 });
 
 test('Chinese system language is the initial default, explicit English wins on restart', async ({page,viewer}) => {
   await page.addInitScript(()=>Object.defineProperty(navigator,'languages',{get:()=>['zh-CN','en-US']}));
   await viewer.open(null);
-  await expect(page.locator('#tab-files')).toHaveAccessibleName('资源库');
+  await expect(page.locator('#tab-files')).toHaveAccessibleName(zh('Library'));
   await language(page,'en');
   await viewer.open(null);
   await expect(page.locator('#tab-files')).toHaveAccessibleName('Library');
@@ -125,10 +127,10 @@ test('an open clipboard dialog updates its labels without changing text or selec
   await dialog.locator('input[value="scs"]').check();
   const code = await dialog.locator('.clip-preview').textContent();
   await page.evaluate(async () => (await import('./i18n.js')).setLanguage('zh-CN'));
-  await expect(dialog.locator('.dialog-note').first()).toContainText('2 行');
-  await expect(dialog.getByRole('radio', {name:'Spectre 网表 (.scs)'})).toBeChecked();
+  await expect(dialog.locator('.dialog-note').first()).toContainText(zh('{0} lines',2));
+  await expect(dialog.getByRole('radio', {name:`${zh('Spectre netlist')} (.scs)`})).toBeChecked();
   await expect(dialog.locator('.clip-preview')).toHaveText(code);
-  await dialog.getByRole('button',{name:'取消',exact:true}).click();
+  await dialog.getByRole('button',{name:zh('Cancel'),exact:true}).click();
 });
 
 test('symbol labels switch live and obsolete source tooltips stay removed after changing level', async ({page,viewer}) => {
@@ -149,8 +151,110 @@ test('symbol labels switch live and obsolete source tooltips stay removed after 
   await viewer.symbolFitted();
   const svg=await page.locator('.symbol-preview > svg').getAttribute('viewBox');
   await language(page,'zh');
-  await expect(page.locator('.symbol-label-list')).toContainText('自动位置');
-  await expect(page.locator('.symbol-origin-info')).toHaveText('定义于 leaf');
+  await expect(page.locator('.symbol-label-list')).toContainText(zh(' · automatic position').replace(/^ · /,''));
+  await expect(page.locator('.symbol-origin-info')).toHaveText(zh('Defined in {0}','leaf'));
   await expect(line).not.toHaveAttribute('title');
   await expect(page.locator('.symbol-preview > svg')).toHaveAttribute('viewBox',svg);
 });
+
+test('a pseudo language shows every text of the menu bar and the panel tabs translated (decision 0015)', async ({page,viewer}) => {
+  // only the fake shell offers it, with ?pseudo: every text of the catalogs, its letters accented, in ［…］
+  await viewer.open('04-hierarchy', {pseudo: '1'});
+  await language(page,'qps');
+  await expect(page.locator('html')).toHaveAttribute('lang','qps-ploc');
+  await expect(page.locator('#tab-files')).toHaveAccessibleName(/^［/);
+  // every title and entry of the web's menu bar but the names of the languages, which are their own
+  const plain = await page.evaluate(() => [...document.querySelectorAll('.menu-title, .menu-item')]
+    .filter((el) => !el.dataset.id?.startsWith('language-'))
+    .map((el) => (el.querySelector('.label') ?? el).textContent.trim())
+    .filter((text) => /[A-Za-z]/.test(text) && !text.startsWith('［')));
+  expect(plain).toEqual([]);
+  for (const tab of ['files','netlist','hierarchy','symbol']) await expect(page.locator(`#tab-${tab}`)).toHaveAccessibleName(/^［/);
+  await language(page,'en');
+  await expect(page.locator('html')).toHaveAttribute('lang','en');
+  await expect(page.locator('#tab-files')).toHaveAccessibleName('Library');
+});
+
+test('a language whose catalog cannot be read is left out, and the page starts without it (decision 0015)', async ({page,viewer}) => {
+  await page.addInitScript(() => Object.defineProperty(Navigator.prototype, 'languages', { get: () => ['zh-CN','en-US'], configurable: true }));
+  await page.route('**/locales/zh-CN.json', (route) => route.fulfill({ status: 500, body: 'unavailable' }));
+  await viewer.open('04-hierarchy');
+  await expect(page.locator('html')).toHaveAttribute('lang','en');
+  // in English, naming the language in English, whatever the interface's language (decision 0015)
+  const chinese = uiLanguages(repository).find((l) => l.code === 'zh-CN').english;
+  await expect(page.locator('#note')).toHaveText(`The interface could not load ${chinese}; it is offered in the other languages.`);
+  // English and every other language but the one that failed
+  await expect(page.locator('.menu-item[data-id^="language-"]')).toHaveCount(uiLanguages(repository).length - 1);
+  await expect(page.locator('#tab-files')).toHaveAccessibleName('Library');
+});
+
+test('a system language takes the language that fits it longest, whatever the order of the list', async ({page,viewer}) => {
+  // Traditional Chinese after Simplified Chinese, as the registry lists them: zh-TW is not Simplified's zh
+  await page.addInitScript(() => Object.defineProperty(Navigator.prototype, 'languages', { get: () => ['zh-TW','en-US'], configurable: true }));
+  await viewer.open('04-hierarchy');
+  await expect(page.locator('html')).toHaveAttribute('lang','zh-Hant');
+  await expect(page.locator('#tab-files')).toHaveAccessibleName(translated('zh-hant', 'Library'));
+});
+
+test('without the list of languages the page starts in English alone (decision 0015)', async ({page,viewer}) => {
+  await page.route('**/locales/languages.json', (route) => route.fulfill({ status: 500, body: 'unavailable' }));
+  await viewer.open('04-hierarchy');
+  await expect(page.locator('html')).toHaveAttribute('lang','en');
+  await expect(page.locator('#note')).toContainText("The interface's languages could not be loaded");
+  await expect(page.locator('.menu-item[data-id^="language-"]')).toHaveCount(1);
+});
+
+// a catalog's text of an English one, as the page shows it: English when the catalog has none
+const own = (lang, english) => {
+  const catalog = JSON.parse(readFileSync(new URL(`../../../i18n/${lang}/viewer.json`, import.meta.url), 'utf8'));
+  return typeof catalog[english] === 'string' ? catalog[english] : english;
+};
+const plain = (text) => text.split('\t')[0].replace('&', '');
+
+test('the Language submenu has a globe, and it and the View menu keep an English word in every other language (decision 0015)', async ({page,viewer}) => {
+  await viewer.open('04-hierarchy');
+  // the menu that holds the globe: the View menu, whatever its language
+  const view = page.locator('#menubar .menu').filter({ has: page.locator('.menu-icon') }).locator('.menu-title');
+  const sub = page.locator('.menu-item.opens').filter({ has: page.locator('.menu-icon') });
+  const check = async (viewText, languageText, lang) => {
+    await expect(view.locator('.label'), lang).toHaveText(viewText);
+    await view.click();
+    await expect(sub.locator('.label'), lang).toHaveText(languageText);
+    await expect(sub.locator('.menu-icon'), lang).toHaveCount(1);
+    // the names of the languages are as they were: each in its own writing, with no English added
+    await sub.hover();
+    for (const l of uiLanguages(repository)) await expect(viewer.menuItem(`language-${l.lang}`).locator('.label'), `${lang}: ${l.lang}`).toHaveText(l.name);
+    await page.keyboard.press('Escape');
+  };
+  // English: the labels as they were, and the globe
+  await check('View', 'Language', 'en');
+  for (const l of uiLanguages(repository).slice(1)) {
+    await language(page, l.lang);
+    await expect(page.locator('html')).toHaveAttribute('lang', l.code);
+    // the English words come from the table, not from the catalog: the catalog's own words are what is before them
+    await check(`${plain(own(l.lang, '&View'))} (View)`, `${plain(own(l.lang, '&Language'))} (Language)`, l.lang);
+  }
+  await language(page, 'en');
+  await check('View', 'Language', 'en again');
+});
+
+// the first start walks the browser's list of languages in its order and takes the first that is offered, as
+// the site's root does; a saved choice comes first; the language is the registry's first published one
+const other = uiLanguages(repository)[1];
+const tag = other.matches[0];
+for (const { name, list, saved, expected } of [
+  { name: `[it-IT, ${tag}] takes ${other.lang}, the first of the list that is offered`, list: ['it-IT', tag], expected: other.code },
+  { name: `[it-IT, ${tag}-XX] takes ${other.lang}: a region is the language's`, list: ['it-IT', `${tag}-XX`], expected: other.code },
+  { name: '[it-IT] is English: nothing in the list is offered', list: ['it-IT'], expected: 'en' },
+  { name: `[it-IT, en-US, ${tag}] is English, the first of the list that is offered`, list: ['it-IT', 'en-US', tag], expected: 'en' },
+  { name: `[${tag}] with English saved is English: the saved choice comes first`, list: [tag], saved: 'en', expected: 'en' },
+]) {
+  test(`the language of the first start: ${name}`, async ({page,viewer}) => {
+    await page.addInitScript(([languages, saved]) => {
+      Object.defineProperty(Navigator.prototype, 'languages', { get: () => languages, configurable: true });
+      if (saved) localStorage.setItem('language', JSON.stringify(saved));
+    }, [list, saved ?? null]);
+    await viewer.open('04-hierarchy');
+    await expect(page.locator('html')).toHaveAttribute('lang', expected);
+  });
+}

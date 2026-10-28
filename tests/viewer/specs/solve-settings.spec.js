@@ -4,7 +4,7 @@
 // takes it, which the shell can ask the solver to check. The fake shell's defaults are those of the
 // solver at the time of writing; the page is tested against their shape.
 
-import { expect, test } from "../viewer.js";
+import { dialogGone, expect, test } from "../viewer.js";
 
 const DESKTOP = { platform: "desktop" };
 const T4 = "T4-miller-conflicts";
@@ -97,6 +97,7 @@ test.describe("on the desktop", () => {
     await expect(asText(page)).toHaveText("The defaults of rnl solve.");
     // Cancel keeps nothing, and a solve gets the defaults
     await dialog(page).getByRole("button", { name: "Cancel" }).click();
+    await dialogGone(page);
     expect(await viewer.stored("solve-options")).toBeNull();
     expect(await solved(page, viewer)).toEqual({ options: "", hintsForLow: false });
   });
@@ -104,7 +105,7 @@ test.describe("on the desktop", () => {
   test("a time limit set, and no limit, reach the solve; Restore Defaults takes them back", async ({ page, viewer }) => {
     await open(page);
     await field(page, "Time limit").fill("2.5");
-    await expect(asText(page)).toHaveText('As rnl solve takes them: rnl solve --solver-options "time_limit=2.5"');
+    await expect(asText(page)).toHaveText('Equivalent CLI command: rnl solve --solver-options "time_limit=2.5"');
     await ok(page);
     expect(await viewer.stored("solve-options")).toEqual({ time_limit: 2.5 });
     expect(await solved(page, viewer)).toEqual({ options: "time_limit=2.5", hintsForLow: false });
@@ -137,7 +138,7 @@ test.describe("on the desktop", () => {
     await field(page, "Router cells").fill("5000");
     await field(page, "Seek every conflict group of the facts of priority low").check();
     await expect(asText(page)).toHaveText(
-      'As rnl solve takes them: rnl solve --report --solver-options "tolerance=0.001;grid=none;beam=8;budget=candidates:10,astar_expansions:5000"',
+      'Equivalent CLI command: rnl solve --report --solver-options "tolerance=0.001;grid=none;beam=8;budget=candidates:10,astar_expansions:5000"',
     );
     await ok(page);
     expect(await viewer.stored("solve-options")).toEqual({
@@ -247,6 +248,7 @@ test.describe("on the desktop", () => {
     await expect(objective(page, "crossings").getByLabel("equal within")).toBeVisible();
     await expect(objective(page, "area").getByLabel("equal within")).toBeVisible();
     await dialog(page).getByRole("button", { name: "Cancel" }).click();
+    await dialogGone(page);
     // Cancel kept the first order
     expect((await viewer.stored("solve-options")).objectives[8].items[0].name).toBe("crossings");
   });
@@ -255,18 +257,18 @@ test.describe("on the desktop", () => {
     await open(page);
     await field(page, "Beam").fill("");
     await dialog(page).getByRole("button", { name: "OK" }).click();
-    await expect(dialog(page).locator(".dialog-error")).toHaveText("The beam is a whole number.");
+    await expect(dialog(page).locator(".dialog-error")).toHaveText("Beam must be a positive whole number.");
     await field(page, "Beam").fill("2.5");
     await dialog(page).getByRole("button", { name: "OK" }).click();
-    await expect(dialog(page).locator(".dialog-error")).toHaveText("The beam is a whole number.");
+    await expect(dialog(page).locator(".dialog-error")).toHaveText("Beam must be a positive whole number.");
     await field(page, "Beam").fill("4");
     await field(page, "Time limit").fill("");
     await dialog(page).getByRole("button", { name: "OK" }).click();
-    await expect(dialog(page).locator(".dialog-error")).toHaveText("The time limit is a number of seconds, or no limit.");
+    await expect(dialog(page).locator(".dialog-error")).toHaveText("Time limit must be a number of seconds, or no limit.");
     await field(page, "Time limit").fill("5");
     await objective(page, "area").getByLabel("weight").fill("1.5");
     await dialog(page).getByRole("button", { name: "OK" }).click();
-    await expect(dialog(page).locator(".dialog-error")).toHaveText("The weight of area is a whole number.");
+    await expect(dialog(page).locator(".dialog-error")).toHaveText("Weight of area must be a whole number.");
     await objective(page, "area").getByLabel("weight").fill("1");
     // nothing reached the solver or was kept while it would not do
     expect(await viewer.calls("checkSolverOptions")).toEqual([]);
@@ -296,6 +298,7 @@ test.describe("on the desktop", () => {
     await open(page);
     await expect(field(page, "Beam")).toHaveValue("6");
     await dialog(page).getByRole("button", { name: "Cancel" }).click();
+    await dialogGone(page);
     expect(await solved(page, viewer)).toEqual({ options: "beam=6", hintsForLow: false });
     // a time limit kept by the menu item that the settings replaced still counts, until they are kept
     await page.evaluate(() => {

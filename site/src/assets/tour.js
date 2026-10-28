@@ -36,25 +36,26 @@
 
   var LAB = [
     { k: 'PLACE', bare: '#M1 @PLACE(10, 20)', en: '#M1 is at @PLACE(10, 20)',
-      fact: '<zh>M1 的原点在 (10, 20)。这是两个事实，x、y 各一个，冲突时可以各自丢弃。</zh><en>M1’s origin is at (10, 20). These are two facts, one for x and one for y; in a conflict each can be dropped on its own.</en>' },
+      fact: '<en>M1’s origin is at (10, 20). These are two facts, one for x and one for y; in a conflict each can be dropped on its own.</en>' },
     { k: 'ALIGN', bare: '{#M1 #M2} @ALIGN("y")', en: '{#M1 #M2} @ALIGN("y"), i.e., same y',
-      fact: '<zh>M1、M2 的 y 坐标相同，排成一行。“, i.e., same y” 只是补一句说明。</zh><en>M1 and M2 have the same y, so they sit in a row. “, i.e., same y” is only a gloss.</en>' },
+      fact: '<en>M1 and M2 have the same y, so they sit in a row. “, i.e., same y” is only a gloss.</en>' },
     { k: 'ORDER', bare: '{#M1 #M2 #M3} @ORDER("left-to-right")', en: '{#M1 #M2 #M3} are in @ORDER("left-to-right")',
-      fact: '<zh>M1、M2、M3 从左到右严格排开。写 "x" 就只定轴，倒过来也成立。</zh><en>M1, M2 and M3 run strictly from left to right. With "x" only the axis is fixed, and the reverse holds too.</en>' },
+      fact: '<en>M1, M2 and M3 run strictly from left to right. With "x" only the axis is fixed, and the reverse holds too.</en>' },
     { k: 'DISTANCE', bare: '#M1 #M2 @DISTANCE("bottom-to-top", min=4)', en: 'from #M1 to #M2, they have @DISTANCE("bottom-to-top", min=4)',
-      fact: '<zh>从 M1 往上到 M2 至少 4 格：M2 的 y 比 M1 大 4 以上。</zh><en>From M1 up to M2 is at least 4 units: M2’s y exceeds M1’s by 4 or more.</en>' },
+      fact: '<en>From M1 up to M2 is at least 4 units: M2’s y exceeds M1’s by 4 or more.</en>' },
     { k: 'AS', bare: '%dp = #M1(in_p) #M2(in_n) @AS $DIFFERENTIAL_PAIR', en: '%dp = #M1(in_p) and #M2(in_n) treated @AS $DIFFERENTIAL_PAIR',
-      fact: '<zh>M1（in_p）和 M2（in_n）合起来是一个差分对。这次套用是一个用例，名字叫 %dp。</zh><en>M1 (in_p) and M2 (in_n) together form a differential pair. This application is a usage, named %dp.</en>' },
+      fact: '<en>M1 (in_p) and M2 (in_n) together form a differential pair. This application is a usage, named %dp.</en>' },
     { k: 'ATTACH', bare: '$GROUND @ATTACH &c => @PLACE(24, 38) => %g0', en: '$GROUND is @ATTACH to &c => it is at @PLACE(24, 38) => named %g0',
-      fact: '<zh>网络 c 上添了一个地，位于 (24, 38)，名字叫 %g0。=&gt; 把前一段的结果交给后一段。</zh><en>A ground is added on net c, at (24, 38), and named %g0. =&gt; hands each part’s result to the next.</en>' },
+      fact: '<en>A ground is added on net c, at (24, 38), and named %g0. =&gt; hands each part’s result to the next.</en>' },
     { k: 'SELECT-INSTANCE', bare: '# @SELECT-INSTANCE(model="nch") => @SET-SYMBOL $NMOS', en: 'among the instances at each level in # and below, @SELECT-INSTANCE(model="nch") => they @SET-SYMBOL to $NMOS',
-      fact: '<zh>这一层和下面每一层里，模型为 nch 的元件都用 $NMOS 画。这是一条规则，每一层各求一次。</zh><en>On this level and on every level below, instances of model nch are drawn with $NMOS. This is a rule, evaluated once per level.</en>' },
+      fact: '<en>On this level and on every level below, instances of model nch are drawn with $NMOS. This is a rule, evaluated once per level.</en>' },
     { k: 'WIRE', bare: '&n1 @WIRE {#R1:2 %j #R2:1}', en: 'net &n1 has a @WIRE connecting {#R1:2 %j #R2:1}',
-      fact: '<zh>网络 n1 有一根导线，依次经过 R1 的 2 号端子、点 %j、R2 的 1 号端子。</zh><en>Net n1 has a wire running through R1’s terminal 2, the point %j and R2’s terminal 1, in that order.</en>' }
+      fact: '<en>Net n1 has a wire running through R1’s terminal 2, the point %j and R2’s terminal 1, in that order.</en>' }
   ];
-  /* The same statements as Chinese standard sentences, with the alias package rnl-zh; shown on every page */
+  /* The same statements as Chinese standard sentences, with the alias package rnl-zh; only the Chinese pages have them */
+  var LAB_ZH = [];
   /*zh-CN*/
-  var LAB_ZH = [
+  LAB_ZH = [
     '#M1 @位于(10, 20)',
     '{#M1 #M2} @对齐("y")，即 y 坐标相同',
     '{#M1 #M2 #M3} 按 @顺序("从左到右") 排列',
@@ -111,7 +112,7 @@
         openLink.setAttribute('href', openLink.getAttribute('href').replace(/url=samples\/site\/[^&#]*/, 'url=samples/site/' + target));
       }
     }
-    var first = '<zh>zh</zh><en>en</en>';
+    var first = '<en>en</en>';
     PG.setPressed(btns, btns.filter(function (b) { return b.getAttribute('data-style') === first; })[0]);
     show(first);
   }
@@ -176,12 +177,12 @@
       view.setScene(mpScene(on), { animate: animate, duration: 900 });
       if (on) {
         var X = [
-          ['{#M1 #M2} @ALIGN("y", priority="low");', 'M1 M2 ov:al', '<zh>同一行</zh><en>same row</en>'],
-          ['{#M1 %ax #M2} @DISTRIBUTE("x", priority="low");', 'M1 M2 ov:di', '<zh>到轴等距</zh><en>equal steps around the axis</en>'],
-          ['{#M1 #M2} @ORDER("left-to-right", priority="low");', 'M1 M2', '<zh>M1 在左</zh><en>M1 on the left</en>'],
-          ['#M1 #M2 @ORIENT-RELATION("MY", priority="low")', 'M1 M2 ov:or', '<zh>互为镜像</zh><en>mirror images</en>']
+          ['{#M1 #M2} @ALIGN("y", priority="low");', 'M1 M2 ov:al', '<en>same row</en>'],
+          ['{#M1 %ax #M2} @DISTRIBUTE("x", priority="low");', 'M1 M2 ov:di', '<en>equal steps around the axis</en>'],
+          ['{#M1 #M2} @ORDER("left-to-right", priority="low");', 'M1 M2', '<en>M1 on the left</en>'],
+          ['#M1 #M2 @ORIENT-RELATION("MY", priority="low")', 'M1 M2 ov:or', '<en>mirror images</en>']
         ];
-        exp.innerHTML = '<p class="exp-k"><zh>$MIRRORED 展开后，相当于这一层多了四句（不写进文件），都是 low：</zh><en>Expanded, $MIRRORED adds four statements to this level (not written in the file), all of priority low:</en></p>' +
+        exp.innerHTML = '<p class="exp-k"><en>Expanded, $MIRRORED adds four statements to this level (not written in the file), all of priority low:</en></p>' +
           X.map(function (x) { return '<div class="exp-l" data-refs="' + x[1] + '" tabindex="0"><code>' + C.hlSnippet(x[0]) + '</code><span>' + x[2] + '</span></div>'; }).join('');
         $$('.exp-l', exp).forEach(function (row) {
           function hl() { view.highlight(row.getAttribute('data-refs').split(' ')); }
@@ -190,10 +191,10 @@
           row.addEventListener('mouseleave', function () { view.highlight(null); });
           row.addEventListener('blur', function () { view.highlight(null); });
         });
-        cap.innerHTML = '<zh>角色 a、b、axis 换成 M1、M2、%ax，体里的四条约束就展开到这一层：同一行、到轴等距、M1 在左、互为镜像。它们都是 low，作者另写的事实先走。轴 %ax 是自由点，由求解器定。</zh><en>With the roles a, b and axis replaced by M1, M2 and %ax, the four constraints in the body expand into this level: same row, equal steps around the axis, M1 on the left, mirror images. They are all of priority low, so what the author writes comes first. The axis %ax is a free point that the solver places.</en>';
+        cap.innerHTML = '<en>With the roles a, b and axis replaced by M1, M2 and %ax, the four constraints in the body expand into this level: same row, equal steps around the axis, M1 on the left, mirror images. They are all of priority low, so what the author writes comes first. The axis %ax is a free point that the solver places.</en>';
       } else {
         exp.innerHTML = '';
-        cap.innerHTML = '<zh>只套用了 $DIFFERENTIAL_PAIR：它记下“M1、M2 是差分对”，查看器可以把它们框出来，图上的位置却没有变。</zh><en>Only $DIFFERENTIAL_PAIR is applied: it records that M1 and M2 are a differential pair, and a viewer may outline them, but nothing moves.</en>';
+        cap.innerHTML = '<en>Only $DIFFERENTIAL_PAIR is applied: it records that M1 and M2 are a differential pair, and a viewer may outline them, but nothing moves.</en>';
       }
     }
     PG.initSeg($('#mp-seg'), 'data-v', function (v) { on = v === '1'; show(true); });
@@ -268,9 +269,9 @@
     ['vir', '$CURRENT_ARROW', '@DEFINE(roles=[["p", ["terminal", "point"]]]) {}']
   ];
   var STD_GROUPS = [
-    ['sem', '<zh>结构，只有角色：用 AS 套用</zh><en>Structures with roles only, applied with AS</en>'],
-    ['lay', '<zh>结构，体里带默认画法：约束都是 low，作者写的先走</zh><en>Structures with a default drawing in the body: all of priority low, so what the author writes comes first</en>'],
-    ['vir', '<zh>显示元素和桩：用 ATTACH 添上，由规则配符号；桩的约束也是 low</zh><en>Display elements and stubs: added with ATTACH, given symbols by rules; the stubs’ constraints are low too</en>']
+    ['sem', '<en>Structures with roles only, applied with AS</en>'],
+    ['lay', '<en>Structures with a default drawing in the body: all of priority low, so what the author writes comes first</en>'],
+    ['vir', '<en>Display elements and stubs: added with ATTACH, given symbols by rules; the stubs’ constraints are low too</en>']
   ];
 
   function initStd() {
@@ -343,18 +344,18 @@
 
   var CE_GEN = [
     [
-      ['check', '<zh>符号按名字的首字母：Q1 → $NPN，RC → $RESISTOR，CL → $CAPACITOR。</zh><en>Symbols by first letter: Q1 → $NPN, RC → $RESISTOR, CL → $CAPACITOR.</en>'],
-      ['plus', '<zh>端口符号 in、out、vdd、vss：$PORT_FILL_SET 起初是子电路的全部端口。</zh><en>Port tags in, out, vdd and vss: $PORT_FILL_SET starts with every port of the subcircuit.</en>'],
-      ['info', '<zh>vdd、vss 只是两个普通的端口：不在电源、地网络集里，不补电源和地。</zh><en>vdd and vss are just two ports: they are not in the supply or ground sets, so no supply or ground is added.</en>']
+      ['check', '<en>Symbols by first letter: Q1 → $NPN, RC → $RESISTOR, CL → $CAPACITOR.</en>'],
+      ['plus', '<en>Port tags in, out, vdd and vss: $PORT_FILL_SET starts with every port of the subcircuit.</en>'],
+      ['info', '<en>vdd and vss are just two ports: they are not in the supply or ground sets, so no supply or ground is added.</en>']
     ],
     [
-      ['plus', '<zh>电源桩：RC 接 vdd 的端子没有导线，$SUPPLY_STUB 在它上方补一个电源，至少隔 2 格。</zh><en>Supply stub: RC’s vdd terminal has no wire, so $SUPPLY_STUB adds a supply above it, at least 2 units away.</en>'],
-      ['plus', '<zh>地桩：Q1:e、CL:n 没有导线，$GROUND_STUB 各补一个地。vss 不叫 0，地下面写上网络名。</zh><en>Ground stubs: Q1:e and CL:n have no wires, so $GROUND_STUB adds a ground to each. vss is not named 0, so the grounds show its name.</en>'],
-      ['minus', '<zh>vdd、vss 的端口符号去掉了：电源、地网络上已经有电源和地，不再补端口符号。</zh><en>The port tags of vdd and vss are gone: supply and ground nets have their supplies and grounds, and get no port tags.</en>']
+      ['plus', '<en>Supply stub: RC’s vdd terminal has no wire, so $SUPPLY_STUB adds a supply above it, at least 2 units away.</en>'],
+      ['plus', '<en>Ground stubs: Q1:e and CL:n have no wires, so $GROUND_STUB adds a ground to each. vss is not named 0, so the grounds show its name.</en>'],
+      ['minus', '<en>The port tags of vdd and vss are gone: supply and ground nets have their supplies and grounds, and get no port tags.</en>']
     ],
     [
-      ['minus', '<zh>地下面的网络名去掉了：vss 已经不在 $NAMED_GROUND_NET_SET 里。</zh><en>The net name under the grounds is gone: vss is no longer in $NAMED_GROUND_NET_SET.</en>'],
-      ['check', '<zh>电源和地照旧：这就是教科书上的样子，文件里只写了三句。</zh><en>The supply and grounds stay: the textbook look, from three lines in the file.</en>']
+      ['minus', '<en>The net name under the grounds is gone: vss is no longer in $NAMED_GROUND_NET_SET.</en>'],
+      ['check', '<en>The supply and grounds stay: the textbook look, from three lines in the file.</en>']
     ]
   ];
 
@@ -386,20 +387,20 @@
     show(0, false);
 
     snippetRows($('#fill-code'), [
-      { t: '/* <zh>给文件用的集合</zh><en>sets for files to edit</en> */', cls: 'is-cmt' },
+      { t: '/* <en>sets for files to edit</en> */', cls: 'is-cmt' },
       '$GROUND_NET_SET = # @SELECT-NET(name="0");',
       '$SUPPLY_NET_SET = {};',
       '$PORT_FILL_SET = # @SELECT-NET(port=true);',
-      { t: '/* <zh>地网络、电源网络上没接线的端子，各补一个桩</zh><en>a stub for each unwired terminal on ground and supply nets</en> */', cls: 'is-cmt' },
+      { t: '/* <en>a stub for each unwired terminal on ground and supply nets</en> */', cls: 'is-cmt' },
       '$GROUND_FILL_SET = $GROUND_NET_SET @SELECT-TERMINAL(wired=false);',
       '$GROUND_STUB @ATTACH $GROUND_FILL_SET;',
       '$SUPPLY_FILL_SET = $SUPPLY_NET_SET @SELECT-TERMINAL(wired=false);',
       '$SUPPLY_STUB @ATTACH $SUPPLY_FILL_SET;',
-      { t: '/* <zh>子电路的每个端口一个端口符号，电源、地网络除外</zh><en>one port tag for each port of a subcircuit, but not on supply and ground nets</en> */', cls: 'is-cmt' },
+      { t: '/* <en>one port tag for each port of a subcircuit, but not on supply and ground nets</en> */', cls: 'is-cmt' },
       '$SUPPLY_NET_SET @REMOVE-FROM $PORT_FILL_SET;',
       '$GROUND_NET_SET @REMOVE-FROM $PORT_FILL_SET;',
       '$IO_PORT @ATTACH $PORT_FILL_SET;',
-      { t: '/* <zh>不叫 0 的地网络，地下面写网络名</zh><en>on a ground net other than 0, the grounds show the net’s name</en> */', cls: 'is-cmt' },
+      { t: '/* <en>on a ground net other than 0, the grounds show the net’s name</en> */', cls: 'is-cmt' },
       '$NAMED_GROUND_NET_SET = {$GROUND_NET_SET};',
       '# @SELECT-NET(name="0") => @REMOVE-FROM $NAMED_GROUND_NET_SET;',
       '$NAMED_GROUND_NET_SET @SELECT-ANCESTOR-USAGE $GROUND => @SET-SYMBOL $NAMED_GROUND_SYMBOL'
@@ -500,14 +501,14 @@
   }
 
   var SEL = [
-    { t: '# @SELECT-INSTANCE(type="pmos")', hl: ['M1'], n: '<zh>1 个元件</zh><en>1 instance</en>',
-      cap: '<zh>范围是整层（#），条件是 pmos 类型：只有 M1。</zh><en>The scope is the whole level (#) and the condition is type pmos: only M1.</en>' },
-    { t: '&en @SELECT-INSTANCE', hl: ['M1', 'M2', 'M3', 'net:en'], n: '<zh>3 个元件</zh><en>3 instances</en>',
-      cap: '<zh>范围是网络 en：选出在 en 上有引脚的元件。M3 的漏极驱动它，M1、M2 的栅极接在上面。</zh><en>The scope is net en: the instances with a pin on it. M3’s drain drives en, and the gates of M1 and M2 sit on it.</en>' },
-    { t: '&en @SELECT-TERMINAL(terminal="g") => @SELECT-INSTANCE', hl: ['M1', 'M2', 'ov:pin'], mode: 'g', n: '<zh>2 个元件</zh><en>2 instances</en>',
-      cap: '<zh>先选出 en 上名叫 g 的端子，再走到它们所属的元件：M1、M2。M3 接在 en 上的是漏极，不算。</zh><en>First the terminals on en named g, then the instances they belong to: M1 and M2. M3 touches en with its drain, so it is left out.</en>' },
-    { t: '# @SELECT-TERMINAL(net="0", wired=false)', hl: ['ov:pin', 'M2', 'M3', 'M4'], mode: 'z', n: '<zh>6 个端子</zh><en>6 terminals</en>',
-      cap: '<zh>整层里接在网络 0 上、还没有导线的端子：M2、M3、M4 的源极，以及它们的衬底端子（三端符号不画衬底）。标准包正是这样找到要补地的地方。</zh><en>Terminals on net 0 with no wire yet, across the level: the sources of M2, M3 and M4, and their bulk terminals (three-terminal symbols do not draw the bulk). This is exactly how the standard package finds where to add grounds.</en>' }
+    { t: '# @SELECT-INSTANCE(type="pmos")', hl: ['M1'], n: '<en>1 instance</en>',
+      cap: '<en>The scope is the whole level (#) and the condition is type pmos: only M1.</en>' },
+    { t: '&en @SELECT-INSTANCE', hl: ['M1', 'M2', 'M3', 'net:en'], n: '<en>3 instances</en>',
+      cap: '<en>The scope is net en: the instances with a pin on it. M3’s drain drives en, and the gates of M1 and M2 sit on it.</en>' },
+    { t: '&en @SELECT-TERMINAL(terminal="g") => @SELECT-INSTANCE', hl: ['M1', 'M2', 'ov:pin'], mode: 'g', n: '<en>2 instances</en>',
+      cap: '<en>First the terminals on en named g, then the instances they belong to: M1 and M2. M3 touches en with its drain, so it is left out.</en>' },
+    { t: '# @SELECT-TERMINAL(net="0", wired=false)', hl: ['ov:pin', 'M2', 'M3', 'M4'], mode: 'z', n: '<en>6 terminals</en>',
+      cap: '<en>Terminals on net 0 with no wire yet, across the level: the sources of M2, M3 and M4, and their bulk terminals (three-terminal symbols do not draw the bulk). This is exactly how the standard package finds where to add grounds.</en>' }
   ];
 
   function initSel() {
@@ -539,16 +540,16 @@
     var rec = true, step = 0, visible = false, timer = null;
     var lvs = $$('.lv', root);
     var TITLE = [
-      '<zh>第 1 次，顶层</zh><en>Pass 1, the top level</en>',
-      '<zh>第 2 次，子电路 amp</zh><en>Pass 2, subcircuit amp</en>',
-      '<zh>第 3 次，子电路 bias</zh><en>Pass 3, subcircuit bias</en>'
+      '<en>Pass 1, the top level</en>',
+      '<en>Pass 2, subcircuit amp</en>',
+      '<en>Pass 3, subcircuit bias</en>'
     ];
     var FOUND = [
-      '<zh>：选出 M9。</zh><en>: M9 is picked.</en>',
-      '<zh>：选出 M1、M2。amp 是一层，XA、XB 都是它的实例，规则在 amp 里只求一次。</zh><en>: M1 and M2 are picked. amp is one level; XA and XB are both instances of it, and the rule is evaluated once in amp.</en>',
-      '<zh>：选出 MB。</zh><en>: MB is picked.</en>'
+      '<en>: M9 is picked.</en>',
+      '<en>: M1 and M2 are picked. amp is one level; XA and XB are both instances of it, and the rule is evaluated once in amp.</en>',
+      '<en>: MB is picked.</en>'
     ];
-    var EMPTY = '<zh>：结果为空。recursive=false 只选写它的那一层的对象。</zh><en>: the result is empty. recursive=false picks objects only on the level where it is written.</en>';
+    var EMPTY = '<en>: the result is empty. recursive=false picks objects only on the level where it is written.</en>';
     function render() {
       codeEl.innerHTML = C.hlSnippet('# @SELECT-INSTANCE(model="nch"' + (rec ? '' : ', recursive=false') + ') => @SET-SYMBOL $MY_NMOS');
     }
@@ -608,7 +609,7 @@
         if (shared) return [{ id: 'j', kind: 'tag', at: [6.6, 1.2], anchor: 'start', text: '%j' }];
         return [
           { id: 'ring', kind: 'ring', at: [6, 0], r: 0.9, tone: 'err' },
-          { id: 'two', kind: 'text', at: [7.2, 1.6], anchor: 'start', tone: 'err', text: '<zh>没有接上</zh><en>not joined</en>' }
+          { id: 'two', kind: 'text', at: [7.2, 1.6], anchor: 'start', tone: 'err', text: '<en>not joined</en>' }
         ];
       }
     };
@@ -630,20 +631,20 @@
       C.render(codeEl, L);
       view.setScene(teeScene(shared), { animate: animate, duration: 400 });
       cap.innerHTML = shared
-        ? '<zh>两根导线共用点对象 %j，所以接在一起；圆点由 $JUNCTION 显式画出，渲染器不会自己加。地是标准包补的。</zh><en>Both wires share the point object %j, so they join; the dot is drawn explicitly by $JUNCTION, and renderers never add one on their own. The grounds come from the standard package.</en>'
-        : '<zh>两个 (6, 0) 是两个点对象，只是坐标相同：RC 那根导线没有接上。画出来几乎一样，含义却不同；写成同一个命名的点才算接上。</zh><en>The two (6, 0) are two point objects that merely share coordinates: RC’s wire is not joined. The drawing looks almost the same and means something else; write one named point to join them.</en>';
+        ? '<en>Both wires share the point object %j, so they join; the dot is drawn explicitly by $JUNCTION, and renderers never add one on their own. The grounds come from the standard package.</en>'
+        : '<en>The two (6, 0) are separate point objects that merely share coordinates: RC’s wire is not joined. The drawing looks almost the same, but means something different; use one named point to join them.</en>';
     }
     PG.initSeg($('#tee-seg'), 'data-v', function (v) { show(v === 'shared', true); });
     show(true, false);
   }
 
   var MODES = [
-    ['auto', '<zh>不写 mode 就是 auto：由求解器和查看器的设置决定，求解器可以按实际情况优化。</zh><en>Without mode it is auto: the solver’s and viewer’s settings decide, and a solver may optimize the path.</en>'],
-    ['straight', '<zh>一段直线。</zh><en>One straight segment.</en>'],
-    ['horizontal-vertical', '<zh>先横后竖：A → (x₂, y₁) → B。</zh><en>Horizontal first, then vertical: A → (x₂, y₁) → B.</en>'],
-    ['vertical-horizontal', '<zh>先竖后横：A → (x₁, y₂) → B。</zh><en>Vertical first, then horizontal: A → (x₁, y₂) → B.</en>'],
-    ['manhattan', '<zh>横向更长时，先横走一半，竖走全程，再横走另一半；否则横竖对调。拐点可能落在半格上。</zh><en>When the horizontal run is longer: half of it, then the whole vertical run, then the other half; otherwise the axes swap. Bends may land on half units.</en>'],
-    ['manhattan45', '<zh>先横走一段，再 45° 斜走，最后横走剩下的；竖向更长时横竖对调。</zh><en>A horizontal run, a 45° diagonal, then the rest horizontally; when the vertical run is longer, the axes swap.</en>']
+    ['auto', '<en>Without mode it is auto: the solver’s and viewer’s settings decide, and a solver may optimize the path.</en>'],
+    ['straight', '<en>One straight segment.</en>'],
+    ['horizontal-vertical', '<en>Horizontal first, then vertical: A → (x₂, y₁) → B.</en>'],
+    ['vertical-horizontal', '<en>Vertical first, then horizontal: A → (x₁, y₂) → B.</en>'],
+    ['manhattan', '<en>When the horizontal run is longer: half of it, then the whole vertical run, then the other half; otherwise the axes swap. Bends may land on half units.</en>'],
+    ['manhattan45', '<en>A horizontal run, a 45° diagonal, then the rest horizontally; when the vertical run is longer, the axes swap.</en>']
   ];
 
   function modePts(mode, a, b) {
@@ -694,7 +695,7 @@
       });
       codeEl.innerHTML = C.hlSnippet('%a = ' + pt(A).replace(/−/g, '-') + '; %b = ' + pt(B).replace(/−/g, '-') + ';\n&n @WIRE' + (mode === 'auto' ? '' : '(mode="' + mode + '")') + ' {%a %b}');
       var m = MODES.filter(function (x) { return x[0] === mode; })[0];
-      cap.innerHTML = m[1] + (p && p.length > 2 ? ' <span class="muted"><zh>空心方块是走法加出的拐点：它们不是对象，不能引用，也不能从那里接支线。</zh><en>The hollow squares are bends added by the mode: they are not objects, cannot be referenced and cannot start a branch.</en></span>' : '');
+      cap.innerHTML = m[1] + (p && p.length > 2 ? ' <span class="muted"><en>The hollow squares are bends added by the mode: they are not objects, cannot be referenced and cannot start a branch.</en></span>' : '');
     }
     PG.initSeg(seg, 'data-mode', function (v) { mode = v; draw(); });
     svg.addEventListener('click', function (e) {
@@ -810,12 +811,12 @@
       if (!linker) linker = C.link(codeEl, L, view); else linker.setLines(L);
       view.setScene(scene(), { animate: animate, duration: 700 });
       cap.innerHTML = what === 'move'
-        ? (moved ? '<zh>M1 移到 x = 12：标签跟着走，标注留在原处。</zh><en>M1 moved to x = 12: the label goes with it, the annotation stays.</en>'
-          : '<zh>M1 回到 x = 4，标签也跟着回来。</zh><en>M1 is back at x = 4, and so is its label.</en>')
+        ? (moved ? '<en>M1 moved to x = 12: the label goes with it, the annotation stays.</en>'
+          : '<en>M1 is back at x = 4, and so is its label.</en>')
         : what === 'key'
-          ? (keyed ? '<zh>同一个对象、同一个 key 就是同一段文字：后写的换掉内容，位置照旧。别的记录用 #M1::wl 找到它。</zh><en>Same object and same key means the same text: the later statement replaces the content and keeps the position. Other records find it as #M1::wl.</en>'
-            : '<zh>去掉第二句，标签恢复原来的内容。</zh><en>Without the second statement, the label has its original content.</en>')
-          : '<zh>标签附着在 M1 上：${w}、${l} 读 M1 的参数，dy=-3 把它放在原点下方 3 格。标注附着在点 (2, 9) 上，只能读这个点的坐标。</zh><en>The label is attached to M1: ${w} and ${l} read M1’s parameters, and dy=-3 puts it 3 units below the origin. The annotation is attached to the point (2, 9) and can read only that point’s coordinates.</en>';
+          ? (keyed ? '<en>Same object and same key means the same text: the later statement replaces the content and keeps the position. Other records find it as #M1::wl.</en>'
+            : '<en>Without the second statement, the label has its original content.</en>')
+          : '<en>The label is attached to M1: ${w} and ${l} read M1’s parameters, and dy=-3 puts it 3 units below the origin. The annotation is attached to the point (2, 9) and can read only that point’s coordinates.</en>';
     }
     $('#tx-move').addEventListener('click', function () { moved = !moved; show(true, 'move'); });
     $('#tx-key').addEventListener('click', function () { keyed = !keyed; show(true, 'key'); });
@@ -843,7 +844,7 @@
       i++;
       var h = seq('}');
       if (src[i] === '}') { i++; return h; }
-      warn.push('<zh>花括号不配对</zh><en>unmatched brace</en>');
+      warn.push('<en>unmatched brace</en>');
       return h;
     }
     function seq(stop) {
@@ -856,7 +857,7 @@
           if (e < 0) { out += esc(src.slice(i)); i = n; break; }
           var key = src.slice(i + 2, e).replace(/^#/, '');
           if (Object.prototype.hasOwnProperty.call(M1_ATTR, key)) out += '<span class="ref">' + esc(M1_ATTR[key]) + '</span>';
-          else { out += '<span class="bad">' + esc(src.slice(i, e + 1)) + '</span>'; warn.push('<zh>M1 没有属性 ' + esc(key) + '：这段文字失效</zh><en>M1 has no property ' + esc(key) + ': the text fails</en>'); }
+          else { out += '<span class="bad">' + esc(src.slice(i, e + 1)) + '</span>'; warn.push(PG.fill('<en>M1 has no property {key}: the text fails</en>', { key: esc(key) })); }
           i = e + 1;
           continue;
         }
@@ -887,7 +888,7 @@
               out += '<span class="frac"><span>' + num + '</span><span>' + den + '</span></span>';
             } else {
               out += esc(BS + 'frac') + '{' + num + '}';
-              warn.push('<zh>\\frac 后面要紧跟两个花括号</zh><en>\\frac needs two braces right after it</en>');
+              warn.push('<en>\\frac needs two braces right after it</en>');
             }
             continue;
           }
@@ -900,7 +901,7 @@
             continue;
           }
           out += '<span class="bad">' + esc(BS + name) + '</span>';
-          warn.push('<zh>不认识的命令 \\' + esc(name) + '：照原样显示</zh><en>unknown command \\' + esc(name) + ': shown as written</en>');
+          warn.push(PG.fill('<en>unknown command \\{name}: shown as written</en>', { name: esc(name) }));
           i = j;
           continue;
         }
@@ -908,10 +909,10 @@
           i++;
           var plain = seq('}');
           if (src[i] === '}') { i++; out += '{' + plain + '}'; }
-          else { out += '{' + plain; warn.push('<zh>花括号不配对</zh><en>unmatched brace</en>'); }
+          else { out += '{' + plain; warn.push('<en>unmatched brace</en>'); }
           continue;
         }
-        if (c === '}') { warn.push('<zh>花括号不配对</zh><en>unmatched brace</en>'); out += '}'; i++; continue; }
+        if (c === '}') { warn.push('<en>unmatched brace</en>'); out += '}'; i++; continue; }
         out += esc(c);
         i++;
       }
@@ -931,7 +932,7 @@
     function update() {
       var r = markup(input.value);
       view.innerHTML = '<span class="mk-line">' + (r.html || '&nbsp;') + '</span>';
-      warnEl.innerHTML = r.warn.length ? icon('warn') + '<span>' + r.warn.filter(function (w, k, a) { return a.indexOf(w) === k; }).join('<zh>；</zh><en>; </en>') + '</span>' : icon('check') + '<span><zh>没有警告</zh><en>No warnings</en></span>';
+      warnEl.innerHTML = r.warn.length ? icon('warn') + '<span>' + r.warn.filter(function (w, k, a) { return a.indexOf(w) === k; }).join('<en>; </en>') + '</span>' : icon('check') + '<span><en>No warnings</en></span>';
       warnEl.classList.toggle('is-ok', !r.warn.length);
     }
     $$('.mk-chip', chips).forEach(function (b) {
@@ -946,9 +947,9 @@
   var CODES = ['R0', 'R90', 'R180', 'R270', 'MY', 'MX', 'MYR90', 'MXR90'];
   var MAP = { R0: '(x, y)', R90: '(−y, x)', R180: '(−x, −y)', R270: '(y, −x)', MY: '(−x, y)', MX: '(x, −y)', MYR90: '(−y, −x)', MXR90: '(y, x)' };
   var CODE_NOTE = {
-    R0: '<zh>不转</zh><en>unchanged</en>', R90: '<zh>逆时针 90°</zh><en>90° counterclockwise</en>', R180: '<zh>转 180°</zh><en>turned 180°</en>',
-    R270: '<zh>逆时针 270°，即顺时针 90°</zh><en>270° counterclockwise, i.e. 90° clockwise</en>', MY: '<zh>左右翻</zh><en>flipped left-right</en>',
-    MX: '<zh>上下翻</zh><en>flipped upside down</en>', MYR90: '<zh>先 MY 再 R90</zh><en>MY, then R90</en>', MXR90: '<zh>先 MX 再 R90</zh><en>MX, then R90</en>'
+    R0: '<en>unchanged</en>', R90: '<en>90° counterclockwise</en>', R180: '<en>turned 180°</en>',
+    R270: '<en>270° counterclockwise, i.e. 90° clockwise</en>', MY: '<en>flipped left-right</en>',
+    MX: '<en>flipped upside down</en>', MYR90: '<en>MY, then R90</en>', MXR90: '<en>MX, then R90</en>'
   };
   function matOf(code) { var p = S.apply(S.stateOf({ x: 0, y: 0, o: code }), [1, 0]), q = S.apply(S.stateOf({ x: 0, y: 0, o: code }), [0, 1]); return [p[0], q[0], p[1], q[1]]; }
   function codeOfMat(m) { return CODES.filter(function (c) { var k = matOf(c); return k[0] === m[0] && k[1] === m[1] && k[2] === m[2] && k[3] === m[3]; })[0]; }
@@ -997,7 +998,7 @@
       $$('button', grid).forEach(function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-c') === c ? 'true' : 'false'); });
       title.innerHTML = '#M1 @ORIENT("' + c + '") · ' + CODE_NOTE[c];
       var st = S.stateOf({ x: 0, y: 0, o: c });
-      pins.innerHTML = '<thead><tr><th><zh>端子</zh><en>Terminal</en></th><th><zh>符号里</zh><en>In the symbol</en></th><th><zh>画在</zh><en>Drawn at</en></th></tr></thead><tbody>' +
+      pins.innerHTML = '<thead><tr><th><en>Terminal</en></th><th><en>In the symbol</en></th><th><en>Drawn at</en></th></tr></thead><tbody>' +
         PINS.map(function (p) { return '<tr><td>' + p[1] + '</td><td>' + pt(p[2]) + '</td><td><b>' + pt(S.apply(st, p[2])) + '</b></td></tr>'; }).join('') +
         '</tbody><caption>' + c + ' : (x, y) → ' + MAP[c] + '</caption>';
       view.setScene(scene(), { animate: animate, duration: 800 });
@@ -1032,7 +1033,7 @@
         }
       }, { animate: animate, duration: 700 });
       codeEl.innerHTML = C.hlSnippet('#A @ORIENT("' + a + '");\n#A #B @ORIENT-RELATION("' + t + '")');
-      cap.innerHTML = PG.fill('<zh>A 是 {a}，关系是 {t}，所以 B 是 <b>{b}</b>：先按 A 的朝向摆，再做一次 {t}。</zh><en>A is {a} and the relation is {t}, so B is <b>{b}</b>: A’s orientation followed by {t}.</en>', { a: a, t: t, b: b });
+      cap.innerHTML = PG.fill('<en>A is {a} and the relation is {t}, so B is <b>{b}</b>: A’s orientation followed by {t}.</en>', { a: a, t: t, b: b });
     }
     sa.addEventListener('change', function () { show(true); });
     stt.addEventListener('change', function () { show(true); });
@@ -1051,8 +1052,8 @@
     { text: function (p) { return '%c = #M1 #M2 @DISTANCE("x", min=1)' + (p === 'normal' ? '' : ' => @PRIORITY("' + p + '")'); }, def: 'disabled', fact: function (a, b) { return Math.abs(b - a) >= 1; } }
   ];
   var PR_NOTE = [
-    '<zh>M1 的 x = 4</zh><en>M1’s x = 4</en>', '<zh>M2 的 x = 12</zh><en>M2’s x = 12</en>', '<zh>x 坐标相同</zh><en>same x</en>',
-    '<zh>M2 在 M1 右边至少 2 格</zh><en>M2 at least 2 right of M1</en>', '<zh>相距至少 1 格，不分先后</zh><en>at least 1 apart, either way</en>'
+    '<en>M1’s x = 4</en>', '<en>M2’s x = 12</en>', '<en>same x</en>',
+    '<en>M2 at least 2 right of M1</en>', '<en>at least 1 apart, either way</en>'
   ];
   var GRID = []; for (var gx = -4; gx <= 24; gx++) GRID.push(gx);
 
@@ -1074,10 +1075,10 @@
     var prio = PR.map(function (r) { return r.def; });
     rows.innerHTML = PR.map(function (r, i) {
       return '<div class="prio-row" data-i="' + i + '"><span class="prio-n"></span><code class="prio-code"></code>' +
-        '<label class="prio-sel"><span class="vh"><zh>优先级</zh><en>Priority</en></span><select data-i="' + i + '">' +
+        '<label class="prio-sel"><span class="vh"><en>Priority</en></span><select data-i="' + i + '">' +
         PRIOS.map(function (p) { return '<option value="' + p + '">' + p + '</option>'; }).join('') + '</select></label>' +
         '<span class="prio-st"></span><span class="prio-note">' + PR_NOTE[i] + '</span></div>';
-    }).join('') + '<div class="prio-foot"><button class="btn btn-sm" type="button" id="prio-reset">' + icon('replay') + '<zh>恢复原样</zh><en>Reset</en></button><span class="muted"><zh>按优先级从高到低、同一档里后写的在前，逐条纳入。</zh><en>Taken by priority, highest first; within one priority, later first.</en></span></div>';
+    }).join('') + '<div class="prio-foot"><button class="btn btn-sm" type="button" id="prio-reset">' + icon('replay') + '<en>Reset</en></button><span class="muted"><en>Taken by priority, highest first; within one priority, later first.</en></span></div>';
     var el = S.el;
     /* number line: x from -2 to 22 */
     function X(v) { return 24 + (v + 2) * 14.5; }
@@ -1112,9 +1113,9 @@
         $('.prio-n', row).textContent = rank[i] ? rank[i] : '–';
         var st = status[i] || 'off';
         row.className = 'prio-row is-' + st;
-        $('.prio-st', row).innerHTML = st === 'kept' ? '<span class="chip chip-ok">' + icon('check') + '<zh>纳入</zh><en>kept</en></span>'
-          : st === 'dropped' ? '<span class="chip chip-err">' + icon('cross') + '<zh>丢弃</zh><en>dropped</en></span>'
-            : '<span class="chip chip-mute"><zh>停用</zh><en>disabled</en></span>';
+        $('.prio-st', row).innerHTML = st === 'kept' ? '<span class="chip chip-ok">' + icon('check') + '<en>kept</en></span>'
+          : st === 'dropped' ? '<span class="chip chip-err">' + icon('cross') + '<en>dropped</en></span>'
+            : '<span class="chip chip-mute"><en>disabled</en></span>';
       });
       var sols = solve(kept);
       var xs1 = sols.map(function (s) { return s[0]; }), xs2 = sols.map(function (s) { return s[1]; });
@@ -1126,10 +1127,10 @@
         boxes[k].classList.toggle('is-free', !(k ? fixed2 : fixed1));
       });
       function desc(n, fixed, v) {
-        return fixed ? n + ' x = ' + v : '<zh>' + n + ' 的 x 由求解器定</zh><en>' + n + '’s x is left to the solver</en>';
+        return fixed ? n + ' x = ' + v : PG.fill('<en>{n}’s x is left to the solver</en>', { n: n });
       }
-      cap.innerHTML = desc('M1', fixed1, xs1[0]) + '<zh>；</zh><en>; </en>' + desc('M2', fixed2, xs2[0]) + '<zh>。</zh><en>.</en>' +
-        (fixed1 && fixed2 && xs1[0] === xs2[0] ? ' <zh>两者对齐，DISTANCE 被丢弃。</zh><en>They are aligned, and the DISTANCE is dropped.</en>' : '');
+      cap.innerHTML = desc('M1', fixed1, xs1[0]) + '<en>; </en>' + desc('M2', fixed2, xs2[0]) + '<en>.</en>' +
+        (fixed1 && fixed2 && xs1[0] === xs2[0] ? ' <en>They are aligned, and the DISTANCE is dropped.</en>' : '');
     }
     $$('select', rows).forEach(function (s) {
       s.addEventListener('change', function () { prio[+s.getAttribute('data-i')] = s.value; update(); });
@@ -1148,10 +1149,10 @@
     [['* ', ''], ['}', '']]
   ];
   var HDR_TIP = {
-    rec: ['type="header"', '<zh>这是头段记录：文件的第一条记录，在子电路之外，至多一条。它总按标准写法读，里面不认代称。</zh><en>This is the header record: the file’s first record, outside any subcircuit, at most one. It is always read in standard spelling, without aliases.</en>'],
-    ver: ['@VERSION', '<zh>文件使用的语言版本。不写时按工具默认的版本读，工具保存文件时会补上。</zh><en>The language version of the file. Without it the tool’s default version applies, and tools add it when they save the file.</en>'],
-    ali: ['@USE-ALIASES', '<zh>加载代称包。rnl-zh 给关键字、参数名和标准包里的名字起了中文代称，之后的记录里中英文写法可以混用。version= 写明用哪一版：不写就用找到的最新一版，以后出了新版，读法可能跟着变。</zh><en>Loads an alias package. rnl-zh gives Chinese spellings to keywords, parameter names and the names in the standard package, so later records may mix both. version= says which version: without it the newest found is used, and a later version could change how the file reads.</en>'],
-    dev: ['@DEVICE', '<zh>给网表里没有定义的器件起端子名：名字匹配 XM*、模型匹配 sky130_fd_pr__nfet_* 的元件，端子依次叫 d、g、s、b。</zh><en>Names the terminals of devices the netlist does not define: instances whose name matches XM* and model matches sky130_fd_pr__nfet_* get the terminals d, g, s and b, in order.</en>']
+    rec: ['type="header"', '<en>This is the header record: the file’s first record, outside any subcircuit, at most one. It is always read in standard spelling, without aliases.</en>'],
+    ver: ['@VERSION', '<en>The language version of the file. Without it the tool’s default version applies, and tools add it when they save the file.</en>'],
+    ali: ['@USE-ALIASES', '<en>Loads an alias package. rnl-zh gives Chinese spellings to keywords, parameter names and the names in the standard package, so later records may mix both. version= says which version: without it the newest found is used, and a later version could change how the file reads.</en>'],
+    dev: ['@DEVICE', '<en>Names the terminals of devices the netlist does not define: instances whose name matches XM* and model matches sky130_fd_pr__nfet_* get the terminals d, g, s and b, in order.</en>']
   };
 
   function initHeader() {
@@ -1202,10 +1203,10 @@
       ];
       C.render(codeEl, L);
       diag.innerHTML = on
-        ? '<li class="ok">' + icon('check') + '<span><zh><code>#XM1:d</code> 是 XM1 的第 1 个端子，名字来自 @DEVICE。</zh><en><code>#XM1:d</code> is XM1’s first terminal, named by @DEVICE.</en></span></li>' +
-          '<li class="info">' + icon('info') + '<span><zh>通配让一句话管住一整类器件：nfet 的各种规格都匹配 sky130_fd_pr__nfet_*。</zh><en>Patterns let one statement cover a whole family: every nfet variant matches sky130_fd_pr__nfet_*.</en></span></li>'
-        : '<li class="err">' + icon('cross') + '<span><zh><code>#XM1:d</code>：XM1 没有端子 d。网表里没有 sky130_fd_pr__nfet_01v8 的定义，不知道端子叫什么；只有这一句失效。</zh><en><code>#XM1:d</code>: XM1 has no terminal d. The netlist does not define sky130_fd_pr__nfet_01v8, so its terminal names are unknown; only this statement fails.</en></span></li>' +
-          '<li class="info">' + icon('info') + '<span><zh>按序号写 <code>#XM1:1</code> 照样可以；或者在头段记录里加上 @DEVICE。</zh><en>The position <code>#XM1:1</code> still works; or add @DEVICE to the header record.</en></span></li>';
+        ? '<li class="ok">' + icon('check') + '<span><en><code>#XM1:d</code> is XM1’s first terminal, named by @DEVICE.</en></span></li>' +
+          '<li class="info">' + icon('info') + '<span><en>Patterns let one statement cover a whole family: every nfet variant matches sky130_fd_pr__nfet_*.</en></span></li>'
+        : '<li class="err">' + icon('cross') + '<span><en><code>#XM1:d</code>: XM1 has no terminal d. The netlist does not define sky130_fd_pr__nfet_01v8, so its terminal names are unknown; only this statement fails.</en></span></li>' +
+          '<li class="info">' + icon('info') + '<span><en>The position <code>#XM1:1</code> still works; or add @DEVICE to the header record.</en></span></li>';
     }
     PG.initSeg($('#dev-seg'), 'data-v', function (v) { show(v === '1'); });
     show(true);

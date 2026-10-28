@@ -1,4 +1,4 @@
-import { showSource } from "../viewer.js";
+import { dialogGone, showSource } from "../viewer.js";
 // Smoke tests of the web viewer (apps/web): the site that build.mjs makes with the samples, served by
 // serve.mjs, with the web shell and the real core as WebAssembly in its Worker. It opens netlists by
 // URL, files set on its file inputs, a folder and dropped files, and each Document is the one
@@ -13,9 +13,26 @@ import path from "node:path";
 import { expect, test } from "@playwright/test";
 import { PICK, root, UNCALLED } from "../fixtures.js";
 import { publicPackageDir, publicPackagesAvailable } from "../../../scripts/packages.mjs";
+import { zh } from "../zh.js";
 const hasPublicPackages = publicPackagesAvailable();
 test.beforeEach(async ({ page }) => {
   await page.route("https://rich-netlist.github.io/rnl-packages/**", route => route.abort());
+});
+
+test("panel keys work at once while the WebAssembly core is still loading", async ({ page }) => {
+  // a browser that runs WebAssembly without JIT takes long to have the core ready
+  let release;
+  const ready = new Promise(resolve => release = resolve);
+  await page.route("**/*.wasm", async route => { await ready; await route.continue(); });
+  await page.goto(`${process.env.RNL_WEB_URL}/?url=samples/cases/04-hierarchy.sp`);
+  await expect(page.locator("#startup")).toHaveCount(0);
+  await page.keyboard.press("3");
+  await expect(page.locator("#pane-hierarchy")).toBeVisible();
+  await page.keyboard.press("1");
+  await expect(page.locator("#pane-files")).toBeVisible();
+  release();
+  await expect(page).toHaveTitle(/^04-hierarchy\.sp/);
+  await expect(page.locator("#pane-files")).toBeVisible();
 });
 
 test('usage inspection and overlay selection work with the real WASM core', async ({ page }) => {
@@ -903,7 +920,11 @@ test("the core's labels are clicked and marked, the pointer shows names, and a c
   });
   const labels = doc.levels[0].hits.filter((h) => h.kind === "label");
   expect(labels.map((h) => h.id).sort()).toEqual(["#C1::name", "#C1::value", "#R1::name", "#R1::value", "#R2::name", "#R2::value", "a text"]);
-  expect(labels.filter((h) => h.objects.length === 0).map((h) => h.id)).toEqual(["a text"]);
+  // R1's first terminal's label stands for the net of its pin, as the pin does
+  const terminal = labels.find((h) => h.id === "a text");
+  expect(terminal.objects.map((o) => doc.objects[o].name)).toEqual(["a"]);
+  expect(terminal.objects).toEqual(doc.levels[0].hits.find((h) => h.kind === "pin" && h.objects.includes(terminal.objects[0])).objects);
+  expect(labels.filter((h) => h.objects.length === 0)).toEqual([]);
   /** The page point of a point of the drawing, in its pixels. */
   const point = ([u, v]) =>
     page.evaluate(
@@ -966,7 +987,7 @@ test("the text edited and applied is built by the core as rnl view builds the sa
   const [download] = await Promise.all([page.waitForEvent("download"), page.keyboard.press("Control+s")]);
   expect(download.suggestedFilename()).toBe("parts.inc");
   expect(fs.readFileSync(await download.path(), "utf8")).toBe(editedParts);
-  await expect(page.locator("#note")).toHaveText("已下载 parts.inc。");
+  await expect(page.locator("#note")).toHaveText(zh("Downloaded {0}.", "parts.inc"));
   await expect(page.locator('dialog.dialog')).toHaveCount(0);
   await page.evaluate(() => window.viewer.command('language-en'));
   await expect(page.locator("#note")).toHaveText("Downloaded parts.inc.");
@@ -1049,7 +1070,7 @@ test('automatic package offers wait for an existing manual Library download',asy
   await expect.poll(()=>!!downloadRequest).toBe(true);
   // Allow a full automatic-offer polling interval while the manual download stays blocked.
   await page.evaluate(()=>new Promise(resolve=>setTimeout(resolve,350)));
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await dialogGone(page);
   await downloadRequest.fallback();
   const prompt=page.getByRole('dialog',{name:'Public Packages Found'});
   await expect(prompt).toBeVisible();
@@ -1080,7 +1101,7 @@ test('public package offers choose the newest unpinned version and remember Canc
   await expect(prompt.locator('li')).toHaveText(['offer-test 0.2']);
   await prompt.getByRole('button',{name:'Cancel',exact:true}).click();
   await opened(page,()=>page.evaluate(()=>window.viewer.command('reload-library')));
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await dialogGone(page);
   await expect(page.locator('.package-hint button')).toHaveText('Include');
 });
 
@@ -1094,7 +1115,7 @@ test('unresolved symbols do not offer packages and delayed catalog results canno
   await opened(page,()=>page.locator('#file-input').setInputFiles(packageFile(plain,'other.sp')));
   await pending.fulfill({json:catalog});
   await page.evaluate(async()=>{await (await import('./shells/web.js')).default.publicPackages();});
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await dialogGone(page);
   await expect(page.locator('.package-hint')).toHaveCount(0);
   await page.locator('#tab-files').click();
   await expect(page.getByRole('button',{name:'Exclude offer-test 0.1',exact:true})).toHaveCount(0);
@@ -1114,9 +1135,9 @@ test('a stalled public catalog times out after ten seconds while viewing and edi
   await opened(page,()=>page.keyboard.press('Control+q'));
   expect(await page.evaluate(()=>window.viewer.doc.files[0].text)).toContain('* typed while offline');
   await expect(page.locator('#public-package-status')).toContainText('timed out after 10 seconds',{timeout:15000});
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await dialogGone(page);
   await pending.fulfill({json:catalog}).catch(()=>{});
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await dialogGone(page);
 });
 
 test("Include File resolves a package with a different filename and Exclude removes it from search", async ({ page }) => {
@@ -1168,6 +1189,7 @@ test("a missing published Canvas package offers Include and rebuilds; other vers
   const prompt = page.getByRole('dialog', { name: 'Public Packages Found' });
   await expect(prompt).toBeVisible();
   await prompt.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await dialogGone(page);
   if (process.env.RNL_PACKAGE_SCREENSHOTS && info.project.name === "chromium") {
     await page.screenshot({ path: path.join(process.env.RNL_PACKAGE_SCREENSHOTS, "web-missing-canvas-include.png") });
   }
@@ -1185,7 +1207,7 @@ test("a missing published Canvas package offers Include and rebuilds; other vers
     await page.screenshot({ path: path.join(process.env.RNL_PACKAGE_SCREENSHOTS, "web-library-standard-builtins.png") });
   }
   await opened(page, () => page.locator("#file-input").setInputFiles({ name: "canvas-newer.sp", mimeType: "text/plain", buffer: Buffer.from(source.toString().replace('version="0.1"', 'version="99.0"')) }));
-  await expect(page.locator(".package-hint")).toContainText("Look for it in File › Include Public Package…");
+  await expect(page.locator(".package-hint")).toContainText("Look for it in File › Include Public Package...");
   await expect(page.locator(".package-hint button")).toHaveCount(0);
 });
 
@@ -1303,4 +1325,197 @@ test("temporary package is absent from include and USE-PACKAGE lookup; applied t
   await pasteText(page, "* next paste\nR2 b 0 2k\n.end\n");
   await expect(page.locator(".pool-temporary")).toHaveCount(1);
   expect((await page.evaluate(() => window.viewer.doc)).files[0].text).toContain("R2 b 0 2k");
+});
+
+// ---- files by an external manifest (?manifest=, core/manifest.js) ----
+
+const MANIFEST_BASE = "https://raw.githubusercontent.com/someone/design/0123456789abcdef0123456789abcdef01234567/";
+const MANIFEST_URL = "https://manifests.test/designs/demo.json";
+const MANIFEST_TREE = "https://github.com/someone/design/tree/0123456789abcdef0123456789abcdef01234567/examples/demo";
+const MANIFEST_REMOTE = "https://rich-netlist.github.io/rnl-packages/demo-remote/2.0/demo-remote.rnl";
+const manifestDir = path.join(root, "tests/viewer/inputs/manifest");
+const manifestFiles = ["top.sp", "cells/amp.sp", "cells/stage.sp", "lib/models.inc", "pkg/demo-local.rnl"];
+const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
+
+/** The fixture design's manifest, with `change` over it. */
+function demoManifest(change = {}) {
+  const remote = fs.readFileSync(path.join(root, "tests/viewer/inputs/manifest-remote.rnl"));
+  return {
+    format: 1, id: "demo", title: { en: "Manifest demo", zh: "清单示例" }, author: "someone",
+    source: { repo: "someone/design", commit: "0123456789abcdef0123456789abcdef01234567", url: MANIFEST_TREE },
+    license: "MIT", base: MANIFEST_BASE, entry: "top.sp", level: "amp",
+    files: [
+      ...manifestFiles.map((file) => {
+        const bytes = fs.readFileSync(path.join(manifestDir, file));
+        return { path: file, sha256: sha256(bytes), size: bytes.length };
+      }),
+      { path: ".packages/demo-remote/2.0/demo-remote.rnl", sha256: sha256(remote), size: remote.length, url: MANIFEST_REMOTE },
+    ],
+    // a bare include and a package by name look in the pool, in its order
+    pool: ["lib/models.inc", "pkg/demo-local.rnl", ".packages/demo-remote/2.0/demo-remote.rnl"],
+    ...change,
+  };
+}
+
+/** Serve the manifest, its files from raw GitHub and the remote package; count the manifest's fetches. */
+async function manifestRoutes(page, manifest, served = {}) {
+  const counts = { manifest: 0 };
+  await page.route(MANIFEST_URL, (route) => {
+    counts.manifest += 1;
+    return route.fulfill({ status: 200, contentType: "application/json", headers: { "Access-Control-Allow-Origin": "*" }, body: JSON.stringify(manifest) });
+  });
+  await page.route(`${MANIFEST_BASE}**`, (route) => {
+    const file = new URL(route.request().url()).pathname.split("/").slice(4).join("/");
+    const body = served[file] ?? (manifestFiles.includes(file) ? fs.readFileSync(path.join(manifestDir, file)) : null);
+    return body === null ? route.fulfill({ status: 404, body: "missing" })
+      : route.fulfill({ status: 200, contentType: "text/plain", headers: { "Access-Control-Allow-Origin": "*" }, body });
+  });
+  await page.route(MANIFEST_REMOTE, (route) => route.fulfill({ status: 200, contentType: "text/plain",
+    headers: { "Access-Control-Allow-Origin": "*" }, body: fs.readFileSync(path.join(root, "tests/viewer/inputs/manifest-remote.rnl")) }));
+  return counts;
+}
+
+test("?manifest= opens the files of a manifest: its pool and packages, its level, the source bar and a read-only Library group", async ({ page }) => {
+  // "(top)": the top level of the entry; a level in another file opens that file, as the next tests show
+  const counts = await manifestRoutes(page, demoManifest({ level: "(top)" }));
+  await page.goto(`${process.env.RNL_WEB_URL}/index.html?manifest=${encodeURIComponent(MANIFEST_URL)}`);
+  const doc = await shown(page);
+  // the relative include, the bare one on the search path and both packages are found
+  expect(doc.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+  expect(doc.files.map((f) => f.name)).toEqual(expect.arrayContaining(["top.sp", "cells/amp.sp", "lib/models.inc"]));
+  expect(await page.evaluate(() => window.viewer.level)).toBe(0);
+  const bar = page.locator("#manifest-bar");
+  await expect(bar).toBeVisible();
+  await expect(bar.locator(".manifest-title")).toHaveText("Manifest demo");
+  await expect(bar).toContainText("someone");
+  await expect(bar.locator(".manifest-source")).toHaveText("Source: someone/design@0123456");
+  await expect(bar.locator(".manifest-source")).toHaveAttribute("href", MANIFEST_TREE);
+  // the source is the bar's only link
+  await expect(bar.locator("a")).toHaveCount(1);
+  await page.locator("#tab-files").click();
+  const group = page.locator('.lib-group[data-group="external"]');
+  await expect(group.locator(".lib-title")).toHaveText("From external manifest · demo · read only");
+  await expect(group.locator(".pool-open")).toHaveText([".packages/demo-remote/2.0/demo-remote.rnl", "cells/amp.sp", "cells/stage.sp", "lib/models.inc", "pkg/demo-local.rnl", "top.sp"]);
+  await expect(group.getByRole("button", { name: /Exclude/ })).toHaveCount(0);
+  // read only: the text cannot be edited
+  await page.evaluate(() => window.viewer.command("toggle-edit"));
+  await expect(page.locator("#source textarea")).toHaveCount(0);
+  // Chinese: the title and the way back follow the language
+  await page.evaluate(() => window.viewer.command("language-zh"));
+  await expect(bar.locator(".manifest-title")).toHaveText("清单示例");
+  await page.evaluate(() => window.viewer.command("language-en"));
+  if (process.env.RNL_REVIEW_DIR && test.info().project.name === "chromium") {
+    await page.screenshot({ path: path.join(process.env.RNL_REVIEW_DIR, "external-manifest.png") });
+  }
+  // Reload reads the manifest again
+  const before = counts.manifest;
+  await opened(page, () => page.keyboard.press("F5"));
+  expect(counts.manifest).toBe(before + 1);
+});
+
+test("a file of a manifest whose SHA-256 does not match is named and nothing opens; a missing level is told", async ({ page }) => {
+  await manifestRoutes(page, demoManifest(), { "cells/amp.sp": "* changed\n" });
+  await page.goto(`${process.env.RNL_WEB_URL}/index.html?manifest=${encodeURIComponent(MANIFEST_URL)}`);
+  await expect(page.locator("#diags .diag.error .msg")).toContainText("cells/amp.sp");
+  expect(await page.evaluate(() => window.viewer.doc)).toBeNull();
+  await expect(page.locator("#manifest-bar")).toBeHidden();
+
+  await page.unrouteAll();
+  await manifestRoutes(page, demoManifest({ level: "nothing" }));
+  await page.goto(`${process.env.RNL_WEB_URL}/index.html?manifest=${encodeURIComponent(MANIFEST_URL)}`);
+  await shown(page);
+  await expect(page.locator("#notice")).toContainText("no level nothing");
+  // a manifest with no title, author or source has no bar
+  await page.unrouteAll();
+  await manifestRoutes(page, demoManifest({ title: undefined, author: undefined, source: undefined }));
+  await page.goto(`${process.env.RNL_WEB_URL}/index.html?manifest=${encodeURIComponent(MANIFEST_URL)}`);
+  await shown(page);
+  await expect(page.locator("#manifest-bar")).toBeHidden();
+  // ?level= wins over the manifest's
+  await page.goto(`${process.env.RNL_WEB_URL}/index.html?manifest=${encodeURIComponent(MANIFEST_URL)}&level=amp`);
+  await shown(page);
+  await expect.poll(() => page.evaluate(() => window.viewer.doc.levels[window.viewer.level].title)).toBe("amp");
+  expect(await page.evaluate(() => window.viewer.doc.path)).toBe("/demo/top.sp");
+});
+
+test("an embedded canvas opens the files of a manifest by ?manifest=", async ({ page }) => {
+  await manifestRoutes(page, demoManifest());
+  await page.goto(`${process.env.RNL_WEB_URL}/index.html?embed=1&manifest=${encodeURIComponent(MANIFEST_URL)}`);
+  await expect(page.locator("#canvas > svg")).toBeVisible();
+  await expect(page.locator("#manifest-bar")).toBeHidden();
+  await expect.poll(() => page.evaluate(() => window.viewer?.doc?.levels[window.viewer.level]?.title)).toBe("amp");
+  expect(await page.evaluate(() => window.viewer.doc.path)).toBe("/demo/top.sp");
+});
+
+test("the bar stays while a file of the manifest is shown, goes with another file, and comes back with one of its files", async ({ page }) => {
+  await manifestRoutes(page, demoManifest({ level: "(top)" }));
+  await page.goto(`${process.env.RNL_WEB_URL}/index.html?manifest=${encodeURIComponent(MANIFEST_URL)}`);
+  await shown(page);
+  const bar = page.locator("#manifest-bar");
+  await expect(bar).toBeVisible();
+  await page.locator("#tab-files").click();
+  const group = page.locator('.lib-group[data-group="external"]');
+  // another file of the manifest, opened from the Library
+  await opened(page, () => group.locator(".pool-open", { hasText: /^cells\/amp\.sp$/ }).click());
+  expect(await page.evaluate(() => window.viewer.doc.path)).toBe("/demo/cells/amp.sp");
+  await expect(bar).toBeVisible();
+  await expect(bar.locator(".manifest-title")).toHaveText("Manifest demo");
+  // a file of the computer has nothing to do with the manifest
+  await opened(page, () => page.locator("#file-input").setInputFiles({ name: "local.sp", mimeType: "text/plain", buffer: Buffer.from("* local\nR1 a 0 1k\n.end\n") }));
+  await expect(bar).toBeHidden();
+  // and the manifest's entry again
+  await opened(page, () => group.locator(".pool-open", { hasText: /^top\.sp$/ }).click());
+  await expect(bar).toBeVisible();
+  await expect(bar.locator(".manifest-source")).toHaveText("Source: someone/design@0123456");
+});
+
+test("the bar names a manifest's authors in their order, each with an https address as a link", async ({ page }) => {
+  await manifestRoutes(page, demoManifest({ level: "(top)", author: [
+    { name: "Ada", url: "https://example.org/ada" }, { name: "Bob" }, { name: "Eve", url: "javascript:alert(1)" },
+  ] }));
+  await page.goto(`${process.env.RNL_WEB_URL}/index.html?manifest=${encodeURIComponent(MANIFEST_URL)}`);
+  await shown(page);
+  const authors = page.locator("#manifest-bar .manifest-author");
+  await expect(authors).toHaveText("Ada, Bob, Eve");
+  const links = authors.locator("a");
+  await expect(links).toHaveCount(1);
+  await expect(links).toHaveText("Ada");
+  await expect(links).toHaveAttribute("href", "https://example.org/ada");
+  await expect(links).toHaveAttribute("target", "_blank");
+  await expect(links).toHaveAttribute("rel", "noopener noreferrer");
+  if (process.env.RNL_REVIEW_DIR && test.info().project.name === "chromium") {
+    await page.screenshot({ path: path.join(process.env.RNL_REVIEW_DIR, "manifest-authors.png"), clip: { x: 420, y: 0, width: 780, height: 120 } });
+  }
+});
+
+test("a manifest's level defined in an included file is shown in the entry's document, with all it includes", async ({ page }) => {
+  await manifestRoutes(page, demoManifest({ level: "amp" }));
+  await page.goto(`${process.env.RNL_WEB_URL}/index.html?manifest=${encodeURIComponent(MANIFEST_URL)}`);
+  await shown(page);
+  await expect.poll(() => page.evaluate(() => window.viewer.doc.levels[window.viewer.level].title)).toBe("amp");
+  const doc = await page.evaluate(() => window.viewer.doc);
+  // the entry stays the document: amp is entered there, not opened from cells/amp.sp alone
+  expect(doc.path).toBe("/demo/top.sp");
+  expect(doc.files.map((f) => f.name)).toEqual(expect.arrayContaining(["top.sp", "cells/amp.sp", "lib/models.inc"]));
+  expect(doc.levels[await page.evaluate(() => window.viewer.level)].kind).toBe("subckt");
+  await expect(page).toHaveTitle(/^top\.sp/);
+});
+
+test("the files of a manifest are searched as the Library's: Auto Include finds a subcircuit for a file opened alone", async ({ page }) => {
+  await manifestRoutes(page, demoManifest({ level: "(top)" }));
+  await page.goto(`${process.env.RNL_WEB_URL}/index.html?manifest=${encodeURIComponent(MANIFEST_URL)}`);
+  await shown(page);
+  expect(await page.evaluate(() => document.getElementById("auto-include").checked)).toBe(true);
+  const defined = () => page.evaluate(() => {
+    const doc = window.viewer.doc;
+    return doc.levels.flatMap((l) => l.children).filter((c) => c.master === "amp").map((c) => c.level !== null);
+  });
+  // a file of the manifest that uses amp without including it, opened from the Library
+  await page.locator("#tab-files").click();
+  await opened(page, () => page.locator('.lib-group[data-group="external"] .pool-open', { hasText: /^cells\/stage\.sp$/ }).click());
+  expect(await page.evaluate(() => window.viewer.doc.path)).toBe("/demo/cells/stage.sp");
+  expect(await defined()).toEqual([true]);
+  // a file of the computer that uses amp: the manifest's files are searched for it too
+  await opened(page, () => page.locator("#file-input").setInputFiles({ name: "local.sp", mimeType: "text/plain", buffer: Buffer.from("* local\nX9 a b amp\n.end\n") }));
+  expect(await defined()).toEqual([true]);
 });

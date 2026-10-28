@@ -19,6 +19,7 @@ on:
       - "scripts/packages*"
       - "site/**"
       - "scripts/site_i18n.py"
+      - "i18n/**"
       - "apps/desktop/release-notes/**"
       - "release-notes/**"
       - "spec/**"
@@ -28,6 +29,7 @@ on:
       - "scripts/brand*"
       - "skills/**"
       - ".github/actions/install-spec-tools/**"
+      - ".github/actions/install-playwright/**"
       - "apps/web/**"
       - "apps/viewer-ui/**"
       - "bindings/**"
@@ -44,6 +46,7 @@ on:
       - "scripts/packages*"
       - "site/**"
       - "scripts/site_i18n.py"
+      - "i18n/**"
       - "apps/desktop/release-notes/**"
       - "release-notes/**"
       - "spec/**"
@@ -53,6 +56,7 @@ on:
       - "scripts/brand*"
       - "skills/**"
       - ".github/actions/install-spec-tools/**"
+      - ".github/actions/install-playwright/**"
       - "apps/web/**"
       - "apps/viewer-ui/**"
       - "bindings/**"
@@ -116,7 +120,8 @@ jobs:
         run: |
           python3 -m unittest discover -s site -p 'test_*.py'
           python3 -m unittest discover -s scripts -p 'test_packages.py'
-          python3 site/build.py
+          # --online: the translation status also counts what rnl-gallery and rnl-packages publish
+          python3 site/build.py --online
 
       # Normally under half a minute, about 12 with slow downloads; one run hung here for over 1.5 hours.
       - uses: ./.github/actions/install-spec-tools
@@ -132,12 +137,12 @@ jobs:
 
       # The RNL skill package, for agents: site/dist/skill/rnl-skill.zip, the files of the package as plain
       # text under site/dist/skill/rnl/, a manifest and the hashes, and the plain-text entry that agents look
-      # for, site/dist/llms.txt (English) and site/dist/zh/llms.txt (Chinese), which the page for agents,
+      # for, site/dist/llms.txt, in English only, which the page for agents,
       # agents.html, links. The package is checked by skill.yml.
       - name: Build the skill package for agents
         run: python3 scripts/skill/build.py --site site/dist
 
-      # The web viewer, one copy for both languages: the core as WebAssembly, the page of
+      # The web viewer, one copy for every language: the core as WebAssembly, the page of
       # apps/viewer-ui with its web fonts, and the conformance corpus as samples.
       - name: Install Rust with the WebAssembly target
         id: rust
@@ -178,7 +183,7 @@ jobs:
         if: steps.fonts.outputs.cache-hit != 'true'
         run: pip install fonttools brotli && python scripts/fonts.py web
       # writes apps/web/dist/, including libraries/*.rnl, index.json and bundled.json,
-      # and puts it at site/dist/viewer/, where the pages of both languages link
+      # and puts it at site/dist/viewer/, where the pages of every language link
       - name: Build the web viewer, with samples and the package library
         run: |
           node --test apps/web/*.test.mjs
@@ -191,22 +196,32 @@ jobs:
       # its reading of package files run first.
       - name: Build the gallery of the standard packages
         run: |
-          node --test site/gallery/package-file.test.mjs
+          node --test site/gallery/package-file.test.mjs site/gallery/public-packages.test.mjs
           node site/gallery/build.mjs
 
       - name: Use the locked offline catalog for browser tests
         run: |
           python scripts/packages.py fixture
           echo "RNL_PACKAGE_CATALOG=$GITHUB_WORKSPACE/.rnl-packages/fixture/catalog.json" >> "$GITHUB_ENV"
+      # The browsers and their system packages (--with-deps, about 120 MB for WebKit): cached, with a time limit
+      # and one retry from another mirror, as the Ubuntu mirror was slow for 15 to 50 minutes in several runs
+      # on 2026-10-23, 24 and 26, in bursts that apt's own timeouts do not catch.
+      - name: Install the dependencies of the browser tests
+        run: npm ci --prefix tests/viewer
+      - name: Install the browsers for the site checks
+        timeout-minutes: 25
+        uses: ./.github/actions/install-playwright
+        with:
+          working-directory: tests/viewer
+      # Normally about 5 minutes.
       - name: Check site navigation in Chromium and WebKit
+        timeout-minutes: 25
         env:
           RNL_SITE_SCREENSHOTS: ${{ runner.temp }}/package-review
           RNL_I18N_SCREENSHOTS: ${{ runner.temp }}/package-review/language-menu
           RNL_MACOS_SCREENSHOTS: ${{ runner.temp }}/package-review/macos
           RNL_TIMELINE_SCREENSHOTS: ${{ runner.temp }}/package-review/timeline
         run: |
-          npm ci --prefix tests/viewer
-          node tests/viewer/node_modules/@playwright/test/cli.js install --with-deps chromium webkit
           node --test scripts/brand.test.mjs
           node tests/viewer/node_modules/@playwright/test/cli.js test --config site/playwright.config.mjs
 

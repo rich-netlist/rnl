@@ -4,7 +4,8 @@
 //! types give; run it with `RNL_BLESS=1` to write the files after a change that is meant.
 
 use crate::{CurrentArrow, UsageFrame};
-use crate::{InspectedLabel, InspectedPin, InspectedSymbol, SourceInclude, Usage, UsageRole};
+use crate::{FormatInfo, InspectedLabel, InspectedPin, InspectedSymbol, SourceInclude, Usage, UsageRole};
+use crate::{MemberOf, RoleOf, RuleAt, UsageOf};
 use std::path::Path;
 
 use ts_rs::{Config, TS};
@@ -74,6 +75,9 @@ fn snapshot_all() -> Vec<(String, String)> {
         one::<HostInstance>(&cfg),
         one::<HostTerminal>(&cfg),
         one::<HostNet>(&cfg),
+        one::<UsageOf>(&cfg),
+        one::<RoleOf>(&cfg),
+        one::<RuleAt>(&cfg),
         one::<LevelModel>(&cfg),
         one::<SymbolRef>(&cfg),
         one::<SymbolDefinition>(&cfg),
@@ -130,7 +134,11 @@ fn all() -> Vec<(String, String)> {
         one::<UnplacedDrawing>(&cfg),
         one::<SourceFile>(&cfg),
         one::<SourceInclude>(&cfg),
+        one::<FormatInfo>(&cfg),
         one::<Object>(&cfg),
+        one::<MemberOf>(&cfg),
+        one::<RoleOf>(&cfg),
+        one::<RuleAt>(&cfg),
         one::<Span>(&cfg),
         one::<Diagnostic>(&cfg),
         one::<Primitive>(&cfg),

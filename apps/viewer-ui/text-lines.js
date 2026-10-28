@@ -1,9 +1,11 @@
 // Prepare line data and lexical checkpoints without constructing offscreen DOM. Syntax state is
 // retained across continued host statements and multi-line RNL comments, so any row can render alone.
 import { hostLine, mark, rnlRange } from "./syntax.js";
-import { m, setAttr } from "./i18n.js";
+import { m, setAttr, tr } from "./i18n.js";
 
-export function lineModel(file, f, allSpans, dialect) {
+/** The lines of `file`, number `f` of the document; with `plain` as text with no reading of it as a netlist. */
+export function lineModel(file, f, allSpans, dialect, plain = false) {
+  if (plain) file = { ...file, records: [], failed: [], semantics: [], includes: [] };
   const texts = file.text.split(/\r?\n/);
   if (texts.length > 1 && texts.at(-1) === "") texts.pop();
   const starts = new Map();
@@ -12,6 +14,8 @@ export function lineModel(file, f, allSpans, dialect) {
     return starts.get(n)(c);
   };
   const rnl = new Map(), spans = new Map(), failed = new Map();
+  // the text of a package file outside its records is prose, which no netlist rule reads
+  const packageFile = file.format === "rnl";
   const semantics = new Set((file.semantics || []).map(n => n - 1));
   const includes = new Map();
   for (const link of file.includes || []) {
@@ -34,6 +38,7 @@ export function lineModel(file, f, allSpans, dialect) {
   }
   function syntax(i, flags, stack = "") {
     const text = texts[i], cls = new Array(text.length).fill("");
+    if (plain) return { cls, flags: 0, stack: "" };
     const state = { comment: !!(flags & 2), stack };
     let joined = false;
     if (i === 0 && f === 0 && dialect === "spice") mark(cls, 0, text.length, "comment");
@@ -43,7 +48,7 @@ export function lineModel(file, f, allSpans, dialect) {
         if (r.first) { state.comment = false; state.stack = ""; }
         rnlRange(text, r.from, Math.min(r.to, text.length), r.first, cls, state);
       }
-    } else joined = hostLine(text, cls, !!(flags & 1) || /^\s*\+/.test(text), null);
+    } else if (!packageFile) joined = hostLine(text, cls, !!(flags & 1) || /^\s*\+/.test(text), null);
     return { cls, flags: (joined ? 1 : 0) | (state.comment ? 2 : 0), stack: state.stack };
   }
   const states = new Uint8Array(texts.length);
@@ -156,8 +161,8 @@ function leadingCarrier(text) {
 }
 
 const FAIL_TITLE = {
-  failed: "Failed: this does not take effect (see Problems)",
-  overridden: "Overridden: another statement wins this conflict (7.5)",
+  failed: tr("Failed: this does not take effect (see Problems)"),
+  overridden: tr("Overridden: superseded by a higher-priority statement (7.5)"),
 };
 
 function lineElement(text, n, cls, obj, fail) {
@@ -182,7 +187,7 @@ function lineElement(text, n, cls, obj, fail) {
       if (cls[i]) s.className = `s-${cls[i]}`;
       if (fail[i]) {
         s.classList.add(`x-${fail[i]}`);
-        s.title = FAIL_TITLE[fail[i]];
+        s.title = m(FAIL_TITLE[fail[i]]);
       }
       if (obj[i]) {
         s.classList.add("obj");

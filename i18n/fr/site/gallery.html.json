@@ -1,0 +1,21 @@
+{
+  "RNL gallery · Rich Netlist": "Galerie RNL · Rich Netlist",
+  "Circuit examples drawn with RNL: open any entry in the web viewer. The gallery is maintained on GitHub, and new entries appear within minutes of being merged.": "Exemples de circuits dessinés avec RNL : ouvrez n’importe quelle entrée dans la visionneuse web. La galerie est maintenue sur GitHub, et les nouvelles entrées apparaissent quelques minutes après leur fusion.",
+  "Skip to content": "Aller au contenu",
+  "On this page": "Sur cette page",
+  "Switch color theme": "Changer de thème de couleur",
+  "Gallery": "Galerie",
+  "Some RNL examples, published under their own licenses.": "Quelques exemples en RNL, publiés sous leurs propres licences.",
+  "How to contribute": "Comment contribuer",
+  "Gallery navigation": "Navigation de la galerie",
+  "Search the gallery": "Rechercher dans la galerie",
+  "Search titles, descriptions and authors": "Rechercher dans les titres, descriptions et auteurs",
+  "Filter by tag": "Filtrer par étiquette",
+  "Loading…": "Chargement…",
+  "This page needs JavaScript to show the gallery. The list is in the <a href=\"https://github.com/rich-netlist/rnl-gallery/tree/main/entries\">rnl-gallery repository on GitHub</a>.": "Cette page nécessite JavaScript pour afficher la galerie. La liste se trouve dans le <a href=\"https://github.com/rich-netlist/rnl-gallery/tree/main/entries\">dépôt rnl-gallery sur GitHub</a>.",
+  "This page reads the index and the thumbnails from <a href=\"https://rich-netlist.github.io/rnl-gallery/\">rnl-gallery’s GitHub Pages</a>. Each design is under the license of its own repository.": "Cette page lit l’index et les vignettes depuis <a href=\"https://rich-netlist.github.io/rnl-gallery/\">les GitHub Pages de rnl-gallery</a>. Chaque circuit est soumis à la licence de son propre dépôt.",
+  "See also": "Voir aussi",
+  "Web viewer": "Visionneuse web",
+  "Packages": "Paquets",
+  "The rnl-gallery repository": "Le dépôt rnl-gallery"
+}

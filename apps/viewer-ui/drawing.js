@@ -19,6 +19,7 @@ import { markUnplaced, scopeSource } from "./text.js";
 import { renderUnplaced } from "./unplaced.js";
 import { $, clamp, svgElement } from "./util.js";
 import { paintUsages, usageAt, usagesAt } from "./usages.js";
+import { TOUCH_CLICK_MS, touchGestures } from "./touch-gestures.js";
 
 const canvas = $("canvas");
 
@@ -116,6 +117,8 @@ export function showLevel(i, keptView) {
  * the netlist's other levels are in the Hierarchy.
  */
 function emptyMessage(lv) {
+  // the file opened is no netlist, which the core does not read
+  if (doc.dialect === "text") return m("This file is not a netlist. It is shown as text.");
   if (lv.unplaced.length > 0) return m("Nothing on this level has a position yet, so nothing is drawn.");
   const none = m("This level has no objects, so nothing is drawn.");
   return doc.levels.length > 1 ? m`${none} The subcircuits of this netlist are in the Hierarchy.` : none;
@@ -238,6 +241,40 @@ export function fit() {
   apply();
 }
 
+/**
+ * The view as a manifest records it (export of a project's display settings): the point at the
+ * centre of the canvas, in the drawing's units, and the pixels per unit; null with no drawing.
+ */
+export function viewCentre() {
+  if (!view) return null;
+  const { w, h } = canvasSize();
+  return { center: [view.x + w / (2 * view.k), view.y + h / (2 * view.k)], scale: view.k };
+}
+
+/** Show the drawing centred on `center`, in its units, at `scale` pixels per unit, as a manifest names a view. */
+export function showView({ center, scale }) {
+  cancelGesture();
+  if (!svg) return;
+  const { w, h } = canvasSize();
+  const k = clamp(scale, MIN_ZOOM, MAX_ZOOM);
+  view = { k, x: center[0] - w / (2 * k), y: center[1] - h / (2 * k) };
+  apply();
+}
+
+/** Bring the selection into the middle of the view, zoomed out as far as it needs to be all in it. */
+export function showSelection() {
+  cancelGesture();
+  if (!svg || !view || selected === null) return;
+  const points = doc.levels[current].hits.filter((h) => h.objects.includes(selected)).flatMap((h) => h.points);
+  if (!points.length) return;
+  const xs = points.map((p) => p[0]), ys = points.map((p) => p[1]);
+  const x0 = Math.min(...xs), y0 = Math.min(...ys), x1 = Math.max(...xs), y1 = Math.max(...ys);
+  const { w, h } = canvasSize();
+  const k = clamp(Math.min(view.k, (w - 2 * FIT_MARGIN) / (x1 - x0 || 1), (h - 2 * FIT_MARGIN) / (y1 - y0 || 1)), MIN_ZOOM, MAX_ZOOM);
+  view = { k, x: (x0 + x1) / 2 - w / (2 * k), y: (y0 + y1) / 2 - h / (2 * k) };
+  apply();
+}
+
 /** Zoom by `factor` keeping the drawing point under (px, py), in canvas pixels, in place. */
 function zoomAt(px, py, factor) {
   cancelGesture();
@@ -296,6 +333,7 @@ canvas.addEventListener(
 );
 
 canvas.addEventListener("pointerdown", (e) => {
+  if (e.pointerType === "touch") { gestures.down(e); return; }
   if (!view || press || ![0, 1, 2].includes(e.button)) return;
   e.preventDefault();
   hideTip();
@@ -305,6 +343,7 @@ canvas.addEventListener("pointerdown", (e) => {
 });
 
 canvas.addEventListener("pointermove", (e) => {
+  if (e.pointerType === "touch") { gestures.move(e); return; }
   pointer = canvasPoint(e);
   showPointer();
   if (!press || e.pointerId !== press.id) {
@@ -349,7 +388,11 @@ function endPress(e, cancelled) {
     }
   }
   cancelGesture();
-  if (!click) return;
+  if (click) clickAt(e);
+}
+
+/** A click, or a tap, at the event's point: select what is there, or ask which, or clear the selection. */
+function clickAt(e) {
   const { hits, blocked } = hitsAt(doc && doc.levels[current], view, canvasPoint(e));
   const objects = hits.length ? objectsOf(hits) : !blocked ? usagesAt(canvasPoint(e)) : [];
   if (e.shiftKey && objects.some((o) => opens(o) !== null)) return; // Shift-double-click leaves this viewer unchanged
@@ -360,20 +403,48 @@ function endPress(e, cancelled) {
   else if (!blocked) clearSelection();
 }
 
+/** A double click, or a double tap: open the subcircuit instance there, or else fit the drawing. */
+function doubleAt(e) {
+  const box = boxAt(doc && doc.levels[current], view, canvasPoint(e));
+  const o = box ? box.objects.find((k) => opens(k) !== null) : undefined;
+  if (o !== undefined) descend(o, { newWindow: e.shiftKey });
+  else fit();
+}
+
+/**
+ * Touch (pointerType "touch"), as a phone or a tablet gives it, is the gestures of touch-gestures.js,
+ * shared with the preview of a symbol: a tap does what a click does here, a double tap what a double
+ * click does, once.
+ */
+const gestures = touchGestures({
+  element: canvas,
+  view: () => view,
+  setView: (v) => { view = v; apply(); },
+  min: MIN_ZOOM,
+  max: MAX_ZOOM,
+  onDown: hideTip,
+  onTap: clickAt,
+  onDoubleTap: doubleAt,
+});
+
 /**
  * The pointer moved over the drawing with no button down: the cursor says whether a click selects
  * something, and, if names are shown on hover, the box beside the pointer names what it rests on.
  */
 function pointOut(e, point) {
+  // a move the browser makes of a tap names nothing: a finger does not hover
+  if (performance.now() - gestures.touchedAt() < TOUCH_CLICK_MS) { hideTip(); return; }
   const { hits } = hitsAt(doc && doc.levels[current], view, point);
   canvas.classList.toggle("over-object", hits.length > 0 || usageAt(point) !== null);
   const name = hoverNamesOn() ? nameOf(doc, hits[0]) : null;
   if (name === null) hideTip();
   else showTip(name, e.clientX, e.clientY);
 }
-canvas.addEventListener("pointerup", (e) => endPress(e, false));
-canvas.addEventListener("pointercancel", (e) => endPress(e, true));
-canvas.addEventListener("lostpointercapture", (e) => endPress(e, true));
+// a finger that lifts names nothing: a finger does not hover
+const touchUp = (e, cancelled) => { gestures.up(e, cancelled); hideTip(); };
+canvas.addEventListener("pointerup", (e) => (e.pointerType === "touch" ? touchUp(e, false) : endPress(e, false)));
+canvas.addEventListener("pointercancel", (e) => (e.pointerType === "touch" ? touchUp(e, true) : endPress(e, true)));
+canvas.addEventListener("lostpointercapture", (e) => (e.pointerType === "touch" ? touchUp(e, true) : endPress(e, true)));
 window.addEventListener("blur", cancelGesture);
 canvas.addEventListener("pointerleave", () => {
   pointer = null;
@@ -383,13 +454,11 @@ canvas.addEventListener("pointerleave", () => {
 // no autoscroll on the middle button, no page menu on the drawing
 canvas.addEventListener("mousedown", (e) => { if (e.button === 1) e.preventDefault(); });
 canvas.addEventListener("contextmenu", (e) => e.preventDefault());
-// a double click opens a subcircuit instance, and fits the drawing anywhere else
+// a double click opens a subcircuit instance, and fits the drawing anywhere else; one the browser
+// makes of two taps is left out, as the page told the double tap itself
 canvas.addEventListener("dblclick", (e) => {
-  if (e.target.closest("#enter-badge")) return;
-  const box = boxAt(doc && doc.levels[current], view, canvasPoint(e));
-  const o = box ? box.objects.find((k) => opens(k) !== null) : undefined;
-  if (o !== undefined) descend(o, { newWindow: e.shiftKey });
-  else fit();
+  if (e.target.closest("#enter-badge") || performance.now() - gestures.touchedAt() < TOUCH_CLICK_MS) return;
+  doubleAt(e);
 });
 
 // keep the middle of the view in place when the window or a panel changes size

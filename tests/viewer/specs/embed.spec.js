@@ -5,6 +5,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { publicPackagesAvailable, publicPackageText } from "../../../scripts/packages.mjs";
+import { zh } from "../zh.js";
 
 test.skip(!process.env.RNL_WEB_URL, "the site is not built: RNL_WEB=0");
 const base = process.env.RNL_WEB_URL;
@@ -373,10 +374,12 @@ for (const identified of [false, true]) test(`cross-file navigation supersedes a
   expect((await messages(page, 'level')).at(-1).name).toBe('rdiv');
 });
 
-test('initial cross-file level selection belongs to the embed import', async ({ page }) => {
+test('initial cross-file level selection belongs to the embed import, in the netlist with all it includes', async ({ page }) => {
   const frame = await start(page, { url: hierarchy, level: 'rdiv' });
   expect(await waitMessage(page, 'loaded')).toMatchObject({ name: '04-hierarchy.sp', level: 'rdiv' });
-  expect(await frame.evaluate(() => window.viewer.doc.name)).toBe('04-hierarchy-lib.inc');
+  // rdiv is defined in the included file, and shown in the netlist that includes it, not in that file alone
+  expect(await frame.evaluate(() => window.viewer.doc.name)).toBe('04-hierarchy.sp');
+  expect(await frame.evaluate(() => window.viewer.doc.levels[window.viewer.level].title)).toBe('rdiv');
   expect(await messages(page, 'error')).toEqual([]);
   await expect(frame.locator('body')).not.toHaveClass(/busy/);
 });
@@ -419,9 +422,9 @@ test("Chinese browser language labels controls", async ({ browser }) => {
   const context = await browser.newContext({ locale: "zh-CN" });
   const page = await context.newPage();
   const frame = await start(page);
-  await expect(frame.locator("#embed-fit")).toHaveAttribute("aria-label", "适应窗口");
-  await expect(frame.locator("#embed-zoom-in")).toHaveAttribute("title", "放大");
-  await expect(frame.locator("#embed-zoom-out")).toHaveAttribute("title", "缩小");
+  await expect(frame.locator("#embed-fit")).toHaveAttribute("aria-label", zh("Fit to window"));
+  await expect(frame.locator("#embed-zoom-in")).toHaveAttribute("title", zh("Zoom in"));
+  await expect(frame.locator("#embed-zoom-out")).toHaveAttribute("title", zh("Zoom out"));
   await context.close();
 });
 
@@ -558,7 +561,8 @@ test("public packages: foreign library URLs and includes bypass the catalog", as
     return { opened, files: doc.files, errors: doc.diagnostics.filter(d => d.severity === 'error') };
   }, foreign);
   expect(result.opened.text).toBe(include);
-  expect(result.errors).toEqual([]);
+  // a `.rnl` file is a package file, which an include does not load (2.7): its text is fetched and kept
+  expect(result.errors.map((d) => d.message)).toEqual(["`x.rnl` is a package file and is not loaded with an include (2.7); USE-PACKAGE finds it (16.2)"]);
   expect(result.files).toEqual(expect.arrayContaining([expect.objectContaining({ text: expect.stringContaining('Rexternal') })]));
   expect(requests.filter(url => url === '/libraries/x.rnl')).toHaveLength(2);
   expect(catalogs).toBe(0);
@@ -618,4 +622,74 @@ test("public packages: versions coexist at their canonical catalog paths", async
   });
   expect(result.paths).toEqual(['/library/eda-symbol/eda-symbol.rnl', '/library/eda-symbol/0.2/eda-symbol.rnl']);
   expect(result.errors).toEqual([]);
+});
+
+const usageCurrent = fs.readFileSync(new URL("../inputs/usage-current.sp", import.meta.url), "utf8");
+const frames = (frame) => frame.locator("#canvas .usage-frame");
+const arrows = (frame) => frame.locator("#canvas .current-arrow");
+async function openUsageCurrent(page, count = 1) {
+  await send(page, { type: "open", name: "usage-current.sp", text: usageCurrent });
+  await waitMessage(page, "loaded", count);
+}
+
+test("an embedded drawing starts without the usage frames and with the current directions; ready tells they are known", async ({ page }) => {
+  // the user's own settings of the complete viewer are neither read nor written
+  const frame = await start(page, {}, { seed: { "usages-shown": true, "currents-shown": false } });
+  expect((await messages(page, "ready"))[0].features).toEqual(expect.arrayContaining(["usages", "currents"]));
+  await openUsageCurrent(page);
+  await expect(arrows(frame)).toHaveCount(7);
+  await expect(frames(frame)).toHaveCount(0);
+  expect(await frame.evaluate(() => window.storageCalls)).toEqual([]);
+  expect(await page.evaluate(() => JSON.stringify({ ...localStorage }) === window.storedBefore)).toBe(true);
+});
+
+test("usages=1 and currents=0 turn the defaults over, for this page only", async ({ page, browserName }) => {
+  const frame = await start(page, { usages: "1", currents: "0" }, { seed: { "usages-shown": false, "currents-shown": true } });
+  await openUsageCurrent(page);
+  await expect(frames(frame).first()).toBeVisible();
+  await expect(arrows(frame)).toHaveCount(0);
+  expect(await frame.evaluate(() => window.storageCalls)).toEqual([]);
+  expect(await page.evaluate(() => JSON.stringify({ ...localStorage }) === window.storedBefore)).toBe(true);
+  // another open keeps them
+  await openUsageCurrent(page, 2);
+  await expect(frames(frame).first()).toBeVisible();
+  await expect(arrows(frame)).toHaveCount(0);
+  await screenshot(page, "embed-usages-1-currents-0.png", browserName);
+});
+
+test("usages=0 and currents=1 are the defaults; other values are no choice", async ({ page }) => {
+  const frame = await start(page, { usages: "0", currents: "1" });
+  await openUsageCurrent(page);
+  await expect(frames(frame)).toHaveCount(0);
+  await expect(arrows(frame)).toHaveCount(7);
+  await frame.goto(`${base}/?embed=1&usages=yes&currents=no`);
+  await waitMessage(page, "ready", 2);
+  await send(page, { type: "open", name: "usage-current.sp", text: usageCurrent });
+  await waitMessage(page, "loaded", 2);
+  await expect(frames(frame)).toHaveCount(0);
+  await expect(arrows(frame)).toHaveCount(7);
+});
+
+test("usages and currents messages switch the usage frames and the current directions, on and off, without a reload", async ({ page }) => {
+  const frame = await start(page, {}, { seed: { "usages-shown": false, "currents-shown": true } });
+  await openUsageCurrent(page);
+  await expect(arrows(frame)).toHaveCount(7);
+  await expect(frames(frame)).toHaveCount(0);
+  await send(page, { type: "usages", value: true });
+  await expect(frames(frame).first()).toBeVisible();
+  await send(page, { type: "currents", value: false });
+  await expect(arrows(frame)).toHaveCount(0);
+  await send(page, { type: "usages", value: false });
+  await expect(frames(frame)).toHaveCount(0);
+  await send(page, { type: "currents", value: true });
+  await expect(arrows(frame)).toHaveCount(7);
+  // a value that is no boolean changes nothing
+  await send(page, { type: "usages", value: "1" });
+  await send(page, { type: "currents", value: 0 });
+  await send(page, { type: "fit" });
+  await expect(frames(frame)).toHaveCount(0);
+  await expect(arrows(frame)).toHaveCount(7);
+  expect(await messages(page, "error")).toEqual([]);
+  expect(await frame.evaluate(() => window.storageCalls)).toEqual([]);
+  expect(await page.evaluate(() => JSON.stringify({ ...localStorage }) === window.storedBefore)).toBe(true);
 });

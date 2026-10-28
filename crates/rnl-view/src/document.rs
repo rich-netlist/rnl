@@ -10,7 +10,7 @@ use std::collections::{HashMap, HashSet};
 
 use rnl_runtime::diag::{Diag, Sink};
 use rnl_runtime::geom::{Orient, Pt};
-use rnl_runtime::host::{file_name, HostDocument, LevelKind};
+use rnl_runtime::host::{dialect_key, file_name, HostDocument, LevelKind};
 use rnl_runtime::interp::obj::{Lit, WStr};
 use rnl_runtime::markup;
 use rnl_runtime::model::{ItemView, Layer, LevelView, RefTarget, Style, SymbolView, TextTarget, TextView};
@@ -19,11 +19,13 @@ use rnl_runtime::Interpretation;
 use serde::Serialize;
 
 use crate::primitive::{self, Primitive};
-use crate::BuildOptions;
+use crate::{BuildOptions, FormatInfo};
 
 mod symbols;
 pub use symbols::{InspectedLabel, InspectedPin, InspectedSymbol};
+mod member_of;
 mod usages;
+pub use member_of::{MemberOf, RoleOf, RuleAt};
 pub use usages::{Usage, UsageRole};
 
 /// What a viewer shows of a document, as [`crate::build`] gives it.
@@ -36,8 +38,11 @@ pub struct Document {
     pub path: String,
     /// Its file name, for the title bar.
     pub name: String,
-    /// "spice" or "spectre".
+    /// The format of the main file, "spice" or "spectre"; "rnl" for a package file, checked on its
+    /// own; or "text" for a file that is not a netlist, such as a Verilog-A model, which is not read.
     pub dialect: String,
+    /// The formats a file can be read with, as `rnl_view::formats` lists them.
+    pub formats: Vec<FormatInfo>,
     pub levels: Vec<Level>,
     pub diagnostics: Vec<Diagnostic>,
     /// Why the document could not be interpreted at all, such as an unsupported language version.
@@ -267,8 +272,9 @@ pub struct Child {
 pub struct Hit {
     /// "box": a symbol, given by its top-left and bottom-right corners; "pin": a pin, one point;
     /// "wire": a wire, its vertices; "label": a label of an object, given by its top-left and
-    /// bottom-right corners, which stands for what that object stands for, and for nothing when
-    /// it is not an instance, a bundle, a usage, a wire or a net.
+    /// bottom-right corners, which stands for what that object stands for: for a terminal, the nets
+    /// of its pin, as the pin does; and for nothing when it is not an instance, a bundle, a usage, a
+    /// wire, a net or a terminal drawn at a pin with a net.
     pub kind: &'static str,
     /// In SVG pixels, y down.
     pub points: Vec<[f64; 2]>,
@@ -303,6 +309,13 @@ pub struct SourceFile {
     pub path: String,
     /// The file as shown: relative to the opened file's directory when it is inside it.
     pub name: String,
+    /// The format the file was read with, a name of `Document::formats`: "rnl" for a package file
+    /// checked on its own, and for one a netlist includes, which is not read; "text" for a file that
+    /// is not a netlist, such as a Verilog-A model: its text, not read.
+    pub format: Option<String>,
+    /// The format the file is read with when none is set for it, as a frontend shows its
+    /// automatic choice.
+    pub default_format: Option<String>,
     pub text: String,
     /// Where each record is: first line, first column, last line, last column (1-based, inclusive).
     pub records: Vec<[u32; 4]>,
@@ -326,6 +339,10 @@ pub struct Object {
     /// For a subcircuit instance, the level that draws its subcircuit, an index into
     /// `Document::levels`.
     pub opens: Option<usize>,
+    /// The usages it is a member of in its level, each with the roles it fills: those of its
+    /// terminals too for an instance, and those a failed application names, with their state. In
+    /// the order of the level's usages, then of the failed applications.
+    pub usages: Vec<MemberOf>,
 }
 
 #[derive(Serialize, Debug)]
@@ -377,7 +394,7 @@ pub(crate) fn document(
 
     // A package checked on its own has no host sources. Still expose the opened package's
     // text, including its record ranges, so the Files tab can open built-ins read-only.
-    let package_doc = if r.doc.sources.is_empty() && r.doc.dialect.name == "none" {
+    let package_doc = if r.doc.sources.is_empty() && r.doc.dialect.name == rnl_runtime::host::package::NAME {
         let mut source_doc = r.doc.clone();
         if let Some((name, text)) = r.sources.iter().find(|(name, _)| name == &source_doc.main().file) {
             source_doc.sources.push((name.clone(), text.clone()));
@@ -426,7 +443,7 @@ pub(crate) fn document(
             .filter(|i| i.is_subckt)
             .map(|i| {
                 let master = i.model.clone().unwrap_or_default();
-                let level = r.doc.subckt(&master).and_then(|h| drawn.get(&h).copied());
+                let level = r.doc.subckt_of(i).and_then(|h| drawn.get(&h).copied());
                 Child { instance: i.name.clone(), master, level, symbol: None }
             })
             .collect();
@@ -434,12 +451,12 @@ pub(crate) fn document(
     for (&(lv, i), &o) in &ix.insts {
         let inst = &r.doc.levels[lv].instances[i];
         if inst.is_subckt {
-            let master = inst.model.as_deref().unwrap_or_default();
-            ix.objects[o].opens = r.doc.subckt(master).and_then(|h| drawn.get(&h).copied());
+            ix.objects[o].opens = r.doc.subckt_of(inst).and_then(|h| drawn.get(&h).copied());
         }
     }
 
     usages::inspect_all(r, &mut levels, &mut ix);
+    member_of::index_all(r, &mut ix);
     let symbols = symbols::inspect(r, &mut levels);
     let diagnostic = |d: &Diag, sink: &Sink| {
         let (file, line, col) = match &d.loc {
@@ -472,6 +489,7 @@ pub(crate) fn document(
         path: entry.to_string(),
         name: file_name(entry).to_string(),
         dialect: r.doc.dialect.name.clone(),
+        formats: crate::formats(),
         levels,
         diagnostics,
         failed: r.model.failed.clone(),
@@ -500,6 +518,8 @@ fn source_files(doc: &HostDocument, shown: &dyn Fn(&str) -> String) -> Vec<Sourc
             semantics: Vec::new(),
             path: p.clone(),
             name: shown(p),
+            format: doc.file_format(p).map(|f| f.format.clone()),
+            default_format: doc.file_format(p).map(|f| f.default.clone()),
             text: text.clone(),
             records: Vec::new(),
             failed: Vec::new(),
@@ -596,14 +616,22 @@ impl<'a> Index<'a> {
             level_title: self.doc.levels[level].title(),
             lines: None,
             opens: None,
+            usages: Vec::new(),
         });
         self.usages.insert(key, o);
         o
     }
 
-    /// The net of a level by the name a statement writes.
+    /// The net of a level by the name a statement of its own file writes.
     fn net(&mut self, level: usize, written: &str) -> usize {
-        let key = self.doc.net_key(written);
+        let file = self.doc.levels[level].file.clone();
+        self.net_in(level, written, &file)
+    }
+
+    /// The net of a level by the name a statement of the file `file` writes: compared as the
+    /// runtime compares it ([`HostDocument::net_key_in`]).
+    fn net_in(&mut self, level: usize, written: &str, file: &str) -> usize {
+        let key = self.doc.net_key_in(level, written, file);
         self.net_by_key(level, &key, written)
     }
 
@@ -619,6 +647,7 @@ impl<'a> Index<'a> {
             level_title: self.doc.levels[level].title(),
             lines: None,
             opens: None,
+            usages: Vec::new(),
         });
         self.nets.insert((level, key.to_string()), self.objects.len() - 1);
         self.objects.len() - 1
@@ -641,6 +670,7 @@ impl<'a> Index<'a> {
                     level_title: level.title(),
                     lines: statement.as_ref().map(|(f, last, _)| [*f as u32, inst.line, *last as u32 + 1]),
                     opens: None,
+                    usages: Vec::new(),
                 });
                 let object = self.objects.len() - 1;
                 self.insts.insert((lv, i), object);
@@ -648,30 +678,42 @@ impl<'a> Index<'a> {
                 if let Some(t) = tokens.first() {
                     self.spans.push(Span { object, file: f, line: t.line, col: t.col, len: t.len, kind: "name" });
                 }
-                self.nodes(lv, f, &tokens, 1, &inst.nodes, "node");
+                self.nodes(lv, f, &inst.file, &tokens, 1, &inst.nodes, "node");
             }
             if level.kind == LevelKind::Subckt && level.line > 0 {
                 if let Some(&f) = self.files.get(&level.file) {
                     if let Some((_, tokens)) = statement(&lines[f], level.line as usize - 1) {
                         // `.subckt NAME ports…`, `subckt NAME (ports…)` or `inline subckt NAME …`
                         let skip = if tokens.first().is_some_and(|t| t.text == "inline") { 3 } else { 2 };
-                        self.nodes(lv, f, &tokens, skip, &level.ports, "port");
+                        self.nodes(lv, f, &level.file, &tokens, skip, &level.ports, "port");
                     }
                 }
             }
         }
     }
 
-    /// The tokens from `from` on that name `nodes`, in order.
-    fn nodes(&mut self, lv: usize, file: usize, tokens: &[Token], from: usize, nodes: &[String], kind: &'static str) {
+    /// The tokens from `from` on that name `nodes`, in order, in a statement of the file `written`,
+    /// the `file`th of the Document.
+    #[allow(clippy::too_many_arguments)]
+    fn nodes(
+        &mut self,
+        lv: usize,
+        file: usize,
+        written: &str,
+        tokens: &[Token],
+        from: usize,
+        nodes: &[String],
+        kind: &'static str,
+    ) {
+        let rules = self.doc.rules(written);
         let mut j = from;
         for node in nodes {
-            let key = self.doc.key(node);
-            while j < tokens.len() && self.doc.key(&tokens[j].text) != key {
+            let key = dialect_key(rules, node);
+            while j < tokens.len() && dialect_key(rules, &tokens[j].text) != key {
                 j += 1;
             }
             let Some(t) = tokens.get(j) else { break };
-            let object = self.net(lv, node);
+            let object = self.net_in(lv, node, written);
             self.spans.push(Span { object, file, line: t.line, col: t.col, len: t.len, kind });
             j += 1;
         }
@@ -744,7 +786,8 @@ impl<'a> Index<'a> {
                 name: None,
             });
         }
-        // a label stands for what it is attached to, and for nothing when that cannot be selected:
+        // a label stands for what it is attached to (a terminal's for its pin's nets), and for
+        // nothing when that cannot be selected:
         // a click on it is then not a click on whatever is under it. with_page_ids gives each
         // text its own groups, including labels of repeated unnamed usages.
         let boxes = rnl_render::text_boxes(lv, &render);
@@ -756,6 +799,14 @@ impl<'a> Index<'a> {
                     lv.wires.get(*i).map(|w| w.nets.iter().map(|n| self.net(lv.level, n)).collect()).unwrap_or_default()
                 }
                 Some(TextTarget::Net(n)) => vec![self.net(lv.level, n)],
+                // a terminal's label stands for its pin's nets, as the pin does, and for nothing
+                // when the pin has none
+                Some(TextTarget::Pin(i, k)) => lv
+                    .items
+                    .get(*i)
+                    .and_then(|it| it.pin_nets.get(*k))
+                    .map(|nets| nets.iter().map(|n| self.net(lv.level, n)).collect())
+                    .unwrap_or_default(),
                 None => Vec::new(),
             };
             hits.push(Hit {
@@ -1170,17 +1221,49 @@ C1 b 0 1p
         assert!((of("R1"), of("C1")) == (2, 2) || (of("R1"), of("C1")) == (2, 1), "{labels:?}");
         assert!(labels.iter().all(|h| h.points.len() == 2 && h.points[0][0] < h.points[1][0]));
         assert!(labels.iter().all(|h| h.points[0][1] < h.points[1][1]));
-        // a label of something that cannot be selected stands for nothing, and is still a hit
-        let nothing: Vec<&&Hit> = labels.iter().filter(|h| h.objects.is_empty()).collect();
-        assert_eq!(nothing.len(), 1, "{labels:?}");
+        // a terminal's label stands for its pin's nets, as a click on the pin does
+        let pin = level.hits.iter().find(|h| h.kind == "pin" && names(h) == ["a"]).expect("R1's first pin");
+        let terminal: Vec<&&Hit> = labels.iter().filter(|h| names(h) == ["a"]).collect();
+        assert_eq!(terminal.len(), 1, "{labels:?}");
+        assert_eq!(terminal[0].objects, pin.objects);
+        assert!(labels.iter().all(|h| !h.objects.is_empty()), "{labels:?}");
         // a label's group is in the SVG, and its box is around the text
         let svg = level.svg.as_deref().unwrap();
-        for h in labels.iter().filter(|h| !h.objects.is_empty()) {
+        for h in &labels {
             let id = h.id.as_deref().unwrap();
             assert!(svg.contains(&format!("data-id=\"{id}\"")), "{id}");
         }
         // none of it changes the other hits
         assert_eq!(level.hits.iter().filter(|h| h.kind == "box").count(), 2);
+    }
+
+    #[test]
+    fn a_terminal_that_no_pin_draws_has_no_label_to_click() {
+        // the symbol draws a pin for R1's first terminal only: the second is not drawn, nor is its
+        // label, so nothing on the drawing stands for it; the first's label stands for its pin's net
+        let text = "* a terminal without a pin
+R1 a b 1k
+* @RNL(type=\"header\") { @VERSION(\"0.2\")}
+* @RNL {
+*   $ONE = @DEFINE-SYMBOL { (0, 0) @PIN(terminal=1); @LINE {(0, 0) (0, 2)} };
+*   #R1 @SET-SYMBOL $ONE;
+*   #R1 @PLACE(0, 0);
+*   #R1:1 @TEXT(\"one\", dx=2);
+*   #R1:2 @TEXT(\"two\", dx=-2)
+* }
+.end
+";
+        let files = rnl_runtime::source::MemoryProvider::new().with("a.sp", text);
+        let d = crate::build("a.sp", &files, &BuildOptions::default()).unwrap();
+        let level = &d.levels[0];
+        let names = |h: &Hit| h.objects.iter().map(|o| d.objects[*o].name.as_str()).collect::<Vec<_>>();
+        let pins: Vec<&Hit> = level.hits.iter().filter(|h| h.kind == "pin").collect();
+        assert_eq!(pins.iter().map(|h| names(h)).collect::<Vec<_>>(), [["a"]], "{pins:?}");
+        // the symbol has no labels of its own: the labels are the terminals'
+        let terminals: Vec<&Hit> = level.hits.iter().filter(|h| h.kind == "label").collect();
+        assert_eq!(terminals.iter().map(|h| names(h)).collect::<Vec<_>>(), [["a"]], "{terminals:?}");
+        assert_eq!(terminals[0].objects, pins[0].objects);
+        assert!(!level.svg.as_deref().unwrap().contains(">two<"));
     }
 
     #[test]

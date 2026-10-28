@@ -1,0 +1,15 @@
+{
+  "Translation status · Rich Netlist": "Estado de la traducción · Rich Netlist",
+  "How far each language of RNL is translated, from the site and the viewers to the standard.": "Grado de avance de la traducción de cada idioma en RNL, desde el sitio web y los visores hasta el estándar.",
+  "Skip to content": "Saltar al contenido",
+  "Switch color theme": "Cambiar tema de color",
+  "Translation status": "Estado de la traducción",
+  "This report was made from <a href=\"https://github.com/rich-netlist/rnl/blob/main/i18n/surfaces.json\">the list of what there is to translate</a> when the site was built; every pull request gets the same one. To translate a language or bring one up to date, start from <a href=\"https://github.com/rich-netlist/rnl/blob/main/i18n/README.md\">i18n/README.md</a>.": "Este informe se generó a partir de <a href=\"https://github.com/rich-netlist/rnl/blob/main/i18n/surfaces.json\">la lista de elementos por traducir</a> al compilar el sitio; cada solicitud de extracción (pull request) recibe el mismo informe. Para traducir un idioma o ponerlo al día, empieza por <a href=\"https://github.com/rich-netlist/rnl/blob/main/i18n/README.md\">i18n/README.md</a>.",
+  "How far each language is": "Avance de cada idioma",
+  "The report is in English, as the texts it counts are. A missing translation shows the English; a stale one was made from an English text that has changed since.": "El informe está en inglés, al igual que los textos que contabiliza. Cuando falta una traducción se muestra el inglés; una traducción marcada como desactualizada (stale) se hizo a partir de un texto en inglés que cambió posteriormente.",
+  "Machine translation and AI models may make a first draft; a language is shown once a native speaker has reviewed it.": "La traducción automática y los modelos de IA pueden generar un primer borrador; un idioma se muestra una vez que un hablante nativo lo ha revisado.",
+  "See also": "Véase también",
+  "Decision 0015: English is the only core language": "Decisión 0015: el inglés es el único idioma del núcleo",
+  "Introduction": "Introducción",
+  "English is the source of every text of RNL; every other language is a translation that follows it.": "El inglés es la fuente de todos los textos de RNL; los textos en cualquier otro idioma son traducciones que lo siguen."
+}

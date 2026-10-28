@@ -216,3 +216,29 @@ test("the plain filename follows the circuit and the controls stay below its pat
   await expect(page.locator("#netlist-file")).toHaveText(/04-hierarchy\.sp$/);
   await expect(viewer.line(49)).toHaveText(/X1 a b vdd 0 amp/);
 });
+
+test("the problems' severity column is as wide as the widest name, so that a language's longer names do not run into the messages", async ({ page, viewer }) => {
+  await viewer.open("12-diagnostics");
+  await page.locator("#tab-netlist").click();
+  const rows = page.locator("#diags .diag");
+  expect(await rows.count()).toBeGreaterThan(2);
+  const measure = () => page.evaluate(() => [...document.querySelectorAll("#diags .diag")].map((row) => {
+    const msg = row.querySelector(".msg").getBoundingClientRect();
+    // the name's own text, not its cell: a name wider than the column overflows the cell, and its
+    // lines are not the cell's height, which a longer message stretches
+    const text = document.createRange();
+    text.selectNodeContents(row.querySelector(".sev"));
+    return { sevRight: text.getBoundingClientRect().right, msgLeft: msg.left, wrapped: text.getClientRects().length > 1 };
+  }));
+  // as it is: every message starts at the same place, after its severity
+  const before = await measure();
+  expect(new Set(before.map((r) => Math.round(r.msgLeft))).size).toBe(1);
+  expect(before.every((r) => r.sevRight <= r.msgLeft)).toBe(true);
+  // a name wider than the column was (Spanish "advertencia", French "avertissement"), in one row
+  await page.evaluate(() => { document.querySelector("#diags .diag .sev").textContent = "avertissement"; });
+  const after = await measure();
+  expect(after.every((r) => r.sevRight <= r.msgLeft), "no name runs into its message").toBe(true);
+  expect(new Set(after.map((r) => Math.round(r.msgLeft))).size, "the messages stay in one column").toBe(1);
+  expect(after[0].msgLeft).toBeGreaterThan(before[0].msgLeft);
+  expect(after.some((r) => r.wrapped)).toBe(false);
+});

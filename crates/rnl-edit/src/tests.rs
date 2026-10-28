@@ -59,8 +59,8 @@ C1 out VSS 10n
 R1 in out 10k
 * @RNL(author="test") {
 *   #R1 @SET-SYMBOL $RES => @PLACE(19, -16) => @ORIENT("R90");
-*   #C1 @PLACE(29, -22);
-*   $GND @ATTACH &VSS(p) => @SET-SYMBOL $GROUND => @PLACE(10, -25) => %gnd1;
+*   #C1 @PLACE(29, -22) => @ORIENT("R0");
+*   $GND @ATTACH &VSS(p) => @SET-SYMBOL $GROUND => @PLACE(10, -25) => @ORIENT("R0") => %gnd1;
 *   %j1 = (11, 2);
 *   $JUNCTION @ATTACH %j1;
 *   &VSS @REMOVE-FROM $PORT_FILL_SET;
@@ -185,6 +185,35 @@ fn long_statements_break_at_spaces_outside_strings_and_brackets() {
 }
 
 #[test]
+fn an_edit_on_a_file_that_is_not_a_netlist_is_refused() {
+    // a Verilog-A model, which the core reads as text: a viewer's edit of it carries that dialect
+    let va = "module res(p, n);\n  electrical p, n;\n  analog V(p, n) <+ 1k * I(p, n);\nendmodule\n";
+    let ops = json!([{"level": "file:res.va", "op": "add-text", "at": [0, 0], "markup": "x"}]);
+    let r = WriteRequest { file: Some("res.va".into()), ..request("text", va, ops) };
+    assert_eq!(
+        write(&r).unwrap_err(),
+        "dialect \"text\" is that of a file that is not a netlist; RNL is written only into a netlist"
+    );
+}
+
+#[test]
+fn an_edit_on_a_package_file_is_refused_and_a_netlist_named_rnl_is_written() {
+    let package = "@RNL(type=\"header\") { @VERSION(\"0.3\"); @PACKAGE(name=\"acme\", version=\"1.0\")}\n";
+    let ops = json!([{"level": "file:acme.pkg", "op": "add-text", "at": [0, 0], "markup": "x"}]);
+    let r = WriteRequest { file: Some("acme.pkg".into()), ..request("rnl", package, ops) };
+    assert_eq!(
+        write(&r).unwrap_err(),
+        "dialect \"rnl\" is that of a package file (2.7), which is not a netlist; RNL is written here only into a netlist"
+    );
+    // a netlist saved under a `.rnl` name, read as SPICE as the request says, is carried in comments
+    let ops = json!([{"level": "subckt:rc_lowpass", "op": "set", "object": "#R1", "at": [0, 0]}]);
+    let r = WriteRequest { file: Some("rc.rnl".into()), ..request("spice", RC, ops) };
+    let out = write(&r).unwrap();
+    assert!(out.contains("\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\n"), "{out}");
+    assert!(out.contains("\n* @RNL(author="), "{out}");
+}
+
+#[test]
 fn refusals_name_the_op() {
     let refused = |ops: Value| write(&request("spice", RC, ops)).unwrap_err();
     assert_eq!(
@@ -202,11 +231,11 @@ fn refusals_name_the_op() {
     );
     assert_eq!(
         refused(json!([{"level": "subckt:rc_lowpass", "op": "set", "object": "#R1", "style": {}}])),
-        "op 0 (set): `style` is not written yet"
+        "op 0 (set): nothing to set: no `symbol`, `style`, `at` or `orient`"
     );
     assert_eq!(
         refused(json!([{"level": "subckt:rc_lowpass", "op": "set", "object": "#R1"}])),
-        "op 0 (set): nothing to set: no `symbol`, `at` or `orient`"
+        "op 0 (set): nothing to set: no `symbol`, `style`, `at` or `orient`"
     );
     assert_eq!(
         refused(json!([{"level": "subckt:rc_lowpass", "op": "set", "object": "#R1", "at": [0]}])),
@@ -711,5 +740,286 @@ fn the_editor_explains_when_a_conditional_subcircuit_has_no_safe_write_place() {
     assert_eq!(
         write(&request("spice", net, ops)).unwrap_err(),
         "op 0 (set): cell lies in a host region excluded from writing, lines 2 to 6 (2.2)"
+    );
+}
+
+#[test]
+fn an_orientation_given_is_written_r0_too() {
+    // without an ORIENT the solver chooses the orientation (11.2): an R0 given is a decision, and is
+    // written; an orientation not given is not
+    let net = "* title\nR1 a 0 1k\nR2 a 0 1k\n.end\n";
+    let ops = json!([
+        {"level": "file", "op": "set", "object": "#R1", "at": [0, 0], "orient": "R0"},
+        {"level": "file", "op": "set", "object": "#R2", "at": [4, 0]}
+    ]);
+    let out = write(&request("spice", net, ops)).unwrap();
+    let want = "*   #R1 @PLACE(0, 0) => @ORIENT(\"R0\");\n*   #R2 @PLACE(4, 0)\n";
+    assert!(out.contains(want), "{out}");
+    let files = MemoryProvider::new().with(entry("spice"), &out);
+    let r = rnl_view::interpret(entry("spice"), Some("spice"), &files, &Options::default()).unwrap();
+    assert!(r.diagnostics().iter().all(|d| d.severity != Severity::Error), "{:?}", r.diagnostics());
+}
+
+/// A package of the tests of parameters: a definition that draws nothing, with a parameter of each
+/// kind of literal, and three of analog-canvas-extensions 0.2 as that package writes them.
+const PARAMS_PACKAGE: &str = r#"@RNL(type="header") { @VERSION("0.3"); @PACKAGE(name="params-test", version="0.1")}
+@RNL {
+  $NOTE = @DEFINE(roles=[["dev", "instance"]], parameters=[["s", ""], ["n", 1], ["on", false], ["pts", []]]) {};
+  $CANVAS_NAME = @DEFINE(roles=[["part", "instance"]], parameters=["name"]) {};
+  $CANVAS_LABEL = @DEFINE(roles=["label"], parameters=["bind", "parameter", "show_value"]) {};
+  $CANVAS_PARAMETER_TEXT = @DEFINE(roles=[["part", "instance"]], parameters=["name", "text"]) {}
+}
+"#;
+
+/// What `usages` write into a netlist of R1, placed so that it has its labels, with PARAMS_PACKAGE
+/// used; the errors of reading it back, and the snapshot's objects of its level.
+fn written_with_params(usages: Value) -> (String, Vec<String>, Vec<Value>) {
+    let mut ops = vec![
+        json!({"level": "file", "op": "use-package", "name": "params-test", "version": "0.1"}),
+        json!({"level": "file", "op": "set", "object": "#R1", "at": [0, 0]}),
+    ];
+    ops.extend(usages.as_array().unwrap().iter().cloned());
+    let out = write(&request("spice", "* params\nR1 a 0 1k\n.end\n", Value::Array(ops))).unwrap();
+    let mut files = MemoryProvider::new().with(entry("spice"), &out).with("pkgs/params-test.rnl", PARAMS_PACKAGE);
+    files.package_dirs.push("pkgs".into());
+    let r = rnl_view::interpret(entry("spice"), Some("spice"), &files, &Options::default()).unwrap();
+    let errors = r.diagnostics().iter().filter(|d| d.severity == Severity::Error).map(|d| d.message.clone()).collect();
+    let parts = rnl_view::Parts { drawing: false, host: false, model: true };
+    let s = rnl_view::snapshot(entry("spice"), &files, &rnl_view::BuildOptions::default(), parts).unwrap();
+    let s = serde_json::to_value(s).unwrap();
+    (out, errors, s["levels"][0]["model"]["objects"].as_array().unwrap().clone())
+}
+
+/// A JSON value with every number as a float, as the snapshot gives numbers: `7` and `7.0` are one
+/// number to a reader of JSON.
+fn floats(v: &Value) -> Value {
+    match v {
+        Value::Number(n) => json!(n.as_f64().unwrap()),
+        Value::Array(a) => Value::Array(a.iter().map(floats).collect()),
+        Value::Object(o) => Value::Object(o.iter().map(|(k, v)| (k.clone(), floats(v))).collect()),
+        v => v.clone(),
+    }
+}
+
+#[test]
+fn a_usage_is_written_with_its_parameters_and_reads_them_back_as_given() {
+    // each kind of literal, a string with a quote and a character outside ASCII, numbers that a
+    // millionth would round, and lists, nested and empty, in an order other than the definition's
+    let params = json!({
+        "pts": [1, "a", [true, -0.5], []],
+        "s": "1MegΩ \"q\"",
+        "n": 1.0e-9,
+        "on": true,
+    });
+    let (out, errors, objects) = written_with_params(json!([
+        {"level": "file", "op": "add-usage", "name": "%u", "definition": "$NOTE", "attach": {"dev": "#R1"}, "params": params},
+        {"level": "file", "op": "add-usage", "name": "%big", "definition": "$NOTE", "attach": {"dev": "#R1"},
+         "params": {"n": -123456789.125, "s": ""}},
+    ]));
+    assert!(
+        out.contains(r#"*   $NOTE @ATTACH(pts=[1, "a", [true, -0.5], []], s="1MegΩ ""q""", n=0.000000001, on=true) #R1(dev) => %u"#),
+        "{out}"
+    );
+    assert!(errors.is_empty(), "{out}\n{errors:?}");
+    let object = |id: &str| objects.iter().find(|o| o["id"] == id).unwrap_or_else(|| panic!("no {id}: {objects:?}"));
+    assert_eq!(object("%u")["params"], floats(&params), "{out}");
+    assert_eq!(object("%big")["params"], json!({"n": -123456789.125, "s": ""}), "{out}");
+}
+
+#[test]
+fn the_parameters_of_a_definition_from_a_package_read_back_as_given() {
+    // the definitions of meaning only that Analog Canvas writes: one on a part, one on a label
+    let label = json!({"bind": "parameter", "parameter": "w", "show_value": false});
+    let (out, errors, objects) = written_with_params(json!([
+        {"level": "file", "op": "add-usage", "name": "%n", "definition": "$CANVAS_NAME", "attach": {"part": "#R1"}, "params": {"name": "M1"}},
+        {"level": "file", "op": "add-usage", "name": "%l", "definition": "$CANVAS_LABEL", "attach": {"label": "#R1::name"}, "params": label},
+        {"level": "file", "op": "add-usage", "definition": "$CANVAS_PARAMETER_TEXT", "attach": {"part": "#R1"}, "params": {"name": "r", "text": "1MegΩ"}},
+    ]));
+    assert!(out.contains(r#"*   $CANVAS_NAME @ATTACH(name="M1") #R1(part) => %n"#), "{out}");
+    assert!(
+        out.contains(
+            r#"*   $CANVAS_LABEL @ATTACH(bind="parameter", parameter="w", show_value=false) #R1::name(label) => %l"#
+        ),
+        "{out}"
+    );
+    assert!(errors.is_empty(), "{out}\n{errors:?}");
+    let object = |id: &str| objects.iter().find(|o| o["id"] == id).unwrap_or_else(|| panic!("no {id}: {objects:?}"));
+    assert_eq!(object("%n")["params"], json!({"name": "M1"}));
+    assert_eq!(object("%l")["params"], label);
+    assert_eq!(object("%l")["attach"], json!({"label": "#R1::name"}));
+    let text = objects.iter().find(|o| o["definition"] == "$CANVAS_PARAMETER_TEXT").unwrap();
+    assert_eq!(text["params"], json!({"name": "r", "text": "1MegΩ"}));
+}
+
+#[test]
+fn a_parameter_the_definition_lacks_fails_as_a_written_one_does() {
+    let usage = json!({"level": "file", "op": "add-usage", "name": "%u", "definition": "$CANVAS_NAME",
+                       "attach": {"part": "#R1"}, "params": {"nmae": "M1"}});
+    let (out, errors, _) = written_with_params(json!([usage]));
+    assert!(out.contains(r#"*   $CANVAS_NAME @ATTACH(nmae="M1") #R1(part) => %u"#), "{out}");
+    // the same statement written by hand, read the same way
+    let mut files = MemoryProvider::new()
+        .with(
+            entry("spice"),
+            "* params\nR1 a 0 1k\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"params-test\", version=\"0.1\")}\n\
+             * @RNL { #R1 @PLACE(0, 0); $CANVAS_NAME @ATTACH(nmae=\"M1\") #R1(part) => %u }\n.end\n",
+        )
+        .with("pkgs/params-test.rnl", PARAMS_PACKAGE);
+    files.package_dirs.push("pkgs".into());
+    let r = rnl_view::interpret(entry("spice"), Some("spice"), &files, &Options::default()).unwrap();
+    let by_hand: Vec<String> =
+        r.diagnostics().iter().filter(|d| d.severity == Severity::Error).map(|d| d.message.clone()).collect();
+    assert!(!by_hand.is_empty());
+    assert_eq!(errors, by_hand, "{out}");
+}
+
+#[test]
+fn parameters_that_a_record_cannot_hold_are_refused() {
+    let usage = |params: Value| {
+        request(
+            "spice",
+            "* params\nR1 a 0 1k\n.end\n",
+            json!([{"level": "file", "op": "add-usage", "definition": "$NOTE", "attach": {"dev": "#R1"}, "params": params}]),
+        )
+    };
+    let refused =
+        "op 0 (add-usage): `params` `s` is not a string without a line break, a number, a boolean or a list of them";
+    for params in [json!({"s": "two\nlines"}), json!({"s": null}), json!({"s": {"a": 1}}), json!({"s": [1, {"a": 1}]})]
+    {
+        assert_eq!(write(&usage(params.clone())).unwrap_err(), refused, "{params}");
+    }
+    assert_eq!(write(&usage(json!([1]))).unwrap_err(), "op 0 (add-usage): `params` is not an object");
+    // none, or an empty object, writes no parentheses
+    for params in [json!({}), Value::Null] {
+        let out = write(&usage(params)).unwrap();
+        assert!(out.contains("*   $NOTE @ATTACH #R1(dev)\n"), "{out}");
+    }
+}
+
+/// What `ops` write into `net`, read back: the text, the diagnostics as rendered, and the
+/// snapshot's levels.
+fn written_and_snapshot(net: &str, ops: Value) -> (String, Vec<(Severity, String)>, Vec<Value>) {
+    let out = write(&request("spice", net, ops)).unwrap();
+    let files = MemoryProvider::new().with(entry("spice"), &out);
+    let r = rnl_view::interpret(entry("spice"), Some("spice"), &files, &Options::default()).unwrap();
+    let diagnostics = r.diagnostics().iter().map(|d| (d.severity, r.sink.render(d))).collect();
+    let parts = rnl_view::Parts { drawing: false, host: false, model: true };
+    let s = rnl_view::snapshot(entry("spice"), &files, &rnl_view::BuildOptions::default(), parts).unwrap();
+    let s = serde_json::to_value(s).unwrap();
+    (out, diagnostics, s["levels"].as_array().unwrap().clone())
+}
+
+/// The object `id` of the model of `level`.
+fn model_object<'a>(level: &'a Value, id: &str) -> &'a Value {
+    let objects = level["model"]["objects"].as_array().unwrap();
+    objects.iter().find(|o| o["id"] == id).unwrap_or_else(|| panic!("no {id} in {objects:?}"))
+}
+
+#[test]
+fn a_style_is_written_as_a_definition_that_set_style_gives_and_reads_back_as_given() {
+    let blue = json!({"linecolor": "#2275e2", "textcolor": "#2275e2"});
+    let wide = json!({"linewidth": 0.25, "linestyle": "dashed", "bold": true});
+    let net = "* styles\nR1 a 0 1k\nR2 a 0 1k\nR3 a 0 1k\nR4 a 0 1k\n.end\n";
+    let (out, diagnostics, levels) = written_and_snapshot(
+        net,
+        json!([
+            {"level": "file", "op": "set", "object": "#R1", "style": blue, "at": [0, 0]},
+            // the same properties in another order are the same style
+            {"level": "file", "op": "set", "object": "#R2", "style": {"textcolor": "#2275e2", "linecolor": "#2275e2"}, "at": [4, 0]},
+            {"level": "file", "op": "set", "object": "#R3", "symbol": "$RESISTOR", "style": wide, "at": [8, 0]},
+            {"level": "file", "op": "set", "object": "#R4", "at": [12, 0]},
+            {"level": "file", "op": "add-usage", "name": "%g", "definition": "$GROUND", "attach": {"p": "&0"},
+             "style": blue, "at": [0, -4]},
+        ]),
+    );
+    for line in [
+        r##"*   $style1 = @DEFINE-STYLE(linecolor="#2275e2", textcolor="#2275e2") {};"##,
+        r##"*   $style2 = @DEFINE-STYLE(linewidth=0.25, linestyle="dashed", bold=true) {};"##,
+        "*   #R1 @SET-STYLE $style1 => @PLACE(0, 0);",
+        "*   #R2 @SET-STYLE $style1 => @PLACE(4, 0);",
+        "*   #R3 @SET-SYMBOL $RESISTOR => @SET-STYLE $style2 => @PLACE(8, 0);",
+        "*   $GROUND @ATTACH &0(p) => @SET-STYLE $style1 => @PLACE(0, -4) => %g",
+    ] {
+        assert!(out.contains(line), "{line}\n{out}");
+    }
+    assert_eq!(out.matches("@DEFINE-STYLE").count(), 2, "{out}");
+    assert!(diagnostics.iter().all(|(s, _)| *s != Severity::Error), "{out}\n{diagnostics:?}");
+    let top = &levels[0];
+    for id in ["#R1", "#R2", "%g"] {
+        assert_eq!(model_object(top, id)["style"], blue, "{id}\n{out}");
+    }
+    assert_eq!(model_object(top, "#R3")["style"], wide, "{out}");
+    // the object's style passes to its labels (11.3): its name is drawn in the colour, as Analog
+    // Canvas colours an instance's labels with the instance
+    let files = MemoryProvider::new().with(entry("spice"), &out);
+    let r = rnl_view::interpret(entry("spice"), Some("spice"), &files, &Options::default()).unwrap();
+    let drawn = r.model.levels[0].texts.iter().find(|t| t.object_id == "#R1::name").unwrap();
+    assert_eq!(drawn.style.get("textcolor").and_then(|v| v.str()), Some("#2275e2"), "{out}");
+    // an object the document gives no style has none: the standard package's are left out
+    assert!(model_object(top, "#R4").get("style").is_none(), "{}", model_object(top, "#R4"));
+}
+
+#[test]
+fn each_level_defines_the_styles_it_uses() {
+    // a subcircuit could see the style of the file level, but its own definition keeps it the same
+    // when its file is read on its own, and with its own name it hides nothing (6.8)
+    let blue = json!({"linecolor": "#2275e2"});
+    let net = "* levels\n.subckt cell a b\nR1 a b 1k\n.ends\nX1 n 0 cell\nR2 n 0 1k\n.end\n";
+    let (out, diagnostics, levels) = written_and_snapshot(
+        net,
+        json!([
+            {"level": "file", "op": "set", "object": "#R2", "style": blue, "at": [0, 0]},
+            {"level": "subckt:cell", "op": "set", "object": "#R1", "style": blue, "at": [0, 0]},
+            {"level": "subckt:cell", "op": "set", "object": "#R1", "style": blue},
+        ]),
+    );
+    assert!(out.contains(r##"*   $style1 = @DEFINE-STYLE(linecolor="#2275e2") {};"##), "{out}");
+    assert!(out.contains(r##"*   $style2 = @DEFINE-STYLE(linecolor="#2275e2") {};"##), "{out}");
+    assert_eq!(out.matches("@DEFINE-STYLE").count(), 2, "{out}");
+    let loud = diagnostics.iter().filter(|(s, m)| *s != Severity::Hint || m.contains("hides"));
+    assert_eq!(loud.count(), 0, "{out}\n{diagnostics:?}");
+    let level = |id: &str| levels.iter().find(|l| l["id"] == id).unwrap_or_else(|| panic!("no level {id}"));
+    assert_eq!(model_object(level("file:netlist.sp"), "#R2")["style"], blue);
+    assert_eq!(model_object(level("subckt:cell"), "#R1")["style"], blue);
+}
+
+#[test]
+fn a_style_property_the_language_lacks_fails_as_a_written_one_does() {
+    let net = "* styles\nR1 a 0 1k\n.end\n";
+    let ops = json!([{"level": "file", "op": "set", "object": "#R1", "style": {"colour": "#2275e2"}}]);
+    let (out, diagnostics, _) = written_and_snapshot(net, ops);
+    assert!(out.contains(r##"*   $style1 = @DEFINE-STYLE(colour="#2275e2") {};"##), "{out}");
+    let message = |d: &[(Severity, String)]| -> Vec<String> {
+        d.iter()
+            .filter(|(s, _)| *s == Severity::Error)
+            // what, without where: the record written by hand is on another line
+            .map(|(_, m)| m.split_once(": ").unwrap().1.lines().next().unwrap().to_string())
+            .collect()
+    };
+    let by_hand = "* styles\nR1 a 0 1k\n* @RNL { $style1 = @DEFINE-STYLE(colour=\"#2275e2\") {}; #R1 @SET-STYLE $style1 }\n.end\n";
+    let files = MemoryProvider::new().with(entry("spice"), by_hand);
+    let r = rnl_view::interpret(entry("spice"), Some("spice"), &files, &Options::default()).unwrap();
+    let by_hand: Vec<(Severity, String)> = r.diagnostics().iter().map(|d| (d.severity, r.sink.render(d))).collect();
+    assert!(!message(&by_hand).is_empty());
+    assert_eq!(message(&diagnostics), message(&by_hand), "{out}");
+}
+
+#[test]
+fn a_style_that_a_record_cannot_hold_is_refused() {
+    let set = |style: Value| {
+        request(
+            "spice",
+            "* styles\nR1 a 0 1k\n.end\n",
+            json!([{"level": "file", "op": "set", "object": "#R1", "style": style}]),
+        )
+    };
+    assert_eq!(
+        write(&set(json!({"linecolor": ["#000000"]}))).unwrap_err(),
+        "op 0 (set): `style` `linecolor` is not a string, number or boolean"
+    );
+    // an empty style sets nothing
+    assert_eq!(
+        write(&set(json!({}))).unwrap_err(),
+        "op 0 (set): nothing to set: no `symbol`, `style`, `at` or `orient`"
     );
 }

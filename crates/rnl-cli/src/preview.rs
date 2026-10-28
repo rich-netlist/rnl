@@ -116,11 +116,13 @@ pub fn preview(
         written.insert(&f.path, &f.text);
     }
     let both = Layered { layers: vec![&written, files] };
-    let build = BuildOptions { dialect: options.dialect.clone(), ..BuildOptions::default() };
+    let build =
+        BuildOptions { dialect: options.dialect.clone(), formats: options.formats.clone(), ..BuildOptions::default() };
     let document = rnl_view::build(entry, &both, &build)?;
     // the texts as a solver reads them, without the records of the solver, so that the facts are
     // those solved, at the lines where the Document shows them
-    let again = rnl_view::interpret(entry, options.dialect.as_deref(), &both, &options.runtime())?;
+    let again =
+        rnl_view::interpret_with(entry, options.dialect.as_deref(), &options.formats, &both, &options.runtime())?;
     let report = report(&run, &document, &again.problems);
     Ok(Preview { copy: Copy::of(&run), document, report })
 }

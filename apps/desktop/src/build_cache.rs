@@ -8,6 +8,8 @@ use std::sync::Arc;
 
 use rnl_runtime::source::{normalize, LibraryDefinition, LibraryLookup, Provider};
 use rnl_view::{BuildOptions, Drawings, UnplacedDrawing};
+
+use crate::formats::Formats;
 use serde::Serialize;
 
 pub const DEFAULT_LIMIT: usize = 256 * 1024 * 1024;
@@ -103,6 +105,9 @@ impl Provider for Observed<'_> {
     fn auto_include(&self) -> Option<&dyn LibraryLookup> {
         self.files.auto_include().map(|_| self as &dyn LibraryLookup)
     }
+    fn path_key(&self, path: &str) -> String {
+        self.files.path_key(path)
+    }
 }
 impl LibraryLookup for Observed<'_> {
     fn candidates(&self, name: &str, sensitive: bool) -> Vec<LibraryDefinition> {
@@ -120,6 +125,8 @@ impl LibraryLookup for Observed<'_> {
 pub struct Prepared {
     path: String,
     auto_include: bool,
+    /// The formats chosen for files that it was built with: another choice is another entry.
+    formats: Formats,
     inputs: Inputs,
     json: String,
     name: String,
@@ -193,10 +200,12 @@ impl BuildCache {
         self.active.as_ref().ok_or_else(|| "no document has kept drawings".to_string())?.unplaced(level, items, names)
     }
 
-    pub fn build(&mut self, path: &str, files: &dyn Provider, fresh: bool) -> Result<Built, String> {
+    pub fn build(&mut self, path: &str, files: &dyn Provider, formats: &Formats, fresh: bool) -> Result<Built, String> {
         let path = normalize(path);
         let automatic = files.auto_include().is_some();
-        if let Some(at) = self.entries.iter().position(|e| e.path == path && e.auto_include == automatic) {
+        if let Some(at) =
+            self.entries.iter().position(|e| e.path == path && e.auto_include == automatic && e.formats == *formats)
+        {
             let mut entry = self.entries.remove(at).unwrap();
             self.used -= entry.bytes;
             if !fresh && entry.inputs.valid(files) {
@@ -210,7 +219,7 @@ impl BuildCache {
             }
         }
         self.misses += 1;
-        let entry = Prepared::build(&path, files)?;
+        let entry = Prepared::build(&path, files, formats)?;
         self.active = Some(entry.drawings.clone());
         let built = Built { json: entry.json.clone(), name: entry.name.clone(), hit: false };
         if entry.bytes <= self.limit {
@@ -225,9 +234,9 @@ impl BuildCache {
 
     /// Do not waste background CPU on an already retained entry. Foreground hits still validate
     /// every dependency, including negative reads and library lookups, before using its result.
-    pub fn contains(&self, path: &str, auto_include: bool) -> bool {
+    pub fn contains(&self, path: &str, auto_include: bool, formats: &Formats) -> bool {
         let path = normalize(path);
-        self.entries.iter().any(|e| e.path == path && e.auto_include == auto_include)
+        self.entries.iter().any(|e| e.path == path && e.auto_include == auto_include && e.formats == *formats)
     }
 
     pub fn room(&self) -> usize {
@@ -237,7 +246,7 @@ impl BuildCache {
     /// Speculation may use spare space, but must never evict a result the user visited (or a
     /// higher-priority candidate already prepared). It does not change active lazy drawings.
     pub fn offer(&mut self, mut entry: Prepared) -> bool {
-        if self.contains(&entry.path, entry.auto_include) || entry.bytes > self.room() {
+        if self.contains(&entry.path, entry.auto_include, &entry.formats) || entry.bytes > self.room() {
             return false;
         }
         entry.speculative = true;
@@ -248,10 +257,11 @@ impl BuildCache {
 }
 
 impl Prepared {
-    pub fn build(path: &str, files: &dyn Provider) -> Result<Self, String> {
+    pub fn build(path: &str, files: &dyn Provider, formats: &Formats) -> Result<Self, String> {
         let path = normalize(path);
         let observed = Observed { files, inputs: RefCell::new(Inputs::default()) };
-        let (doc, drawings) = rnl_view::build_drawn(&path, &observed, &BuildOptions::default())?;
+        let options = BuildOptions { formats: formats.clone(), ..BuildOptions::default() };
+        let (doc, drawings) = rnl_view::build_drawn(&path, &observed, &options)?;
         let json = serde_json::to_string(&doc).map_err(|e| e.to_string())?;
         let drawings = Arc::new(drawings);
         let inputs = observed.inputs.into_inner();
@@ -260,11 +270,13 @@ impl Prepared {
             + string_bytes(&path)
             + string_bytes(&json)
             + string_bytes(&doc.name)
+            + formats.iter().map(|(p, f)| string_bytes(p) + string_bytes(f)).sum::<usize>()
             + inputs.bytes()
             + drawings.retained_bytes();
         Ok(Self {
             path,
             auto_include: files.auto_include().is_some(),
+            formats: formats.clone(),
             inputs,
             json,
             name: doc.name,
@@ -281,6 +293,54 @@ mod tests {
     use rnl_runtime::source::{Layered, MemoryProvider};
     use rnl_view::{LibraryIndex, LibraryProvider};
 
+    fn none() -> Formats {
+        Formats::new()
+    }
+
+    #[test]
+    fn another_choice_of_formats_is_another_entry() {
+        let mut cache = BuildCache::default();
+        let spectre = Formats::from([("/a.sp".to_string(), "spectre".to_string())]);
+        assert!(!cache.build("/a.sp", &files(), &none(), false).unwrap().hit);
+        let chosen = cache.build("/a.sp", &files(), &spectre, false).unwrap();
+        assert!(!chosen.hit);
+        assert!(chosen.json.contains(r#""format":"spectre""#));
+        assert!(cache.build("/a.sp", &files(), &none(), false).unwrap().hit);
+        assert!(cache.build("/a.sp", &files(), &spectre, false).unwrap().hit);
+        assert!(cache.contains("/a.sp", false, &spectre));
+        assert!(!cache.contains("/a.sp", false, &Formats::from([("/a.sp".to_string(), "spice".to_string())])));
+    }
+
+    /// A file system that ignores case, as on Windows and macOS: paths compare in lower case.
+    struct Caseless(MemoryProvider);
+    impl Provider for Caseless {
+        fn read(&self, path: &str) -> Option<String> {
+            self.0.read(&path.to_lowercase())
+        }
+        fn path_key(&self, path: &str) -> String {
+            path.to_lowercase()
+        }
+    }
+
+    #[test]
+    fn a_format_chosen_in_another_case_reaches_the_file_through_every_layer() {
+        // the page keeps the choice in lower case; the include is written in another case
+        let disk = Caseless(
+            MemoryProvider::new()
+                .with("/w/top.sp", "* top\n.include \"Models.SCS\"\nR1 a 0 1k\n.end\n")
+                .with("/w/models.scs", "simulator lang=spectre\nR2 (a 0) resistor r=1k\n"),
+        );
+        let formats = Formats::from([("/w/models.scs".to_string(), "spice".to_string())]);
+        let held = MemoryProvider::new();
+        let layered = Layered { layers: vec![&held, &disk] };
+        let mut cache = BuildCache::default();
+        let built = cache.build("/W/Top.sp", &layered, &formats, false).unwrap();
+        let doc: serde_json::Value = serde_json::from_str(&built.json).unwrap();
+        let included =
+            doc["files"].as_array().unwrap().iter().find(|f| f["path"].as_str().unwrap().ends_with("odels.SCS"));
+        assert_eq!(included.map(|f| f["format"].clone()), Some(serde_json::json!("spice")), "{doc:#}");
+    }
+
     fn files() -> MemoryProvider {
         MemoryProvider::new()
             .with("/a.sp", "* a\nR1 a 0 1k\n.end\n")
@@ -291,12 +351,12 @@ mod tests {
     #[test]
     fn background_result_moves_threads_without_replacing_active_drawings() {
         let mut cache = BuildCache::default();
-        cache.build("/a.sp", &files(), false).unwrap();
-        let prepared = std::thread::spawn(|| Prepared::build("/b.sp", &files()).unwrap()).join().unwrap();
+        cache.build("/a.sp", &files(), &none(), false).unwrap();
+        let prepared = std::thread::spawn(|| Prepared::build("/b.sp", &files(), &none()).unwrap()).join().unwrap();
         assert!(cache.offer(prepared));
         assert_eq!(cache.stats().prefetched, 1);
         assert!(cache.unplaced(0, &[0], &["R1".into()]).unwrap()[0].svg.is_some());
-        assert!(cache.build("/b.sp", &files(), false).unwrap().hit);
+        assert!(cache.build("/b.sp", &files(), &none(), false).unwrap().hit);
         assert_eq!(cache.stats().prefetched, 0);
         assert!(cache.unplaced(0, &[0], &["R2".into()]).unwrap()[0].svg.is_some());
     }
@@ -304,39 +364,39 @@ mod tests {
     #[test]
     fn speculative_results_cannot_evict_visited_and_are_evicted_first() {
         let mut cache = BuildCache::default();
-        cache.build("/a.sp", &files(), false).unwrap();
-        let b = Prepared::build("/b.sp", &files()).unwrap();
+        cache.build("/a.sp", &files(), &none(), false).unwrap();
+        let b = Prepared::build("/b.sp", &files(), &none()).unwrap();
         cache.set_limit(cache.used + b.bytes);
         assert!(cache.offer(b));
-        assert!(!cache.offer(Prepared::build("/c.sp", &files()).unwrap()));
+        assert!(!cache.offer(Prepared::build("/c.sp", &files(), &none()).unwrap()));
         assert_eq!(cache.stats().entries, 2);
-        cache.build("/c.sp", &files(), false).unwrap();
-        assert!(cache.contains("/a.sp", false));
-        assert!(!cache.contains("/b.sp", false));
+        cache.build("/c.sp", &files(), &none(), false).unwrap();
+        assert!(cache.contains("/a.sp", false, &none()));
+        assert!(!cache.contains("/b.sp", false, &none()));
         assert!(cache.used <= cache.limit);
     }
 
     #[test]
     fn speculative_hit_checks_file_changes_and_fresh_bypasses_it() {
         let mut cache = BuildCache::default();
-        assert!(cache.offer(Prepared::build("/a.sp", &files()).unwrap()));
+        assert!(cache.offer(Prepared::build("/a.sp", &files(), &none()).unwrap()));
         let changed = files().with("/a.sp", "* a\nR9 a 0 1k\n.end\n");
-        assert!(!cache.build("/a.sp", &changed, false).unwrap().hit);
+        assert!(!cache.build("/a.sp", &changed, &none(), false).unwrap().hit);
         assert!(cache.unplaced(0, &[0], &["R9".into()]).unwrap()[0].svg.is_some());
         cache.clear();
-        assert!(cache.offer(Prepared::build("/a.sp", &files()).unwrap()));
-        assert!(!cache.build("/a.sp", &files(), true).unwrap().hit);
+        assert!(cache.offer(Prepared::build("/a.sp", &files(), &none()).unwrap()));
+        assert!(!cache.build("/a.sp", &files(), &none(), true).unwrap().hit);
     }
 
     #[test]
     fn switching_back_reuses_document_and_reactivates_its_lazy_drawings() {
         let mut cache = BuildCache::default();
         let files = files();
-        let a = cache.build("/a.sp", &files, false).unwrap();
+        let a = cache.build("/a.sp", &files, &none(), false).unwrap();
         assert!(!a.hit);
-        cache.build("/b.sp", &files, false).unwrap();
+        cache.build("/b.sp", &files, &none(), false).unwrap();
         assert!(cache.unplaced(0, &[0], &["R1".into()]).is_err());
-        let again = cache.build("/a.sp", &files, false).unwrap();
+        let again = cache.build("/a.sp", &files, &none(), false).unwrap();
         assert!(again.hit);
         assert_eq!(again.json, a.json);
         assert!(cache.unplaced(0, &[0], &["R1".into()]).unwrap()[0].svg.is_some());
@@ -348,30 +408,30 @@ mod tests {
     fn same_size_edits_deleted_files_and_applied_overlays_cannot_reuse_stale_results() {
         let mut cache = BuildCache::default();
         let mut files = files();
-        cache.build("/a.sp", &files, false).unwrap();
+        cache.build("/a.sp", &files, &none(), false).unwrap();
         files.insert("/a.sp", "* a\nR1 a 0 9k\n.end\n");
-        let changed = cache.build("/a.sp", &files, false).unwrap();
+        let changed = cache.build("/a.sp", &files, &none(), false).unwrap();
         assert!(!changed.hit && changed.json.contains("9k"));
         let edits = MemoryProvider::new().with("/a.sp", "* edited\nRedit a 0 8k\n");
         let overlay = Layered { layers: vec![&edits, &files] };
-        let edited = cache.build("/a.sp", &overlay, false).unwrap();
+        let edited = cache.build("/a.sp", &overlay, &none(), false).unwrap();
         assert!(!edited.hit && edited.json.contains("Redit"));
-        assert!(cache.build("/a.sp", &overlay, false).unwrap().hit);
-        assert!(!cache.build("/a.sp", &files, false).unwrap().hit);
+        assert!(cache.build("/a.sp", &overlay, &none(), false).unwrap().hit);
+        assert!(!cache.build("/a.sp", &files, &none(), false).unwrap().hit);
         files.files.remove("/a.sp");
-        assert!(cache.build("/a.sp", &files, false).is_err());
+        assert!(cache.build("/a.sp", &files, &none(), false).is_err());
     }
 
     #[test]
     fn missing_includes_appearing_and_dependency_edits_invalidate_the_root() {
         let mut cache = BuildCache::default();
         let mut files = MemoryProvider::new().with("/a.sp", "* a\n.include part.inc\n");
-        cache.build("/a.sp", &files, false).unwrap();
-        assert!(cache.build("/a.sp", &files, false).unwrap().hit);
+        cache.build("/a.sp", &files, &none(), false).unwrap();
+        assert!(cache.build("/a.sp", &files, &none(), false).unwrap().hit);
         files.insert("/part.inc", "R1 a 0 1k\n");
-        assert!(!cache.build("/a.sp", &files, false).unwrap().hit);
+        assert!(!cache.build("/a.sp", &files, &none(), false).unwrap().hit);
         files.insert("/part.inc", "R1 a 0 2k\n");
-        let changed = cache.build("/a.sp", &files, false).unwrap();
+        let changed = cache.build("/a.sp", &files, &none(), false).unwrap();
         assert!(!changed.hit && changed.json.contains("2k"));
     }
 
@@ -384,16 +444,16 @@ mod tests {
             .with("/duplicate.inc", ".subckt cell p n\n.ends\n");
         let mut index = LibraryIndex::default();
         index.update(&["/cell.inc".into()], &files, false);
-        cache.build("/top.sp", &files, false).unwrap();
+        cache.build("/top.sp", &files, &none(), false).unwrap();
         let enabled = LibraryProvider { files: &files, index: &index, enabled: true };
-        let imported = cache.build("/top.sp", &enabled, false).unwrap();
+        let imported = cache.build("/top.sp", &enabled, &none(), false).unwrap();
         assert!(!imported.hit && imported.json.contains("added by Auto Include"));
-        assert!(cache.build("/top.sp", &enabled, false).unwrap().hit);
+        assert!(cache.build("/top.sp", &enabled, &none(), false).unwrap().hit);
         index.update(&["/cell.inc".into(), "/duplicate.inc".into()], &files, false);
         let collision = LibraryProvider { files: &files, index: &index, enabled: true };
-        let changed = cache.build("/top.sp", &collision, false).unwrap();
+        let changed = cache.build("/top.sp", &collision, &none(), false).unwrap();
         assert!(!changed.hit && changed.json.contains("conflicting definitions"));
-        assert!(cache.build("/top.sp", &files, false).unwrap().hit);
+        assert!(cache.build("/top.sp", &files, &none(), false).unwrap().hit);
     }
 
     #[test]
@@ -423,23 +483,23 @@ mod tests {
     fn lru_evicts_the_least_recently_used_result_and_respects_lowered_limits() {
         let mut cache = BuildCache::default();
         let files = files();
-        cache.build("/a.sp", &files, false).unwrap();
-        cache.build("/b.sp", &files, false).unwrap();
+        cache.build("/a.sp", &files, &none(), false).unwrap();
+        cache.build("/b.sp", &files, &none(), false).unwrap();
         let budget = cache.stats().used;
         cache.set_limit(budget);
-        assert!(cache.build("/a.sp", &files, false).unwrap().hit);
-        cache.build("/c.sp", &files, false).unwrap();
+        assert!(cache.build("/a.sp", &files, &none(), false).unwrap().hit);
+        cache.build("/c.sp", &files, &none(), false).unwrap();
         assert!(cache.stats().used <= budget);
         assert!(cache.entries.iter().all(|e| e.path != "/b.sp"));
-        assert!(cache.build("/a.sp", &files, false).unwrap().hit);
-        assert!(!cache.build("/b.sp", &files, false).unwrap().hit);
+        assert!(cache.build("/a.sp", &files, &none(), false).unwrap().hit);
+        assert!(!cache.build("/b.sp", &files, &none(), false).unwrap().hit);
         cache.set_limit(0);
         assert_eq!((cache.stats().used, cache.stats().entries), (0, 0));
         assert!(cache.unplaced(0, &[0], &["R2".into()]).is_ok());
-        assert!(!cache.build("/b.sp", &files, false).unwrap().hit);
+        assert!(!cache.build("/b.sp", &files, &none(), false).unwrap().hit);
         assert_eq!(cache.stats().entries, 0);
         cache.set_limit(1);
-        assert!(!cache.build("/a.sp", &files, false).unwrap().hit);
+        assert!(!cache.build("/a.sp", &files, &none(), false).unwrap().hit);
         assert_eq!(cache.stats().used, 0); // oversized documents still open but are not cached
     }
 
@@ -447,12 +507,12 @@ mod tests {
     fn force_reload_and_clear_rebuild_while_preserving_the_current_thumbnails() {
         let mut cache = BuildCache::default();
         let files = files();
-        cache.build("/a.sp", &files, false).unwrap();
-        assert!(!cache.build("/a.sp", &files, true).unwrap().hit);
-        assert!(cache.build("/a.sp", &files, false).unwrap().hit);
+        cache.build("/a.sp", &files, &none(), false).unwrap();
+        assert!(!cache.build("/a.sp", &files, &none(), true).unwrap().hit);
+        assert!(cache.build("/a.sp", &files, &none(), false).unwrap().hit);
         cache.clear();
         assert_eq!(cache.stats().entries, 0);
         assert!(cache.unplaced(0, &[0], &["R1".into()]).is_ok());
-        assert!(!cache.build("/a.sp", &files, false).unwrap().hit);
+        assert!(!cache.build("/a.sp", &files, &none(), false).unwrap().hit);
     }
 }

@@ -996,8 +996,8 @@
     {
       "severity": "hint",
       "file": "01-rc-lowpass.sp",
-      "line": 2,
-      "col": 4
+      "line": 15,
+      "col": 23
     }
   ]
 }

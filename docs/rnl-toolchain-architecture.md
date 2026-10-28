@@ -1,555 +1,556 @@
-# RNL 独立工具链架构与技术栈方案
+# Architecture and technology stack of the independent RNL toolchain
 
-状态：架构提案，记录需求与推荐方案；尚未实施，不是已冻结的语言规范或性能承诺。
+Status: an architecture proposal that records requirements and recommended choices; not yet implemented, and neither a frozen language standard nor a performance commitment. It is the proposal as of the dates below; where later decisions or the standard differ from it, they prevail.
 
-日期：2026-09-23。修订：2026-09-23，吸收首轮审阅讨论的结论，主要涉及 solver 输出契约与所有权（第 3.3、5 章）、runtime 形态与运行模式（第 4、6 章）、宿主适配器（第 4.1 节）、统一渲染器（第 4.3 节）、solver 确定性与依赖政策（第 4.2 节）、字体（第 7 章）和落地顺序（第 11 章）。修订：2026-09-24，迁入独立仓库后记录已决定的 npm 作用域（第 9.1 节）和许可证（第 12 章）。修订：2026-10-13，[决定 0008](decisions/0008-shared-core-per-platform-frontends.md) 修改了第 6.1、6.3 节和第 7 章，并补充了第 8 章的目录：共享的 Rust 核心决定图形（定位好的图元和随核心发布的字体），桌面原生调用核心，各平台的前端可以不同；下文这几处的原文保留，以决定为准。修订：2026-10-16，按语言标准 0.2、尚未发布的草案 0.3 和已实现的求解器接口（rnl#16），改写了与求解器有关的第 1.2 节、第 2 章、第 3.2–3.4 节、第 4.2、4.3、4.5 节、第 5 章、第 10.2 节和第 11、12 章：求解器的记录、hash、层次、坐标、写回的范围和编辑器的写法都以标准为准，原提案的 source 标记、输入指纹、按实例路径的作用域、整数网格坐标和覆盖诊断等说法已删去。修订：2026-10-16，草案 0.3 定下了第 12 章列出的四个问题：判定的时间上限、丢弃时的提示、"有解"的数域和容差、展开出的事实只保留一半。第 3.3、4.2 节、第 5 章、第 10.2 节和第 12 章已照改。
+Date: 2026-09-23. Revised 2026-09-23, taking in the conclusions of the first review discussion, mainly on the solver's output contract and ownership (section 3.3 and chapter 5), the runtime's form and modes of running (chapters 4 and 6), host adapters (section 4.1), the unified renderer (section 4.3), the solver's determinism and dependency policy (section 4.2), fonts (chapter 7) and the order of delivery (chapter 11). Revised 2026-09-24, after the move to the independent repository, recording the decided npm scope (section 9.1) and licences (chapter 12). Revised 2026-10-13: [decision 0008](decisions/0008-shared-core-per-platform-frontends.md) amended sections 6.1 and 6.3 and chapter 7, and added to the layout of chapter 8: the shared Rust core decides the drawing (placed primitives and the fonts shipped with the core), the desktop calls the core natively, and the frontends of each platform may differ; the original text of these places is kept below, and the decision prevails. Revised 2026-10-16, following language standard 0.2, the unpublished draft 0.3 and the implemented solver interface (rnl#16): rewrote the parts about the solver, section 1.2, chapter 2, sections 3.2–3.4, sections 4.2, 4.3 and 4.5, chapter 5, section 10.2 and chapters 11 and 12. The solver's record, hash, levels, coordinates, the scope of writing back and how the editor writes all follow the standard; the original proposal's source marks, input fingerprints, scopes by instance path, integer grid coordinates and override diagnostics have been removed. Revised 2026-10-16: draft 0.3 settled the four questions listed in chapter 12, namely the time limit of the decision, the hints on discarding, the number domain and tolerance of "has a solution", and the facts a definition expands to being kept only in part. Sections 3.3 and 4.2, chapter 5, section 10.2 and chapter 12 have been changed to match.
 
-来源：迁自 Analog Canvas 仓库（`cascode-ai/analog-canvas`）`rich-netlist` 分支的 `docs/standards/rnl-toolchain-architecture.md`，提交 `168ce69afc988b4e6a57816664fabdafb5d948ee`（2026-09-23），于 2026-09-24 迁入。迁入时除增加本段外，只修改了与文档位置有关的表述：删去"暂存于 Analog Canvas、待明确归属"的说明，更新两份语言草案的链接，并把第 8 章、第 12 章中指代 Analog Canvas 的"本仓库"改为明确名称；方案内容未改动。此后以本仓库为唯一维护位置。
+Source: moved from `docs/standards/rnl-toolchain-architecture.md` on the `rich-netlist` branch of the Analog Canvas repository (`cascode-ai/analog-canvas`), commit `168ce69afc988b4e6a57816664fabdafb5d948ee` (2026-09-23), on 2026-09-24. Apart from adding this paragraph, the move changed only the wording that depends on where the document is: it removed the note that it was "kept in Analog Canvas for now, its home to be settled", updated the links to the two language drafts, and replaced "this repository", where chapters 8 and 12 meant Analog Canvas, with its name; the content of the proposal was not changed. From then on this repository is the only place where it is maintained.
 
-许可：本文由版权所有者按 [CC-BY-4.0](../LICENSES/CC-BY-4.0.txt) 发布，仓库各部分的许可见[许可说明](../README.md#license)。Analog Canvas 中的冻结副本仍按该仓库的 AGPL-3.0 条款提供。
+Licence: published by the copyright holder under [CC-BY-4.0](../LICENSES/CC-BY-4.0.txt); the licences of the parts of the repository are in the [licence notes](../README.md#license). The frozen copy in Analog Canvas remains available under that repository's AGPL-3.0 terms.
 
-本文规划独立的 Rich Netlist（RNL）runtime、solver、viewer/editor，以及它们的模块、仓库和发行方式。目标工具链不依赖 Analog Canvas 的代码、运行环境或元件资产。
+This document plans an independent Rich Netlist (RNL) runtime, solver and viewer/editor, with their modules, repositories and distribution. The target toolchain does not depend on Analog Canvas's code, runtime environment or component assets.
 
-语言背景见 [RNL 原则](../spec/rich-netlist.zh.md)和[语言标准 0.2](../spec/rnl-0.2.zh.md)（本文写于标准之前，当时依据的语法讨论稿 0.1-draft.2 已被它取代）。草案 0.3 让求解器把全部决定写回，尚未发布；本文引用的条文以研究仓库 rnl-dev 的提交 f76197d（2026-10-16）为准。工具包已经实现了它：声明 0.3 的文件、没有头记录的主文件都按 0.3 读，不用开关，见 [rnl-runtime](../crates/rnl-runtime/README.md#for-a-solver)。本文中的接口名、目录名、包名和能力约定均为设计示意，不意味着已有对应实现，也不新增已获确认的 RNL 语法。
+For the language, see the [RNL principles](../spec/rich-netlist.md) and [language standard 0.2](../spec/rnl-0.2.md) (this document was written before the standard; the syntax discussion draft 0.1-draft.2 it was based on has been replaced by the standard). Draft 0.3, which has the solver write back everything, is not yet published; the clauses this document cites follow commit f76197d (2026-10-16) of the research repository rnl-dev. The toolkit already implements it: files that declare 0.3, and main files without a header record, are read as 0.3 without a switch; see [rnl-runtime](../crates/rnl-runtime/README.md#for-a-solver). The interface names, directory names, package names and capability conventions in this document are design sketches; they do not imply existing implementations and add no confirmed RNL syntax.
 
-## 1. 用户需求与方案状态
+## 1. User requirements and status of the proposal
 
-### 1.1 用户需求
+### 1.1 User requirements
 
-以下需求整理自用户在本次讨论中的逐步澄清，是方案的输入。后续 Rust、TypeScript、Tauri 和 monorepo 等推荐不属于用户已经限定的实现方式。
+The following requirements were gathered from the user's step-by-step clarifications in this discussion and are the input to the proposal. The later recommendations of Rust, TypeScript, Tauri, a monorepo and the like are not implementation choices the user has prescribed.
 
-1. **独立、轻量的 RNL 阅读工具。** 为 Rich Netlist 单独提供好用的 viewer，具备发展为编辑器的空间。
-2. **快速启动指框架和界面。** 关注软件框架启动、窗口和界面加载到可交互的速度，不将求解时间计入这一要求。求解可以先给用户一个初始版本，再动态刷新更优结果。
-3. **跨平台从一开始就是重点。** 希望获得类似 PDF 的使用体验：在绝大多数平台上都有好用的 viewer。不同平台的应用架构可以不同，但求解、渲染等核心能力希望以统一且可移植的模块提供。
-4. **关键计算模块强调执行效率。** 尤其是 solver，倾向使用 Rust 或 C++ 等高效编译语言，同时兼顾移植性和升级后各平台的统一构建与发行。
-5. **完全不依赖 Analog Canvas。** 不依赖其前端、运行环境或现有元件资源。现有 Canvas 仅可作为电路信息、层次、连接和交互概念的参考。
-6. **viewer 不携带领域资产。** RNL 将具备内嵌 symbol 定义能力，标准 symbol 通过 RNL 库发布；viewer 提供通用的解析和显示能力，不以自身内置的元件库为前提。
-7. **solver 与 renderer/editor 是两个核心。** 两者可以采用不同语言和运行平台。solver 使用编译语言，前端可以使用启动足够快的 JS 方案，也可以用 Rust 实现原生应用。
-8. **两核之间保留完整的文档语义。** 传递的信息包含电路与层次、元件及 symbol 定义、走线、连接关系等，使前端能继续编辑，不能只传递失去电路对象身份的绘图数据。
-9. **进一步使用 RNL 自身作为契约。** 因为 RNL 可以精确定义图形，solver 可以将高层语义转译为精确 RNL 描述，并保留原语义，利用语言支持的后续描述覆盖机制表达结果。无需另造一套独立的电路交换格式。
-10. **viewer 可直接阅读精确 RNL。** 已有完整精确描述时直接渲染；遇到尚不精确的 RNL，再视情况调用 solver。调用 solver 不是每次打开文档的必经步骤。
-11. **运行时不要求交换文本。** solver 和 viewer 实际通信可以采用高效的数据结构或其他通道，只要表达同一份 RNL 语义。
-12. **适应早期标准的快速演进。** 语言在初期会频繁调整，技术栈和框架需要便于快速迭代与分发，优先考虑类似 npm 的安装、升级和模块消费机制。
+1. **An independent, lightweight tool for reading RNL.** A good viewer of its own for Rich Netlist, with room to grow into an editor.
+2. **Fast start-up refers to the framework and the interface.** What matters is how fast the software framework starts and the window and interface load to an interactive state; solving time does not count towards this requirement. Solving can first give the user an initial version and then refresh it with better results.
+3. **Cross-platform matters from the start.** The hope is for a PDF-like experience: a good viewer on almost every platform. The application architecture may differ between platforms, but core capabilities such as solving and rendering should come as unified, portable modules.
+4. **Key computational modules stress execution efficiency.** Above all the solver, with a preference for efficient compiled languages such as Rust or C++, while keeping portability and unified builds and releases on every platform after upgrades.
+5. **No dependence on Analog Canvas at all.** Not on its frontend, its runtime environment or its existing component resources. The existing Canvas may serve only as a reference for the concepts of circuit information, hierarchy, connections and interaction.
+6. **The viewer carries no domain assets.** RNL will be able to define symbols inline, and the standard symbols are published as RNL libraries; the viewer provides general parsing and display, and does not presuppose a built-in component library of its own.
+7. **The solver and the renderer/editor are the two cores.** They may use different languages and platforms. The solver uses a compiled language; the frontend may use a JS solution that starts fast enough, or be a native application written in Rust.
+8. **The full document semantics are kept between the two cores.** What passes between them includes the circuit and its hierarchy, components and symbol definitions, wiring and connections, so that the frontend can keep editing; it cannot be only drawing data that has lost the identity of the circuit's objects.
+9. **RNL itself is the contract as well.** Since RNL can define graphics exactly, the solver can translate high-level semantics into an exact RNL description while keeping the original semantics, expressing its result with the language's mechanism of later descriptions overriding earlier ones. No separate circuit exchange format is needed.
+10. **The viewer can read exact RNL directly.** When a complete, exact description exists, it is rendered directly; RNL that is not yet exact may call the solver as needed. Calling the solver is not a required step every time a document is opened.
+11. **No text exchange is required at run time.** The solver and the viewer may actually communicate through efficient data structures or other channels, as long as they express the same RNL semantics.
+12. **Keep up with the early standard's rapid evolution.** The language will change often at first, so the technology stack and frameworks must make fast iteration and distribution easy, with npm-like installation, upgrades and module consumption preferred.
 
-本文件同时回答技术栈如何组合，以及 runtime、solver、viewer/editor 应采用一个还是多个 Git 仓库管理的问题。仓库与发布策略属于下文给出的推荐方案。
+This document also answers how the technology stack fits together, and whether the runtime, solver and viewer/editor are managed in one Git repository or several. The repository and release strategy belong to the recommendations given below.
 
-### 1.2 本方案推荐，仍需实现验证的选择
+### 1.2 Choices this proposal recommends, still to be validated in implementation
 
-| 事项 | 推荐选择 | 尚需验证或确认 |
+| Item | Recommended choice | Still to validate or confirm |
 | --- | --- | --- |
-| 核心语言 | Rust；solver 的全部依赖必须可用纯 Rust 实现并编译到 WASM | 判定与坐标采用增量的有理数单纯形（第 4.2 节），规模与性能待验证 |
-| 宿主方言 | 首版同时支持 SPICE 与 Spectre 的结构子集 | 子集的精确范围、注释载体与保真写回验证 |
-| runtime 形态 | 支持库，进程内链接进 viewer、CLI 和 solver | WASM 解析大文件的耗时 |
-| 首个前端 | TypeScript viewer/editor；统一渲染器在 Rust 核心；SVG 输出 | 真实复杂图、高 DPI 和大层次交互表现 |
-| 应用 UI | React + Vite，核心不依赖 React | 实际加载体积和首屏表现 |
-| 桌面外壳 | Tauri 2 | 各平台冷启动、WebView 和文件集成 |
-| 源码管理 | 新建独立 monorepo | 独立仓库名称和迁移安排 |
-| SDK 发行 | npm + WASM，配套 Rust crate/native 产物 | 包名、公开 API、发布平台矩阵 |
-| 版本策略 | 早期协调发布核心 SDK，符号库独立版本化 | 兼容窗口、破坏性变更与迁移策略 |
+| Core language | Rust; every dependency of the solver must be implementable in pure Rust and compile to WASM | Decision and coordinates by an incremental rational simplex (section 4.2); scale and performance to be validated |
+| Host dialects | Structural subsets of both SPICE and Spectre in the first version | The exact extent of the subsets, the comment carriers, and validation of faithful write-back |
+| Runtime form | A support library, linked in-process into the viewer, the CLI and the solver | The time WASM takes to parse large files |
+| First frontend | A TypeScript viewer/editor; the unified renderer in the Rust core; SVG output | Behaviour on real complex drawings, high DPI and large hierarchies |
+| Application UI | React + Vite, with the core not depending on React | Actual load size and first-screen behaviour |
+| Desktop shell | Tauri 2 | Cold start, WebView and file integration on each platform |
+| Source control | A new independent monorepo | The independent repository's name and the migration arrangements |
+| SDK distribution | npm + WASM, with Rust crates and native artifacts | Package names, public API, release platform matrix |
+| Versioning | Core SDK packages released together early on, the symbol library versioned on its own | Compatibility window, breaking changes and migration strategy |
 
-原生 Rust 前端是可选后续路线，不要求初期维护两套前端。Skia、tiny-skia、Qt、egui 等不作为本方案的必选依赖；若 Web 前端不满足实测目标，再围绕具体差距选型。
+A native Rust frontend is an optional later route; two frontends need not be maintained at first. Skia, tiny-skia, Qt, egui and the like are not required dependencies of this proposal; if the web frontend misses measured targets, a choice will be made around the specific gap.
 
-## 2. 总体架构：RNL 到精确 RNL
+## 2. Overall architecture: RNL to exact RNL
 
-solver 的职责是解释呈现意图，为一个层次定下尚未确定的全部位置、姿态和走线，并把结果写成该层次的一条求解器记录（`type="generated"`，第 3.3 节）。viewer 的职责是解释可直接呈现的描述、生成基本图元并提供交互，不做布局决策。两者之间的正式语义契约仍然是 RNL：求解器交给 viewer 的结果只能含 RNL 能精确表达的内容（草案 0.3 的 14.8）。
+The solver interprets the intent of the presentation, settles every position, orientation and route not yet determined for one level, and writes the result as one record of the solver for that level (`type="generated"`, section 3.3). The viewer interprets descriptions that can be presented directly, produces basic primitives and provides interaction; it makes no layout decisions. The formal semantic contract between the two is still RNL: the results the solver hands to the viewer may contain only what RNL can express exactly (14.8 of draft 0.3).
 
 ```mermaid
 flowchart TD
-    A[宿主网表、RNL 与符号库] --> B[宿主适配器 + Runtime：解析与引用解析]
-    B --> C[语句文档与生效模型]
-    C --> R[统一渲染器：基本图元]
-    R --> D[Viewer / Editor 显示与交互]
-    R --> X[CLI 导出 SVG / PDF]
-    C -->|一个层次的求解问题，不含求解器记录| E[Solver：独立执行上下文]
-    E -->|求解器记录：type=generated，带 hash| C
-    D -->|追加的用户语句| B
-    C --> F[Runtime：保留来源的序列化]
-    F --> G[宿主网表与 RNL 文件]
+    A[Host netlist, RNL and symbol libraries] --> B[Host adapter + runtime: parsing and reference resolution]
+    B --> C[Statement document and effective model]
+    C --> R[Unified renderer: basic primitives]
+    R --> D[Viewer / editor display and interaction]
+    R --> X[CLI export of SVG / PDF]
+    C -->|The solving problem of one level, without the records of the solver| E[Solver: separate execution context]
+    E -->|Record of the solver: type=generated, with a hash| C
+    D -->|User statements appended| B
+    C --> F[Runtime: serialization that keeps the source]
+    F --> G[Host netlist and RNL files]
 ```
 
-这允许三种独立使用方式：
+This allows three independent ways of use:
 
-- 无 solver 的 viewer 打开已有完整精确描述的文件。
-- CLI 或后台任务将语义 RNL 求解为精确 RNL，交给任意兼容 viewer。
-- editor 与 solver 联动，用户编辑与后台优化共享版本化文档状态。
+- A viewer without a solver opens a file that already has a complete, exact description.
+- The CLI or a background task solves semantic RNL into exact RNL and hands it to any compatible viewer.
+- The editor works with the solver, user edits and background optimization sharing a versioned document state.
 
-## 3. RNL 作为数据契约
+## 3. RNL as the data contract
 
-### 3.1 电气事实与显示描述
+### 3.1 Electrical facts and display descriptions
 
-宿主网表继续定义器件、参数、端子顺序、子电路接口和电气连接。RNL 引用、解释和呈现这些事实。solver 的布局输出不能增加或修改电气事实；线条接触、交叉或端点重合不能建立新的电气连接。
+The host netlist still defines devices, parameters, terminal order, subcircuit interfaces and electrical connections. RNL refers to these facts, interprets them and presents them. The solver's layout output cannot add or change electrical facts; lines touching, crossing or sharing end points cannot create new electrical connections.
 
-内存模型应保留宿主电路的只读投影及引用。viewer 可以据此搜索器件、追踪网络和进入层次；不应为了显示而维护另一套相互竞争的电气权威。
+The in-memory model should keep a read-only projection of the host circuit, with references to it. The viewer can use it to search devices, trace nets and enter levels; it should not keep a second, competing electrical authority for the sake of display.
 
-未来 editor 若支持改网表，需要显式的宿主编辑与写回操作。修改 RNL 呈现描述不隐式修改电气结构。
+If a future editor supports changing the netlist, that needs explicit host edit and write-back operations. Changing RNL's presentation descriptions does not implicitly change the electrical structure.
 
-### 3.2 可直接渲染的能力约定
+### 3.2 A convention for what can be rendered directly
 
-建议定义同一语言中的可直接渲染能力约定，暂称 `render-ready profile`，不是另一种文件格式。具体内容尚待规范化，候选条件包括：
+A convention within the same language for what can be rendered directly is proposed, called `render-ready profile` for now; it is not another file format. Its content is still to be specified; candidate conditions include:
 
-- 当前显示范围使用的 symbol 和必要资源能够解析。
-- 必要的对象位置、姿态和尺寸已经确定。
-- 需要显示的路径、标签和标注具有足够的几何信息。
-- 层次、引用与作用域足以确定生效描述。
-- 必要的几何决策不再依赖约束求解。
+- The symbols and necessary resources used in the current display range can be resolved.
+- The necessary positions, orientations and sizes of objects are settled.
+- The paths, labels and annotations to be shown have enough geometric information.
+- The levels, references and scopes are enough to determine the effective descriptions.
+- The necessary geometric decisions no longer depend on constraint solving.
 
-判定可以按当前 cell 或显示范围进行，不要求展开整棵实例树。文件中保留高层语义不影响直接呈现；是否调用 solver 取决于几何是否缺失、是否失效或用户是否请求优化。
+The judgement can be made for the current cell or display range, without expanding the whole instance tree. Keeping high-level semantics in a file does not prevent direct presentation; whether to call the solver depends on whether geometry is missing or out of date, or the user asks for optimization.
 
-部分精确的文件不由 viewer 自行补布局。草案 0.3 起求解器必须写回它的全部决定（第 3.3 节），求解后的文件不装求解器也能照样画出。尚未求解或结果已过期的部分，viewer 照常画出已确定的内容：
-- 有位置未定的点的导线，画出位置已定的各段，中间连飞线；
-- 位置未定的文字，放在所附对象旁边；
-- `"auto"` 导线按工具包的缺省规则画（13.1）；
-- 没有位置的对象列为未画出，并给出"需要求解"的状态。
+The viewer does not fill in the layout of a partly exact file itself. From draft 0.3 the solver must write back all its decisions (section 3.3), so a solved file can be drawn the same without the solver installed. For parts not yet solved, or whose results are out of date, the viewer draws what is settled as usual:
+- a wire with points whose positions are not settled: the settled segments are drawn, joined by flylines;
+- a text whose position is not settled: placed beside the object it is attached to;
+- an `"auto"` wire: drawn by the toolkit's default rule (13.1);
+- an object without a position: listed as not drawn, with the state "needs solving".
 
-走线模式的展开，例如只给锚点的直角连线如何生成拐点，是 runtime 中的纯函数规则，solver、CLI 和 editor 共用同一实现。
+Expanding a wiring mode, for example generating the bends of a right-angle connection given only its anchors, is a pure-function rule in the runtime, shared by the solver, the CLI and the editor.
 
-Document 可以按需给出每个层次的求解状态，供前端决定何时调用求解器（决定 0008）：
-- 无需求解；
-- 未求解；
-- 已求解：求解器记录的 hash 与当前输入相符；
-- 已过期。
+The Document can give the solving state of each level on request, for the frontend to decide when to call the solver (decision 0008):
+- no solving needed;
+- not solved;
+- solved: the hash of the record of the solver matches the current input;
+- out of date.
 
-在 CLI 中用 `rnl view --status` 取得。
+In the CLI it is obtained with `rnl view --status`.
 
-没有 solver 时，viewer 对不能直接呈现的部分提供明确状态和可用的文档信息，不能假装完成求解。
+Without a solver, the viewer gives a clear state and the document information available for the parts it cannot present directly; it cannot pretend that solving is done.
 
-"精确"指必要几何已确定，不承诺不同平台像素一致；字体由 viewer 环境决定，见第 7 章。
+"Exact" means that the necessary geometry is settled; it does not promise the same pixels on every platform. Fonts are decided by the viewer's environment; see chapter 7.
 
-### 3.3 solver 输出、覆盖与标记
+### 3.3 The solver's output, overriding and marks
 
-本节原是审阅讨论定下的模型。标准 0.2 已经定下求解器输出的写法（2.8、8.5、14.8、第 17 章），以下以标准为准，草案 0.3 的改动注明出处。
+This section was originally the model set by the review discussion. Standard 0.2 has since settled how the solver's output is written (2.8, 8.5, 14.8, chapter 17); what follows follows the standard, with the changes of draft 0.3 noted.
 
-- **一条求解器记录。** 求解器把一个层次的结果写成一条记录：`@RNL(type="generated", priority="high", author="…", hash="…") {…}`。
-  - 位置：该层次自己文本的末尾。子电路写在它的 `.subckt … .ends` 之内，即使它在被 include 的文件里；顶层写在主文件的文件层。
-  - 求解器的输出不用 `scope`（2.6）。
-  - 下一次求解时，这条记录整段替换（第 17 章）。
-- **求解时不把求解器记录算进解释。**
-  - 旧结果不约束下一次求解，求解的输入是设计者的语句和编辑器的记录。
-  - 0.2 写的是求解时不读这些记录。草案 0.3 放宽为"不算进解释，怎样另用由求解器定"：求解器可以拿旧结果当初值，或在同样好的解之间按它选择，即热启动。
-- **写回全部决定（草案 0.3 的 14.8）。** 求解器定下的每个位置、姿态和走线都写进它的记录：
-  - 有名字或键的对象，按名字写；
-  - 没有名字的对象，按编号写，如 `%#3`，记录头带 `numbering` 校验值（5.9）；
-  - `"auto"` 导线的走线，用 WIRE 改写这条导线（13.1）；
-  - 规则生成的对象，写成显式语句（10.5）。
+- **One record of the solver.** The solver writes the result for one level as one record: `@RNL(type="generated", priority="high", author="…", hash="…") {…}`.
+  - Where: at the end of the level's own text. For a subcircuit, within its `.subckt … .ends`, even in an included file; for the top level, at the file level of the main file.
+  - The solver's output does not use `scope` (2.6).
+  - At the next solving, this record is replaced as a whole (chapter 17).
+- **The records of the solver are not counted in the interpretation when solving.**
+  - An old result does not constrain the next solving; the input of solving is the designer's statements and the editor's records.
+  - 0.2 says that these records are not read when solving. Draft 0.3 relaxes this to "not counted in the interpretation, and how else they are used is up to the solver": the solver may take the old result as the initial value, or choose by it between equally good solutions, that is, warm start.
+- **Write back all decisions (14.8 of draft 0.3).** Every position, orientation and route the solver settles is written into its record:
+  - an object with a name or a key, by its name;
+  - an object without a name, by number, such as `%#3`, with a `numbering` check value in the record header (5.9);
+  - the route of an `"auto"` wire, by rewriting the wire with WIRE (13.1);
+  - an object generated by a rule, as an explicit statement (10.5).
 
-  没写回的决定不算结果，对象仍是自由的，所以不装求解器的 viewer 照记录画出的就是求解器的图。0.2 里，没有名字的对象和 `"auto"` 导线的走线写不回；工具包把这类决定逐条列为"没解出"，不悄悄丢掉。
-- **接口与 RNL 等价（草案 0.3 的 14.8）。** 求解器以任何形式交给别的工具的结果，例如交给 viewer 的消息，只能含求解器记录装得下的内容，任何一份结果都能存成一条这样的记录。所以 viewer 应用结果时，走"写进工作区、再照常读入"这同一条路（决定 0008）。
-- **冲突取舍（8.5）。**
-  - 几何事实先按优先级排，同优先级的后写的在前，然后逐条纳入，无解的就丢弃。结果是按这个次序字典序最大的相容子集。
-  - "有解"在实数上判定：存在实数坐标，并为每个自由的姿态取一个值，使全部事实在容差内成立；整数格点只是求解器的目标（草案 0.3 的 8.5、11.7）。
-  - 求解器必须这样保留事实，实现自己的考虑（如不重叠、网格、美观）排在所有事实之后。草案 0.3 补了一条说明：8.5 规定保留哪些事实，不规定怎样求出。
-  - **丢弃时的提示**（草案 0.3 的 8.5、7.6）：
-    - 列出全部最小冲突组，每条事实按写它的语句指出；最小冲突组是与被丢弃的事实一起无解、且少了任何一条就有解的一组已纳入的事实；
-    - 冲突组里的每条语句，也得到提示，说明哪些事实因它而丢弃；
-    - 时间上限内没有找全的，提示里说明列表不全；
-    - low 的事实被丢弃是预期的，可以不给这些提示。
-  - **判定的时间上限**（草案 0.3 的 8.5、7.6）：
-    - 判定可能很慢，所以实现可以限制判定的时间。上限是用户可以设定的求解器选项，标准不规定值，工具包默认 5 秒。
-    - 某条事实在上限内没判定完，就丢弃它，并给警告说明没有判定。
-    - 不设上限、或没有判定碰到上限时，结果就是上面定义的那个；碰到上限时，结果允许与它不同，每次运行也可能不同。
-- **hash 只给提示（第 17 章）。**
-  - hash 按该层次继承后的实际输入计算：流下来生效的规则、选定的符号、包的版本和求解器选项，不含求解器记录和元数据。
-  - 算法归工具，值带算法标签。工具包的 `sig1` 分两段，`sig1:<输入>.<选项>`；viewer 不知道当初的求解器选项，只比输入段。
-  - 对不上时，旧结果照常生效，viewer 提示重新求解。
-  - 草案 0.3 另有 `numbering` 校验值，由标准定义，只回答"编号还指得对吗"：对不上时，用到编号的语句不生效，那些对象回到待求解，其余照常。
-- **用户的修改（14.8、第 17 章）。**
-  - 用户不手改求解器的记录。
-  - editor 把拖动写成自己的记录（`author` 是 editor）里 `priority="high"` 的位置，追加在求解器记录之后；以后每次求解，它都是固定位置。
-  - 要改设计者写的约束，就直接改设计者的记录。
+  A decision not written back is not a result, and the object is still free, so a viewer without the solver that draws from the record draws the solver's drawing. In 0.2, objects without names and the routes of `"auto"` wires cannot be written back; the toolkit lists each such decision as "not solved" rather than dropping it silently.
+- **Interfaces are equivalent to RNL (14.8 of draft 0.3).** A result the solver hands to another tool in any form, such as a message to the viewer, may contain only what a record of the solver can hold, and any such result can be stored as such a record. So when the viewer applies a result, it takes the same path, "write it into the workspace, then read it as usual" (decision 0008).
+- **Resolving conflicts (8.5).**
+  - Geometric facts are first ordered by priority, and at the same priority the one written later comes first; they are then taken in one by one, and one without a solution is discarded. The result is the consistent subset that is lexicographically greatest in this order.
+  - "Has a solution" is decided over the reals: there are real coordinates, and a value for each free orientation, that make all the facts hold within the tolerance; integer grid points are only the solver's goal (8.5 and 11.7 of draft 0.3).
+  - The solver must keep facts this way, and the implementation's own concerns (such as no overlap, the grid, looks) come after all the facts. Draft 0.3 adds a note: 8.5 specifies which facts are kept, not how they are found.
+  - **Hints on discarding** (8.5 and 7.6 of draft 0.3):
+    - every minimal conflict set is listed, each fact by the statement that wrote it; a minimal conflict set is a set of facts taken in that has no solution together with the discarded fact, and has one with any one of them left out;
+    - each statement in a conflict set gets a hint as well, saying which facts were discarded because of it;
+    - when they are not all found within the time limit, the hint says that the list is not complete;
+    - a `low` fact being discarded is expected, and these hints may be left out.
+  - **The time limit of the decision** (8.5 and 7.6 of draft 0.3):
+    - the decision can be slow, so an implementation may limit its time. The limit is a solver option the user can set; the standard sets no value, and the toolkit's default is 5 seconds.
+    - A fact whose decision is not finished within the limit is discarded, with a warning that it was not decided.
+    - With no limit, or when no decision reaches the limit, the result is the one defined above; when the limit is reached, the result may differ from it, and from run to run.
+- **The hash only gives a hint (chapter 17).**
+  - The hash is computed from the level's actual input after inheritance: the rules that flow down and take effect, the symbols chosen, the versions of the packages and the solver options, not the records of the solver or metadata.
+  - The algorithm belongs to the tool, and the value carries an algorithm label. The toolkit's `sig1` has two parts, `sig1:<input>.<options>`; the viewer does not know the solver options used then and compares only the input part.
+  - When it does not match, the old result takes effect as usual, and the viewer suggests solving again.
+  - Draft 0.3 also has the `numbering` check value, defined by the standard, which only answers "do the numbers still point right": when it does not match, the statements that use numbers take no effect, those objects go back to waiting to be solved, and the rest are as usual.
+- **The user's changes (14.8, chapter 17).**
+  - The user does not edit the solver's record by hand.
+  - The editor writes a drag as a position with `priority="high"` in its own record (`author` is the editor), appended after the record of the solver; in every later solving it is a fixed position.
+  - To change a constraint the designer wrote, change the designer's record directly.
 
-高层语义和精确描述可以同时存在：求解器记录给出的坐标与对称等语义并存；下一次求解时求解器记录不参与解释，对称语义仍是求解的输入。后写描述是否覆盖前写描述，仍遵循对应操作、对象和作用域的语言规则（8.4、8.5）。完整的例子见标准第 17 章。
+High-level semantics and exact descriptions can exist together: the coordinates the record of the solver gives sit alongside semantics such as symmetry; at the next solving the record of the solver takes no part in the interpretation, and the symmetry semantics are still an input to solving. Whether a later description overrides an earlier one still follows the language's rules for the operation, object and scope concerned (8.4, 8.5). A complete example is in chapter 17 of the standard.
 
-### 3.4 四层表示
+### 3.4 Four layers of representation
 
-| 表示层 | 保留的信息 | 用途 |
+| Layer | Information kept | Use |
 | --- | --- | --- |
-| 源文本与语法表示 | 文件来源、范围、普通注释、未知记录、编码和换行信息 | 诊断、精确编辑和保留式写回 |
-| 语句文档 | 按层次有序的 RNL 语句、记录头（`type`、`author`、`hash`，草案 0.3 的 `numbering`）、来源关系 | 编辑、追加、写回、hash 计算、整段替换求解器记录 |
-| 生效模型 | 按层次应用覆盖与继承后的宿主电路投影、层次、symbol、对象槽位（有值或 free）、语义约束 | 统一渲染器的输入；不含求解器记录读出时，从中导出 solver 的求解问题 |
-| 基本图元与缓存 | 线条、填充、文字等图元及其对象身份、包围盒、空间索引、可选 GPU 数据 | viewer 显示与命中、CLI 导出 |
+| Source text and syntax | The file of origin, ranges, ordinary comments, unknown records, encoding and line endings | Diagnostics, exact editing and write-back that keeps the text |
+| Statement document | RNL statements ordered by level, record headers (`type`, `author`, `hash`, and `numbering` in draft 0.3), relations of origin | Editing, appending, write-back, computing hashes, replacing the record of the solver as a whole |
+| Effective model | The host circuit's projection after overrides and inheritance by level, levels, symbols, object slots (with a value or free), semantic constraints | Input of the unified renderer; read without the records of the solver, the solver's solving problem is derived from it |
+| Basic primitives and caches | Primitives such as lines, fills and texts, with their object identities, bounding boxes, spatial index, optional GPU data | Display and hit testing in the viewer, export from the CLI |
 
-语句文档与生效模型都是 runtime 的内存表示，后者由前者推导。solver 消费求解问题（`LevelProblem`，第 4.2 节），即不含求解器记录读出的生效模型中求解器要用的部分；它给出的解由 runtime 写成求解器记录，替换回语句文档。文档模型是 RNL 的实现表示，不建立第二套独立电路语言。
+The statement document and the effective model are both in-memory representations of the runtime, the latter derived from the former. The solver consumes the solving problem (`LevelProblem`, section 4.2), that is, the part of the effective model, read without the records of the solver, that the solver needs; the solution it gives is written by the runtime as a record of the solver, replaced back into the statement document. The document model is an implementation representation of RNL and does not set up a second, independent circuit language.
 
-对于支持的内容，直接接收内存更新，与将更新写成 RNL 后重新读取，应得到等价文档语义。内部 ID、缓存和会话修订号不必成为文件格式的一部分，但不能丢失影响语义的对象身份或来源。草案 0.3 的编号 `%#n` 不是内部 ID：它只给不能经名字找到的对象，完全由文本决定。runtime 内部另有不随文本挪动的身份，并记下每个对象在文件里的引用（名字，或编号）。
+For the content supported, receiving an update directly in memory and writing the update as RNL and reading it again should give equivalent document semantics. Internal IDs, caches and session revision numbers need not be part of the file format, but object identities or origins that affect semantics must not be lost. The numbers `%#n` of draft 0.3 are not internal IDs: they are given only to objects that cannot be reached by name, and are determined entirely by the text. The runtime has internal identities of its own that do not move with the text, and records each object's reference in the file (a name, or a number).
 
-## 4. 模块职责与依赖
+## 4. Module responsibilities and dependencies
 
-### 4.1 Runtime 与宿主适配器
+### 4.1 Runtime and host adapters
 
-runtime 是支持库，不是独立进程或服务：viewer 以 WASM 形式在进程内链接它，CLI 和 solver 链接原生版本。同一 runtime 版本按文件声明的语言版本分派解释，而不是在一个应用里并载多个 runtime 构建；应用固定一个 runtime 发布版本。
+The runtime is a support library, not a separate process or service: the viewer links it in-process as WASM, and the CLI and the solver link the native build. One runtime version dispatches interpretation by the language version a file declares, rather than loading several runtime builds side by side in one application; an application fixes one runtime release.
 
-runtime 实现 RNL 词法与语法解析、作用域和引用解析、覆盖规则、symbol 定义解释、走线风格展开等纯函数规则、诊断、文档事务及序列化。解析和求解属于独立模块；语法调整不应直接侵入搜索算法。
+The runtime implements RNL's lexing and parsing, scope and reference resolution, override rules, interpretation of symbol definitions, pure-function rules such as expanding wiring styles, diagnostics, document transactions and serialization. Parsing and solving are separate modules; syntax changes should not reach into the search algorithms directly.
 
-宿主适配器是独立的一层，每种方言一个包。它负责识别合法注释与安全位置、解析器件、端子、网、子电路接口和层次、按宿主的 include 展开顺序提供记录，并负责该方言的保真写回。适配器向 runtime 核心提供统一的宿主电路模型接口，核心不依赖任何具体方言。元件端子名和端子顺序是宿主语言知识，由适配器提供；语法稿明确端子名不能靠器件类型惯例猜测。
+The host adapters are a layer of their own, one package per dialect. An adapter recognizes valid comments and safe positions, parses devices, terminals, nets, subcircuit interfaces and levels, provides the records in the order the host expands includes, and is responsible for that dialect's faithful write-back. Adapters give the runtime core a unified interface to the host circuit model, and the core depends on no particular dialect. Terminal names and terminal order are knowledge of the host language, provided by the adapter; the syntax draft says explicitly that terminal names cannot be guessed from the conventions of device types.
 
-首版同时支持 SPICE 与 Spectre 两种方言的结构子集：实例、网、子电路定义与接口、include、模型身份；不做表达式求值，不解释仿真控制语句。两种方言同时进入首版，是为了让宿主电路模型接口从一开始就方言中立，并建立跨方言等价测试：同一电路分别写成两种方言，附同一份 RNL，生效模型必须相同。
+The first version supports structural subsets of both the SPICE and Spectre dialects: instances, nets, subcircuit definitions and interfaces, includes, model identity; it does not evaluate expressions or interpret simulation control statements. Both dialects go into the first version so that the interface to the host circuit model is dialect-neutral from the start, and so that cross-dialect equivalence tests exist: the same circuit written in the two dialects, with the same RNL, must give the same effective model.
 
-宿主通过接口提供文件、include 和资源内容，runtime 不直接绑定桌面路径、网络下载、DOM 或窗口系统。TypeScript 前端通过 runtime 获得语句文档与生效模型，不维护另一套覆盖、作用域和引用解析规则。
+The host provides the contents of files, includes and resources through an interface; the runtime does not bind directly to desktop paths, network downloads, the DOM or the window system. The TypeScript frontend gets the statement document and the effective model through the runtime, and does not keep a second set of rules for overriding, scope and reference resolution.
 
 ### 4.2 Solver
 
-solver 接收一个层次的求解问题和求解器选项，维护搜索状态，给出该层次的解，由 runtime 写成求解器记录。它不输出 DOM、SVG 元素、三角形或像素，也不引用 viewer 内部类型。
+The solver receives the solving problem of one level and the solver options, keeps the search state and gives the level's solution, which the runtime writes as a record of the solver. It outputs no DOM, SVG elements, triangles or pixels, and refers to no internal types of the viewer.
 
-**输入与输出。** 这部分已在 runtime 中实现（rnl#16，见 [rnl-runtime](../crates/rnl-runtime/README.md#for-a-solver)）。
+**Input and output.** This part is implemented in the runtime (rnl#16; see [rnl-runtime](../crates/rnl-runtime/README.md#for-a-solver)).
 
-- **输入。** solver 用 `Options::solver()` 读入文档，即各层次不带求解器记录地解释。每个绘图层次得到一个求解问题 `LevelProblem`（`problem` 模块，`rnl problem` 可以打印），包括：
-  - 要定位的对象：每轴一个槽位（自由，或由哪条事实固定），姿态（自由或固定），写回用的引用（名字，规则生成的用例及路径；草案 0.3 下，没有名字的对象有编号）；
-  - symbol：外框、引脚的位置、出线方向和端子；
-  - 几何事实：已按 8.5 的次序排好，下标就是名次；成员都是点，即原点、引脚、集合中心或集合范围；
-  - 已写的导线、要布线的网络（ROUTE）、GROUP；
-  - 每个用例：定义名与角色；语义用例可以作为求解器的提示；
-  - 文件声明的语言版本。
-- **输出。** solver 给出 `Solution`（`solution` 模块）：位置与姿态、为 ROUTE 布出的导线与分叉、已有 `"auto"` 导线的走线。
-  - runtime 把它写成求解器记录（`write_record`；草案 0.3 下，由 `finish_record` 补上 `numbering`），写不进记录的决定逐条列出原因。
-  - `Solution` 的设计保证任何一份都能存成一条记录（第 3.3 节）。
-- **两项辅助。**
-  - `previous` 把该层次现有的求解器记录对应到这次的求解问题上，供热启动用。
-  - Document 可以按需给出每个层次的求解状态（第 3.2 节）。
+- **Input.** The solver reads the document with `Options::solver()`, that is, each level interpreted without the records of the solver. Each drawn level gives a solving problem `LevelProblem` (the `problem` module; `rnl problem` can print it), which includes:
+  - the objects to place: one slot per axis (free, or fixed by which fact), the orientation (free or fixed), the reference used to write back (a name, or a usage generated by a rule with its path; under draft 0.3, objects without names have numbers);
+  - symbols: the box, the positions of the pins, their directions and terminals;
+  - geometric facts: already ordered by 8.5, the index being the rank; their members are all points, that is, origins, pins, the centres of sets or the extents of sets;
+  - the wires already written, the nets to route (ROUTE), GROUP;
+  - each usage: the definition's name and the roles; semantic usages can serve the solver as hints;
+  - the language version the file declares.
+- **Output.** The solver gives a `Solution` (the `solution` module): positions and orientations, the wires and branches routed for ROUTE, and the routes of existing `"auto"` wires.
+  - The runtime writes it as a record of the solver (`write_record`; under draft 0.3, `finish_record` adds `numbering`), and lists, one by one, the decisions that cannot go into the record, with the reasons.
+  - `Solution` is designed so that any one of them can be stored as a record (section 3.3).
+- **Two aids.**
+  - `previous` maps the level's existing record of the solver onto this solving problem, for warm start.
+  - The Document can give the solving state of each level on request (section 3.2).
 
-**层次。** 一个子电路定义一张图（6.1），一次任务只求解一个层次。求解时，该层次生效的全部描述都参与，包括上层用 `scope` 写进来的语句；结果写进该层次自己的文本（第 3.3 节）。求解范围可以配置为整个文件逐层求解、只求顶层或任一子电路。子电路被单独取出到其他环境的问题由导出工具处理，RNL 文件不应被直接拆开使用。
+**Levels.** One subcircuit definition is one drawing (6.1), and one task solves only one level. When solving, every description in effect at the level takes part, including statements written into it from above with `scope`; the result is written into the level's own text (section 3.3). The range of solving can be configured as the whole file level by level, only the top level, or any subcircuit. Taking a subcircuit out on its own into another environment is a matter for export tools; RNL files should not be taken apart and used directly.
 
-**算法（设计，正在实现）。** 结构优先，冲突裁决独立：
+**Algorithm (designed, being implemented).** Structure first, with the resolution of conflicts separate:
 
-1. **8.5 的裁决器是一个独立部件，只看语言事实。**
-   - 姿态：带 D4 群标签的并查集，把相关的姿态合并成姿态类。
-   - 坐标：每轴一个增量的有理数单纯形，带上下界、带解释、可撤销。
-   - 离散选择：在单纯形之上回溯搜索。离散选择来自只给轴的 ORDER 和 DISTANCE、集合范围的上界、三个以上成员的集合中心，以及影响引脚位置的自由姿态。
-   - 丢弃一条事实时，按草案 0.3 的 8.5 给出全部最小冲突组（第 3.3 节）。
-   - 一般情形下判定是 NP-hard，所以判定有时间上限，由用户设定，工具包默认 5 秒。没判定完的事实丢弃，并给警告（第 3.3 节）。
-2. **候选搜索。**
-   - 先求问题的结构：分组树、裁决后仍待定的选择、连接关系。
-   - 再按可配置的分层目标生成候选。一个候选是一组离散决定：姿态、行与行内次序、每组的排法、析取取哪一侧等；沿分组树自底向上做束搜索。
-   - 候选带来的结构关系排在所有语言事实之后，也经裁决器检查，不相容的就不加，所以用户的事实不会因为它们被丢弃。
-3. **坐标。** 每个候选每轴解一串字典序 LP，用同一个单纯形，层序可配置。只有差分约束时，最优顶点是整数；等距一类的约束可能给出小数，标准允许。
-4. **布线与评分。** 在放好的元件之间为 ROUTE 网络直角布线；然后按分层目标评分，层与层之间按字典序，层内加权，选出最好的候选。
+1. **The arbiter of 8.5 is a separate component that looks only at the language's facts.**
+   - Orientations: a union-find with D4 group labels, merging related orientations into orientation classes.
+   - Coordinates: one incremental rational simplex per axis, with bounds, with explanations, and able to undo.
+   - Discrete choices: backtracking search over the simplex. Discrete choices come from ORDER and DISTANCE given only an axis, upper bounds of set extents, centres of sets with three or more members, and free orientations that affect the positions of pins.
+   - When a fact is discarded, every minimal conflict set is given, as 8.5 of draft 0.3 asks (section 3.3).
+   - In general the decision is NP-hard, so it has a time limit, set by the user, 5 seconds by default in the toolkit. A fact not decided within it is discarded with a warning (section 3.3).
+2. **Candidate search.**
+   - First the structure of the problem is found: the group tree, the choices still open after arbitration, the connections.
+   - Then candidates are generated by configurable layered goals. A candidate is a set of discrete decisions: orientations, rows and the order within a row, the arrangement of each group, which side of a disjunction is taken, and so on; a beam search runs bottom-up along the group tree.
+   - The structural relations a candidate brings come after all the language's facts and are also checked by the arbiter; incompatible ones are not added, so the user's facts are never discarded because of them.
+3. **Coordinates.** For each candidate, each axis solves a series of lexicographic LPs with the same simplex, in a configurable order of layers. With only difference constraints the optimal vertex is integral; constraints such as equal spacing may give fractions, which the standard allows.
+4. **Routing and scoring.** ROUTE nets are routed at right angles between the placed components; then candidates are scored by the layered goals, lexicographically between layers and weighted within a layer, and the best is chosen.
 
-**坐标与容差。**
-- "有解"在实数上判定，整数格点只是目标（8.5）。网格是求解器自己的考虑，排在语言描述之后，事实迫使的小数照写。
-- 判定和检查约束时，差在容差之内就算成立；容差是用户可以设定的求解器选项，标准不规定值（草案 0.3 的 11.7）。
-- 求解器内部用有理数，写回能读回同一个值的十进制。1/3 这类写不成有限小数的值，写足够多位，使记录读回时它满足的事实仍在容差内成立。
+**Coordinates and tolerance.**
+- "Has a solution" is decided over the reals, and integer grid points are only a goal (8.5). The grid is the solver's own concern, coming after the language's descriptions, and fractions the facts force are written as they are.
+- In deciding and checking constraints, a difference within the tolerance counts as holding; the tolerance is a solver option the user can set, and the standard sets no value (11.7 of draft 0.3).
+- The solver uses rationals internally and writes back decimals that read back as the same value. A value such as 1/3 that has no finite decimal is written with enough digits that, when the record is read back, the facts it satisfies still hold within the tolerance.
 
-**确定性是设计要求。**
-- 判定不用浮点比较。
-- 判定的上限是时间，由用户设定（第 3.3 节）；候选搜索和布线的预算按工作量计，例如候选数和布线展开数，不按时间。
-- 只要没有判定碰到时间上限，同一 solver 版本的 native 与 WASM 构建，在相同输入、相同选项下输出逐字节相同。碰到上限时，结果允许不同，每次运行也可能不同（8.5）。
-- 求解器选项（目标的层序与权重、容差、判定的时间上限、搜索预算）是求解输入的一部分，计入 hash 的选项段；选项写进文件是标准附录 C 的保留项。
+**Determinism is a design requirement.**
+- The decision uses no floating-point comparisons.
+- The limit of the decision is time, set by the user (section 3.3); the budgets of candidate search and routing are counted in work, such as the number of candidates and routing expansions, not in time.
+- As long as no decision reaches the time limit, native and WASM builds of the same solver version give byte-identical output for the same input and options. When the limit is reached, the results may differ, and from run to run (8.5).
+- The solver options (the order and weights of the goals, the tolerance, the time limit of the decision, the search budgets) are part of the input of solving and count in the options part of the hash; writing options into the file is a reserved item of Annex C of the standard.
 
-**热启动。** 草案 0.3 只规定求解时不把求解器记录算进解释，怎样另用由求解器定。`previous` 给出旧结果的位置、姿态和走线，供求解器当初值、在平局时作为偏好，使小改动后图不大跳。第一次求解没有旧结果，也要给出好图。
+**Warm start.** Draft 0.3 specifies only that the records of the solver are not counted in the interpretation when solving, and how else they are used is up to the solver. `previous` gives the positions, orientations and routes of the old result, for the solver to use as initial values and as a preference in ties, so that the drawing does not jump much after a small change. The first solving has no old result and must still give a good drawing.
 
-**依赖政策。** WASM 目标不能直接链接 C++ 库，SMT、MIP 求解器的 WASM 版本体积和初始化时间也不适合。所以 solver 的全部依赖必须是纯 Rust、能编译到 WASM，例如用 `num-rational` 表示有理数；不引入 SMT、LP 库或 C 绑定。
+**Dependency policy.** A WASM target cannot link C++ libraries directly, and the WASM versions of SMT and MIP solvers do not suit in size and start-up time. So every dependency of the solver must be pure Rust and compile to WASM, for example `num-rational` for rationals; no SMT or LP library or C binding is brought in.
 
-输出保留稳定对象引用、层次和必要的网络关联。symbol 定义、端子位置和姿态变换由文档提供，不能依赖硬编码器件资源。
+The output keeps stable object references, levels and the necessary net associations. Symbol definitions, terminal positions and orientation transforms are provided by the document and cannot depend on hard-coded device resources.
 
-### 4.3 统一渲染器、viewer 与 editor
+### 4.3 Unified renderer, viewer and editor
 
-渲染分两段。第一段是统一渲染器，位于共享的 Rust 核心：展开 symbol 实例与变换，把 RNL 的图形描述翻译成线条、填充、文字等基本图元，每个图元带对象身份和包围盒。第二段由各工具完成最终输出：viewer 画成 SVG，CLI 导出 SVG 或 PDF，golden 测试比较图元列表或输出文件。这样三处输出一致，命中测试直接使用图元包围盒，未来的 Rust 原生前端除最终绘制与 UI 外全部复用。
+Rendering has two stages. The first is the unified renderer, in the shared Rust core: it expands symbol instances and transforms, and translates RNL's graphic descriptions into basic primitives such as lines, fills and texts, each with an object identity and a bounding box. The second stage, the final output, is done by each tool: the viewer draws SVG, the CLI exports SVG or PDF, and golden tests compare primitive lists or output files. So the three outputs agree, hit testing uses the primitives' bounding boxes directly, and a future native Rust frontend reuses everything but the final drawing and the UI.
 
-viewer 实现缩放、平移、选择、命中、搜索、网络高亮和层次导航。runtime 与渲染器在同一进程同一线程内，这些查询都是同步调用，不跨 Worker 或 IPC。viewer 不做布局决策。
+The viewer implements zooming, panning, selection, hit testing, search, net highlighting and level navigation. The runtime and the renderer are in the same process and thread, so these queries are all synchronous calls, not across a Worker or IPC. The viewer makes no layout decisions.
 
-editor 在 viewer 之上提供编辑工具、事务和撤销重做，通过 runtime 验证并应用文档变化。
+The editor provides editing tools, transactions and undo/redo on top of the viewer, validating and applying document changes through the runtime.
 
-- **拖动。** 用户的手工调整写进 editor 自己的记录（`author` 是 editor）。拖动写成 `priority="high"` 的位置，追加在求解器记录之后，以后每次求解它都是固定位置（14.8、第 17 章）。
-- **拖动时的走线。** 拖动器件时，editor 内嵌的轻量 router 重画相关走线，不要求 solver 在线。router 的结果属于求解器结果，可以写成 editor 自己的 `type="generated"` 记录，下一次求解时与求解器的记录一样整段替换；是否这样做由 editor 决定。语言层不区分"临时摆放"和"锁定"。
-- **改导线的形状。** 草案 0.3 起，用户改一条导线的形状时，editor 在自己的记录里用 WIRE 改写这条导线（13.1）；求解器读到后不再改它。
-- **改规则生成的对象。** 要单独拖动规则生成的对象，例如补地 stub 里的地，editor 按 10.5 先在自己的记录里把它写成显式对象，再写拖动（草案 0.3 第 17 章的说明）。
+- **Dragging.** The user's manual adjustments are written into the editor's own record (`author` is the editor). A drag is written as a position with `priority="high"`, appended after the record of the solver, and in every later solving it is a fixed position (14.8, chapter 17).
+- **Wiring while dragging.** When a device is dragged, a lightweight router built into the editor redraws the wires concerned, without requiring the solver online. The router's result is a solver result and may be written as the editor's own `type="generated"` record, replaced as a whole at the next solving like the solver's record; whether to do so is up to the editor. The language does not distinguish "temporary placement" from "locked".
+- **Changing the shape of a wire.** From draft 0.3, when the user changes the shape of a wire, the editor rewrites the wire with WIRE in its own record (13.1); the solver, reading it, no longer changes it.
+- **Changing an object generated by a rule.** To drag an object generated by a rule on its own, such as the ground in a ground stub that a rule adds, the editor first writes it as an explicit object in its own record, as 10.5 says, and then writes the drag (the note in chapter 17 of draft 0.3).
 
-首版的编辑基础围绕呈现和约束。完整宿主网表编辑属于额外能力，需要独立确定支持边界。
+The editing basics of the first version centre on presentation and constraints. Full host netlist editing is an additional capability whose limits must be settled separately.
 
-### 4.4 依赖方向
+### 4.4 Direction of dependencies
 
 ```text
-宿主适配器 → runtime 核心接口
-solver     → runtime
-渲染器     → runtime（同属共享核心）
-viewer     → runtime + 渲染器，进程内链接
-editor     → viewer + runtime 的编辑接口 + 轻量 router
-应用       → 所需模块 + solver 传输适配器
+host adapters → runtime core interface
+solver        → runtime
+renderer      → runtime (both in the shared core)
+viewer        → runtime + renderer, linked in-process
+editor        → viewer + the runtime's editing interface + lightweight router
+application   → the modules it needs + a solver transport adapter
 ```
 
-runtime 不依赖 solver、viewer 或标准符号库；viewer 不强制依赖 solver。两者的连接由应用或独立适配器完成，安装 viewer 不应自动引入整个求解依赖。
+The runtime does not depend on the solver, the viewer or the standard symbol library; the viewer does not require the solver. The two are connected by the application or by a separate adapter, and installing the viewer should not pull in all the solving dependencies.
 
-### 4.5 支持语言快速演进的机制
+### 4.5 Mechanisms for a fast-changing language
 
-需求 12 由以下机制支撑，分发方式只解决"怎么发出去"。这些机制本轮记录，尚待实现验证：
+Requirement 12 is supported by the following mechanisms; distribution only solves "how to ship it". These mechanisms are recorded in this round and are still to be validated in implementation:
 
-1. 操作签名目录是数据文件，包含语法稿 9.1 节要求每个操作声明的全部信息；解析校验、文档表格、TS 类型和一致性测试骨架从它生成。新增或修改一个操作是改一个数据文件加一个语义处理器。
-2. 生效模型的 schema 只在 Rust 定义一次，TS 类型生成，不手写镜像。
-3. 一致性语料是"宿主文件加期望生效模型"的目录，带语言版本标签；native 和 WASM 两个 runtime 跑同一份。
-4. 提供迁移工具，把语料和样例从一个草案版本升到下一个，破坏性改动不让样例作废。
-5. solver 只依赖 runtime 的求解问题与解（`problem`、`solution` 模块），viewer 只依赖 Document，都不依赖语法层类型；不改变它们的语法改动，对两者不可见。
+1. The catalog of operation signatures is a data file, with all the information section 9.1 of the syntax draft asks each operation to declare; parsing checks, documentation tables, TS types and the skeletons of conformance tests are generated from it. Adding or changing an operation is one data file plus one semantic handler.
+2. The schema of the effective model is defined once, in Rust; the TS types are generated, not hand-written mirrors.
+3. The conformance corpus is a directory of "host files plus the expected effective model", labelled with language versions; the native and WASM runtimes run the same one.
+4. A migration tool moves the corpus and the samples from one draft version to the next, so that breaking changes do not make the samples obsolete.
+5. The solver depends only on the runtime's solving problem and solution (the `problem` and `solution` modules), and the viewer only on the Document; neither depends on syntax-layer types, so syntax changes that leave these unchanged are invisible to both.
 
-## 5. 增量求解与并发编辑
+## 5. Incremental solving and concurrent editing
 
-### 5.1 求解协议
+### 5.1 The solving protocol
 
-solver 的公开契约是一套消息协议，而不是进程内函数。按决定 0008，solver 的代码是共享核心的一部分，在哪里运行由前端决定：桌面和 CLI 在原生后台线程，Web 在 Worker 里以 WASM 运行。同一协议也可用于未来的远程求解服务。
+The solver's public contract is a message protocol, not in-process functions. By decision 0008 the solver's code is part of the shared core, and where it runs is up to the frontend: in a native background thread on the desktop and in the CLI, and as WASM in a Worker on the web. The same protocol can also serve a future remote solving service.
 
 ```text
 start(workspace, level, options)
-update*  → 该层次完整的求解器记录（RNL 文本）、状态、丢弃事实的提示
+update*  → the level's complete record of the solver (RNL text), state, hints on discarded facts
 done | cancelled | failed
 cancel()
 ```
 
-- **输入是工作区。** solver 带自己的 runtime 实例，收到的是工作区，即各文件的文本，自己读出求解问题，所以不必为生效模型定义交换格式。
-- **更新是完整快照。** 每次更新是该层次求解器记录的完整快照，幂等，不发送相对上一次的增量。前端把它写进工作区，替换该层次原来的求解器记录，再照常读入。UI 可以先显示初始结果，再接收更优结果；更新节奏与求解迭代频率解耦，优先消费最新结果，避免积压。
-- **没有"无解"的终止状态。** 在 8.5 下，事实冲突不是失败：冲突的事实被丢弃，总有结果，所以没有"无可行结果"。判定碰到时间上限的事实也是丢弃，以警告列出；搜索预算用尽时给出已有的最好结果，以 `done` 结束并说明。`failed` 只表示实现出错。
-- **单线程是完整功能的基线。** 按工作量切片推进是 solver 内部的原语，用于单线程回退；一次推进不重新创建整个求解问题。多线程只能并行计算预先定好的候选批次，按固定编号归并，不影响结果，也不是读取精确 RNL 的前提。
+- **The input is the workspace.** The solver has its own runtime instance and receives the workspace, that is, the texts of the files, and reads the solving problem itself, so no exchange format for the effective model needs defining.
+- **An update is a complete snapshot.** Each update is a complete snapshot of the level's record of the solver, idempotent; no deltas against the previous update are sent. The frontend writes it into the workspace, replacing the level's previous record of the solver, and reads it as usual. The UI can show an initial result first and then receive better ones; the pace of updates is decoupled from the frequency of solving iterations, and the latest result is consumed first to avoid a backlog.
+- **There is no "no solution" end state.** Under 8.5 a conflict of facts is not a failure: the conflicting facts are discarded and there is always a result, so there is no "no feasible result". A fact whose decision reaches the time limit is discarded too, listed in a warning; when the search budget is used up, the best result so far is given, ending with `done` and a note. `failed` means only that the implementation went wrong.
+- **A single thread is the baseline of full function.** Advancing in slices of work is a primitive inside the solver, used for the single-threaded fallback; an advance does not recreate the whole solving problem. Multiple threads may only compute fixed batches of candidates in parallel, merged by fixed numbers, without affecting the result; they are not a prerequisite for reading exact RNL.
 
-### 5.2 更新信封
+### 5.2 Update envelopes
 
-| 类型 | 内容 |
+| Kind | Content |
 | --- | --- |
-| 求解请求 | 任务身份、工作区（各文件的文本）、目标层次、求解器选项 |
-| 求解更新 | 任务身份、所依据输入的 hash、更新序号、目标层次、求解器记录的文本、状态、丢弃的事实（包括没判定完的）与它们的全部最小冲突组 |
-| 编辑事务 | 基础修订号、要写的操作（`rnl-edit` 的事务）、来源和事务身份 |
+| Solving request | Task identity, workspace (the texts of the files), target level, solver options |
+| Solving update | Task identity, the hash of the input it is based on, update sequence number, target level, the text of the record of the solver, state, the discarded facts (including those not decided) with all their minimal conflict sets |
+| Edit transaction | Base revision number, the operations to write (a transaction of `rnl-edit`), origin and transaction identity |
 
-初期采用结构化消息。出现明确传输瓶颈后再增加二进制编码或可转移缓冲区。JSON 只是可能的传输编码，不是第二种正式文档格式。
+Structured messages come first. Binary encodings or transferable buffers are added only after a clear transport bottleneck appears. JSON is only a possible transport encoding, not a second formal document format.
 
-### 5.3 失效与所有权
+### 5.3 Invalidation and ownership
 
-三类信息在文件中的表达：
-- 设计者的约束：设计者的记录；
-- solver 当前的结果：`type="generated"` 的求解器记录；
-- 用户在 editor 里的修改：editor 自己的记录，拖动是 `priority="high"` 的固定位置。
+How three kinds of information are expressed in the file:
+- the designer's constraints: the designer's records;
+- the solver's current result: the record of the solver with `type="generated"`;
+- the user's changes in the editor: the editor's own record, a drag being a fixed position with `priority="high"`.
 
-用户要固化某个值，就在自己的记录里写出来；不通过修改求解器记录来"接受"结果（第 17 章）。
+To fix a value, the user writes it in their own record; a result is not "accepted" by changing the record of the solver (chapter 17).
 
-旧任务的更新不能覆盖新编辑。更新带着它所依据的输入的 hash；与当前工作区的输入段不符时，前端丢弃这个更新，并取消或重启任务。缩放、选择和当前层次状态不属于求解输出，应在更新中保持。
+Updates from an old task cannot override new edits. An update carries the hash of the input it is based on; when it does not match the input part of the current workspace, the frontend discards the update and cancels or restarts the task. Zoom, selection and the current level are not solving output and should be kept across updates.
 
-用户在求解器记录之后追加语句后，hash 的输入段随之改变，viewer 把这个层次标为已过期，提示重新求解。下一次求解整段替换求解器记录，见第 3.3 节。
+When the user appends statements after the record of the solver, the input part of the hash changes with them, and the viewer marks the level as out of date and suggests solving again. The next solving replaces the record of the solver as a whole; see section 3.3.
 
-### 5.4 持久化与再次打开
+### 5.4 Saving and opening again
 
-后写覆盖只决定生效值。求解结果是否仍适合当前输入，由 hash 判断。hash 写在求解器记录的记录头里，随文件保存；认得它的算法标签的工具都能比较，不认得的不比较（第 17 章）。再次打开时：
-- hash 的输入段相符：已求解，直接画出，不必重新求解；
-- 不符：旧结果照常生效，标为已过期，提示重新求解；
-- 草案 0.3 的 `numbering` 不符：用到编号的语句不生效，那些对象回到待求解，其余照常。
+A later write overriding an earlier one decides only the effective value. Whether a solving result still suits the current input is judged by the hash. The hash is written in the header of the record of the solver and saved with the file; any tool that knows its algorithm label can compare it, and one that does not, does not compare (chapter 17). When the file is opened again:
+- the input part of the hash matches: solved, drawn directly, no need to solve again;
+- it does not match: the old result takes effect as usual, marked as out of date, with a suggestion to solve again;
+- draft 0.3's `numbering` does not match: the statements that use numbers take no effect, those objects go back to waiting to be solved, and the rest are as usual.
 
-旧结果永远不是下一次求解的约束（第 3.3 节）。
+An old result is never a constraint on the next solving (section 3.3).
 
-只改 RNL 时，应保留宿主正文和普通注释；未知内容的读取、诊断与保存遵循支持的语言版本策略。不能只依据求解后的显示投影重建原文件。
+When only RNL is changed, the host text and ordinary comments should be kept; reading, diagnosing and saving unknown content follow the policy for the supported language versions. The original file cannot be rebuilt from the solved display projection alone.
 
-## 6. 技术栈与运行模式
+## 6. Technology stack and modes of running
 
-### 6.1 推荐组合
+### 6.1 Recommended combination
 
-| 模块 | 推荐实现 | 选择理由 |
+| Module | Recommended implementation | Reasons |
 | --- | --- | --- |
-| runtime / 宿主适配器 / 统一渲染器 | Rust，独立 crates，共享核心 | 原生执行、WASM 编译、CLI 与 viewer 输出一致 |
-| solver | Rust，纯 Rust 依赖 | 原生与 WASM 双路径、确定性 |
-| Web 绑定 | wasm-bindgen，配合 wasm-pack 等构建工具 | 生成 JS 接口并包装为 npm 包 |
-| viewer / editor | TypeScript，核心不依赖 React | 快速迭代、浏览器嵌入和 npm 分发 |
-| 最终输出 | SVG 起步 | 矢量、文字、交互与早期调试方便；图元列表不绑定 SVG，后端可换 |
-| 应用界面 | React + Vite | 常规 UI 与构建工具，隔离于 RNL 核心 |
-| 桌面外壳 | Tauri 2 | 复用 Web 前端并接入原生求解与文件能力 |
-| CLI | Rust | 无 UI 的检查、求解、渲染和序列化 |
-| 符号库 | RNL 数据包 | 与引擎和应用独立演进 |
+| Runtime / host adapters / unified renderer | Rust, separate crates, shared core | Native execution, WASM compilation, the same output from the CLI and the viewer |
+| Solver | Rust, pure-Rust dependencies | Both native and WASM paths, determinism |
+| Web bindings | wasm-bindgen, with build tools such as wasm-pack | Generates the JS interface and wraps it as an npm package |
+| Viewer / editor | TypeScript, with the core not depending on React | Fast iteration, embedding in browsers and npm distribution |
+| Final output | SVG to start | Vectors, text, interaction and easy early debugging; the primitive list is not tied to SVG, and the backend can be replaced |
+| Application interface | React + Vite | Ordinary UI and build tools, kept apart from the RNL core |
+| Desktop shell | Tauri 2 | Reuses the web frontend and adds native solving and file capabilities |
+| CLI | Rust | Checking, solving, rendering and serialization without a UI |
+| Symbol library | RNL data packages | Evolves independently of the engines and applications |
 
-Rust 与 C++ 都能实现高效求解，没有语言本身保证更快的结论。优先优化算法、数据布局、增量计算、分配和热点。依赖政策见 4.2 节：不能把宿主语言可移植等同于全部依赖可移植。
+Both Rust and C++ can implement efficient solving; neither language by itself is guaranteed to be faster. Algorithms, data layout, incremental computation, allocation and hot spots are optimized first. For the dependency policy see section 4.2: a portable host language does not mean that all dependencies are portable.
 
 ### 6.2 Web
 
 ```text
-React 界面 + TypeScript viewer/editor
-        ↕ 同步调用，进程内
-主线程中的 WASM runtime + 统一渲染器
-        ↕ 求解消息协议：快照 / 完整更新
-Worker 中的 WASM solver，含自己的 runtime 实例，按需加载
+React interface + TypeScript viewer/editor
+        ↕ synchronous calls, in-process
+WASM runtime + unified renderer on the main thread
+        ↕ solving message protocol: snapshots / complete updates
+WASM solver in a Worker, with its own runtime instance, loaded on demand
 ```
 
-runtime 与渲染器在主线程，命中、搜索和高亮都是同步调用；超大文件的解析可以在验证后移到 Worker，以序列化的生效模型回传。solver 独立加载，界面加载不等待 solver 下载、初始化或求解。solver 的 WASM 若启用多线程，需要 SharedArrayBuffer，即部署必须发送跨源隔离头；静态部署要验证这一点。单线程 solver 没有这个要求。
+The runtime and the renderer are on the main thread, so hit testing, search and highlighting are synchronous calls; parsing very large files can move to a Worker after validation, sending back a serialized effective model. The solver loads separately, and loading the interface does not wait for the solver to download, initialize or solve. If the solver's WASM uses multiple threads, it needs SharedArrayBuffer, so deployments must send cross-origin isolation headers; static deployments must check this. A single-threaded solver has no such requirement.
 
-### 6.3 桌面
+### 6.3 Desktop
 
 ```text
-Tauri WebView：同一套 TypeScript viewer/editor + 同一 WASM runtime 与渲染器
-        ↕ 求解消息协议：Tauri channel
-Rust 后台线程中的原生 solver；文件读写、文件关联、拖入、更新由 Tauri 提供
+Tauri WebView: the same TypeScript viewer/editor + the same WASM runtime and renderer
+        ↕ solving message protocol: Tauri channel
+Native solver in a Rust background thread; file reading and writing, file associations, drag-in and updates provided by Tauri
 ```
 
-> 已由[决定 0008](decisions/0008-shared-core-per-platform-frontends.md) 修改：桌面原生调用共享核心，不在 WebView 里运行 WASM；桌面和 Web 的前端可以共用界面代码，但不要求相同。
+> Amended by [decision 0008](decisions/0008-shared-core-per-platform-frontends.md): the desktop calls the shared core natively and does not run WASM in the WebView; the desktop and web frontends may share interface code but need not be the same.
 
-桌面与 Web 的前端代码路径完全相同，Tauri 只接入两个缝：文件 I/O 和 solver 传输。原生 solver 满足需求 4 的执行效率。若 WebView 侧的 WASM 启用多线程，自定义协议同样需要跨源隔离头。
+The frontend code path is exactly the same on the desktop and the web; Tauri only plugs into two seams: file I/O and the solver transport. The native solver meets requirement 4's execution efficiency. If the WASM on the WebView side uses multiple threads, custom protocols need cross-origin isolation headers as well.
 
-Tauri 使用系统 WebView；安装包较小不能证明冷启动足够快，也不能证明所有 Linux 发行版都能开箱即用。需要在目标系统上验证依赖和行为。
+Tauri uses the system WebView; a small installer proves neither a fast enough cold start nor that every Linux distribution works out of the box. Dependencies and behaviour must be validated on the target systems.
 
-### 6.4 移动端与未来原生前端
+### 6.4 Mobile and a future native frontend
 
-从项目早期验证移动浏览器上的精确 RNL 阅读，并保持 runtime/solver 的移动编译能力。正式原生移动应用可采用经过验证的共享外壳，也可以通过 C ABI 等接口接入 Swift/Kotlin。
+Reading exact RNL in mobile browsers is validated from early in the project, and the runtime and solver keep the ability to compile for mobile. A full native mobile application may use a validated shared shell, or connect to Swift/Kotlin through an interface such as a C ABI.
 
-若桌面实测不满足启动或交互目标，可另做 Rust 原生前端。它复用 runtime、solver、统一渲染器、命中逻辑、RNL 库和一致性语料；只有 TypeScript 的最终绘制与 UI 代码需要重写，必须计入第二套前端的实现成本。
+If measurements on the desktop miss the start-up or interaction targets, a native Rust frontend can be built. It reuses the runtime, the solver, the unified renderer, the hit-testing logic, the RNL libraries and the conformance corpus; only the final drawing and the UI code of TypeScript need rewriting, which must be counted in the implementation cost of a second frontend.
 
-跨平台首先保证语义一致和能力可声明，不承诺所有平台具有相同 UI、相同执行速度或逐像素一致的画面。
+Cross-platform first guarantees consistent semantics and declarable capabilities; it does not promise the same UI, the same execution speed or pixel-identical drawings on every platform.
 
-## 7. Symbol、字体与文档资源
+## 7. Symbols, fonts and document resources
 
-viewer 理解通用路径、变换、端子、文字等能力，但不携带器件目录和内置元件图形。标准 symbol 通过普通 RNL 库定义和发布。
+The viewer understands general capabilities such as paths, transforms, terminals and text, but carries no device catalog or built-in component graphics. The standard symbols are defined and published through ordinary RNL libraries.
 
-资源解析由宿主提供，建议支持本地文档依赖、明确版本的库和可离线携带的依赖集合。版本或内容哈希用于防止同一文件随"最新版"库变化而产生不同图形。
+Resource resolution is provided by the host; supporting local document dependencies, libraries of explicit versions and dependency sets that can be carried offline is suggested. Versions or content hashes prevent the same file from giving different drawings as a "latest" library changes.
 
-接近 PDF 的分享体验需要接收方能取得全部必要资源。可以设计可打包依赖的文档分发形式，但容器格式、清单和相对路径规则尚未确定；不因出现类型名称而自动联网。
+A sharing experience close to PDF needs the recipient to be able to get all the necessary resources. A form of document distribution that can bundle dependencies can be designed, but its container format, manifest and rules for relative paths are not settled; the appearance of a type name does not trigger network access by itself.
 
-> 已由[决定 0008](decisions/0008-shared-core-per-platform-frontends.md) 修改：字体随核心发布，渲染器按其度量排定文字位置，前端只负责绘制，跨平台的文字位置一致；具体字体与许可待定。
+> Amended by [decision 0008](decisions/0008-shared-core-per-platform-frontends.md): fonts ship with the core, the renderer lays out text by their metrics, and the frontend only draws, so text positions are the same across platforms; the specific fonts and their licences are to be decided.
 
-字体由 viewer 环境提供并可配置。标签在 viewer 中可以改字体、改大小或隐藏，solver 不依赖实际文字度量，标签压线不是正确性问题。本方案不建立字体嵌入、缺失回退或 solver 与 viewer 共用的度量契约，也不承诺跨平台文字外观一致。
+Fonts are provided by the viewer's environment and can be configured. In the viewer, labels can change font or size or be hidden; the solver does not depend on actual text metrics, and a label crossing a line is not a correctness problem. This proposal sets up no font embedding, fallback for missing fonts, or metrics contract shared by the solver and the viewer, and does not promise the same look of text across platforms.
 
-## 8. 源码组织：一个独立 monorepo
+## 8. Source organization: one independent monorepo
 
-推荐新建独立于 Analog Canvas 的仓库，把 runtime、solver、viewer/editor、标准库与规范放在同一个 monorepo 中。三个主要交付物是模块边界，不要求对应三个 Git 仓库。建议建仓时把语言草案与一致性语料一并迁入，Analog Canvas 只保留指向新仓库的链接。
+A new repository independent of Analog Canvas is recommended, with the runtime, solver, viewer/editor, standard library and specification in one monorepo. The three main deliverables are module boundaries and need not correspond to three Git repositories. It is suggested that the language drafts and the conformance corpus move in when the repository is created, with Analog Canvas keeping only a link to the new repository.
 
-RNL 初期一次语言调整可能同时改变规范、解释器、求解输出、渲染和测试。单仓库允许同一提交或 PR 表达完整变化，并验证兼容组合。提前拆仓库会增加依赖发布、跨仓库协调和不兼容中间状态。
+Early on, one language change may change the specification, interpreter, solving output, rendering and tests at once. A single repository lets one commit or PR express the whole change and validate compatible combinations. Splitting repositories early adds dependency releases, cross-repository coordination and incompatible intermediate states.
 
-建议目录：
+Suggested layout:
 
 ```text
 rnl/
-├─ spec/                       # 语言与能力约定，一致性语料的规范来源
+├─ spec/                       # language and capability conventions; the normative source of the conformance corpus
 ├─ crates/
-│  ├─ rnl-runtime/             # 语言核心：解析、作用域、覆盖、事务、序列化
-│  ├─ rnl-host-spice/          # SPICE 结构子集适配器与保真写回
-│  ├─ rnl-host-spectre/        # Spectre 结构子集适配器与保真写回
-│  ├─ rnl-render/              # 统一渲染器：生效模型到基本图元
-│  ├─ rnl-solver/              # 求解核心
-│  └─ rnl-cli/                 # 检查、求解、渲染、迁移
+│  ├─ rnl-runtime/             # language core: parsing, scope, overriding, transactions, serialization
+│  ├─ rnl-host-spice/          # adapter for the structural subset of SPICE, with faithful write-back
+│  ├─ rnl-host-spectre/        # adapter for the structural subset of Spectre, with faithful write-back
+│  ├─ rnl-render/              # unified renderer: effective model to basic primitives
+│  ├─ rnl-solver/              # solving core
+│  └─ rnl-cli/                 # checking, solving, rendering, migration
 ├─ bindings/
-│  └─ wasm/                    # WASM 绑定入口：runtime + 渲染器；solver 单独入口
+│  └─ wasm/                    # WASM binding entry: runtime + renderer; the solver has its own entry
 ├─ packages/
-│  ├─ runtime/                 # npm 接口与生成类型
-│  ├─ solver/                  # npm 求解接口与 Worker 封装
-│  ├─ viewer/                  # 图元绘制与浏览
-│  └─ editor/                  # 编辑工具、事务接口与轻量 router
+│  ├─ runtime/                 # npm interface and generated types
+│  ├─ solver/                  # npm solving interface and Worker wrapper (planned, no directory yet)
+│  ├─ viewer/                  # drawing primitives and browsing (planned, no directory yet)
+│  └─ editor/                  # editing tools, transaction interface and lightweight router (planned, no directory yet)
 ├─ libraries/
-│  └─ standard/                # 标准 RNL 符号库
+│  └─ standard/                # the standard RNL symbol library
 ├─ apps/
-│  ├─ web/                     # 参考 Web 应用
-│  └─ desktop/                 # Tauri 应用
-├─ tests/
-│  ├─ conformance/             # 语言一致性、跨方言等价
-│  ├─ roundtrip/               # 读取、修改、写回
-│  └─ integration/             # 求解到显示与编辑
-└─ examples/
+│  ├─ web/                     # reference web application
+│  └─ desktop/                 # Tauri application
+└─ tests/
+   ├─ conformance/             # language conformance, cross-dialect equivalence
+   ├─ roundtrip/               # reading, changing, writing back
+   └─ integration/             # from solving to display and editing
 ```
 
-> 已由[决定 0008](decisions/0008-shared-core-per-platform-frontends.md) 补充：`crates/` 下还有 `rnl-view/`，即核心接口：输入工作区（各文件的文本），输出 Document；桌面、CLI 和 Web 前端都通过它取得要显示的内容。
+> Note of 2026-10-25: the top-level `examples/` of the original plan only ever held its README and has been removed; examples are in `site/examples/`, `skills/rnl/examples/` and rnl-gallery.
 
-Rust 使用 Cargo workspace，TypeScript 使用 pnpm workspace。两套工具共存，各自管理依赖与构建，由根级脚本和 CI 协调；初期无需引入更重的统一构建系统。
+> Added by [decision 0008](decisions/0008-shared-core-per-platform-frontends.md): `crates/` also holds `rnl-view/`, the core interface: its input is the workspace (the texts of the files) and its output the Document; the desktop, CLI and web frontends all get what to show through it.
 
-单仓库不允许绕过模块边界直接引用内部实现。包仍应通过公开接口消费，并验证打包后的独立安装。未来出现独立团队、权限边界或稳定且低频的跨模块变化时，再考虑拆仓库；标准若形成独立治理，也可以单独管理规范与一致性测试。
+Rust uses a Cargo workspace and TypeScript a pnpm workspace. The two toolsets coexist, each managing its own dependencies and builds, coordinated by root-level scripts and CI; no heavier unified build system is needed at first.
 
-## 9. 分发与版本策略
+A single repository does not allow bypassing module boundaries to refer to internal implementations directly. Packages should still be consumed through their public interfaces, and independent installation after packaging should be validated. Splitting repositories can be considered later when independent teams, permission boundaries or stable, infrequent cross-module changes appear; if the standard comes to have its own governance, the specification and conformance tests can also be managed separately.
 
-### 9.1 发行物
+## 9. Distribution and versioning
 
-| 发行物 | 建议渠道 | 消费者 |
+### 9.1 Deliverables
+
+| Deliverable | Suggested channel | Consumers |
 | --- | --- | --- |
-| runtime / 渲染器 / solver Rust 库 | crates 与原生构建产物 | Rust 应用、原生宿主 |
-| runtime / 渲染器 / solver WASM | npm 包及对应 JS 接口 | Web、JS 工具和嵌入应用 |
-| viewer / editor | npm | Web 应用、桌面前端 |
-| 标准符号库 | npm 数据包及普通归档 | 所有平台的资源解析器 |
-| CLI | 各平台预编译程序 | 命令行用户与自动化 |
-| 桌面应用 | 安装包及应用更新渠道 | 终端用户 |
-| Web 应用 | 静态部署 | 浏览器用户 |
+| Runtime / renderer / solver Rust libraries | Crates and native build artifacts | Rust applications, native hosts |
+| Runtime / renderer / solver WASM | npm packages with their JS interfaces | Web, JS tools and embedding applications |
+| Viewer / editor | npm | Web applications, desktop frontends |
+| Standard symbol library | npm data packages and plain archives | Resource resolvers on every platform |
+| CLI | Precompiled programs for each platform | Command-line users and automation |
+| Desktop application | Installers and the application's update channel | End users |
+| Web application | Static deployment | Browser users |
 
-npm 包使用已注册的 `@rich-netlist` 组织作用域，见[决策 0003](decisions/0003-npm-scope.md)。包名暂以 `@rich-netlist/runtime`、`@rich-netlist/solver`、`@rich-netlist/viewer`、`@rich-netlist/editor`、`@rich-netlist/stdlib` 表达意图，具体名称仍待确认。
+The npm packages use the registered `@rich-netlist` organization scope; see [decision 0003](decisions/0003-npm-scope.md). The package names `@rich-netlist/runtime`, `@rich-netlist/solver`, `@rich-netlist/viewer`, `@rich-netlist/editor` and `@rich-netlist/stdlib` express the intent for now; the exact names are still to be confirmed.
 
-npm 解决模块分发，不自动更新已安装桌面应用。跨平台统一发布指同一源码版本、锁定依赖、测试矩阵和产物清单；不意味着所有平台使用同一二进制，也不保证应用商店审核同时完成。
+npm solves module distribution; it does not update installed desktop applications automatically. A unified cross-platform release means the same source version, locked dependencies, a test matrix and a manifest of artifacts; it does not mean that every platform uses the same binary, nor that app store reviews finish at the same time.
 
-### 9.2 版本分层
+### 9.2 Layers of versions
 
-| 版本 | 意义 |
+| Version | Meaning |
 | --- | --- |
-| RNL 语言版本 | 文档应如何解释 |
-| SDK 文档接口 / 通信版本 | runtime、solver 和前端如何交换结构化数据 |
-| 软件包版本 | 实现、算法、修复和 API 的发行版本 |
-| 标准库版本 | symbol 和其他库定义的内容 |
+| RNL language version | How a document is to be interpreted |
+| SDK document interface / communication version | How the runtime, solver and frontends exchange structured data |
+| Package version | The release of implementations, algorithms, fixes and APIs |
+| Standard library version | The content of the symbols and other library definitions |
 
-接口版本不是另一套电路标准。语法变化若被 runtime 吸收且保留相同生效模型，前端和 solver 不必修改；新增前端必须理解的能力则需要显式兼容处理。
+The interface version is not another circuit standard. If a syntax change is absorbed by the runtime and keeps the same effective model, the frontends and the solver need not change; a new capability that the frontends must understand needs explicit compatibility handling.
 
-建议早期协调发布核心 SDK 包，提供已验证的兼容组合，标准符号库独立版本化。使用 `next` 发布预览迭代、`latest` 发布经过验证的版本；应用固定兼容组合，不在启动时各自追踪最新版。
+It is suggested that the core SDK packages be released together early on, offering validated compatible combinations, with the standard symbol library versioned on its own. Previews are published as `next`, validated versions as `latest`; applications fix a compatible combination rather than each tracking the latest version at start-up.
 
-JS 包版本与变更记录可使用 Changesets；Rust crates 可用 release-plz 或 cargo-release 协调版本。WASM、CLI 和应用由同一发布流水线协调；Changesets 本身不负责全部 Rust 发行。跨 registry 的发布不能假定原子完成，应先验证整组产物，再提升推荐版本，并能识别部分发布失败。
+Versions and change logs of the JS packages can use Changesets; the versions of the Rust crates can be coordinated with release-plz or cargo-release. WASM, the CLI and the applications are coordinated by the same release pipeline; Changesets alone does not handle all of the Rust releases. Publishing across registries cannot be assumed to be atomic: the whole set of artifacts should be validated first and the recommended version promoted afterwards, and partly failed releases must be recognizable.
 
-### 9.3 一次发行的基本流程
+### 9.3 The basic flow of a release
 
-1. 选定源码提交，固定依赖与工具链，记录语言和接口支持范围。
-2. 构建并测试原生目标和 WASM，生成类型、绑定与发行包。
-3. 从打包产物验证独立安装及跨模块兼容，避免 workspace 链接掩盖缺失文件。
-4. 先发布预览产物和兼容清单，通过后提升稳定渠道。
-5. 发布 Web、CLI、桌面安装包及必要的签名产物。
+1. Choose the source commit, fix the dependencies and toolchain, and record the supported range of the language and interfaces.
+2. Build and test the native targets and WASM, and generate the types, bindings and release packages.
+3. Validate independent installation and cross-module compatibility from the packaged artifacts, so that workspace links do not hide missing files.
+4. Publish the preview artifacts and the compatibility manifest first, and promote them to the stable channel once they pass.
+5. Publish the web application, the CLI, the desktop installers and the necessary signed artifacts.
 
-目标平台矩阵、最低系统版本、CPU 架构和签名安排必须显式确定，不能以"支持跨平台"代替发行验收。
+The target platform matrix, minimum system versions, CPU architectures and signing arrangements must be settled explicitly; "cross-platform support" cannot stand in for release acceptance.
 
-## 10. 验证与性能边界
+## 10. Validation and performance boundaries
 
-### 10.1 启动与加载
+### 10.1 Start-up and loading
 
-分别测量进程冷启动到可交互、Web 首次/缓存加载、精确 RNL 打开到首帧、solver 初始化与首次结果、持续求解期间交互延迟、内存及发行体积。测量需要一组固定的参考文档，按规模分为小、中、大三档，例如十余个器件的单层电路、数百器件的多层次电路和数千器件的电路；没有参考语料就无法执行验收。
+Measure separately: process cold start to interactive, first and cached web loads, opening exact RNL to the first frame, solver initialization and first result, interaction latency during continuous solving, memory, and release size. Measurement needs a fixed set of reference documents in three sizes, small, medium and large, for example a single-level circuit of a dozen or so devices, a multi-level circuit of hundreds of devices and a circuit of thousands; without a reference corpus there can be no acceptance.
 
-启动验收不包含求解耗时；应用也不能在实现上把 solver 初始化放进必须等待的首屏路径。性能目标数值待参考机器、图规模和平台范围确定后制定，当前没有已验证的毫秒数或体积承诺。
+Start-up acceptance does not include solving time; nor may an application's implementation put solver initialization on the first-screen path it must wait for. Numeric performance targets will be set once the reference machines, drawing sizes and platform range are settled; there are no validated millisecond or size commitments now.
 
-### 10.2 语义与互操作
+### 10.2 Semantics and interoperability
 
-- 同一文档在 native/WASM runtime 上的引用、覆盖和诊断符合相同契约。
-- 同一电路的 SPICE 与 Spectre 版本附同一份 RNL，得到相同的生效模型。
-- 文本通道与内存通道得到等价的有效文档语义。
-- 含高层语义和完整几何的文档，在完全不加载 solver 时仍可阅读。
-- 求解后保存并再次打开，不需要重新求解就能画出求解器的图（草案 0.3：全部决定都写回），hash 的输入段相符。
-- hash 按求解问题计算：只改空白、注释或换行不改变它，改动语义语句改变它。
-- 求解器保留的事实全部成立；丢弃的事实有提示，并指出与之冲突的事实（8.5）。
-- 修改呈现描述不改变宿主电气事实；保留式写回不重排宿主正文。
-- 旧任务结果不能覆盖新编辑，撤销重做与文档修订一致。
-- 同一 solver 版本的 native 与 WASM 构建，在相同输入与相同选项下、没有判定碰到时间上限时，输出逐字节相同；不同选项或版本允许得到不同的可行布局，不能被误判为格式不兼容。
+- The same document gives references, overrides and diagnostics under the same contract on the native and WASM runtimes.
+- The SPICE and Spectre versions of the same circuit, with the same RNL, give the same effective model.
+- The text channel and the memory channel give equivalent effective document semantics.
+- A document with high-level semantics and complete geometry can still be read with no solver loaded at all.
+- Saved after solving and opened again, it draws the solver's drawing without solving again (draft 0.3: all decisions are written back), and the input part of the hash matches.
+- The hash is computed from the solving problem: changing only whitespace, comments or line endings does not change it, and changing a semantic statement does.
+- All the facts the solver keeps hold; discarded facts get hints that name the facts they conflict with (8.5).
+- Changing presentation descriptions does not change the host's electrical facts; write-back that keeps the text does not reorder the host text.
+- Results of old tasks cannot override new edits, and undo/redo agrees with the document revisions.
+- Native and WASM builds of the same solver version, for the same input and options, when no decision reaches the time limit, give byte-identical output; different options or versions may give different feasible layouts, which must not be mistaken for format incompatibility.
 
-### 10.3 渲染与资源
+### 10.3 Rendering and resources
 
-验证 symbol 实例化、端子与姿态变换、层次选择、网络关联、资源缺失状态和高 DPI 行为。统一渲染器的图元列表是 CLI 与 viewer 共同的比较对象；跨平台采用适当的图像容差，并单独检查语义和几何，不能只靠截图判断连接正确。
+Validate symbol instantiation, terminal and orientation transforms, level selection, net associations, the state of missing resources and high-DPI behaviour. The unified renderer's primitive list is what the CLI and the viewer are both compared on; across platforms, suitable image tolerances are used, with semantics and geometry checked separately; screenshots alone cannot show that connections are correct.
 
-### 10.4 健壮性
+### 10.4 Robustness
 
-viewer 会打开任意来源的文件。宿主适配器与 RNL 解析器需要模糊测试，并限制 include 深度、层次深度和文件大小；资源加载只经宿主接口，默认不访问网络，不执行任何代码。
+The viewer will open files from any source. The host adapters and the RNL parser need fuzz testing, and limits on include depth, level depth and file size; resources are loaded only through the host interface, with no network access by default and no code executed.
 
-## 11. 落地顺序与验收问题
+## 11. Order of delivery and acceptance questions
 
-以下是未来实施顺序，不是当前已启动的工作清单。
+The following is the future order of implementation, not a list of work already started.
 
-1. **精确 RNL 阅读闭环。** 实现最小 runtime、两种宿主方言的结构子集适配器、统一渲染器、外部 symbol 库、CLI 的检查与渲染，以及 TS viewer；在不安装 solver 时打开同一组完整精确案例，跨方言等价测试通过。Tauri 冷启动、WASM 解析耗时、IPC 吞吐作为独立的测量项并行进行，不阻塞本阶段。
-2. **求解闭环。** solver 把一个层次的全部决定写成带 hash 的求解器记录，支持持续更新、保存、重新读取和过期检测；同一语义实现具备 native/WASM 路径且输出一致。runtime 一侧（求解问题、写回、hash、旧结果的提示、求解状态）已在 rnl#16 完成，solver 本身在开发中。
-3. **编辑闭环。** 追加式用户编辑、轻量 router、撤销重做、修订检查和重新求解，验证 editor 的记录与求解器记录的归属。
-4. **发行闭环。** 从 npm 独立安装，生成 CLI/桌面产物，验证离线资源携带和兼容版本组合。
-5. **按证据扩展。** 根据实际性能决定 GPU 后端、二进制通道、多线程，以及是否需要原生 Rust 前端。
+1. **The loop of reading exact RNL.** Implement a minimal runtime, structural subset adapters for the two host dialects, the unified renderer, external symbol libraries, checking and rendering in the CLI, and the TS viewer; open the same set of complete, exact cases without the solver installed, with the cross-dialect equivalence tests passing. Tauri cold start, WASM parsing time and IPC throughput are measured in parallel as separate items and do not block this stage.
+2. **The loop of solving.** The solver writes all the decisions for one level as a record of the solver with a hash, supporting continuous updates, saving, reading again and detecting staleness; the same semantic implementation has native and WASM paths with the same output. The runtime side (the solving problem, write-back, the hash, hints from the old result, the solving state) was completed in rnl#16; the solver itself is in development.
+3. **The loop of editing.** Appended user edits, the lightweight router, undo/redo, revision checks and solving again, validating the ownership of the editor's records and the records of the solver.
+4. **The loop of release.** Independent installation from npm, CLI and desktop artifacts, validating carrying resources offline and compatible version combinations.
+5. **Extending by evidence.** Decide on a GPU backend, binary channels, multiple threads, and whether a native Rust frontend is needed, by actual performance.
 
-首个阶段已经需要验证跨平台和 solver 可选边界，而不是先依赖单一桌面环境完成全部功能后再移植。
+The first stage already needs to validate cross-platform behaviour and the boundary of the optional solver, rather than first completing every function on a single desktop environment and porting afterwards.
 
-## 12. 尚待决定的问题
+## 12. Questions still to decide
 
-- 两种宿主方言结构子集的精确范围、注释载体和保真写回的验证矩阵；RNL 语法版本和可直接渲染能力的精确范围。
-- 求解器选项（包括目标的层序与权重）写进文件的方式：标准附录 C 的保留项。hash 的算法归工具，工具包用 `sig1`。
-- editor 的轻量 router 的结果，是否写成 editor 自己的 `type="generated"` 记录（第 4.3 节）。
-- symbol 定义语言、标准库加载、版本固定与离线容器形式。
-- 一个定义展开出的几条事实，是否可以声明为"整体保留或整体丢弃"：草案 0.3 不改，每条事实仍单独取舍（8.5），这一项列为标准附录 C 的保留项。
-- 已在草案 0.3 中定下、从本章移出的三件事（见第 3.3、4.2 节）：
-  - 判定的时间上限是用户可设定的求解器选项，没判定完的事实丢弃并给警告；
-  - 丢弃时的提示列出全部最小冲突组；
-  - "有解"在实数上判定，容差是用户可设定的求解器选项。
-- 草案 0.3 的发布时间；在那之前，编号、`numbering` 和 WIRE 改写只在开发开关后面，不写进文件。
-- 首版平台/架构矩阵及可衡量的启动和交互预算。
-- crate 命名、兼容窗口与发布治理；npm 作用域已确定为 `@rich-netlist`，见[决策 0003](decisions/0003-npm-scope.md)。
-- 本仓库的许可证已确定（代码 MIT、规范与文档 CC-BY-4.0、数据 CC0-1.0），见[决策 0002](decisions/0002-licenses.md)。移植 Analog Canvas 仓库中 AGPL 下的代码（例如 Python 求解原型）之前，仍需其版权所有者对该部分重新授权。
+- The exact extent of the structural subsets of the two host dialects, the comment carriers, and the validation matrix of faithful write-back; the exact extent of the RNL syntax version and of what can be rendered directly.
+- How the solver options (including the order and weights of the goals) are written into a file: a reserved item of Annex C of the standard. The hash's algorithm belongs to the tool; the toolkit uses `sig1`.
+- Whether the lightweight router's results in the editor are written as the editor's own `type="generated"` record (section 4.3).
+- The symbol definition language, loading of the standard library, version pinning and the form of offline containers.
+- Whether the several facts one definition expands to can be declared "kept or discarded as a whole": draft 0.3 does not change this, each fact is still chosen on its own (8.5), and the item is listed as a reserved item of Annex C of the standard.
+- Three things settled in draft 0.3 and moved out of this chapter (see sections 3.3 and 4.2):
+  - the time limit of the decision is a solver option the user can set, and a fact not decided within it is discarded with a warning;
+  - the hints on discarding list every minimal conflict set;
+  - "has a solution" is decided over the reals, and the tolerance is a solver option the user can set.
+- When draft 0.3 is published; until then, numbers, `numbering` and rewriting by WIRE stay behind a development switch and are not written into files.
+- The first version's platform/architecture matrix and measurable start-up and interaction budgets.
+- Crate naming, the compatibility window and release governance; the npm scope is settled as `@rich-netlist`, see [decision 0003](decisions/0003-npm-scope.md).
+- The licences of this repository are settled (code MIT, specification and documentation CC-BY-4.0, data CC0-1.0); see [decision 0002](decisions/0002-licenses.md). Before porting code under the AGPL in the Analog Canvas repository (such as the Python solving prototype), its copyright holder must still relicense that part.
 
-这些问题不影响总体模块划分，但必须在对应实现或语言能力冻结前作出明确决定。
+These questions do not affect the overall module division, but must be decided explicitly before the corresponding implementation or language capability is frozen.
 
-## 13. 技术资料
+## 13. Technical references
 
-以下链接用于核查工具能力，不构成性能保证；正式工程应固定依赖版本。
+The following links are for checking what the tools can do and do not constitute performance guarantees; a formal project should pin dependency versions.
 
-- [Cargo workspaces](https://doc.rust-lang.org/cargo/reference/workspaces.html)：Rust 多包管理。
-- [pnpm workspace](https://pnpm.io/workspaces)：JS/TS 多包管理。
-- [wasm-bindgen](https://github.com/wasm-bindgen/wasm-bindgen)：Rust 与 JS/WASM 绑定。
-- [wasm-pack](https://github.com/drager/wasm-pack)：WASM 包构建与 npm 工作流。
-- [Rust 平台支持](https://doc.rust-lang.org/rustc/platform-support.html)及 [WASM 目标限制](https://doc.rust-lang.org/rustc/platform-support/wasm32-unknown-unknown.html)：目标能力与支持层级。
-- [SharedArrayBuffer 的安全要求](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/SharedArrayBuffer)：多线程 WASM 所需的跨源隔离。
-- [Tauri 架构](https://v2.tauri.app/concept/architecture/)及 [WebView 平台](https://v2.tauri.app/reference/webview-versions/)：桌面外壳及运行依赖。
-- [Tauri 调用前端与 channel](https://v2.tauri.app/develop/calling-frontend/)：桌面侧 solver 传输。
-- [Changesets](https://github.com/changesets/changesets)：多包版本和变更记录。
-- [npm 发行标签](https://docs.npmjs.com/adding-dist-tags-to-packages/)：预览与稳定分发渠道。
+- [Cargo workspaces](https://doc.rust-lang.org/cargo/reference/workspaces.html): managing several Rust packages.
+- [pnpm workspace](https://pnpm.io/workspaces): managing several JS/TS packages.
+- [wasm-bindgen](https://github.com/wasm-bindgen/wasm-bindgen): bindings between Rust and JS/WASM.
+- [wasm-pack](https://github.com/drager/wasm-pack): building WASM packages and the npm workflow.
+- [Rust platform support](https://doc.rust-lang.org/rustc/platform-support.html) and [the limits of the WASM target](https://doc.rust-lang.org/rustc/platform-support/wasm32-unknown-unknown.html): target capabilities and support tiers.
+- [The security requirements of SharedArrayBuffer](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/SharedArrayBuffer): the cross-origin isolation multithreaded WASM needs.
+- [Tauri architecture](https://v2.tauri.app/concept/architecture/) and [WebView platforms](https://v2.tauri.app/reference/webview-versions/): the desktop shell and its runtime dependencies.
+- [Tauri: calling the frontend, and channels](https://v2.tauri.app/develop/calling-frontend/): the solver transport on the desktop.
+- [Changesets](https://github.com/changesets/changesets): versions and change logs of several packages.
+- [npm dist-tags](https://docs.npmjs.com/adding-dist-tags-to-packages/): preview and stable distribution channels.

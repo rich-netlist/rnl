@@ -384,6 +384,9 @@ pub struct UsageData {
     pub roles: Vec<(String, ObjId)>,
     pub role_sets: Vec<String>,
     pub params: Vec<(String, Option<Lit>)>,
+    /// The parameters written at the statement that applies it, in the order of the definition,
+    /// without the defaults of the definition (9.3).
+    pub given: Vec<(String, Lit)>,
     pub locals: Vec<(String, ObjId)>,
     /// The usage whose expansion made this one (14.8).
     pub parent: Option<ObjId>,
@@ -642,6 +645,9 @@ pub enum ObjData {
         failed: bool,
         site: Option<Rc<Ctx>>,
         off: usize,
+        /// The last TEXT that gave it a layer written for its object itself, not for what a
+        /// selection reached (10.4), and where; none when only rules gave it layers.
+        direct: Option<(Rc<Ctx>, usize)>,
     },
     Usage(Box<UsageData>),
     Bundle {

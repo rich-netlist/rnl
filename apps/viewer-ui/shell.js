@@ -8,7 +8,9 @@
  * @typedef {object} Shell
  * @property {boolean} [embed] The web shell's canvas-only mode, with no persisted preferences.
  * @property {"desktop" | "web"} platform The platform, which picks the commands of commands.json it offers.
- * @property {(language: "en" | "zh-CN") => Promise<void>} [setLanguage] Update native UI labels, preserving command IDs and state.
+ * @property {(language: string) => Promise<void>} [setLanguage] Update native UI labels, preserving command IDs and state.
+ * @property {() => Promise<Array<{code: string, lang: string, name: string, english?: string, matches: string[]}>>} [uiLanguages] The UI languages, English first, each with `english`, its name in English; without it the page reads locales/languages.json.
+ * @property {(code: string) => Promise<Record<string, string>>} [uiCatalog] A UI language's catalog, {English: translation}; without it the page reads locales/<code>.json.
  * @property {() => Promise<Record<string, string>>} [bundledFiles] Built-in package texts by path.
  * @property {() => Promise<Array<{name: string, version: string, path: string, description: string, builtin: boolean}>>} [publicPackages] Published package metadata for lookup hints.
  * @property {(pkg: {name: string, version: string}, signal?: AbortSignal) => Promise<object[]>} [includePackage] Include an exact published package.
@@ -17,6 +19,11 @@
  * @property {() => Promise<string | null>} [pickPath] Pick a desktop search directory.
  * @property {(dir: string) => Promise<string[]>} [pathPackages] Package and netlist paths in a desktop PATH directory.
  * @property {(source: Source) => object} [poolItem] A web source's entry as a searchable file.
+ * @property {() => Promise<Array<{name: string, title: string, extensions: string[], fallback: boolean}>>} [formats] The core's parse formats, in its order, for the Library's format menus before a Document lists them.
+ * @property {() => Promise<{ bundled: boolean, catalog: string, fetched: string, packages: Array<{ name: string, version: string, kind: string, path: string }>, licenses: string[] }>} [bundledPackages] The public packages that this build bundles (desktop): none in the build without them; they are found without a network.
+ * @property {(path: string) => Promise<string>} [detectFormat] The format the core detects for a Library file that the document shown does not read.
+ * @property {(path: string) => string} [formatKey] The key a file's format choice is kept by: its path folded where the platform ignores case, or the address of a file a server served.
+ * @property {(path: string) => boolean} [keepsFormat] Whether a format chosen for the file is kept in the settings; otherwise only while the page is open. True when absent.
  * @property {(source: Source, document: object, file: number) => Source} sourceForFile Re-root at a document file, retaining read capabilities but no compiled include scope.
  * @property {() => Source[]} [preloadCandidates] Library/PATH sources eligible for background compilation.
  * @property {(source: Source) => Promise<string>} [preload] Prepare an independent file without activating its document. Returns ready/cached/full/paused/busy/cancelled/skipped/disabled.
@@ -92,8 +99,27 @@
  *   took it away, is not written, nor are the others: `{ changed }`, the names of those files, for
  *   the user to say. On the web, which cannot write files, download them. Rejects with a message when
  *   it cannot. A shell that offers neither does not save.
- * @property {(files: {path: string, read: () => Promise<Blob | string> | Blob | string}[], preparing: () => void) => Promise<boolean>} [downloadLibrary]
- *   Web only: choose a destination, then export the captured library as one ZIP; false on cancel.
+ * @property {(name: string, build: () => Promise<Blob>) => Promise<string | false>} [saveProject]
+ *   Save Project (desktop) or Download Project (web), project.js: ask where (the web where the browser
+ *   lets it), then write the archive `build` gives, named `name`; what was written, or false on cancel.
+ * @property {() => Promise<{ name: string, path?: string, bytes: Uint8Array } | null>} [pickProject]
+ *   Open Project: the archive the user chooses, or null.
+ * @property {(picked: object, manifest: object) => Promise<string | null>} [projectRoot] Where the
+ *   project's files go, the workspace directory its manifest's paths are under, ending in "/": a
+ *   folder the desktop asks for (and asks before replacing files there), or the web's /<name>/.
+ * @property {(read: object, picked: object) => Promise<{ source: Source, items: object[] }> | { source: Source, items: object[] }} [projectSource]
+ *   A project read (manifest.js loadManifest): put its files where the shell reads them, and give the
+ *   source of its entry and its pool as Library items.
+ * @property {(path: string) => Promise<Uint8Array>} [readFile] Desktop: the bytes of a file on disk.
+ * @property {{ projectBytes?: number }} [projectLimits] Web: the largest project it opens, smaller than the desktop's.
+ * @property {() => Promise<{ name: string, text: string } | null>} [pickManifest] Web: the manifest file the user chooses.
+ * @property {(json: object, name: string) => Source} [sourceFromManifestJson] Web: the source of a manifest a file gave.
+ * @property {(name: string, text: string) => Promise<void>} [saveManifest] Web: download a manifest of links.
+ * @property {(request: { doc: object, level: number, title: string, overlays: object, source: Source, edits: Object<string, string> }) => Promise<string>} [exportSvg]
+ *   File > Export Image (export-image.js): the core's SVG of `levels[level]` of `doc`, the Document
+ *   shown, with `overlays` (rnl_view::OverlayOptions), built again from what `doc` was built from.
+ * @property {(name: string, blob: Blob, kind: "svg" | "png") => Promise<string | null>} [saveImage]
+ *   Save the image: the web downloads it, the desktop asks where; what was written, or null on cancel.
  * @property {(source: Source, file: SavedFile, encoding?: "preserve" | "utf8") => Promise<Source | null>} [saveAs] Ask where to save the
  *   text of the netlist that was opened, write it there, and give the source of the file written; null
  *   when the user cancels. Rejects with a message when it cannot. Only the desktop offers it.

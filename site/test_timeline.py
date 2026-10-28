@@ -51,6 +51,36 @@ class Timeline(unittest.TestCase):
         self.assertLess(html.index('class="now"'), html.index('class="tl-sep"'))
         self.assertLess(html.index('class="tl-sep"'), html.index('class="next"'))
 
+    def test_the_homepage_keeps_the_latest_entries_and_links_to_the_full_timeline(self):
+        count = build.HOME_ENTRIES + 2
+        data = {"milestones": [milestone(f"m{i}", f"2026-10-{10 + i}") for i in range(count)],
+                "next": [{"title": {"zh": "计划", "en": "Plan"}, "description": {"zh": "计划中。", "en": "Planned."}}]}
+        home = build.timeline_html(data, [])
+        self.assertEqual(home.count("<time>"), build.HOME_ENTRIES)
+        self.assertIn(f"<time>2026-10-{10 + count - 1}</time>", home)
+        self.assertNotIn("<time>2026-10-10</time>", home)
+        self.assertEqual(home.count('class="now"'), 1)
+        self.assertEqual(home.count('href="timeline.html"'), 1)
+        self.assertLess(home.index("<time>"), home.index('class="tl-more"'))
+        self.assertLess(home.index('class="tl-more"'), home.index('class="tl-sep"'))
+        # nothing to link to while the homepage shows everything
+        few = build.timeline_html({**data, "milestones": data["milestones"][:build.HOME_ENTRIES]}, [])
+        self.assertNotIn("timeline.html", few)
+
+    def test_the_full_timeline_has_every_entry_the_latest_first_and_no_plans(self):
+        count = build.HOME_ENTRIES + 2
+        data = {"milestones": [milestone(f"m{i}", f"2026-10-{10 + i}") for i in range(count)],
+                "next": [{"title": {"zh": "计划", "en": "Plan"}, "description": {"zh": "计划中。", "en": "Planned."}}]}
+        full = build.timeline_html(data, [], full=True)
+        dates = re.findall(r"<time>([\d-]+)</time>", full)
+        self.assertEqual(dates, sorted(dates, reverse=True))
+        self.assertEqual(len(dates), count)
+        self.assertEqual(full.count('class="now"'), 1)
+        self.assertTrue(full.lstrip().startswith('<li class="now">'))
+        self.assertNotIn("tl-sep", full)
+        self.assertNotIn("tl-more", full)
+        self.assertNotIn('class="next"', full)
+
     def test_dates_reject_missing_timezone_and_reversed_ranges(self):
         with self.assertRaises(build.BuildError):
             build.timeline_date("2026-10-21T16:00:00")
@@ -74,8 +104,13 @@ class Timeline(unittest.TestCase):
         template = build.sources()
         with patch.object(build, "has_linux_release", return_value=False):
             actual = build.build(None)
-        remove = lambda html: re.sub(r'(<ol class="tl">).*?(</ol>)', r'\1\2', html, flags=re.S)
+        # the timeline, and the notice its texts may bring: a release published in English alone leaves a
+        # language's homepage partly translated until its summary is translated (decision 0015)
+        remove = lambda html: re.sub(r'\n<div class="wrap translation-notice[^"]*" lang="en">.*?</div>', '',
+                                    re.sub(r'(<ol class="tl">).*?(</ol>)', r'\1\2', html, flags=re.S), flags=re.S)
         for index, (language, _) in enumerate(build.LANGS):
+            if language not in build.I18N.published:
+                continue  # an incubating language is built only with --incubating
             expected = build.build_language(template, index, None)
             for page in ("index.html", "rnl-intro-standalone.html"):
                 self.assertEqual(remove(actual[f"{language}/{page}"]), remove(expected[page]))

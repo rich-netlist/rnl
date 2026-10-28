@@ -2,7 +2,9 @@
 // https://github.com/tauri-apps/tauri/blob/dev/crates/tauri-driver/src/server.rs
 // Node 22+, webkit2gtk-driver, xdotool and ImageMagick; run under dbus-run-session and xvfb-run.
 // No build, plugins or test-only code in the app. --exe accepts an AppImage or an installed binary.
-//   dbus-run-session -- xvfb-run -a node apps/desktop/tests/linux-smoke.mjs --exe PATH
+//   dbus-run-session -- xvfb-run -a node apps/desktop/tests/linux-smoke.mjs --exe PATH [--packages with|without]
+// --packages says whether the program bundles the public packages: with, it finds eda-style without a network
+// and lists them in the Library; without, it reports the package missing, with the hint to Help > Public Packages.
 import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
 import { once } from "node:events";
@@ -18,6 +20,9 @@ assert.equal(process.platform, "linux", "The Linux smoke test must run on Linux.
 const exeIndex = process.argv.indexOf("--exe");
 assert.ok(exeIndex >= 0 && process.argv[exeIndex + 1], "Pass --exe PATH.");
 const exe = path.resolve(process.argv[exeIndex + 1]);
+const packagesIndex = process.argv.indexOf("--packages");
+const expectPackages = packagesIndex >= 0 ? process.argv[packagesIndex + 1] : undefined;
+assert.ok(expectPackages === undefined || expectPackages === "with" || expectPackages === "without", "--packages takes with or without.");
 fs.accessSync(exe, fs.constants.X_OK);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), "rnl-linux-smoke-"));
@@ -168,6 +173,31 @@ try {
   await execute('for (const [rule,font] of window.cjkStyles) rule.style.fontFamily=font;');
   await execute('return new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true))));');
   fs.writeFileSync(path.join(output, `${path.basename(exe)}-cjk-after.png`), Buffer.from(await request('GET', `/session/${session}/screenshot`),'base64'));
+  if (expectPackages) {
+    // the public packages: found without a network when bundled, reported missing with a hint when not; the
+    // step before left the page in Chinese, and the hint is told in English
+    await execute('window.viewer.command("language-en");');
+    await execute('return new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true))));');
+    const top = path.join(temp, "use-eda-style.sp");
+    fs.writeFileSync(top, ["* a file that uses a public package", '* @RNL(type="header") { @VERSION("0.3"); @USE-PACKAGE(name="eda-style", version="0.1") }', "R1 a 0 1k", ".end", ""].join("\n"));
+    const info = await execute("return import('./shell.js').then((m) => m.shell.bundledPackages());");
+    await execute(`return import('./open.js').then((o) => o.openSource({ path: ${JSON.stringify(top)}, name: 'use-eda-style.sp' }, false));`);
+    const missing = await execute("return window.viewer.doc.diagnostics.some((d) => d.message.includes('eda-style') && d.message.includes('cannot be found'));");
+    const names = info.packages.map((p) => `${p.name} ${p.version}`);
+    if (expectPackages === "with") {
+      assert.ok(info.bundled && names.includes("eda-style 0.1"), `bundled: ${JSON.stringify(info)}`);
+      assert.equal(missing, false, "eda-style 0.1 is bundled, and was reported missing");
+      await execute("document.getElementById('tab-files').click();");
+      assert.deepEqual(await execute("const g = document.querySelector('[data-group=\"public\"]'); return g ? [...g.querySelectorAll('.pool-open')].map((b) => b.textContent) : null;"), names);
+      console.log(`${path.basename(exe)}: the public packages are bundled and found without a network: ${names.join(", ")}`);
+    } else {
+      assert.ok(!info.bundled && info.packages.length === 0, `bundled: ${JSON.stringify(info)}`);
+      assert.equal(missing, true, "eda-style 0.1 is not bundled, and was not reported missing");
+      await execute("const head = document.getElementById('problems-head'); if (head.getAttribute('aria-expanded') === 'false') head.click();");
+      assert.equal(await execute("return document.querySelector('.package-hint .msg')?.textContent;"), "Look for it in Help › Public Packages.");
+      console.log(`${path.basename(exe)}: the public packages are not bundled; the package is reported missing, with the hint to Help > Public Packages`);
+    }
+  }
   console.log(`${path.basename(exe)}: visible window, sample and include loaded, SVG drawn, no errors.`);
 } finally {
   if (session) {

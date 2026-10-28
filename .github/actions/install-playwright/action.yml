@@ -1,0 +1,107 @@
+# Installs Playwright's browsers and the system packages they need on an Ubuntu runner, so that a slow
+# mirror or download costs a few minutes and not the 20 that a hung step used to take before it failed
+# (it did three times on 2026-10-26 in viewer.yml, with no test run). Used by pages.yml, viewer.yml,
+# core-release.yml and publish-runtime.yml; the caller has run `npm ci` in `working-directory` first.
+#
+# - The browsers (~/.cache/ms-playwright) are kept by actions/cache, keyed by the runner and the lock file
+#   of the Playwright package, so that a run downloads them only when the version changes.
+# - The system packages (--with-deps) come from the runner's Ubuntu mirror, which was slow for 15 to 50
+#   minutes in bursts that apt's timeouts do not catch. Their .deb files are kept by actions/cache too, also
+#   when the install fails, so a slow run still moves the next one forward.
+# - The install is tried with a time limit; if it hangs or fails, whatever apt left is cleaned up and it is
+#   tried once more from archive.ubuntu.com, the mirror of last resort, with a time limit of its own.
+name: Install Playwright's browsers
+description: Chromium and WebKit (or the browsers named) with their system packages, cached, with one retry
+
+inputs:
+  working-directory:
+    description: The folder with the package.json and package-lock.json of Playwright
+    required: true
+  browsers:
+    description: The browsers to install, separated by spaces
+    default: chromium webkit
+  first-attempt-minutes:
+    description: The time limit of the first attempt (a normal install takes one or two minutes)
+    default: "8"
+  second-attempt-minutes:
+    description: The time limit of the second attempt, from another mirror
+    default: "12"
+
+runs:
+  using: composite
+  steps:
+    - id: apt
+      shell: bash
+      run: echo "image=${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
+    - id: browsers-cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ inputs.browsers }}-${{ hashFiles(format('{0}/package-lock.json', inputs.working-directory)) }}
+    - id: apt-cache
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/apt-debs
+        key: apt-debs-${{ steps.apt.outputs.image }}-${{ hashFiles(format('{0}/package-lock.json', inputs.working-directory)) }}-${{ inputs.browsers }}-full
+        restore-keys: |
+          apt-debs-${{ steps.apt.outputs.image }}-${{ hashFiles(format('{0}/package-lock.json', inputs.working-directory)) }}-${{ inputs.browsers }}-
+          apt-debs-${{ steps.apt.outputs.image }}-
+          apt-debs-
+    - id: install
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        BROWSERS: ${{ inputs.browsers }}
+        FIRST: ${{ inputs.first-attempt-minutes }}
+        SECOND: ${{ inputs.second-attempt-minutes }}
+      run: |
+        # A stalled download is abandoned after 30 s without data and retried by apt itself.
+        sudo tee /etc/apt/apt.conf.d/80-rnl-network >/dev/null <<'CONF'
+        Acquire::Retries "5";
+        Acquire::http::Timeout "30";
+        Acquire::https::Timeout "30";
+        CONF
+        if ls ~/apt-debs/*.deb >/dev/null 2>&1; then
+          sudo cp -n ~/apt-debs/*.deb /var/cache/apt/archives/
+          echo "Restored $(ls ~/apt-debs/*.deb | wc -l) cached system packages"
+        fi
+        echo "Browsers cache hit: ${{ steps.browsers-cache.outputs.cache-hit }}"
+        attempt() {
+          local started=$SECONDS status=0
+          # shellcheck disable=SC2086
+          timeout --kill-after=30 "${1}m" npx playwright install --with-deps $BROWSERS || status=$?
+          echo "Attempt took $((SECONDS - started)) s, exit status $status"
+          return $status
+        }
+        if ! attempt "$FIRST"; then
+          echo "::warning::Installing Playwright's browsers failed or took over $FIRST minutes; trying once more from archive.ubuntu.com"
+          # what a killed apt may have left: its processes and a half-configured dpkg
+          sudo pkill -x apt-get || true
+          sudo pkill -x apt || true
+          sudo pkill -x dpkg || true
+          sleep 5
+          sudo dpkg --configure -a || true
+          if [ -f /etc/apt/apt-mirrors.txt ]; then
+            echo 'http://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+          fi
+          attempt "$SECOND"
+        fi
+    - id: keep
+      if: always() && steps.apt-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        mkdir -p ~/apt-debs
+        cp -n /var/cache/apt/archives/*.deb ~/apt-debs/ 2>/dev/null || true
+        count=$(ls ~/apt-debs/*.deb 2>/dev/null | wc -l)
+        echo "Keeping $count system packages"
+        echo "count=$count" >> "$GITHUB_OUTPUT"
+        # A complete set takes the exact key the next run looks for; what a failed install left is only a
+        # fallback, under a key of its own, so that a later successful run can store the complete set.
+        base="apt-debs-${{ steps.apt.outputs.image }}-${{ hashFiles(format('{0}/package-lock.json', inputs.working-directory)) }}-${{ inputs.browsers }}"
+        if [ "${{ steps.install.outcome }}" = success ]; then echo "key=$base-full" >> "$GITHUB_OUTPUT"
+        else echo "key=$base-partial-${{ github.run_id }}" >> "$GITHUB_OUTPUT"; fi
+    - if: always() && steps.keep.outputs.count != '' && steps.keep.outputs.count != '0'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/apt-debs
+        key: ${{ steps.keep.outputs.key }}

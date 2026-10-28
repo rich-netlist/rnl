@@ -5,6 +5,8 @@ import type {
   CatalogRequest,
   Document,
   DrawingsRequest,
+  FormatList,
+  FormatsRequest,
   LibraryRequest,
   Request,
   Snapshot,
@@ -18,6 +20,9 @@ export type {
   CatalogRequest,
   Document,
   DrawingsRequest,
+  FormatInfo,
+  FormatList,
+  FormatsRequest,
   LibraryRequest,
   Literal,
   Op,
@@ -48,6 +53,8 @@ export interface CoreWorker {
   drawings(request: DrawingsRequest): Promise<UnplacedDrawing[]>;
   /** Update the viewer library index; returns read errors. */
   library(request: LibraryRequest): Promise<string[]>;
+  /** The formats a file can be read with, and the format each file of `detect` has when none is set. */
+  formats(request: FormatsRequest): Promise<FormatList>;
   /** Stop the Worker; calls still waiting, and later ones, reject. */
   terminate(): void;
 }

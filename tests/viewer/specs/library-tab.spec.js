@@ -1,24 +1,23 @@
 import { showSource } from "../viewer.js";
 import fs from "node:fs";
 import path from "node:path";
-import { test, expect } from "../viewer.js";
+import { dialogGone, test, expect } from "../viewer.js";
 
 const group = (page, key) => page.locator(`.lib-group[data-group=${JSON.stringify(key)}]`);
 const files = (page) => group(page, "files");
 const builtin = (page) => group(page, "builtin");
 const dialog = (page) => page.locator("dialog.dialog");
 
-test("desktop: missing public package keeps its error and offers the website in the system browser", async ({ page, viewer }, info) => {
+test("desktop: a missing public package keeps its error and points to Help › Public Packages, with no download", async ({ page, viewer }, info) => {
   await viewer.open("missing-canvas-package", { platform: "desktop", pool: "1" });
   await expect(page.locator(".diag.error .msg")).toContainText(["package analog-canvas-extensions 0.1 cannot be found"]);
   const hint = page.locator(".package-hint");
-  await expect(hint).toContainText("Add the package file to Library or a PATH directory");
-  await expect(hint.getByRole("link")).toHaveAttribute("href", "https://rich-netlist.github.io/rnl/en/packages.html");
+  await expect(hint).toContainText("Look for it in Help › Public Packages.");
+  await expect(hint.getByRole("link")).toHaveCount(0);
+  await expect(hint.getByRole("button")).toHaveCount(0);
   if (process.env.RNL_PACKAGE_SCREENSHOTS && info.project.name === "chromium") {
     await page.screenshot({ path: path.join(process.env.RNL_PACKAGE_SCREENSHOTS, "desktop-missing-canvas-hint.png") });
   }
-  await hint.getByRole("link").click();
-  expect(await page.evaluate(() => window.fakeShell.calls)).toContainEqual(["browse", "https://rich-netlist.github.io/rnl/en/packages.html"]);
 });
 
 async function paste(page, viewer, text) {
@@ -41,9 +40,9 @@ for (const platform of ["desktop", "web"]) {
     await expect(files(page).locator(".current")).toHaveAttribute("aria-current", "true");
     await expect(files(page).locator(".pool-row")).toHaveCount(1);
     if (platform === "web") {
-      await expect(page.locator("#include-library")).toHaveText("Include Public Package…");
+      await expect(page.locator("#include-library")).toHaveText("Include Public Package...");
       await viewer.menuTitle("File").click();
-      await expect(viewer.menuItem("include-library")).toHaveText("Include Public Package…");
+      await expect(viewer.menuItem("include-library")).toHaveText("Include Public Package...");
       await page.keyboard.press("Escape");
       await expect(page.locator("#add-path")).toBeHidden();
       await expect(page.locator(".lib-path")).toHaveCount(0);
@@ -112,6 +111,7 @@ for (const platform of ["desktop", "web"]) {
     await files(page).locator(".pool-open").click();
     await expect(dialog(page).locator(".dialog-title")).toHaveText("Changes Not Saved");
     await dialog(page).getByRole("button", { name: "Cancel", exact: true }).click();
+    await dialogGone(page);
     await expect(temp).toHaveClass(/current/);
     await files(page).locator(".pool-open").click();
     await viewer.build(() => dialog(page).getByRole("button", { name: platform === "desktop" ? "Don't Save" : "Discard Changes", exact: true }).click());

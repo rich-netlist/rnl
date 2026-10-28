@@ -354,8 +354,9 @@ test("a long path keeps the level shown in a narrow bar, and leaves the levels b
   await expect(menu).toBeHidden();
   expect(await segments(page)).toEqual(shown);
 
-  // narrower still, the root gives way too, and the level shown stays
-  await page.setViewportSize({ width: 400, height: 800 });
+  // narrower still, the root gives way too, and the level shown stays (a phone's width: the drawing
+  // is a page of its own, and the bar as wide as the screen)
+  await page.setViewportSize({ width: 180, height: 400 });
   await expect.poll(() => segments(page)).toEqual(["leaf XL2"]);
   await expect.poll(fits).toBe(true);
   await more.click();
@@ -364,6 +365,8 @@ test("a long path keeps the level shown in a narrow bar, and leaves the levels b
 
   // wide again, the whole path and the kind
   await page.setViewportSize({ width: 1200, height: 800 });
+  // no phone now: the side panel is back beside the drawing before it is hidden
+  await expect(page.locator("#sidebar")).toBeVisible();
   await page.keyboard.press("Control+B");
   await expect.poll(() => segments(page)).toEqual([TOP, "bank XK1", "block XB2", "cell XC1", "leaf XL2"]);
   await expect(more).toBeHidden();

@@ -11,9 +11,14 @@ on:
     paths:
       - "apps/desktop/**"
       - "apps/viewer-ui/**"
+      - "i18n/**"
+      - "scripts/i18n/viewer-locales.mjs"
       - "crates/**"
       - "libraries/**"
       - "scripts/fonts.py"
+      - "scripts/bundle_packages.py"
+      - "scripts/test_bundle_packages.py"
+      - "scripts/packages.py"
       - "tests/conformance/cases/04-hierarchy*"
       - "rustfmt.toml"
       - ".github/workflows/desktop.yml"
@@ -22,9 +27,14 @@ on:
     paths:
       - "apps/desktop/**"
       - "apps/viewer-ui/**"
+      - "i18n/**"
+      - "scripts/i18n/viewer-locales.mjs"
       - "crates/**"
       - "libraries/**"
       - "scripts/fonts.py"
+      - "scripts/bundle_packages.py"
+      - "scripts/test_bundle_packages.py"
+      - "scripts/packages.py"
       - "tests/conformance/cases/04-hierarchy*"
       - "rustfmt.toml"
       - ".github/workflows/desktop.yml"
@@ -175,7 +185,7 @@ jobs:
             case "$format" in
               unbundled) exe="$RUNNER_TEMP/diagnostic-binaries/rnl-viewer";;
               appimage) exe="$(find "$RUNNER_TEMP/diagnostic-binaries" -name '*.AppImage' -print -quit)";;
-              deb) sudo apt-get install -y "$RUNNER_TEMP/diagnostic-binaries/"*.deb; exe=/usr/bin/rnl-viewer;;
+              deb) sudo apt-get install -y --no-install-recommends "$RUNNER_TEMP/diagnostic-binaries/"*.deb; exe=/usr/bin/rnl-viewer;;
             esac
             for mode in default no-compositing no-dmabuf software x11-only native-default native-software; do
               flags=()
@@ -238,6 +248,10 @@ jobs:
       # downloads the pinned fonts and writes apps/viewer-ui/fonts/, the drawing's web fonts
       - name: Write the web fonts
         run: pip install fonttools brotli && python scripts/fonts.py web
+      # the script that gets the public packages for the release, which the installers and the single file carry
+      - name: Test the bundling of the public packages
+        if: matrix.os == 'ubuntu-latest'
+        run: python -m unittest discover -s scripts -p test_bundle_packages.py -v
       - name: Formatting
         if: matrix.os == 'ubuntu-latest'
         run: cargo fmt --manifest-path apps/desktop/Cargo.toml --check
@@ -260,7 +274,7 @@ jobs:
         timeout-minutes: 20
         env:
           SMOKE_OUTPUT_DIR: ${{ runner.temp }}/smoke-windows
-        run: node apps/desktop/tests/smoke.mjs
+        run: node apps/desktop/tests/smoke.mjs --packages without
       - name: Keep the Windows smoke-test screenshots
         if: always() && runner.os == 'Windows'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

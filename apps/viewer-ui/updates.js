@@ -1,4 +1,4 @@
-import { append, m, setText } from "./i18n.js";
+import { append, m, setText, tr } from "./i18n.js";
 // Help > Check for Updates, on a platform whose shell has `version` and `browse` (the desktop): the
 // newest release of the viewer on GitHub against the version that runs, in a dialog that offers to
 // open the release's page. It looks only when the user asks, never by itself. The shell says the
@@ -36,7 +36,7 @@ export async function checkForUpdates() {
     document.body.classList.remove("checking");
   }
   if (found.why !== undefined) {
-    await inform({ title: TITLE, paragraphs: [m`The latest version could not be looked up: ${found.why}.`, releasesLink()] });
+    await inform({ title: TITLE, paragraphs: [m`Could not check for the latest version: ${found.why}.`, releasesLink()] });
     return;
   }
   const { running, newest } = found;
@@ -51,9 +51,9 @@ export async function checkForUpdates() {
       title: TITLE,
       paragraphs: [
         heading(m`RNL Viewer ${newest.version} is available.`),
-        m`This is version ${running}. The release's page on GitHub has its installers and what changed.`,
+        m`You are running version ${running}. The release page on GitHub has the installers and the release notes.`,
       ],
-      action: "Open Release Page",
+      action: tr("Open Release Page"),
     });
     if (open) openPage(newest.url);
     return;
@@ -80,17 +80,17 @@ async function fetchReleases() {
         signal: stop.signal,
       });
     } catch {
-      throw new Error(stop.signal.aborted ? `GitHub did not answer in ${WAIT / 1000} seconds` : "GitHub could not be reached");
+      throw new Error(stop.signal.aborted ? m`GitHub did not respond within ${WAIT / 1000} seconds` : m("GitHub could not be reached"));
     }
     if (!response.ok) {
       // GitHub answers so many requests from one address an hour without an account
       if (response.headers.get("x-ratelimit-remaining") === "0") {
-        throw new Error("GitHub takes no more requests from this network for a while");
+        throw new Error(m("GitHub API rate limit exceeded; please try again later"));
       }
-      throw new Error(`GitHub answered ${`${response.status} ${response.statusText}`.trim()}`);
+      throw new Error(m`GitHub returned ${`${response.status} ${response.statusText}`.trim()}`);
     }
     const releases = await response.json().catch(() => null);
-    if (!Array.isArray(releases)) throw new Error("GitHub's answer is not a list of releases");
+    if (!Array.isArray(releases)) throw new Error(m("GitHub's response is not a list of releases"));
     return releases;
   } finally {
     clearTimeout(timer);

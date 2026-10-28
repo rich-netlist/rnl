@@ -744,8 +744,8 @@
     {
       "severity": "hint",
       "file": "10-constraints-and-priority.sp",
-      "line": 2,
-      "col": 4
+      "line": 47,
+      "col": 24
     },
     {
       "severity": "hint",

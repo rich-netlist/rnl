@@ -6,6 +6,7 @@
 
 mod catalog;
 mod document;
+mod formats;
 mod library;
 pub mod overlays;
 mod primitive;
@@ -15,14 +16,15 @@ mod snapshot;
 mod types;
 
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use rnl_runtime::diag::Sink;
-use rnl_runtime::host::{file_name, HostDocument};
+use rnl_runtime::host::format::Reading;
+use rnl_runtime::host::{file_name, package, FileFormat, HostDocument};
 use rnl_runtime::model::LevelView;
 use rnl_runtime::previous::{solve_status, Previous, SolveStatus};
 use rnl_runtime::problem::LevelProblem;
-use rnl_runtime::source::{dirname, Provider};
+use rnl_runtime::source::{dirname, normalize, prefer_filename, Provider};
 use rnl_runtime::writeback::record_type;
 use rnl_runtime::{Interpretation, Options};
 
@@ -31,9 +33,10 @@ pub use catalog::{
     Terminal,
 };
 pub use document::{
-    Child, Diagnostic, Document, Drawings, Hit, InspectedLabel, InspectedPin, InspectedSymbol, Level, Object,
-    SourceFile, SourceInclude, Span, Unplaced, UnplacedDrawing, Usage, UsageRole,
+    Child, Diagnostic, Document, Drawings, Hit, InspectedLabel, InspectedPin, InspectedSymbol, Level, MemberOf, Object,
+    RoleOf, RuleAt, SourceFile, SourceInclude, Span, Unplaced, UnplacedDrawing, Usage, UsageRole,
 };
+pub use formats::{detect_format, formats, FormatInfo};
 pub use library::{LibraryIndex, LibraryProvider};
 pub use primitive::{
     Bar, Cap, Color, HAlign, Join, Layer, Primitive, Run, RunStyle, Segment, Shape, Stroke, Text, TextRun, Unit, VAlign,
@@ -43,7 +46,7 @@ pub use rnl_runtime::source::MemoryProvider;
 pub use snapshot::{
     FileRef, HostInstance, HostLevel, HostNet, HostTerminal, LevelModel, LevelSnapshot, ObjectView, PackageUse, Parts,
     PinLabel, PinView, PointView, ShapeView, Slot, Snapshot, SymbolDefinition, SymbolPin, SymbolPrim, SymbolRef,
-    TextView, Vertex, WireView, SCHEMA,
+    TextView, UsageOf, Vertex, WireView, SCHEMA,
 };
 
 include!(concat!(env!("OUT_DIR"), "/bundled.rs"));
@@ -69,8 +72,13 @@ pub fn bundled() -> MemoryProvider {
 /// How to build a Document, and what to give of each level's drawing.
 #[derive(Clone, Debug)]
 pub struct BuildOptions {
-    /// "spice" or "spectre", instead of guessing from the entry.
+    /// The format of the entry, "spice" or "spectre", instead of guessing from it.
     pub dialect: Option<String>,
+    /// The format set for files, by path as the frontend names them, as it names the entry: only
+    /// those the user set. A file not among them is read by [`detect_format`], by its suffix and
+    /// its first lines, and the entry by `dialect` before them. An unknown format name fails the build; a
+    /// file the netlist does not read is left alone. Paths compare by [`Provider::path_key`].
+    pub formats: BTreeMap<String, String>,
     /// The runtime's options, such as using the standard package at the root (16.3), or reading
     /// the levels without their generated records, as a solver does (2.8).
     pub runtime: Options,
@@ -86,7 +94,14 @@ pub struct BuildOptions {
 
 impl Default for BuildOptions {
     fn default() -> BuildOptions {
-        BuildOptions { dialect: None, runtime: Options::default(), svg: true, primitives: false, status: false }
+        BuildOptions {
+            dialect: None,
+            formats: BTreeMap::new(),
+            runtime: Options::default(),
+            svg: true,
+            primitives: false,
+            status: false,
+        }
     }
 }
 
@@ -118,15 +133,15 @@ fn build_with(
     options: &BuildOptions,
     lazy: bool,
 ) -> Result<(Document, Option<Drawings>), String> {
-    let ws = Workspace::new(files);
+    let ws = Workspace::with_formats(files, &options.formats);
     if ws.read(&slashed(entry)).is_none() {
         return Err(format!("cannot read {entry}"));
     }
-    let dialect = options.dialect.as_deref();
+    let reading = (options.dialect.as_deref(), &options.formats);
     // the solve status takes the problems; built in this reading too, they change nothing else
     let runtime = Options { problems: options.runtime.problems || options.status, ..options.runtime.clone() };
-    let mut r = interpret_in(entry, dialect, &ws, &runtime)?;
-    let solve = if options.status { solve_statuses(entry, dialect, &ws, &runtime, &r)? } else { HashMap::new() };
+    let mut r = interpret_in(entry, reading, &ws, &runtime)?;
+    let solve = if options.status { solve_statuses(entry, reading, &ws, &runtime, &r)? } else { HashMap::new() };
     let mut d = document::document(entry, &r, ws.missing.into_inner(), options, lazy);
     for level in &mut d.levels {
         level.solve = solve.get(&level.host).map(|s| s.as_str());
@@ -141,7 +156,7 @@ fn build_with(
 /// solver, which reads the same with them and without, is not read again.
 fn solve_statuses(
     entry: &str,
-    dialect: Option<&str>,
+    reading: Formats,
     ws: &Workspace,
     runtime: &Options,
     r: &Interpretation,
@@ -151,10 +166,10 @@ fn solve_statuses(
     let (with, without) = if !records {
         (r, r)
     } else if runtime.generated {
-        other = interpret_in(entry, dialect, ws, &Options { generated: false, ..runtime.clone() })?;
+        other = interpret_in(entry, reading, ws, &Options { generated: false, ..runtime.clone() })?;
         (r, &other)
     } else {
-        other = interpret_in(entry, dialect, ws, &Options { generated: true, problems: false, ..runtime.clone() })?;
+        other = interpret_in(entry, reading, ws, &Options { generated: true, problems: false, ..runtime.clone() })?;
         (&other, r)
     };
     let views: HashMap<usize, &LevelView> = without.model.levels.iter().map(|lv| (lv.level, lv)).collect();
@@ -171,16 +186,16 @@ fn solve_statuses(
 /// same interpretation as its Document; the Document in it is built as `options` ask. Fails as
 /// [`build`] does.
 pub fn snapshot(entry: &str, files: &dyn Provider, options: &BuildOptions, parts: Parts) -> Result<Snapshot, String> {
-    let ws = Workspace::new(files);
+    let ws = Workspace::with_formats(files, &options.formats);
     if ws.read(&slashed(entry)).is_none() {
         return Err(format!("cannot read {entry}"));
     }
-    let r = interpret_in(entry, options.dialect.as_deref(), &ws, &options.runtime)?;
+    let r = interpret_in(entry, (options.dialect.as_deref(), &options.formats), &ws, &options.runtime)?;
     // without the drawing, the Document is built only for its files, levels and diagnostics
     let draw =
         if parts.drawing { options.clone() } else { BuildOptions { svg: false, primitives: false, ..options.clone() } };
     let document = document::document(entry, &r, ws.missing.into_inner(), &draw, false);
-    Ok(snapshot::snapshot(&r, document, parts, &options.runtime))
+    Ok(snapshot::snapshot(&r, document, parts, &options.runtime, !options.formats.is_empty()))
 }
 
 /// The catalog of the packages the core has: those of the package directories of `files`, the
@@ -208,7 +223,15 @@ pub fn is_spectre(entry: &str, text: &str, dialect: Option<&str>) -> bool {
     })
 }
 
-/// Read a host document with the adapter its dialect needs. The bundled packages are layered
+/// How the files of a netlist are read: the format of the entry, as `dialect` names it, and the
+/// formats set for files by path ([`BuildOptions::formats`]).
+type Formats<'f> = (Option<&'f str>, &'f BTreeMap<String, String>);
+
+/// No format set for any file.
+static NONE_SET: BTreeMap<String, String> = BTreeMap::new();
+
+/// Read a host document, each file with the adapter of its format: the entry's by `dialect` or by
+/// [`detect_format`], and every file it includes by [`detect_format`]. The bundled packages are layered
 /// under `files`, so an entry among them can be read as well.
 pub fn read_host(
     entry: &str,
@@ -216,66 +239,130 @@ pub fn read_host(
     files: &dyn Provider,
     sink: &mut Sink,
 ) -> Result<HostDocument, String> {
-    read_host_in(entry, dialect, &Workspace::new(files), sink)
+    read_host_in(entry, (dialect, &NONE_SET), &Workspace::new(files), sink)
+}
+
+/// [`read_host`], with the formats set for files by path ([`BuildOptions::formats`]).
+pub fn read_host_with(
+    entry: &str,
+    dialect: Option<&str>,
+    formats: &BTreeMap<String, String>,
+    files: &dyn Provider,
+    sink: &mut Sink,
+) -> Result<HostDocument, String> {
+    read_host_in(entry, (dialect, formats), &Workspace::with_formats(files, formats), sink)
 }
 
 /// [`read_host`] in a workspace, which has the bundled packages already.
-fn read_host_in(entry: &str, dialect: Option<&str>, ws: &Workspace, sink: &mut Sink) -> Result<HostDocument, String> {
+fn read_host_in(entry: &str, (dialect, set): Formats, ws: &Workspace, sink: &mut Sink) -> Result<HostDocument, String> {
     let path = slashed(entry);
-    let text = ws.read(&path).ok_or_else(|| format!("cannot read {entry}"))?;
+    let main = entry_format_in(entry, (dialect, set), ws)?;
+    let set = formats::set_formats(set, ws)?;
     let doc = library::resolve(&path, ws, sink, |extra, sink| {
-        if is_spectre(&path, &text, dialect) {
-            rnl_host_spectre::read_with_includes(&path, ws, sink, extra)
-        } else {
-            rnl_host_spice::read_with_includes(&path, ws, sink, extra)
-        }
+        formats::with(main, &set, ws, |f| Reading::read(&path, ws, sink, f, extra, true))
     });
     doc.ok_or_else(|| format!("cannot read {entry}"))
 }
 
-/// Interpret an entry: a netlist, or a package file (`.rnl`) checked on its own. The bundled
-/// packages are layered under `files`.
+/// The format `entry` is read in, by its name: the one set for it in `formats`, else the one
+/// `dialect` names, else the one [`detect_format`] gives. A package file, of the format `rnl`, is
+/// checked on its own ([`interpret`]); a file of another is read as a netlist.
+pub fn entry_format(
+    entry: &str,
+    dialect: Option<&str>,
+    formats: &BTreeMap<String, String>,
+    files: &dyn Provider,
+) -> Result<&'static str, String> {
+    Ok(formats::name(entry_format_in(entry, (dialect, formats), &Workspace::new(files))?.0))
+}
+
+/// The format of `entry` and its default, by index ([`formats::main_format`]).
+fn entry_format_in(entry: &str, (dialect, set): Formats, ws: &Workspace) -> Result<(usize, usize), String> {
+    let path = slashed(entry);
+    let text = ws.read(&path).ok_or_else(|| format!("cannot read {entry}"))?;
+    let set = formats::set_formats(set, ws)?;
+    Ok(formats::main_format(&path, &text, dialect, &set, ws))
+}
+
+/// The package file `entry` checked on its own (2.7), when it is of the format `rnl`
+/// ([`entry_format`]), with that format and its default noted for it.
+fn package_in(
+    entry: &str,
+    reading: Formats,
+    ws: &Workspace,
+    options: &Options,
+) -> Result<Option<Interpretation>, String> {
+    let (main, default) = entry_format_in(entry, reading, ws)?;
+    if formats::name(main) != package::NAME {
+        return Ok(None);
+    }
+    let mut r = rnl_runtime::check_package(&slashed(entry), ws, options);
+    let file = r.doc.main().file.clone();
+    let (format, default) = (formats::name(main).to_string(), formats::name(default).to_string());
+    r.doc.file_formats.push(FileFormat { file, format, default });
+    Ok(Some(r))
+}
+
+/// Interpret an entry: a netlist, or a package file checked on its own, one of the format `rnl`
+/// ([`entry_format`]). The bundled packages are layered under `files`.
 pub fn interpret(
     entry: &str,
     dialect: Option<&str>,
     files: &dyn Provider,
     options: &Options,
 ) -> Result<Interpretation, String> {
-    interpret_in(entry, dialect, &Workspace::new(files), options)
+    interpret_in(entry, (dialect, &NONE_SET), &Workspace::new(files), options)
+}
+
+/// [`interpret`], with the formats set for files by path ([`BuildOptions::formats`]).
+pub fn interpret_with(
+    entry: &str,
+    dialect: Option<&str>,
+    formats: &BTreeMap<String, String>,
+    files: &dyn Provider,
+    options: &Options,
+) -> Result<Interpretation, String> {
+    interpret_in(entry, (dialect, formats), &Workspace::with_formats(files, formats), options)
 }
 
 /// Both readings of an entry that a solver makes, with the bundled packages under `files`
 /// ([`rnl_runtime::previous::read_previous`]): the interpretation without the records of the
 /// solver, with the problems, and the previous result of each level, from the reading with them,
 /// in the order of the problems. `options` are those of both readings; `generated` and `problems`
-/// are set here. A package file (`.rnl`) has no problems.
+/// are set here. A package file ([`entry_format`]) has no problems.
 pub fn read_previous(
     entry: &str,
     dialect: Option<&str>,
     files: &dyn Provider,
     options: &Options,
 ) -> Result<(Interpretation, Vec<Option<Previous>>), String> {
-    let ws = Workspace::new(files);
-    if extension(entry).is_some_and(|e| e.eq_ignore_ascii_case("rnl")) {
-        return Ok((rnl_runtime::check_package(&slashed(entry), &ws, options), Vec::new()));
+    read_previous_with(entry, dialect, &NONE_SET, files, options)
+}
+
+/// [`read_previous`], with the formats set for files by path ([`BuildOptions::formats`]).
+pub fn read_previous_with(
+    entry: &str,
+    dialect: Option<&str>,
+    formats: &BTreeMap<String, String>,
+    files: &dyn Provider,
+    options: &Options,
+) -> Result<(Interpretation, Vec<Option<Previous>>), String> {
+    let ws = Workspace::with_formats(files, formats);
+    if let Some(r) = package_in(entry, (dialect, formats), &ws, options)? {
+        return Ok((r, Vec::new()));
     }
     let mut sink = Sink::new();
-    let doc = read_host_in(entry, dialect, &ws, &mut sink)?;
+    let doc = read_host_in(entry, (dialect, formats), &ws, &mut sink)?;
     Ok(rnl_runtime::previous::read_previous(doc, &ws, options, sink))
 }
 
 /// [`interpret`] in a workspace, which has the bundled packages already.
-fn interpret_in(
-    entry: &str,
-    dialect: Option<&str>,
-    ws: &Workspace,
-    options: &Options,
-) -> Result<Interpretation, String> {
-    if extension(entry).is_some_and(|e| e.eq_ignore_ascii_case("rnl")) {
-        return Ok(rnl_runtime::check_package(&slashed(entry), ws, options));
+fn interpret_in(entry: &str, reading: Formats, ws: &Workspace, options: &Options) -> Result<Interpretation, String> {
+    if let Some(r) = package_in(entry, reading, ws, options)? {
+        return Ok(r);
     }
     let mut sink = Sink::new();
-    let doc = read_host_in(entry, dialect, ws, &mut sink)?;
+    let doc = read_host_in(entry, reading, ws, &mut sink)?;
     Ok(rnl_runtime::interpret(doc, ws, options, sink))
 }
 
@@ -328,17 +415,47 @@ struct Workspace<'a> {
     files: &'a dyn Provider,
     bundled: MemoryProvider,
     missing: RefCell<Vec<String>>,
+    /// The files set to the format `rnl` ([`BuildOptions::formats`]): packages that USE-PACKAGE finds
+    /// by name (16.2), before those of the package directories, whatever their suffix.
+    packages: Vec<String>,
+    /// The keys of the paths set to another format: no package, whatever their suffix.
+    others: Vec<String>,
 }
 
 impl Workspace<'_> {
     fn new(files: &dyn Provider) -> Workspace<'_> {
-        Workspace { files, bundled: bundled(), missing: RefCell::new(Vec::new()) }
+        Workspace::with_formats(files, &NONE_SET)
+    }
+
+    /// The workspace of `files`, where the files set to the format `rnl` in `formats` are packages,
+    /// and those set to another are not.
+    fn with_formats<'a>(files: &'a dyn Provider, formats: &BTreeMap<String, String>) -> Workspace<'a> {
+        let (mut packages, mut others) = (Vec::new(), Vec::new());
+        for (path, name) in formats {
+            let path = normalize(&slashed(path));
+            if name == package::NAME {
+                packages.push(path);
+            } else {
+                others.push(files.path_key(&path));
+            }
+        }
+        Workspace { files, bundled: bundled(), missing: RefCell::new(Vec::new()), packages, others }
+    }
+
+    /// Whether a package file of the frontend's package directories or pool stays one: not when
+    /// its format is set, to another or to `rnl`, which [`Workspace::packages`] lists already.
+    fn kept(&self, path: &str) -> bool {
+        let key = self.files.path_key(&normalize(path));
+        !self.others.contains(&key) && !self.packages.iter().any(|p| self.files.path_key(p) == key)
     }
 }
 
 impl Provider for Workspace<'_> {
     fn auto_include(&self) -> Option<&dyn rnl_runtime::source::LibraryLookup> {
         self.files.auto_include()
+    }
+    fn path_key(&self, path: &str) -> String {
+        self.files.path_key(path)
     }
     fn read(&self, path: &str) -> Option<String> {
         if path.starts_with(BUNDLED_DIR) {
@@ -354,14 +471,18 @@ impl Provider for Workspace<'_> {
         text
     }
 
-    /// The frontend's package directories, then the bundled packages (16.2).
+    /// The files set to the format `rnl`, the frontend's package directories, then the bundled
+    /// packages (16.2).
     fn package_files(&self) -> Vec<String> {
-        let mut out = self.files.package_files();
+        let mut out = self.packages.clone();
+        out.extend(self.files.package_files().into_iter().filter(|p| self.kept(p)));
         out.extend(self.bundled.package_files());
         out
     }
     fn package_candidates(&self, name: &str) -> Vec<String> {
-        let mut out = self.files.package_candidates(name);
+        let mut out = self.packages.clone();
+        prefer_filename(&mut out, name);
+        out.extend(self.files.package_candidates(name).into_iter().filter(|p| self.kept(p)));
         out.extend(self.bundled.package_candidates(name));
         out
     }
@@ -730,6 +851,7 @@ R1 p q 1k
             "path",
             "name",
             "dialect",
+            "formats",
             "levels",
             "diagnostics",
             "failed",

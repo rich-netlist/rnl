@@ -1,4 +1,4 @@
-import { append, m, setText } from "./i18n.js";
+import { append, m, setText, tr } from "./i18n.js";
 import { form, inform, modal } from './dialog.js';
 import { isLoading } from './open.js';
 import { shell } from './shell.js';
@@ -45,7 +45,7 @@ export async function memoryCache() {
     });
     await form({ title: m('Memory Cache'),
       text: m('Reuse compiled netlists and drawings. Least recently used results are removed first. Set 0 to disable caching. This budget excludes the current view and temporary build memory.'),
-      parts: [label, preload, state, prepared, clear, error], focus: limit, action: 'Apply',
+      parts: [label, preload, state, prepared, clear, error], focus: limit, action: tr('Apply'),
       answer: async () => {
         const value = limit.valueAsNumber;
         if (!limit.checkValidity() || !Number.isInteger(value)) { setText(error, m('Enter a whole number from 0 to 4096.')); return; }

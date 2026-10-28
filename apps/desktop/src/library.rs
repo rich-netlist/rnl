@@ -1,5 +1,4 @@
 //! Per-process viewer library index. IPC updates finish before a dependent build starts.
-use rnl_cli::FsProvider;
 use rnl_runtime::source::FilePool;
 use rnl_view::LibraryIndex;
 use std::sync::{Arc, Mutex};
@@ -22,18 +21,21 @@ pub async fn update_library(
     pool: Vec<String>,
     reload: Option<bool>,
     refresh: Option<Vec<String>>,
+    formats: Option<crate::formats::Formats>,
 ) -> Result<Vec<String>, String> {
     core.preload.cancel();
     let library = library.inner().clone();
     let core = core.inner().clone();
     let paths = settings.paths()?;
     tauri::async_runtime::spawn_blocking(move || {
-        let disk = FsProvider::new(&paths).with_search_paths(&paths);
+        let disk = crate::public_packages::provider(&paths);
         let files = FilePool { files: &disk, paths: &pool };
         let mut index = library.0.lock().map_err(|e| e.to_string())?;
         let refresh = refresh.unwrap_or_default();
         let reload = reload.unwrap_or(false);
         index.invalidate(&refresh);
+        // a file whose format changed, and those that include it, are read again
+        index.set_formats(formats.unwrap_or_default());
         let errors = index.update(&pool, &files, reload);
         drop(index);
         if reload {

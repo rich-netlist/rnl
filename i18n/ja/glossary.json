@@ -1,0 +1,791 @@
+{
+ "language": "ja",
+ "about": "Terms of this language's translations: the English term, its rendering here, and variants not to use. English terms are the only normative ones (decision 0016); this list is a convention for translating and talking about RNL, not part of the standard. kind: rnl (a term of RNL), circuit (of circuit design), command (a command or label of an interface), general.",
+ "draft": true,
+ "terms": [
+  {
+   "en": "alias",
+   "term": "別名",
+   "kind": "rnl"
+  },
+  {
+   "en": "alias package",
+   "term": "別名パッケージ",
+   "kind": "rnl"
+  },
+  {
+   "en": "apply",
+   "sense": "definition",
+   "term": "適用する",
+   "kind": "rnl"
+  },
+  {
+   "en": "bend",
+   "term": "折れ曲がり点",
+   "kind": "rnl",
+   "note": "3 texts say 折れ曲がり without 点."
+  },
+  {
+   "en": "body",
+   "term": "定義本体",
+   "kind": "rnl",
+   "note": "Short: 本体; one text glosses it ボディ."
+  },
+  {
+   "en": "bounding box / box",
+   "sense": "the box of a symbol",
+   "term": "外接枠",
+   "kind": "rnl"
+  },
+  {
+   "en": "bounding box / box",
+   "sense": "the rectangle around an ellipse",
+   "term": "外接枠",
+   "kind": "rnl"
+  },
+  {
+   "en": "brace",
+   "term": "波括弧",
+   "kind": "rnl"
+  },
+  {
+   "en": "branch",
+   "sense": "wire routing",
+   "term": "分岐",
+   "kind": "rnl"
+  },
+  {
+   "en": "bundle",
+   "term": "バンドル",
+   "kind": "rnl",
+   "note": "One text glosses it 束ね描画."
+  },
+  {
+   "en": "comment",
+   "term": "コメント",
+   "kind": "rnl"
+  },
+  {
+   "en": "constraint",
+   "term": "制約",
+   "kind": "rnl"
+  },
+  {
+   "en": "coordinate",
+   "term": "座標",
+   "kind": "rnl"
+  },
+  {
+   "en": "core",
+   "term": "コア",
+   "kind": "rnl"
+  },
+  {
+   "en": "crossing",
+   "sense": "wires",
+   "term": "交差",
+   "kind": "rnl"
+  },
+  {
+   "en": "definition",
+   "term": "定義",
+   "kind": "rnl"
+  },
+  {
+   "en": "diagnostic",
+   "term": "診断",
+   "kind": "rnl"
+  },
+  {
+   "en": "drawing",
+   "sense": "the schematic as a whole",
+   "term": "回路図",
+   "avoid": [
+    "描き方"
+   ],
+   "kind": "rnl",
+   "note": "図面 also appears in this sense; 描画（ジオメトリ） names the drawing as the RNL layer of positions and wires."
+  },
+  {
+   "en": "drawing",
+   "sense": "the drawing shown, its canvas",
+   "term": "図面",
+   "kind": "rnl",
+   "note": "Short 図 in 図中 (in the drawing)."
+  },
+  {
+   "en": "drawing layer",
+   "term": "描画レイヤー",
+   "kind": "rnl"
+  },
+  {
+   "en": "dropped",
+   "sense": "fact status",
+   "term": "破棄",
+   "kind": "rnl"
+  },
+  {
+   "en": "evaluate",
+   "sense": "RNL runtime",
+   "term": "評価する",
+   "kind": "rnl"
+  },
+  {
+   "en": "fact",
+   "term": "事実",
+   "avoid": [
+    "制約"
+   ],
+   "kind": "rnl",
+   "note": "3 viewer texts render facts as 制約, the word for constraint."
+  },
+  {
+   "en": "fill-in",
+   "term": "自動補完",
+   "kind": "rnl"
+  },
+  {
+   "en": "free text",
+   "term": "自由テキスト",
+   "kind": "rnl"
+  },
+  {
+   "en": "header record",
+   "term": "ヘッダーレコード",
+   "kind": "rnl",
+   "note": "Short: ヘッダー."
+  },
+  {
+   "en": "hierarchy",
+   "term": "階層",
+   "avoid": [
+    "階層構造"
+   ],
+   "kind": "rnl",
+   "note": "3 texts on the tools page say 階層構造."
+  },
+  {
+   "en": "horizontal",
+   "term": "水平",
+   "kind": "rnl"
+  },
+  {
+   "en": "instance",
+   "term": "インスタンス",
+   "avoid": [
+    "素子"
+   ],
+   "kind": "rnl",
+   "note": "1 text says 素子, the word for device."
+  },
+  {
+   "en": "junction / junction dot",
+   "term": "接続点の黒丸",
+   "kind": "rnl",
+   "note": "The point itself: 接続点."
+  },
+  {
+   "en": "kept",
+   "sense": "fact status",
+   "term": "採用",
+   "kind": "rnl",
+   "note": "Not kept: 不採用."
+  },
+  {
+   "en": "key",
+   "sense": "TEXT identifier",
+   "term": "key",
+   "kind": "rnl",
+   "note": "Kept as the parameter name key."
+  },
+  {
+   "en": "label",
+   "term": "ラベル",
+   "kind": "rnl"
+  },
+  {
+   "en": "layout",
+   "term": "レイアウト",
+   "kind": "rnl"
+  },
+  {
+   "en": "level",
+   "term": "レベル",
+   "kind": "rnl"
+  },
+  {
+   "en": "manifest",
+   "term": "マニフェスト",
+   "kind": "rnl"
+  },
+  {
+   "en": "mirrored pair",
+   "sense": "the structure, a mirrored pair",
+   "term": "鏡像対",
+   "avoid": [
+    "ミラー対"
+   ],
+   "kind": "rnl",
+   "note": "1 viewer text says ミラー対."
+  },
+  {
+   "en": "mirrored pair",
+   "sense": "the symmetry",
+   "term": "鏡像対称",
+   "kind": "rnl"
+  },
+  {
+   "en": "name",
+   "term": "名前",
+   "avoid": [
+    "名称"
+   ],
+   "kind": "rnl",
+   "note": "8 texts, mostly the names in the standard package, say 名称."
+  },
+  {
+   "en": "net",
+   "term": "ネット",
+   "kind": "rnl"
+  },
+  {
+   "en": "netlist",
+   "term": "ネットリスト",
+   "kind": "rnl"
+  },
+  {
+   "en": "netlist body",
+   "term": "ネットリスト本文",
+   "kind": "rnl"
+  },
+  {
+   "en": "objective",
+   "term": "目的関数",
+   "kind": "rnl"
+  },
+  {
+   "en": "orientation code",
+   "term": "向きコード",
+   "kind": "rnl"
+  },
+  {
+   "en": "package",
+   "term": "パッケージ",
+   "kind": "rnl"
+  },
+  {
+   "en": "phase",
+   "term": "フェーズ",
+   "avoid": [
+    "段階"
+   ],
+   "kind": "rnl",
+   "note": "1 text says 段階的に (in phases)."
+  },
+  {
+   "en": "pin",
+   "term": "ピン",
+   "kind": "rnl"
+  },
+  {
+   "en": "port",
+   "term": "ポート",
+   "kind": "rnl"
+  },
+  {
+   "en": "primitive",
+   "term": "プリミティブ",
+   "kind": "rnl"
+  },
+  {
+   "en": "priority",
+   "term": "優先度",
+   "kind": "rnl"
+  },
+  {
+   "en": "private parts",
+   "term": "内部パーツ",
+   "kind": "rnl"
+  },
+  {
+   "en": "queue",
+   "term": "キュー",
+   "kind": "rnl"
+  },
+  {
+   "en": "record",
+   "term": "レコード",
+   "kind": "rnl"
+  },
+  {
+   "en": "record header",
+   "term": "レコードヘッダー",
+   "kind": "rnl"
+  },
+  {
+   "en": "role",
+   "term": "ロール",
+   "kind": "rnl"
+  },
+  {
+   "en": "routing / route",
+   "sense": "the router's work",
+   "term": "配線",
+   "avoid": [
+    "配線ルーティング"
+   ],
+   "kind": "rnl",
+   "note": "配線 is also the word for wire; routing modes are 配線モード."
+  },
+  {
+   "en": "routing / route",
+   "sense": "the path of a drawn wire",
+   "term": "経路",
+   "kind": "rnl",
+   "note": "Also 配線経路."
+  },
+  {
+   "en": "schematic",
+   "term": "回路図",
+   "kind": "rnl"
+  },
+  {
+   "en": "selection",
+   "term": "選択",
+   "kind": "rnl",
+   "note": "Often glossed 選択（SELECT）; choosing in the interface is also 選択."
+  },
+  {
+   "en": "set",
+   "term": "セット",
+   "kind": "rnl"
+  },
+  {
+   "en": "solver",
+   "term": "ソルバー",
+   "kind": "rnl"
+  },
+  {
+   "en": "standard package",
+   "term": "標準パッケージ",
+   "kind": "rnl"
+  },
+  {
+   "en": "standard series",
+   "term": "標準シリーズ",
+   "kind": "rnl"
+  },
+  {
+   "en": "statement",
+   "term": "文",
+   "kind": "rnl",
+   "note": "A semantic statement: 意味記述."
+  },
+  {
+   "en": "structure",
+   "term": "構造",
+   "kind": "rnl"
+  },
+  {
+   "en": "subject",
+   "term": "主語",
+   "kind": "rnl"
+  },
+  {
+   "en": "symbol",
+   "term": "シンボル",
+   "kind": "rnl"
+  },
+  {
+   "en": "terminal",
+   "term": "端子",
+   "kind": "rnl"
+  },
+  {
+   "en": "text",
+   "sense": "the text of a file or netlist",
+   "term": "テキスト",
+   "kind": "rnl",
+   "note": "The text of the standard: 本文; the text that defines a package: 定義の原文."
+  },
+  {
+   "en": "text",
+   "sense": "text drawn in a schematic (@TEXT, labels)",
+   "term": "テキスト",
+   "kind": "rnl",
+   "note": "Style properties say 文字 (文字色, 文字サイズ)."
+  },
+  {
+   "en": "tier",
+   "sense": "solver objectives",
+   "term": "ティア",
+   "avoid": [
+    "レベル"
+   ],
+   "kind": "rnl"
+  },
+  {
+   "en": "union",
+   "term": "和集合",
+   "kind": "rnl"
+  },
+  {
+   "en": "usage",
+   "term": "適用オブジェクト",
+   "avoid": [
+    "利用"
+   ],
+   "kind": "rnl",
+   "note": "Often glossed 適用オブジェクト（usage）; 1 text says 利用パス for Usage path."
+  },
+  {
+   "en": "verb",
+   "term": "述語",
+   "kind": "rnl"
+  },
+  {
+   "en": "vertical",
+   "term": "垂直",
+   "kind": "rnl"
+  },
+  {
+   "en": "wire",
+   "term": "配線",
+   "kind": "rnl"
+  },
+  {
+   "en": "bias source",
+   "term": "バイアス源",
+   "kind": "circuit"
+  },
+  {
+   "en": "bulk",
+   "term": "バルク",
+   "kind": "circuit",
+   "note": "One text glosses it 基板."
+  },
+  {
+   "en": "bus",
+   "term": "バス",
+   "kind": "circuit"
+  },
+  {
+   "en": "cascade",
+   "term": "カスケード",
+   "kind": "circuit"
+  },
+  {
+   "en": "common-emitter stage",
+   "term": "エミッタ接地増幅段",
+   "kind": "circuit"
+  },
+  {
+   "en": "connectivity",
+   "term": "接続関係",
+   "kind": "circuit"
+  },
+  {
+   "en": "D flip-flop",
+   "term": "Dフリップフロップ",
+   "kind": "circuit"
+  },
+  {
+   "en": "device",
+   "term": "素子",
+   "kind": "circuit"
+  },
+  {
+   "en": "differential pair",
+   "term": "差動対",
+   "kind": "circuit"
+  },
+  {
+   "en": "diode",
+   "term": "ダイオード",
+   "kind": "circuit"
+  },
+  {
+   "en": "drain",
+   "term": "ドレイン",
+   "kind": "circuit"
+  },
+  {
+   "en": "five-transistor OTA",
+   "term": "5トランジスタOTA",
+   "kind": "circuit"
+  },
+  {
+   "en": "function / signal-flow block",
+   "term": "機能ブロック",
+   "kind": "circuit",
+   "note": "A block of a signal flow: 信号フローブロック."
+  },
+  {
+   "en": "gate",
+   "term": "ゲート",
+   "kind": "circuit"
+  },
+  {
+   "en": "ground",
+   "sense": "the ground net",
+   "term": "グラウンド",
+   "kind": "circuit",
+   "note": "The ground net: グラウンドネット; a grounded terminal: 接地端子."
+  },
+  {
+   "en": "ground",
+   "sense": "the ground symbol",
+   "term": "グラウンド",
+   "kind": "circuit",
+   "note": "The symbol and the net are both グラウンド."
+  },
+  {
+   "en": "logic gate",
+   "term": "論理ゲート",
+   "kind": "circuit"
+  },
+  {
+   "en": "magnitude response",
+   "term": "振幅特性",
+   "kind": "circuit"
+  },
+  {
+   "en": "no-connect mark",
+   "term": "未接続マーク",
+   "kind": "circuit"
+  },
+  {
+   "en": "passive part",
+   "term": "受動素子",
+   "kind": "circuit"
+  },
+  {
+   "en": "primitive",
+   "sense": "Spectre device",
+   "term": "プリミティブ",
+   "kind": "circuit",
+   "note": "Same word as the RNL primitive (one text)."
+  },
+  {
+   "en": "signal",
+   "term": "信号",
+   "kind": "circuit"
+  },
+  {
+   "en": "simulation / simulate",
+   "term": "シミュレーション",
+   "kind": "circuit"
+  },
+  {
+   "en": "simulator",
+   "term": "シミュレータ",
+   "kind": "circuit"
+  },
+  {
+   "en": "tail / tail transistor",
+   "term": "テール",
+   "kind": "circuit",
+   "note": "The transistor: テールトランジスタ; one text says テール電流源."
+  },
+  {
+   "en": "transconductor",
+   "term": "トランスコンダクタ",
+   "kind": "circuit"
+  },
+  {
+   "en": "transistor",
+   "term": "トランジスタ",
+   "kind": "circuit"
+  },
+  {
+   "en": "Add PATH",
+   "term": "PATHを追加",
+   "kind": "command"
+  },
+  {
+   "en": "Always",
+   "sense": "file association",
+   "term": "常に使う",
+   "kind": "command"
+  },
+  {
+   "en": "Apply and Exit Editing",
+   "term": "適用して編集を終了",
+   "kind": "command"
+  },
+  {
+   "en": "Auto Include",
+   "term": "自動インクルード",
+   "kind": "command"
+  },
+  {
+   "en": "Clear Cache",
+   "term": "キャッシュをクリア",
+   "kind": "command"
+  },
+  {
+   "en": "Collapse",
+   "term": "折りたたむ",
+   "kind": "command"
+  },
+  {
+   "en": "double tap",
+   "term": "ダブルタップ",
+   "kind": "command"
+  },
+  {
+   "en": "eject",
+   "sense": "disk image",
+   "term": "取り出す",
+   "kind": "command"
+  },
+  {
+   "en": "Exclude",
+   "sense": "Library command",
+   "term": "除外",
+   "kind": "command"
+  },
+  {
+   "en": "Exit / quit",
+   "sense": "application or editing",
+   "term": "終了",
+   "kind": "command"
+  },
+  {
+   "en": "Find",
+   "sense": "text search",
+   "term": "検索",
+   "kind": "command",
+   "note": "The menu says ネットリスト内を検索; Search is also 検索."
+  },
+  {
+   "en": "Fit to Window",
+   "term": "ウィンドウに合わせる",
+   "kind": "command"
+  },
+  {
+   "en": "Get Info",
+   "sense": "macOS",
+   "term": "情報を見る",
+   "kind": "command"
+  },
+  {
+   "en": "Help",
+   "sense": "menu",
+   "term": "ヘルプ",
+   "kind": "command"
+  },
+  {
+   "en": "Library",
+   "sense": "panel",
+   "term": "ライブラリ",
+   "kind": "command"
+  },
+  {
+   "en": "Markdown",
+   "sense": "single file",
+   "term": "Markdown（単一ファイル）",
+   "kind": "command",
+   "note": "Kept in English, with a gloss."
+  },
+  {
+   "en": "More info",
+   "sense": "Windows SmartScreen",
+   "term": "詳細情報",
+   "kind": "command"
+  },
+  {
+   "en": "Open Anyway",
+   "sense": "macOS",
+   "term": "このまま開く",
+   "kind": "command",
+   "note": "The viewer's own Open Anyway button says そのまま開く."
+  },
+  {
+   "en": "Open URL",
+   "term": "URLを開く",
+   "kind": "command"
+  },
+  {
+   "en": "Open With",
+   "sense": "macOS",
+   "term": "このアプリケーションで開く",
+   "kind": "command"
+  },
+  {
+   "en": "Open With",
+   "sense": "Windows",
+   "term": "プログラムから開く",
+   "kind": "command"
+  },
+  {
+   "en": "Overwrite",
+   "sense": "file",
+   "term": "上書き",
+   "kind": "command"
+  },
+  {
+   "en": "Problems",
+   "sense": "panel",
+   "term": "問題",
+   "avoid": [
+    "問題一覧"
+   ],
+   "kind": "command",
+   "note": "The viewer tab is 問題; 3 site texts say 問題一覧."
+  },
+  {
+   "en": "Reload",
+   "term": "再読み込み",
+   "kind": "command"
+  },
+  {
+   "en": "Replace",
+   "sense": "file",
+   "term": "置き換える",
+   "kind": "command"
+  },
+  {
+   "en": "Reset",
+   "term": "リセット",
+   "kind": "command"
+  },
+  {
+   "en": "Save As",
+   "term": "名前を付けて保存",
+   "kind": "command"
+  },
+  {
+   "en": "Save Solved Copy As",
+   "term": "求解結果に名前を付けて保存",
+   "kind": "command"
+  },
+  {
+   "en": "scroll",
+   "term": "スクロール",
+   "kind": "command"
+  },
+  {
+   "en": "Search",
+   "term": "検索",
+   "kind": "command",
+   "note": "The solver's search is 探索."
+  },
+  {
+   "en": "Trash",
+   "sense": "macOS",
+   "term": "ゴミ箱",
+   "kind": "command"
+  },
+  {
+   "en": "Undo",
+   "term": "元に戻す",
+   "kind": "command"
+  },
+  {
+   "en": "uninstall",
+   "term": "アンインストール",
+   "kind": "command"
+  }
+ ]
+}

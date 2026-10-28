@@ -1,0 +1,8 @@
+@RNL(type="header") {
+  @VERSION("0.3");
+  @PACKAGE(name="demo-local", version="1.0")
+}
+A package the manifest lists by its path.
+@RNL {
+  $local_style = @DEFINE-STYLE(linecolor="#2b7800") {}
+}

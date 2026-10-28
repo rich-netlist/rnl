@@ -36,6 +36,8 @@
   --select-line: rgba(232, 89, 12, 0.08);
   --out-of-scope: #ececee; /* the lines outside the subcircuit drawn */
   --select-fill: rgba(232, 89, 12, 0.07);
+  /* the rectangle a right drag zooms to: the plain highlight, whatever is selected */
+  --zoom-box-fill: var(--select-fill);
   /* the selection when it is a subcircuit instance, which can be opened */
   --sub: #c2255c;
   --sub-text: rgba(194, 37, 92, 0.18);
@@ -251,6 +253,17 @@ body[data-background="dark"] .usage-overlays { --usage-label-bg: black; }
   background: var(--bg);
 }
 .level-bar { position: relative; padding-left: 4px; }
+/* the bar of files opened by a manifest (manifest-bar.js), between the level bar and the drawing; rows fixed, as it is mostly hidden */
+.drawing > .level-bar { grid-row: 1; }
+.drawing > .manifest-bar { grid-row: 2; }
+.drawing > .canvas { grid-row: 3; }
+.manifest-bar { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 4px 10px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--line); background: var(--panel); }
+.manifest-bar[hidden] { display: none; }
+.manifest-title { color: var(--fg); font-weight: 600; }
+.manifest-source { color: var(--accent); text-decoration: none; }
+.manifest-source:hover { text-decoration: underline; }
+.manifest-author a { color: inherit; text-decoration: underline dotted; }
+.manifest-author a:hover { color: var(--accent); }
 /* the hierarchy path of the level shown (subcircuits.js): a segment per level, each but the root's
    with the instance it was reached through, and the level shown last; the others go back to theirs */
 .level-path { display: flex; align-items: center; flex: 0 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; }
@@ -430,7 +443,7 @@ button.crumb:hover:not(:disabled) { color: var(--fg); }
 
 .drawing {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
 }
@@ -450,11 +463,12 @@ button.crumb:hover:not(:disabled) { color: var(--fg); }
 }
 .canvas.over-object { cursor: pointer; }
 .canvas.dragging { cursor: grabbing; }
+/* Not var(--select): a selected subcircuit instance turns that into its own colour (.sel-sub). */
 .zoom-box {
   position: absolute;
   z-index: 4;
-  border: 1px solid var(--select);
-  background: var(--select-fill);
+  border: 1px solid var(--drawing-select);
+  background: var(--zoom-box-fill);
   pointer-events: none;
 }
 .zoom-box[hidden] { display: none; }
@@ -704,6 +718,16 @@ body[data-background="dark"] .unplaced-row .thumb { background: var(--drawing-ba
   font-variant-numeric: tabular-nums;
 }
 .diag .more { grid-column: 2; color: var(--muted); }
+/*
+ * The names of the severities of another language may be wider than the 58 px of the first column
+ * (advertencia, avertissement): where subgrid is supported, the list is a grid of its own, whose
+ * first column is as wide as the widest name of any row, and each row takes its columns from it.
+ */
+@supports (grid-template-columns: subgrid) {
+  .diags { display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: 8px; }
+  .diag { grid-column: 1 / -1; grid-template-columns: subgrid; }
+  .diags > :not(.diag) { grid-column: 1 / -1; }
+}
 .diags .nothing { padding: 6px 10px; color: var(--muted); }
 .diagnostics-more { padding: 6px 10px; }
 .diagnostics-more button { color: var(--muted); text-align: left; }
@@ -1238,6 +1262,18 @@ body.dropping::after {
 button.pool-open { background: transparent; border: 0; color: inherit; cursor: pointer; }
 button.pool-open:hover { text-decoration: underline; }
 .pool-badge { font-size: 10px; color: var(--muted); max-width: 80px; }
+.format-chip { flex: none; font-size: 10px; line-height: 1; padding: 2px 6px; border: 1px solid var(--line); border-radius: 9px; background: transparent; color: var(--muted); cursor: pointer; }
+.format-chip.chosen { border-color: var(--accent); background: var(--accent); color: var(--panel); }
+/* the hover colour of every button would leave its light text on a light ground */
+.format-chip.chosen:hover:not(:disabled) { background: var(--accent); }
+.format-chip:disabled { cursor: default; opacity: 0.6; }
+.format-menu { position: fixed; z-index: 30; display: flex; flex-direction: column; min-width: 140px; padding: 4px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); box-shadow: 0 4px 14px rgb(0 0 0 / 18%); }
+.format-item { padding: 5px 10px 5px 24px; border: 0; border-radius: 4px; background: transparent; color: inherit; text-align: left; cursor: pointer; position: relative; }
+.format-item:hover, .format-item:focus-visible { background: var(--select-text); outline: none; }
+.format-check { position: absolute; left: 8px; }
+.pool-include { display: flex; align-items: center; gap: 6px; padding: 3px 10px 3px 42px; font-size: 12px; }
+.pool-include-name { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; direction: rtl; text-align: left; color: var(--muted); }
+.pool-include-name::before { content: "\200e"; }
 .pool-note { font-size: 11px; color: var(--muted); margin: 4px 10px 10px; overflow-wrap: anywhere; }
 .pool-temporary { padding-left: 10px; border-bottom: 1px solid var(--line); }
 .pool-temporary .pool-open { font-style: italic; }
@@ -1249,6 +1285,7 @@ button.pool-open:hover { text-decoration: underline; }
 .lib-toggle[aria-expanded="false"] .chevron { transform: rotate(-90deg); }
 .lib-title { font-size: 12px; font-weight: 600; color: var(--fg); }
 .lib-ordinal { flex: none; font-size: 11px; font-weight: 600; color: var(--muted); }
+.lib-deep { flex: none; font-size: 10px; padding: 1px 5px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); white-space: nowrap; }
 .lib-path { font-size: 12px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .lib-count { flex: none; font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; line-height: 15px; }
 .lib-act { flex: none; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 3px; background: transparent; color: var(--muted); font-size: 13px; cursor: pointer; }
@@ -1296,3 +1333,123 @@ button.pool-open:hover { text-decoration: underline; }
 .symbol-definition { border: 1px solid var(--line); border-radius: 6px; padding: 8px 0; overflow: auto; font: 12px/1.55 ui-monospace, "Cascadia Mono", Consolas, "Microsoft YaHei UI", monospace, "Noto Sans SC"; background: var(--netlist-background); }
 .symbol-definition .ln { min-width: max-content; }
 .symbol-definition .no { width: 4em; }
+
+/* the display settings a manifest proposes, and the box that writes them into one (display.js) */
+.display-setting { display: flex; align-items: flex-start; gap: 8px; text-align: left; }
+.dialog-body .display-setting input[type="checkbox"] { width: auto; flex: none; margin: 2px 0 0; padding: 0; }
+
+/* ------------------------------------------------------------------ small screens and touch */
+
+/* a submenu under its entry, where the screen has room on neither side of it (menubar.js) */
+.submenu.inline { position: static; width: auto; min-width: 0; margin: 0 8px 4px 16px; box-shadow: none; }
+/* the status bar keeps the zoom; a long name of the selection is cut short */
+.statusbar .selection { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 1; }
+
+/*
+ * Upright and narrow (a phone, a tablet held upright, a narrow window): the side panel under the
+ * drawing, as wide as the screen, its handle between them; folded, only its tabs show, and a tap on
+ * one unfolds it (panels.js). Its height is --panel-h, which the handle sets.
+ */
+@media (min-width: 600px) and (max-width: 1023px) and (min-height: 500px) and (max-aspect-ratio: 4/5) {
+  .app, .app.sidebar-hidden { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(80px, 1fr) 24px var(--panel-h, 33vh); }
+  .drawing { grid-column: 1; grid-row: 1; }
+  .vsplit { grid-column: 1; grid-row: 2; display: grid; place-items: center; cursor: row-resize; border-width: 1px 0; touch-action: none; }
+  .vsplit::after { content: ""; width: 44px; height: 4px; border-radius: 2px; background: var(--muted); opacity: 0.5; }
+  .sidebar { grid-column: 1; grid-row: 3; }
+  .app.sidebar-hidden { grid-template-rows: minmax(80px, 1fr) 0 auto; }
+  .app.sidebar-hidden .sidebar { display: grid; grid-template-rows: auto; }
+  .app.sidebar-hidden .sidebar > :not(.side-head) { display: none; }
+  .app.sidebar-hidden #hide-sidebar, .app.sidebar-hidden #show-sidebar { display: none; }
+  .view-tabs { flex-wrap: nowrap; }
+  .side-head { height: auto; min-height: 32px; }
+  /* the netlist's file and options on one row, the options scrolled sideways, to leave it its lines */
+  .file-bar { flex-direction: row; align-items: center; gap: 8px; }
+  .netlist-file { width: auto; flex: 0 1 auto; min-width: 4em; }
+  .netlist-options, .rnl-filter-group { flex-wrap: nowrap; }
+  .netlist-options { flex: 1 1 auto; min-width: 0; overflow-x: auto; white-space: nowrap; }
+  .netlist-options > * { flex: none; }
+  /* the problems as tall as what they hold, at most their height: a few leave the netlist the rest */
+  .problems-body { height: auto; max-height: var(--problems-h); }
+}
+
+/* a finger is bigger than a pointer: the controls a finger presses, the rows of the menus and lists */
+@media (pointer: coarse) {
+  .menubar { height: auto; min-height: 44px; }
+  .menu-title { min-height: 44px; min-width: 44px; padding: 0 12px; }
+  .menu-list .menu-item { min-height: 40px; }
+  .side-head { height: auto; min-height: 44px; }
+  .view-tabs { flex-wrap: nowrap; align-self: stretch; }
+  .view-tabs button { min-height: 44px; min-width: 44px; }
+  #hide-sidebar, #show-sidebar { min-width: 44px; min-height: 44px; }
+  .problems-head { min-height: 44px; }
+  .level-bar { height: auto; min-height: 44px; }
+  .up-button { min-height: 44px; min-width: 44px; }
+  .enter-badge { width: 32px; height: 32px; }
+  .enter-badge svg { width: 20px; height: 20px; }
+}
+.menu-list.scrolls { overflow-y: auto; }
+/* the icon of an entry, in the colour of its text: the globe of the Language submenu */
+.menu-icon { flex: none; width: 14px; height: 14px; margin-right: 6px; vertical-align: -2px; fill: none; stroke: currentColor; stroke-width: 1.2; stroke-linecap: round; }
+
+/*
+ * A mobile browser flashes what a finger presses that takes clicks or focus: the drawing, the whole
+ * screen's canvas, among them. None flashes; the controls show their own press.
+ */
+html { -webkit-tap-highlight-color: transparent; }
+@media (pointer: coarse) {
+  button:active:not(:disabled), [role="tab"]:active, [role="treeitem"]:active, .menu-item:active { background: var(--hover); }
+}
+
+/* the tabs of a touch screen: no keys to name, and they scroll sideways when they do not fit */
+@media (pointer: coarse) {
+  .view-tabs { flex: 1 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  .view-tabs::-webkit-scrollbar { display: none; }
+  .view-tabs .tab-key { display: none; }
+  .view-tabs button { flex: none; padding-left: 10px; }
+}
+
+/* the netlist's options behind a button of their own, where the screen is a phone's (panels.js) */
+.netlist-options-button, .page-switch, .page-link { display: none; }
+
+/*
+ * A phone, narrow or low: the drawing and the side panel are two pages of the screen, one shown at a
+ * time and the other kept as it was, laid out but hidden; the bar at the bottom switches them, and a
+ * link in the status bar shows the selection on the other page (panels.js). An embedded viewer keeps
+ * its one canvas.
+ */
+@media (max-width: 599px), (pointer: coarse) and (max-height: 499px) {
+  body:not(.embed) { grid-template-rows: minmax(0, 1fr) auto auto; }
+  body.menubar-shown:not(.embed) { grid-template-rows: auto minmax(0, 1fr) auto auto; }
+  body:not(.embed) .app, body:not(.embed) .app.sidebar-hidden { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+  body:not(.embed) .drawing, body:not(.embed) .sidebar { grid-column: 1; grid-row: 1; }
+  body:not(.embed) .vsplit, body:not(.embed) #hide-sidebar, body:not(.embed) .app.sidebar-hidden #show-sidebar { display: none; }
+  body:not(.embed) .app.sidebar-hidden .sidebar { display: grid; visibility: hidden; }
+  body:not(.embed) .app:not(.sidebar-hidden) .drawing { visibility: hidden; }
+  body:not(.embed) .page-switch { display: flex; height: 44px; border-top: 1px solid var(--line); background: var(--panel); }
+  .page-switch button { flex: 1; min-height: 40px; margin: 2px; color: var(--muted); }
+  .page-switch button[aria-selected="true"] { color: var(--accent); background: var(--hover); font-weight: 600; }
+  body:not(.embed) #app[data-page="drawing"] ~ .statusbar #show-in-netlist,
+  body:not(.embed) #app[data-page="panel"] ~ .statusbar #show-in-drawing { display: inline-block; }
+  .statusbar { height: auto; min-height: 32px; gap: 10px; }
+  .statusbar .pointer { display: none; }
+  .page-link { flex: none; margin-left: auto; min-height: 32px; padding: 0 10px; border-color: var(--line); color: var(--accent); }
+  .page-link:disabled { color: var(--muted); opacity: 0.6; }
+  /* the netlist's file and the button for its options on one row; the options, opened, under them */
+  .file-bar { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+  .netlist-file { width: auto; flex: 1 1 0; min-width: 0; }
+  .netlist-options-button { display: inline-block; flex: none; min-height: 44px; min-width: 44px; margin-left: auto; border-color: var(--line); }
+  .netlist-options { display: none; flex-basis: 100%; }
+  .file-bar.options-open .netlist-options { display: flex; }
+  .problems-body { height: auto; max-height: var(--problems-h); }
+}
+
+/* a phone lying down: the status bar and the switch bar share the bottom row, the switch at its end */
+@media (pointer: coarse) and (max-height: 499px) {
+  body:not(.embed) { grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: minmax(0, 1fr) auto; }
+  body.menubar-shown:not(.embed) { grid-template-rows: auto minmax(0, 1fr) auto; }
+  body:not(.embed) > .menubar, body:not(.embed) > .app { grid-column: 1 / -1; }
+  body:not(.embed) > .statusbar { grid-column: 1; grid-row: -2; }
+  body:not(.embed) > .page-switch { grid-column: 2; grid-row: -2; border-left: 1px solid var(--line); }
+  /* buttons of one width, so that the row stays as it is when the page shown, in bold, changes */
+  body:not(.embed) > .page-switch button { flex: none; width: 96px; padding: 0 8px; }
+}

@@ -1,7 +1,7 @@
 * Facts of the segments of one pipe: the later segment is written later
-*! 一条语句的管道里有几段写同一个对象的位置或朝向时，后面的那段算后写，同优先级时它先纳入、保留下来（8.5），先写的那段被它取代。
-*! R1 先写 PLACE(0, 0)，后写 PLACE(5, 5)：画在 (5, 5)。R2 先写 ORIENT("R0")，后写 ORIENT("R90")：转 R90。
-*! R3 先写 x=20，再写 y=3，最后写 x=25：画在 (25, 3)。R4 前一段写 high、后一段写 normal：high 的那段保留，画在 (0, -10)。
+*! When several segments of one statement's pipe write the position or orientation of the same object, the later segment counts as written later: at the same priority it is taken in first and kept (8.5), and replaces the earlier.
+*! R1 has PLACE(0, 0) and then PLACE(5, 5): drawn at (5, 5). R2 has ORIENT("R0") and then ORIENT("R90"): turned R90.
+*! R3 has x=20, then y=3, then x=25: drawn at (25, 3). R4's first segment is high and its second normal: the high one is kept, drawn at (0, -10).
 R1 a1 b1 1k
 R2 a2 b2 2k
 R3 a3 b3 3k

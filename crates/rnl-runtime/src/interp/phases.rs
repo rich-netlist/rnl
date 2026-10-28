@@ -231,7 +231,11 @@ impl Interp<'_> {
                 let inst = self.inst_of(base).clone();
                 if inst.is_subckt {
                     if let Some(m) = &inst.model {
-                        let key = self.doc.key(m);
+                        // the subcircuit it names, by the rules of its file; its blocks by its name
+                        let key = match self.doc.subckt_of(&inst) {
+                            Some(sub) => self.doc.level_key(sub),
+                            None => self.doc.key(m),
+                        };
                         if let Some(blocks) = self.block_symbols.get(&key) {
                             for (p, sym) in blocks.values() {
                                 let mut pp = vec![PosElem::Int(1)];
@@ -286,6 +290,41 @@ impl Interp<'_> {
             }
         }
         self.warn_undrawn(s);
+        self.hint_undefined(s);
+    }
+
+    /// One hint for each subcircuit that instances of the level name, that no file read defines,
+    /// and that they are drawn with the renderer's stand-in box for, as no rule or package gives
+    /// them a symbol (6.4, 9.2.6): a missing include is told, a PDK device with a symbol is not.
+    fn hint_undefined(&mut self, s: SceneId) {
+        let mut by_master: Vec<(String, Vec<ObjId>)> = Vec::new();
+        for o in self.scenes[s].insts.clone() {
+            if !self.scenes[s].default_symbol.contains(&o) {
+                continue;
+            }
+            let inst = self.inst_of(o);
+            let Some(master) = inst.model.clone().filter(|_| inst.is_subckt) else { continue };
+            if self.doc.subckt_of(inst).is_some() {
+                continue;
+            }
+            match by_master.iter_mut().find(|(m, _)| *m == master) {
+                Some((_, v)) => v.push(o),
+                None => by_master.push((master, vec![o])),
+            }
+        }
+        for (master, insts) in by_master {
+            let names: Vec<String> = insts.iter().map(|o| self.inst_of(*o).name.clone()).collect();
+            let first = self.inst_of(insts[0]).clone();
+            let shown = names.iter().take(8).cloned().collect::<Vec<_>>().join(", ");
+            let more = if names.len() > 8 { format!(" and {} more", names.len() - 8) } else { String::new() };
+            let verb = if names.len() == 1 { "is" } else { "are" };
+            self.sink.hint(
+                format!(
+                    "no file read defines the subcircuit {master}, so {shown}{more} {verb} drawn as a box of its terminals; an include may be missing (6.4, 9.2.6)"
+                ),
+                Some(Loc::line(first.file.clone(), first.line.max(1))),
+            );
+        }
     }
 
     /// One warning for each model card that devices of the level name and the netlist lacks: they
@@ -779,15 +818,24 @@ impl Interp<'_> {
             }
         }
         for t in self.scenes[s].texts.clone() {
-            let (att, from_symbol, site, off) = match self.o(t) {
-                ObjData::Text { attach, from_symbol, site, off, .. } => (*attach, *from_symbol, site.clone(), *off),
-                ObjData::KeyText { attach, from_symbol, site, off, .. } => (*attach, *from_symbol, site.clone(), *off),
+            // `by_rule`: only rules gave the text, a TEXT for what a selection reached (10.4); one
+            // that lands on a usage without a symbol or a terminal without a pin does nothing then,
+            // and says nothing, as SET-STYLE does on a semantic usage (8.3), such as the rules of
+            // rnl-std-no-labels on the usages of structures; written for the object, it fails
+            let (att, from_symbol, site, off, by_rule) = match self.o(t) {
+                ObjData::Text { attach, from_symbol, site, off, generated, .. } => {
+                    (*attach, *from_symbol, site.clone(), *off, *generated)
+                }
+                ObjData::KeyText { attach, from_symbol, site, off, generated, direct, .. } => match direct {
+                    Some((c, o)) => (*attach, *from_symbol, Some(c.clone()), *o, false),
+                    None => (*attach, *from_symbol, site.clone(), *off, *generated),
+                },
                 _ => continue,
             };
             let mut failed = false;
             match self.o(att).clone() {
                 ObjData::Usage(_) if !self.scenes[s].symbol.contains_key(&att) && !from_symbol => {
-                    if site.is_some() {
+                    if site.is_some() && !by_rule {
                         let l = self.label(att);
                         self.diag_site(
                             Severity::Error,
@@ -799,7 +847,7 @@ impl Interp<'_> {
                     failed = true;
                 }
                 ObjData::Term { .. } if !self.has_pin(s, att) => {
-                    if site.is_some() {
+                    if site.is_some() && !by_rule {
                         let l = self.label(att);
                         self.diag_site(
                             Severity::Error,

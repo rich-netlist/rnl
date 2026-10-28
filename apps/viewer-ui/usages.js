@@ -48,6 +48,18 @@ function setting(u) {
   return value;
 }
 function persist() { save("usage-preferences", Object.fromEntries(preferences)); }
+
+/**
+ * What the drawing shows of the level shown's overlays, for File > Export Image: whether usages and
+ * current directions are shown, and each usage's visibility and colour, by its object.
+ */
+export function overlayChoices() {
+  return {
+    usages: shown,
+    currents: currentsShown,
+    each: new Map(usages().map((u) => [u.object, { visible: visible(u), color: setting(u).color }])),
+  };
+}
 function remember(u) {
   const key = keyOf(u);
   preferences.delete(key);
@@ -74,6 +86,16 @@ export function startUsages() {
   const height = Math.max(80, Math.min(800, Number(load("usage-list-height", 240)) || 240));
   document.documentElement.style.setProperty("--usage-list-h", `${height}px`);
   renderUsages();
+}
+/**
+ * Show or hide usages and current directions as a manifest's display settings say (display.js):
+ * for this page only, not kept in the settings.
+ */
+export function showOverlays({ usages, currents }) {
+  if (typeof usages === "boolean") { shown = usages; setCheck("toggle-usages", shown); }
+  if (typeof currents === "boolean") { currentsShown = currents; setCheck("toggle-currents", currentsShown); }
+  revision++;
+  repaint();
 }
 export function toggleUsages() {
   shown = !shown;

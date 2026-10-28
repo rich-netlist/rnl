@@ -106,7 +106,26 @@
           {
             "id": "&0",
             "global": true,
-            "port": false
+            "port": false,
+            "usages": [
+              {
+                "id": "@rnl-std-virtual.rnl:52:9",
+                "definition": "$GND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 52,
+                "source": "body",
+                "made_in": "%gs_R4_2",
+                "state": "in-effect"
+              }
+            ]
           }
         ]
       },
@@ -184,6 +203,24 @@
                   "&b"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "%r",
+                "definition": "$ROW",
+                "roles": [
+                  {
+                    "role": "m",
+                    "set": true,
+                    "member": "#R1",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 27,
+                "source": "written",
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -235,6 +272,24 @@
                 "nets": [
                   "&c"
                 ]
+              }
+            ],
+            "usages": [
+              {
+                "id": "%r",
+                "definition": "$ROW",
+                "roles": [
+                  {
+                    "role": "m",
+                    "set": true,
+                    "member": "#R2",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 27,
+                "source": "written",
+                "state": "in-effect"
               }
             ]
           },
@@ -288,6 +343,56 @@
                   "&d"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "%p1",
+                "definition": "$PAIR_Y",
+                "roles": [
+                  {
+                    "role": "a",
+                    "set": false,
+                    "member": "#R3",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 22,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "%r",
+                "definition": "$ROW",
+                "roles": [
+                  {
+                    "role": "m",
+                    "set": true,
+                    "member": "#R3",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 27,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "%p2",
+                "definition": "$PAIR_Y",
+                "roles": [
+                  {
+                    "role": "a",
+                    "set": false,
+                    "member": "#R3",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 45,
+                "source": "written",
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -339,6 +444,56 @@
                 "nets": [
                   "&0"
                 ]
+              }
+            ],
+            "usages": [
+              {
+                "id": "%p1",
+                "definition": "$PAIR_Y",
+                "roles": [
+                  {
+                    "role": "b",
+                    "set": false,
+                    "member": "#R4",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 22,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "%gs_R4_2",
+                "definition": "$GND_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#R4:2",
+                    "terminal": "n"
+                  }
+                ],
+                "file": 0,
+                "line": 41,
+                "source": "solver",
+                "state": "in-effect"
+              },
+              {
+                "id": "%p2",
+                "definition": "$PAIR_Y",
+                "roles": [
+                  {
+                    "role": "b",
+                    "set": false,
+                    "member": "#R4",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 45,
+                "source": "written",
+                "state": "in-effect"
               }
             ]
           },

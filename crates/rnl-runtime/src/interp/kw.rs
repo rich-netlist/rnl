@@ -11,7 +11,7 @@ use crate::words::{words, ParamSpec, ParamType, ParamsSpec, PositionSpec, Takes}
 use super::ctx::{Ctx, Frame, FrameKind, FrameRef, Nested, StmtSpan};
 use super::eval::{get, ArgV, Stop, R};
 use super::obj::*;
-use super::scene::{TargetOp, Task};
+use super::scene::{FailedApplication, TargetOp, Task};
 use super::Interp;
 
 const MAX_SYMBOL_LEVELS: usize = 64;
@@ -79,8 +79,8 @@ impl Interp<'_> {
             "DEFINE-SYMBOL" => self.kw_define_symbol(kw, &args, seg, ctx, member),
             "DEFINE-STYLE" => self.kw_define_style(kw, &args, seg, ctx, member),
             "DEFINE" => self.kw_define(kw, &args, seg, ctx, member),
-            "AS" => self.kw_usage(kw, args, seg, ctx, false),
-            "ATTACH" => self.kw_usage(kw, args, seg, ctx, true),
+            "AS" => self.kw_usage_noted(kw, args, seg, ctx, false, member),
+            "ATTACH" => self.kw_usage_noted(kw, args, seg, ctx, true, member),
             "PIN" => self.kw_pin(kw, &args, seg, ctx),
             "LINE" | "RECTANGLE" | "CIRCLE" | "ELLIPSE" | "ARC" | "BEZIER" => self.kw_prim(kw, &args, seg, ctx),
             "TEXT" => self.kw_text(kw, &args, seg, ctx),
@@ -501,7 +501,7 @@ impl Interp<'_> {
                             _ => return self.fail(ctx, "a role is a name or [name, kind] (9.4)", at),
                         };
                         for k in &kinds {
-                            if !["instance", "terminal", "net", "point", "wire", "usage"].contains(&k.as_str()) {
+                            if !ROLE_KINDS.contains(&k.as_str()) {
                                 return self.fail(ctx, format!("unknown kind name {k} (9.4)"), at);
                             }
                         }
@@ -663,6 +663,47 @@ impl Interp<'_> {
 
     // ------------------------------------------------------------------ usages: AS, ATTACH (9.4, 10.5, 12)
 
+    /// [`Interp::kw_usage`], noting an application written in a record of a level that fails, with
+    /// the name it binds, its definition and the objects written for its roles, so that a tool can
+    /// list it with them ([`crate::model::FailedUsage`]).
+    fn kw_usage_noted(
+        &mut self,
+        kw: &str,
+        args: Vec<ArgV>,
+        seg: &Segment,
+        ctx: &Ctx,
+        first: bool,
+        member: &Rc<Member>,
+    ) -> R<(ObjId, bool)> {
+        let result = self.kw_usage(kw, args.clone(), seg, ctx, first);
+        let (Err(Stop::Fail(diag)), Some(s)) = (&result, ctx.scene) else { return result };
+        if ctx.frame.is_some() || ctx.selected {
+            return result;
+        }
+        let npiped = usize::from(seg.piped).min(args.len());
+        let written = &args[npiped..];
+        let dfn_at = if first { 0 } else { written.len().saturating_sub(1) };
+        let definition =
+            written.get(dfn_at).map(|a| self.anon_def(a.obj)).filter(|d| matches!(self.o(*d), ObjData::Definition(_)));
+        let roles_of: Vec<String> =
+            definition.map(|d| self.def(d).roles.iter().map(|r| r.name.clone()).collect()).unwrap_or_default();
+        let objs =
+            args[..npiped].iter().chain(written.iter().enumerate().filter(|(k, _)| *k != dfn_at).map(|(_, a)| a));
+        let roles = objs
+            .enumerate()
+            .filter(|(_, a)| self.failed_obj(a.obj).is_none())
+            .map(|(k, a)| (a.role.clone().or_else(|| roles_of.get(k).cloned()), a.obj))
+            .collect();
+        let k = member.segments.iter().position(|x| x.id == seg.id);
+        let name = member.binds.iter().find(|b| b.prefix == '%' && Some(b.after) == k).map(|b| b.name.clone());
+        let stmt = ctx.stmt.as_ref().map_or((ctx.rec, seg.start, seg.end), |st| (st.rec, st.start, st.end));
+        let app = FailedApplication { name, definition, roles, stmt, diag: *diag };
+        if !self.scenes[s].failed_usages.iter().any(|f| f.stmt == app.stmt) {
+            self.scenes[s].failed_usages.push(app);
+        }
+        result
+    }
+
     /// AS takes the definition as its last object, ATTACH as the first written one; objects that
     /// come down the pipe fill roles and never take the definition position (5.5, 5.6).
     fn kw_usage(&mut self, kw: &str, args: Vec<ArgV>, seg: &Segment, ctx: &Ctx, first: bool) -> R<(ObjId, bool)> {
@@ -753,6 +794,8 @@ impl Interp<'_> {
                 )
             })
             .collect();
+        let given: Vec<(String, Lit)> =
+            d.params.iter().filter_map(|(n, _)| get(&p, n).map(|v| (n.clone(), written_in(v, ctx.unit)))).collect();
         // roles (5.2.1, 9.4)
         let mut filled: Vec<(String, ArgV)> = Vec::new();
         let labeled = objs.iter().filter(|a| a.role.is_some()).count();
@@ -840,7 +883,7 @@ impl Interp<'_> {
                 seg.start,
             );
         }
-        let app = Rc::new(Application { dfn, filled, params, priority, seg_start: seg.start, seg: seg.clone() });
+        let app = Rc::new(Application { dfn, filled, params, given, priority, seg_start: seg.start, seg: seg.clone() });
         if let Some(rname) = lazy_roles.first().cloned() {
             let key = ("gen", ptr_seg(seg), self.frame_key(ctx), 0usize);
             let gen = match self.node_memo.get(&key) {
@@ -987,6 +1030,7 @@ impl Interp<'_> {
             roles: rmap,
             role_sets: rsets,
             params: app.params.clone(),
+            given: app.given.clone(),
             locals: Vec::new(),
             parent,
             generated,
@@ -1040,16 +1084,14 @@ impl Interp<'_> {
         off: usize,
     ) -> R<()> {
         let Some(kinds) = kinds else { return Ok(()) };
-        let mut k = self.kind_of(obj);
-        if matches!(self.o(obj), ObjData::Bundle { .. }) {
-            k = "instance";
-        }
-        if let ObjData::Term { owner, .. } = self.o(obj) {
-            if matches!(self.o(*owner), ObjData::Bundle { .. }) {
-                k = "terminal";
-            }
-        }
-        if !kinds.iter().any(|x| x == k) {
+        let any = self.kind_of(obj);
+        // a TEXT is also a label or an annotation, by what it is attached to (5.1)
+        let k = match any {
+            "text" => self.obj_kind(obj).unwrap_or(any),
+            _ => any,
+        };
+        // "instance" also takes bundles, and "terminal" their terminals, which are terminals (11.8)
+        if !kinds.iter().any(|x| x == k || x == any || (x == "instance" && k == "bundle")) {
             let dl = self.label(dfn);
             let ol = self.label(obj);
             return self.fail(
@@ -1134,7 +1176,7 @@ impl Interp<'_> {
         let val = match r {
             Ok(v) => v,
             Err(Stop::Fail(dg)) => self.new_obj(ObjData::Failed(dg)),
-            Err(Stop::LocalRef) => self.new_obj(ObjData::Failed(None)),
+            Err(Stop::LocalRef) | Err(Stop::OwnLevel) => self.new_obj(ObjData::Failed(None)),
             Err(Stop::NoCircuit) => return Err(Stop::NoCircuit),
         };
         self.tm_memo.insert(key, val);
@@ -1175,6 +1217,7 @@ impl Interp<'_> {
             roles: vec![(first.unwrap(), pt)],
             role_sets: Vec::new(),
             params: app.params.clone(),
+            given: app.given.clone(),
             locals: Vec::new(),
             parent: None,
             generated: false,
@@ -1263,6 +1306,7 @@ impl Interp<'_> {
                     self.err(&sctx, "this statement cannot be written in a symbol body (9.2.2)", m.start);
                 }
                 Err(Stop::LocalRef) => return Err(Stop::LocalRef),
+                Err(Stop::OwnLevel) => return Err(Stop::OwnLevel),
             }
         }
         Ok(())
@@ -1582,7 +1626,14 @@ impl Interp<'_> {
 
     fn set_text_off(&mut self, t: ObjId, off: usize) {
         match self.om(t) {
-            ObjData::Text { off: o, .. } | ObjData::KeyText { off: o, .. } => *o = off,
+            ObjData::Text { off: o, .. } => *o = off,
+            ObjData::KeyText { off: o, direct, .. } => {
+                *o = off;
+                // a TEXT written for the object itself, as this one is, is the last direct one
+                if let Some((_, d)) = direct {
+                    *d = off;
+                }
+            }
             _ => {}
         }
     }
@@ -1784,7 +1835,7 @@ impl Interp<'_> {
         let level = self.units[u].level.filter(|_| self.units[u].kind == super::unit::UnitKind::Level);
         match level {
             Some(lv) if ctx.frame.is_none() && self.doc.levels[lv].kind == crate::host::LevelKind::Subckt => {
-                let name = self.doc.key(&self.doc.levels[lv].name);
+                let name = self.doc.level_key(lv);
                 let (rec, k) = match &ctx.member_key {
                     MemberKey::M { rec, k, .. } => (*rec as i64, *k as i64),
                     _ => (0, 0),
@@ -2127,12 +2178,18 @@ impl Interp<'_> {
     }
 }
 
+/// The kind names a role can be declared with (9.4), those of the word list (5.3).
+const ROLE_KINDS: [&str; 10] =
+    ["instance", "terminal", "net", "point", "wire", "usage", "bundle", "text", "annotation", "label"];
+
 /// One AS or ATTACH, applied once or once per member.
 #[derive(Debug)]
 pub struct Application {
     pub dfn: ObjId,
     pub filled: Vec<(String, ArgV)>,
     pub params: Vec<(String, Option<Lit>)>,
+    /// The parameters the statement writes, without the definition's defaults.
+    pub given: Vec<(String, Lit)>,
     pub priority: Option<Priority>,
     pub seg_start: usize,
     pub seg: Segment,

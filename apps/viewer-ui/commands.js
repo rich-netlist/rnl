@@ -1,4 +1,4 @@
-import { m, locale, setLanguage, translate } from "./i18n.js";
+import { languageFor, m, locale, setLanguage, translate, uiLanguages } from "./i18n.js";
 // The commands and the keys that run them. Both come from the command table, commands.json, which
 // the desktop viewer also builds its native menu from: the menus, their items and submenus, and per
 // item its id, its label, its keys and the platforms that offer it. A command runs by its id,
@@ -22,11 +22,13 @@ import { doc, selected } from "./state.js";
 import { findInSource } from "./text.js";
 import { ascend, descend, opens } from "./subcircuits.js";
 import { checkForUpdates } from "./updates.js";
+import { bundledPackagesHelp } from "./bundled-packages.js";
 import { fileAssociations } from "./file-associations.js";
 import { memoryCache } from "./memory-cache.js";
 import { toggleUsages, toggleCurrents } from "./usages.js";
 import { netlistColors } from "./netlist-colors.js";
-import { downloadLibrary } from "./library-download.js";
+import { downloadManifest, openManifest, openProject, saveProject } from "./project.js";
+import { exportImage } from "./export-image.js";
 import { $ } from "./util.js";
 
 let table = null; // commands.json, once loaded
@@ -37,6 +39,7 @@ export async function startCommands() {
   const response = await fetch("commands.json");
   if (!response.ok) throw new Error(`The page could not load its command table (${response.status}).`);
   table = await response.json();
+  for (const menu of table.menus) addLanguages(menu.items);
   for (const [id, checked] of checks) shell.setCheck(id, checked);
   shell.onCommand(command);
   setEnabled("descend-new-window", false);
@@ -44,10 +47,23 @@ export async function startCommands() {
   languageChecks();
 }
 
+/**
+ * The submenu that the table marks with "languages" lists English, and after it each language that
+ * i18n.js offers, by its name in itself, as the item language-<code> of i18n/languages.json.
+ */
+function addLanguages(items) {
+  for (const item of items) {
+    if (item === "-" || !item.items) continue;
+    if (item.languages) {
+      item.items = [...item.items, ...uiLanguages().slice(1).map((l) => ({ id: `language-${l.lang}`, label: l.name, check: true, radio: true }))];
+    }
+    addLanguages(item.items);
+  }
+}
+
 function languageChecks() {
   if (!table) return;
-  setCheck("language-en", locale() === "en");
-  setCheck("language-zh", locale() === "zh-CN");
+  for (const l of uiLanguages()) setCheck(`language-${l.lang}`, locale() === l.code);
 }
 window.addEventListener("language-changed", languageChecks);
 
@@ -58,10 +74,10 @@ window.addEventListener("language-changed", languageChecks);
 export function command(id, options = {}) {
   if (!isEnabled(id)) return;
   if (shell?.embed && !["fit", "zoom-in", "zoom-out", "descend", "descend-new-window", "ascend"].includes(id)) return;
+  const language = uiLanguages().find((l) => `language-${l.lang}` === id);
+  if (language) return setLanguage(language.code).catch(error =>
+    inform({ title: m("Language"), paragraphs: [m`Could not change language: ${error.message || error}`] }));
   switch (id) {
-    case "language-en":
-    case "language-zh": return setLanguage(id === "language-en" ? "en" : "zh-CN").catch(error =>
-      inform({ title: m("Language"), paragraphs: [m`Could not change language: ${error.message || error}`] }));
     case "new-window": return duplicateWindow();
     case "open": pickAndOpen("file"); break;
     case "include-file": includeFiles("file"); break;
@@ -74,8 +90,13 @@ export function command(id, options = {}) {
     case "toggle-auto-include": return toggleAutoInclude();
     case "memory-cache": return memoryCache();
     case "save": save(); break;
-    case "download-library": return downloadLibrary();
+    case "save-project": return saveProject();
+    case "open-project": return openProject();
+    case "download-manifest": return downloadManifest();
+    case "load-manifest": return openManifest();
     case "save-as": saveAs(); break;
+    case "export-svg": return exportImage("svg");
+    case "export-png": return exportImage("png");
     case "save-utf8": save(false, "utf8"); break;
     case "save-as-utf8": saveAs("utf8"); break;
     case "file-associations": return fileAssociations();
@@ -112,8 +133,8 @@ export function command(id, options = {}) {
     case "descend-new-window": return descend(selected, { newWindow: true });
     case "ascend": return ascend(options);
     case "shortcuts": inform({ title: m("Keyboard Shortcuts"), paragraphs: [
-      m`${m`${m("1: Library. 2: Netlist. 3: Hierarchy. 4: Symbol. 5: Usage. 6: Not drawn.")}${shell.solve ? m(" 7: Solve report.") : ""}`}${m(" These keys also expand a collapsed side panel; they do not run while typing.")}`,
-      m("Ctrl+R: Show Usages. F5: Reload the netlist."),
+      m`${m`${m("1: Library. 2: Netlist. 3: Hierarchy. 4: Symbol. 5: Usage. 6: Not drawn.")}${shell.solve ? m(" 7: Solve.") : ""}`}${m(" These keys also expand a collapsed side panel; they do not run while typing.")}`,
+      m("Ctrl+R: Show Usages. Shift+R: Show Current Directions. F5: Reload the netlist."),
       m("E or Enter: Open Subcircuit. Ctrl+E or Backspace: Up to Parent Level."),
       m("Shift+E or Shift+Enter: Open Subcircuit in New Window. Hold Shift during any circuit navigation to open its target in a new window."),
       m("Ctrl+Q: Edit Text (the physical Control key on macOS too). Ctrl+Enter: Apply and Exit Editing."),
@@ -125,6 +146,7 @@ export function command(id, options = {}) {
     case "solve-save-utf8": saveSolved("utf8"); break;
     case "solve-settings": settings(); break;
     case "check-updates": checkForUpdates(); break;
+    case "public-packages": bundledPackagesHelp(); break;
     case "about": about(); break;
     case "desktop-viewer": toolsPage(); break;
     default: break;
@@ -144,17 +166,17 @@ function about() {
   }
 }
 
-/** The project site's page of the tools, which offers the desktop viewer, in each of its languages. */
-const TOOLS = { zh: "https://rich-netlist.github.io/rnl/zh/tools.html", en: "https://rich-netlist.github.io/rnl/en/tools.html" };
+/** The project site's page of the tools, which offers the desktop viewer, in a language of the site. */
+const TOOLS = (lang) => `https://rich-netlist.github.io/rnl/${lang}/tools.html`;
 
 /**
- * Show the site's page of the tools through the shell (Help > Desktop Viewer, on the web): in
- * Chinese when the browser's languages put Chinese before English, else in English, the site's
- * default.
+ * Show the site's page of the tools through the shell (Help > Desktop Viewer, on the web): in the
+ * first of the browser's languages that the project's list of languages offers (i18n/languages.json,
+ * by its matches), else in English, the site's default.
  */
 function toolsPage() {
-  const first = navigator.languages.find((language) => /^(en|zh)\b/i.test(language)) || "";
-  if (shell.browse) shell.browse(/^zh/i.test(first) ? TOOLS.zh : TOOLS.en);
+  const language = navigator.languages.map((wanted) => languageFor(wanted)).find(Boolean);
+  if (shell.browse) shell.browse(TOOLS(language?.lang || "en"));
 }
 
 /** Set the state of a check-mark command, such as "toggle-netlist", in the menus that show it. */
@@ -179,6 +201,17 @@ function offered(item) {
 }
 
 /**
+ * A menu's or submenu's text: its label translated and, when the interface is not in English, the
+ * English word the table gives it (`english`) after it in parentheses, so that the Language submenu,
+ * and the View menu that holds it, can be found by a user who reads none of the interface. The word
+ * is no text of the catalogs: the same in every language.
+ */
+function named(item) {
+  const text = translate(item.label);
+  return item.english && locale() !== "en" ? `${text} (${item.english})` : text;
+}
+
+/**
  * The entries of a menu or a submenu that this platform shows: the items it offers, the submenus
  * that have any, each as { label, items }, and a separator ("-") only between two entries.
  */
@@ -190,7 +223,7 @@ function entries(items) {
       gap = shown.length > 0;
       continue;
     }
-    const entry = item.items ? { label: translate(item.label), items: entries(item.items) } : { ...item, label: translate(item.label) };
+    const entry = item.items ? { label: named(item), icon: item.icon, items: entries(item.items) } : { ...item, label: translate(item.label) };
     if (entry.items ? entry.items.length === 0 : !offered(item)) continue;
     if (gap) shown.push("-");
     shown.push(entry);
@@ -201,7 +234,7 @@ function entries(items) {
 
 /** The menus with the entries this platform shows, and no menu left without any. */
 export function menus() {
-  return table.menus.map((m) => ({ label: translate(m.label), items: entries(m.items) })).filter((m) => m.items.length > 0);
+  return table.menus.map((m) => ({ label: named(m), items: entries(m.items) })).filter((m) => m.items.length > 0);
 }
 
 /** The commands among a menu's items, those of its submenus too. */
@@ -232,6 +265,8 @@ function matches(e, spec) {
   if (parts.includes("Control")) return e.ctrlKey && !e.metaKey && !e.altKey && e.shiftKey === parts.includes("Shift");
   if (parts.includes("Ctrl")) return ctrl && (!/^[a-z]$/.test(key) || e.shiftKey === parts.includes("Shift"));
   if (key === "e" || key === "enter") return !ctrl && !e.altKey && e.shiftKey === parts.includes("Shift");
+  // A letter written with Shift, such as Shift+R, needs it, so that the bare letter stays free.
+  if (parts.includes("Shift") && /^[a-z]$/.test(key)) return !ctrl && !e.altKey && e.shiftKey;
   if (/^[1-7]$/.test(key)) return !ctrl && !e.altKey && !e.shiftKey;
   return !(ctrl || e.altKey) || !(key.length === 1 || key === "backspace");
 }
@@ -260,40 +295,48 @@ export function runStartupShortcuts(keys) {
   }
 }
 
+/** Tell `?debug=keys` (index.html) what became of a key; nothing without it. */
+const note = (e, what) => window.rnlKeyNote?.(e, what);
+
 document.addEventListener("keydown", (e) => {
-  if (shell?.embed && !document.hasFocus()) return;
-  if (e.defaultPrevented || e.isComposing || e.keyCode === 229) return;
+  if (shell?.embed && !document.hasFocus()) return note(e, "embed without focus");
+  if (e.defaultPrevented || e.isComposing || e.keyCode === 229) {
+    return note(e, e.defaultPrevented ? "taken before the page's handler" : "composing (IME)");
+  }
   const ctrl = e.ctrlKey || e.metaKey;
   const input = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target.isContentEditable || !!e.target.closest("select");
   const textInput = input && !e.target.matches('input[type="checkbox"], input[type="radio"]');
   const typing = input || !!e.target.closest('[role="listbox"], [role="tree"], #tree, #index, #unplaced-list');
   if (e.key === "Escape" && cancelGesture()) {
     e.preventDefault();
-    return;
+    return note(e, "cancelled a gesture");
   }
   const direction = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
   // Lists, menus, editors and controls retain their own navigation. Body and the drawing pan.
   if (direction && !typing && !ctrl && !e.altKey &&
       (e.target === document.body || e.target === $("canvas"))) {
     if (pan(...direction, e.shiftKey ? 0.3 : 0.1)) e.preventDefault();
-    return;
+    return note(e, "panned");
   }
   let id = null;
   if (e.key === "F5") id = "reload"; // re-read the file, not the page
   else if (e.key === "Escape" && !typing) {
     clearSelection();
     e.preventDefault();
-    return;
+    return note(e, "cleared the selection");
   } else id = keyCommand(e, typing, textInput);
-  if (id === "find-text" && (typing || !isEnabled(id))) return;
+  if (id === "find-text" && (typing || !isEnabled(id))) return note(e, "find not available");
   // Focused buttons and source links retain native Enter activation.
   const control = e.target.closest('button, a[href]')?.getClientRects().length > 0;
-  if ((id === "descend" || id === "descend-new-window") && (control || opens(selected) === null)) return;
+  if ((id === "descend" || id === "descend-new-window") && (control || opens(selected) === null)) return note(e, "nothing to open");
   // Shift modifies navigation, including Ctrl+Shift+E (up) and Shift+Backspace.
   if (!typing && e.shiftKey && e.key === "Backspace" && !ctrl && !e.altKey) id = "ascend";
   if (e.shiftKey && ctrl && e.key.toLowerCase() === "e") id = "ascend";
   if (id) {
     e.preventDefault();
+    note(e, `ran ${id}`);
     command(id, { newWindow: e.shiftKey });
+  } else {
+    note(e, !table ? "command table not loaded" : textInput ? "typing in a text box" : typing ? "in a list (typing)" : "no command for this key");
   }
 });

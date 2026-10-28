@@ -43,11 +43,15 @@ const VALID = {
  * Change the settings that `changes` names, keep them for the next start, and draw the grid again.
  * A value that will not do, such as one an older page kept, leaves its setting as it was.
  */
-export function setGrid(changes) {
+/** The grid's settings: shown, style, axes, and the rest. */
+export const gridSettings = () => ({ ...settings });
+
+/** Change the grid's settings; with `persist` false, for this page only, as a manifest's display settings are. */
+export function setGrid(changes, { persist = true } = {}) {
   for (const [key, value] of Object.entries(changes)) {
     if (VALID[key] && VALID[key](value)) settings[key] = value;
   }
-  for (const key of Object.keys(VALID)) save(`grid-${key}`, settings[key]);
+  if (persist) for (const key of Object.keys(VALID)) save(`grid-${key}`, settings[key]);
   // all the marks, also those that did not change: a native menu toggles the item chosen
   setCheck("toggle-grid", settings.shown);
   setCheck("grid-none", !settings.shown);
@@ -272,7 +276,7 @@ async function askSettings() {
         return wrong(m`The spacing is a number of units above 0 and at most ${MAX_SPACING}.`, units);
       }
       const every = Number(major.value);
-      if (!VALID.major(every)) return wrong(m`A major line comes every 2 to ${MAX_MAJOR} lines, a whole number.`, major);
+      if (!VALID.major(every)) return wrong(m`Major line interval must be a whole number from 2 to ${MAX_MAJOR}.`, major);
       const style = styles.find((r) => r.checked).value;
       return { shown: style !== "none", ...(style !== "none" && { style }), spacing, major: every, axes: axes.checked };
     },

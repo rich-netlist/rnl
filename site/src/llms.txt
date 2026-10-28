@@ -1,6 +1,6 @@
 # RNL (Rich Netlist)
 
-> RNL writes the drawing of a schematic into a SPICE or Spectre netlist as comment records (`@RNL`), so the netlist alone is the source of the schematic. This file tells an AI agent how to install the RNL skill, a folder that teaches reading, writing, checking and drawing RNL 0.3, and where the rest is. Chinese version of this file: {{site}}zh/llms.txt
+> RNL writes the drawing of a schematic into a SPICE or Spectre netlist as comment records (`@RNL`), so the netlist alone is the source of the schematic. This file tells an AI agent how to install the RNL skill, a folder that teaches reading, writing, checking and drawing RNL 0.3, and where the rest is.
 
 ## Install the skill
 
@@ -34,7 +34,7 @@ If you cannot unpack or write files, read the files below as they are; they are 
 - The `rnl` command: download the archive for Windows, Linux or macOS from the latest core release ({{github}}/releases/latest), or build it from source (Rust 1.85 or later): `git clone {{github}}`, then `cargo build --release -p rnl-cli`; `rnl check FILE` prints the diagnostics and exits 1 on errors, `rnl render FILE -o DIR` writes an SVG for each drawing level.
 - The npm package `@rich-netlist/runtime` (`npm i @rich-netlist/runtime`, Node 18 or later): the same core as WebAssembly; a complete checker script is in references/tools.md.
 - The web viewer, for a person with a browser: {{site}}viewer/
-- The desktop viewer for Windows and Linux: the newest `viewer-v…` release at {{github}}/releases
+- The desktop viewer for Windows, Linux and macOS: the newest `viewer-v…` release at {{github}}/releases
 
 ## The language and the packages
 

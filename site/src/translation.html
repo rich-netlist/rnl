@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="{{html-lang}}" data-locale="{{locale-code}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title><en>Translation status · Rich Netlist</en></title>
+<meta name="description" content="<en>How far each language of RNL is translated, from the site and the viewers to the standard.</en>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="{{font-href}}">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+<link rel="stylesheet" href="assets/intro.css">
+<link rel="stylesheet" href="assets/languages.css">
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem('rnl-intro-theme');
+      if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  })();
+</script>
+</head>
+<body class="ts-page">
+
+<svg class="sprite" aria-hidden="true" focusable="false">
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 4l9 16H3z"/><path d="M12 10v4.5M12 17.2v.3"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.6v.3"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M5 5a2 2 0 0 1 2-2h12v15H7a2 2 0 0 0-2 2z"/><path d="M5 20a2 2 0 0 0 2 1h12v-3"/></symbol>
+  <symbol id="i-git" viewBox="0 0 24 24"><circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="8" r="2"/><path d="M6 7v10"/><path d="M18 10c0 4-6 3-12 7"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M16 16l4 4"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></symbol>
+</svg>
+
+<a class="skip" href="#main"><en>Skip to content</en></a>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <a class="brand" href="./"><span class="brand-logo theme-logo"><img class="logo-light" src="assets/brand/rnl-logo-small.svg" width="24" height="24" alt=""><img class="logo-dark" src="assets/brand/rnl-logo-small-dark.svg" width="24" height="24" alt=""></span><span class="brand-mark">RNL</span><span class="brand-sub">Rich Netlist</span></a>
+    <button class="icon-btn menu-btn" id="menu-btn" type="button" aria-label="{{nav-pages}}" aria-expanded="false" aria-controls="primary-nav"><svg class="ico"><use href="#i-menu"/></svg></button>
+    <nav class="pages" id="primary-nav" aria-label="{{nav-pages}}">
+      <a href="./">{{nav-intro}}</a>
+      <a href="language.html">{{nav-tour}}</a>
+      <a href="{{spec-root}}">{{nav-spec}}</a>
+      <a href="packages.html">{{nav-packages}}</a>
+      <a href="gallery.html">{{nav-gallery}}</a>
+      <a href="tools.html">{{nav-tools}}</a>
+      <a href="agents.html">{{nav-agents}}</a>
+      <a href="https://github.com/rich-netlist/rnl">GitHub</a>
+    </nav>
+    {{language-menu}}
+    <button class="icon-btn" id="theme-btn" type="button" aria-label="<en>Switch color theme</en>"><svg class="ico"><use href="#i-moon"/></svg></button>
+  </div>
+  <div class="progress" aria-hidden="true"><span id="progress-bar"></span></div>
+</header>{{ai-translation-notice}}
+
+<main id="main">
+
+<section class="hero tour-hero" id="top" aria-labelledby="status-title">
+  <div class="wrap">
+    <div class="hero-copy">
+      <p class="eyebrow"><span>RICH NETLIST · TRANSLATION</span></p>
+      <h1 id="status-title" class="tour-h1"><en>Translation status</en></h1>
+      <p class="thesis"><en>English is the source of every text of RNL; every other language is a translation that follows it.</en></p>
+      <p class="lead"><en>This report was made from <a href="https://github.com/rich-netlist/rnl/blob/main/i18n/surfaces.json">the list of what there is to translate</a> when the site was built; every pull request gets the same one. To translate a language or bring one up to date, start from <a href="https://github.com/rich-netlist/rnl/blob/main/i18n/README.md">i18n/README.md</a>.</en></p>
+    </div>
+  </div>
+</section>{{translation-notice}}
+
+<section id="status" class="sheet ts-sheet" aria-labelledby="status-table-title">
+  <div class="wrap">
+    <h2 id="status-table-title"><en>How far each language is</en></h2>
+    <p class="lead"><en>The report is in English, as the texts it counts are. A missing translation shows the English; a stale one was made from an English text that has changed since.</en></p>
+{{translation-status}}
+  </div>
+</section>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-grid">
+    <div>
+      <span class="brand-mark">RNL</span>
+      <p><en>Machine translation and AI models may make a first draft; a language is shown once a native speaker has reviewed it.</en></p>
+    </div>
+    <div>
+      <h4><en>See also</en></h4>
+      <ul>
+        <li><a href="https://github.com/rich-netlist/rnl/blob/main/docs/decisions/0015-english-is-the-only-core-language.md"><en>Decision 0015: English is the only core language</en></a></li>
+        <li><a href="./"><en>Introduction</en></a></li>
+      </ul>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/languages.js"></script>
+<script src="assets/common.js"></script>
+</body>
+</html>

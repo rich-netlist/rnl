@@ -10,7 +10,8 @@ export function validateCatalog(data, url) {
   return data.packages.map(p => {
     const key = `${p.name} ${p.version}`;
     if (!/^[a-z0-9-]+$/.test(p.name) || !/^\d+\.\d+$/.test(p.version) || !/^[a-f0-9]{64}$/.test(p.sha256) ||
-        !['pdk', 'extension'].includes(p.kind) || typeof p.summary?.en !== 'string' || typeof p.summary?.zh !== 'string' || seen.has(key))
+        !['pdk', 'extension'].includes(p.kind) || typeof p.summary?.en !== 'string' ||
+        Object.values(p.summary).some(text => typeof text !== 'string') || seen.has(key))
       throw new Error(`Invalid public package record: ${key}`);
     seen.add(key);
     const resolved = new URL(p.url, url);

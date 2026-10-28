@@ -1509,8 +1509,8 @@
     {
       "severity": "hint",
       "file": "11-header-alias-device.sp",
-      "line": 2,
-      "col": 11
+      "line": 10,
+      "col": 14
     },
     {
       "severity": "warning",

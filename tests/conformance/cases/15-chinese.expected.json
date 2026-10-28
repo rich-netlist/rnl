@@ -2709,8 +2709,8 @@
     {
       "severity": "hint",
       "file": "15-chinese.sp",
-      "line": 2,
-      "col": 4
+      "line": 3,
+      "col": 43
     },
     {
       "severity": "warning",

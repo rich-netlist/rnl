@@ -2,11 +2,12 @@
 
 Status: accepted (2026-10-22). Initial version numbers and npm dist-tag await the user's decision.
 
-The user asked: “再写一个每次发布rnl时自动编译可执行文件的任务单, 顺便把skill也补充一下,
-让用户可以直接下载可执行文件用”. They also asked: “这个共用viewer-v有点奇怪?
-viewer可能会在核心没有更新的情况下更新很多个版本, 那每次更新viewer都会附带更新rnl核心的版本?
-另外latest release作为语言标准是否也有点奇怪, 是不是应该让release回归应用程序,
-语言单独弄一个language之类的tag?”
+The user asked for a task that builds the executables automatically each time rnl is released,
+and for the skill to tell users that they can download them directly. They then questioned the
+shared `viewer-v` tag: the viewer may have many releases while the core does not change, so
+should each viewer release also bump the version of the core? They also found it odd that the
+latest release stood for the language standard, and asked whether releases should go back to
+the applications, with the language under a tag of its own.
 
 The resulting choice is three independent lines:
 

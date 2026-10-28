@@ -4,8 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Rich Netlist (RNL)</title>
-<meta name="description" content="<zh>Rich Netlist（RNL）项目介绍：把原理图的理解与画法写进网表注释，让同一份网表既能仿真，也能画成原理图。</zh>
-  <en>An introduction to Rich Netlist (RNL): it writes how a schematic should be understood and drawn into netlist comments, so the same netlist can be simulated and drawn as a schematic.</en>">
+<meta name="description" content="<en>An introduction to Rich Netlist (RNL): it writes how a schematic should be understood and drawn into netlist comments, so the same netlist can be simulated and drawn as a schematic.</en>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="{{font-href}}">
@@ -65,6 +64,7 @@
   <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></symbol>
   <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></symbol>
   <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></symbol>
   <symbol id="i-db" viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/></symbol>
   <symbol id="i-asterisk" viewBox="0 0 24 24"><path d="M12 4.5v15M5.5 8.2l13 7.6M18.5 8.2l-13 7.6"/></symbol>
   <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></symbol>
@@ -78,26 +78,28 @@
   <symbol id="i-cpu" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="1.5"/><path d="M10 3v4M14 3v4M10 17v4M14 17v4M3 10h4M3 14h4M17 10h4M17 14h4"/></symbol>
 </svg>
 
-<a class="skip" href="#main"><zh>跳到正文</zh><en>Skip to content</en></a>
+<a class="skip" href="#main"><en>Skip to content</en></a>
 
 <header class="topbar">
   <div class="topbar-in">
     <a class="brand" href="#top"><span class="brand-logo theme-logo"><img class="logo-light" src="assets/brand/rnl-logo-small.svg" width="24" height="24" alt=""><img class="logo-dark" src="assets/brand/rnl-logo-small-dark.svg" width="24" height="24" alt=""></span><span class="brand-mark">RNL</span><span class="brand-sub">Rich Netlist</span></a>
-    <nav class="pages" aria-label="{{nav-pages}}">
+    <button class="icon-btn menu-btn" id="menu-btn" type="button" aria-label="{{nav-pages}}" aria-expanded="false" aria-controls="primary-nav"><svg class="ico"><use href="#i-menu"/></svg></button>
+    <nav class="pages" id="primary-nav" aria-label="{{nav-pages}}">
       <a class="is-on" aria-current="page" href="./">{{nav-intro}}</a>
       <a href="language.html">{{nav-tour}}</a>
       <a href="{{spec-root}}">{{nav-spec}}</a>
       <a href="packages.html">{{nav-packages}}</a>
+      <a href="gallery.html">{{nav-gallery}}</a>
       <a href="tools.html">{{nav-tools}}</a>
       <a href="agents.html">{{nav-agents}}</a>
       <a href="https://github.com/rich-netlist/rnl">GitHub</a>
     </nav>
-    <button class="icon-btn toc-btn" id="toc-btn" type="button" aria-label="<zh>目录</zh><en>Contents</en>" aria-expanded="false" aria-controls="toc"><svg class="ico"><use href="#i-menu"/></svg></button>
+    <button class="icon-btn toc-btn" id="toc-btn" type="button" aria-label="<en>On this page</en>" aria-expanded="false" aria-controls="toc"><svg class="ico"><use href="#i-list"/></svg></button>
     {{language-menu}}
-    <button class="icon-btn" id="theme-btn" type="button" aria-label="<zh>切换配色</zh><en>Switch color theme</en>"><svg class="ico"><use href="#i-moon"/></svg></button>
+    <button class="icon-btn" id="theme-btn" type="button" aria-label="<en>Switch color theme</en>"><svg class="ico"><use href="#i-moon"/></svg></button>
   </div>
   <div class="progress" aria-hidden="true"><span id="progress-bar"></span></div>
-</header>
+</header>{{ai-translation-notice}}
 
 
 
@@ -106,51 +108,49 @@
   <div class="wrap">
     <div class="hero-grid">
       <div class="hero-copy">
-        <p class="eyebrow"><span>RICH NETLIST</span><span class="chip chip-ok"><zh>标准 0.3 已发布 · 工具链预览版</zh><en>Standard 0.3 released · toolkit preview</en></span></p>
+        <p class="eyebrow"><span>RICH NETLIST</span><span class="chip chip-ok"><en>Standard 0.3 released · toolkit preview</en></span></p>
         <div id="hero-brand" class="hero-brand">
-          <h1 id="hero-title"><button id="hero-logo" type="button" class="hero-logo theme-logo" aria-label="<zh>打开 logo 的电路</zh><en>Open the logo's circuit</en>" title="<zh>打开 logo 的电路</zh><en>Open the logo's circuit</en>" aria-expanded="false" aria-controls="hero-logo-panel"><img class="logo-light" src="assets/brand/rnl-logo.svg" alt=""><img class="logo-dark" src="assets/brand/rnl-logo-dark.svg" alt=""></button><span class="wordmark">RNL</span></h1>
-          <div id="hero-logo-panel" class="hero-logo-panel panel" role="region" aria-label="<zh>logo 的电路</zh><en>The logo's circuit</en>" data-viewer-url="../viewer/" hidden>
-            <div class="hero-logo-controls"><button id="hero-logo-close" type="button" aria-label="<zh>关闭</zh><en>Close</en>" title="<zh>关闭</zh><en>Close</en>">×</button></div>
+          <h1 id="hero-title"><button id="hero-logo" type="button" class="hero-logo theme-logo" aria-label="<en>Open the logo's circuit</en>" title="<en>Open the logo's circuit</en>" aria-expanded="false" aria-controls="hero-logo-panel"><img class="logo-light" src="assets/brand/rnl-logo.svg" alt=""><img class="logo-dark" src="assets/brand/rnl-logo-dark.svg" alt=""></button><span class="wordmark">RNL</span></h1>
+          <div id="hero-logo-panel" class="hero-logo-panel panel" role="region" aria-label="<en>The logo's circuit</en>" data-viewer-url="../viewer/" hidden>
+            <div class="hero-logo-controls"><button id="hero-logo-close" type="button" aria-label="<en>Close</en>" title="<en>Close</en>">×</button></div>
           </div>
         </div>
-        <p class="thesis"><zh>让一份网表既能仿真，也能画成原理图。</zh><en>A netlist you can simulate and also draw as a schematic.</en></p>
-        <p class="lead"><zh>RNL 把“这个电路该怎么理解、怎么画”写进网表的注释里。仿真器照常把它当注释跳过；支持 RNL 的工具读它，画出整洁的原理图。</zh>
-          <en>RNL writes “how to understand and draw this circuit” into the netlist’s comments. Simulators skip it as a comment, as they always do; tools that support RNL read it and draw a clean schematic.</en></p>
+        <p class="thesis"><en>A netlist you can simulate and also draw as a schematic.</en></p>
+        <p class="lead"><en>RNL writes “how to understand and draw this circuit” into the netlist’s comments. Simulators skip it as a comment, as they always do; tools that support RNL read it and draw a clean schematic.</en></p>
         <div class="cta">
-          <a class="btn btn-primary" href="#overview"><zh>三分钟速览</zh><en>Three-minute tour</en> <svg class="ico"><use href="#i-down"/></svg></a>
-          <a class="btn" href="#journey"><zh>看它一步步画出来</zh><en>Watch it draw, step by step</en></a>
-          <a class="btn" href="language.html"><zh>语言导览</zh><en>Language tour</en> <svg class="ico"><use href="#i-arrow"/></svg></a>
+          <a class="btn btn-primary" href="#overview"><en>Three-minute tour</en> <svg class="ico"><use href="#i-down"/></svg></a>
+          <a class="btn" href="#journey"><en>Watch it draw, step by step</en></a>
+          <a class="btn" href="language.html"><en>Language tour</en> <svg class="ico"><use href="#i-arrow"/></svg></a>
         </div>
       </div>
-      <dl class="titleblock" aria-label="<zh>项目信息</zh><en>Project facts</en>">
-        <div class="tb-main"><dt><zh>项目</zh><en>Project</en></dt><dd>Rich Netlist (RNL)</dd></div>
-        <div><dt><zh>是什么</zh><en>What</en></dt><dd><zh>附着在网表上的元数据扩展</zh><en>A metadata extension attached to netlists</en></dd></div>
-        <div><dt><zh>宿主</zh><en>Hosts</en></dt><dd><zh>SPICE、Spectre 等网表，写在注释里</zh><en>SPICE, Spectre and other netlists, inside comments</en></dd></div>
-        <div><dt><zh>阶段</zh><en>Stage</en></dt><dd><zh>语言标准 0.3；<a href="tools.html">工具链预览版</a>；求解器第一版</zh><en>Language standard 0.3; <a href="tools.html">a preview toolkit</a>; a first solver</en></dd></div>
-        <div><dt><zh>语言</zh><en>Language</en></dt><dd><span class="mono">0.3 · 2026-10-18</span></dd></div>
-        <div><dt><zh>许可</zh><en>License</en></dt><dd><zh>代码 MIT · 规范 CC-BY-4.0 · 数据 CC0</zh><en>Code MIT · spec CC-BY-4.0 · data CC0</en></dd></div>
+      <dl class="titleblock" aria-label="<en>Project facts</en>">
+        <div class="tb-main"><dt><en>Project</en></dt><dd>Rich Netlist (RNL)</dd></div>
+        <div><dt><en>What</en></dt><dd><en>A metadata extension attached to netlists</en></dd></div>
+        <div><dt><en>Hosts</en></dt><dd><en>SPICE, Spectre and other netlists, inside comments</en></dd></div>
+        <div><dt><en>Stage</en></dt><dd><en>Language standard 0.3; <a href="tools.html">a preview toolkit</a>; a first solver</en></dd></div>
+        <div><dt><en>Language</en></dt><dd><span class="mono">0.3 · 2026-10-18</span></dd></div>
+        <div><dt><en>License</en></dt><dd><en>Code MIT · spec CC-BY-4.0 · data CC0</en></dd></div>
       </dl>
     </div>
 
     <div class="hero-demo" id="hero-demo">
       <div class="hd-out hd-sim panel">
-        <div class="ph"><svg class="ico"><use href="#i-wave"/></svg><span class="ph-title"><zh>仿真器</zh><en>Simulator</en></span><span class="ph-right"><span class="chip" id="hero-sim-chip"><zh>只读网表</zh><en>Netlist only</en></span></span></div>
-        <div class="fig"><svg id="hero-plot" role="img" aria-label="<zh>RC 低通的幅频响应，截止频率约 1.59 kHz</zh><en>Magnitude response of the RC low-pass filter; cutoff near 1.59 kHz</en>"></svg></div>
-        <p class="cap"><zh>照常仿真：<span class="mono">.ac</span> 扫频，−3 dB 点在 1.59 kHz。RNL 那几行对它来说只是注释。</zh>
-          <en>Simulated as usual: an <span class="mono">.ac</span> sweep puts the −3 dB point at 1.59 kHz. To the simulator, the RNL lines are only comments.</en></p>
+        <div class="ph"><svg class="ico"><use href="#i-wave"/></svg><span class="ph-title"><en>Simulator</en></span><span class="ph-right"><span class="chip" id="hero-sim-chip"><en>Netlist only</en></span></span></div>
+        <div class="fig"><svg id="hero-plot" role="img" aria-label="<en>Magnitude response of the RC low-pass filter; cutoff near 1.59 kHz</en>"></svg></div>
+        <p class="cap"><en>Simulated as usual: an <span class="mono">.ac</span> sweep puts the −3 dB point at 1.59 kHz. To the simulator, the RNL lines are only comments.</en></p>
       </div>
       <div class="hd-arrow to-left" aria-hidden="true">
         <svg viewBox="0 0 64 44"><path class="hd-flow" d="M60 22H10"/><path class="hd-head" d="M2 22l10-5.5v11z"/></svg>
-        <span><zh>只读网表</zh><en>netlist only</en></span>
+        <span><en>netlist only</en></span>
       </div>
       <div class="hd-file panel">
         <div class="ph">
           <svg class="ico"><use href="#i-file"/></svg><span class="ph-title">rc_lowpass.sp</span>
           <span class="ph-right">
-            <span class="seg" id="hero-mode" role="group" aria-label="<zh>用谁的眼光看这个文件</zh><en>Read this file as</en>">
-              <button type="button" data-mode="both" aria-pressed="true"><zh>都看</zh><en>Both</en></button>
-              <button type="button" data-mode="sim" aria-pressed="false"><zh>仿真器</zh><en>Simulator</en></button>
-              <button type="button" data-mode="view" aria-pressed="false"><zh>RNL 工具</zh><en>RNL tools</en></button>
+            <span class="seg" id="hero-mode" role="group" aria-label="<en>Read this file as</en>">
+              <button type="button" data-mode="both" aria-pressed="true"><en>Both</en></button>
+              <button type="button" data-mode="sim" aria-pressed="false"><en>Simulator</en></button>
+              <button type="button" data-mode="view" aria-pressed="false"><en>RNL tools</en></button>
             </span>
           </span>
         </div>
@@ -158,30 +158,29 @@
       </div>
       <div class="hd-arrow to-right" aria-hidden="true">
         <svg viewBox="0 0 64 44"><path class="hd-flow" d="M4 22h50"/><path class="hd-head" d="M62 22l-10-5.5v11z"/></svg>
-        <span><zh>读网表<br>+ RNL</zh><en>netlist<br>+ RNL</en></span>
+        <span><en>netlist<br>+ RNL</en></span>
       </div>
       <div class="hd-out hd-view panel">
-        <div class="ph"><svg class="ico"><use href="#i-eye"/></svg><span class="ph-title"><zh>RNL 查看器</zh><en>RNL viewer</en></span><span class="ph-right"><span class="chip chip-rnl" id="hero-view-chip"><zh>网表 + RNL</zh><en>Netlist + RNL</en></span></span></div>
-        <div class="fig"><svg id="hero-svg" role="img" aria-label="<zh>由同一个文件画出的 RC 低通原理图</zh><en>RC low-pass schematic drawn from the same file</en>"></svg></div>
-        <p class="cap"><zh>同一个文件画出的原理图：源在左、负载在右，网络名来自 RNL；地符号由标准包补上，不用写。</zh>
-          <en>The schematic drawn from the same file: source on the left, load on the right, the net name from RNL; the standard package adds the ground symbols without a line written.</en></p>
+        <div class="ph"><svg class="ico"><use href="#i-eye"/></svg><span class="ph-title"><en>RNL viewer</en></span><span class="ph-right"><span class="chip chip-rnl" id="hero-view-chip"><en>Netlist + RNL</en></span></span></div>
+        <div class="fig"><svg id="hero-svg" role="img" aria-label="<en>RC low-pass schematic drawn from the same file</en>"></svg></div>
+        <p class="cap"><en>The schematic drawn from the same file: source on the left, load on the right, and the net label from RNL; the standard package adds the ground symbols automatically.</en></p>
       </div>
       <p class="hero-note"><svg class="ico"><use href="#i-info"/></svg><span id="hero-note-text"></span></p>
     </div>
   </div>
-</section>
+</section>{{translation-notice}}
 
 <div class="layout">
-<nav id="toc" aria-label="<zh>目录</zh><en>Contents</en>">
-  <p class="toc-title"><zh>目录</zh><en>Contents</en></p>
+<nav id="toc" aria-label="<en>Contents</en>">
+  <p class="toc-title"><en>Contents</en></p>
   <ul>
-    <li><a href="#overview"><zh>三分钟速览</zh><en>The three-minute tour</en></a></li>
-    <li><a href="#what"><zh>是什么</zh><en>What</en></a></li>
-    <li><a href="#why"><zh>为什么</zh><en>Why</en></a></li>
-    <li><a href="#vision"><zh>愿景</zh><en>Vision</en></a></li>
-    <li><a href="#scenes"><zh>场景对比</zh><en>Scenarios</en></a></li>
-    <li><a href="#status"><zh>现状</zh><en>Status</en></a></li>
-    <li><a href="#next"><zh>想看细节，去这几页。</zh><en>For the details, go to these pages.</en></a></li>
+    <li><a href="#overview"><en>The three-minute tour</en></a></li>
+    <li><a href="#what"><en>What</en></a></li>
+    <li><a href="#why"><en>Why</en></a></li>
+    <li><a href="#vision"><en>Vision</en></a></li>
+    <li><a href="#scenes"><en>Scenarios</en></a></li>
+    <li><a href="#status"><en>Status</en></a></li>
+    <li><a href="#next"><en>Next</en></a></li>
   </ul>
 </nav>
 <main id="main" class="page-content">
@@ -190,33 +189,29 @@
 <section id="overview" class="sheet">
   <div class="wrap">
     <header class="sheet-head">
-      <p class="sheet-no"><zh>00 · 速览</zh><en>00 · Overview</en></p>
-      <h2><zh>三分钟速览</zh><en>The three-minute tour</en></h2>
+      <p class="sheet-no"><en>00 · Overview</en></p>
+      <h2><en>The three-minute tour</en></h2>
     </header>
     <ol class="brief">
       <li>
-        <span class="brief-k"><svg class="ico"><use href="#i-question"/></svg><zh>问题</zh><en>Problem</en></span>
-        <p><zh>网表能仿真，但看不出电路的样子；原理图看得懂，却锁在各家工具的专有格式里，还常和网表对不上。</zh>
-          <en>A netlist simulates, but you cannot see the circuit in it. A schematic is easy to read, but it is locked in each tool’s proprietary format and often disagrees with the netlist.</en></p>
-        <a href="#why"><zh>为什么需要 RNL →</zh><en>Why RNL →</en></a>
+        <span class="brief-k"><svg class="ico"><use href="#i-question"/></svg><en>Problem</en></span>
+        <p><en>A netlist simulates, but you cannot see the circuit in it. A schematic is easy to read, but it is locked in each tool’s proprietary format and often disagrees with the netlist.</en></p>
+        <a href="#why"><en>Why RNL →</en></a>
       </li>
       <li>
-        <span class="brief-k"><svg class="ico"><use href="#i-asterisk"/></svg><zh>做法</zh><en>Approach</en></span>
-        <p><zh>把“怎么理解、怎么画”写进网表注释：差分对、对称、信号流向，也可以是精确的坐标和导线。仿真器看到的只是注释。</zh>
-          <en>Write “how to read it, how to draw it” into netlist comments: differential pairs, symmetry, signal flow, or exact coordinates and wires. The simulator sees only comments.</en></p>
-        <a href="#what"><zh>RNL 是什么 →</zh><en>What RNL is →</en></a>
+        <span class="brief-k"><svg class="ico"><use href="#i-asterisk"/></svg><en>Approach</en></span>
+        <p><en>Write “how to read it, how to draw it” into netlist comments: differential pairs, symmetry, signal flow, or exact coordinates and wires. The simulator sees only comments.</en></p>
+        <a href="#what"><en>What RNL is →</en></a>
       </li>
       <li>
-        <span class="brief-k"><svg class="ico"><use href="#i-spark"/></svg><zh>效果</zh><en>Result</en></span>
-        <p><zh>写几句意图，求解器就能排出规整的原理图；任何支持 RNL 的查看器都能打开，像打开 PDF 一样。</zh>
-          <en>Write a few lines of intent and a solver lays out a tidy schematic. Any viewer that supports RNL can open it, the way any reader opens a PDF.</en></p>
-        <a href="#vision"><zh>看效果 →</zh><en>See the result →</en></a>
+        <span class="brief-k"><svg class="ico"><use href="#i-spark"/></svg><en>Result</en></span>
+        <p><en>Write a few lines of intent and a solver lays out a tidy schematic. Any viewer that supports RNL can open it, the way any reader opens a PDF.</en></p>
+        <a href="#vision"><en>See the result →</en></a>
       </li>
       <li>
-        <span class="brief-k"><svg class="ico"><use href="#i-flask"/></svg><zh>现状</zh><en>Status</en></span>
-        <p><zh>语言已经整理成标准 0.3。工具链能读网表、画出有坐标的部分，有网页版和桌面版查看器，现在都能改文本；求解器有了第一版，桌面版查看器能用它求解，先作为预览。</zh>
-          <en>The language has been consolidated into standard 0.3. The toolkit reads netlists and draws what has coordinates, in a web viewer and a desktop viewer, which now edit the text too; the solver has a first version, and the desktop viewer solves with it, as a preview.</en></p>
-        <a href="#status"><zh>进度 →</zh><en>Progress →</en></a>
+        <span class="brief-k"><svg class="ico"><use href="#i-flask"/></svg><en>Status</en></span>
+        <p><en>Language standard 0.3 is released. The web and desktop viewers read netlists, draw placed objects, and edit the text; a first version of the solver runs in the CLI and as a preview in the desktop viewer.</en></p>
+        <a href="#status"><en>Progress →</en></a>
       </li>
     </ol>
   </div>
@@ -226,76 +221,66 @@
 <section id="what" class="sheet">
   <div class="wrap">
     <header class="sheet-head">
-      <p class="sheet-no"><zh>01 · 是什么</zh><en>01 · What</en></p>
-      <h2><zh>网表定义电路，<span class="mk">RNL 描述怎样理解和呈现它。</span></zh>
-        <en>The netlist defines the circuit. <span class="mk">RNL describes how to understand and present it.</span></en></h2>
-      <p class="lead"><zh>Rich Netlist（RNL）不是一种新的网表格式。它是写在现有网表注释里的一层描述：这些器件构成什么结构，设计者希望怎么摆，图上怎么画。</zh>
-        <en>Rich Netlist (RNL) is not a new netlist format. It is a layer of description written in the comments of existing netlists: which structures the devices form, how the designer wants them placed, and how the drawing should look.</en></p>
+      <p class="sheet-no"><en>01 · What</en></p>
+      <h2><en>The netlist defines the circuit. <span class="mk">RNL describes how to understand and present it.</span></en></h2>
+      <p class="lead"><en>Rich Netlist (RNL) is not a new netlist format. It is a layer of description written in the comments of existing netlists: which structures the devices form, how the designer wants them placed, and how the drawing should look.</en></p>
     </header>
 
     <blockquote class="motto">
-      <p><zh><span class="m-host">原生网表定义电路；</span><span class="m-rnl">Rich Netlist 描述如何理解和呈现这个电路。</span>语义描述可以独立于几何存在，几何可以逐步细化，但两者都不能重新定义电路。</zh>
-        <en><span class="m-host">The native netlist defines the circuit;</span> <span class="m-rnl">Rich Netlist describes how to understand and present that circuit.</span> Semantic description can exist without geometry, and geometry can be refined step by step, but neither may redefine the circuit.</en></p>
-      <cite><zh>RNL 原则草案 · 定位与总纲</zh><en>RNL principles draft · Scope and guiding statement</en></cite>
+      <p><en><span class="m-host">The native netlist defines the circuit;</span> <span class="m-rnl">Rich Netlist describes how to understand and present that circuit.</span> Semantic description can exist without geometry, and geometry can be refined step by step, but neither may redefine the circuit.</en></p>
+      <cite><en>RNL Principles · 1. Positioning and overview</en></cite>
     </blockquote>
 
     <div class="owners" id="owners">
       <div class="own own-host">
-        <h3><svg class="ico"><use href="#i-netlist"/></svg><zh>网表管的</zh><en>Owned by the netlist</en></h3>
-        <p class="own-sub"><zh>电气事实，唯一来源</zh><en>Electrical facts, one source</en></p>
+        <h3><svg class="ico"><use href="#i-netlist"/></svg><en>Owned by the netlist</en></h3>
+        <p class="own-sub"><en>Electrical facts, one source</en></p>
         <ul>
-          <li><button type="button" data-own="devices"><span class="dot"></span><span><zh>器件与类型<small>M1–M5 各是什么管子</small></zh><en>Devices and types<small>what each of M1–M5 is</small></en></span></button></li>
-          <li><button type="button" data-own="params"><span class="dot"></span><span><zh>参数<small>W、L、10k 这类数值</small></zh><en>Parameters<small>values such as W, L, 10k</small></en></span></button></li>
-          <li><button type="button" data-own="nets"><span class="dot"></span><span><zh>连接关系<small>哪些端子接在一起</small></zh><en>Connectivity<small>which terminals are joined</small></en></span></button></li>
-          <li><button type="button" data-own="ports"><span class="dot"></span><span><zh>子电路接口<small>inp、inn、out、vbias</small></zh>
-            <en>Subcircuit interface<small>inp, inn, out, vbias</small></en></span></button></li>
+          <li><button type="button" data-own="devices"><span class="dot"></span><span><en>Devices and types<small>what each of M1–M5 is</small></en></span></button></li>
+          <li><button type="button" data-own="params"><span class="dot"></span><span><en>Parameters<small>values such as W, L, 10k</small></en></span></button></li>
+          <li><button type="button" data-own="nets"><span class="dot"></span><span><en>Connectivity<small>which terminals are joined</small></en></span></button></li>
+          <li><button type="button" data-own="ports"><span class="dot"></span><span><en>Subcircuit interface<small>inp, inn, out, vbias</small></en></span></button></li>
         </ul>
       </div>
       <div class="own-fig panel">
-        <div class="ph"><svg class="ico"><use href="#i-eye"/></svg><span class="ph-title"><zh>ota5t · 五管运放</zh><en>ota5t · five-transistor OTA</en></span><span class="ph-right"><span class="chip"><zh>悬停或点击两侧条目</zh><en>Hover or click the items on either side</en></span><a class="chip" href="../viewer/?url=samples/site/ota5t.sp"><zh>在查看器中打开</zh><en>Open in viewer</en></a></span></div>
-        <div class="fig"><svg id="own-svg" role="img" aria-label="<zh>五管运放原理图</zh><en>Five-transistor OTA schematic</en>"></svg></div>
+        <div class="ph"><svg class="ico"><use href="#i-eye"/></svg><span class="ph-title"><en>ota5t · five-transistor OTA</en></span><span class="ph-right"><span class="chip"><en>Hover or click the items on either side</en></span><a class="chip" href="../viewer/?url=samples/site/ota5t.sp" target="_blank" rel="noopener"><en>Open in viewer</en></a></span></div>
+        <div class="fig"><svg id="own-svg" role="img" aria-label="<en>Five-transistor OTA schematic</en>"></svg></div>
         <p class="own-cap" id="own-cap"></p>
       </div>
       <div class="own own-rnl">
-        <h3><svg class="ico"><use href="#i-asterisk"/></svg><zh>RNL 管的</zh><en>Owned by RNL</en></h3>
-        <p class="own-sub"><zh>理解与呈现，只引用不改写</zh><en>Understanding and presentation; it references, never rewrites</en></p>
+        <h3><svg class="ico"><use href="#i-asterisk"/></svg><en>Owned by RNL</en></h3>
+        <p class="own-sub"><en>Understanding and presentation; it references, never rewrites</en></p>
         <ul>
-          <li><button type="button" data-own="semantic"><span class="dot"></span><span><zh>结构<small>差分对和它的尾管、电流镜</small></zh>
-            <en>Structure<small>differential pair with its tail, current mirror</small></en></span></button></li>
-          <li><button type="button" data-own="intent"><span class="dot"></span><span><zh>意图<small>对称、居中、上下次序、电流方向</small></zh>
-            <en>Intent<small>symmetry, centering, order, current direction</small></en></span></button></li>
-          <li><button type="button" data-own="geometry"><span class="dot"></span><span><zh>画法<small>位置、朝向、导线</small></zh><en>Drawing<small>positions, orientations, wires</small></en></span></button></li>
-          <li><button type="button" data-own="virtual"><span class="dot"></span><span><zh>显示元素<small>电源、地、端口这类只为显示的符号</small></zh>
-            <en>Display elements<small>supply, ground and port symbols, only for display</small></en></span></button></li>
+          <li><button type="button" data-own="semantic"><span class="dot"></span><span><en>Structure<small>differential pair with its tail, current mirror</small></en></span></button></li>
+          <li><button type="button" data-own="intent"><span class="dot"></span><span><en>Intent<small>symmetry, centering, order, current direction</small></en></span></button></li>
+          <li><button type="button" data-own="geometry"><span class="dot"></span><span><en>Drawing<small>positions, orientations, wires</small></en></span></button></li>
+          <li><button type="button" data-own="virtual"><span class="dot"></span><span><en>Display elements<small>supply, ground and port symbols, only for display</small></en></span></button></li>
         </ul>
       </div>
     </div>
 
     <div class="facts">
       <div class="fact">
-        <h3><svg class="ico"><use href="#i-asterisk"/></svg><zh>藏在注释里</zh><en>Hidden in comments</en></h3>
-        <p><zh>写在宿主网表的合法注释里，比如 SPICE 的 <code>* @RNL {…}</code>。仿真器把它当普通注释，不需要先剥掉。</zh>
-          <en>Written in the host netlist’s legal comments, such as SPICE’s <code>* @RNL {…}</code>. Simulators treat it as an ordinary comment; nothing has to be stripped first.</en></p>
+        <h3><svg class="ico"><use href="#i-asterisk"/></svg><en>Hidden in comments</en></h3>
+        <p><en>Written in the host netlist’s legal comments, such as SPICE’s <code>* @RNL {…}</code>. Simulators treat it as an ordinary comment; nothing has to be stripped first.</en></p>
       </div>
       <div class="fact">
-        <h3><svg class="ico"><use href="#i-link"/></svg><zh>不改电路</zh><en>Leaves the circuit alone</en></h3>
-        <p><zh>只能引用网表里的器件、网络和端子，不能新建器件、连接或参数。图上的线交叉、重叠，都不算连接。</zh>
-          <en>It can only reference the netlist’s devices, nets and terminals; it cannot add devices, connections or parameters. Lines that cross or overlap in the drawing are not connections.</en></p>
+        <h3><svg class="ico"><use href="#i-link"/></svg><en>Leaves the circuit alone</en></h3>
+        <p><en>It can only reference the netlist’s devices, nets and terminals; it cannot add devices, connections or parameters. Lines that cross or overlap in the drawing are not connections.</en></p>
       </div>
       <div class="fact">
-        <h3><svg class="ico"><use href="#i-sliders"/></svg><zh>粒度随意</zh><en>Any level of detail</en></h3>
-        <p><zh>可以只写一句“M1、M2 是差分对”，也可以写到每个坐标和拐点，两种写法能在同一个文件里混用。</zh>
-          <en>Write just “M1 and M2 are a differential pair”, or go down to every coordinate and bend; both styles can be mixed in one file.</en></p>
+        <h3><svg class="ico"><use href="#i-sliders"/></svg><en>Any level of detail</en></h3>
+        <p><en>Write just “M1 and M2 are a differential pair”, or go down to every coordinate and bend; both styles can be mixed in one file.</en></p>
       </div>
     </div>
 
     <div class="isnot">
-      <h3><zh>RNL 不是</zh><en>RNL is not</en></h3>
+      <h3><en>RNL is not</en></h3>
       <ul>
-        <li><svg class="ico"><use href="#i-cross"/></svg><zh>又一种网表语言</zh><en>Another netlist language</en></li>
-        <li><svg class="ico"><use href="#i-cross"/></svg><zh>第二份连接表</zh><en>A second connection list</en></li>
-        <li><svg class="ico"><use href="#i-cross"/></svg><zh>规定唯一画法的格式</zh><en>A format that prescribes one drawing</en></li>
-        <li><svg class="ico"><use href="#i-cross"/></svg><zh>像素级的图片存档</zh><en>A pixel-level image archive</en></li>
+        <li><svg class="ico"><use href="#i-cross"/></svg><en>Another netlist language</en></li>
+        <li><svg class="ico"><use href="#i-cross"/></svg><en>A second connection list</en></li>
+        <li><svg class="ico"><use href="#i-cross"/></svg><en>A format that prescribes one drawing</en></li>
+        <li><svg class="ico"><use href="#i-cross"/></svg><en>A pixel-level image archive</en></li>
       </ul>
     </div>
   </div>
@@ -305,65 +290,64 @@
 <section id="why" class="sheet">
   <div class="wrap">
     <header class="sheet-head">
-      <p class="sheet-no"><zh>02 · 为什么</zh><en>02 · Why</en></p>
-      <h2><zh>网表和原理图，各缺一半。</zh><en>Netlists and schematics each miss half.</en></h2>
-      <p class="lead"><zh>仿真靠网表，看懂电路靠原理图。设计者每天在这两种表示之间来回，而它们各有短板。</zh>
-        <en>Simulation runs on netlists; understanding a circuit takes a schematic. Designers switch between the two every day, and each falls short somewhere.</en></p>
+      <p class="sheet-no"><en>02 · Why</en></p>
+      <h2><en>Netlists and schematics each miss half the picture.</en></h2>
+      <p class="lead"><en>Simulation runs on netlists; understanding a circuit takes a schematic. Designers switch between the two every day, and each falls short somewhere.</en></p>
     </header>
 
     <div class="matrix-wrap">
       <table class="matrix">
         <thead>
-          <tr><th scope="col"><zh>要做的事</zh><en>Task</en></th><th scope="col"><zh>网表</zh><en>Netlist</en></th><th scope="col"><zh>原理图（专有格式）</zh><en>Schematic (proprietary format)</en></th><th scope="col" class="col-rnl"><zh>网表 + RNL</zh><en>Netlist + RNL</en></th></tr>
+          <tr><th scope="col"><en>Task</en></th><th scope="col"><en>Netlist</en></th><th scope="col"><en>Schematic (proprietary format)</en></th><th scope="col" class="col-rnl"><en>Netlist + RNL</en></th></tr>
         </thead>
         <tbody>
           <tr>
-            <th scope="row"><zh>仿真器直接读</zh><en>Simulator reads it directly</en></th>
-            <td><span class="mx y"><svg class="ico"><use href="#i-check"/></svg><zh>本来就是给它的</zh><en>It is made for that</en></span></td>
-            <td><span class="mx n"><svg class="ico"><use href="#i-cross"/></svg><zh>要先导出网表</zh><en>Export a netlist first</en></span></td>
-            <td class="col-rnl"><span class="mx y"><svg class="ico"><use href="#i-check"/></svg><zh>RNL 只是注释</zh><en>RNL is just comments</en></span></td>
+            <th scope="row"><en>Simulator reads it directly</en></th>
+            <td><span class="mx y"><svg class="ico"><use href="#i-check"/></svg><en>It is made for that</en></span></td>
+            <td><span class="mx n"><svg class="ico"><use href="#i-cross"/></svg><en>Export a netlist first</en></span></td>
+            <td class="col-rnl"><span class="mx y"><svg class="ico"><use href="#i-check"/></svg><en>RNL is just comments</en></span></td>
           </tr>
           <tr>
-            <th scope="row"><zh>一眼看懂电路结构</zh><en>See the circuit’s structure at a glance</en></th>
-            <td><span class="mx n"><svg class="ico"><use href="#i-cross"/></svg><zh>只有一行行文字</zh><en>Only lines of text</en></span></td>
-            <td><span class="mx y"><svg class="ico"><use href="#i-check"/></svg><zh>看得懂</zh><en>Yes</en></span></td>
-            <td class="col-rnl"><span class="mx y"><svg class="ico"><use href="#i-check"/></svg><zh>查看器画出来</zh><en>A viewer draws it</en></span></td>
+            <th scope="row"><en>See the circuit’s structure at a glance</en></th>
+            <td><span class="mx n"><svg class="ico"><use href="#i-cross"/></svg><en>Only lines of text</en></span></td>
+            <td><span class="mx y"><svg class="ico"><use href="#i-check"/></svg><en ctx=readable>Yes</en></span></td>
+            <td class="col-rnl"><span class="mx y"><svg class="ico"><use href="#i-check"/></svg><en>A viewer draws it</en></span></td>
           </tr>
           <tr>
-            <th scope="row"><zh>纯文本，能 diff、能进 Git</zh><en>Plain text you can diff and keep in Git</en></th>
-            <td><span class="mx y"><svg class="ico"><use href="#i-check"/></svg><zh>是</zh><en>Yes</en></span></td>
-            <td><span class="mx n"><svg class="ico"><use href="#i-cross"/></svg><zh>二进制数据库</zh><en>Binary database</en></span></td>
-            <td class="col-rnl"><span class="mx y"><svg class="ico"><use href="#i-check"/></svg><zh>是</zh><en>Yes</en></span></td>
+            <th scope="row"><en>Plain text you can diff and keep in Git</en></th>
+            <td><span class="mx y"><svg class="ico"><use href="#i-check"/></svg><en>Yes</en></span></td>
+            <td><span class="mx n"><svg class="ico"><use href="#i-cross"/></svg><en>Binary database</en></span></td>
+            <td class="col-rnl"><span class="mx y"><svg class="ico"><use href="#i-check"/></svg><en>Yes</en></span></td>
           </tr>
           <tr>
-            <th scope="row"><zh>AI 能读、能写</zh><en>AI can read and write it</en></th>
-            <td><span class="mx y"><svg class="ico"><use href="#i-check"/></svg><zh>文本</zh><en>Text</en></span></td>
-            <td><span class="mx n"><svg class="ico"><use href="#i-cross"/></svg><zh>图形格式</zh><en>Graphical format</en></span></td>
-            <td class="col-rnl"><span class="mx y"><svg class="ico"><use href="#i-check"/></svg><zh>画法也是文本</zh><en>The drawing is text too</en></span></td>
+            <th scope="row"><en>AI can read and write it</en></th>
+            <td><span class="mx y"><svg class="ico"><use href="#i-check"/></svg><en>Text</en></span></td>
+            <td><span class="mx n"><svg class="ico"><use href="#i-cross"/></svg><en>Graphical format</en></span></td>
+            <td class="col-rnl"><span class="mx y"><svg class="ico"><use href="#i-check"/></svg><en>The drawing is text too</en></span></td>
           </tr>
           <tr>
-            <th scope="row"><zh>不装原来的工具也能打开</zh><en>Opens without the original tool</en></th>
-            <td><span class="mx y"><svg class="ico"><use href="#i-check"/></svg><zh>任何文本编辑器</zh><en>Any text editor</en></span></td>
-            <td><span class="mx n"><svg class="ico"><use href="#i-cross"/></svg><zh>要同款软件和版本</zh><en>Needs the same software and version</en></span></td>
-            <td class="col-rnl"><span class="mx y"><svg class="ico"><use href="#i-check"/></svg><zh>任何 RNL 查看器</zh><en>Any RNL viewer</en></span></td>
+            <th scope="row"><en>Opens without the original tool</en></th>
+            <td><span class="mx y"><svg class="ico"><use href="#i-check"/></svg><en>Any text editor</en></span></td>
+            <td><span class="mx n"><svg class="ico"><use href="#i-cross"/></svg><en>Needs the same software and version</en></span></td>
+            <td class="col-rnl"><span class="mx y"><svg class="ico"><use href="#i-check"/></svg><en>Any RNL viewer</en></span></td>
           </tr>
           <tr>
-            <th scope="row"><zh>带着设计意图</zh><en>Carries design intent</en></th>
-            <td><span class="mx n"><svg class="ico"><use href="#i-cross"/></svg><zh>没有</zh><en>No</en></span></td>
-            <td><span class="mx p"><svg class="ico"><use href="#i-half"/></svg><zh>只在画面里，机器读不出</zh><en>Only in the picture; machines cannot read it</en></span></td>
-            <td class="col-rnl"><span class="mx y"><svg class="ico"><use href="#i-check"/></svg><zh>差分对、对称都是语句</zh><en>Pairs and symmetry are statements</en></span></td>
+            <th scope="row"><en>Carries design intent</en></th>
+            <td><span class="mx n"><svg class="ico"><use href="#i-cross"/></svg><en>No</en></span></td>
+            <td><span class="mx p"><svg class="ico"><use href="#i-half"/></svg><en>Only in the picture; machines cannot read it</en></span></td>
+            <td class="col-rnl"><span class="mx y"><svg class="ico"><use href="#i-check"/></svg><en>Pairs and symmetry are statements</en></span></td>
           </tr>
           <tr>
-            <th scope="row"><zh>电路只有一份真相</zh><en>One source of truth for the circuit</en></th>
-            <td><span class="mx y"><svg class="ico"><use href="#i-check"/></svg><zh>是</zh><en>Yes</en></span></td>
-            <td><span class="mx n"><svg class="ico"><use href="#i-cross"/></svg><zh>图和网表可能对不上</zh><en>Drawing and netlist can disagree</en></span></td>
-            <td class="col-rnl"><span class="mx y"><svg class="ico"><use href="#i-check"/></svg><zh>连接只看网表</zh><en>Connectivity comes only from the netlist</en></span></td>
+            <th scope="row"><en>One source of truth for the circuit</en></th>
+            <td><span class="mx y"><svg class="ico"><use href="#i-check"/></svg><en>Yes</en></span></td>
+            <td><span class="mx n"><svg class="ico"><use href="#i-cross"/></svg><en>Drawing and netlist can disagree</en></span></td>
+            <td class="col-rnl"><span class="mx y"><svg class="ico"><use href="#i-check"/></svg><en>Connectivity comes only from the netlist</en></span></td>
           </tr>
         </tbody>
       </table>
     </div>
 
-    <h3 class="sub-h"><zh>现在的几种补救办法</zh><en>Today’s workarounds</en></h3>
+    <h3 class="sub-h"><en>Today’s workarounds</en></h3>
     <div class="fixes">
       <div class="fix">
         <div class="fix-fig">
@@ -377,12 +361,11 @@
             <path class="fx-redo" d="M96 88a10 10 0 1 0 3-7"/><path class="fx-redo" d="M95 77v5h5"/>
           </svg>
         </div>
-        <div class="fix-body"><h4><zh>手工重画</zh><en>Redraw by hand</en></h4><p><zh>费时，而且网表一改，图又得跟着再画一遍。</zh><en>Slow, and every netlist change means redrawing.</en></p></div>
+        <div class="fix-body"><h4><en>Redraw by hand</en></h4><p><en>Slow, and every netlist change means redrawing.</en></p></div>
       </div>
       <div class="fix">
-        <div class="fix-fig"><svg id="fix-air" role="img" aria-label="<zh>只按连接关系摆出来的五管运放：飞线交叉纵横</zh><en>Five-transistor OTA placed from connectivity alone: airwires crossing everywhere</en>"></svg></div>
-        <div class="fix-body"><h4><zh>自动生成</zh><en>Generate automatically</en></h4><p><zh>只知道连接，不知道结构：线都连上了，却看不出哪两个管子是一对。</zh>
-          <en>It knows the connections but not the structure: everything is wired, yet you cannot tell which two transistors form a pair.</en></p></div>
+        <div class="fix-fig"><svg id="fix-air" role="img" aria-label="<en>Five-transistor OTA placed from connectivity alone: airwires crossing everywhere</en>"></svg></div>
+        <div class="fix-body"><h4><en>Generate automatically</en></h4><p><en>An auto-layout tool knows the connections but not the structure: everything is wired, yet you cannot tell which two transistors form a pair.</en></p></div>
       </div>
       <div class="fix">
         <div class="fix-fig">
@@ -394,7 +377,7 @@
             <g transform="translate(152 88)"><circle class="fx-badge" r="11"/><path class="fx-x" d="M-4.5 -4.5l9 9M4.5 -4.5l-9 9"/></g>
           </svg>
         </div>
-        <div class="fix-body"><h4><zh>截图、导出图片</zh><en>Screenshots and exports</en></h4><p><zh>图有了，电路没了：不能仿真，也没法再改。</zh><en>You keep the picture and lose the circuit: no simulation, no further edits.</en></p></div>
+        <div class="fix-body"><h4><en>Screenshots and exports</en></h4><p><en>You keep the picture and lose the circuit: no simulation, no further edits.</en></p></div>
       </div>
       <div class="fix">
         <div class="fix-fig">
@@ -409,13 +392,11 @@
             </g>
           </svg>
         </div>
-        <div class="fix-body"><h4><zh>专有格式</zh><en>Proprietary formats</en></h4><p><zh>只能在原来的工具里打开；换工具、换版本，往往要从头再来。</zh>
-          <en>They open only in the original tool; switching tools or versions often means starting over.</en></p></div>
+        <div class="fix-body"><h4><en>Proprietary formats</en></h4><p><en>They open only in the original tool; switching tools or versions often means starting over.</en></p></div>
       </div>
     </div>
 
-    <p class="pivot"><svg class="ico"><use href="#i-asterisk"/></svg><zh>RNL 的思路：不另起一个文件，把画法写回网表本身。</zh>
-      <en>RNL’s approach: no separate file; write the drawing back into the netlist itself.</en></p>
+    <p class="pivot"><svg class="ico"><use href="#i-asterisk"/></svg><en>RNL’s approach: no separate file; write the drawing back into the netlist itself.</en></p>
   </div>
 </section>
 
@@ -423,69 +404,66 @@
 <section id="vision" class="sheet">
   <div class="wrap">
     <header class="sheet-head">
-      <p class="sheet-no"><zh>03 · 愿景</zh><en>03 · Vision</en></p>
-      <h2><zh>目标：像 PDF 一样的原理图。</zh><en>The goal: schematics that travel like PDFs.</en></h2>
-      <p class="lead"><zh>一份文件，到哪里都能仿真、能打开、能看懂、能修改。</zh>
-        <en>One file that can be simulated, opened, understood and edited anywhere.</en></p>
+      <p class="sheet-no"><en>03 · Vision</en></p>
+      <h2><en>The goal: schematics that travel like PDFs.</en></h2>
+      <p class="lead"><en>One file that can be simulated, opened, understood and edited anywhere.</en></p>
     </header>
 
     <div class="hub" id="hub">
       <svg class="hub-wires" id="hub-wires" aria-hidden="true"></svg>
       <div class="hub-col">
-        <div class="hub-node"><svg class="ico"><use href="#i-wave"/></svg><div><h4><zh>仿真器</zh><en>Simulator</en></h4><p><zh>SPICE、Spectre 照常仿真，RNL 只是注释。</zh><en>SPICE and Spectre simulate as usual; RNL is just comments.</en></p></div></div>
-        <div class="hub-node"><svg class="ico"><use href="#i-eye"/></svg><div><h4><zh>查看器</zh><en>Viewer</en></h4><p><zh>网页、桌面、手机上直接打开，不需要 EDA 软件。</zh>
-          <en>Opens in a browser, on the desktop or on a phone, with no EDA software.</en></p></div></div>
-        <div class="hub-node"><svg class="ico"><use href="#i-solver"/></svg><div><h4><zh>求解器</zh><en>Solver</en></h4><p><zh>把意图排成整齐的布局，结果写回文件。</zh><en>Turns intent into a tidy layout and writes the result back to the file.</en></p></div></div>
+        <div class="hub-node"><svg class="ico"><use href="#i-wave"/></svg><div><h4><en>Simulator</en></h4><p><en>SPICE and Spectre simulate as usual; RNL is just comments.</en></p></div></div>
+        <div class="hub-node"><svg class="ico"><use href="#i-eye"/></svg><div><h4><en>Viewer</en></h4><p><en>Opens in a browser, on the desktop or on a phone, with no EDA software.</en></p></div></div>
+        <div class="hub-node"><svg class="ico"><use href="#i-solver"/></svg><div><h4><en>Solver</en></h4><p><en>Turns intent into a tidy layout and writes the result back to the file.</en></p></div></div>
       </div>
       <div class="hub-core" id="hub-core">
         <svg class="ico"><use href="#i-netlist"/></svg>
         <h3>ota5t.sp</h3>
-        <p><zh>一份文件：网表 + RNL</zh><en>One file: netlist + RNL</en></p>
+        <p><en>One file: netlist + RNL</en></p>
         <div class="hub-lines" id="hub-lines"></div>
       </div>
       <div class="hub-col">
-        <div class="hub-node"><svg class="ico"><use href="#i-pencil"/></svg><div><h4><zh>编辑器</zh><en>Editor</en></h4><p><zh>拖动一个器件，文件末尾多一行。</zh><en>Drag a device and the file gains one line at the end.</en></p></div></div>
-        <div class="hub-node"><svg class="ico"><use href="#i-chat"/></svg><div><h4><zh>AI 助手</zh><en>AI assistant</en></h4><p><zh>生成电路时顺手写出结构和画法。</zh><en>Writes the structure and drawing along with the circuit.</en></p></div></div>
-        <div class="hub-node"><svg class="ico"><use href="#i-git"/></svg><div><h4><zh>版本管理</zh><en>Version control</en></h4><p><zh>每次改动都是看得懂的文本差异。</zh><en>Every change is a readable text diff.</en></p></div></div>
+        <div class="hub-node"><svg class="ico"><use href="#i-pencil"/></svg><div><h4><en>Editor</en></h4><p><en>Drag a device and the file gains one line at the end.</en></p></div></div>
+        <div class="hub-node"><svg class="ico"><use href="#i-chat"/></svg><div><h4><en>AI assistant</en></h4><p><en>Writes the structure and drawing along with the circuit.</en></p></div></div>
+        <div class="hub-node"><svg class="ico"><use href="#i-git"/></svg><div><h4><en>Version control</en></h4><p><en>Every change is a readable text diff.</en></p></div></div>
       </div>
     </div>
 
-    <h3 class="sub-h" id="journey"><zh>从一份网表到一张好图</zh><en>From a netlist to a good drawing</en></h3>
-    <p class="sub-lead"><zh>同一个五管运放，每一步多写几句 RNL。左边是文件，右边是查看器画出来的样子；把鼠标放到某一行上，看它管图里的哪一部分。文件上方可以换写法：只写记号、英文例句或中文例句，机器读到的语句完全相同。</zh>
-      <en>The same five-transistor OTA, with a few more RNL lines at each step. The file is on the left, the viewer’s drawing on the right; hover over a line to see which part of the drawing it controls. Above the file you can switch the writing style between bare notation, English sentences and Chinese sentences; machines read exactly the same statements.</en></p>
+    <h3 class="sub-h" id="journey"><en>From a netlist to a good drawing</en></h3>
+    <p class="sub-lead"><!--zh-CN--><en>The same five-transistor OTA, with a few more RNL lines at each step. The file is on the left, the viewer’s drawing on the right; hover over a line to see which part of the drawing it controls. Above the file you can switch the writing style between bare notation, English sentences and Chinese sentences; machines read exactly the same statements.</en><!--/zh-CN--><!--not-zh-CN--><en>The same five-transistor OTA, with a few more RNL lines at each step. The file is on the left, the viewer’s drawing on the right; hover over a line to see which part of the drawing it controls. Above the file you can switch the writing style between bare notation and English sentences; machines read exactly the same statements.</en><!--/not-zh-CN--></p>
     <div class="journey">
-      <div class="jr-steps" id="jr-steps" role="tablist" aria-label="<zh>步骤</zh><en>Steps</en>">
-        <button type="button" role="tab" data-i="0"><span class="n">STEP 0</span><span class="t"><zh>只有网表</zh><en>Netlist only</en></span></button>
-        <button type="button" role="tab" data-i="1"><span class="n">STEP 1</span><span class="t"><zh>写下结构</zh><en>Add structure</en></span></button>
-        <button type="button" role="tab" data-i="2"><span class="n">STEP 2</span><span class="t"><zh>写下意图</zh><en>Add intent</en></span></button>
-        <button type="button" role="tab" data-i="3"><span class="n">STEP 3</span><span class="t"><zh>求解器写回</zh><en>Solver writes back</en></span></button>
-        <button type="button" role="tab" data-i="4"><span class="n">STEP 4</span><span class="t"><zh>手动微调</zh><en>Tweak by hand</en></span></button>
-        <button type="button" role="tab" data-i="5"><span class="n">STEP 5</span><span class="t"><zh>重新求解</zh><en>Solve again</en></span></button>
+      <div class="jr-steps" id="jr-steps" role="tablist" aria-label="<en>Steps</en>">
+        <button type="button" role="tab" data-i="0"><span class="n">STEP 0</span><span class="t"><en ctx=step-0>Netlist only</en></span></button>
+        <button type="button" role="tab" data-i="1"><span class="n">STEP 1</span><span class="t"><en>Add structure</en></span></button>
+        <button type="button" role="tab" data-i="2"><span class="n">STEP 2</span><span class="t"><en>Add intent</en></span></button>
+        <button type="button" role="tab" data-i="3"><span class="n">STEP 3</span><span class="t"><en>Solver writes back</en></span></button>
+        <button type="button" role="tab" data-i="4"><span class="n">STEP 4</span><span class="t"><en>Tweak by hand</en></span></button>
+        <button type="button" role="tab" data-i="5"><span class="n">STEP 5</span><span class="t"><en>Solve again</en></span></button>
       </div>
       <div class="jr-body">
         <div class="jr-code panel">
           <div class="ph"><svg class="ico"><use href="#i-file"/></svg><span class="ph-title">ota5t.sp</span><span class="ph-right">
-            <span class="seg" id="jr-style" role="group" aria-label="<zh>写法</zh><en>Writing style</en>">
-              <button type="button" data-style="bare" aria-pressed="false"><zh>只写记号</zh><en>Notation</en></button>
-              <button type="button" data-style="en" aria-pressed="true"><zh>英文例句</zh><en>English</en></button>
-              <button type="button" data-style="zh" aria-pressed="false"><zh>中文例句</zh><en>Chinese</en></button>
+            <span class="seg" id="jr-style" role="group" aria-label="<en>Writing style</en>">
+              <button type="button" data-style="bare" aria-pressed="false"><en>Notation</en></button>
+              <button type="button" data-style="en" aria-pressed="true"><en>English</en></button>
+              <!--zh-CN--><button type="button" data-style="zh" aria-pressed="false"><en>Chinese</en></button><!--/zh-CN-->
             </span>
-            <a class="chip" id="jr-open" href="../viewer/?url=samples/site/ota5t.sp"><zh>在查看器中打开</zh><en>Open in viewer</en></a></span></div>
+            <a class="chip" id="jr-open" href="../viewer/?url=samples/site/ota5t.sp" target="_blank" rel="noopener"><en>Open in viewer</en></a></span></div>
           <div class="code" id="jr-code"></div>
-          <div class="jr-legend"><span class="chip chip-ok"><zh>新增的行</zh><en>Added lines</en></span><span class="chip chip-warn"><zh>改写的行</zh><en>Rewritten lines</en></span><span class="chip chip-rnl"><zh>RNL 记录</zh><en>RNL records</en></span></div>
+          <div class="jr-legend"><span class="chip chip-ok"><en>Added lines</en></span><span class="chip chip-warn"><en>Rewritten lines</en></span><span class="chip chip-rnl"><en>RNL records</en></span></div>
         </div>
         <div class="jr-fig panel">
-          <div class="ph"><svg class="ico"><use href="#i-eye"/></svg><span class="ph-title"><zh>RNL 查看器</zh><en>RNL viewer</en></span><span class="ph-right metric" id="jr-metrics"></span></div>
+          <div class="ph"><svg class="ico"><use href="#i-eye"/></svg><span class="ph-title"><en>RNL viewer</en></span><span class="ph-right metric" id="jr-metrics"></span></div>
           <div class="jr-svgwrap">
-            <svg id="jr-svg" role="img" aria-label="<zh>五管运放在当前步骤下的画面</zh><en>The five-transistor OTA at the current step</en>"></svg>
+            <svg id="jr-svg" role="img" aria-label="<en>The five-transistor OTA at the current step</en>"></svg>
             <div class="jr-notice" id="jr-notice" hidden></div>
           </div>
           <p class="jr-cap" id="jr-cap" aria-live="polite"></p>
           <div class="jr-ctrl">
-            <button class="btn btn-sm" type="button" id="jr-prev"><svg class="ico"><use href="#i-prev"/></svg><zh>上一步</zh><en>Back</en></button>
-            <button class="btn btn-sm btn-primary" type="button" id="jr-next"><zh>下一步</zh><en>Next</en><svg class="ico"><use href="#i-next"/></svg></button>
+            <button class="btn btn-sm" type="button" id="jr-prev"><svg class="ico"><use href="#i-prev"/></svg><en>Back</en></button>
+            <button class="btn btn-sm btn-primary" type="button" id="jr-next"><en>Next</en><svg class="ico"><use href="#i-next"/></svg></button>
             <span class="spacer"></span>
-            <button class="btn btn-sm" type="button" id="jr-play" aria-pressed="false"><svg class="ico"><use href="#i-play"/></svg><span><zh>自动播放</zh><en>Autoplay</en></span></button>
+            <button class="btn btn-sm" type="button" id="jr-play" aria-pressed="false"><svg class="ico"><use href="#i-play"/></svg><span><en>Autoplay</en></span></button>
           </div>
         </div>
       </div>
@@ -497,84 +475,79 @@
 <section id="scenes" class="sheet">
   <div class="wrap">
     <header class="sheet-head">
-      <p class="sheet-no"><zh>04 · 场景对比</zh><en>04 · Scenarios</en></p>
-      <h2><zh>同一件事，两种做法。</zh><en>Same task, two ways.</en></h2>
-      <p class="lead"><zh>几个电路设计者经常碰到的场景：现在怎么做，用了 RNL 以后怎么做。</zh>
-        <en>Situations circuit designers run into often: how they are handled today, and how they would be handled with RNL.</en></p>
+      <p class="sheet-no"><en>04 · Scenarios</en></p>
+      <h2><en>Same task, two ways.</en></h2>
+      <p class="lead"><en>Situations circuit designers run into often: how they are handled today, and how they would be handled with RNL.</en></p>
     </header>
 
-    <div class="tabs" role="tablist" id="sc-tabs" aria-label="<zh>场景</zh><en>Scenarios</en>">
-      <button type="button" role="tab" id="t-share" aria-controls="sc-share" aria-selected="true"><zh>分享电路</zh><en>Share a circuit</en></button>
-      <button type="button" role="tab" id="t-ai" aria-controls="sc-ai" aria-selected="false"><zh>让 AI 画图</zh><en>Ask AI to draw</en></button>
-      <button type="button" role="tab" id="t-auto" aria-controls="sc-auto" aria-selected="false"><zh>自动出图</zh><en>Auto-draw</en></button>
-      <button type="button" role="tab" id="t-git" aria-controls="sc-git" aria-selected="false"><zh>版本管理</zh><en>Version control</en></button>
-      <button type="button" role="tab" id="t-truth" aria-controls="sc-truth" aria-selected="false"><zh>图与网表一致</zh><en>Drawing = netlist</en></button>
-      <button type="button" role="tab" id="t-port" aria-controls="sc-port" aria-selected="false"><zh>换工具</zh><en>Switch tools</en></button>
+    <div class="tabs" role="tablist" id="sc-tabs" aria-label="<en ctx=tabs>Scenarios</en>">
+      <button type="button" role="tab" id="t-share" aria-controls="sc-share" aria-selected="true"><en>Share a circuit</en></button>
+      <button type="button" role="tab" id="t-ai" aria-controls="sc-ai" aria-selected="false"><en>Ask AI to draw</en></button>
+      <button type="button" role="tab" id="t-auto" aria-controls="sc-auto" aria-selected="false"><en>Auto-draw</en></button>
+      <button type="button" role="tab" id="t-git" aria-controls="sc-git" aria-selected="false"><en>Version control</en></button>
+      <button type="button" role="tab" id="t-truth" aria-controls="sc-truth" aria-selected="false"><en>Drawing = netlist</en></button>
+      <button type="button" role="tab" id="t-port" aria-controls="sc-port" aria-selected="false"><en>Switch tools</en></button>
     </div>
 
     <div role="tabpanel" id="sc-share" aria-labelledby="t-share">
       <div class="vs">
         <div class="vs-side">
-          <div class="vs-head"><svg class="ico"><use href="#i-cross"/></svg><zh>现在</zh><en>Today</en></div>
+          <div class="vs-head"><svg class="ico"><use href="#i-cross"/></svg><en>Today</en></div>
           <div class="vs-fig">
             <div>
               <div class="flowline">
-                <div class="fnode bad"><span class="box"><svg class="ico"><use href="#i-db"/></svg><span class="badge n"><svg class="ico"><use href="#i-lock"/></svg></span></span><zh>工具里的原理图库</zh><en>Schematic database inside the tool</en></div>
+                <div class="fnode bad"><span class="box"><svg class="ico"><use href="#i-db"/></svg><span class="badge n"><svg class="ico"><use href="#i-lock"/></svg></span></span><en>Schematic database inside the tool</en></div>
                 <span class="farrow"><svg class="ico"><use href="#i-arrow"/></svg></span>
-                <div class="fnode"><span class="box"><svg class="ico"><use href="#i-monitor"/></svg></span><zh>同事的电脑</zh><en>A colleague’s computer</en></div>
+                <div class="fnode"><span class="box"><svg class="ico"><use href="#i-monitor"/></svg></span><en>A colleague’s computer</en></div>
               </div>
-              <div class="reqs"><span class="chip chip-err"><zh>同款软件</zh><en>Same software</en></span><span class="chip chip-err"><zh>同一版本</zh><en>Same version</en></span><span class="chip chip-err"><zh>同一套工艺库</zh><en>Same PDK</en></span><span class="chip chip-err"><zh>许可证</zh><en>License</en></span></div>
+              <div class="reqs"><span class="chip chip-err"><en>Same software</en></span><span class="chip chip-err"><en>Same version</en></span><span class="chip chip-err"><en>Same PDK</en></span><span class="chip chip-err"><en ctx=chip>License</en></span></div>
               <div class="flowline alt">
-                <span class="chip"><svg class="ico"><use href="#i-image"/></svg><zh>截图.png</zh><en>screenshot.png</en></span><span class="plus">+</span><span class="chip"><svg class="ico"><use href="#i-netlist"/></svg>netlist.sp</span><span class="chip chip-warn"><zh>两份，容易对不上</zh><en>Two files that drift apart</en></span>
+                <span class="chip"><svg class="ico"><use href="#i-image"/></svg><en>screenshot.png</en></span><span class="plus">+</span><span class="chip"><svg class="ico"><use href="#i-netlist"/></svg>netlist.sp</span><span class="chip chip-warn"><en>Two files that drift apart</en></span>
               </div>
             </div>
           </div>
-          <p class="vs-text"><zh>原理图存在 EDA 工具的数据库里，对方得装齐同样的环境才能打开。要么只发截图，再附一份网表：两份东西，改了一份，另一份就过期。</zh>
-            <en>The schematic lives in the EDA tool’s database, so the recipient needs the same setup to open it. The alternative is a screenshot plus a netlist: two files, and when one changes the other goes stale.</en></p>
+          <p class="vs-text"><en>The schematic lives in the EDA tool’s database, so the recipient needs the same setup to open it. The alternative is a screenshot plus a netlist: two files, and when one changes the other goes stale.</en></p>
         </div>
         <div class="vs-side rnl">
-          <div class="vs-head"><svg class="ico"><use href="#i-check"/></svg><zh>用 RNL</zh><en>With RNL</en></div>
+          <div class="vs-head"><svg class="ico"><use href="#i-check"/></svg><en>With RNL</en></div>
           <div class="vs-fig">
             <div class="flowline">
               <div class="fnode rnl"><span class="box"><svg class="ico"><use href="#i-netlist"/></svg></span>ota5t.sp</div>
               <span class="farrow"><svg class="ico"><use href="#i-arrow"/></svg></span>
               <ul class="targets">
-                <li><svg class="ico"><use href="#i-wave"/></svg><zh>仿真器照常仿真</zh><en>The simulator runs it as usual</en></li>
-                <li><svg class="ico"><use href="#i-globe"/></svg><zh>浏览器里直接看图</zh><en>A browser shows the drawing</en></li>
-                <li><svg class="ico"><use href="#i-chat"/></svg><zh>同事和 AI 都能读、能改</zh><en>Colleagues and AI can read and edit it</en></li>
+                <li><svg class="ico"><use href="#i-wave"/></svg><en>The simulator runs it as usual</en></li>
+                <li><svg class="ico"><use href="#i-globe"/></svg><en>A browser shows the drawing</en></li>
+                <li><svg class="ico"><use href="#i-chat"/></svg><en>Colleagues and AI can read and edit it</en></li>
               </ul>
             </div>
           </div>
-          <p class="vs-text"><zh>只发一个 .sp 文件。仿真器直接跑，浏览器里的查看器直接看图，图和电路来自同一份文件。</zh>
-            <en>Send a single .sp file. The simulator runs it, a viewer in the browser draws it, and the drawing and the circuit come from the same file.</en></p>
+          <p class="vs-text"><en>Send a single .sp file. The simulator runs it, a viewer in the browser draws it, and the drawing and the circuit come from the same file.</en></p>
         </div>
       </div>
-      <p class="vs-diff"><svg class="ico"><use href="#i-arrow"/></svg><zh>图跟着电路走，不再跟着工具走。</zh><en>The drawing travels with the circuit, not with the tool.</en></p>
+      <p class="vs-diff"><svg class="ico"><use href="#i-arrow"/></svg><en>The drawing travels with the circuit, not with the tool.</en></p>
     </div>
 
     <div role="tabpanel" id="sc-ai" aria-labelledby="t-ai" hidden>
       <div class="vs">
         <div class="vs-side">
-          <div class="vs-head"><svg class="ico"><use href="#i-cross"/></svg><zh>现在</zh><en>Today</en></div>
+          <div class="vs-head"><svg class="ico"><use href="#i-cross"/></svg><en>Today</en></div>
           <div class="vs-fig">
             <div class="chat">
-              <p class="bubble me"><zh>帮我设计一个五管 OTA，并画出原理图。</zh><en>Design a five-transistor OTA for me and draw the schematic.</en></p>
+              <p class="bubble me"><en>Design a five-transistor OTA for me and draw the schematic.</en></p>
               <div class="bubble"><div class="minicode" data-hl="M1 x inp tail vss nch W=2u L=0.5u
 M2 out inn tail vss nch W=2u L=0.5u
 M3 x x vdd vdd pch W=4u L=0.5u
 M4 out x vdd vdd pch W=4u L=0.5u
-M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写出来了，原理图只能用文字描述，或者画一张 ASCII 草图。</zh>
-  <en>The netlist is there, but the schematic can only be described in words or sketched in ASCII.</en></p></div>
+M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><en>The netlist is there, but the schematic can only be described in words or sketched in ASCII.</en></p></div>
             </div>
           </div>
-          <p class="vs-text"><zh>大模型擅长写网表，却产出不了原理图。你只能读文本，或者自己动手重画。</zh>
-            <en>Language models write netlists well but cannot produce schematics. You read the text, or redraw it yourself.</en></p>
+          <p class="vs-text"><en>Language models write netlists well but cannot produce schematics. You read the text, or redraw it yourself.</en></p>
         </div>
         <div class="vs-side rnl">
-          <div class="vs-head"><svg class="ico"><use href="#i-check"/></svg><zh>用 RNL</zh><en>With RNL</en></div>
+          <div class="vs-head"><svg class="ico"><use href="#i-check"/></svg><en>With RNL</en></div>
           <div class="vs-fig">
             <div class="chat">
-              <p class="bubble me"><zh>帮我设计一个五管 OTA，并画出原理图。</zh><en>Design a five-transistor OTA for me and draw the schematic.</en></p>
+              <p class="bubble me"><en>Design a five-transistor OTA for me and draw the schematic.</en></p>
               <div class="bubble"><div class="minicode" data-hl="M1 x inp tail vss nch W=2u L=0.5u
 …
 * @RNL {
@@ -583,117 +556,106 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
 *   %ax = (_, _);
 *   #M1(a), #M2(b) and %ax(axis) are treated @AS $MIRRORED
 * }"></div></div>
-              <svg class="thumb" id="ai-thumb" role="img" aria-label="<zh>据此画出的五管运放</zh><en>The five-transistor OTA drawn from it</en>"></svg>
+              <svg class="thumb" id="ai-thumb" role="img" aria-label="<en>The five-transistor OTA drawn from it</en>"></svg>
             </div>
           </div>
-          <p class="vs-text"><zh>模型在网表里顺手写上结构和意图，求解器负责画，人负责检查和微调。</zh>
-            <en>The model writes the structure and intent into the netlist as it goes; the solver draws, and people review and fine-tune.</en></p>
+          <p class="vs-text"><en>The model writes the structure and intent into the netlist as it goes; the solver draws, and people review and fine-tune.</en></p>
         </div>
       </div>
-      <p class="vs-diff"><svg class="ico"><use href="#i-arrow"/></svg><zh>画法也变成了文本：模型能写、能改，也能被 diff。</zh>
-        <en>The drawing becomes text too: models can write it and edit it, and it can be diffed.</en></p>
+      <p class="vs-diff"><svg class="ico"><use href="#i-arrow"/></svg><en>The drawing becomes text too: models can write it and edit it, and it can be diffed.</en></p>
     </div>
 
     <div role="tabpanel" id="sc-auto" aria-labelledby="t-auto" hidden>
       <div class="vs">
         <div class="vs-side">
-          <div class="vs-head"><svg class="ico"><use href="#i-cross"/></svg><zh>现在</zh><en>Today</en></div>
-          <div class="vs-fig"><div class="thumb-wrap"><svg class="thumb" id="auto-air" role="img" aria-label="<zh>只按连接摆放的五管运放</zh><en>Five-transistor OTA placed from connectivity alone</en>"></svg><div class="thumb-cap" id="auto-air-cap"></div></div></div>
-          <p class="vs-text"><zh>只凭连接关系，工具不知道哪两个管子是一对、信号往哪边走，也就排不出熟悉的样子。</zh>
-            <en>With connectivity alone, a tool cannot tell which two transistors form a pair or which way the signal flows, so it cannot produce the familiar arrangement.</en></p>
+          <div class="vs-head"><svg class="ico"><use href="#i-cross"/></svg><en>Today</en></div>
+          <div class="vs-fig"><div class="thumb-wrap"><svg class="thumb" id="auto-air" role="img" aria-label="<en>Five-transistor OTA placed from connectivity alone</en>"></svg><div class="thumb-cap" id="auto-air-cap"></div></div></div>
+          <p class="vs-text"><en>With connectivity alone, a tool cannot tell which two transistors form a pair or which way the signal flows, so it cannot produce the familiar arrangement.</en></p>
         </div>
         <div class="vs-side rnl">
-          <div class="vs-head"><svg class="ico"><use href="#i-check"/></svg><zh>用 RNL</zh><en>With RNL</en></div>
-          <div class="vs-fig"><div class="thumb-wrap"><svg class="thumb" id="auto-sym" role="img" aria-label="<zh>按 RNL 意图排出的五管运放</zh><en>Five-transistor OTA laid out from RNL intent</en>"></svg><div class="thumb-cap" id="auto-sym-cap"></div></div></div>
-          <p class="vs-text"><zh>连接之外还有意图：差分对、对称、尾管居中、信号从左到右。求解器照着意图排，就是教科书上的样子。</zh>
-            <en>Beyond connectivity there is intent: a differential pair, symmetry, a centered tail, signal flowing left to right. A solver that follows the intent produces the textbook drawing.</en></p>
+          <div class="vs-head"><svg class="ico"><use href="#i-check"/></svg><en>With RNL</en></div>
+          <div class="vs-fig"><div class="thumb-wrap"><svg class="thumb" id="auto-sym" role="img" aria-label="<en>Five-transistor OTA laid out from RNL intent</en>"></svg><div class="thumb-cap" id="auto-sym-cap"></div></div></div>
+          <p class="vs-text"><en>Beyond connectivity there is intent: a differential pair, symmetry, a centered tail, signal flowing left to right. A solver that follows the intent produces the textbook drawing.</en></p>
         </div>
       </div>
-      <p class="vs-diff"><svg class="ico"><use href="#i-arrow"/></svg><zh>少写坐标，多写意图。</zh><en>Fewer coordinates, more intent.</en></p>
+      <p class="vs-diff"><svg class="ico"><use href="#i-arrow"/></svg><en>Fewer coordinates, more intent.</en></p>
     </div>
 
     <div role="tabpanel" id="sc-git" aria-labelledby="t-git" hidden>
       <div class="vs">
         <div class="vs-side">
-          <div class="vs-head"><svg class="ico"><use href="#i-cross"/></svg><zh>现在</zh><en>Today</en></div>
+          <div class="vs-head"><svg class="ico"><use href="#i-cross"/></svg><en>Today</en></div>
           <div class="vs-fig"><div class="minicode term"><div class="dim">$ git diff ota5t/</div><div>diff --git a/ota5t/schematic/sch.oa b/ota5t/schematic/sch.oa</div><div class="del">Binary files a/ota5t/schematic/sch.oa and b/ota5t/schematic/sch.oa differ</div></div></div>
-          <p class="vs-text"><zh>原理图是二进制数据库，版本管理只能告诉你“文件变了”。改了哪里、为什么改，只能打开工具一张张对比。</zh>
-            <en>The schematic is a binary database, so version control can only tell you “the file changed”. To find out what changed and why, you open the tool and compare sheet by sheet.</en></p>
+          <p class="vs-text"><en>The schematic is a binary database, so version control can only tell you “the file changed”. To find out what changed and why, you open the tool and compare sheet by sheet.</en></p>
         </div>
         <div class="vs-side rnl">
-          <div class="vs-head"><svg class="ico"><use href="#i-check"/></svg><zh>用 RNL</zh><en>With RNL</en></div>
+          <div class="vs-head"><svg class="ico"><use href="#i-check"/></svg><en>With RNL</en></div>
           <div class="vs-fig"><div class="minicode term"><div class="dim">$ git diff ota5t.sp</div><div class="dim">@@ -31,2 +31,3 @@</div><div> * }</div><div class="add">+* @RNL(author="rnl-editor") { #M2 @PLACE(x=30, priority="high")}</div><div> .ends ota5t</div></div></div>
-          <p class="vs-text"><zh>每处改动都是能读懂的一行：编辑器把 M2 移到了 x = 30。求解器写的记录标着 type="generated"，可以整段重新生成。</zh>
-            <en>Every change is one readable line: the editor moved M2 to x = 30. The solver’s record is marked type="generated" and can be regenerated as a whole.</en></p>
+          <p class="vs-text"><en>Every change is one readable line: the editor moved M2 to x = 30. The solver’s record is marked type="generated" and can be regenerated as a whole.</en></p>
         </div>
       </div>
-      <p class="vs-diff"><svg class="ico"><use href="#i-arrow"/></svg><zh>原理图的修改也能评审、能回滚。</zh><en>Schematic changes can be reviewed and rolled back too.</en></p>
+      <p class="vs-diff"><svg class="ico"><use href="#i-arrow"/></svg><en>Schematic changes can be reviewed and rolled back too.</en></p>
     </div>
 
     <div role="tabpanel" id="sc-truth" aria-labelledby="t-truth" hidden>
       <div class="vs">
         <div class="vs-side">
-          <div class="vs-head"><svg class="ico"><use href="#i-cross"/></svg><zh>现在</zh><en>Today</en></div>
+          <div class="vs-head"><svg class="ico"><use href="#i-cross"/></svg><en>Today</en></div>
           <div class="vs-fig">
             <div class="truth">
-              <div class="truth-card"><span class="truth-k"><zh>原理图上</zh><en>In the schematic</en></span><svg viewBox="0 0 120 70" aria-hidden="true"><path class="fx-sch" d="M72 10v16h-8v18h8v16M64 22v26M40 35h24"/><circle class="fx-port" cx="36" cy="35" r="3.5"/><text class="fx-lbl" x="30" y="39" text-anchor="end">inp</text><text class="fx-lbl" x="80" y="38">M1</text></svg></div>
+              <div class="truth-card"><span class="truth-k"><en>In the schematic</en></span><svg viewBox="0 0 120 70" aria-hidden="true"><path class="fx-sch" d="M72 10v16h-8v18h8v16M64 22v26M40 35h24"/><circle class="fx-port" cx="36" cy="35" r="3.5"/><text class="fx-lbl" x="30" y="39" text-anchor="end">inp</text><text class="fx-lbl" x="80" y="38">M1</text></svg></div>
               <span class="truth-ne">≠</span>
-              <div class="truth-card"><span class="truth-k"><zh>网表里</zh><en>In the netlist</en></span><div class="minicode" data-hl="M1 x inn tail vss nch"></div></div>
+              <div class="truth-card"><span class="truth-k"><en>In the netlist</en></span><div class="minicode" data-hl="M1 x inn tail vss nch"></div></div>
             </div>
           </div>
-          <p class="vs-text"><zh>原理图和网表各自保存一份连接关系。改了一边，另一边就可能过期；图上看着连着的线，网表里未必连着。</zh>
-            <en>The schematic and the netlist each keep their own copy of the connections. Change one and the other may go stale; a line that looks connected in the drawing may not be connected in the netlist.</en></p>
+          <p class="vs-text"><en>The schematic and the netlist each keep their own copy of the connections. Change one and the other may go stale; a line that looks connected in the drawing may not be connected in the netlist.</en></p>
         </div>
         <div class="vs-side rnl">
-          <div class="vs-head"><svg class="ico"><use href="#i-check"/></svg><zh>用 RNL</zh><en>With RNL</en></div>
+          <div class="vs-head"><svg class="ico"><use href="#i-check"/></svg><en>With RNL</en></div>
           <div class="vs-fig">
             <svg class="cross-demo" viewBox="0 0 240 120" aria-hidden="true">
               <path class="cd-a" d="M20 60h200"/><path class="cd-b" d="M120 12v96"/>
               <circle class="cd-ring" cx="120" cy="60" r="11"/>
-              <text class="cd-t" x="24" y="52"><zh>网络 a</zh><en>net a</en></text><text class="cd-t" x="128" y="22"><zh>网络 b</zh><en>net b</en></text>
-              <text class="cd-big" x="150" y="92"><zh>交叉 ≠ 连接</zh><en><tspan x="132" dy="-6">crossing</tspan><tspan x="132" dy="17">≠ connection</tspan></en></text>
+              <text class="cd-t" x="24" y="52"><en>net a</en></text><text class="cd-t" x="128" y="22"><en>net b</en></text>
+              <text class="cd-big" x="150" y="92"><en><tspan x="132" dy="-6">crossing</tspan><tspan x="132" dy="17">≠ connection</tspan></en></text>
             </svg>
           </div>
-          <p class="vs-text"><zh>连接只由网表定义。RNL 只能引用器件和网络，不能增删器件或连接；图上两条线交叉、端点重合，都不会变成连接。画导线时也一样：只有共用同一个点或端子的线才接在一起。</zh>
-            <en>Connectivity is defined only by the netlist. RNL can only reference devices and nets, never add or remove devices or connections; two lines crossing, or endpoints landing on each other, never become a connection. Drawn wires work the same way: they join only where they share a point or a terminal.</en></p>
+          <p class="vs-text"><en>Connectivity is defined only by the netlist. RNL can only reference devices and nets, never add or remove devices or connections; two lines crossing, or endpoints landing on each other, never become a connection. Drawn wires work the same way: they join only where they share a point or a terminal.</en></p>
         </div>
       </div>
-      <p class="vs-diff"><svg class="ico"><use href="#i-arrow"/></svg><zh>电路只有一份真相，就是网表。</zh><en>The circuit has one source of truth: the netlist.</en></p>
+      <p class="vs-diff"><svg class="ico"><use href="#i-arrow"/></svg><en>The circuit has one source of truth: the netlist.</en></p>
     </div>
 
     <div role="tabpanel" id="sc-port" aria-labelledby="t-port" hidden>
       <div class="vs">
         <div class="vs-side">
-          <div class="vs-head"><svg class="ico"><use href="#i-cross"/></svg><zh>现在</zh><en>Today</en></div>
+          <div class="vs-head"><svg class="ico"><use href="#i-cross"/></svg><en>Today</en></div>
           <div class="vs-fig">
             <div>
               <div class="formats">
                 <span class="fmt">.oa<small>Virtuoso</small></span>
                 <span class="fmt">.kicad_sch<small>KiCad</small></span>
                 <span class="fmt">.asc<small>LTspice</small></span>
-                <span class="fmt"><zh>…<small>其他工具</small></zh><en>…<small>other tools</small></en></span>
+                <span class="fmt"><en>…<small>other tools</small></en></span>
               </div>
-              <p class="fig-note"><zh>每个工具一套原理图格式，符号库也各不相同。</zh><en>Every tool has its own schematic format and its own symbol libraries.</en></p>
+              <p class="fig-note"><en>Every tool has its own schematic format and its own symbol libraries.</en></p>
             </div>
           </div>
-          <p class="vs-text"><zh>换一个工具，原理图往往要重画；换一个仿真器，网表方言也要跟着改写。</zh>
-            <en>Switch tools and the schematic often has to be redrawn; switch simulators and the netlist dialect has to be rewritten too.</en></p>
+          <p class="vs-text"><en>Switch tools and the schematic often has to be redrawn; switch simulators and the netlist dialect has to be rewritten too.</en></p>
         </div>
         <div class="vs-side rnl">
-          <div class="vs-head"><svg class="ico"><use href="#i-check"/></svg><zh>用 RNL</zh><en>With RNL</en></div>
+          <div class="vs-head"><svg class="ico"><use href="#i-check"/></svg><en>With RNL</en></div>
           <div class="vs-fig">
             <div class="two-hosts">
               <div class="minicode" data-hl="* @RNL {#M1 @PLACE(12, 20)}"><span class="host-tag">SPICE</span></div>
               <div class="minicode" data-hl="// @RNL {#M1 @PLACE(12, 20)}"><span class="host-tag">Spectre</span></div>
-              <p class="fig-note"><zh>注释前缀随网表格式变，RNL 内容一字不差。</zh>
-                <en>The comment prefix follows the netlist format; the RNL content stays identical.</en></p>
+              <p class="fig-note"><en>The comment prefix follows the netlist format; the RNL content stays identical.</en></p>
             </div>
           </div>
-          <p class="vs-text"><zh>RNL 的内容与网表格式无关。查看器也不自带元件库：符号本身用 RNL 定义，跟着文件或 RNL 库走。</zh>
-            <en>RNL content does not depend on the netlist format. Viewers ship no component library of their own either: symbols are defined in RNL and travel with the file or an RNL library.</en></p>
+          <p class="vs-text"><en>RNL content does not depend on the netlist format. Viewers ship no component library of their own either: symbols are defined in RNL and travel with the file or an RNL library.</en></p>
         </div>
       </div>
-      <p class="vs-diff"><svg class="ico"><use href="#i-arrow"/></svg><zh>换仿真器、换查看器，画法都还在。</zh><en>Switch simulators or viewers, and the drawing is still there.</en></p>
+      <p class="vs-diff"><svg class="ico"><use href="#i-arrow"/></svg><en>Switch simulators or viewers, and the drawing is still there.</en></p>
     </div>
   </div>
 </section>
@@ -702,56 +664,47 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
 <section id="status" class="sheet">
   <div class="wrap">
     <header class="sheet-head">
-      <p class="sheet-no"><zh>05 · 现状</zh><en>05 · Status</en></p>
-      <h2><zh>现在走到哪一步。</zh><en>Where things stand.</en></h2>
-      <p class="lead"><zh>语言已经发布为标准 0.3；<a href="tools.html">网页版和桌面版查看器</a>能读网表、画图、改文本，求解器有了第一版。下面只列对外发布的节点和接下来的计划。</zh>
-        <en>The language is released as standard 0.3; <a href="tools.html">the web and desktop viewers</a> read netlists, draw them and edit the text, and the solver has a first version. Below are only the released milestones and what comes next.</en></p>
+      <p class="sheet-no"><en>05 · Status</en></p>
+      <h2><en>Where things stand.</en></h2>
+      <p class="lead"><en>The language is released as standard 0.3; <a href="tools.html">the web and desktop viewers</a> read netlists, draw them and edit the text, and the solver has a first version. Below are the latest released milestones and what comes next; all released milestones are on the full timeline.</en></p>
     </header>
     <div class="status-grid">
       <ol class="tl">
 {{timeline}}
       </ol>
       <div class="faq">
-        <h3><zh>常见问题</zh><en>FAQ</en></h3>
+        <h3><en>FAQ</en></h3>
         <details>
-          <summary><zh>加了 RNL 的网表，仿真器会报错吗？</zh><en>Will simulators complain about a netlist with RNL in it?</en><svg class="ico"><use href="#i-next"/></svg></summary>
-          <p><zh>不会。RNL 只写在宿主网表的合法注释里，仿真器当普通注释跳过，不需要预处理。具体用哪个标记在各家仿真器里都安全，还在调研和验证。</zh>
-            <en>No. RNL is written only in the host netlist’s legal comments, and simulators skip it like any other comment, with no preprocessing. Which exact marker is safe in every vendor’s simulator is still being researched and verified.</en></p>
+          <summary><en>Will simulators complain about a netlist with RNL in it?</en><svg class="ico"><use href="#i-next"/></svg></summary>
+          <p><en>No. RNL is written only in the host netlist’s legal comments, and simulators skip it like any other comment, with no preprocessing. Which exact marker is safe in every vendor’s simulator is still being researched and verified.</en></p>
         </details>
         <details>
-          <summary><zh>RNL 会改我的电路吗？</zh><en>Will RNL change my circuit?</en><svg class="ico"><use href="#i-next"/></svg></summary>
-          <p><zh>不会。器件、参数和连接只由网表定义，RNL 只能引用它们。图上的线交叉、重叠，都不会产生连接；只改 RNL 时，网表正文原样保留。</zh>
-            <en>No. Devices, parameters and connections are defined only by the netlist; RNL can only reference them. Lines that cross or overlap in the drawing never create connections, and when only RNL changes, the netlist body is kept as is.</en></p>
+          <summary><en>Will RNL change my circuit?</en><svg class="ico"><use href="#i-next"/></svg></summary>
+          <p><en>No. Devices, parameters and connections are defined only by the netlist; RNL can only reference them. Lines that cross or overlap in the drawing never create connections, and when only RNL changes, the netlist body is kept as is.</en></p>
         </details>
         <details>
-          <summary><zh>一定要写坐标吗？</zh><en>Do I have to write coordinates?</en><svg class="ico"><use href="#i-next"/></svg></summary>
-          <p><zh>不用。只写“M1、M2 是差分对，关于中轴对称”也是合法、有用的描述；坐标可以交给求解器，也可以以后逐步补上。</zh>
-            <en>No. “M1 and M2 are a differential pair, symmetric about the center line” on its own is a valid and useful description; coordinates can be left to the solver or added later, bit by bit.</en></p>
+          <summary><en>Do I have to write coordinates?</en><svg class="ico"><use href="#i-next"/></svg></summary>
+          <p><en>No. “M1 and M2 are a differential pair, symmetric about the center line” on its own is a valid and useful description; coordinates can be left to the solver or added later, bit by bit.</en></p>
         </details>
         <details>
-          <summary><zh>同一份 RNL，不同工具画出来一样吗？</zh><en>Will different tools draw the same RNL the same way?</en><svg class="ico"><use href="#i-next"/></svg></summary>
-          <p><zh>写了精确几何的部分会一致；只写了意图的部分，不同求解器可以给出不同、但都满足意图的画法。RNL 不承诺像素级一致。</zh>
-            <en>Parts with exact geometry will match. For parts that state only intent, different solvers may produce different drawings that all satisfy it. RNL does not promise pixel-identical output.</en></p>
+          <summary><en>Will different tools draw the same RNL the same way?</en><svg class="ico"><use href="#i-next"/></svg></summary>
+          <p><en>Parts with exact geometry will match. For parts that state only intent, different solvers may produce different drawings that all satisfy it. RNL does not promise pixel-identical output.</en></p>
         </details>
         <details>
-          <summary><zh>和 Virtuoso、KiCad 的原理图文件有什么不同？</zh><en>How is this different from Virtuoso or KiCad schematic files?</en><svg class="ico"><use href="#i-next"/></svg></summary>
-          <p><zh>那些是各个工具自己的图形格式，和网表分开保存。RNL 附着在网表上，任何支持它的工具都能读；查看器也不自带元件库，符号本身就用 RNL 定义。</zh>
-            <en>Those are each tool’s own graphical formats, stored apart from the netlist. RNL is attached to the netlist, and any tool that supports it can read it; viewers ship no component library either, because symbols are themselves defined in RNL.</en></p>
+          <summary><en>How is this different from Virtuoso or KiCad schematic files?</en><svg class="ico"><use href="#i-next"/></svg></summary>
+          <p><en>Those are each tool’s own graphical formats, stored apart from the netlist. RNL is attached to the netlist, and any tool that supports it can read it; viewers ship no component library either, because symbols are themselves defined in RNL.</en></p>
         </details>
         <details>
-          <summary><zh>为什么常提到 AI？</zh><en>Why does AI come up so often?</en><svg class="ico"><use href="#i-next"/></svg></summary>
-          <p><zh>大模型擅长读写网表这样的文本。RNL 让“画法”也变成文本，模型能直接写出、局部修改。第一轮试写里，11 个模型照着参考写了 264 次，大多数写出了能用的 RNL。语句之间可以夹自由文本方便人读，但自由文本不改变机器读到的含义。</zh>
-            <en>Language models are good at reading and writing text such as netlists. RNL makes the drawing text too, so a model can write it directly and edit it in place. In the first writing trial, 11 models wrote 264 runs from a reference, and most produced usable RNL. Free text between statements helps people read, but it never changes what machines understand.</en></p>
+          <summary><en>Why does AI come up so often?</en><svg class="ico"><use href="#i-next"/></svg></summary>
+          <p><en>Language models are good at reading and writing text such as netlists. RNL makes the drawing text too, so a model can write it directly and edit it in place. In an initial benchmark, 11 models generated 264 RNL samples from a reference, and 228 of them passed the prototype checker without errors. Free text between statements helps people read, but it never changes what machines understand.</en></p>
         </details>
         <details>
-          <summary><zh>可以用中文写 RNL 吗？</zh><en>Can RNL be written in Chinese?</en><svg class="ico"><use href="#i-next"/></svg></summary>
-          <p><zh>可以。关键字和标准包里的名字都有中文代称，在文件头段记录里写 <code>@USE-ALIASES(name="rnl-zh", version="0.3")</code> 就能用，比如 <code lang="zh-CN">#M1 @位于(10, 20)</code>。代称只是另一种拼写：中英文写法可以混用，机器读到的完全相同；头段记录本身总按标准写法读。</zh>
-            <en>Yes. Keywords and the names in the standard package have Chinese aliases; write <code>@USE-ALIASES(name="rnl-zh", version="0.3")</code> in the file’s header record and use them, as in <code lang="zh-CN">#M1 @位于(10, 20)</code>. An alias is only another spelling: the two can be mixed, and machines read exactly the same thing; the header record itself is always read in standard spelling.</en></p>
+          <summary><en>Can RNL be written in other languages?</en><svg class="ico"><use href="#i-next"/></svg></summary>
+          <p><!--zh-CN--><en>Keywords and standard-package names can have aliases in another language. In its header record, a file can declare individual aliases with <code>@ALIAS</code> or load an alias package—a package file collecting aliases for a language—using <code>@USE-ALIASES(name=…, version=…)</code> (or <code>path=…</code> for a custom file). Standard series 0.3 includes one bundled alias package so far, Chinese (<code>rnl-zh</code>): write <code>@USE-ALIASES(name="rnl-zh", version="0.3")</code> in the header record to use aliases such as <code lang="zh-CN">#M1 @位于(10, 20)</code>. An alias is simply an alternate spelling: standard and alias spellings can be mixed freely, and machines read the exact same statements; the header record itself always uses standard spelling.</en><!--/zh-CN--><!--not-zh-CN--><en>Keywords and standard-package names can have aliases in another language. In its header record, a file can declare individual aliases with <code>@ALIAS</code> or load an alias package—a package file collecting aliases for a language—using <code>@USE-ALIASES(name=…, version=…)</code> (or <code>path=…</code> for a custom file). Standard series 0.3 includes one bundled alias package so far, Chinese (<code>rnl-zh</code>): write <code>@USE-ALIASES(name="rnl-zh", version="0.3")</code> in the header record to use its aliases. An alias is simply an alternate spelling: standard and alias spellings can be mixed freely, and machines read the exact same statements; the header record itself always uses standard spelling.</en><!--/not-zh-CN--></p>
         </details>
         <details>
-          <summary><zh>现在能用吗？</zh><en>Can I use it now?</en><svg class="ico"><use href="#i-next"/></svg></summary>
-          <p><zh>看图和改文本可以：<a href="tools.html">查看器</a>能在浏览器里，或者在 Windows 和 Linux 上打开带 RNL 的网表，画出写了坐标的部分，也能改文本、应用后重画。自动排版刚起步：求解器有了第一版，<code>rnl solve</code> 和桌面版查看器能用它排出只写了意图、没写坐标的部分，桌面版先作为预览显示。网页版还不能求解，这些部分它画不出来，只在 Not drawn 视图里列出。拖动器件的编辑器还没有。</zh>
-            <en>For looking at drawings and editing the text, yes: the <a href="tools.html">viewers</a> open a netlist with RNL in the browser or on Windows and Linux, draw the parts that have coordinates, and edit the text and draw it again. Laying out has just begun: the solver has a first version, with which <code>rnl solve</code> and the desktop viewer place the parts that give intent without coordinates, the desktop viewer as a preview. The web viewer does not solve yet, so it does not draw those parts and lists them in its Not drawn view. There is no editor for dragging devices yet.</en></p>
+          <summary><en>Can I use it now?</en><svg class="ico"><use href="#i-next"/></svg></summary>
+          <p><en>For viewing schematics and editing netlist text, yes: the <a href="tools.html">viewers</a> open netlists with RNL in the browser or on Windows, Linux and macOS, draw placed objects, and let you edit the text and re-render. Automatic layout is at an early stage: a first version of the solver is available in <code>rnl solve</code> and as a preview in the desktop viewer to place objects specified only by intent. The web viewer does not run the solver yet, so it leaves unplaced objects undrawn and lists them in its Not drawn view. Graphical drag-and-drop editing is not yet available.</en></p>
         </details>
       </div>
     </div>
@@ -762,15 +715,15 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
 <section id="next" class="sheet">
   <div class="wrap">
     <header class="sheet-head">
-      <p class="sheet-no"><zh>06 · 接下来</zh><en>06 · Next</en></p>
-      <h2><zh>想看细节，去这几页。</zh><en>For the details, go to these pages.</en></h2>
+      <p class="sheet-no"><en>06 · Next</en></p>
+      <h2><en>For the details, go to these pages.</en></h2>
     </header>
     <ol class="tour-map">
-      <li><a href="language.html"><span class="n">→</span><b><zh>语言导览</zh><en>Language tour</en></b><span><zh>语言长什么样，九个小节，几个例子，都可以动手试</zh><en>What the language looks like, nine sections and a few examples, all hands-on</en></span></a></li>
-      <li><a href="{{spec-root}}"><span class="n">→</span><b><zh>语言标准</zh><en>Standard</en></b><span><zh>正式文本，附简明指南和设计原则</zh><en>The formal text, with a short guide and the principles</en></span></a></li>
-      <li><a href="packages.html"><span class="n">→</span><b><zh>标准包</zh><en>Packages</en></b><span><zh>每个符号怎么画，定义原文</zh><en>How every symbol is drawn, and the text that defines it</en></span></a></li>
-      <li><a href="tools.html"><span class="n">→</span><b><zh>工具</zh><en>Tools</en></b><span><zh>网页版和桌面版查看器，以及整个工具链</zh><en>The web and desktop viewers, and the whole toolchain</en></span></a></li>
-      <li><a href="agents.html"><span class="n">→</span><b><zh>给 agent</zh><en>For agents</en></b><span><zh>skill 包、llms.txt 和使用说明</zh><en>The skill package, llms.txt and how to use them</en></span></a></li>
+      <li><a href="language.html"><span class="n">→</span><b><en>Language tour</en></b><span><en>What the language looks like, nine sections and a few examples, all hands-on</en></span></a></li>
+      <li><a href="{{spec-root}}"><span class="n">→</span><b><en>Standard</en></b><span><en>The formal text, with a short guide and the principles</en></span></a></li>
+      <li><a href="packages.html"><span class="n">→</span><b><en>Packages</en></b><span><en>How every symbol is drawn, and the text that defines it</en></span></a></li>
+      <li><a href="tools.html"><span class="n">→</span><b><en>Tools</en></b><span><en>The web and desktop viewers, and the whole toolchain</en></span></a></li>
+      <li><a href="agents.html"><span class="n">→</span><b><en>For agents</en></b><span><en>The skill package, llms.txt and how to use them</en></span></a></li>
     </ol>
   </div>
 </section>
@@ -782,20 +735,19 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
   <div class="wrap foot-grid">
     <div>
       <span class="brand-mark">RNL</span>
-      <p><zh>Rich Netlist（RNL）。本页用于介绍项目：写法照语言标准 0.3 和标准系列 0.3，例子都用 rnl check 检查过；图中的坐标由本页手工排布，符号由本页自绘，引脚位置与标准包一致。</zh>
-        <en>Rich Netlist (RNL). This page introduces the project: the notation follows language standard 0.3 and the standard series 0.3, and every example has been checked with rnl check; the coordinates in the drawings were placed by hand and the symbols were drawn for this page, with pins where the standard package puts them.</en></p>
+      <p><en>Rich Netlist (RNL). This page introduces the project: the notation follows language standard 0.3 and the standard series 0.3, and every example has been checked with rnl check; the coordinates in the drawings were placed by hand and the symbols were drawn for this page, with pins where the standard package puts them.</en></p>
     </div>
     <div>
-      <h4><zh>资料来源</zh><en>Sources</en></h4>
+      <h4><en>Sources</en></h4>
       <ul>
-        <li><zh>原则：</zh><en>Principles: </en><a href="https://github.com/rich-netlist/rnl/blob/main/spec/rich-netlist.md"><code>spec/rich-netlist.md</code></a></li>
-        <li><zh>早期语法草案（已被语言标准 0.2 取代，留在 Git 历史里）：</zh><en>Early syntax draft (superseded by language standard 0.2; kept in the Git history): </en><a href="https://github.com/rich-netlist/rnl/blob/1eefd27/spec/RNL-Syntax-0.1-draft.2.md"><code>spec/RNL-Syntax-0.1-draft.2.md</code></a></li>
-        <li><zh>当前语言：<a href="spec/0.3/">语言标准 0.3</a>（<code>spec/rnl-0.3.md</code>，另有 PDF 和 Markdown 下载）；本站的<a href="language.html">语言导览</a>按它编写</zh>
-          <en>Current language: <a href="spec/0.3/">language standard 0.3</a> (<code>spec/rnl-0.3.md</code>, also as PDF and Markdown downloads); this site’s <a href="language.html">language tour</a> follows it</en></li>
-        <li><zh>工具链架构：</zh><en>Toolchain architecture: </en><a href="https://github.com/rich-netlist/rnl/blob/main/docs/rnl-toolchain-architecture.md"><code>docs/rnl-toolchain-architecture.md</code></a></li>
-        <li><zh>标准包：</zh><en>Standard packages: </en><a href="packages.html"><zh>标准包图库</zh><en>the gallery</en></a><zh>，每个符号的图和定义原文</zh><en>, every symbol as drawn and the text that defines it</en></li>
-        <li><zh>工具：</zh><en>Tools: </en><a href="tools.html"><zh>网页版和桌面版查看器</zh><en>the web and desktop viewers</en></a></li>
-        <li><zh>路线图：</zh><en>Roadmap: </en><a href="https://github.com/rich-netlist/rnl/blob/main/docs/roadmap.md"><code>docs/roadmap.md</code></a><zh>；布局求解原型和解释器原型在研究仓库中，尚未公开</zh><en>; the layout-solver and interpreter prototypes are in a research repository that is not public yet</en></li>
+        <li><en>Principles: </en><a href="https://github.com/rich-netlist/rnl/blob/main/spec/rich-netlist.md"><code>spec/rich-netlist.md</code></a></li>
+        <li><en>Early syntax draft (superseded by language standard 0.2; kept in the Git history): </en><a href="https://github.com/rich-netlist/rnl/blob/1eefd27/spec/RNL-Syntax-0.1-draft.2.md"><code>spec/RNL-Syntax-0.1-draft.2.md</code></a></li>
+        <li><en>Current language: <a href="spec/0.3/">language standard 0.3</a> (<code>spec/rnl-0.3.md</code>, also as PDF and Markdown downloads); this site’s <a href="language.html">language tour</a> follows it</en></li>
+        <li><en>Toolchain architecture: </en><a href="https://github.com/rich-netlist/rnl/blob/main/docs/rnl-toolchain-architecture.md"><code>docs/rnl-toolchain-architecture.md</code></a></li>
+        <li><en>Standard packages: </en><a href="packages.html"><en>the gallery</en></a><en>, every symbol as drawn and the text that defines it</en></li>
+        <li><en>Tools: </en><a href="tools.html"><en>the web and desktop viewers</en></a></li>
+        <li><en>Roadmap: </en><a href="https://github.com/rich-netlist/rnl/blob/main/docs/roadmap.md"><code>docs/roadmap.md</code></a><en>; the runtime and layout solver live in <code>crates/</code> in this repository</en></li>
+        <li><a href="translation.html">{{nav-translation}}</a></li>
       </ul>
     </div>
   </div>

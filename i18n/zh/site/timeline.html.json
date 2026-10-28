@@ -1,0 +1,12 @@
+{
+  "RNL timeline · Rich Netlist": "RNL 时间线 · Rich Netlist",
+  "Every release and milestone of RNL, the latest first.": "RNL 的每次发布与里程碑，由最新排起。",
+  "Skip to content": "跳至主要内容",
+  "Switch color theme": "切换颜色主题",
+  "Timeline": "时间线",
+  "The <a href=\"./#status\">introduction</a> shows only the latest few, and what comes next.": "<a href=\"./#status\">介绍页</a>仅列出最近几项进展与接下来的计划。",
+  "Dates are in Shanghai time (UTC+8). Each release links to its release notes on GitHub.": "日期按上海时间（UTC+8）标注。每次发布均链接至其在 GitHub 上的发布说明。",
+  "See also": "另见",
+  "Introduction": "介绍",
+  "All releases on GitHub": "GitHub 上的所有发布版本"
+}

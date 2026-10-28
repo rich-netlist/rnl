@@ -120,12 +120,40 @@ function button(text, role) {
   return b;
 }
 
+// when a finger last chose an entry: the click a browser may make of the same tap is not a second choice
+let tappedAt = -Infinity;
+
 function entry(item) {
   const b = button(item.label, item.radio ? "menuitemradio" : item.check ? "menuitemcheckbox" : "menuitem");
   b.dataset.id = item.id;
   b.lastChild.textContent = shortcut(item);
-  b.addEventListener("click", (e) => choose(b, e.shiftKey));
+  // a tap chooses as the finger lifts: WebKit makes no click after a pointerdown whose default is prevented
+  b.addEventListener("pointerup", (e) => {
+    if (e.pointerType !== "touch") return;
+    tappedAt = performance.now();
+    choose(b, false);
+  });
+  b.addEventListener("click", (e) => {
+    if (performance.now() - tappedAt < 800) return;
+    choose(b, e.shiftKey);
+  });
   return b;
+}
+
+/** The pictures an entry can have, by the name the command table gives (`icon`), as SVG. */
+const ICONS = {
+  // a globe: the Language submenu, which a user who reads none of the interface looks for
+  globe: '<circle cx="8" cy="8" r="6.2"/><ellipse cx="8" cy="8" rx="2.7" ry="6.2"/><path d="M1.8 8h12.4M2.8 4.9h10.4M2.8 11.1h10.4"/>',
+};
+
+/** An icon of the table, as an element for an entry. */
+function icon(name) {
+  const el = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  el.setAttribute("class", "menu-icon");
+  el.setAttribute("viewBox", "0 0 16 16");
+  el.setAttribute("aria-hidden", "true");
+  el.innerHTML = ICONS[name] || "";
+  return el;
 }
 
 /** A submenu's entry, with the submenu's list next to it. */
@@ -133,10 +161,13 @@ function submenu(item) {
   const el = document.createElement("div");
   el.className = "menu-sub";
   const b = button(item.label, "menuitem");
+  // in the label, not beside it: an entry is a grid of a check, its label and its keys
+  if (item.icon) b.children[1].prepend(icon(item.icon));
   b.classList.add("opens");
   b.setAttribute("aria-haspopup", "menu");
   b.setAttribute("aria-expanded", "false");
   b.addEventListener("click", () => openSub(b, false));
+  b.addEventListener("pointerup", (e) => { if (e.pointerType === "touch") openSub(b, false); });
   el.append(b, list(item.items, "submenu"));
   return el;
 }
@@ -171,6 +202,7 @@ function show(i, withList, fromKeys) {
     mark(l, null);
   });
   if (!withList) return;
+  fitScreen(lists()[i]);
   showChecks(lists()[i]);
   mark(lists()[i], keyboard ? entriesOf(lists()[i])[0] : null);
 }
@@ -194,6 +226,25 @@ function leave() {
 }
 
 /** Show the check marks of a list's entries as the commands have them. */
+/**
+ * Keep a menu on the screen, as on a phone: one wider than the room right of its title moves left,
+ * and one taller than the room below it scrolls in that room, its submenus then under their entries,
+ * which a scrolled list cannot show beside it.
+ */
+function fitScreen(el) {
+  el.style.maxHeight = "";
+  el.style.left = "";
+  el.classList.remove("scrolls");
+  // and no wider than the screen: a menu at its right edge moves left as far as it must
+  const width = document.documentElement.clientWidth;
+  const box = el.getBoundingClientRect();
+  if (box.right > width - 4) el.style.left = `${Math.min(0, Math.max(4 - box.left, width - 4 - box.right))}px`;
+  const room = window.innerHeight - el.getBoundingClientRect().top - 8;
+  if (el.scrollHeight <= room) return;
+  el.style.maxHeight = `${Math.max(120, room)}px`;
+  el.classList.add("scrolls");
+}
+
 function showChecks(el) {
   for (const b of entriesOf(el)) {
     if (b.dataset.id) b.disabled = !isEnabled(b.dataset.id);
@@ -233,9 +284,12 @@ function openSub(b, fromKeys) {
     closeSubs(depth);
     subs.push(b);
     b.setAttribute("aria-expanded", "true");
-    sub.classList.remove("left");
+    sub.classList.remove("left", "inline");
     sub.hidden = false;
-    if (sub.getBoundingClientRect().right > document.documentElement.clientWidth) sub.classList.add("left");
+    // beside its entry, on the right, else on the left; on a screen too narrow for either, under it
+    const width = document.documentElement.clientWidth;
+    if (sub.getBoundingClientRect().right > width) sub.classList.add("left");
+    if (sub.getBoundingClientRect().left < 0 || listIn(b).classList.contains("scrolls")) { sub.classList.remove("left"); sub.classList.add("inline"); }
     showChecks(sub);
   }
   mark(el, b);
@@ -340,6 +394,7 @@ document.addEventListener(
     } else {
       return;
     }
+    window.rnlKeyNote?.(e, "taken by the menu bar");
     e.preventDefault();
     e.stopPropagation();
   },

@@ -1,4 +1,4 @@
-import { append, m, setAttr, setText } from "./i18n.js";
+import { append, m, setAttr, setText, tr } from "./i18n.js";
 // Opening a document: the shell reads a source and builds its Document, and the page shows it.
 // Reading the same source again keeps the level, the visit history to it while its circuits are
 // still there, the view, the selection and the text's scroll. File > Load from Clipboard opens the
@@ -45,13 +45,13 @@ export function beginOpenOperation() {
  * Open a source, or read it again with `keep`. Opening another one asks first about changes not
  * saved. `edited` are texts to build over the files, by the path the Document names them by (a
  * preview closed shows the text applied); without them the files are read as they are, and the
- * text edited is what they hold.
+ * text edited is what they hold. `confirmed` when the user was asked already (Open Project).
  */
-export async function openSource(source, keep, edited, fresh = false, navigation = null, signal = null) {
+export async function openSource(source, keep, edited, fresh = false, navigation = null, signal = null, confirmed = false) {
   if (!source || loading) return;
   // Initial API level selection is part of its import, not a competing user navigation.
   const operation = signal ? { signal } : beginOpenOperation();
-  if (!keep && !edited && !(await confirmLeave(m("open another file"), operation.signal))) return;
+  if (!keep && !edited && !confirmed && !(await confirmLeave(m("open another file"), operation.signal))) return;
   if (operation.signal.aborted) return;
   if (loading) return;
   loading = true;
@@ -182,6 +182,8 @@ export function showBuilt(d, keep, navigation = null) {
   const before = keep && doc ? snapshot() : null;
   setDoc(d);
   showDocument(before, navigation);
+  // a file opened, not one read again: a phone shows its drawing
+  if (!keep) window.dispatchEvent(new Event("viewer-navigate"));
 }
 
 /** What a text from the clipboard can be read as, by the extension of the file it is opened as. */
@@ -215,7 +217,7 @@ export async function loadClipboard() {
   const title = m("Load from Clipboard");
   let text;
   try {
-    if (!navigator.clipboard || !navigator.clipboard.readText) throw new Error(m("the browser does not let the page read it"));
+    if (!navigator.clipboard || !navigator.clipboard.readText) throw new Error(m("the browser does not allow this page to read the clipboard"));
     text = await navigator.clipboard.readText();
   } catch (e) {
     const why = (e instanceof Error && e.message ? e.message : String(e)).replace(/\.$/, "");
@@ -245,8 +247,9 @@ function preview(title, text) {
   setText(box, lines.slice(0, PREVIEW_LINES).join("\n"));
   const size = document.createElement("p");
   size.className = "dialog-note";
-  const more = lines.length > PREVIEW_LINES ? m`; the first ${PREVIEW_LINES} are shown` : "";
-  setText(size, m`${count(lines.length, "line")}, ${count(text.length, "character")}${more}.`);
+  const more = lines.length > PREVIEW_LINES ? m`; first ${PREVIEW_LINES} lines shown` : "";
+  const n = lines.length, c = text.length;
+  setText(size, m`${n === 1 ? m("{0} line", n) : m("{0} lines", n)}, ${c === 1 ? m("{0} character", c) : m("{0} characters", c)}${more}.`);
   const set = document.createElement("fieldset");
   const legend = document.createElement("legend");
   setText(legend, m("Read it as"));
@@ -266,19 +269,14 @@ function preview(title, text) {
   });
   const alone = document.createElement("p");
   alone.className = "dialog-note";
-  setText(alone, m("It is read alone, as clipboard.sp, .scs or .rnl: files that it includes are missing."));
+  setText(alone, m("Opened without a folder as clipboard.sp, .scs or .rnl; included files are looked up in Library (and in PATH in the desktop viewer)."));
   return form({
     title,
     parts: [warning, box, size, set, alone],
     answer: () => inputs.find((i) => i.checked).value,
-    action: "Load",
+    action: tr("Load"),
     wide: true,
   });
-}
-
-/** A number of things, such as "1 line" or "12 lines". */
-function count(n, thing) {
-  return m`${n} ${m(thing + (n === 1 ? "" : "s"))}`;
 }
 
 /** What to keep when the same source is read again. */

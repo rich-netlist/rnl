@@ -119,6 +119,23 @@ const drawings = await core.drawings({
 
 The request is about the last build that had `lazy_unplaced`, and is refused, with a message, when no build did, when an object is not there, or when the names are those of another build.
 
+## Manifests
+
+`@rich-netlist/runtime/manifest` reads the files a manifest (format 1) lists, as the web viewer's `?manifest=` does, such as the manifests the RNL gallery writes: it fetches the files, checks each against the SHA-256 and size of its bytes, and gives what a build takes. The same format is a viewer project's `rnl-project.json` (`PROJECT_MANIFEST`), in a ZIP archive with its files, and a manifest of links.
+
+```js
+import { startCore } from "@rich-netlist/runtime";
+import { readManifest } from "@rich-netlist/runtime/manifest";
+
+const design = await readManifest("https://example.org/manifests/amp.json", { onProgress: (done, total) => {} });
+const core = startCore();
+const document = await core.build({ entry: design.entry, files: design.files, pool: design.pool, formats: design.formats });
+```
+
+`files` holds the text of every file by its path under `/<id>/` (or the `root` given), `bytes` their bytes, `pool` the manifest's pool in its order, `formats` the parse format chosen for some files by the same paths, and `level` the level the files open on, a subcircuit's name or `"(top)"`. Files are fetched from their own `url` or from the manifest's `base` joined with their path, https addresses (http only on this computer), and their bytes checked before they are decoded. A file that does not match or cannot be fetched rejects with a `ManifestError` whose `file` names it. A fetched manifest's files are at most 300, 2 MB each and 20 MB in all.
+
+`loadManifest(json, { readFile })` reads a manifest already parsed, such as a project's, with `readFile(path)` giving each file's bytes from its archive; `writeManifest({ files, entry, pool, formats, level, archive })` writes one, with the SHA-256 and size of each file's bytes, and checks it as a reader would. Node 18 and later, and browsers, are supported.
+
 ## Vite
 
 A frontend built with Vite needs three settings:

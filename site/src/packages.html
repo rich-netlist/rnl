@@ -3,9 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title><zh>RNL 标准包图库 · Rich Netlist</zh><en>RNL standard packages · Rich Netlist</en></title>
-<meta name="description" content="<zh>Rich Netlist（RNL）的标准包：每个包的用途和定义原文，每个符号画出来的样子、引脚和选择框，以及给元件配符号的规则。</zh>
-  <en>The standard packages of Rich Netlist (RNL): what each package is for and the text that defines it, every symbol as it is drawn with its pins and box, and the rules that give elements their symbols.</en>">
+<title><en>RNL standard packages · Rich Netlist</en></title>
+<meta name="description" content="<en>The standard packages of Rich Netlist (RNL): what each package is for and the text that defines it, every symbol as it is drawn with its pins and box, and the rules that give elements their symbols.</en>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="{{font-href}}">
@@ -44,29 +43,32 @@
   <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></symbol>
   <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></symbol>
   <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></symbol>
   <symbol id="i-next" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
 </svg>
 
-<a class="skip" href="#main"><zh>跳到正文</zh><en>Skip to content</en></a>
+<a class="skip" href="#main"><en>Skip to content</en></a>
 
 <header class="topbar">
   <div class="topbar-in">
     <a class="brand" href="./"><span class="brand-logo theme-logo"><img class="logo-light" src="assets/brand/rnl-logo-small.svg" width="24" height="24" alt=""><img class="logo-dark" src="assets/brand/rnl-logo-small-dark.svg" width="24" height="24" alt=""></span><span class="brand-mark">RNL</span><span class="brand-sub">Rich Netlist</span></a>
-    <nav class="pages" aria-label="{{nav-pages}}">
+    <button class="icon-btn menu-btn" id="menu-btn" type="button" aria-label="{{nav-pages}}" aria-expanded="false" aria-controls="primary-nav"><svg class="ico"><use href="#i-menu"/></svg></button>
+    <nav class="pages" id="primary-nav" aria-label="{{nav-pages}}">
       <a href="./">{{nav-intro}}</a>
       <a href="language.html">{{nav-tour}}</a>
       <a href="{{spec-root}}">{{nav-spec}}</a>
       <a class="is-on" aria-current="page" href="packages.html">{{nav-packages}}</a>
+      <a href="gallery.html">{{nav-gallery}}</a>
       <a href="tools.html">{{nav-tools}}</a>
       <a href="agents.html">{{nav-agents}}</a>
       <a href="https://github.com/rich-netlist/rnl">GitHub</a>
     </nav>
-    <button class="icon-btn toc-btn" id="toc-btn" type="button" aria-label="<zh>目录</zh><en>Contents</en>" aria-expanded="false" aria-controls="toc"><svg class="ico"><use href="#i-menu"/></svg></button>
+    <button class="icon-btn toc-btn" id="toc-btn" type="button" aria-label="<en>On this page</en>" aria-expanded="false" aria-controls="toc"><svg class="ico"><use href="#i-list"/></svg></button>
     {{language-menu}}
-    <button class="icon-btn" id="theme-btn" type="button" aria-label="<zh>切换配色</zh><en>Switch color theme</en>"><svg class="ico"><use href="#i-moon"/></svg></button>
+    <button class="icon-btn" id="theme-btn" type="button" aria-label="<en>Switch color theme</en>"><svg class="ico"><use href="#i-moon"/></svg></button>
   </div>
   <div class="progress" aria-hidden="true"><span id="progress-bar"></span></div>
-</header>
+</header>{{ai-translation-notice}}
 
 <main id="main">
 
@@ -74,30 +76,29 @@
   <div class="wrap">
     <div class="hero-grid">
       <div class="hero-copy">
-        <p class="eyebrow"><span>RICH NETLIST · STANDARD PACKAGES</span><span class="chip chip-warn"><zh>草案 · 名字可能还会改</zh><en>Draft · names may change</en></span></p>
-        <h1 id="gallery-title" class="tour-h1"><zh>标准包图库</zh><en>Standard packages</en></h1>
-        <p class="thesis"><zh>标准包里有什么：每个符号画出来的样子，和写出它的原文。</zh><en>What the standard packages hold: every symbol as it is drawn, and the text that defines it.</en></p>
-        <p class="lead"><zh>每份网表的根上默认就有标准包 <code>rnl-std</code>：它给元件配符号、给对象配样式，还给没连线的引脚补上地和电源。它由几个子包组成，一个文件可以去掉其中的子包，也可以加上按需使用的包。这一页逐个列出每个包的用途、引用关系和定义原文；符号的图是构建网站时由 RNL 的核心画的，和查看器里看到的一样。</zh>
-          <en>Every netlist has the standard package <code>rnl-std</code> at its root by default: it gives elements their symbols and objects their styles, and fills in grounds and supplies for unwired pins. It is made of sub-packages; a file can drop any of them, and add packages that are used on demand. This page lists every package with what it is for, what it references and the text that defines it; the symbols are drawn by the RNL core when the site is built, as the viewers draw them.</en></p>
+        <p class="eyebrow"><span>RICH NETLIST · STANDARD PACKAGES</span><span class="chip chip-warn"><en>Draft · names may change</en></span></p>
+        <h1 id="gallery-title" class="tour-h1"><en>Standard packages</en></h1>
+        <p class="thesis"><en>What the standard packages hold: every symbol as it is drawn, and the text that defines it.</en></p>
+        <p class="lead"><en>Every netlist has the standard package <code>rnl-std</code> at its root by default: it gives elements their symbols and objects their styles, and fills in grounds and supplies for unwired pins. It is made of sub-packages; a file can drop any of them, and add packages that are used on demand. This page lists every package with what it is for, what it references and the text that defines it; the symbols are drawn by the RNL core when the site is built, as the viewers draw them.</en></p>
       </div>
-      <dl class="titleblock" aria-label="<zh>标准包概况</zh><en>Package facts</en>">
-        <div class="tb-main"><dt><zh>内容</zh><en>Content</en></dt><dd id="tb-series">…</dd></div>
-        <div><dt><zh>包</zh><en>Packages</en></dt><dd id="tb-packages">…</dd></div>
-        <div><dt><zh>符号</zh><en>Symbols</en></dt><dd id="tb-symbols">…</dd></div>
-        <div><dt><zh>画图</zh><en>Drawn by</en></dt><dd><zh>RNL 核心（WebAssembly），构建时</zh><en>the RNL core (WebAssembly), at build time</en></dd></div>
-        <div><dt><zh>源文件</zh><en>Source</en></dt><dd><a class="mono" href="https://github.com/rich-netlist/rnl/tree/main/libraries/standard">standard/</a> · <a class="mono" href="https://github.com/rich-netlist/rnl-packages/tree/main/packages"><zh>公开包</zh><en>public packages</en></a></dd></div>
-        <div><dt><zh>许可</zh><en>Licence</en></dt><dd><zh>CC0-1.0，定义可以随意复制</zh><en>CC0-1.0: copy definitions freely</en></dd></div>
+      <dl class="titleblock" aria-label="<en>Package facts</en>">
+        <div class="tb-main"><dt><en>Content</en></dt><dd id="tb-series">…</dd></div>
+        <div><dt><en>Packages</en></dt><dd id="tb-packages">…</dd></div>
+        <div><dt><en>Symbols</en></dt><dd id="tb-symbols">…</dd></div>
+        <div><dt><en>Drawn by</en></dt><dd><en>The RNL core (WebAssembly), at build time</en></dd></div>
+        <div><dt><en>Source</en></dt><dd><a class="mono" href="https://github.com/rich-netlist/rnl/tree/main/libraries/standard">standard/</a> · <a class="mono" href="https://github.com/rich-netlist/rnl-packages/tree/main/packages"><en>public packages</en></a></dd></div>
+        <div><dt><en>License</en></dt><dd><en>CC0-1.0: copy definitions freely</en></dd></div>
       </dl>
     </div>
   </div>
-</section>
+</section>{{translation-notice}}
 
-<section id="gallery" class="sheet gl-sheet" aria-label="<zh>图库</zh><en>Gallery</en>">
+<section id="gallery" class="sheet gl-sheet" aria-label="<en>Gallery</en>">
   <div class="layout">
-    <nav id="toc" aria-label="<zh>包导航</zh><en>Package navigation</en>">
+    <nav id="toc" aria-label="<en>Package navigation</en>">
       <label class="gl-search">
         <svg class="ico"><use href="#i-search"/></svg>
-        <input id="gl-q" type="search" autocomplete="off" spellcheck="false" placeholder="<zh>搜索名字：NMOS、$GROUND、R*、port…</zh><en>Search names: NMOS, $GROUND, R*, port…</en>" aria-label="<zh>按名字搜索</zh><en>Search by name</en>">
+        <input id="gl-q" type="search" autocomplete="off" spellcheck="false" placeholder="<en>Search names: NMOS, $GROUND, R*, port…</en>" aria-label="<en>Search by name</en>">
       </label>
       <div id="gl-nav"></div>
     </nav>
@@ -107,16 +108,16 @@
         <p id="gl-group-counts"></p>
       </header>
       <div class="gl-bar" id="gl-bar">
-        <div class="gl-toggles" role="group" aria-label="<zh>符号图上显示</zh><en>Show on the symbols</en>">
-          <button type="button" class="gl-tog" data-show="pins" aria-pressed="true"><svg class="ico"><use href="#i-pin"/></svg><zh>引脚</zh><en>Pins</en></button>
-          <button type="button" class="gl-tog" data-show="box" aria-pressed="false"><svg class="ico"><use href="#i-box"/></svg><zh>选择框</zh><en>Box</en></button>
-          <button type="button" class="gl-tog" data-show="labels" aria-pressed="true"><svg class="ico"><use href="#i-tag"/></svg><zh>标签</zh><en>Labels</en></button>
-          <button type="button" class="gl-tog" data-show="origin" aria-pressed="false"><svg class="ico"><use href="#i-origin"/></svg><zh>原点</zh><en>Origin</en></button>
+        <div class="gl-toggles" role="group" aria-label="<en>Show on the symbols</en>">
+          <button type="button" class="gl-tog" data-show="pins" aria-pressed="true"><svg class="ico"><use href="#i-pin"/></svg><en>Pins</en></button>
+          <button type="button" class="gl-tog" data-show="box" aria-pressed="false"><svg class="ico"><use href="#i-box"/></svg><en>Box</en></button>
+          <button type="button" class="gl-tog" data-show="labels" aria-pressed="true"><svg class="ico"><use href="#i-tag"/></svg><en>Labels</en></button>
+          <button type="button" class="gl-tog" data-show="origin" aria-pressed="false"><svg class="ico"><use href="#i-origin"/></svg><en>Origin</en></button>
         </div>
       </div>
       <div class="gl-main" id="gl-main" aria-live="polite">
-        <p class="gl-status" id="gl-status"><zh>正在载入……</zh><en>Loading…</en></p>
-        <noscript><p class="gl-status"><zh>这一页要用 JavaScript 显示图库。包文件本身在 <a href="https://github.com/rich-netlist/rnl/tree/main/libraries/standard">GitHub 的标准库 libraries/standard/</a> 和 <a href="https://github.com/rich-netlist/rnl-packages/tree/main/packages">公开包仓库</a> 里。</zh><en>This page needs JavaScript to show the gallery. The package files themselves are in <a href="https://github.com/rich-netlist/rnl/tree/main/libraries/standard">libraries/standard/ on GitHub</a> and the <a href="https://github.com/rich-netlist/rnl-packages/tree/main/packages">public packages repository</a>.</en></p></noscript>
+        <p class="gl-status" id="gl-status"><en>Loading…</en></p>
+        <noscript><p class="gl-status"><en>This page needs JavaScript to show the gallery. The package files themselves are in <a href="https://github.com/rich-netlist/rnl/tree/main/libraries/standard">libraries/standard/ on GitHub</a> and the <a href="https://github.com/rich-netlist/rnl-packages/tree/main/packages">public packages repository</a>.</en></p></noscript>
       </div>
     </div>
   </div>
@@ -128,7 +129,7 @@
   <div class="gl-dlg-in">
     <header class="gl-dlg-head">
       <h3 id="gl-dlg-title"></h3>
-      <button class="icon-btn" type="button" id="gl-dlg-close" aria-label="<zh>关闭</zh><en>Close</en>"><svg class="ico"><use href="#i-close"/></svg></button>
+      <button class="icon-btn" type="button" id="gl-dlg-close" aria-label="<en>Close</en>"><svg class="ico"><use href="#i-close"/></svg></button>
     </header>
     <div class="gl-dlg-body" id="gl-dlg-body"></div>
   </div>
@@ -138,16 +139,16 @@
   <div class="wrap foot-grid">
     <div>
       <span class="brand-mark">RNL</span>
-      <p><zh>这一页的数据在构建网站时从内置标准包和 <a href="https://github.com/rich-netlist/rnl-packages">公开包清单</a>生成：每个包文件读一遍，每个符号由 RNL 核心画一遍。包文件变了，下次发布网站时这一页跟着变。</zh>
-        <en>The data of this page is built from the bundled standard packages and the <a href="https://github.com/rich-netlist/rnl-packages">public package catalog</a> when the site is built: every package file is read, and every symbol drawn by the RNL core. When a package file changes, this page follows at the next publication of the site.</en></p>
+      <p><en>The data on this page is generated at build time from the bundled standard packages and the <a href="https://github.com/rich-netlist/rnl-packages">public package catalog</a>: every package file is read and every symbol is rendered by the RNL core. When a package file changes, this page updates the next time the site is published.</en></p>
     </div>
     <div>
-      <h4><zh>另见</zh><en>See also</en></h4>
+      <h4><en>See also</en></h4>
       <ul>
-        <li><a href="language.html#defaults"><zh>语言导览</zh><en>Language tour</en></a><zh>：标准包的默认行为</zh><en>: what the standard package does by default</en></li>
-        <li><a href="{{spec-root}}"><zh>语言标准</zh><en>Language standard</en></a><zh>：16.3 节讲标准包</zh><en>: section 16.3 is about the standard package</en></li>
-        <li><a href="../viewer/"><zh>网页版查看器</zh><en>Web viewer</en></a><zh>：把网表画成原理图</zh><en>: draw a netlist as a schematic</en></li>
-        <li><zh>源文件：</zh><en>Source files: </en><a href="https://github.com/rich-netlist/rnl/tree/main/libraries/standard"><code>standard/</code></a> · <a href="https://github.com/rich-netlist/rnl-packages/tree/main/packages"><zh>公开包</zh><en>public packages</en></a></li>
+        <li><a href="language.html#defaults"><en>Language tour</en></a><en>: what the standard package does by default</en></li>
+        <li><a href="{{spec-root}}"><en>Language standard</en></a><en>: section 16.3 is about the standard package</en></li>
+        <li><a href="../viewer/" target="_blank" rel="noopener"><en>Web viewer</en></a><en>: draw a netlist as a schematic</en></li>
+        <li><en>Source files: </en><a href="https://github.com/rich-netlist/rnl/tree/main/libraries/standard"><code>standard/</code></a> · <a href="https://github.com/rich-netlist/rnl-packages/tree/main/packages"><en>public packages</en></a></li>
+        <li><a href="translation.html">{{nav-translation}}</a></li>
       </ul>
     </div>
   </div>

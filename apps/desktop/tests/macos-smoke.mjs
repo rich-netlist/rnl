@@ -21,6 +21,15 @@ execFileSync('codesign',['--verify','--deep','--strict','--verbose=2',app],{stdi
 const signature=spawnSync('codesign',['-dvv',app],{encoding:'utf8'});
 fs.writeFileSync(path.join(output,'signature.txt'),signature.stdout+signature.stderr);
 assert.match(signature.stderr,/Signature=adhoc/,'The shipped bundle must be ad-hoc signed.');
+// --packages with|without: the public packages are among the app's resources, which the viewer searches
+// without a network (public_packages.rs), or the app has none
+const packagesAt=process.argv.indexOf('--packages');
+if(packagesAt>=0) {
+  const mode=process.argv[packagesAt+1], folder=path.join(app,'Contents/Resources/public-packages');
+  assert.ok(mode==='with'||mode==='without','--packages takes with or without.');
+  if(mode==='without') assert.ok(!fs.existsSync(folder),'The app without the public packages has them.');
+  else for(const file of ['public-packages.json','eda-style/0.1/eda-style.rnl','LICENSES/MIT.txt']) assert.ok(fs.existsSync(path.join(folder,file)),`${file} is not among the app's public packages.`);
+}
 const osa=script=>execFileSync('osascript',['-e',script],{encoding:'utf8',timeout:15000});
 const key=(key,modifiers='')=>osa(`tell application "System Events"
   set frontmost of (first application process whose bundle identifier is "io.github.rich-netlist.viewer") to true
@@ -44,10 +53,11 @@ async function observe(label,check) {
 }
 const text=r=>r.words.map(w=>w.text).join(' ');
 const drawn=(r,left=0.38)=>{
-  const labels=r.words.filter(w=>w.x>left), amps=labels.filter(w=>/\bamp\b/.test(w.text));
+  const labels=r.words.filter(w=>w.x>left), amps=labels.filter(w=>/\bam[il]?p\b/.test(w.text));
   // X1/X2 are only ~10 pixels high on the runner's 1024px desktop and Vision can omit them.
   // Two separated stage names plus a source/supply/third-instance label prove the schematic
-  // independently of source text. Individual tiny labels can be omitted by Vision.
+  // independently of source text. Individual tiny labels can be omitted by Vision, and a grid dot
+  // just above "amp" can be read into it as "amip" (Intel runner, 1200x800 at 107%).
   return r.circuitInk>200 && r.circuitDensity<0.35 && amps.length>=2 &&
     Math.max(...amps.map(w=>w.x))-Math.min(...amps.map(w=>w.x))>0.08 &&
     labels.some(w=>/\b(?:Vin|Vdd|X3)\b/i.test(w.text));

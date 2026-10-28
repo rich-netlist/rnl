@@ -4,6 +4,7 @@
 // native menu the page shows no bar and tells the shell the marks.
 
 import { expect, test } from "../viewer.js";
+import { zhMenu, uiLanguages, repository } from "../zh.js";
 
 const TOP = "04-hierarchy.sp";
 
@@ -19,7 +20,16 @@ const entry = (page, text) => page.locator("#menubar .menu-item.opens", { hasTex
  * entries, and no menu or submenu left without items.
  */
 async function webMenus(page) {
-  const table = await page.evaluate(() => fetch("commands.json").then((r) => r.json()));
+  // the Language submenu lists English and then the languages of i18n/ that the page offers (commands.js)
+  const table = await page.evaluate(async () => {
+    const [table, languages] = await Promise.all(["commands.json", "locales/languages.json"].map((f) => fetch(f).then((r) => r.json())));
+    const add = (items) => items.filter((i) => i.items).forEach((i) => {
+      if (i.languages) i.items.push(...languages.slice(1).map((l) => ({ id: `language-${l.lang}`, label: l.name, check: true, radio: true })));
+      add(i.items);
+    });
+    for (const m of table.menus) add(m.items);
+    return table;
+  });
   const plain = (label) => label.replace("&", "");
   const entries = (items) => {
     const shown = [];
@@ -63,19 +73,19 @@ test.describe("on the web", () => {
         title: "File",
         letter: "F",
         items: [
-          "New Window", "Open File...Ctrl+O", "Include File...", "Include Folder...", "Include Public Package…", "Open URL...", "Load from Clipboard...Ctrl+Shift+V", "ReloadF5",
+          "New Window", "Open File...Ctrl+O", "Include File...", "Include Folder...", "Include Public Package...", "Open URL...", "Open Project...", "Load Manifest...", "Load from Clipboard...Ctrl+Shift+V", "ReloadF5",
           "Reload Library", "Auto Include",
-          "", "Download FileCtrl+S", "Download Library",
+          "", "Download FileCtrl+S", "Download Project...", "Download Manifest...", "Export Image", "Export SVG...", "Export PNG...",
         ],
       },
-      { title: "Edit", letter: "E", items: ["Edit TextCtrl+Q", "Apply and Exit EditingCtrl+Enter", "Discard Changes", "Find in Netlist…Ctrl+F", "", "Open SubcircuitE", "Open Subcircuit in New Window…Shift+E", "Up to Parent LevelCtrl+E"] },
+      { title: "Edit", letter: "E", items: ["Edit TextCtrl+Q", "Apply and Exit EditingCtrl+Enter", "Discard Changes", "Find in Netlist...Ctrl+F", "", "Open SubcircuitE", "Open Subcircuit in New WindowShift+E", "Up to Parent LevelCtrl+E"] },
       {
         title: "View",
         letter: "V",
         items: [
           "Fit to WindowF", "Zoom InCtrl++", "Zoom OutCtrl+-", "Color Scheme...",
           "Background", "Light", "Dark",
-          "Grid", "Show GridG", "", "None", "Dots", "Lines", "", "Axes", "", "Grid Settings...", "Show Names on Hover", "Show UsagesCtrl+R", "Show Current Directions", "Language", "English", "简体中文", "",
+          "Grid", "Show GridG", "", "None", "Dots", "Lines", "", "Axes", "", "Grid Settings...", "Show Names on Hover", "Show UsagesCtrl+R", "Show Current DirectionsShift+R", "Language", ...uiLanguages(repository).map((l) => l.name), "",
           "Side Panels", "Library1", "Netlist2", "Hierarchy3", "Symbol4", "Usage5", "Not Drawn6", "", "Hide",
         ],
       },
@@ -96,7 +106,7 @@ test.describe("on the web", () => {
         Object.defineProperty(Navigator.prototype, "languages", { get: () => list, configurable: true });
       }, languages);
       await viewer.open("04-hierarchy");
-      await viewer.menuTitle(languages[0].startsWith("zh") ? "帮助" : "Help").click();
+      await viewer.menuTitle(languages[0].startsWith("zh") ? zhMenu("&Help") : "Help").click();
       await viewer.menuItem("desktop-viewer").click();
       await expect(page.locator("#menubar .menu-list:visible")).toHaveCount(0);
       return viewer.calls("browse");
@@ -105,9 +115,11 @@ test.describe("on the web", () => {
     const en = "https://rich-netlist.github.io/rnl/en/tools.html";
     expect(await shown(["en-US", "zh-CN"])).toEqual([[en]]);
     expect(await shown(["zh-CN", "en-US"])).toEqual([[zh]]);
-    expect(await shown(["de-DE", "en-GB", "zh-TW"])).toEqual([[en]]);
-    // without either, English, the site's default
-    expect(await shown(["fr-FR"])).toEqual([[en]]);
+    // languages the project does not offer are passed over; without any it does, English, the site's default
+    const offered = (tag) => uiLanguages(repository).some((l) => l.matches.some((m) => tag.toLowerCase().startsWith(m)));
+    expect(offered("pt-BR") || offered("it-IT")).toBe(false);
+    expect(await shown(["pt-BR", "en-GB", "zh-TW"])).toEqual([[en]]);
+    expect(await shown(["it-IT"])).toEqual([[en]]);
   });
 
   test("a click opens a menu, pointing switches it, and Escape or a click on its title closes it", async ({ page, viewer }) => {
@@ -283,7 +295,7 @@ test.describe("on the web", () => {
     await page.keyboard.press("F10");
     await expect(marked).toHaveText("File");
     await page.keyboard.press("ArrowUp");
-    await expect(viewer.menuItem("download-library")).toHaveClass(/\bactive\b/);
+    await expect(entry(page, "Export Image")).toHaveClass(/\bactive\b/);
     // Escape closes the menu and keeps the title, then leaves the bar
     await page.keyboard.press("Escape");
     await expect(list(page, "File")).toBeHidden();
@@ -426,7 +438,7 @@ test.describe("with a native menu", () => {
       ["toggle-netlist", true], ["toggle-problems", true], ["toggle-edit", false],
       ["toggle-grid", true], ["grid-none", false], ["grid-dots", true], ["grid-lines", false], ["grid-axes", false],
       ["toggle-hover-names", true], ["toggle-usages", true], ["toggle-currents", false],
-      ["language-en", true], ["language-zh", false],
+      ...uiLanguages(repository).map((l, i) => [`language-${l.lang}`, i === 0]),
       ["toggle-auto-include", true],
     ];
     expect(await viewer.calls("setCheck")).toEqual(expect.arrayContaining(marks));

@@ -1,6 +1,6 @@
 * A rule package of the other dialect that the file writes is kept
-*! 文件自己写了另一种方言的规则包（rnl-std-spectre 的 USE-PACKAGE），写的优先，它照常生效、不被隐式去掉（16.3）。
-*! X1 是名叫 resistor 的子电路的实例，按 Spectre 的规则以 master 画成电阻；R1 按 SPICE 的规则画。
+*! The file itself writes the rule package of the other dialect (a USE-PACKAGE of rnl-std-spectre); what is written comes first, so it takes effect as usual and is not implicitly left out (16.3).
+*! X1 is an instance of a subcircuit named resistor, drawn as a resistor by its master under the Spectre rules; R1 is drawn by the SPICE rules.
 * @RNL(type="header") {
 *   @VERSION("0.3");
 *   @USE-PACKAGE(name="rnl-std-spectre", version="0.3")

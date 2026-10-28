@@ -2,6 +2,8 @@ import { m, setText } from "./i18n.js";
 // Shared by normal opens, rebuilds and embeds. A newer operation owns the indicator, so an older
 // completion or progress event cannot clear or relabel it. There is no invented percentage.
 const stages = { reading: m("Reading files…"), parsing: m("Parsing netlist…"), cached: m("Using cached drawing…"), displaying: m("Displaying netlist…") };
+// a stage with a count, such as the files of a manifest fetched: { stage: "fetching", done, total }
+const counted = { fetching: (done, total) => m`Fetching files… ${done} / ${total}` };
 let generation = 0;
 
 /** Give the browser a paint opportunity without stalling a hidden/background iframe. */
@@ -23,7 +25,13 @@ export function startLoading() {
   const timer = setTimeout(() => { if (id === generation) el.hidden = false; }, 120);
   app.setAttribute("aria-busy", "true");
   const setStage = (stage) => {
-    if (id !== generation || !(stage in stages)) return;
+    if (id !== generation) return;
+    if (stage && typeof stage === "object" && stage.stage in counted) {
+      el.dataset.stage = stage.stage;
+      setText(document.getElementById("loading-stage"), counted[stage.stage](stage.done, stage.total));
+      return;
+    }
+    if (!(stage in stages)) return;
     el.dataset.stage = stage;
     setText(document.getElementById("loading-stage"), stages[stage]);
   };

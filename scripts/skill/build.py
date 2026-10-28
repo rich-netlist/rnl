@@ -38,7 +38,7 @@ GUIDE = (SPEC / "rnl-0.3-guide.md", "references/language.md")
 GUIDE_NOTE = (f"> The short guide to the language RNL {SERIES}, for reading and writing RNL files. It is not the standard, "
               f"which prevails where the two differ: {SITE_URL}en/spec/{SERIES}/. Licence: CC-BY-4.0, see `LICENSE.md`.")
 LICENSE_TEXTS = ("MIT", "CC-BY-4.0", "CC0-1.0")  # the licences of what the package holds, copied to LICENSES/
-GALLERY_JS = ROOT / "site" / "src" / "assets" / "gallery.js"  # what each package is for, in both languages
+GALLERY_JS = ROOT / "site" / "src" / "assets" / "gallery.js"  # what each package is for, in English
 SITE_SRC = ROOT / "site" / "src"
 # the package files the reference is written from: the series, and the packages outside it that the
 # catalog lists with it
@@ -46,7 +46,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from packages import require as require_public_package
 LIBRARIES = [ROOT / "libraries" / "standard" / SERIES]
 ALLOWED_FRONT = {"name", "description", "license", "compatibility", "metadata", "allowed-tools"}
-SUMMARY_LINE = re.compile(r"^\s*'([\w-]+(?: [\d.]+)?)':\s*'<zh>.*?</zh><en>(.*?)</en>'", re.M)
+SUMMARY_LINE = re.compile(r"^\s*'([\w-]+(?: [\d.]+)?)':\s*'<en>(.*?)</en>'", re.M)
 FENCE = re.compile(r"^(```+)([^\n]*)\n(.*?)^\1[ \t]*$", re.M | re.S)
 RULE = re.compile(r'#\s*@SELECT-INSTANCE\((\w+)="([^"]*)"\)\s*=>\s*@SET-SYMBOL\s+(\$\w+)')
 ALIAS = re.compile(r'@ALIAS\("([^"]+)",\s*"([^"]+)"\)')
@@ -347,7 +347,7 @@ def check_links() -> list[str]:
 def check_site_texts() -> list[str]:
     """The pages and the llms.txt of the site name every file of the package, so they cannot fall behind it."""
     errors = []
-    for name in ("agents.html", "llms.txt", "llms.zh.txt"):
+    for name in ("agents.html", "llms.txt"):
         text = read(SITE_SRC / name)
         errors += [f"site/src/{name} does not name {f}" for f in skill_files()
                    if not f.startswith("LICENSES/") and f != "LICENSE.md" and f not in text]
@@ -440,7 +440,7 @@ def sha256(p: Path) -> str:
 
 def build_site(site: Path) -> None:
     """Add to a built site: skill/rnl-skill.zip, the files of the package as plain text under skill/rnl/, a manifest and
-    the hashes, and the pointer for agents, llms.txt (English) and zh/llms.txt (Chinese)."""
+    the hashes, and the pointer for agents, llms.txt, in English only."""
     skill = site / "skill"
     shutil.rmtree(skill, ignore_errors=True)
     for f in skill_files():
@@ -455,11 +455,9 @@ def build_site(site: Path) -> None:
     (skill / "manifest.json").write_text(json.dumps(manifest, indent=1) + "\n", encoding="utf-8", newline="\n")
     sums = [f"{sha256(skill / 'rnl-skill.zip')}  rnl-skill.zip"] + [f"{e['sha256']}  {SKILL.name}/{e['path']}" for e in manifest["files"]]
     (skill / "SHA256SUMS.txt").write_text("\n".join(sums) + "\n", encoding="utf-8", newline="\n")
-    for src, dest in (("llms.txt", site / "llms.txt"), ("llms.zh.txt", site / "zh" / "llms.txt")):
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(read(SITE_SRC / src).replace("{{site}}", SITE_URL).replace("{{github}}", GITHUB),
-                        encoding="utf-8", newline="\n")
-    print(f"wrote {skill} ({len(manifest['files'])} files and rnl-skill.zip), {site / 'llms.txt'} and {site / 'zh' / 'llms.txt'}")
+    text = read(SITE_SRC / "llms.txt")
+    (site / "llms.txt").write_text(text.replace("{{site}}", SITE_URL).replace("{{github}}", GITHUB), encoding="utf-8", newline="\n")
+    print(f"wrote {skill} ({len(manifest['files'])} files and rnl-skill.zip) and {site / 'llms.txt'}")
 
 
 def main(argv: list[str]) -> int:

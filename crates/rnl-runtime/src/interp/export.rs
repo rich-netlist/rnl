@@ -327,7 +327,8 @@ impl Interp<'_> {
 
         // the nets (6.3), in the order the netlist first names them: each with the wires that draw
         // it, the ROUTEs that ask for it and its place among the ports of the subcircuit
-        let port_keys: Vec<String> = level.ports.iter().map(|p| self.doc.net_key(p)).collect();
+        let port_keys: Vec<String> =
+            level.ports.iter().map(|p| self.doc.net_key_in(self.scenes[s].level, p, &level.file)).collect();
         let mut nets: Vec<ProblemNet> = Vec::new();
         let mut net_at: HashMap<ObjId, usize> = HashMap::new();
         for n in self.scenes[s].nets.clone() {

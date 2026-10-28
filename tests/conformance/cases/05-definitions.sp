@@ -1,7 +1,7 @@
 * Three-stage RC ladder
-*! 普通定义：角色声明种类、参数及默认值、局部名（%s1::mid）、体里的导线与约束、参数写在字面量的位置（max=?drop）；
-*! 用例填进别的用例的角色（$CHAIN 的集合角色）；按角色选择（role="c"）；自定义虚元件 $TP 与它的符号和规则，命名插在管道中间（=> %tp =>），文字 ${p} 显示角色里端子所在的网络；
-*! 标准包的 $GND_STUB（体里 ATTACH $GND、接线、约束），求解器写回 %st::g 的位置。
+*! Ordinary definitions: roles that declare kinds, parameters with defaults, local names (%s1::mid), wires and constraints in the body, a parameter in the place of a literal (max=?drop);
+*! a usage filling another usage's role (the set role of $CHAIN); selection by role (role="c"); a custom virtual part $TP with its symbol and rule, a name in the middle of the pipe (=> %tp =>), and the text ${p} showing the net of the terminal in the role;
+*! the standard package's $GND_STUB (ATTACH $GND, a wire and constraints in its body), and the solver writing back where %st::g is.
 V1 in 0 AC 1
 R1 in n1 1k
 C1 n1 0 1n

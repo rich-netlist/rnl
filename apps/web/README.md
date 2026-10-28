@@ -9,20 +9,55 @@ The web viewer: the page of the RNL viewers ([`apps/viewer-ui`](../viewer-ui/REA
 - **File › Load from Clipboard** (Ctrl+Shift+V) opens the clipboard's text once the browser lets the page read the clipboard, which it may ask you first: the page shows the text, with what it will be read as, a SPICE or Spectre netlist or a package, and opens it on **Load**, with file pool entries available to bare includes.
 - **File › Reload** (F5) reads the document again, not the page, keeping the level, the view and the selection. A URL is fetched again past the browser's cache. Files are read again from what the browser holds of them: a dropped file as it is now, but a file chosen with Open File or Include Folder only as it was when it was chosen; once it has changed, Reload says to open it again.
 - **Edit › Edit Text** (Ctrl+Q) switches the netlist text to edit, a text box for each file; **Edit › Apply and Exit Editing** (Ctrl+Enter) builds the document again from the texts held, in the core, over the files as they were read, and draws it; **File › Download File** (Ctrl+S) downloads the file shown, with the line ends it had, as UTF-8; nothing is written where a file was read from. Changes not applied are shown as such, a dot marks the tab of each file with changes not saved, and File › Reload, opening another file and closing the page ask first ([the page](../viewer-ui/README.md#editing-the-text)).
-- **File › Download Library ZIP** downloads the Library as one archive: the built-in packages, the files not referenced by the document, the original bytes of local files and the current edits.
+- **File › Download Project** downloads the Library as a project, one ZIP archive with its manifest, `rnl-project.json`: the files not referenced by the document, the original bytes of local files and the current edits, and how they are set up, the entry, the pool's order, the formats chosen, the level shown and Auto Include. **File › Open Project** reads one back, from the web or the desktop viewer ([Projects and manifests](#projects-and-manifests)).
+- **File › Download Manifest** downloads the manifest of the Library's files by their addresses alone, when every one has one and is as it was fetched; **File › Load Manifest** opens such a manifest file as `?manifest=` would.
+- **File › Export Image › Export SVG / Export PNG** saves the whole of the level shown, not the part in view, as the core draws it with its overlays (`rnl_view::overlays::svg`, as `rnl render --usages --currents` does): usages and current directions as the drawing shows them, on or off, each usage in its colour and hidden ones left out; no selection, hover or grid; an opaque paper, light or dark as the page's. The page's fonts that its texts use go into the SVG, so it shows the texts as the page does elsewhere too. The PNG is that SVG drawn by the browser at twice its size (at most 16384 pixels a side). It is named after the file and the level. The web downloads it.
 - **View › Show Current Directions** draws an arrow at each terminal with `@CURRENT("in")` or `@CURRENT("out")`, off to begin with and kept in the browser; the Usage tab frames usages. Both are inspection overlays whose geometry comes from the core, the same as `rnl render --currents --usages` ([decision 0014](../../docs/decisions/0014-inspection-overlay-geometry.md)).
 - **Help › About** names the version and the commit the site was built from. The browser tab is named after the document.
 - The bar above the drawing shows the hierarchy path to the level shown, a segment per subcircuit instance gone down into, each going back to its level, as in the [desktop viewer](../desktop/README.md).
 - Resting the pointer on an instance or a net shows its name beside it (**View › Show Names on Hover**, on to begin with and kept in the browser). A click on a label selects the instance or net it is attached to, the selected object's labels are marked, and a click on several objects at once opens a list of them beside the pointer to choose from, as in the [desktop viewer](../desktop/README.md).
 - **View › Grid** shows a light grey grid under the drawing, dots or lines at every unit of the scene, coarser when zoomed out, and the axes through the origin, as in the [desktop viewer](../desktop/README.md); G shows and hides it, and the settings are kept in the browser for the next visit. The status bar shows where the pointer is on the drawing, in units with y up.
-- **Help › Desktop Viewer** opens the project site's page of the tools in a new tab, where the desktop viewer is downloaded: [in Chinese](https://rich-netlist.github.io/rnl/zh/tools.html) when the browser's languages put Chinese before English, else [in English](https://rich-netlist.github.io/rnl/en/tools.html), the site's default.
+- **Help › Desktop Viewer** opens the project site's page of the tools in a new tab, where the desktop viewer is downloaded: in the first of the browser's languages that the project's list of languages offers ([`i18n/languages.json`](../../i18n/languages.json), by its `matches`), else [in English](https://rich-netlist.github.io/rnl/en/tools.html), the site's default.
 - Packages found by name (16.2) come from the file pool before bundled packages; a package file named by path is tried relative to the file that references it.
 
 Text is decoded as `rnl` decodes it, UTF-8 or else Latin-1, so a document is the one `rnl view` and the desktop viewer give for the same files, but for the paths that name them. Files opened from the computer are named in the workspace as `/NAME`, and a folder's as `/FOLDER/SUB/NAME`; a URL's files by their paths on the server that served the netlist, after any redirect, such as `/netlists/a/top.sp`, or `/top.sp` at its root, so that a URL that redirects opens as the one it redirects to. A netlist served at a directory's address is named after the directory, or after the server at its root, such as `/example.org`. The workspace has nothing above its root: an include such as `../x.inc` of a file opened from the computer is missing, not a file of that name opened with it.
 
+## External manifests
+
+`?manifest=ADDRESS` opens the files an external manifest lists, at a commit of a public GitHub repository, such as the manifests the [RNL gallery](https://rich-netlist.github.io/rnl/en/gallery.html) writes; `?url=` is unchanged, and the page takes one or the other. The reading is `core/manifest.js` (`bindings/runtime-wasm/js/manifest.js`, also `@rich-netlist/runtime/manifest`), which tools in Node can use too:
+
+- The manifest is format 1; a newer format asks for a newer viewer. Its `base` and each file's `url` are https addresses (http only on this computer, as a page in development has), such as `https://raw.githubusercontent.com/` at one commit for the RNL gallery's; every file has its SHA-256 and size; its paths relative without `..`, and its files at most 300, 2 MB each and 20 MB in all.
+- Every file is fetched from `base`, six at a time, with the count shown while it loads, and its bytes checked against its SHA-256 before they are decoded; a file that does not match, is missing or cannot be fetched stops the opening, and the error names it. A file with a `url` of its own, such as a public package under `.packages/`, comes from that address instead, checked the same way, without asking.
+- The formats a manifest gives, `formats`, are chosen for those files as if the user had chosen them in the Library, once: a later choice, or Reload, keeps the user's.
+- The files go under `/<id>/` in the workspace, read only, and the Library lists them in a group of their own, *From external manifest · id · read only*, with their directories. They are searched as the Library's files are, for bare includes, packages by name and Auto Include, by any file opened, theirs or not. The manifest's `pool` is the build's pool, in its order: a bare include falls back to it by file name, and a package by name is found in it first; relative includes resolve as usual.
+- The document opens on the manifest's `level`, a subcircuit's name or "(top)" for the netlist's own level, or on `?level=` when the address gives one; a subcircuit the netlist has not is told, and the default level is shown. The level is shown in the entry's document, with all it includes, also when an included file defines the subcircuit; the embed's `level` and `?level=` do the same.
+- A slim bar above the drawing shows what the manifest gives of its title (in the page's language), its author and its source, `repo@commit` linked to the manifest's `source.url`; a manifest that gives none of them has no bar.
+- Reload (F5) fetches the manifest and the files again.
+
+A manifest of links, which Download Manifest writes and Load Manifest reads, has no title or source: it opens without the bar.
+
+In an embedded canvas, `?embed=1&manifest=` and the `open` message's `manifest` field (instead of `url`) do the same, without the bar and the Library.
+
+## Projects and manifests
+
+A project, a gallery design and a manifest of links have one manifest format, format 1, which `manifest.js` reads and writes (a copy of `bindings/runtime-wasm/js/manifest.js`, `@rich-netlist/runtime/manifest`, which a test keeps the same). Each file is listed by its relative path with the SHA-256 and size of its bytes, and is taken from its `url`, or from the archive the manifest is in, or from `base` joined with its path; `pool` is the build's pool in its order, `formats` the parse format chosen for some files, `level` a subcircuit's name or "(top)", `settings` the Library's (`autoInclude`), and a desktop project's `paths` record its PATH directories, whose files it copied under `PATH/<n>-<name>/` and put in `pool`.
+
+- **Download Project** (web) and **Save Project** (desktop) write the archive. The desktop's files lose the directory all of them are in, so that includes between them resolve where the project is opened.
+- **Open Project** reads the archive, checks every file against the manifest, and makes the project's pool the Library's files, with the formats and settings it gives; its entry opens at its level. The web keeps the files under `/<name>/` in the page; the desktop asks for a folder to write them in, starting where the archive is, and asks before replacing files there; its Save Project then offers to save to the archive it opened. Opening a project does not change the desktop's PATH.
+- **Display settings.** A manifest may propose display settings, `display`: the view of its `level` (`{ "fit": true }`, or `{ "center": [x, y], "scale": k }` in the drawing's units and pixels per unit), the `background` (`light` or `dark`), `colors` of the colour scheme by their names, whether `usages` and `currents` are shown, and the `grid` (`none`, `dots` or `lines`). `?manifest=`, Load Manifest and Open Project list those it has, each with a box ticked, and apply the ones kept: they hold while a file of the manifest (or of the project) is shown, go back to your own settings for another file and come back, unasked, with a file of it again; they are never written into your settings, and a setting you change meanwhile is yours. The view is set when the manifest is opened. A setting this viewer does not know is told and kept. Download Project, Save Project and Download Manifest ask whether to write the display settings shown into it. Embedded viewers do not apply them: to hide the usage frames or show the current directions of an embedded drawing, use the `usages` and `currents` parameters or messages.
+- A project's archive holds at most 5000 files and 1 GiB, and a file may be larger than a fetched manifest allows. The web opens projects of at most 256 MB, as its WebAssembly core holds a project's texts several times over; a larger one is to be opened in the desktop viewer.
+
+## Touch and small screens
+
+- **On the drawing**, one finger drags the view, two zoom it around their middle as they spread or pinch, and drag it as their middle moves; a tap does what a click does (a finger may move about 10 pixels and still tap) and a double tap what a double click does, once: the page tells taps itself, as WebKit makes no double click of them. Gestures on the drawing neither scroll nor zoom the page; elsewhere the browser may zoom the page. A finger shows no hover names. The mouse, the wheel and the keys are as on a desktop, on a laptop with a touch screen too.
+- **A phone** (`(max-width: 599px), (pointer: coarse) and (max-height: 499px)`: narrow, or a touch screen's low, upright or lying down; a narrow window too, and a low one of a mouse not) shows two pages, the schematic and the side panel, each the whole screen; the bar at the bottom switches them, and each stays as it was left: the view, the level, the selection, the panel's view and where its text is scrolled. With a selection, the status bar's View in Netlist shows its line in the netlist, and View in Drawing brings it into the middle of the drawing. Opening a file, going into or out of a subcircuit, and picking a level in the hierarchy show the schematic. A phone starts on the schematic. The netlist's options are behind its Options button; lying down, the switch bar is at the end of the status bar's row and the problems start folded to their heading.
+- **Upright and narrow, and no phone** (`(max-width: 1023px) and (max-aspect-ratio: 4/5)`: a tablet held upright, a narrow window), the side panel is under the drawing, as wide as the screen; at first a little less than half the room the two share, and at most two fifths of the screen. Its handle drags it taller or lower, from its tabs to what leaves the drawing 80 pixels, and the height is kept (`panel-height`). The netlist's file and options are on one row there, the options scrolled sideways, and a short pane gives the netlist its lines before the problems theirs, down to a row of them. There, and on a phone, the problems are as tall as what they hold, at most their height. Hide the Side Panel folds it to its tabs; a tap on a tab unfolds it.
+- **On a touch screen** (`pointer: coarse`) the menu titles, the tabs, the side panel's buttons, the up button and the Problems heading are at least 44 pixels, the menus' rows 40, the open badge of a subcircuit instance 32. The tabs show no keys and scroll sideways when they do not fit, and the status bar says a double tap opens a subcircuit instance. A menu taller or wider than the room it has moves left or scrolls, its submenus then under their entries. A tap on a menu item chooses it as the finger lifts.
+- The status bar cuts a long name of the selection short, so the zoom stays on the screen. Embedded viewers keep their one-canvas layout.
+
 ## File pool and search paths
 
-The first sidebar tab, **Library**, groups the session's searchable files. Opening a file with Open File, a drop, the command line (desktop), or `?url=` (web) also adds it to **Files**, without duplicates. **Include File** adds selected netlists or `.rnl` packages; **Include Folder** recursively adds files with netlist/package extensions (`sp`, `spi`, `spice`, `cir`, `ckt`, `net`, `inc`, `lib`, `scs`, `rnl`), preserving their directories. Click a pooled file to open it. **Exclude** removes it from the search pool, without deleting the file or closing an already open document. Pool changes rebuild the current document while keeping edited text and the view; edits not yet applied remain unapplied.
+The first sidebar tab, **Library**, groups the session's searchable files. Opening a file with Open File, a drop, the command line (desktop), or `?url=` (web) also adds it to **Files**, without duplicates. **Include File** adds selected netlists or `.rnl` packages; **Include Folder** recursively adds files with netlist/package extensions (`sp`, `spi`, `spice`, `cir`, `ckt`, `net`, `netlist`, `inc`, `lib`, `scs`, `rnl`), preserving their directories. Click a pooled file to open it. **Exclude** removes it from the search pool, without deleting the file or closing an already open document. Pool changes rebuild the current document while keeping edited text and the view; edits not yet applied remain unapplied.
 
 Built-in standard packages from series 0.3 and 0.2 are in the initially collapsed **Built-in** group, with **read only** badges. They can be opened but cannot be edited or excluded. The pool itself lasts for this viewer session. Files starts expanded; group collapse state lasts only for this session, and a newly added file expands Files. Matching root-file rows are highlighted across all groups; selecting an included Netlist tab does not change that highlight.
 
@@ -42,7 +77,7 @@ The browser cannot access arbitrary local directories. The note at the bottom of
 node apps/web/build.mjs
 ```
 
-builds the core with [`bindings/runtime-wasm/build.mjs`](../../bindings/runtime-wasm/README.md#building) and puts the site into `apps/web/dist/`, which git ignores: the page from `apps/viewer-ui` without its README, its `package.json` and the desktop shell; the binding's modules and the WebAssembly module in `core/`; and `about.json`, with the independent Viewer `version` from the desktop manifests, the workspace `coreVersion` and the build `commit` for the About box. It needs Rust with the `wasm32-unknown-unknown` target and Node 18 or later, and no npm packages.
+builds the core with [`bindings/runtime-wasm/build.mjs`](../../bindings/runtime-wasm/README.md#building) and puts the site into `apps/web/dist/`, which git ignores: the page from `apps/viewer-ui` without its README, its `package.json` and the desktop shell; the binding's modules and the WebAssembly module in `core/`; `locales/`, the languages of the interface and their catalogs from [`i18n/`](../../i18n/README.md), which the page reads (`languages.json`, `<code>.json`); and `about.json`, with the independent Viewer `version` from the desktop manifests, the workspace `coreVersion` and the build `commit` for the About box. It needs Rust with the `wasm32-unknown-unknown` target and Node 18 or later, and no npm packages.
 
 The page's `fonts/`, the drawing's web fonts ([decision 0009](../../docs/decisions/0009-fonts-shipped-with-the-core.md)), comes with it when it is there. Write it first, with Python 3, fontTools and brotli:
 
@@ -101,7 +136,7 @@ The page keeps the browser baseline of decision 0008: Chromium 109, the last Chr
 Embed the canvas with `viewer/?embed=1`. Pan, zoom, double-click a subcircuit to enter it, and use
 Backspace or the floating hierarchy path to return. Keys act only while the iframe has focus.
 The canvas fills the iframe and preserves its centre when resized. A floating toolbar fits,
-zooms in and zooms out; labels follow the browser's Chinese or English language. Errors appear
+zooms in and zooms out; labels follow the browser's language when the project offers it, else English. Errors appear
 on the canvas rather than in a dialog. Embedded preferences neither read nor write localStorage
 or native settings. The ordinary web viewer and desktop viewer keep their usual behaviour.
 
@@ -109,20 +144,25 @@ or native settings. The ordinary web viewer and desktop viewer keep their usual 
 | --- | --- | --- | --- |
 | `embed` | `1` | Normal viewer | Use the canvas-only web viewer. |
 | `url` | Netlist URL | None | Open a file, with includes relative to its served URL. |
+| `manifest` | Manifest URL | None | Open the files of an external manifest ([External manifests](#external-manifests)); not with `url`. |
 | `level` | Subcircuit name | Automatic, as when opening normally | Initial level. |
 | `background` | `light`, `dark` | `light` | Drawing background, as in View › Background; also colours the floating controls. |
 | `grid` | `dots`, `lines`, `off` | `off` | Canvas grid. |
 | `names` | `1`, `0` | `1` | Show names on hover. |
+| `usages` | `1`, `0` | `0` | Show the usage frames, as View › Show Usages. An embedded drawing starts without them; an embedding page that was written when they were shown writes `usages=1`. The complete viewer's default is unchanged. |
+| `currents` | `1`, `0` | `1` | Show the current directions, as View › Show Current Directions. `0` starts without them. The complete viewer's default is unchanged. |
 | `origin` | An exact origin, e.g. `https://example.com` | Any origin | Accept messages only from this origin and reply to it. |
 
 Send object messages to the iframe's `contentWindow`, each with `rnl: 1`:
 
 | `type` | Other fields | Effect |
 | --- | --- | --- |
-| `open` | `text` and `name` (e.g. `amp.sp`), or `url`; optional `requestId`, `packages` | Replace the netlist without reloading. The filename determines its dialect. |
+| `open` | `text` and `name` (e.g. `amp.sp`), `url`, or `manifest`; optional `requestId`, `packages` | Replace the netlist without reloading. The filename determines its dialect. |
 | `level` | `name` | Display that level. |
 | `fit` | None | Fit the drawing to the iframe. |
 | `background` | `value`: `light` or `dark` | Change this page's drawing and floating controls' background without saving a user preference. |
+| `usages` | `value`: `true` or `false` | Show or hide the usage frames of this page, without saving a user preference. |
+| `currents` | `value`: `true` or `false` | Show or hide the current directions of this page, without saving a user preference. |
 
 The iframe sends these messages to `window.parent`, also with `rnl: 1`:
 
@@ -197,7 +237,8 @@ text and metadata. Larger messages return an error naming the actual and maximum
 they are never truncated. Existing calls without the new fields, including the site's Logo
 easter egg, keep their existing behavior.
 
-`ready.features` advertises `requestId` and `packages`, plus `opener` in complete API mode.
+`ready.features` advertises `requestId` and `packages`, plus `opener` in complete API mode and `usages` and `currents` for an embedded
+canvas, which takes the messages of those names; a page can check for them to know that the viewer it embeds does.
 `viewer-api.json` publishes the supported complete-Viewer features and size limit, using the
 same constants as `ready`. Callers can check it to report an old complete Viewer promptly:
 versions predating this API emit no `ready` at all. In a complete Viewer, an incoming `open`
@@ -285,7 +326,7 @@ A missing named USE-PACKAGE keeps the core error and starts a background public-
 
 File > Download File (Ctrl+S) downloads the editor's current snapshot, which clears its unsaved mark without changing the browser's original File/URL. Build overlays use a separate source baseline, so Download before Apply, later Library rebuilds and repeated editing keep downloaded edits. Native saves update that source baseline because they write the file. Typing while a save is pending remains unsaved after the earlier snapshot finishes.
 
-File > Download Library exports one `rnl-library.zip`, preserving library paths and including unused files, included public packages, every built-in standard package/version under `standard-packages/`, loaded include files and the separate `temporary/` clipboard source. Current editor text is captured before choosing a destination, including pending changes, without applying it or marking it saved. Other files retain their original bytes. Browsers that support [showSaveFilePicker](https://wicg.github.io/file-system-access/#api-showsavefilepicker) ask for the ZIP destination; others use the browser's download settings. Canceling the picker exports nothing. An unreadable file fails the export with its path instead of creating an incomplete ZIP. Packaging runs locally, yielding during checksums; the dependency-free ZIP STORE format uses UTF-8 paths and CRC-32, with portable escaped names and collision suffixes. ZIP32 limits apply (under 4 GiB, up to 65534 files).
+File > Download Project exports one `<entry>.zip` with `rnl-project.json` and the Library's files by their paths: unused files, included public packages, loaded include files and the separate `temporary/` clipboard source, but not the built-in standard packages, which every viewer has. Current editor text is captured before choosing a destination, including pending changes, without applying it or marking it saved. Other files retain their original bytes. Browsers that support [showSaveFilePicker](https://wicg.github.io/file-system-access/#api-showsavefilepicker) ask for the ZIP destination; others use the browser's ordinary download. An unreadable file stops the export, and the error names it.
 
 ### New windows and navigation keys
 

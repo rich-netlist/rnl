@@ -122,8 +122,8 @@
 
   function boxes() {
     return [
-      { id: 'cm1', kind: 'box', layer: 'back', ids: ['M3', 'M4'], pad: 1, label: '<zh>%cm1 · 电流镜</zh><en>%cm1 · current mirror</en>', labelAt: [0.5, 1], anchor: 'middle' },
-      { id: 'dp1', kind: 'box', layer: 'back', ids: ['M1', 'M2', 'M5'], pad: 1.4, label: '<zh>%dp1 · 差分对，尾管 M5</zh><en>%dp1 · diff pair, tail M5</en>', labelAt: [0.03, 0], anchor: 'start' }
+      { id: 'cm1', kind: 'box', layer: 'back', ids: ['M3', 'M4'], pad: 1, label: '<en>%cm1 · current mirror</en>', labelAt: [0.5, 1], anchor: 'middle' },
+      { id: 'dp1', kind: 'box', layer: 'back', ids: ['M1', 'M2', 'M5'], pad: 1.4, label: '<en>%dp1 · diff pair, tail M5</en>', labelAt: [0.03, 0], anchor: 'start' }
     ];
   }
 
@@ -188,9 +188,10 @@
     u13: ['{#M5 #M1 #M3} @ORDER("bottom-to-top");', '{#M5 #M1 #M3} are in @ORDER("bottom-to-top");'],
     u14: ['#M5:d @CURRENT("in")', '#M5:d has @CURRENT("in")']
   };
-  /* zh: the Chinese standard sentences, written with the alias package rnl-zh; shown on every page */
+  /* zh: the Chinese standard sentences, written with the alias package rnl-zh; only the Chinese pages have them */
+  var UZ = {};
   /*zh-CN*/
-  var UZ = {
+  UZ = {
     u1: '%dp1 = #M1(正输入)、#M2(负输入) 和 #M5(尾管) @视作 $"差分对";',
     u2: '%cm1 = #M3(参考管) 和 #M4(输出管) @视作 $"电流镜"',
     u4: '{#M1 #M2 #M5} @使用符号 $NMOS;',
@@ -254,7 +255,7 @@
       add('s2', '*   #M3 @PLACE(' + x1 + ', 16) => @ORIENT("MY");  #M4 @PLACE(' + x2 + ', 16) => @ORIENT("R0");', 'M3 M4');
       add('s3', '*   #M5 @PLACE(20, 0);  %ja = (' + (x1 + 4) + ', 16);  %jb = (' + x1 + ', 12);', 'M5');
       add('s4', '*   &x @WIRE {#M3:d %jb #M1:d};  &x @WIRE {#M3:g %ja #M4:g};', 'net:x');
-      add('s5', '*   /* <zh>另有导线、交汇点、端口、电源和地，这里从略</zh><en>more wires, junctions, ports, supplies and the ground follow; left out here</en> */');
+      add('s5', '*   /* <en>more wires, junctions, ports, supplies and the ground follow; left out here</en> */');
       add('s6', '* }');
     }
     if (stage >= 4) add('e0', '* @RNL(author="rnl-editor") { #M2 @PLACE(x=30, priority="high")}', 'M2');
@@ -319,11 +320,11 @@
   ];
 
   var E5_DIAG = [
-    { k: 'err', id: 'm9', icon: 'cross', html: '<zh><code>{#M1 #M2 #M9} @ALIGN("y")</code>：本层没有元件 M9。ALIGN 对成员是严格的，整句失效，不会退化成“只对齐 M1、M2”。</zh><en><code>{#M1 #M2 #M9} @ALIGN("y")</code>: this level has no instance M9. ALIGN is strict about its members, so the whole statement fails; it does not fall back to “align only M1 and M2”.</en>', refs: [] },
-    { k: 'err', id: 'bad', icon: 'cross', html: '<zh><code>#M4 @PLACE(2O, 16, …)</code>：数后面不能带字母，“2O” 里是字母 O。只有这一句失效，M4 保留求解器给的 (28, 16)。</zh><en><code>#M4 @PLACE(2O, 16, …)</code>: a number cannot be followed by a letter, and “2O” contains the letter O. Only this statement fails; M4 keeps the solver’s (28, 16).</en>', refs: ['M4'] },
-    { k: 'warn', id: 'conflict', icon: 'warn', html: '<zh>编辑器的 <code>#M2 @PLACE(x=30, …)</code> 是 high，后写，盖过求解器给的 x = 28。求解器的那条被丢弃。两个源极的中点因此到了 x = 21，而 M5 留在 20：<code>%dp1</code> 自带的尾管居中是 low，与这些 high 坐标冲突，让步了，尾管不再居中。low 的约束让步是预料之中的，不另提示。</zh><en>The editor’s <code>#M2 @PLACE(x=30, …)</code> is high and written later, so it overrides the solver’s x = 28, which is discarded. The midpoint of the two sources moves to x = 21 while M5 stays at 20: the tail centering that <code>%dp1</code> carries is low, conflicts with these high coordinates and gives way, so the tail is no longer centered. A low constraint giving way is expected and noted no further.</en>', refs: ['M2', 'M5', 'ov:c1'] },
-    { k: 'info', id: 'fp', icon: 'info', html: '<zh>求解记录的 <code>hash</code> 与当前输入不符：求解之后，编辑器加了一条记录。查看器建议重新求解，旧结果照常显示。</zh><en>The solver record’s <code>hash</code> no longer matches the current input: the editor added a record after solving. The viewer suggests solving again; the old result still displays.</en>', refs: [] },
-    { k: 'ok', id: 'ok', icon: 'check', html: '<zh>其余照常生效：差分对和它的尾管；对称（也是 low，但对称轴是自由点，跟着移到 x = 21，照样成立）；其他坐标。</zh><en>Everything else takes effect: the differential pair and its tail; the symmetry (low as well, but the axis is a free point that moves to x = 21, so it still holds); the other coordinates.</en>', refs: ['M1', 'M2', 'ov:ax'] }
+    { k: 'err', id: 'm9', icon: 'cross', html: '<en><code>{#M1 #M2 #M9} @ALIGN("y")</code>: this level has no instance M9. ALIGN is strict about its members, so the whole statement fails; it does not fall back to “align only M1 and M2”.</en>', refs: [] },
+    { k: 'err', id: 'bad', icon: 'cross', html: '<en><code>#M4 @PLACE(2O, 16, …)</code>: a number cannot be followed by a letter, and “2O” contains the letter O. Only this statement fails; M4 keeps the solver’s (28, 16).</en>', refs: ['M4'] },
+    { k: 'warn', id: 'conflict', icon: 'warn', html: '<en>The editor’s <code>#M2 @PLACE(x=30, …)</code> is high and written later, so it overrides the solver’s x = 28, which is discarded. The midpoint of the two sources moves to x = 21 while M5 stays at 20: the tail centering that <code>%dp1</code> carries is low, conflicts with these high coordinates and gives way, so the tail is no longer centered. A low constraint giving way is expected and noted no further.</en>', refs: ['M2', 'M5', 'ov:c1'] },
+    { k: 'info', id: 'fp', icon: 'info', html: '<en>The solver record’s <code>hash</code> no longer matches the current input: the editor added a record after solving. The viewer suggests solving again; the old result still displays.</en>', refs: [] },
+    { k: 'ok', id: 'ok', icon: 'check', html: '<en>Everything else takes effect: the differential pair and its tail; the symmetry (low as well, but the axis is a free point that moves to x = 21, so it still holds); the other coordinates.</en>', refs: ['M1', 'M2', 'ov:ax'] }
   ];
 
   /* ================= Hero: RC low-pass ================= */
@@ -358,17 +359,17 @@
   };
 
   var HERO_LINES = [
-    { t: '* RC low-pass filter', sim: 'title', view: 'skip', note: '<zh>第一行是标题。SPICE 把文件第一行当作标题，不属于电路。</zh><en>The first line is the title. SPICE treats a file’s first line as its title, not as part of the circuit.</en>' },
-    { t: 'V1 in 0 AC 1', r: 'V1 G1', sim: 'use', view: 'draw', note: '<zh><b>网表</b>：信号源 V1 接在 in 与地之间。接地的那一端不用写 RNL：标准包会自动补一个地符号。</zh><en><b>Netlist</b>: source V1 between in and ground. The grounded end needs no RNL: the standard package adds a ground symbol by itself.</en>' },
-    { t: 'R1 in out 10k', r: 'R1', sim: 'use', view: 'draw', note: '<zh><b>网表</b>：10 kΩ 电阻，从 in 接到 out。</zh><en><b>Netlist</b>: a 10 kΩ resistor from in to out.</en>' },
-    { t: 'C1 out 0 10n', r: 'C1 G2', sim: 'use', view: 'draw', note: '<zh><b>网表</b>：10 nF 电容，从 out 接到地；地符号同样由标准包补上。</zh><en><b>Netlist</b>: a 10 nF capacitor from out to ground; the standard package adds its ground symbol too.</en>' },
-    { t: '.ac dec 20 10 1meg', cls: 'is-analysis', sim: 'use', view: 'skip', plot: true, note: '<zh><b>仿真指令</b>：从 10 Hz 扫到 1 MHz。查看器画图用不到它。</zh><en><b>Simulation command</b>: sweep from 10 Hz to 1 MHz. The viewer does not need it to draw.</en>' },
-    { t: '* @RNL {', sim: 'skip', view: 'meta', note: '<zh><b>RNL 记录开始</b>。仿真器眼里，这只是一行以 * 开头的注释。</zh><en><b>Start of an RNL record</b>. To the simulator, this is just a comment line starting with *.</en>' },
-    { t: '*   {#V1 #R1 #C1} are treated @AS $FLOW;', r: 'V1 R1 C1 ov:flow', mode: 'flow', sim: 'skip', view: 'draw', note: '<zh><b>RNL</b>：V1、R1、C1 按信号流向排开，默认从左到右。“are treated” 是自由文本，只为读起来像一句话，机器不读。</zh><en><b>RNL</b>: V1, R1 and C1 follow the signal flow, left to right by default. “are treated” is free text, there only so the line reads as a sentence; machines skip it.</en>' },
-    { t: '*   #R1 @ORIENT("R90");', r: 'R1', sim: 'skip', view: 'draw', note: '<zh><b>RNL</b>：R1 逆时针转 90°，横着放。</zh><en><b>RNL</b>: R1 turns 90° counterclockwise and lies flat.</en>' },
-    { t: '*   on &out there is a @TEXT("V_{out}")', r: 'net:out', sim: 'skip', view: 'draw', note: '<zh><b>RNL</b>：在网络 out 上标出 V<sub>out</sub>，<code>_{…}</code> 写下标。</zh><en><b>RNL</b>: label net out as V<sub>out</sub>; <code>_{…}</code> makes a subscript.</en>' },
-    { t: '* }', sim: 'skip', view: 'meta', note: '<zh><b>RNL 记录结束</b>。</zh><en><b>End of the RNL record</b>.</en>' },
-    { t: '.end', sim: 'use', view: 'skip', note: '<zh>网表结束。</zh><en>End of the netlist.</en>' }
+    { t: '* RC low-pass filter', sim: 'title', view: 'skip', note: '<en>The first line is the title. SPICE treats a file’s first line as its title, not as part of the circuit.</en>' },
+    { t: 'V1 in 0 AC 1', r: 'V1 G1', sim: 'use', view: 'draw', note: '<en><b>Netlist</b>: source V1 between in and ground. The grounded end needs no RNL: the standard package adds a ground symbol by itself.</en>' },
+    { t: 'R1 in out 10k', r: 'R1', sim: 'use', view: 'draw', note: '<en><b>Netlist</b>: a 10 kΩ resistor from in to out.</en>' },
+    { t: 'C1 out 0 10n', r: 'C1 G2', sim: 'use', view: 'draw', note: '<en><b>Netlist</b>: a 10 nF capacitor from out to ground; the standard package adds its ground symbol too.</en>' },
+    { t: '.ac dec 20 10 1meg', cls: 'is-analysis', sim: 'use', view: 'skip', plot: true, note: '<en><b>Simulation command</b>: sweep from 10 Hz to 1 MHz. The viewer does not need it to draw.</en>' },
+    { t: '* @RNL {', sim: 'skip', view: 'meta', note: '<en><b>Start of an RNL record</b>. To the simulator, this is just a comment line starting with *.</en>' },
+    { t: '*   {#V1 #R1 #C1} are treated @AS $FLOW;', r: 'V1 R1 C1 ov:flow', mode: 'flow', sim: 'skip', view: 'draw', note: '<en><b>RNL</b>: V1, R1 and C1 follow the signal flow, left to right by default. “are treated” is free text, there only so the line reads as a sentence; machines skip it.</en>' },
+    { t: '*   #R1 @ORIENT("R90");', r: 'R1', sim: 'skip', view: 'draw', note: '<en><b>RNL</b>: R1 turns 90° counterclockwise and lies flat.</en>' },
+    { t: '*   on &out there is a @TEXT("V_{out}")', r: 'net:out', sim: 'skip', view: 'draw', note: '<en><b>RNL</b>: label net out as V<sub>out</sub>; <code>_{…}</code> makes a subscript.</en>' },
+    { t: '* }', sim: 'skip', view: 'meta', note: '<en><b>End of the RNL record</b>.</en>' },
+    { t: '.end', sim: 'use', view: 'skip', note: '<en>End of the netlist.</en>' }
   ];
 
   /* ================= Example 1: RLC, what it is and how it flows ================= */
@@ -493,7 +494,7 @@
   var E2_LINES = [
     { t: '* 5T OTA testbench' },
     { t: '.subckt ota5t inp inn out vdd vss vbias' },
-    { t: '* <zh>（M1 … M5 与前面相同，从略）</zh><en>(M1 … M5 as before, left out)</en>' },
+    { t: '* <en>(M1 … M5 as before, left out)</en>' },
     { t: '* @RNL {', r: 'XU1' },
     { t: '*   $OTA_SYM = @DEFINE-SYMBOL {', r: 'XU1' },
     { t: '*     (-5, 2) @PIN(terminal="inp", direction="left");', r: 'XU1 net:inp' },
@@ -543,19 +544,19 @@
   ];
 
   var E3_NOTES = {
-    box: '<zh><b>@DEFINE-SYMBOL</b> 把花括号里的引脚和图元收成一个符号。坐标是符号自己的，(0, 0) 是原点：摆放、对齐都按原点算。</zh><en><b>@DEFINE-SYMBOL</b> gathers the pins and primitives in braces into one symbol. The coordinates are the symbol’s own, and (0, 0) is its origin: placement and alignment are measured from it.</en>',
-    'pin-d': '<zh><b>引脚</b>是画端子的点：<code>terminal="d"</code> 对应网表里 MOS 的漏极（写序号 1 也一样），<code>direction="up"</code> 是出线方向，<code>label</code> 只用于显示。</zh><en>A <b>pin</b> is where a terminal is drawn: <code>terminal="d"</code> is the MOS drain in the netlist (the number 1 means the same), <code>direction="up"</code> is the way wires leave, and <code>label</code> is for display only.</en>',
-    'pin-g': '<zh>栅极引脚，出线朝左。</zh><en>Gate pin; wires leave to the left.</en>',
-    'pin-s': '<zh>源极引脚，出线朝下。衬底不想画，就不写它的引脚：没有引脚的端子不画。</zh><en>Source pin; wires leave downward. To leave the bulk undrawn, give it no pin: a terminal without a pin is not drawn.</en>',
-    l1: '<zh><b>@LINE</b> 收一串点：两个点是线段，更多是折线。这一段是栅极的引线。</zh><en><b>@LINE</b> takes a list of points: two make a segment, more make a polyline. This one is the gate lead.</en>',
-    l2: '<zh>栅极板。</zh><en>The gate plate.</en>',
-    l3: '<zh>沟道，<code>linestyle="bold"</code> 加粗。具体多粗由样式决定，换主题不用改符号。</zh><en>The channel, drawn with <code>linestyle="bold"</code>. How thick that is comes from the style, so a new theme needs no symbol changes.</en>',
-    l4: '<zh>漏极的引线，终点就是漏极引脚 (0, 2)。</zh><en>The drain lead, ending on the drain pin at (0, 2).</en>',
-    l5: '<zh>源极的引线。</zh><en>The source lead.</en>',
-    poly: '<zh>首尾相接的折线加 <code>fill="linecolor"</code>，用线色填满：这是 NMOS 的箭头。</zh><en>A closed polyline with <code>fill="linecolor"</code> is filled with the line color: this is the NMOS arrow.</en>',
-    text: '<zh>单独的 <code>?</code> 指用这个符号画出的那个元件：在它旁边显示名字（<code>${name}</code>）。</zh><en>A lone <code>?</code> means the instance drawn with this symbol: its name (<code>${name}</code>) is shown next to it.</en>',
-    rule: '<zh>一条<b>规则</b>：所有模型为 nch 的元件都用这个符号。它在写它的这一层求一次，在下面每一层再各求一次。</zh><en>A <b>rule</b>: every instance whose model is nch uses this symbol. It is evaluated on the level it is written in, and once more on each level below.</en>',
-    idle: '<zh>把鼠标放到左边任意一行上，看它对应符号里的哪一笔。</zh><en>Hover over any line on the left to see which stroke of the symbol it draws.</en>'
+    box: '<en><b>@DEFINE-SYMBOL</b> gathers the pins and primitives in braces into one symbol. The coordinates are the symbol’s own, and (0, 0) is its origin: placement and alignment are measured from it.</en>',
+    'pin-d': '<en>A <b>pin</b> is where a terminal is drawn: <code>terminal="d"</code> is the MOS drain in the netlist (the number 1 means the same), <code>direction="up"</code> is the way wires leave, and <code>label</code> is for display only.</en>',
+    'pin-g': '<en>Gate pin; wires leave to the left.</en>',
+    'pin-s': '<en>Source pin; wires leave downward. To leave the bulk undrawn, give it no pin: a terminal without a pin is not drawn.</en>',
+    l1: '<en><b>@LINE</b> takes a list of points: two make a segment, more make a polyline. This one is the gate lead.</en>',
+    l2: '<en>The gate plate.</en>',
+    l3: '<en>The channel, drawn with <code>linestyle="bold"</code>. How thick that is comes from the style, so a new theme needs no symbol changes.</en>',
+    l4: '<en>The drain lead, ending on the drain pin at (0, 2).</en>',
+    l5: '<en>The source lead.</en>',
+    poly: '<en>A closed polyline with <code>fill="linecolor"</code> is filled with the line color: this is the NMOS arrow.</en>',
+    text: '<en>A lone <code>?</code> means the instance drawn with this symbol: its name (<code>${name}</code>) is shown next to it.</en>',
+    rule: '<en>A <b>rule</b>: every instance whose model is nch uses this symbol. It is evaluated on the level it is written in, and once more on each level below.</en>',
+    idle: '<en>Hover over any line on the left to see which stroke of the symbol it draws.</en>'
   };
 
   /* ================= Example 4: rules and fill ================= */
@@ -591,13 +592,13 @@
         return { wires: w, dots: [[10, 10, 'out']], labels: [{ text: 'vdd', at: [5, 16.75], net: 'vdd' }, { text: 'out', at: [14, 10.75], net: 'out' }] };
       },
       overlays: function () {
-        return [{ id: 'own', ref: 'Gv', kind: 'text', at: [-3, 5.4], text: '<zh>写在引脚上</zh><en>on the pin</en>', anchor: 'middle', tone: 'mute' }];
+        return [{ id: 'own', ref: 'Gv', kind: 'text', at: [-3, 5.4], text: '<en>on the pin</en>', anchor: 'middle', tone: 'mute' }];
       }
     };
   }
 
   var E4_LINES = [
-    { t: '* <zh>补位：地由标准包补，端口由一条规则补</zh><en>Fill: grounds from the standard package, the port from a rule</en>' },
+    { t: '* <en>Fill: grounds from the standard package, the port from a rule</en>' },
     { t: '.model nch nmos level=1' },
     { t: 'V1 vdd 0 1.8', r: 'V1 Gv' },
     { t: 'R1 vdd out 10k', r: 'R1' },

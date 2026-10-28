@@ -1,10 +1,13 @@
 import { test, expect } from "../../tests/viewer/node_modules/@playwright/test/index.mjs";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const review = process.env.RNL_EMBED_REVIEW_DIR;
 const pageErrors = new WeakMap();
-const label = lang => lang === "zh" ? "打开 logo 的电路" : "Open the logo's circuit";
+// the button's names as the page's catalog has them, so that a revised translation needs no change here
+const zh = JSON.parse(readFileSync(new URL("../../i18n/zh/site/index.html.json", import.meta.url), "utf8"));
+const label = lang => lang === "zh" ? zh["Open the logo's circuit"] : "Open the logo's circuit";
+const close = lang => lang === "zh" ? zh["Close"] : "Close";
 
 test.beforeEach(async ({ page }) => {
   pageErrors.set(page, []);
@@ -156,7 +159,7 @@ for (const lang of ["zh", "en"]) {
     await button.click();
     expect(await frame.evaluate(() => window.logoMarker)).toBe("reused");
     await expect(panel.locator("iframe")).toHaveCount(1);
-    await panel.getByRole("button", { name: lang === "zh" ? "关闭" : "Close", exact: true }).click();
+    await panel.getByRole("button", { name: close(lang), exact: true }).click();
     await expect(panel).toBeHidden();
     await expect(button).toBeFocused();
     // Resizing while hidden must refit on reopening, without recreating or reloading the iframe.

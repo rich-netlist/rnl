@@ -74,9 +74,35 @@ pub fn bundled_files() -> std::collections::BTreeMap<String, String> {
     rnl_view::bundled().files
 }
 
+/// What a PATH directory lists in the Library: its packages and netlists, and whether it was added
+/// with sub-folders that are more than the settings search ([`crate::settings::SUBFOLDER_LIMIT`]).
+#[derive(serde::Serialize, Debug, PartialEq)]
+pub struct PathFiles {
+    files: Vec<String>,
+    truncated: bool,
+}
+
+/// The packages and netlists of a PATH directory, as lookup finds them, and with `subfolders` those
+/// of each sub-folder that the settings bring in with it ([`crate::settings::subfolders`]).
 #[tauri::command]
-pub fn path_packages(dir: String) -> Result<Vec<String>, String> {
+pub fn path_packages(dir: String, subfolders: Option<bool>) -> Result<PathFiles, String> {
     let path = Path::new(&dir);
+    let mut files = directory_files(path)?;
+    let mut truncated = false;
+    if subfolders == Some(true) {
+        let (dirs, more) = crate::settings::subfolders(path);
+        truncated = more;
+        for sub in dirs {
+            files.extend(directory_files(&sub).unwrap_or_default());
+        }
+        files.sort();
+        files.dedup();
+    }
+    Ok(PathFiles { files, truncated })
+}
+
+/// The packages and netlists of one directory, as lookup finds them there.
+fn directory_files(path: &Path) -> Result<Vec<String>, String> {
     // Report directory errors to the Library; enumeration itself uses the lookup provider's rule.
     std::fs::read_dir(path).map_err(|e| {
         if e.kind() == std::io::ErrorKind::NotFound {
@@ -87,7 +113,7 @@ pub fn path_packages(dir: String) -> Result<Vec<String>, String> {
     })?;
     let mut files = rnl_cli::provider::directory_packages(path);
     // Netlists follow the same direct/numeric-version layout as packages. Arbitrary child
-    // directories remain opt-in through Include Folder, rather than recursively searching PATH.
+    // directories are searched only for a PATH added with its sub-folders, or through Include Folder.
     for entry in std::fs::read_dir(path).map_err(|e| e.to_string())? {
         let entry = entry.map_err(|e| e.to_string())?;
         let p = entry.path();
@@ -150,21 +176,30 @@ mod tests {
         ] {
             std::fs::write(dir.join(name), "text").unwrap();
         }
+        let direct = [
+            "0.3/cell.spi",
+            "0.3/versioned.RNL",
+            "cell.NETLIST",
+            "cell.inc",
+            "cell.lib",
+            "cell.scs",
+            "cell.sp",
+            "direct.rnl",
+        ];
+        let listed = |names: &[&str]| names.iter().map(|name| rnl_cli::path_str(&dir.join(name))).collect::<Vec<_>>();
         assert_eq!(
-            path_packages(rnl_cli::path_str(&dir)).unwrap(),
-            [
-                "0.3/cell.spi",
-                "0.3/versioned.RNL",
-                "cell.NETLIST",
-                "cell.inc",
-                "cell.lib",
-                "cell.scs",
-                "cell.sp",
-                "direct.rnl"
-            ]
-            .map(|name| rnl_cli::path_str(&dir.join(name)))
+            path_packages(rnl_cli::path_str(&dir), None).unwrap(),
+            PathFiles { files: listed(&direct), truncated: false }
         );
-        assert_eq!(path_packages(rnl_cli::path_str(&dir.join("missing"))).unwrap_err(), "Directory not found.");
+        // with its sub-folders, those of `other` too
+        let mut deep = direct.to_vec();
+        deep.extend(["other/ignored.rnl", "other/ignored.sp"]);
+        deep.sort();
+        assert_eq!(
+            path_packages(rnl_cli::path_str(&dir), Some(true)).unwrap(),
+            PathFiles { files: listed(&deep), truncated: false }
+        );
+        assert_eq!(path_packages(rnl_cli::path_str(&dir.join("missing")), None).unwrap_err(), "Directory not found.");
         std::fs::remove_dir_all(dir).unwrap();
     }
     #[test]

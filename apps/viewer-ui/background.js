@@ -7,6 +7,9 @@ export const DARK_LIGHTNESS_THRESHOLD = 0.25;
 let dark = false;
 const originals = new WeakMap();
 
+/** Whether the drawing is shown on the dark background. */
+export const isDark = () => dark;
+
 export const darkLightness = (lightness) => lightness < DARK_LIGHTNESS_THRESHOLD ? 1 - lightness : lightness;
 
 /** RNL colours are CSS hex, with optional alpha. Reflect HSL L, retaining hue, saturation and alpha. */
@@ -55,20 +58,29 @@ export function colourDrawing(svg) {
   }
 }
 
-export function setBackground(mode, { persist = true } = {}) {
-  dark = mode === "dark";
-  document.body.dataset.background = dark ? "dark" : "light";
-  if (persist) save("background", dark ? "dark" : "light");
-  setCheck("background-light", !dark);
-  setCheck("background-dark", dark);
-  // Keep the normal highlight styles. Their colours obey the same rule as drawing colours.
+/**
+ * The drawing's highlights, the normal one and a selected subcircuit's (the Color Scheme's second),
+ * by the same rule as drawing colours: lightened on a dark background.
+ */
+function drawingHighlights() {
   const style = getComputedStyle(document.body);
   const canvas = document.getElementById("canvas");
   for (const name of ["select", "sub"]) {
     const colour = style.getPropertyValue(`--${name}`).trim();
     canvas.style.setProperty(`--drawing-${name}`, dark ? darkColour(colour) : colour);
   }
-  const ink = style.getPropertyValue("--fg").trim();
+}
+// globalThis: scripts/brand.test.mjs reads these colour rules in Node, which has no window
+globalThis.addEventListener?.("highlight-colors", drawingHighlights);
+
+export function setBackground(mode, { persist = true } = {}) {
+  dark = mode === "dark";
+  document.body.dataset.background = dark ? "dark" : "light";
+  if (persist) save("background", dark ? "dark" : "light");
+  setCheck("background-light", !dark);
+  setCheck("background-dark", dark);
+  drawingHighlights();
+  const ink = getComputedStyle(document.body).getPropertyValue("--fg").trim();
   document.body.style.setProperty("--drawing-ink", dark ? darkColour(ink) : ink);
   for (const svg of document.querySelectorAll("#canvas > svg, .thumb svg, .symbol-preview svg")) colourDrawing(svg);
   refreshGridColours();

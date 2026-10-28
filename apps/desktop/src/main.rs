@@ -2,14 +2,18 @@
 //! instance or a net between the drawing and the text. It can edit the text, build it again from the
 //! texts in memory, and write the files the user changed when the user saves them (decision 0011);
 //! it can solve the netlist as a preview, and save a solved copy where the user says (decision
-//! 0010). It writes no file otherwise, and as opened, objects without a position are not drawn.
+//! 0010); it saves a project's archive, and opens one into a folder, where the user says
+//! (project.rs), and exports an image of a level where the user says (export.rs). It writes no
+//! file otherwise, and as opened, objects without a position are not drawn.
 
 // Viewer is a GUI application, including local fast/debug builds. The CLI keeps its console.
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
 mod build_cache;
 mod core_thread;
+mod export;
 mod files;
+mod formats;
 mod library;
 mod load_progress;
 #[cfg(target_os = "macos")]
@@ -17,6 +21,8 @@ mod macos;
 mod menu;
 mod pool;
 mod preload;
+mod project;
+mod public_packages;
 mod session;
 mod settings;
 mod solve;
@@ -28,7 +34,6 @@ use std::sync::Mutex;
 
 use core_thread::Core;
 use files::{Edits, Saved, SavedFile};
-use rnl_cli::FsProvider;
 use rnl_view::UnplacedDrawing;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow, WindowEvent};
 use tauri_plugin_dialog::DialogExt;
@@ -114,6 +119,7 @@ async fn open_document(
     edits: Option<Edits>,
     request_id: Option<String>,
     fresh: Option<bool>,
+    formats: Option<formats::Formats>,
 ) -> Result<tauri::ipc::Response, String> {
     core.preload.cancel();
     let core = core.inner().clone();
@@ -121,6 +127,7 @@ async fn open_document(
     let cache_limit = settings.cache_limit()?;
     let library = library.snapshot()?;
     let pool = pool.unwrap_or_default();
+    let formats = formats.unwrap_or_default();
     let progress_window = window.clone();
     let doc = tauri::async_runtime::spawn_blocking(move || {
         core.run(move |drawn| {
@@ -131,7 +138,7 @@ async fn open_document(
             };
             let entry = path.to_string_lossy().into_owned();
             let held = files::held(&entry, &edits.unwrap_or_default());
-            let disk = FsProvider::new(&paths).with_search_paths(&paths);
+            let disk = crate::public_packages::provider(&paths);
             let disk = rnl_runtime::source::FilePool { files: &disk, paths: &pool };
             let layered = files::layered(&held, &disk);
             let index = library.with_edits(&held, &layered);
@@ -139,7 +146,7 @@ async fn open_document(
                 rnl_view::LibraryProvider { files: &layered, index: &index, enabled: auto_include.unwrap_or(false) };
             let provider = load_progress::LoadingProvider::new(&layered, &progress_window, request_id.as_deref());
             drawn.set_limit(cache_limit);
-            let built = drawn.build(&entry, &provider, fresh.unwrap_or(false))?;
+            let built = drawn.build(&entry, &provider, &formats, fresh.unwrap_or(false))?;
             if built.hit {
                 provider.cached();
             }
@@ -170,6 +177,7 @@ async fn open_text(
     edits: Option<Edits>,
     request_id: Option<String>,
     fresh: Option<bool>,
+    formats: Option<formats::Formats>,
 ) -> Result<tauri::ipc::Response, String> {
     core.preload.cancel();
     let core = core.inner().clone();
@@ -177,12 +185,13 @@ async fn open_text(
     let cache_limit = settings.cache_limit()?;
     let library = library.snapshot()?;
     let pool = pool.unwrap_or_default();
+    let formats = formats.unwrap_or_default();
     let progress_window = window.clone();
     let doc = tauri::async_runtime::spawn_blocking(move || {
         core.run(move |drawn| {
             let entry = format!("/{name}");
             let held = files::held_text(&entry, &text, &edits.unwrap_or_default());
-            let disk = FsProvider::new(&paths).with_search_paths(&paths);
+            let disk = crate::public_packages::provider(&paths);
             let disk = rnl_runtime::source::FilePool { files: &disk, paths: &pool };
             let files = files::layered(&held, &disk);
             let index = library.with_edits(&held, &files);
@@ -190,7 +199,7 @@ async fn open_text(
                 rnl_view::LibraryProvider { files: &files, index: &index, enabled: auto_include.unwrap_or(false) };
             let provider = load_progress::LoadingProvider::new(&files, &progress_window, request_id.as_deref());
             drawn.set_limit(cache_limit);
-            let built = drawn.build(&entry, &provider, fresh.unwrap_or(false))?;
+            let built = drawn.build(&entry, &provider, &formats, fresh.unwrap_or(false))?;
             if built.hit {
                 provider.cached();
             }
@@ -415,6 +424,10 @@ fn main() {
         .manage(Core::new())
         .manage(library::Library::default())
         .manage(startup)
+        .setup(|app| {
+            public_packages::init(app.handle());
+            Ok(())
+        })
         .menu(menu::menu)
         .on_menu_event(|app, event| match event.id().as_ref() {
             "exit" => request_exit(app),
@@ -457,10 +470,23 @@ fn main() {
             pool::dropped_files,
             pool::bundled_files,
             pool::path_packages,
+            public_packages::public_packages,
+            export::export_svg,
+            export::save_image,
+            project::read_bytes,
+            project::write_bytes,
+            project::pick_project,
+            project::pick_project_save,
+            project::pick_project_folder,
+            project::existing_files,
             library::update_library,
+            formats::formats,
+            formats::detect_format,
             menu::set_view_check,
             menu::set_command_enabled,
             menu::set_ui_language,
+            menu::ui_languages,
+            menu::ui_catalog,
             solve::solve_preview,
             solve::solver_defaults,
             solve::check_solver_options,

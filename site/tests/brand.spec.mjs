@@ -69,7 +69,7 @@ for (const lang of ["zh", "en"]) {
 }
 
 test("built favicon URLs resolve for both languages, standalone pages, viewer and standard", async ({ page, request }) => {
-  const pages = ["index.html", "language.html", "tools.html", "packages.html", "agents.html",
+  const pages = ["index.html", "language.html", "tools.html", "packages.html", "gallery.html", "agents.html", "timeline.html", "translation.html",
     "rnl-intro-standalone.html", "rnl-language-standalone.html", "rnl-tools-standalone.html",
     "spec/0.2/index.html", "spec/0.3/index.html", "spec/0.3/compare-0.2.html"];
   for (const path of [...["zh", "en"].flatMap(lang => pages.map(p => `/${lang}/${p}`)), "/viewer/"]) {

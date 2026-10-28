@@ -1,6 +1,6 @@
 * Five-transistor OTA
-*! 语义用例（差分对、电流镜、输入级里用例填角色、集合角色 $MATCHED）；布局用例展开的约束对照写死的坐标检查；
-*! 按语义选择再指派样式；本层规则盖过标准包的规则（三端符号）；端口、汇合点；求解器写回普通定义的局部点 %tc::mid。
+*! Semantic usages (a differential pair, current mirrors, usages filling the roles of the input stage, the set role of $MATCHED); the constraints that layout usages expand to, checked against fixed coordinates;
+*! styles given by semantic selection; this level's rules override the standard package's (a three-terminal symbol); ports and junctions; the solver writes back %tc::mid, a local point of an ordinary definition.
 .model nch nmos level=1
 .model pch pmos level=1
 M1 x inp tail 0 nch w=4u l=0.5u

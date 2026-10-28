@@ -208,12 +208,152 @@
           {
             "id": "&vcc",
             "global": false,
-            "port": false
+            "port": false,
+            "usages": [
+              {
+                "id": "@rnl-std-virtual.rnl:58:9#1",
+                "definition": "$SUPPLY",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&vcc",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 58,
+                "source": "body",
+                "made_in": "%ss_R1_1",
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-virtual.rnl:58:9#2",
+                "definition": "$SUPPLY",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&vcc",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 58,
+                "source": "body",
+                "made_in": "%ss_RC_1",
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-virtual.rnl:58:9#3",
+                "definition": "$SUPPLY",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&vcc",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 58,
+                "source": "body",
+                "made_in": "%ss_Vcc_1",
+                "state": "in-effect"
+              }
+            ]
           },
           {
             "id": "&0",
             "global": true,
-            "port": false
+            "port": false,
+            "usages": [
+              {
+                "id": "@rnl-std-virtual.rnl:52:9#1",
+                "definition": "$GND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 52,
+                "source": "body",
+                "made_in": "%gs_R2_2",
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-virtual.rnl:52:9#2",
+                "definition": "$GND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 52,
+                "source": "body",
+                "made_in": "%gs_RE_2",
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-virtual.rnl:52:9#3",
+                "definition": "$GND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 52,
+                "source": "body",
+                "made_in": "%gs_RL_2",
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-virtual.rnl:52:9#4",
+                "definition": "$GND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 52,
+                "source": "body",
+                "made_in": "%gs_Vcc_2",
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-virtual.rnl:52:9#5",
+                "definition": "$GND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 52,
+                "source": "body",
+                "made_in": "%gs_Vin_2",
+                "state": "in-effect"
+              }
+            ]
           },
           {
             "id": "&in",
@@ -398,6 +538,24 @@
                   "&b"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "%ss_R1_1",
+                "definition": "$SUPPLY_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#R1:1",
+                    "terminal": "p"
+                  }
+                ],
+                "file": 0,
+                "line": 34,
+                "source": "solver",
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -449,6 +607,24 @@
                 "nets": [
                   "&0"
                 ]
+              }
+            ],
+            "usages": [
+              {
+                "id": "%gs_R2_2",
+                "definition": "$GND_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#R2:2",
+                    "terminal": "n"
+                  }
+                ],
+                "file": 0,
+                "line": 29,
+                "source": "solver",
+                "state": "in-effect"
               }
             ]
           },
@@ -502,6 +678,24 @@
                   "&c"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "%ss_RC_1",
+                "definition": "$SUPPLY_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#RC:1",
+                    "terminal": "p"
+                  }
+                ],
+                "file": 0,
+                "line": 35,
+                "source": "solver",
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -553,6 +747,24 @@
                 "nets": [
                   "&0"
                 ]
+              }
+            ],
+            "usages": [
+              {
+                "id": "%gs_RE_2",
+                "definition": "$GND_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#RE:2",
+                    "terminal": "n"
+                  }
+                ],
+                "file": 0,
+                "line": 30,
+                "source": "solver",
+                "state": "in-effect"
               }
             ]
           },
@@ -710,6 +922,24 @@
                   "&0"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "%gs_RL_2",
+                "definition": "$GND_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#RL:2",
+                    "terminal": "n"
+                  }
+                ],
+                "file": 0,
+                "line": 31,
+                "source": "solver",
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -762,6 +992,40 @@
                   "&0"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "%gs_Vcc_2",
+                "definition": "$GND_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#Vcc:2",
+                    "terminal": "n"
+                  }
+                ],
+                "file": 0,
+                "line": 32,
+                "source": "solver",
+                "state": "in-effect"
+              },
+              {
+                "id": "%ss_Vcc_1",
+                "definition": "$SUPPLY_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#Vcc:1",
+                    "terminal": "p"
+                  }
+                ],
+                "file": 0,
+                "line": 36,
+                "source": "solver",
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -813,6 +1077,24 @@
                 "nets": [
                   "&0"
                 ]
+              }
+            ],
+            "usages": [
+              {
+                "id": "%gs_Vin_2",
+                "definition": "$GND_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#Vin:2",
+                    "terminal": "n"
+                  }
+                ],
+                "file": 0,
+                "line": 33,
+                "source": "solver",
+                "state": "in-effect"
               }
             ]
           },

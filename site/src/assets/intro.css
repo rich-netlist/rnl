@@ -219,6 +219,8 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible, summary:focus-v
 }
 .lang-link:hover { color: var(--ink); border-color: var(--line-2); text-decoration: none; }
 .toc-btn { display: none; }
+/* the menu of the pages: its button is for narrow screens, whose width scripts/site_i18n.py sets for each language */
+.menu-btn { display: none; }
 .progress { height: 2px; }
 .progress span { display: block; height: 100%; width: 0; background: var(--markup); }
 
@@ -269,9 +271,10 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible, summary:focus-v
 .chip {
   display: inline-flex; align-items: center; gap: 6px; min-height: 24px; padding: 1px 9px;
   border-radius: 999px; border: 1px solid var(--line); background: var(--panel);
-  font: 500 12.5px/1.4 var(--f-body); color: var(--ink-2); white-space: nowrap;
+  font: 500 12.5px/1.4 var(--f-body); color: var(--ink-2); white-space: nowrap; max-width: 100%;
 }
 .chip .ico { width: 14px; height: 14px; }
+@media (max-width: 640px) { .chip { white-space: normal; } }
 .chip-rnl { color: var(--markup); border-color: var(--markup-line); background: var(--markup-2); }
 .chip-ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 35%, transparent); background: var(--ok-2); }
 .chip-warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 35%, transparent); background: var(--warn-2); }
@@ -280,7 +283,7 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible, summary:focus-v
 .chip-mute { color: var(--ink-3); }
 
 .seg {
-  display: inline-flex; padding: 3px; gap: 2px; border-radius: 9px; border: 1px solid var(--line); background: var(--panel-2);
+  display: inline-flex; flex-wrap: wrap; max-width: 100%; padding: 3px; gap: 2px; border-radius: 9px; border: 1px solid var(--line); background: var(--panel-2);
 }
 .seg button {
   height: 30px; padding: 0 12px; border: 0; border-radius: 6px; background: transparent; color: var(--ink-2);
@@ -410,7 +413,7 @@ button.hero-logo { padding: 0; border: 0; background: none; cursor: pointer; }
 .hero-note b { color: var(--ink); font-weight: 600; }
 
 @media (max-width: 1000px) {
-  .hero-grid { grid-template-columns: 1fr; gap: 32px; }
+  .hero-grid { grid-template-columns: minmax(0, 1fr); gap: 32px; }
   .titleblock { max-width: 520px; }
   .hero-demo { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
   .hd-file { grid-column: 1 / -1; order: -1; }
@@ -667,7 +670,7 @@ button.hero-logo { padding: 0; border: 0; background: none; cursor: pointer; }
   .hub-col { display: contents; }
   .hub-wires { display: none; }
 }
-@media (max-width: 520px) { .hub { grid-template-columns: 1fr; } }
+@media (max-width: 520px) { .hub { grid-template-columns: minmax(0, 1fr); } }
 
 /* Step-by-step refinement demo */
 .journey { margin-top: 18px; }
@@ -957,6 +960,40 @@ html[lang="en"] .fam { grid-template-columns: 108px 1fr; }
 .tl li.next b { color: var(--ink-2); }
 .tl-sep { font: 700 13px var(--f-body); color: var(--markup); letter-spacing: .08em; padding-top: 6px; }
 .tl-sep::before { display: none; }
+.tl-more::before { display: none; }
+.tl-more a { font: 600 14.5px var(--f-body); color: var(--markup); text-decoration: none; }
+.tl-more a::after { content: " →"; }
+.tl-more a:hover { text-decoration: underline; }
+.tl-sheet { padding-block: 0 72px; }
+.tl-sheet .tl { max-width: 760px; }
+/* translation.html: the report of scripts/i18n/status.py */
+.ts-sheet { padding-block: 0 72px; }
+.ts-sheet h2 { margin: 0 0 8px; font: 700 24px var(--f-disp); }
+.ts-sheet h3 { margin: 32px 0 10px; font: 700 18px var(--f-disp); }
+.ts-sheet .lead { margin: 0 0 20px; max-width: 760px; }
+.ts-table { min-width: 560px; }
+.ts-table tbody th { width: auto; }
+/* glossary.html: a language's glossary (build.py, glossary_html) */
+.gs-table { min-width: 520px; }
+.gs-table tbody th small { display: block; font-weight: 400; color: var(--ink-3); }
+.gs-table td.gs-term { font-weight: 600; white-space: nowrap; }
+.gs-table td.gs-avoid { color: var(--ink-3); text-decoration: line-through; }
+.gs-languages small { color: var(--ink-3); }
+.ts-table td { width: 180px; white-space: nowrap; }
+.ts-table th small { display: block; margin-top: 2px; font: 400 12.5px var(--f-body); color: var(--ink-3); }
+.ts-count { font: 500 14px var(--f-mono); }
+.ts-stale { margin-left: 8px; font-size: 12.5px; color: var(--err); }
+.ts-bar { display: block; height: 4px; margin-top: 6px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.ts-bar i { display: block; height: 100%; background: var(--markup); }
+.ts-none { color: var(--ink-3); }
+.ts-others { margin: 0; padding-left: 20px; color: var(--ink-2); font-size: 14.5px; line-height: 1.6; }
+.ts-others li { margin-bottom: 6px; }
+.ts-errors { color: var(--err); }
+@media (max-width: 600px) {
+  .ts-table { min-width: 0; font-size: 14px; }
+  .ts-table th, .ts-table td { padding: 10px 12px; }
+  .ts-table td { width: 104px; }
+}
 .faq { display: grid; gap: 10px; }
 .faq details { border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
 .faq summary { list-style: none; cursor: pointer; padding: 14px 16px; font: 600 15.5px var(--f-body); display: flex; gap: 10px; align-items: center; }
@@ -1250,7 +1287,7 @@ html[lang="en"] .fam { grid-template-columns: 108px 1fr; }
 /* ---------- Language tour ---------- */
 
 .tour-hero { padding-block: 44px 64px; }
-.tour-h1 { margin: 16px 0 0; font: 700 clamp(44px, 7vw, 84px)/1.05 var(--f-disp); letter-spacing: -.01em; }
+.tour-h1 { margin: 16px 0 0; font: 700 clamp(44px, 7vw, 84px)/1.05 var(--f-disp); letter-spacing: -.01em; overflow-wrap: anywhere; }
 html[lang="zh-CN"] .tour-h1 { font-family: var(--f-body); font-weight: 900; letter-spacing: .02em; }
 .tour-map { list-style: none; margin: 34px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .tour-map a {
@@ -1276,6 +1313,14 @@ html[lang="zh-CN"] .tour-h1 { font-family: var(--f-body); font-weight: 900; lett
 .cl.is-cmt .tx { color: var(--t-cmt); }
 .note { margin-top: 18px; display: flex; gap: 10px; align-items: flex-start; font-size: 15px; color: var(--ink-2); max-width: 60em; }
 .note .ico { color: var(--signal); margin-top: 3px; }
+/* a page not wholly in its language says so, below its hero (site_i18n.py, decision 0015); quieter when only parts are missing */
+.translation-notice .note { margin-block: 0 24px; max-width: none; }
+/* a language translated by AI, or one with a glossary: a band under the top bar of every page (site_i18n.py, ai_notice) */
+.ai-notice, .terms-notice { border-bottom: 1px solid var(--line); background: var(--panel-2); color: var(--ink-2); font: 13.5px/1.5 var(--f-body); }
+.ai-notice p, .terms-notice p { display: flex; gap: 8px; align-items: flex-start; margin: 0 auto; padding-block: 8px; }
+.ai-notice .ico, .terms-notice .ico { flex: none; width: 16px; height: 16px; margin-top: 2px; }
+.ai-notice a, .terms-notice a { color: var(--markup); }
+.translation-notice.is-partial .note, .translation-notice.is-partial .note .ico { color: var(--ink-3); }
 .vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* T1 statement lab */

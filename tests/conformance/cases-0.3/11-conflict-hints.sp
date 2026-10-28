@@ -1,7 +1,7 @@
 * The hints of a conflict of geometric facts in a file of 0.3
-*! 几何事实冲突时，按 8.5 的顺序丢掉的那条给提示，列出和它冲突的每一组留下的事实；冲突里的每条语句也给提示，列出因它丢掉的事实（8.5）。
-*! R1 的 x 先写 0 后写 10，后写的留下；R2 的朝向写了两次，后写的留下。%row 写在最前，在 8.5 的顺序里排在坐标之后：
-*! R1、R2 写定的 y 不同，它和这两个 y 一起无解，被丢掉，提示列出这一组。
+*! When geometric facts conflict, the one dropped by the order of 8.5 gets a hint listing each group of kept facts it conflicts with; each statement in the conflict gets a hint too, listing the facts dropped because of it (8.5).
+*! R1's x is written 0 and then 10, and the later is kept; R2's orientation is written twice, and the later is kept. %row is written first, and comes after the coordinates in the order of 8.5:
+*! R1 and R2 are given different y, so with those two y it has no solution and is dropped, with a hint listing that group.
 * @RNL(type="header") { @VERSION("0.3")}
 R1 a b 1k
 R2 b 0 1k

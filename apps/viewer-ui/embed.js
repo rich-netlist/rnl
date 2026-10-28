@@ -12,6 +12,7 @@ import { startViewerApi } from "./viewer-api.js";
 import { viewerChannel } from "./window-session.js";
 import { current, doc, path, setDoc } from "./state.js";
 import { backTo, enterRow, enterRoot } from "./subcircuits.js";
+import { showOverlays } from "./usages.js";
 import { $, span, svgElement } from "./util.js";
 import { startLoading, nextPaint } from "./loading.js";
 import { m, setText, setAttr } from "./i18n.js";
@@ -53,8 +54,8 @@ function level(name, signal) {
     return null;
   }
   const row = find(0, "0", new Set());
-  if (row) return enterRow(row, { newWindow: false, signal });
-  return enterRoot(wanted, { newWindow: false, signal });
+  if (row) return enterRow(row, { newWindow: false, signal, here: true });
+  return enterRoot(wanted, { newWindow: false, signal, here: true });
 }
 
 function updateLevel() {
@@ -89,7 +90,7 @@ async function open(source, packages, isCurrent, initial, message, signal) {
   link.hidden = true;
   let built;
   try {
-    const url = message.url ?? null;
+    const url = message.url ?? null, manifest = message.manifest ?? null;
     await progress.stage("reading");
     built = await shell.build(source, undefined, progress.setStage, packages, signal);
     if (!isCurrent()) return;
@@ -101,7 +102,9 @@ async function open(source, packages, isCurrent, initial, message, signal) {
     adoptSource(source);
     showBuilt(built, false);
     document.title = `${built.name} - RNL Viewer`;
-    if (initial && params.has("level")) await level(params.get("level"), signal);
+    // the address's level first; else the manifest's, where "(top)" is the level it opens on
+    const wanted = (initial && params.get("level")) || source.external?.level;
+    if (wanted && wanted !== "(top)") await level(wanted, signal);
     if (!isCurrent()) return;
     // A short embed fits visible ink, so its first view needs the drawing's actual font metrics.
     if (getComputedStyle($("canvas")).getPropertyValue("--fit-content").trim() === "1") {
@@ -112,10 +115,11 @@ async function open(source, packages, isCurrent, initial, message, signal) {
     fit();
     await nextPaint();
     if (!isCurrent()) return;
-    if (url !== null) {
+    if (url !== null || manifest !== null) {
       const full = new URL(location.href);
       full.searchParams.delete("embed");
-      full.searchParams.set("url", url);
+      full.searchParams.delete(url !== null ? "manifest" : "url");
+      full.searchParams.set(url !== null ? "url" : "manifest", url ?? manifest);
       link.href = full.href;
       link.hidden = false;
     }
@@ -190,6 +194,8 @@ export async function startEmbed() {
     const grid = params.get("grid");
     setGrid({ shown: grid === "dots" || grid === "lines", style: grid === "lines" ? "lines" : "dots" });
     setHoverNames(params.get("names") !== "0");
+    // an embedded drawing starts without the usage frames and with the current directions, unless the address says otherwise
+    showOverlays({ usages: params.get("usages") === "1", currents: params.get("currents") !== "0" });
     window.addEventListener("viewer-level", updateLevel);
     api = startViewerApi({ version, open, onError: message => error(message.replace(/^Could not open the netlist: /, "")), begin(signal) {
       const operation = beginOpenOperation();
@@ -204,10 +210,17 @@ export async function startEmbed() {
           case "background":
             if (message.value === "light" || message.value === "dark") setBackground(message.value);
             break;
+          case "usages":
+            if (typeof message.value === "boolean") showOverlays({ usages: message.value });
+            break;
+          case "currents":
+            if (typeof message.value === "boolean") showOverlays({ currents: message.value });
+            break;
           default: break;
         }
     } });
     if (params.has("url")) void api.open({ url: params.get("url") }, true);
+    else if (params.has("manifest")) void api.open({ manifest: params.get("manifest") }, true);
   } catch (reason) {
     error(reason);
     // Initialization can fail before the shared API has announced readiness.

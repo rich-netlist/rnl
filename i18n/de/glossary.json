@@ -1,0 +1,761 @@
+{
+ "language": "de",
+ "about": "Terms of this language's translations: the English term, its rendering here, and variants not to use. English terms are the only normative ones (decision 0016); this list is a convention for translating and talking about RNL, not part of the standard. kind: rnl (a term of RNL), circuit (of circuit design), command (a command or label of an interface), general.",
+ "draft": true,
+ "terms": [
+  {
+   "en": "alias",
+   "term": "Alias",
+   "kind": "rnl"
+  },
+  {
+   "en": "alias package",
+   "term": "Alias-Paket",
+   "kind": "rnl"
+  },
+  {
+   "en": "apply",
+   "sense": "definition",
+   "term": "anwenden",
+   "kind": "rnl"
+  },
+  {
+   "en": "bend",
+   "term": "Knick",
+   "kind": "rnl"
+  },
+  {
+   "en": "body",
+   "term": "Rumpf",
+   "kind": "rnl"
+  },
+  {
+   "en": "bounding box / box",
+   "sense": "the box of a symbol",
+   "term": "Rahmen",
+   "kind": "rnl",
+   "note": "One text says Begrenzungsrahmen (bounding box)."
+  },
+  {
+   "en": "bounding box / box",
+   "sense": "the rectangle around an ellipse",
+   "term": "umschließender Rahmen",
+   "kind": "rnl"
+  },
+  {
+   "en": "brace",
+   "term": "geschweifte Klammer",
+   "kind": "rnl"
+  },
+  {
+   "en": "branch",
+   "sense": "wire routing",
+   "term": "Verzweigung",
+   "kind": "rnl",
+   "note": "Zweig is the branch structure of the standard package."
+  },
+  {
+   "en": "bundle",
+   "term": "Bündel",
+   "kind": "rnl"
+  },
+  {
+   "en": "comment",
+   "term": "Kommentar",
+   "kind": "rnl"
+  },
+  {
+   "en": "constraint",
+   "term": "Bedingung",
+   "kind": "rnl"
+  },
+  {
+   "en": "coordinate",
+   "term": "Koordinate",
+   "kind": "rnl"
+  },
+  {
+   "en": "core",
+   "term": "Kern",
+   "kind": "rnl"
+  },
+  {
+   "en": "crossing",
+   "sense": "wires",
+   "term": "Kreuzung",
+   "kind": "rnl"
+  },
+  {
+   "en": "definition",
+   "term": "Definition",
+   "kind": "rnl"
+  },
+  {
+   "en": "diagnostic",
+   "term": "Diagnosemeldung",
+   "kind": "rnl"
+  },
+  {
+   "en": "drawing",
+   "sense": "the schematic as a whole",
+   "term": "Zeichnung",
+   "kind": "rnl",
+   "note": "2 texts render \"textbook drawing\" as Lehrbuchlayout."
+  },
+  {
+   "en": "drawing",
+   "sense": "the drawing shown, its canvas",
+   "term": "Zeichnung",
+   "kind": "rnl",
+   "note": "Zeichenfläche for the canvas-only embedding mode."
+  },
+  {
+   "en": "drawing layer",
+   "term": "Zeichenebene",
+   "kind": "rnl"
+  },
+  {
+   "en": "dropped",
+   "sense": "fact status",
+   "term": "verworfen",
+   "kind": "rnl"
+  },
+  {
+   "en": "evaluate",
+   "sense": "RNL runtime",
+   "term": "auswerten",
+   "kind": "rnl"
+  },
+  {
+   "en": "fact",
+   "term": "Fakt",
+   "kind": "rnl"
+  },
+  {
+   "en": "fill-in",
+   "term": "Ergänzung",
+   "kind": "rnl"
+  },
+  {
+   "en": "free text",
+   "term": "Freitext",
+   "kind": "rnl"
+  },
+  {
+   "en": "header record",
+   "term": "Kopfeintrag",
+   "kind": "rnl"
+  },
+  {
+   "en": "hierarchy",
+   "term": "Hierarchie",
+   "kind": "rnl"
+  },
+  {
+   "en": "horizontal",
+   "term": "waagerecht",
+   "kind": "rnl"
+  },
+  {
+   "en": "index",
+   "term": "Index",
+   "kind": "rnl"
+  },
+  {
+   "en": "instance",
+   "term": "Instanz",
+   "kind": "rnl"
+  },
+  {
+   "en": "junction / junction dot",
+   "term": "Knotenpunkt",
+   "kind": "rnl"
+  },
+  {
+   "en": "kept",
+   "sense": "fact status",
+   "term": "behalten",
+   "kind": "rnl",
+   "note": "The language page words it as \"bleibt erhalten\"."
+  },
+  {
+   "en": "key",
+   "sense": "TEXT identifier",
+   "term": "key",
+   "kind": "rnl",
+   "note": "Kept as the parameter name key."
+  },
+  {
+   "en": "label",
+   "term": "Beschriftung",
+   "kind": "rnl"
+  },
+  {
+   "en": "layout",
+   "term": "Layout",
+   "kind": "rnl"
+  },
+  {
+   "en": "level",
+   "term": "Ebene",
+   "kind": "rnl"
+  },
+  {
+   "en": "manifest",
+   "term": "Manifest",
+   "kind": "rnl"
+  },
+  {
+   "en": "mirrored pair",
+   "sense": "the structure, a mirrored pair",
+   "term": "gespiegeltes Paar",
+   "avoid": [
+    "Spiegelpaar"
+   ],
+   "kind": "rnl",
+   "note": "1 viewer text uses Spiegelpaar."
+  },
+  {
+   "en": "mirrored pair",
+   "sense": "the symmetry",
+   "term": "Symmetrie",
+   "kind": "rnl",
+   "note": "The gallery lists the $MIRRORED structure as Spiegelung."
+  },
+  {
+   "en": "name",
+   "term": "Name",
+   "kind": "rnl"
+  },
+  {
+   "en": "net",
+   "term": "Netz",
+   "kind": "rnl"
+  },
+  {
+   "en": "netlist",
+   "term": "Netzliste",
+   "kind": "rnl"
+  },
+  {
+   "en": "netlist body",
+   "term": "Netzlistenrumpf",
+   "kind": "rnl"
+  },
+  {
+   "en": "objective",
+   "term": "Ziel",
+   "kind": "rnl",
+   "note": "4 texts use the full form Optimierungsziel."
+  },
+  {
+   "en": "orientation code",
+   "term": "Ausrichtungscode",
+   "kind": "rnl"
+  },
+  {
+   "en": "package",
+   "term": "Paket",
+   "kind": "rnl"
+  },
+  {
+   "en": "phase",
+   "term": "Phase",
+   "kind": "rnl"
+  },
+  {
+   "en": "pin",
+   "term": "Pin",
+   "kind": "rnl"
+  },
+  {
+   "en": "port",
+   "term": "Port",
+   "kind": "rnl"
+  },
+  {
+   "en": "primitive",
+   "term": "Grundform",
+   "kind": "rnl"
+  },
+  {
+   "en": "priority",
+   "term": "Priorität",
+   "kind": "rnl"
+  },
+  {
+   "en": "private parts",
+   "term": "interne Teilform",
+   "kind": "rnl"
+  },
+  {
+   "en": "queue",
+   "term": "Warteschlange",
+   "kind": "rnl"
+  },
+  {
+   "en": "record",
+   "term": "Eintrag",
+   "kind": "rnl"
+  },
+  {
+   "en": "record header",
+   "term": "Eintragskopf",
+   "kind": "rnl"
+  },
+  {
+   "en": "role",
+   "term": "Rolle",
+   "kind": "rnl"
+  },
+  {
+   "en": "routing / route",
+   "sense": "the router's work",
+   "term": "Leitungsführung",
+   "kind": "rnl",
+   "note": "Routing modes are Leitungsmodi."
+  },
+  {
+   "en": "routing / route",
+   "sense": "the path of a drawn wire",
+   "term": "Pfad",
+   "kind": "rnl"
+  },
+  {
+   "en": "schematic",
+   "term": "Schaltplan",
+   "kind": "rnl"
+  },
+  {
+   "en": "selection",
+   "term": "Auswahl",
+   "kind": "rnl",
+   "note": "The same word as choosing in the interface; 2 texts add (Selection) to mark the RNL term."
+  },
+  {
+   "en": "set",
+   "term": "Menge",
+   "kind": "rnl"
+  },
+  {
+   "en": "solver",
+   "term": "Solver",
+   "kind": "rnl",
+   "note": "Kept in English; to solve is lösen."
+  },
+  {
+   "en": "standard package",
+   "term": "Standardpaket",
+   "kind": "rnl"
+  },
+  {
+   "en": "standard series",
+   "term": "Standardserie",
+   "kind": "rnl"
+  },
+  {
+   "en": "statement",
+   "term": "Anweisung",
+   "kind": "rnl"
+  },
+  {
+   "en": "structure",
+   "term": "Struktur",
+   "kind": "rnl"
+  },
+  {
+   "en": "subject",
+   "term": "Subjekt",
+   "kind": "rnl"
+  },
+  {
+   "en": "symbol",
+   "term": "Symbol",
+   "kind": "rnl"
+  },
+  {
+   "en": "terminal",
+   "term": "Anschluss",
+   "kind": "rnl"
+  },
+  {
+   "en": "text",
+   "sense": "the text of a file or netlist",
+   "term": "Text",
+   "kind": "rnl"
+  },
+  {
+   "en": "text",
+   "sense": "text drawn in a schematic (@TEXT, labels)",
+   "term": "Text",
+   "kind": "rnl"
+  },
+  {
+   "en": "tier",
+   "sense": "solver objectives",
+   "term": "Stufe",
+   "avoid": [
+    "Ebene"
+   ],
+   "kind": "rnl"
+  },
+  {
+   "en": "union",
+   "term": "Vereinigungsmenge",
+   "kind": "rnl"
+  },
+  {
+   "en": "usage",
+   "term": "Anwendung",
+   "avoid": [
+    "Anwendungsobjekt"
+   ],
+   "kind": "rnl",
+   "note": "2 texts say Anwendungsobjekt to tell the usage from the act of applying."
+  },
+  {
+   "en": "verb",
+   "term": "Verb",
+   "kind": "rnl"
+  },
+  {
+   "en": "vertical",
+   "term": "senkrecht",
+   "kind": "rnl"
+  },
+  {
+   "en": "wire",
+   "term": "Leitung",
+   "kind": "rnl"
+  },
+  {
+   "en": "bias source",
+   "term": "Bias-Quelle",
+   "kind": "circuit"
+  },
+  {
+   "en": "bulk",
+   "term": "Bulk",
+   "kind": "circuit",
+   "note": "Kept in English as in German EDA usage; the terminal is Bulk-Anschluss."
+  },
+  {
+   "en": "bus",
+   "term": "Bus",
+   "kind": "circuit"
+  },
+  {
+   "en": "cascade",
+   "term": "Kaskade",
+   "kind": "circuit"
+  },
+  {
+   "en": "common-emitter stage",
+   "term": "Emitterschaltung",
+   "kind": "circuit"
+  },
+  {
+   "en": "connectivity",
+   "term": "Verbindungen",
+   "kind": "circuit",
+   "note": "Rendered in the plural; elektrische Verbindung where the English says electrical."
+  },
+  {
+   "en": "D flip-flop",
+   "term": "D-Flipflop",
+   "kind": "circuit"
+  },
+  {
+   "en": "device",
+   "term": "Bauteil",
+   "kind": "circuit"
+  },
+  {
+   "en": "differential pair",
+   "term": "Differenzpaar",
+   "kind": "circuit"
+  },
+  {
+   "en": "diode",
+   "term": "Diode",
+   "kind": "circuit"
+  },
+  {
+   "en": "drain",
+   "term": "Drain",
+   "kind": "circuit",
+   "note": "Kept in English as in German electronics usage."
+  },
+  {
+   "en": "five-transistor OTA",
+   "term": "Fünf-Transistor-OTA",
+   "kind": "circuit"
+  },
+  {
+   "en": "function / signal-flow block",
+   "term": "Funktionsblock",
+   "kind": "circuit",
+   "note": "A block of a signal flow: Signalflussblock."
+  },
+  {
+   "en": "gate",
+   "term": "Gate",
+   "kind": "circuit",
+   "note": "Kept in English as in German electronics usage."
+  },
+  {
+   "en": "ground",
+   "sense": "the ground net",
+   "term": "Masse",
+   "kind": "circuit"
+  },
+  {
+   "en": "ground",
+   "sense": "the ground symbol",
+   "term": "Masse",
+   "kind": "circuit",
+   "note": "Massesymbol where the English says ground symbol."
+  },
+  {
+   "en": "logic gate",
+   "term": "Logikgatter",
+   "kind": "circuit"
+  },
+  {
+   "en": "magnitude response",
+   "term": "Amplitudengang",
+   "kind": "circuit"
+  },
+  {
+   "en": "no-connect mark",
+   "term": "Nicht-verbunden-Markierung",
+   "kind": "circuit"
+  },
+  {
+   "en": "passive part",
+   "term": "passives Bauteil",
+   "kind": "circuit"
+  },
+  {
+   "en": "primitive",
+   "sense": "Spectre device",
+   "term": "Grundelement",
+   "kind": "circuit"
+  },
+  {
+   "en": "signal",
+   "term": "Signal",
+   "kind": "circuit"
+  },
+  {
+   "en": "simulation / simulate",
+   "term": "Simulation",
+   "kind": "circuit",
+   "note": "The verb is simulieren."
+  },
+  {
+   "en": "simulator",
+   "term": "Simulator",
+   "kind": "circuit"
+  },
+  {
+   "en": "tail / tail transistor",
+   "term": "Fußtransistor",
+   "kind": "circuit",
+   "note": "Short: Fuß."
+  },
+  {
+   "en": "transconductor",
+   "term": "Transkonduktanzverstärker",
+   "kind": "circuit"
+  },
+  {
+   "en": "transistor",
+   "term": "Transistor",
+   "kind": "circuit"
+  },
+  {
+   "en": "Add PATH",
+   "term": "PATH hinzufügen",
+   "kind": "command"
+  },
+  {
+   "en": "Always",
+   "sense": "file association",
+   "term": "Immer",
+   "kind": "command"
+  },
+  {
+   "en": "Apply and Exit Editing",
+   "term": "Anwenden und Bearbeitung beenden",
+   "kind": "command"
+  },
+  {
+   "en": "Auto Include",
+   "term": "Automatisch einbinden",
+   "avoid": [
+    "Auto-Include"
+   ],
+   "kind": "command",
+   "note": "2 timeline texts keep Auto-Include."
+  },
+  {
+   "en": "Clear Cache",
+   "term": "Cache leeren",
+   "kind": "command"
+  },
+  {
+   "en": "Collapse",
+   "term": "Einklappen",
+   "kind": "command"
+  },
+  {
+   "en": "double tap",
+   "term": "Doppeltippen",
+   "kind": "command"
+  },
+  {
+   "en": "eject",
+   "sense": "disk image",
+   "term": "auswerfen",
+   "kind": "command"
+  },
+  {
+   "en": "Exclude",
+   "sense": "Library command",
+   "term": "Ausschließen",
+   "kind": "command"
+  },
+  {
+   "en": "Exit / quit",
+   "sense": "application or editing",
+   "term": "Beenden",
+   "kind": "command"
+  },
+  {
+   "en": "Find",
+   "sense": "text search",
+   "term": "suchen",
+   "kind": "command",
+   "note": "The menu is In Netzliste suchen; German uses suchen for both Find and Search."
+  },
+  {
+   "en": "Fit to Window",
+   "term": "An Fenster anpassen",
+   "kind": "command"
+  },
+  {
+   "en": "Get Info",
+   "sense": "macOS",
+   "term": "Informationen",
+   "kind": "command"
+  },
+  {
+   "en": "Help",
+   "sense": "menu",
+   "term": "Hilfe",
+   "kind": "command"
+  },
+  {
+   "en": "Library",
+   "sense": "panel",
+   "term": "Bibliothek",
+   "kind": "command"
+  },
+  {
+   "en": "More info",
+   "sense": "Windows SmartScreen",
+   "term": "Weitere Informationen",
+   "kind": "command"
+  },
+  {
+   "en": "Open Anyway",
+   "sense": "macOS",
+   "term": "Dennoch öffnen",
+   "kind": "command",
+   "note": "The viewer's own New Window dialog says Trotzdem öffnen."
+  },
+  {
+   "en": "Open URL",
+   "term": "URL öffnen",
+   "kind": "command"
+  },
+  {
+   "en": "Open With",
+   "sense": "macOS",
+   "term": "Öffnen mit",
+   "kind": "command"
+  },
+  {
+   "en": "Open With",
+   "sense": "Windows",
+   "term": "Öffnen mit",
+   "kind": "command"
+  },
+  {
+   "en": "Overwrite",
+   "sense": "file",
+   "term": "Überschreiben",
+   "kind": "command"
+  },
+  {
+   "en": "Problems",
+   "sense": "panel",
+   "term": "Probleme",
+   "kind": "command"
+  },
+  {
+   "en": "Reload",
+   "term": "Neu laden",
+   "kind": "command"
+  },
+  {
+   "en": "Replace",
+   "sense": "file",
+   "term": "Ersetzen",
+   "kind": "command"
+  },
+  {
+   "en": "Reset",
+   "term": "Zurücksetzen",
+   "kind": "command"
+  },
+  {
+   "en": "Save As",
+   "term": "Speichern unter",
+   "kind": "command"
+  },
+  {
+   "en": "Save Solved Copy As",
+   "term": "Gelöste Kopie speichern unter",
+   "kind": "command"
+  },
+  {
+   "en": "scroll",
+   "term": "scrollen",
+   "kind": "command"
+  },
+  {
+   "en": "Search",
+   "term": "suchen",
+   "kind": "command",
+   "note": "durchsuchen when searching through a collection."
+  },
+  {
+   "en": "Trash",
+   "sense": "macOS",
+   "term": "Papierkorb",
+   "kind": "command"
+  },
+  {
+   "en": "Undo",
+   "term": "Rückgängig",
+   "kind": "command"
+  },
+  {
+   "en": "uninstall",
+   "term": "deinstallieren",
+   "kind": "command"
+  }
+ ]
+}

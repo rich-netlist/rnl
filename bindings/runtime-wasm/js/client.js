@@ -24,7 +24,9 @@ import { requestText } from "./core.js";
  *   drawings, `{ svg?, primitives? }` each, of the objects without a position that the last build
  *   with `lazy_unplaced` listed, as the request names them; rejects when none was built, an object
  *   is not there, or `names` are not those of the build.
- * @property {(request: {library: {reload?: boolean, refresh?: string[]}, pool: string[], files: Record<string, string>}) => Promise<string[]>} library Update the viewer library index; returns read errors.
+ * @property {(request: {library: {reload?: boolean, refresh?: string[]}, pool: string[], files: Record<string, string>, formats?: Record<string, string>}) => Promise<string[]>} library Update the viewer library index, reading its files with the formats set for them; returns read errors.
+ * @property {(request: import("./core.js").FormatsRequest) => Promise<{ list: object[], detected: Record<string, string> }>} formats
+ *   The formats a file can be read with, and the format each file of `detect` has when none is set.
  * @property {() => void} terminate Stop the Worker; calls still waiting, and later ones, reject.
  */
 
@@ -91,6 +93,7 @@ export function startCore(options = {}) {
     catalog: (request) => send(request, "catalog"),
     drawings: (request) => send(request, "drawings"),
     library: (request) => send(request, "library"),
+    formats: (request) => send(request, "formats"),
     terminate() {
       stop(new Error("The core was stopped."));
       worker.then((w) => w.terminate(), () => {});

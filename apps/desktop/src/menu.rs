@@ -13,6 +13,9 @@ use tauri::{AppHandle, Manager, State, Wry};
 /// The command table: the menus, their items, and the keys of the items.
 const COMMANDS: &str = include_str!("../../viewer-ui/commands.json");
 
+// UI_LANGUAGES, the languages of the interface besides English, from i18n/ (build.rs, decision 0015)
+include!(concat!(env!("OUT_DIR"), "/ui_languages.rs"));
+
 /// This platform, as the command table names it: an item that names its platforms is only shown
 /// when they include this one.
 const PLATFORM: &str = "desktop";
@@ -27,6 +30,14 @@ struct Table {
 struct TableMenu {
     label: String,
     items: Vec<Entry>,
+    /// Whether it lists the languages: its items, English, and then each of [`UI_LANGUAGES`].
+    #[serde(default)]
+    languages: bool,
+    /// An English word that follows its translated label, in parentheses, when the interface is not
+    /// in English: on the View menu and its Language submenu, so that a user who reads none of the
+    /// interface finds the way back. The table's `icon` is the page's alone: a submenu has none here.
+    #[serde(default)]
+    english: Option<String>,
 }
 
 /// A menu entry: a submenu, which has entries of its own, a command, or `"-"` for a separator.
@@ -147,7 +158,17 @@ fn entries(items: &[Entry], windows: bool) -> Vec<Shown> {
             }
             Entry::Submenu(menu) => match entries(&menu.items, windows) {
                 inner if inner.is_empty() => continue,
-                inner => Shown::Submenu(menu.label.clone(), inner),
+                mut inner => {
+                    if menu.languages {
+                        inner.extend(UI_LANGUAGES.iter().map(|(code, _, name, _, _)| Shown::Item {
+                            id: format!("language-{code}"),
+                            text: (*name).into(),
+                            accelerator: None,
+                            check: true,
+                        }));
+                    }
+                    Shown::Submenu(menu.label.clone(), inner)
+                }
             },
             Entry::Command(c) if c.platforms.as_ref().is_some_and(|p| !p.iter().any(|p| p == PLATFORM)) => continue,
             Entry::Command(c) if c.windows_only && !windows => continue,
@@ -196,20 +217,55 @@ pub fn menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
 
 type LabelList = Vec<(MenuItemKind<Wry>, String)>;
 pub struct Labels(Mutex<(String, LabelList)>);
-static CHINESE: LazyLock<HashMap<String, String>> = LazyLock::new(|| {
-    serde_json::from_str(include_str!("../../viewer-ui/locales/zh-CN.json")).expect("Chinese UI catalog")
+/// The catalog of each language of the interface, by the code the page knows it by, without the
+/// entries that have no translation yet (null).
+static CATALOGS: LazyLock<HashMap<&str, HashMap<String, String>>> = LazyLock::new(|| {
+    UI_LANGUAGES
+        .iter()
+        .map(|(_, code, _, _, json)| {
+            let catalog: HashMap<String, Option<String>> = serde_json::from_str(json).expect("a UI catalog");
+            (*code, catalog.into_iter().filter_map(|(key, text)| Some((key, text?))).collect())
+        })
+        .collect()
+});
+
+/// The English word that follows the translated label of a menu or a submenu, by its label in the
+/// table (`english` of commands.json): the same in every language, and no text of the catalogs.
+static ENGLISH_WORDS: LazyLock<HashMap<String, String>> = LazyLock::new(|| {
+    fn collect(menu: &TableMenu, words: &mut HashMap<String, String>) {
+        if let Some(word) = &menu.english {
+            words.insert(menu.label.clone(), word.clone());
+        }
+        for entry in &menu.items {
+            if let Entry::Submenu(inner) = entry {
+                collect(inner, words);
+            }
+        }
+    }
+    let table: Table = serde_json::from_str(COMMANDS).expect("commands.json is a command table");
+    let mut words = HashMap::new();
+    for menu in &table.menus {
+        collect(menu, &mut words);
+    }
+    words
 });
 
 fn translated(language: &str, source: &str) -> String {
     let (label, keys) = source.split_once('\t').map_or((source, None), |(a, b)| (a, Some(b)));
-    let label = if language == "zh-CN" { CHINESE.get(label).map_or(label, String::as_str) } else { label };
-    keys.map_or_else(|| label.to_string(), |keys| format!("{label}\t{keys}"))
+    let mut text =
+        CATALOGS.get(language).and_then(|catalog| catalog.get(label)).map_or(label, String::as_str).to_string();
+    if language != "en" {
+        if let Some(word) = ENGLISH_WORDS.get(label) {
+            text = format!("{text} ({word})");
+        }
+    }
+    keys.map_or_else(|| text.clone(), |keys| format!("{text}\t{keys}"))
 }
 
 /// Change labels in place: command IDs, accelerators, enabled state and check marks stay intact.
 #[tauri::command]
 pub fn set_ui_language(labels: State<'_, Labels>, language: String) -> Result<(), String> {
-    if language != "en" && language != "zh-CN" {
+    if language != "en" && !CATALOGS.contains_key(language.as_str()) {
         return Err("Unsupported UI language".into());
     }
     let mut state = labels.0.lock().map_err(|e| e.to_string())?;
@@ -225,6 +281,31 @@ pub fn set_ui_language(labels: State<'_, Labels>, language: String) -> Result<()
     }
     state.0 = language;
     Ok(())
+}
+
+/// A language of the interface, as the page takes it (i18n.js): the code it knows it by, the code of
+/// i18n/languages.json, its name in itself, and the first parts of the system languages that ask for it.
+#[derive(serde::Serialize)]
+pub struct UiLanguage {
+    code: &'static str,
+    lang: &'static str,
+    name: &'static str,
+    matches: &'static [&'static str],
+}
+
+/// The languages of the interface, English first.
+#[tauri::command]
+pub fn ui_languages() -> Vec<UiLanguage> {
+    let english = UiLanguage { code: "en", lang: "en", name: "English", matches: &["en"] };
+    std::iter::once(english)
+        .chain(UI_LANGUAGES.iter().map(|&(lang, code, name, matches, _)| UiLanguage { code, lang, name, matches }))
+        .collect()
+}
+
+/// The catalog of a language of the interface, {English: translation}.
+#[tauri::command]
+pub fn ui_catalog(language: String) -> Result<HashMap<String, String>, String> {
+    CATALOGS.get(language.as_str()).cloned().ok_or_else(|| format!("No UI catalog for {language}"))
 }
 
 pub fn text(app: &AppHandle, source: &str) -> String {
@@ -372,6 +453,25 @@ mod tests {
     }
 
     #[test]
+    fn the_view_and_language_menus_have_their_english_word_in_every_other_language() {
+        // the word is the table's, the translation the catalog's; English has the label as it is
+        assert_eq!(translated("en", "&Language"), "&Language");
+        assert_eq!(translated("en", "&View"), "&View");
+        assert!(!UI_LANGUAGES.is_empty());
+        for (_, code, _, _, _) in UI_LANGUAGES {
+            let catalog = &CATALOGS[code];
+            for (label, word) in [("&Language", "Language"), ("&View", "View")] {
+                let own = catalog.get(label).map_or(label, String::as_str);
+                assert_eq!(translated(code, label), format!("{own} ({word})"), "{code} {label}");
+            }
+            // another menu, and a command's keys, are as they were
+            assert_eq!(translated(code, "&Edit"), catalog.get("&Edit").map_or("&Edit", String::as_str));
+            let own = catalog.get("&Open File...").map_or("&Open File...", String::as_str);
+            assert_eq!(translated(code, "&Open File...\tCtrl+O"), format!("{own}\tCtrl+O"));
+        }
+    }
+
+    #[test]
     fn macos_has_one_application_about_and_quit_and_keeps_control_q_for_editing() {
         let menus = macos_plan(&table());
         assert_eq!(menus[0].0, "RNL Viewer");
@@ -430,11 +530,11 @@ mod tests {
         Shown::Submenu("Side P&anels".into(), entries)
     }
 
+    /// English, and each language the registry publishes, by its name in itself (build.rs)
     fn languages() -> Shown {
-        Shown::Submenu(
-            "&Language".into(),
-            vec![check("language-en", "English", None), check("language-zh", "简体中文", None)],
-        )
+        let mut items = vec![check("language-en", "English", None)];
+        items.extend(UI_LANGUAGES.iter().map(|(lang, _, name, _, _)| check(&format!("language-{lang}"), name, None)));
+        Shown::Submenu("&Language".into(), items)
     }
 
     /// The Edit menu (decision 0011): switching the text to edit, a check item, and applying its
@@ -457,16 +557,12 @@ mod tests {
                 switch,
                 apply,
                 item("discard-edits", "&Discard Changes", None),
-                item("find-text", if tabbed { "&Find in Netlist…\tCtrl+F" } else { "&Find in Netlist…" }, None),
+                item("find-text", if tabbed { "&Find in Netlist...\tCtrl+F" } else { "&Find in Netlist..." }, None),
                 Shown::Separator,
                 item("descend", if tabbed { "Open &Subcircuit\tE" } else { "Open &Subcircuit" }, None),
                 item(
                     "descend-new-window",
-                    if tabbed {
-                        "Open Subcircuit in New &Window…\tShift+E"
-                    } else {
-                        "Open Subcircuit in New &Window…"
-                    },
+                    if tabbed { "Open Subcircuit in New &Window\tShift+E" } else { "Open Subcircuit in New &Window" },
                     None,
                 ),
                 item("ascend", if tabbed { "&Up to Parent Level\tCtrl+E" } else { "&Up to Parent Level" }, None),
@@ -507,6 +603,7 @@ mod tests {
             "&Help".to_string(),
             vec![
                 item("shortcuts", "&Keyboard Shortcuts...", None),
+                item("public-packages", "Public &Packages...", None),
                 updates,
                 Shown::Separator,
                 Shown::About("&About RNL Viewer".into()),
@@ -526,16 +623,22 @@ mod tests {
                     item("open", "&Open File...\tCtrl+O", None),
                     item("include-file", "&Include File...", None),
                     item("include-folder", "Include &Folder...", None),
+                    item("open-project", "Open Projec&t...", None),
                     item("load-clipboard", "Load from &Clipboard...\tCtrl+Shift+V", None),
                     item("reload", "&Reload\tF5", None),
                     item("reload-library", "Reload &Library", None),
                     check("toggle-auto-include", "&Auto Include", None),
-                    item("memory-cache", "Memory &Cache…", None),
+                    item("memory-cache", "Memory &Cache...", None),
                     Shown::Separator,
                     item("save", "&Save\tCtrl+S", None),
                     item("save-as", "Save &As...", None),
                     item("save-utf8", "Save Changes Using UTF-8", None),
                     item("save-as-utf8", "Save As UTF-8...", None),
+                    item("save-project", "Save Pro&ject...", None),
+                    Shown::Submenu(
+                        "Export Ima&ge".into(),
+                        vec![item("export-svg", "Export &SVG...", None), item("export-png", "Export &PNG...", None)],
+                    ),
                     Shown::Separator,
                     item("file-associations", "File &Associations...", None),
                     item("exit", "E&xit", None),
@@ -556,7 +659,7 @@ mod tests {
                     grid("Show &Grid\tG"),
                     check("toggle-hover-names", "Show &Names on Hover", None),
                     check("toggle-usages", "Show &Usages\tCtrl+R", None),
-                    check("toggle-currents", "Show Current &Directions", None),
+                    check("toggle-currents", "Show Current &Directions\tShift+R", None),
                     languages(),
                     Shown::Separator,
                     panels(true),
@@ -581,16 +684,22 @@ mod tests {
                     item("open", "&Open File...", Some("CmdOrCtrl+O")),
                     item("include-file", "&Include File...", None),
                     item("include-folder", "Include &Folder...", None),
+                    item("open-project", "Open Projec&t...", None),
                     item("load-clipboard", "Load from &Clipboard...", Some("CmdOrCtrl+Shift+V")),
                     item("reload", "&Reload", Some("F5")),
                     item("reload-library", "Reload &Library", None),
                     check("toggle-auto-include", "&Auto Include", None),
-                    item("memory-cache", "Memory &Cache…", None),
+                    item("memory-cache", "Memory &Cache...", None),
                     Shown::Separator,
                     item("save", "&Save", Some("CmdOrCtrl+S")),
                     item("save-as", "Save &As...", None),
                     item("save-utf8", "Save Changes Using UTF-8", None),
                     item("save-as-utf8", "Save As UTF-8...", None),
+                    item("save-project", "Save Pro&ject...", None),
+                    Shown::Submenu(
+                        "Export Ima&ge".into(),
+                        vec![item("export-svg", "Export &SVG...", None), item("export-png", "Export &PNG...", None)],
+                    ),
                     Shown::Separator,
                     item("exit", "E&xit", None),
                 ],

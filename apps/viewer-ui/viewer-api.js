@@ -1,8 +1,8 @@
 // One protocol for iframe canvases and the complete web viewer. UI adapters own presentation.
 import { viewerChannel } from "./window-session.js";
 import { shell } from "./shell.js";
-import { sourceFromUrl } from "./shells/web.js";
-import { API_FEATURES, MAX_OPEN_BYTES } from "./viewer-api-contract.js";
+import { sourceFromManifest, sourceFromUrl } from "./shells/web.js";
+import { API_FEATURES, EMBED_FEATURES, MAX_OPEN_BYTES } from "./viewer-api-contract.js";
 
 function validateOpen(message) {
   const bytes = new TextEncoder().encode(JSON.stringify(message)).byteLength;
@@ -16,8 +16,10 @@ function validateOpen(message) {
   let source;
   if (typeof message.text === "string" && typeof message.name === "string" && message.name.trim() && message.name.length <= 1024)
     source = { name: message.name, text: message.text, temporary: true };
+  else if (typeof message.url === "string" && typeof message.manifest === "string") throw new Error("open takes url or manifest, not both.");
   else if (typeof message.url === "string") source = sourceFromUrl(message.url);
-  else throw new Error("open needs text and name, or url.");
+  else if (typeof message.manifest === "string") source = sourceFromManifest(message.manifest);
+  else throw new Error("open needs text and name, url, or manifest.");
   return { source, packages };
 }
 
@@ -71,7 +73,7 @@ export function startViewerApi({ version, opener = false, begin = () => null, op
     try { Promise.resolve(command(message)).catch(error => send("error", { message: String(error.message || error) })); }
     catch (error) { send("error", { message: String(error.message || error) }); }
   });
-  send("ready", { version, features: API_FEATURES.filter(f => opener || f !== "opener"), maxOpenBytes: MAX_OPEN_BYTES });
+  send("ready", { version, features: [...API_FEATURES.filter(f => opener || f !== "opener"), ...(opener ? [] : EMBED_FEATURES)], maxOpenBytes: MAX_OPEN_BYTES });
   window.addEventListener("pagehide", stop, { once: true });
   return { send, open: receiveOpen };
 }

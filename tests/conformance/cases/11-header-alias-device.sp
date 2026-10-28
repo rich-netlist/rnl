@@ -1,6 +1,6 @@
 * sky130 inverter: aliases, devices and a package found by path
-*! header 记录：@ALIAS 给关键字、参数名、枚举值、属性名起中文代称，与标准写法混写；@DEVICE 给 sky130 的子电路器件起端子名（包里一条、文件里一条）；
-*! @USE-PACKAGE 按 path= 找包，版本 1.2 没有、用同一大版本的 1.3 并警告；包里的规则按包的位置排在本层语句之前；钉住标准包的版本。
+*! Header records: @ALIAS gives keywords, parameter names, enumerated values and property names Chinese aliases, mixed with the standard spelling; @DEVICE gives terminal names to sky130 subcircuit devices (one in a package, one in the file);
+*! @USE-PACKAGE finds a package by path=, and with no version 1.2 uses 1.3 of the same major version with a warning; a package's rules come before this level's statements by where the package is; the standard package's version pinned.
 XM1 out in 0 0 sky130_fd_pr__nfet_01v8 w=1 l=0.15
 XM2 out in vdd vdd sky130_fd_pr__pfet_01v8 w=2 l=0.15
 V1 vdd 0 1.8
