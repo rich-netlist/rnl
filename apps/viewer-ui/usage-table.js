@@ -22,7 +22,17 @@ function sentence(message, ...nodes) {
     if (!part) continue;
     const i = part.charCodeAt(0) - 0xe000;
     if (part.length === 1 && i >= 0 && i < nodes.length) out.append(nodes[i]);
-    else out.append(document.createTextNode(part));
+    else {
+      // a closing bracket stays with the name before it, however long the name is and wherever it breaks
+      const [, closing, rest] = part.match(/^([)）]*)([^]*)$/);
+      if (closing) {
+        const close = document.createElement("span");
+        close.className = "membership-close";
+        close.textContent = closing;
+        out.append(close);
+      }
+      if (rest) out.append(document.createTextNode(rest));
+    }
   }
   return out;
 }

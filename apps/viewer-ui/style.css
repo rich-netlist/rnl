@@ -208,10 +208,15 @@ button.icon { padding: 0 6px; font-size: 16px; line-height: 20px; color: var(--m
 .usage-membership-row:hover, .usage-membership-row:focus-within { background: var(--select-line); }
 .usage-membership-main { display: flex; align-items: baseline; gap: 8px; }
 .usage-membership-head { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+/* Chinese and Japanese do not break between characters here, only at the spaces and the names (which still break anywhere when they must); a closing bracket does not begin a line */
+.membership-sentence { word-break: keep-all; }
+/* the definition, which a closing bracket follows, breaks at any character (overflow-wrap would break between its last character and the bracket) */
+.membership-definition { word-break: break-all; overflow-wrap: normal; }
+.membership-close::before { content: "\2060"; }
 .membership-role, .membership-subject { font-weight: 600; overflow-wrap: anywhere; }
 .membership-id { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; text-align: left; overflow-wrap: anywhere; }
 button.membership-id { cursor: pointer; text-decoration: underline dotted; }
-.membership-definition { color: var(--muted); overflow-wrap: anywhere; }
+.membership-definition { color: var(--muted); }
 .usage-membership-detail { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; margin-top: 2px; font-size: 12px; color: var(--muted); min-width: 0; }
 .membership-where { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; cursor: pointer; }
 .membership-state { flex: none; margin-left: auto; font-weight: 600; font-size: 12px; color: var(--muted); }

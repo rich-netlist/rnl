@@ -66,6 +66,20 @@ for (const width of [0, 420]) {
   });
 }
 
+for (const lang of ["en", "zh"]) {
+  test(`a closing bracket does not begin a line, whatever the language and the width (${lang})`, async ({ page }) => {
+    await page.evaluate(async (w) => (await import("./panels.js")).setSidebarWidth(w), 0);
+    await selectObject(page, "instance", "R1");
+    if (lang === "zh") await page.evaluate(() => window.viewer.command("language-zh"));
+    await expect(rows(page)).toHaveCount(8);
+    const stray = await page.evaluate(() => [...document.querySelectorAll("#usage-detail .membership-close")].filter((c) => {
+      const rects = c.previousElementSibling.getClientRects();
+      return c.getBoundingClientRect().top > rects[rects.length - 1].top + 4;
+    }).length);
+    expect(stray).toBe(0);
+  });
+}
+
 test("the usages on the way up are not listed again: a usage that is a member of itself ends the chain", async ({ page }) => {
   // a Document in which the first usage is, by a hand-made entry, a member of the usage that wraps it
   const ids = await page.evaluate(async () => {
