@@ -182,3 +182,22 @@ test('review: the file and the drawing are in one row on a wide screen, and noth
   await expect(page.locator('#rv-stage svg')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
+
+// The legend under the file says what the picked lines look like: it has the colour of those lines, in both themes and both looks.
+for (const theme of ['light', 'dark']) {
+  for (const look of ['standard', 'eda']) {
+    test(`review: the legend chip of the picked lines has the colour of the lines, ${theme} theme, ${look} look`, async ({ page }) => {
+      await page.addInitScript(t => localStorage.setItem('rnl-intro-theme', t), theme);
+      await open(page, '/en/index.html');
+      if (look === 'eda') await page.locator('#rv-look [data-look="eda"]').click();
+      await page.locator('#rv-items .rv-item').nth(0).click();
+      await page.mouse.move(5, 5);
+      const chip = await page.locator('.rv-code .jr-legend .chip', { hasText: 'Lines of the picked item' })
+        .evaluate(el => ({ bg: getComputedStyle(el).backgroundColor, color: getComputedStyle(el).color }));
+      const hot = page.locator('#rv-code .cl.is-hot').first();
+      // the lines fade to their colour (a transition): wait for it
+      await expect.poll(() => hot.evaluate(el => getComputedStyle(el).backgroundColor)).toBe(chip.bg);
+      expect(await hot.evaluate(el => getComputedStyle(el).boxShadow)).toContain(chip.color);
+    });
+  }
+}
