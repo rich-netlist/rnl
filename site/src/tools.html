@@ -84,7 +84,7 @@
       <div class="hero-copy">
         <p class="eyebrow"><span>RICH NETLIST · TOOLKIT 0.1</span><span class="chip chip-ok"><en>Edits text · solves on the desktop</en></span></p>
         <h1 id="tools-title" class="tour-h1"><en>Tools</en></h1>
-        <p class="thesis"><en>Open a netlist in your browser, or download the viewer for Windows, Linux or macOS.</en></p>
+        <p class="thesis"><en>Open a netlist in your browser, or download the viewer for Windows, Linux or macOS</en></p>
         <p class="lead"><en>The RNL toolkit comes with two viewers: the web viewer, with nothing to install, and the desktop viewer for Windows 10 and 11, Linux and macOS. They read netlists with RNL records and draw them as schematics, and they edit the netlist’s text and draw it again when you apply the changes. The web viewer saves by downloading the file; the desktop viewer writes it back where it was read, and it also solves, showing the result as a preview that writes nothing into the files.</en></p>
         <div class="cta">
           <a class="btn btn-primary" href="../viewer/" target="_blank" rel="noopener"><svg class="ico"><use href="#i-globe"/></svg><en>Open the web viewer</en></a>
@@ -123,7 +123,7 @@
   <div class="wrap">
     <header class="sheet-head">
       <p class="sheet-no"><en>01 · Viewers</en></p>
-      <h2><en>Open a netlist, see the schematic. <span class="mk">Nothing is written until you save.</span></en></h2>
+      <h2><en>Open a netlist, see the schematic. <span class="mk">Nothing is written until you save</span></en></h2>
       <p class="lead"><en>A viewer opens a SPICE or Spectre netlist with RNL records, with the files it includes, draws each level of the circuit, and shows the netlist text, the problems and the hierarchy beside it. A netlist’s text in the clipboard opens too: File › Load from Clipboard shows the text first, and opens it when you confirm.</en></p>
     </header>
 
@@ -179,7 +179,7 @@
   <div class="wrap">
     <header class="sheet-head">
       <p class="sheet-no"><en>02 · Web viewer</en></p>
-      <h2><en>The web viewer: nothing to install.</en></h2>
+      <h2><en>The web viewer: nothing to install</en></h2>
       <p><en>In the Library sidebar tab (the first tab), opened files are added to the Files group without duplicates. Include File and Include Folder add files to the Library without opening them, while Exclude removes a file from search without closing the current document. Include Public Package adds hosted packages such as SKY130 from this site without using the GitHub API. Files starts expanded and the read-only Built-in group (standard series 0.3 and 0.2) starts collapsed; collapse state lasts for the session, and root-file rows are highlighted. Pasted clipboard text appears as a single temporary · not searched row outside lookup—click it to return to its last applied text, paste again to replace it, or close it to clear it. Because browsers cannot search arbitrary local PATH directories, the web viewer resolves includes and packages from the Library.</en></p>
       <p class="lead"><en>The web viewer is a static web page, with the RNL core compiled to WebAssembly running inside it. It opens files or a whole folder from your computer, or a netlist on the web; files dropped on the page open too.</en></p>
     </header>
@@ -226,7 +226,7 @@
   <div class="wrap">
     <header class="sheet-head">
       <p class="sheet-no"><en>03 · Desktop viewer</en></p>
-      <h2><en>The desktop viewer for Windows, Linux and macOS.</en></h2>
+      <h2><en>The desktop viewer for Windows, Linux and macOS</en></h2>
       <p class="lead"><en>The desktop RNL Viewer reads and writes files on disk by their paths: the files a netlist includes are found wherever they are, F5 reads a changed file again, edited text is saved back where it was read, and File › Save As saves the netlist under a new name. It shares the web viewer’s interface and adds a <a href="#solve">Solve menu</a> for automatic layout.</en></p>
     </header>
       <p><en>The desktop Library shows ordered PATH groups between Files and Built-in, initially collapsed, with add, move and remove controls. Expand a group to see .rnl files directly in that folder or one level deep in a version-number subfolder; opening a row also adds it to Files. Directories are rescanned when you open Library and after PATH changes. All settings—including solver, display and PATH—are stored in settings.json in Tauri’s application configuration directory; existing web-view settings migrate on first start, and the exact path to settings.json is shown at the bottom of Library. Includes try their relative path first; bare filenames fall back to the Library and then PATH, emitting a hint that names the resolved file. Packages search the Library, PATH and built-ins, taking the first match for the requested version. Each directory checks name.rnl and version/name.rnl first, then scans other .rnl files for their PACKAGE headers, so filenames need not match package names. A user’s rnl-std can override the bundled copy.</en></p>
@@ -329,7 +329,7 @@
   <div class="wrap">
     <header class="sheet-head">
       <p class="sheet-no"><en>04 · Command line</en></p>
-      <h2><en>Download, extract, run.</en></h2>
+      <h2><en>Download, extract, run</en></h2>
       <p class="lead"><en>Use <code>rnl</code> to check netlists, render SVGs and solve layouts. No Rust installation is needed; Windows also needs no separate VC++ runtime. The CLI and npm package share the core version, independently of Viewer and the language standard.</en></p>
     </header>
     <div class="panel dl">
@@ -351,7 +351,7 @@
   <div class="wrap">
     <header class="sheet-head">
       <p class="sheet-no"><en>05 · Virtuoso export</en></p>
-      <h2><en>Export Virtuoso schematics to RNL.</en></h2>
+      <h2><en>Export Virtuoso schematics to RNL</en></h2>
       <p class="lead"><en><code>rnl-virtuoso</code> adds <b>RNL → Export RNL...</b> to Virtuoso’s schematic editor and <b>File → Export → RNL...</b> to the CIW. It exports one cell or a whole library, keeping hierarchy, custom block symbols, placement, orientation, wires and buses, and draws with the <code>eda-symbol</code> and <code>eda-style</code> packages.</en></p>
     </header>
     <div class="panel dl">
@@ -370,7 +370,7 @@
   <div class="wrap">
     <header class="sheet-head">
       <p class="sheet-no"><en>06 · Toolchain</en></p>
-      <h2><en>The RNL toolchain: read, solve, draw, edit.</en></h2>
+      <h2><en>The RNL toolchain: read, solve, draw, edit</en></h2>
       <p class="lead"><en>The toolchain keeps “understanding RNL” and “turning intent into coordinates” in separate modules: you can view a drawing without a solver and solve only when needed. What exists today: the runtime, the host adapters, the renderer and the command line, the two viewers above, and a first version of the solver, in <code>rnl solve</code> and the desktop viewer. Pick a path to see how data flows; click a module to see what it does.</en></p>
     </header>
 
@@ -416,7 +416,7 @@
   <div class="wrap">
     <header class="sheet-head">
       <p class="sheet-no"><en>07 · Licenses</en></p>
-      <h2><en>Open source, free to use.</en></h2>
+      <h2><en>Open source, free to use</en></h2>
       <p class="lead"><en>The source of the viewers and of the whole RNL toolkit is public on GitHub.</en></p>
     </header>
     <div class="facts">
