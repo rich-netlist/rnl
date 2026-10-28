@@ -17,9 +17,10 @@
 //!   objectives measure and the wire length of the coordinate LP shortens. The problem does not
 //!   carry the netlist itself, so a net that is neither routed nor wired is known only through
 //!   the usages on it.
-//! - **Supply and ground** ([`Power`]): the usages of `$SUPPLY_STUB`, `$GND_STUB`, `$SUPPLY` and
-//!   `$GND`, the nets they attach to, the terminals they hang from or are drawn on (12.1), and the
-//!   nets of those terminals as far as the problem shows them.
+//! - **Supply and ground** ([`Power`]): the symbols attached to a net or a terminal (12.1) that hang
+//!   above or below their pin, told by their drawing and not by a name ([`hang`]); the nets they
+//!   attach to, the terminals they hang from (a stub, as its facts kept place it) or are drawn on,
+//!   and the nets of those terminals as far as the problem shows them.
 //! - **Current depth**: the distance from a supply terminal through the pins the current runs
 //!   through (drain and source, collector and emitter, both ends of other devices) to each element,
 //!   by breadth-first search, no operating point; an element reached only through a gate takes the
@@ -70,11 +71,11 @@ pub(crate) enum Role {
     /// An instance, a bundle, or a virtual part with a symbol and a position of its own: a member
     /// of the rows.
     Element,
-    /// The symbol of `$SUPPLY`.
+    /// A symbol attached to a net or a terminal that hangs above its pin, such as `$SUPPLY`'s ([`hang`]).
     Supply,
-    /// The symbol of `$GND`.
+    /// One that hangs below its pin, such as `$GROUND`'s ([`hang`]).
     Ground,
-    /// The symbol of `$IOPORT`.
+    /// One that hangs beside its pin, such as `$IO_PORT`'s ([`hang`]).
     Port,
     Point,
     Text,
@@ -147,8 +148,9 @@ pub(crate) struct SymbolInfo {
     pub pins: Vec<PinInfo>,
 }
 
-/// A stub of the standard package (`$GND_STUB`, `$SUPPLY_STUB`): its symbol hangs `rise` above
-/// the pin `host` (below for a negative `rise`), as its facts say.
+/// A stub, such as `$GROUND_STUB` and `$SUPPLY_STUB` of the standard package: a supply or ground
+/// symbol made in a usage attached to a terminal, which hangs `rise` above the pin `host` (below for
+/// a negative `rise`), as its facts say ([`power`]).
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Stub {
     pub host: PinKey,
@@ -743,7 +745,7 @@ pub(crate) fn analyse(
     let witness = resolved.witness.geometry.clone();
     let kept = resolved.kept.clone();
     let mut objects = object_infos(problem, &model, &kept);
-    let power = power(problem, &mut objects);
+    let power = power(problem, &kept, &mut objects);
     let mut connections = connections(problem, &model);
     let power = power_pins(power, &mut connections);
     let elements: Vec<usize> = (0..objects.len()).filter(|&k| objects[k].role == Role::Element).collect();
@@ -1064,15 +1066,14 @@ fn object_infos(problem: &LevelProblem, model: &Model, kept: &[usize]) -> Vec<Ob
         .enumerate()
         .map(|(k, o)| {
             let own = matches!(o.position, Position::Own { .. });
-            let definition = o.usage.and_then(|u| problem.usages.get(u)).map(|u| u.definition.as_str());
-            let role = match (o.kind, definition) {
+            let role = match (o.kind, hang(problem, k)) {
                 (ObjectKind::Point, _) => Role::Point,
                 (ObjectKind::Text, _) => Role::Text,
-                (ObjectKind::Usage, Some("$GND")) => Role::Ground,
-                (ObjectKind::Usage, Some("$SUPPLY")) => Role::Supply,
-                (ObjectKind::Usage, Some("$IOPORT")) => Role::Port,
-                (ObjectKind::Usage, _) if own && o.symbol.is_some() => Role::Element,
-                (ObjectKind::Usage, _) => Role::Other,
+                (ObjectKind::Usage, Some(Hang::Below)) => Role::Ground,
+                (ObjectKind::Usage, Some(Hang::Above)) => Role::Supply,
+                (ObjectKind::Usage, Some(Hang::Beside)) => Role::Port,
+                (ObjectKind::Usage, None) if own && o.symbol.is_some() => Role::Element,
+                (ObjectKind::Usage, None) => Role::Other,
                 (ObjectKind::Instance | ObjectKind::Bundle, _) if own => Role::Element,
                 (ObjectKind::Instance | ObjectKind::Bundle, _) => Role::Other,
             };
@@ -1092,29 +1093,112 @@ fn object_infos(problem: &LevelProblem, model: &Model, kept: &[usize]) -> Vec<Ob
         .collect()
 }
 
-/// A number of a usage's parameters.
-fn param(problem: &LevelProblem, u: usize, name: &str) -> Option<Q> {
-    problem.usages[u].params.iter().find(|(n, _)| n == name).and_then(|(_, v)| v.num()).and_then(from_f64)
+/// Which way a symbol attached to a net or a terminal hangs from the pin it joins it by (12.1).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Hang {
+    /// Its body below its pin, the wire leaving the pin up: drawn as a ground is.
+    Below,
+    /// Its body above its pin: drawn as a supply is.
+    Above,
+    /// Its body beside its pin: drawn as a port is.
+    Beside,
 }
 
-/// The supply and ground symbols, the nets they attach to, the terminals they are drawn on, and
-/// the stubs with the pins they hang from.
-fn power(problem: &LevelProblem, objects: &mut [ObjectInfo]) -> Power {
-    let mut p = Power::default();
-    for usage in &problem.usages {
-        let supply = match usage.definition.as_str() {
-            "$SUPPLY" => true,
-            "$GND" => false,
-            _ => continue,
-        };
-        if let Some(k) = usage.object {
-            if supply {
-                p.supply.push(k);
+/// How the symbol of object `k` hangs, when `k` is the object of a usage that attaches it to a net
+/// or a terminal (12.1) and its symbol has one pin; none otherwise. Read off the symbol as it is
+/// drawn unturned: the way its pin leaves (9.2.4), or, for a pin without a direction along an axis,
+/// the way from the pin to the middle of its box. No name of a definition or a symbol decides it,
+/// so a ground, a supply or a port of any series of the standard package, or of a package of one's
+/// own, is told by its drawing alone.
+pub(crate) fn hang(problem: &LevelProblem, k: usize) -> Option<Hang> {
+    let o = problem.objects.get(k)?;
+    let usage = problem.usages.get(o.usage?)?;
+    let attached = usage
+        .roles
+        .iter()
+        .flat_map(|r| &r.members)
+        .any(|m| matches!(m, Filler::Net(_) | Filler::Terminal { pin: Some(_), .. }));
+    let symbol = problem.symbols.get(o.symbol?)?;
+    let [pin] = symbol.pins.as_slice() else { return None };
+    if !attached || usage.object != Some(k) {
+        return None;
+    }
+    let way = match pin.dir.map(|d| d.rem_euclid(360)) {
+        Some(90) => (0, 1),
+        Some(270) => (0, -1),
+        Some(0) => (1, 0),
+        Some(180) => (-1, 0),
+        _ => {
+            // from the middle of the box to the pin, the longer way
+            let b = symbol.bbox.map(number);
+            let (px, py) = (number(pin.pos.0), number(pin.pos.1));
+            let dx = px * int(2) - &b[0] - &b[2];
+            let dy = py * int(2) - &b[1] - &b[3];
+            let sign = |v: &Q| if v.is_positive() { 1 } else { -1 };
+            if dy.abs() > dx.abs() {
+                (0, sign(&dy))
+            } else if !dx.is_zero() {
+                (sign(&dx), 0)
             } else {
-                p.ground.push(k);
+                return None;
             }
         }
-        for role in usage.roles.iter().filter(|r| r.role == "p") {
+    };
+    match way {
+        (0, 1) => Some(Hang::Below),
+        (0, -1) => Some(Hang::Above),
+        (x, 0) if x != 0 => Some(Hang::Beside),
+        _ => None,
+    }
+}
+
+/// How far above the pin `host` the pin of stub `k` is, as a fact kept says: a DISTANCE on y
+/// between the two pins with a direction and a least gap (14.5), such as the one the stubs of the
+/// standard package hold themselves by; none without such a fact.
+fn stub_rise(problem: &LevelProblem, kept: &[usize], k: usize, host: PinKey) -> Option<Q> {
+    let is = |refs: &[PointRef], (object, pin): PinKey| matches!(refs, [PointRef::Pin { object: o, pin: p, .. }] if *o == object && *p == pin);
+    kept.iter().find_map(|&f| {
+        let FactKind::Distance { axis: Axis::Y, sense, min: Some(min), from, to, .. } = &problem.facts.get(f)?.kind
+        else {
+            return None;
+        };
+        let gap = from_f64(*min)?;
+        // `to` is above `from` when the sense increases
+        let up = match sense {
+            Sense::Increasing => true,
+            Sense::Decreasing => false,
+            Sense::Either => return None,
+        };
+        if is(from, host) && is(to, (k, 0)) {
+            Some(if up { gap } else { -gap })
+        } else if is(from, (k, 0)) && is(to, host) {
+            Some(if up { -gap } else { gap })
+        } else {
+            None
+        }
+    })
+}
+
+/// The supply and ground symbols ([`Role::Supply`], [`Role::Ground`]: those that hang above and
+/// below their pins, [`hang`]), the nets they attach to, the terminals they are drawn on, and the
+/// stubs with the pins they hang from: a supply or ground symbol made in a usage that attaches
+/// to a terminal, such as `$SUPPLY_STUB` or `$GROUND_STUB` of the standard package, hangs from that
+/// terminal as far above or below it as a fact kept says ([`stub_rise`]), else `ATTACH_GAP`.
+fn power(problem: &LevelProblem, kept: &[usize], objects: &mut [ObjectInfo]) -> Power {
+    let mut p = Power::default();
+    for usage in &problem.usages {
+        let Some(k) = usage.object else { continue };
+        let supply = match objects.get(k).map(|o| o.role) {
+            Some(Role::Supply) => true,
+            Some(Role::Ground) => false,
+            _ => continue,
+        };
+        if supply {
+            p.supply.push(k);
+        } else {
+            p.ground.push(k);
+        }
+        for role in &usage.roles {
             for m in &role.members {
                 match m {
                     Filler::Net(name) if supply => {
@@ -1137,20 +1221,17 @@ fn power(problem: &LevelProblem, objects: &mut [ObjectInfo]) -> Power {
         }
         // a stub: the usage this one is made in hangs it from a terminal
         let Some(parent) = usage.parent else { continue };
-        let stub = &problem.usages[parent];
-        let rises = match stub.definition.as_str() {
-            "$SUPPLY_STUB" if supply => true,
-            "$GND_STUB" if !supply => false,
-            _ => continue,
-        };
-        let host = stub.roles.iter().filter(|r| r.role == "t").flat_map(|r| &r.members).find_map(|m| match m {
+        let host = problem.usages[parent].roles.iter().flat_map(|r| &r.members).find_map(|m| match m {
             Filler::Terminal { object, pin: Some(pin), .. } => Some((*object, *pin)),
             _ => None,
         });
-        let (Some(k), Some(host)) = (usage.object, host) else { continue };
-        let gap = param(problem, parent, "gap").unwrap_or_else(|| int(2));
+        // drawn at a point of its own, not right on the terminal (12.1)
+        let (Some(host), true) = (host, objects[k].own) else { continue };
+        let gap = int(crate::search::ATTACH_GAP);
+        let rise = stub_rise(problem, kept, k, host).unwrap_or_else(|| if supply { gap } else { -gap });
+        let rises = rise.is_positive();
         if let Some(o) = objects.get_mut(k) {
-            o.stub = Some(Stub { host, rise: if rises { gap } else { -gap } });
+            o.stub = Some(Stub { host, rise });
         }
         if rises {
             p.supply_pins.insert(host);
@@ -1257,7 +1338,7 @@ fn connections(problem: &LevelProblem, model: &Model) -> Connections {
     // the symbols that usages attach to a net are on it (12.1)
     for usage in &problem.usages {
         let Some(k) = usage.object else { continue };
-        for role in usage.roles.iter().filter(|r| r.role == "p") {
+        for role in &usage.roles {
             for m in &role.members {
                 if let Filler::Net(name) = m {
                     let has_pin = problem.objects.get(k).and_then(|o| o.symbol).and_then(|s| problem.symbols.get(s));
@@ -1290,7 +1371,7 @@ fn ports(problem: &LevelProblem, objects: &[ObjectInfo], symbols: &[SymbolInfo],
         }
         let usage = problem.objects[k].usage.and_then(|u| problem.usages.get(u));
         let net = usage.and_then(|u| {
-            u.roles.iter().filter(|r| r.role == "p").flat_map(|r| &r.members).find_map(|m| match m {
+            u.roles.iter().flat_map(|r| &r.members).find_map(|m| match m {
                 Filler::Net(n) => Some(n.clone()),
                 _ => None,
             })

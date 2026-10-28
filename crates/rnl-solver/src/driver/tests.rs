@@ -2182,7 +2182,9 @@ fn a_symbol_without_a_name_on_no_net_drawn_is_left_free() {
 /// are not drawn, the axes of `$MIRROR_PAIR` and the middle point of `$TAIL_CENTER` (T3, T4, corpus
 /// 03 and 15) and a point aligned on x only (corpus 10), on y (11.1), and the ports that rules
 /// make, which the record names (10.5), on nets that nothing draws: no pin of an element on them
-/// is known to the solver, which places them as before (`crate::structure::ObjectInfo::left_free`).
+/// is known to the solver, which places them as before (`crate::structure::ObjectInfo::left_free`);
+/// in the files of 0.3 too, now that their `$IO_PORT` is told a port by its drawing, where it was an
+/// element of the rows.
 /// What it leaves free is the bus label of corpus 09, on a wire (13.3), and the ground without a
 /// name of the subcircuit of 0.3/09, on a net that nothing draws; the solution gives it no
 /// orientation either, and nothing that the candidate puts beside a pin is left free.
@@ -2220,15 +2222,34 @@ fn nothing_is_placed_where_only_the_witness_puts_it() {
     assert_eq!(
         unheld,
         [
+            ("02-dialect-rules.scs / cell", 2),
+            ("02-dialect-rules.scs / mid", 2),
+            ("02-dialect-rules.scs / spsub", 2),
+            ("03-written-rules.sp / resistor", 2),
             ("04-no-rule-packages.scs / cell", 2),
             ("06-symbols.sp / shapes", 2),
+            ("07-virtuoso-netlist.scs / inv", 2),
             ("08-styles-and-text.sp / opamp", 3),
             ("09-buses-and-bundles.sp / dff", 3),
             ("09-buses-and-bundles.sp / reg4", 1),
             ("09-include-without-header.sp / divider", 2),
             ("12-diagnostics.sp / sub", 2),
+            ("13-numbering-order.sp / cell", 2),
+            ("14-numbering-first-name.sp / first_p", 1),
+            ("14-numbering-first-name.sp / first_q", 1),
+            ("15-numbering-stale-and-errors.sp / stale_sub", 1),
+            ("18-dialect-switch.scs / box_cell", 2),
+            ("18-dialect-switch.scs / sub_dropped", 2),
+            ("18-dialect-switch.scs / sub_inc", 2),
+            ("18-dialect-switch.scs / sub_kept", 2),
+            ("18-dialect-switch.scs / sub_sec_scs", 2),
+            ("18-dialect-switch.scs / sub_sec_sp", 2),
             ("19-header-and-lib-versions.sp / sub_02", 2),
+            ("19-header-and-lib-versions.sp / sub_03", 2),
+            ("19-header-and-lib-versions.sp / sub_late", 2),
             ("19-set-cycles.sp / cell", 2),
+            ("21-scope-bindings.sp / cell", 2),
+            ("23-generation-set-difference.sp / cell", 1),
             ("inverter-chain.scs / inv", 1),
             ("inverter-chain.sp / inv", 1),
         ]
@@ -2358,4 +2379,91 @@ fn a_distribute_written_the_other_way_round_is_drawn_alike() {
         assert!(pins_alike(&e, &f, false) || pins_alike(&e, &f, true), "{written}:\n{what}\n{reversed}:\n{other}");
         assert_eq!(e.placed.dropped, f.placed.dropped, "{what}\n{other}");
     }
+}
+
+// ------------------------------------------------------------------------ supply, ground and ports by their drawing
+
+/// A common-source stage of a PMOS load and an NMOS driver, in the language version given, with
+/// the supply net marked so that the fill of the standard package hangs stubs from the pins on the
+/// supply and the ground, and a port on the output.
+fn stage(version: &str) -> String {
+    format!(
+        "* cs\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\")}}\n.model nch nmos level=1\n.model pch pmos level=1\n\
+         M1 out in vdd vdd pch\nM2 out in 0 0 nch\n\
+         * @RNL {{\n\
+         *   # @SELECT-INSTANCE(model=\"nch\") => @SET-SYMBOL $NMOS;\n\
+         *   # @SELECT-INSTANCE(model=\"pch\") => @SET-SYMBOL $PMOS;\n\
+         *   &vdd @ADD-TO $SUPPLY_NET_SET;\n\
+         *   $WIRE_NET_SET @ROUTE\n\
+         * }}\n.end\n"
+    )
+}
+
+/// The stubs of the standard series 0.3 (`$GROUND_STUB`, `$SUPPLY_STUB`) are told by their drawing
+/// and their facts, not by their names: the grounds hang below their pins as stubs, not as elements
+/// of the rows, the current direction and the ground direction are in force, and the current depth
+/// puts the PMOS above the NMOS, each upright (the review of the solver's drawings of 0.3,
+/// 2026-10-24: every ground was an element of the bottom row, and the transistors lay any way).
+#[test]
+fn the_stubs_of_the_series_0_3_hang_from_their_pins_by_their_drawing() {
+    use num_traits::Signed;
+    let (p, solved, e) = solve_text(&stage("0.3"));
+    let what = summary(&p, &solved, &e);
+    let s = &e.structure;
+    let [m1, m2] = ["#M1", "#M2"].map(|l| object(&p, l));
+    assert!(solved.report.inert_objectives.iter().all(|i| i.starts_with("terminal_wire_alignment")), "{what}");
+    assert!(!s.power.ground.is_empty() && !s.power.supply.is_empty(), "{what}");
+    for &k in s.power.ground.iter().chain(&s.power.supply) {
+        let stub = s.objects[k].stub.as_ref().unwrap_or_else(|| panic!("{} is no stub: {what}", p.objects[k].label));
+        let up = s.power.supply.contains(&k);
+        assert_eq!(stub.rise.is_positive(), up, "{}: {what}", p.objects[k].label);
+        assert!(stub.host.0 == m1 || stub.host.0 == m2, "{what}");
+    }
+    assert_eq!(s.elements, vec![m1, m2], "{what}");
+    let depth = s.depth.as_ref().unwrap_or_else(|| panic!("no current depth: {what}"));
+    assert_eq!((depth[m1], depth[m2]), (Some(0), Some(1)), "{what}");
+    let at = &e.placed.origins;
+    assert!(at[m1][1] > at[m2][1], "{what}");
+    // each source towards its rail: the PMOS's up, the NMOS's down
+    let pin = |k: usize, terminal: &str| {
+        let i = s.pins(k).iter().position(|q| q.terminals.iter().any(|t| t == terminal)).unwrap();
+        s.pin_at(at, &e.placed.geometry.orient, k, i).unwrap()
+    };
+    assert!(pin(m1, "3")[1] > pin(m1, "1")[1] && pin(m2, "3")[1] < pin(m2, "1")[1], "{what}");
+}
+
+/// A port of the standard series 0.3 (`$IO_PORT`) is a port, which goes beside the pin it joins,
+/// not an element of the rows.
+#[test]
+fn a_port_of_the_series_0_3_is_a_port_by_its_drawing() {
+    let (p, solved, e) = solve_text(
+        "* p\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\nR1 a out 1k\nR2 out 0 1k\n\
+         * @RNL { $IO_PORT @ATTACH &out => %po; $WIRE_NET_SET @ROUTE }\n.end\n",
+    );
+    let what = summary(&p, &solved, &e);
+    let po = object(&p, "%po");
+    assert_eq!(e.structure.objects[po].role, crate::structure::Role::Port, "{what}");
+    assert!(!e.structure.elements.contains(&po), "{what}");
+}
+
+/// The same stage in the series 0.2 and 0.3 has the same supply, ground, current depth and rows:
+/// what the solver reads of the drawing does not depend on the names the series gives.
+#[test]
+fn the_series_0_2_and_0_3_give_the_same_structure() {
+    let shape = |version: &str| {
+        let (p, solved, e) = solve_text(&stage(version));
+        let s = &e.structure;
+        let label = |k: &usize| p.objects[*k].label.clone();
+        let hosts = |ks: &[usize]| -> Vec<String> {
+            let mut v: Vec<String> =
+                ks.iter().filter_map(|k| s.objects[*k].stub.as_ref()).map(|st| label(&st.host.0)).collect();
+            v.sort();
+            v
+        };
+        let rows: Vec<Vec<String>> = s.rows.iter().map(|r| r.iter().map(label).collect()).collect();
+        let depth: Vec<(String, Option<u32>)> =
+            s.elements.iter().map(|k| (label(k), s.depth.as_ref().and_then(|d| d[*k]))).collect();
+        (hosts(&s.power.supply), hosts(&s.power.ground), rows, depth, solved.report.inert_objectives.clone())
+    };
+    assert_eq!(shape("0.2"), shape("0.3"));
 }
