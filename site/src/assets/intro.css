@@ -1579,6 +1579,7 @@ html[lang="zh-CN"] .tour-h1 { font-family: var(--f-body); font-weight: 900; lett
 @media (max-width: 760px) { .dl-list li { grid-template-columns: 1fr; } }
 
 /* ---------- The example of 01: a five-transistor OTA, reviewed by what it says ---------- */
+#example, #journey { scroll-margin-top: 70px; }   /* the links to the example land below the top bar */
 .rv-legend { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 16px 0 24px; }
 .rv-own { display: flex; gap: 10px; align-items: flex-start; margin: 0; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); font-size: 14px; color: var(--ink-2); line-height: 1.55; }
 .rv-own b { color: var(--ink); }
@@ -1655,6 +1656,8 @@ html[lang="zh-CN"] .tour-h1 { font-family: var(--f-body); font-weight: 900; lett
 /* on a wide screen the example stops the scroll when it comes up under the bar (proximity: a nudge, never a trap) */
 @media (min-width: 1001px) and (min-height: 600px) {
   html { scroll-snap-type: y proximity; }
+  /* a link to an address of the page lands where it points: the stop is off until the page is scrolled by hand (intro.js) */
+  html.no-snap { scroll-snap-type: none; }
   .review { scroll-snap-align: start; scroll-margin-top: 71px; }
 }
 @media (max-width: 1000px) {

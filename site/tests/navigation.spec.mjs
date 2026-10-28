@@ -5,6 +5,7 @@ import { readFileSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 
 const files = ["index.html", "language.html", "packages.html", "gallery.html", "tools.html", "agents.html"];
+const zh = JSON.parse(readFileSync(new URL("../../i18n/zh/site/index.html.json", import.meta.url), "utf8"));
 const index = JSON.parse(readFileSync(new URL("../dist/gallery/index.js", import.meta.url), "utf8").match(/^RNLGallery.index\((.*)\);/s)[1]);
 const review = process.env.RNL_SITE_SCREENSHOTS;
 const pageErrors = new WeakMap();
@@ -80,12 +81,13 @@ test("existing deep links and the full-width introduction hero remain usable", a
   const heroWidth = await page.locator(".hero").evaluate(el => el.getBoundingClientRect().width);
   expect(heroWidth).toBe(1440);
   await capture(page, "zh-light-index-hero-1440", info.project.name);
-  await page.locator(".hero").getByRole("link", { name: "看示例", exact: true }).click();
+  await page.locator(".hero").getByRole("link", { name: zh["See the example"], exact: true }).click();
   await expect(page).toHaveURL(/#example$/);
   await expect(page.locator('#toc a[href="#what"]')).toHaveClass("here");
   await page.locator(".language-menu > summary").click();
   await page.locator('[data-language="en"]').click();
-  await expect(page).toHaveURL(/\/en\/#example$/);
+  // switching the language keeps the reader on the section of the contents (What), which holds the example
+  await expect(page).toHaveURL(/\/en\/#what$/);
 });
 
 test("gallery: directory categories, search, disclosure, packages, history and shared URLs", async ({ page }) => {

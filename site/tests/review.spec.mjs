@@ -201,3 +201,20 @@ for (const theme of ['light', 'dark']) {
     });
   }
 }
+
+// The example is a stop of the scroll (proximity), but a link to it must land where it points: below the top bar, on its heading.
+for (const hash of ['example', 'journey']) {
+  test(`review: the link #${hash} lands on the example, not moved on by the scroll stop`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await open(page, `/en/index.html#${hash}`);
+    await page.waitForTimeout(600);
+    const bar = await page.locator('.topbar').boundingBox();
+    const top = await page.locator(`#${hash}`).evaluate(el => el.getBoundingClientRect().top);
+    expect(top).toBeGreaterThanOrEqual(bar.y + bar.height - 1);
+    expect(top).toBeLessThan(300);
+    // scrolled by hand, the stop is back
+    await page.mouse.move(700, 500);
+    await page.mouse.wheel(0, 60);
+    await expect.poll(() => page.evaluate(() => document.documentElement.classList.contains('no-snap'))).toBe(false);
+  });
+}

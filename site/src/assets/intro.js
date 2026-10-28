@@ -144,7 +144,20 @@
 
   /* ================= Startup ================= */
 
+  /* The example is a stop of the scroll on a wide screen (intro.css, proximity). A link to an address of the page, #journey or
+     any other, must land where it points and not be moved on to the stop: the stop is off after such a link, and back on at the
+     next scroll by hand. */
+  function initScrollStop() {
+    var root = document.documentElement;
+    function hold() { root.classList.add('no-snap'); }
+    function release() { root.classList.remove('no-snap'); }
+    if (location.hash) hold();
+    window.addEventListener('hashchange', hold);
+    ['wheel', 'touchstart', 'keydown'].forEach(function (name) { window.addEventListener(name, release, { passive: true }); });
+  }
+
   function boot() {
+    initScrollStop();
     initLogoViewer();
     initFixes();
     initHub();
