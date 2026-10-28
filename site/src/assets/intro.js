@@ -104,13 +104,14 @@
       var hb = hub.getBoundingClientRect(), cb = core.getBoundingClientRect();
       nodes.forEach(function (n, i) {
         var nb = n.getBoundingClientRect();
-        var left = nb.right <= cb.left;
-        var x0 = left ? cb.left - hb.left : cb.right - hb.left;
-        var y0 = cb.top - hb.top + cb.height * (0.28 + 0.22 * (i % 3));
-        var x1 = left ? nb.right - hb.left : nb.left - hb.left;
-        var y1 = nb.top - hb.top + nb.height / 2;
-        var xm = Math.round((x0 + x1) / 2);
-        var d = 'M' + x0 + ' ' + y0 + ' H' + xm + ' V' + y1 + ' H' + x1;
+        var above = nb.bottom <= cb.top;
+        var x1 = Math.round(nb.left - hb.left + nb.width / 2);
+        /* from the file's edge to the box's edge: the boxes above are fed from the left and the right of the top edge */
+        var x0 = above ? Math.round(cb.left - hb.left + cb.width * (x1 + hb.left < cb.left + cb.width / 2 ? 0.3 : 0.7)) : x1;
+        var y0 = Math.round(above ? cb.top - hb.top : cb.bottom - hb.top);
+        var y1 = Math.round(above ? nb.bottom - hb.top : nb.top - hb.top);
+        var ym = Math.round((y0 + y1) / 2);
+        var d = 'M' + x0 + ' ' + y0 + ' V' + ym + ' H' + x1 + ' V' + y1;
         S.el('path', { d: d }, svg);
         S.el('circle', { cx: x0, cy: y0, r: 3.2, class: 'end' }, svg);
         S.el('circle', { cx: x1, cy: y1, r: 3.2, class: 'end' }, svg);
