@@ -6,7 +6,7 @@
   "Switch color theme": "切換色彩主題",
   "Draft · names may change": "草案 · 名稱仍可能調整",
   "Standard packages": "標準套件",
-  "What the standard packages hold: every symbol as it is drawn, and the text that defines it.": "標準套件的內容：每個符號繪製出的外觀，以及定義它的原文。",
+  "What the standard packages hold: every symbol as it is drawn, and the text that defines it": "標準套件的內容：每個符號繪製出的外觀，以及定義它的原文",
   "Every netlist has the standard package <code>rnl-std</code> at its root by default: it gives elements their symbols and objects their styles, and fills in grounds and supplies for unwired pins. It is made of sub-packages; a file can drop any of them, and add packages that are used on demand. This page lists every package with what it is for, what it references and the text that defines it; the symbols are drawn by the RNL core when the site is built, as the viewers draw them.": "每份網表的根層級預設皆載入標準套件 <code>rnl-std</code>：它為實例指定符號、為物件設定樣式，並為未連線的接腳補上接地與電源符號。它由多個子套件組成；檔案可以移除其中任一子套件，也可以加入按需使用的套件。本頁列出每個套件的用途、引用關係與定義原文；所有符號皆於網站建置時由 RNL 核心繪製，與檢視器中呈現的結果完全一致。",
   "Package facts": "套件資訊",
   "Content": "內容",

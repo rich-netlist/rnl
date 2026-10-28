@@ -6,7 +6,7 @@
   "Switch color theme": "Cambiar tema de color",
   "Draft · names may change": "Borrador · los nombres pueden cambiar",
   "Standard packages": "Paquetes estándar",
-  "What the standard packages hold: every symbol as it is drawn, and the text that defines it.": "Qué contienen los paquetes estándar: cada símbolo tal como se dibuja y el texto que lo define.",
+  "What the standard packages hold: every symbol as it is drawn, and the text that defines it": "Qué contienen los paquetes estándar: cada símbolo tal como se dibuja y el texto que lo define",
   "Every netlist has the standard package <code>rnl-std</code> at its root by default: it gives elements their symbols and objects their styles, and fills in grounds and supplies for unwired pins. It is made of sub-packages; a file can drop any of them, and add packages that are used on demand. This page lists every package with what it is for, what it references and the text that defines it; the symbols are drawn by the RNL core when the site is built, as the viewers draw them.": "Todo netlist tiene por defecto el paquete estándar <code>rnl-std</code> en su raíz: asigna símbolos a los elementos y estilos a los objetos, y completa tierras y alimentaciones para los pines sin cablear. Está compuesto por subpaquetes; un archivo puede prescindir de cualquiera de ellos y añadir paquetes que se usan bajo demanda. Esta página enumera cada paquete con su propósito, sus referencias y el texto que lo define; los símbolos los dibuja el núcleo de RNL al compilar el sitio, tal como los dibujan los visores.",
   "Package facts": "Datos de los paquetes",
   "Content": "Contenido",

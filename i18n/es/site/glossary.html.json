@@ -4,7 +4,7 @@
   "Skip to content": "Saltar al contenido",
   "Switch color theme": "Cambiar tema de color",
   "Glossary": "Glosario",
-  "The English terms of RNL are the only normative ones; every language keeps its own way of rendering them.": "Los términos en inglés de RNL son los únicos normativos; cada idioma mantiene su propia forma de traducirlos.",
+  "The English terms of RNL are the only normative ones; every language keeps its own way of rendering them": "Los términos en inglés de RNL son los únicos normativos; cada idioma mantiene su propia forma de traducirlos",
   "A glossary is not part of the standard: it is a convention for translating RNL and for talking about it, kept in <a href=\"https://github.com/rich-netlist/rnl/tree/main/i18n\">i18n/&lt;lang&gt;/glossary.json</a>. Where a translation is unclear, the English term decides. To change a rendering, open a pull request.": "Un glosario no forma parte del estándar: es una convención para traducir RNL y hablar sobre él, mantenida en <a href=\"https://github.com/rich-netlist/rnl/tree/main/i18n\">i18n/&lt;lang&gt;/glossary.json</a>. Cuando una traducción resulta ambigua, prevalece el término en inglés. Para cambiar una traducción, abre una solicitud de extracción.",
   "Terms": "Términos",
   "RNL’s terms, such as record, usage and fill-in, are defined by the English standard; a language’s glossary only says how it writes them.": "Los términos de RNL, como registro, uso y relleno, están definidos por el estándar en inglés; el glosario de cada idioma solo indica cómo se escriben en él.",

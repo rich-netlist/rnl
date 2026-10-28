@@ -4,7 +4,7 @@
   "Skip to content": "跳至主要內容",
   "Switch color theme": "切換色彩主題",
   "Glossary": "術語表",
-  "The English terms of RNL are the only normative ones; every language keeps its own way of rendering them.": "RNL 的英文術語是唯一的規範術語；每種語言各有自己的譯法。",
+  "The English terms of RNL are the only normative ones; every language keeps its own way of rendering them": "RNL 的英文術語是唯一的規範術語；每種語言各有自己的譯法",
   "A glossary is not part of the standard: it is a convention for translating RNL and for talking about it, kept in <a href=\"https://github.com/rich-netlist/rnl/tree/main/i18n\">i18n/&lt;lang&gt;/glossary.json</a>. Where a translation is unclear, the English term decides. To change a rendering, open a pull request.": "術語表不屬於標準，只是翻譯與溝通 RNL 時的約定，存放於 <a href=\"https://github.com/rich-netlist/rnl/tree/main/i18n\">i18n/&lt;lang&gt;/glossary.json</a>。譯文有歧義時，以英文術語為準。如要修改某個譯法，請提交 pull request。",
   "Terms": "術語",
   "RNL’s terms, such as record, usage and fill-in, are defined by the English standard; a language’s glossary only says how it writes them.": "RNL 的術語，例如 record（記錄）、usage（用例）、fill-in（自動補齊），由英文標準定義；各語言的術語表只說明它們在該語言中如何書寫。",
