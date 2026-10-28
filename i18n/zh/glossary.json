@@ -3,6 +3,16 @@
  "about": "Terms of this language's translations: the English term, its rendering here, and variants not to use. English terms are the only normative ones (decision 0016); this list is a convention for translating and talking about RNL, not part of the standard. kind: rnl (a term of RNL), circuit (of circuit design), command (a command or label of an interface), general.",
  "terms": [
   {
+   "en": "agent",
+   "term": "Agent",
+   "avoid": [
+    "智能体",
+    "代理"
+   ],
+   "kind": "general",
+   "note": "An AI agent. Written in English, capitalized, in Chinese text (owner, 2026-10-28)."
+  },
+  {
    "en": "alias",
    "term": "代称",
    "kind": "rnl"
