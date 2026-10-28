@@ -6,7 +6,7 @@
   "Switch color theme": "색상 테마 전환",
   "Draft · names may change": "초안 · 이름은 변경될 수 있음",
   "Standard packages": "표준 패키지",
-  "What the standard packages hold: every symbol as it is drawn, and the text that defines it.": "표준 패키지에 담긴 내용: 실제로 그려진 모든 심볼과 이를 정의하는 원문 텍스트입니다.",
+  "What the standard packages hold: every symbol as it is drawn, and the text that defines it": "표준 패키지에 담긴 내용: 실제로 그려진 모든 심볼과 이를 정의하는 원문 텍스트입니다",
   "Every netlist has the standard package <code>rnl-std</code> at its root by default: it gives elements their symbols and objects their styles, and fills in grounds and supplies for unwired pins. It is made of sub-packages; a file can drop any of them, and add packages that are used on demand. This page lists every package with what it is for, what it references and the text that defines it; the symbols are drawn by the RNL core when the site is built, as the viewers draw them.": "모든 넷리스트는 기본적으로 루트에 표준 패키지 <code>rnl-std</code>를 포함합니다. 이 패키지는 소자에 심볼을, 객체에 스타일을 부여하고 배선되지 않은 핀에 접지와 전원을 채워 넣습니다. 여러 하위 패키지로 구성되어 있어 파일에서 일부를 제외하거나 필요한 패키지를 추가로 불러올 수 있습니다. 이 페이지는 모든 패키지의 용도, 참조 관계, 정의 원문을 나열하며, 각 심볼은 사이트 빌드 시 뷰어와 동일한 RNL 코어가 직접 그린 것입니다.",
   "Package facts": "패키지 개요",
   "Content": "내용",

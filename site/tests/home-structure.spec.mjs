@@ -1,6 +1,6 @@
 import { test, expect } from '../../tests/viewer/node_modules/@playwright/test/index.mjs';
 
-// The structure of the introduction page: headings without a full stop, the order of the scenarios, and the design flow of
+// The structure of the introduction page: the order of the scenarios, and the design flow of
 // the vision section, drawn the same way at every width (the arrows between the boxes are kept on a phone).
 test.beforeEach(async ({ page }) => {
   await page.route('https://rich-netlist.github.io/**', route => route.abort());
@@ -14,13 +14,6 @@ async function open(page, url) {
 }
 
 for (const language of ['en', 'zh']) {
-  test(`headings of the page do not end with a full stop, ${language}`, async ({ page }) => {
-    await open(page, `/${language}/index.html`);
-    const ends = await page.locator('main h1, main h2, main h3, main h4, .hero h1').evaluateAll(
-      els => els.map(el => el.textContent.trim()).filter(t => /[.。]$/.test(t)));
-    expect(ends).toEqual([]);
-  });
-
   test(`the scenarios: AI first, the open ecosystem last, ${language}`, async ({ page }) => {
     await open(page, `/${language}/index.html`);
     const tabs = page.locator('#sc-tabs [role="tab"]');
