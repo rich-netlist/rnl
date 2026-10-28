@@ -2,14 +2,14 @@
   "<b>M1</b> and <b>M2</b> are the input pair; <b>M5</b> is its tail source.": "<b>M1</b>、<b>M2</b> 是输入差分对；<b>M5</b> 是它的尾电流源。",
   "structure": "结构",
   "intent": "意图",
-  "Pick a statement in the file or an item of the checklist: its devices light up in the drawing and in the netlist.": "点文件里的一条语句或清单的一条：它涉及的器件会在图里和网表里亮起来。",
+  "Pick a statement in the file or an item in the checklist: its devices light up in the drawing and the netlist.": "点文件里的一条语句或清单的一条：它涉及的器件会在图里和网表里亮起来。",
   "<b>Structure</b>: <code>$DIFFERENTIAL_PAIR</code> says which devices form the pair and which is its tail; the standard package puts the tail under the middle of the pair.": "<b>结构</b>：<code>$DIFFERENTIAL_PAIR</code> 说明哪些器件构成差分对、哪个是尾管；标准包把尾管放在差分对的正下方中间。",
   "<b>M3</b> and <b>M4</b> are a current mirror, the load.": "<b>M3</b>、<b>M4</b> 是电流镜，作负载。",
   "Symmetric: <b>M1</b>/<b>M2</b> and <b>M3</b>/<b>M4</b> mirror about one axis.": "对称：<b>M1</b>/<b>M2</b> 与 <b>M3</b>/<b>M4</b> 关于同一条轴镜像。",
   "Bottom to top: tail <b>M5</b>, pair <b>M1</b>, load <b>M3</b>.": "从下到上：尾管 <b>M5</b>、对管 <b>M1</b>、负载 <b>M3</b>。",
   "The tail current enters at the drain of <b>M5</b>.": "尾电流从 <b>M5</b> 的漏极流入。",
-  "<b>Structure</b>: <code>$CURRENT_MIRROR</code> says which device is the reference and which copies it: here the load of the pair.": "<b>结构</b>：<code>$CURRENT_MIRROR</code> 说明哪个器件是参考、哪个来复制它：这里是差分对的负载。",
-  "<b>Intent</b>: two pairs, mirror images about one axis. The standard package puts each pair at one height; a tool that draws from it keeps the symmetry.": "<b>意图</b>：两对器件关于同一条轴镜像。标准包让每一对等高；按它来画的工具会保持对称。",
+  "<b>Structure</b>: <code>$CURRENT_MIRROR</code> says which device is the reference and which copies it. Here the mirror is the pair’s load.": "<b>结构</b>：<code>$CURRENT_MIRROR</code> 说明哪个器件是参考、哪个来复制它：这里是差分对的负载。",
+  "<b>Intent</b>: two pairs, mirror images about one axis. The standard package puts the two devices of each pair at the same height; a tool that draws from it keeps the symmetry.": "<b>意图</b>：两对器件关于同一条轴镜像。标准包让每一对等高；按它来画的工具会保持对称。",
   "<b>Intent</b>: the tail at the bottom, the pair above it, the load on top, as schematics are usually read.": "<b>意图</b>：尾管在最下，对管在上，负载在最上，符合原理图通常的读法。",
   "<b>Intent</b>: where the current flows, from the top of the circuit to the bottom.": "<b>意图</b>：电流往哪流，从电路的上面流到下面。",
   "A simulator reads the lines that are not dimmed: the netlist. Every RNL line starts with <code>*</code>, so for the simulator it is a comment.": "仿真器读的是没有变暗的行：网表。每一行 RNL 都以 <code>*</code> 开头，对仿真器就是注释。",
@@ -17,5 +17,5 @@
   "Low-frequency gain": "低频增益",
   "−3 dB at": "−3 dB 点在",
   "Unity gain at": "单位增益频率",
-  "One volt of differential input and a 1 pF load, simulated from the netlist lines of the file.": "1 V 差分输入、1 pF 负载，由文件里的网表行仿真得到。"
+  "1 V differential input and a 1 pF load, simulated from the netlist lines in the file.": "1 V 差分输入、1 pF 负载，由文件里的网表行仿真得到。"
 }

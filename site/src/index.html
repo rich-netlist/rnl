@@ -161,14 +161,14 @@
 
     <!-- #journey, the old address of the example, is on the lead below: links to it keep working -->
     <h3 class="sub-h" id="example"><en>An example: a five-transistor OTA</en></h3>
-    <p class="sub-lead" id="journey"><en>This is the kind of file an agent writes with the RNL skill. A person reviews what it declares instead of reading the netlist line by line: pick an item of the checklist or a statement of the file. Exact positions and wires can be written back into the file by a solver or a model.</en></p>
+    <p class="sub-lead" id="journey"><en>This is the kind of file an agent writes with the RNL skill. A person reviews what it declares instead of reading the netlist line by line: pick an item in the checklist or a statement in the file. Exact positions and wires can be written back into the file by a solver or a model.</en></p>
 
     <div class="review" id="review">
       <div class="rv-code panel">
         <div class="ph"><svg class="ico"><use href="#i-file"/></svg><span class="ph-title">ota5t.sp</span><span class="ph-right">
           <span class="seg" id="rv-style" role="group" aria-label="<en>Writing style</en>">
-            <button type="button" data-style="bare" aria-pressed="false"><en>Notation</en></button>
-            <button type="button" data-style="en" aria-pressed="true"><en>English</en></button>
+            <button type="button" data-style="bare" aria-pressed="false"><en>Plain</en></button>
+            <button type="button" data-style="en" aria-pressed="true"><en>Annotated</en></button>
             <!--zh-CN--><button type="button" data-style="zh" aria-pressed="false"><en>Chinese</en></button><!--/zh-CN-->
           </span>
           <a class="chip" id="rv-open" href="../viewer/?url=samples/site/ota5t-review.sp" target="_blank" rel="noopener"><en>Open in viewer</en></a></span></div>
@@ -240,7 +240,7 @@
     <header class="sheet-head">
       <p class="sheet-no"><en>02 · Why</en></p>
       <h2><en>Netlists and schematics each miss half the picture.</en></h2>
-      <p class="lead"><en>Simulation runs on netlists; understanding a circuit takes a schematic. Each falls short somewhere.</en></p>
+      <p class="lead"><en>Simulation runs on netlists; understanding a circuit takes a schematic. Each falls short on its own.</en></p>
     </header>
 
     <div class="matrix-wrap">
@@ -382,15 +382,15 @@
       </div>
       <div class="fact">
         <h3><svg class="ico"><use href="#i-chat"/></svg><en>AI writes, people review</en></h3>
-        <p><en>An AI writes the circuit together with its structures and drawing; people review the declared structures and intent in a viewer.</en></p>
+        <p><en>AI writes the circuit together with its structures and drawing; people review the declared structures and intent in a viewer.</en></p>
       </div>
       <div class="fact">
         <h3><svg class="ico"><use href="#i-globe"/></svg><en>Open</en></h3>
         <p><en>A public standard and symbol libraries, open-source tools, a viewer that opens in the browser.</en></p>
       </div>
       <div class="fact">
-        <h3><svg class="ico"><use href="#i-layers"/></svg><en>Circuit apart from style</en></h3>
-        <p><en>The netlist fixes what the circuit is; packages decide how it looks, as HTML carries content and CSS its style. Include the public packages <code>eda-symbol</code> and <code>eda-style</code> and the same file draws as a traditional EDA schematic. <a href="#example">Switch the look in the example.</a></en></p>
+        <h3><svg class="ico"><use href="#i-layers"/></svg><en>Circuit separate from style</en></h3>
+        <p><en>The netlist defines what the circuit is; packages decide how it looks, like HTML for content and CSS for style. Include the public packages <code>eda-symbol</code> and <code>eda-style</code>, and the same file draws as a traditional EDA schematic. <a href="#example">Switch the look in the example.</a></en></p>
       </div>
     </div>
 
@@ -431,7 +431,7 @@
               </div>
             </div>
           </div>
-          <p class="vs-text"><en>The schematic lives in the EDA tool’s database, so the recipient needs the same setup. A screenshot plus a netlist goes stale when one changes.</en></p>
+          <p class="vs-text"><en>The schematic lives in the EDA tool’s database, so the recipient needs the same setup. A screenshot paired with a netlist goes stale as soon as either changes.</en></p>
         </div>
         <div class="vs-side rnl">
           <div class="vs-head"><svg class="ico"><use href="#i-check"/></svg><en>With RNL</en></div>
@@ -550,7 +550,7 @@ M5 tail vbias vss vss nch W=4u L=1u
               <p class="fig-note"><en>Every tool has its own schematic format and its own symbol libraries.</en></p>
             </div>
           </div>
-          <p class="vs-text"><en>Switching tools often means redrawing the schematic; switching simulators, rewriting the netlist dialect.</en></p>
+          <p class="vs-text"><en>Switching tools often means redrawing the schematic; switching simulators means rewriting the netlist dialect.</en></p>
         </div>
         <div class="vs-side rnl">
           <div class="vs-head"><svg class="ico"><use href="#i-check"/></svg><en>With RNL</en></div>
@@ -581,8 +581,8 @@ M5 tail vbias vss vss nch W=4u L=1u
     <h3 class="sub-h"><en>An open ecosystem</en></h3>
     <p class="sub-lead"><en>Circuits and symbol libraries published and reused like open-source software.</en></p>
     <ul class="eco">
-      <li><a href="{{spec-root}}"><svg class="ico"><use href="#i-book"/></svg><b><en>A public standard</en></b><span><en>The language and its packages are specified in the open</en></span></a></li>
-      <li><a href="packages.html"><svg class="ico"><use href="#i-layers"/></svg><b><en>Symbol libraries</en></b><span><en>Every symbol drawn, and the text that defines it</en></span></a></li>
+      <li><a href="{{spec-root}}"><svg class="ico"><use href="#i-book"/></svg><b><en>A public standard</en></b><span><en>The language and its packages, openly specified</en></span></a></li>
+      <li><a href="packages.html"><svg class="ico"><use href="#i-layers"/></svg><b><en>Symbol libraries</en></b><span><en>Every symbol’s drawing and the text that defines it</en></span></a></li>
       <li><a href="gallery.html"><svg class="ico"><use href="#i-eye"/></svg><b><en>A gallery of circuits</en></b><span><en>Designs in public repositories, opened in the web viewer</en></span></a></li>
       <li><a href="tools.html"><svg class="ico"><use href="#i-term"/></svg><b><en>Open-source tools</en></b><span><en>The runtime, the command line and the viewers</en></span></a></li>
     </ul>
@@ -614,7 +614,7 @@ M5 tail vbias vss vss nch W=4u L=1u
     <header class="sheet-head">
       <p class="sheet-no"><en>06 · Status</en></p>
       <h2><en>Where things stand.</en></h2>
-      <p class="lead"><en>The language is released as standard 0.3; <a href="tools.html">the web and desktop viewers</a> read, draw and edit netlists, and the solver has a first version. Below are the latest released milestones and what comes next; the full timeline has all released ones.</en></p>
+      <p class="lead"><en>The language is released as standard 0.3; <a href="tools.html">the web and desktop viewers</a> read, draw and edit netlists, and the solver has a first version. Below are the latest released milestones and what comes next; the full timeline lists every released milestone.</en></p>
     </header>
     <div class="status-grid">
       <ol class="tl">
@@ -636,7 +636,7 @@ M5 tail vbias vss vss nch W=4u L=1u
         </details>
         <details>
           <summary><en>Will different tools draw the same RNL the same way?</en><svg class="ico"><use href="#i-next"/></svg></summary>
-          <p><en>Parts with exact geometry will match. Parts that state only intent may be drawn differently by different solvers, all satisfying it; RNL does not promise pixel-identical output.</en></p>
+          <p><en>Parts with exact geometry will match. Parts that state only intent may be drawn differently by different solvers while still satisfying that intent; RNL does not promise pixel-identical output.</en></p>
         </details>
         <details>
           <summary><en>How is this different from Virtuoso or KiCad schematic files?</en><svg class="ico"><use href="#i-next"/></svg></summary>
@@ -644,7 +644,7 @@ M5 tail vbias vss vss nch W=4u L=1u
         </details>
         <details>
           <summary><en>Why does AI come up so often?</en><svg class="ico"><use href="#i-next"/></svg></summary>
-          <p><en>Language models are good at reading and writing text such as netlists. RNL makes the circuit’s structure, intent and drawing text too, so an agent writes a circuit and its meaning in one file and people review what it declared in a viewer. Free text between statements helps people read, but never changes what machines understand.</en></p>
+          <p><en>Language models are good at reading and writing text such as netlists. RNL turns the circuit’s structure, intent and drawing into text too, so an agent writes a circuit and its meaning in one file and people review what it declared in a viewer. Free text between statements helps people read, but never changes what machines understand.</en></p>
         </details>
         <details>
           <summary><en>Can RNL be written in other languages?</en><svg class="ico"><use href="#i-next"/></svg></summary>

@@ -127,11 +127,11 @@
 
   var KIND = { structure: '<en>structure</en>', intent: '<en>intent</en>' };
 
-  var DEFAULT = '<en>Pick a statement in the file or an item of the checklist: its devices light up in the drawing and in the netlist.</en>';
+  var DEFAULT = '<en>Pick a statement in the file or an item in the checklist: its devices light up in the drawing and the netlist.</en>';
   var CAPS = {
     dp: '<en><b>Structure</b>: <code>$DIFFERENTIAL_PAIR</code> says which devices form the pair and which is its tail; the standard package puts the tail under the middle of the pair.</en>',
-    cm1: '<en><b>Structure</b>: <code>$CURRENT_MIRROR</code> says which device is the reference and which copies it: here the load of the pair.</en>',
-    sym: '<en><b>Intent</b>: two pairs, mirror images about one axis. The standard package puts each pair at one height; a tool that draws from it keeps the symmetry.</en>',
+    cm1: '<en><b>Structure</b>: <code>$CURRENT_MIRROR</code> says which device is the reference and which copies it. Here the mirror is the pair’s load.</en>',
+    sym: '<en><b>Intent</b>: two pairs, mirror images about one axis. The standard package puts the two devices of each pair at the same height; a tool that draws from it keeps the symmetry.</en>',
     ord: '<en><b>Intent</b>: the tail at the bottom, the pair above it, the load on top, as schematics are usually read.</en>',
     cur: '<en><b>Intent</b>: where the current flows, from the top of the circuit to the bottom.</en>'
   };
@@ -198,7 +198,7 @@
     }
     el.innerHTML = '<p class="rv-sim-h"><svg class="ico"><use href="#i-wave"/></svg><span><en>AC response from</en> ' + R.simulator + ' ' + R.version.replace(/^(\d+\.\d+\.\d+).*/, '$1') + '</span></p>' + s +
       '<ul class="rv-sim-m"><li><en>Low-frequency gain</en> <b>' + dc.toFixed(1) + ' dB</b></li><li><en>−3 dB at</en> <b>' + fmtHz(f3) + '</b></li><li><en>Unity gain at</en> <b>' + fmtHz(f0) + '</b></li></ul>' +
-      '<p class="rv-sim-n"><en>One volt of differential input and a 1 pF load, simulated from the netlist lines of the file.</en> <code>' + R.analysis + '</code></p>';
+      '<p class="rv-sim-n"><en>1 V differential input and a 1 pF load, simulated from the netlist lines in the file.</en> <code>' + R.analysis + '</code></p>';
   }
 
   function init() {
