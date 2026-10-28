@@ -56,6 +56,30 @@ test.describe("on a phone", () => {
     expect(wide.outside).toBe(0);
   });
 
+  test("a name that fits a line is moved whole to the next, not broken", async ({ page, viewer }) => {
+    await viewer.open("usage-ota5t");
+    await page.evaluate(async () => {
+      const o = window.viewer.doc.objects.findIndex((x) => x.kind === "instance" && x.name === "M1");
+      (await import("./selection.js")).select(o, "list", { usage: false });
+    });
+    await page.locator("#page-panel").tap();
+    await page.locator("#tab-usages").tap();
+    await expect(page.locator("#usage-detail .usage-membership-row")).toHaveCount(2);
+    for (const lang of ["en", "zh"]) {
+      if (lang === "zh") await page.evaluate(() => window.viewer.command("language-zh"));
+      const names = await page.evaluate(() => [...document.querySelectorAll("#usage-detail .membership-definition, #usage-detail .membership-id")].map((d) => {
+        const first = d.firstChild;
+        const r = document.createRange();
+        r.setStart(first, 0); r.setEnd(first, 1);
+        const last = d.lastChild.lastChild ?? d.lastChild;
+        const q = document.createRange();
+        q.selectNodeContents(last);
+        return [d.textContent.replace("）", ")"), Math.round(r.getBoundingClientRect().top) === Math.round(q.getBoundingClientRect().top) ? 1 : 2];
+      }));
+      expect(names).toEqual([["%dp1", 1], ["$DIFFERENTIAL_PAIR)", 1], ["%sym12", 1], ["$MIRRORED)", 1]]);
+    }
+  });
+
   test("a tap on the id of a row selects the usage", async ({ page }) => {
     await page.locator('#usage-detail button.membership-id:text-is("%gnd")').tap();
     await expect(page.locator("#usage-detail h2")).toHaveText(/%gnd/);

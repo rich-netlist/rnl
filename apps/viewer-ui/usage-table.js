@@ -23,14 +23,18 @@ function sentence(message, ...nodes) {
     const i = part.charCodeAt(0) - 0xe000;
     if (part.length === 1 && i >= 0 && i < nodes.length) out.append(nodes[i]);
     else {
-      // a closing bracket stays with the name before it, however long the name is and wherever it breaks
+      // a closing bracket stays with the name before it: the name's last character and the bracket are one
+      // piece, so a name that is longer than a line breaks before that, never leaves the bracket to begin one
       const [, closing, rest] = part.match(/^([)）]*)([^]*)$/);
-      if (closing) {
-        const close = document.createElement("span");
-        close.className = "membership-close";
-        close.textContent = closing;
-        out.append(close);
-      }
+      const before = out.lastChild;
+      if (closing && before?.nodeType === 1 && before.textContent) {
+        const letters = Array.from(before.textContent);
+        const tail = document.createElement("span");
+        tail.className = "membership-tail";
+        tail.textContent = letters.pop() + closing;
+        before.textContent = letters.join("");
+        before.append(tail);
+      } else if (closing) out.append(document.createTextNode(closing));
       if (rest) out.append(document.createTextNode(rest));
     }
   }

@@ -72,11 +72,35 @@ for (const lang of ["en", "zh"]) {
     await selectObject(page, "instance", "R1");
     if (lang === "zh") await page.evaluate(() => window.viewer.command("language-zh"));
     await expect(rows(page)).toHaveCount(8);
-    const stray = await page.evaluate(() => [...document.querySelectorAll("#usage-detail .membership-close")].filter((c) => {
-      const rects = c.previousElementSibling.getClientRects();
-      return c.getBoundingClientRect().top > rects[rects.length - 1].top + 4;
+    // the bracket is on the line of the character before it
+    const stray = await page.evaluate(() => [...document.querySelectorAll("#usage-detail .membership-tail")].filter((tail) => {
+      const text = tail.firstChild;
+      const at = (from, to) => { const r = document.createRange(); r.setStart(text, from); r.setEnd(text, to); return r.getBoundingClientRect().top; };
+      return at(text.length - 1, text.length) > at(0, 1) + 4;
     }).length);
     expect(stray).toBe(0);
+  });
+}
+
+/** The definitions of the usages of M1 of the OTA, `$DIFFERENTIAL_PAIR` and `$MIRRORED`, each on one line: a name that fits a line is moved whole to the next, not broken. */
+const unbroken = (page) => page.evaluate(() => [...document.querySelectorAll("#usage-detail .membership-definition")].map((d) => {
+  // the lines it is on: the top of its first character and of its last
+  const tops = [d.firstChild, d.lastChild.lastChild ?? d.lastChild].map((n, i) => {
+    const r = document.createRange();
+    if (i === 0) { r.setStart(n, 0); r.setEnd(n, 1); } else { r.selectNodeContents(n); }
+    return Math.round(r.getBoundingClientRect().top);
+  });
+  return [d.textContent.replace("）", ")"), tops[0] === tops[1] ? 1 : 2];
+}));
+
+for (const lang of ["en", "zh"]) {
+  test(`a name that fits a line is not broken, in a panel as narrow as it goes (${lang})`, async ({ page, viewer }) => {
+    await viewer.open("usage-ota5t");
+    await page.evaluate(async (w) => (await import("./panels.js")).setSidebarWidth(w), 0);
+    await selectObject(page, "instance", "M1");
+    if (lang === "zh") await page.evaluate(() => window.viewer.command("language-zh"));
+    await expect(rows(page)).toHaveCount(2);
+    expect(await unbroken(page)).toEqual([["$DIFFERENTIAL_PAIR)", 1], ["$MIRRORED)", 1]]);
   });
 }
 

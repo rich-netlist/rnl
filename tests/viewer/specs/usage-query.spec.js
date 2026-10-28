@@ -36,7 +36,8 @@ test("an instance's usages are in the lower half of the Usage panel, the usages 
   await expect(page.locator("#usage-detail h2")).toHaveText("Usages of R1");
   await expect(ids(page)).toHaveText(["%pair1", "%outer", "%top", "%top", "%all", "%bad"]);
   await expect(page.locator("#usage-detail .membership-role")).toHaveText(["left", "first", "first", "second", "{members}", "left"]);
-  await expect(page.locator("#usage-detail .membership-definition")).toHaveText(["$PAIR", "$TWO", "$TWO", "$TWO", "$SET", "$PAIR"]);
+  // (the bracket that closes the definition is a part of its element, to stay with its last character)
+  await expect(page.locator("#usage-detail .membership-definition")).toHaveText(["$PAIR", "$TWO", "$TWO", "$TWO", "$SET", "$PAIR"].map((d) => d + ")"));
   // %outer is a member of %top in turn, under %pair1, which it is made of: the chain upward, indented
   const depths = await rows(page).evaluateAll((els) => els.map((e) => Number(e.style.getPropertyValue("--depth"))));
   expect(depths).toEqual([0, 1, 2, 0, 0, 0]);
