@@ -65,6 +65,7 @@ from base64 import b64encode
 from datetime import date, datetime, timedelta, timezone
 from functools import lru_cache
 from html import escape
+import hashlib
 import importlib.util
 import json
 import os
@@ -551,7 +552,8 @@ COUNTS = re.compile(r"(\d+) errors?, (\d+) warnings?, (\d+) hints?")
 
 def check_examples(files, ex):
     """Check that every samples/site/<name>.sp referenced in src/ exists in site/examples/, and that
-    the 5T OTA netlist excerpts and coordinates in src/assets/scenes.js stay in step with them."""
+    the 5T OTA netlist excerpts and coordinates in src/assets/scenes.js, and the example's in src/assets/ota.js,
+    stay in step with them."""
     errors = []
     linked = {m.group(1) for text in files.values() for m in SAMPLES_SITE.finditer(text)}
     have = set(ex)
@@ -573,18 +575,17 @@ def check_examples(files, ex):
     for bare, en in re.findall(r"u\d+:\s*\['([^']+)',\s*'([^']+)'\]", block(r"var U = \{(.*?)\n  \};")):
         if "ota5t-edits.sp" in ex and bare not in ex["ota5t-edits.sp"]:
             errors.append("examples/ota5t-edits.sp: missing %r from U in src/assets/scenes.js" % bare)
-        for target in ("ota5t.sp", "ota5t-resolved.sp"):
+        for target in ("ota5t.sp",):
             if target in ex and en not in ex[target]:
                 errors.append("examples/%s: missing %r from U in src/assets/scenes.js" % (target, en))
     for zh in re.findall(r"u\d+:\s*'([^']+)'", block(r"var UZ = \{(.*?)\n  \};")):
         if "ota5t-zh.sp" in ex and zh not in ex["ota5t-zh.sp"]:
             errors.append("examples/ota5t-zh.sp: missing %r from UZ in src/assets/scenes.js" % zh)
     for line in re.findall(r"add\('(?:[hm]\d+|end)',\s*'([^']+)'", scenes):
-        for target in ("ota5t.sp", "ota5t-zh.sp", "ota5t-edits.sp", "ota5t-resolved.sp", "ota5t_tb.sp"):
+        for target in ("ota5t.sp", "ota5t-zh.sp", "ota5t-edits.sp", "ota5t_tb.sp"):
             if target in ex and line not in ex[target]:
                 errors.append("examples/%s: missing %r from otaCode in src/assets/scenes.js" % (target, line))
-    for tbl_name, targets in (("L_SYM", ("ota5t.sp", "ota5t-zh.sp", "ota5t-edits.sp")),
-                              ("L_RESOLVED", ("ota5t-resolved.sp",))):
+    for tbl_name, targets in (("L_SYM", ("ota5t.sp", "ota5t-zh.sp", "ota5t-edits.sp")),):
         for dev, x, y, o in re.findall(r"(M\d):\s*\[(-?\d+),\s*(-?\d+),\s*'(\w+)'\]",
                                        block(r"var %s = \{(.*?)\};" % tbl_name)):
             stmt = ('#%s @PLACE(%s, %s);' % (dev, x, y) if dev == "M5" and o == "R0"
@@ -603,6 +604,87 @@ def check_examples(files, ex):
             continue
         if "ota5t_tb.sp" in ex and line not in ex["ota5t_tb.sp"]:
             errors.append("examples/ota5t_tb.sp: missing %r from E2_LINES in src/assets/scenes.js" % line)
+    return errors + check_ota(files, ex) + check_sim(files, ex)
+
+
+OTA_FILES = {"bare": "ota5t-review-bare.sp", "en": "ota5t-review.sp", "zh": "ota5t-review-zh.sp", "eda": "ota5t-review-eda.sp"}
+
+
+def check_ota(files, ex):
+    """The OTA of the introduction: the lines in src/assets/ota.js are those of the four files
+    examples/ota5t-review*.sp (the notation, the English sentences, the Chinese ones, and the English file with the two
+    public packages), and src/assets/ota-looks.js holds the core's drawings of the present text of the standard and
+    the package files."""
+    script = files.get("assets/ota.js", "")
+    if not script or any(name not in ex for name in OTA_FILES.values()):
+        return []
+    errors = []
+    bare, en, zh, eda = (ex[OTA_FILES[k]] for k in ("bare", "en", "zh", "eda"))
+
+    def block(pattern):
+        m = re.search(pattern, script, re.S)
+        if not m:
+            errors.append("src/assets/ota.js: missing %s" % pattern)
+            return ""
+        return m.group(1)
+
+    for key, notation, sentence in re.findall(r"(\w+):\s*\['([^']+)',\s*'([^']+)'\]", block(r"var T = \{(.*?)\n  \};")):
+        for name, text, want in (("ota5t-review-bare.sp", bare, notation), ("ota5t-review.sp", en, sentence)):
+            if want not in text:
+                errors.append("examples/%s: missing %r from T[%s] in src/assets/ota.js" % (name, want, key))
+    for key, text in re.findall(r"(\w+):\s*'([^']+)'", block(r"TZ = \{(.*?)\n  \};")):
+        if text not in zh:
+            errors.append("examples/ota5t-review-zh.sp: missing %r from TZ[%s] in src/assets/ota.js" % (text, key))
+    # the fixed lines of the file are the same in the four files, and every line of a file is in the script
+    fixed = re.findall(r"add\('\w+', '([^']+)'", script)
+    fixed += [text for _, text in re.findall(r"dev\('(\w+)', '([^']+)'\)", script)]
+    fixed = [line for line in fixed if '@RNL(type="header")' not in line]   # built from its parts, checked below
+    for line in fixed:
+        for name in OTA_FILES.values():
+            if line not in ex[name].split("\n"):
+                errors.append("examples/%s: missing the line %r of src/assets/ota.js" % (name, line))
+    statements = {t for pair in re.findall(r"\w+:\s*\['([^']+)',\s*'([^']+)'\]", block(r"var T = \{(.*?)\n  \};")) for t in pair}
+    statements |= set(re.findall(r"\w+:\s*'([^']+)'", block(r"TZ = \{(.*?)\n  \};")))
+    for name, text in (("ota5t-review-bare.sp", bare), ("ota5t-review.sp", en), ("ota5t-review-zh.sp", zh)):
+        for line in text.split("\n"):
+            if not line.strip() or '@RNL(type="header")' in line:
+                continue
+            if line not in fixed and not (line.startswith("*   ") and line[4:] in statements):
+                errors.append("examples/%s: the line %r is not among the lines of src/assets/ota.js" % (name, line))
+    # the same file with the two public packages, and the core's drawings of the two, which say which file they are of
+    header = '* @RNL(type="header") { @VERSION("0.3")}'
+    packages = '; @USE-PACKAGE(name="eda-symbol", version="0.1"); @USE-PACKAGE(name="eda-style", version="0.1")'
+    if eda != en.replace(header, header.replace('")}', '")' + packages + "}")):
+        errors.append("examples/ota5t-review-eda.sp: is not examples/ota5t-review.sp with the USE-PACKAGE lines of eda-symbol and eda-style in its header")
+    if packages not in script:
+        errors.append("src/assets/ota.js: PACKAGES is not the USE-PACKAGE lines of examples/ota5t-review-eda.sp")
+    looks = files.get("assets/ota-looks.js", "")
+    for look, name in (("standard", "ota5t-review.sp"), ("eda", "ota5t-review-eda.sp")):
+        m = re.search(r'"%s": \{\s*"file": "([^"]+)",\s*"sha256": "([0-9a-f]+)"' % look, looks)
+        want = hashlib.sha256(ex[name].encode("utf-8")).hexdigest()
+        if not m or m.group(1) != name or not want.startswith(m.group(2)):
+            errors.append("src/assets/ota-looks.js: the %s look is not drawn from the present examples/%s; run node site/render-examples.mjs" % (look, name))
+    return errors
+
+
+SIM = HERE / "sim" / "ota5t-review-tb.sp"
+
+
+def check_sim(files, ex):
+    """The simulation beside the example: site/sim/ota5t-review-tb.sp is the example file with a testbench, and the
+    result in src/assets/ota-sim.js (a Spectre run, site/sim/make-result.py; Spectre is not in CI) is that of the present
+    testbench."""
+    result = files.get("assets/ota-sim.js", "")
+    if not SIM.is_file() or "ota5t-review.sp" not in ex or not result:
+        return []
+    errors = []
+    tb = SIM.read_text(encoding="utf-8").replace("\r\n", "\n")
+    lines = ex["ota5t-review.sp"].split("\n")
+    if lines[-2:] != [".end", ""] or not tb.startswith("\n".join(lines[:-2]) + "\n"):
+        errors.append("site/sim/ota5t-review-tb.sp: does not start with the lines of examples/ota5t-review.sp (without .end)")
+    m = re.search(r'"sha256":"([0-9a-f]+)"', result)
+    if not m or not hashlib.sha256(tb.encode("utf-8")).hexdigest().startswith(m.group(1)):
+        errors.append("src/assets/ota-sim.js: not the result of the present site/sim/ota5t-review-tb.sp; run the testbench and site/sim/make-result.py")
     return errors
 
 
@@ -623,7 +705,15 @@ def check_examples_rnl(rnl):
     with tempfile.TemporaryDirectory() as tmp:
         for idx, path in enumerate(sorted(EXAMPLES.glob("*.sp"))):
             rel = "examples/" + path.name
-            chk = subprocess.run([str(rnl), "check", str(path)], capture_output=True, text=True, encoding="utf-8")
+            # a file that includes public packages (USE-PACKAGE) finds them in the locked copies
+            # (python scripts/packages.py download)
+            paths = []
+            for name, version in re.findall(r'@USE-PACKAGE\(name="([\w-]+)", version="([\d.]+)"\)', path.read_text(encoding="utf-8")):
+                folder = ROOT / ".rnl-packages" / name / version
+                if not folder.is_dir():
+                    errors.append("%s: the package %s %s is not in .rnl-packages/: run python scripts/packages.py download" % (rel, name, version))
+                paths += ["--path", str(folder)]
+            chk = subprocess.run([str(rnl), "check", str(path), *paths], capture_output=True, text=True, encoding="utf-8")
             m = COUNTS.search(chk.stdout)
             if not m:
                 errors.append("%s: rnl check printed no summary:\n%s%s" % (rel, chk.stdout, chk.stderr))
@@ -634,7 +724,7 @@ def check_examples_rnl(rnl):
                               % (rel, n_err, n_warn, "\n".join(
                                   l for l in chk.stdout.splitlines() if l.startswith(("error", "warning")))))
             out_dir = Path(tmp) / str(idx)
-            rnd = subprocess.run([str(rnl), "render", str(path), "--out", str(out_dir)],
+            rnd = subprocess.run([str(rnl), "render", str(path), "--out", str(out_dir), *paths],
                                  capture_output=True, text=True, encoding="utf-8")
             if rnd.returncode != 0 or not list(out_dir.glob("*.svg")):
                 errors.append("%s: rnl render failed:\n%s%s" % (rel, rnd.stdout, rnd.stderr))

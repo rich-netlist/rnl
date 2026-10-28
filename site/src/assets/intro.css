@@ -382,45 +382,11 @@ button.hero-logo { padding: 0; border: 0; background: none; cursor: pointer; }
 .titleblock .tb-main dd { font: 700 17px/1.5 var(--f-disp); letter-spacing: .02em; }
 .titleblock dd .mono { font-size: 13px; }
 
-/* Hero demo: one file, two readers */
-.hero-demo {
-  margin-top: 48px; display: grid; align-items: stretch; gap: 0;
-  grid-template-columns: minmax(0, 1fr) 64px minmax(0, 1.18fr) 64px minmax(0, 1fr);
-}
-.hd-arrow { position: relative; display: grid; place-items: center; }
-.hd-arrow svg { width: 64px; height: 44px; overflow: visible; }
-.hd-arrow .hd-flow { fill: none; stroke: var(--ink-3); stroke-width: 1.6; stroke-dasharray: 3 5; animation: dash-left 1.2s linear infinite; }
-.hd-arrow.to-right .hd-flow { animation-name: dash-right; }
-.hd-arrow .hd-head { fill: var(--ink-3); }
-.hd-arrow span {
-  position: absolute; top: calc(50% + 24px); left: 50%; transform: translateX(-50%); width: 60px; text-align: center;
-  font-size: 12px; line-height: 1.4; color: var(--ink-3);
-}
-@keyframes dash-left { to { stroke-dashoffset: 16; } }
 @keyframes dash-right { to { stroke-dashoffset: -16; } }
-.hero-demo.focus-sim .to-right .hd-flow, .hero-demo.focus-view .to-left .hd-flow { opacity: .25; }
-.hero-demo.focus-sim .hd-view, .hero-demo.focus-view .hd-sim { opacity: .5; }
-.hd-out { display: flex; flex-direction: column; transition: opacity .3s; }
-.hd-out .fig { flex: 1; display: grid; place-items: center; padding: 10px 12px 4px; min-height: 0; }
-.hd-out .cap { padding: 8px 14px 12px; font-size: 13px; color: var(--ink-2); min-height: 56px; }
-.hd-file .ph { flex-wrap: wrap; }
-.hd-file .code { max-height: none; font-size: 12.5px; }
-.hero-note {
-  grid-column: 1 / -1; margin-top: 16px; display: flex; align-items: flex-start; gap: 10px;
-  font-size: 15px; color: var(--ink-2); min-height: 52px;
-}
-.hero-note .ico { color: var(--markup); margin-top: 3px; }
-.hero-note b { color: var(--ink); font-weight: 600; }
 
 @media (max-width: 1000px) {
   .hero-grid { grid-template-columns: minmax(0, 1fr); gap: 32px; }
   .titleblock { max-width: 520px; }
-  .hero-demo { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
-  .hd-file { grid-column: 1 / -1; order: -1; }
-  .hd-arrow { display: none; }
-}
-@media (max-width: 640px) {
-  .hero-demo { grid-template-columns: 1fr; }
 }
 
 /* ---------- Code panels ---------- */
@@ -644,8 +610,12 @@ button.hero-logo { padding: 0; border: 0; background: none; cursor: pointer; }
 
 /* ---------- 03 Vision ---------- */
 
-.hub { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, .9fr) minmax(0, 1fr); gap: 26px 64px; align-items: center; }
-.hub-col { display: grid; gap: 18px; }
+/* One layout at every width, so that the arrows keep their meaning: the two who work on the file above it, the tools that
+   read it below it; the wires are drawn between the boxes (intro.js) */
+.hub { position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 56px 16px; align-items: stretch; }
+.hub-col { display: contents; }
+.hub-core { grid-column: 1 / -1; justify-self: center; width: min(100%, 520px); }
+.hub-col:last-child .hub-node { grid-column: 1 / -1; justify-self: center; width: min(100%, 440px); }
 .hub-core {
   position: relative; z-index: 1; padding: 22px 22px 18px; border: 1.5px solid var(--ink); border-radius: 14px; background: var(--panel);
   box-shadow: var(--shadow); text-align: center;
@@ -664,13 +634,11 @@ button.hero-logo { padding: 0; border: 0; background: none; cursor: pointer; }
 .hub-wires { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; overflow: visible; }
 .hub-wires path { fill: none; stroke: var(--line-2); stroke-width: 1.5; }
 .hub-wires circle.pulse { fill: var(--markup); }
-@media (max-width: 900px) {
-  .hub { grid-template-columns: 1fr 1fr; gap: 14px; }
-  .hub-core { grid-column: 1 / -1; order: -1; }
-  .hub-col { display: contents; }
-  .hub-wires { display: none; }
+@media (max-width: 520px) {
+  .hub { gap: 44px 10px; }
+  .hub-node { flex-direction: column; gap: 6px; padding: 12px; }
+  .hub-node p { font-size: 13px; line-height: 1.5; }
 }
-@media (max-width: 520px) { .hub { grid-template-columns: minmax(0, 1fr); } }
 
 /* Step-by-step refinement demo */
 .journey { margin-top: 18px; }
@@ -1609,5 +1577,109 @@ html[lang="zh-CN"] .tour-h1 { font-family: var(--f-body); font-weight: 900; lett
 .dl-soon .ico { color: var(--signal); margin-top: 3px; }
 .dl-notes { margin-top: 18px; }
 @media (max-width: 760px) { .dl-list li { grid-template-columns: 1fr; } }
+
+/* ---------- The example of 01: a five-transistor OTA, reviewed by what it says ---------- */
+#example, #journey { scroll-margin-top: 70px; }   /* the links to the example land below the top bar */
+.rv-legend { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 16px 0 24px; }
+.rv-own { display: flex; gap: 10px; align-items: flex-start; margin: 0; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); font-size: 14px; color: var(--ink-2); line-height: 1.55; }
+.rv-own b { color: var(--ink); }
+.rv-own .ico { flex: none; margin-top: 2px; }
+.rv-host .ico { color: var(--ink); }
+.rv-rnl { border-color: var(--markup-line); background: var(--markup-2); }
+.rv-rnl .ico { color: var(--markup); }
+/* the file and the drawing in one row; the checklist under them */
+.review { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: stretch; }
+.rv-code, .rv-fig { display: flex; flex-direction: column; min-width: 0; }
+.rv-code .ph { flex-wrap: wrap; }
+.rv-code .code { flex: 1 1 0; height: 0; min-height: 280px; max-height: none; font-size: 12px; }
+.rv-fig .ph { flex-wrap: wrap; row-gap: 6px; }
+.rv-fig .ph .ph-right { margin-left: auto; }
+.rv-fig.is-sim #rv-look { visibility: hidden; }
+.rv-stage { --hl: #1f4fd8; background: #fff; padding: 6px 10px; line-height: 0; }
+.rv-stage[hidden], .rv-sim[hidden] { display: none; }
+/* the traditional EDA look on black: the package's dark ink (wires, dots, texts) turns light, its green and red stay as it defines them */
+.rv-stage.is-black { --hl: #82a6ff; background: #000; }
+.rv-stage.is-black svg [stroke="#1d1d1f"] { stroke: #dcdcdc; }
+.rv-stage.is-black svg [fill="#1d1d1f"] { fill: #dcdcdc; }
+.rv-stage.is-black svg.has-lit g[data-id]:not(.is-lit), .rv-stage.is-black svg.has-lit > rect { opacity: .42; }
+/* the drawing is as tall as the screen leaves room for: file, drawing and checklist are in view together (about 300px of the
+   block is not the drawing) */
+.rv-stage svg { display: block; width: 100%; height: auto; max-height: clamp(260px, calc(100vh - 390px), 520px); margin: 0 auto; }
+.rv-stage svg g[data-id] { transition: opacity .15s; }
+.rv-stage svg.has-lit g[data-id]:not(.is-lit), .rv-stage svg.has-lit > rect { opacity: .2; }
+.rv-stage svg .is-lit [stroke]:not([stroke="none"]) { stroke: var(--hl); }
+.rv-stage svg .is-lit [fill]:not([fill="none"]) { fill: var(--hl); }
+.rv-stage svg .rv-note { display: none; pointer-events: none; }
+.rv-stage svg .rv-note.is-on { display: inline; }
+.rv-note line { stroke: var(--hl); stroke-width: 2.4; }
+.rv-note .axis { stroke-width: 1.6; stroke-dasharray: 6 5; }
+.rv-note .head { fill: var(--hl); stroke: none; }
+.rv-note text { fill: var(--hl); stroke: none; font: 600 15px var(--f-mono); }
+.rv-sim { flex: 1; min-height: 300px; padding: 12px 16px; background: var(--panel); }
+/* on a wide screen the simulator view is exactly as tall as the drawing (ota.js sets the height), so the screen does not change */
+@media (min-width: 1001px) {
+  .rv-sim:not([hidden]) { display: flex; flex-direction: column; flex: none; min-height: 0; overflow: hidden; }
+  .rv-simplot { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
+  .rv-simplot .bode { flex: 1 1 0; min-height: 0; height: auto; }
+}
+.rv-sim-h { display: flex; gap: 8px; align-items: center; margin: 0 0 6px; font-size: 14px; font-weight: 600; color: var(--ink); }
+.rv-sim-h .ico { color: var(--signal); }
+.rv-sim-m { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 13.5px; color: var(--ink-2); }
+.rv-sim-m b { color: var(--ink); font-weight: 600; }
+.rv-sim-n { margin: 8px 0 0; font-size: 13px; line-height: 1.55; color: var(--ink-3); }
+.rv-sim-n code { font-size: 12px; }
+.rv-fig .jr-cap { padding: 8px 14px 6px; font-size: 14px; line-height: 1.55; min-height: 72px; }
+.code.is-sim .cl.is-rnl { background: none; box-shadow: none; }
+.code.is-sim .cl.is-rnl .tx { opacity: .36; }
+.cl.is-diff { background: var(--markup-2); box-shadow: inset 3px 0 0 var(--markup); }
+.rv-list { grid-column: 1 / -1; }
+.rv-list .ph { padding-block: 7px; }
+.rv-items { list-style: none; margin: 0; padding: 4px 8px 6px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; }
+.rv-item { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 8px; align-items: baseline; padding: 5px 10px; border-radius: 8px; border: 1px solid transparent; cursor: pointer; font-size: 14px; line-height: 1.45; color: var(--ink-2); }
+.rv-item:hover, .rv-item:focus-visible, .rv-item.is-on { background: var(--signal-2); border-color: color-mix(in srgb, var(--signal) 30%, transparent); outline: none; }
+.rv-item[aria-pressed="true"] { border-color: var(--signal); }
+.rv-item b { color: var(--ink); }
+.rv-k { font: 600 11px var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--markup); }
+.rv-item.is-intent .rv-k { color: var(--ok); }
+.cl.is-dev { background: var(--signal-2); box-shadow: inset 3px 0 0 color-mix(in srgb, var(--signal) 55%, transparent); }
+.cl.is-hot.is-rnl { background: var(--signal-2); }
+.facts.four { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 0; }
+.facts.five { grid-template-columns: repeat(6, minmax(0, 1fr)); margin-top: 0; }
+.facts.five .fact { grid-column: span 2; }
+.facts.five .fact:nth-child(n+4) { grid-column: span 3; }
+.facts.ai-points { margin-top: 0; }
+.eco { list-style: none; margin: 0 0 8px; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.eco a { display: grid; gap: 6px; align-content: start; height: 100%; padding: 16px 18px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); text-decoration: none; color: var(--ink); }
+.eco a:hover { border-color: var(--markup-line); background: var(--markup-2); }
+.eco .ico { width: 22px; height: 22px; color: var(--markup); }
+.eco span { font-size: 14px; color: var(--ink-2); line-height: 1.55; }
+/* on a wide screen the example stops the scroll when it comes up under the bar (proximity: a nudge, never a trap) */
+@media (min-width: 1001px) and (min-height: 600px) {
+  html { scroll-snap-type: y proximity; }
+  /* a link to an address of the page lands where it points: the stop is off until the page is scrolled by hand (intro.js) */
+  html.no-snap { scroll-snap-type: none; }
+  .review { scroll-snap-align: start; scroll-margin-top: 71px; }
+}
+@media (max-width: 1000px) {
+  .review { grid-template-columns: minmax(0, 1fr); }
+  .rv-fig { order: 1; }
+  .rv-code { order: 2; }
+  .rv-list { order: 3; }
+  .rv-code .code { flex: none; height: auto; min-height: 0; max-height: 360px; }
+  .rv-stage svg { max-height: 520px; }
+  .rv-fig .jr-cap { min-height: 92px; }
+  .rv-items { grid-template-columns: minmax(0, 1fr); }
+  .facts.four, .eco { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .facts.five { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .facts.five .fact, .facts.five .fact:nth-child(n+4) { grid-column: auto; }
+}
+@media (max-width: 640px) {
+  /* the long lines of the file wrap at phone width instead of being cut */
+  .rv-code .cl { min-width: 0; }
+  .rv-code .cl .tx { min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .rv-legend { grid-template-columns: 1fr; }
+  .rv-item { grid-template-columns: 1fr; gap: 2px; }
+  .facts.four, .facts.five, .eco { grid-template-columns: 1fr; }
+}
 
 {{locale-css}}

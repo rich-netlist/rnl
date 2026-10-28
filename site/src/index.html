@@ -115,17 +115,16 @@
             <div class="hero-logo-controls"><button id="hero-logo-close" type="button" aria-label="<en>Close</en>" title="<en>Close</en>">×</button></div>
           </div>
         </div>
-        <p class="thesis"><en>A netlist you can simulate and also draw as a schematic.</en></p>
-        <p class="lead"><en>RNL writes “how to understand and draw this circuit” into the netlist’s comments. Simulators skip it as a comment, as they always do; tools that support RNL read it and draw a clean schematic.</en></p>
+        <p class="thesis"><en>The circuit source file for the AI era</en></p>
+        <p class="lead"><en>RNL writes the semantics of a circuit into the comments of its netlist: structures, intent and drawing, in a plain-text format that people and AI can read.</en></p>
         <div class="cta">
-          <a class="btn btn-primary" href="#overview"><en>Three-minute tour</en> <svg class="ico"><use href="#i-down"/></svg></a>
-          <a class="btn" href="#journey"><en>Watch it draw, step by step</en></a>
+          <a class="btn btn-primary" href="#example"><en>See the example</en> <svg class="ico"><use href="#i-down"/></svg></a>
           <a class="btn" href="language.html"><en>Language tour</en> <svg class="ico"><use href="#i-arrow"/></svg></a>
         </div>
       </div>
       <dl class="titleblock" aria-label="<en>Project facts</en>">
         <div class="tb-main"><dt><en>Project</en></dt><dd>Rich Netlist (RNL)</dd></div>
-        <div><dt><en>What</en></dt><dd><en>A metadata extension attached to netlists</en></dd></div>
+        <div><dt><en>What</en></dt><dd><en>A data extension attached to netlist comments</en></dd></div>
         <div><dt><en>Hosts</en></dt><dd><en>SPICE, Spectre and other netlists, inside comments</en></dd></div>
         <div><dt><en>Stage</en></dt><dd><en>Language standard 0.3; <a href="tools.html">a preview toolkit</a>; a first solver</en></dd></div>
         <div><dt><en>Language</en></dt><dd><span class="mono">0.3 · 2026-10-18</span></dd></div>
@@ -133,40 +132,6 @@
       </dl>
     </div>
 
-    <div class="hero-demo" id="hero-demo">
-      <div class="hd-out hd-sim panel">
-        <div class="ph"><svg class="ico"><use href="#i-wave"/></svg><span class="ph-title"><en>Simulator</en></span><span class="ph-right"><span class="chip" id="hero-sim-chip"><en>Netlist only</en></span></span></div>
-        <div class="fig"><svg id="hero-plot" role="img" aria-label="<en>Magnitude response of the RC low-pass filter; cutoff near 1.59 kHz</en>"></svg></div>
-        <p class="cap"><en>Simulated as usual: an <span class="mono">.ac</span> sweep puts the −3 dB point at 1.59 kHz. To the simulator, the RNL lines are only comments.</en></p>
-      </div>
-      <div class="hd-arrow to-left" aria-hidden="true">
-        <svg viewBox="0 0 64 44"><path class="hd-flow" d="M60 22H10"/><path class="hd-head" d="M2 22l10-5.5v11z"/></svg>
-        <span><en>netlist only</en></span>
-      </div>
-      <div class="hd-file panel">
-        <div class="ph">
-          <svg class="ico"><use href="#i-file"/></svg><span class="ph-title">rc_lowpass.sp</span>
-          <span class="ph-right">
-            <span class="seg" id="hero-mode" role="group" aria-label="<en>Read this file as</en>">
-              <button type="button" data-mode="both" aria-pressed="true"><en>Both</en></button>
-              <button type="button" data-mode="sim" aria-pressed="false"><en>Simulator</en></button>
-              <button type="button" data-mode="view" aria-pressed="false"><en>RNL tools</en></button>
-            </span>
-          </span>
-        </div>
-        <div class="code" id="hero-code"></div>
-      </div>
-      <div class="hd-arrow to-right" aria-hidden="true">
-        <svg viewBox="0 0 64 44"><path class="hd-flow" d="M4 22h50"/><path class="hd-head" d="M62 22l-10-5.5v11z"/></svg>
-        <span><en>netlist<br>+ RNL</en></span>
-      </div>
-      <div class="hd-out hd-view panel">
-        <div class="ph"><svg class="ico"><use href="#i-eye"/></svg><span class="ph-title"><en>RNL viewer</en></span><span class="ph-right"><span class="chip chip-rnl" id="hero-view-chip"><en>Netlist + RNL</en></span></span></div>
-        <div class="fig"><svg id="hero-svg" role="img" aria-label="<en>RC low-pass schematic drawn from the same file</en>"></svg></div>
-        <p class="cap"><en>The schematic drawn from the same file: source on the left, load on the right, and the net label from RNL; the standard package adds the ground symbols automatically.</en></p>
-      </div>
-      <p class="hero-note"><svg class="ico"><use href="#i-info"/></svg><span id="hero-note-text"></span></p>
-    </div>
   </div>
 </section>{{translation-notice}}
 
@@ -174,103 +139,85 @@
 <nav id="toc" aria-label="<en>Contents</en>">
   <p class="toc-title"><en>Contents</en></p>
   <ul>
-    <li><a href="#overview"><en>The three-minute tour</en></a></li>
     <li><a href="#what"><en>What</en></a></li>
     <li><a href="#why"><en>Why</en></a></li>
-    <li><a href="#vision"><en>Vision</en></a></li>
+    <li><a href="#advantages"><en>Advantages</en></a></li>
     <li><a href="#scenes"><en>Scenarios</en></a></li>
+    <li><a href="#vision"><en>Vision</en></a></li>
     <li><a href="#status"><en>Status</en></a></li>
     <li><a href="#next"><en>Next</en></a></li>
   </ul>
 </nav>
 <main id="main" class="page-content">
 
-<!-- ===================== Overview ===================== -->
-<section id="overview" class="sheet">
-  <div class="wrap">
-    <header class="sheet-head">
-      <p class="sheet-no"><en>00 · Overview</en></p>
-      <h2><en>The three-minute tour</en></h2>
-    </header>
-    <ol class="brief">
-      <li>
-        <span class="brief-k"><svg class="ico"><use href="#i-question"/></svg><en>Problem</en></span>
-        <p><en>A netlist simulates, but you cannot see the circuit in it. A schematic is easy to read, but it is locked in each tool’s proprietary format and often disagrees with the netlist.</en></p>
-        <a href="#why"><en>Why RNL →</en></a>
-      </li>
-      <li>
-        <span class="brief-k"><svg class="ico"><use href="#i-asterisk"/></svg><en>Approach</en></span>
-        <p><en>Write “how to read it, how to draw it” into netlist comments: differential pairs, symmetry, signal flow, or exact coordinates and wires. The simulator sees only comments.</en></p>
-        <a href="#what"><en>What RNL is →</en></a>
-      </li>
-      <li>
-        <span class="brief-k"><svg class="ico"><use href="#i-spark"/></svg><en>Result</en></span>
-        <p><en>Write a few lines of intent and a solver lays out a tidy schematic. Any viewer that supports RNL can open it, the way any reader opens a PDF.</en></p>
-        <a href="#vision"><en>See the result →</en></a>
-      </li>
-      <li>
-        <span class="brief-k"><svg class="ico"><use href="#i-flask"/></svg><en>Status</en></span>
-        <p><en>Language standard 0.3 is released. The web and desktop viewers read netlists, draw placed objects, and edit the text; a first version of the solver runs in the CLI and as a preview in the desktop viewer.</en></p>
-        <a href="#status"><en>Progress →</en></a>
-      </li>
-    </ol>
-  </div>
-</section>
-
 <!-- ===================== 01 What ===================== -->
 <section id="what" class="sheet">
   <div class="wrap">
     <header class="sheet-head">
-      <p class="sheet-no"><en>01 · What</en></p>
-      <h2><en>The netlist defines the circuit. <span class="mk">RNL describes how to understand and present it.</span></en></h2>
-      <p class="lead"><en>Rich Netlist (RNL) is not a new netlist format. It is a layer of description written in the comments of existing netlists: which structures the devices form, how the designer wants them placed, and how the drawing should look.</en></p>
+      <p class="sheet-no"><en>01 · What RNL is</en></p>
+      <h2><en>Netlists rich in circuit semantics</en></h2>
+      <p class="lead"><en>RNL fills the high-level semantic gap between netlists and schematics: structures, intent and drawing</en></p>
     </header>
 
-    <blockquote class="motto">
-      <p><en><span class="m-host">The native netlist defines the circuit;</span> <span class="m-rnl">Rich Netlist describes how to understand and present that circuit.</span> Semantic description can exist without geometry, and geometry can be refined step by step, but neither may redefine the circuit.</en></p>
-      <cite><en>RNL Principles · 1. Positioning and overview</en></cite>
-    </blockquote>
+    <!-- #journey, the old address of the example, is on the lead below: links to it keep working -->
+    <h3 class="sub-h" id="example"><en>A real RNL case designed by an agent, and the schematic rendered from it</en></h3>
+    <p class="sub-lead" id="journey"><en>Review needs no line-by-line reading of the netlist, only a check of the semantics it declares. Exact schematic information can be generated by a solver or output directly by a model.</en></p>
 
-    <div class="owners" id="owners">
-      <div class="own own-host">
-        <h3><svg class="ico"><use href="#i-netlist"/></svg><en>Owned by the netlist</en></h3>
-        <p class="own-sub"><en>Electrical facts, one source</en></p>
-        <ul>
-          <li><button type="button" data-own="devices"><span class="dot"></span><span><en>Devices and types<small>what each of M1–M5 is</small></en></span></button></li>
-          <li><button type="button" data-own="params"><span class="dot"></span><span><en>Parameters<small>values such as W, L, 10k</small></en></span></button></li>
-          <li><button type="button" data-own="nets"><span class="dot"></span><span><en>Connectivity<small>which terminals are joined</small></en></span></button></li>
-          <li><button type="button" data-own="ports"><span class="dot"></span><span><en>Subcircuit interface<small>inp, inn, out, vbias</small></en></span></button></li>
-        </ul>
+    <div class="review" id="review">
+      <div class="rv-code panel">
+        <div class="ph"><svg class="ico"><use href="#i-file"/></svg><span class="ph-title">ota5t.sp</span><span class="ph-right">
+          <span class="seg" id="rv-style" role="group" aria-label="<en>Writing style</en>">
+            <button type="button" data-style="bare" aria-pressed="false"><en>Plain</en></button>
+            <button type="button" data-style="en" aria-pressed="true"><en>Annotated</en></button>
+            <!--zh-CN--><button type="button" data-style="zh" aria-pressed="false"><en>Chinese</en></button><!--/zh-CN-->
+          </span>
+          <a class="chip" id="rv-open" href="../viewer/?url=samples/site/ota5t-review.sp" target="_blank" rel="noopener"><en>Open in viewer</en></a></span></div>
+        <div class="code" id="rv-code"></div>
+        <div class="jr-legend"><span class="chip chip-rnl"><en>RNL records</en></span><span class="chip chip-user"><en>Lines of the picked item</en></span></div>
       </div>
-      <div class="own-fig panel">
-        <div class="ph"><svg class="ico"><use href="#i-eye"/></svg><span class="ph-title"><en>ota5t · five-transistor OTA</en></span><span class="ph-right"><span class="chip"><en>Hover or click the items on either side</en></span><a class="chip" href="../viewer/?url=samples/site/ota5t.sp" target="_blank" rel="noopener"><en>Open in viewer</en></a></span></div>
-        <div class="fig"><svg id="own-svg" role="img" aria-label="<en>Five-transistor OTA schematic</en>"></svg></div>
-        <p class="own-cap" id="own-cap"></p>
+      <div class="rv-fig panel" id="rv-figure">
+        <div class="ph"><svg class="ico"><use href="#i-eye"/></svg>
+          <span class="seg" id="rv-view" role="group" aria-label="<en>Read the file as</en>">
+            <button type="button" data-view="viewer" aria-pressed="true"><en>RNL viewer</en></button>
+            <button type="button" data-view="sim" aria-pressed="false"><en>Simulator</en></button>
+          </span>
+          <span class="ph-right"><span class="seg" id="rv-look" role="group" aria-label="<en>Look of the drawing</en>">
+            <button type="button" data-look="standard" aria-pressed="true"><en>Standard look</en></button>
+            <button type="button" data-look="eda" aria-pressed="false"><en>Traditional EDA look</en></button>
+          </span></span></div>
+        <div class="rv-stage" id="rv-stage"></div>
+        <div class="rv-sim" id="rv-sim" hidden>
+          <div class="rv-simplot" id="rv-simplot"></div>
+        </div>
+        <p class="jr-cap" id="rv-cap" aria-live="polite"></p>
       </div>
-      <div class="own own-rnl">
-        <h3><svg class="ico"><use href="#i-asterisk"/></svg><en>Owned by RNL</en></h3>
-        <p class="own-sub"><en>Understanding and presentation; it references, never rewrites</en></p>
-        <ul>
-          <li><button type="button" data-own="semantic"><span class="dot"></span><span><en>Structure<small>differential pair with its tail, current mirror</small></en></span></button></li>
-          <li><button type="button" data-own="intent"><span class="dot"></span><span><en>Intent<small>symmetry, centering, order, current direction</small></en></span></button></li>
-          <li><button type="button" data-own="geometry"><span class="dot"></span><span><en>Drawing<small>positions, orientations, wires</small></en></span></button></li>
-          <li><button type="button" data-own="virtual"><span class="dot"></span><span><en>Display elements<small>supply, ground and port symbols, only for display</small></en></span></button></li>
-        </ul>
+      <div class="rv-list panel">
+        <div class="ph"><svg class="ico"><use href="#i-check"/></svg><span class="ph-title"><en>High-level semantics checklist</en></span><span class="ph-right"><span class="chip"><en>Hover or click an item</en></span></span></div>
+        <ol class="rv-items" id="rv-items"></ol>
       </div>
     </div>
+
+    <div class="rv-legend" aria-label="<en>Who owns what</en>">
+      <p class="rv-own rv-host"><svg class="ico"><use href="#i-netlist"/></svg><span><b><en>The netlist owns</en></b> <en>devices and types, parameters, connections, the subcircuit interface</en></span></p>
+      <p class="rv-own rv-rnl"><svg class="ico"><use href="#i-asterisk"/></svg><span><b><en>RNL owns</en></b> <en>structures, intent, the drawing, display symbols; it only references the netlist</en></span></p>
+    </div>
+
+    <blockquote class="motto">
+      <p><en><span class="m-host">The netlist describes the electrical facts,</span> <span class="m-rnl">and Rich Netlist describes how to understand and present the circuit</span></en></p>
+    </blockquote>
 
     <div class="facts">
       <div class="fact">
         <h3><svg class="ico"><use href="#i-asterisk"/></svg><en>Hidden in comments</en></h3>
-        <p><en>Written in the host netlist’s legal comments, such as SPICE’s <code>* @RNL {…}</code>. Simulators treat it as an ordinary comment; nothing has to be stripped first.</en></p>
+        <p><en>Written in the host netlist’s legal comments, such as SPICE’s <code>* @RNL {…}</code>. Simulators skip it; nothing has to be stripped.</en></p>
       </div>
       <div class="fact">
         <h3><svg class="ico"><use href="#i-link"/></svg><en>Leaves the circuit alone</en></h3>
-        <p><en>It can only reference the netlist’s devices, nets and terminals; it cannot add devices, connections or parameters. Lines that cross or overlap in the drawing are not connections.</en></p>
+        <p><en>It only references the netlist’s devices, nets and terminals; it cannot add devices, connections or parameters.</en></p>
       </div>
       <div class="fact">
         <h3><svg class="ico"><use href="#i-sliders"/></svg><en>Any level of detail</en></h3>
-        <p><en>Write just “M1 and M2 are a differential pair”, or go down to every coordinate and bend; both styles can be mixed in one file.</en></p>
+        <p><en>From “M1 and M2 are a differential pair” down to every coordinate and bend, mixed freely in one file.</en></p>
       </div>
     </div>
 
@@ -291,8 +238,8 @@
   <div class="wrap">
     <header class="sheet-head">
       <p class="sheet-no"><en>02 · Why</en></p>
-      <h2><en>Netlists and schematics each miss half the picture.</en></h2>
-      <p class="lead"><en>Simulation runs on netlists; understanding a circuit takes a schematic. Designers switch between the two every day, and each falls short somewhere.</en></p>
+      <h2><en>Netlists and schematics each miss half the picture</en></h2>
+      <p class="lead"><en>Simulation runs on netlists; understanding a circuit takes a schematic. Each falls short on its own.</en></p>
     </header>
 
     <div class="matrix-wrap">
@@ -347,6 +294,22 @@
       </table>
     </div>
 
+    <h3 class="sub-h"><en>New challenges in AI-driven design flows</en></h3>
+    <div class="facts ai-points">
+      <div class="fact">
+        <h3><svg class="ico"><use href="#i-netlist"/></svg><en>AI writes netlists people cannot review</en></h3>
+        <p><en>A few hundred generated lines do not tell a reviewer what the circuit is.</en></p>
+      </div>
+      <div class="fact">
+        <h3><svg class="ico"><use href="#i-image"/></svg><en>AI draws schematics unreliably</en></h3>
+        <p><en>Drawing a schematic stroke by stroke is hard for language models, and results vary widely between models.</en></p>
+      </div>
+      <div class="fact">
+        <h3><svg class="ico"><use href="#i-lock"/></svg><en>Agents reach schematics only through EDA tools</en></h3>
+        <p><en>The schematic is in a proprietary binary database: reading it or changing one wire goes through the tool’s interface.</en></p>
+      </div>
+    </div>
+
     <h3 class="sub-h"><en>Today’s workarounds</en></h3>
     <div class="fixes">
       <div class="fix">
@@ -365,7 +328,7 @@
       </div>
       <div class="fix">
         <div class="fix-fig"><svg id="fix-air" role="img" aria-label="<en>Five-transistor OTA placed from connectivity alone: airwires crossing everywhere</en>"></svg></div>
-        <div class="fix-body"><h4><en>Generate automatically</en></h4><p><en>An auto-layout tool knows the connections but not the structure: everything is wired, yet you cannot tell which two transistors form a pair.</en></p></div>
+        <div class="fix-body"><h4><en>Generate automatically</en></h4><p><en>Auto-layout knows the connections but not the structure: you cannot tell which transistors form a pair.</en></p></div>
       </div>
       <div class="fix">
         <div class="fix-fig">
@@ -386,88 +349,50 @@
             <path class="fx-db" d="M32 30v46c0 5.5 13.4 10 30 10s30-4.5 30-10V30M32 53c0 5.5 13.4 10 30 10s30-4.5 30-10"/>
             <g transform="translate(88 74)"><rect class="fx-badge" x="-11" y="-6" width="22" height="18" rx="3"/><path class="fx-x" d="M-6 -6v-4a6 6 0 0 1 12 0v4"/></g>
             <g class="fx-fmt">
-              <rect x="110" y="18" width="82" height="20" rx="4"/><text x="151" y="32">.oa</text>
-              <rect x="110" y="45" width="82" height="20" rx="4"/><text x="151" y="59">.kicad_sch</text>
-              <rect x="110" y="72" width="82" height="20" rx="4"/><text x="151" y="86">.asc</text>
+              <rect x="110" y="18" width="82" height="20" rx="4"/><text x="151" y="32">read()</text>
+              <rect x="110" y="45" width="82" height="20" rx="4"/><text x="151" y="59">edit()</text>
+              <rect x="110" y="72" width="82" height="20" rx="4"/><text x="151" y="86">save()</text>
             </g>
           </svg>
         </div>
-        <div class="fix-body"><h4><en>Proprietary formats</en></h4><p><en>They open only in the original tool; switching tools or versions often means starting over.</en></p></div>
+        <div class="fix-body"><h4><en>Relying on EDA APIs</en></h4><p><en>AI can only edit the circuit through the EDA tool’s API, bound by the EDA ecosystem.</en></p></div>
       </div>
     </div>
 
-    <p class="pivot"><svg class="ico"><use href="#i-asterisk"/></svg><en>RNL’s approach: no separate file; write the drawing back into the netlist itself.</en></p>
+    <p class="pivot"><svg class="ico"><use href="#i-asterisk"/></svg><en>RNL’s approach: a plain-text format that people and AI can read and edit directly, independent of any specific EDA tool</en></p>
   </div>
 </section>
 
-<!-- ===================== 03 Vision ===================== -->
-<section id="vision" class="sheet">
+<!-- ===================== 03 Advantages ===================== -->
+<section id="advantages" class="sheet">
   <div class="wrap">
     <header class="sheet-head">
-      <p class="sheet-no"><en>03 · Vision</en></p>
-      <h2><en>The goal: schematics that travel like PDFs.</en></h2>
-      <p class="lead"><en>One file that can be simulated, opened, understood and edited anywhere.</en></p>
+      <p class="sheet-no"><en>03 · Advantages</en></p>
+      <h2><en>What you get from writing the meaning down</en></h2>
     </header>
-
-    <div class="hub" id="hub">
-      <svg class="hub-wires" id="hub-wires" aria-hidden="true"></svg>
-      <div class="hub-col">
-        <div class="hub-node"><svg class="ico"><use href="#i-wave"/></svg><div><h4><en>Simulator</en></h4><p><en>SPICE and Spectre simulate as usual; RNL is just comments.</en></p></div></div>
-        <div class="hub-node"><svg class="ico"><use href="#i-eye"/></svg><div><h4><en>Viewer</en></h4><p><en>Opens in a browser, on the desktop or on a phone, with no EDA software.</en></p></div></div>
-        <div class="hub-node"><svg class="ico"><use href="#i-solver"/></svg><div><h4><en>Solver</en></h4><p><en>Turns intent into a tidy layout and writes the result back to the file.</en></p></div></div>
+    <div class="facts five">
+      <div class="fact">
+        <h3><svg class="ico"><use href="#i-asterisk"/></svg><en>Meaning first</en></h3>
+        <p><en>Say which devices form a differential pair or a current mirror, what is symmetric, where the current flows. These statements stay in the file however the drawing changes.</en></p>
       </div>
-      <div class="hub-core" id="hub-core">
-        <svg class="ico"><use href="#i-netlist"/></svg>
-        <h3>ota5t.sp</h3>
-        <p><en>One file: netlist + RNL</en></p>
-        <div class="hub-lines" id="hub-lines"></div>
+      <div class="fact">
+        <h3><svg class="ico"><use href="#i-file"/></svg><en>One plain-text file</en></h3>
+        <p><en>Simulators run it as before; it diffs and merges in Git; the drawing and the netlist cannot drift apart.</en></p>
       </div>
-      <div class="hub-col">
-        <div class="hub-node"><svg class="ico"><use href="#i-pencil"/></svg><div><h4><en>Editor</en></h4><p><en>Drag a device and the file gains one line at the end.</en></p></div></div>
-        <div class="hub-node"><svg class="ico"><use href="#i-chat"/></svg><div><h4><en>AI assistant</en></h4><p><en>Writes the structure and drawing along with the circuit.</en></p></div></div>
-        <div class="hub-node"><svg class="ico"><use href="#i-git"/></svg><div><h4><en>Version control</en></h4><p><en>Every change is a readable text diff.</en></p></div></div>
+      <div class="fact">
+        <h3><svg class="ico"><use href="#i-chat"/></svg><en>AI writes, people review</en></h3>
+        <p><en>AI writes the circuit together with its structures and drawing; people review the declared structures and intent in a viewer.</en></p>
       </div>
-    </div>
-
-    <h3 class="sub-h" id="journey"><en>From a netlist to a good drawing</en></h3>
-    <p class="sub-lead"><!--zh-CN--><en>The same five-transistor OTA, with a few more RNL lines at each step. The file is on the left, the viewer’s drawing on the right; hover over a line to see which part of the drawing it controls. Above the file you can switch the writing style between bare notation, English sentences and Chinese sentences; machines read exactly the same statements.</en><!--/zh-CN--><!--not-zh-CN--><en>The same five-transistor OTA, with a few more RNL lines at each step. The file is on the left, the viewer’s drawing on the right; hover over a line to see which part of the drawing it controls. Above the file you can switch the writing style between bare notation and English sentences; machines read exactly the same statements.</en><!--/not-zh-CN--></p>
-    <div class="journey">
-      <div class="jr-steps" id="jr-steps" role="tablist" aria-label="<en>Steps</en>">
-        <button type="button" role="tab" data-i="0"><span class="n">STEP 0</span><span class="t"><en ctx=step-0>Netlist only</en></span></button>
-        <button type="button" role="tab" data-i="1"><span class="n">STEP 1</span><span class="t"><en>Add structure</en></span></button>
-        <button type="button" role="tab" data-i="2"><span class="n">STEP 2</span><span class="t"><en>Add intent</en></span></button>
-        <button type="button" role="tab" data-i="3"><span class="n">STEP 3</span><span class="t"><en>Solver writes back</en></span></button>
-        <button type="button" role="tab" data-i="4"><span class="n">STEP 4</span><span class="t"><en>Tweak by hand</en></span></button>
-        <button type="button" role="tab" data-i="5"><span class="n">STEP 5</span><span class="t"><en>Solve again</en></span></button>
+      <div class="fact">
+        <h3><svg class="ico"><use href="#i-globe"/></svg><en>Open</en></h3>
+        <p><en>A public standard and symbol libraries, open-source tools, a viewer that opens in the browser.</en></p>
       </div>
-      <div class="jr-body">
-        <div class="jr-code panel">
-          <div class="ph"><svg class="ico"><use href="#i-file"/></svg><span class="ph-title">ota5t.sp</span><span class="ph-right">
-            <span class="seg" id="jr-style" role="group" aria-label="<en>Writing style</en>">
-              <button type="button" data-style="bare" aria-pressed="false"><en>Notation</en></button>
-              <button type="button" data-style="en" aria-pressed="true"><en>English</en></button>
-              <!--zh-CN--><button type="button" data-style="zh" aria-pressed="false"><en>Chinese</en></button><!--/zh-CN-->
-            </span>
-            <a class="chip" id="jr-open" href="../viewer/?url=samples/site/ota5t.sp" target="_blank" rel="noopener"><en>Open in viewer</en></a></span></div>
-          <div class="code" id="jr-code"></div>
-          <div class="jr-legend"><span class="chip chip-ok"><en>Added lines</en></span><span class="chip chip-warn"><en>Rewritten lines</en></span><span class="chip chip-rnl"><en>RNL records</en></span></div>
-        </div>
-        <div class="jr-fig panel">
-          <div class="ph"><svg class="ico"><use href="#i-eye"/></svg><span class="ph-title"><en>RNL viewer</en></span><span class="ph-right metric" id="jr-metrics"></span></div>
-          <div class="jr-svgwrap">
-            <svg id="jr-svg" role="img" aria-label="<en>The five-transistor OTA at the current step</en>"></svg>
-            <div class="jr-notice" id="jr-notice" hidden></div>
-          </div>
-          <p class="jr-cap" id="jr-cap" aria-live="polite"></p>
-          <div class="jr-ctrl">
-            <button class="btn btn-sm" type="button" id="jr-prev"><svg class="ico"><use href="#i-prev"/></svg><en>Back</en></button>
-            <button class="btn btn-sm btn-primary" type="button" id="jr-next"><en>Next</en><svg class="ico"><use href="#i-next"/></svg></button>
-            <span class="spacer"></span>
-            <button class="btn btn-sm" type="button" id="jr-play" aria-pressed="false"><svg class="ico"><use href="#i-play"/></svg><span><en>Autoplay</en></span></button>
-          </div>
-        </div>
+      <div class="fact">
+        <h3><svg class="ico"><use href="#i-layers"/></svg><en>Circuit separate from style</en></h3>
+        <p><en>The netlist defines what the circuit is; packages decide how it looks, like HTML for content and CSS for style. Include the public packages <code>eda-symbol</code> and <code>eda-style</code>, and the same file draws as a traditional EDA schematic. <a href="#example">Switch the look in the example.</a></en></p>
       </div>
     </div>
+
   </div>
 </section>
 
@@ -476,109 +401,54 @@
   <div class="wrap">
     <header class="sheet-head">
       <p class="sheet-no"><en>04 · Scenarios</en></p>
-      <h2><en>Same task, two ways.</en></h2>
-      <p class="lead"><en>Situations circuit designers run into often: how they are handled today, and how they would be handled with RNL.</en></p>
+      <h2><en>Same task, two ways</en></h2>
+      <p class="lead"><en>Common situations, handled today and with RNL.</en></p>
     </header>
 
     <div class="tabs" role="tablist" id="sc-tabs" aria-label="<en ctx=tabs>Scenarios</en>">
-      <button type="button" role="tab" id="t-share" aria-controls="sc-share" aria-selected="true"><en>Share a circuit</en></button>
-      <button type="button" role="tab" id="t-ai" aria-controls="sc-ai" aria-selected="false"><en>Ask AI to draw</en></button>
-      <button type="button" role="tab" id="t-auto" aria-controls="sc-auto" aria-selected="false"><en>Auto-draw</en></button>
-      <button type="button" role="tab" id="t-git" aria-controls="sc-git" aria-selected="false"><en>Version control</en></button>
+      <button type="button" role="tab" id="t-ai" aria-controls="sc-ai" aria-selected="true"><en>AI writes, people review</en></button>
+      <button type="button" role="tab" id="t-git" aria-controls="sc-git" aria-selected="false"><en>Version control and collaboration</en></button>
       <button type="button" role="tab" id="t-truth" aria-controls="sc-truth" aria-selected="false"><en>Drawing = netlist</en></button>
-      <button type="button" role="tab" id="t-port" aria-controls="sc-port" aria-selected="false"><en>Switch tools</en></button>
+      <button type="button" role="tab" id="t-port" aria-controls="sc-port" aria-selected="false"><en>Cross-tool compatibility</en></button>
+      <button type="button" role="tab" id="t-open" aria-controls="sc-open" aria-selected="false"><en>Building an open ecosystem</en></button>
     </div>
 
-    <div role="tabpanel" id="sc-share" aria-labelledby="t-share">
-      <div class="vs">
-        <div class="vs-side">
-          <div class="vs-head"><svg class="ico"><use href="#i-cross"/></svg><en>Today</en></div>
-          <div class="vs-fig">
-            <div>
-              <div class="flowline">
-                <div class="fnode bad"><span class="box"><svg class="ico"><use href="#i-db"/></svg><span class="badge n"><svg class="ico"><use href="#i-lock"/></svg></span></span><en>Schematic database inside the tool</en></div>
-                <span class="farrow"><svg class="ico"><use href="#i-arrow"/></svg></span>
-                <div class="fnode"><span class="box"><svg class="ico"><use href="#i-monitor"/></svg></span><en>A colleague’s computer</en></div>
-              </div>
-              <div class="reqs"><span class="chip chip-err"><en>Same software</en></span><span class="chip chip-err"><en>Same version</en></span><span class="chip chip-err"><en>Same PDK</en></span><span class="chip chip-err"><en ctx=chip>License</en></span></div>
-              <div class="flowline alt">
-                <span class="chip"><svg class="ico"><use href="#i-image"/></svg><en>screenshot.png</en></span><span class="plus">+</span><span class="chip"><svg class="ico"><use href="#i-netlist"/></svg>netlist.sp</span><span class="chip chip-warn"><en>Two files that drift apart</en></span>
-              </div>
-            </div>
-          </div>
-          <p class="vs-text"><en>The schematic lives in the EDA tool’s database, so the recipient needs the same setup to open it. The alternative is a screenshot plus a netlist: two files, and when one changes the other goes stale.</en></p>
-        </div>
-        <div class="vs-side rnl">
-          <div class="vs-head"><svg class="ico"><use href="#i-check"/></svg><en>With RNL</en></div>
-          <div class="vs-fig">
-            <div class="flowline">
-              <div class="fnode rnl"><span class="box"><svg class="ico"><use href="#i-netlist"/></svg></span>ota5t.sp</div>
-              <span class="farrow"><svg class="ico"><use href="#i-arrow"/></svg></span>
-              <ul class="targets">
-                <li><svg class="ico"><use href="#i-wave"/></svg><en>The simulator runs it as usual</en></li>
-                <li><svg class="ico"><use href="#i-globe"/></svg><en>A browser shows the drawing</en></li>
-                <li><svg class="ico"><use href="#i-chat"/></svg><en>Colleagues and AI can read and edit it</en></li>
-              </ul>
-            </div>
-          </div>
-          <p class="vs-text"><en>Send a single .sp file. The simulator runs it, a viewer in the browser draws it, and the drawing and the circuit come from the same file.</en></p>
-        </div>
-      </div>
-      <p class="vs-diff"><svg class="ico"><use href="#i-arrow"/></svg><en>The drawing travels with the circuit, not with the tool.</en></p>
-    </div>
-
-    <div role="tabpanel" id="sc-ai" aria-labelledby="t-ai" hidden>
+    <div role="tabpanel" id="sc-ai" aria-labelledby="t-ai">
       <div class="vs">
         <div class="vs-side">
           <div class="vs-head"><svg class="ico"><use href="#i-cross"/></svg><en>Today</en></div>
           <div class="vs-fig">
             <div class="chat">
-              <p class="bubble me"><en>Design a five-transistor OTA for me and draw the schematic.</en></p>
+              <p class="bubble me"><en>Design a five-transistor OTA for me.</en></p>
               <div class="bubble"><div class="minicode" data-hl="M1 x inp tail vss nch W=2u L=0.5u
 M2 out inn tail vss nch W=2u L=0.5u
 M3 x x vdd vdd pch W=4u L=0.5u
 M4 out x vdd vdd pch W=4u L=0.5u
-M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><en>The netlist is there, but the schematic can only be described in words or sketched in ASCII.</en></p></div>
+M5 tail vbias vss vss nch W=4u L=1u
+…"></div><p class="bubble-note"><en>The netlist is there, but nothing in it says what the circuit is.</en></p></div>
             </div>
           </div>
-          <p class="vs-text"><en>Language models write netlists well but cannot produce schematics. You read the text, or redraw it yourself.</en></p>
+          <p class="vs-text"><en>A few hundred generated lines do not tell a reviewer what the circuit is, and models draw its schematic unreliably.</en></p>
         </div>
         <div class="vs-side rnl">
           <div class="vs-head"><svg class="ico"><use href="#i-check"/></svg><en>With RNL</en></div>
           <div class="vs-fig">
             <div class="chat">
-              <p class="bubble me"><en>Design a five-transistor OTA for me and draw the schematic.</en></p>
+              <p class="bubble me"><en>Design a five-transistor OTA for me.</en></p>
               <div class="bubble"><div class="minicode" data-hl="M1 x inp tail vss nch W=2u L=0.5u
 …
 * @RNL {
 *   %dp1 = #M1(in_p), #M2(in_n) and #M5(tail) treated @AS $DIFFERENTIAL_PAIR;
 *   %cm1 = #M3(ref) and #M4(out) treated @AS $CURRENT_MIRROR;
-*   %ax = (_, _);
-*   #M1(a), #M2(b) and %ax(axis) are treated @AS $MIRRORED
+*   …
 * }"></div></div>
               <svg class="thumb" id="ai-thumb" role="img" aria-label="<en>The five-transistor OTA drawn from it</en>"></svg>
             </div>
           </div>
-          <p class="vs-text"><en>The model writes the structure and intent into the netlist as it goes; the solver draws, and people review and fine-tune.</en></p>
+          <p class="vs-text"><en>The agent writes the structures and the drawing along with the circuit; a person reviews what it declared in a viewer.</en></p>
         </div>
       </div>
-      <p class="vs-diff"><svg class="ico"><use href="#i-arrow"/></svg><en>The drawing becomes text too: models can write it and edit it, and it can be diffed.</en></p>
-    </div>
-
-    <div role="tabpanel" id="sc-auto" aria-labelledby="t-auto" hidden>
-      <div class="vs">
-        <div class="vs-side">
-          <div class="vs-head"><svg class="ico"><use href="#i-cross"/></svg><en>Today</en></div>
-          <div class="vs-fig"><div class="thumb-wrap"><svg class="thumb" id="auto-air" role="img" aria-label="<en>Five-transistor OTA placed from connectivity alone</en>"></svg><div class="thumb-cap" id="auto-air-cap"></div></div></div>
-          <p class="vs-text"><en>With connectivity alone, a tool cannot tell which two transistors form a pair or which way the signal flows, so it cannot produce the familiar arrangement.</en></p>
-        </div>
-        <div class="vs-side rnl">
-          <div class="vs-head"><svg class="ico"><use href="#i-check"/></svg><en>With RNL</en></div>
-          <div class="vs-fig"><div class="thumb-wrap"><svg class="thumb" id="auto-sym" role="img" aria-label="<en>Five-transistor OTA laid out from RNL intent</en>"></svg><div class="thumb-cap" id="auto-sym-cap"></div></div></div>
-          <p class="vs-text"><en>Beyond connectivity there is intent: a differential pair, symmetry, a centered tail, signal flowing left to right. A solver that follows the intent produces the textbook drawing.</en></p>
-        </div>
-      </div>
-      <p class="vs-diff"><svg class="ico"><use href="#i-arrow"/></svg><en>Fewer coordinates, more intent.</en></p>
+      <p class="vs-diff"><svg class="ico"><use href="#i-arrow"/></svg><en>People review the structures and the intent, not the netlist line by line.</en></p>
     </div>
 
     <div role="tabpanel" id="sc-git" aria-labelledby="t-git" hidden>
@@ -586,12 +456,12 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><en>The netlis
         <div class="vs-side">
           <div class="vs-head"><svg class="ico"><use href="#i-cross"/></svg><en>Today</en></div>
           <div class="vs-fig"><div class="minicode term"><div class="dim">$ git diff ota5t/</div><div>diff --git a/ota5t/schematic/sch.oa b/ota5t/schematic/sch.oa</div><div class="del">Binary files a/ota5t/schematic/sch.oa and b/ota5t/schematic/sch.oa differ</div></div></div>
-          <p class="vs-text"><en>The schematic is a binary database, so version control can only tell you “the file changed”. To find out what changed and why, you open the tool and compare sheet by sheet.</en></p>
+          <p class="vs-text"><en>The schematic is a binary database, so version control can only say “the file changed”.</en></p>
         </div>
         <div class="vs-side rnl">
           <div class="vs-head"><svg class="ico"><use href="#i-check"/></svg><en>With RNL</en></div>
-          <div class="vs-fig"><div class="minicode term"><div class="dim">$ git diff ota5t.sp</div><div class="dim">@@ -31,2 +31,3 @@</div><div> * }</div><div class="add">+* @RNL(author="rnl-editor") { #M2 @PLACE(x=30, priority="high")}</div><div> .ends ota5t</div></div></div>
-          <p class="vs-text"><en>Every change is one readable line: the editor moved M2 to x = 30. The solver’s record is marked type="generated" and can be regenerated as a whole.</en></p>
+          <div class="vs-fig"><div class="minicode term"><div class="dim">$ git diff ota5t.sp</div><div class="dim">@@ -31,2 +31,3 @@</div><div> * }</div><div class="add">+* @RNL(author="agent") { #M2 @PLACE(x=30, priority="high")}</div><div> .ends ota5t</div></div></div>
+          <p class="vs-text"><en>A change is one readable line: M2 moved to x = 30. Git, pull requests and CI work on it as on code.</en></p>
         </div>
       </div>
       <p class="vs-diff"><svg class="ico"><use href="#i-arrow"/></svg><en>Schematic changes can be reviewed and rolled back too.</en></p>
@@ -608,7 +478,7 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><en>The netlis
               <div class="truth-card"><span class="truth-k"><en>In the netlist</en></span><div class="minicode" data-hl="M1 x inn tail vss nch"></div></div>
             </div>
           </div>
-          <p class="vs-text"><en>The schematic and the netlist each keep their own copy of the connections. Change one and the other may go stale; a line that looks connected in the drawing may not be connected in the netlist.</en></p>
+          <p class="vs-text"><en>The schematic and the netlist each keep their own copy of the connections, and the two can disagree.</en></p>
         </div>
         <div class="vs-side rnl">
           <div class="vs-head"><svg class="ico"><use href="#i-check"/></svg><en>With RNL</en></div>
@@ -620,7 +490,7 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><en>The netlis
               <text class="cd-big" x="150" y="92"><en><tspan x="132" dy="-6">crossing</tspan><tspan x="132" dy="17">≠ connection</tspan></en></text>
             </svg>
           </div>
-          <p class="vs-text"><en>Connectivity is defined only by the netlist. RNL can only reference devices and nets, never add or remove devices or connections; two lines crossing, or endpoints landing on each other, never become a connection. Drawn wires work the same way: they join only where they share a point or a terminal.</en></p>
+          <p class="vs-text"><en>Connectivity is defined only by the netlist. Lines that cross, or endpoints that merely land on each other, never become a connection; drawn wires join only where they share a point or a terminal.</en></p>
         </div>
       </div>
       <p class="vs-diff"><svg class="ico"><use href="#i-arrow"/></svg><en>The circuit has one source of truth: the netlist.</en></p>
@@ -641,7 +511,7 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><en>The netlis
               <p class="fig-note"><en>Every tool has its own schematic format and its own symbol libraries.</en></p>
             </div>
           </div>
-          <p class="vs-text"><en>Switch tools and the schematic often has to be redrawn; switch simulators and the netlist dialect has to be rewritten too.</en></p>
+          <p class="vs-text"><en>Switching tools often means redrawing the schematic; switching simulators means rewriting the netlist dialect.</en></p>
         </div>
         <div class="vs-side rnl">
           <div class="vs-head"><svg class="ico"><use href="#i-check"/></svg><en>With RNL</en></div>
@@ -652,21 +522,98 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><en>The netlis
               <p class="fig-note"><en>The comment prefix follows the netlist format; the RNL content stays identical.</en></p>
             </div>
           </div>
-          <p class="vs-text"><en>RNL content does not depend on the netlist format. Viewers ship no component library of their own either: symbols are defined in RNL and travel with the file or an RNL library.</en></p>
+          <p class="vs-text"><en>RNL content is the same in every netlist format, and symbols are defined in RNL, so they travel with the file or a library.</en></p>
         </div>
       </div>
       <p class="vs-diff"><svg class="ico"><use href="#i-arrow"/></svg><en>Switch simulators or viewers, and the drawing is still there.</en></p>
     </div>
+
+    <div role="tabpanel" id="sc-open" aria-labelledby="t-open" hidden>
+      <div class="vs">
+        <div class="vs-side">
+          <div class="vs-head"><svg class="ico"><use href="#i-cross"/></svg><en>Today</en></div>
+          <div class="vs-fig">
+            <div>
+              <div class="flowline">
+                <div class="fnode bad"><span class="box"><svg class="ico"><use href="#i-db"/></svg><span class="badge n"><svg class="ico"><use href="#i-lock"/></svg></span></span><en>Schematic database inside the tool</en></div>
+                <span class="farrow"><svg class="ico"><use href="#i-arrow"/></svg></span>
+                <div class="fnode"><span class="box"><svg class="ico"><use href="#i-monitor"/></svg></span><en>A colleague’s computer</en></div>
+              </div>
+              <div class="reqs"><span class="chip chip-err"><en>Same software</en></span><span class="chip chip-err"><en>Same version</en></span><span class="chip chip-err"><en>Same PDK</en></span><span class="chip chip-err"><en ctx=chip>License</en></span></div>
+              <div class="flowline alt">
+                <span class="chip"><svg class="ico"><use href="#i-image"/></svg><en>screenshot.png</en></span><span class="plus">+</span><span class="chip"><svg class="ico"><use href="#i-netlist"/></svg>netlist.sp</span><span class="chip chip-warn"><en>Two files that drift apart</en></span>
+              </div>
+            </div>
+          </div>
+          <p class="vs-text"><en>Traditional formats open only in the EDA tool that wrote them, so the recipient needs the same setup. A screenshot paired with a netlist goes stale as soon as either changes.</en></p>
+        </div>
+        <div class="vs-side rnl">
+          <div class="vs-head"><svg class="ico"><use href="#i-check"/></svg><en>With RNL</en></div>
+          <div class="vs-fig">
+            <div class="flowline">
+              <div class="fnode rnl"><span class="box"><svg class="ico"><use href="#i-netlist"/></svg></span>ota5t.sp</div>
+              <span class="farrow"><svg class="ico"><use href="#i-arrow"/></svg></span>
+              <ul class="targets">
+                <li><svg class="ico"><use href="#i-wave"/></svg><en>The simulator runs it as usual</en></li>
+                <li><svg class="ico"><use href="#i-globe"/></svg><en>A browser shows the drawing</en></li>
+                <li><svg class="ico"><use href="#i-chat"/></svg><en>Colleagues and AI can read and edit it</en></li>
+              </ul>
+            </div>
+          </div>
+          <p class="vs-text"><en>RNL is plain text, easy to share and to open-source: the simulator runs the file and a viewer in the browser draws it.</en></p>
+        </div>
+      </div>
+      <p class="vs-diff"><svg class="ico"><use href="#i-arrow"/></svg><en>The drawing travels with the circuit, not with the tool.</en></p>
+    </div>
   </div>
 </section>
 
-<!-- ===================== 05 Status ===================== -->
+<!-- ===================== 05 Vision ===================== -->
+<section id="vision" class="sheet">
+  <div class="wrap">
+    <header class="sheet-head">
+      <p class="sheet-no"><en>05 · Vision</en></p>
+      <h2><en>An open ecosystem, and a design flow built on it</en></h2>
+      <p class="lead"><en>RNL is the data layer: circuits and their meaning in files that anyone can open.</en></p>
+    </header>
+
+    <h3 class="sub-h"><en>An open ecosystem</en></h3>
+    <p class="sub-lead"><en>Circuits and symbol libraries published and reused like open-source software.</en></p>
+    <ul class="eco">
+      <li><a href="{{spec-root}}"><svg class="ico"><use href="#i-book"/></svg><b><en>A public standard</en></b><span><en>The language and its packages, openly specified</en></span></a></li>
+      <li><a href="packages.html"><svg class="ico"><use href="#i-layers"/></svg><b><en>Symbol libraries</en></b><span><en>Every symbol’s drawing and the text that defines it</en></span></a></li>
+      <li><a href="gallery.html"><svg class="ico"><use href="#i-eye"/></svg><b><en>A gallery of circuits</en></b><span><en>Designs in public repositories, opened in the web viewer</en></span></a></li>
+      <li><a href="tools.html"><svg class="ico"><use href="#i-term"/></svg><b><en>Open-source tools</en></b><span><en>The runtime, the command line and the viewers</en></span></a></li>
+    </ul>
+
+    <h3 class="sub-h"><en>A design flow built on RNL</en></h3>
+    <p class="sub-lead"><en>Agents write and change circuits; people review their structures and intent; EDA tools simulate and verify.</en></p>
+    <div class="hub" id="hub">
+      <svg class="hub-wires" id="hub-wires" aria-hidden="true"></svg>
+      <div class="hub-col">
+        <div class="hub-node"><svg class="ico"><use href="#i-chat"/></svg><div><h4><en>Agents</en></h4><p><en>Write and change circuits, with their structures and drawing.</en></p></div></div>
+        <div class="hub-node"><svg class="ico"><use href="#i-eye"/></svg><div><h4><en>People</en></h4><p><en>Review the declared structures and intent in a viewer.</en></p></div></div>
+      </div>
+      <div class="hub-core" id="hub-core">
+        <svg class="ico"><use href="#i-netlist"/></svg>
+        <h3>ota5t.sp</h3>
+        <p><en>RNL, the data layer: netlist + meaning</en></p>
+        <div class="hub-lines" id="hub-lines"></div>
+      </div>
+      <div class="hub-col">
+        <div class="hub-node"><svg class="ico"><use href="#i-wave"/></svg><div><h4><en>EDA tools</en></h4><p><en>Simulate and verify; a simulator skips the RNL comments.</en></p></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 06 Status ===================== -->
 <section id="status" class="sheet">
   <div class="wrap">
     <header class="sheet-head">
-      <p class="sheet-no"><en>05 · Status</en></p>
-      <h2><en>Where things stand.</en></h2>
-      <p class="lead"><en>The language is released as standard 0.3; <a href="tools.html">the web and desktop viewers</a> read netlists, draw them and edit the text, and the solver has a first version. Below are the latest released milestones and what comes next; all released milestones are on the full timeline.</en></p>
+      <p class="sheet-no"><en>06 · Status</en></p>
+      <h2><en>Where things stand</en></h2>
+      <p class="lead"><en>The language is released as standard 0.3; <a href="tools.html">the web and desktop viewers</a> read, draw and edit netlists, and the solver has a first version. Below are the latest released milestones and what comes next; the full timeline lists every released milestone.</en></p>
     </header>
     <div class="status-grid">
       <ol class="tl">
@@ -676,47 +623,47 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><en>The netlis
         <h3><en>FAQ</en></h3>
         <details>
           <summary><en>Will simulators complain about a netlist with RNL in it?</en><svg class="ico"><use href="#i-next"/></svg></summary>
-          <p><en>No. RNL is written only in the host netlist’s legal comments, and simulators skip it like any other comment, with no preprocessing. Which exact marker is safe in every vendor’s simulator is still being researched and verified.</en></p>
+          <p><en>No. RNL is written only in the host netlist’s legal comments, which simulators skip with no preprocessing. Which exact marker is safe in every vendor’s simulator is still being verified.</en></p>
         </details>
         <details>
           <summary><en>Will RNL change my circuit?</en><svg class="ico"><use href="#i-next"/></svg></summary>
-          <p><en>No. Devices, parameters and connections are defined only by the netlist; RNL can only reference them. Lines that cross or overlap in the drawing never create connections, and when only RNL changes, the netlist body is kept as is.</en></p>
+          <p><en>No. Devices, parameters and connections are defined only by the netlist; RNL can only reference them. When only RNL changes, the netlist body is kept as is.</en></p>
         </details>
         <details>
           <summary><en>Do I have to write coordinates?</en><svg class="ico"><use href="#i-next"/></svg></summary>
-          <p><en>No. “M1 and M2 are a differential pair, symmetric about the center line” on its own is a valid and useful description; coordinates can be left to the solver or added later, bit by bit.</en></p>
+          <p><en>No. “M1 and M2 are a differential pair, symmetric about the center line” is a valid description on its own; coordinates can be left to the solver or added later.</en></p>
         </details>
         <details>
           <summary><en>Will different tools draw the same RNL the same way?</en><svg class="ico"><use href="#i-next"/></svg></summary>
-          <p><en>Parts with exact geometry will match. For parts that state only intent, different solvers may produce different drawings that all satisfy it. RNL does not promise pixel-identical output.</en></p>
+          <p><en>Parts with exact geometry will match. Parts that state only intent may be drawn differently by different solvers while still satisfying that intent; RNL does not promise pixel-identical output.</en></p>
         </details>
         <details>
           <summary><en>How is this different from Virtuoso or KiCad schematic files?</en><svg class="ico"><use href="#i-next"/></svg></summary>
-          <p><en>Those are each tool’s own graphical formats, stored apart from the netlist. RNL is attached to the netlist, and any tool that supports it can read it; viewers ship no component library either, because symbols are themselves defined in RNL.</en></p>
+          <p><en>Those are each tool’s own graphical formats, stored apart from the netlist. RNL is attached to the netlist, any tool that supports it can read it, and symbols are themselves defined in RNL.</en></p>
         </details>
         <details>
           <summary><en>Why does AI come up so often?</en><svg class="ico"><use href="#i-next"/></svg></summary>
-          <p><en>Language models are good at reading and writing text such as netlists. RNL makes the drawing text too, so a model can write it directly and edit it in place. In an initial benchmark, 11 models generated 264 RNL samples from a reference, and 228 of them passed the prototype checker without errors. Free text between statements helps people read, but it never changes what machines understand.</en></p>
+          <p><en>Language models are good at reading and writing text such as netlists. RNL turns the circuit’s structure, intent and drawing into text too, so an agent writes a circuit and its meaning in one file and people review what it declared in a viewer. Free text between statements helps people read, but never changes what machines understand.</en></p>
         </details>
         <details>
           <summary><en>Can RNL be written in other languages?</en><svg class="ico"><use href="#i-next"/></svg></summary>
-          <p><!--zh-CN--><en>Keywords and standard-package names can have aliases in another language. In its header record, a file can declare individual aliases with <code>@ALIAS</code> or load an alias package—a package file collecting aliases for a language—using <code>@USE-ALIASES(name=…, version=…)</code> (or <code>path=…</code> for a custom file). Standard series 0.3 includes one bundled alias package so far, Chinese (<code>rnl-zh</code>): write <code>@USE-ALIASES(name="rnl-zh", version="0.3")</code> in the header record to use aliases such as <code lang="zh-CN">#M1 @位于(10, 20)</code>. An alias is simply an alternate spelling: standard and alias spellings can be mixed freely, and machines read the exact same statements; the header record itself always uses standard spelling.</en><!--/zh-CN--><!--not-zh-CN--><en>Keywords and standard-package names can have aliases in another language. In its header record, a file can declare individual aliases with <code>@ALIAS</code> or load an alias package—a package file collecting aliases for a language—using <code>@USE-ALIASES(name=…, version=…)</code> (or <code>path=…</code> for a custom file). Standard series 0.3 includes one bundled alias package so far, Chinese (<code>rnl-zh</code>): write <code>@USE-ALIASES(name="rnl-zh", version="0.3")</code> in the header record to use its aliases. An alias is simply an alternate spelling: standard and alias spellings can be mixed freely, and machines read the exact same statements; the header record itself always uses standard spelling.</en><!--/not-zh-CN--></p>
+          <p><!--zh-CN--><en>Keywords and standard-package names can have aliases in another language. A file can declare individual aliases with <code>@ALIAS</code> in its header record, or load an alias package (a package file collecting the aliases of a language) with <code>@USE-ALIASES(name=…, version=…)</code>, or <code>path=…</code> for a custom file. Standard series 0.3 bundles one so far, Chinese (<code>rnl-zh</code>): write <code>@USE-ALIASES(name="rnl-zh", version="0.3")</code> in the header record to use aliases such as <code lang="zh-CN">#M1 @位于(10, 20)</code>. An alias is only an alternate spelling: the two can be mixed freely and machines read the same statements; the header record itself always uses standard spelling.</en><!--/zh-CN--><!--not-zh-CN--><en>Keywords and standard-package names can have aliases in another language. A file can declare individual aliases with <code>@ALIAS</code> in its header record, or load an alias package (a package file collecting the aliases of a language) with <code>@USE-ALIASES(name=…, version=…)</code>, or <code>path=…</code> for a custom file. Standard series 0.3 bundles one so far, Chinese (<code>rnl-zh</code>): write <code>@USE-ALIASES(name="rnl-zh", version="0.3")</code> in the header record to use its aliases. An alias is only an alternate spelling: the two can be mixed freely and machines read the same statements; the header record itself always uses standard spelling.</en><!--/not-zh-CN--></p>
         </details>
         <details>
           <summary><en>Can I use it now?</en><svg class="ico"><use href="#i-next"/></svg></summary>
-          <p><en>For viewing schematics and editing netlist text, yes: the <a href="tools.html">viewers</a> open netlists with RNL in the browser or on Windows, Linux and macOS, draw placed objects, and let you edit the text and re-render. Automatic layout is at an early stage: a first version of the solver is available in <code>rnl solve</code> and as a preview in the desktop viewer to place objects specified only by intent. The web viewer does not run the solver yet, so it leaves unplaced objects undrawn and lists them in its Not drawn view. Graphical drag-and-drop editing is not yet available.</en></p>
+          <p><en>For viewing schematics and editing netlist text, yes: the <a href="tools.html">viewers</a> open netlists with RNL in the browser or on Windows, Linux and macOS, draw placed objects, and let you edit the text and re-render. Automatic layout is early: a first solver is in <code>rnl solve</code> and, as a preview, in the desktop viewer. The web viewer does not run it yet, so it lists unplaced objects in its Not drawn view. Drag-and-drop editing is not yet available.</en></p>
         </details>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ===================== 06 Where next ===================== -->
+<!-- ===================== 07 Where next ===================== -->
 <section id="next" class="sheet">
   <div class="wrap">
     <header class="sheet-head">
-      <p class="sheet-no"><en>06 · Next</en></p>
-      <h2><en>For the details, go to these pages.</en></h2>
+      <p class="sheet-no"><en>07 · Next</en></p>
+      <h2><en>For the details, go to these pages</en></h2>
     </header>
     <ol class="tour-map">
       <li><a href="language.html"><span class="n">→</span><b><en>Language tour</en></b><span><en>What the language looks like, nine sections and a few examples, all hands-on</en></span></a></li>
@@ -756,6 +703,9 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><en>The netlis
 <script src="assets/schem.js"></script>
 <script src="assets/rnl-code.js"></script>
 <script src="assets/scenes.js"></script>
+<script src="assets/ota-looks.js"></script>
+<script src="assets/ota-sim.js"></script>
+<script src="assets/ota.js"></script>
 <script src="assets/languages.js"></script>
 <script src="assets/common.js"></script>
 <script src="assets/intro.js"></script>

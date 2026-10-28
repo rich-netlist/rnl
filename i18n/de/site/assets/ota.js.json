@@ -1,0 +1,21 @@
+{
+  "<b>M1</b> and <b>M2</b> are the input pair; <b>M5</b> is its tail source.": "<b>M1</b> und <b>M2</b> sind das Eingangspaar; <b>M5</b> ist seine Fußstromquelle.",
+  "<b>M3</b> and <b>M4</b> are a current mirror, the load.": "<b>M3</b> und <b>M4</b> sind ein Stromspiegel, die Last.",
+  "Symmetric: <b>M1</b>/<b>M2</b> and <b>M3</b>/<b>M4</b> mirror about one axis.": "Symmetrisch: <b>M1</b>/<b>M2</b> und <b>M3</b>/<b>M4</b> spiegeln sich an einer Achse.",
+  "Bottom to top: tail <b>M5</b>, pair <b>M1</b>, load <b>M3</b>.": "Von unten nach oben: Fuß <b>M5</b>, Paar <b>M1</b>, Last <b>M3</b>.",
+  "The tail current enters at the drain of <b>M5</b>.": "Der Fußstrom fließt am Drain von <b>M5</b> hinein.",
+  "structure": "Struktur",
+  "intent": "Absicht",
+  "Pick a statement in the file or an item in the checklist: its devices light up in the drawing and the netlist.": "Wählen Sie eine Anweisung in der Datei oder einen Punkt der Checkliste: Die zugehörigen Bauteile leuchten in Zeichnung und Netzliste auf.",
+  "<b>Structure</b>: <code>$DIFFERENTIAL_PAIR</code> says which devices form the pair and which is its tail; the standard package puts the tail under the middle of the pair.": "<b>Struktur</b>: <code>$DIFFERENTIAL_PAIR</code> gibt an, welche Bauteile das Paar bilden und welches der Fußtransistor ist; das Standardpaket platziert den Fuß mittig unter dem Paar.",
+  "<b>Structure</b>: <code>$CURRENT_MIRROR</code> says which device is the reference and which copies it. Here the mirror is the pair’s load.": "<b>Struktur</b>: <code>$CURRENT_MIRROR</code> gibt an, welches Bauteil die Referenz ist und welches sie kopiert. Hier ist der Spiegel die Last des Paars.",
+  "<b>Intent</b>: two pairs, mirror images about one axis. The standard package puts the two devices of each pair at the same height; a tool that draws from it keeps the symmetry.": "<b>Absicht</b>: zwei Paare, gespiegelt an einer gemeinsamen Achse. Das Standardpaket setzt die beiden Bauteile jedes Paars auf gleiche Höhe; ein zeichnendes Werkzeug wahrt die Symmetrie.",
+  "<b>Intent</b>: the tail at the bottom, the pair above it, the load on top, as schematics are usually read.": "<b>Absicht</b>: der Fuß unten, darüber das Paar, ganz oben die Last – so, wie man Schaltpläne üblicherweise liest.",
+  "<b>Intent</b>: where the current flows, from the top of the circuit to the bottom.": "<b>Absicht</b>: wohin der Strom fließt – in der Schaltung von oben nach unten.",
+  "A simulator reads the lines that are not dimmed: the netlist. Every RNL line starts with <code>*</code>, so for the simulator it is a comment.": "Ein Simulator liest die nicht abgeblendeten Zeilen: die Netzliste. Jede RNL-Zeile beginnt mit <code>*</code> und ist für den Simulator daher ein Kommentar.",
+  "AC response from": "AC-Frequenzgang aus",
+  "Low-frequency gain": "Niederfrequenzverstärkung",
+  "−3 dB at": "−3 dB bei",
+  "Unity gain at": "Einheitsverstärkung bei",
+  "1 V differential input and a 1 pF load, simulated from the netlist lines in the file.": "1 V Differenzeingang und 1 pF Last, simuliert aus den Netzlistenzeilen in der Datei."
+}

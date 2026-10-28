@@ -1,0 +1,21 @@
+{
+  "<b>M1</b> and <b>M2</b> are the input pair; <b>M5</b> is its tail source.": "<b>M1</b> y <b>M2</b> son el par de entrada; <b>M5</b> es su fuente de cola.",
+  "<b>M3</b> and <b>M4</b> are a current mirror, the load.": "<b>M3</b> y <b>M4</b> son un espejo de corriente, la carga.",
+  "Symmetric: <b>M1</b>/<b>M2</b> and <b>M3</b>/<b>M4</b> mirror about one axis.": "Simétrico: <b>M1</b>/<b>M2</b> y <b>M3</b>/<b>M4</b> se reflejan respecto a un eje.",
+  "Bottom to top: tail <b>M5</b>, pair <b>M1</b>, load <b>M3</b>.": "De abajo arriba: cola <b>M5</b>, par <b>M1</b>, carga <b>M3</b>.",
+  "The tail current enters at the drain of <b>M5</b>.": "La corriente de cola entra por el drenador de <b>M5</b>.",
+  "structure": "estructura",
+  "intent": "intención",
+  "Pick a statement in the file or an item in the checklist: its devices light up in the drawing and the netlist.": "Elige una sentencia del archivo o un elemento de la lista: sus dispositivos se iluminan en el dibujo y en el netlist.",
+  "<b>Structure</b>: <code>$DIFFERENTIAL_PAIR</code> says which devices form the pair and which is its tail; the standard package puts the tail under the middle of the pair.": "<b>Estructura</b>: <code>$DIFFERENTIAL_PAIR</code> indica qué dispositivos forman el par y cuál es su cola; el paquete estándar sitúa la cola bajo el centro del par.",
+  "<b>Structure</b>: <code>$CURRENT_MIRROR</code> says which device is the reference and which copies it. Here the mirror is the pair’s load.": "<b>Estructura</b>: <code>$CURRENT_MIRROR</code> indica qué dispositivo es la referencia y cuál la copia. Aquí el espejo es la carga del par.",
+  "<b>Intent</b>: two pairs, mirror images about one axis. The standard package puts the two devices of each pair at the same height; a tool that draws from it keeps the symmetry.": "<b>Intención</b>: dos pares, reflejados respecto a un mismo eje. El paquete estándar sitúa los dos dispositivos de cada par a la misma altura; una herramienta que dibuje a partir de él conserva la simetría.",
+  "<b>Intent</b>: the tail at the bottom, the pair above it, the load on top, as schematics are usually read.": "<b>Intención</b>: la cola abajo, el par encima y la carga arriba del todo, tal como suelen leerse los esquemas.",
+  "<b>Intent</b>: where the current flows, from the top of the circuit to the bottom.": "<b>Intención</b>: hacia dónde fluye la corriente, de la parte superior del circuito a la inferior.",
+  "A simulator reads the lines that are not dimmed: the netlist. Every RNL line starts with <code>*</code>, so for the simulator it is a comment.": "Un simulador lee las líneas no atenuadas: el netlist. Cada línea de RNL empieza por <code>*</code>, así que para el simulador es un comentario.",
+  "AC response from": "Respuesta CA de",
+  "Low-frequency gain": "Ganancia en baja frecuencia",
+  "−3 dB at": "−3 dB en",
+  "Unity gain at": "Ganancia unitaria en",
+  "1 V differential input and a 1 pF load, simulated from the netlist lines in the file.": "Entrada diferencial de 1 V y carga de 1 pF, simuladas a partir de las líneas de netlist del archivo."
+}

@@ -35,9 +35,13 @@ for (const language of ['zh', 'en']) {
 
 test('the homepage and the tour keep their viewer links in a new tab when a script changes them', async ({ page }) => {
   await page.goto('/en/index.html');
-  const link = page.locator('#jr-open');
+  await expect(page.locator('#rv-open')).toHaveAttribute('target', '_blank');
+  // the Chinese page opens the Chinese file when its sentences are shown: the script changes the address
+  await page.goto('/zh/index.html');
+  const link = page.locator('#rv-open');
   await expect(link).toHaveAttribute('target', '_blank');
-  await page.locator('#jr-next').click();
+  await page.locator('#rv-style [data-style="zh"]').click();
+  await expect(link).toHaveAttribute('href', /ota5t-review-zh\.sp/);
   await expect(link).toHaveAttribute('target', '_blank');
   await page.goto('/en/language.html');
   await expect(page.locator('#file-open')).toHaveAttribute('target', '_blank');

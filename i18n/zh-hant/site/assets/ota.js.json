@@ -1,0 +1,21 @@
+{
+  "<b>M1</b> and <b>M2</b> are the input pair; <b>M5</b> is its tail source.": "<b>M1</b> 與 <b>M2</b> 為輸入差動對；<b>M5</b> 為其尾端電流源。",
+  "<b>M3</b> and <b>M4</b> are a current mirror, the load.": "<b>M3</b> 與 <b>M4</b> 為電流鏡，作為負載。",
+  "Symmetric: <b>M1</b>/<b>M2</b> and <b>M3</b>/<b>M4</b> mirror about one axis.": "對稱：<b>M1</b>/<b>M2</b> 與 <b>M3</b>/<b>M4</b> 以同一條軸鏡像對稱。",
+  "Bottom to top: tail <b>M5</b>, pair <b>M1</b>, load <b>M3</b>.": "由下而上：尾端 <b>M5</b>、差動對 <b>M1</b>、負載 <b>M3</b>。",
+  "The tail current enters at the drain of <b>M5</b>.": "尾端電流由 <b>M5</b> 的汲極流入。",
+  "structure": "結構",
+  "intent": "意圖",
+  "Pick a statement in the file or an item in the checklist: its devices light up in the drawing and the netlist.": "點選檔案中的一條敘述或檢查清單中的一個項目：其器件會在圖面與網表中亮起。",
+  "<b>Structure</b>: <code>$DIFFERENTIAL_PAIR</code> says which devices form the pair and which is its tail; the standard package puts the tail under the middle of the pair.": "<b>結構</b>：<code>$DIFFERENTIAL_PAIR</code> 說明哪些器件構成差動對、哪一個是尾端電晶體；標準套件會將尾端置於差動對正下方中央。",
+  "<b>Structure</b>: <code>$CURRENT_MIRROR</code> says which device is the reference and which copies it. Here the mirror is the pair’s load.": "<b>結構</b>：<code>$CURRENT_MIRROR</code> 說明哪個器件是參考端、哪個複製它。這裡的電流鏡就是差動對的負載。",
+  "<b>Intent</b>: two pairs, mirror images about one axis. The standard package puts the two devices of each pair at the same height; a tool that draws from it keeps the symmetry.": "<b>意圖</b>：兩對器件以同一條軸鏡像對稱。標準套件將每一對的兩個器件置於相同高度；據此繪圖的工具會保持對稱。",
+  "<b>Intent</b>: the tail at the bottom, the pair above it, the load on top, as schematics are usually read.": "<b>意圖</b>：尾端在最下、差動對在其上、負載在最上，符合原理圖慣常的閱讀方式。",
+  "<b>Intent</b>: where the current flows, from the top of the circuit to the bottom.": "<b>意圖</b>：標示電流流向，由電路上方流向下方。",
+  "A simulator reads the lines that are not dimmed: the netlist. Every RNL line starts with <code>*</code>, so for the simulator it is a comment.": "模擬器讀取的是未變暗的各行：也就是網表。每一行 RNL 皆以 <code>*</code> 開頭，對模擬器而言只是註解。",
+  "AC response from": "交流響應，來自",
+  "Low-frequency gain": "低頻增益",
+  "−3 dB at": "−3 dB 位於",
+  "Unity gain at": "單位增益位於",
+  "1 V differential input and a 1 pF load, simulated from the netlist lines in the file.": "1 V 差動輸入與 1 pF 負載，由檔案中的網表行模擬而得。"
+}
