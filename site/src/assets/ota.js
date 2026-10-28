@@ -118,24 +118,24 @@
 
   /* One item of the checklist for each statement of meaning: what the agent declared, in plain words */
   var ITEMS = [
-    { key: 'dp', kind: 'structure', devs: 'M1 M2 M5', stmt: ['dp'], text: '<en><b>M1</b> and <b>M2</b> are the input differential pair; <b>M5</b> is its tail current source.</en>' },
-    { key: 'cm1', kind: 'structure', devs: 'M3 M4', stmt: ['cm1'], text: '<en><b>M3</b> and <b>M4</b> are a current mirror: the load of the pair.</en>' },
-    { key: 'sym', kind: 'intent', devs: 'M1 M2 M3 M4', stmt: ['s12', 's34', 'ax'], text: '<en>The circuit is symmetric: <b>M1</b> and <b>M2</b>, and <b>M3</b> and <b>M4</b>, are mirror images about one axis.</en>' },
-    { key: 'ord', kind: 'intent', devs: 'M5 M1 M3', stmt: ['ord'], text: '<en>From bottom to top: the tail <b>M5</b>, the pair <b>M1</b>, the load <b>M3</b>.</en>' },
+    { key: 'dp', kind: 'structure', devs: 'M1 M2 M5', stmt: ['dp'], text: '<en><b>M1</b> and <b>M2</b> are the input pair; <b>M5</b> is its tail source.</en>' },
+    { key: 'cm1', kind: 'structure', devs: 'M3 M4', stmt: ['cm1'], text: '<en><b>M3</b> and <b>M4</b> are a current mirror, the load.</en>' },
+    { key: 'sym', kind: 'intent', devs: 'M1 M2 M3 M4', stmt: ['s12', 's34', 'ax'], text: '<en>Symmetric: <b>M1</b>/<b>M2</b> and <b>M3</b>/<b>M4</b> mirror about one axis.</en>' },
+    { key: 'ord', kind: 'intent', devs: 'M5 M1 M3', stmt: ['ord'], text: '<en>Bottom to top: tail <b>M5</b>, pair <b>M1</b>, load <b>M3</b>.</en>' },
     { key: 'cur', kind: 'intent', devs: 'M5', stmt: ['cur'], text: '<en>The tail current enters at the drain of <b>M5</b>.</en>' }
   ];
 
   var KIND = { structure: '<en>structure</en>', intent: '<en>intent</en>' };
 
-  var DEFAULT = '<en>Pick a statement in the file or an item of the checklist: the devices it is about light up in the drawing and in the netlist. Nothing here needs the netlist to be read line by line.</en>';
+  var DEFAULT = '<en>Pick a statement in the file or an item of the checklist: its devices light up in the drawing and in the netlist.</en>';
   var CAPS = {
-    dp: '<en><b>Structure</b>: <code>$DIFFERENTIAL_PAIR</code> says which devices form the pair and which is its tail. The standard package’s definition puts the tail under the middle of the pair.</en>',
-    cm1: '<en><b>Structure</b>: <code>$CURRENT_MIRROR</code> says which device is the reference and which one copies it: here the load of the pair.</en>',
-    sym: '<en><b>Intent</b>: two mirrored pairs about one axis. The standard package’s definition puts each pair at one height, mirror images about the axis; a tool that draws from it keeps the symmetry.</en>',
-    ord: '<en><b>Intent</b>: the tail at the bottom, the pair above it, the load on top. A drawing that follows it reads as a schematic usually does.</en>',
-    cur: '<en><b>Intent</b>: where the current flows. The tail current runs from the top to the bottom of the circuit.</en>'
+    dp: '<en><b>Structure</b>: <code>$DIFFERENTIAL_PAIR</code> says which devices form the pair and which is its tail; the standard package puts the tail under the middle of the pair.</en>',
+    cm1: '<en><b>Structure</b>: <code>$CURRENT_MIRROR</code> says which device is the reference and which copies it: here the load of the pair.</en>',
+    sym: '<en><b>Intent</b>: two pairs, mirror images about one axis. The standard package puts each pair at one height; a tool that draws from it keeps the symmetry.</en>',
+    ord: '<en><b>Intent</b>: the tail at the bottom, the pair above it, the load on top, as schematics are usually read.</en>',
+    cur: '<en><b>Intent</b>: where the current flows, from the top of the circuit to the bottom.</en>'
   };
-  var SIM = '<en>A simulator reads the lines that are not dimmed: the netlist. Every RNL line starts with <code>*</code>, so for the simulator it is a comment; nothing has to be stripped before it runs.</en>';
+  var SIM = '<en>A simulator reads the lines that are not dimmed: the netlist. Every RNL line starts with <code>*</code>, so for the simulator it is a comment.</en>';
 
   /* What picking a statement shows in the drawing besides the lit devices, in the drawing's own units (the core draws
      the grid unit as 14: x grows to the right, y downwards) */
@@ -198,7 +198,7 @@
     }
     el.innerHTML = '<p class="rv-sim-h"><svg class="ico"><use href="#i-wave"/></svg><span><en>AC response from</en> ' + R.simulator + ' ' + R.version.replace(/^(\d+\.\d+\.\d+).*/, '$1') + '</span></p>' + s +
       '<ul class="rv-sim-m"><li><en>Low-frequency gain</en> <b>' + dc.toFixed(1) + ' dB</b></li><li><en>−3 dB at</en> <b>' + fmtHz(f3) + '</b></li><li><en>Unity gain at</en> <b>' + fmtHz(f0) + '</b></li></ul>' +
-      '<p class="rv-sim-n"><en>One volt of differential input and a 1 pF load, simulated from the netlist lines of the file; the RNL lines are comments to the simulator.</en> <code>' + R.analysis + '</code></p>';
+      '<p class="rv-sim-n"><en>One volt of differential input and a 1 pF load, simulated from the netlist lines of the file.</en> <code>' + R.analysis + '</code></p>';
   }
 
   function init() {
@@ -289,6 +289,13 @@
       });
       cap.innerHTML = keep;
       cap.style.minHeight = tallest + 'px';
+      sizeSim();
+    }
+    /* a wide screen: the simulator view is as tall as the drawing it replaces */
+    var stageH = 0;
+    function sizeSim() {
+      if (!stage.hidden && stage.offsetHeight) stageH = stage.offsetHeight;
+      sim.style.height = stageH && global.matchMedia('(min-width: 1001px)').matches ? stageH + 'px' : '';
     }
     function show(item, quiet) { if (mode !== 'viewer') setView('viewer'); cur = item; mark(item, quiet); }
     function leave() { if (pinned) show(pinned, true); else clear(); }
@@ -363,6 +370,7 @@
       code.scrollTop = keep;
     });
     function setView(v) {
+      sizeSim();
       mode = v;
       figure.classList.toggle('is-sim', v === 'sim');
       code.classList.toggle('is-sim', v === 'sim');

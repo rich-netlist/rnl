@@ -1585,10 +1585,10 @@ html[lang="zh-CN"] .tour-h1 { font-family: var(--f-body); font-weight: 900; lett
 .rv-rnl { border-color: var(--markup-line); background: var(--markup-2); }
 .rv-rnl .ico { color: var(--markup); }
 /* the file and the drawing in one row; the checklist under them */
-.review { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: stretch; }
+.review { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: stretch; }
 .rv-code, .rv-fig { display: flex; flex-direction: column; min-width: 0; }
 .rv-code .ph { flex-wrap: wrap; }
-.rv-code .code { flex: 1 1 0; height: 0; min-height: 420px; max-height: none; font-size: 12px; }
+.rv-code .code { flex: 1 1 0; height: 0; min-height: 280px; max-height: none; font-size: 12px; }
 .rv-fig .ph { flex-wrap: wrap; row-gap: 6px; }
 .rv-fig .ph .ph-right { margin-left: auto; }
 .rv-fig.is-sim #rv-look { visibility: hidden; }
@@ -1599,7 +1599,9 @@ html[lang="zh-CN"] .tour-h1 { font-family: var(--f-body); font-weight: 900; lett
 .rv-stage.is-black svg [stroke="#1d1d1f"] { stroke: #dcdcdc; }
 .rv-stage.is-black svg [fill="#1d1d1f"] { fill: #dcdcdc; }
 .rv-stage.is-black svg.has-lit g[data-id]:not(.is-lit), .rv-stage.is-black svg.has-lit > rect { opacity: .42; }
-.rv-stage svg { display: block; width: 100%; height: auto; max-height: 520px; margin: 0 auto; }
+/* the drawing is as tall as the screen leaves room for: file, drawing and checklist are in view together (about 300px of the
+   block is not the drawing) */
+.rv-stage svg { display: block; width: 100%; height: auto; max-height: clamp(260px, calc(100vh - 390px), 520px); margin: 0 auto; }
 .rv-stage svg g[data-id] { transition: opacity .15s; }
 .rv-stage svg.has-lit g[data-id]:not(.is-lit), .rv-stage svg.has-lit > rect { opacity: .2; }
 .rv-stage svg .is-lit [stroke]:not([stroke="none"]) { stroke: var(--hl); }
@@ -1611,19 +1613,26 @@ html[lang="zh-CN"] .tour-h1 { font-family: var(--f-body); font-weight: 900; lett
 .rv-note .head { fill: var(--hl); stroke: none; }
 .rv-note text { fill: var(--hl); stroke: none; font: 600 15px var(--f-mono); }
 .rv-sim { flex: 1; min-height: 300px; padding: 12px 16px; background: var(--panel); }
+/* on a wide screen the simulator view is exactly as tall as the drawing (ota.js sets the height), so the screen does not change */
+@media (min-width: 1001px) {
+  .rv-sim:not([hidden]) { display: flex; flex-direction: column; flex: none; min-height: 0; overflow: hidden; }
+  .rv-simplot { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
+  .rv-simplot .bode { flex: 1 1 0; min-height: 0; height: auto; }
+}
 .rv-sim-h { display: flex; gap: 8px; align-items: center; margin: 0 0 6px; font-size: 14px; font-weight: 600; color: var(--ink); }
 .rv-sim-h .ico { color: var(--signal); }
 .rv-sim-m { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 13.5px; color: var(--ink-2); }
 .rv-sim-m b { color: var(--ink); font-weight: 600; }
 .rv-sim-n { margin: 8px 0 0; font-size: 13px; line-height: 1.55; color: var(--ink-3); }
 .rv-sim-n code { font-size: 12px; }
-.rv-fig .jr-cap { min-height: 92px; }
+.rv-fig .jr-cap { padding: 8px 14px 6px; font-size: 14px; line-height: 1.55; min-height: 72px; }
 .code.is-sim .cl.is-rnl { background: none; box-shadow: none; }
 .code.is-sim .cl.is-rnl .tx { opacity: .36; }
 .cl.is-diff { background: var(--markup-2); box-shadow: inset 3px 0 0 var(--markup); }
 .rv-list { grid-column: 1 / -1; }
-.rv-items { list-style: none; margin: 0; padding: 6px 8px 10px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 14px; }
-.rv-item { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 10px; align-items: baseline; padding: 8px 10px; border-radius: 8px; border: 1px solid transparent; cursor: pointer; font-size: 14.5px; line-height: 1.55; color: var(--ink-2); }
+.rv-list .ph { padding-block: 7px; }
+.rv-items { list-style: none; margin: 0; padding: 4px 8px 6px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; }
+.rv-item { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 8px; align-items: baseline; padding: 5px 10px; border-radius: 8px; border: 1px solid transparent; cursor: pointer; font-size: 14px; line-height: 1.45; color: var(--ink-2); }
 .rv-item:hover, .rv-item:focus-visible, .rv-item.is-on { background: var(--signal-2); border-color: color-mix(in srgb, var(--signal) 30%, transparent); outline: none; }
 .rv-item[aria-pressed="true"] { border-color: var(--signal); }
 .rv-item b { color: var(--ink); }
@@ -1641,12 +1650,19 @@ html[lang="zh-CN"] .tour-h1 { font-family: var(--f-body); font-weight: 900; lett
 .eco a:hover { border-color: var(--markup-line); background: var(--markup-2); }
 .eco .ico { width: 22px; height: 22px; color: var(--markup); }
 .eco span { font-size: 14px; color: var(--ink-2); line-height: 1.55; }
+/* on a wide screen the example stops the scroll when it comes up under the bar (proximity: a nudge, never a trap) */
+@media (min-width: 1001px) and (min-height: 600px) {
+  html { scroll-snap-type: y proximity; }
+  .review { scroll-snap-align: start; scroll-margin-top: 71px; }
+}
 @media (max-width: 1000px) {
   .review { grid-template-columns: minmax(0, 1fr); }
   .rv-fig { order: 1; }
   .rv-code { order: 2; }
   .rv-list { order: 3; }
   .rv-code .code { flex: none; height: auto; min-height: 0; max-height: 360px; }
+  .rv-stage svg { max-height: 520px; }
+  .rv-fig .jr-cap { min-height: 92px; }
   .rv-items { grid-template-columns: minmax(0, 1fr); }
   .facts.four, .eco { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .facts.five { grid-template-columns: repeat(2, minmax(0, 1fr)); }

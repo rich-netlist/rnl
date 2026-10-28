@@ -134,6 +134,42 @@ test('review: the writing style of the file, Chinese sentences only on the Chine
   expect(han.test(await page.locator('#rv-code .cl', { hasText: '$DIFFERENTIAL_PAIR' }).textContent())).toBe(false);
 });
 
+// The file, the drawing and the checklist are in one view on a 16:9 screen: 1080p without the browser's bars, and a laptop at 125%.
+// The page stops there when it is scrolled close (proximity: it never holds the scroll).
+for (const [width, height] of [[1920, 950], [1536, 730]]) {
+  for (const language of ['en', 'zh']) {
+    test(`review: file, drawing and checklist fit one screen at ${width}x${height}, in both views, ${language}`, async ({ page }) => {
+      await page.setViewportSize({ width, height });
+      await open(page, `/${language}/index.html`);
+      const snap = await page.evaluate(() => getComputedStyle(document.documentElement).scrollSnapType);
+      expect(snap).toMatch(/^y( proximity)?$/);   // proximity is the default strictness, and is how the browsers print it
+      await page.locator('#review').evaluate(el => el.scrollIntoView({ behavior: 'instant' }));
+      await page.waitForTimeout(300);
+      const bar = await page.locator('.topbar').boundingBox();
+      const inView = async () => {
+        const box = await page.locator('#review').boundingBox();
+        expect(box.y).toBeGreaterThanOrEqual(bar.y + bar.height - 1);
+        expect(box.y + box.height).toBeLessThanOrEqual(height);
+        return box.height;
+      };
+      for (const part of ['.rv-code', '#rv-figure', '.rv-list']) await expect(page.locator(part)).toBeInViewport({ ratio: 1 });
+      const viewer = await inView();
+      await page.locator('#rv-view [data-view="sim"]').click();
+      await expect(page.locator('#rv-sim')).toBeVisible();
+      expect(Math.abs(await inView() - viewer)).toBeLessThan(2);
+    });
+  }
+}
+
+test('review: on a phone the file, the drawing and the checklist stay one above the other', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await open(page, '/en/index.html');
+  const figure = await page.locator('#rv-figure').boundingBox(), code = await page.locator('.rv-code').boundingBox(), list = await page.locator('.rv-list').boundingBox();
+  expect(code.y).toBeGreaterThan(figure.y + figure.height - 2);
+  expect(list.y).toBeGreaterThan(code.y + code.height - 2);
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).scrollSnapType)).toBe('none');
+});
+
 test('review: the file and the drawing are in one row on a wide screen, and nothing is wider than the screen', async ({ page }) => {
   await page.setViewportSize({ width: 1200, height: 900 });
   await open(page, '/en/index.html');
