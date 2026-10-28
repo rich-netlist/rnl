@@ -11,7 +11,7 @@ use crate::words::{words, ParamSpec, ParamType, ParamsSpec, PositionSpec, Takes}
 use super::ctx::{Ctx, Frame, FrameKind, FrameRef, Nested, StmtSpan};
 use super::eval::{get, ArgV, Stop, R};
 use super::obj::*;
-use super::scene::{TargetOp, Task};
+use super::scene::{FailedApplication, TargetOp, Task};
 use super::Interp;
 
 const MAX_SYMBOL_LEVELS: usize = 64;
@@ -79,8 +79,8 @@ impl Interp<'_> {
             "DEFINE-SYMBOL" => self.kw_define_symbol(kw, &args, seg, ctx, member),
             "DEFINE-STYLE" => self.kw_define_style(kw, &args, seg, ctx, member),
             "DEFINE" => self.kw_define(kw, &args, seg, ctx, member),
-            "AS" => self.kw_usage(kw, args, seg, ctx, false),
-            "ATTACH" => self.kw_usage(kw, args, seg, ctx, true),
+            "AS" => self.kw_usage_noted(kw, args, seg, ctx, false, member),
+            "ATTACH" => self.kw_usage_noted(kw, args, seg, ctx, true, member),
             "PIN" => self.kw_pin(kw, &args, seg, ctx),
             "LINE" | "RECTANGLE" | "CIRCLE" | "ELLIPSE" | "ARC" | "BEZIER" => self.kw_prim(kw, &args, seg, ctx),
             "TEXT" => self.kw_text(kw, &args, seg, ctx),
@@ -662,6 +662,47 @@ impl Interp<'_> {
     }
 
     // ------------------------------------------------------------------ usages: AS, ATTACH (9.4, 10.5, 12)
+
+    /// [`Interp::kw_usage`], noting an application written in a record of a level that fails, with
+    /// the name it binds, its definition and the objects written for its roles, so that a tool can
+    /// list it with them ([`crate::model::FailedUsage`]).
+    fn kw_usage_noted(
+        &mut self,
+        kw: &str,
+        args: Vec<ArgV>,
+        seg: &Segment,
+        ctx: &Ctx,
+        first: bool,
+        member: &Rc<Member>,
+    ) -> R<(ObjId, bool)> {
+        let result = self.kw_usage(kw, args.clone(), seg, ctx, first);
+        let (Err(Stop::Fail(diag)), Some(s)) = (&result, ctx.scene) else { return result };
+        if ctx.frame.is_some() || ctx.selected {
+            return result;
+        }
+        let npiped = usize::from(seg.piped).min(args.len());
+        let written = &args[npiped..];
+        let dfn_at = if first { 0 } else { written.len().saturating_sub(1) };
+        let definition =
+            written.get(dfn_at).map(|a| self.anon_def(a.obj)).filter(|d| matches!(self.o(*d), ObjData::Definition(_)));
+        let roles_of: Vec<String> =
+            definition.map(|d| self.def(d).roles.iter().map(|r| r.name.clone()).collect()).unwrap_or_default();
+        let objs =
+            args[..npiped].iter().chain(written.iter().enumerate().filter(|(k, _)| *k != dfn_at).map(|(_, a)| a));
+        let roles = objs
+            .enumerate()
+            .filter(|(_, a)| self.failed_obj(a.obj).is_none())
+            .map(|(k, a)| (a.role.clone().or_else(|| roles_of.get(k).cloned()), a.obj))
+            .collect();
+        let k = member.segments.iter().position(|x| x.id == seg.id);
+        let name = member.binds.iter().find(|b| b.prefix == '%' && Some(b.after) == k).map(|b| b.name.clone());
+        let stmt = ctx.stmt.as_ref().map_or((ctx.rec, seg.start, seg.end), |st| (st.rec, st.start, st.end));
+        let app = FailedApplication { name, definition, roles, stmt, diag: *diag };
+        if !self.scenes[s].failed_usages.iter().any(|f| f.stmt == app.stmt) {
+            self.scenes[s].failed_usages.push(app);
+        }
+        result
+    }
 
     /// AS takes the definition as its last object, ATTACH as the first written one; objects that
     /// come down the pipe fill roles and never take the definition position (5.5, 5.6).

@@ -199,7 +199,60 @@
           {
             "id": "&0",
             "global": true,
-            "port": false
+            "port": false,
+            "usages": [
+              {
+                "id": "@rnl-std-virtual.rnl:52:9#1",
+                "definition": "$GND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 52,
+                "source": "body",
+                "made_in": "%gs_M0_3",
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-virtual.rnl:52:9#2",
+                "definition": "$GND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 52,
+                "source": "body",
+                "made_in": "%gs_M1_3",
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-virtual.rnl:52:9#3",
+                "definition": "$GND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 52,
+                "source": "body",
+                "made_in": "%gs_M2_3",
+                "state": "in-effect"
+              }
+            ]
           },
           {
             "id": "&o1",
@@ -219,7 +272,77 @@
           {
             "id": "&\"vdd!\"",
             "global": true,
-            "port": false
+            "port": false,
+            "usages": [
+              {
+                "id": "@rnl-std-virtual.rnl:58:9#1",
+                "definition": "$SUPPLY",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&\"vdd!\"",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 58,
+                "source": "body",
+                "made_in": "%ss_R1_1",
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-virtual.rnl:58:9#2",
+                "definition": "$SUPPLY",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&\"vdd!\"",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 58,
+                "source": "body",
+                "made_in": "%ss_R2_1",
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-virtual.rnl:58:9#3",
+                "definition": "$SUPPLY",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&\"vdd!\"",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 58,
+                "source": "body",
+                "made_in": "%ss_R3_1",
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-virtual.rnl:58:9#4",
+                "definition": "$SUPPLY",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&\"vdd!\"",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 58,
+                "source": "body",
+                "made_in": "%ss_Iref_1",
+                "state": "in-effect"
+              }
+            ]
           }
         ]
       },
@@ -350,6 +473,24 @@
                   "&0"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "%gs_M0_3",
+                "definition": "$GND_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#M0:3",
+                    "terminal": "s"
+                  }
+                ],
+                "file": 0,
+                "line": 50,
+                "source": "solver",
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -415,6 +556,45 @@
                   "&0"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "%gs_M1_3",
+                "definition": "$GND_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#M1:3",
+                    "terminal": "s"
+                  }
+                ],
+                "file": 0,
+                "line": 51,
+                "source": "solver",
+                "state": "in-effect"
+              },
+              {
+                "id": "@07-sets-and-selections.sp:29:52#1",
+                "definition": "$CURRENT_ARROW",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "#M1:1",
+                    "terminal": "d"
+                  }
+                ],
+                "file": 0,
+                "line": 29,
+                "source": "rule",
+                "rule": {
+                  "package": "",
+                  "file": "07-sets-and-selections.sp",
+                  "line": 29
+                },
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -479,6 +659,45 @@
                 "nets": [
                   "&0"
                 ]
+              }
+            ],
+            "usages": [
+              {
+                "id": "%gs_M2_3",
+                "definition": "$GND_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#M2:3",
+                    "terminal": "s"
+                  }
+                ],
+                "file": 0,
+                "line": 52,
+                "source": "solver",
+                "state": "in-effect"
+              },
+              {
+                "id": "@07-sets-and-selections.sp:29:52#2",
+                "definition": "$CURRENT_ARROW",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "#M2:1",
+                    "terminal": "d"
+                  }
+                ],
+                "file": 0,
+                "line": 29,
+                "source": "rule",
+                "rule": {
+                  "package": "",
+                  "file": "07-sets-and-selections.sp",
+                  "line": 29
+                },
+                "state": "in-effect"
               }
             ]
           },
@@ -553,6 +772,45 @@
                   "&0"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "@07-sets-and-selections.sp:35:5",
+                "definition": "$GND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "#M3:3",
+                    "terminal": "s"
+                  }
+                ],
+                "file": 0,
+                "line": 35,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "@07-sets-and-selections.sp:29:52#3",
+                "definition": "$CURRENT_ARROW",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "#M3:1",
+                    "terminal": "d"
+                  }
+                ],
+                "file": 0,
+                "line": 29,
+                "source": "rule",
+                "rule": {
+                  "package": "",
+                  "file": "07-sets-and-selections.sp",
+                  "line": 29
+                },
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -604,6 +862,24 @@
                 "nets": [
                   "&o1"
                 ]
+              }
+            ],
+            "usages": [
+              {
+                "id": "%ss_R1_1",
+                "definition": "$SUPPLY_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#R1:1",
+                    "terminal": "p"
+                  }
+                ],
+                "file": 0,
+                "line": 53,
+                "source": "solver",
+                "state": "in-effect"
               }
             ]
           },
@@ -657,6 +933,24 @@
                   "&o2"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "%ss_R2_1",
+                "definition": "$SUPPLY_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#R2:1",
+                    "terminal": "p"
+                  }
+                ],
+                "file": 0,
+                "line": 54,
+                "source": "solver",
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -709,6 +1003,24 @@
                   "&o3"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "%ss_R3_1",
+                "definition": "$SUPPLY_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#R3:1",
+                    "terminal": "p"
+                  }
+                ],
+                "file": 0,
+                "line": 55,
+                "source": "solver",
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -760,6 +1072,24 @@
                 "nets": [
                   "&bias"
                 ]
+              }
+            ],
+            "usages": [
+              {
+                "id": "%ss_Iref_1",
+                "definition": "$SUPPLY_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#Iref:1",
+                    "terminal": "p"
+                  }
+                ],
+                "file": 0,
+                "line": 56,
+                "source": "solver",
+                "state": "in-effect"
               }
             ]
           },

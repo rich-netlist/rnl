@@ -23,7 +23,9 @@ use crate::{BuildOptions, FormatInfo};
 
 mod symbols;
 pub use symbols::{InspectedLabel, InspectedPin, InspectedSymbol};
+mod member_of;
 mod usages;
+pub use member_of::{MemberOf, RoleOf, RuleAt};
 pub use usages::{Usage, UsageRole};
 
 /// What a viewer shows of a document, as [`crate::build`] gives it.
@@ -337,6 +339,10 @@ pub struct Object {
     /// For a subcircuit instance, the level that draws its subcircuit, an index into
     /// `Document::levels`.
     pub opens: Option<usize>,
+    /// The usages it is a member of in its level, each with the roles it fills: those of its
+    /// terminals too for an instance, and those a failed application names, with their state. In
+    /// the order of the level's usages, then of the failed applications.
+    pub usages: Vec<MemberOf>,
 }
 
 #[derive(Serialize, Debug)]
@@ -450,6 +456,7 @@ pub(crate) fn document(
     }
 
     usages::inspect_all(r, &mut levels, &mut ix);
+    member_of::index_all(r, &mut ix);
     let symbols = symbols::inspect(r, &mut levels);
     let diagnostic = |d: &Diag, sink: &Sink| {
         let (file, line, col) = match &d.loc {
@@ -609,6 +616,7 @@ impl<'a> Index<'a> {
             level_title: self.doc.levels[level].title(),
             lines: None,
             opens: None,
+            usages: Vec::new(),
         });
         self.usages.insert(key, o);
         o
@@ -639,6 +647,7 @@ impl<'a> Index<'a> {
             level_title: self.doc.levels[level].title(),
             lines: None,
             opens: None,
+            usages: Vec::new(),
         });
         self.nets.insert((level, key.to_string()), self.objects.len() - 1);
         self.objects.len() - 1
@@ -661,6 +670,7 @@ impl<'a> Index<'a> {
                     level_title: level.title(),
                     lines: statement.as_ref().map(|(f, last, _)| [*f as u32, inst.line, *last as u32 + 1]),
                     opens: None,
+                    usages: Vec::new(),
                 });
                 let object = self.objects.len() - 1;
                 self.insts.insert((lv, i), object);

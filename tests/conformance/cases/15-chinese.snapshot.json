@@ -226,7 +226,25 @@
           {
             "id": "&inp",
             "global": false,
-            "port": false
+            "port": false,
+            "usages": [
+              {
+                "id": "%pi",
+                "definition": "$IOPORT",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&inp",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 67,
+                "source": "written",
+                "state": "in-effect"
+              }
+            ]
           },
           {
             "id": "&tail",
@@ -236,22 +254,163 @@
           {
             "id": "&vss",
             "global": false,
-            "port": false
+            "port": false,
+            "usages": [
+              {
+                "id": "%g0",
+                "definition": "$GND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&vss",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 73,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-virtual.rnl:52:9#1",
+                "definition": "$GND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&vss",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 52,
+                "source": "body",
+                "made_in": "%gr",
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-virtual.rnl:52:9#2",
+                "definition": "$GND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&vss",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 52,
+                "source": "body",
+                "made_in": "%gs_M5_3",
+                "state": "in-effect"
+              }
+            ]
           },
           {
             "id": "&out",
             "global": false,
-            "port": false
+            "port": false,
+            "usages": [
+              {
+                "id": "%po",
+                "definition": "$IOPORT",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&out",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 69,
+                "source": "written",
+                "state": "in-effect"
+              }
+            ]
           },
           {
             "id": "&inn",
             "global": false,
-            "port": false
+            "port": false,
+            "usages": [
+              {
+                "id": "%pn",
+                "definition": "$IOPORT",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&inn",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 68,
+                "source": "written",
+                "state": "in-effect"
+              }
+            ]
           },
           {
             "id": "&vdd",
             "global": false,
-            "port": false
+            "port": false,
+            "usages": [
+              {
+                "id": "@rnl-std-virtual.rnl:58:9#1",
+                "definition": "$SUPPLY",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&vdd",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 58,
+                "source": "body",
+                "made_in": "%ss_M3_3",
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-virtual.rnl:58:9#2",
+                "definition": "$SUPPLY",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&vdd",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 58,
+                "source": "body",
+                "made_in": "%ss_M4_3",
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-virtual.rnl:58:9#3",
+                "definition": "$SUPPLY",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&vdd",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 58,
+                "source": "body",
+                "made_in": "%ss_R1_1",
+                "state": "in-effect"
+              }
+            ]
           },
           {
             "id": "&bias",
@@ -408,6 +567,72 @@
                   "&tail"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "%dp",
+                "definition": "$DIFFPAIR",
+                "roles": [
+                  {
+                    "role": "in_p",
+                    "set": false,
+                    "member": "#M1",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 23,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "@15-chinese.sp:29:5",
+                "definition": "$MIRROR_PAIR",
+                "roles": [
+                  {
+                    "role": "a",
+                    "set": false,
+                    "member": "#M1",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 29,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "%tc",
+                "definition": "$TAIL_CENTER",
+                "roles": [
+                  {
+                    "role": "a",
+                    "set": false,
+                    "member": "#M1",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 31,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "@15-chinese.sp:32:5",
+                "definition": "$FLOW",
+                "roles": [
+                  {
+                    "role": "path",
+                    "set": true,
+                    "member": "#M1",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 32,
+                "source": "written",
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -481,6 +706,72 @@
                   "&tail"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "%dp",
+                "definition": "$DIFFPAIR",
+                "roles": [
+                  {
+                    "role": "in_n",
+                    "set": false,
+                    "member": "#M2",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 23,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "@15-chinese.sp:29:5",
+                "definition": "$MIRROR_PAIR",
+                "roles": [
+                  {
+                    "role": "b",
+                    "set": false,
+                    "member": "#M2",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 29,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "%tc",
+                "definition": "$TAIL_CENTER",
+                "roles": [
+                  {
+                    "role": "b",
+                    "set": false,
+                    "member": "#M2",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 31,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "@15-chinese.sp:32:5",
+                "definition": "$FLOW",
+                "roles": [
+                  {
+                    "role": "path",
+                    "set": true,
+                    "member": "#M2",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 32,
+                "source": "written",
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -545,6 +836,56 @@
                 "nets": [
                   "&vdd"
                 ]
+              }
+            ],
+            "usages": [
+              {
+                "id": "@15-chinese.sp:24:5",
+                "definition": "$CURRENT_MIRROR",
+                "roles": [
+                  {
+                    "role": "ref",
+                    "set": false,
+                    "member": "#M3",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 24,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "@15-chinese.sp:30:5",
+                "definition": "$MIRROR_PAIR",
+                "roles": [
+                  {
+                    "role": "a",
+                    "set": false,
+                    "member": "#M3",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 30,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "%ss_M3_3",
+                "definition": "$SUPPLY_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#M3:3",
+                    "terminal": "s"
+                  }
+                ],
+                "file": 0,
+                "line": 91,
+                "source": "solver",
+                "state": "in-effect"
               }
             ]
           },
@@ -611,6 +952,56 @@
                   "&vdd"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "@15-chinese.sp:24:5",
+                "definition": "$CURRENT_MIRROR",
+                "roles": [
+                  {
+                    "role": "out",
+                    "set": false,
+                    "member": "#M4",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 24,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "@15-chinese.sp:30:5",
+                "definition": "$MIRROR_PAIR",
+                "roles": [
+                  {
+                    "role": "b",
+                    "set": false,
+                    "member": "#M4",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 30,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "%ss_M4_3",
+                "definition": "$SUPPLY_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#M4:3",
+                    "terminal": "s"
+                  }
+                ],
+                "file": 0,
+                "line": 92,
+                "source": "solver",
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -676,6 +1067,56 @@
                   "&vss"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "@15-chinese.sp:25:5",
+                "definition": "$INPUT_STAGE",
+                "roles": [
+                  {
+                    "role": "tail",
+                    "set": false,
+                    "member": "#M5",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 25,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "%tc",
+                "definition": "$TAIL_CENTER",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#M5",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 31,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "%gs_M5_3",
+                "definition": "$GND_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#M5:3",
+                    "terminal": "s"
+                  }
+                ],
+                "file": 0,
+                "line": 90,
+                "source": "solver",
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -731,6 +1172,40 @@
                 "nets": [
                   "&n1"
                 ]
+              }
+            ],
+            "usages": [
+              {
+                "id": "%bc",
+                "definition": "$偏置链",
+                "roles": [
+                  {
+                    "role": "电阻",
+                    "set": true,
+                    "member": "#R1",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 45,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "%ss_R1_1",
+                "definition": "$SUPPLY_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#R1:1",
+                    "terminal": "p"
+                  }
+                ],
+                "file": 0,
+                "line": 93,
+                "source": "solver",
+                "state": "in-effect"
               }
             ]
           },
@@ -788,6 +1263,24 @@
                   "&bias"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "%bc",
+                "definition": "$偏置链",
+                "roles": [
+                  {
+                    "role": "电阻",
+                    "set": true,
+                    "member": "#R2",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 45,
+                "source": "written",
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -844,6 +1337,40 @@
                   "&vss"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "%bc",
+                "definition": "$偏置链",
+                "roles": [
+                  {
+                    "role": "电阻",
+                    "set": true,
+                    "member": "#R3",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 45,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "%gr",
+                "definition": "$GND_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#R3:2",
+                    "terminal": "n"
+                  }
+                ],
+                "file": 0,
+                "line": 75,
+                "source": "written",
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -896,6 +1423,24 @@
                   "&vss"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "@15-chinese.sp:32:5",
+                "definition": "$FLOW",
+                "roles": [
+                  {
+                    "role": "path",
+                    "set": true,
+                    "member": "#CL",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 32,
+                "source": "written",
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -922,7 +1467,25 @@
               "value": "R0",
               "source": null
             },
-            "pins": []
+            "pins": [],
+            "usages": [
+              {
+                "id": "@15-chinese.sp:25:5",
+                "definition": "$INPUT_STAGE",
+                "roles": [
+                  {
+                    "role": "pair",
+                    "set": false,
+                    "member": "%dp",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 25,
+                "source": "written",
+                "state": "in-effect"
+              }
+            ]
           },
           {
             "id": "@15-chinese.sp:24:5",

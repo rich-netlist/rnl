@@ -33,8 +33,8 @@ pub use catalog::{
     Terminal,
 };
 pub use document::{
-    Child, Diagnostic, Document, Drawings, Hit, InspectedLabel, InspectedPin, InspectedSymbol, Level, Object,
-    SourceFile, SourceInclude, Span, Unplaced, UnplacedDrawing, Usage, UsageRole,
+    Child, Diagnostic, Document, Drawings, Hit, InspectedLabel, InspectedPin, InspectedSymbol, Level, MemberOf, Object,
+    RoleOf, RuleAt, SourceFile, SourceInclude, Span, Unplaced, UnplacedDrawing, Usage, UsageRole,
 };
 pub use formats::{detect_format, formats, FormatInfo};
 pub use library::{LibraryIndex, LibraryProvider};
@@ -46,7 +46,7 @@ pub use rnl_runtime::source::MemoryProvider;
 pub use snapshot::{
     FileRef, HostInstance, HostLevel, HostNet, HostTerminal, LevelModel, LevelSnapshot, ObjectView, PackageUse, Parts,
     PinLabel, PinView, PointView, ShapeView, Slot, Snapshot, SymbolDefinition, SymbolPin, SymbolPrim, SymbolRef,
-    TextView, Vertex, WireView, SCHEMA,
+    TextView, UsageOf, Vertex, WireView, SCHEMA,
 };
 
 include!(concat!(env!("OUT_DIR"), "/bundled.rs"));

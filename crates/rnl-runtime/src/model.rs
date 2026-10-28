@@ -315,6 +315,8 @@ pub struct LevelView {
     pub objects: Vec<ObjectInfo>,
     /// The named points of the level.
     pub points: Vec<PointInfo>,
+    /// The applications of definitions written in the level's records that failed (7.2).
+    pub failed_usages: Vec<FailedUsage>,
     /// The terminal names of each host instance of the level, in the order of its nodes: from
     /// DEVICE, the subcircuit's ports or the adapter's defaults (6.4, 6.12); None where there is
     /// no name.
@@ -398,6 +400,45 @@ pub struct ObjectInfo {
     pub pins: Vec<PinPlace>,
     /// Its symbol, by index in `LevelView::symbols`, when it is drawn.
     pub symbol_view: Option<usize>,
+    /// Where a usage comes from; [`UsageOrigin::Written`] for an instance or a bundle.
+    pub origin: UsageOrigin,
+    /// The usage whose expansion made a usage (14.8), by its id; none for one that a record of the
+    /// level or a rule makes.
+    pub parent: Option<String>,
+    /// A usage whose priority, its own or that of the usage it is made in, is "disabled" (14.8):
+    /// its facts are left out of the drawing and the solver's problem.
+    pub disabled: bool,
+}
+
+/// Where a usage comes from.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub enum UsageOrigin {
+    /// A statement of a record of the document.
+    #[default]
+    Written,
+    /// A statement of a record that a solver wrote back, `type="generated"` (2.8).
+    Solver,
+    /// A rule (10.5): the package it is in, empty for the document's own, and where it is written.
+    Rule { package: String, at: crate::diag::Loc },
+    /// The body of the definition that the usage [`ObjectInfo::parent`] applies (9.4).
+    Body,
+}
+
+/// An application of a definition, AS or ATTACH, written in a record of the level, that failed
+/// and made no usage (7.2): what it names, so that a tool can list it with the objects it names.
+#[derive(Clone, Debug, PartialEq)]
+pub struct FailedUsage {
+    /// The name the statement binds, such as `%dp1`, when it binds one.
+    pub id: Option<String>,
+    /// The definition, such as `$DIFFERENTIAL_PAIR`, when the statement names one.
+    pub definition: Option<String>,
+    /// The objects written for its roles, each with the role it is written for, labelled or by
+    /// place, when that is known, and its id as [`ObjectInfo::attach`] writes ids.
+    pub roles: Vec<(Option<String>, Attach)>,
+    /// The statement: its first and last character.
+    pub source: (crate::diag::Loc, crate::diag::Loc),
+    /// Why it failed: the message of its error.
+    pub reason: String,
 }
 
 /// What a role of a usage is attached to: an object, by its id, or a point; for a set role (9.4),

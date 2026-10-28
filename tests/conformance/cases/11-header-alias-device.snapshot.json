@@ -116,12 +116,101 @@
           {
             "id": "&0",
             "global": true,
-            "port": false
+            "port": false,
+            "usages": [
+              {
+                "id": "@rnl-std-virtual.rnl:52:9#1",
+                "definition": "$GND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 52,
+                "source": "body",
+                "made_in": "%gs_XM1_3",
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-virtual.rnl:52:9#2",
+                "definition": "$GND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 52,
+                "source": "body",
+                "made_in": "%gs_V1_2",
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-virtual.rnl:52:9#3",
+                "definition": "$GND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 52,
+                "source": "body",
+                "made_in": "%gs_V2_2",
+                "state": "in-effect"
+              }
+            ]
           },
           {
             "id": "&vdd",
             "global": false,
-            "port": false
+            "port": false,
+            "usages": [
+              {
+                "id": "@rnl-std-virtual.rnl:58:9#1",
+                "definition": "$SUPPLY",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&vdd",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 58,
+                "source": "body",
+                "made_in": "%ss_XM2_3",
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-virtual.rnl:58:9#2",
+                "definition": "$SUPPLY",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&vdd",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 58,
+                "source": "body",
+                "made_in": "%ss_V1_1",
+                "state": "in-effect"
+              }
+            ]
           }
         ]
       },
@@ -244,6 +333,24 @@
                   "&0"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "%gs_XM1_3",
+                "definition": "$GND_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#XM1:3",
+                    "terminal": "s"
+                  }
+                ],
+                "file": 0,
+                "line": 34,
+                "source": "solver",
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -309,6 +416,24 @@
                   "&vdd"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "%ss_XM2_3",
+                "definition": "$SUPPLY_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#XM2:3",
+                    "terminal": "s"
+                  }
+                ],
+                "file": 0,
+                "line": 37,
+                "source": "solver",
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -361,6 +486,40 @@
                   "&0"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "%gs_V1_2",
+                "definition": "$GND_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#V1:2",
+                    "terminal": "n"
+                  }
+                ],
+                "file": 0,
+                "line": 35,
+                "source": "solver",
+                "state": "in-effect"
+              },
+              {
+                "id": "%ss_V1_1",
+                "definition": "$SUPPLY_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#V1:1",
+                    "terminal": "p"
+                  }
+                ],
+                "file": 0,
+                "line": 38,
+                "source": "solver",
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -412,6 +571,24 @@
                 "nets": [
                   "&0"
                 ]
+              }
+            ],
+            "usages": [
+              {
+                "id": "%gs_V2_2",
+                "definition": "$GND_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#V2:2",
+                    "terminal": "n"
+                  }
+                ],
+                "file": 0,
+                "line": 36,
+                "source": "solver",
+                "state": "in-effect"
               }
             ]
           },

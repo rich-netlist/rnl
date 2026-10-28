@@ -159,7 +159,94 @@
           {
             "id": "&0",
             "global": true,
-            "port": false
+            "port": false,
+            "usages": [
+              {
+                "id": "@rnl-std-virtual.rnl:52:9#1",
+                "definition": "$GND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 52,
+                "source": "body",
+                "made_in": "%st",
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-virtual.rnl:52:9#2",
+                "definition": "$GND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 52,
+                "source": "body",
+                "made_in": "%gs_V1_2",
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-virtual.rnl:52:9#3",
+                "definition": "$GND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 52,
+                "source": "body",
+                "made_in": "%gs_C2_2",
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-virtual.rnl:52:9#4",
+                "definition": "$GND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 52,
+                "source": "body",
+                "made_in": "%gs_C3_2",
+                "state": "in-effect"
+              },
+              {
+                "id": "@rnl-std-virtual.rnl:52:9#5",
+                "definition": "$GND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 52,
+                "source": "body",
+                "made_in": "%gs_RL_2",
+                "state": "in-effect"
+              }
+            ]
           },
           {
             "id": "&n1",
@@ -323,6 +410,40 @@
                   "&0"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "%ch",
+                "definition": "$CHAIN",
+                "roles": [
+                  {
+                    "role": "source",
+                    "set": false,
+                    "member": "#V1",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 26,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "%gs_V1_2",
+                "definition": "$GND_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#V1:2",
+                    "terminal": "n"
+                  }
+                ],
+                "file": 0,
+                "line": 49,
+                "source": "solver",
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -374,6 +495,24 @@
                 "nets": [
                   "&n1"
                 ]
+              }
+            ],
+            "usages": [
+              {
+                "id": "%s1",
+                "definition": "$RC_STAGE",
+                "roles": [
+                  {
+                    "role": "r",
+                    "set": false,
+                    "member": "#R1",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 23,
+                "source": "written",
+                "state": "in-effect"
               }
             ]
           },
@@ -431,6 +570,40 @@
                   "&0"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "%s1",
+                "definition": "$RC_STAGE",
+                "roles": [
+                  {
+                    "role": "c",
+                    "set": false,
+                    "member": "#C1",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 23,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "%st",
+                "definition": "$GND_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#C1:2",
+                    "terminal": "n"
+                  }
+                ],
+                "file": 0,
+                "line": 39,
+                "source": "written",
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -482,6 +655,24 @@
                 "nets": [
                   "&n2"
                 ]
+              }
+            ],
+            "usages": [
+              {
+                "id": "%s2",
+                "definition": "$RC_STAGE",
+                "roles": [
+                  {
+                    "role": "r",
+                    "set": false,
+                    "member": "#R2",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 24,
+                "source": "written",
+                "state": "in-effect"
               }
             ]
           },
@@ -539,6 +730,40 @@
                   "&0"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "%s2",
+                "definition": "$RC_STAGE",
+                "roles": [
+                  {
+                    "role": "c",
+                    "set": false,
+                    "member": "#C2",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 24,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "%gs_C2_2",
+                "definition": "$GND_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#C2:2",
+                    "terminal": "n"
+                  }
+                ],
+                "file": 0,
+                "line": 50,
+                "source": "solver",
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -590,6 +815,24 @@
                 "nets": [
                   "&out"
                 ]
+              }
+            ],
+            "usages": [
+              {
+                "id": "%s3",
+                "definition": "$RC_STAGE",
+                "roles": [
+                  {
+                    "role": "r",
+                    "set": false,
+                    "member": "#R3",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 25,
+                "source": "written",
+                "state": "in-effect"
               }
             ]
           },
@@ -647,6 +890,40 @@
                   "&0"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "%s3",
+                "definition": "$RC_STAGE",
+                "roles": [
+                  {
+                    "role": "c",
+                    "set": false,
+                    "member": "#C3",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 25,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "%gs_C3_2",
+                "definition": "$GND_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#C3:2",
+                    "terminal": "n"
+                  }
+                ],
+                "file": 0,
+                "line": 51,
+                "source": "solver",
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -699,6 +976,56 @@
                   "&0"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "id": "%ch",
+                "definition": "$CHAIN",
+                "roles": [
+                  {
+                    "role": "load",
+                    "set": false,
+                    "member": "#RL",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 26,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "%tp",
+                "definition": "$TP",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "#RL:1",
+                    "terminal": "p"
+                  }
+                ],
+                "file": 0,
+                "line": 37,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "id": "%gs_RL_2",
+                "definition": "$GND_STUB",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#RL:2",
+                    "terminal": "n"
+                  }
+                ],
+                "file": 0,
+                "line": 52,
+                "source": "solver",
+                "state": "in-effect"
+              }
             ]
           },
           {
@@ -725,7 +1052,25 @@
               "value": "R0",
               "source": null
             },
-            "pins": []
+            "pins": [],
+            "usages": [
+              {
+                "id": "%ch",
+                "definition": "$CHAIN",
+                "roles": [
+                  {
+                    "role": "series",
+                    "set": true,
+                    "member": "%s1",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 26,
+                "source": "written",
+                "state": "in-effect"
+              }
+            ]
           },
           {
             "id": "@05-definitions.sp:18:7#1",
@@ -779,7 +1124,25 @@
               "value": "R0",
               "source": null
             },
-            "pins": []
+            "pins": [],
+            "usages": [
+              {
+                "id": "%ch",
+                "definition": "$CHAIN",
+                "roles": [
+                  {
+                    "role": "series",
+                    "set": true,
+                    "member": "%s2",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 26,
+                "source": "written",
+                "state": "in-effect"
+              }
+            ]
           },
           {
             "id": "@05-definitions.sp:18:7#2",
@@ -833,7 +1196,25 @@
               "value": "R0",
               "source": null
             },
-            "pins": []
+            "pins": [],
+            "usages": [
+              {
+                "id": "%ch",
+                "definition": "$CHAIN",
+                "roles": [
+                  {
+                    "role": "series",
+                    "set": true,
+                    "member": "%s3",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 26,
+                "source": "written",
+                "state": "in-effect"
+              }
+            ]
           },
           {
             "id": "@05-definitions.sp:18:7#3",
