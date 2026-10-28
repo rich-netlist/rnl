@@ -40,7 +40,7 @@
   "Zoom, pan, search for devices": "縮放、平移、搜尋器件",
   "Highlight a net, descend into subcircuits": "醒目顯示網路、進入子電路",
   "No solver needed when the file already has full geometry": "當檔案已具備完整幾何資訊時，無須使用求解器",
-  "Edit the text and draw it again on Apply; a file is written only on Save, which on the web is a download": "編輯文字並於套用時重新繪圖；僅在儲存時寫入檔案（網頁版為下載檔案）",
+  "Edit the text and draw it again on Apply; a file is written only on Save, which on the web is a download": "編輯文字並於應用時重新繪圖；僅在儲存時寫入檔案（網頁版為下載檔案）",
   "No built-in component library; symbols come from the standard package and RNL libraries": "不內建器件庫；符號來自標準套件與 RNL 資源庫",
   "apps/web and apps/desktop, sharing the page apps/viewer-ui": "apps/web 與 apps/desktop，共用介面 apps/viewer-ui",
   "Since 0.1 · edits; desktop solves": "0.1 起已有 · 可編輯，桌面版可求解",
