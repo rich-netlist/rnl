@@ -5,6 +5,9 @@ import { select } from "./selection.js";
 import { setCheck } from "./commands.js";
 import { $, load, save, span, svgElement } from "./util.js";
 import { setPathText } from "./source-path.js";
+import { objectUsages } from "./usage-table.js";
+import { setPane } from "./panels.js";
+import { revealLine } from "./text.js";
 
 export const USAGE_COLORS = ["#e03131", "#e5b500", "#4263eb", "#2f9e44", "#9c36b5", "#009ccc"];
 const MAX_PREFERENCES = 2000;
@@ -199,8 +202,22 @@ export function renderUsages() {
 function renderDetail() {
   const detail = $("usage-detail");
   detail.replaceChildren();
+  highlightUsage(null);
   const u = chosen();
-  if (!u) { append(detail, span("placeholder", m("Select a usage to inspect it."))); return; }
+  if (!u) {
+    // an object that is no usage: the usages it is a member of, in the place of a usage's details
+    // (of the level shown: an object's usages are those of its own level)
+    if (selected !== null && doc?.objects[selected]?.level === doc.levels[current]?.host) {
+      append(detail, objectUsages(doc, selected, {
+        select: (usage) => select(usage, "usage"),
+        hover: highlightUsage,
+        reveal: (file, line) => { setPane("netlist"); revealLine(file, line, true); },
+      }));
+      return;
+    }
+    append(detail, span("placeholder", m("Select an object to see its usages, or a usage to inspect it.")));
+    return;
+  }
   const title = document.createElement("h2");
   setText(title, `${u.definition}: ${u.id}`);
   const colorRow = document.createElement("label");
@@ -248,6 +265,34 @@ function renderDetail() {
   append(detail, title, colorRow, palette, roleHead, table, sourceHead, file, source);
 }
 
+/** The groups of the drawing that stay at full strength when a usage is in focus: its members and what it draws. */
+function focusSet(u) {
+  const keep = new Set(localSymbol(u) ? [] : u.roles.flatMap(r => r.groups));
+  if (!localSymbol(u)) {
+    const members = new Set(u.roles.flatMap(r => r.objects));
+    for (const h of doc.levels[current].hits) if (h.id && h.objects.some(o => members.has(o))) keep.add(h.id);
+  }
+  // A virtual symbol is local to one usage; its attached net may span the entire drawing.
+  for (const h of doc.levels[current].hits) if (h.objects.includes(u.object) && h.id) keep.add(h.id);
+  return keep;
+}
+/** Dim every group of the drawing that is not in `keep`; with none, dim none. */
+function mute(groups, keep) {
+  for (const [id, elements] of groups) for (const g of elements) {
+    g.classList.toggle("usage-muted", !!keep && !keep.has(id) && !g.parentElement.closest("[data-id]"));
+  }
+}
+/**
+ * Light up the members of a usage in the drawing while a row of the object's usages is pointed at, as a
+ * selection does, without selecting it; with null, the drawing goes back to what is selected.
+ */
+export function highlightUsage(object) {
+  if (!context || !doc) return;
+  const [, , groups] = context;
+  const hovered = object === null ? chosen() : usages().find(u => u.object === object);
+  mute(groups, hovered ? focusSet(hovered) : null);
+}
+
 // Net and terminal roles of a virtual symbol denote its local connections, not every
 // other symbol on the same electrical net. Whole component roles retain their geometry.
 function localSymbol(u) {
@@ -292,16 +337,7 @@ export function paintUsages(svg, view, groups) {
     layer = svgElement("g", { class: "usage-overlays", "pointer-events": "none" });
     append(svg, layer);
     drawing = svg; layerDoc = doc; layerLevel = current; layerRevision = revision; layerSelected = focus;
-    const keep = u ? new Set(localSymbol(u) ? [] : u.roles.flatMap(r => r.groups)) : null;
-    if (keep && !localSymbol(u)) {
-      const members = new Set(u.roles.flatMap(r => r.objects));
-      for (const h of doc.levels[current].hits) if (h.id && h.objects.some(o => members.has(o))) keep.add(h.id);
-    }
-    // A virtual symbol is local to one usage; its attached net may span the entire drawing.
-    if (keep) for (const h of doc.levels[current].hits) if (h.objects.includes(u.object) && h.id) keep.add(h.id);
-    for (const [id, elements] of groups) for (const g of elements) {
-      g.classList.toggle("usage-muted", !!keep && !keep.has(id) && !g.parentElement.closest("[data-id]"));
-    }
+    mute(groups, u ? focusSet(u) : null);
     frames = [];
     for (const entry of [...usages()].sort((a, b) => Number(a.object === focus) - Number(b.object === focus))) {
       const active = entry.object === focus;
@@ -369,3 +405,4 @@ export function usagesAt({ x, y }) {
 }
 window.addEventListener("viewer-level", () => { revision++; renderUsages(); persist(); });
 window.addEventListener("viewer-selection", renderUsages);
+window.addEventListener("language-changed", renderUsages);

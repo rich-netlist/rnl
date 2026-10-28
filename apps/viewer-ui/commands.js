@@ -11,7 +11,7 @@ import { cancelGesture, fit, pan, zoomCenter } from "./drawing.js";
 import { applyChanges, discardChanges, editing, save, saveAs, toggleEdit } from "./editor.js";
 import { duplicateWindow } from "./navigation.js";
 import { gridCommand } from "./grid.js";
-import { hoverNamesOn, setHoverNames } from "./hover.js";
+import { hoverNamesOn, hoverRolesOn, setHoverNames, setHoverRoles } from "./hover.js";
 import { loadClipboard, pickAndOpen, reload } from "./open.js";
 import { setProblems, setSidebar, showPane } from "./panels.js";
 import { clearSelection } from "./selection.js";
@@ -117,6 +117,7 @@ export function command(id, options = {}) {
     case "grid-axes":
     case "grid-settings": gridCommand(id); break;
     case "toggle-hover-names": setHoverNames(!hoverNamesOn()); break;
+    case "toggle-hover-roles": setHoverRoles(!hoverRolesOn()); break;
     case "toggle-usages": return toggleUsages();
     case "toggle-currents": return toggleCurrents();
     case "toggle-netlist": setSidebar($("app").classList.contains("sidebar-hidden")); break;
