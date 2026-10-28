@@ -13,7 +13,7 @@
   "agents": "Agent",
   "translation": "翻譯進度",
   "pages": "頁面",
-  "guide_note": "這是語言標準的精簡版：說明讀寫 RNL 檔案所需瞭解的內容。本指南並非正式規範；若與下方正文有所出入，以下方正文為準。同一份指南亦包含在[提供給 AI agent 的 skill 套件]({agents})中。",
+  "guide_note": "這是語言標準的精簡版：說明讀寫 RNL 檔案所需瞭解的內容。本指南並非正式規範；若與下方正文有所出入，以下方正文為準。同一份指南亦包含在[提供給 AI Agent 的 skill 套件]({agents})中。",
   "principles_note": "這是 RNL 的設計原則，即 [`spec/rich-netlist.md`](https://github.com/rich-netlist/rnl/blob/main/spec/rich-netlist.md) 的正文，列於此處以便與語言標準一併閱讀。它們不屬於語言標準的一部分，亦不綁定特定版本；語言標準引用它們時稱作「原則」。以英文原文為準。",
   "kicker": "Rich Netlist 語言標準",
   "theme_dark": "切換至深色主題",
