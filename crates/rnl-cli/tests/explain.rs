@@ -170,20 +170,20 @@ fn explain_prints_a_line_for_each_usage_and_the_chain_upward() {
     assert_eq!(
         out,
         "#R3 in explain.sp: 6 usages
-  second · %outer · $TWO · explain.sp:16 · written · in effect
-    first · %top · $TWO · explain.sp:17 · written · in effect
-  {members} · %all · $SET · explain.sp:18 · written · in effect
-  right · %off · $PAIR · explain.sp:19 · written · disabled
-  p (terminal n) · %gnd · $GROUND · explain.sp:24 · written · in effect
-  part · @explain.sp:23:38 · $LONE · explain.sp:23 · rule at explain.sp:23 · in effect
-  extra · %bad · $PAIR · explain.sp:20 · written · failed: the ordinary definition $PAIR has no role extra (9.4)
+  second of usage %outer (definition $TWO) · explain.sp:16 · written
+    %outer is in turn first of usage %top (definition $TWO) · explain.sp:17 · written
+  one of {members} of usage %all (definition $SET) · explain.sp:18 · written
+  right of usage %off (definition $PAIR) · explain.sp:19 · written · DISABLED
+  p (through terminal n) of usage %gnd (definition $GROUND) · explain.sp:24 · written
+  part of usage @explain.sp:23:38 (definition $LONE) · explain.sp:23 · made by the rule at explain.sp:23
+  extra of usage %bad (definition $PAIR) · explain.sp:20 · written · FAILED: the ordinary definition $PAIR has no role extra (9.4)
 "
     );
     // a terminal, by its name or its number: only the usages of that terminal
     let (_, by_name, _) = rnl(&["explain", &file, "#M1:d"]);
     assert_eq!(
         by_name,
-        "#M1:d in explain.sp: 1 usage\n  pin (terminal d) · %drain · $PIN · explain.sp:21 · written · in effect\n"
+        "#M1:d in explain.sp: 1 usage\n  pin (through terminal d) of usage %drain (definition $PIN) · explain.sp:21 · written\n"
     );
     let (_, by_number, _) = rnl(&["explain", &file, "#M1:1"]);
     assert_eq!(by_number, by_name.replace("#M1:d in", "#M1:1 in"));
@@ -227,11 +227,84 @@ fn explain_on_the_five_transistor_ota() {
     assert_eq!(
         out,
         "#M1 in ota5t: 2 usages
-  in_p · %dp1 · $DIFFERENTIAL_PAIR · ota5t.sp:12 · written · in effect
-  a · %sym12 · $MIRRORED · ota5t.sp:19 · written · in effect
+  in_p of usage %dp1 (definition $DIFFERENTIAL_PAIR) · ota5t.sp:12 · written
+  a of usage %sym12 (definition $MIRRORED) · ota5t.sp:19 · written
 "
     );
     // the level by its title
     let (code, same, _) = rnl(&["explain", &ota, "#M1", "--level", "ota5t"]);
     assert_eq!((code, same), (0, out));
+}
+
+/// Usages nested seven deep, with one, `%u3`, a member of two outer usages, `%u4` and `%v4`.
+const DEEP: &str = r#"* deep
+R1 a b 1k
+R2 b c 1k
+R3 c d 1k
+* @RNL(type="header") { @VERSION("0.3")}
+* @RNL {
+*   $PAIR = @DEFINE(roles=["left", "right"]) {};
+*   $TWO = @DEFINE(roles=[["first", "usage"], "second"]) {};
+*   %u1 = #R1(left) #R2(right) @AS $PAIR;
+*   %u2 = %u1(first) #R3(second) @AS $TWO;
+*   %u3 = %u2(first) #R3(second) @AS $TWO;
+*   %u4 = %u3(first) #R3(second) @AS $TWO;
+*   %u5 = %u4(first) #R3(second) @AS $TWO;
+*   %u6 = %u5(first) #R3(second) @AS $TWO;
+*   %u7 = %u6(first) #R3(second) @AS $TWO;
+*   %v4 = %u3(first) #R1(second) @AS $TWO;
+*   %v5 = %v4(first) #R2(second) @AS $TWO;
+* }
+.end
+"#;
+
+#[test]
+fn explain_indents_a_deep_chain_and_its_forks() {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("rnl-explain");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("deep.sp"), DEEP).unwrap();
+    let (code, out, err) = rnl(&["explain", &rnl_cli::path_str(&dir.join("deep.sp")), "#R2"]);
+    assert_eq!((code, err.as_str()), (0, ""));
+    assert_eq!(
+        out,
+        "#R2 in deep.sp: 2 usages
+  right of usage %u1 (definition $PAIR) · deep.sp:9 · written
+    %u1 is in turn first of usage %u2 (definition $TWO) · deep.sp:10 · written
+      %u2 is in turn first of usage %u3 (definition $TWO) · deep.sp:11 · written
+        %u3 is in turn first of usage %u4 (definition $TWO) · deep.sp:12 · written
+          %u4 is in turn first of usage %u5 (definition $TWO) · deep.sp:13 · written
+            %u5 is in turn first of usage %u6 (definition $TWO) · deep.sp:14 · written
+              %u6 is in turn first of usage %u7 (definition $TWO) · deep.sp:15 · written
+        %u3 is in turn first of usage %v4 (definition $TWO) · deep.sp:16 · written
+          %v4 is in turn first of usage %v5 (definition $TWO) · deep.sp:17 · written
+  second of usage %v5 (definition $TWO) · deep.sp:17 · written
+"
+    );
+}
+
+#[test]
+fn explain_stops_a_chain_that_loops() {
+    // The language cannot write a usage that contains itself, so the loop is made in the index.
+    let files = MemoryProvider::new().with("/w/deep.sp", DEEP);
+    let mut d = rnl_view::build("/w/deep.sp", &files, &BuildOptions { svg: false, ..BuildOptions::default() }).unwrap();
+    let at = |d: &Document, name: &str| d.objects.iter().position(|o| o.kind == "usage" && o.name == name).unwrap();
+    let (u1, u7) = (at(&d, "%u1"), at(&d, "%u7"));
+    let into_u2 = d.objects[u1].usages[0].clone();
+    d.objects[u7].usages.push(into_u2);
+    let found = rnl_cli::explain::find(&d, "%u2", None).unwrap();
+    assert_eq!(
+        rnl_cli::explain::lines(&d, &found),
+        [
+            "%u2 in deep.sp: 1 usage",
+            "  first of usage %u3 (definition $TWO) · deep.sp:11 · written",
+            "    %u3 is in turn first of usage %u4 (definition $TWO) · deep.sp:12 · written",
+            "      %u4 is in turn first of usage %u5 (definition $TWO) · deep.sp:13 · written",
+            "        %u5 is in turn first of usage %u6 (definition $TWO) · deep.sp:14 · written",
+            "          %u6 is in turn first of usage %u7 (definition $TWO) · deep.sp:15 · written",
+            "            %u7 is in turn first of usage %u2 (definition $TWO) · deep.sp:10 · written",
+            "              %u2 is in turn first of usage %u3 (definition $TWO) · deep.sp:11 · written · the chain loops back to %u3",
+            "    %u3 is in turn first of usage %v4 (definition $TWO) · deep.sp:16 · written",
+            "      %v4 is in turn first of usage %v5 (definition $TWO) · deep.sp:17 · written",
+        ]
+    );
 }
