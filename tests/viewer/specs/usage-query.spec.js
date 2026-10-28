@@ -13,7 +13,8 @@ const rows = (page) => page.locator("#usage-detail .usage-membership-row");
 const ids = (page) => page.locator("#usage-detail .membership-id");
 const NEW = ["Usages of {0}", "It is in no usage.", "Select an object to see its usages, or a usage to inspect it.", "Select this usage",
   "overridden", "disabled", "written back by a solver", "rule of {0}", "rule of this document", "made in {0}", "{0} (terminal {1})",
-  "{0} of {1} {2}", "Show its usages", "Show &Roles on Hover"];
+  "{0} of {1} {2}", "Show its usages", "Show &Roles on Hover", "{0} of usage {1} (definition {2})",
+  "{0} is in turn {1} of usage {2} (definition {3})"];
 
 /** Select an object of the Document by its kind and name, as a click on a list does, and open the Usage panel. */
 async function selectObject(page, kind, name) {
@@ -39,6 +40,12 @@ test("an instance's usages are in the lower half of the Usage panel, the usages 
   // %outer is a member of %top in turn, under %pair1, which it is made of: the chain upward, indented
   const depths = await rows(page).evaluateAll((els) => els.map((e) => Number(e.style.getPropertyValue("--depth"))));
   expect(depths).toEqual([0, 1, 2, 0, 0, 0]);
+  // each row reads as a sentence; a usage in a usage says whose member it is, which no indentation need tell
+  const sentences = page.locator("#usage-detail .membership-sentence");
+  await expect(sentences.nth(0)).toHaveText("left of usage %pair1 (definition $PAIR)");
+  await expect(sentences.nth(1)).toHaveText("%pair1 is in turn first of usage %outer (definition $TWO)");
+  await expect(sentences.nth(2)).toHaveText("%outer is in turn first of usage %top (definition $TWO)");
+  await expect(sentences.nth(4)).toHaveText("{members} of usage %all (definition $SET)");
   // each row says where its statement is: the file's line
   await expect(page.locator("#usage-detail .membership-where")).toHaveText(Array(6).fill(/usage-query\.sp:\d+/));
   expect(await page.locator("#usage-detail .membership-where").first().textContent()).toBe("usage-query.sp:16");
@@ -50,6 +57,13 @@ test("a usage that is not in effect is greyed, with its state and its reason, an
   await expect(bad).toHaveClass(/greyed/);
   await expect(bad).toHaveAttribute("data-state", "failed");
   await expect(bad.locator(".membership-state")).toHaveText("failed");
+  // the whole row is grey, and its state is at the right of it; a row in effect has none
+  const grey = await bad.locator(".usage-membership-head").evaluate((el) => Number(getComputedStyle(el).opacity));
+  expect(grey).toBeLessThan(1);
+  const [head, state, row] = await bad.evaluate((el) => [".usage-membership-head", ".membership-state"].map((s) => el.querySelector(s).getBoundingClientRect()).concat(el.getBoundingClientRect()));
+  expect(state.right).toBeGreaterThan(row.right - 20);
+  expect(state.left).toBeGreaterThan(head.right - 1);
+  await expect(rows(page).first().locator(".membership-state")).toHaveCount(0);
   await expect(bad.locator(".membership-reason")).toContainText("has no role extra");
   // it made no usage: its id is text
   expect(await bad.locator(".membership-id").evaluate((el) => el.tagName)).toBe("SPAN");
@@ -59,6 +73,7 @@ test("a usage that is not in effect is greyed, with its state and its reason, an
   const off = rows(page).filter({ has: page.locator('.membership-id:text-is("%off")') });
   await expect(off).toHaveClass(/greyed/);
   await expect(off.locator(".membership-state")).toHaveText("disabled");
+  await expect(off.locator(".membership-sentence")).toHaveText("right of usage %off (definition $PAIR)");
 });
 
 test("a terminal's role, a net's, the origin of a usage a rule made, and an object that is in none", async ({ page }) => {

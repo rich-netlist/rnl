@@ -502,6 +502,8 @@
   "{0} of {1} {2}": "{1} {2} 的 {0}",
   "Show its usages": "檢視所在用例",
   "Show &Roles on Hover": "游標懸停時顯示角色(&R)",
+  "{0} of usage {1} (definition {2})": "用例 {1}（定義 {2}）的 {0}",
+  "{0} is in turn {1} of usage {2} (definition {3})": "{0} 又是用例 {2}（定義 {3}）的 {1}",
   "No usages in this circuit.": "目前電路中沒有任何用例。",
   "Color": "顏色",
   "Roles": "角色",

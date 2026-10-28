@@ -24,6 +24,7 @@ export const FILES = {
   "verilog-a": "tests/viewer/inputs/resistor.va",
   "verilog": "tests/viewer/inputs/inverter.v",
   "usage-query": "tests/viewer/inputs/usage-query.sp",
+  "usage-deep": "tests/viewer/inputs/usage-deep.sp",
   "package-pkg": "tests/viewer/inputs/acme.pkg",
   "wire-labels": "tests/viewer/inputs/wire-labels.sp",
   "usage-inspector": "tests/viewer/inputs/usage-inspector.sp",

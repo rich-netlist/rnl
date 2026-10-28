@@ -502,6 +502,8 @@
   "{0} of {1} {2}": "{1} {2}의 {0}",
   "Show its usages": "용례 보기",
   "Show &Roles on Hover": "마우스오버 시 역할 표시(&R)",
+  "{0} of usage {1} (definition {2})": "용례 {1}(정의 {2})의 {0}",
+  "{0} is in turn {1} of usage {2} (definition {3})": "{0}은(는) 다시 용례 {2}(정의 {3})의 {1}",
   "No usages in this circuit.": "이 회로에는 용례가 없습니다.",
   "Color": "색상",
   "Roles": "역할",

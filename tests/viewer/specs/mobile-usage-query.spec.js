@@ -32,6 +32,30 @@ test.describe("on a phone", () => {
     expect(inside).toBe(true);
   });
 
+  test("usages nested deep, with long names, wrap within the width of the screen", async ({ page, viewer }) => {
+    await viewer.open("usage-deep");
+    await page.evaluate(async () => {
+      const o = window.viewer.doc.objects.findIndex((x) => x.kind === "instance" && x.name === "R1");
+      (await import("./selection.js")).select(o, "list", { usage: false });
+    });
+    await page.locator("#page-panel").tap();
+    await page.locator("#tab-usages").tap();
+    const rows = page.locator("#usage-detail .usage-membership-row");
+    await expect(rows).toHaveCount(8);
+    const wide = await page.evaluate(() => {
+      const detail = document.querySelector("#usage-detail");
+      const panel = detail.getBoundingClientRect();
+      return {
+        page: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        detail: detail.scrollWidth - detail.clientWidth,
+        outside: [...detail.querySelectorAll(".usage-membership-row *")].filter((e) => e.getBoundingClientRect().right > panel.right + 1).length,
+      };
+    });
+    expect(wide.page).toBeLessThanOrEqual(0);
+    expect(wide.detail).toBeLessThanOrEqual(0);
+    expect(wide.outside).toBe(0);
+  });
+
   test("a tap on the id of a row selects the usage", async ({ page }) => {
     await page.locator('#usage-detail button.membership-id:text-is("%gnd")').tap();
     await expect(page.locator("#usage-detail h2")).toHaveText(/%gnd/);

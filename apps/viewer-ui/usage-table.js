@@ -1,12 +1,31 @@
 // The usages of one object, from the Document's reverse index (`Object.usages`, the core's MemberOf): in which
 // usages the instance, net or terminal is a member, as which role. The table is shown in the lower half of the
 // Usage panel when an object that is no usage is selected; a role note for the pointer's box is made from the
-// same entries. The usages the object's usages are members of in turn are listed under them, indented.
+// same entries. Each row reads as a sentence, `in_p of usage %dp1 (definition $DIFFERENTIAL_PAIR)`, and the
+// usages the object's usages are members of in turn are listed under them, indented to a few levels, each
+// naming whose member it is, `%outer is in turn first of usage %top (definition $TWO)`.
 
 import { append, m, setAttr, setText } from "./i18n.js";
 import { span } from "./util.js";
 
-const MAX_DEPTH = 8; // a chain of usages in usages is a few deep; this is for the one that loops
+const MAX_DEPTH = 16; // a chain of usages in usages is a few deep; this is for the one that loops
+const INDENT_LEVELS = 3; // the rows are indented this many levels; deeper ones go no further, their sentence says whose they are
+
+/** A private-use character that stands for the node of a sentence's slot until the sentence is translated. */
+const slot = (i) => String.fromCharCode(0xe000 + i);
+
+/** A sentence of the catalog with its slots filled by nodes: the template is translated whole, as a language orders it. */
+function sentence(message, ...nodes) {
+  const out = document.createElement("span");
+  out.className = "membership-sentence";
+  for (const part of String(message).split(/([-])/)) {
+    if (!part) continue;
+    const i = part.charCodeAt(0) - 0xe000;
+    if (part.length === 1 && i >= 0 && i < nodes.length) out.append(nodes[i]);
+    else out.append(document.createTextNode(part));
+  }
+  return out;
+}
 
 /** The role as the table and the note say it: `in_p`, a set role's member as `{tail}`, and its terminal. */
 export function roleName(r) {
@@ -66,34 +85,36 @@ export function objectUsages(doc, o, on) {
   const list = document.createElement("ul");
   list.className = "usage-membership-list";
   const seen = new Set([o]);
-  const add = (entries, depth) => {
+  const add = (entries, depth, subject) => {
     for (const entry of entries) {
-      append(list, row(doc, entry, depth, on));
+      append(list, row(doc, entry, depth, subject, on));
       // the usage's own memberships go under it, once each: one that holds itself is cut
       if (entry.usage !== null && depth < MAX_DEPTH && !seen.has(entry.usage)) {
         seen.add(entry.usage);
-        add(doc.objects[entry.usage]?.usages ?? [], depth + 1);
+        add(doc.objects[entry.usage]?.usages ?? [], depth + 1, entry.id);
         seen.delete(entry.usage);
       }
     }
   };
-  add(object.usages ?? [], 0);
+  add(object.usages ?? [], 0, null);
   if (!list.children.length) append(out, span("placeholder", m("It is in no usage.")));
   else append(out, list);
   return out;
 }
 
-function row(doc, entry, depth, on) {
+function row(doc, entry, depth, subject, on) {
   const li = document.createElement("li");
   li.className = "usage-membership-row";
   li.dataset.state = entry.state;
   if (entry.usage !== null) li.dataset.usage = String(entry.usage);
-  li.style.setProperty("--depth", String(depth));
+  li.dataset.depth = String(depth);
+  li.style.setProperty("--depth", String(Math.min(depth, INDENT_LEVELS)));
   li.classList.toggle("nested", depth > 0);
   li.classList.toggle("greyed", entry.state !== "in-effect");
+  const main = document.createElement("div");
+  main.className = "usage-membership-main";
   const head = document.createElement("div");
   head.className = "usage-membership-head";
-  append(head, span("membership-role", roleList(entry)));
   // a failed application made no usage: its id is text, not something to select
   let id;
   if (entry.usage !== null) {
@@ -104,8 +125,18 @@ function row(doc, entry, depth, on) {
   } else id = document.createElement("span");
   id.className = "membership-id";
   id.textContent = entry.id;
-  append(head, id, span("membership-definition", entry.definition));
-  append(li, head);
+  // the row is one sentence of the catalog: the role of the object in the usage, the usage, its definition
+  const role = span("membership-role", roleList(entry));
+  const definition = span("membership-definition", entry.definition);
+  if (subject === null) append(head, sentence(m`${slot(0)} of usage ${slot(1)} (definition ${slot(2)})`, role, id, definition));
+  else {
+    const whose = span("membership-subject", subject);
+    append(head, sentence(m`${slot(0)} is in turn ${slot(1)} of usage ${slot(2)} (definition ${slot(3)})`, whose, role, id, definition));
+  }
+  append(main, head);
+  // a usage that is not in effect says so at the right of its row
+  if (entry.state !== "in-effect") append(main, span("membership-state", STATES[entry.state]?.() ?? entry.state));
+  append(li, main);
   const detail = document.createElement("div");
   detail.className = "usage-membership-detail";
   const file = fileIndex(doc, entry);
@@ -123,7 +154,6 @@ function row(doc, entry, depth, on) {
   }
   const from = origin(entry);
   if (from) append(detail, span("membership-origin", from));
-  if (entry.state !== "in-effect") append(detail, span("membership-state", STATES[entry.state]?.() ?? entry.state));
   if (entry.reason) append(detail, span("membership-reason", entry.reason));
   if (detail.childNodes.length) append(li, detail);
   if (entry.usage !== null) {
