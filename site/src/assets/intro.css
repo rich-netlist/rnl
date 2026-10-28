@@ -1579,7 +1579,9 @@ html[lang="zh-CN"] .tour-h1 { font-family: var(--f-body); font-weight: 900; lett
 @media (max-width: 760px) { .dl-list li { grid-template-columns: 1fr; } }
 
 /* ---------- The example of 01: a five-transistor OTA, reviewed by what it says ---------- */
-#example, #journey { scroll-margin-top: 70px; }   /* the links to the example land below the top bar */
+/* the links to the example land below the top bar, on its heading (the lead is 40px under it) */
+#example { scroll-margin-top: 66px; }
+#journey { scroll-margin-top: 106px; }
 .rv-legend { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 16px 0 24px; }
 .rv-own { display: flex; gap: 10px; align-items: flex-start; margin: 0; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); font-size: 14px; color: var(--ink-2); line-height: 1.55; }
 .rv-own b { color: var(--ink); }
@@ -1602,9 +1604,9 @@ html[lang="zh-CN"] .tour-h1 { font-family: var(--f-body); font-weight: 900; lett
 .rv-stage.is-black svg [stroke="#1d1d1f"] { stroke: #dcdcdc; }
 .rv-stage.is-black svg [fill="#1d1d1f"] { fill: #dcdcdc; }
 .rv-stage.is-black svg.has-lit g[data-id]:not(.is-lit), .rv-stage.is-black svg.has-lit > rect { opacity: .42; }
-/* the drawing is as tall as the screen leaves room for: file, drawing and checklist are in view together (about 300px of the
-   block is not the drawing) */
-.rv-stage svg { display: block; width: 100%; height: auto; max-height: clamp(260px, calc(100vh - 390px), 520px); margin: 0 auto; }
+/* the drawing is as tall as the screen leaves room for: the heading of the example, the file, the drawing and the checklist are in
+   view together (about 390px of that is not the drawing) */
+.rv-stage svg { display: block; width: 100%; height: auto; max-height: clamp(220px, calc(100vh - 452px), 520px); margin: 0 auto; }
 .rv-stage svg g[data-id] { transition: opacity .15s; }
 .rv-stage svg.has-lit g[data-id]:not(.is-lit), .rv-stage svg.has-lit > rect { opacity: .2; }
 .rv-stage svg .is-lit [stroke]:not([stroke="none"]) { stroke: var(--hl); }
@@ -1633,9 +1635,9 @@ html[lang="zh-CN"] .tour-h1 { font-family: var(--f-body); font-weight: 900; lett
 .code.is-sim .cl.is-rnl .tx { opacity: .36; }
 .cl.is-diff { background: var(--markup-2); box-shadow: inset 3px 0 0 var(--markup); }
 .rv-list { grid-column: 1 / -1; }
-.rv-list .ph { padding-block: 7px; }
+.review .ph { padding-block: 4px; }
 .rv-items { list-style: none; margin: 0; padding: 4px 8px 6px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; }
-.rv-item { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 8px; align-items: baseline; padding: 5px 10px; border-radius: 8px; border: 1px solid transparent; cursor: pointer; font-size: 14px; line-height: 1.45; color: var(--ink-2); }
+.rv-item { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 8px; align-items: baseline; padding: 3px 10px; border-radius: 8px; border: 1px solid transparent; cursor: pointer; font-size: 14px; line-height: 1.45; color: var(--ink-2); }
 .rv-item:hover, .rv-item:focus-visible, .rv-item.is-on { background: var(--signal-2); border-color: color-mix(in srgb, var(--signal) 30%, transparent); outline: none; }
 .rv-item[aria-pressed="true"] { border-color: var(--signal); }
 .rv-item b { color: var(--ink); }
@@ -1653,12 +1655,14 @@ html[lang="zh-CN"] .tour-h1 { font-family: var(--f-body); font-weight: 900; lett
 .eco a:hover { border-color: var(--markup-line); background: var(--markup-2); }
 .eco .ico { width: 22px; height: 22px; color: var(--markup); }
 .eco span { font-size: 14px; color: var(--ink-2); line-height: 1.55; }
-/* on a wide screen the example stops the scroll when it comes up under the bar (proximity: a nudge, never a trap) */
+/* on a wide screen the heading of the example stops the scroll when it comes up under the bar (proximity: a nudge, never a trap);
+   from the heading down to the checklist is one screen, so the heading and its lead are kept short */
 @media (min-width: 1001px) and (min-height: 600px) {
   html { scroll-snap-type: y proximity; }
   /* a link to an address of the page lands where it points: the stop is off until the page is scrolled by hand (intro.js) */
   html.no-snap { scroll-snap-type: none; }
-  .review { scroll-snap-align: start; scroll-margin-top: 71px; }
+  #example { scroll-snap-align: start; margin-bottom: 4px; }
+  #journey { max-width: 60em; margin-bottom: 12px; font-size: 15px; line-height: 1.5; }
 }
 @media (max-width: 1000px) {
   .review { grid-template-columns: minmax(0, 1fr); }

@@ -134,25 +134,26 @@ test('review: the writing style of the file, Chinese sentences only on the Chine
   expect(han.test(await page.locator('#rv-code .cl', { hasText: '$DIFFERENTIAL_PAIR' }).textContent())).toBe(false);
 });
 
-// The file, the drawing and the checklist are in one view on a 16:9 screen: 1080p without the browser's bars, and a laptop at 125%.
-// The page stops there when it is scrolled close (proximity: it never holds the scroll).
+// The heading of the example, the file, the drawing and the checklist are in one view on a 16:9 screen: 1080p without the
+// browser's bars, and a laptop at 125%. The page stops at the heading when it is scrolled close (proximity: it never holds the scroll).
 for (const [width, height] of [[1920, 950], [1536, 730]]) {
   for (const language of ['en', 'zh']) {
-    test(`review: file, drawing and checklist fit one screen at ${width}x${height}, in both views, ${language}`, async ({ page }) => {
+    test(`review: heading, file, drawing and checklist fit one screen at ${width}x${height}, in both views, ${language}`, async ({ page }) => {
       await page.setViewportSize({ width, height });
       await open(page, `/${language}/index.html`);
       const snap = await page.evaluate(() => getComputedStyle(document.documentElement).scrollSnapType);
       expect(snap).toMatch(/^y( proximity)?$/);   // proximity is the default strictness, and is how the browsers print it
-      await page.locator('#review').evaluate(el => el.scrollIntoView({ behavior: 'instant' }));
+      await page.locator('#example').evaluate(el => el.scrollIntoView({ behavior: 'instant' }));
       await page.waitForTimeout(300);
       const bar = await page.locator('.topbar').boundingBox();
       const inView = async () => {
+        const title = await page.locator('#example').boundingBox();
+        expect(title.y).toBeGreaterThanOrEqual(bar.y + bar.height - 1);   // the heading is not under the bar
         const box = await page.locator('#review').boundingBox();
-        expect(box.y).toBeGreaterThanOrEqual(bar.y + bar.height - 1);
         expect(box.y + box.height).toBeLessThanOrEqual(height);
         return box.height;
       };
-      for (const part of ['.rv-code', '#rv-figure', '.rv-list']) await expect(page.locator(part)).toBeInViewport({ ratio: 1 });
+      for (const part of ['#example', '#journey', '.rv-code', '#rv-figure', '.rv-list']) await expect(page.locator(part)).toBeInViewport({ ratio: 1 });
       const viewer = await inView();
       await page.locator('#rv-view [data-view="sim"]').click();
       await expect(page.locator('#rv-sim')).toBeVisible();
@@ -218,3 +219,14 @@ for (const hash of ['example', 'journey']) {
     await expect.poll(() => page.evaluate(() => document.documentElement.classList.contains('no-snap'))).toBe(false);
   });
 }
+
+// Scrolled by hand to somewhere close, the page comes to rest with the heading of the example under the bar.
+test('review: the scroll comes to rest at the heading of the example', async ({ page, browserName }) => {
+  test.skip(browserName !== 'chromium', 'proximity snapping after a wheel scroll is checked in Chromium');
+  await page.setViewportSize({ width: 1536, height: 730 });
+  await open(page, '/en/index.html');
+  const top = () => page.locator('#example').evaluate(el => Math.round(el.getBoundingClientRect().top));
+  await page.mouse.move(700, 400);
+  for (let i = 0; i < 40 && (await top()) > 220; i++) await page.mouse.wheel(0, 100);
+  await expect.poll(top, { timeout: 5000 }).toBe(66);
+});
