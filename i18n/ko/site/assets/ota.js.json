@@ -1,0 +1,21 @@
+{
+  "<b>M1</b> and <b>M2</b> are the input pair; <b>M5</b> is its tail source.": "<b>M1</b>과 <b>M2</b>는 입력쌍, <b>M5</b>는 그 꼬리 트랜지스터입니다.",
+  "<b>M3</b> and <b>M4</b> are a current mirror, the load.": "<b>M3</b>과 <b>M4</b>는 부하인 전류 거울입니다.",
+  "Symmetric: <b>M1</b>/<b>M2</b> and <b>M3</b>/<b>M4</b> mirror about one axis.": "대칭: <b>M1</b>/<b>M2</b>와 <b>M3</b>/<b>M4</b>는 한 축 기준 거울 대칭입니다.",
+  "Bottom to top: tail <b>M5</b>, pair <b>M1</b>, load <b>M3</b>.": "아래에서 위로: 꼬리 <b>M5</b>, 차동쌍 <b>M1</b>, 부하 <b>M3</b>.",
+  "The tail current enters at the drain of <b>M5</b>.": "꼬리 전류는 <b>M5</b>의 드레인으로 흘러 들어갑니다.",
+  "structure": "구조",
+  "intent": "의도",
+  "Pick a statement in the file or an item in the checklist: its devices light up in the drawing and the netlist.": "파일의 구문이나 체크리스트 항목을 선택하면 해당 소자가 도면과 넷리스트에서 강조 표시됩니다.",
+  "<b>Structure</b>: <code>$DIFFERENTIAL_PAIR</code> says which devices form the pair and which is its tail; the standard package puts the tail under the middle of the pair.": "<b>구조</b>: <code>$DIFFERENTIAL_PAIR</code>는 어느 소자가 쌍을 이루고 어느 소자가 꼬리 트랜지스터인지 나타내며, 표준 패키지는 꼬리를 쌍의 가운데 아래에 배치합니다.",
+  "<b>Structure</b>: <code>$CURRENT_MIRROR</code> says which device is the reference and which copies it. Here the mirror is the pair’s load.": "<b>구조</b>: <code>$CURRENT_MIRROR</code>는 어느 소자가 기준이고 어느 소자가 이를 복사하는지 나타냅니다. 여기서는 이 전류 미러가 차동쌍의 부하입니다.",
+  "<b>Intent</b>: two pairs, mirror images about one axis. The standard package puts the two devices of each pair at the same height; a tool that draws from it keeps the symmetry.": "<b>의도</b>: 한 축을 기준으로 좌우 거울 대칭을 이루는 두 쌍입니다. 표준 패키지는 각 쌍의 두 소자를 같은 높이에 두고, 이를 바탕으로 그리는 도구는 대칭을 유지합니다.",
+  "<b>Intent</b>: the tail at the bottom, the pair above it, the load on top, as schematics are usually read.": "<b>의도</b>: 회로도를 읽는 일반적인 순서대로 맨 아래에 꼬리, 그 위에 차동쌍, 맨 위에 부하를 배치합니다.",
+  "<b>Intent</b>: where the current flows, from the top of the circuit to the bottom.": "<b>의도</b>: 회로 위에서 아래로 향하는 전류의 흐름을 나타냅니다.",
+  "A simulator reads the lines that are not dimmed: the netlist. Every RNL line starts with <code>*</code>, so for the simulator it is a comment.": "시뮬레이터는 어둡게 표시되지 않은 줄, 즉 넷리스트만 읽습니다. 모든 RNL 줄은 <code>*</code>로 시작하므로 시뮬레이터에게는 주석입니다.",
+  "AC response from": "AC 응답:",
+  "Low-frequency gain": "저주파 이득",
+  "−3 dB at": "−3 dB 지점",
+  "Unity gain at": "단위 이득 주파수",
+  "1 V differential input and a 1 pF load, simulated from the netlist lines in the file.": "1 V 차동 입력과 1 pF 부하 조건에서 파일의 넷리스트 줄로 시뮬레이션한 결과입니다."
+}

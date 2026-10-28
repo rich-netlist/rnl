@@ -1,0 +1,21 @@
+{
+  "<b>M1</b> and <b>M2</b> are the input pair; <b>M5</b> is its tail source.": "<b>M1</b>と<b>M2</b>は入力対、<b>M5</b>はそのテール電流源。",
+  "<b>M3</b> and <b>M4</b> are a current mirror, the load.": "<b>M3</b>と<b>M4</b>は負荷となるカレントミラー。",
+  "Symmetric: <b>M1</b>/<b>M2</b> and <b>M3</b>/<b>M4</b> mirror about one axis.": "対称：<b>M1</b>/<b>M2</b>と<b>M3</b>/<b>M4</b>は同一軸で鏡像対称。",
+  "Bottom to top: tail <b>M5</b>, pair <b>M1</b>, load <b>M3</b>.": "下から上へ：テール<b>M5</b>、差動対<b>M1</b>、負荷<b>M3</b>。",
+  "The tail current enters at the drain of <b>M5</b>.": "テール電流は<b>M5</b>のドレインから流入。",
+  "structure": "構造",
+  "intent": "意図",
+  "Pick a statement in the file or an item in the checklist: its devices light up in the drawing and the netlist.": "ファイル内の文またはチェックリストの項目を選択すると、該当する素子が図面とネットリストでハイライトされます。",
+  "<b>Structure</b>: <code>$DIFFERENTIAL_PAIR</code> says which devices form the pair and which is its tail; the standard package puts the tail under the middle of the pair.": "<b>構造</b>：<code>$DIFFERENTIAL_PAIR</code>はどの素子が差動対を成しどれがテールかを示し、標準パッケージはテールを差動対の中央下に配置します。",
+  "<b>Structure</b>: <code>$CURRENT_MIRROR</code> says which device is the reference and which copies it. Here the mirror is the pair’s load.": "<b>構造</b>：<code>$CURRENT_MIRROR</code>はどの素子が基準でどれがそれをコピーするかを示します。ここではこのカレントミラーが差動対の負荷です。",
+  "<b>Intent</b>: two pairs, mirror images about one axis. The standard package puts the two devices of each pair at the same height; a tool that draws from it keeps the symmetry.": "<b>意図</b>：1つの軸に関して鏡像対称な2組のペア。標準パッケージは各ペアの2つの素子を同じ高さに揃え、それをもとに描画するツールも対称性を保ちます。",
+  "<b>Intent</b>: the tail at the bottom, the pair above it, the load on top, as schematics are usually read.": "<b>意図</b>：通常の回路図の読み方に合わせ、一番下にテール、その上に差動対、一番上に負荷を配置します。",
+  "<b>Intent</b>: where the current flows, from the top of the circuit to the bottom.": "<b>意図</b>：回路の上から下へと向かう電流の流れを示します。",
+  "A simulator reads the lines that are not dimmed: the netlist. Every RNL line starts with <code>*</code>, so for the simulator it is a comment.": "シミュレータは暗くなっていない行（ネットリスト）だけを読み取ります。RNLの行はすべて<code>*</code>で始まるため、シミュレータにとってはコメントです。",
+  "AC response from": "AC応答：",
+  "Low-frequency gain": "低周波利得",
+  "−3 dB at": "−3 dB点",
+  "Unity gain at": "単位利得周波数",
+  "1 V differential input and a 1 pF load, simulated from the netlist lines in the file.": "1 Vの差動入力と1 pFの負荷で、ファイル内のネットリスト行からシミュレーションした結果です。"
+}
