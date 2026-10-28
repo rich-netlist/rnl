@@ -17,7 +17,18 @@
    "en": "apply",
    "sense": "definition",
    "term": "anwenden",
-   "kind": "rnl"
+   "kind": "rnl",
+   "note": "Applying a definition (RNL), as its usage, Anwendung, says; changes in the interface are übernommen."
+  },
+  {
+   "en": "apply",
+   "sense": "UI changes",
+   "term": "übernehmen",
+   "avoid": [
+    "anwenden"
+   ],
+   "kind": "general",
+   "note": "Applying changes in the interface, as Windows says it (Übernehmen); anwenden is applying a definition, and Anwendung is a usage."
   },
   {
    "en": "bend",
@@ -587,7 +598,7 @@
   },
   {
    "en": "Apply and Exit Editing",
-   "term": "Anwenden und Bearbeitung beenden",
+   "term": "Übernehmen und Bearbeitung beenden",
    "kind": "command"
   },
   {

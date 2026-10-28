@@ -62,7 +62,7 @@
   "Adds members to a named set, such as vdd to the supply nets, so the standard package adds supply symbols for it.": "將成員加入具名集合，例如將 vdd 加入電源網路集合，讓標準套件自動為其補上電源符號。",
   "Removes members from a named set—for example, removing vss from $NAMED_GROUND_NET_SET so its ground symbols do not show the net name.": "從具名集合移除成員，例如將 vss 從 $NAMED_GROUND_NET_SET 移除，使其接地符號不顯示網路名稱。",
   "A union without duplicates.": "去除重複項目的聯集。",
-  "The language version of the file. Only in the header record; without it, the tool’s default version applies.": "檔案所使用的語言版本。僅能寫在檔頭記錄中；未指定時套用工具的預設版本。",
+  "The language version of the file. Only in the header record; without it, the tool’s default version applies.": "檔案所使用的語言版本。僅能寫在檔頭記錄中；未指定時適用工具的預設版本。",
   "Declares another spelling (an alias) for a standard word or a $ name, alias first. Only in the header record.": "為標準詞彙或 $ 名稱宣告另一種拼寫（別名），別名寫在前。僅能寫在檔頭記錄中。",
   "Loads an alias package, such as the Chinese package rnl-zh. Only in the header record.": "載入別名套件，例如中文套件 rnl-zh。僅能寫在檔頭記錄中。",
   "Names the terminals of devices the netlist does not define, such as PDK devices, so #XM1:d works. Only in the header record.": "為網表未定義的器件（如 PDK 器件）指定端子名稱，使 #XM1:d 可正常使用。僅能寫在檔頭記錄中。",
