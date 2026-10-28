@@ -1,7 +1,7 @@
 //! `rnl explain`: the usages an object is a member of, from the Document's reverse index
-//! (`rnl_view::Object::usages`): for each, the roles the object fills, the usage, its definition,
-//! where it is written, where it comes from and whether it takes effect, with the usages that
-//! contain that usage in turn.
+//! (`rnl_view::Object::usages`): for each, a line that says the roles the object fills, of which
+//! usage of which definition, where it is written, where it comes from and, when it does not take
+//! effect, why, with the usages that contain that usage in turn.
 
 use std::collections::HashSet;
 
@@ -120,37 +120,49 @@ fn entries<'d>(doc: &'d Document, found: &Found) -> Vec<&'d MemberOf> {
         .collect()
 }
 
-/// One line of an entry: role · usage · definition · file:line · source · state.
-fn line(e: &MemberOf) -> String {
+/// One line of an entry, said as a sentence: the roles the object fills, of which usage of which
+/// definition, then where it is written, where it comes from and, when it does not take effect,
+/// its state with the reason. On a line of the chain upward, `subject` is the usage that fills
+/// those roles.
+fn line(e: &MemberOf, subject: Option<&str>) -> String {
     let roles: Vec<String> = e
         .roles
         .iter()
         .map(|r| {
-            let role = if r.set { format!("{{{}}}", r.role) } else { r.role.clone() };
+            let role = if r.set { format!("one of {{{}}}", r.role) } else { r.role.clone() };
             match &r.terminal {
-                Some(t) => format!("{role} (terminal {t})"),
+                Some(t) => format!("{role} (through terminal {t})"),
                 None => role,
             }
         })
         .collect();
+    let mut said = match subject {
+        Some(s) => format!("{s} is in turn {} of usage {}", roles.join(" and "), e.id),
+        None => format!("{} of usage {}", roles.join(" and "), e.id),
+    };
+    if !e.definition.is_empty() {
+        said.push_str(&format!(" (definition {})", e.definition));
+    }
     let at = match &e.file {
         Some(f) => format!("{f}:{}", e.line),
         None => "-".into(),
     };
     let source = match (e.source, &e.rule, &e.made_in) {
-        ("rule", Some(r), _) if r.package.is_empty() => format!("rule at {}:{}", r.file, r.line),
-        ("rule", Some(r), _) => format!("rule of {} at {}:{}", r.package, r.file, r.line),
-        ("body", _, Some(p)) => format!("body of {p}"),
+        ("rule", Some(r), _) if r.package.is_empty() => format!("made by the rule at {}:{}", r.file, r.line),
+        ("rule", Some(r), _) => format!("made by the rule of {} at {}:{}", r.package, r.file, r.line),
+        ("body", _, Some(p)) => format!("made by the body of {p}"),
         ("solver", _, _) => "written back by a solver".into(),
         (s, _, _) => s.to_string(),
     };
-    let state = match (e.state, &e.reason) {
-        ("in-effect", _) => "in effect".to_string(),
-        (s, Some(r)) => format!("{s}: {r}"),
-        (s, None) => s.to_string(),
-    };
-    let definition = if e.definition.is_empty() { "-" } else { e.definition.as_str() };
-    format!("{} · {} · {definition} · {at} · {source} · {state}", roles.join(", "), e.id)
+    let mut out = format!("{said} · {at} · {source}");
+    if e.state != "in-effect" {
+        out.push_str(" · ");
+        out.push_str(&e.state.to_uppercase());
+        if let Some(r) = &e.reason {
+            out.push_str(&format!(": {r}"));
+        }
+    }
+    out
 }
 
 /// The lines `rnl explain` prints for `found`: one for each usage, each followed by the usages
@@ -166,7 +178,7 @@ pub fn lines(doc: &Document, found: &[Found]) -> Vec<String> {
         let list = entries(doc, f);
         out.push(format!("{what} in {}: {}", o.level_title, count(list.len())));
         for e in list {
-            chain(doc, e, 1, &mut HashSet::new(), &mut out);
+            chain(doc, e, None, 1, &mut HashSet::new(), &mut out);
         }
     }
     out
@@ -180,14 +192,28 @@ fn count(n: usize) -> String {
     }
 }
 
-fn chain(doc: &Document, e: &MemberOf, depth: usize, seen: &mut HashSet<usize>, out: &mut Vec<String>) {
-    out.push(format!("{}{}", "  ".repeat(depth), line(e)));
-    let Some(u) = e.usage else { return };
+fn chain(
+    doc: &Document,
+    e: &MemberOf,
+    subject: Option<&str>,
+    depth: usize,
+    seen: &mut HashSet<usize>,
+    out: &mut Vec<String>,
+) {
+    let mut text = format!("{}{}", "  ".repeat(depth), line(e, subject));
+    let Some(u) = e.usage else {
+        out.push(text);
+        return;
+    };
+    // a usage already on the way up: the chain loops, and stops here
     if !seen.insert(u) {
+        text.push_str(&format!(" · the chain loops back to {}", e.id));
+        out.push(text);
         return;
     }
+    out.push(text);
     for outer in &doc.objects[u].usages {
-        chain(doc, outer, depth + 1, seen, out);
+        chain(doc, outer, Some(&e.id), depth + 1, seen, out);
     }
     seen.remove(&u);
 }
