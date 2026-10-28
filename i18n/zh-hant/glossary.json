@@ -577,7 +577,7 @@
   },
   {
    "en": "Apply and Exit Editing",
-   "term": "套用並結束編輯",
+   "term": "應用並結束編輯",
    "kind": "command"
   },
   {
@@ -770,8 +770,12 @@
   {
    "en": "apply",
    "sense": "UI changes",
-   "term": "套用",
-   "kind": "general"
+   "term": "應用",
+   "kind": "general",
+   "avoid": [
+    "套用"
+   ],
+   "note": "Applying changes in the interface; 套用 is applying a definition (RNL)."
   },
   {
    "en": "archive",

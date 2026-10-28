@@ -40,7 +40,7 @@
   "Zoom, pan, search for devices": "Zoomen, verschieben, nach Bauteilen suchen",
   "Highlight a net, descend into subcircuits": "Ein Netz hervorheben, in Teilschaltungen absteigen",
   "No solver needed when the file already has full geometry": "Kein Solver nötig, wenn die Datei bereits vollständige Geometrie enthält",
-  "Edit the text and draw it again on Apply; a file is written only on Save, which on the web is a download": "Text bearbeiten und mit „Anwenden“ neu zeichnen; geschrieben wird erst beim Speichern (im Web als Download)",
+  "Edit the text and draw it again on Apply; a file is written only on Save, which on the web is a download": "Text bearbeiten und mit „Übernehmen“ neu zeichnen; geschrieben wird erst beim Speichern (im Web als Download)",
   "No built-in component library; symbols come from the standard package and RNL libraries": "Keine fest eingebaute Bauteilbibliothek; Symbole stammen aus dem Standardpaket und RNL-Bibliotheken",
   "apps/web and apps/desktop, sharing the page apps/viewer-ui": "apps/web und apps/desktop, gemeinsame Oberfläche in apps/viewer-ui",
   "Since 0.1 · edits; desktop solves": "Seit 0.1 · Textbearbeitung; Desktop löst",
