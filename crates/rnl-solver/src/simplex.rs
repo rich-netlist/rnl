@@ -169,13 +169,13 @@ pub(crate) enum Failure<T> {
     Time,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 struct Bound<T> {
     value: Q,
     tag: T,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 struct VarState<T> {
     value: Q,
     lower: Option<Bound<T>>,
@@ -203,7 +203,7 @@ impl<T> VarState<T> {
 }
 
 /// A row of the tableau: `basic = Σ aⱼ xⱼ` over nonbasic variables, sorted, none zero.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 struct Row {
     basic: Var,
     terms: Vec<(Var, Q)>,
@@ -216,7 +216,7 @@ enum Side {
 }
 
 /// A bound replaced, to put back on undo.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 struct Undo<T> {
     var: Var,
     side: Side,
@@ -224,7 +224,7 @@ struct Undo<T> {
 }
 
 /// The tableau, the bounds with their tags, and the undo stack.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Simplex<T> {
     vars: Vec<VarState<T>>,
     rows: Vec<Row>,

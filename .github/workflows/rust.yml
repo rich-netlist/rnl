@@ -20,6 +20,7 @@ on:
       - "scripts/solver-performance/**"
       - ".github/workflows/solver-performance.yml"
       - ".github/workflows/solver-work-diagnostic.yml"
+      - ".github/workflows/solver-m04-pair.yml"
       - "Cargo.toml"
       - "Cargo.lock"
       - "rustfmt.toml"
@@ -39,6 +40,7 @@ on:
       - "scripts/solver-performance/**"
       - ".github/workflows/solver-performance.yml"
       - ".github/workflows/solver-work-diagnostic.yml"
+      - ".github/workflows/solver-m04-pair.yml"
       - "Cargo.toml"
       - "Cargo.lock"
       - "rustfmt.toml"
@@ -69,6 +71,18 @@ on:
         description: Build one frozen release candidate for download without solver commands
         type: boolean
         default: false
+      solver_m04_pair:
+        description: Fixed M04 prototype comparison, at most ten starts, no diagnostic or synthetic queue
+        type: boolean
+        default: false
+      pair_tool_sha:
+        description: Frozen tool SHA, must equal the dispatch branch commit
+        type: string
+        default: ""
+      pair_authorization_token:
+        description: Root-issued M04 execution token, required for this single authorized run
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -79,7 +93,7 @@ env:
 
 jobs:
   test:
-    if: github.event_name != 'workflow_dispatch' || (!inputs.solver_performance && !inputs.solver_profile_work && !inputs.solver_build_only)
+    if: github.event_name != 'workflow_dispatch' || (!inputs.solver_performance && !inputs.solver_profile_work && !inputs.solver_build_only && !inputs.solver_m04_pair)
     strategy:
       fail-fast: false
       matrix:
@@ -112,7 +126,7 @@ jobs:
           fi
 
   wasm:
-    if: github.event_name != 'workflow_dispatch' || (!inputs.solver_performance && !inputs.solver_profile_work && !inputs.solver_build_only)
+    if: github.event_name != 'workflow_dispatch' || (!inputs.solver_performance && !inputs.solver_profile_work && !inputs.solver_build_only && !inputs.solver_m04_pair)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -141,7 +155,7 @@ jobs:
           node bindings/runtime-wasm/tests/equality.mjs --rnl target/debug/rnl --snapshot
 
   fonts:
-    if: github.event_name != 'workflow_dispatch' || (!inputs.solver_performance && !inputs.solver_profile_work && !inputs.solver_build_only)
+    if: github.event_name != 'workflow_dispatch' || (!inputs.solver_performance && !inputs.solver_profile_work && !inputs.solver_build_only && !inputs.solver_m04_pair)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -158,7 +172,7 @@ jobs:
         run: python scripts/fonts.py metrics --check
 
   performance-harness:
-    if: github.event_name != 'workflow_dispatch' || (!inputs.solver_performance && !inputs.solver_profile_work && !inputs.solver_build_only)
+    if: github.event_name != 'workflow_dispatch' || (!inputs.solver_performance && !inputs.solver_profile_work && !inputs.solver_build_only && !inputs.solver_m04_pair)
     strategy:
       fail-fast: false
       matrix:
@@ -183,7 +197,7 @@ jobs:
         shell: python
         run: |
           import subprocess, sys
-          for test in ('test_inputs.py', 'test_benchmark.py', 'test_work.py'):
+          for test in ('test_inputs.py', 'test_benchmark.py', 'test_work.py', 'test_pair.py'):
               subprocess.run([sys.executable, 'scripts/solver-performance/'+test], check=True)
       - name: Prepare and verify the measurement inputs without a solver
         shell: python
@@ -197,22 +211,35 @@ jobs:
         run: python scripts/solver-performance/test_benchmark.py --owned-helper-fixture "${{ runner.temp }}/owned-helper-smoke"
 
   diagnostic-dispatch-policy:
-    if: github.event_name == 'workflow_dispatch' && (inputs.solver_performance || inputs.solver_profile_work || inputs.solver_build_only)
+    if: github.event_name == 'workflow_dispatch' && (inputs.solver_performance || inputs.solver_profile_work || inputs.solver_build_only || inputs.solver_m04_pair)
     runs-on: ubuntu-latest
     env:
       PERFORMANCE: ${{ inputs.solver_performance }}
       WORK: ${{ inputs.solver_profile_work }}
       BUILD_ONLY: ${{ inputs.solver_build_only }}
       WORK_SHA: ${{ inputs.work_candidate_sha }}
+      PAIR: ${{ inputs.solver_m04_pair }}
+      PAIR_TOOL_SHA: ${{ inputs.pair_tool_sha }}
+      PAIR_TOKEN: ${{ inputs.pair_authorization_token }}
+      BASE_SHA: ${{ inputs.baseline_sha }}
+      HEAD_SHA: ${{ inputs.candidate_sha }}
     steps:
       - name: Reject overlapping diagnostic queues
         shell: python
         run: |
           import os, re
-          if sum(os.environ[key] == "true" for key in ("PERFORMANCE", "WORK", "BUILD_ONLY")) != 1:
+          if sum(os.environ[key] == "true" for key in ("PERFORMANCE", "WORK", "BUILD_ONLY", "PAIR")) != 1:
               raise SystemExit("Choose exactly one diagnostic queue")
           if (os.environ["WORK"] == "true" or os.environ["BUILD_ONLY"] == "true") and not re.fullmatch("[0-9a-f]{40}", os.environ["WORK_SHA"]):
               raise SystemExit("Work/build-only requires one frozen public candidate SHA")
+          if os.environ["PAIR"] == "true":
+              if any(not re.fullmatch("[0-9a-f]{40}", os.environ[key]) for key in ("BASE_SHA", "HEAD_SHA", "PAIR_TOOL_SHA")):
+                  raise SystemExit("Pair requires frozen baseline/candidate/tool SHAs")
+              if os.environ["PAIR_TOOL_SHA"] != os.environ["GITHUB_SHA"] or os.environ["GITHUB_RUN_ATTEMPT"] != "1":
+                  raise SystemExit("Pair tool binding differs or this is a forbidden rerun")
+              if not re.fullmatch("M04-[A-Za-z0-9_-]{8,100}", os.environ["PAIR_TOKEN"]):
+                  raise SystemExit("Pair requires a root execution token")
+
 
   solver-performance:
     needs: diagnostic-dispatch-policy
@@ -229,3 +256,13 @@ jobs:
     with:
       candidate_sha: ${{ inputs.work_candidate_sha }}
       build_only: ${{ inputs.solver_build_only }}
+
+  solver-m04-pair:
+    needs: diagnostic-dispatch-policy
+    if: github.event_name == 'workflow_dispatch' && inputs.solver_m04_pair
+    uses: ./.github/workflows/solver-m04-pair.yml
+    with:
+      baseline_sha: ${{ inputs.baseline_sha }}
+      candidate_sha: ${{ inputs.candidate_sha }}
+      tool_sha: ${{ inputs.pair_tool_sha }}
+      authorization_token: ${{ inputs.pair_authorization_token }}

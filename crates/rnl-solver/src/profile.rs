@@ -16,6 +16,29 @@ pub trait ProfileObserver: Clock {
 /// A shared observer supplied by `Clock::profiler`.
 pub type ProfileHandle = Rc<dyn ProfileObserver>;
 
+/// A small, separate observer for the feasibility-reuse prototype. Installing it does not
+/// enable tableau scans or the full profiler. The caller supplies its observational clock and
+/// output; neither is the resolution's deadline clock.
+pub trait StateReuseObserver: Clock {
+    fn record(&self, report: StateReuseReport);
+}
+
+pub type StateReuseHandle = Rc<dyn StateReuseObserver>;
+
+#[derive(Clone, Debug, Default)]
+pub struct StateReuseReport {
+    pub hit: bool,
+    pub miss_reason: &'static str,
+    pub reused_relations: usize,
+    pub total_relations: usize,
+    pub save_clones: u64,
+    pub save_ns: u64,
+    pub restore_ns: u64,
+    pub model_clone_ns: u64,
+    pub logical_prefix_nodes: u64,
+    pub logical_prefix_pivots: u64,
+}
+
 /// Observations, separate from the solution and the canonical solver options.
 #[derive(Clone, Debug)]
 pub enum ProfileEvent {
@@ -32,6 +55,25 @@ pub enum ProfileEvent {
 
 thread_local! {
     static OBSERVER: RefCell<Option<ProfileHandle>> = const { RefCell::new(None) };
+    static STATE_REUSE_OBSERVER: RefCell<Option<StateReuseHandle>> = const { RefCell::new(None) };
+}
+
+pub(crate) fn state_reuse_observer() -> Option<StateReuseHandle> {
+    STATE_REUSE_OBSERVER.with(|o| o.borrow().clone())
+}
+
+/// Run with an optional lightweight reuse observer. Restores the previous caller's observer
+/// even on unwinding, just as the full profiler does.
+pub fn with_state_reuse_observer<R>(observer: Option<StateReuseHandle>, f: impl FnOnce() -> R) -> R {
+    struct Restore(Option<StateReuseHandle>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            STATE_REUSE_OBSERVER.with(|o| *o.borrow_mut() = self.0.take());
+        }
+    }
+    let previous = STATE_REUSE_OBSERVER.with(|o| o.replace(observer));
+    let _restore = Restore(previous);
+    f()
 }
 
 pub(crate) fn enabled() -> bool {

@@ -10,6 +10,7 @@ pub mod problem;
 pub mod profile;
 pub mod provider;
 pub mod solve;
+pub mod state_reuse;
 
 /// Core version and source revision shared by the CLI and the desktop About dialog.
 pub const CORE_VERSION: &str = env!("CARGO_PKG_VERSION");
