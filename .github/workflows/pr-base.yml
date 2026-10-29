@@ -14,7 +14,7 @@ permissions: {}
 jobs:
   base:
     name: Base is main
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Require main as the base
         env:
