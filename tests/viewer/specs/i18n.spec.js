@@ -258,3 +258,61 @@ for (const { name, list, saved, expected } of [
     await expect(page.locator('html')).toHaveAttribute('lang', expected);
   });
 }
+
+// The page reads the catalog of the language it starts in and no other, and one more when a language is chosen: the
+// requests for locales/ are what is checked, on the fake shell (which reads them as the web shell does).
+const localeRequests = (page) => {
+  const names = [];
+  page.on('request', (request) => { const m = /\/locales\/([^/?]+)\.json/.exec(request.url()); if (m) names.push(m[1]); });
+  return names;
+};
+
+test('a start in English reads no catalog, only the languages and the list of the texts they translate', async ({page,viewer}) => {
+  const names = localeRequests(page);
+  await viewer.open('04-hierarchy');
+  await expect(page.locator('html')).toHaveAttribute('lang','en');
+  expect([...names].sort()).toEqual(['keys', 'languages']);
+});
+
+test('a start in Chinese reads its catalog and no other', async ({page,viewer}) => {
+  await page.addInitScript(() => Object.defineProperty(Navigator.prototype, 'languages', { get: () => ['zh-CN','en-US'], configurable: true }));
+  const names = localeRequests(page);
+  await viewer.open('04-hierarchy');
+  await expect(page.locator('html')).toHaveAttribute('lang','zh-CN');
+  await expect(page.locator('#tab-files')).toHaveAccessibleName(zh('Library'));
+  expect([...names].sort()).toEqual(['keys', 'languages', 'zh-CN']);
+});
+
+test('a catalog is read when its language is first chosen, once, and the static texts are translated by it', async ({page,viewer}) => {
+  const names = localeRequests(page);
+  await viewer.open('04-hierarchy');
+  await expect(page.locator('#tab-files')).toHaveAccessibleName('Library');
+  await language(page,'de');
+  await expect(page.locator('html')).toHaveAttribute('lang','de');
+  await expect(page.locator('#tab-files')).toHaveAccessibleName(translated('de', 'Library'));
+  await language(page,'en');
+  await language(page,'de');
+  await language(page,'zh');
+  await expect(page.locator('#tab-files')).toHaveAccessibleName(zh('Library'));
+  await language(page,'de');
+  await expect(page.locator('#tab-files')).toHaveAccessibleName(translated('de', 'Library'));
+  expect(names.filter((n) => n === 'de')).toHaveLength(1);
+  expect(names.filter((n) => n === 'zh-CN')).toHaveLength(1);
+  expect(names.filter((n) => n === 'ja')).toHaveLength(0);
+});
+
+test('a language whose catalog cannot be read when it is chosen is told of, and the language stays', async ({page,viewer}) => {
+  await viewer.open('04-hierarchy');
+  await page.route('**/locales/de.json', (route) => route.fulfill({ status: 500, body: 'unavailable' }));
+  // (the command waits for the dialog to be closed, so it is not awaited)
+  await page.evaluate(() => { void window.viewer.command('language-de'); });
+  const dialog = page.locator('dialog.dialog');
+  await expect(dialog).toContainText('Could not change language');
+  await expect(page.locator('html')).toHaveAttribute('lang','en');
+  await expect(page.locator('#tab-files')).toHaveAccessibleName('Library');
+  // and it can be chosen again, once the catalog is there
+  await dialog.getByRole('button').first().click();
+  await page.unroute('**/locales/de.json');
+  await language(page,'de');
+  await expect(page.locator('html')).toHaveAttribute('lang','de');
+});

@@ -4,14 +4,14 @@
 // and its Worker are there, so the first visit waits for a chain of round trips; with the hints it asks for all of
 // them at once. (The desktop viewer reads its page from disk and has no use for them: its index.html has none.)
 
-import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, posix } from "node:path";
 
 const BEGIN = "<!-- preload hints, written by apps/web/preload-hints.mjs -->";
 const END = "<!-- end of the preload hints -->";
 
 /** The files the page reads with fetch() when it starts, as the web shell, i18n.js and commands.js name them. */
-export const STARTUP_FILES = ["about.json", "commands.json", "libraries/bundled.json", "public-packages.json", "locales/languages.json"];
+export const STARTUP_FILES = ["about.json", "commands.json", "libraries/bundled.json", "public-packages.json", "locales/languages.json", "locales/keys.json"];
 
 /** The modules a script imports statically, `import … from`, `export … from` and `import "…"`, by their written paths. */
 export function staticImports(source) {
@@ -56,10 +56,8 @@ export function preloadTags(dir, html) {
   const modules = moduleGraph(dir, roots).filter((path) => !entries.includes(path));
   const tags = modules.map((path) => `<link rel="modulepreload" href="${path}">`);
   // read by fetch(), in a Worker for the core: `crossorigin` is the request's mode, the same origin's credentials
+  // (no catalog: the page reads the one of the language it starts in, which the HTML does not know)
   const fetched = ["core/rnl_runtime_wasm.wasm", ...STARTUP_FILES];
-  if (existsSync(join(dir, "locales"))) {
-    for (const name of readdirSync(join(dir, "locales")).filter((n) => n.endsWith(".json") && n !== "languages.json").sort()) fetched.push(`locales/${name}`);
-  }
   for (const path of fetched) if (existsSync(join(dir, path))) tags.push(`<link rel="preload" as="fetch" crossorigin href="${path}">`);
   return tags;
 }
