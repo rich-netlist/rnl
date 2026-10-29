@@ -47,7 +47,7 @@ function site() {
   for (const name of ["about.json", "commands.json", "public-packages.json"]) put(name, "{}");
   mkdirSync(join(dir, "libraries"));
   put("libraries/bundled.json", "{}");
-  for (const name of ["languages", "de", "zh-CN"]) put(`locales/${name}.json`, "{}");
+  for (const name of ["languages", "keys", "de", "zh-CN"]) put(`locales/${name}.json`, "{}");
   return dir;
 }
 
@@ -64,9 +64,10 @@ test("the module graph is the static imports from the scripts, the web shell and
     assert.ok(!tags.some((t) => t.includes('href="startup.js"') || t.includes('href="main.js"')), "the scripts the page runs are not preloaded");
     assert.ok(tags.includes('<link rel="modulepreload" href="panels.js">'));
     assert.ok(tags.includes('<link rel="preload" as="fetch" crossorigin href="core/rnl_runtime_wasm.wasm">'));
-    for (const file of ["about.json", "commands.json", "libraries/bundled.json", "public-packages.json", "locales/languages.json", "locales/de.json", "locales/zh-CN.json"]) {
+    for (const file of ["about.json", "commands.json", "libraries/bundled.json", "public-packages.json", "locales/languages.json", "locales/keys.json"]) {
       assert.ok(tags.includes(`<link rel="preload" as="fetch" crossorigin href="${file}">`), file);
     }
+    assert.ok(!tags.some((t) => t.includes("locales/de.json") || t.includes("locales/zh-CN.json")), "a catalog is read only when its language is wanted");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
