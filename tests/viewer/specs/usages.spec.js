@@ -13,6 +13,10 @@ for (const platform of ['desktop', 'web']) {
     await viewer.open('usage-inspector', { platform });
     await page.keyboard.press('5');
     await expect(page.locator('#pane-usages')).toBeVisible();
+    // every group is folded to begin with
+    await expect(page.locator('.usage-expand[aria-expanded="true"]')).toHaveCount(0);
+    await expect(page.locator('.usage-row')).toHaveCount(0);
+    await viewer.expandUsages();
     const types = await page.locator('.usage-group').evaluateAll(rows => rows.map(r => r.dataset.type));
     expect(types).toEqual([...types].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })));
     expect(types).not.toContain('$OTHER');
@@ -41,6 +45,9 @@ for (const platform of ['desktop', 'web']) {
       const v = window.viewer;
       await (await import('./subcircuits.js')).goTo(v.doc.levels.findIndex(l => l.title === 'other'));
     });
+    // a level shown starts with every group folded again
+    await expect(page.locator('.usage-row')).toHaveCount(0);
+    await viewer.expandUsages();
     await expect(row(page, '%other')).toBeVisible();
     await expect(row(page, '%pair1')).toHaveCount(0);
     await expect(page.locator('#usage-detail')).not.toContainText('%pair1');
@@ -54,6 +61,7 @@ for (const platform of ['desktop', 'web']) {
     await expect(frame(page, unseen.object)).toHaveCount(0);
     await expect(frame(page, ground.object)).toHaveCount(0);
     await page.keyboard.press('5');
+    await viewer.expandUsages();
     await expect(row(page, '%ground').getByRole('checkbox')).not.toBeChecked();
     await row(page, '%pair1').getByRole('checkbox').uncheck();
     await expect(frame(page, pair.object)).toHaveCount(0);
