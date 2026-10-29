@@ -41,8 +41,8 @@ const typeOf = (u) => (isGroup(u) ? GROUP_TYPE : u.definition);
 /** What the drawing and the details call it: `$DIFFERENTIAL_PAIR: %dp1`, `@GROUP: %core`. */
 const labelOf = (u) => `${typeOf(u)}: ${u.id}`;
 /**
- * Whether the usage is in effect. A usage in the level's list always is, but a group may be turned off by PRIORITY
- * (14.8); the Document says so in the entry, or else in the memberships of its members.
+ * The state of a usage or group: the entry's `state` (the core gives it), else, from an older core, the one of the
+ * memberships of its first member. A group may be turned off by PRIORITY (14.8), and is never failed or overridden.
  */
 function stateOf(u) {
   if (u.state) return u.state;
@@ -219,7 +219,7 @@ export function renderUsages() {
         row.className = "usage-row";
         row.dataset.object = String(u.object);
         row.classList.toggle("selected", u.object === inspected);
-        const state = stateOf(u);
+        const state = isGroup(u) ? stateOf(u) : "in-effect"; // (the list greys the groups that are turned off; a usage that is not in effect has its state in the table of its members' usages)
         row.classList.toggle("greyed", state !== "in-effect");
         const button = document.createElement("button");
         button.type = "button";
