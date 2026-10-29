@@ -248,6 +248,8 @@ function urlSource(url, cached = null) {
   return {
     files: cached?.files,
     get url() { return served.href; },
+    // read at once, while the Library is indexed and the core loads, not when they are done (build)
+    prefetch: true,
     name: url.href,
     path: serverPath(url),
     /** The address of a file of this source by its workspace path: the entry's, or one it includes. */
@@ -874,16 +876,20 @@ export default {
    * is read.
    */
   async build(source, edits, progress, suppliedPackages, signal) {
-    await poolReady;
-    const library = librarySnapshot;
     const again = built.has(source);
     built.add(source);
+    // a file at an address is asked for before the Library is indexed and the core is loaded, which take longer than it
+    // does on a slow network; an error of it is told where it is awaited
+    const reading = source.prefetch && source.text === undefined ? source.open(again, progress) : null;
+    reading?.catch(() => {});
+    await poolReady;
+    const library = librarySnapshot;
     let buildingCore;
     const abort = () => buildingCore?.terminate();
     try {
       progress?.("reading");
       const held = source.text !== undefined;
-      const entry = held ? { path: source.path || `/${source.name}`, text: source.text } : await source.open(again, progress);
+      const entry = held ? { path: source.path || `/${source.name}`, text: source.text } : await (reading ?? source.open(again, progress));
       const dir = entry.path.slice(0, entry.path.lastIndexOf("/"));
       const files = {};
       // An independently opened source owns its relative paths. Put the pool in a separate

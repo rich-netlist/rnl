@@ -19,6 +19,30 @@ test.beforeEach(async ({ page }) => {
   await page.route("https://rich-netlist.github.io/rnl-packages/**", route => route.abort());
 });
 
+test("the preload hints name the scripts the page loads and the files it reads when it starts", async ({ page }) => {
+  const requested = new Map();
+  page.on("response", response => {
+    const url = new URL(response.url());
+    if (url.origin === new URL(process.env.RNL_WEB_URL).origin) requested.set(url.pathname.replace(/^\//, ""), response.status());
+  });
+  await page.goto(`${process.env.RNL_WEB_URL}/?url=samples/cases/04-hierarchy.sp`);
+  await expect(page).toHaveTitle(/^04-hierarchy\.sp/);
+  const hints = await page.evaluate(() => ({
+    modules: [...document.querySelectorAll('link[rel="modulepreload"]')].map(l => l.getAttribute("href")),
+    fetched: [...document.querySelectorAll('link[rel="preload"][as="fetch"]')].map(l => l.getAttribute("href")),
+  }));
+  expect(hints.modules.length).toBeGreaterThan(50);
+  expect(new Set(hints.modules).size).toBe(hints.modules.length);
+  // everything hinted is read ...
+  for (const href of [...hints.modules, ...hints.fetched]) expect(requested.get(href), href).toBe(200);
+  // ... the core and the files read at start are among them ...
+  expect(hints.fetched).toEqual(expect.arrayContaining(["core/rnl_runtime_wasm.wasm", "about.json", "commands.json", "libraries/bundled.json", "locales/languages.json"]));
+  // ... and every script the page runs to start is hinted, but those of the modes this page is not in
+  const modes = new Set(["embed.js", "full-viewer-api.js", "shells/desktop.js"]);
+  const scripts = [...requested].filter(([path, status]) => path.endsWith(".js") && status === 200 && !modes.has(path)).map(([path]) => path);
+  expect(scripts.filter(path => !hints.modules.includes(path) && path !== "startup.js" && path !== "main.js")).toEqual([]);
+});
+
 test("panel keys work at once while the WebAssembly core is still loading", async ({ page }) => {
   // a browser that runs WebAssembly without JIT takes long to have the core ready
   let release;
