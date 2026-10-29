@@ -80,6 +80,21 @@ test.describe("on a phone", () => {
     }
   });
 
+  test("the button that opens and folds all the groups of usages is on the screen's width", async ({ page, viewer }) => {
+    await viewer.open("usage-inspector");
+    await page.locator("#page-panel").tap();
+    await page.locator("#tab-usages").tap();
+    const button = page.locator("#usage-expand-all");
+    await expect(button).toBeVisible();
+    const [b, list] = await Promise.all([button.boundingBox(), page.locator("#usage-list").boundingBox()]);
+    expect(b.x).toBeGreaterThanOrEqual(list.x);
+    expect(b.x + b.width).toBeLessThanOrEqual(list.x + list.width + 1);
+    await expect(page.locator(".usage-row")).toHaveCount(0);
+    await button.tap();
+    await expect(page.locator(".usage-row").first()).toBeVisible();
+    await expect(button).toHaveText("Collapse All");
+  });
+
   test("a tap on the id of a row selects the usage", async ({ page }) => {
     await page.locator('#usage-detail button.membership-id:text-is("%gnd")').tap();
     await expect(page.locator("#usage-detail h2")).toHaveText(/%gnd/);

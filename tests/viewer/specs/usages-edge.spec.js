@@ -5,6 +5,7 @@ test('anonymous usage selection reveals its source even without a named token', 
   const u = await page.evaluate(() => window.viewer.doc.levels[0].usages.find(u => u.definition === '$PAIR'));
   await expect(page.locator(`#source .ln[data-line="${u.first_line}"]`)).not.toBeInViewport();
   await page.keyboard.press('5');
+  await viewer.expandUsages();
   expect(u.id.startsWith('@')).toBe(true);
   await page.locator(`.usage-row[data-object="${u.object}"] .usage-name`).click();
   await page.keyboard.press('2');
@@ -37,6 +38,7 @@ test('large usage groups defer hidden DOM and expose their names in bounded batc
 test('selected semantic usage screenshot for visual review', async ({page,viewer}, info) => {
   await viewer.open('03-five-transistor-ota');
   await page.keyboard.press('5');
+  await viewer.expandUsages();
   const u = await page.evaluate(() => window.viewer.doc.levels[0].usages.find(u => u.definition === '$DIFFPAIR'));
   await page.locator(`.usage-row[data-object="${u.object}"] .usage-name`).click();
   const visible = await page.locator('#canvas .usage-frame').evaluateAll(es => es.map(e => Number(e.dataset.usage)));

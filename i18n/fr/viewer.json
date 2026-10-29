@@ -504,6 +504,8 @@
   "Show &Roles on Hover": "Afficher les &rôles au survol",
   "{0} of usage {1} (definition {2})": "{0} de l’utilisation {1} (définition {2})",
   "{0} is in turn {1} of usage {2} (definition {3})": "{0} est à son tour {1} de l’utilisation {2} (définition {3})",
+  "Expand All": "Tout déplier",
+  "Collapse All": "Tout replier",
   "No usages in this circuit.": "Aucune utilisation dans ce circuit.",
   "Color": "Couleur",
   "Roles": "Rôles",

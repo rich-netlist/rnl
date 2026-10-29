@@ -504,6 +504,8 @@
   "Show &Roles on Hover": "ホバー時にロールを表示(&R)",
   "{0} of usage {1} (definition {2})": "適用オブジェクト {1}（定義 {2}）の {0}",
   "{0} is in turn {1} of usage {2} (definition {3})": "{0} はさらに適用オブジェクト {2}（定義 {3}）の {1}",
+  "Expand All": "すべて展開",
+  "Collapse All": "すべて折りたたむ",
   "No usages in this circuit.": "この回路には適用オブジェクトがありません。",
   "Color": "色",
   "Roles": "ロール",

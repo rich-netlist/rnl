@@ -100,6 +100,7 @@ test("a terminal's role, a net's, the origin of a usage a rule made, and an obje
 test("nothing selected, and a usage selected, keep the panel's own lower half", async ({ page }) => {
   await page.locator("#tab-usages").click();
   await expect(page.locator("#usage-detail .placeholder")).toHaveText("Select an object to see its usages, or a usage to inspect it.");
+  await page.locator("#usage-expand-all").click();
   await page.locator(".usage-name", { hasText: "%pair1" }).click();
   await expect(page.locator("#usage-detail h2")).toHaveText("$PAIR: %pair1");
   await expect(rows(page)).toHaveCount(0);
