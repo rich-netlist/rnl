@@ -159,18 +159,27 @@ try {
   assertCjk(cjk, process.env.RNL_NO_SYSTEM_CJK === '1');
   // Negative control: remove only the new fallback from the live styles, with the same
   // binary, sample, rendering core and system fonts. This must fail on the fontless runner.
-  await execute(`window.cjkStyles = [];
-    for (const sheet of document.styleSheets) for (const rule of sheet.cssRules) {
-      if (rule.style?.fontFamily.includes('var(--ui-cjk)')) {
-        window.cjkStyles.push([rule,rule.style.fontFamily]);
-        rule.style.fontFamily = rule.style.fontFamily.replace(/,\\s*var\\(--ui-cjk\\)/g,'');
+  // A font stack that ends with var() is read back whole only by its property, `font` or `font-family`: a shorthand
+  // with var() leaves rule.style.fontFamily empty.
+  const changed = await execute(`window.cjkStyles = [];
+    const strip = rules => { for (const rule of rules) {
+      if (rule.cssRules) strip(rule.cssRules);
+      if (!rule.style) continue;
+      for (const property of ['font', 'font-family']) {
+        const value = rule.style.getPropertyValue(property);
+        if (!value.includes('var(--ui-cjk)')) continue;
+        window.cjkStyles.push([rule, property, value, rule.style.getPropertyPriority(property)]);
+        rule.style.setProperty(property, value.replace(/,\\s*var\\(--ui-cjk\\)/g, ''), rule.style.getPropertyPriority(property));
       }
-    }`);
+    } };
+    for (const sheet of document.styleSheets) strip(sheet.cssRules);
+    return window.cjkStyles.length;`);
+  assert.ok(changed > 0,'The negative control found no font stack ending in var(--ui-cjk).');
   const before = await execute(`return (${cjkEvidence.toString()})();`);
   fs.writeFileSync(path.join(output, `${path.basename(exe)}-cjk-before.json`), JSON.stringify(before,null,2));
   fs.writeFileSync(path.join(output, `${path.basename(exe)}-cjk-before.png`), Buffer.from(await request('GET', `/session/${session}/screenshot`),'base64'));
   if (process.env.RNL_NO_SYSTEM_CJK === '1') assert.throws(() => assertCjk(before,true));
-  await execute('for (const [rule,font] of window.cjkStyles) rule.style.fontFamily=font;');
+  await execute('for (const [rule, property, value, priority] of window.cjkStyles) rule.style.setProperty(property, value, priority);');
   await execute('return new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true))));');
   fs.writeFileSync(path.join(output, `${path.basename(exe)}-cjk-after.png`), Buffer.from(await request('GET', `/session/${session}/screenshot`),'base64'));
   if (expectPackages) {
