@@ -176,16 +176,22 @@ export type HostNet = {
  */
 export type UsageOf = {
   /**
+   * "usage", or "group", a set marked with GROUP (11.5), by its id in `groups`.
+   */
+  kind: string,
+  /**
    * The usage's id, as its object view has it: `%dp1`, `@file:line:col`. A failed application,
    * which made no usage, has the name it binds, or where it is written.
    */
   id: string,
   /**
-   * Its definition, such as `$DIFFERENTIAL_PAIR`; empty when a failed statement names none.
+   * Its definition, such as `$DIFFERENTIAL_PAIR`; empty for a group, and when a failed
+   * statement names none.
    */
   definition: string,
   /**
-   * The roles the object fills in it.
+   * The roles the object fills in it: for a group, `members`; none for a group within this one,
+   * as `MemberOf::roles`.
    */
   roles: Array<RoleOf>,
   /**
@@ -245,6 +251,45 @@ export type RoleOf = {
 export type RuleAt = { package: string, file: string, line: number };
 
 /**
+ * A set marked with GROUP (11.5), which a viewer lists with the usages.
+ */
+export type GroupView = {
+  /**
+   * `%core` when a record of the level names it; otherwise where GROUP is written,
+   * `@file:line:col`, with `#n` after it when several groups have that place.
+   */
+  id: string,
+  /**
+   * Its members in order, each an id or a point, nested sets followed down.
+   */
+  members: (string | [number, number])[],
+  /**
+   * The statement that gives GROUP: its file, by index in `files` when it is one of them, and
+   * its first line.
+   */
+  file: number | null,
+  line: number,
+  /**
+   * "written", "solver", "rule" or "body", as `UsageOf::source`.
+   */
+  source: string,
+  rule?: RuleAt,
+  /**
+   * For a group the body of a definition made: the usage whose definition it is, by id.
+   */
+  made_in?: string,
+  /**
+   * "in-effect", or "disabled" when PRIORITY turns it off (11.5, 14.8).
+   */
+  state: string,
+  /**
+   * The groups it is within, the smallest ones, and the usages it fills a role of
+   * ([`UsageOf`]); only for a group that has some.
+   */
+  usages?: Array<UsageOf>,
+};
+
+/**
  * What the RNL makes of a level. Coordinates are scene units, y up.
  */
 export type LevelModel = {
@@ -277,6 +322,10 @@ export type LevelModel = {
    * The graphics of the scene (13.4) that have their points, in the order written.
    */
   shapes: Array<ShapeView>,
+  /**
+   * The sets marked with GROUP (11.5), in the order of writing; only for a level that has some.
+   */
+  groups?: Array<GroupView>,
 };
 
 /**

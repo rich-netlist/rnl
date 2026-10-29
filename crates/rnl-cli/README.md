@@ -13,7 +13,7 @@ rnl check FILE [options]          print the diagnostics; exit 1 on errors
 rnl render FILE -o DIR [options]  write one SVG per drawing level
 rnl dump FILE [options]           print the effective model and diagnostics as JSON
 rnl view FILE [options]           print the Document a viewer shows, as JSON
-rnl explain FILE REF [options]    print the usages the object REF is a member of, such as #M1, &vdd,
+rnl explain FILE REF [options]    print the usages and groups the object REF is in, such as #M1, &vdd,
                                   #M5:d or %dp1, written as RNL refers to it
 rnl problem FILE [options]        print what a solver reads of each level, with its hash, as JSON
 rnl solve FILE -o DIR [options]   solve each drawing level and write its record of the solver back
@@ -82,13 +82,30 @@ write:
   draft writes them; --dialect (spice by default) and --author NAME give the fields it leaves out
 ```
 
-`explain` prints the usages that the object REF is a member of. REF is written as RNL refers to the object: `#M1`, `&vdd`, `#M5:d` or `#M5:1` for a terminal, `%dp1`, or `@file:line:col` for a usage without a name. It is looked for in every level, or only in the level `--level TITLE` names; each level that has it is printed in turn. There is one line for each usage, which says:
+`explain` prints the usages and groups that the object REF is a member of. REF is written as RNL refers to the object: `#M1`, `&vdd`, `#M5:d` or `#M5:1` for a terminal, `%dp1` or `%core` for a usage or group, or `@file:line:col` for one without a name. It is looked for in every level, or only in the level `--level TITLE` names; each level that has it is printed in turn. There is one line for each usage, which says:
 - the roles the object fills, of which usage, of which definition: `in_p of usage %dp1 (definition $DIFFERENTIAL_PAIR)`, with `one of {members}` for a member of a set role and `(through terminal s)` for an instance whose terminal fills the role;
 - where the statement is;
 - where the usage comes from: `written`, `made by the rule at FILE:LINE` (of a package, `made by the rule of rnl-std-fill at …`), `made by the body of %vdd1`, the usage whose definition made it, or `written back by a solver`;
 - when it does not take effect, its state in capitals, with the reason: `FAILED: …`, `OVERRIDDEN: …` or `DISABLED`. A usage in effect says nothing more.
 
-The usages that contain that usage follow, indented one step for each level up the chain, each line naming the usage it is about: `%dp1 is in turn input of usage %stage1 (definition $CASCADE)`. A usage that is a member of two usages has both, at the same indent. A chain that comes back to a usage already on it stops there, with `the chain loops back to %u`. An application that failed, and so made no usage, is listed with its error. A REF that names no object is an error that lists up to five close names. `--json` prints the same as `rnl-view`'s `MemberOf` entries, each with `outer`, the usages that contain it. The lists are [`rnl-view`'s](../rnl-view/README.md#the-usages-of-an-object) `Object.usages`. On the five-transistor OTA of the site's examples:
+The usages that contain that usage follow, indented one step for each level up the chain, each line naming the usage it is about: `%dp1 is in turn input of usage %stage1 (definition $CASCADE)`. A usage that is a member of two usages has both, at the same indent. A chain that comes back to a usage already on it stops there, with `the chain loops back to %u`. An application that failed, and so made no usage, is listed with its error.
+
+The groups (11.5) are listed the same way, after the usages, and the first line counts them apart: `#R1 in amp: 1 usage, 2 groups`. A group's line says `member of group %stage1`, or `member (through terminal d) of group …` for a terminal written into it, and a group's own lines say `within group %core`: a reference to a set is spread in a set (5.2), so one group is within another when all its members are among the other's, and only the smallest such groups are named. A group is in effect or `DISABLED`, which PRIORITY makes it; it is never failed or overridden. A group without a name goes by where GROUP is written, `@file:line:col`.
+
+```text
+$ rnl explain groups.sp '#R1'
+#R1 in groups.sp: 1 usage, 4 groups
+  left of usage %dp (definition $PAIR) · groups.sp:11 · written
+    %dp is in turn a member of group %blocks · groups.sp:16 · written
+  member of group %stage1 · groups.sp:12 · written
+    %stage1 is in turn within group %core · groups.sp:15 · written
+  member of group %pair · groups.sp:14 · written
+    %pair is in turn within group %stage1 · groups.sp:12 · written
+      %stage1 is in turn within group %core · groups.sp:15 · written
+  member of group %core · groups.sp:15 · written
+  member of group @groups.sp:20:5 · groups.sp:20 · written
+    @groups.sp:20:5 is in turn within group %core · groups.sp:15 · written
+``` A REF that names no object is an error that lists up to five close names. `--json` prints the same as `rnl-view`'s `MemberOf` entries, each with `outer`, the usages that contain it. The lists are [`rnl-view`'s](../rnl-view/README.md#the-usages-of-an-object) `Object.usages`. On the five-transistor OTA of the site's examples:
 
 ```text
 $ rnl explain site/examples/ota5t.sp '#M1'

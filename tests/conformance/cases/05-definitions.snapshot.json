@@ -162,6 +162,7 @@
             "port": false,
             "usages": [
               {
+                "kind": "usage",
                 "id": "@rnl-std-virtual.rnl:52:9#1",
                 "definition": "$GND",
                 "roles": [
@@ -179,6 +180,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "@rnl-std-virtual.rnl:52:9#2",
                 "definition": "$GND",
                 "roles": [
@@ -196,6 +198,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "@rnl-std-virtual.rnl:52:9#3",
                 "definition": "$GND",
                 "roles": [
@@ -213,6 +216,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "@rnl-std-virtual.rnl:52:9#4",
                 "definition": "$GND",
                 "roles": [
@@ -230,6 +234,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "@rnl-std-virtual.rnl:52:9#5",
                 "definition": "$GND",
                 "roles": [
@@ -413,6 +418,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "%ch",
                 "definition": "$CHAIN",
                 "roles": [
@@ -429,6 +435,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "%gs_V1_2",
                 "definition": "$GND_STUB",
                 "roles": [
@@ -499,6 +506,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "%s1",
                 "definition": "$RC_STAGE",
                 "roles": [
@@ -573,6 +581,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "%s1",
                 "definition": "$RC_STAGE",
                 "roles": [
@@ -589,6 +598,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "%st",
                 "definition": "$GND_STUB",
                 "roles": [
@@ -659,6 +669,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "%s2",
                 "definition": "$RC_STAGE",
                 "roles": [
@@ -733,6 +744,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "%s2",
                 "definition": "$RC_STAGE",
                 "roles": [
@@ -749,6 +761,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "%gs_C2_2",
                 "definition": "$GND_STUB",
                 "roles": [
@@ -819,6 +832,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "%s3",
                 "definition": "$RC_STAGE",
                 "roles": [
@@ -893,6 +907,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "%s3",
                 "definition": "$RC_STAGE",
                 "roles": [
@@ -909,6 +924,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "%gs_C3_2",
                 "definition": "$GND_STUB",
                 "roles": [
@@ -979,6 +995,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "%ch",
                 "definition": "$CHAIN",
                 "roles": [
@@ -995,6 +1012,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "%tp",
                 "definition": "$TP",
                 "roles": [
@@ -1011,6 +1029,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "%gs_RL_2",
                 "definition": "$GND_STUB",
                 "roles": [
@@ -1055,6 +1074,7 @@
             "pins": [],
             "usages": [
               {
+                "kind": "usage",
                 "id": "%ch",
                 "definition": "$CHAIN",
                 "roles": [
@@ -1127,6 +1147,7 @@
             "pins": [],
             "usages": [
               {
+                "kind": "usage",
                 "id": "%ch",
                 "definition": "$CHAIN",
                 "roles": [
@@ -1199,6 +1220,7 @@
             "pins": [],
             "usages": [
               {
+                "kind": "usage",
                 "id": "%ch",
                 "definition": "$CHAIN",
                 "roles": [

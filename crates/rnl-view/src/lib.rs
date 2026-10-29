@@ -44,9 +44,9 @@ pub use primitive::{
 /// Texts held in memory, for a frontend that builds one, such as a netlist from the clipboard.
 pub use rnl_runtime::source::MemoryProvider;
 pub use snapshot::{
-    FileRef, HostInstance, HostLevel, HostNet, HostTerminal, LevelModel, LevelSnapshot, ObjectView, PackageUse, Parts,
-    PinLabel, PinView, PointView, ShapeView, Slot, Snapshot, SymbolDefinition, SymbolPin, SymbolPrim, SymbolRef,
-    TextView, UsageOf, Vertex, WireView, SCHEMA,
+    FileRef, GroupView, HostInstance, HostLevel, HostNet, HostTerminal, LevelModel, LevelSnapshot, ObjectView,
+    PackageUse, Parts, PinLabel, PinView, PointView, ShapeView, Slot, Snapshot, SymbolDefinition, SymbolPin,
+    SymbolPrim, SymbolRef, TextView, UsageOf, Vertex, WireView, SCHEMA,
 };
 
 include!(concat!(env!("OUT_DIR"), "/bundled.rs"));

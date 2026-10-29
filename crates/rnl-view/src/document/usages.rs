@@ -1,7 +1,7 @@
 //! Scope-local usage inspection, without constructing the solver's geometric problem.
 use std::collections::{BTreeSet, HashMap, HashSet};
 
-use rnl_runtime::model::{quoted, Attach, LevelView, ObjectInfo};
+use rnl_runtime::model::{quoted, Attach, GroupInfo, LevelView, ObjectInfo};
 use rnl_runtime::Interpretation;
 use serde::Serialize;
 
@@ -13,7 +13,11 @@ pub struct Usage {
     /// Shared frame and label anchors in SVG pixels; absent when no member is drawn.
     pub frame: Option<crate::UsageFrame>,
     pub object: usize,
+    /// "usage", or "group" for a set marked with GROUP (11.5), whose one role, `members`, holds
+    /// its members.
+    pub kind: &'static str,
     pub id: String,
+    /// Its definition; empty for a group.
     pub definition: String,
     /// Whether the usage itself is a virtual part with its own symbol.
     pub has_symbol: bool,
@@ -63,8 +67,38 @@ pub(super) fn inspect_all(r: &Interpretation, levels: &mut [Level], ix: &mut Ind
         level.usages = inspect(lv, level, ix, &source_lines);
     }
 }
+/// A group (11.5) as a usage of kind "group", with one role, `members`.
+fn group_object(g: &GroupInfo) -> ObjectInfo {
+    ObjectInfo {
+        usage_has_drawing: false,
+        source: g.source.clone(),
+        id: g.id.clone(),
+        kind: "group",
+        host: Vec::new(),
+        definition: None,
+        attach: vec![("members".into(), Attach::Set(g.members.clone()))],
+        params: Vec::new(),
+        own_style: Default::default(),
+        symbol: None,
+        at: None,
+        orient: Default::default(),
+        pins: Vec::new(),
+        symbol_view: None,
+        origin: g.origin.clone(),
+        parent: g.parent.clone(),
+        disabled: g.disabled,
+    }
+}
+
+/// The usages of a level, then its groups as usages of kind "group".
+pub(super) fn listed(lv: &LevelView) -> Vec<ObjectInfo> {
+    let usages = lv.objects.iter().filter(|o| o.kind == "usage").cloned();
+    usages.chain(lv.groups.iter().map(group_object)).collect()
+}
+
 fn inspect(lv: &LevelView, level: &Level, ix: &mut Index<'_>, source_lines: &HashMap<&str, Vec<&str>>) -> Vec<Usage> {
-    if !lv.objects.iter().any(|o| o.kind == "usage") {
+    let listed = listed(lv);
+    if listed.is_empty() {
         return Vec::new();
     }
     let instances: HashMap<_, _> = ix.doc.levels[lv.level]
@@ -74,16 +108,14 @@ fn inspect(lv: &LevelView, level: &Level, ix: &mut Index<'_>, source_lines: &Has
         .filter_map(|(i, inst)| ix.insts.get(&(lv.level, i)).map(|&k| (format!("#{}", quoted(&inst.name)), k)))
         .collect();
     let mut references = HashMap::new();
-    for o in &lv.objects {
-        let objects = if o.kind == "usage" {
-            vec![ix.usage(lv.level, &o.id)]
-        } else {
-            o.host.iter().filter_map(|id| instances.get(id).copied()).collect()
-        };
-        references.insert(o.id.clone(), objects);
+    for o in lv.objects.iter().filter(|o| o.kind != "usage") {
+        references.insert(o.id.clone(), o.host.iter().filter_map(|id| instances.get(id).copied()).collect());
+    }
+    for o in &listed {
+        references.insert(o.id.clone(), vec![ix.usage_of_kind(lv.level, &o.id, o.kind)]);
     }
     // Nets may not have appeared on a drawing yet, but must still be inspectable as roles.
-    for o in lv.objects.iter().filter(|o| o.kind == "usage") {
+    for o in &listed {
         for (_, a) in &o.attach {
             add_nets(a, lv.level, ix, &mut references);
         }
@@ -141,9 +173,8 @@ fn inspect(lv: &LevelView, level: &Level, ix: &mut Index<'_>, source_lines: &Has
     }
     let by_id: HashMap<_, _> = lv.objects.iter().map(|o| (o.id.as_str(), o)).collect();
     let mut memo = HashMap::new();
-    lv.objects
+    listed
         .iter()
-        .filter(|o| o.kind == "usage")
         .map(|o| {
             let object = references[&o.id][0];
             let mut source = String::new();
@@ -230,9 +261,14 @@ fn inspect(lv: &LevelView, level: &Level, ix: &mut Index<'_>, source_lines: &Has
                     local,
                     &roles,
                     &level.hits,
-                    &format!("{}: {}", o.definition.as_deref().unwrap_or_default(), o.id),
+                    &format!(
+                        "{}: {}",
+                        if o.kind == "group" { "@GROUP" } else { o.definition.as_deref().unwrap_or_default() },
+                        o.id
+                    ),
                 ),
                 object,
+                kind: o.kind,
                 id: o.id.clone(),
                 definition: o.definition.clone().unwrap_or_default(),
                 has_symbol: o.symbol.is_some(),

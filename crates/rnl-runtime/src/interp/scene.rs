@@ -140,9 +140,8 @@ pub struct Scene {
     pub prioritys: Vec<Fact>,
     /// CURRENT on host terminals, each with its place in the order of writing (5.5, 15.2).
     pub currents: Vec<(Pos, ObjId, String)>,
-    /// The sets given GROUP (11.5), each with where it is written and the usages whose expansion
-    /// wrote it, outermost first (14.8).
-    pub groups: Vec<(Pos, ObjId, Vec<ObjId>)>,
+    /// The sets given GROUP (11.5), in the order of writing.
+    pub groups: Vec<GroupFact>,
     pub tasks: Vec<Vec<(Pos, Task)>>,
     pub created: HashMap<ObjId, Pos>,
     /// Where each object is made, in the order of writing: `created` with the segment of each
@@ -178,6 +177,17 @@ pub struct Scene {
     pub failed_usages: Vec<FailedApplication>,
 }
 
+/// A GROUP (11.5): the set, where it is written and the usages whose expansion wrote it, outermost
+/// first (14.8), with the context of its statement and where GROUP is in it.
+#[derive(Clone, Debug)]
+pub struct GroupFact {
+    pub pos: Pos,
+    pub set: ObjId,
+    pub chain: Vec<ObjId>,
+    pub site: Rc<Ctx>,
+    pub off: usize,
+}
+
 /// An application of a definition that failed and made no usage ([`crate::model::FailedUsage`]).
 #[derive(Clone, Debug)]
 pub struct FailedApplication {
@@ -204,7 +214,7 @@ impl Scene {
 
     /// Whether GROUP marks the set in this level (11.5); complete once generation is done (10.5).
     pub(crate) fn grouped(&self, set: ObjId) -> bool {
-        self.groups.iter().any(|(_, g, _)| *g == set)
+        self.groups.iter().any(|g| g.set == set)
     }
 
     fn new(level: LevelId, levelobj: ObjId) -> Scene {

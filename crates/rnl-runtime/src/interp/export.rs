@@ -400,8 +400,9 @@ impl Interp<'_> {
 
         // GROUP (11.5), without those PRIORITY turns off
         let mut groups = Vec::new();
-        for (_, set, chain) in self.scenes[s].groups.clone() {
-            if self.eff_priority(s, None, &chain, Some(set)) == Priority::Disabled {
+        for g in self.scenes[s].groups.clone() {
+            let set = g.set;
+            if self.eff_priority(s, None, &g.chain, Some(set)) == Priority::Disabled {
                 continue;
             }
             let members = self.flatten(s, set, 7, None);

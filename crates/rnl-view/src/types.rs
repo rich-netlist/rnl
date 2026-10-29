@@ -5,7 +5,7 @@
 
 use crate::{CurrentArrow, UsageFrame};
 use crate::{FormatInfo, InspectedLabel, InspectedPin, InspectedSymbol, SourceInclude, Usage, UsageRole};
-use crate::{MemberOf, RoleOf, RuleAt, UsageOf};
+use crate::{GroupView, MemberOf, RoleOf, RuleAt, UsageOf};
 use std::path::Path;
 
 use ts_rs::{Config, TS};
@@ -78,6 +78,7 @@ fn snapshot_all() -> Vec<(String, String)> {
         one::<UsageOf>(&cfg),
         one::<RoleOf>(&cfg),
         one::<RuleAt>(&cfg),
+        one::<GroupView>(&cfg),
         one::<LevelModel>(&cfg),
         one::<SymbolRef>(&cfg),
         one::<SymbolDefinition>(&cfg),

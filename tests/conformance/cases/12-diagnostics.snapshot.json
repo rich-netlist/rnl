@@ -143,6 +143,7 @@
             "port": false,
             "usages": [
               {
+                "kind": "usage",
                 "id": "@rnl-std-virtual.rnl:52:9#1",
                 "definition": "$GND",
                 "roles": [
@@ -160,6 +161,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "@rnl-std-virtual.rnl:52:9#2",
                 "definition": "$GND",
                 "roles": [
@@ -177,6 +179,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "@rnl-std-virtual.rnl:52:9#3",
                 "definition": "$GND",
                 "roles": [
@@ -194,6 +197,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "@rnl-std-virtual.rnl:52:9#4",
                 "definition": "$GND",
                 "roles": [
@@ -218,6 +222,7 @@
             "port": false,
             "usages": [
               {
+                "kind": "usage",
                 "id": "@12-diagnostics.sp:21:27",
                 "definition": "$DIFFPAIR",
                 "roles": [
@@ -242,6 +247,7 @@
             "port": false,
             "usages": [
               {
+                "kind": "usage",
                 "id": "@12-diagnostics.sp:21:27",
                 "definition": "$DIFFPAIR",
                 "roles": [
@@ -384,6 +390,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "%gs_M1_3",
                 "definition": "$GND_STUB",
                 "roles": [
@@ -506,6 +513,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "%gs_R2_2",
                 "definition": "$GND_STUB",
                 "roles": [
@@ -576,6 +584,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "%gs_C1_2",
                 "definition": "$GND_STUB",
                 "roles": [
@@ -668,6 +677,7 @@
             "pins": [],
             "usages": [
               {
+                "kind": "usage",
                 "id": "@rnl-std-fill.rnl:28:3",
                 "definition": "$GND_STUB",
                 "roles": [
@@ -1497,6 +1507,7 @@
             "port": true,
             "usages": [
               {
+                "kind": "usage",
                 "id": "@rnl-std-fill.rnl:37:3#1",
                 "definition": "$IOPORT",
                 "roles": [
@@ -1525,6 +1536,7 @@
             "port": true,
             "usages": [
               {
+                "kind": "usage",
                 "id": "@rnl-std-fill.rnl:37:3#2",
                 "definition": "$IOPORT",
                 "roles": [

@@ -188,7 +188,7 @@ fn explain_prints_a_line_for_each_usage_and_the_chain_upward() {
     let (_, by_number, _) = rnl(&["explain", &file, "#M1:1"]);
     assert_eq!(by_number, by_name.replace("#M1:d in", "#M1:1 in"));
     let (_, out, _) = rnl(&["explain", &file, "%top"]);
-    assert_eq!(out, "%top in explain.sp: in no usage\n");
+    assert_eq!(out, "%top in explain.sp: in no usage or group\n");
 }
 
 #[test]
@@ -307,4 +307,200 @@ fn explain_stops_a_chain_that_loops() {
             "      %v4 is in turn first of usage %v5 (definition $TWO) · deep.sp:17 · written",
         ]
     );
+}
+
+/// Groups (11.5): nested by their members, overlapping, holding a usage and a terminal, turned off,
+/// made by the body of a definition and by a rule.
+const GROUPS: &str = r#"* groups
+R1 a b 1k
+R2 b c 1k
+R3 c d 1k
+R4 d e 1k
+R5 e f 1k
+* @RNL(type="header") { @VERSION("0.3")}
+* @RNL {
+*   $PAIR = @DEFINE(roles=["left", "right"]) {};
+*   $BOXED = @DEFINE(roles=["a", "b"]) { %inner = {?a ?b} @GROUP };
+*   %dp = #R1(left) #R2(right) @AS $PAIR;
+*   %stage1 = {#R1 #R2 #R5} @GROUP;
+*   %stage2 = {#R3 #R4} @GROUP;
+*   %pair = {#R1 #R2} @GROUP;
+*   %core = {{%stage1} {%stage2}} @GROUP;
+*   %blocks = {%dp #R3} @GROUP;
+*   %off = {#R3 #R5} @GROUP;
+*   %off @PRIORITY("disabled");
+*   %b1 = #R4(a) #R5(b) @AS $BOXED;
+*   {#R1 #R3} @GROUP;
+*   {#R5:2 &a} @GROUP;
+*   # @SELECT-INSTANCE(name="R4") => @GROUP
+* }
+.end
+"#;
+
+fn groups() -> Document {
+    let files = MemoryProvider::new().with("/w/groups.sp", GROUPS);
+    rnl_view::build("/w/groups.sp", &files, &BuildOptions { svg: false, ..BuildOptions::default() }).unwrap()
+}
+
+/// Each entry of an object: its kind, its id and its state.
+fn kinds(o: &rnl_view::Object) -> Vec<(&str, &str, &str)> {
+    o.usages.iter().map(|e| (e.kind, e.id.as_str(), e.state)).collect()
+}
+
+#[test]
+fn groups_are_listed_with_the_usages() {
+    let d = groups();
+    assert!(!d.diagnostics.iter().any(|x| x.severity == "error"), "{:?}", d.diagnostics);
+    let r1 = object(&d, "instance", "R1");
+    assert_eq!(
+        kinds(r1),
+        [
+            ("usage", "%dp", "in-effect"),
+            ("group", "%stage1", "in-effect"),
+            ("group", "%pair", "in-effect"),
+            ("group", "%core", "in-effect"),
+            ("group", "@groups.sp:20:5", "in-effect"),
+        ]
+    );
+    let stage1 = &r1.usages[1];
+    assert_eq!(
+        (stage1.definition.as_str(), stage1.file.as_deref(), stage1.line, stage1.source),
+        ("", Some("groups.sp"), 12, "written")
+    );
+    assert_eq!(stage1.roles, [RoleOf { role: "members".into(), set: true, member: "#R1".into(), terminal: None }]);
+    // a group is within the smallest groups that hold all its members, with no roles
+    let g = |name: &str| object(&d, "group", name);
+    assert_eq!(kinds(g("%pair")), [("group", "%stage1", "in-effect")]);
+    assert!(g("%pair").usages[0].roles.is_empty());
+    assert_eq!(kinds(g("%stage1")), [("group", "%core", "in-effect")]);
+    assert_eq!(kinds(g("%core")), []);
+    // a usage written into a group, a group turned off, and a terminal
+    assert_eq!(kinds(object(&d, "usage", "%dp")), [("group", "%blocks", "in-effect")]);
+    let r3 = object(&d, "instance", "R3");
+    assert_eq!(r3.usages.iter().find(|e| e.id == "%off").unwrap().state, "disabled");
+    let r5 = object(&d, "instance", "R5");
+    let term = r5.usages.iter().find(|e| e.id == "@groups.sp:21:5").unwrap();
+    assert_eq!((term.roles[0].member.as_str(), term.roles[0].terminal.as_deref()), ("#R5:2", Some("n")));
+    assert_eq!(kinds(object(&d, "net", "a")), [("group", "@groups.sp:21:5", "in-effect")]);
+    // made by the body of a definition, and by a rule
+    let r4 = object(&d, "instance", "R4");
+    let body = r4.usages.iter().find(|e| e.id == "@groups.sp:10:50").unwrap();
+    assert_eq!((body.source, body.made_in.as_deref()), ("body", Some("%b1")));
+    let rule = r4.usages.iter().find(|e| e.id == "@groups.sp:22:38").unwrap();
+    assert_eq!(rule.source, "rule");
+    assert_eq!(rule.rule, Some(RuleAt { package: String::new(), file: "groups.sp".into(), line: 22 }));
+    // the usage table: the groups after the usages, each with its one role
+    let table = &d.levels[0].usages;
+    let rows: Vec<(&str, &str)> = table.iter().map(|u| (u.kind, u.id.as_str())).collect();
+    assert_eq!(&rows[..2], [("usage", "%dp"), ("usage", "%b1")]);
+    let core = table.iter().find(|u| u.id == "%core").unwrap();
+    assert_eq!((core.kind, core.definition.as_str(), core.first_line), ("group", "", 15));
+    assert_eq!(core.roles.len(), 1);
+    assert_eq!((core.roles[0].name.as_str(), core.roles[0].members.len()), ("members", 5));
+    assert_eq!(d.objects[core.object].kind, "group");
+}
+
+#[test]
+fn the_snapshot_lists_the_groups() {
+    let files = MemoryProvider::new().with("/w/groups.sp", GROUPS);
+    let parts = Parts { drawing: false, host: false, model: true };
+    let s = rnl_view::snapshot("/w/groups.sp", &files, &BuildOptions::default(), parts).unwrap();
+    let s = serde_json::to_value(&s).unwrap();
+    let model = &s["levels"][0]["model"];
+    let groups = model["groups"].as_array().unwrap();
+    let ids: Vec<&str> = groups.iter().map(|g| g["id"].as_str().unwrap()).collect();
+    assert_eq!(
+        ids,
+        [
+            "%stage1",
+            "%stage2",
+            "%pair",
+            "%core",
+            "%blocks",
+            "%off",
+            "@groups.sp:10:50",
+            "@groups.sp:20:5",
+            "@groups.sp:21:5",
+            "@groups.sp:22:38"
+        ]
+    );
+    let core = &groups[3];
+    assert_eq!(core["members"], serde_json::json!(["#R1", "#R2", "#R5", "#R3", "#R4"]));
+    assert_eq!((&core["file"], &core["line"], &core["state"]), (&0.into(), &15.into(), &"in-effect".into()));
+    assert!(core.get("usages").is_none());
+    assert_eq!(groups[5]["state"], "disabled");
+    assert_eq!(groups[6]["made_in"], "%b1");
+    assert_eq!(groups[2]["usages"][0]["id"], "%stage1");
+    assert_eq!(groups[2]["usages"][0]["kind"], "group");
+    let r1 = model["objects"].as_array().unwrap().iter().find(|o| o["id"] == "#R1").unwrap();
+    let listed: Vec<(&str, &str)> = r1["usages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|u| (u["kind"].as_str().unwrap(), u["id"].as_str().unwrap()))
+        .collect();
+    assert_eq!(listed[..2], [("usage", "%dp"), ("group", "%stage1")]);
+}
+
+#[test]
+fn explain_says_the_groups_an_object_is_in() {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("rnl-explain");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("groups.sp"), GROUPS).unwrap();
+    let file = rnl_cli::path_str(&dir.join("groups.sp"));
+    let (code, out, err) = rnl(&["explain", &file, "#R1"]);
+    assert_eq!((code, err.as_str()), (0, ""));
+    assert_eq!(
+        out,
+        "#R1 in groups.sp: 1 usage, 4 groups
+  left of usage %dp (definition $PAIR) · groups.sp:11 · written
+    %dp is in turn a member of group %blocks · groups.sp:16 · written
+  member of group %stage1 · groups.sp:12 · written
+    %stage1 is in turn within group %core · groups.sp:15 · written
+  member of group %pair · groups.sp:14 · written
+    %pair is in turn within group %stage1 · groups.sp:12 · written
+      %stage1 is in turn within group %core · groups.sp:15 · written
+  member of group %core · groups.sp:15 · written
+  member of group @groups.sp:20:5 · groups.sp:20 · written
+    @groups.sp:20:5 is in turn within group %core · groups.sp:15 · written
+"
+    );
+    let (_, out, _) = rnl(&["explain", &file, "#R4"]);
+    assert_eq!(
+        out,
+        "#R4 in groups.sp: 1 usage, 4 groups
+  a of usage %b1 (definition $BOXED) · groups.sp:19 · written
+  member of group %stage2 · groups.sp:13 · written
+    %stage2 is in turn within group %core · groups.sp:15 · written
+  member of group %core · groups.sp:15 · written
+  member of group @groups.sp:10:50 · groups.sp:10 · made by the body of %b1
+    @groups.sp:10:50 is in turn within group %core · groups.sp:15 · written
+  member of group @groups.sp:22:38 · groups.sp:22 · made by the rule at groups.sp:22
+    @groups.sp:22:38 is in turn within group %stage2 · groups.sp:13 · written
+      %stage2 is in turn within group %core · groups.sp:15 · written
+    @groups.sp:22:38 is in turn within group @groups.sp:10:50 · groups.sp:10 · made by the body of %b1
+      @groups.sp:10:50 is in turn within group %core · groups.sp:15 · written
+"
+    );
+    let (_, out, _) = rnl(&["explain", &file, "#R3"]);
+    assert!(out.contains("\n  member of group %off · groups.sp:17 · written · DISABLED\n"), "{out}");
+    let (_, out, _) = rnl(&["explain", &file, "#R5:2"]);
+    assert_eq!(
+        out,
+        "#R5:2 in groups.sp: 1 group\n  member (through terminal n) of group @groups.sp:21:5 · groups.sp:21 · written\n"
+    );
+    let (_, out, _) = rnl(&["explain", &file, "%pair"]);
+    assert_eq!(
+        out,
+        "%pair in groups.sp: 1 group
+  within group %stage1 · groups.sp:12 · written
+    %stage1 is in turn within group %core · groups.sp:15 · written
+"
+    );
+    let (_, out, _) = rnl(&["explain", &file, "%core"]);
+    assert_eq!(out, "%core in groups.sp: in no usage or group\n");
+    let (_, out, _) = rnl(&["explain", &file, "#R1", "--json"]);
+    let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+    assert_eq!(v["objects"][0]["usages"][1]["kind"], "group");
+    assert_eq!(v["objects"][0]["usages"][1]["outer"][0]["id"], "%core");
 }

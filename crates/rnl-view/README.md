@@ -61,7 +61,7 @@ gives the editor interface's view of a document (`notes/rnl-editor-interface/spe
 - The `style` of a wire, a text or a graphic holds what the document's own records give, not the standard package's defaults, so that a converter reads back what it wrote. A text with nothing to show, such as a label emptied by `rnl-std-no-labels`, is left out; `written` tells a text the document writes from a label its symbol alone gives, such as the formula of a block.
 - `revision` is the fingerprint of what the snapshot is made from (3.7): the texts of the host files and of the packages read, their line endings made `\n`, and the build's options, hashed with SHA-256. The same texts and options give the same revision; any change to a text, a space included, gives another, so that a transaction can say which revision it was made for.
 - Each value is a slot with a `source`, which stays null until the snapshot's `sources` come.
-- An object view, and a net of the host circuit, that is a member of some usage has `usages` (`UsageOf`): the list of [the usages of an object](#the-usages-of-an-object), each usage by its id, its file by index in `files`.
+- An object view, and a net of the host circuit, that is a member of some usage has `usages` (`UsageOf`): the list of [the usages of an object](#the-usages-of-an-object), each usage by its id, its file by index in `files`, a group's with `kind` `"group"`. A level that has groups (11.5) has `groups` in its model (`GroupView`), each with its id, its members by id, its statement's file and line, `source`, `state` and the groups it is within.
 
 `rnl snapshot FILE` prints it, with the host circuit and the model by default.
 
@@ -105,11 +105,13 @@ See the [roadmap](../../docs/roadmap.md) for planned work.
 
 `Level.usages` lists every usage in that drawing scope, including semantic usages without a symbol. Each entry shares a selectable `Document.objects` identity with its symbol when it has one; it carries the creating statement and its source, the definition name, its own symbol classification, whether it creates drawing objects in its body/descendants, and role references. Roles contain deduplicated selectable members, special wire display groups, and visible extents in SVG pixel coordinates. Set roles, nested semantic usages, quoted references and fragmented wires retain their geometry; shared nested usages are memoized. Unavailable role members keep their references with no extent. The frontend alone assigns display colors and draws usage overlays; exporting usages does not construct a solver problem.
 
+The groups (11.5) follow the usages in `Level.usages`, each a `Usage` of `kind` `"group"` (a usage's is `"usage"`) with an empty `definition` and one role, `members`, which holds its members as a set role does, so a group has a frame like a usage's. Its `Document.objects` entry is of kind `"group"`, its id `%core` when a record of the level names the set, otherwise where GROUP is written, `@file:line:col`. The runtime gives the groups in `LevelView::groups` (`GroupInfo`): the id, the members, the statement, `origin`, `parent` and `disabled`, as for a usage; a group that PRIORITY turns off is listed too.
+
 ## The usages of an object
 
-`Object.usages` turns the usage table round: for each instance, net and usage, the usages it is a member of in its level (`MemberOf`), in the order of the level's usages, then of the failed applications. Each entry has:
+`Object.usages` turns the usage table round: for each instance, net, usage and group, the usages and groups it is a member of in its level (`MemberOf`), in the order of the usage table, then of the failed applications. Each entry has:
 
-- `usage`: the usage, an index into `objects`, or none for an application that failed and made no usage. `id` is the usage's id (`%dp1`, or `@file:line:col` for one without a name), and `definition` its definition.
+- `usage`: the usage or group, an index into `objects`, or none for an application that failed and made no usage. `kind` is `"usage"` or `"group"`. `id` is the usage's id (`%dp1`, or `@file:line:col` for one without a name), and `definition` its definition, empty for a group.
 - `roles`: the roles the object fills (`RoleOf`). `role` is the role's name. `set` says it is a set role (9.4) with the object as one of its members. `member` is how the role names the object, as the snapshot writes ids: `#M1`, `&vdd`, `%dp1`, `#M5:1` for an instance's terminal by number, or `%g1:p` for a usage's. `terminal` is a terminal's name, such as `d`.
 - `file` and `line`: the statement's file and first line, as `Usage::file` and `first_line` have them.
 - `source`, where the usage comes from:
@@ -123,9 +125,11 @@ See the [roadmap](../../docs/roadmap.md) for planned work.
   - `overridden`: a fact its statement writes lost a conflict to one of higher priority (8.5);
   - `disabled`: its priority, or that of the usage it is made in, is `"disabled"` (14.8).
 
+A group is only `in-effect` or `disabled`: GROUP takes no part in conflicts and has no priority but on and off (11.5). Its members have it with the role `members`, a set role. A reference to a set is spread in a set (5.2), so a group is never itself a member of another; a group is within another when all its members are among the other's, and then its own entry lists the smallest such groups, with no roles. In `%stage1 = {#M1 #M2 #M5} @GROUP; %core = {{%stage1} {#M3 #M4}} @GROUP`, `#M1` lists `%stage1` and `%core`, and `%stage1` lists `%core`. A usage that is a member of a group lists the group, as `%dp1` in `{%dp1 #M5} @GROUP`.
+
 An instance lists the usages of its terminals too. The chain upward is the usage's own entry in `objects`: `%dp1`'s `usages` say that it is `input` of `%stage1`, and so on. The runtime gives what this needs in `ObjectInfo`:
 - `origin` (`UsageOrigin`: written, solver, rule with its package and place, or body);
 - `parent`, the usage it is made in;
 - `disabled`.
 
-It gives the failed applications in `LevelView::failed_usages`, each with the name it binds, its definition, the objects written for its roles and the error's message. A failed application is noted only for a statement of the level's own records, not for a definition's body or a rule. `rnl explain FILE REF` prints these lists (see the [CLI](../rnl-cli/README.md)). The snapshot gives the same lists by ids, as `ObjectView.usages` and `HostNet.usages` (`UsageOf`).
+It gives the failed applications in `LevelView::failed_usages`, each with the name it binds, its definition, the objects written for its roles and the error's message. A failed application is noted only for a statement of the level's own records, not for a definition's body or a rule. `rnl explain FILE REF` prints these lists (see the [CLI](../rnl-cli/README.md)). The snapshot gives the same lists by ids, as `ObjectView.usages` and `HostNet.usages` (`UsageOf`, with `kind`), and the groups as `LevelModel.groups` (`GroupView`: id, members by id, file and line, source, state, and `usages`, the groups it is within).

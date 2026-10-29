@@ -421,6 +421,64 @@ impl Interp<'_> {
             .collect()
     }
 
+    /// The sets marked with GROUP ([`GroupInfo`]), each once, at its first GROUP.
+    fn groups(&mut self, s: SceneId, ids: &HashMap<ObjId, String>) -> Vec<GroupInfo> {
+        let mut facts = self.scenes[s].groups.clone();
+        let mut seen = HashSet::new();
+        facts.retain(|g| seen.insert(g.set));
+        let mut taken: HashMap<String, usize> = ids.values().map(|v| (v.clone(), 1)).collect();
+        let base: Vec<String> = facts
+            .iter()
+            .map(|g| {
+                if self.level_named(s, g.set) {
+                    return format!("%{}", quoted(&self.objs[g.set.0 as usize].name));
+                }
+                match self.rec_loc(g.site.rec, g.off) {
+                    Some(loc) => format!("@{}:{}:{}", loc.file, loc.line, loc.col),
+                    None => format!("@{}", g.set.0),
+                }
+            })
+            .collect();
+        for b in &base {
+            *taken.entry(b.clone()).or_default() += 1;
+        }
+        let mut numbered: HashMap<String, usize> = HashMap::new();
+        let mut out = Vec::new();
+        for (g, id) in facts.into_iter().zip(base) {
+            let id = if taken[&id] > 1 {
+                let n = numbered.entry(id.clone()).or_default();
+                *n += 1;
+                format!("{id}#{n}")
+            } else {
+                id
+            };
+            let members = self.flatten(s, g.set, 7, None).into_iter().map(|m| self.attached(s, m, ids)).collect();
+            let site = &g.site;
+            let source = site.stmt.as_ref().and_then(|st| {
+                Some((self.rec_loc(st.rec, st.start)?, self.rec_loc(st.rec, st.end.saturating_sub(1))?))
+            });
+            let origin = match g.chain.last() {
+                Some(_) => UsageOrigin::Body,
+                // a statement that GROUPs a selection is a rule (10.4)
+                None if self.rules.contains(&site.member_key) => UsageOrigin::Rule {
+                    package: self.units[site.unit].pkg().to_string(),
+                    at: self.rec_loc(site.rec, g.off).unwrap_or_else(|| crate::diag::Loc::line(String::new(), 0)),
+                },
+                None if site.header.type_ == "generated" => UsageOrigin::Solver,
+                None => UsageOrigin::Written,
+            };
+            out.push(GroupInfo {
+                id,
+                members,
+                source,
+                origin,
+                parent: g.chain.last().map(|p| self.ref_id(s, *p, ids)),
+                disabled: self.eff_priority(s, None, &g.chain, Some(g.set)) == Priority::Disabled,
+            });
+        }
+        out
+    }
+
     fn style_of(&self, s: SceneId, o: ObjId) -> Style {
         self.scenes[s]
             .style
@@ -756,6 +814,7 @@ impl Interp<'_> {
         ids.extend(prim_ids);
         let (objects, points) = self.objects_of(s, &objs, &named_points, &ids);
         let failed_usages = self.failed_usages(s, &ids);
+        let groups = self.groups(s, &ids);
         let mut terminal_names = vec![Vec::new(); level.instances.len()];
         for i in self.scenes[s].insts.clone() {
             let ObjData::Inst { idx, .. } = *self.o(i) else { continue };
@@ -1000,6 +1059,7 @@ impl Interp<'_> {
             objects,
             points,
             failed_usages,
+            groups,
             terminal_names,
             block_symbol: self.block_symbol_of(lv),
             packages,

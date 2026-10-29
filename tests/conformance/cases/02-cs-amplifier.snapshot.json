@@ -136,6 +136,7 @@
             "port": false,
             "usages": [
               {
+                "kind": "usage",
                 "id": "%g1",
                 "definition": "$GND",
                 "roles": [
@@ -152,6 +153,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "@rnl-std-virtual.rnl:52:9#1",
                 "definition": "$GND",
                 "roles": [
@@ -169,6 +171,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "@rnl-std-virtual.rnl:52:9#2",
                 "definition": "$GND",
                 "roles": [
@@ -186,6 +189,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "@rnl-std-virtual.rnl:52:9#3",
                 "definition": "$GND",
                 "roles": [
@@ -215,6 +219,7 @@
             "port": false,
             "usages": [
               {
+                "kind": "usage",
                 "id": "@rnl-std-virtual.rnl:58:9#1",
                 "definition": "$SUPPLY",
                 "roles": [
@@ -232,6 +237,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "@rnl-std-virtual.rnl:58:9#2",
                 "definition": "$SUPPLY",
                 "roles": [
@@ -447,6 +453,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "%ss_M2_3",
                 "definition": "$SUPPLY_STUB",
                 "roles": [
@@ -517,6 +524,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "%gs_Vdd_2",
                 "definition": "$GND_STUB",
                 "roles": [
@@ -533,6 +541,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "%ss_Vdd_1",
                 "definition": "$SUPPLY_STUB",
                 "roles": [
@@ -603,6 +612,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "%gs_Vin_2",
                 "definition": "$GND_STUB",
                 "roles": [
@@ -673,6 +683,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "%gs_Vb_2",
                 "definition": "$GND_STUB",
                 "roles": [

@@ -176,12 +176,16 @@ pub struct HostNet {
 #[derive(Serialize, Debug, Clone)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct UsageOf {
+    /// "usage", or "group", a set marked with GROUP (11.5), by its id in `groups`.
+    pub kind: String,
     /// The usage's id, as its object view has it: `%dp1`, `@file:line:col`. A failed application,
     /// which made no usage, has the name it binds, or where it is written.
     pub id: String,
-    /// Its definition, such as `$DIFFERENTIAL_PAIR`; empty when a failed statement names none.
+    /// Its definition, such as `$DIFFERENTIAL_PAIR`; empty for a group, and when a failed
+    /// statement names none.
     pub definition: String,
-    /// The roles the object fills in it.
+    /// The roles the object fills in it: for a group, `members`; none for a group within this one,
+    /// as `MemberOf::roles`.
     pub roles: Vec<RoleOf>,
     /// The statement that applies the definition: its file, by index in `files` when it is one of
     /// them, and its first line.
@@ -205,6 +209,38 @@ pub struct UsageOf {
     pub reason: Option<String>,
 }
 
+/// A set marked with GROUP (11.5), which a viewer lists with the usages.
+#[derive(Serialize, Debug, Clone)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct GroupView {
+    /// `%core` when a record of the level names it; otherwise where GROUP is written,
+    /// `@file:line:col`, with `#n` after it when several groups have that place.
+    pub id: String,
+    /// Its members in order, each an id or a point, nested sets followed down.
+    #[cfg_attr(test, ts(type = "(string | [number, number])[]"))]
+    pub members: Vec<Value>,
+    /// The statement that gives GROUP: its file, by index in `files` when it is one of them, and
+    /// its first line.
+    pub file: Option<usize>,
+    pub line: u32,
+    /// "written", "solver", "rule" or "body", as `UsageOf::source`.
+    pub source: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
+    pub rule: Option<RuleAt>,
+    /// For a group the body of a definition made: the usage whose definition it is, by id.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
+    pub made_in: Option<String>,
+    /// "in-effect", or "disabled" when PRIORITY turns it off (11.5, 14.8).
+    pub state: String,
+    /// The groups it is within, the smallest ones, and the usages it fills a role of
+    /// ([`UsageOf`]); only for a group that has some.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(test, ts(as = "Option<Vec<UsageOf>>", optional))]
+    pub usages: Vec<UsageOf>,
+}
+
 /// What the RNL makes of a level. Coordinates are scene units, y up.
 #[derive(Serialize, Debug)]
 #[cfg_attr(test, derive(ts_rs::TS))]
@@ -224,6 +260,10 @@ pub struct LevelModel {
     pub texts: Vec<TextView>,
     /// The graphics of the scene (13.4) that have their points, in the order written.
     pub shapes: Vec<ShapeView>,
+    /// The sets marked with GROUP (11.5), in the order of writing; only for a level that has some.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(test, ts(as = "Option<Vec<GroupView>>", optional))]
+    pub groups: Vec<GroupView>,
 }
 
 /// A symbol, by an id unique in the level's `symbols`: its name, or its name and where it is
@@ -504,9 +544,11 @@ pub(crate) fn snapshot(r: &Interpretation, document: Document, parts: Parts, opt
                 line: if host_level.kind == LevelKind::Subckt { host_level.line } else { 0 },
                 status: dl.status.clone(),
                 host: parts.host.then(|| host(&r.doc, lv, &usages_of(&r.doc, &document, lv.level, &file_index))),
-                model: parts
-                    .model
-                    .then(|| level_model(&r.doc, lv, &usages_of(&r.doc, &document, lv.level, &file_index))),
+                model: parts.model.then(|| {
+                    let usages = usages_of(&r.doc, &document, lv.level, &file_index);
+                    let groups = groups_of(lv, dl, &file_index, &usages);
+                    level_model(&r.doc, lv, &usages, groups)
+                }),
             }
         })
         .collect();
@@ -610,6 +652,7 @@ fn usages_of(
                 .usages
                 .iter()
                 .map(|m| UsageOf {
+                    kind: m.kind.to_string(),
                     id: m.id.clone(),
                     definition: m.definition.clone(),
                     roles: m.roles.clone(),
@@ -765,7 +808,47 @@ fn attached(a: &Attach) -> Value {
     }
 }
 
-fn level_model(doc: &HostDocument, lv: &LevelView, usages: &HashMap<String, Vec<UsageOf>>) -> LevelModel {
+/// The groups of a level ([`GroupView`]), with where each is written as the Document's usage table
+/// has it.
+fn groups_of(
+    lv: &LevelView,
+    dl: &crate::document::Level,
+    files: &HashMap<&str, usize>,
+    usages: &HashMap<String, Vec<UsageOf>>,
+) -> Vec<GroupView> {
+    lv.groups
+        .iter()
+        .map(|g| {
+            let row = dl.usages.iter().find(|u| u.kind == "group" && u.id == g.id);
+            let (source, rule) = match &g.origin {
+                model::UsageOrigin::Written => ("written", None),
+                model::UsageOrigin::Solver => ("solver", None),
+                model::UsageOrigin::Rule { package, at } => {
+                    ("rule", Some(RuleAt { package: package.clone(), file: at.file.clone(), line: at.line }))
+                }
+                model::UsageOrigin::Body => ("body", None),
+            };
+            GroupView {
+                id: g.id.clone(),
+                members: g.members.iter().map(attached).collect(),
+                file: row.and_then(|u| u.file.as_deref()).and_then(|f| files.get(f).copied()),
+                line: row.map_or(0, |u| u.first_line),
+                source: source.into(),
+                rule,
+                made_in: g.parent.clone(),
+                state: if g.disabled { "disabled" } else { "in-effect" }.into(),
+                usages: usages.get(&g.id).cloned().unwrap_or_default(),
+            }
+        })
+        .collect()
+}
+
+fn level_model(
+    doc: &HostDocument,
+    lv: &LevelView,
+    usages: &HashMap<String, Vec<UsageOf>>,
+    groups: Vec<GroupView>,
+) -> LevelModel {
     let symbols = symbol_refs(doc, lv);
     let symbol_id = |s: &SymbolInfo| symbols.iter().find(|(info, _)| info == s).map(|(_, r)| r.id.clone());
     let net_id = |shown: &str| format!("&{}", quoted(shown));
@@ -864,7 +947,16 @@ fn level_model(doc: &HostDocument, lv: &LevelView, usages: &HashMap<String, Vec<
         })
         .collect();
     let symbol = Slot::of(lv.block_symbol.as_ref().and_then(|b| symbol_id(&b.info)));
-    LevelModel { symbols: symbols.into_iter().map(|(_, r)| r).collect(), symbol, objects, points, wires, texts, shapes }
+    LevelModel {
+        symbols: symbols.into_iter().map(|(_, r)| r).collect(),
+        symbol,
+        objects,
+        points,
+        wires,
+        texts,
+        shapes,
+        groups,
+    }
 }
 
 #[cfg(test)]

@@ -68,7 +68,8 @@ pub struct Document {
 pub struct Level {
     /// Optional inspection geometry in SVG pixels (y down), independent of display styles.
     pub currents: Vec<crate::CurrentArrow>,
-    /// All usages in this drawing scope, including semantic usages without a symbol.
+    /// All usages in this drawing scope, including semantic usages without a symbol, then the
+    /// groups (11.5), as usages of kind "group".
     pub usages: Vec<Usage>,
     /// Terminal names in subcircuit declaration order.
     pub ports: Vec<String>,
@@ -327,9 +328,9 @@ pub struct SourceFile {
 #[derive(Serialize, Debug)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Object {
-    /// "instance", "net" or "usage".
+    /// "instance", "net", "usage" or "group", a set marked with GROUP (11.5).
     pub kind: &'static str,
-    /// An instance or net's name, or a usage's editor identity (`%gnd1` when named).
+    /// An instance or net's name, or a usage's or group's editor identity (`%gnd1` when named).
     pub name: String,
     /// The host level it belongs to, and that level's title.
     pub level: usize,
@@ -604,13 +605,18 @@ impl<'a> Index<'a> {
     }
 
     fn usage(&mut self, level: usize, id: &str) -> usize {
+        self.usage_of_kind(level, id, "usage")
+    }
+
+    /// A usage, or a group (11.5), which the usage table lists with the usages.
+    fn usage_of_kind(&mut self, level: usize, id: &str, kind: &'static str) -> usize {
         let key = (level, id.to_string());
         if let Some(&o) = self.usages.get(&key) {
             return o;
         }
         let o = self.objects.len();
         self.objects.push(Object {
-            kind: "usage",
+            kind,
             name: id.into(),
             level,
             level_title: self.doc.levels[level].title(),

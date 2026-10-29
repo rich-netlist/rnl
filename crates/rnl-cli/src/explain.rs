@@ -1,7 +1,8 @@
 //! `rnl explain`: the usages an object is a member of, from the Document's reverse index
 //! (`rnl_view::Object::usages`): for each, a line that says the roles the object fills, of which
 //! usage of which definition, where it is written, where it comes from and, when it does not take
-//! effect, why, with the usages that contain that usage in turn.
+//! effect, why, with the usages that contain that usage in turn. The groups (11.5) are listed the
+//! same way: the groups the object is a member of, and of a group, the groups it is within.
 
 use std::collections::HashSet;
 
@@ -121,9 +122,9 @@ fn entries<'d>(doc: &'d Document, found: &Found) -> Vec<&'d MemberOf> {
 }
 
 /// One line of an entry, said as a sentence: the roles the object fills, of which usage of which
-/// definition, then where it is written, where it comes from and, when it does not take effect,
-/// its state with the reason. On a line of the chain upward, `subject` is the usage that fills
-/// those roles.
+/// definition, or the group it is a member of or within, then where it is written, where it comes
+/// from and, when it does not take effect, its state with the reason. On a line of the chain
+/// upward, `subject` is the usage or group that fills those roles.
 fn line(e: &MemberOf, subject: Option<&str>) -> String {
     let roles: Vec<String> = e
         .roles
@@ -136,9 +137,22 @@ fn line(e: &MemberOf, subject: Option<&str>) -> String {
             }
         })
         .collect();
-    let mut said = match subject {
-        Some(s) => format!("{s} is in turn {} of usage {}", roles.join(" and "), e.id),
-        None => format!("{} of usage {}", roles.join(" and "), e.id),
+    let mut said = match (e.kind, subject) {
+        // a group within this one: its members are all among this one's (5.2, 11.5)
+        ("group", Some(s)) if roles.is_empty() => format!("{s} is in turn within group {}", e.id),
+        ("group", None) if roles.is_empty() => format!("within group {}", e.id),
+        ("group", _) => {
+            let member = match e.roles.iter().find_map(|r| r.terminal.as_ref()) {
+                Some(t) => format!("member (through terminal {t})"),
+                None => "member".into(),
+            };
+            match subject {
+                Some(s) => format!("{s} is in turn a {member} of group {}", e.id),
+                None => format!("{member} of group {}", e.id),
+            }
+        }
+        (_, Some(s)) => format!("{s} is in turn {} of usage {}", roles.join(" and "), e.id),
+        (_, None) => format!("{} of usage {}", roles.join(" and "), e.id),
     };
     if !e.definition.is_empty() {
         said.push_str(&format!(" (definition {})", e.definition));
@@ -176,7 +190,8 @@ pub fn lines(doc: &Document, found: &[Found]) -> Vec<String> {
             None => id_of(doc, f.object),
         };
         let list = entries(doc, f);
-        out.push(format!("{what} in {}: {}", o.level_title, count(list.len())));
+        let groups = list.iter().filter(|e| e.kind == "group").count();
+        out.push(format!("{what} in {}: {}", o.level_title, count(list.len() - groups, groups)));
         for e in list {
             chain(doc, e, None, 1, &mut HashSet::new(), &mut out);
         }
@@ -184,11 +199,16 @@ pub fn lines(doc: &Document, found: &[Found]) -> Vec<String> {
     out
 }
 
-fn count(n: usize) -> String {
-    match n {
-        0 => "in no usage".into(),
-        1 => "1 usage".into(),
-        n => format!("{n} usages"),
+fn count(usages: usize, groups: usize) -> String {
+    let some = |n: usize, one: &str| match n {
+        1 => format!("1 {one}"),
+        n => format!("{n} {one}s"),
+    };
+    match (usages, groups) {
+        (0, 0) => "in no usage or group".into(),
+        (n, 0) => some(n, "usage"),
+        (0, g) => some(g, "group"),
+        (n, g) => format!("{}, {}", some(n, "usage"), some(g, "group")),
     }
 }
 
