@@ -658,5 +658,12 @@
   "Project archives": "工程压缩包",
   "Choose the folder to open the project in": "选择要解压并打开工程的文件夹",
   "Save Solved Copy As": "求解副本另存为",
-  "Save the Solved Files Into a Folder": "将求解后的文件保存至文件夹"
+  "Save the Solved Files Into a Folder": "将求解后的文件保存至文件夹",
+  "Show all groups": "显示所有组",
+  "member of group {0}": "组 {0} 的成员",
+  "member (through terminal {0}) of group {1}": "组 {1} 的成员（经端子 {0}）",
+  "{0} is in turn a member of group {1}": "{0} 又是组 {1} 的成员",
+  "{0} is in turn within group {1}": "{0} 又在组 {1} 之内",
+  "within group {0}": "在组 {0} 之内",
+  "group": "组"
 }

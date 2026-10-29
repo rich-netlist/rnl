@@ -658,5 +658,12 @@
   "Project archives": "Projektarchive",
   "Choose the folder to open the project in": "Zielordner zum Öffnen des Projekts wählen",
   "Save Solved Copy As": "Gelöste Kopie speichern unter",
-  "Save the Solved Files Into a Folder": "Gelöste Dateien in einem Ordner speichern"
+  "Save the Solved Files Into a Folder": "Gelöste Dateien in einem Ordner speichern",
+  "Show all groups": "Alle Gruppen anzeigen",
+  "member of group {0}": "Mitglied der Gruppe {0}",
+  "member (through terminal {0}) of group {1}": "Mitglied der Gruppe {1} (über Anschluss {0})",
+  "{0} is in turn a member of group {1}": "{0} ist wiederum Mitglied der Gruppe {1}",
+  "{0} is in turn within group {1}": "{0} liegt wiederum innerhalb der Gruppe {1}",
+  "within group {0}": "innerhalb der Gruppe {0}",
+  "group": "Gruppe"
 }

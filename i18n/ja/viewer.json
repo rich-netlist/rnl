@@ -658,5 +658,12 @@
   "Project archives": "プロジェクトアーカイブ",
   "Choose the folder to open the project in": "プロジェクトを展開するフォルダを選択",
   "Save Solved Copy As": "求解結果に名前を付けて保存",
-  "Save the Solved Files Into a Folder": "求解済みファイルをフォルダに保存"
+  "Save the Solved Files Into a Folder": "求解済みファイルをフォルダに保存",
+  "Show all groups": "すべてのグループを表示",
+  "member of group {0}": "グループ {0} のメンバー",
+  "member (through terminal {0}) of group {1}": "グループ {1} のメンバー（端子 {0} 経由）",
+  "{0} is in turn a member of group {1}": "{0} はさらにグループ {1} のメンバー",
+  "{0} is in turn within group {1}": "{0} はさらにグループ {1} に含まれる",
+  "within group {0}": "グループ {0} に含まれる",
+  "group": "グループ"
 }

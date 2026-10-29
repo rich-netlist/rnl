@@ -7,7 +7,7 @@ import { doc } from "./state.js";
 import { $, span } from "./util.js";
 
 /** The kinds of the objects of a Document, as the picker and the selection name them. */
-const OBJECT_KINDS = { instance: tr("instance"), net: tr("net"), usage: tr("usage") };
+const OBJECT_KINDS = { instance: tr("instance"), net: tr("net"), usage: tr("usage"), group: tr("group") };
 export const kindName = (kind) => m(OBJECT_KINDS[kind] ?? kind);
 
 const list = $("pick-list");

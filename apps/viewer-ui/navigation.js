@@ -60,7 +60,7 @@ function fileSource(file) {
 /** File > New Window keeps the current level and selection. */
 export function duplicateWindow() {
   return newWindow(destination({ path: path.slice(), selection: selected,
-    selectionUsage: doc?.objects[selected]?.kind === "usage" ? selectedAsUsage : undefined }));
+    selectionUsage: (doc?.objects[selected]?.kind === "usage" || doc?.objects[selected]?.kind === "group") ? selectedAsUsage : undefined }));
 }
 
 async function newWindow(visit) {

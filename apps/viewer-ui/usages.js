@@ -5,7 +5,7 @@ import { select } from "./selection.js";
 import { setCheck } from "./commands.js";
 import { $, load, save, span, svgElement } from "./util.js";
 import { setPathText } from "./source-path.js";
-import { objectUsages } from "./usage-table.js";
+import { objectUsages, stateName } from "./usage-table.js";
 import { setPane } from "./panels.js";
 import { revealLine } from "./text.js";
 
@@ -33,6 +33,22 @@ let layerSelected = null;
 let context = null;
 
 const usages = () => doc?.levels[current]?.usages || [];
+/** A group (`@GROUP`, 11.5) is listed with the usages and drawn as one, of a kind of its own. */
+const GROUP_TYPE = "@GROUP";
+export const isGroup = (u) => u.kind === "group";
+/** The heading a usage is listed under: its definition, or `@GROUP` for the groups. */
+const typeOf = (u) => (isGroup(u) ? GROUP_TYPE : u.definition);
+/** What the drawing and the details call it: `$DIFFERENTIAL_PAIR: %dp1`, `@GROUP: %core`. */
+const labelOf = (u) => `${typeOf(u)}: ${u.id}`;
+/**
+ * Whether the usage is in effect. A usage in the level's list always is, but a group may be turned off by PRIORITY
+ * (14.8); the Document says so in the entry, or else in the memberships of its members.
+ */
+function stateOf(u) {
+  if (u.state) return u.state;
+  const member = u.roles.flatMap((r) => r.objects)[0];
+  return doc.objects[member]?.usages?.find((e) => e.usage === u.object)?.state ?? "in-effect";
+}
 /** A level shown, or another document, starts with every group folded. */
 function newScope() {
   if (doc === scopeDoc && current === scopeLevel) return;
@@ -48,7 +64,7 @@ export function usageSelection(object, from) {
   const u = usages().find(u => u.object === object);
   return !!u && (from === "usage" || from === "source" || visible(u));
 }
-const keyOf = u => JSON.stringify([doc.path, doc.levels[current].kind, doc.levels[current].title, u.id]);
+const keyOf = u => JSON.stringify([doc.path, doc.levels[current].kind, doc.levels[current].title, ...(isGroup(u) ? ["group"] : []), u.id]);
 function setting(u) {
   if (activeSettings.has(u)) return activeSettings.get(u);
   const key = keyOf(u);
@@ -145,10 +161,11 @@ export function renderUsages() {
   if (!all.length) append(list, span("placeholder", m("No usages in this circuit.")));
   const groups = new Map();
   for (const u of all) {
-    if (!groups.has(u.definition)) groups.set(u.definition, []);
-    groups.get(u.definition).push(u);
+    if (!groups.has(typeOf(u))) groups.set(typeOf(u), []);
+    groups.get(typeOf(u)).push(u);
   }
-  const sorted = [...groups].sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }));
+  // the groups come last, after the definitions
+  const sorted = [...groups].sort(([a], [b]) => (a === GROUP_TYPE) - (b === GROUP_TYPE) || a.localeCompare(b, undefined, { numeric: true }));
   if (sorted.length) {
     // one button for all the groups: Expand All, or Collapse All when every group is open
     const every = sorted.every(([type]) => expanded.has(type));
@@ -187,7 +204,7 @@ export function renderUsages() {
       renderUsages();
     });
     const visible = items.filter(u => setting(u).visible).length;
-    const control = checkbox(m`Show all usages of ${type}`, visible === items.length, value => {
+    const control = checkbox(type === GROUP_TYPE ? m("Show all groups") : m`Show all usages of ${type}`, visible === items.length, value => {
       for (const u of items) { Object.assign(setting(u), { visible: value }); remember(u); }
       persist(); revision++; renderUsages(); repaint();
     });
@@ -202,6 +219,8 @@ export function renderUsages() {
         row.className = "usage-row";
         row.dataset.object = String(u.object);
         row.classList.toggle("selected", u.object === inspected);
+        const state = stateOf(u);
+        row.classList.toggle("greyed", state !== "in-effect");
         const button = document.createElement("button");
         button.type = "button";
         button.className = "usage-name";
@@ -213,7 +232,10 @@ export function renderUsages() {
         button.addEventListener("click", () => select(u.object, "usage"));
         const check = checkbox(m`Show ${u.id}`, setting(u).visible, visible => change(u, { visible }));
         check.dataset.focusKey = `check:${u.id}`;
-        append(row, button, check);
+        // a group that is turned off is greyed, the whole row, and says so
+        append(row, button);
+        if (state !== "in-effect") append(row, span("usage-state", stateName(state)));
+        append(row, check);
         append(group, row);
       }
       if (items.length > limit) {
@@ -255,7 +277,7 @@ function renderDetail() {
     return;
   }
   const title = document.createElement("h2");
-  setText(title, `${u.definition}: ${u.id}`);
+  setText(title, labelOf(u));
   const colorRow = document.createElement("label");
   colorRow.className = "usage-color-control";
   const color = document.createElement("input");
@@ -390,7 +412,7 @@ export function paintUsages(svg, view, groups) {
         "stroke-width": active ? 8 / 3 : 4 / 3, "stroke-dasharray": "1 5", "stroke-linecap": "round", rx: 10 });
       append(group, rect);
       append(layer, group);
-      const title = badge(`${entry.definition}: ${entry.id}`, color, group, "usage-title", entry.frame.title_width);
+      const title = badge(labelOf(entry), color, group, "usage-title", entry.frame.title_width);
       const roles = active ? entry.roles.map((r, i) => ({ ...r, anchor: entry.frame.roles[i], width: entry.frame.role_widths[i] })).filter(r => r.anchor).map(r => ({
         anchor: r.anchor,
         ...badge(r.name, color, group, "usage-role-label", r.width),
@@ -445,10 +467,10 @@ function showSelected() {
   newScope();
   const u = chosen();
   if (u) {
-    expanded.add(u.definition);
-    const items = usages().filter((x) => x.definition === u.definition);
+    expanded.add(typeOf(u));
+    const items = usages().filter((x) => typeOf(x) === typeOf(u));
     const at = items.findIndex((x) => x.object === u.object);
-    if (at >= (rowLimits.get(u.definition) || 100)) rowLimits.set(u.definition, Math.ceil((at + 1) / 100) * 100);
+    if (at >= (rowLimits.get(typeOf(u)) || 100)) rowLimits.set(typeOf(u), Math.ceil((at + 1) / 100) * 100);
   }
   revealPending = !!u;
   renderUsages();
