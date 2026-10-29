@@ -71,10 +71,13 @@ jobs:
       # downloads the pinned fonts and writes apps/viewer-ui/fonts/, the drawing's web fonts
       - name: Write the web fonts
         run: pip install fonttools brotli && python scripts/fonts.py web
+      # esbuild bundles the page's scripts, as the published site has them (apps/web/bundle.mjs)
+      - name: Install esbuild
+        run: npm ci --prefix apps/web --no-audit --no-fund
       - name: Build the site, with the samples
         run: |
-          node --test apps/web/build-info.test.mjs apps/web/preload-hints.test.mjs apps/web/library.test.mjs apps/web/edits.test.mjs apps/web/public-packages.test.mjs apps/web/zip.test.mjs apps/web/manifest-copy.test.mjs bindings/runtime-wasm/tests/manifest.test.mjs
-          node apps/web/build.mjs --samples
+          node --test apps/web/build-info.test.mjs apps/web/preload-hints.test.mjs apps/web/bundle.test.mjs apps/web/library.test.mjs apps/web/edits.test.mjs apps/web/public-packages.test.mjs apps/web/zip.test.mjs apps/web/manifest-copy.test.mjs bindings/runtime-wasm/tests/manifest.test.mjs
+          node apps/web/build.mjs --samples --bundle
           node --input-type=module -e 'import assert from "node:assert/strict"; import {readFileSync} from "node:fs"; import {buildVersions} from "./apps/web/build-info.mjs"; const about=JSON.parse(readFileSync("apps/web/dist/about.json")); const expected=buildVersions(process.cwd()); assert.equal(about.version,expected.version); assert.equal(about.coreVersion,expected.coreVersion); assert.match(about.commit,/^[0-9a-f]+$/); console.log(about);'
       - name: Serve the site
         run: |

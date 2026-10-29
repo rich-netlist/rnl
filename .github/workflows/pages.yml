@@ -184,10 +184,13 @@ jobs:
         run: pip install fonttools brotli && python scripts/fonts.py web
       # writes apps/web/dist/, including libraries/*.rnl, index.json and bundled.json,
       # and puts it at site/dist/viewer/, where the pages of every language link
+      # esbuild bundles the page's scripts (apps/web/bundle.mjs)
+      - name: Install esbuild
+        run: npm ci --prefix apps/web --no-audit --no-fund
       - name: Build the web viewer, with samples and the package library
         run: |
           node --test apps/web/*.test.mjs
-          node apps/web/build.mjs --samples
+          node apps/web/build.mjs --samples --bundle
           cp -r apps/web/dist site/dist/viewer
 
       # The data of the gallery of the standard packages (packages.html), which the pages of both

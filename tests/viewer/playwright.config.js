@@ -19,7 +19,8 @@
 // tests find it at RNL_WEB_URL. A command line that names spec files, none of them web.spec.js,
 // such as `npx playwright test specs/text.spec.js`, builds and serves no site, as the page's own
 // tests need neither it nor the WebAssembly target. RNL_WEB=0 leaves the site out in any case, and
-// the web viewer's tests skip; RNL_WEB=1 builds it in any case.
+// the web viewer's tests skip; RNL_WEB=1 builds it in any case. RNL_WEB_BUNDLE=1 builds it as it is
+// published, with its scripts bundled (apps/web/bundle.mjs; npm ci --prefix apps/web installs esbuild).
 
 import net from "node:net";
 import { preparePublicPackageFixture } from "../../scripts/packages.mjs";
@@ -52,7 +53,7 @@ function freePort() {
 /** Whether the command line names spec files, and none of them is the web viewer's. */
 function pageSpecsOnly() {
   const specs = process.argv.filter((arg) => /\.spec\.js(:\d+)*$/.test(arg));
-  return specs.length > 0 && !specs.some((spec) => /(?:web|embed|api)\.spec\.js/.test(spec));
+  return specs.length > 0 && !specs.some((spec) => /(?:web|web-bundle|embed|api)\.spec\.js/.test(spec));
 }
 
 // the workers load this file too, and inherit whether the runner builds the site, and its port
@@ -74,7 +75,7 @@ export default defineConfig({
   use: { trace: "retain-on-failure" },
   webServer: web
     ? {
-        command: `node apps/web/build.mjs --samples ${process.env.RNL_WEB_NO_CORE ? "--no-core" : ""} && node apps/web/serve.mjs --port ${process.env.RNL_WEB_PORT}`,
+        command: `node apps/web/build.mjs --samples ${process.env.RNL_WEB_NO_CORE ? "--no-core" : ""} ${process.env.RNL_WEB_BUNDLE ? "--bundle" : ""} && node apps/web/serve.mjs --port ${process.env.RNL_WEB_PORT}`,
         cwd: root,
         url: `${process.env.RNL_WEB_URL}/about.json`,
         // building the core from nothing takes minutes

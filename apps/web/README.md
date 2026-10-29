@@ -92,8 +92,16 @@ Without it the build says so, and the drawing falls back on the fonts installed 
 | --- | --- |
 | `--no-core` | Take the core as `bindings/runtime-wasm/build.mjs` last built it, without building it again. |
 | `--samples` | Copy the conformance corpus's [`cases`](../../tests/conformance/README.md) and `equivalence` files into `samples/`, for trying the viewer and for tests. |
+| `--bundle` | Bundle and minify the page's scripts, as the published site has them ([Bundling](#bundling)). |
+| `--out DIR` | Build into `DIR`, emptied first, in place of `dist/`; `node apps/web/serve.mjs --dir DIR` serves it. |
 
 The site is 26 files and 1.36 MB, the licence of the fonts' metrics in `fonts/OFL.txt` among them, of which the core is 1.22 MB, 412 KB gzip-compressed; the web fonts add 232 files and 17.6 MB, of which a browser downloads only the slices a drawing uses, and the samples 0.70 MB.
+
+## Bundling
+
+The page is some seventy ES modules, 630 KB of source, 220 KB gzip-compressed, which a browser fetches as seventy files. `--bundle` has [esbuild](https://esbuild.github.io/) ([`bundle.mjs`](bundle.mjs); `npm ci --prefix apps/web` installs it, pinned in `package-lock.json`) bundle and minify them into 7 scripts and about ten chunks of 100 KB gzip-compressed, which the preload hints below then name. The published site is built so (`pages.yml`); the tests and the desktop viewer read the modules themselves, since a spec imports single modules of the page (`import('./selection.js')`), and a bundle has no such modules, only copies of them.
+
+The entry points are what something else names by address: `startup.js` and `main.js` (index.html), `shells/web.js` (which `shell.js` imports by a name made at run time), `embed.js` and `full-viewer-api.js` (the other modes), and `core/worker.js` and `core/client.js` (the client starts the Worker with `new Worker(new URL("./worker.js", import.meta.url))`, which esbuild does not follow, and the Worker finds the core's WebAssembly beside itself the same way). What the entries share goes into `core/chunk-*.js`, so that those addresses stay what they were. The sources that went into the bundles are not in the site beside them. The scripts are compiled for the browsers of [the baseline](#browsers). A test bundles a small site (`bundle.test.mjs`), and `specs/web-bundle.spec.js` builds the real one bundled into a directory of its own and starts it in a browser: the document built in the Worker, a language chosen, text applied, the embedded mode.
 
 ## Preload hints
 
@@ -109,7 +117,7 @@ serves `apps/web/dist/` at `http://127.0.0.1:8000/`, on this computer only; `--p
 
 ## Deploying
 
-The project site publishes it at <https://rich-netlist.github.io/rnl/viewer/>, with the samples, so that <https://rich-netlist.github.io/rnl/viewer/?url=samples/cases/04-hierarchy.sp> opens one. [`pages.yml`](../../.github/workflows/pages.yml) builds it with `--samples` whenever it, the page, the bindings, the crates, the standard library, the font script or the conformance corpus changes on `main`, and puts `dist/` at the site's `viewer/`, which the site's [page of the tools](https://rich-netlist.github.io/rnl/en/tools.html) links to ([`site`](../../site/README.md)).
+The project site publishes it at <https://rich-netlist.github.io/rnl/viewer/>, with the samples, so that <https://rich-netlist.github.io/rnl/viewer/?url=samples/cases/04-hierarchy.sp> opens one. [`pages.yml`](../../.github/workflows/pages.yml) builds it with `--samples --bundle` whenever it, the page, the bindings, the crates, the standard library, the font script or the conformance corpus changes on `main`, and puts `dist/` at the site's `viewer/`, which the site's [page of the tools](https://rich-netlist.github.io/rnl/en/tools.html) links to ([`site`](../../site/README.md)).
 
 Any static host serves the site: copy `dist/` as it is, at the root or under a path. It needs no server code and no special headers, only the usual MIME types:
 
@@ -317,6 +325,8 @@ hover or keyboard focus.
 | Path | Content |
 | --- | --- |
 | `build.mjs` | Builds the core and assembles the site in `dist/`. |
+| `bundle.mjs` | Bundles the page's scripts with esbuild, for `build.mjs --bundle`. |
+| `package.json` | esbuild, the one thing the bundled build needs from npm (`npm ci --prefix apps/web`). |
 | `serve.mjs` | Serves `dist/` on this computer. |
 | [`../viewer-ui/shells/web.js`](../viewer-ui/README.md#the-shell) | The web shell: opening files, a folder, a URL or what is dropped; reading only the files a document needs, with `collect`; building in the core's Worker; the About box; a web page in a new tab. |
 | [`../viewer-ui/dialog.js`](../viewer-ui/README.md#modules) | The dialogs the web shell asks with: which netlist, which address, About. |

@@ -1,12 +1,12 @@
 // Serve the web viewer that build.mjs put into apps/web/dist/, on this computer only, to try it and
 // for tests:
 //
-//   node apps/web/serve.mjs [--port N]
+//   node apps/web/serve.mjs [--port N] [--dir DIR]
 //
 // It answers GET and HEAD with the site's files, with the MIME types a browser needs, such as
 // application/wasm for the core and text/javascript for the module Worker, and tells the browser not
 // to cache them, so that a rebuilt site and a changed sample are read anew. --port 0 takes a free
-// port; 8000 by default. It prints the page's address.
+// port; 8000 by default. --dir DIR serves the site that build.mjs --out DIR made. It prints the page's address.
 
 import { createServer } from "node:http";
 import { existsSync, readFile, stat } from "node:fs";
@@ -14,13 +14,14 @@ import { dirname, extname, isAbsolute, join, relative, resolve } from "node:path
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const site = join(here, "dist");
-const usage = "usage: node apps/web/serve.mjs [--port N]";
+let site = join(here, "dist");
+const usage = "usage: node apps/web/serve.mjs [--port N] [--dir DIR]";
 
 let port = 8000;
 const args = process.argv.slice(2);
 for (let k = 0; k < args.length; k++) {
   if (args[k] === "--port" && k + 1 < args.length && /^\d+$/.test(args[k + 1])) port = Number(args[++k]);
+  else if (args[k] === "--dir" && k + 1 < args.length) site = resolve(args[++k]);
   else {
     console.error(usage);
     process.exit(2);

@@ -3,7 +3,12 @@
 // fonts' licence in fonts/OFL.txt in any case, and the core as WebAssembly with its JavaScript
 // modules in core/:
 //
-//   node apps/web/build.mjs [--no-core] [--samples]
+//   node apps/web/build.mjs [--no-core] [--samples] [--bundle] [--out DIR]
+//
+// --bundle bundles and minifies the page's scripts with esbuild (bundle.mjs; npm ci --prefix apps/web
+// installs it), as the published site is built: a dozen files in place of seventy. Without it the
+// site has the page's modules as they are, which is what the tests and the desktop viewer read.
+// --out DIR builds into DIR (which is emptied first) in place of apps/web/dist/.
 //
 // --no-core takes the binding as bindings/runtime-wasm/build.mjs last built it instead of building it
 // again; --samples copies the conformance corpus's cases and equivalence files and the site's
@@ -14,7 +19,7 @@ import { buildVersions } from "./build-info.mjs";
 import { addPreloadHints } from "./preload-hints.mjs";
 import { execFileSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, sep } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
 import { API_FEATURES, MAX_OPEN_BYTES } from "../viewer-ui/viewer-api-contract.js";
@@ -22,13 +27,19 @@ import { writeLocales } from "../../scripts/i18n/viewer-locales.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..", "..");
-const usage = "usage: node apps/web/build.mjs [--no-core] [--samples]";
+const usage = "usage: node apps/web/build.mjs [--no-core] [--samples] [--bundle] [--out DIR]";
 
 let buildCore = true;
 let samples = false;
-for (const arg of process.argv.slice(2)) {
+let bundle = false;
+let outDir = join(here, "dist");
+const argv = process.argv.slice(2);
+for (let k = 0; k < argv.length; k++) {
+  const arg = argv[k];
   if (arg === "--no-core") buildCore = false;
   else if (arg === "--samples") samples = true;
+  else if (arg === "--bundle") bundle = true;
+  else if (arg === "--out" && k + 1 < argv.length) outDir = resolve(argv[++k]);
   else {
     console.error(usage);
     process.exit(2);
@@ -38,7 +49,7 @@ for (const arg of process.argv.slice(2)) {
 const page = join(root, "apps", "viewer-ui");
 const binding = join(root, "bindings", "runtime-wasm");
 const core = join(binding, "dist");
-const out = join(here, "dist");
+const out = outDir;
 
 if (buildCore) execFileSync(process.execPath, [join(binding, "build.mjs")], { stdio: "inherit" });
 if (!existsSync(join(core, "rnl_runtime_wasm.wasm"))) {
@@ -112,6 +123,18 @@ writeFileSync(join(out, "public-packages.json"), JSON.stringify({
   url: fixture ? "public-packages/catalog.json" : process.env.RNL_PACKAGE_CATALOG || "https://rich-netlist.github.io/rnl-packages/catalog.json",
 }) + "\n");
 
+let bundled = "";
+if (bundle) {
+  const esbuild = await import("esbuild").catch(() => null);
+  if (!esbuild) {
+    console.error("--bundle needs esbuild: npm ci --prefix apps/web");
+    process.exit(1);
+  }
+  const { bundleScripts } = await import("./bundle.mjs");
+  const { entries, chunks, removed } = await bundleScripts(out, esbuild);
+  bundled = `; ${removed} modules bundled into ${entries} scripts and ${chunks} chunks`;
+}
+
 // the page asks for its scripts, the core and the files it reads at start all at once (preload-hints.mjs)
 const hints = addPreloadHints(out);
 const all = files(out);
@@ -120,7 +143,7 @@ const wasm = readFileSync(join(out, "core", "rnl_runtime_wasm.wasm"));
 const kib = (n) => `${(n / 1024).toFixed(0)} KiB`;
 console.log(out);
 const packed = gzipSync(wasm, { level: 9 }).length;
-console.log(`${all.length} files, ${kib(bytes)}; the core ${kib(wasm.length)}, ${kib(packed)} gzip-compressed; ${hints} preload hints`);
+console.log(`${all.length} files, ${kib(bytes)}; the core ${kib(wasm.length)}, ${kib(packed)} gzip-compressed; ${hints} preload hints${bundled}`);
 if (fonts) {
   const font = all.filter((f) => f.startsWith("fonts/"));
   console.log(`the web fonts: ${font.length} files, ${kib(font.reduce((n, f) => n + statSync(join(out, f)).size, 0))}`);

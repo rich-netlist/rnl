@@ -1,0 +1,8 @@
+{
+  "name": "rnl-web-build",
+  "private": true,
+  "description": "What apps/web/build.mjs --bundle needs: esbuild, which bundles the page's scripts for the site (npm ci --prefix apps/web)",
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

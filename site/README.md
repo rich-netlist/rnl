@@ -236,7 +236,8 @@ The web viewer is not written by `build.py`. To look at the pages with it, build
 
 ```bash
 python scripts/fonts.py web
-node apps/web/build.mjs --samples
+npm ci --prefix apps/web   # esbuild, for --bundle; leave both out for the page's modules as they are
+node apps/web/build.mjs --samples --bundle
 cp -r apps/web/dist site/dist/viewer
 python -m http.server --directory site/dist
 ```

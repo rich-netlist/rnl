@@ -71,6 +71,9 @@ jobs:
           node-version: 24
       - name: Install Playwright
         run: npm ci
+      # for specs/web-bundle.spec.js, which builds the site with its scripts bundled
+      - name: Install esbuild
+        run: npm ci --prefix "$GITHUB_WORKSPACE/apps/web" --no-audit --no-fund
       # The browsers and their system packages: cached, with a time limit and one retry from another mirror
       # (the Ubuntu mirror stalled for most of an hour several times on 2026-10-23, 24 and 26).
       - name: Install the browsers and what they need
