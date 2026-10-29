@@ -108,7 +108,7 @@ test('record web font transfer before and after the fallback on a Chinese sample
     await page.route('**/style.css',async route=>{
       const response=await route.fetch();
       const body=await response.text();
-      await route.fulfill({response,body:enabled ? body : body.replaceAll(', "Noto Sans SC"','')});
+      await route.fulfill({response,body:enabled ? body : body.replaceAll(', var(--ui-cjk)','')});
     });
     await page.goto(`${process.env.RNL_VIEWER_URL}/index.html?shell=fake&open=15-chinese`);
     await page.waitForFunction(()=>window.viewer?.doc && !document.body.classList.contains('busy') && !document.body.classList.contains('starting'));
@@ -131,3 +131,29 @@ test('record web font transfer before and after the fallback on a Chinese sample
   expect(result.delta).toBeGreaterThan(0); // UI/source add slices; no new font payload is shipped
   await info.attach('web-font-transfer.json',{body:JSON.stringify(result,null,2),contentType:'application/json'});
 });
+
+for (const [command, code] of [['zh','zh-CN'],['zh-hant','zh-Hant'],['ja','ja']]) {
+  test(`the interface in ${code} takes its characters from one small font, not from the slices`, async ({page,viewer}) => {
+    const fonts = await page.request.get(`${process.env.RNL_VIEWER_URL}/fonts/fonts.css`);
+    test.skip(!fonts.ok() || !(await fonts.text()).includes(`RNL UI ${code}`),'The web fonts are not written; run python scripts/fonts.py web.');
+    await viewer.open('04-hierarchy');
+    await page.evaluate(command=>window.viewer.command(`language-${command}`),command);
+    const catalog = await (await page.request.get(`${process.env.RNL_VIEWER_URL}/locales/${code}.json`)).json();
+    // every character of the catalog but ASCII, in the font the page's texts name
+    const text = [...new Set(Object.values(catalog).join('').replace(/[\x00-\x7e]/g,''))].join('');
+    expect(text.length).toBeGreaterThan(100);
+    await page.evaluate(async text=>{
+      const probe = document.createElement('span');
+      probe.id = 'ui-cjk-probe';
+      probe.style.cssText = 'font-family: var(--ui-cjk); position: fixed; top: 0; left: 0';
+      probe.textContent = text;
+      document.body.append(probe);
+      await new Promise(resolve=>requestAnimationFrame(resolve));
+      await document.fonts.ready;
+    },text);
+    const files = await page.evaluate(()=>performance.getEntriesByType('resource').map(r=>r.name.split('/fonts/')[1]).filter(Boolean));
+    expect(files).toContain(`ui-${code}-400.woff2`);
+    // the face has every character: none falls through to the slices
+    expect(files.filter(f=>f.includes('-cjk-'))).toEqual([]);
+  });
+}

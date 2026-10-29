@@ -9,7 +9,13 @@ tag into target/fonts/, which Git ignores, and checks their SHA-256 sums. From t
   when it is not what the pinned fonts give.
 - `web` writes the web fonts of the viewers' page into apps/viewer-ui/fonts/, which Git ignores:
   WOFF2 files split by Unicode ranges, so that a browser downloads only the slices a drawing uses,
-  fonts.css with their @font-face rules, and OFL.txt, the licence with the fonts' copyright.
+  fonts.css with their @font-face rules, and OFL.txt, the licence with the fonts' copyright. For
+  each language of the interface whose catalog has characters the fonts map, such as Chinese and
+  Japanese, it writes one more small file, ui-<language>-<weight>.woff2, of just the characters of
+  that catalog (and of the languages' names), a family of its own, "RNL UI <language>"; the page
+  puts it before the slices in the fonts of its texts, so that a computer with no font of its own
+  for them downloads some 100 KB for the interface, not the megabytes of the slices that the
+  characters are spread over.
 
 The metrics file, little-endian:
     "RNLM", u16 version (1), u16 number of faces F (Regular, then Bold)
@@ -32,6 +38,7 @@ metrics and web fetch the fonts first when they are missing.
 import argparse
 import hashlib
 import io
+import json
 import shutil
 import struct
 import sys
@@ -167,6 +174,23 @@ def slices(mapped):
     return [(name, cps) for name, cps in out if cps]
 
 
+def ui_languages():
+    """The languages of the viewers' interface that have a catalog: (the code the viewers know it by,
+    such as zh-CN; the characters of its catalog), and the characters of the names of the languages,
+    which every language's Language menu lists."""
+    config = json.loads((ROOT / "i18n" / "languages.json").read_text(encoding="utf-8"))
+    names = set()
+    found = []
+    for entry in config["languages"]:
+        names.update(entry.get("names", {}).get("viewer", entry.get("name", "")))
+        catalog = ROOT / "i18n" / entry["code"] / "viewer.json"
+        if entry["code"] == config["default"] or entry.get("status") != "published" or not catalog.exists():
+            continue
+        values = json.loads(catalog.read_text(encoding="utf-8")).values()
+        found.append((entry.get("codes", {}).get("viewer", entry["code"]), {c for v in values if isinstance(v, str) for c in v}))
+    return found, names
+
+
 def unicode_range(cps):
     """The code points as a CSS unicode-range, in runs."""
     runs = []
@@ -220,6 +244,39 @@ def web(out):
                 '  font-display: swap;\n  src: url("%s") format("woff2");\n  unicode-range: %s;\n}\n'
                 % (FAMILY, weight, file, unicode_range(cps))
             )
+    # the characters of each language's interface: its own family, a small file for the one language the page is in
+    languages, names = ui_languages()
+    mapped_set = set(mapped)
+    css.append("/* the interface's texts, in the languages the fonts have characters for: the page's fonts name\n"
+               "   --ui-cjk, which is the family of the language it is in, then the slices (style.css) */\n")
+    ui = {}
+    for code, chars in languages:
+        cps = sorted(cp for cp in {ord(c) for c in chars | names} if cp > 0x7E and cp in mapped_set)
+        if not any(cp >= 0x2E80 and chr(cp) in chars for cp in cps):  # not for the names of the languages, which every catalog's menu lists
+            continue
+        family = "RNL UI %s" % code
+        for (name, weight, _), path in zip(FACES, paths):
+            options = subset.Options()
+            options.flavor = "woff2"
+            options.layout_features = []
+            options.drop_tables += ["vhea", "vmtx", "VORG"]
+            options.name_IDs = [0, 1, 2, 3, 4, 5, 6, 7, 13, 14]
+            font = TTFont(path, recalcTimestamp=False)
+            subsetter = subset.Subsetter(options)
+            subsetter.populate(unicodes=cps)
+            subsetter.subset(font)
+            data = io.BytesIO()
+            font.save(data)
+            file = "ui-%s-%d.woff2" % (code, weight)
+            (out / file).write_bytes(data.getvalue())
+            sizes[file] = len(data.getvalue())
+            # no unicode-range: it has the characters of the catalog and no other, and what it lacks falls through to the slices
+            css.append(
+                '@font-face {\n  font-family: "%s";\n  font-style: normal;\n  font-weight: %d;\n'
+                '  font-display: swap;\n  src: url("%s") format("woff2");\n}\n' % (family, weight, file)
+            )
+        ui[code] = len(cps)
+        css.append('html:lang(%s) {\n  --ui-cjk: "%s", "%s";\n}\n' % (code, family, FAMILY))
     (out / "fonts.css").write_text("".join(css), encoding="utf-8", newline="\n")
     (out / "OFL.txt").write_text("%s\n\n%s" % (COPYRIGHT, LICENSE.read_text(encoding="utf-8")),
                                  encoding="utf-8", newline="\n")
@@ -231,6 +288,8 @@ def web(out):
     print("%s: %d slices of %d code points in %d weights, %s; fonts.css %s" % (
         out, len(parts), len(mapped), len(FACES), kib(total), kib((out / "fonts.css").stat().st_size)))
     print("the Latin slice: %s" % ", ".join("%s %s" % (f, kib(n)) for f, n in sizes.items() if "-latin." in f))
+    print("the interface's texts: %s" % ", ".join("%s %d characters, %s" % (code, n, ", ".join(
+        "%d: %s" % (w, kib(sizes["ui-%s-%d.woff2" % (code, w)])) for _, w, _ in FACES)) for code, n in ui.items()))
 
 
 def main():

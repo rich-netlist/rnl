@@ -7,7 +7,7 @@ import {createHash} from 'node:crypto';
 const root=process.cwd(), app=path.join(root,'apps/desktop');
 const css=path.join(root,'apps/viewer-ui/style.css');
 const fixed=fs.readFileSync(css,'utf8');
-const baseline=fixed.replaceAll(', "Noto Sans SC"','').replace(/\/\* Web fonts follow the generic families:[\s\S]*?\*\/\r?\n\r?\n/,'');
+const baseline=fixed.replaceAll(', var(--ui-cjk)','').replace(/\/\* Web fonts follow the generic families:[\s\S]*?\*\/\r?\n\r?\n/,'');
 const assets=process.env.FONT_SIZE_ASSETS;
 const output=process.env.FONT_SIZE_OUTPUT;
 if(!assets || !output || baseline===fixed) throw new Error('Pass FONT_SIZE_ASSETS and FONT_SIZE_OUTPUT with the fallback present.');
