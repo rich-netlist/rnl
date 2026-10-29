@@ -190,7 +190,7 @@ button.icon { padding: 0 6px; font-size: 16px; line-height: 20px; color: var(--m
 .usage-group-head { background: var(--bg); border-bottom: 1px solid var(--line); }
 .usage-expand, .usage-name { flex: 1; min-width: 0; text-align: left; display: flex; align-items: center; gap: 6px; overflow-wrap: anywhere; }
 .usage-expand { font-weight: 600; }
-.usage-expand[aria-expanded="true"] .chevron { transform: rotate(90deg); }
+.usage-expand[aria-expanded="false"] .chevron { transform: rotate(-90deg); }
 .usage-row { padding-left: 26px; }
 .usage-row.selected { background: var(--select-line); }
 .usage-name { font-family: ui-monospace, Consolas, monospace, "Noto Sans SC"; }

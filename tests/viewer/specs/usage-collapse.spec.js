@@ -150,3 +150,53 @@ test("the button's texts are in every language of the interface, and follow the 
   await toggle(page).click();
   await expect(toggle(page)).toHaveText(zh("Collapse All"));
 });
+
+/**
+ * Which way a fold triangle points, by its drawn shape and its rotation: the style's `.chevron` is drawn pointing down, a
+ * tree's twisty pointing right, and a state turns it; "down" or "right".
+ */
+const pointing = (locator, drawn) => locator.evaluate((el, drawn) => {
+  const matrix = getComputedStyle(el, drawn === "right" ? "::before" : null).transform;
+  const [a, b] = matrix === "none" ? [1, 0] : matrix.match(/-?[\d.e-]+/g).map(Number);
+  const angle = Math.atan2(b, a); // clockwise, in the page's y-down plane
+  const from = drawn === "down" ? [0, 1] : [1, 0];
+  const x = from[0] * Math.cos(angle) - from[1] * Math.sin(angle);
+  const y = from[0] * Math.sin(angle) + from[1] * Math.cos(angle);
+  return Math.abs(x) > Math.abs(y) ? (x > 0 ? "right" : "left") : (y > 0 ? "down" : "up");
+}, drawn); // (read while a state turns it, a transition has not ended: poll)
+
+test("the fold triangles point right when folded and down when open, in every list that folds", async ({ page, viewer }) => {
+  await viewer.open("04-hierarchy");
+  // the Problems list
+  const problems = page.locator("#problems-head");
+  await expect(problems).toHaveAttribute("aria-expanded", "true");
+  await expect.poll(() => pointing(problems.locator(".chevron"), "down")).toBe("down");
+  await problems.click();
+  await expect(problems).toHaveAttribute("aria-expanded", "false");
+  await expect.poll(() => pointing(problems.locator(".chevron"), "down")).toBe("right");
+  // the Usage panel's groups
+  await usagePanel(page);
+  const chevron = page.locator(".usage-group").first().locator(".chevron");
+  const head = page.locator(".usage-group").first().locator(".usage-expand");
+  await expect(head).toHaveAttribute("aria-expanded", "false");
+  await expect.poll(() => pointing(chevron, "down")).toBe("right");
+  await head.click();
+  await expect(head).toHaveAttribute("aria-expanded", "true");
+  await expect.poll(() => pointing(chevron, "down")).toBe("down");
+  // the Library's groups
+  await page.locator("#tab-files").click();
+  const lib = page.locator('[data-group="builtin"] .lib-toggle');
+  await expect(lib).toHaveAttribute("aria-expanded", "false");
+  await expect.poll(() => pointing(lib.locator(".chevron"), "down")).toBe("right");
+  await lib.click();
+  await expect(lib).toHaveAttribute("aria-expanded", "true");
+  await expect.poll(() => pointing(lib.locator(".chevron"), "down")).toBe("down");
+  // the Hierarchy tree
+  await page.locator("#tab-hierarchy").click();
+  const twisty = page.locator(".tree-row .twisty").first();
+  await expect(twisty).toHaveAttribute("aria-expanded", "true");
+  await expect.poll(() => pointing(twisty, "right")).toBe("down");
+  await twisty.click();
+  await expect(twisty).toHaveAttribute("aria-expanded", "false");
+  await expect.poll(() => pointing(twisty, "right")).toBe("right");
+});
