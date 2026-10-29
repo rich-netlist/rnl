@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import sys
 import time
+import zlib
 
 import variants
 
@@ -78,6 +79,7 @@ def main():
                "rustc": subprocess.check_output(["rustc", "-Vv"], text=True),
                "cargo": subprocess.check_output(["cargo", "-V"], text=True).strip(),
                "node": subprocess.check_output(["node", "--version"], text=True).strip(),
+               "python": platform.python_version(), "zlib": zlib.ZLIB_RUNTIME_VERSION,
                "run_id": os.environ.get("GITHUB_RUN_ID"), "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
                "compression": "gzip level 9, mtime=0; Brotli quality 11", "variants": []}
     save(out/"results.json", receipt)
@@ -217,6 +219,12 @@ def main():
     # Do not make an unsuccessful collection green; rejected ablations are expected.
     if any(r["status"] == "ERROR" for r in receipt["variants"]):
         raise SystemExit("One or more measurements failed; inspect preserved artifacts")
+    exits = list(receipt.get("core_native_tests", []))
+    for row in receipt["variants"]:
+        exits += row.get("core_native_tests", []) + row.get("native_equality", [])
+        exits += [row.get("js_tests_exit", 0)]
+    if any(exits):
+        raise SystemExit("One or more validation suites failed; inspect preserved artifacts")
 
 
 if __name__ == "__main__":

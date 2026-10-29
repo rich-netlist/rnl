@@ -1,4 +1,4 @@
-"""Account for every WASM byte; attribute code through a names-only companion.
+"""Account for every WASM byte; attribute code through an unstripped companion.
 
 LTO inlines across crates, so attribution is by surviving symbol, not perfect
 source ownership. gzip is non-additive: zeroing ranges is a marginal diagnostic,
@@ -101,7 +101,10 @@ def canonical_name(name):
 
 
 def symbol_crate(name):
-    match = re.search(r"\b([A-Za-z_][A-Za-z_0-9]*)::", canonical_name(name))
+    # Only the leading qualified owner is evidence. For <str>::replace::<T>,
+    # 'replace' is a method, and a qualified T would be an argument, not its owner.
+    # Leave primitive/anonymous owners unattributed rather than inventing crates.
+    match = re.match(r"^<*([A-Za-z_][A-Za-z_0-9]*)::", canonical_name(name))
     return match.group(1) if match else "<unattributed>"
 
 

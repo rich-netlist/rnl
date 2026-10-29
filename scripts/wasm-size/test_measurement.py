@@ -28,6 +28,7 @@ class MeasurementTests(unittest.TestCase):
         self.assertEqual(wasm_bytes.canonical_name(name), "<rnl_runtime::interp::Interp>::keyword")
         self.assertEqual(wasm_bytes.symbol_crate("core[0123456789abcdef]::fmt::write"), "core")
         self.assertEqual(wasm_bytes.symbol_crate("function[12]"), "<unattributed>")
+        self.assertEqual(wasm_bytes.symbol_crate("<str>::replace::<alloc::string::String>"), "<unattributed>")
 
     def test_prototype_anchors_and_data_are_lossless(self):
         import json

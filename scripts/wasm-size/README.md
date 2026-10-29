@@ -15,11 +15,11 @@ gh workflow run rust.yml --repo rich-netlist/rnl --ref ext/wasm-size -f wasm_siz
 
 Once registered, `wasm-size.yml` also supports `workflow_dispatch` directly.
 Neither route publishes, tags, deploys, nor commits product changes. Artifact
-names are `wasm-size-{profiles,code,binaryen}-RUN_ID-ATTEMPT`, retained 30 days.
+names are `wasm-size-{profiles,code,binaryen,analysis}-RUN_ID-ATTEMPT`, retained 30 days.
 `results.json` records source/harness/compiler identity and every variant's
 raw/gzip/Brotli bytes, actual-byte equivalence and test results. Per-variant
 files include patches, commands, test logs and paired runtime samples.
-The names-only build provides `breakdown.json` and twiggy reports. Binaries are
+The unstripped build provides `breakdown.json` and twiggy reports. Binaries are
 omitted from the uploaded report; the exact build instructions remain available.
 The compiler is Rust 1.99.1, the version recorded by the baseline commit's actual
 Pages build (run 40889165832); compression uses Python Brotli 1.1.0 and gzip level 9.
@@ -60,7 +60,7 @@ After downloading the three artifacts, a compact, durable result file can be
 created with `python scripts/wasm-size/summarize.py DIR1 DIR2 DIR3 --out RESULTS.json`.
 
 `wasm_bytes.py` attributes function bodies to surviving demangled symbols after
-LTO and accounts for every release section byte. It checks whether the names-only
+LTO and accounts for every release section byte. It checks whether the unstripped
 companion has identical non-custom sections. If Rust's strip option changes code
 layout, it attributes the companion's own code and records its size delta; it
 never transfers names to different release function indices. A selected
