@@ -94,7 +94,7 @@ jobs:
       github.event_name != 'workflow_run' ||
       (github.event.workflow_run.conclusion == 'success' &&
        (github.event.workflow_run.name != 'Viewer release' || github.event.workflow_run.event == 'push'))
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # A build normally takes 5 to 10 minutes; with slow downloads, successful builds have taken up to
     # 70. A hung build fails here instead of running for GitHub's default of six hours.
     timeout-minutes: 90
@@ -248,7 +248,7 @@ jobs:
   deploy:
     if: github.event_name != 'pull_request'
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       pages: write
       id-token: write
