@@ -1,0 +1,185 @@
+"""CI-only, fixed-source WASM size investigation. Artifacts survive partial failures."""
+import argparse
+import gzip
+import hashlib
+import importlib.util
+import json
+import os
+from pathlib import Path
+import platform
+import shutil
+import subprocess
+import sys
+import time
+
+import variants
+
+HERE = Path(__file__).resolve().parent
+BASE = "9ee4fe83d7401239472b4b9d5a568b3bb2d2422e"
+
+
+def save(path, value):
+    path.write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+def command(args, cwd, log, env=None, required=True, timeout=900):
+    with log.open("w", encoding="utf-8") as f:
+        f.write(json.dumps([str(a) for a in args]) + "\n")
+        f.flush()
+        try:
+            p = subprocess.run([str(a) for a in args], cwd=cwd, env=env, stdout=f,
+                               stderr=subprocess.STDOUT, timeout=timeout)
+            code = p.returncode
+        except subprocess.TimeoutExpired:
+            code = 124
+            f.write("\nTIMEOUT\n")
+    if code and required:
+        raise RuntimeError(f"Command failed ({code}): see {log}")
+    return code
+
+
+def size(path):
+    import brotli
+    data = path.read_bytes()
+    return {"raw": len(data), "gzip": len(gzip.compress(data, compresslevel=9, mtime=0)),
+            "brotli": len(brotli.compress(data, quality=11)), "sha256": hashlib.sha256(data).hexdigest()}
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--source", type=Path, required=True)
+    parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--group", choices=("profiles", "code", "binaryen"), required=True)
+    args = parser.parse_args()
+    if os.environ.get("GITHUB_ACTIONS") != "true" or os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted":
+        raise SystemExit("Builds and measurement are restricted to GitHub-hosted CI runners")
+    root, out = args.source.resolve(), args.out.resolve()
+    if root == HERE.parents[1] or out == root or root in out.parents:
+        raise SystemExit("Use separate disposable source and artifact directories")
+    out.mkdir(parents=True, exist_ok=True)
+    actual = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
+    if actual != BASE or subprocess.check_output(["git", "status", "--porcelain"], cwd=root):
+        raise SystemExit("Source must be a clean checkout of the frozen public baseline")
+    tracked = {p: (root/p).read_bytes() for p in subprocess.check_output(["git", "ls-files"], cwd=root, text=True).splitlines()}
+    receipt = {"source_sha": actual, "harness_sha": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=HERE, text=True).strip(),
+               "group": args.group, "platform": platform.platform(), "cpu": platform.processor(),
+               "rustc": subprocess.check_output(["rustc", "-Vv"], text=True),
+               "cargo": subprocess.check_output(["cargo", "-V"], text=True).strip(),
+               "node": subprocess.check_output(["node", "--version"], text=True).strip(),
+               "run_id": os.environ.get("GITHUB_RUN_ID"), "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
+               "compression": "gzip level 9, mtime=0; Brotli quality 11", "variants": []}
+    save(out/"results.json", receipt)
+    command(["python", "scripts/packages.py", "download"], root, out/"packages.log")
+    command(["cargo", "tree", "--locked", "--target", "wasm32-unknown-unknown", "-p", "rnl-runtime-wasm", "-e", "normal"], root, out/"dependency-tree.txt")
+    command(["rustc", "--print", "cfg", "--target", "wasm32-unknown-unknown"], root, out/"target-cfg.txt")
+    # Reuse the repository's deterministic performance-input generator, without solving.
+    spec = importlib.util.spec_from_file_location("performance_inputs", root/"scripts/solver-performance/prepare_inputs.py")
+    generator = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(generator)
+    perf = []
+    for family, n in (("chain", 1024), ("diffmirror", 128)):
+        entry = f"/size/{family}-{n}.sp"
+        data = generator.generate(family, n)
+        perf.append({"name": f"{family}-{n}", "input_sha256": hashlib.sha256(data).hexdigest(),
+                     "request": {"entry": entry, "files": {entry: data.decode()}, "primitives": True}})
+    save(out/"performance-inputs.json", perf)
+    native = root/"target/debug/rnl"
+    if args.group == "profiles":
+        command(["cargo", "test", "--workspace", "--locked"], root, out/"workspace-tests.log", timeout=1200)
+        command(["cargo", "build", "--locked", "-p", "rnl-cli"], root, out/"native-build.log")
+        # Existing harness checks are run as checks, never mislabelled as solver timing.
+        for test in ("test_benchmark.py", "test_work.py"):
+            command(["python", "scripts/solver-performance/"+test], root, out/test.replace(".py", ".log"))
+    names = [n for n, _ in variants.PROFILES] if args.group == "profiles" else variants.CODE if args.group == "code" else ["baseline", "opt-z"]
+    profile_map = dict(variants.PROFILES)
+    for name in names:
+        print(f"Measuring {args.group}/{name}", flush=True)
+        dest = out/name
+        dest.mkdir(exist_ok=True)
+        row = {"name": name, "ablative": name in variants.ABLATIONS}
+        receipt["variants"].append(row)
+        try:
+            overrides = variants.apply(root, name)
+            overrides.update(profile_map.get(name, {}))
+            env = dict(os.environ)
+            env.update({"CARGO_PROFILE_WASM_"+k: v for k, v in overrides.items()})
+            row["profile_overrides"] = overrides
+            if name in ("compressed-packages", "combined", "combined-value"):
+                # Lock only the declared prototype dependency; the baseline lock is restored afterwards.
+                command(["cargo", "update", "--workspace"], root, dest/"prototype-lock.log", env)
+                shutil.copy2(root/"Cargo.lock", dest/"Cargo.lock")
+            patch = subprocess.check_output(["git", "diff", "--binary"], cwd=root)
+            (dest/"prototype.patch").write_bytes(patch)
+            for generated in ("size-bundle.rs", "size-bundle.zlib"):
+                p = root/"crates/rnl-view/src"/generated
+                if p.exists():
+                    shutil.copy2(p, dest/generated)
+            started = time.monotonic()
+            command(["node", "bindings/runtime-wasm/build.mjs", "--out", dest], root, dest/"build.log", env)
+            row["build_seconds"] = time.monotonic()-started
+            wasm = dest/"rnl_runtime_wasm.wasm"
+            row.update(size(wasm))
+            if name == "baseline":
+                command(["node", HERE/"verify.mjs", "corpus", root, wasm, wasm, out/"corpus.json"], root, dest/"corpus.log")
+            command(["node", HERE/"verify.mjs", "check", root, out, wasm, dest/"equality.json"], root, dest/"equality.log")
+            equality = json.loads((dest/"equality.json").read_text())
+            row["equality"] = {k: equality[k] for k in ("checked", "differing", "byte_identical")}
+            if equality["byte_identical"]:
+                command(["node", HERE/"verify.mjs", "benchmark", root, out, wasm, dest/"timings.json"], root, dest/"timings.log")
+                row["js_tests_exit"] = command(["node", "bindings/runtime-wasm/tests/core.mjs", dest], root, dest/"core-tests.log", required=False)
+            if args.group == "profiles" and name in ("baseline", "opt-z"):
+                row["native_equality"] = []
+                for extra in ([], ["--view", "--primitives", "--request", '{"primitives":true}'], ["--snapshot"]):
+                    code = command(["node", "bindings/runtime-wasm/tests/equality.mjs", "--rnl", native, "--dist", dest, *extra], root, dest/f"native-equality-{len(row['native_equality'])}.log", required=False)
+                    row["native_equality"].append(code)
+            if args.group == "code" and name in ("compact-words", "compressed-packages", "json-value-output", "combined", "combined-value") and equality["byte_identical"]:
+                row["workspace_tests_exit"] = command(["cargo", "test", "--workspace", "--locked"], root, dest/"workspace-tests.log", env, required=False, timeout=1200)
+            if name == "symbols":
+                spec = importlib.util.spec_from_file_location("wasm_inspect", HERE/"wasm_bytes.py")
+                audit_module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(audit_module)
+                save(dest/"breakdown.json", audit_module.audit(out/"baseline/rnl_runtime_wasm.wasm", wasm, root))
+                for tool, extra in (("top", ["-n", "100"]), ("dominators", []), ("monos", [])):
+                    row["twiggy_"+tool] = command(["twiggy", tool, *extra, wasm], root, dest/f"twiggy-{tool}.txt", required=False)
+            row["status"] = "MEASURED"
+        except Exception as error:
+            row["status"] = "ERROR"
+            row["error"] = str(error)
+            print(str(error), flush=True)
+        finally:
+            for path, content in tracked.items():
+                p = root/path
+                if p.read_bytes() != content:
+                    p.write_bytes(content)
+            for generated in ("size-bundle.rs", "size-bundle.zlib"):
+                (root/"crates/rnl-view/src"/generated).unlink(missing_ok=True)
+            save(out/"results.json", receipt)
+    if args.group == "binaryen":
+        command(["wasm-opt", "--version"], root, out/"binaryen-version.txt")
+        for base in ("baseline", "opt-z"):
+            for suffix, flags in (("Os", ["-Os"]), ("Oz", ["-Oz"]), ("Oz-no-inline", ["-Oz", "--inlining-optimizing", "--pass-arg=inline-functions-with-loops@0", "--pass-arg=always-inline-max-function-size@0", "--pass-arg=one-caller-inline-max-function-size@0", "--pass-arg=flexible-inline-max-function-size@0"])):
+                name = base+"-"+suffix
+                dest = out/name
+                dest.mkdir(exist_ok=True)
+                row = {"name": name, "wasm_opt_flags": flags, "ablative": False}
+                receipt["variants"].append(row)
+                try:
+                    wasm = dest/"rnl_runtime_wasm.wasm"
+                    command(["wasm-opt", out/base/"rnl_runtime_wasm.wasm", *flags, "--all-features", "-o", wasm], root, dest/"build.log")
+                    row.update(size(wasm))
+                    command(["node", HERE/"verify.mjs", "check", root, out, wasm, dest/"equality.json"], root, dest/"equality.log")
+                    equality = json.loads((dest/"equality.json").read_text())
+                    row["equality"] = {k: equality[k] for k in ("checked", "differing", "byte_identical")}
+                    if equality["byte_identical"]:
+                        command(["node", HERE/"verify.mjs", "benchmark", root, out, wasm, dest/"timings.json"], root, dest/"timings.log")
+                    row["status"] = "MEASURED"
+                except Exception as error:
+                    row.update(status="ERROR", error=str(error))
+                save(out/"results.json", receipt)
+    # Do not make an unsuccessful collection green; rejected ablations are expected.
+    if any(r["status"] == "ERROR" for r in receipt["variants"]):
+        raise SystemExit("One or more measurements failed; inspect preserved artifacts")
+
+
+if __name__ == "__main__":
+    main()

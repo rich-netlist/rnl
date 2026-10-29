@@ -45,6 +45,10 @@ on:
       - ".github/workflows/rust.yml"
   workflow_dispatch:
     inputs:
+      wasm_size:
+        description: Run the temporary fixed-source WASM size investigation
+        type: boolean
+        default: false
       solver_performance:
         description: Collect optimized solver measurements instead of the standard test jobs
         type: boolean
@@ -78,8 +82,12 @@ env:
   CARGO_BUILD_JOBS: 4
 
 jobs:
+  wasm-size:
+    if: github.event_name == 'workflow_dispatch' && inputs.wasm_size && !inputs.solver_performance && !inputs.solver_profile_work && !inputs.solver_build_only
+    uses: ./.github/workflows/wasm-size.yml
+
   test:
-    if: github.event_name != 'workflow_dispatch' || (!inputs.solver_performance && !inputs.solver_profile_work && !inputs.solver_build_only)
+    if: github.event_name != 'workflow_dispatch' || (!inputs.wasm_size && !inputs.solver_performance && !inputs.solver_profile_work && !inputs.solver_build_only)
     strategy:
       fail-fast: false
       matrix:
@@ -112,7 +120,7 @@ jobs:
           fi
 
   wasm:
-    if: github.event_name != 'workflow_dispatch' || (!inputs.solver_performance && !inputs.solver_profile_work && !inputs.solver_build_only)
+    if: github.event_name != 'workflow_dispatch' || (!inputs.wasm_size && !inputs.solver_performance && !inputs.solver_profile_work && !inputs.solver_build_only)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -141,7 +149,7 @@ jobs:
           node bindings/runtime-wasm/tests/equality.mjs --rnl target/debug/rnl --snapshot
 
   fonts:
-    if: github.event_name != 'workflow_dispatch' || (!inputs.solver_performance && !inputs.solver_profile_work && !inputs.solver_build_only)
+    if: github.event_name != 'workflow_dispatch' || (!inputs.wasm_size && !inputs.solver_performance && !inputs.solver_profile_work && !inputs.solver_build_only)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -158,7 +166,7 @@ jobs:
         run: python scripts/fonts.py metrics --check
 
   performance-harness:
-    if: github.event_name != 'workflow_dispatch' || (!inputs.solver_performance && !inputs.solver_profile_work && !inputs.solver_build_only)
+    if: github.event_name != 'workflow_dispatch' || (!inputs.wasm_size && !inputs.solver_performance && !inputs.solver_profile_work && !inputs.solver_build_only)
     strategy:
       fail-fast: false
       matrix:

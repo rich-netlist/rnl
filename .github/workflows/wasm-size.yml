@@ -1,0 +1,71 @@
+name: WASM size investigation (temporary)
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wasm-size-investigation
+  cancel-in-progress: false
+
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [profiles, code, binaryen]
+    env:
+      CARGO_BUILD_JOBS: "4"
+      CARGO_TERM_COLOR: never
+      RUSTUP_TOOLCHAIN: "1.97.1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: harness
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: rich-netlist/rnl
+          ref: 9ee4fe83d7401239472b4b9d5a568b3bb2d2422e
+          path: source
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+      - name: Install the fixed compiler and CI-only analysis tools
+        run: |
+          rustup toolchain install 1.97.1 --profile minimal --target wasm32-unknown-unknown
+          python -m pip install Brotli==1.1.0
+          if [ '${{ matrix.group }}' = profiles ]; then
+            cargo install twiggy --version 0.8.0 --locked
+            cargo install rustfilt --version 0.2.1 --locked
+          fi
+          if [ '${{ matrix.group }}' = binaryen ]; then
+            sudo apt-get update -qq
+            sudo apt-get install -y binaryen
+          fi
+      - name: Measure fixed source with isolated disposable prototypes
+        run: |
+          python harness/scripts/wasm-size/test_measurement.py
+          node --check harness/scripts/wasm-size/verify.mjs
+          python harness/scripts/wasm-size/run.py --source source --out '${{ runner.temp }}/wasm-size-${{ matrix.group }}' --group '${{ matrix.group }}'
+      - name: Keep the evidence even if a variant fails
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: wasm-size-${{ matrix.group }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/wasm-size-${{ matrix.group }}/
+            !${{ runner.temp }}/wasm-size-${{ matrix.group }}/**/*.wasm
+            !${{ runner.temp }}/wasm-size-${{ matrix.group }}/**/*.js
+            !${{ runner.temp }}/wasm-size-${{ matrix.group }}/**/*.d.ts
+          if-no-files-found: warn
+          retention-days: 30
