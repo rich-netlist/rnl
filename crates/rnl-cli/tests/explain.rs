@@ -3,6 +3,7 @@
 
 use std::path::Path;
 use std::process::Command;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use rnl_runtime::source::MemoryProvider;
 use rnl_view::{BuildOptions, Document, MemberOf, Parts, RoleOf, RuleAt};
@@ -155,11 +156,19 @@ fn rnl(args: &[&str]) -> (i32, String, String) {
     (out.status.code().unwrap_or(-1), text(&out.stdout), text(&out.stderr))
 }
 
-fn netlist() -> String {
-    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("rnl-explain");
+/// `text` written as `name` in a directory of its own, so that tests running at once do not read
+/// a file another is writing.
+fn written(name: &str, text: &str) -> String {
+    static NEXT: AtomicUsize = AtomicUsize::new(0);
+    let n = NEXT.fetch_add(1, Ordering::Relaxed);
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("rnl-explain-{n}"));
     std::fs::create_dir_all(&dir).unwrap();
-    std::fs::write(dir.join("explain.sp"), NETLIST).unwrap();
-    rnl_cli::path_str(&dir.join("explain.sp"))
+    std::fs::write(dir.join(name), text).unwrap();
+    rnl_cli::path_str(&dir.join(name))
+}
+
+fn netlist() -> String {
+    written("explain.sp", NETLIST)
 }
 
 #[test]
@@ -260,10 +269,7 @@ R3 c d 1k
 
 #[test]
 fn explain_indents_a_deep_chain_and_its_forks() {
-    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("rnl-explain");
-    std::fs::create_dir_all(&dir).unwrap();
-    std::fs::write(dir.join("deep.sp"), DEEP).unwrap();
-    let (code, out, err) = rnl(&["explain", &rnl_cli::path_str(&dir.join("deep.sp")), "#R2"]);
+    let (code, out, err) = rnl(&["explain", &written("deep.sp", DEEP), "#R2"]);
     assert_eq!((code, err.as_str()), (0, ""));
     assert_eq!(
         out,
@@ -460,10 +466,7 @@ fn the_snapshot_lists_the_groups() {
 
 #[test]
 fn explain_says_the_groups_an_object_is_in() {
-    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("rnl-explain");
-    std::fs::create_dir_all(&dir).unwrap();
-    std::fs::write(dir.join("groups.sp"), GROUPS).unwrap();
-    let file = rnl_cli::path_str(&dir.join("groups.sp"));
+    let file = written("groups.sp", GROUPS);
     let (code, out, err) = rnl(&["explain", &file, "#R1"]);
     assert_eq!((code, err.as_str()), (0, ""));
     assert_eq!(
