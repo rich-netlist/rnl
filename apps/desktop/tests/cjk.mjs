@@ -26,7 +26,7 @@ export async function cjkEvidence() {
     const reference = raster(prefix + '"Noto Sans SC"');
     const missing = raster(prefix + '"RNL nonexistent font", monospace');
     const latin = raster(prefix + s.fontFamily, '0iMW.()');
-    const oldLatin = raster(prefix + s.fontFamily.replace(/,\s*["']?Noto Sans SC["']?/g,''), '0iMW.()');
+    const oldLatin = raster(prefix + s.fontFamily.replace(/,\s*["']?(?:Noto Sans SC|RNL UI [^"',]*)["']?/g,''), '0iMW.()');
     let ink=0, referenceDifference=0, missingDifference=0, latinDifference=0;
     for (let i=3; i<actual.length; i+=4) {
       if (actual[i]) ink++;

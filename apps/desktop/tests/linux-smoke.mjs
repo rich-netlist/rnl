@@ -161,9 +161,9 @@ try {
   // binary, sample, rendering core and system fonts. This must fail on the fontless runner.
   await execute(`window.cjkStyles = [];
     for (const sheet of document.styleSheets) for (const rule of sheet.cssRules) {
-      if (rule.style?.fontFamily.includes('Noto Sans SC')) {
+      if (rule.style?.fontFamily.includes('var(--ui-cjk)')) {
         window.cjkStyles.push([rule,rule.style.fontFamily]);
-        rule.style.fontFamily = rule.style.fontFamily.replace(/,\\s*["']?Noto Sans SC["']?/g,'');
+        rule.style.fontFamily = rule.style.fontFamily.replace(/,\\s*var\\(--ui-cjk\\)/g,'');
       }
     }`);
   const before = await execute(`return (${cjkEvidence.toString()})();`);
