@@ -46,11 +46,22 @@ export function uiCatalog(root, code) {
   return Object.fromEntries(Object.entries(catalog).filter(([, value]) => typeof value === "string"));
 }
 
-/** Write locales/languages.json and locales/<code>.json, as the page reads them, into `dir`. */
+/**
+ * The English texts that some catalog of the viewers translates, sorted: what the page binds its static texts to, so
+ * that it need read only the catalog of the language it starts in, not every one (i18n.js).
+ */
+export function uiKeys(root) {
+  const keys = new Set();
+  for (const { code } of uiLanguages(root).slice(1)) for (const key of Object.keys(uiCatalog(root, code) ?? {})) keys.add(key);
+  return [...keys].sort();
+}
+
+/** Write locales/languages.json, locales/keys.json and locales/<code>.json, as the page reads them, into `dir`. */
 export function writeLocales(root, dir) {
   mkdirSync(dir, { recursive: true });
   const languages = uiLanguages(root);
   writeFileSync(join(dir, "languages.json"), JSON.stringify(languages, null, 1) + "\n");
+  writeFileSync(join(dir, "keys.json"), JSON.stringify(uiKeys(root)) + "\n");
   for (const { code } of languages.slice(1)) writeFileSync(join(dir, `${code}.json`), JSON.stringify(uiCatalog(root, code), null, 1) + "\n");
   return languages;
 }

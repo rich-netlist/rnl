@@ -6,7 +6,9 @@
 let language = "en";
 // the languages offered, English first: { code, lang, name, english, matches } as viewer-locales.mjs gives them
 let languages = [{ code: "en", lang: "en", name: "English", english: "English", matches: ["en"] }];
-const catalogs = {}; // the catalog of each language but English, by its code
+const catalogs = {}; // the catalogs read so far, by the code of the language: those of the languages but English that the page has had to show
+const reading = new Map(); // the catalogs being read, by code
+let known = null; // the English texts that some catalog translates, as the page's static texts are bound to them; null: not given, the catalogs read say
 let host = null;
 let persist = null;
 let switching = Promise.resolve();
@@ -65,7 +67,18 @@ export function languageFor(wanted = "") {
   return found;
 }
 /** Whether a text is in a catalog, and so shown translated in some language. */
-const translatable = (key) => Object.values(catalogs).some((catalog) => typeof catalog[key] === "string");
+const translatable = (key) => known ? known.has(key) : Object.values(catalogs).some((catalog) => typeof catalog[key] === "string");
+
+/** The catalog of a language but English, read the first time it is wanted, from the shell or from locales/. */
+function catalogOf(code) {
+  if (catalogs[code]) return Promise.resolve(catalogs[code]);
+  if (!reading.has(code)) {
+    reading.set(code, Promise.resolve(host.uiCatalog ? host.uiCatalog(code) : locales(`${code}.json`))
+      .then((catalog) => (catalogs[code] = catalog))
+      .finally(() => reading.delete(code)));
+  }
+  return reading.get(code);
+}
 
 function textNode(value) {
   const node = document.createTextNode(String(value ?? ""));
@@ -145,11 +158,19 @@ export async function startI18n(shell, saved, save) {
     console.warn(`The languages of the interface could not be read: ${error.message || error}`);
     unavailable = "The interface's languages could not be loaded; it is shown in English.";
   }
-  // every catalog, as the static HTML is bound to the texts that any of them translates
+  // The catalog of the language the page starts in, and no other: a visit in English reads none, one in Chinese one.
+  // The static HTML is bound to the texts that some catalog translates, which locales/keys.json lists; a shell that
+  // has not that list, the desktop app's, reads every catalog, as it has them at hand, and the texts are theirs.
+  try {
+    known = new Set(await (host.uiKeys ? host.uiKeys() : locales("keys.json")));
+  } catch {
+    known = null;
+  }
+  const wanted = languages.some((l) => l.code === saved) ? saved : preferredLanguage();
   const failed = [];
-  await Promise.all(languages.slice(1).map(async (l) => {
+  await Promise.all(languages.slice(1).filter((l) => !known || l.code === wanted).map(async (l) => {
     try {
-      catalogs[l.code] = await (host.uiCatalog ? host.uiCatalog(l.code) : locales(`${l.code}.json`));
+      await catalogOf(l.code);
     } catch (error) {
       console.warn(`The interface's catalog of ${l.code} could not be read: ${error.message || error}`);
       failed.push(l);
@@ -171,6 +192,8 @@ export async function startI18n(shell, saved, save) {
 export function setLanguage(next) {
   if (!languages.some((l) => l.code === next)) return Promise.reject(new Error("Unsupported UI language"));
   const change = async () => {
+    // the catalog of a language is read when it is first chosen
+    if (next !== languages[0].code) await catalogOf(next);
     await host?.setLanguage?.(next);
     language = next;
     refresh();

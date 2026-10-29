@@ -13,7 +13,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildRnl, root, writeFixtures } from "./fixtures.js";
-import { uiCatalog, uiLanguages } from "../../scripts/i18n/viewer-locales.mjs";
+import { uiCatalog, uiKeys, uiLanguages } from "../../scripts/i18n/viewer-locales.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const page = path.join(root, "apps", "viewer-ui");
@@ -54,7 +54,7 @@ export function serve(fixtures, port = 0) {
     // the languages of the interface and their catalogs, from i18n/, as the web viewer's build writes them
     const locale = /^\/locales\/(.+)\.json$/.exec(pathname);
     if (locale && req.method === "GET") {
-      const body = locale[1] === "languages" ? uiLanguages(root) : uiCatalog(root, locale[1]);
+      const body = locale[1] === "languages" ? uiLanguages(root) : locale[1] === "keys" ? uiKeys(root) : uiCatalog(root, locale[1]);
       res.writeHead(body ? 200 : 404, { "content-type": TYPES[".json"], "cache-control": "no-store" });
       res.end(body ? JSON.stringify(body) : "not found");
       return;
