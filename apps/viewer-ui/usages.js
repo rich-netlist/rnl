@@ -40,14 +40,31 @@ export const isGroup = (u) => u.kind === "group";
 const typeOf = (u) => (isGroup(u) ? GROUP_TYPE : u.definition);
 /** What the drawing and the details call it: `$DIFFERENTIAL_PAIR: %dp1`, `@GROUP: %core`. */
 const labelOf = (u) => `${typeOf(u)}: ${u.id}`;
+/** A group may be turned off by PRIORITY (14.8), which its entry says in `state`; it is never failed or overridden. */
+const stateOf = (u) => u.state ?? "in-effect";
+const GROUP_STEP = 18; // screen pixels: how far a group's frame goes out beyond the groups within it, for each level, a label's height
 /**
- * The state of a usage or group: the entry's `state` (the core gives it), else, from an older core, the one of the
- * memberships of its first member. A group may be turned off by PRIORITY (14.8), and is never failed or overridden.
+ * How many levels of groups are within each group of the level shown, by its object: 0 for one with none within it.
+ * The frame of a group is drawn that many steps outside its extent, so that nested frames, which the core gives the
+ * same edge when their members share one, and their labels, do not lie on one another.
  */
-function stateOf(u) {
-  if (u.state) return u.state;
-  const member = u.roles.flatMap((r) => r.objects)[0];
-  return doc.objects[member]?.usages?.find((e) => e.usage === u.object)?.state ?? "in-effect";
+function groupLevels() {
+  const children = new Map(usages().filter(isGroup).map((g) => [g.object, []]));
+  for (const g of children.keys()) {
+    for (const e of doc.objects[g]?.usages ?? []) if (e.kind === "group" && e.roles.length === 0) children.get(e.usage)?.push(g);
+  }
+  const levels = new Map();
+  const levelOf = (g, seen = new Set()) => {
+    if (levels.has(g)) return levels.get(g);
+    if (seen.has(g)) return 0; // a chain that loops is cut
+    seen.add(g);
+    const level = Math.max(-1, ...children.get(g).map((c) => levelOf(c, seen))) + 1;
+    seen.delete(g);
+    levels.set(g, level);
+    return level;
+  };
+  for (const g of children.keys()) levelOf(g);
+  return levels;
 }
 /** A level shown, or another document, starts with every group folded. */
 function newScope() {
@@ -57,7 +74,7 @@ function newScope() {
   expanded.clear();
   rowLimits.clear();
 }
-const chosen = () => selectedAsUsage ? usages().find(u => u.object === selected) : null;
+const chosen =() => selectedAsUsage ? usages().find(u => u.object === selected) : null;
 const visible = u => shown && setting(u).visible;
 /** Hidden virtual symbols still select as ordinary parts when picked on the drawing. */
 export function usageSelection(object, from) {
@@ -397,6 +414,7 @@ export function paintUsages(svg, view, groups) {
     drawing = svg; layerDoc = doc; layerLevel = current; layerRevision = revision; layerSelected = focus;
     mute(groups, u ? focusSet(u) : null);
     frames = [];
+    const levels = groupLevels();
     for (const entry of [...usages()].sort((a, b) => Number(a.object === focus) - Number(b.object === focus))) {
       const active = entry.object === focus;
       if (!active && !visible(entry)) continue;
@@ -417,7 +435,7 @@ export function paintUsages(svg, view, groups) {
         anchor: r.anchor,
         ...badge(r.name, color, group, "usage-role-label", r.width),
       })) : [];
-      frames.push({ entry, bounds, rect, fill, title, roles, active, local });
+      frames.push({ entry, bounds, rect, fill, title, roles, active, local, pad: (levels.get(entry.object) ?? 0) * GROUP_STEP });
     }
     append(svg, currentLayer);
   }
@@ -427,12 +445,13 @@ export function paintUsages(svg, view, groups) {
   for (const f of frames) {
     const [x, y] = project(f.bounds[0], f.bounds[1]);
     const [right, bottom] = project(f.bounds[2], f.bounds[3]);
-    const b = [x, y, right, bottom];
+    const b = [x - f.pad, y - f.pad, right + f.pad, bottom + f.pad];
     f.screen = b;
     for (const [attr, value] of Object.entries({ x: b[0], y: b[1], width: b[2] - b[0], height: b[3] - b[1] })) {
       f.rect.setAttribute(attr, value); f.fill.setAttribute(attr, value);
     }
-    placeBadge(f.title, ...project(...f.entry.frame.title), false);
+    const [titleX, titleY] = project(...f.entry.frame.title);
+    placeBadge(f.title, titleX - f.pad, titleY - f.pad, false);
     const titleVisible = f.active || f.title.width + 16 <= b[2] - b[0];
     f.title.g.setAttribute("display", titleVisible ? "inline" : "none");
     if (!titleVisible) f.title.screen = null;

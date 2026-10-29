@@ -71,6 +71,25 @@ test("a group is drawn as a frame titled @GROUP: its id, and selecting one light
   await expect(page.locator("#selection")).toContainText("group");
 });
 
+test("the frames of nested groups are set out a level each, so that their labels do not lie on one another", async ({ page }) => {
+  const box = (id) => page.evaluate((id) => {
+    const object = window.viewer.doc.levels[0].usages.find((u) => u.id === id).object;
+    const frame = document.querySelector(`#canvas .usage-frame[data-usage="${object}"]`);
+    const rect = frame.querySelector("rect").getBoundingClientRect();
+    const title = frame.querySelector(".usage-title").getBoundingClientRect();
+    return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, titleTop: title.top, titleLeft: title.left };
+  }, id);
+  const [core, amp, inp] = [await box("%core"), await box("%amp"), await box("%inp")];
+  // %inp is within %amp, which is within %core: each is outside the one within it, by a label's height
+  for (const [outer, inner] of [[core, amp], [amp, inp]]) {
+    expect(outer.left).toBeLessThan(inner.left);
+    expect(outer.top).toBeLessThan(inner.top);
+    expect(outer.right).toBeGreaterThan(inner.right);
+    expect(outer.bottom).toBeGreaterThan(inner.bottom);
+    expect(inner.titleTop - outer.titleTop).toBeGreaterThanOrEqual(17);
+  }
+});
+
 test("the usages of an instance say which groups it is a member of, and which groups those are within, indented", async ({ page }) => {
   await selectObject(page, "instance", "M1");
   const groups = page.locator('#usage-detail .usage-membership-row[data-kind="group"]');
