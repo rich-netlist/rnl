@@ -22,6 +22,13 @@ class MeasurementTests(unittest.TestCase):
     def test_uleb(self):
         self.assertEqual(wasm_bytes.uleb(b"\xe5\x8e\x26", 0), (624485, 3))
 
+    def test_v0_symbol_crate_disambiguators(self):
+        name = "<rnl_runtime[91ba1dec054bb563]::interp::Interp>::keyword"
+        self.assertEqual(wasm_bytes.symbol_crate(name), "rnl_runtime")
+        self.assertEqual(wasm_bytes.canonical_name(name), "<rnl_runtime::interp::Interp>::keyword")
+        self.assertEqual(wasm_bytes.symbol_crate("core[0123456789abcdef]::fmt::write"), "core")
+        self.assertEqual(wasm_bytes.symbol_crate("function[12]"), "<unattributed>")
+
     def test_prototype_anchors_and_data_are_lossless(self):
         import json
         import shutil

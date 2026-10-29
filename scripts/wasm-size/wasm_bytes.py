@@ -94,6 +94,17 @@ def gz(data):
     return len(gzip.compress(data, compresslevel=9, mtime=0))
 
 
+def canonical_name(name):
+    # rustfilt exposes v0 crate disambiguators as crate[0123456789abcdef].
+    # They are identity metadata, not a nested module or part of a crate name.
+    return re.sub(r"\[[0-9a-f]{16}\]", "", name)
+
+
+def symbol_crate(name):
+    match = re.search(r"\b([A-Za-z_][A-Za-z_0-9]*)::", canonical_name(name))
+    return match.group(1) if match else "<unattributed>"
+
+
 def audit(baseline, companion, root):
     release, named = baseline.read_bytes(), companion.read_bytes()
     identical = noncustom(release) == noncustom(named)
@@ -109,9 +120,8 @@ def audit(baseline, companion, root):
     symbols = dict(zip(indices, demangled))
     groups, entries = defaultdict(list), []
     for index, start, end in functions(data):
-        name = symbols.get(index, f"function[{index}]")
-        match = re.search(r"\b([A-Za-z_][A-Za-z_0-9]*)::", name)
-        crate = match.group(1) if match else "<unattributed>"
+        name = canonical_name(symbols.get(index, f"function[{index}]"))
+        crate = symbol_crate(name)
         entry = {"index": index, "name": name, "crate": crate, "start": start,
                  "end": end, "raw": end-start, "standalone_gzip": gz(data[start:end])}
         entries.append(entry)
