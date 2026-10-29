@@ -15,7 +15,7 @@ jobs:
   publish:
     needs: build
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/core-v')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       id-token: write
@@ -43,7 +43,7 @@ jobs:
         run: npm publish "./assets/rich-netlist-runtime-$VERSION.tgz" --access public --tag "$DIST_TAG" --provenance
   smoke:
     needs: [build, publish]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Download and verify the smoke test's locked public packages
@@ -70,7 +70,7 @@ jobs:
           node smoke.mjs "@rich-netlist/runtime@$VERSION"
   release:
     needs: [build, publish, smoke]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
