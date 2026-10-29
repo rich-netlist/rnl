@@ -22,7 +22,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: wasm-size-investigation
+  group: wasm-size-investigation-${{ github.workflow_ref }}
   cancel-in-progress: false
 
 jobs:
@@ -36,7 +36,7 @@ jobs:
     env:
       CARGO_BUILD_JOBS: "4"
       CARGO_TERM_COLOR: never
-      RUSTUP_TOOLCHAIN: "1.97.1"
+      RUSTUP_TOOLCHAIN: "1.99.1"
       SIZE_VARIANTS: ${{ inputs.variants }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -57,7 +57,7 @@ jobs:
           node-version: "22"
       - name: Install the fixed compiler and CI-only analysis tools
         run: |
-          rustup toolchain install 1.97.1 --profile minimal --target wasm32-unknown-unknown
+          rustup toolchain install 1.99.1 --profile minimal --target wasm32-unknown-unknown
           python -m pip install Brotli==1.1.0
           if [ '${{ matrix.group }}' = profiles ]; then
             cargo install twiggy --version 0.8.0 --locked

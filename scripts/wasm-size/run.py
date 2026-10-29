@@ -183,6 +183,7 @@ def main():
             save(out/"results.json", receipt)
     if args.group == "binaryen":
         command(["wasm-opt", "--version"], root, out/"binaryen-version.txt")
+        command(["cargo", "build", "--locked", "-p", "rnl-cli"], root, out/"native-build.log")
         for base in ("baseline", "opt-z"):
             for suffix, flags in (("Os", ["-Os"]), ("Oz", ["-Oz"]), ("Oz-no-inline", ["-Oz", "--always-inline-max-function-size", "0", "--one-caller-inline-max-function-size", "0", "--flexible-inline-max-function-size", "0"])):
                 name = base+"-"+suffix
@@ -200,6 +201,15 @@ def main():
                     row["equality"] = {k: equality[k] for k in ("checked", "differing", "byte_identical")}
                     if equality["byte_identical"]:
                         command(["node", HERE/"verify.mjs", "benchmark", root, out, wasm, dest/"timings.json"], root, dest/"timings.log")
+                        for glue in (out/base).iterdir():
+                            if glue.suffix in (".js", ".ts") or glue.name == "package.json":
+                                shutil.copy2(glue, dest/glue.name)
+                        row["js_tests_exit"] = command(["node", "bindings/runtime-wasm/tests/core.mjs", dest], root, dest/"core-tests.log", required=False)
+                        if suffix == "Oz-no-inline":
+                            row["native_equality"] = []
+                            for extra in ([], ["--view", "--primitives", "--request", '{"primitives":true}'], ["--snapshot"]):
+                                code = command(["node", "bindings/runtime-wasm/tests/equality.mjs", "--rnl", native, "--dist", dest, *extra], root, dest/f"native-equality-{len(row['native_equality'])}.log", required=False)
+                                row["native_equality"].append(code)
                     row["status"] = "MEASURED"
                 except Exception as error:
                     row.update(status="ERROR", error=str(error))

@@ -21,6 +21,14 @@ raw/gzip/Brotli bytes, actual-byte equivalence and test results. Per-variant
 files include patches, commands, test logs and paired runtime samples.
 The names-only build provides `breakdown.json` and twiggy reports. Binaries are
 omitted from the uploaded report; the exact build instructions remain available.
+The compiler is Rust 1.99.1, the version recorded by the baseline commit's actual
+Pages build (run 40889165832); compression uses Python Brotli 1.1.0 and gzip level 9.
+An earlier exploratory campaign used the solver harness's Rust 1.97.1 pin;
+its records retain that identity and must not be mixed with the production-toolchain table.
+Binaryen 133 is downloaded from its official release and SHA-256 checked. Only
+the input's supported WASM features are enabled, so optimization cannot opt into
+GC or other unrelated proposals. Its no-inlining experiment sets all three
+inlining size thresholds to zero using Binaryen's documented CLI options.
 
 The compressed-package prototype adds **miniz_oxide 0.8.9** only in the disposable
 source tree. Its resolved lock and generated compressed data are retained.
@@ -34,6 +42,9 @@ baseline/candidate order, 3 warmups and 9 samples. The Windows solver collector
 does not benchmark this module: it has no solver entry point. Its offline harness
 checks run separately, as do workspace tests and native/WASM conformance checks.
 The result is not a browser/phone/network benchmark.
+The per-variant native checks cover all workspace libraries except the untouched
+solver and CLI's unrelated integration suites, plus the CLI conformance target.
+The full baseline workspace test log is retained with the investigation evidence.
 
 Local checks compile and install nothing:
 
@@ -41,6 +52,12 @@ Local checks compile and install nothing:
 python scripts/wasm-size/test_measurement.py
 node --check scripts/wasm-size/verify.mjs
 ```
+
+For selected reruns, pass `wasm_size_groups` as a JSON array and
+`wasm_size_variants` as comma-separated names to `rust.yml`. Baseline is always
+built and replayed first. Do not combine this queue with the solver queues.
+After downloading the three artifacts, a compact, durable result file can be
+created with `python scripts/wasm-size/summarize.py DIR1 DIR2 DIR3 --out RESULTS.json`.
 
 `wasm_bytes.py` attributes function bodies to surviving demangled symbols after
 LTO, verifies the names-only companion has identical non-custom sections, and
