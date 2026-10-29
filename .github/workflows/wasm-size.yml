@@ -64,8 +64,10 @@ jobs:
             cargo install rustfilt --version 0.2.1 --locked
           fi
           if [ '${{ matrix.group }}' = binaryen ]; then
-            sudo apt-get update -qq
-            sudo apt-get install -y binaryen
+            curl --fail --location --retry 3 --output "$RUNNER_TEMP/binaryen.tar.gz" https://github.com/WebAssembly/binaryen/releases/download/version_133/binaryen-version_133-x86_64-linux.tar.gz
+            printf '%s  %s\n' 2dc9c7813f5375db93d96ead4b78222fcc3e2677bbb832297af4797782a37489 "$RUNNER_TEMP/binaryen.tar.gz" | sha256sum --check
+            tar -xzf "$RUNNER_TEMP/binaryen.tar.gz" -C "$RUNNER_TEMP"
+            echo "$RUNNER_TEMP/binaryen-version_133/bin" >> "$GITHUB_PATH"
           fi
       - name: Measure fixed source with isolated disposable prototypes
         run: |

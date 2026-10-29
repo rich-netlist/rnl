@@ -133,6 +133,8 @@ def main():
             command(["node", HERE/"verify.mjs", "check", root, out, wasm, dest/"equality.json"], root, dest/"equality.log")
             equality = json.loads((dest/"equality.json").read_text())
             row["equality"] = {k: equality[k] for k in ("checked", "differing", "byte_identical")}
+            if name == "baseline" and not equality["byte_identical"]:
+                raise RuntimeError("Baseline self-replay failed: the corpus is not valid evidence")
             if equality["byte_identical"]:
                 command(["node", HERE/"verify.mjs", "benchmark", root, out, wasm, dest/"timings.json"], root, dest/"timings.log")
                 row["js_tests_exit"] = command(["node", "bindings/runtime-wasm/tests/core.mjs", dest], root, dest/"core-tests.log", required=False)
@@ -167,7 +169,7 @@ def main():
     if args.group == "binaryen":
         command(["wasm-opt", "--version"], root, out/"binaryen-version.txt")
         for base in ("baseline", "opt-z"):
-            for suffix, flags in (("Os", ["-Os"]), ("Oz", ["-Oz"]), ("Oz-no-inline", ["-Oz", "--inlining-optimizing", "--pass-arg=inline-functions-with-loops@0", "--pass-arg=always-inline-max-function-size@0", "--pass-arg=one-caller-inline-max-function-size@0", "--pass-arg=flexible-inline-max-function-size@0"])):
+            for suffix, flags in (("Os", ["-Os"]), ("Oz", ["-Oz"]), ("Oz-no-inline", ["-Oz", "--always-inline-max-function-size", "0", "--one-caller-inline-max-function-size", "0", "--flexible-inline-max-function-size", "0"])):
                 name = base+"-"+suffix
                 dest = out/name
                 dest.mkdir(exist_ok=True)
@@ -175,7 +177,8 @@ def main():
                 receipt["variants"].append(row)
                 try:
                     wasm = dest/"rnl_runtime_wasm.wasm"
-                    command(["wasm-opt", out/base/"rnl_runtime_wasm.wasm", *flags, "--all-features", "-o", wasm], root, dest/"build.log")
+                    features = ["--enable-bulk-memory", "--enable-sign-ext", "--enable-nontrapping-float-to-int", "--enable-multivalue", "--enable-reference-types", "--enable-mutable-globals"]
+                    command(["wasm-opt", out/base/"rnl_runtime_wasm.wasm", *flags, *features, "-o", wasm], root, dest/"build.log")
                     row.update(size(wasm))
                     command(["node", HERE/"verify.mjs", "check", root, out, wasm, dest/"equality.json"], root, dest/"equality.log")
                     equality = json.loads((dest/"equality.json").read_text())

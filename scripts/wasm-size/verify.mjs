@@ -39,7 +39,9 @@ if (mode === "corpus") {
   const requests = [];
   function call(request, label) {
     const answer = raw(request);
-    requests.push({ label, request, sha256: hash(answer), bytes: answer.length });
+    // collect() adds include texts to its files object after each call. Freeze
+    // exactly the request we executed, including intermediate missing-file calls.
+    requests.push({ label, request: structuredClone(request), sha256: hash(answer), bytes: answer.length });
     const value = JSON.parse(answer);
     if (value.error) throw new Error(value.error);
     return Object.values(value)[0];
