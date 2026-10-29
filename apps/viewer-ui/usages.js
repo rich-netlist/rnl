@@ -17,9 +17,11 @@ let shown = true;
 let currentsShown = false;
 let currentLayer = null;
 let revision = 0;
-const collapsed = new Set();
-const expandedLarge = new Set();
+const expanded = new Set(); // the definitions whose group is open: none to begin with, for each level of each document
 const rowLimits = new Map();
+let scopeDoc = null;
+let revealPending = false; // a usage was selected: its row is brought into view once the list is shown
+let scopeLevel = -1;
 let drawing = null;
 let layer = null;
 let underlay = null;
@@ -31,6 +33,14 @@ let layerSelected = null;
 let context = null;
 
 const usages = () => doc?.levels[current]?.usages || [];
+/** A level shown, or another document, starts with every group folded. */
+function newScope() {
+  if (doc === scopeDoc && current === scopeLevel) return;
+  scopeDoc = doc;
+  scopeLevel = current;
+  expanded.clear();
+  rowLimits.clear();
+}
 const chosen = () => selectedAsUsage ? usages().find(u => u.object === selected) : null;
 const visible = u => shown && setting(u).visible;
 /** Hidden virtual symbols still select as ordinary parts when picked on the drawing. */
@@ -126,6 +136,7 @@ function checkbox(label, checked, action) {
 export function renderUsages() {
   const list = $("usage-list");
   if (!list || $("pane-usages").hidden) return;
+  newScope();
   const scroll = list.scrollTop;
   const focused = list.contains(document.activeElement) ? document.activeElement.dataset.focusKey : null;
   list.replaceChildren();
@@ -137,7 +148,28 @@ export function renderUsages() {
     if (!groups.has(u.definition)) groups.set(u.definition, []);
     groups.get(u.definition).push(u);
   }
-  for (const [type, items] of [...groups].sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))) {
+  const sorted = [...groups].sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }));
+  if (sorted.length) {
+    // one button for all the groups: Expand All, or Collapse All when every group is open
+    const every = sorted.every(([type]) => expanded.has(type));
+    const bar = document.createElement("div");
+    bar.className = "usage-toolbar";
+    const all = document.createElement("button");
+    all.type = "button";
+    all.id = "usage-expand-all";
+    all.className = "usage-expand-all";
+    all.dataset.focusKey = "expand-all";
+    all.setAttribute("aria-pressed", String(every));
+    setText(all, every ? m("Collapse All") : m("Expand All"));
+    all.addEventListener("click", () => {
+      if (every) expanded.clear();
+      else for (const [type] of sorted) expanded.add(type);
+      renderUsages();
+    });
+    append(bar, all);
+    append(list, bar);
+  }
+  for (const [type, items] of sorted) {
     const group = document.createElement("section");
     group.className = "usage-group";
     group.dataset.type = type;
@@ -147,11 +179,11 @@ export function renderUsages() {
     expand.type = "button";
     expand.className = "usage-expand";
     expand.dataset.focusKey = `type:${type}`;
-    const folded = collapsed.has(type) || (items.length > 100 && !expandedLarge.has(type));
+    const folded = !expanded.has(type);
     expand.setAttribute("aria-expanded", String(!folded));
     append(expand, span("chevron", ""), type, span("badge", `(${items.length})`));
     expand.addEventListener("click", () => {
-      if (folded) { collapsed.delete(type); expandedLarge.add(type); } else collapsed.add(type);
+      if (folded) expanded.add(type); else expanded.delete(type);
       renderUsages();
     });
     const visible = items.filter(u => setting(u).visible).length;
@@ -196,6 +228,10 @@ export function renderUsages() {
   }
   list.scrollTop = scroll;
   if (focused) [...list.querySelectorAll("[data-focus-key]")].find(e => e.dataset.focusKey === focused)?.focus({ preventScroll: true });
+  if (revealPending) {
+    revealPending = false;
+    list.querySelector(".usage-row.selected")?.scrollIntoView({ block: "nearest" });
+  }
   renderDetail();
 }
 
@@ -404,5 +440,18 @@ export function usagesAt({ x, y }) {
   return hits;
 }
 window.addEventListener("viewer-level", () => { revision++; renderUsages(); persist(); });
-window.addEventListener("viewer-selection", renderUsages);
+/** A usage that is selected, from the drawing, the text or the table of an object's usages, has its group open, and is in view. */
+function showSelected() {
+  newScope();
+  const u = chosen();
+  if (u) {
+    expanded.add(u.definition);
+    const items = usages().filter((x) => x.definition === u.definition);
+    const at = items.findIndex((x) => x.object === u.object);
+    if (at >= (rowLimits.get(u.definition) || 100)) rowLimits.set(u.definition, Math.ceil((at + 1) / 100) * 100);
+  }
+  revealPending = !!u;
+  renderUsages();
+}
+window.addEventListener("viewer-selection", showSelected);
 window.addEventListener("language-changed", renderUsages);

@@ -59,8 +59,10 @@ for (const platform of ['web', 'desktop']) {
       await viewer.open('usage-current', {platform});
       await page.evaluate(() => window.viewer.command('toggle-currents'));
       await page.keyboard.press('5');
+      await viewer.expandUsages();
       for (const [level, file] of [[0, 'usage-current.svg'], [1, 'usage-current.cell.svg']]) {
         await page.evaluate(async level => (await import('./subcircuits.js')).goTo(level), level);
+        await viewer.expandUsages();
         // Display every usage; selection still controls only emphasis and role labels.
         for (const control of await page.locator('.usage-group-head input').all()) await control.check();
         const exported = fs.readFileSync(path.join(dir, file), 'utf8');
@@ -112,6 +114,7 @@ for (const platform of ['web', 'desktop']) {
         for (const {actual,expected} of roles) expected.forEach((v,i) => expect(actual[i]).toBeCloseTo(v,3));
       }
       await page.evaluate(async () => (await import('./subcircuits.js')).goTo(0));
+      await viewer.expandUsages();
       await page.locator('.usage-row').filter({has: page.getByRole('button', {name: '%pair', exact: true})}).getByRole('button').click();
       for (const lang of ['en','zh']) for (const theme of ['light','dark']) {
         await page.emulateMedia({colorScheme: theme});

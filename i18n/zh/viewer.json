@@ -504,6 +504,8 @@
   "Show &Roles on Hover": "光标悬停时显示角色(&R)",
   "{0} of usage {1} (definition {2})": "用例 {1}（定义 {2}）的 {0}",
   "{0} is in turn {1} of usage {2} (definition {3})": "{0} 又是用例 {2}（定义 {3}）的 {1}",
+  "Expand All": "全部展开",
+  "Collapse All": "全部折叠",
   "No usages in this circuit.": "当前电路中没有任何用例。",
   "Color": "颜色",
   "Roles": "角色",

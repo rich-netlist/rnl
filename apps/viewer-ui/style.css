@@ -182,11 +182,15 @@ button.icon { padding: 0 6px; font-size: 16px; line-height: 20px; color: var(--m
 .usage-detail { padding: 12px; }
 .usage-detail h2 { font-size: 14px; margin: 0 0 12px; overflow-wrap: anywhere; }
 .usage-detail h3 { font-size: 13px; margin: 16px 0 8px; }
+.usage-toolbar { position: sticky; top: 0; z-index: 2; display: flex; justify-content: flex-end; padding: 3px 10px; background: var(--panel, var(--bg)); border-bottom: 1px solid var(--line); }
+.usage-expand-all { padding: 2px 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--tab); color: var(--fg); font: inherit; cursor: pointer; }
+.usage-expand-all:hover { background: var(--select-line); }
+.usage-row { scroll-margin-top: 34px; }
 .usage-group-head, .usage-row { display: flex; align-items: center; gap: 6px; padding: 3px 10px; }
 .usage-group-head { background: var(--bg); border-bottom: 1px solid var(--line); }
 .usage-expand, .usage-name { flex: 1; min-width: 0; text-align: left; display: flex; align-items: center; gap: 6px; overflow-wrap: anywhere; }
 .usage-expand { font-weight: 600; }
-.usage-expand[aria-expanded="true"] .chevron { transform: rotate(90deg); }
+.usage-expand[aria-expanded="false"] .chevron { transform: rotate(-90deg); }
 .usage-row { padding-left: 26px; }
 .usage-row.selected { background: var(--select-line); }
 .usage-name { font-family: ui-monospace, Consolas, monospace, "Noto Sans SC"; }

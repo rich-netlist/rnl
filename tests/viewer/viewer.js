@@ -45,6 +45,12 @@ class Viewer {
     await this.page.waitForFunction(() => window.fakeShell && window.fakeShell.calls.some((c) => c[0] === "initial"));
   }
 
+  /** Open every group of the Usage panel's list of usages, which are folded when a document or a level is shown. */
+  async expandUsages() {
+    const button = this.page.locator("#usage-expand-all");
+    if ((await button.getAttribute("aria-pressed")) !== "true") await button.click();
+  }
+
   /** Wait until a Document is shown and nothing is being read. */
   async idle() {
     await this.page.waitForFunction(() => window.viewer.doc && !document.body.classList.contains("busy"));

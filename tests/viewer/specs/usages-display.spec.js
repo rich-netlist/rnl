@@ -44,6 +44,7 @@ for (const platform of ['desktop', 'web']) {
       window.dispatchEvent(new Event('viewer-level'));
     }, pair.object);
     await page.keyboard.press('5');
+    await viewer.expandUsages();
     await page.evaluate(async () => (await import('./drawing.js')).zoomCenter(.02));
     const f = frame(page, pair.object), title = f.locator('.usage-title');
     await expect(f).toBeVisible();
@@ -95,6 +96,7 @@ for (const platform of ['desktop', 'web']) {
       return {r1: stroke('R1'), r2: stroke('R2'), r3: stroke('R3'), probe: {stroke: probe.stroke, fill: probe.fill}};
     });
     await page.keyboard.press('5');
+    await viewer.expandUsages();
     for (const mode of ['light', 'dark', 'light']) {
       await page.keyboard.press('Escape');
       await page.evaluate(mode => window.viewer.command(`background-${mode}`), mode);
@@ -120,6 +122,7 @@ for (const platform of ['desktop', 'web']) {
     await viewer.open('virtual-selection', {platform});
     const ground = await usage(page, '%ground');
     await page.keyboard.press('5');
+    await viewer.expandUsages();
     const g = row(page, '%ground');
     await expect(g.getByRole('checkbox')).not.toBeChecked();
     await viewer.click('%ground');
@@ -130,6 +133,7 @@ for (const platform of ['desktop', 'web']) {
     await expect(g).not.toHaveClass(/selected/);
     await viewer.build(() => page.keyboard.press('F5'));
     await expect(frame(page, (await usage(page, '%ground')).object)).toHaveCount(0);
+    await viewer.expandUsages();
     await g.getByRole('button').click();
     const f = frame(page, (await usage(page, '%ground')).object);
     await expect(f).toHaveClass(/selected/);
@@ -157,6 +161,7 @@ for (const platform of ['desktop', 'web']) {
   test(`${platform}: grounds and supplies frame and focus only their own symbols on a shared net`, async ({page, viewer}) => {
     await viewer.open('virtual-selection', {platform});
     await page.keyboard.press('5');
+    await viewer.expandUsages();
     for (const name of ['%ground', '%ground2', '%supply']) {
       const u = await usage(page, name);
       await row(page, name).getByRole('button').click();
@@ -192,6 +197,7 @@ for (const platform of ['desktop', 'web']) {
   test(`${platform}: multiple roles of virtual usages stay readable and component roles keep their centers`, async ({page, viewer}) => {
     await viewer.open('usage-virtual-roles', {platform});
     await page.keyboard.press('5');
+    await viewer.expandUsages();
     for (const name of ['%pair', '%connections']) {
       const u = await usage(page, name);
       expect(u.has_symbol).toBe(true);
