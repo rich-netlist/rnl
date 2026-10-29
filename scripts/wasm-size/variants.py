@@ -40,7 +40,9 @@ def apply(root, name):
     if name in ("compact-words", "combined", "combined-value"):
         words = root / "crates/rnl-runtime/data/words-0.2.json"
         value = json.loads(words.read_text(encoding="utf-8"))
-        words.write_text(json.dumps(value, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+        (words.parent/"size-words.json").write_text(json.dumps(value, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+        replace(root/"crates/rnl-runtime/src/words.rs", 'Words::parse(WORDS_0_2).expect(',
+                'Words::parse(include_str!("../data/size-words.json")).expect(')
     if name in ("compressed-packages", "combined", "combined-value"):
         # A measured extra runtime dependency, not proposed as a production change.
         manifest = root / "crates/rnl-view/Cargo.toml"

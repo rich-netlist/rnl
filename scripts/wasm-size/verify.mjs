@@ -45,6 +45,10 @@ if (mode === "corpus") {
     return Object.values(value)[0];
   }
   const dirs = ["tests/conformance/cases", "tests/conformance/cases-0.3", "tests/conformance/equivalence", "libraries/standard", "tests/performance/inputs/representative"];
+  const manifest = json(join(root, "tests/performance/manifest.json"));
+  for (const item of manifest.representative) {
+    assert.equal(hash(readFileSync(join(root, "tests/performance", item.input))), item.sha256);
+  }
   const entries = dirs.flatMap((p) => files(join(root, p))).filter(p => /\.(sp|scs|inc|rnl)$/.test(p));
   for (const entry of entries) {
     for (const options of [{}, { primitives: true }, { parts: { drawing: false, host: true, model: true } }, { lazy_unplaced: true }]) {
@@ -91,14 +95,14 @@ if (mode === "corpus") {
 } else if (mode === "benchmark") {
   const corpus = json(join(baseline, "corpus.json"));
   const prepared = json(join(baseline, "performance-inputs.json"));
-  const requests = [];
-  const seen = new Set();
+  const completeRequests = new Map();
   for (const row of corpus.requests) {
     if (!row.label.includes("tests/performance/inputs/representative/") || !row.label.endsWith(":{}")) continue;
-    if (seen.has(row.label)) continue;
-    seen.add(row.label);
-    requests.push({ name: row.label, request: row.request });
+    // Keep the last request, after any include files have been collected.
+    completeRequests.set(row.label, { name: row.label, request: row.request });
   }
+  const requests = [...completeRequests.values()];
+  assert.equal(requests.length, 11, "All frozen representative inputs must be benchmarked");
   requests.push(...prepared);
   const raw = [await instance(join(baseline, "baseline/rnl_runtime_wasm.wasm")), await instance(candidate)];
   const results = [];

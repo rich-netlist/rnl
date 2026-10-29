@@ -30,13 +30,17 @@ class MeasurementTests(unittest.TestCase):
         for name in variants.CODE:
             with self.subTest(name=name), tempfile.TemporaryDirectory() as folder:
                 root = Path(folder)
-                for rel in ("bindings/runtime-wasm/src/lib.rs", "crates/rnl-view/Cargo.toml", "crates/rnl-view/src/lib.rs", "crates/rnl-runtime/data/words-0.2.json"):
+                for rel in ("bindings/runtime-wasm/src/lib.rs", "crates/rnl-view/Cargo.toml", "crates/rnl-view/src/lib.rs", "crates/rnl-runtime/src/words.rs", "crates/rnl-runtime/data/words-0.2.json"):
                     (root/rel).parent.mkdir(parents=True, exist_ok=True)
                     shutil.copyfile(ROOT/rel, root/rel)
                 shutil.copytree(ROOT/"libraries/standard", root/"libraries/standard")
                 variants.apply(root, name)
                 words = "crates/rnl-runtime/data/words-0.2.json"
                 self.assertEqual(json.loads((root/words).read_text(encoding="utf-8")), json.loads((ROOT/words).read_text(encoding="utf-8")))
+                self.assertEqual((root/words).read_bytes(), (ROOT/words).read_bytes())
+                compact = root/"crates/rnl-runtime/data/size-words.json"
+                if compact.exists():
+                    self.assertEqual(json.loads(compact.read_text(encoding="utf-8")), json.loads((ROOT/words).read_text(encoding="utf-8")))
                 compressed = root/"crates/rnl-view/src/size-bundle.zlib"
                 if compressed.exists():
                     original = b"".join(p.read_bytes() for p in sorted((root/"libraries/standard").glob("*/*.rnl")))

@@ -120,6 +120,9 @@ def main():
                 p = root/"crates/rnl-view/src"/generated
                 if p.exists():
                     shutil.copy2(p, dest/generated)
+            compact = root/"crates/rnl-runtime/data/size-words.json"
+            if compact.exists():
+                shutil.copy2(compact, dest/compact.name)
             started = time.monotonic()
             command(["node", "bindings/runtime-wasm/build.mjs", "--out", dest], root, dest/"build.log", env)
             row["build_seconds"] = time.monotonic()-started
@@ -159,6 +162,7 @@ def main():
                     p.write_bytes(content)
             for generated in ("size-bundle.rs", "size-bundle.zlib"):
                 (root/"crates/rnl-view/src"/generated).unlink(missing_ok=True)
+            (root/"crates/rnl-runtime/data/size-words.json").unlink(missing_ok=True)
             save(out/"results.json", receipt)
     if args.group == "binaryen":
         command(["wasm-opt", "--version"], root, out/"binaryen-version.txt")
