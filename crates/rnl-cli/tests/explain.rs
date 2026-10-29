@@ -398,6 +398,22 @@ fn groups_are_listed_with_the_usages() {
     assert_eq!(core.roles.len(), 1);
     assert_eq!((core.roles[0].name.as_str(), core.roles[0].members.len()), ("members", 5));
     assert_eq!(d.objects[core.object].kind, "group");
+    // each row says whether it takes effect, as its members' entries do
+    let state = |id: &str| table.iter().find(|u| u.id == id).map(|u| (u.state, u.reason.is_some())).unwrap();
+    assert_eq!(state("%core"), ("in-effect", false));
+    assert_eq!(state("%off"), ("disabled", false));
+    assert_eq!(state("%dp"), ("in-effect", false));
+}
+
+#[test]
+fn the_usage_table_gives_each_usage_its_state() {
+    let d = document();
+    let table = &d.levels[0].usages;
+    let row = |id: &str| table.iter().find(|u| u.id == id).unwrap();
+    assert_eq!((row("%pair1").state, row("%off").state, row("%port").state), ("in-effect", "disabled", "overridden"));
+    assert_eq!(row("%port").reason, object(&d, "net", "c").usages[0].reason);
+    // an application that failed made no usage, and has no row
+    assert!(table.iter().all(|u| u.id != "%bad"));
 }
 
 #[test]

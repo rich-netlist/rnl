@@ -188,6 +188,17 @@ export type Usage = {
   first_line: number,
   source: string,
   roles: Array<UsageRole>,
+  /**
+   * "in-effect"; "overridden", a fact its statement writes lost a conflict to one of higher
+   * priority (8.5); "disabled", its priority, or that of the usage it is made in, is
+   * "disabled" (14.8). A group is only "in-effect" or "disabled" (11.5). As
+   * `MemberOf::state`; an application that failed makes no usage and has no row.
+   */
+  state: string,
+  /**
+   * Why it was overridden: the message of the diagnostic.
+   */
+  reason: string | null,
 };
 
 export type UsageRole = {

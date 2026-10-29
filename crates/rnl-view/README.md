@@ -105,6 +105,8 @@ See the [roadmap](../../docs/roadmap.md) for planned work.
 
 `Level.usages` lists every usage in that drawing scope, including semantic usages without a symbol. Each entry shares a selectable `Document.objects` identity with its symbol when it has one; it carries the creating statement and its source, the definition name, its own symbol classification, whether it creates drawing objects in its body/descendants, and role references. Roles contain deduplicated selectable members, special wire display groups, and visible extents in SVG pixel coordinates. Set roles, nested semantic usages, quoted references and fragmented wires retain their geometry; shared nested usages are memoized. Unavailable role members keep their references with no extent. The frontend alone assigns display colors and draws usage overlays; exporting usages does not construct a solver problem.
 
+Each entry has `state`, as [the usages of an object](#the-usages-of-an-object) give it: `in-effect`, `overridden` (with `reason`) or `disabled`. An application that failed made no usage and has no entry.
+
 The groups (11.5) follow the usages in `Level.usages`, each a `Usage` of `kind` `"group"` (a usage's is `"usage"`) with an empty `definition` and one role, `members`, which holds its members as a set role does, so a group has a frame like a usage's. Its `Document.objects` entry is of kind `"group"`, its id `%core` when a record of the level names the set, otherwise where GROUP is written, `@file:line:col`. The runtime gives the groups in `LevelView::groups` (`GroupInfo`): the id, the members, the statement, `origin`, `parent` and `disabled`, as for a usage; a group that PRIORITY turns off is listed too.
 
 ## The usages of an object

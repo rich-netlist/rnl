@@ -27,6 +27,13 @@ pub struct Usage {
     pub first_line: u32,
     pub source: String,
     pub roles: Vec<UsageRole>,
+    /// "in-effect"; "overridden", a fact its statement writes lost a conflict to one of higher
+    /// priority (8.5); "disabled", its priority, or that of the usage it is made in, is
+    /// "disabled" (14.8). A group is only "in-effect" or "disabled" (11.5). As
+    /// `MemberOf::state`; an application that failed makes no usage and has no row.
+    pub state: &'static str,
+    /// Why it was overridden: the message of the diagnostic.
+    pub reason: Option<String>,
 }
 
 #[derive(Serialize, Debug)]
@@ -64,7 +71,7 @@ impl Geometry {
 pub(super) fn inspect_all(r: &Interpretation, levels: &mut [Level], ix: &mut Index<'_>) {
     let source_lines: HashMap<_, Vec<_>> = r.sources.iter().map(|(p, s)| (p.as_str(), s.lines().collect())).collect();
     for (lv, level) in r.model.levels.iter().zip(levels) {
-        level.usages = inspect(lv, level, ix, &source_lines);
+        level.usages = inspect(r, lv, level, ix, &source_lines);
     }
 }
 /// A group (11.5) as a usage of kind "group", with one role, `members`.
@@ -96,7 +103,13 @@ pub(super) fn listed(lv: &LevelView) -> Vec<ObjectInfo> {
     usages.chain(lv.groups.iter().map(group_object)).collect()
 }
 
-fn inspect(lv: &LevelView, level: &Level, ix: &mut Index<'_>, source_lines: &HashMap<&str, Vec<&str>>) -> Vec<Usage> {
+fn inspect(
+    r: &Interpretation,
+    lv: &LevelView,
+    level: &Level,
+    ix: &mut Index<'_>,
+    source_lines: &HashMap<&str, Vec<&str>>,
+) -> Vec<Usage> {
     let listed = listed(lv);
     if listed.is_empty() {
         return Vec::new();
@@ -255,6 +268,7 @@ fn inspect(lv: &LevelView, level: &Level, ix: &mut Index<'_>, source_lines: &Has
                             || (b[0] == b[2] && b[1] == b[3])
                     })
                 });
+            let (state, reason) = super::member_of::state(r, o);
             Usage {
                 frame: crate::overlays::usage_frame(
                     object,
@@ -277,6 +291,8 @@ fn inspect(lv: &LevelView, level: &Level, ix: &mut Index<'_>, source_lines: &Has
                 first_line,
                 source,
                 roles,
+                state,
+                reason,
             }
         })
         .collect()

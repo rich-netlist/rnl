@@ -5,7 +5,7 @@
 use std::collections::{BTreeSet, HashMap};
 
 use rnl_runtime::diag::Loc;
-use rnl_runtime::model::{quoted, Attach, LevelView, UsageOrigin};
+use rnl_runtime::model::{quoted, Attach, LevelView, ObjectInfo, UsageOrigin};
 use rnl_runtime::Interpretation;
 use serde::Serialize;
 
@@ -170,6 +170,32 @@ fn first_line((a, b): &(Loc, Loc), sources: &HashMap<&str, Vec<&str>>) -> u32 {
         .unwrap_or(a.line)
 }
 
+/// Whether a usage or group of the usage table takes effect, as `MemberOf::state` says, with the
+/// reason for one overridden.
+pub(super) fn state(r: &Interpretation, o: &ObjectInfo) -> (&'static str, Option<String>) {
+    let within = |(a, b): &(Loc, Loc), at: &Loc| {
+        at.file == a.file && (a.line, a.col) <= (at.line, at.col) && (at.line, at.col) <= (b.line, b.col)
+    };
+    if o.disabled {
+        return ("disabled", None);
+    }
+    // GROUP takes no part in conflicts (11.5)
+    let overridden = o
+        .source
+        .as_ref()
+        .filter(|span| o.kind == "usage" && r.failed.iter().any(|f| f.conflict && within(span, &f.start)));
+    match overridden {
+        Some(span) => (
+            "overridden",
+            r.diagnostics()
+                .into_iter()
+                .find(|d| d.loc.as_ref().is_some_and(|l| within(span, l)))
+                .map(|d| d.message.clone()),
+        ),
+        None => ("in-effect", None),
+    }
+}
+
 fn level(
     r: &Interpretation,
     lv: &LevelView,
@@ -189,25 +215,10 @@ fn level(
         usages.insert(o.id.as_str(), ix.usage_of_kind(lv.level, &o.id, o.kind));
     }
     let found = Members { level: lv.level, view: lv, instances, usages };
-    let within = |(a, b): &(Loc, Loc), at: &Loc| {
-        at.file == a.file && (a.line, a.col) <= (at.line, at.col) && (at.line, at.col) <= (b.line, b.col)
-    };
-    let reason_in = |span: &(Loc, Loc)| {
-        r.diagnostics().into_iter().find(|d| d.loc.as_ref().is_some_and(|l| within(span, l))).map(|d| d.message.clone())
-    };
     let mut out = Vec::new();
     let mut groups = Vec::new();
     for o in &listed {
-        // GROUP takes no part in conflicts (11.5)
-        let overridden = o
-            .source
-            .as_ref()
-            .filter(|span| o.kind == "usage" && r.failed.iter().any(|f| f.conflict && within(span, &f.start)));
-        let (state, reason) = match overridden {
-            _ if o.disabled => ("disabled", None),
-            Some(span) => ("overridden", reason_in(span)),
-            None => ("in-effect", None),
-        };
+        let (state, reason) = state(r, o);
         let (source, rule) = match &o.origin {
             UsageOrigin::Written => ("written", None),
             UsageOrigin::Solver => ("solver", None),
