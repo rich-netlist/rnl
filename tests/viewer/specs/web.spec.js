@@ -44,6 +44,7 @@ test('usage inspection and overlay selection work with the real WASM core', asyn
   const pair = doc.levels[0].usages.find(u => u.id === '%pair1');
   expect(pair.roles.every(r => r.bounds && r.objects.length)).toBe(true);
   await page.keyboard.press('5');
+  await page.locator('#usage-expand-all').click(); // the groups are folded to begin with
   await page.getByRole('button', { name: '%pair1', exact: true }).click();
   await expect(page.locator(`#canvas .usage-frame[data-usage="${pair.object}"]`)).toHaveClass(/selected/);
   await expect(page.locator('.usage-source')).toContainText('%pair1');
