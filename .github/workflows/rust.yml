@@ -49,6 +49,14 @@ on:
         description: Run the temporary fixed-source WASM size investigation
         type: boolean
         default: false
+      wasm_size_groups:
+        description: JSON array of WASM experiment groups
+        type: string
+        default: '["profiles","code","binaryen"]'
+      wasm_size_variants:
+        description: Optional comma-separated WASM variants (baseline always included)
+        type: string
+        default: ""
       solver_performance:
         description: Collect optimized solver measurements instead of the standard test jobs
         type: boolean
@@ -85,6 +93,9 @@ jobs:
   wasm-size:
     if: github.event_name == 'workflow_dispatch' && inputs.wasm_size && !inputs.solver_performance && !inputs.solver_profile_work && !inputs.solver_build_only
     uses: ./.github/workflows/wasm-size.yml
+    with:
+      groups: ${{ inputs.wasm_size_groups }}
+      variants: ${{ inputs.wasm_size_variants }}
 
   test:
     if: github.event_name != 'workflow_dispatch' || (!inputs.wasm_size && !inputs.solver_performance && !inputs.solver_profile_work && !inputs.solver_build_only)

@@ -58,7 +58,8 @@ def apply(root, name):
         declarations += '];\n'
         (root / "crates/rnl-view/src/size-bundle.rs").write_text(declarations, encoding="utf-8")
         source = root / "crates/rnl-view/src/lib.rs"
-        replace(source, 'include!(concat!(env!("OUT_DIR"), "/bundled.rs"));', 'include!("size-bundle.rs");')
+        replace(source, 'include!(concat!(env!("OUT_DIR"), "/bundled.rs"));',
+                '#[cfg(test)]\ninclude!(concat!(env!("OUT_DIR"), "/bundled.rs"));\ninclude!("size-bundle.rs");')
         replace(source, '    for &(path, text) in BUNDLED {', '''    static DATA: std::sync::OnceLock<Vec<u8>> = std::sync::OnceLock::new();
     let data = DATA.get_or_init(|| miniz_oxide::inflate::decompress_to_vec_zlib(BUNDLED_DATA).unwrap());
     for &(path, start, len) in BUNDLED_RANGES {

@@ -50,6 +50,7 @@ def main():
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--group", choices=("profiles", "code", "binaryen"), required=True)
+    parser.add_argument("--only", default="", help="Comma-separated variant names; baseline is always included")
     args = parser.parse_args()
     if os.environ.get("GITHUB_ACTIONS") != "true" or os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted":
         raise SystemExit("Builds and measurement are restricted to GitHub-hosted CI runners")
@@ -91,6 +92,11 @@ def main():
         for test in ("test_benchmark.py", "test_work.py"):
             command(["python", "scripts/solver-performance/"+test], root, out/test.replace(".py", ".log"))
     names = [n for n, _ in variants.PROFILES] if args.group == "profiles" else variants.CODE if args.group == "code" else ["baseline", "opt-z"]
+    if args.only:
+        selected = set(args.only.split(",")) | {"baseline"}
+        if not selected <= set(names):
+            raise SystemExit("Unknown variants: " + repr(selected-set(names)))
+        names = [name for name in names if name in selected]
     profile_map = dict(variants.PROFILES)
     for name in names:
         print(f"Measuring {args.group}/{name}", flush=True)
