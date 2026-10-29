@@ -22,7 +22,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: wasm-size-investigation-${{ github.workflow_ref }}
+  group: wasm-size-investigation-${{ github.workflow_ref }}-${{ inputs.groups }}
   cancel-in-progress: false
 
 jobs:
@@ -59,7 +59,7 @@ jobs:
         run: |
           rustup toolchain install 1.99.1 --profile minimal --target wasm32-unknown-unknown
           python -m pip install Brotli==1.1.0
-          if [ '${{ matrix.group }}' = profiles ]; then
+          if [ '${{ matrix.group }}' = profiles ] || [ '${{ matrix.group }}' = analysis ]; then
             cargo install twiggy --version 0.8.0 --locked
             cargo install rustfilt --version 0.2.1 --locked
           fi

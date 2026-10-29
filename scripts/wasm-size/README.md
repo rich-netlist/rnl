@@ -60,7 +60,11 @@ After downloading the three artifacts, a compact, durable result file can be
 created with `python scripts/wasm-size/summarize.py DIR1 DIR2 DIR3 --out RESULTS.json`.
 
 `wasm_bytes.py` attributes function bodies to surviving demangled symbols after
-LTO, verifies the names-only companion has identical non-custom sections, and
-accounts for every section byte. Compressed sizes are not additive: standalone
+LTO and accounts for every release section byte. It checks whether the names-only
+companion has identical non-custom sections. If Rust's strip option changes code
+layout, it attributes the companion's own code and records its size delta; it
+never transfers names to different release function indices. A selected
+`analysis` group can rerun just these builds and the bounded twiggy commands.
+Compressed sizes are not additive: standalone
 gzip sizes and the marginal change when code bytes are zeroed are labelled
 diagnostics, not exact gzip ownership or safe removal savings.

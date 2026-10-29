@@ -95,9 +95,12 @@ def gz(data):
 
 
 def audit(baseline, companion, root):
-    data, named = baseline.read_bytes(), companion.read_bytes()
-    # Do not attach symbol names to different code by position.
-    assert noncustom(data) == noncustom(named), "Names-only build changed non-custom sections"
+    release, named = baseline.read_bytes(), companion.read_bytes()
+    identical = noncustom(release) == noncustom(named)
+    # Changing Rust's strip option can change code layout. Never attach companion
+    # names to release indices in that case. Attribute the companion's OWN
+    # executable sections and disclose the measured difference to the release.
+    data = noncustom(named)
     symbols = names(named)
     indices = sorted(symbols)
     text = "\n".join(symbols[i] for i in indices) + "\n"
@@ -129,15 +132,15 @@ def audit(baseline, companion, root):
     for row in top:
         row["zeroed_gzip_delta"] = marginal([row])
     section_rows = []
-    for kind, start, at, end in sections(data):
-        section_rows.append({"id": kind, "name": string(data, at)[0] if kind == 0 else str(kind),
-                             "raw": end-start, "standalone_gzip": gz(data[start:end])})
+    for kind, start, at, end in sections(release):
+        section_rows.append({"id": kind, "name": string(release, at)[0] if kind == 0 else str(kind),
+                             "raw": end-start, "standalone_gzip": gz(release[start:end])})
     embedded = []
     paths = list(sorted((root/"libraries/standard").glob("*/*.rnl")))
     paths += [root/"crates/rnl-runtime/data/words-0.2.json", root/"crates/rnl-render/fonts/noto-sans-sc.metrics"]
     for path in paths:
         content = path.read_bytes()
-        count = data.count(content)
+        count = release.count(content)
         embedded.append({"path": str(path.relative_to(root)), "raw": len(content),
                          "standalone_gzip": gz(content), "complete_occurrences": count,
                          "sha256": hashlib.sha256(content).hexdigest()})
@@ -147,11 +150,21 @@ def audit(baseline, companion, root):
         for path in sorted((root/folder).rglob("*")):
             if path.suffix in (".sp", ".scs"):
                 b = path.read_bytes()
-                if len(b) > 32 and b in data:
+                if len(b) > 32 and b in release:
                     fixtures.append(str(path.relative_to(root)))
-    return {"raw": len(data), "gzip": total_gzip, "noncustom_identical": True,
+    semantic = []
+    for label, pattern in (("serde / JSON (including derives)", r"serde|Serialize|Deserialize"),
+                           ("formatting", r"core::fmt|alloc::fmt|flt2dec|num::flt"),
+                           ("Unicode functions", r"unicode"),
+                           ("panic / errors", r"panic|backtrace|::error")):
+        rows = [r for r in entries if re.search(pattern, r["name"])]
+        semantic.append({"label": label, "raw": sum(r["raw"] for r in rows), "functions": len(rows)})
+    return {"raw": len(release), "gzip": gz(release), "noncustom_identical": identical,
+            "attribution_raw": len(data), "attribution_gzip": total_gzip,
+            "attribution_raw_delta": len(data)-len(noncustom(release)),
             "function_count": len(entries), "sections": section_rows,
             "crates": sorted(by_crate, key=lambda r: r["raw"], reverse=True),
             "top_functions": top, "functions": entries, "embedded": embedded,
+            "semantic_slices_overlapping": semantic,
             "whole_test_inputs_found": fixtures,
-            "caveat": "Symbols survive fat LTO; generic code belongs to its surviving symbol, not every crate named in type arguments. zeroed_gzip_delta is non-additive and does not represent safe removal."}
+            "caveat": "Crate/function attribution is for the named companion's own non-custom sections; see noncustom_identical and attribution_raw_delta before treating it as the release. Symbols survive fat LTO; generic code belongs to its surviving symbol, not every crate named in type arguments. Semantic slices overlap. zeroed_gzip_delta is non-additive and does not represent safe removal."}

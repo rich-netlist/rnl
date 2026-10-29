@@ -60,7 +60,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
-    parser.add_argument("--group", choices=("profiles", "code", "binaryen"), required=True)
+    parser.add_argument("--group", choices=("profiles", "code", "binaryen", "analysis"), required=True)
     parser.add_argument("--only", default="", help="Comma-separated variant names; baseline is always included")
     args = parser.parse_args()
     if os.environ.get("GITHUB_ACTIONS") != "true" or os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted":
@@ -106,7 +106,7 @@ def main():
             command(["git", "fetch", "--no-tags", "origin", manifest[key]["commit"]], root, out/(key+"-fetch.log"))
         for test in ("test_inputs.py", "test_benchmark.py", "test_work.py"):
             command(["python", "scripts/solver-performance/"+test], root, out/test.replace(".py", ".log"))
-    names = [n for n, _ in variants.PROFILES] if args.group == "profiles" else variants.CODE if args.group == "code" else ["baseline", "opt-z"]
+    names = [n for n, _ in variants.PROFILES] if args.group == "profiles" else variants.CODE if args.group == "code" else ["baseline", "symbols"] if args.group == "analysis" else ["baseline", "opt-z"]
     if args.only:
         selected = set(args.only.split(",")) | {"baseline"}
         if not selected <= set(names):
@@ -150,7 +150,7 @@ def main():
             row["equality"] = {k: equality[k] for k in ("checked", "differing", "byte_identical")}
             if name == "baseline" and not equality["byte_identical"]:
                 raise RuntimeError("Baseline self-replay failed: the corpus is not valid evidence")
-            if equality["byte_identical"]:
+            if equality["byte_identical"] and args.group != "analysis":
                 command(["node", HERE/"verify.mjs", "benchmark", root, out, wasm, dest/"timings.json"], root, dest/"timings.log")
                 row["js_tests_exit"] = command(["node", "bindings/runtime-wasm/tests/core.mjs", dest], root, dest/"core-tests.log", required=False)
             if args.group == "profiles" and name in ("baseline", "opt-z"):
@@ -165,8 +165,8 @@ def main():
                 audit_module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(audit_module)
                 save(dest/"breakdown.json", audit_module.audit(out/"baseline/rnl_runtime_wasm.wasm", wasm, root))
-                for tool, extra in (("top", ["-n", "100"]), ("dominators", []), ("monos", [])):
-                    row["twiggy_"+tool] = command(["twiggy", tool, *extra, wasm], root, dest/f"twiggy-{tool}.txt", required=False)
+                for tool, extra in (("top", ["-n", "100"]), ("dominators", ["-d", "4", "-r", "100"]), ("monos", [])):
+                    row["twiggy_"+tool] = command(["twiggy", tool, *extra, wasm], root, dest/f"twiggy-{tool}.txt", required=False, timeout=180)
             row["status"] = "MEASURED"
         except Exception as error:
             row["status"] = "ERROR"
