@@ -45,6 +45,17 @@ def size(path):
             "brotli": len(brotli.compress(data, quality=11)), "sha256": hashlib.sha256(data).hexdigest()}
 
 
+def core_tests(root, out, env=None):
+    # The untouched solver's full suite was collected separately. Exercise all
+    # libraries actually linked by this WASM and the native conformance snapshots.
+    commands = [
+        ["cargo", "test", "--locked", "--workspace", "--exclude", "rnl-solver", "--exclude", "rnl-cli"],
+        ["cargo", "test", "--locked", "-p", "rnl-cli", "--test", "conformance"],
+    ]
+    return [command(cmd, root, out/f"core-native-{i}.log", env, required=False, timeout=1200)
+            for i, cmd in enumerate(commands)]
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--source", type=Path, required=True)
@@ -86,10 +97,14 @@ def main():
     save(out/"performance-inputs.json", perf)
     native = root/"target/debug/rnl"
     if args.group == "profiles":
-        command(["cargo", "test", "--workspace", "--locked"], root, out/"workspace-tests.log", timeout=1200)
+        receipt["core_native_tests"] = core_tests(root, out)
+        save(out/"results.json", receipt)
         command(["cargo", "build", "--locked", "-p", "rnl-cli"], root, out/"native-build.log")
         # Existing harness checks are run as checks, never mislabelled as solver timing.
-        for test in ("test_benchmark.py", "test_work.py"):
+        manifest = json.loads((root/"tests/performance/manifest.json").read_text())
+        for key in ("historical_source", "library_source"):
+            command(["git", "fetch", "--no-tags", "origin", manifest[key]["commit"]], root, out/(key+"-fetch.log"))
+        for test in ("test_inputs.py", "test_benchmark.py", "test_work.py"):
             command(["python", "scripts/solver-performance/"+test], root, out/test.replace(".py", ".log"))
     names = [n for n, _ in variants.PROFILES] if args.group == "profiles" else variants.CODE if args.group == "code" else ["baseline", "opt-z"]
     if args.only:
@@ -144,7 +159,7 @@ def main():
                     code = command(["node", "bindings/runtime-wasm/tests/equality.mjs", "--rnl", native, "--dist", dest, *extra], root, dest/f"native-equality-{len(row['native_equality'])}.log", required=False)
                     row["native_equality"].append(code)
             if args.group == "code" and name in ("compact-words", "compressed-packages", "json-value-output", "combined", "combined-value") and equality["byte_identical"]:
-                row["workspace_tests_exit"] = command(["cargo", "test", "--workspace", "--locked"], root, dest/"workspace-tests.log", env, required=False, timeout=1200)
+                row["core_native_tests"] = core_tests(root, dest, env)
             if name == "symbols":
                 spec = importlib.util.spec_from_file_location("wasm_inspect", HERE/"wasm_bytes.py")
                 audit_module = importlib.util.module_from_spec(spec)
