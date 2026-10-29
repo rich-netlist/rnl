@@ -11,6 +11,7 @@
 
 import { publishLibrary } from "./library.mjs";
 import { buildVersions } from "./build-info.mjs";
+import { addPreloadHints } from "./preload-hints.mjs";
 import { execFileSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
@@ -111,13 +112,15 @@ writeFileSync(join(out, "public-packages.json"), JSON.stringify({
   url: fixture ? "public-packages/catalog.json" : process.env.RNL_PACKAGE_CATALOG || "https://rich-netlist.github.io/rnl-packages/catalog.json",
 }) + "\n");
 
+// the page asks for its scripts, the core and the files it reads at start all at once (preload-hints.mjs)
+const hints = addPreloadHints(out);
 const all = files(out);
 const bytes = all.reduce((n, f) => n + statSync(join(out, f)).size, 0);
 const wasm = readFileSync(join(out, "core", "rnl_runtime_wasm.wasm"));
 const kib = (n) => `${(n / 1024).toFixed(0)} KiB`;
 console.log(out);
 const packed = gzipSync(wasm, { level: 9 }).length;
-console.log(`${all.length} files, ${kib(bytes)}; the core ${kib(wasm.length)}, ${kib(packed)} gzip-compressed`);
+console.log(`${all.length} files, ${kib(bytes)}; the core ${kib(wasm.length)}, ${kib(packed)} gzip-compressed; ${hints} preload hints`);
 if (fonts) {
   const font = all.filter((f) => f.startsWith("fonts/"));
   console.log(`the web fonts: ${font.length} files, ${kib(font.reduce((n, f) => n + statSync(join(out, f)).size, 0))}`);

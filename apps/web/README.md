@@ -95,6 +95,10 @@ Without it the build says so, and the drawing falls back on the fonts installed 
 
 The site is 26 files and 1.36 MB, the licence of the fonts' metrics in `fonts/OFL.txt` among them, of which the core is 1.22 MB, 412 KB gzip-compressed; the web fonts add 232 files and 17.6 MB, of which a browser downloads only the slices a drawing uses, and the samples 0.70 MB.
 
+## Preload hints
+
+A browser finds a page's scripts one level of imports at a time, and the core's WebAssembly only once the shell, the core's client and its Worker have loaded, so a first visit waits for a chain of round trips before the largest file even starts. `build.mjs` therefore writes hints into the built `index.html` ([`preload-hints.mjs`](preload-hints.mjs)): a `modulepreload` for every module the page imports statically (from its scripts, the web shell and the core's Worker), and a `preload` for the core and the small files read at start (`about.json`, `commands.json`, `libraries/bundled.json`, `public-packages.json` and the catalogs of the interface's languages). With them the browser asks for all of it at once. The page of `apps/viewer-ui` has none, as the desktop viewer reads it from disk. A URL given as `?url=` is read at once too, while the Library is indexed and the core loads, not when they are done. A test (`web.spec.js`) checks that the page reads what the hints name and that no script the page loads is left out.
+
 ## Serving
 
 ```bash
