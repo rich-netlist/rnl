@@ -18,6 +18,7 @@ use rnl_runtime::source::{dirname, relative_to};
 use rnl_runtime::Interpretation;
 use serde::Serialize;
 
+use crate::params::{ParamValue, Params, SubcktParam};
 use crate::primitive::{self, Primitive};
 use crate::{BuildOptions, FormatInfo};
 
@@ -111,6 +112,11 @@ pub struct Level {
     pub hits: Vec<Hit>,
     /// The subcircuit instances of the level, in netlist order: the hierarchy below it.
     pub children: Vec<Child>,
+    /// For a subcircuit, its parameters: their defaults, the values bound to them
+    /// ([`crate::BuildOptions::bind`]) and the numbers those come to; left out when it has none.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(test, ts(as = "Option<Vec<SubcktParam>>", optional))]
+    pub params: Vec<SubcktParam>,
     /// The objects of the level that are not drawn on it: those that have no position, each with
     /// its symbol drawn alone, in the order of the netlist (their number is the one `status`
     /// gives), then those that are not drawn at all, since no symbol can be chosen for them, each
@@ -271,6 +277,17 @@ pub struct Child {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[cfg_attr(test, ts(as = "Option<Vec<AutoIncludeCandidate>>", optional))]
     pub candidates: Vec<AutoIncludeCandidate>,
+    /// The parameters the instance writes, each with the number it comes to in the level the
+    /// instance is in; left out when it writes none.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(test, ts(as = "Option<Vec<ParamValue>>", optional))]
+    pub params: Vec<ParamValue>,
+    /// When the netlist defines the subcircuit: its parameters for this instance, those the
+    /// instance writes and the defaults of the others, with the numbers they come to; left out
+    /// when it has none.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(test, ts(as = "Option<Vec<SubcktParam>>", optional))]
+    pub effective: Vec<SubcktParam>,
 }
 
 /// A definition of a subcircuit in the Library that Auto Include could include.
@@ -448,6 +465,7 @@ pub(crate) fn document(
         ix.spans.push(Span { object, file, line: h.loc.line, col: h.loc.col, len: h.len, kind: "ref" });
     }
     let mut levels: Vec<Level> = r.model.levels.iter().map(|lv| ix.level(lv, options, lazy)).collect();
+    let (params, notes) = Params::new(&r.doc, options.bind.as_ref());
     let drawn: HashMap<usize, usize> = r.model.levels.iter().enumerate().map(|(k, lv)| (lv.level, k)).collect();
     for (k, lv) in r.model.levels.iter().enumerate() {
         let host = &r.doc.levels[lv.level];
@@ -458,6 +476,9 @@ pub(crate) fn document(
                 let end = if host.end_line >= host.line { host.end_line.min(last) } else { last };
                 levels[k].lines = Some([f as u32, host.line, end]);
             }
+        }
+        if host.kind == LevelKind::Subckt {
+            levels[k].params = params.level(lv.level);
         }
         levels[k].children = r.doc.levels[lv.level]
             .instances
@@ -485,7 +506,21 @@ pub(crate) fn document(
                             .collect()
                     })
                     .unwrap_or_default();
-                Child { instance: i.name.clone(), master, level, symbol: None, candidates }
+                let effective = r
+                    .doc
+                    .subckt_of(i)
+                    .filter(|_| level.is_some())
+                    .map(|child| params.effective(lv.level, i, child))
+                    .unwrap_or_default();
+                Child {
+                    instance: i.name.clone(),
+                    master,
+                    level,
+                    symbol: None,
+                    candidates,
+                    params: params.actuals(lv.level, i),
+                    effective,
+                }
             })
             .collect();
     }
@@ -523,7 +558,21 @@ pub(crate) fn document(
             cause,
         }
     };
-    let diagnostics = r.diagnostics().into_iter().map(|d| diagnostic(d, &r.sink)).collect();
+    let mut diagnostics: Vec<Diagnostic> = r.diagnostics().into_iter().map(|d| diagnostic(d, &r.sink)).collect();
+    for (severity, message, loc) in notes {
+        let (file, line) = loc.map(|l| (l.file, l.line)).unwrap_or_default();
+        diagnostics.push(Diagnostic {
+            severity,
+            file: shown_file(&file),
+            file_index: file_index.get(&file).copied(),
+            full_path: file,
+            line,
+            col: 0,
+            message,
+            origin: String::new(),
+            cause: None,
+        });
+    }
     let (objects, spans) = (ix.objects, ix.spans);
     Document {
         symbols,
@@ -880,6 +929,7 @@ impl<'a> Index<'a> {
             solve: None,
             hits,
             children: Vec::new(),
+            params: Vec::new(),
             unplaced: self.unplaced(lv, &render, options, lazy),
         }
     }

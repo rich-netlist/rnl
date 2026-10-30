@@ -57,6 +57,9 @@ view options:
   --primitives        give each level's primitives, in scene units with y up
   --no-svg            leave out each level's SVG
   --status            give each level its solve status: fixed, unsolved, solved or stale
+  --bind SUBCKT       show the parameters of the subcircuit SUBCKT with the values --param gives
+  --param NAME=VALUE  a value for a parameter of the subcircuit --bind names, as text; repeatable.
+                      Only the Document's lists of parameters change; nothing drawn does
 render options (inspection only; all disabled by default):
   --usages MODE       usage frames: semantic (no drawing of their own) or all
   --currents          show in/out terminal currents, including explicit subcircuit port symbols
@@ -142,6 +145,8 @@ struct Args {
     /// `explain`'s REF, and `--json`.
     reference: Option<String>,
     json: bool,
+    /// `view`'s `--bind` and `--param`.
+    bind: Option<rnl_view::Bind>,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -152,6 +157,8 @@ fn parse_args() -> Result<Args, String> {
     }
     let mut positional = Vec::new();
     let mut json = false;
+    let mut bind_subckt: Option<String> = None;
+    let mut bind_params: BTreeMap<String, String> = BTreeMap::new();
     let mut out = None;
     let mut package_dirs = Vec::new();
     let mut search_paths = Vec::new();
@@ -228,6 +235,12 @@ fn parse_args() -> Result<Args, String> {
             "--package" => packages.push(it.next().ok_or("--package needs a name, such as rnl-std-basic")?),
             "--all-versions" => all_versions = true,
             "--json" => json = true,
+            "--bind" => bind_subckt = Some(it.next().ok_or("--bind needs a subcircuit name")?),
+            "--param" => {
+                let set = it.next().ok_or("--param needs NAME=VALUE, such as w=2u")?;
+                let (name, value) = set.split_once('=').ok_or("--param needs NAME=VALUE, such as w=2u")?;
+                bind_params.insert(name.to_string(), value.to_string());
+            }
             "--encoding" => encoding = Some(it.next().ok_or("--encoding needs preserve or utf8")?.parse()?),
             _ if a.starts_with("--encoding=") => encoding = Some(a[11..].parse()?),
             _ if a.starts_with('-') => return Err(format!("unknown option {a}\n{USAGE}")),
@@ -247,6 +260,13 @@ fn parse_args() -> Result<Args, String> {
     if json && command != "explain" {
         return Err("--json is an option of explain".into());
     }
+    if (bind_subckt.is_some() || !bind_params.is_empty()) && command != "view" {
+        return Err("--bind and --param are options of view".into());
+    }
+    if !bind_params.is_empty() && bind_subckt.is_none() {
+        return Err("--param needs --bind SUBCKT, the subcircuit whose parameters it gives".into());
+    }
+    let bind = bind_subckt.map(|subckt| rnl_view::Bind { subckt, params: bind_params });
     if profile.is_some() && command != "solve" {
         return Err("--profile is an option of solve".into());
     }
@@ -294,6 +314,7 @@ fn parse_args() -> Result<Args, String> {
         encoding: encoding.unwrap_or_default(),
         reference,
         json,
+        bind,
     })
 }
 
@@ -457,6 +478,7 @@ fn run(args: &Args) -> Result<ExitCode, String> {
                 svg: args.svg,
                 primitives: args.primitives,
                 status: args.status,
+                bind: args.bind.clone(),
             };
             let doc = rnl_view::build(&args.file.to_string_lossy(), &provider, &options)?;
             println!("{}", serde_json::to_string_pretty(&doc).unwrap());
@@ -470,6 +492,7 @@ fn run(args: &Args) -> Result<ExitCode, String> {
                 svg: false,
                 primitives: false,
                 status: false,
+                bind: None,
             };
             let doc = rnl_view::build(&args.file.to_string_lossy(), &provider, &options)?;
             let reference = args.reference.as_deref().unwrap_or_default();
@@ -501,6 +524,7 @@ fn run(args: &Args) -> Result<ExitCode, String> {
                 svg: args.svg,
                 primitives: args.primitives,
                 status: args.status,
+                bind: None,
             };
             let snapshot = rnl_view::snapshot(&args.file.to_string_lossy(), &provider, &options, parts)?;
             println!("{}", serde_json::to_string_pretty(&snapshot).unwrap());
