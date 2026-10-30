@@ -15,6 +15,10 @@ pub mod solve;
 pub const CORE_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const BUILD_COMMIT: &str = env!("RNL_BUILD_COMMIT");
 
+/// What `rnl solve` and `rnl preview` say on the standard error each time they solve: the solver is
+/// a preview.
+pub const SOLVER_PREVIEW_NOTICE: &str = "note: the solver is a preview, and its layouts may be poor; for comparison, have the model write the exact RNL placement directly";
+
 use std::collections::BTreeMap;
 use std::path::Path;
 
