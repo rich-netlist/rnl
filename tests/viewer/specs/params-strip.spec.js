@@ -193,3 +193,15 @@ test("cancelling the question leaves the value missing, and it is not asked agai
   await expect(dialog(page)).toHaveCount(0);
   expect(await binds(page)).toEqual([]);
 });
+
+test("a Document built with the values of one subcircuit bound still asks for those another shown by itself lacks", async ({ page }) => {
+  await enter(page, "X1");
+  await bar(page).locator(".params-edit").click();
+  await dialog(page).locator("input").first().fill("4u");
+  await dialog(page).getByRole("button", { name: "Apply" }).click();
+  await expect(params(page).first()).toHaveText("wn = 4uchanged");
+  await expect(page.locator("body")).not.toHaveClass(/busy/);
+  await showAlone(page, "gain");
+  await expect(dialog(page).locator(".dialog-title")).toHaveText("Parameters of gain");
+  await page.keyboard.press("Escape");
+});

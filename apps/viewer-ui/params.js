@@ -131,7 +131,7 @@ export function updateParams() {
  */
 async function askMissing() {
   const [shownDoc, title] = [doc, doc.levels[current].title];
-  if (shell?.embed || bindings.has(doc) || asked.get(doc)?.has(title)) return;
+  if (shell?.embed || boundHere(doc.levels[current]) || asked.get(doc)?.has(title)) return;
   asked.set(doc, (asked.get(doc) || new Set()).add(title));
   // the dialog waits for what is opening the Document, and for another that is open
   for (let tries = 0; tries < 60 && (isLoading() || modal()); tries++) await new Promise((resolve) => setTimeout(resolve, 50));
