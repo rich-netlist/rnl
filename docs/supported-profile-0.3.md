@@ -192,7 +192,7 @@ and the language line takes them up for 0.4.
    `rnl-std-no-labels`, `# @SELECT-USAGE => @TEXT("", key="name")` and the like, reach the usages
    of structures such as `$MIRRORED`, which have no symbol, and failed in every file that uses the
    package and writes a structure.
-3. **A file that is not a netlist** (the core after 0.5.3). A file whose format is not set and
+3. **A file that is not a netlist** (core 0.5.4). A file whose format is not set and
    whose suffix marks a hardware description language, `.va`, `.vams`, `.v`, `.vh`, `.sv`, `.svh`,
    `.vhd` or `.vhdl`, is of the format text: it is kept as text and not read, records included,
    and a hint says so, at its include or, opened, at its first line. 16.3 reads every file of a
