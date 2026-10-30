@@ -709,6 +709,32 @@ async function about() {
   });
 }
 
+/**
+ * The source of the file at `full`, as the shell names it, where the file `f` (its name and, for a built-in, its text) is read from:
+ * the pool, a server, an external folder or the host. The file is read again, with no compiled include closure.
+ */
+function sourceAt(source, full, f) {
+  const path = full.replace(/^\/<pool>(?=\/)/, '');
+  if (full !== path || source.fromPool && poolSources.has(path)) {
+    return poolSources.get(path) || { ...filesSource(poolFiles, path), fromPool: true };
+  }
+  if (full.startsWith('<')) return { path, name: f.name, text: f.text, readonly: true };
+  if (source.external) return externalFile(source.external, path);
+  // A reader supplies available bytes, never a previously compiled include closure.
+  if (source.url) {
+    const url = new URL(relative(source.path.split('/').slice(0, -1), path), source.url);
+    // Re-read like Open URL, with the session's local bytes available if the server is gone.
+    return urlSource(url, source.files ? filesSource(source.files, path) : null);
+  }
+  const read = source.read || (async () => null);
+  return { path, name: path.slice(1), files: source.files, fromPool: source.fromPool,
+    read, async open(again) {
+      const text = await read(path, again);
+      if (text === null) throw new Error(`${path} could not be read. Open it again.`);
+      return { path, text };
+    } };
+}
+
 /** @type {import("../shell.js").Shell} */
 export default {
   platform: "web",
@@ -726,27 +752,10 @@ export default {
   sourceForFile(source, document, index) {
     const f = document.files[index];
     // At workspace root the core displays this virtual prefix without its leading slash.
-    const full = sourcePath(document, f).replace(/^<pool>\//, '/<pool>/');
-    const path = full.replace(/^\/<pool>(?=\/)/, '');
-    if (full !== path || source.fromPool && poolSources.has(path)) {
-      return poolSources.get(path) || { ...filesSource(poolFiles, path), fromPool: true };
-    }
-    if (full.startsWith('<')) return { path, name: f.name, text: f.text, readonly: true };
-    if (source.external) return externalFile(source.external, path);
-    // A reader supplies available bytes, never a previously compiled include closure.
-    if (source.url) {
-      const url = new URL(relative(source.path.split('/').slice(0, -1), path), source.url);
-      // Re-read like Open URL, with the session's local bytes available if the server is gone.
-      return urlSource(url, source.files ? filesSource(source.files, path) : null);
-    }
-    const read = source.read || (async () => null);
-    return { path, name: path.slice(1), files: source.files, fromPool: source.fromPool,
-      read, async open(again) {
-        const text = await read(path, again);
-        if (text === null) throw new Error(`${path} could not be read. Open it again.`);
-        return { path, text };
-      } };
+    return sourceAt(source, sourcePath(document, f).replace(/^<pool>\//, '/<pool>/'), f);
   },
+  // a Library file the document does not read, such as one of several definitions of a subcircuit
+  sourceForPath: (source, full) => sourceAt(source, full, { name: full.split('/').pop() }),
   newWindow(session, doc) {
     return openWebWindow(async () => {
       // Share descriptors within the handoff, not entire Documents or duplicate folder snapshots.

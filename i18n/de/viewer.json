@@ -665,5 +665,9 @@
   "{0} is in turn a member of group {1}": "{0} ist wiederum Mitglied der Gruppe {1}",
   "{0} is in turn within group {1}": "{0} liegt wiederum innerhalb der Gruppe {1}",
   "within group {0}": "innerhalb der Gruppe {0}",
-  "group": "Gruppe"
+  "group": "Gruppe",
+  "Choose a definition of {0}": "Definition von {0} wählen",
+  "{0} is defined {1} times in the Library. The one you choose opens as a view of its own file, without the parameters of this instance; this netlist is not changed.": "{0} ist {1}-mal in der Bibliothek definiert. Die gewählte Definition wird als Ansicht ihrer eigenen Datei geöffnet, ohne die Parameter dieser Instanz; diese Netzliste bleibt unverändert.",
+  " instance of a subcircuit with {0} definitions in {1} · a double tap asks which to open": " Instanz einer Teilschaltung mit {0} Definitionen in {1} · Doppeltippen fragt, welche geöffnet wird",
+  " instance of a subcircuit with {0} definitions in {1} · E or Enter asks which to open; Shift opens a new window": " Instanz einer Teilschaltung mit {0} Definitionen in {1} · E oder Enter fragt, welche geöffnet wird; Shift öffnet ein neues Fenster"
 }

@@ -154,6 +154,55 @@ test("Auto Include resolves indexed library subcircuits, warns on conflicts and 
   expect(disabled.files).toHaveLength(1);
 });
 
+test("an instance whose subcircuit the Library defines twice asks which definition to enter, and opens that file as a view of its own", async ({ page }) => {
+  await start(page);
+  // (the first line of a file opened on its own is its title)
+  const define = (resistance) => `* library\n.subckt cell p n\nR1 p n ${resistance}\n.ends\n`;
+  await page.locator("#include-input").setInputFiles([
+    { name: "cell_a.inc", mimeType: "text/plain", buffer: Buffer.from(define("1k")) },
+    { name: "cell_b.inc", mimeType: "text/plain", buffer: Buffer.from(define("2k")) },
+  ]);
+  await expect(page.getByRole("button", { name: "Exclude cell_b.inc", exact: true })).toBeVisible();
+  await page.locator("#file-input").setInputFiles({ name: "top.netlist", mimeType: "text/plain", buffer: Buffer.from("* top\nX1 a 0 cell\n.end\n") });
+  const top = await shown(page);
+  expect(top.levels[0].children[0].level).toBeNull();
+  expect(top.levels[0].children[0].candidates).toHaveLength(2);
+  const choose = async () => {
+    await page.evaluate(async () => {
+      const o = window.viewer.doc.objects.findIndex((x) => x.kind === "instance" && x.name === "X1");
+      (await import("./selection.js")).select(o, "list", { usage: false });
+    });
+    await page.keyboard.press("e");
+    const dialog = page.locator("dialog.dialog");
+    await expect(dialog.locator(".dialog-title")).toHaveText("Choose a definition of cell");
+    return dialog;
+  };
+  const dialog = await choose();
+  await expect(dialog.locator(".dialog-option")).toHaveText(["/cell_a.inc:2", "/cell_b.inc:2"]);
+  // Escape opens nothing
+  await page.keyboard.press("Escape");
+  expect(await page.evaluate(() => window.viewer.doc.path)).toMatch(/top\.netlist$/);
+  // the second definition, as a view of its own file, at its subcircuit
+  await page.evaluate(() => { window.seen = new WeakSet([window.viewer.doc]); });
+  await page.keyboard.press("e");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  const entered = await shown(page);
+  expect(entered.path).toMatch(/cell_b\.inc$/);
+  await expect(page.locator("#level-name")).toHaveText("cell");
+  await expect(page.locator("#source")).toContainText("R1 p n 2k");
+  // the instance selected in the netlist is no selection of this document
+  await expect(page.locator("#selection")).toHaveText("");
+  // back to the netlist, which is as it was: entering asks again
+  await page.evaluate(() => { window.seen = new WeakSet([window.viewer.doc]); });
+  await page.evaluate(() => window.viewer.command("ascend"));
+  const again = await shown(page);
+  expect(again.path).toMatch(/top\.netlist$/);
+  expect(again.levels[0].children[0].candidates).toHaveLength(2);
+  await choose();
+  await page.keyboard.press("Escape");
+});
+
 test("Auto Include imports the actual nested definition without pulling its testbench into the web document", async ({ page }) => {
   await start(page);
   const results = await page.evaluate(async () => {

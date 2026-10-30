@@ -34,6 +34,7 @@ export default {
     const f = document.files[index], path = sourcePath(document, f);
     return path.startsWith('<') ? { path, name: f.name, text: f.text, readonly: true } : file(path);
   },
+  sourceForPath: (source, path) => file(path),
   setLanguage: language => invoke("set_ui_language", { language }),
   // the languages the app was built with, from i18n/ (apps/desktop/build.rs)
   uiLanguages: () => invoke("ui_languages"),

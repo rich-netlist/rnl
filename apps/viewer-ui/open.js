@@ -19,9 +19,9 @@ import { renderHierarchy, rootPath } from "./hierarchy.js";
 import { setProblems } from "./panels.js";
 import { markDiagnostics, renderDiagnostics } from "./problems.js";
 import { startLevel, uncalledRoots } from "./roots.js";
-import { select } from "./selection.js";
+import { clearSelection, select } from "./selection.js";
 import { endPreview, previewing, solve } from "./solve.js";
-import { namedPath, restorePath, visitView } from "./subcircuits.js";
+import { levelNamed, namedPath, restorePath, visitView } from "./subcircuits.js";
 import { clearSource, fileShown, fileViews, renderFiles, revealDefinition, showFile } from "./text.js";
 import { $ } from "./util.js";
 import { setEnabled } from "./commands.js";
@@ -341,7 +341,7 @@ function showDocument(before, navigation) {
     return;
   }
   const wanted = before?.level || navigation?.level;
-  const kept = wanted ? doc.levels.findIndex((l) => l.title === wanted) : -1;
+  const kept = wanted ? levelNamed(wanted) : -1;
   // the level it was, else the top level, or, when that has no objects, the first subcircuit that
   // nothing calls, with a line that says so
   const start = kept >= 0 ? { level: kept, note: "" } : startLevel();
@@ -350,16 +350,19 @@ function showDocument(before, navigation) {
   showLevel(start.level, kept >= 0 ? before?.view || visitView() : null);
   notice(start.note);
 
+  let selectedHere = false;
   if (navigation?.reveal) revealDefinition(start.level);
   if (navigation?.select) {
     const s = navigation.select;
     const o = doc.objects.findIndex(o => o.kind === s.kind && o.name === s.name && o.level_title === s.level);
-    if (o >= 0) select(o, "ascend", { usage: s.usage });
+    if (o >= 0) { select(o, "ascend", { usage: s.usage }); selectedHere = true; }
   }
 
   if (before && before.selected) {
     const s = before.selected;
     const o = doc.objects.findIndex((x) => x.kind === s.kind && x.name === s.name && x.level === s.level);
-    if (o >= 0) select(o, "reload", { usage: s.usage });
+    if (o >= 0) { select(o, "reload", { usage: s.usage }); selectedHere = true; }
   }
+  // what was selected in another document is no selection of this one
+  if (!selectedHere) clearSelection();
 }

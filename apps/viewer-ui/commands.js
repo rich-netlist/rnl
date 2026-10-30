@@ -20,7 +20,7 @@ import { closePreview, saveSolved, solve } from "./solve.js";
 import { settings } from "./solve-settings.js";
 import { doc, selected } from "./state.js";
 import { findInSource } from "./text.js";
-import { ascend, descend, opens } from "./subcircuits.js";
+import { ascend, canOpen, descend } from "./subcircuits.js";
 import { checkForUpdates } from "./updates.js";
 import { bundledPackagesHelp } from "./bundled-packages.js";
 import { fileAssociations } from "./file-associations.js";
@@ -191,7 +191,7 @@ export function isChecked(id) {
   return checks.get(id) === true;
 }
 
-export const isEnabled = (id) => id === "panel-hide" ? !$("app").classList.contains("sidebar-hidden") : id === "find-text" ? !!doc && !editing : id !== "descend-new-window" || opens(selected) !== null;
+export const isEnabled = (id) => id === "panel-hide" ? !$("app").classList.contains("sidebar-hidden") : id === "find-text" ? !!doc && !editing : id !== "descend-new-window" || canOpen(selected);
 export function setEnabled(id, enabled) {
   shell?.setEnabled?.(id, enabled);
 }
@@ -329,7 +329,7 @@ document.addEventListener("keydown", (e) => {
   if (id === "find-text" && (typing || !isEnabled(id))) return note(e, "find not available");
   // Focused buttons and source links retain native Enter activation.
   const control = e.target.closest('button, a[href]')?.getClientRects().length > 0;
-  if ((id === "descend" || id === "descend-new-window") && (control || opens(selected) === null)) return note(e, "nothing to open");
+  if ((id === "descend" || id === "descend-new-window") && (control || !canOpen(selected))) return note(e, "nothing to open");
   // Shift modifies navigation, including Ctrl+Shift+E (up) and Shift+Backspace.
   if (!typing && e.shiftKey && e.key === "Backspace" && !ctrl && !e.altKey) id = "ascend";
   if (e.shiftKey && ctrl && e.key.toLowerCase() === "e") id = "ascend";

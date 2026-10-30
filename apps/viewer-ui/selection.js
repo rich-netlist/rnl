@@ -4,7 +4,7 @@ import { append, m, setText } from "./i18n.js";
 import { current, doc, selected, setSelected } from "./state.js";
 import { paintDrawingSelection } from "./drawing.js";
 import { kindName } from "./picker.js";
-import { goTo, opens } from "./subcircuits.js";
+import { candidatesOf, canOpen, goTo, opens } from "./subcircuits.js";
 import { paintSourceSelection } from "./text.js";
 import { $ } from "./util.js";
 import { setEnabled } from "./commands.js";
@@ -30,7 +30,7 @@ export function select(o, from, options) {
   }
   if (options?.newWindow) return;
   setSelected(o, options?.usage ?? usageSelection(o, from));
-  markSubcircuit(opens(o) !== null);
+  markSubcircuit(canOpen(o));
   paintDrawingSelection();
   paintSourceSelection(from === "drawing" || from === "ascend" || from === "usage");
   window.dispatchEvent(new Event("viewer-selection"));
@@ -38,7 +38,13 @@ export function select(o, from, options) {
   sel.replaceChildren();
   const b = document.createElement("b");
   setText(b, obj.name);
-  if (opens(o) !== null) {
+  if (opens(o) === null && candidatesOf(o).length > 1) {
+    // several definitions in the Library, none chosen: entering asks which
+    const n = candidatesOf(o).length;
+    append(sel, b, touch.matches
+      ? m` instance of a subcircuit with ${n} definitions in ${obj.level_title} · a double tap asks which to open`
+      : m` instance of a subcircuit with ${n} definitions in ${obj.level_title} · E or Enter asks which to open; Shift opens a new window`);
+  } else if (opens(o) !== null) {
     append(sel, b, touch.matches
       ? m` instance of ${doc.levels[obj.opens].title} in ${obj.level_title} · a double tap opens it`
       : m` instance of ${doc.levels[obj.opens].title} in ${obj.level_title} · E or Enter opens it; Shift opens a new window`);
@@ -48,6 +54,7 @@ export function select(o, from, options) {
 }
 
 export function clearSelection() {
+  setText($("selection"), ""); // (a document shown after another has no selection, whatever the line said)
   if (selected === null) return;
   setSelected(null);
   markSubcircuit(false);

@@ -3,6 +3,8 @@ import { append, m, setAttr, setText } from "./i18n.js";
 // other navigation starts a new chain. Ancestors retain their entry source and title so
 // crossing a file boundary can rebuild independently and still return to that visit.
 
+import { choose } from "./dialog.js";
+import { shell } from "./shell.js";
 import { current, doc, path, setPath, viewCache } from "./state.js";
 import { showLevel, view } from "./drawing.js";
 import { rootPath } from "./hierarchy.js";
@@ -25,6 +27,26 @@ let hidden = []; // the levels of the path left out of the bar, behind the ellip
 export function opens(o) {
   const obj = doc && o !== null && o !== undefined ? doc.objects[o] : null;
   return obj && obj.kind === "instance" && obj.opens !== null && obj.opens !== undefined ? obj.opens : null;
+}
+
+/** The Library definitions Auto Include found for the subcircuit of instance `o`, when there are several and it chose none. */
+export function candidatesOf(o) {
+  const obj = doc && o !== null && o !== undefined ? doc.objects[o] : null;
+  if (!obj || obj.kind !== "instance" || (obj.opens !== null && obj.opens !== undefined)) return [];
+  const level = doc.levels.find((l) => l.host === obj.level);
+  const child = level?.children.find((c) => c.instance === obj.name && c.level === null);
+  return child?.candidates?.length > 1 ? child.candidates : [];
+}
+
+/** Whether an instance can be entered: it has a definition, or has several to choose from. */
+export const canOpen = (o) => opens(o) !== null || candidatesOf(o).length > 1;
+
+/** The level a title names: exactly, or else, when only one level has it, by the title in any case, as SPICE names it. */
+export function levelNamed(title) {
+  const exact = doc.levels.findIndex((l) => l.title === title);
+  if (exact >= 0 || typeof title !== "string") return exact;
+  const loose = doc.levels.flatMap((l, k) => (l.title.toLowerCase() === title.toLowerCase() ? [k] : []));
+  return loose.length === 1 ? loose[0] : -1;
 }
 
 /** A path's key among the views kept: its root's title and the instances on it. */
@@ -67,10 +89,32 @@ function cutTo(level) {
   return k >= 0 ? path.slice(0, k + 1) : [{ level, via: null }];
 }
 
-/** Open the subcircuit of instance `o`, below the level that has the instance. */
+/**
+ * Ask which of the several definitions of the instance's subcircuit to open, in a dialog, however it was asked for, and
+ * open the file of the one chosen as a view of its own, as for a subcircuit defined in an included file: this netlist
+ * is not changed, so the next time asks again.
+ */
+async function chooseDefinition(o, options) {
+  const candidates = candidatesOf(o);
+  if (candidates.length < 2 || !shell.sourceForPath) return;
+  const obj = doc.objects[o];
+  const master = doc.levels.find((l) => l.host === obj.level).children.find((c) => c.instance === obj.name).master;
+  const picked = await choose({
+    title: m`Choose a definition of ${master}`,
+    text: m`${master} is defined ${candidates.length} times in the Library. The one you choose opens as a view of its own file, without the parameters of this instance; this netlist is not changed.`,
+    items: candidates.map((c) => ({ label: `${c.source}:${c.line}`, value: c })),
+  });
+  if (!picked) return;
+  const at = doc.levels[current].host === obj.level ? current : doc.levels.findIndex((l) => l.host === obj.level);
+  if (!options?.newWindow) window.dispatchEvent(new Event("viewer-navigate"));
+  const step = { title: master, via: obj.name };
+  return navigate({ source: shell.sourceForPath(currentSource(), picked.file), path: at < 0 ? [step] : [...cutTo(at), step], selection: null, reveal: true }, options);
+}
+
+/** Open the subcircuit of instance `o`, below the level that has the instance; with several definitions, the one chosen. */
 export function descend(o, options) {
   const level = opens(o);
-  if (level === null) return;
+  if (level === null) return chooseDefinition(o, options);
   const obj = doc.objects[o];
   // the instance is on the level shown, or on one that the path is cut back to or starts at
   const at = doc.levels[current].host === obj.level ? current : doc.levels.findIndex((l) => l.host === obj.level);
@@ -146,7 +190,7 @@ export function namedPath(route = path) {
 /** Resolve only visits belonging to this entry; ancestors in other files need no local level. */
 export function restorePath(named, level) {
   const next = named.map(s => ({ ...s, entry: s.entry || currentSource(),
-    level: !s.entry || sameSource(s.entry, currentSource()) ? doc.levels.findIndex(l => l.title === s.title) : -1 }));
+    level: !s.entry || sameSource(s.entry, currentSource()) ? levelNamed(s.title) : -1 }));
   const found = next.length && next.at(-1).level === level
     && next.every(s => !sameSource(s.entry, currentSource()) || s.level >= 0);
   setPath(found ? next : [{ level, title: doc.levels[level].title, entry: currentSource(), via: null }]);
