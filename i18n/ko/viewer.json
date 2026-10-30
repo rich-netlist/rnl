@@ -658,5 +658,12 @@
   "Project archives": "프로젝트 압축 파일",
   "Choose the folder to open the project in": "프로젝트를 풀어 열 폴더 선택",
   "Save Solved Copy As": "풀이 결과 사본 다른 이름으로 저장",
-  "Save the Solved Files Into a Folder": "풀이 결과 파일들을 폴더에 저장"
+  "Save the Solved Files Into a Folder": "풀이 결과 파일들을 폴더에 저장",
+  "Show all groups": "모든 그룹 표시",
+  "member of group {0}": "그룹 {0}의 구성원",
+  "member (through terminal {0}) of group {1}": "그룹 {1}의 구성원(단자 {0} 경유)",
+  "{0} is in turn a member of group {1}": "{0}은(는) 다시 그룹 {1}의 구성원",
+  "{0} is in turn within group {1}": "{0}은(는) 다시 그룹 {1} 안에 있음",
+  "within group {0}": "그룹 {0} 안에 있음",
+  "group": "그룹"
 }

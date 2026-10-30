@@ -658,5 +658,12 @@
   "Project archives": "專案壓縮檔",
   "Choose the folder to open the project in": "選擇要解壓縮並開啟專案的資料夾",
   "Save Solved Copy As": "另存求解副本",
-  "Save the Solved Files Into a Folder": "將求解後的檔案儲存至資料夾"
+  "Save the Solved Files Into a Folder": "將求解後的檔案儲存至資料夾",
+  "Show all groups": "顯示所有組",
+  "member of group {0}": "組 {0} 的成員",
+  "member (through terminal {0}) of group {1}": "組 {1} 的成員（經端子 {0}）",
+  "{0} is in turn a member of group {1}": "{0} 又是組 {1} 的成員",
+  "{0} is in turn within group {1}": "{0} 又在組 {1} 之內",
+  "within group {0}": "在組 {0} 之內",
+  "group": "組"
 }

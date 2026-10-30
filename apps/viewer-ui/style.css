@@ -194,6 +194,10 @@ button.icon { padding: 0 6px; font-size: 16px; line-height: 20px; color: var(--m
 .usage-expand[aria-expanded="false"] .chevron { transform: rotate(-90deg); }
 .usage-row { padding-left: 26px; }
 .usage-row.selected { background: var(--select-line); }
+/* a group that PRIORITY has turned off: the whole row greyed, with its state at the right */
+.usage-row.greyed .usage-name, .usage-row.greyed .usage-color-dot { opacity: 0.55; }
+.usage-row.greyed .usage-name { color: var(--muted); }
+.usage-state { flex: none; font-size: 12px; color: var(--muted); }
 .usage-name { font-family: ui-monospace, Consolas, monospace, var(--ui-cjk); }
 .usage-color-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; }
 .usage-color-control { display: flex; align-items: center; gap: 10px; }

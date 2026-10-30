@@ -97,9 +97,9 @@ for (const platform of ['desktop', 'web']) {
       await page.mouse.click(b.x, b.y + b.height / 2);
     };
     await clickBorder();
-    // Nested semantic groups can have exactly the same frame: normal overlap picking applies.
-    await expect(page.locator('#pick-list')).toBeVisible();
-    await page.locator(`#pick-list [data-object="${pair.object}"]`).click();
+    // Nested usages have frames of exactly the same extent, which are set out a level each (usages.js, frameSteps):
+    // the border is this usage's own, and a click on it selects it, with no list of objects to choose from.
+    await expect(page.locator('#pick-list')).toBeHidden();
     await expect(frame(page, pair.object)).toHaveClass(/selected/);
     expect(await page.evaluate(() => window.viewer.selected)).toBe(pair.object);
     await expect(fill).toHaveAttribute('fill-opacity', '0.2');

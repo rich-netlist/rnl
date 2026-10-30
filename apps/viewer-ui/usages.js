@@ -5,7 +5,8 @@ import { select } from "./selection.js";
 import { setCheck } from "./commands.js";
 import { $, load, save, span, svgElement } from "./util.js";
 import { setPathText } from "./source-path.js";
-import { objectUsages } from "./usage-table.js";
+import { objectUsages, stateName } from "./usage-table.js";
+import { FRAME_STEP, frameSteps, TITLE_ROW, titleRows } from "./frame-layout.js";
 import { setPane } from "./panels.js";
 import { revealLine } from "./text.js";
 
@@ -33,6 +34,16 @@ let layerSelected = null;
 let context = null;
 
 const usages = () => doc?.levels[current]?.usages || [];
+/** A group (`@GROUP`, 11.5) is listed with the usages and drawn as one, of a kind of its own. */
+const GROUP_TYPE = "@GROUP";
+export const isGroup = (u) => u.kind === "group";
+/** The heading a usage is listed under: its definition, or `@GROUP` for the groups. */
+const typeOf = (u) => (isGroup(u) ? GROUP_TYPE : u.definition);
+/** What the drawing and the details call it: `$DIFFERENTIAL_PAIR: %dp1`, `@GROUP: %core`. */
+const labelOf = (u) => `${typeOf(u)}: ${u.id}`;
+/** A group may be turned off by PRIORITY (14.8), which its entry says in `state`; it is never failed or overridden. */
+const stateOf = (u) => u.state ?? "in-effect";
+const DISABLED_OPACITY = 0.4; // how strongly the frame of a group that is turned off is drawn
 /** A level shown, or another document, starts with every group folded. */
 function newScope() {
   if (doc === scopeDoc && current === scopeLevel) return;
@@ -41,14 +52,14 @@ function newScope() {
   expanded.clear();
   rowLimits.clear();
 }
-const chosen = () => selectedAsUsage ? usages().find(u => u.object === selected) : null;
+const chosen =() => selectedAsUsage ? usages().find(u => u.object === selected) : null;
 const visible = u => shown && setting(u).visible;
 /** Hidden virtual symbols still select as ordinary parts when picked on the drawing. */
 export function usageSelection(object, from) {
   const u = usages().find(u => u.object === object);
   return !!u && (from === "usage" || from === "source" || visible(u));
 }
-const keyOf = u => JSON.stringify([doc.path, doc.levels[current].kind, doc.levels[current].title, u.id]);
+const keyOf = u => JSON.stringify([doc.path, doc.levels[current].kind, doc.levels[current].title, ...(isGroup(u) ? ["group"] : []), u.id]);
 function setting(u) {
   if (activeSettings.has(u)) return activeSettings.get(u);
   const key = keyOf(u);
@@ -145,10 +156,11 @@ export function renderUsages() {
   if (!all.length) append(list, span("placeholder", m("No usages in this circuit.")));
   const groups = new Map();
   for (const u of all) {
-    if (!groups.has(u.definition)) groups.set(u.definition, []);
-    groups.get(u.definition).push(u);
+    if (!groups.has(typeOf(u))) groups.set(typeOf(u), []);
+    groups.get(typeOf(u)).push(u);
   }
-  const sorted = [...groups].sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }));
+  // the groups come last, after the definitions
+  const sorted = [...groups].sort(([a], [b]) => (a === GROUP_TYPE) - (b === GROUP_TYPE) || a.localeCompare(b, undefined, { numeric: true }));
   if (sorted.length) {
     // one button for all the groups: Expand All, or Collapse All when every group is open
     const every = sorted.every(([type]) => expanded.has(type));
@@ -187,7 +199,7 @@ export function renderUsages() {
       renderUsages();
     });
     const visible = items.filter(u => setting(u).visible).length;
-    const control = checkbox(m`Show all usages of ${type}`, visible === items.length, value => {
+    const control = checkbox(type === GROUP_TYPE ? m("Show all groups") : m`Show all usages of ${type}`, visible === items.length, value => {
       for (const u of items) { Object.assign(setting(u), { visible: value }); remember(u); }
       persist(); revision++; renderUsages(); repaint();
     });
@@ -202,6 +214,8 @@ export function renderUsages() {
         row.className = "usage-row";
         row.dataset.object = String(u.object);
         row.classList.toggle("selected", u.object === inspected);
+        const state = isGroup(u) ? stateOf(u) : "in-effect"; // (the list greys the groups that are turned off; a usage that is not in effect has its state in the table of its members' usages)
+        row.classList.toggle("greyed", state !== "in-effect");
         const button = document.createElement("button");
         button.type = "button";
         button.className = "usage-name";
@@ -213,7 +227,10 @@ export function renderUsages() {
         button.addEventListener("click", () => select(u.object, "usage"));
         const check = checkbox(m`Show ${u.id}`, setting(u).visible, visible => change(u, { visible }));
         check.dataset.focusKey = `check:${u.id}`;
-        append(row, button, check);
+        // a group that is turned off is greyed, the whole row, and says so
+        append(row, button);
+        if (state !== "in-effect") append(row, span("usage-state", stateName(state)));
+        append(row, check);
         append(group, row);
       }
       if (items.length > limit) {
@@ -255,7 +272,7 @@ function renderDetail() {
     return;
   }
   const title = document.createElement("h2");
-  setText(title, `${u.definition}: ${u.id}`);
+  setText(title, labelOf(u));
   const colorRow = document.createElement("label");
   colorRow.className = "usage-color-control";
   const color = document.createElement("input");
@@ -375,6 +392,7 @@ export function paintUsages(svg, view, groups) {
     drawing = svg; layerDoc = doc; layerLevel = current; layerRevision = revision; layerSelected = focus;
     mute(groups, u ? focusSet(u) : null);
     frames = [];
+    const levels = frameSteps(usages().filter((u) => u.frame?.bounds && !localSymbol(u) && (u.object === focus || visible(u))));
     for (const entry of [...usages()].sort((a, b) => Number(a.object === focus) - Number(b.object === focus))) {
       const active = entry.object === focus;
       if (!active && !visible(entry)) continue;
@@ -382,20 +400,22 @@ export function paintUsages(svg, view, groups) {
       const bounds = entry.frame?.bounds;
       if (!bounds) continue;
       const color = setting(entry).color;
-      const group = svgElement("g", { class: `usage-frame${active ? " selected" : ""}`, "data-usage": entry.object });
-      const fill = svgElement("rect", { class: "usage-fill", "data-usage": entry.object, fill: color, "fill-opacity": active ? .2 : .1, rx: 10 });
+      // a group that PRIORITY has turned off is drawn faint, its frame, fill and label
+      const off = isGroup(entry) && stateOf(entry) !== "in-effect";
+      const group = svgElement("g", { class: `usage-frame${active ? " selected" : ""}${off ? " disabled" : ""}`, "data-usage": entry.object, ...(off ? { opacity: DISABLED_OPACITY } : {}) });
+      const fill = svgElement("rect", { class: "usage-fill", "data-usage": entry.object, fill: color, "fill-opacity": (active ? .2 : .1) * (off ? DISABLED_OPACITY : 1), rx: 10 });
       append(underlay, fill);
       // Overlay coordinates are CSS pixels: 1pt = 4/3px, independent of drawing zoom.
       const rect = svgElement("rect", { fill: "none", stroke: color,
         "stroke-width": active ? 8 / 3 : 4 / 3, "stroke-dasharray": "1 5", "stroke-linecap": "round", rx: 10 });
       append(group, rect);
       append(layer, group);
-      const title = badge(`${entry.definition}: ${entry.id}`, color, group, "usage-title", entry.frame.title_width);
+      const title = badge(labelOf(entry), color, group, "usage-title", entry.frame.title_width);
       const roles = active ? entry.roles.map((r, i) => ({ ...r, anchor: entry.frame.roles[i], width: entry.frame.role_widths[i] })).filter(r => r.anchor).map(r => ({
         anchor: r.anchor,
         ...badge(r.name, color, group, "usage-role-label", r.width),
       })) : [];
-      frames.push({ entry, bounds, rect, fill, title, roles, active, local });
+      frames.push({ entry, bounds, rect, fill, title, roles, active, local, pad: (levels.get(entry.object) ?? 0) * FRAME_STEP });
     }
     append(svg, currentLayer);
   }
@@ -405,19 +425,32 @@ export function paintUsages(svg, view, groups) {
   for (const f of frames) {
     const [x, y] = project(f.bounds[0], f.bounds[1]);
     const [right, bottom] = project(f.bounds[2], f.bounds[3]);
-    const b = [x, y, right, bottom];
+    const b = [x - f.pad, y - f.pad, right + f.pad, bottom + f.pad];
     f.screen = b;
     for (const [attr, value] of Object.entries({ x: b[0], y: b[1], width: b[2] - b[0], height: b[3] - b[1] })) {
       f.rect.setAttribute(attr, value); f.fill.setAttribute(attr, value);
     }
-    placeBadge(f.title, ...project(...f.entry.frame.title), false);
-    const titleVisible = f.active || f.title.width + 16 <= b[2] - b[0];
+    const [titleX, titleY] = project(...f.entry.frame.title);
+    f.titleAt = [titleX - f.pad, titleY - f.pad];
+    placeBadge(f.title, ...f.titleAt, false);
+    const titleVisible = f.active || f.title.width + 16 <= right - x; // (the frame's own width, as the core decides for the image)
     f.title.g.setAttribute("display", titleVisible ? "inline" : "none");
     if (!titleVisible) f.title.screen = null;
     for (const role of f.roles) {
       placeBadge(role, ...project(...role.anchor), true);
     }
   }
+  spreadTitles();
+}
+/**
+ * The titles that would lie on another's go down a row each (titleRows), the outer frames' titles, and the selected
+ * one's, staying where they are: frames that cross without one holding the other, and the frames below the outer
+ * three of a nest, have titles at one place otherwise.
+ */
+function spreadTitles() {
+  const shown = frames.filter((f) => f.title.screen);
+  const rows = titleRows(shown.map((f) => ({ key: f, x: f.titleAt[0], y: f.titleAt[1], width: f.title.width, first: (f.active ? 1e6 : 0) + f.pad })));
+  for (const f of shown) if (rows.get(f)) placeBadge(f.title, f.titleAt[0], f.titleAt[1] + rows.get(f) * TITLE_ROW, false);
 }
 function placeBadge(b, x, y, centered) {
   const width = b.width ??= b.label.getComputedTextLength();
@@ -445,10 +478,10 @@ function showSelected() {
   newScope();
   const u = chosen();
   if (u) {
-    expanded.add(u.definition);
-    const items = usages().filter((x) => x.definition === u.definition);
+    expanded.add(typeOf(u));
+    const items = usages().filter((x) => typeOf(x) === typeOf(u));
     const at = items.findIndex((x) => x.object === u.object);
-    if (at >= (rowLimits.get(u.definition) || 100)) rowLimits.set(u.definition, Math.ceil((at + 1) / 100) * 100);
+    if (at >= (rowLimits.get(typeOf(u)) || 100)) rowLimits.set(typeOf(u), Math.ceil((at + 1) / 100) * 100);
   }
   revealPending = !!u;
   renderUsages();

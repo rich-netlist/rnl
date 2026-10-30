@@ -658,5 +658,12 @@
   "Project archives": "Archivos de proyecto",
   "Choose the folder to open the project in": "Elige la carpeta donde abrir el proyecto",
   "Save Solved Copy As": "Guardar copia resuelta como",
-  "Save the Solved Files Into a Folder": "Guardar los archivos resueltos en una carpeta"
+  "Save the Solved Files Into a Folder": "Guardar los archivos resueltos en una carpeta",
+  "Show all groups": "Mostrar todos los grupos",
+  "member of group {0}": "miembro del grupo {0}",
+  "member (through terminal {0}) of group {1}": "miembro del grupo {1} (a través del terminal {0})",
+  "{0} is in turn a member of group {1}": "{0} es a su vez miembro del grupo {1}",
+  "{0} is in turn within group {1}": "{0} está a su vez dentro del grupo {1}",
+  "within group {0}": "dentro del grupo {0}",
+  "group": "grupo"
 }

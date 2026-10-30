@@ -26,7 +26,7 @@ export function select(o, from, options) {
   // starting there
   if (from === "source" && (!doc.levels[current] || doc.levels[current].host !== obj.level)) {
     const k = doc.levels.findIndex((l) => l.host === obj.level);
-    if (k >= 0) return goTo(k, o, { ...options, usage: obj.kind === "usage" });
+    if (k >= 0) return goTo(k, o, { ...options, usage: obj.kind === "usage" || obj.kind === "group" });
   }
   if (options?.newWindow) return;
   setSelected(o, options?.usage ?? usageSelection(o, from));

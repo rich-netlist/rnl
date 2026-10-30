@@ -64,6 +64,56 @@ test('Export SVG draws the whole level with the usages and current directions th
   expect(svg.bytes.toString()).toMatch(new RegExp(`<rect class="backdrop"[^>]*fill="${paper}"`));
 });
 
+test('Export SVG sets nested frames out as the page does: each frame outside the ones in it, no two titles on one another, all in the image', async ({ page }) => {
+  await page.goto(`${process.env.RNL_WEB_URL}/index.html`);
+  await expect(page.locator('#menubar')).toBeVisible();
+  await page.locator('#file-input').setInputFiles({ name: 'ota-groups.sp', mimeType: 'text/plain', buffer: fs.readFileSync(path.join(import.meta.dirname, '..', 'inputs', 'ota-groups.sp')) });
+  await page.waitForFunction(() => window.viewer.doc && !document.body.classList.contains('busy'));
+  const svg = await exported(page, 'export-svg');
+  const result = await page.evaluate(([text]) => {
+    const doc = new DOMParser().parseFromString(text, 'image/svg+xml');
+    const n = (el, a) => Number(el.getAttribute(a));
+    const usages = window.viewer.doc.levels[window.viewer.level].usages;
+    const frame = (id) => {
+      const object = usages.find((u) => u.id === id).object;
+      const r = doc.querySelector(`g.usage-frame[data-usage="${object}"] > rect`);
+      return [n(r, 'x'), n(r, 'y'), n(r, 'x') + n(r, 'width'), n(r, 'y') + n(r, 'height')];
+    };
+    const boxes = [...doc.querySelectorAll('g.usage-title')].map((g) => {
+      const r = g.querySelector('rect');
+      const [dx, dy] = (g.getAttribute('transform') || 'translate(0 0)').match(/-?[\d.]+/g).map(Number);
+      return [n(r, 'x') + dx, n(r, 'y') + dy, n(r, 'x') + dx + n(r, 'width'), n(r, 'y') + dy + n(r, 'height')];
+    });
+    const rects = [...doc.querySelectorAll('g.usage-frame > rect')].map((r) => [n(r, 'x'), n(r, 'y'), n(r, 'x') + n(r, 'width'), n(r, 'y') + n(r, 'height')]);
+    const [vx, vy, vw, vh] = doc.documentElement.getAttribute('viewBox').split(/\s+/).map(Number);
+    const backdrop = doc.querySelector('rect.backdrop');
+    return { core: frame('%core'), amp: frame('%amp'), inp: frame('%inp'), boxes, rects, view: [vx, vy, vx + vw, vy + vh],
+      backdrop: [n(backdrop, 'x'), n(backdrop, 'y'), n(backdrop, 'x') + n(backdrop, 'width'), n(backdrop, 'y') + n(backdrop, 'height')],
+      width: n(doc.documentElement, 'width') };
+  }, [svg.bytes.toString()]);
+  // %inp is within %amp within %core: each outside the one within it by a step (the page's, 18) at least
+  for (const [outer, inner] of [[result.core, result.amp], [result.amp, result.inp]]) {
+    expect(inner[0] - outer[0]).toBeGreaterThanOrEqual(17);
+    expect(inner[1] - outer[1]).toBeGreaterThanOrEqual(17);
+    expect(outer[2] - inner[2]).toBeGreaterThanOrEqual(17);
+    expect(outer[3] - inner[3]).toBeGreaterThanOrEqual(17);
+  }
+  // no two titles lie on one another
+  expect(result.boxes.length).toBeGreaterThan(5);
+  for (const [i, a] of result.boxes.entries()) for (const b of result.boxes.slice(i + 1)) {
+    expect(a[0] < b[2] - 1 && b[0] < a[2] - 1 && a[1] < b[3] - 1 && b[1] < a[3] - 1, `titles ${i}`).toBe(false);
+  }
+  // the image holds every frame and title, and the paper is as large as the image
+  for (const r of [...result.rects, ...result.boxes]) {
+    expect(r[0]).toBeGreaterThanOrEqual(result.view[0] - 0.01);
+    expect(r[1]).toBeGreaterThanOrEqual(result.view[1] - 0.01);
+    expect(r[2]).toBeLessThanOrEqual(result.view[2] + 0.01);
+    expect(r[3]).toBeLessThanOrEqual(result.view[3] + 0.01);
+  }
+  for (let k = 0; k < 4; k++) expect(result.backdrop[k]).toBeCloseTo(result.view[k], 3);
+  expect(Math.abs(result.width - (result.view[2] - result.view[0]))).toBeLessThan(1);
+});
+
 test('Export PNG draws the SVG at twice its size, not empty', async ({ page }) => {
   await open(page);
   await page.evaluate(() => window.viewer.command('toggle-currents'));
