@@ -33,8 +33,9 @@ pub use catalog::{
     Terminal,
 };
 pub use document::{
-    Child, Diagnostic, Document, Drawings, Hit, InspectedLabel, InspectedPin, InspectedSymbol, Level, MemberOf, Object,
-    RoleOf, RuleAt, SourceFile, SourceInclude, Span, Unplaced, UnplacedDrawing, Usage, UsageRole,
+    AutoIncludeCandidate, Child, Diagnostic, Document, Drawings, Hit, InspectedLabel, InspectedPin, InspectedSymbol,
+    Level, MemberOf, Object, RoleOf, RuleAt, SourceFile, SourceInclude, Span, Unplaced, UnplacedDrawing, Usage,
+    UsageRole,
 };
 pub use formats::{detect_format, formats, FormatInfo};
 pub use library::{LibraryIndex, LibraryProvider};

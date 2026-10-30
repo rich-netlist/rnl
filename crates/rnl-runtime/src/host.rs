@@ -255,6 +255,10 @@ pub struct HostDocument {
     /// starts in it, and the line of the `simulator lang=spectre` that ends it, one past the last
     /// line of the file when none does. The rest of a file of such a reading is in Spectre mode.
     pub spice_mode: Vec<(String, u32, u32)>,
+    /// The subcircuits that a viewer's Auto Include found defined more than once in its Library,
+    /// and so did not include: the name as an instance writes it, whether it compares by case,
+    /// and the definitions, in the Library's order. Empty without Auto Include.
+    pub library_candidates: Vec<(String, bool, Vec<crate::source::LibraryDefinition>)>,
 }
 
 impl HostDocument {
@@ -273,6 +277,7 @@ impl HostDocument {
             excluded: Vec::new(),
             unselected_sections: Vec::new(),
             spice_mode: Vec::new(),
+            library_candidates: Vec::new(),
         }
     }
 

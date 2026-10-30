@@ -300,7 +300,7 @@ pub(crate) fn resolve(
     let mut attempted = HashSet::new();
     loop {
         let mut parsed = Sink::new();
-        let doc = reader(&extra, &mut parsed)?;
+        let mut doc = reader(&extra, &mut parsed)?;
         let mut next = Vec::new();
         let mut approved = HashSet::new();
         let mut reserved: HashMap<String, LibraryDefinition> = HashMap::new();
@@ -320,7 +320,12 @@ pub(crate) fn resolve(
                 let loc = Some(Loc::line(&inst.file, inst.line));
                 if candidates.len() > 1 {
                     let names: Vec<_> = candidates.iter().map(|d| format!("{}:{}", d.source, d.line)).collect();
-                    conflicts.push((model.to_string(), format!("Auto Include: subcircuit {model} has conflicting definitions in {}; add an explicit include to choose one", names.join(", ")), loc));
+                    let message = format!(
+                        "Auto Include: subcircuit {model} is defined {} times in the Library ({}); enter the instance to choose one, or add an explicit include",
+                        candidates.len(),
+                        names.join(", ")
+                    );
+                    conflicts.push((model.to_string(), message, loc, Some((inst.case_sensitive, candidates))));
                 } else if let Some(def) = candidates.first() {
                     if extra.contains(&def.path) || normalize(path) == def.path {
                         continue;
@@ -356,7 +361,7 @@ pub(crate) fn resolve(
                         present || duplicate
                     });
                     if let Some(other) = conflict {
-                        conflicts.push((model.to_string(), format!("Auto Include: {} was not included for subcircuit {model} because its definition of {} conflicts with an existing definition", def.source, other.name), loc));
+                        conflicts.push((model.to_string(), format!("Auto Include: {} was not included for subcircuit {model} because its definition of {} conflicts with an existing definition", def.source, other.name), loc, None));
                     } else {
                         approved.insert(def.path.clone());
                         automatic.push((model.to_string(), def.source.clone(), loc));
@@ -375,9 +380,13 @@ pub(crate) fn resolve(
             continue;
         }
         *sink = parsed;
-        for (model, message, loc) in conflicts {
+        for (model, message, loc, candidates) in conflicts {
             if doc.subckt(&model).is_none() {
                 sink.warning(message, loc);
+                // for a viewer to offer the definitions when the instance is entered
+                if let Some((case_sensitive, candidates)) = candidates {
+                    doc.library_candidates.push((model, case_sensitive, candidates));
+                }
             }
         }
         for (model, file, loc) in automatic {
@@ -437,13 +446,39 @@ mod tests {
         let index = index(&files, &["/a.inc", "/b.inc"]);
         let (doc, sink) = host(&files, &index, true, "/top.sp");
         assert!(doc.subckt("cell").is_none());
-        assert!(sink.all().iter().any(|d| d.message.contains("conflicting definitions")
-            && d.message.contains("/a.inc")
-            && d.message.contains("/b.inc")));
+        assert!(sink.all().iter().any(|d| d.message
+            == "Auto Include: subcircuit CELL is defined 2 times in the Library (/a.inc:1, /b.inc:1); enter the instance to choose one, or add an explicit include"));
+        let (model, case_sensitive, candidates) = &doc.library_candidates[0];
+        assert_eq!((model.as_str(), *case_sensitive, candidates.len()), ("CELL", false, 2));
         files.insert("/top.sp", "* title\n.include \"/a.inc\"\nX1 a 0 CELL\n");
         let (doc, sink) = host(&files, &index, true, "/top.sp");
         assert!(doc.subckt("cell").is_some());
         assert!(!sink.all().iter().any(|d| d.message.contains("Auto Include")));
+    }
+
+    #[test]
+    fn an_instance_of_a_subcircuit_defined_twice_offers_both_definitions() {
+        let files = MemoryProvider::new()
+            .with("/top.sp", "* title\nX1 a 0 CELL\nX2 a 0 cell\nX3 a 0 other\n.end\n")
+            .with("/a.inc", "* a\n.subckt cell p n\n.ends\n")
+            .with("/lib/b.lib", ".include \"/lib/b.inc\"\n")
+            .with("/lib/b.inc", ".subckt CELL p n\n.ends\n");
+        let index = index(&files, &["/a.inc", "/lib/b.lib"]);
+        let provider = LibraryProvider { files: &files, index: &index, enabled: true };
+        let d = crate::build("/top.sp", &provider, &crate::BuildOptions::default()).unwrap();
+        let children = &d.levels[0].children;
+        assert_eq!(children.len(), 3);
+        let offered: Vec<(&str, &str, u32)> =
+            children[0].candidates.iter().map(|c| (c.path.as_str(), c.file.as_str(), c.line)).collect();
+        // the defining file itself is what is included, when it can be included on its own
+        assert_eq!(offered, [("/a.inc", "/a.inc", 2), ("/lib/b.inc", "/lib/b.inc", 1)]);
+        assert_eq!(children[0].level, None);
+        // every instance of it, as SPICE compares names, and none of a subcircuit found nowhere
+        assert_eq!(children[1].candidates, children[0].candidates);
+        assert!(children[2].candidates.is_empty());
+        let json = serde_json::to_value(&children[2]).unwrap();
+        assert!(json.get("candidates").is_none());
+        assert_eq!(d.diagnostics.iter().filter(|x| x.message.contains("is defined 2 times in the Library")).count(), 1);
     }
 
     #[test]
