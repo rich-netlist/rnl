@@ -2438,3 +2438,29 @@ fn a_library_section_is_raised_as_a_file_of_its_own() {
         assert_eq!(again.files, run.files, "{level:?}");
     }
 }
+
+#[test]
+fn solve_and_preview_say_on_the_standard_error_that_the_solver_is_a_preview() {
+    assert_eq!(
+        rnl_cli::SOLVER_PREVIEW_NOTICE,
+        "note: the solver is a preview, and its layouts may be poor; for comparison, have the model write the exact RNL placement directly"
+    );
+    let notice = format!("{}\n", rnl_cli::SOLVER_PREVIEW_NOTICE);
+    let f = path_str(&case("T1-rc-lowpass"));
+    let dir = scratch("preview-notice");
+    let out = path_str(&dir.join("out"));
+    let (code, stdout, stderr) = rnl(&["solve", &f, "-o", &out, "--solver-options", "time_limit=none"]);
+    assert_eq!(code, 0, "{stdout}{stderr}");
+    assert_eq!(stderr, notice);
+    // the standard output and the file written are as they were
+    assert!(stdout.starts_with("solver options: "), "{stdout}");
+    assert!(!stdout.contains(rnl_cli::SOLVER_PREVIEW_NOTICE), "{stdout}");
+    let snapshot = std::fs::read(solver_dir().join("solved/T1-rc-lowpass.sp")).unwrap();
+    assert!(std::fs::read(dir.join("out").join("T1-rc-lowpass.sp")).unwrap() == snapshot);
+    // the preview's JSON is the whole of its standard output
+    let (code, stdout, stderr) = rnl(&["preview", &f, "--solver-options", "time_limit=none"]);
+    assert_eq!(code, 0, "{stderr}");
+    assert_eq!(stderr, notice);
+    let v: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert!(v.get("document").is_some() && v.get("report").is_some(), "{v}");
+}

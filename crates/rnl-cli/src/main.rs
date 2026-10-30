@@ -87,6 +87,8 @@ solve options (the levels are read without their type=\"generated\" records; -o 
   solve exits with 1 when an error was reported, once the files are written: one of the netlist as a
   solver reads it, whose number it gives on the standard error as rnl check --no-generated counts
   them, or one of the solver
+  the solver is a preview, whose layouts may be poor: solve and preview say so in a line on the
+  standard error each time they solve; what they print on the standard output and write is the same
 saving options (solve and strip-generated only):
   --encoding MODE     preserve (default) or utf8; UTF-8 adds a BOM only to protect leading U+FEFF
                       copied includes that are not rewritten retain their original bytes
@@ -566,6 +568,7 @@ fn run(args: &Args) -> Result<ExitCode, String> {
                 solver,
             };
             let entry = rnl_cli::path_str(&args.file);
+            eprintln!("{}", rnl_cli::SOLVER_PREVIEW_NOTICE);
             let shown = rnl_cli::preview::preview(&entry, &provider, &options, &WallClock::new(), &|_| true)?;
             let out = serde_json::json!({ "document": shown.document, "report": shown.report });
             println!("{}", serde_json::to_string_pretty(&out).unwrap());
@@ -678,6 +681,7 @@ fn solve(args: &Args, provider: &FsProvider) -> Result<ExitCode, String> {
             rnl_cli::profile::ProfileClock::new(path)
         })
         .transpose()?;
+    eprintln!("{}", rnl_cli::SOLVER_PREVIEW_NOTICE);
     let result = match &profile_clock {
         Some(clock) => rnl_cli::solve::solve_with_clock(&args.file, provider, &options, clock),
         None => rnl_cli::solve::solve(&args.file, provider, &options),
