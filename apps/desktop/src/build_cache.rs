@@ -235,7 +235,13 @@ impl BuildCache {
     /// Build with the parameters of a subcircuit bound (`bind`), to show: it is the document whose drawings
     /// are kept now, but it is not kept among the entries, which are the files' own, as the next time the
     /// same file is opened its parameters are its own again.
-    pub fn build_bound(&mut self, path: &str, files: &dyn Provider, formats: &Formats, bind: &Bind) -> Result<Built, String> {
+    pub fn build_bound(
+        &mut self,
+        path: &str,
+        files: &dyn Provider,
+        formats: &Formats,
+        bind: &Bind,
+    ) -> Result<Built, String> {
         let path = normalize(path);
         self.misses += 1;
         let entry = Prepared::build_with(&path, files, formats, Some(bind))?;
@@ -407,13 +413,8 @@ mod tests {
     #[test]
     fn a_build_with_parameters_bound_shows_them_and_is_not_kept() {
         let mut cache = BuildCache::default();
-        let files = MemoryProvider::new().with("/p.sp", "* p
-.subckt amp a b w=1u
-R1 a b 1k
-.ends
-X1 a b amp
-.end
-");
+        let files =
+            MemoryProvider::new().with("/p.sp", "* p\n.subckt amp a b w=1u\nR1 a b 1k\n.ends\nX1 a b amp\n.end\n");
         let own = cache.build("/p.sp", &files, &none(), false).unwrap();
         assert!(own.json.contains(r#""value":"1u""#));
         let bind = Bind { subckt: "amp".into(), params: BTreeMap::from([("w".to_string(), "2u".to_string())]) };
