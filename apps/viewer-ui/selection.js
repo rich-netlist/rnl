@@ -54,6 +54,7 @@ export function select(o, from, options) {
 }
 
 export function clearSelection() {
+  setText($("selection"), ""); // (a document shown after another has no selection, whatever the line said)
   if (selected === null) return;
   setSelected(null);
   markSubcircuit(false);
