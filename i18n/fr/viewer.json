@@ -669,5 +669,19 @@
   "Choose a definition of {0}": "Choisir une définition de {0}",
   "{0} is defined {1} times in the Library. The one you choose opens as a view of its own file, without the parameters of this instance; this netlist is not changed.": "{0} est défini {1} fois dans la bibliothèque. La définition choisie s’ouvre comme une vue de son propre fichier, sans les paramètres de cette instance ; cette netlist n’est pas modifiée.",
   " instance of a subcircuit with {0} definitions in {1} · a double tap asks which to open": " instance d’un sous-circuit à {0} définitions dans {1} · un double toucher demande laquelle ouvrir",
-  " instance of a subcircuit with {0} definitions in {1} · E or Enter asks which to open; Shift opens a new window": " instance d’un sous-circuit à {0} définitions dans {1} · E ou Enter demande laquelle ouvrir ; Shift ouvre une nouvelle fenêtre"
+  " instance of a subcircuit with {0} definitions in {1} · E or Enter asks which to open; Shift opens a new window": " instance d’un sous-circuit à {0} définitions dans {1} · E ou Enter demande laquelle ouvrir ; Shift ouvre une nouvelle fenêtre",
+  "Parameters": "Paramètres",
+  "The parameters of this subcircuit": "Les paramètres de ce sous-circuit",
+  "from {0}": "de {0}",
+  "changed": "modifié",
+  "not set": "non défini",
+  "default": "par défaut",
+  "This value cannot be evaluated; it is shown as written.": "Cette valeur ne peut pas être évaluée ; elle est affichée telle qu’elle est écrite.",
+  "{0} parameters": "{0} paramètres",
+  "{0} from {1}": "{0} de {1}",
+  "{0} changed": "{0} modifiés",
+  "{0} default": "{0} par défaut",
+  "{0} not set": "{0} non définis",
+  "Show all": "Tout afficher",
+  "Fold": "Replier"
 }

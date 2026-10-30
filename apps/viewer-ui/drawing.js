@@ -16,6 +16,7 @@ import { roleNote } from "./usage-table.js";
 import { closePicker, openPicker } from "./picker.js";
 import { clearSelection, select } from "./selection.js";
 import { canOpen, descend, updatePath } from "./subcircuits.js";
+import { hideParams, updateParams } from "./params.js";
 import { markUnplaced, scopeSource } from "./text.js";
 import { renderUnplaced } from "./unplaced.js";
 import { $, clamp, svgElement } from "./util.js";
@@ -64,6 +65,7 @@ export function showLevel(i, keptView) {
   hideTip();
   updateHierarchy();
   updatePath();
+  updateParams();
   scopeSource(i);
   markUnplaced(i);
   renderUnplaced();
@@ -146,6 +148,7 @@ export function clearDrawing(message) {
   $("empty").hidden = false;
   setPath([]);
   updatePath();
+  hideParams();
   setText($("level-kind"), "");
   badgeAt = null;
   positionBadge();

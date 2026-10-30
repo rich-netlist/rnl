@@ -669,5 +669,19 @@
   "Choose a definition of {0}": "Definition von {0} wählen",
   "{0} is defined {1} times in the Library. The one you choose opens as a view of its own file, without the parameters of this instance; this netlist is not changed.": "{0} ist {1}-mal in der Bibliothek definiert. Die gewählte Definition wird als Ansicht ihrer eigenen Datei geöffnet, ohne die Parameter dieser Instanz; diese Netzliste bleibt unverändert.",
   " instance of a subcircuit with {0} definitions in {1} · a double tap asks which to open": " Instanz einer Teilschaltung mit {0} Definitionen in {1} · Doppeltippen fragt, welche geöffnet wird",
-  " instance of a subcircuit with {0} definitions in {1} · E or Enter asks which to open; Shift opens a new window": " Instanz einer Teilschaltung mit {0} Definitionen in {1} · E oder Enter fragt, welche geöffnet wird; Shift öffnet ein neues Fenster"
+  " instance of a subcircuit with {0} definitions in {1} · E or Enter asks which to open; Shift opens a new window": " Instanz einer Teilschaltung mit {0} Definitionen in {1} · E oder Enter fragt, welche geöffnet wird; Shift öffnet ein neues Fenster",
+  "Parameters": "Parameter",
+  "The parameters of this subcircuit": "Die Parameter dieser Teilschaltung",
+  "from {0}": "von {0}",
+  "changed": "geändert",
+  "not set": "nicht gesetzt",
+  "default": "Standard",
+  "This value cannot be evaluated; it is shown as written.": "Dieser Wert lässt sich nicht berechnen; er wird wie geschrieben angezeigt.",
+  "{0} parameters": "{0} Parameter",
+  "{0} from {1}": "{0} von {1}",
+  "{0} changed": "{0} geändert",
+  "{0} default": "{0} Standard",
+  "{0} not set": "{0} nicht gesetzt",
+  "Show all": "Alle zeigen",
+  "Fold": "Einklappen"
 }

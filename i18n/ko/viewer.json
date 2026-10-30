@@ -669,5 +669,19 @@
   "Choose a definition of {0}": "{0}의 정의 선택",
   "{0} is defined {1} times in the Library. The one you choose opens as a view of its own file, without the parameters of this instance; this netlist is not changed.": "{0}은(는) 라이브러리에 {1}곳 정의되어 있습니다. 선택한 정의는 그 파일 자체의 보기로 열리며, 이 인스턴스의 매개변수는 전달되지 않고 이 넷리스트는 바뀌지 않습니다.",
   " instance of a subcircuit with {0} definitions in {1} · a double tap asks which to open": " ({1} 내 서브서킷의 인스턴스, 정의 {0}개 · 두 번 탭하면 열 정의를 고릅니다)",
-  " instance of a subcircuit with {0} definitions in {1} · E or Enter asks which to open; Shift opens a new window": " ({1} 내 서브서킷의 인스턴스, 정의 {0}개 · E 또는 Enter로 열 정의 고르기, Shift를 누르면 새 창에서 열기)"
+  " instance of a subcircuit with {0} definitions in {1} · E or Enter asks which to open; Shift opens a new window": " ({1} 내 서브서킷의 인스턴스, 정의 {0}개 · E 또는 Enter로 열 정의 고르기, Shift를 누르면 새 창에서 열기)",
+  "Parameters": "매개변수",
+  "The parameters of this subcircuit": "이 서브서킷의 매개변수",
+  "from {0}": "{0}에서",
+  "changed": "변경됨",
+  "not set": "미설정",
+  "default": "기본값",
+  "This value cannot be evaluated; it is shown as written.": "이 값은 계산할 수 없어 쓰인 그대로 표시합니다.",
+  "{0} parameters": "매개변수 {0}개",
+  "{0} from {1}": "{1}에서 {0}개",
+  "{0} changed": "변경됨 {0}개",
+  "{0} default": "기본값 {0}개",
+  "{0} not set": "미설정 {0}개",
+  "Show all": "모두 보기",
+  "Fold": "접기"
 }

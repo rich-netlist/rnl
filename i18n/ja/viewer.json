@@ -669,5 +669,19 @@
   "Choose a definition of {0}": "{0} の定義を選択",
   "{0} is defined {1} times in the Library. The one you choose opens as a view of its own file, without the parameters of this instance; this netlist is not changed.": "{0} はライブラリに {1} 箇所で定義されています。選んだ定義は、そのファイル自体のビューとして開きます（このインスタンスのパラメータは引き継がれず、このネットリストは変更されません）。",
   " instance of a subcircuit with {0} definitions in {1} · a double tap asks which to open": "：{1} 内のサブサーキットのインスタンス（定義は {0} 個） · ダブルタップでどれを開くか選びます",
-  " instance of a subcircuit with {0} definitions in {1} · E or Enter asks which to open; Shift opens a new window": "：{1} 内のサブサーキットのインスタンス（定義は {0} 個） · EまたはEnterでどれを開くか選びます（Shiftで新しいウィンドウ）"
+  " instance of a subcircuit with {0} definitions in {1} · E or Enter asks which to open; Shift opens a new window": "：{1} 内のサブサーキットのインスタンス（定義は {0} 個） · EまたはEnterでどれを開くか選びます（Shiftで新しいウィンドウ）",
+  "Parameters": "パラメータ",
+  "The parameters of this subcircuit": "このサブサーキットのパラメータ",
+  "from {0}": "{0} から",
+  "changed": "変更済み",
+  "not set": "未設定",
+  "default": "既定値",
+  "This value cannot be evaluated; it is shown as written.": "この値は評価できないため、書かれたまま表示しています。",
+  "{0} parameters": "パラメータ {0} 個",
+  "{0} from {1}": "{1} から {0} 個",
+  "{0} changed": "変更済み {0} 個",
+  "{0} default": "既定値 {0} 個",
+  "{0} not set": "未設定 {0} 個",
+  "Show all": "すべて表示",
+  "Fold": "たたむ"
 }
