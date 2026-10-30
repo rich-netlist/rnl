@@ -47,7 +47,8 @@
         "-",
         { "id": "descend", "label": "Open &Subcircuit", "keys": ["E", "Enter"], "page": true },
         { "id": "descend-new-window", "label": "Open Subcircuit in New &Window", "keys": ["Shift+E", "Shift+Enter"], "page": true },
-        { "id": "ascend", "label": "&Up to Parent Level", "keys": ["Ctrl+E", "Backspace"], "page": true }
+        { "id": "ascend", "label": "&Up to Parent Level", "keys": ["Ctrl+E", "Backspace"], "page": true },
+        { "id": "edit-params", "label": "Subcircuit &Parameters..." }
       ]
     },
     {

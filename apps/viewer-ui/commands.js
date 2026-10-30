@@ -20,6 +20,7 @@ import { closePreview, saveSolved, solve } from "./solve.js";
 import { settings } from "./solve-settings.js";
 import { doc, selected } from "./state.js";
 import { findInSource } from "./text.js";
+import { canEditParams, editParameters } from "./params.js";
 import { ascend, canOpen, descend } from "./subcircuits.js";
 import { checkForUpdates } from "./updates.js";
 import { bundledPackagesHelp } from "./bundled-packages.js";
@@ -43,6 +44,7 @@ export async function startCommands() {
   for (const [id, checked] of checks) shell.setCheck(id, checked);
   shell.onCommand(command);
   setEnabled("descend-new-window", false);
+  setEnabled("edit-params", false);
   setEnabled("find-text", false);
   languageChecks();
 }
@@ -133,6 +135,7 @@ export function command(id, options = {}) {
     case "descend": return descend(selected, options);
     case "descend-new-window": return descend(selected, { newWindow: true });
     case "ascend": return ascend(options);
+    case "edit-params": return editParameters();
     case "shortcuts": inform({ title: m("Keyboard Shortcuts"), paragraphs: [
       m`${m`${m("1: Library. 2: Netlist. 3: Hierarchy. 4: Symbol. 5: Usage. 6: Not drawn.")}${shell.solve ? m(" 7: Solve.") : ""}`}${m(" These keys also expand a collapsed side panel; they do not run while typing.")}`,
       m("Ctrl+R: Show Usages. Shift+R: Show Current Directions. F5: Reload the netlist."),
@@ -191,7 +194,7 @@ export function isChecked(id) {
   return checks.get(id) === true;
 }
 
-export const isEnabled = (id) => id === "panel-hide" ? !$("app").classList.contains("sidebar-hidden") : id === "find-text" ? !!doc && !editing : id !== "descend-new-window" || canOpen(selected);
+export const isEnabled = (id) => id === "panel-hide" ? !$("app").classList.contains("sidebar-hidden") : id === "find-text" ? !!doc && !editing : id === "edit-params" ? canEditParams() : id !== "descend-new-window" || canOpen(selected);
 export function setEnabled(id, enabled) {
   shell?.setEnabled?.(id, enabled);
 }

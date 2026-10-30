@@ -542,7 +542,7 @@ test.describe("on the web", () => {
       const table = await (await fetch("commands.json")).json();
       return table.menus.map((m) => [m.label, m.items.filter((i) => i !== "-").map((i) => i.id)]);
     });
-    expect(menus.find(([label]) => label === "&Edit")[1]).toEqual(["toggle-edit", "apply-edits", "discard-edits", "find-text", "descend", "descend-new-window", "ascend"]);
+    expect(menus.find(([label]) => label === "&Edit")[1]).toEqual(["toggle-edit", "apply-edits", "discard-edits", "find-text", "descend", "descend-new-window", "ascend", "edit-params"]);
     expect(menus.find(([label]) => label === "&File")[1]).toContain("save");
   });
 });

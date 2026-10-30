@@ -683,5 +683,16 @@
   "{0} default": "{0} 个默认",
   "{0} not set": "{0} 个未设",
   "Show all": "全部展开",
-  "Fold": "折叠"
+  "Fold": "折叠",
+  "Parameters of {0}": "{0} 的参数",
+  "A change applies to this view only; the netlist is not changed. Values are written as in the netlist, and a value left empty is the parameter's default.": "改动只对当前视图生效，网表不会被修改。值按网表里的写法填写，留空表示使用参数的默认值。",
+  "Parameter": "参数",
+  "Default": "默认值",
+  "Value": "值",
+  "Source": "来源",
+  "Value of {0}": "{0} 的值",
+  "Restore the values of {0}": "恢复为 {0} 传入的值",
+  "Edit Parameters...": "编辑参数...",
+  "Subcircuit &Parameters...": "子电路参数(&P)...",
+  "Some parameters have no default, so this view has no value for them. Write the values to use; a change applies to this view only, and the netlist is not changed.": "有些参数没有默认值，所以这个视图里它们没有值。请填写要用的值；改动只对当前视图生效，网表不会被修改。"
 }

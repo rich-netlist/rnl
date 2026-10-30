@@ -7,7 +7,7 @@ use std::mem::size_of;
 use std::sync::Arc;
 
 use rnl_runtime::source::{normalize, LibraryDefinition, LibraryLookup, Provider};
-use rnl_view::{BuildOptions, Drawings, UnplacedDrawing};
+use rnl_view::{Bind, BuildOptions, Drawings, UnplacedDrawing};
 
 use crate::formats::Formats;
 use serde::Serialize;
@@ -232,6 +232,17 @@ impl BuildCache {
         Ok(built)
     }
 
+    /// Build with the parameters of a subcircuit bound (`bind`), to show: it is the document whose drawings
+    /// are kept now, but it is not kept among the entries, which are the files' own, as the next time the
+    /// same file is opened its parameters are its own again.
+    pub fn build_bound(&mut self, path: &str, files: &dyn Provider, formats: &Formats, bind: &Bind) -> Result<Built, String> {
+        let path = normalize(path);
+        self.misses += 1;
+        let entry = Prepared::build_with(&path, files, formats, Some(bind))?;
+        self.active = Some(entry.drawings.clone());
+        Ok(Built { json: entry.json, name: entry.name, hit: false })
+    }
+
     /// Do not waste background CPU on an already retained entry. Foreground hits still validate
     /// every dependency, including negative reads and library lookups, before using its result.
     pub fn contains(&self, path: &str, auto_include: bool, formats: &Formats) -> bool {
@@ -258,9 +269,14 @@ impl BuildCache {
 
 impl Prepared {
     pub fn build(path: &str, files: &dyn Provider, formats: &Formats) -> Result<Self, String> {
+        Self::build_with(path, files, formats, None)
+    }
+
+    /// As `build`, with the parameters of a subcircuit bound.
+    fn build_with(path: &str, files: &dyn Provider, formats: &Formats, bind: Option<&Bind>) -> Result<Self, String> {
         let path = normalize(path);
         let observed = Observed { files, inputs: RefCell::new(Inputs::default()) };
-        let options = BuildOptions { formats: formats.clone(), ..BuildOptions::default() };
+        let options = BuildOptions { formats: formats.clone(), bind: bind.cloned(), ..BuildOptions::default() };
         let (doc, drawings) = rnl_view::build_drawn(&path, &observed, &options)?;
         let json = serde_json::to_string(&doc).map_err(|e| e.to_string())?;
         let drawings = Arc::new(drawings);
@@ -386,6 +402,29 @@ mod tests {
         cache.clear();
         assert!(cache.offer(Prepared::build("/a.sp", &files(), &none()).unwrap()));
         assert!(!cache.build("/a.sp", &files(), &none(), true).unwrap().hit);
+    }
+
+    #[test]
+    fn a_build_with_parameters_bound_shows_them_and_is_not_kept() {
+        let mut cache = BuildCache::default();
+        let files = MemoryProvider::new().with("/p.sp", "* p
+.subckt amp a b w=1u
+R1 a b 1k
+.ends
+X1 a b amp
+.end
+");
+        let own = cache.build("/p.sp", &files, &none(), false).unwrap();
+        assert!(own.json.contains(r#""value":"1u""#));
+        let bind = Bind { subckt: "amp".into(), params: BTreeMap::from([("w".to_string(), "2u".to_string())]) };
+        let bound = cache.build_bound("/p.sp", &files, &none(), &bind).unwrap();
+        assert!(!bound.hit);
+        assert!(bound.json.contains(r#""value":"2u""#) && bound.json.contains(r#""from":"bound""#));
+        // the entry is the file's own: opening it again is a hit, with its own parameters
+        let again = cache.build("/p.sp", &files, &none(), false).unwrap();
+        assert!(again.hit);
+        assert_eq!(again.json, own.json);
+        assert_eq!(cache.stats().entries, 1);
     }
 
     #[test]

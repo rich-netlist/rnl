@@ -683,5 +683,16 @@
   "{0} default": "{0} 個預設",
   "{0} not set": "{0} 個未設",
   "Show all": "全部展開",
-  "Fold": "收合"
+  "Fold": "收合",
+  "Parameters of {0}": "{0} 的參數",
+  "A change applies to this view only; the netlist is not changed. Values are written as in the netlist, and a value left empty is the parameter's default.": "變更只對目前的檢視生效，網表不會被修改。值依網表中的寫法填寫，留空表示使用參數的預設值。",
+  "Parameter": "參數",
+  "Default": "預設值",
+  "Value": "值",
+  "Source": "來源",
+  "Value of {0}": "{0} 的值",
+  "Restore the values of {0}": "還原為 {0} 傳入的值",
+  "Edit Parameters...": "編輯參數...",
+  "Subcircuit &Parameters...": "子電路參數(&P)...",
+  "Some parameters have no default, so this view has no value for them. Write the values to use; a change applies to this view only, and the netlist is not changed.": "有些參數沒有預設值，所以這個檢視裡它們沒有值。請填寫要用的值；變更只對目前的檢視生效，網表不會被修改。"
 }

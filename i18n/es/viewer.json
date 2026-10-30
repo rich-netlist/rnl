@@ -683,5 +683,16 @@
   "{0} default": "{0} por defecto",
   "{0} not set": "{0} sin valor",
   "Show all": "Mostrar todos",
-  "Fold": "Plegar"
+  "Fold": "Plegar",
+  "Parameters of {0}": "Parámetros de {0}",
+  "A change applies to this view only; the netlist is not changed. Values are written as in the netlist, and a value left empty is the parameter's default.": "Un cambio se aplica solo a esta vista; la netlist no se modifica. Los valores se escriben como en la netlist, y un valor vacío es el valor por defecto del parámetro.",
+  "Parameter": "Parámetro",
+  "Default": "Por defecto",
+  "Value": "Valor",
+  "Source": "Origen",
+  "Value of {0}": "Valor de {0}",
+  "Restore the values of {0}": "Restaurar los valores de {0}",
+  "Edit Parameters...": "Editar parámetros...",
+  "Subcircuit &Parameters...": "&Parámetros del subcircuito...",
+  "Some parameters have no default, so this view has no value for them. Write the values to use; a change applies to this view only, and the netlist is not changed.": "Algunos parámetros no tienen valor por defecto, así que esta vista no tiene valor para ellos. Escriba los valores que usar; un cambio se aplica solo a esta vista y la netlist no se modifica."
 }

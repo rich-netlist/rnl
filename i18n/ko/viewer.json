@@ -683,5 +683,16 @@
   "{0} default": "기본값 {0}개",
   "{0} not set": "미설정 {0}개",
   "Show all": "모두 보기",
-  "Fold": "접기"
+  "Fold": "접기",
+  "Parameters of {0}": "{0}의 매개변수",
+  "A change applies to this view only; the netlist is not changed. Values are written as in the netlist, and a value left empty is the parameter's default.": "변경은 이 보기에만 적용되며 넷리스트는 바뀌지 않습니다. 값은 넷리스트와 같은 방식으로 쓰고, 비워 두면 매개변수의 기본값을 씁니다.",
+  "Parameter": "매개변수",
+  "Default": "기본값",
+  "Value": "값",
+  "Source": "출처",
+  "Value of {0}": "{0}의 값",
+  "Restore the values of {0}": "{0}의 값으로 되돌리기",
+  "Edit Parameters...": "매개변수 편집...",
+  "Subcircuit &Parameters...": "서브서킷 매개변수(&P)...",
+  "Some parameters have no default, so this view has no value for them. Write the values to use; a change applies to this view only, and the netlist is not changed.": "기본값이 없는 매개변수가 있어 이 보기에서는 값이 없습니다. 사용할 값을 입력하세요. 변경은 이 보기에만 적용되며 넷리스트는 바뀌지 않습니다."
 }

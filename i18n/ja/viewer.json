@@ -683,5 +683,16 @@
   "{0} default": "既定値 {0} 個",
   "{0} not set": "未設定 {0} 個",
   "Show all": "すべて表示",
-  "Fold": "たたむ"
+  "Fold": "たたむ",
+  "Parameters of {0}": "{0} のパラメータ",
+  "A change applies to this view only; the netlist is not changed. Values are written as in the netlist, and a value left empty is the parameter's default.": "変更はこのビューにだけ適用され、ネットリストは変更されません。値はネットリストと同じ書き方で入力し、空のままにするとパラメータの既定値になります。",
+  "Parameter": "パラメータ",
+  "Default": "既定値",
+  "Value": "値",
+  "Source": "由来",
+  "Value of {0}": "{0} の値",
+  "Restore the values of {0}": "{0} の値に戻す",
+  "Edit Parameters...": "パラメータを編集...",
+  "Subcircuit &Parameters...": "サブサーキットのパラメータ(&P)...",
+  "Some parameters have no default, so this view has no value for them. Write the values to use; a change applies to this view only, and the netlist is not changed.": "既定値のないパラメータがあり、このビューでは値がありません。使う値を入力してください。変更はこのビューにだけ適用され、ネットリストは変更されません。"
 }

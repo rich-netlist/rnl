@@ -203,6 +203,35 @@ test("an instance whose subcircuit the Library defines twice asks which definiti
   await page.keyboard.press("Escape");
 });
 
+test("the parameters of a subcircuit entered through an instance are built again with the values written, by the real core", async ({ page }) => {
+  await start(page);
+  await page.locator("#file-input").setInputFiles({ name: "top.netlist", mimeType: "text/plain", buffer: Buffer.from("* top\n.subckt amp a b wn=1u l=0.18u\nR1 a b 1k\n.ends\nX1 in out amp wn=2u\n.end\n") });
+  await shown(page);
+  await expect(page.locator("#params-bar")).toBeHidden();
+  await page.evaluate(async () => {
+    const o = window.viewer.doc.objects.findIndex((x) => x.kind === "instance" && x.name === "X1");
+    (await import("./selection.js")).select(o, "list", { usage: false });
+  });
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.press("e");
+  const params = page.locator("#params-bar .param");
+  await expect(params).toHaveText(["wn = 2ufrom X1", "l = 0.18udefault"]);
+  await page.locator("#params-bar .params-edit").click();
+  const dialog = page.locator("dialog.dialog");
+  await dialog.locator(".params-table tbody tr").nth(1).locator("input").fill("0.25u");
+  await dialog.getByRole("button", { name: "Apply" }).click();
+  await expect(params).toHaveText(["wn = 2ufrom X1", "l = 0.25uchanged"]);
+  await expect(page.locator("#level-name")).toHaveText("amp");
+  // the numbers the core evaluated are in the Document, and the netlist's text is as it was
+  expect(await page.evaluate(() => window.viewer.doc.levels.find((l) => l.title === "amp").params.map((p) => [p.name, p.value, p.number, p.from]))).toEqual([["wn", "2u", 2e-6, "bound"], ["l", "0.25u", 2.5e-7, "bound"]]);
+  await expect(page.locator("#source")).toContainText(".subckt amp a b wn=1u l=0.18u");
+  // an expression is the core's to evaluate; one it cannot is kept as written, with a question mark
+  await page.locator("#params-bar .params-edit").click();
+  await dialog.locator(".params-table tbody tr").nth(1).locator("input").fill("{2*nothing}");
+  await dialog.getByRole("button", { name: "Apply" }).click();
+  await expect(params.nth(1)).toHaveText("l = {2*nothing} ?changed");
+});
+
 test("Auto Include imports the actual nested definition without pulling its testbench into the web document", async ({ page }) => {
   await start(page);
   const results = await page.evaluate(async () => {
