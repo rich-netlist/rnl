@@ -248,6 +248,7 @@ export default {
   },
   // Most fixtures exercise same-document UI. A test can supply independent file fixtures.
   sourceForFile(src, document, index) { return fake.fileSources?.[document.files[index].path] || src; },
+  sourceForPath(src, path) { fake.calls.push(["sourceForPath", path]); return fake.fileSources?.[path] || { ...src, path, fake: path }; },
   newWindow(session) { fake.calls.push(["newWindow", JSON.parse(JSON.stringify(session))]); },
   include: async (kind) => { fake.calls.push(["include", kind]); return fake.includes || []; },
   ...(params.has("pool") ? {

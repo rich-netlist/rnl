@@ -25,6 +25,7 @@
  * @property {(path: string) => string} [formatKey] The key a file's format choice is kept by: its path folded where the platform ignores case, or the address of a file a server served.
  * @property {(path: string) => boolean} [keepsFormat] Whether a format chosen for the file is kept in the settings; otherwise only while the page is open. True when absent.
  * @property {(source: Source, document: object, file: number) => Source} sourceForFile Re-root at a document file, retaining read capabilities but no compiled include scope.
+ * @property {(source: Source, path: string) => Source} [sourceForPath] The same for a Library file that the document does not read, by its canonical path, such as one of several definitions of a subcircuit.
  * @property {() => Source[]} [preloadCandidates] Library/PATH sources eligible for background compilation.
  * @property {(source: Source) => Promise<string>} [preload] Prepare an independent file without activating its document. Returns ready/cached/full/paused/busy/cancelled/skipped/disabled.
  * @property {() => Promise<void>} [cancelPreload] Discard in-flight speculative results; never waits for their compiler.

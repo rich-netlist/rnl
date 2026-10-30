@@ -21,7 +21,7 @@ import { markDiagnostics, renderDiagnostics } from "./problems.js";
 import { startLevel, uncalledRoots } from "./roots.js";
 import { select } from "./selection.js";
 import { endPreview, previewing, solve } from "./solve.js";
-import { namedPath, restorePath, visitView } from "./subcircuits.js";
+import { levelNamed, namedPath, restorePath, visitView } from "./subcircuits.js";
 import { clearSource, fileShown, fileViews, renderFiles, revealDefinition, showFile } from "./text.js";
 import { $ } from "./util.js";
 import { setEnabled } from "./commands.js";
@@ -341,7 +341,7 @@ function showDocument(before, navigation) {
     return;
   }
   const wanted = before?.level || navigation?.level;
-  const kept = wanted ? doc.levels.findIndex((l) => l.title === wanted) : -1;
+  const kept = wanted ? levelNamed(wanted) : -1;
   // the level it was, else the top level, or, when that has no objects, the first subcircuit that
   // nothing calls, with a line that says so
   const start = kept >= 0 ? { level: kept, note: "" } : startLevel();

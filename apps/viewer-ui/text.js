@@ -7,7 +7,7 @@ import { append, m, setAttr, setText } from "./i18n.js";
 import { current, doc, selected } from "./state.js";
 import { clearEditors, editing, refreshEditing, renderEditors, revealInEditor, showEditor } from "./editor.js";
 import { clearSelection, select } from "./selection.js";
-import { descend, opens } from "./subcircuits.js";
+import { canOpen, descend } from "./subcircuits.js";
 import { isPlainFile } from "./formats.js";
 import { lineModel } from "./text-lines.js";
 import { LineWindow } from "./line-window.js";
@@ -295,9 +295,9 @@ source.addEventListener("dblclick", (e) => {
   const s = e.target.closest("[data-obj]");
   const ln = e.target.closest(".ln");
   const o = s
-    ? s.dataset.obj.split(" ").map(Number).find((k) => opens(k) !== null)
+    ? s.dataset.obj.split(" ").map(Number).find((k) => canOpen(k))
     : ln ? lineOwners[fileShown].get(Number(ln.dataset.line)) : undefined;
-  if (opens(o) === null) return;
+  if (!canOpen(o)) return;
   window.getSelection().removeAllRanges(); // the word the double click selected
   fileViews[fileShown]?.selection?.clear();
   descend(o, { newWindow: e.shiftKey });

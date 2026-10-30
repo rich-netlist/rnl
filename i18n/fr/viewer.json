@@ -665,5 +665,9 @@
   "{0} is in turn a member of group {1}": "{0} est à son tour membre du groupe {1}",
   "{0} is in turn within group {1}": "{0} est à son tour à l’intérieur du groupe {1}",
   "within group {0}": "à l’intérieur du groupe {0}",
-  "group": "groupe"
+  "group": "groupe",
+  "Choose a definition of {0}": "Choisir une définition de {0}",
+  "{0} is defined in {1} Library files. The one you choose opens as a view of its own file, without the parameters of this instance; this netlist is not changed.": "{0} est défini dans {1} fichiers de la bibliothèque. La définition choisie s’ouvre comme une vue de son propre fichier, sans les paramètres de cette instance ; cette netlist n’est pas modifiée.",
+  " instance of a subcircuit with {0} definitions in {1} · a double tap asks which to open": " instance d’un sous-circuit à {0} définitions dans {1} · un double toucher demande laquelle ouvrir",
+  " instance of a subcircuit with {0} definitions in {1} · E or Enter asks which to open; Shift opens a new window": " instance d’un sous-circuit à {0} définitions dans {1} · E ou Enter demande laquelle ouvrir ; Shift ouvre une nouvelle fenêtre"
 }

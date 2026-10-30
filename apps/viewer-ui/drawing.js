@@ -15,7 +15,7 @@ import { hideTip, hoverNamesOn, hoverRolesOn, showTip } from "./hover.js";
 import { roleNote } from "./usage-table.js";
 import { closePicker, openPicker } from "./picker.js";
 import { clearSelection, select } from "./selection.js";
-import { descend, opens, updatePath } from "./subcircuits.js";
+import { canOpen, descend, updatePath } from "./subcircuits.js";
 import { markUnplaced, scopeSource } from "./text.js";
 import { renderUnplaced } from "./unplaced.js";
 import { $, clamp, svgElement } from "./util.js";
@@ -396,7 +396,7 @@ function endPress(e, cancelled) {
 function clickAt(e) {
   const { hits, blocked } = hitsAt(doc && doc.levels[current], view, canvasPoint(e));
   const objects = hits.length ? objectsOf(hits) : !blocked ? usagesAt(canvasPoint(e)) : [];
-  if (e.shiftKey && objects.some((o) => opens(o) !== null)) return; // Shift-double-click leaves this viewer unchanged
+  if (e.shiftKey && objects.some((o) => canOpen(o))) return; // Shift-double-click leaves this viewer unchanged
   if (objects.length > 1) {
     hideTip();
     openPicker(objects, e.clientX, e.clientY, (o) => select(o, "drawing"));
@@ -407,7 +407,7 @@ function clickAt(e) {
 /** A double click, or a double tap: open the subcircuit instance there, or else fit the drawing. */
 function doubleAt(e) {
   const box = boxAt(doc && doc.levels[current], view, canvasPoint(e));
-  const o = box ? box.objects.find((k) => opens(k) !== null) : undefined;
+  const o = box ? box.objects.find((k) => canOpen(k)) : undefined;
   if (o !== undefined) descend(o, { newWindow: e.shiftKey });
   else fit();
 }
@@ -494,7 +494,7 @@ export function paintDrawingSelection() {
       append(overlay, r);
     } else if (h.kind === "box" && h.objects[0] === selected) {
       const [[x0, y0], [x1, y1]] = h.points;
-      if (isInstance && opens(selected) !== null && !badgeAt) badgeAt = [x1, y0];
+      if (isInstance && canOpen(selected) && !badgeAt) badgeAt = [x1, y0];
       const r = svgElement("rect", { x: x0, y: y0, width: x1 - x0, height: y1 - y0 });
       r.setAttribute("vector-effect", "non-scaling-stroke");
       append(overlay, r);
