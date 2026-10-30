@@ -36,6 +36,13 @@ fn hit_bounds(h: &Hit) -> Option<[f64; 4]> {
     union(h.points.iter().map(|p| [p[0], p[1], p[0], p[1]]))
 }
 
+/// The title of a usage's frame, `$PAIR: %dp1`; of a group's, which has no definition,
+/// `@GROUP: %core` (11.5).
+pub(crate) fn usage_title(kind: &str, definition: &str, id: &str) -> String {
+    let definition = if kind == "group" { "@GROUP" } else { definition };
+    format!("{definition}: {id}")
+}
+
 pub(crate) fn usage_frame(
     object: usize,
     local: bool,
@@ -251,7 +258,7 @@ pub fn svg(level: &Level, options: &OverlayOptions) -> Result<String, String> {
             rect(f.bounds)
         );
         let _ = write!(over, "<g class=\"usage-frame\" data-usage=\"{}\"><rect {} fill=\"none\" stroke=\"{color}\" stroke-width=\"{}\" stroke-dasharray=\"{dashes}\" stroke-linecap=\"round\" rx=\"10\"/>", u.object, rect(f.bounds), options.style.width);
-        let title = format!("{}: {}", u.definition, u.id);
+        let title = usage_title(u.kind, &u.definition, &u.id);
         if f.title_width + 16.0 <= f.bounds[2] - f.bounds[0] {
             let (s, b) = badge(&title, f.title, color, "usage-title", false);
             over.push_str(&s);
@@ -423,6 +430,29 @@ mod tests {
             }
             assert_eq!(std::fs::read_to_string(file).unwrap().replace("\r\n", "\n"), actual);
         }
+    }
+
+    #[test]
+    fn a_group_frame_is_titled_with_group() {
+        let source = "* a group
+R1 a b 1k
+R2 b c 1k
+* @RNL {
+*   #R1 @PLACE(0, 0);
+*   #R2 @PLACE(30, 0);
+*   %core = {#R1 #R2} @GROUP
+* }
+.end
+";
+        let d = crate::build("group.sp", &MemoryProvider::new().with("group.sp", source), &BuildOptions::default())
+            .unwrap();
+        let lv = &d.levels[0];
+        let core = lv.usages.iter().find(|u| u.id == "%core").unwrap();
+        assert_eq!(core.kind, "group");
+        assert!(core.frame.is_some());
+        let svg = svg(lv, &OverlayOptions { usages: UsageMode::All, ..Default::default() }).unwrap();
+        assert!(svg.contains(">@GROUP: %core</text>"), "{svg}");
+        assert!(!svg.contains(">: %core</text>"));
     }
 
     #[test]
