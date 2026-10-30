@@ -152,6 +152,11 @@ export type Level = {
    */
   children: Array<Child>,
   /**
+   * For a subcircuit, its parameters: their defaults, the values bound to them
+   * ([`crate::BuildOptions::bind`]) and the numbers those come to; left out when it has none.
+   */
+  params?: Array<SubcktParam>,
+  /**
    * The objects of the level that are not drawn on it: those that have no position, each with
    * its symbol drawn alone, in the order of the netlist (their number is the one `status`
    * gives), then those that are not drawn at all, since no symbol can be chosen for them, each
@@ -302,6 +307,17 @@ export type Child = {
    * offer when the instance is entered; left out otherwise.
    */
   candidates?: Array<AutoIncludeCandidate>,
+  /**
+   * The parameters the instance writes, each with the number it comes to in the level the
+   * instance is in; left out when it writes none.
+   */
+  params?: Array<ParamValue>,
+  /**
+   * When the netlist defines the subcircuit: its parameters for this instance, those the
+   * instance writes and the defaults of the others, with the numbers they come to; left out
+   * when it has none.
+   */
+  effective?: Array<SubcktParam>,
 };
 
 /**
@@ -326,6 +342,35 @@ export type AutoIncludeCandidate = {
    */
   line: number,
 };
+
+/**
+ * A parameter of a subcircuit: its default, the value it has here, and the number that comes to.
+ */
+export type SubcktParam = {
+  name: string,
+  /**
+   * The default its definition writes; none when it writes none.
+   */
+  default: string | null,
+  /**
+   * The value it has, as written: the one bound, the one the instance gives, or the default.
+   */
+  value: string | null,
+  /**
+   * That value evaluated; none when it cannot be.
+   */
+  number: number | null,
+  /**
+   * Where the value comes from: "bound" ([`Bind`]), "instance", "default", or "unset" when it
+   * has none.
+   */
+  from: string,
+};
+
+/**
+ * A parameter an instance writes, and the number it comes to where the instance is.
+ */
+export type ParamValue = { name: string, value: string, number: number | null };
 
 /**
  * An object of a level that has no position yet, so it is not drawn there: an instance, a bundle

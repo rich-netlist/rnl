@@ -81,6 +81,10 @@ pub struct Request {
     /// (decision 0008); false when not given.
     #[serde(default)]
     pub status: bool,
+    /// The values to build a subcircuit's parameters with, for showing
+    /// ([`rnl_view::BuildOptions::bind`]): only the Document's lists of parameters change.
+    #[serde(default)]
+    pub bind: Option<rnl_view::Bind>,
     /// Leave the drawings of the objects without a position out of the Document and keep them to
     /// give on request ([`DrawingsRequest`]), until the next build that asks for it; false, the
     /// Document carrying them, when not given.
@@ -371,6 +375,7 @@ pub fn respond(request: &[u8]) -> Response {
         svg: request.svg,
         primitives: request.primitives,
         status: request.status,
+        bind: request.bind,
     };
     if let Some(p) = request.parts {
         let parts = Parts { drawing: p.drawing, host: p.host, model: p.model };
@@ -505,6 +510,7 @@ fn write(request: WriteRequest) -> Response {
         svg: request.svg,
         primitives: request.primitives,
         status: request.status,
+        bind: None,
     };
     match rnl_view::build(&entry, &files, &options) {
         Ok(mut document) => {

@@ -206,6 +206,31 @@ pub fn split_params<S: AsRef<str>>(tokens: &[S]) -> (Vec<String>, Vec<(String, S
     (plain, params)
 }
 
+/// The parameters a `.subckt` statement gives its subcircuit, with their defaults as written:
+/// those after `params:`, or from the first `name=value` on, as HSPICE writes them without it.
+/// `statement` is the whole statement, its `+` lines joined, without comments.
+pub fn subckt_params(statement: &str) -> Vec<(String, String)> {
+    let toks = element_tokens(statement);
+    let is_value = |t: &str| t.contains('=') && !t.starts_with(['\'', '"', '{']);
+    let starts = |t: &str| t.to_lowercase().starts_with("params:") || is_value(t);
+    let Some(k) = toks.iter().skip(2).position(|t| starts(t)) else { return Vec::new() };
+    let rest: Vec<String> = toks[2 + k..]
+        .iter()
+        .filter_map(|t| match t.to_lowercase().strip_prefix("params:") {
+            Some("") => None,
+            Some(_) => Some(t["params:".len()..].to_string()),
+            None => Some(t.clone()),
+        })
+        .collect();
+    split_params(&rest).1
+}
+
+/// The parameters a `.param` statement sets, as written.
+pub fn param_statement(statement: &str) -> Vec<(String, String)> {
+    let toks = element_tokens(statement);
+    split_params(&toks[1.min(toks.len())..]).1
+}
+
 /// The length in bytes of the number a token starts with, digits with an optional fraction and
 /// exponent and a sign: `2.0`, `-1e-3u` start with one; `2n3904` and `V(in)` do not (it is `2`
 /// and then letters and digits), `n3904` has none.
@@ -580,6 +605,13 @@ struct Reader<'r, 'a> {
 }
 
 impl Reader<'_, '_> {
+    /// Give a subcircuit the parameters its `.subckt` statement writes, once the statement is read.
+    fn subckt_params(&mut self, statement: Option<(LevelId, String)>) {
+        if let Some((sub, text)) = statement {
+            self.cx.doc.levels[sub].params = subckt_params(&text);
+        }
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn new_level(
         &mut self,
@@ -628,6 +660,8 @@ impl Reader<'_, '_> {
         let mut pending: Option<Pending> = None;
         // a `.subckt` whose `+` lines add ports, until its parameters begin
         let mut subckt_more: Option<LevelId> = None;
+        // the `.subckt` statement being read, its `+` lines joined, for its parameters
+        let mut subckt_text: Option<(LevelId, String)> = None;
         let mut continued = Continued::default();
         // `.lib` sections: inside the selected one when reading a section; skipping an unselected one
         let mut in_section = section.is_none();
@@ -696,6 +730,7 @@ impl Reader<'_, '_> {
             if regions.skip(raw, no, false, main, &fname, self.cx.sink) {
                 self.flush_run(&mut run, &fname, cur);
                 subckt_more = None;
+                self.subckt_params(subckt_text.take());
                 if let Some(p) = pending.take() {
                     self.statement(&p.text, p.line, &fname, path, cur, circ, stack);
                 }
@@ -736,17 +771,24 @@ impl Reader<'_, '_> {
                 if let Some(p) = pending.as_mut() {
                     p.text.push(' ');
                     p.text.push_str(cont);
-                } else if let Some(sub) = subckt_more {
-                    let toks = subckt_tokens(cont);
-                    let (ports, params) = subckt_ports(&toks.iter().map(String::as_str).collect::<Vec<_>>());
-                    self.cx.doc.levels[sub].ports.extend(ports);
-                    if params {
-                        subckt_more = None;
+                } else {
+                    if let Some(sub) = subckt_more {
+                        let toks = subckt_tokens(cont);
+                        let (ports, params) = subckt_ports(&toks.iter().map(String::as_str).collect::<Vec<_>>());
+                        self.cx.doc.levels[sub].ports.extend(ports);
+                        if params {
+                            subckt_more = None;
+                        }
+                    }
+                    if let Some((_, text)) = subckt_text.as_mut() {
+                        text.push(' ');
+                        text.push_str(&strip_inline_comment(cont));
                     }
                 }
                 continue;
             }
             subckt_more = None;
+            self.subckt_params(subckt_text.take());
             if let Some(p) = pending.take() {
                 self.statement(&p.text, p.line, &fname, path, cur, circ, stack);
             }
@@ -795,6 +837,7 @@ impl Reader<'_, '_> {
                 let (ports, params) = subckt_ports(&toks[2.min(toks.len())..]);
                 self.cx.doc.levels[sub].ports = ports;
                 subckt_more = (!params).then_some(sub);
+                subckt_text = Some((sub, strip_inline_comment(stripped)));
                 self.cx.doc.add_subckt(sub);
                 sub_stack.push((cur, circ));
                 cur = sub;
@@ -812,6 +855,7 @@ impl Reader<'_, '_> {
             pending = Some(Pending { line: no, text: stripped.to_string() });
         }
         self.flush_run(&mut run, &fname, cur);
+        self.subckt_params(subckt_text.take());
         if let Some(p) = pending.take() {
             self.statement(&p.text, p.line, &fname, path, cur, circ, stack);
         }
@@ -889,6 +933,10 @@ impl Reader<'_, '_> {
             for t in body.split_whitespace().skip(1) {
                 self.cx.doc.add_global(t, fname);
             }
+            return;
+        }
+        if first == ".param" || first == ".params" {
+            self.cx.doc.levels[cur].param_statements.extend(param_statement(&body));
             return;
         }
         if body.starts_with('.') {

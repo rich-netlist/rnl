@@ -13,9 +13,9 @@ use ts_rs::{Config, TS};
 use crate::{
     AutoIncludeCandidate, Bar, Cap, Catalog, CatalogDefinition, CatalogLabel, CatalogPackage, CatalogPin, CatalogSet,
     CatalogSymbol, Child, Color, Diagnostic, Document, FileRef, HAlign, Hit, HostInstance, HostLevel, HostNet,
-    HostTerminal, Join, Layer, Level, LevelModel, LevelSnapshot, Object, ObjectView, PackageUse, PinLabel, PinView,
-    PointView, Primitive, Run, RunStyle, Segment, Shape, ShapeView, Slot, Snapshot, SourceFile, Span, Stroke,
-    SymbolDefinition, SymbolPin, SymbolPrim, SymbolRef, Terminal, Text, TextRun, TextView, Unit, Unplaced,
+    HostTerminal, Join, Layer, Level, LevelModel, LevelSnapshot, Object, ObjectView, PackageUse, ParamValue, PinLabel,
+    PinView, PointView, Primitive, Run, RunStyle, Segment, Shape, ShapeView, Slot, Snapshot, SourceFile, Span, Stroke,
+    SubcktParam, SymbolDefinition, SymbolPin, SymbolPrim, SymbolRef, Terminal, Text, TextRun, TextView, Unit, Unplaced,
     UnplacedDrawing, VAlign, Vertex, WireView,
 };
 
@@ -132,6 +132,8 @@ fn all() -> Vec<(String, String)> {
         one::<Hit>(&cfg),
         one::<Child>(&cfg),
         one::<AutoIncludeCandidate>(&cfg),
+        one::<SubcktParam>(&cfg),
+        one::<ParamValue>(&cfg),
         one::<Unplaced>(&cfg),
         one::<UnplacedDrawing>(&cfg),
         one::<SourceFile>(&cfg),

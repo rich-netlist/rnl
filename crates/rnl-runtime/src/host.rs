@@ -134,6 +134,13 @@ pub struct Level {
     /// last line of the file when nothing closes it. The section is read as a file of its own (2.8):
     /// two sections of one file are two file levels, each with its header record and its version.
     pub section_lines: Option<(u32, u32)>,
+    /// For a subcircuit, its parameters with their defaults, as its definition writes them (SPICE's
+    /// `.subckt … params: w=1u`, Spectre's `parameters` in its body); an empty default is one
+    /// without a value. The adapters keep them as text and evaluate nothing.
+    pub params: Vec<(String, String)>,
+    /// The parameters that the level's own `.param` statements (Spectre's `parameters` outside a
+    /// subcircuit) set, in the order written, as text.
+    pub param_statements: Vec<(String, String)>,
 }
 
 impl Level {
@@ -156,6 +163,8 @@ impl Level {
             case_sensitive: false,
             section: None,
             section_lines: None,
+            params: Vec::new(),
+            param_statements: Vec::new(),
         }
     }
 

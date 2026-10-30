@@ -39,6 +39,9 @@ view options:
   --primitives        give each level's primitives, in scene units with y up
   --no-svg            leave out each level's SVG
   --status            give each level its solve status: fixed, unsolved, solved or stale
+  --bind SUBCKT       show the parameters of the subcircuit SUBCKT with the values --param gives
+  --param NAME=VALUE  a value for a parameter of the subcircuit --bind names, as text; repeatable.
+                      Only the Document's lists of parameters change; nothing drawn does
 render options (inspection only; all disabled by default):
   --usages MODE       usage frames: semantic (no drawing of their own) or all
   --currents          show in/out terminal currents, including explicit subcircuit port symbols

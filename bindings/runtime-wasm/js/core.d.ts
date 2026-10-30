@@ -68,6 +68,14 @@ export interface Request {
    */
   status?: boolean;
   /**
+   * The values to build a subcircuit's parameters with, for showing: `subckt`, its name, and
+   * `params`, values for some of its parameters as text, such as "2u", "1e-06" or "{2*l}". Only
+   * the Document's lists of parameters change (`Level.params`, `Child.effective`); nothing drawn
+   * does, and nothing is remembered. A name that is not a subcircuit, or not one of its
+   * parameters, is a warning.
+   */
+  bind?: { subckt: string; params?: Record<string, string> };
+  /**
    * Leave the drawings of the objects without a position, `Level.unplaced[].svg` and `primitives`,
    * out of the Document and keep them to give on request (`DrawingsRequest`), until the next build
    * that asks for it; false, the Document carrying them, when not given.

@@ -252,6 +252,32 @@ enum Mode {
 /// that holds parentheses or brackets, `r=(1k + 2k)`, `v=2*v(a)` or `table=[1 2 3]`, is one token
 /// with the name before it.
 /// A `name = value`, `name= value` and `name =value` are `name=value`.
+/// The `name=value` assignments among tokens, `name = value` with spaces as well.
+fn assignments(toks: &[String]) -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    let mut k = 0;
+    while k < toks.len() {
+        let t = &toks[k];
+        if let Some((name, value)) = t.split_once('=').filter(|(n, _)| !n.is_empty()) {
+            if !value.is_empty() {
+                out.push((name.to_string(), value.to_string()));
+                k += 1;
+            } else if let Some(v) = toks.get(k + 1) {
+                out.push((name.to_string(), v.clone()));
+                k += 2;
+            } else {
+                k += 1;
+            }
+        } else if toks.get(k + 1).is_some_and(|e| e == "=") && k + 2 < toks.len() {
+            out.push((t.clone(), toks[k + 2].clone()));
+            k += 3;
+        } else {
+            k += 1;
+        }
+    }
+    out
+}
+
 fn tokens(s: &str) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     let mut cur = String::new();
@@ -449,6 +475,8 @@ impl Reader<'_, '_> {
         let mut pending: Option<(u32, String)> = None;
         // a `.subckt` read in SPICE mode whose `+` lines add ports, until its parameters begin
         let mut subckt_more: Option<LevelId> = None;
+        // that `.subckt` statement, its `+` lines joined, for its parameters
+        let mut subckt_text: Option<(LevelId, String)> = None;
         let mut continued = rnl_host_spice::Continued::default();
         let mut regions = rnl_host_spice::regions::Regions::default();
         let mut in_section = section.is_none();
@@ -540,6 +568,7 @@ impl Reader<'_, '_> {
             if regions.skip(raw, no, st.mode == Mode::Spectre, main, &fname, self.cx.sink) {
                 self.flush(&mut run, &fname, st.cur);
                 subckt_more = None;
+                self.subckt_params(subckt_text.take());
                 if let Some((pl, pt)) = pending.take() {
                     self.spice_statement(&pt, pl, &fname, path, &mut st, stack);
                 }
@@ -598,18 +627,25 @@ impl Reader<'_, '_> {
                     if let Some(p) = pending.as_mut() {
                         p.1.push(' ');
                         p.1.push_str(cont);
-                    } else if let Some(sub) = subckt_more {
-                        let toks = rnl_host_spice::subckt_tokens(cont);
-                        let toks: Vec<&str> = toks.iter().map(String::as_str).collect();
-                        let (ports, params) = rnl_host_spice::subckt_ports(&toks);
-                        self.cx.doc.levels[sub].ports.extend(ports);
-                        if params {
-                            subckt_more = None;
+                    } else {
+                        if let Some(sub) = subckt_more {
+                            let toks = rnl_host_spice::subckt_tokens(cont);
+                            let toks: Vec<&str> = toks.iter().map(String::as_str).collect();
+                            let (ports, params) = rnl_host_spice::subckt_ports(&toks);
+                            self.cx.doc.levels[sub].ports.extend(ports);
+                            if params {
+                                subckt_more = None;
+                            }
+                        }
+                        if let Some((_, text)) = subckt_text.as_mut() {
+                            text.push(' ');
+                            text.push_str(&rnl_host_spice::strip_inline_comment(cont));
                         }
                     }
                     continue;
                 }
                 subckt_more = None;
+                self.subckt_params(subckt_text.take());
                 if let Some((pl, pt)) = pending.take() {
                     self.spice_statement(&pt, pl, &fname, path, &mut st, stack);
                 }
@@ -648,6 +684,7 @@ impl Reader<'_, '_> {
                         let (ports, params) = rnl_host_spice::subckt_ports(&toks[2.min(toks.len())..]);
                         self.open_subckt(name, ports, &fname, path, no, &mut st, false);
                         subckt_more = (!params).then_some(st.cur);
+                        subckt_text = Some((st.cur, rnl_host_spice::strip_inline_comment(stripped)));
                         continue;
                     }
                     ".ends" => {
@@ -676,6 +713,7 @@ impl Reader<'_, '_> {
                 pending = Some((no, stripped.to_string()));
                 continue;
             }
+            self.subckt_params(subckt_text.take());
             // Spectre mode: join `\` and `+` continuations
             let mut stmt = strip_comment(stripped);
             let mut last = no;
@@ -739,6 +777,7 @@ impl Reader<'_, '_> {
             }
         }
         self.flush(&mut run, &fname, st.cur);
+        self.subckt_params(subckt_text.take());
         if let Some((pl, pt)) = pending.take() {
             self.spice_statement(&pt, pl, &fname, path, &mut st, stack);
         }
@@ -775,6 +814,13 @@ impl Reader<'_, '_> {
         let recs = scan_run(run, fname, self.cx.sink);
         self.cx.doc.levels[level].records.extend(recs);
         run.clear();
+    }
+
+    /// Give a subcircuit read in SPICE mode the parameters its `.subckt` statement writes.
+    fn subckt_params(&mut self, statement: Option<(LevelId, String)>) {
+        if let Some((sub, text)) = statement {
+            self.cx.doc.levels[sub].params = rnl_host_spice::subckt_params(&text);
+        }
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -896,6 +942,17 @@ impl Reader<'_, '_> {
             }
             _ => {}
         }
+        if low == "parameters" {
+            // in a subcircuit, its parameters with their defaults; elsewhere, values set (S1 p83)
+            let set = assignments(&toks[1..]);
+            let level = &mut self.cx.doc.levels[st.cur];
+            if level.kind == LevelKind::Subckt {
+                level.params.extend(set);
+            } else {
+                level.param_statements.extend(set);
+            }
+            return None;
+        }
         if DIRECTIVES.contains(&low.as_str()) || first.starts_with('}') || first.starts_with('{') {
             return None;
         }
@@ -973,6 +1030,10 @@ impl Reader<'_, '_> {
             for t in body.split_whitespace().skip(1) {
                 self.cx.doc.add_global(t, fname);
             }
+            return;
+        }
+        if first == ".param" || first == ".params" {
+            self.cx.doc.levels[st.cur].param_statements.extend(rnl_host_spice::param_statement(&body));
             return;
         }
         if body.starts_with('.') {

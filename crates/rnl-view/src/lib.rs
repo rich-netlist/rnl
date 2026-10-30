@@ -9,6 +9,7 @@ mod document;
 mod formats;
 mod library;
 pub mod overlays;
+mod params;
 mod primitive;
 pub use overlays::{CurrentArrow, OverlayOptions, OverlayStyle, UsageFrame, UsageMode};
 mod snapshot;
@@ -39,6 +40,7 @@ pub use document::{
 };
 pub use formats::{detect_format, formats, FormatInfo};
 pub use library::{LibraryIndex, LibraryProvider};
+pub use params::{Bind, ParamValue, SubcktParam};
 pub use primitive::{
     Bar, Cap, Color, HAlign, Join, Layer, Primitive, Run, RunStyle, Segment, Shape, Stroke, Text, TextRun, Unit, VAlign,
 };
@@ -91,6 +93,9 @@ pub struct BuildOptions {
     /// to solve it (decision 0008); off by default. It takes the problems of the levels read
     /// without their records of the solver, so a document that has such records is read once more.
     pub status: bool,
+    /// The values to build a subcircuit's parameters with, for showing ([`Bind`]): only the
+    /// Document's lists of parameters change ([`Level::params`], [`Child::effective`]).
+    pub bind: Option<Bind>,
 }
 
 impl Default for BuildOptions {
@@ -102,6 +107,7 @@ impl Default for BuildOptions {
             svg: true,
             primitives: false,
             status: false,
+            bind: None,
         }
     }
 }
