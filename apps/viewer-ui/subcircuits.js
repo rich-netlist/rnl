@@ -49,6 +49,20 @@ export function levelNamed(title) {
   return loose.length === 1 ? loose[0] : -1;
 }
 
+/** A value an instance writes, as the view of another file takes it: a plain number as written, else the number it comes to in the parent's scope, which the other file cannot evaluate. */
+const argument = (p) => /^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?(f|p|n|u|m|k|meg|g|t)?$/i.test(p.value) || p.number === null ? p.value : String(p.number);
+
+/**
+ * The parameters an instance writes, for the view of its subcircuit's own file, which is built without the
+ * instance: `bind` is what that build takes, and `bound` what the page keeps of it (params.js). Nothing when the instance writes none.
+ */
+function parametersOf(obj) {
+  const child = doc.levels.find((l) => l.host === obj.level)?.children.find((c) => c.instance === obj.name);
+  if (!child?.params?.length) return {};
+  const params = Object.fromEntries(child.params.map((p) => [p.name, argument(p)]));
+  return { bind: { subckt: child.master, params }, bound: { subckt: child.master, via: obj.name, given: params, supplied: Object.keys(params) } };
+}
+
 /** A path's key among the views kept: its root's title and the instances on it. */
 function key(p) {
   return JSON.stringify(p.map(s => [sourceKey(s.entry || currentSource()), s.title || doc.levels[s.level]?.title, s.via]));
@@ -91,8 +105,8 @@ function cutTo(level) {
 
 /**
  * Ask which of the several definitions of the instance's subcircuit to open, in a dialog, however it was asked for, and
- * open the file of the one chosen as a view of its own, as for a subcircuit defined in an included file: this netlist
- * is not changed, so the next time asks again.
+ * open the file of the one chosen as a view of its own, as for a subcircuit defined in an included file, with the
+ * parameters of the instance: this netlist is not changed, so the next time asks again.
  */
 async function chooseDefinition(o, options) {
   const candidates = candidatesOf(o);
@@ -101,14 +115,14 @@ async function chooseDefinition(o, options) {
   const master = doc.levels.find((l) => l.host === obj.level).children.find((c) => c.instance === obj.name).master;
   const picked = await choose({
     title: m`Choose a definition of ${master}`,
-    text: m`${master} is defined ${candidates.length} times in the Library. The one you choose opens as a view of its own file, without the parameters of this instance; this netlist is not changed.`,
+    text: m`${master} is defined ${candidates.length} times in the Library. The one you choose opens as a view of its own file, with the parameters of this instance; this netlist is not changed.`,
     items: candidates.map((c) => ({ label: `${c.source}:${c.line}`, value: c })),
   });
   if (!picked) return;
   const at = doc.levels[current].host === obj.level ? current : doc.levels.findIndex((l) => l.host === obj.level);
   if (!options?.newWindow) window.dispatchEvent(new Event("viewer-navigate"));
   const step = { title: master, via: obj.name };
-  return navigate({ source: shell.sourceForPath(currentSource(), picked.file), path: at < 0 ? [step] : [...cutTo(at), step], selection: null, reveal: true }, options);
+  return navigate({ source: shell.sourceForPath(currentSource(), picked.file), path: at < 0 ? [step] : [...cutTo(at), step], selection: null, reveal: true, ...parametersOf(obj) }, options);
 }
 
 /** Open the subcircuit of instance `o`, below the level that has the instance; with several definitions, the one chosen. */
@@ -119,7 +133,7 @@ export function descend(o, options) {
   // the instance is on the level shown, or on one that the path is cut back to or starts at
   const at = doc.levels[current].host === obj.level ? current : doc.levels.findIndex((l) => l.host === obj.level);
   if (!options?.newWindow) window.dispatchEvent(new Event("viewer-navigate"));
-  return navigate({ path: at < 0 ? [{ level, via: null }] : [...cutTo(at), { level, via: obj.name }], selection: null, reveal: true }, options);
+  return navigate({ path: at < 0 ? [{ level, via: null }] : [...cutTo(at), { level, via: obj.name }], selection: null, reveal: true, ...parametersOf(obj) }, options);
 }
 
 /** Go back along the path to its level at `depth`. */

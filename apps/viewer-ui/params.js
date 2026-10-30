@@ -21,6 +21,16 @@ let editing = false; // the dialog is open
 const asked = new WeakMap(); // a Document -> the subcircuits it asked the values of when they were shown by themselves
 
 /**
+ * What the page knows of the parameters bound in the Document, `{ subckt, via, given, supplied }` (as plain data, which
+ * a session carries): the subcircuit they are bound to, the instance whose values some are, those values by name, and
+ * the names of the bound values that are still the instance's; null for a level that is not that subcircuit.
+ */
+const boundHere = (level) => {
+  const bound = bindings.get(doc);
+  return bound && bound.subckt.toLowerCase() === level.title.toLowerCase() ? bound : null;
+};
+
+/**
  * The parameters of level `i`, each with where it comes from: those the instance it was entered through
  * gives, when that is on the level above in this document, else the level's own, as its definition writes
  * them, or as they were bound; `via` is the instance's name when the values are its.
@@ -28,10 +38,10 @@ const asked = new WeakMap(); // a Document -> the subcircuits it asked the value
 export function paramsOf(i) {
   const level = doc?.levels[i];
   if (!level || level.kind !== "subckt") return { params: [], via: null };
-  const bound = bindings.get(doc);
-  if (bound && bound.subckt === level.title) {
+  const bound = boundHere(level);
+  if (bound) {
     // the values the instance gave stay its, until they are changed
-    return { params: (level.params || []).map((p) => p.from === "bound" && bound.supplied.has(p.name) ? { ...p, from: "instance" } : p), via: bound.via };
+    return { params: (level.params || []).map((p) => p.from === "bound" && bound.supplied.includes(p.name) ? { ...p, from: "instance" } : p), via: bound.via };
   }
   const [step, above] = [path[path.length - 1], path[path.length - 2]];
   if (step?.via !== null && step?.via !== undefined && above && sameSource(above.entry, currentSource())) {
@@ -138,8 +148,8 @@ export function hideParams() {
 
 /** The values the instance gave, by name, as the level shown has them now. */
 function givenBy(params, via) {
-  const bound = bindings.get(doc);
-  if (bound && bound.subckt === doc.levels[current].title) return bound.given;
+  const bound = boundHere(doc.levels[current]);
+  if (bound) return new Map(Object.entries(bound.given));
   return new Map(via === null ? [] : params.filter((p) => p.from === "instance").map((p) => [p.name, p.value]));
 }
 
@@ -209,8 +219,8 @@ export async function editParameters({ missing = false } = {}) {
     if (!result) return false;
     const now = Object.fromEntries(params.filter((p) => p.from !== "default" && p.from !== "unset").map((p) => [p.name, p.value]));
     if (JSON.stringify(Object.entries(result).sort()) === JSON.stringify(Object.entries(now).sort())) return false;
-    const supplied = new Set(Object.keys(result).filter((name) => given.get(name) === result[name]));
-    const record = { subckt: level.title, via, given, supplied };
+    const supplied = Object.keys(result).filter((name) => given.get(name) === result[name]);
+    const record = { subckt: level.title, via, given: Object.fromEntries(given), supplied };
     return (await openSource(currentSource(), true, changes(true), false, null, null, true, { bind: { subckt: level.title, params: result }, bound: record })) === true;
   } finally {
     editing = false;

@@ -667,7 +667,7 @@
   "within group {0}": "在组 {0} 之内",
   "group": "组",
   "Choose a definition of {0}": "选择 {0} 的定义",
-  "{0} is defined {1} times in the Library. The one you choose opens as a view of its own file, without the parameters of this instance; this netlist is not changed.": "{0} 在资源库中有 {1} 处定义。所选的定义会作为它所在文件自己的视图打开，不带入此实例的参数；当前网表不会改变。",
+  "{0} is defined {1} times in the Library. The one you choose opens as a view of its own file, with the parameters of this instance; this netlist is not changed.": "{0} 在资源库中有 {1} 处定义。所选的定义会作为它所在文件自己的视图打开，并带入此实例的参数；当前网表不会改变。",
   " instance of a subcircuit with {0} definitions in {1} · a double tap asks which to open": "：{1} 中的子电路实例（有 {0} 个定义） · 双击会询问打开哪一个",
   " instance of a subcircuit with {0} definitions in {1} · E or Enter asks which to open; Shift opens a new window": "：{1} 中的子电路实例（有 {0} 个定义） · 按 E 或 Enter 会询问打开哪一个；按住 Shift 在新窗口打开",
   "Parameters": "参数",

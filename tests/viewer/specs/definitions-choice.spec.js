@@ -12,7 +12,7 @@ const CANDIDATES = [
   { path: "/lib/adc_b.inc", file: "/lib/adc_b.inc", source: "lib/adc_b.inc", line: 12 },
 ];
 const NEW = ["Choose a definition of {0}",
-  "{0} is defined {1} times in the Library. The one you choose opens as a view of its own file, without the parameters of this instance; this netlist is not changed.",
+  "{0} is defined {1} times in the Library. The one you choose opens as a view of its own file, with the parameters of this instance; this netlist is not changed.",
   " instance of a subcircuit with {0} definitions in {1} · a double tap asks which to open",
   " instance of a subcircuit with {0} definitions in {1} · E or Enter asks which to open; Shift opens a new window"];
 

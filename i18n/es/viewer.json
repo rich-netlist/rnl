@@ -667,7 +667,7 @@
   "within group {0}": "dentro del grupo {0}",
   "group": "grupo",
   "Choose a definition of {0}": "Elegir una definición de {0}",
-  "{0} is defined {1} times in the Library. The one you choose opens as a view of its own file, without the parameters of this instance; this netlist is not changed.": "{0} está definido {1} veces en la biblioteca. La definición que elija se abre como una vista de su propio archivo, sin los parámetros de esta instancia; esta netlist no cambia.",
+  "{0} is defined {1} times in the Library. The one you choose opens as a view of its own file, with the parameters of this instance; this netlist is not changed.": "{0} está definido {1} veces en la biblioteca. La definición que elija se abre como una vista de su propio archivo, con los parámetros de esta instancia; esta netlist no cambia.",
   " instance of a subcircuit with {0} definitions in {1} · a double tap asks which to open": " instancia de un subcircuito con {0} definiciones en {1} · un doble toque pregunta cuál abrir",
   " instance of a subcircuit with {0} definitions in {1} · E or Enter asks which to open; Shift opens a new window": " instancia de un subcircuito con {0} definiciones en {1} · E o Enter pregunta cuál abrir; Shift lo abre en una ventana nueva",
   "Parameters": "Parámetros",
