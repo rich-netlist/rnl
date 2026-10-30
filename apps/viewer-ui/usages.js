@@ -42,6 +42,7 @@ const typeOf = (u) => (isGroup(u) ? GROUP_TYPE : u.definition);
 const labelOf = (u) => `${typeOf(u)}: ${u.id}`;
 /** A group may be turned off by PRIORITY (14.8), which its entry says in `state`; it is never failed or overridden. */
 const stateOf = (u) => u.state ?? "in-effect";
+const DISABLED_OPACITY = 0.4; // how strongly the frame of a group that is turned off is drawn
 const GROUP_STEP = 18; // screen pixels: how far a group's frame goes out beyond the groups within it, for each level, a label's height
 /**
  * How many levels of groups are within each group of the level shown, by its object: 0 for one with none within it.
@@ -422,8 +423,10 @@ export function paintUsages(svg, view, groups) {
       const bounds = entry.frame?.bounds;
       if (!bounds) continue;
       const color = setting(entry).color;
-      const group = svgElement("g", { class: `usage-frame${active ? " selected" : ""}`, "data-usage": entry.object });
-      const fill = svgElement("rect", { class: "usage-fill", "data-usage": entry.object, fill: color, "fill-opacity": active ? .2 : .1, rx: 10 });
+      // a group that PRIORITY has turned off is drawn faint, its frame, fill and label
+      const off = isGroup(entry) && stateOf(entry) !== "in-effect";
+      const group = svgElement("g", { class: `usage-frame${active ? " selected" : ""}${off ? " disabled" : ""}`, "data-usage": entry.object, ...(off ? { opacity: DISABLED_OPACITY } : {}) });
+      const fill = svgElement("rect", { class: "usage-fill", "data-usage": entry.object, fill: color, "fill-opacity": (active ? .2 : .1) * (off ? DISABLED_OPACITY : 1), rx: 10 });
       append(underlay, fill);
       // Overlay coordinates are CSS pixels: 1pt = 4/3px, independent of drawing zoom.
       const rect = svgElement("rect", { fill: "none", stroke: color,

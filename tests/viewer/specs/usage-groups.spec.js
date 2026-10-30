@@ -51,6 +51,12 @@ test("a group is drawn as a frame titled @GROUP: its id, and selecting one light
   const frames = page.locator("#canvas .usage-frame .usage-title text");
   await expect(frames.filter({ hasText: "@GROUP: %core" })).toHaveCount(1);
   await expect(frames.filter({ hasText: "@GROUP: %inp" })).toHaveCount(1);
+  // the frame of the group that is turned off is drawn faint, the others at full strength
+  const off = page.locator("#canvas .usage-frame.disabled");
+  await expect(off).toHaveCount(1);
+  await expect(off.locator(".usage-title text")).toHaveText("@GROUP: %bias");
+  await expect(off).toHaveAttribute("opacity", "0.4");
+  await expect(page.locator("#canvas .usage-frame:not(.disabled)[opacity]")).toHaveCount(0);
   await page.locator("#usage-list .usage-expand").last().click();
   await row(page, "%amp").locator(".usage-name").click();
   await expect(page.locator("#usage-detail h2")).toHaveText("@GROUP: %amp");
