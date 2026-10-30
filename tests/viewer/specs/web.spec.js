@@ -139,7 +139,8 @@ test("Auto Include resolves indexed library subcircuits, warns on conflicts and 
   expect(imported.diagnostics.some((d) => d.severity === "warning" && d.message.includes("cell") && d.message.includes("added by Auto Include"))).toBe(true);
   const conflict = await opened(page, () => page.locator("#include-input").setInputFiles({ name: "duplicate.inc", mimeType: "text/plain", buffer: Buffer.from(cell) }));
   expect(conflict.files).toHaveLength(1);
-  expect(conflict.diagnostics.some((d) => d.message.includes("conflicting definitions"))).toBe(true);
+  expect(conflict.diagnostics.some((d) => d.message.includes("times in the Library"))).toBe(true);
+  expect(conflict.levels[0].children[0].candidates.map((c) => c.line)).toEqual([1, 1]);
   await opened(page, () => page.getByRole("button", { name: "Exclude duplicate.inc", exact: true }).click());
   const reloaded = await opened(page, () => page.evaluate(() => window.viewer.command("reload-library")));
   expect(reloaded.files).toHaveLength(2);

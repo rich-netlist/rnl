@@ -452,7 +452,7 @@ mod tests {
         index.update(&["/cell.inc".into(), "/duplicate.inc".into()], &files, false);
         let collision = LibraryProvider { files: &files, index: &index, enabled: true };
         let changed = cache.build("/top.sp", &collision, &none(), false).unwrap();
-        assert!(!changed.hit && changed.json.contains("conflicting definitions"));
+        assert!(!changed.hit && changed.json.contains("times in the Library"));
         assert!(cache.build("/top.sp", &files, &none(), false).unwrap().hit);
     }
 

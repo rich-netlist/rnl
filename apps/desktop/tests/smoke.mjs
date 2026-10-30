@@ -1165,7 +1165,7 @@ async function autoIncludeSmoke(page, work, parts, pkg) {
   check(solved.levels.some(name => name === 'cell'), "Solve did not inherit Auto Include");
   fs.writeFileSync(duplicate, ".subckt cell p n\n.ends\n");
   await page.evaluate("window.viewer.command('reload-library')");
-  check(await page.evaluate(`window.viewer.doc.diagnostics.some(d => d.message.includes('conflicting definitions'))`), "the reloaded collision was ignored");
+  check(await page.evaluate(`window.viewer.doc.diagnostics.some(d => d.message.includes('times in the Library'))`), "the reloaded collision was ignored");
   same(await page.evaluate("window.viewer.doc.files.length"), 1, "an ambiguous definition was imported");
   fs.unlinkSync(duplicate);
   fs.writeFileSync(cell, ".subckt replacement p n\nR2 p n 2k\n.ends\n");

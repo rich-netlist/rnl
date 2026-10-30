@@ -296,6 +296,35 @@ export type Child = {
    * netlist does not define it.
    */
   level: number | null,
+  /**
+   * When the netlist does not define it and Auto Include found it defined more than once in
+   * the Library, so included none, those definitions, in the Library's order, for a viewer to
+   * offer when the instance is entered; left out otherwise.
+   */
+  candidates?: Array<AutoIncludeCandidate>,
+};
+
+/**
+ * A definition of a subcircuit in the Library that Auto Include could include.
+ */
+export type AutoIncludeCandidate = {
+  /**
+   * The Library file that would be included for it, as the Library names it: the file that
+   * defines it, or a file that includes that one.
+   */
+  path: string,
+  /**
+   * The file that defines it, as the Library names it.
+   */
+  file: string,
+  /**
+   * That file as shown to the user.
+   */
+  source: string,
+  /**
+   * The line of the definition, from 1.
+   */
+  line: number,
 };
 
 /**

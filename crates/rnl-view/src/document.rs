@@ -265,6 +265,27 @@ pub struct Child {
     /// The level that draws the subcircuit, an index into `Document::levels`; None when the
     /// netlist does not define it.
     pub level: Option<usize>,
+    /// When the netlist does not define it and Auto Include found it defined more than once in
+    /// the Library, so included none, those definitions, in the Library's order, for a viewer to
+    /// offer when the instance is entered; left out otherwise.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(test, ts(as = "Option<Vec<AutoIncludeCandidate>>", optional))]
+    pub candidates: Vec<AutoIncludeCandidate>,
+}
+
+/// A definition of a subcircuit in the Library that Auto Include could include.
+#[derive(Serialize, Debug, Clone, PartialEq)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct AutoIncludeCandidate {
+    /// The Library file that would be included for it, as the Library names it: the file that
+    /// defines it, or a file that includes that one.
+    pub path: String,
+    /// The file that defines it, as the Library names it.
+    pub file: String,
+    /// That file as shown to the user.
+    pub source: String,
+    /// The line of the definition, from 1.
+    pub line: u32,
 }
 
 /// Something on a drawing that stands for objects.
@@ -445,7 +466,26 @@ pub(crate) fn document(
             .map(|i| {
                 let master = i.model.clone().unwrap_or_default();
                 let level = r.doc.subckt_of(i).and_then(|h| drawn.get(&h).copied());
-                Child { instance: i.name.clone(), master, level, symbol: None }
+                let same =
+                    |m: &str, sensitive: bool| if sensitive { m == master } else { m.eq_ignore_ascii_case(&master) };
+                let candidates = r
+                    .doc
+                    .library_candidates
+                    .iter()
+                    .filter(|_| level.is_none())
+                    .find(|(m, sensitive, _)| same(m, *sensitive))
+                    .map(|(_, _, defs)| {
+                        defs.iter()
+                            .map(|d| AutoIncludeCandidate {
+                                path: d.path.clone(),
+                                file: d.file.clone(),
+                                source: d.source.clone(),
+                                line: d.line,
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                Child { instance: i.name.clone(), master, level, symbol: None, candidates }
             })
             .collect();
     }
