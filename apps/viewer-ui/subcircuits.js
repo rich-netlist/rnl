@@ -101,7 +101,7 @@ async function chooseDefinition(o, options) {
   const master = doc.levels.find((l) => l.host === obj.level).children.find((c) => c.instance === obj.name).master;
   const picked = await choose({
     title: m`Choose a definition of ${master}`,
-    text: m`${master} is defined in ${candidates.length} Library files. The one you choose opens as a view of its own file, without the parameters of this instance; this netlist is not changed.`,
+    text: m`${master} is defined ${candidates.length} times in the Library. The one you choose opens as a view of its own file, without the parameters of this instance; this netlist is not changed.`,
     items: candidates.map((c) => ({ label: `${c.source}:${c.line}`, value: c })),
   });
   if (!picked) return;

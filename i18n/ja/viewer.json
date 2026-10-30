@@ -667,7 +667,7 @@
   "within group {0}": "グループ {0} に含まれる",
   "group": "グループ",
   "Choose a definition of {0}": "{0} の定義を選択",
-  "{0} is defined in {1} Library files. The one you choose opens as a view of its own file, without the parameters of this instance; this netlist is not changed.": "{0} はライブラリの {1} 個のファイルで定義されています。選んだ定義は、そのファイル自体のビューとして開きます（このインスタンスのパラメータは引き継がれず、このネットリストは変更されません）。",
+  "{0} is defined {1} times in the Library. The one you choose opens as a view of its own file, without the parameters of this instance; this netlist is not changed.": "{0} はライブラリに {1} 箇所で定義されています。選んだ定義は、そのファイル自体のビューとして開きます（このインスタンスのパラメータは引き継がれず、このネットリストは変更されません）。",
   " instance of a subcircuit with {0} definitions in {1} · a double tap asks which to open": "：{1} 内のサブサーキットのインスタンス（定義は {0} 個） · ダブルタップでどれを開くか選びます",
   " instance of a subcircuit with {0} definitions in {1} · E or Enter asks which to open; Shift opens a new window": "：{1} 内のサブサーキットのインスタンス（定義は {0} 個） · EまたはEnterでどれを開くか選びます（Shiftで新しいウィンドウ）"
 }

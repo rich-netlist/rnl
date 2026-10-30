@@ -12,7 +12,7 @@ const CANDIDATES = [
   { path: "/lib/adc_b.inc", file: "/lib/adc_b.inc", source: "lib/adc_b.inc", line: 12 },
 ];
 const NEW = ["Choose a definition of {0}",
-  "{0} is defined in {1} Library files. The one you choose opens as a view of its own file, without the parameters of this instance; this netlist is not changed.",
+  "{0} is defined {1} times in the Library. The one you choose opens as a view of its own file, without the parameters of this instance; this netlist is not changed.",
   " instance of a subcircuit with {0} definitions in {1} · a double tap asks which to open",
   " instance of a subcircuit with {0} definitions in {1} · E or Enter asks which to open; Shift opens a new window"];
 
@@ -40,7 +40,7 @@ test("entering an instance with several definitions opens a dialog that lists th
   await page.keyboard.press("e");
   await expect(dialog(page)).toBeVisible();
   await expect(dialog(page).locator(".dialog-title")).toHaveText("Choose a definition of adc_ref");
-  await expect(dialog(page)).toContainText("adc_ref is defined in 2 Library files");
+  await expect(dialog(page)).toContainText("adc_ref is defined 2 times in the Library");
   await expect(options(page)).toHaveText(["lib/adc_a.inc:3", "lib/adc_b.inc:12"]);
   await expect(options(page).first()).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("Escape");
