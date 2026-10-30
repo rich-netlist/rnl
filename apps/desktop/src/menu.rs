@@ -566,6 +566,7 @@ mod tests {
                     None,
                 ),
                 item("ascend", if tabbed { "&Up to Parent Level\tCtrl+E" } else { "&Up to Parent Level" }, None),
+                item("edit-params", "Subcircuit &Parameters...", None),
             ],
         )
     }

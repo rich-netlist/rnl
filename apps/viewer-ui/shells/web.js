@@ -884,7 +884,7 @@ export default {
    * texts of `edits`, by the paths the Document names the files by, are those of the files, not what
    * is read.
    */
-  async build(source, edits, progress, suppliedPackages, signal) {
+  async build(source, edits, progress, suppliedPackages, signal, { bind } = {}) {
     const again = built.has(source);
     built.add(source);
     // a file at an address is asked for before the Library is indexed and the core is loaded, which take longer than it
@@ -926,6 +926,8 @@ export default {
           const full = joined(dir, path);
           return [full.replace(/^\/<pool>(?=\/)/, ""), text];
         })) };
+      // the parameters of a subcircuit to build with, for showing (params-dialog.js)
+      if (bind) request.bind = bind;
       // API packages are request-local until the newest request commits them to Library.
       for (const item of suppliedPackages || []) {
         const path = `/<api>${item.path}`;

@@ -13,7 +13,7 @@ import { sourceOpened } from "./pool.js";
 import { adoptBuffers, changes, resetBuffers } from "./edits.js";
 import { confirmLeave } from "./editor.js";
 import { shell } from "./shell.js";
-import { current, doc, expanded, selected, selectedAsUsage, setDoc, setExpanded, setSelected, setViewCache, viewCache } from "./state.js";
+import { bindings, current, doc, expanded, selected, selectedAsUsage, setDoc, setExpanded, setSelected, setViewCache, viewCache } from "./state.js";
 import { clearDrawing, notice, showLevel, view } from "./drawing.js";
 import { renderHierarchy, rootPath } from "./hierarchy.js";
 import { setProblems } from "./panels.js";
@@ -45,9 +45,11 @@ export function beginOpenOperation() {
  * Open a source, or read it again with `keep`. Opening another one asks first about changes not
  * saved. `edited` are texts to build over the files, by the path the Document names them by (a
  * preview closed shows the text applied); without them the files are read as they are, and the
- * text edited is what they hold. `confirmed` when the user was asked already (Open Project).
+ * text edited is what they hold. `confirmed` when the user was asked already (Open Project). With
+ * `options.bind`, the parameters of a subcircuit are built with those values, to show, and `options.bound`
+ * is what the page keeps of that for the Document (params.js).
  */
-export async function openSource(source, keep, edited, fresh = false, navigation = null, signal = null, confirmed = false) {
+export async function openSource(source, keep, edited, fresh = false, navigation = null, signal = null, confirmed = false, options = {}) {
   if (!source || loading) return;
   // Initial API level selection is part of its import, not a competing user navigation.
   const operation = signal ? { signal } : beginOpenOperation();
@@ -63,8 +65,9 @@ export async function openSource(source, keep, edited, fresh = false, navigation
     d = await shell.build(source, edited, stage => {
       if (operation.signal.aborted) throw new Error('Opening superseded');
       progress.setStage(stage);
-    }, undefined, operation.signal, { fresh });
+    }, undefined, operation.signal, { fresh, bind: options.bind });
     if (operation.signal.aborted) return;
+    if (options.bound) bindings.set(d, options.bound);
     await progress.stage("displaying");
     if (operation.signal.aborted) return;
     lastSource = source;

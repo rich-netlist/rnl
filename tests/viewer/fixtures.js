@@ -26,6 +26,7 @@ export const FILES = {
   "usage-query": "tests/viewer/inputs/usage-query.sp",
   "ota-groups": "tests/viewer/inputs/ota-groups.sp",
   "definitions-choice": "tests/viewer/inputs/definitions-choice.sp",
+  "subckt-params": "tests/viewer/inputs/subckt-params.sp",
   "ota-nested-usages": "tests/viewer/inputs/ota-nested-usages.sp",
   "usage-deep": "tests/viewer/inputs/usage-deep.sp",
   "usage-ota5t": "site/examples/ota5t.sp",

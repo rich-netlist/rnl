@@ -137,7 +137,7 @@ export default {
     if (generation !== preloadGeneration) return "cancelled";
     return invoke("preload_document", { path: source.path, pool, ticket, autoInclude: load("auto-include", true) === true, formats: fileFormats() });
   },
-  build: async (source, edits, progress, _packages, _signal, { fresh = false } = {}) => {
+  build: async (source, edits, progress, _packages, _signal, { fresh = false, bind = null } = {}) => {
     cancelPreload().catch(() => {});
     await flushSettings();
     await poolReady;
@@ -149,8 +149,8 @@ export default {
     try {
       progress?.("reading");
       return await (source.text === undefined
-        ? invoke("open_document", { path: source.path, edits: edits || null, pool, requestId, autoInclude, fresh, formats })
-        : invoke("open_text", { name: source.name, text: source.text, edits: edits || null, pool, requestId, autoInclude, fresh, formats }));
+        ? invoke("open_document", { path: source.path, edits: edits || null, pool, requestId, autoInclude, fresh, formats, bind })
+        : invoke("open_text", { name: source.name, text: source.text, edits: edits || null, pool, requestId, autoInclude, fresh, formats, bind }));
     } finally { unlisten?.(); }
   },
   // the drawings of the objects listed without a position, which the app keeps from the last build

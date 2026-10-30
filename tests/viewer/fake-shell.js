@@ -110,6 +110,8 @@ const fake = {
   buildEdits: [],
   /** The format choices each build was given, in order, `{ path: format }`, as the shell sends them. */
   buildFormats: [],
+  /** The parameters each build was asked to bind, in order, `{ subckt, params }`, or undefined. */
+  buildBinds: [],
   /** The default formats `detectFormat` gives, by path; otherwise by the `.scs` extension. */
   detected: {},
   /** Whether a format chosen for a file is kept in the settings (`keepsFormat`); true by default. */
@@ -326,9 +328,10 @@ export default {
     fake.calls.push(["pick", kind]);
     return source(fake.picks.shift());
   },
-  async build(src, edits) {
+  async build(src, edits, _progress, _packages, _signal, { bind } = {}) {
     fake.calls.push(src.text === undefined ? ["build", src.name] : ["build", src.name, src.text]);
     fake.buildEdits.push(edits);
+    fake.buildBinds.push(bind);
     const formats = fileFormats();
     fake.buildFormats.push(formats);
     const [fail, name] = [fake.fail, fake.next || src.fixture || (params.has("pool") ? "04-hierarchy" : undefined)];
@@ -344,6 +347,18 @@ export default {
       document.files[0].text = edits?.[document.files[0].path] ?? src.text;
     }
     for (const file of document.files) if (edits?.[file.path] !== undefined) file.text = edits[file.path];
+    // what the core does with `bind`: the parameters of that subcircuit take the values, and nothing else changes
+    for (const level of document.levels) {
+      if (!bind || level.title !== bind.subckt) continue;
+      for (const p of level.params || []) {
+        const text = bind.params?.[p.name];
+        if (text === undefined) continue;
+        // a number with an SI suffix, as a netlist writes it; anything else the core would evaluate, which this does not
+        const [, digits, suffix] = /^([-+]?[\d.]+(?:e[-+]?\d+)?)(f|p|n|u|m|k|meg|g)?$/i.exec(text) || [];
+        const scale = { f: 1e-15, p: 1e-12, n: 1e-9, u: 1e-6, m: 1e-3, k: 1e3, meg: 1e6, g: 1e9 }[suffix?.toLowerCase()] ?? 1;
+        Object.assign(p, { value: text, number: digits === undefined ? null : Number(digits) * scale, from: "bound" });
+      }
+    }
     // the formats a core gives: each host file's default and, where the build was given one, the choice
     document.formats ??= FORMATS;
     for (const file of document.files) {

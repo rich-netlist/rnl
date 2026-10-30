@@ -287,9 +287,27 @@ body[data-background="dark"] .usage-overlays { --usage-label-bg: black; }
 /* the bar of files opened by a manifest (manifest-bar.js), between the level bar and the drawing; rows fixed, as it is mostly hidden */
 .drawing > .level-bar { grid-row: 1; }
 .drawing > .manifest-bar { grid-row: 2; }
-.drawing > .canvas { grid-row: 3; }
+.drawing > .params-bar { grid-row: 3; }
+.drawing > .canvas { grid-row: 4; }
 .manifest-bar { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 4px 10px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--line); background: var(--panel); }
 .manifest-bar[hidden] { display: none; }
+/* the parameters of the subcircuit shown (params.js): the values, each with where it comes from, folded into a summary when many */
+.params-bar { display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 14px; padding: 4px 10px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--line); background: var(--panel); }
+.params-bar[hidden] { display: none; }
+.params-title { color: var(--fg); }
+.param { white-space: nowrap; font-family: ui-monospace, "Cascadia Mono", Consolas, monospace, var(--ui-cjk); }
+.param b { color: var(--fg); font-weight: 600; }
+.param i { margin-left: 4px; font-size: 11px; font-style: normal; font-family: inherit; }
+.param.instance i, .param.bound i { color: var(--accent); }
+.param.unset b, .param.unset i { color: var(--warning); }
+.params-fold, .params-edit { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; cursor: pointer; }
+.params-edit { margin-left: auto; }
+.params-table { width: 100%; border-collapse: collapse; }
+.params-table th { padding: 2px 6px 4px; text-align: left; font-size: 11.5px; font-weight: 600; color: var(--muted); border-bottom: 1px solid var(--line); }
+.params-table td { padding: 3px 6px; border-bottom: 1px solid var(--line); }
+.params-name, .params-default { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace, var(--ui-cjk); }
+.params-default, .params-source { color: var(--muted); font-size: 12px; }
+.dialog-body .params-table input { width: 100%; min-width: 8em; font-family: ui-monospace, "Cascadia Mono", Consolas, monospace, var(--ui-cjk); }
 .manifest-title { color: var(--fg); font-weight: 600; }
 .manifest-source { color: var(--accent); text-decoration: none; }
 .manifest-source:hover { text-decoration: underline; }
@@ -474,7 +492,7 @@ button.crumb:hover:not(:disabled) { color: var(--fg); }
 
 .drawing {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
 }

@@ -157,13 +157,13 @@ test("Auto Include resolves indexed library subcircuits, warns on conflicts and 
 test("an instance whose subcircuit the Library defines twice asks which definition to enter, and opens that file as a view of its own", async ({ page }) => {
   await start(page);
   // (the first line of a file opened on its own is its title)
-  const define = (resistance) => `* library\n.subckt cell p n\nR1 p n ${resistance}\n.ends\n`;
+  const define = (resistance) => `* library\n.subckt cell p n wn=1u\nR1 p n ${resistance}\n.ends\n`;
   await page.locator("#include-input").setInputFiles([
     { name: "cell_a.inc", mimeType: "text/plain", buffer: Buffer.from(define("1k")) },
     { name: "cell_b.inc", mimeType: "text/plain", buffer: Buffer.from(define("2k")) },
   ]);
   await expect(page.getByRole("button", { name: "Exclude cell_b.inc", exact: true })).toBeVisible();
-  await page.locator("#file-input").setInputFiles({ name: "top.netlist", mimeType: "text/plain", buffer: Buffer.from("* top\nX1 a 0 cell\n.end\n") });
+  await page.locator("#file-input").setInputFiles({ name: "top.netlist", mimeType: "text/plain", buffer: Buffer.from("* top\nX1 a 0 cell wn=3u\n.end\n") });
   const top = await shown(page);
   expect(top.levels[0].children[0].level).toBeNull();
   expect(top.levels[0].children[0].candidates).toHaveLength(2);
@@ -191,6 +191,8 @@ test("an instance whose subcircuit the Library defines twice asks which definiti
   expect(entered.path).toMatch(/cell_b\.inc$/);
   await expect(page.locator("#level-name")).toHaveText("cell");
   await expect(page.locator("#source")).toContainText("R1 p n 2k");
+  // with the parameters the instance wrote, as its own
+  await expect(page.locator("#params-bar .param")).toHaveText(["wn = 3ufrom X1"]);
   // the instance selected in the netlist is no selection of this document
   await expect(page.locator("#selection")).toHaveText("");
   // back to the netlist, which is as it was: entering asks again
@@ -201,6 +203,56 @@ test("an instance whose subcircuit the Library defines twice asks which definiti
   expect(again.levels[0].children[0].candidates).toHaveLength(2);
   await choose();
   await page.keyboard.press("Escape");
+});
+
+test("the parameters of a subcircuit entered through an instance are built again with the values written, by the real core", async ({ page }) => {
+  await start(page);
+  await page.locator("#file-input").setInputFiles({ name: "top.netlist", mimeType: "text/plain", buffer: Buffer.from("* top\n.subckt amp a b wn=1u l=0.18u\nR1 a b 1k\n.ends\nX1 in out AMP wn=2u\n.end\n") });
+  await shown(page);
+  await expect(page.locator("#params-bar")).toBeHidden();
+  await page.evaluate(async () => {
+    const o = window.viewer.doc.objects.findIndex((x) => x.kind === "instance" && x.name === "X1");
+    (await import("./selection.js")).select(o, "list", { usage: false });
+  });
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.press("e");
+  const params = page.locator("#params-bar .param");
+  await expect(params).toHaveText(["wn = 2ufrom X1", "l = 0.18udefault"]);
+  await page.locator("#params-bar .params-edit").click();
+  const dialog = page.locator("dialog.dialog");
+  await dialog.locator(".params-table tbody tr").nth(1).locator("input").fill("0.25u");
+  await dialog.getByRole("button", { name: "Apply" }).click();
+  await expect(params).toHaveText(["wn = 2ufrom X1", "l = 0.25uchanged"]);
+  await expect(page.locator("#level-name")).toHaveText("amp");
+  // the numbers the core evaluated are in the Document, and the netlist's text is as it was
+  expect(await page.evaluate(() => window.viewer.doc.levels.find((l) => l.title === "amp").params.map((p) => [p.name, p.value, p.number, p.from]))).toEqual([["wn", "2u", 2e-6, "bound"], ["l", "0.25u", 2.5e-7, "bound"]]);
+  await expect(page.locator("#source")).toContainText(".subckt amp a b wn=1u l=0.18u");
+  // an expression is the core's to evaluate; one it cannot is kept as written, with a question mark
+  await page.locator("#params-bar .params-edit").click();
+  await dialog.locator(".params-table tbody tr").nth(1).locator("input").fill("{2*nothing}");
+  await dialog.getByRole("button", { name: "Apply" }).click();
+  await expect(params.nth(1)).toHaveText("l = {2*nothing} ?changed");
+});
+
+test("a subcircuit defined in a Library file opens as a view of that file with the parameters its instance writes", async ({ page }) => {
+  await start(page);
+  await page.locator("#include-input").setInputFiles([{ name: "amp.inc", mimeType: "text/plain", buffer: Buffer.from("* library\n.subckt amp a b wn=1u l=0.18u\nR1 a b 1k\n.ends\n") }]);
+  await expect(page.getByRole("button", { name: "Exclude amp.inc", exact: true })).toBeVisible();
+  await page.locator("#file-input").setInputFiles({ name: "top.netlist", mimeType: "text/plain", buffer: Buffer.from("* top\nX1 in out AMP wn=2u\n.end\n") });
+  await shown(page);
+  await page.evaluate(async () => {
+    const o = window.viewer.doc.objects.findIndex((x) => x.kind === "instance" && x.name === "X1");
+    (await import("./selection.js")).select(o, "list", { usage: false });
+  });
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.evaluate(() => { window.seen = new WeakSet([window.viewer.doc]); });
+  await page.keyboard.press("e");
+  const entered = await shown(page);
+  expect(entered.path).toMatch(/amp\.inc$/);
+  await expect(page.locator("#level-name")).toHaveText("amp");
+  await expect(page.locator("#params-bar .param")).toHaveText(["wn = 2ufrom X1", "l = 0.18udefault"]);
+  // the file is built with the values bound, which changes no more than the lists of parameters
+  expect(await page.evaluate(() => window.viewer.doc.levels.find((l) => l.title === "amp").params.map((p) => [p.name, p.value, p.from]))).toEqual([["wn", "2u", "bound"], ["l", "0.18u", "default"]]);
 });
 
 test("Auto Include imports the actual nested definition without pulling its testbench into the web document", async ({ page }) => {

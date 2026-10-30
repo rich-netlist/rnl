@@ -25,8 +25,9 @@ export function navigate(target, options = {}) {
   if (target.file !== undefined) setPane('netlist');
   if (target.source || target.file !== undefined || !sameSource(visit.entry, currentSource())) {
     rememberView();
+    // the file is built without the instance, with the parameters that the instance writes bound (params.js)
     return openSource(visit.entry, false, undefined, false,
-      { ...visit, viewCache: visit.path.length ? viewCache : new Map() }, options.signal);
+      { ...visit, viewCache: visit.path.length ? viewCache : new Map() }, options.signal, false, { bind: visit.bind, bound: visit.bound });
   }
   const next = visit.path.map(s => ({ ...s,
     level: sameSource(s.entry, currentSource()) ? doc.levels.findIndex(l => l.title === s.title) : -1 }));
@@ -46,7 +47,7 @@ function destination(target) {
     select: object ? { kind: object.kind, name: object.name, level: object.level_title,
       ...(target.selectionUsage === undefined ? {} : { usage: target.selectionUsage }) }
       : target.via ? { kind: 'instance', name: target.via, level: last?.title } : null,
-    reveal: target.reveal, netlist: target.file !== undefined };
+    reveal: target.reveal, netlist: target.file !== undefined, bind: target.bind, bound: target.bound };
 }
 
 function fileSource(file) {
@@ -85,7 +86,7 @@ async function newWindow(visit) {
 /** Restore only after settings, the shell and the Library are ready. */
 export async function restoreSession(session) {
   await restorePool(session.pool || []);
-  if (!session.entry || !await openSource(session.entry, false, undefined, false, session)) return;
+  if (!session.entry || !await openSource(session.entry, false, undefined, false, session, null, false, { bind: session.bind, bound: session.bound })) return;
   if (session.netlist) setPane('netlist');
   if (session.sourceFile) {
     const file = doc.files.findIndex(f => f.path === session.sourceFile);
