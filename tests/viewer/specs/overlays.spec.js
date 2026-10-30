@@ -68,9 +68,15 @@ for (const platform of ['web', 'desktop']) {
         const exported = fs.readFileSync(path.join(dir, file), 'utf8');
         for (const zoom of [1, 1.5]) {
           if (zoom !== 1) await page.evaluate(async z => (await import('./drawing.js')).zoomCenter(z), zoom);
-          const geometry = await page.evaluate(exported => {
+          const geometry = await page.evaluate(async exported => {
             const cli = new DOMParser().parseFromString(exported, 'image/svg+xml');
             const root = document.querySelector('#canvas > svg');
+            // The core gives every frame at its extent; the Viewer sets a frame that holds others out by a step of 18 screen
+            // pixels for each (frame-layout.js), which is 18 / scale in the drawing's units.
+            const { frameSteps, FRAME_STEP } = await import('./frame-layout.js');
+            const shown = window.viewer.doc.levels[window.viewer.level].usages.filter(u => u.frame?.bounds && !u.frame.local);
+            const steps = frameSteps(shown);
+            const unit = FRAME_STEP / root.getScreenCTM().a;
             const frames = [...root.querySelectorAll('.usage-frame')].map(f => {
               const rect = f.querySelector(':scope > rect');
               const matrix = root.getCTM().inverse().multiply(rect.getCTM());
@@ -80,7 +86,8 @@ for (const platform of ['web', 'desktop']) {
               const expected = cli.querySelector(`.usage-frame[data-usage="${f.dataset.usage}"] > rect`);
               const v = window.viewer;
               const core = v.doc.levels[v.level].usages.find(u => u.object === Number(f.dataset.usage)).frame.bounds;
-              return {actual: [a.x,a.y,b.x,b.y], core, expected: ['x','y','width','height'].map(k => Number(expected.getAttribute(k)))};
+              const out = (steps.get(Number(f.dataset.usage)) ?? 0) * unit;
+              return {actual: [a.x + out, a.y + out, b.x - out, b.y - out], core, expected: ['x','y','width','height'].map(k => Number(expected.getAttribute(k)))};
             });
             const paths = [...root.querySelectorAll('.current-arrow')].map(p => {
               const expected = [...cli.querySelectorAll('.current-arrow')].find(c => c.dataset.terminal === p.dataset.terminal);
