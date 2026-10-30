@@ -11,7 +11,7 @@ use crate::words::{words, ParamSpec, ParamType, ParamsSpec, PositionSpec, Takes}
 use super::ctx::{Ctx, Frame, FrameKind, FrameRef, Nested, StmtSpan};
 use super::eval::{get, ArgV, Stop, R};
 use super::obj::*;
-use super::scene::{FailedApplication, TargetOp, Task};
+use super::scene::{FailedApplication, GroupFact, TargetOp, Task};
 use super::Interp;
 
 const MAX_SYMBOL_LEVELS: usize = 64;
@@ -165,7 +165,8 @@ impl Interp<'_> {
                     return self.scene_only(ctx, seg.start);
                 };
                 let chain = self.apply_chain(ctx);
-                self.scenes[s].groups.push((ctx.pos.clone(), obj, chain));
+                let site = Rc::new(ctx.clone());
+                self.scenes[s].groups.push(GroupFact { pos: ctx.pos.clone(), set: obj, chain, site, off: seg.start });
                 Ok((obj, self.is_lazy(obj)))
             }
             "ADD-TO" => self.kw_mod(kw, &args, seg, ctx, true),

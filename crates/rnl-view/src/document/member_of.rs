@@ -1,29 +1,37 @@
 //! The usages each object is a member of: the usage table of its level ([`super::Usage`]) turned
 //! round, with where each usage comes from and whether it takes effect, and the applications that
-//! failed and made no usage.
-use std::collections::HashMap;
+//! failed and made no usage. The groups (11.5) are listed as usages too: of an object, those it is
+//! a member of; of a group, the groups it is within.
+use std::collections::{BTreeSet, HashMap};
 
 use rnl_runtime::diag::Loc;
-use rnl_runtime::model::{quoted, Attach, LevelView, UsageOrigin};
+use rnl_runtime::model::{quoted, Attach, LevelView, ObjectInfo, UsageOrigin};
 use rnl_runtime::Interpretation;
 use serde::Serialize;
 
 use super::Index;
 
-/// A usage an object is a member of, in the object's level ([`super::Object::usages`]). The usage's
-/// own entry in `Document::objects` lists the usages it is a member of in turn: the chain upward.
+/// A usage an object is a member of, in the object's level ([`super::Object::usages`]), or a group.
+/// The usage's or group's own entry in `Document::objects` lists those it is a member of in turn:
+/// the chain upward.
 #[derive(Serialize, Debug, Clone, PartialEq)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct MemberOf {
-    /// The usage, an index into `Document::objects`; none for an application that failed, which
-    /// made no usage.
+    /// The usage or group, an index into `Document::objects`; none for an application that failed,
+    /// which made no usage.
     pub usage: Option<usize>,
+    /// "usage", or "group", a set marked with GROUP (11.5).
+    pub kind: &'static str,
     /// Its id: `%dp1`, or for one without a name of its own, where the statement that made it is,
-    /// `@file:line:col`.
+    /// `@file:line:col`; for a group, where GROUP is.
     pub id: String,
-    /// Its definition, such as `$DIFFERENTIAL_PAIR`; empty when a failed statement names none.
+    /// Its definition, such as `$DIFFERENTIAL_PAIR`; empty for a group, and when a failed statement
+    /// names none.
     pub definition: String,
-    /// The roles the object fills in it, in the order of the definition.
+    /// The roles the object fills in it, in the order of the definition. For a group, `members`, a
+    /// set role; none when the object is a group within this one: a reference to a set is spread
+    /// in a set (5.2), so a group is within another when all its members are among the other's,
+    /// and it is listed with the smallest such groups only.
     pub roles: Vec<RoleOf>,
     /// Where the statement that applies the definition is: its file, as `Usage::file` names it,
     /// and its first line.
@@ -42,7 +50,7 @@ pub struct MemberOf {
     /// "in-effect"; "failed", the application failed and made no usage (7.2); "overridden", a fact
     /// its statement writes lost a conflict to one of higher priority (8.5); "disabled", its
     /// priority, or that of the usage it is made in, is "disabled" (14.8), and its facts are left
-    /// out.
+    /// out. A group is only "in-effect" or "disabled" (11.5).
     pub state: &'static str,
     /// Why it failed or was overridden: the message of the diagnostic.
     pub reason: Option<String>,
@@ -162,6 +170,32 @@ fn first_line((a, b): &(Loc, Loc), sources: &HashMap<&str, Vec<&str>>) -> u32 {
         .unwrap_or(a.line)
 }
 
+/// Whether a usage or group of the usage table takes effect, as `MemberOf::state` says, with the
+/// reason for one overridden.
+pub(super) fn state(r: &Interpretation, o: &ObjectInfo) -> (&'static str, Option<String>) {
+    let within = |(a, b): &(Loc, Loc), at: &Loc| {
+        at.file == a.file && (a.line, a.col) <= (at.line, at.col) && (at.line, at.col) <= (b.line, b.col)
+    };
+    if o.disabled {
+        return ("disabled", None);
+    }
+    // GROUP takes no part in conflicts (11.5)
+    let overridden = o
+        .source
+        .as_ref()
+        .filter(|span| o.kind == "usage" && r.failed.iter().any(|f| f.conflict && within(span, &f.start)));
+    match overridden {
+        Some(span) => (
+            "overridden",
+            r.diagnostics()
+                .into_iter()
+                .find(|d| d.loc.as_ref().is_some_and(|l| within(span, l)))
+                .map(|d| d.message.clone()),
+        ),
+        None => ("in-effect", None),
+    }
+}
+
 fn level(
     r: &Interpretation,
     lv: &LevelView,
@@ -175,25 +209,16 @@ fn level(
             ix.insts.get(&(lv.level, i)).map(|&o| (name, (o, i)))
         })
         .collect();
+    let listed = super::usages::listed(lv);
     let mut usages = HashMap::new();
-    for o in lv.objects.iter().filter(|o| o.kind == "usage") {
-        usages.insert(o.id.as_str(), ix.usage(lv.level, &o.id));
+    for o in &listed {
+        usages.insert(o.id.as_str(), ix.usage_of_kind(lv.level, &o.id, o.kind));
     }
     let found = Members { level: lv.level, view: lv, instances, usages };
-    let within = |(a, b): &(Loc, Loc), at: &Loc| {
-        at.file == a.file && (a.line, a.col) <= (at.line, at.col) && (at.line, at.col) <= (b.line, b.col)
-    };
-    let reason_in = |span: &(Loc, Loc)| {
-        r.diagnostics().into_iter().find(|d| d.loc.as_ref().is_some_and(|l| within(span, l))).map(|d| d.message.clone())
-    };
     let mut out = Vec::new();
-    for o in lv.objects.iter().filter(|o| o.kind == "usage") {
-        let overridden = o.source.as_ref().filter(|span| r.failed.iter().any(|f| f.conflict && within(span, &f.start)));
-        let (state, reason) = match overridden {
-            _ if o.disabled => ("disabled", None),
-            Some(span) => ("overridden", reason_in(span)),
-            None => ("in-effect", None),
-        };
+    let mut groups = Vec::new();
+    for o in &listed {
+        let (state, reason) = state(r, o);
         let (source, rule) = match &o.origin {
             UsageOrigin::Written => ("written", None),
             UsageOrigin::Solver => ("solver", None),
@@ -206,6 +231,7 @@ fn level(
         let roles: Vec<_> = o.attach.iter().map(|(r, a)| (Some(r.clone()), a.clone())).collect();
         let entry = MemberOf {
             usage: Some(usage),
+            kind: o.kind,
             id: o.id.clone(),
             definition: o.definition.clone().unwrap_or_default(),
             roles: Vec::new(),
@@ -218,11 +244,26 @@ fn level(
             reason,
         };
         add(&found, ix, &entry, &roles, &mut out);
+        if o.kind == "group" {
+            let ids: BTreeSet<String> = members(&roles).into_iter().map(|(_, _, m)| m).collect();
+            groups.push((entry, ids));
+        }
+    }
+    // a group within others: the smallest of them
+    for (inner, ids) in &groups {
+        let outer: Vec<&(MemberOf, BTreeSet<String>)> =
+            groups.iter().filter(|(_, o)| ids.len() < o.len() && ids.is_subset(o)).collect();
+        for (e, o) in &outer {
+            if !outer.iter().any(|(_, m)| m.len() < o.len() && m.is_subset(o)) {
+                out.push((inner.usage.unwrap(), MemberOf { roles: Vec::new(), ..e.clone() }));
+            }
+        }
     }
     for f in &lv.failed_usages {
         let (a, _) = &f.source;
         let entry = MemberOf {
             usage: None,
+            kind: "usage",
             id: f.id.clone().unwrap_or_else(|| format!("@{}:{}:{}", a.file, a.line, a.col)),
             definition: f.definition.clone().unwrap_or_default(),
             roles: Vec::new(),

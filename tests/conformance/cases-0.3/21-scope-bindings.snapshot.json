@@ -208,6 +208,7 @@
             "port": true,
             "usages": [
               {
+                "kind": "usage",
                 "id": "@rnl-std-fill.rnl:40:3#1",
                 "definition": "$IO_PORT",
                 "roles": [
@@ -236,6 +237,7 @@
             "port": true,
             "usages": [
               {
+                "kind": "usage",
                 "id": "@rnl-std-fill.rnl:40:3#2",
                 "definition": "$IO_PORT",
                 "roles": [

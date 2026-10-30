@@ -2732,6 +2732,7 @@
             "port": true,
             "usages": [
               {
+                "kind": "usage",
                 "id": "@rnl-std-fill.rnl:37:3#1",
                 "definition": "$IOPORT",
                 "roles": [
@@ -2760,6 +2761,7 @@
             "port": true,
             "usages": [
               {
+                "kind": "usage",
                 "id": "@rnl-std-fill.rnl:37:3#2",
                 "definition": "$IOPORT",
                 "roles": [

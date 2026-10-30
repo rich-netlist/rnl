@@ -317,6 +317,8 @@ pub struct LevelView {
     pub points: Vec<PointInfo>,
     /// The applications of definitions written in the level's records that failed (7.2).
     pub failed_usages: Vec<FailedUsage>,
+    /// The sets marked with GROUP (11.5), in the order of writing, those PRIORITY turns off too.
+    pub groups: Vec<GroupInfo>,
     /// The terminal names of each host instance of the level, in the order of its nodes: from
     /// DEVICE, the subcircuit's ports or the adapter's defaults (6.4, 6.12); None where there is
     /// no name.
@@ -422,6 +424,29 @@ pub enum UsageOrigin {
     Rule { package: String, at: crate::diag::Loc },
     /// The body of the definition that the usage [`ObjectInfo::parent`] applies (9.4).
     Body,
+}
+
+/// A set marked with GROUP (11.5), for a tool to list with the usages. A reference to a set is
+/// spread in a set (5.2), so a group is never itself a member of another: one group is within
+/// another when its members are among the other's.
+#[derive(Clone, Debug, PartialEq)]
+pub struct GroupInfo {
+    /// `%core` when a record of the level names the set; otherwise where GROUP is written,
+    /// `@file:line:col`, with `#n` after it when several groups have that place, as each expansion
+    /// of a definition makes its own.
+    pub id: String,
+    /// Its members as a set role holds them ([`Attach`]): in order, each an object by its id or a
+    /// point, nested sets followed down.
+    pub members: Vec<Attach>,
+    /// The statement that gives GROUP: its first and last character.
+    pub source: Option<(crate::diag::Loc, crate::diag::Loc)>,
+    /// Where the statement comes from, as for a usage ([`ObjectInfo::origin`]).
+    pub origin: UsageOrigin,
+    /// The usage whose expansion wrote it, by id; none for a record of the level or a rule.
+    pub parent: Option<String>,
+    /// PRIORITY turns it off, on itself or on a usage it is made in (11.5, 14.8): the solver does
+    /// not get it.
+    pub disabled: bool,
 }
 
 /// An application of a definition, AS or ATTACH, written in a record of the level, that failed

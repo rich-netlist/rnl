@@ -1040,7 +1040,7 @@ R1 a 0 1k
         assert_eq!(
             r2["usages"],
             json!([{
-                "id": "%p", "definition": "$PAIR", "file": 0, "line": 6, "source": "written", "state": "in-effect",
+                "kind": "usage", "id": "%p", "definition": "$PAIR", "file": 0, "line": 6, "source": "written", "state": "in-effect",
                 "roles": [{ "role": "right", "set": false, "member": "#R2", "terminal": null }]
             }])
         );

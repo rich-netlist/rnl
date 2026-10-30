@@ -109,6 +109,7 @@
             "port": false,
             "usages": [
               {
+                "kind": "usage",
                 "id": "@rnl-std-basic.rnl:458:9#1",
                 "definition": "$GROUND",
                 "roles": [
@@ -126,6 +127,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "@rnl-std-basic.rnl:458:9#2",
                 "definition": "$GROUND",
                 "roles": [
@@ -143,6 +145,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "@rnl-std-basic.rnl:458:9#3",
                 "definition": "$GROUND",
                 "roles": [
@@ -160,6 +163,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "@rnl-std-basic.rnl:458:9#4",
                 "definition": "$GROUND",
                 "roles": [
@@ -330,6 +334,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "@rnl-std-fill.rnl:28:3#1",
                 "definition": "$GROUND_STUB",
                 "roles": [
@@ -431,6 +436,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "@rnl-std-fill.rnl:28:3#2",
                 "definition": "$GROUND_STUB",
                 "roles": [
@@ -452,6 +458,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "@rnl-std-fill.rnl:28:3#3",
                 "definition": "$GROUND_STUB",
                 "roles": [
@@ -527,6 +534,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "@rnl-std-fill.rnl:28:3#4",
                 "definition": "$GROUND_STUB",
                 "roles": [

@@ -202,6 +202,7 @@
             "port": false,
             "usages": [
               {
+                "kind": "usage",
                 "id": "@rnl-std-virtual.rnl:52:9#1",
                 "definition": "$GND",
                 "roles": [
@@ -219,6 +220,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "@rnl-std-virtual.rnl:52:9#2",
                 "definition": "$GND",
                 "roles": [
@@ -236,6 +238,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "@rnl-std-virtual.rnl:52:9#3",
                 "definition": "$GND",
                 "roles": [
@@ -275,6 +278,7 @@
             "port": false,
             "usages": [
               {
+                "kind": "usage",
                 "id": "@rnl-std-virtual.rnl:58:9#1",
                 "definition": "$SUPPLY",
                 "roles": [
@@ -292,6 +296,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "@rnl-std-virtual.rnl:58:9#2",
                 "definition": "$SUPPLY",
                 "roles": [
@@ -309,6 +314,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "@rnl-std-virtual.rnl:58:9#3",
                 "definition": "$SUPPLY",
                 "roles": [
@@ -326,6 +332,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "@rnl-std-virtual.rnl:58:9#4",
                 "definition": "$SUPPLY",
                 "roles": [
@@ -476,6 +483,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "%gs_M0_3",
                 "definition": "$GND_STUB",
                 "roles": [
@@ -559,6 +567,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "%gs_M1_3",
                 "definition": "$GND_STUB",
                 "roles": [
@@ -575,6 +584,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "@07-sets-and-selections.sp:29:52#1",
                 "definition": "$CURRENT_ARROW",
                 "roles": [
@@ -663,6 +673,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "%gs_M2_3",
                 "definition": "$GND_STUB",
                 "roles": [
@@ -679,6 +690,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "@07-sets-and-selections.sp:29:52#2",
                 "definition": "$CURRENT_ARROW",
                 "roles": [
@@ -775,6 +787,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "@07-sets-and-selections.sp:35:5",
                 "definition": "$GND",
                 "roles": [
@@ -791,6 +804,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "@07-sets-and-selections.sp:29:52#3",
                 "definition": "$CURRENT_ARROW",
                 "roles": [
@@ -866,6 +880,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "%ss_R1_1",
                 "definition": "$SUPPLY_STUB",
                 "roles": [
@@ -936,6 +951,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "%ss_R2_1",
                 "definition": "$SUPPLY_STUB",
                 "roles": [
@@ -1006,6 +1022,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "%ss_R3_1",
                 "definition": "$SUPPLY_STUB",
                 "roles": [
@@ -1076,6 +1093,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "%ss_Iref_1",
                 "definition": "$SUPPLY_STUB",
                 "roles": [

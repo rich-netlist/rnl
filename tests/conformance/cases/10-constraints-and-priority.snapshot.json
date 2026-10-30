@@ -109,6 +109,7 @@
             "port": false,
             "usages": [
               {
+                "kind": "usage",
                 "id": "@rnl-std-virtual.rnl:52:9",
                 "definition": "$GND",
                 "roles": [
@@ -206,6 +207,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "%r",
                 "definition": "$ROW",
                 "roles": [
@@ -276,6 +278,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "%r",
                 "definition": "$ROW",
                 "roles": [
@@ -346,6 +349,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "%p1",
                 "definition": "$PAIR_Y",
                 "roles": [
@@ -362,6 +366,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "%r",
                 "definition": "$ROW",
                 "roles": [
@@ -378,6 +383,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "%p2",
                 "definition": "$PAIR_Y",
                 "roles": [
@@ -448,6 +454,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "%p1",
                 "definition": "$PAIR_Y",
                 "roles": [
@@ -464,6 +471,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "%gs_R4_2",
                 "definition": "$GND_STUB",
                 "roles": [
@@ -480,6 +488,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "%p2",
                 "definition": "$PAIR_Y",
                 "roles": [

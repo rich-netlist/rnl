@@ -87,7 +87,8 @@ export type Level = {
    */
   currents: Array<CurrentArrow>,
   /**
-   * All usages in this drawing scope, including semantic usages without a symbol.
+   * All usages in this drawing scope, including semantic usages without a symbol, then the
+   * groups (11.5), as usages of kind "group".
    */
   usages: Array<Usage>,
   /**
@@ -165,7 +166,15 @@ export type Usage = {
    */
   frame: UsageFrame | null,
   object: number,
+  /**
+   * "usage", or "group" for a set marked with GROUP (11.5), whose one role, `members`, holds
+   * its members.
+   */
+  kind: string,
   id: string,
+  /**
+   * Its definition; empty for a group.
+   */
   definition: string,
   /**
    * Whether the usage itself is a virtual part with its own symbol.
@@ -179,6 +188,17 @@ export type Usage = {
   first_line: number,
   source: string,
   roles: Array<UsageRole>,
+  /**
+   * "in-effect"; "overridden", a fact its statement writes lost a conflict to one of higher
+   * priority (8.5); "disabled", its priority, or that of the usage it is made in, is
+   * "disabled" (14.8). A group is only "in-effect" or "disabled" (11.5). As
+   * `MemberOf::state`; an application that failed makes no usage and has no row.
+   */
+  state: string,
+  /**
+   * Why it was overridden: the message of the diagnostic.
+   */
+  reason: string | null,
 };
 
 export type UsageRole = {
@@ -405,11 +425,11 @@ export type FormatInfo = {
 
 export type Object = {
   /**
-   * "instance", "net" or "usage".
+   * "instance", "net", "usage" or "group", a set marked with GROUP (11.5).
    */
   kind: string,
   /**
-   * An instance or net's name, or a usage's editor identity (`%gnd1` when named).
+   * An instance or net's name, or a usage's or group's editor identity (`%gnd1` when named).
    */
   name: string,
   /**
@@ -435,26 +455,35 @@ export type Object = {
 };
 
 /**
- * A usage an object is a member of, in the object's level ([`super::Object::usages`]). The usage's
- * own entry in `Document::objects` lists the usages it is a member of in turn: the chain upward.
+ * A usage an object is a member of, in the object's level ([`super::Object::usages`]), or a group.
+ * The usage's or group's own entry in `Document::objects` lists those it is a member of in turn:
+ * the chain upward.
  */
 export type MemberOf = {
   /**
-   * The usage, an index into `Document::objects`; none for an application that failed, which
-   * made no usage.
+   * The usage or group, an index into `Document::objects`; none for an application that failed,
+   * which made no usage.
    */
   usage: number | null,
   /**
+   * "usage", or "group", a set marked with GROUP (11.5).
+   */
+  kind: string,
+  /**
    * Its id: `%dp1`, or for one without a name of its own, where the statement that made it is,
-   * `@file:line:col`.
+   * `@file:line:col`; for a group, where GROUP is.
    */
   id: string,
   /**
-   * Its definition, such as `$DIFFERENTIAL_PAIR`; empty when a failed statement names none.
+   * Its definition, such as `$DIFFERENTIAL_PAIR`; empty for a group, and when a failed statement
+   * names none.
    */
   definition: string,
   /**
-   * The roles the object fills in it, in the order of the definition.
+   * The roles the object fills in it, in the order of the definition. For a group, `members`, a
+   * set role; none when the object is a group within this one: a reference to a set is spread
+   * in a set (5.2), so a group is within another when all its members are among the other's,
+   * and it is listed with the smallest such groups only.
    */
   roles: Array<RoleOf>,
   /**
@@ -483,7 +512,7 @@ export type MemberOf = {
    * "in-effect"; "failed", the application failed and made no usage (7.2); "overridden", a fact
    * its statement writes lost a conflict to one of higher priority (8.5); "disabled", its
    * priority, or that of the usage it is made in, is "disabled" (14.8), and its facts are left
-   * out.
+   * out. A group is only "in-effect" or "disabled" (11.5).
    */
   state: string,
   /**

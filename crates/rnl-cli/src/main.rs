@@ -19,7 +19,7 @@ const USAGE: &str = "usage:
   rnl render FILE -o DIR [options]  write one SVG per drawing level
   rnl dump FILE [options]           print the effective model and diagnostics as JSON
   rnl view FILE [options]           print the Document a viewer shows, as JSON
-  rnl explain FILE REF [options]    print the usages the object REF is a member of, such as #M1, &vdd,
+  rnl explain FILE REF [options]    print the usages and groups the object REF is in, such as #M1, &vdd,
                                     #M5:d or %dp1, written as RNL refers to it
   rnl problem FILE [options]        print what a solver reads of each level, with its hash, as JSON
   rnl solve FILE -o DIR [options]   solve each drawing level and write its record of the solver back

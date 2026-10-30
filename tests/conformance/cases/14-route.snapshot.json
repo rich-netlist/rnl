@@ -211,6 +211,7 @@
             "port": false,
             "usages": [
               {
+                "kind": "usage",
                 "id": "@rnl-std-virtual.rnl:58:9#1",
                 "definition": "$SUPPLY",
                 "roles": [
@@ -228,6 +229,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "@rnl-std-virtual.rnl:58:9#2",
                 "definition": "$SUPPLY",
                 "roles": [
@@ -245,6 +247,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "@rnl-std-virtual.rnl:58:9#3",
                 "definition": "$SUPPLY",
                 "roles": [
@@ -269,6 +272,7 @@
             "port": false,
             "usages": [
               {
+                "kind": "usage",
                 "id": "@rnl-std-virtual.rnl:52:9#1",
                 "definition": "$GND",
                 "roles": [
@@ -286,6 +290,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "@rnl-std-virtual.rnl:52:9#2",
                 "definition": "$GND",
                 "roles": [
@@ -303,6 +308,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "@rnl-std-virtual.rnl:52:9#3",
                 "definition": "$GND",
                 "roles": [
@@ -320,6 +326,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "@rnl-std-virtual.rnl:52:9#4",
                 "definition": "$GND",
                 "roles": [
@@ -337,6 +344,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "@rnl-std-virtual.rnl:52:9#5",
                 "definition": "$GND",
                 "roles": [
@@ -541,6 +549,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "%ss_R1_1",
                 "definition": "$SUPPLY_STUB",
                 "roles": [
@@ -611,6 +620,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "%gs_R2_2",
                 "definition": "$GND_STUB",
                 "roles": [
@@ -681,6 +691,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "%ss_RC_1",
                 "definition": "$SUPPLY_STUB",
                 "roles": [
@@ -751,6 +762,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "%gs_RE_2",
                 "definition": "$GND_STUB",
                 "roles": [
@@ -925,6 +937,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "%gs_RL_2",
                 "definition": "$GND_STUB",
                 "roles": [
@@ -995,6 +1008,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "%gs_Vcc_2",
                 "definition": "$GND_STUB",
                 "roles": [
@@ -1011,6 +1025,7 @@
                 "state": "in-effect"
               },
               {
+                "kind": "usage",
                 "id": "%ss_Vcc_1",
                 "definition": "$SUPPLY_STUB",
                 "roles": [
@@ -1081,6 +1096,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "%gs_Vin_2",
                 "definition": "$GND_STUB",
                 "roles": [

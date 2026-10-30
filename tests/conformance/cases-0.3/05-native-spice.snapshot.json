@@ -586,6 +586,7 @@
             "port": false,
             "usages": [
               {
+                "kind": "usage",
                 "id": "@rnl-std-basic.rnl:458:9",
                 "definition": "$GROUND",
                 "roles": [
@@ -1314,6 +1315,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "@rnl-std-fill.rnl:28:3",
                 "definition": "$GROUND_STUB",
                 "roles": [

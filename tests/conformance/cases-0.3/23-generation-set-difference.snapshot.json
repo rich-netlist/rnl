@@ -208,6 +208,7 @@
             "port": true,
             "usages": [
               {
+                "kind": "usage",
                 "id": "%p_in",
                 "definition": "$IO_PORT",
                 "roles": [
@@ -231,6 +232,7 @@
             "port": true,
             "usages": [
               {
+                "kind": "usage",
                 "id": "@rnl-std-fill.rnl:40:3",
                 "definition": "$IO_PORT",
                 "roles": [
@@ -259,6 +261,7 @@
             "port": false,
             "usages": [
               {
+                "kind": "usage",
                 "id": "@rnl-std-basic.rnl:458:9",
                 "definition": "$GROUND",
                 "roles": [
@@ -364,6 +367,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "%g_pin",
                 "definition": "$GROUND",
                 "roles": [
@@ -434,6 +438,7 @@
             ],
             "usages": [
               {
+                "kind": "usage",
                 "id": "@rnl-std-fill.rnl:28:3",
                 "definition": "$GROUND_STUB",
                 "roles": [
