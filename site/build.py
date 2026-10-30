@@ -25,9 +25,12 @@ a release candidate's, does not count), or from --viewer-version. The parts of a
 <!--release--> and <!--/release--> are kept when there is a release, with {{viewer-version}} (such
 as 0.1.0) and {{viewer-tag}} (viewer-v0.1.0) filled in; the parts between <!--no-release--> and
 <!--/no-release--> are kept when there is none. The build checks that these blocks close and do not
-nest, and that the fields are only used in <!--release--> or <!--linux-release--> blocks.
+nest, and that the fields are only used in <!--release-->, <!--linux-release-->, <!--macos-release--> or
+<!--packages-release--> blocks.
 Linux download blocks are kept only when the selected tag contains tauri.linux.conf.json with both
 Linux bundle targets; <!--no-linux-release--> is kept otherwise, including for older Windows-only tags.
+The <!--packages-release--> block, the downloads with the public packages, is kept only when the selected tag has
+scripts/bundle_packages.py, which the release that carries them runs.
 
 Output (site/dist/ by default, ignored by Git), for each page in PAGES:
     zh/index.html, zh/language.html, zh/tools.html, zh/packages.html, zh/assets/, zh/*-standalone.html   Chinese
@@ -127,8 +130,8 @@ VIEWER_TAG = re.compile(r"viewer-v(\d+)\.(\d+)\.(\d+)")
 VERSION = re.compile(r"\d+\.\d+\.\d+")
 # The parts of a page kept with a release of the desktop viewer, or without one, and the fields
 # filled in from the release.
-RELEASE = re.compile(r"<!--((?:no-)?(?:(?:linux|macos)-)?release)-->(.*?)<!--/\1-->", re.S)
-RELEASE_MARK = re.compile(r"<!--/?(?:no-)?(?:(?:linux|macos)-)?release-->")
+RELEASE = re.compile(r"<!--((?:no-)?(?:(?:linux|macos|packages)-)?release)-->(.*?)<!--/\1-->", re.S)
+RELEASE_MARK = re.compile(r"<!--/?(?:no-)?(?:(?:linux|macos|packages)-)?release-->")
 FIELD = re.compile(r"\{\{(viewer-[a-z-]+)\}\}")
 FIELDS = ("viewer-version", "viewer-tag")
 TIMELINE = "{{timeline}}"
@@ -353,18 +356,19 @@ def check_release(text, name):
         if m.group(1) not in FIELDS:
             errors.append("%s:%d: {{%s}} is not a field; the fields are %s"
                           % (name, line_of(text, m.start()), m.group(1), ", ".join("{{%s}}" % f for f in FIELDS)))
-    kept = RELEASE.sub(lambda m: blank(m) if m.group(1) in ("release", "linux-release", "macos-release") else m.group(0), text)
+    kept = RELEASE.sub(lambda m: blank(m) if m.group(1) in ("release", "linux-release", "macos-release", "packages-release") else m.group(0), text)
     for m in FIELD.finditer(kept):
         errors.append("%s:%d: {{%s}} outside a <!--release--> block" % (name, line_of(kept, m.start()), m.group(1)))
     return errors
 
 
-def release(text, version, linux=False, macos=False):
+def release(text, version, linux=False, macos=False, packages=False):
     """Keep the release blocks that apply to `version`, None for no release, with the fields filled in."""
     with_release = version is not None
     enabled = {"release": with_release, "no-release": not with_release,
                "linux-release": with_release and linux, "no-linux-release": not (with_release and linux),
-               "macos-release": with_release and macos, "no-macos-release": not (with_release and macos)}
+               "macos-release": with_release and macos, "no-macos-release": not (with_release and macos),
+               "packages-release": with_release and packages, "no-packages-release": not (with_release and packages)}
     text = RELEASE.sub(lambda m: m.group(2) if enabled[m.group(1)] else "", text)
     if not with_release:
         return text
@@ -500,6 +504,19 @@ def has_macos_release(version):
             cwd=ROOT, capture_output=True, text=True, check=True)
         return set(json.loads(config.stdout)["bundle"]["targets"]) >= {"app", "dmg"}
     except (OSError, subprocess.CalledProcessError, ValueError, KeyError, TypeError):
+        return False
+
+
+def has_packages_release(version):
+    """Older tags must not acquire links to the files with the public packages that were never built: only a
+    tag that has scripts/bundle_packages.py, which fetches them for the release, has them."""
+    if version is None:
+        return False
+    try:
+        subprocess.run(["git", "cat-file", "-e", f"viewer-v{version}:scripts/bundle_packages.py"],
+                       cwd=ROOT, capture_output=True, check=True)
+        return True
+    except (OSError, subprocess.CalledProcessError):
         return False
 
 
@@ -752,7 +769,7 @@ def coverage(files, code):
     return found
 
 
-def build_language(files, index, version, linux=False, macos=False):
+def build_language(files, index, version, linux=False, macos=False, packages=False):
     """Return {relative path: text} for one language, including the standalone pages. Both kinds
     of release block are checked for Chinese before the ones that do not apply are dropped. A page
     less translated than site_i18n.SHOWN_IN_ENGLISH_BELOW is shown in English, with the scripts only
@@ -783,7 +800,7 @@ def build_language(files, index, version, linux=False, macos=False):
         errors += check_leaks(text, "%s (%s)" % (path, code), code)
     if errors:
         raise BuildError("\n".join(errors))
-    out = {path: release(text, version, linux, macos) for path, text in out.items()}
+    out = {path: release(text, version, linux, macos, packages) for path, text in out.items()}
     for page, single in PAGES.items():
         out[page] = out[page].replace("<!doctype html>\n", "<!doctype html>\n" + NOTICE, 1)
         if single:
@@ -932,10 +949,11 @@ def build(version=None, incubating=False, online=False):
     result = {}
     linux = has_linux_release(version)
     macos = has_macos_release(version)
+    packages = has_packages_release(version)
     for index, (code, prefix) in enumerate(LANGS):
         if code not in I18N.published and not incubating:
             continue
-        for path, text in build_language(files, index, version, linux, macos).items():
+        for path, text in build_language(files, index, version, linux, macos, packages).items():
             result[prefix + path] = text
         # Brand images are copied verbatim; only prose and scripts need localization.
         for path in sorted((SRC / "assets").rglob("*")):

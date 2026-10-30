@@ -174,5 +174,15 @@
   ": every symbol as it is drawn, and the text that defines it": ": cada símbolo tal como se dibuja y el texto que lo define",
   "Language standard 0.3": "Estándar del lenguaje 0.3",
   ": the formal text, also as PDF and Markdown downloads": ": el texto formal, disponible también como descargas en PDF y Markdown",
-  "Roadmap:": "Hoja de ruta:"
+  "Roadmap:": "Hoja de ruta:",
+  "with the public packages": "con los paquetes públicos",
+  "The installers above offer the public packages when you install: the Windows installer on a page of its own, the MSI as a feature. These are the other variants, with the packages in the same download. They are the latest versions of the packages of rnl-packages when the release was built; the viewer never downloads them, and Help › Public Packages says which this build has.": "Los instaladores de arriba ofrecen los paquetes públicos al instalar: el instalador de Windows en una página propia, el MSI como una función. Aquí están las otras variantes, con los paquetes en la misma descarga. Son las últimas versiones de los paquetes de rnl-packages cuando se construyó la versión; el visor nunca los descarga por sí mismo, y Ayuda › Paquetes públicos dice cuáles trae esta compilación.",
+  "Windows, portable": "Windows, portable",
+  "The single Windows file with a public-packages folder beside it, in a zip: unpack it and run the file.": "El archivo único de Windows con una carpeta public-packages al lado, en un zip: descomprímalo y ejecute el archivo.",
+  "AppImage, with the packages": "AppImage, con los paquetes",
+  "The same AppImage as above, with the public packages inside; make it executable and run it in the same way.": "El mismo AppImage de arriba, con los paquetes públicos dentro; hágalo ejecutable y ejecútelo de la misma manera.",
+  "Debian package of the public packages": "Paquete Debian de los paquetes públicos",
+  "For the viewer’s Debian package above, which looks for them in /usr/share/rnl-viewer. In the download directory, run <code>sudo apt install ./RNL-Viewer-{{viewer-version}}-linux-public-packages.deb</code>.": "Para el paquete Debian del visor de arriba, que los busca en /usr/share/rnl-viewer. En el directorio de descarga, ejecute <code>sudo apt install ./RNL-Viewer-{{viewer-version}}-linux-public-packages.deb</code>.",
+  "Apple Silicon, with the packages": "Apple Silicon, con los paquetes",
+  "Intel, with the packages": "Intel, con los paquetes"
 }

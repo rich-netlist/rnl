@@ -293,6 +293,30 @@
 <!--no-macos-release-->
     <p id="no-macos-download"><en>The selected release has no macOS packages. Download links appear after a stable tag with Mac builds is published. Until then, build from source as described in the <a href="https://github.com/rich-netlist/rnl/blob/main/apps/desktop/README.md">desktop README</a>.</en></p>
 <!--/no-macos-release-->
+<!--packages-release-->
+    <div class="panel dl" id="package-downloads">
+      <div class="ph"><svg class="ico"><use href="#i-download"/></svg><span class="ph-title">RNL Viewer {{viewer-version}} · <en>with the public packages</en></span></div>
+      <ul class="dl-list">
+        <li>
+          <a class="dl-file" href="https://github.com/rich-netlist/rnl/releases/download/{{viewer-tag}}/RNL-Viewer-{{viewer-version}}-with-packages-windows-x64.zip"><svg class="ico"><use href="#i-download"/></svg><span><b><en>Windows, portable</en></b><code>RNL-Viewer-{{viewer-version}}-with-packages-windows-x64.zip</code></span></a>
+          <p><en>The single Windows file with a public-packages folder beside it, in a zip: unpack it and run the file.</en></p>
+        </li>
+        <li>
+          <a class="dl-file" href="https://github.com/rich-netlist/rnl/releases/download/{{viewer-tag}}/RNL-Viewer-{{viewer-version}}-with-packages-linux-x86_64.AppImage"><svg class="ico"><use href="#i-download"/></svg><span><b><en>AppImage, with the packages</en></b><code>RNL-Viewer-{{viewer-version}}-with-packages-linux-x86_64.AppImage</code></span></a>
+          <p><en>The same AppImage as above, with the public packages inside; make it executable and run it in the same way.</en></p>
+        </li>
+        <li>
+          <a class="dl-file" href="https://github.com/rich-netlist/rnl/releases/download/{{viewer-tag}}/RNL-Viewer-{{viewer-version}}-linux-public-packages.deb"><svg class="ico"><use href="#i-download"/></svg><span><b><en>Debian package of the public packages</en></b><code>RNL-Viewer-{{viewer-version}}-linux-public-packages.deb</code></span></a>
+          <p><en>For the viewer’s Debian package above, which looks for them in /usr/share/rnl-viewer. In the download directory, run <code>sudo apt install ./RNL-Viewer-{{viewer-version}}-linux-public-packages.deb</code>.</en></p>
+        </li>
+        <li><a class="dl-file" href="https://github.com/rich-netlist/rnl/releases/download/{{viewer-tag}}/RNL-Viewer-{{viewer-version}}-with-packages-macos-arm64.dmg"><svg class="ico"><use href="#i-download"/></svg><span><b><en>Apple Silicon, with the packages</en></b><code>RNL-Viewer-{{viewer-version}}-with-packages-macos-arm64.dmg</code></span></a></li>
+        <li><a class="dl-file" href="https://github.com/rich-netlist/rnl/releases/download/{{viewer-tag}}/RNL-Viewer-{{viewer-version}}-with-packages-macos-x86_64.dmg"><svg class="ico"><use href="#i-download"/></svg><span><b><en>Intel, with the packages</en></b><code>RNL-Viewer-{{viewer-version}}-with-packages-macos-x86_64.dmg</code></span></a></li>
+      </ul>
+      <div class="macos-notes">
+      <p><en>The installers above offer the public packages when you install: the Windows installer on a page of its own, the MSI as a feature. These are the other variants, with the packages in the same download. They are the latest versions of the packages of rnl-packages when the release was built; the viewer never downloads them, and Help › Public Packages says which this build has.</en></p>
+      </div>
+    </div>
+<!--/packages-release-->
 
 <!--no-release-->
     <div class="panel dl dl-soon">

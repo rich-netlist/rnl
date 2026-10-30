@@ -128,6 +128,38 @@ class ReleaseDownloads(unittest.TestCase):
         self.assertTrue(build.check_release("<!--macos-release-->{{viewer-tag}}", "test"))
         self.assertTrue(build.check_release("<!--no-macos-release-->{{viewer-tag}}<!--/no-macos-release-->", "test"))
 
+    def test_the_public_packages_need_their_script_in_the_selected_tag(self):
+        with patch.object(build.subprocess, "run", return_value=SimpleNamespace(stdout="")) as run:
+            self.assertTrue(build.has_packages_release("0.5.2"))
+            self.assertEqual(run.call_args.args[0], ["git", "cat-file", "-e", "viewer-v0.5.2:scripts/bundle_packages.py"])
+        with patch.object(build.subprocess, "run", side_effect=subprocess.CalledProcessError(128, "git")):
+            self.assertFalse(build.has_packages_release("0.5.1"))
+        with patch.object(build.subprocess, "run") as run:
+            self.assertFalse(build.has_packages_release(None))
+            run.assert_not_called()
+
+    def test_bilingual_downloads_with_the_public_packages_only_for_tags_that_have_them(self):
+        files = ["-with-packages-windows-x64.zip", "-with-packages-linux-x86_64.AppImage", "-linux-public-packages.deb",
+                 "-with-packages-macos-arm64.dmg", "-with-packages-macos-x86_64.dmg"]
+        for version, packages in [("0.5.2", True), ("0.5.1", False), (None, False)]:
+            with self.subTest(version=version), patch.object(build, "has_packages_release", return_value=packages),                     patch.object(build, "has_linux_release", return_value=True), patch.object(build, "has_macos_release", return_value=True):
+                pages = build.build(version)
+                for language in ["en", "zh", "de"]:
+                    html = pages[f"{language}/tools.html"]
+                    self.assertNotIn("<!--packages-release-->", html)
+                    self.assertNotIn("{{viewer-", html)
+                    for name in files:
+                        self.assertEqual(f"RNL-Viewer-{version}{name}\"" in html, packages, name)
+                    self.assertEqual('id="package-downloads"' in html, packages)
+                    if packages:
+                        self.assertIn("viewer-v0.5.2/RNL-Viewer-0.5.2-linux-public-packages.deb", html)
+                        self.assertIn("sudo apt install ./RNL-Viewer-0.5.2-linux-public-packages.deb", html)
+
+    def test_the_blocks_of_the_public_packages_obey_the_release_markup_rules(self):
+        self.assertEqual(build.check_release("<!--packages-release-->{{viewer-tag}}<!--/packages-release-->", "test"), [])
+        self.assertTrue(build.check_release("<!--packages-release-->{{viewer-tag}}", "test"))
+        self.assertTrue(build.check_release("<!--no-packages-release-->{{viewer-tag}}<!--/no-packages-release-->", "test"))
+
     def test_linux_requires_both_packages_in_the_selected_tag(self):
         for targets, expected in [(["appimage", "deb"], True), (["nsis", "msi"], False), (["deb"], False)]:
             config = SimpleNamespace(stdout=json.dumps({"bundle": {"targets": targets}}))

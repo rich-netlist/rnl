@@ -174,5 +174,15 @@
   ": every symbol as it is drawn, and the text that defines it": "：実際に描画されたすべてのシンボルと定義の原文",
   "Language standard 0.3": "言語標準 0.3",
   ": the formal text, also as PDF and Markdown downloads": "：正式な規格本文（PDFおよびMarkdownのダウンロードも可能）",
-  "Roadmap:": "ロードマップ："
+  "Roadmap:": "ロードマップ：",
+  "with the public packages": "公開パッケージ付き",
+  "The installers above offer the public packages when you install: the Windows installer on a page of its own, the MSI as a feature. These are the other variants, with the packages in the same download. They are the latest versions of the packages of rnl-packages when the release was built; the viewer never downloads them, and Help › Public Packages says which this build has.": "上のインストーラは、インストール時に公開パッケージを含めるか選べます。Windows のインストーラでは専用のページ、MSI では機能として選びます。ここにあるのは、同じダウンロードにパッケージを含めた別の版です。リリースのビルド時点の rnl-packages にある各パッケージの最新版で、ビューアが自分でダウンロードすることはありません。どれが入っているかは［ヘルプ］›［公開パッケージ］に書かれています。",
+  "Windows, portable": "Windows ポータブル版",
+  "The single Windows file with a public-packages folder beside it, in a zip: unpack it and run the file.": "単一の Windows ファイルと、その隣の public-packages フォルダを zip にしたもの。展開してそのファイルを実行します。",
+  "AppImage, with the packages": "AppImage（パッケージ付き）",
+  "The same AppImage as above, with the public packages inside; make it executable and run it in the same way.": "上と同じ AppImage に公開パッケージを入れたものです。実行権限を付けて同じように実行します。",
+  "Debian package of the public packages": "公開パッケージの Debian パッケージ",
+  "For the viewer’s Debian package above, which looks for them in /usr/share/rnl-viewer. In the download directory, run <code>sudo apt install ./RNL-Viewer-{{viewer-version}}-linux-public-packages.deb</code>.": "上のビューアの Debian パッケージ用で、ビューアは /usr/share/rnl-viewer から探します。ダウンロードしたディレクトリで <code>sudo apt install ./RNL-Viewer-{{viewer-version}}-linux-public-packages.deb</code> を実行します。",
+  "Apple Silicon, with the packages": "Apple シリコン（パッケージ付き）",
+  "Intel, with the packages": "Intel（パッケージ付き）"
 }

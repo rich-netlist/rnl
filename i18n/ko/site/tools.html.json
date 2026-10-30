@@ -174,5 +174,15 @@
   ": every symbol as it is drawn, and the text that defines it": ": 실제로 그려진 모든 심볼과 정의 원문",
   "Language standard 0.3": "언어 표준 0.3",
   ": the formal text, also as PDF and Markdown downloads": ": 공식 표준 본문(PDF 및 Markdown 다운로드 제공)",
-  "Roadmap:": "로드맵:"
+  "Roadmap:": "로드맵:",
+  "with the public packages": "공개 패키지 포함",
+  "The installers above offer the public packages when you install: the Windows installer on a page of its own, the MSI as a feature. These are the other variants, with the packages in the same download. They are the latest versions of the packages of rnl-packages when the release was built; the viewer never downloads them, and Help › Public Packages says which this build has.": "위의 설치 프로그램은 설치할 때 공개 패키지를 함께 설치할지 고를 수 있습니다. Windows 설치 프로그램은 별도의 페이지에서, MSI는 기능 항목으로 고릅니다. 여기 있는 것은 같은 다운로드에 패키지를 담은 다른 버전입니다. 릴리스를 빌드할 때의 rnl-packages에 있는 각 패키지의 최신 버전이며, 뷰어는 스스로 내려받지 않습니다. 어떤 패키지가 들어 있는지는 도움말 › 공개 패키지(Help › Public Packages)에 나옵니다.",
+  "Windows, portable": "Windows 포터블 버전",
+  "The single Windows file with a public-packages folder beside it, in a zip: unpack it and run the file.": "단일 Windows 파일과 그 옆의 public-packages 폴더를 zip으로 묶은 것입니다. 압축을 풀고 그 파일을 실행합니다.",
+  "AppImage, with the packages": "AppImage(패키지 포함)",
+  "The same AppImage as above, with the public packages inside; make it executable and run it in the same way.": "위와 같은 AppImage에 공개 패키지를 넣은 것입니다. 실행 권한을 준 뒤 같은 방법으로 실행합니다.",
+  "Debian package of the public packages": "공개 패키지의 Debian 패키지",
+  "For the viewer’s Debian package above, which looks for them in /usr/share/rnl-viewer. In the download directory, run <code>sudo apt install ./RNL-Viewer-{{viewer-version}}-linux-public-packages.deb</code>.": "위 뷰어의 Debian 패키지용이며, 뷰어는 /usr/share/rnl-viewer에서 찾습니다. 다운로드한 디렉터리에서 <code>sudo apt install ./RNL-Viewer-{{viewer-version}}-linux-public-packages.deb</code>를 실행합니다.",
+  "Apple Silicon, with the packages": "Apple 실리콘(패키지 포함)",
+  "Intel, with the packages": "Intel(패키지 포함)"
 }
