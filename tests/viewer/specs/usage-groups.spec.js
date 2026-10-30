@@ -113,6 +113,48 @@ test("the frames of nested usages are set out a level each too, groups or not", 
   expect(dp.titleTop - stage.titleTop).toBeGreaterThanOrEqual(17);
 });
 
+test("the steps of nested frames: by the frames shown, the outer three of a nest only", async ({ page }) => {
+  const steps = (frames) => page.evaluate(async (frames) => {
+    const { frameSteps } = await import("./usages.js");
+    const drawn = frames.map(([object, bounds]) => ({ object, frame: { bounds } }));
+    return Object.fromEntries(frameSteps(drawn));
+  }, frames);
+  // six frames in one another, listed in no order of nesting: the outer three go out 3, 2 and 1 steps, the rest stay
+  const nest = [[1, [0, 0, 100, 100]], [2, [10, 10, 90, 90]], [3, [20, 20, 80, 80]], [4, [30, 30, 70, 70]], [5, [40, 40, 60, 60]], [6, [45, 45, 55, 55]]];
+  expect(await steps(nest)).toEqual({ 1: 3, 2: 2, 3: 1, 4: 0, 5: 0, 6: 0 });
+  // two deep: one step; frames that cross hold one another not at all; frames of one extent go by the list
+  expect(await steps([[1, [0, 0, 100, 100]], [2, [10, 10, 90, 90]]])).toEqual({ 1: 1, 2: 0 });
+  expect(await steps([[1, [0, 0, 50, 50]], [2, [25, 25, 75, 75]]])).toEqual({ 1: 0, 2: 0 });
+  expect(await steps([[1, [0, 0, 50, 50]], [2, [0, 0, 50, 50]]])).toEqual({ 1: 0, 2: 1 });
+  // only the frames shown are counted: with the frames of the usages hidden, %core holds %amp and %inp, two steps, not three
+  const outer = () => page.evaluate(() => {
+    const object = window.viewer.doc.levels[0].usages.find((u) => u.id === "%core").object;
+    return document.querySelector(`#canvas .usage-frame[data-usage="${object}"] rect`).getBoundingClientRect().left;
+  });
+  const before = await outer();
+  for (let k = 0; k < 40; k++) {
+    const done = await page.evaluate(() => {
+      const input = [...document.querySelectorAll('#usage-list .usage-group:not([data-type="@GROUP"]) .usage-group-head input[type=checkbox]')].find((x) => x.checked || x.indeterminate);
+      if (!input) return true;
+      if (input.indeterminate) input.indeterminate = false, input.checked = true;
+      input.click();
+      return false;
+    });
+    if (done) break;
+  }
+  await expect.poll(outer).toBeCloseTo(before + 18, 0);
+});
+
+test("the titles of the frames shown do not lie on one another", async ({ page, viewer }) => {
+  await viewer.open("ota-nested-usages");
+  const titles = await page.locator("#canvas .usage-frame .usage-title:not([display=none])").evaluateAll((els) => els.map((e) => e.getBoundingClientRect()));
+  expect(titles.length).toBeGreaterThan(5);
+  for (const [i, a] of titles.entries()) for (const b of titles.slice(i + 1)) {
+    const meet = a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
+    expect(meet, `titles ${i} and others`).toBe(false);
+  }
+});
+
 test("the usages of an instance say which groups it is a member of, and which groups those are within, indented", async ({ page }) => {
   await selectObject(page, "instance", "M1");
   const groups = page.locator('#usage-detail .usage-membership-row[data-kind="group"]');

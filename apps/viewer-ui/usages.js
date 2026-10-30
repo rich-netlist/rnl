@@ -45,29 +45,36 @@ const stateOf = (u) => u.state ?? "in-effect";
 const DISABLED_OPACITY = 0.4; // how strongly the frame of a group that is turned off is drawn
 const FRAME_STEP = 18; // screen pixels: how far a frame goes out beyond the frames within it, for each level: a label's height
 const MAX_NESTED = 400; // frames: more than this, they are drawn as the core gives them
+const TITLE_ROW = 18; // CSS pixels: the height of a title, by which one that would lie on another goes down
+const MAX_ROWS = 12;
+const MAX_STEPS = 3; // the outer frames of a nest that are set out; the frames below them are drawn at their extent, over one another
 /**
- * How many frames lie inside each frame of the drawing, counting the longest chain: 0 for one with no frame in it, by
- * the usage's object. A frame is drawn that many steps outside its extent, so that nested frames, which the core gives
- * the same edge when their members share one, and their titles do not lie on one another; usages and groups alike.
- * Of two frames with one extent, the one listed later is the outer. A virtual symbol's own box (`frame.local`) is no
- * frame of the usages and does not count.
+ * How many steps outside its extent each frame of `drawn` is drawn, by the usage's object: so that nested frames, which
+ * the core gives the same edge when their members share one, and their titles do not lie on one another. Usages and
+ * groups alike, the frames shown only. A frame goes out one step for each frame in it, the longest chain, but only the
+ * outer MAX_STEPS frames of a nest are set out: those below are drawn at their extent, over one another. Of two frames
+ * of one extent the one listed later is the outer. A virtual symbol's own box (`frame.local`) is no frame of the usages
+ * and is not in `drawn`.
  */
-function frameLevels(drawn) {
-  const levels = new Map();
-  if (drawn.length > MAX_NESTED) return levels; // the pairs are counted: a drawing with this many frames is left as the core gives them
+export function frameSteps(drawn) {
+  const steps = new Map();
+  if (drawn.length > MAX_NESTED) return steps; // the pairs are counted: a drawing with this many frames is left as the core gives them
   const inside = (a, b) => a.bounds[0] >= b.bounds[0] - 0.5 && a.bounds[1] >= b.bounds[1] - 0.5 && a.bounds[2] <= b.bounds[2] + 0.5 && a.bounds[3] <= b.bounds[3] + 0.5;
   const equal = (a, b) => inside(a, b) && inside(b, a);
-  const within = drawn.map((x, i) => drawn.filter((y, k) => y !== x && inside(y.frame, x.frame) && (!equal(y.frame, x.frame) || k < i)));
-  const levelOf = (i) => {
-    const entry = drawn[i].object;
-    if (levels.has(entry)) return levels.get(entry);
-    levels.set(entry, 0); // (the order of equal frames is strict: no chain loops)
-    const level = Math.max(-1, ...within[i].map((y) => levelOf(drawn.indexOf(y)))) + 1;
-    levels.set(entry, level);
-    return level;
+  const holds = (i, k) => i !== k && inside(drawn[k].frame, drawn[i].frame) && (!equal(drawn[k].frame, drawn[i].frame) || k < i); // frame i holds frame k
+  const indexes = drawn.map((_, i) => i);
+  const memo = (next) => {
+    const done = new Map();
+    const of = (i) => {
+      if (!done.has(i)) done.set(i, Math.max(-1, ...indexes.filter((k) => next(i, k)).map(of)) + 1); // (the order of equal frames is strict: no chain loops)
+      return done.get(i);
+    };
+    return of;
   };
-  drawn.forEach((_, i) => levelOf(i));
-  return levels;
+  const below = memo((i, k) => holds(i, k)); // frames in a frame, the longest chain
+  const above = memo((i, k) => holds(k, i)); // frames around a frame, the longest chain
+  indexes.forEach((i) => steps.set(drawn[i].object, Math.min(below(i), Math.max(0, MAX_STEPS - above(i)))));
+  return steps;
 }
 /** A level shown, or another document, starts with every group folded. */
 function newScope() {
@@ -417,7 +424,7 @@ export function paintUsages(svg, view, groups) {
     drawing = svg; layerDoc = doc; layerLevel = current; layerRevision = revision; layerSelected = focus;
     mute(groups, u ? focusSet(u) : null);
     frames = [];
-    const levels = frameLevels(usages().filter((u) => u.frame?.bounds && !localSymbol(u) && (u.object === focus || visible(u))));
+    const levels = frameSteps(usages().filter((u) => u.frame?.bounds && !localSymbol(u) && (u.object === focus || visible(u))));
     for (const entry of [...usages()].sort((a, b) => Number(a.object === focus) - Number(b.object === focus))) {
       const active = entry.object === focus;
       if (!active && !visible(entry)) continue;
@@ -456,13 +463,33 @@ export function paintUsages(svg, view, groups) {
       f.rect.setAttribute(attr, value); f.fill.setAttribute(attr, value);
     }
     const [titleX, titleY] = project(...f.entry.frame.title);
-    placeBadge(f.title, titleX - f.pad, titleY - f.pad, false);
+    f.titleAt = [titleX - f.pad, titleY - f.pad];
+    placeBadge(f.title, ...f.titleAt, false);
     const titleVisible = f.active || f.title.width + 16 <= b[2] - b[0];
     f.title.g.setAttribute("display", titleVisible ? "inline" : "none");
     if (!titleVisible) f.title.screen = null;
     for (const role of f.roles) {
       placeBadge(role, ...project(...role.anchor), true);
     }
+  }
+  spreadTitles();
+}
+/**
+ * The titles that would lie on another's go down a row each, the outer frames' titles, and the selected one's, staying
+ * where they are: frames that cross without one holding the other, and the frames below the outer MAX_STEPS of a nest,
+ * have titles at one place otherwise.
+ */
+function spreadTitles() {
+  const placed = [];
+  const order = frames.filter((f) => f.title.screen).sort((a, b) => Number(b.active) - Number(a.active) || b.pad - a.pad);
+  for (const f of order) {
+    const [x, y] = f.titleAt;
+    const [left, , right] = f.title.screen;
+    const overlaps = (top) => placed.some((r) => left < r[2] - 0.5 && right > r[0] + 0.5 && top - 9 < r[3] - 0.5 && top + 9 > r[1] + 0.5);
+    let row = 0;
+    while (row < MAX_ROWS && overlaps(y + row * TITLE_ROW)) row++;
+    if (row) placeBadge(f.title, x, y + row * TITLE_ROW, false);
+    placed.push(f.title.screen);
   }
 }
 function placeBadge(b, x, y, centered) {
