@@ -275,11 +275,7 @@ fn inspect(
                     local,
                     &roles,
                     &level.hits,
-                    &format!(
-                        "{}: {}",
-                        if o.kind == "group" { "@GROUP" } else { o.definition.as_deref().unwrap_or_default() },
-                        o.id
-                    ),
+                    &crate::overlays::usage_title(o.kind, o.definition.as_deref().unwrap_or_default(), &o.id),
                 ),
                 object,
                 kind: o.kind,
