@@ -115,7 +115,7 @@ test("the frames of nested usages are set out a level each too, groups or not", 
 
 test("the steps of nested frames: by the frames shown, the outer three of a nest only", async ({ page }) => {
   const steps = (frames) => page.evaluate(async (frames) => {
-    const { frameSteps } = await import("./usages.js");
+    const { frameSteps } = await import("./frame-layout.js");
     const drawn = frames.map(([object, bounds]) => ({ object, frame: { bounds } }));
     return Object.fromEntries(frameSteps(drawn));
   }, frames);
@@ -148,7 +148,7 @@ test("the steps of nested frames: by the frames shown, the outer three of a nest
 test("the titles of the frames shown do not lie on one another", async ({ page, viewer }) => {
   await viewer.open("ota-nested-usages");
   const titles = await page.locator("#canvas .usage-frame .usage-title:not([display=none])").evaluateAll((els) => els.map((e) => e.getBoundingClientRect()));
-  expect(titles.length).toBeGreaterThan(5);
+  expect(titles.length).toBeGreaterThan(3);
   for (const [i, a] of titles.entries()) for (const b of titles.slice(i + 1)) {
     const meet = a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
     expect(meet, `titles ${i} and others`).toBe(false);

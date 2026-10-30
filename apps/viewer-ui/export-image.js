@@ -11,6 +11,7 @@ import { changes } from "./edits.js";
 import { note } from "./editor.js";
 import { currentSource, isLoading } from "./open.js";
 import { shell } from "./shell.js";
+import { FRAME_STEP, frameSteps, TITLE_ROW, titleRows } from "./frame-layout.js";
 import { current, doc } from "./state.js";
 import { overlayChoices } from "./usages.js";
 
@@ -33,6 +34,51 @@ function overlayOptions(choices) {
   return { usages: choices.usages ? "all" : "none", currents: choices.currents, roles: false };
 }
 
+/**
+ * Set the frames of the usages shown out as the page does (frame-layout.js): the frames that hold others go out, a step
+ * for each, and the titles that would lie on one another go down a row. The core draws every frame at its extent; the
+ * image takes in the frames that have gone out, which the core's size did not.
+ */
+function setOut(svg, choices) {
+  const shown = doc.levels[current].usages.filter((u) => u.frame?.bounds && choices.each.get(u.object)?.visible);
+  const steps = frameSteps(shown.filter((u) => !u.frame.local));
+  const place = (el, x0, y0, x1, y1) => { if (el) Object.entries({ x: x0, y: y0, width: x1 - x0, height: y1 - y0 }).forEach(([k, v]) => el.setAttribute(k, String(v))); };
+  const titles = [];
+  const extent = [];
+  for (const u of shown) {
+    const pad = (steps.get(u.object) ?? 0) * FRAME_STEP;
+    const [x0, y0, x1, y1] = u.frame.bounds;
+    const frame = svg.querySelector(`g.usage-frame[data-usage="${u.object}"]`);
+    if (!frame) continue;
+    place(frame.querySelector(":scope > rect"), x0 - pad, y0 - pad, x1 + pad, y1 + pad);
+    place(svg.querySelector(`rect.usage-fill[data-usage="${u.object}"]`), x0 - pad, y0 - pad, x1 + pad, y1 + pad);
+    extent.push([x0 - pad, y0 - pad, x1 + pad, y1 + pad]);
+    // (the core leaves the title out of a frame it does not fit)
+    const title = frame.querySelector(":scope > .usage-title");
+    if (title) titles.push({ key: title, x: u.frame.title[0] - pad, y: u.frame.title[1] - pad, width: u.frame.title_width, first: pad, pad });
+  }
+  const rows = titleRows(titles);
+  for (const t of titles) {
+    const row = rows.get(t.key);
+    // the badge is drawn at the core's place for the title; it is moved from there
+    const text = t.key.querySelector("text");
+    const dx = t.x - Number(text.getAttribute("x"));
+    const dy = t.y + row * TITLE_ROW - Number(text.getAttribute("y"));
+    if (dx || dy) t.key.setAttribute("transform", `translate(${dx} ${dy})`);
+    extent.push([t.x - 4, t.y + row * TITLE_ROW - 9, t.x + t.width + 4, t.y + row * TITLE_ROW + 9]);
+  }
+  // the image is as large as the frames that went out need
+  const [vx, vy, vw, vh] = (svg.getAttribute("viewBox") || "").split(/\s+/).map(Number);
+  if (![vx, vy, vw, vh].every(Number.isFinite) || !extent.length) return;
+  const x0 = Math.min(vx, ...extent.map((e) => e[0])), y0 = Math.min(vy, ...extent.map((e) => e[1]));
+  const x1 = Math.max(vx + vw, ...extent.map((e) => e[2])), y1 = Math.max(vy + vh, ...extent.map((e) => e[3]));
+  if (x0 === vx && y0 === vy && x1 === vx + vw && y1 === vy + vh) return;
+  svg.setAttribute("viewBox", `${x0} ${y0} ${x1 - x0} ${y1 - y0}`);
+  svg.setAttribute("width", String(Math.round(x1 - x0)));
+  svg.setAttribute("height", String(Math.round(y1 - y0)));
+  place(svg.querySelector("rect.backdrop"), x0, y0, x1, y1);
+}
+
 /** Keep the usages the page shows, each in its colour; colour the drawing as on a dark background. */
 function asShown(svg, choices) {
   for (const el of svg.querySelectorAll("[data-usage]")) {
@@ -42,6 +88,7 @@ function asShown(svg, choices) {
     for (const rect of el.querySelectorAll(":scope > rect[stroke]")) rect.setAttribute("stroke", choice.color);
     for (const text of el.querySelectorAll("text")) text.setAttribute("fill", choice.color);
   }
+  setOut(svg, choices);
   if (isDark()) {
     for (const el of svg.querySelectorAll("[stroke], [fill]")) {
       if (el.closest(".usage-overlays, .usage-underlays, .current-overlays")) continue;
