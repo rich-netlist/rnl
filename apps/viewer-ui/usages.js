@@ -43,28 +43,30 @@ const labelOf = (u) => `${typeOf(u)}: ${u.id}`;
 /** A group may be turned off by PRIORITY (14.8), which its entry says in `state`; it is never failed or overridden. */
 const stateOf = (u) => u.state ?? "in-effect";
 const DISABLED_OPACITY = 0.4; // how strongly the frame of a group that is turned off is drawn
-const GROUP_STEP = 18; // screen pixels: how far a group's frame goes out beyond the groups within it, for each level, a label's height
+const FRAME_STEP = 18; // screen pixels: how far a frame goes out beyond the frames within it, for each level: a label's height
+const MAX_NESTED = 400; // frames: more than this, they are drawn as the core gives them
 /**
- * How many levels of groups are within each group of the level shown, by its object: 0 for one with none within it.
- * The frame of a group is drawn that many steps outside its extent, so that nested frames, which the core gives the
- * same edge when their members share one, and their labels, do not lie on one another.
+ * How many frames lie inside each frame of the drawing, counting the longest chain: 0 for one with no frame in it, by
+ * the usage's object. A frame is drawn that many steps outside its extent, so that nested frames, which the core gives
+ * the same edge when their members share one, and their titles do not lie on one another; usages and groups alike.
+ * Of two frames with one extent, the one listed later is the outer. A virtual symbol's own box (`frame.local`) is no
+ * frame of the usages and does not count.
  */
-function groupLevels() {
-  const children = new Map(usages().filter(isGroup).map((g) => [g.object, []]));
-  for (const g of children.keys()) {
-    for (const e of doc.objects[g]?.usages ?? []) if (e.kind === "group" && e.roles.length === 0) children.get(e.usage)?.push(g);
-  }
+function frameLevels(drawn) {
   const levels = new Map();
-  const levelOf = (g, seen = new Set()) => {
-    if (levels.has(g)) return levels.get(g);
-    if (seen.has(g)) return 0; // a chain that loops is cut
-    seen.add(g);
-    const level = Math.max(-1, ...children.get(g).map((c) => levelOf(c, seen))) + 1;
-    seen.delete(g);
-    levels.set(g, level);
+  if (drawn.length > MAX_NESTED) return levels; // the pairs are counted: a drawing with this many frames is left as the core gives them
+  const inside = (a, b) => a.bounds[0] >= b.bounds[0] - 0.5 && a.bounds[1] >= b.bounds[1] - 0.5 && a.bounds[2] <= b.bounds[2] + 0.5 && a.bounds[3] <= b.bounds[3] + 0.5;
+  const equal = (a, b) => inside(a, b) && inside(b, a);
+  const within = drawn.map((x, i) => drawn.filter((y, k) => y !== x && inside(y.frame, x.frame) && (!equal(y.frame, x.frame) || k < i)));
+  const levelOf = (i) => {
+    const entry = drawn[i].object;
+    if (levels.has(entry)) return levels.get(entry);
+    levels.set(entry, 0); // (the order of equal frames is strict: no chain loops)
+    const level = Math.max(-1, ...within[i].map((y) => levelOf(drawn.indexOf(y)))) + 1;
+    levels.set(entry, level);
     return level;
   };
-  for (const g of children.keys()) levelOf(g);
+  drawn.forEach((_, i) => levelOf(i));
   return levels;
 }
 /** A level shown, or another document, starts with every group folded. */
@@ -415,7 +417,7 @@ export function paintUsages(svg, view, groups) {
     drawing = svg; layerDoc = doc; layerLevel = current; layerRevision = revision; layerSelected = focus;
     mute(groups, u ? focusSet(u) : null);
     frames = [];
-    const levels = groupLevels();
+    const levels = frameLevels(usages().filter((u) => u.frame?.bounds && !localSymbol(u) && (u.object === focus || visible(u))));
     for (const entry of [...usages()].sort((a, b) => Number(a.object === focus) - Number(b.object === focus))) {
       const active = entry.object === focus;
       if (!active && !visible(entry)) continue;
@@ -438,7 +440,7 @@ export function paintUsages(svg, view, groups) {
         anchor: r.anchor,
         ...badge(r.name, color, group, "usage-role-label", r.width),
       })) : [];
-      frames.push({ entry, bounds, rect, fill, title, roles, active, local, pad: (levels.get(entry.object) ?? 0) * GROUP_STEP });
+      frames.push({ entry, bounds, rect, fill, title, roles, active, local, pad: (levels.get(entry.object) ?? 0) * FRAME_STEP });
     }
     append(svg, currentLayer);
   }

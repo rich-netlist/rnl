@@ -96,6 +96,23 @@ test("the frames of nested groups are set out a level each, so that their labels
   }
 });
 
+test("the frames of nested usages are set out a level each too, groups or not", async ({ page, viewer }) => {
+  await viewer.open("ota-nested-usages");
+  const box = (id) => page.evaluate((id) => {
+    const object = window.viewer.doc.levels[0].usages.find((u) => u.id === id).object;
+    const frame = document.querySelector(`#canvas .usage-frame[data-usage="${object}"]`);
+    const rect = frame.querySelector("rect").getBoundingClientRect();
+    return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, titleTop: frame.querySelector(".usage-title").getBoundingClientRect().top };
+  }, id);
+  // %dp, the input pair, is within %is, the input stage, which has the pair and the tail transistor
+  const [dp, stage] = [await box("%dp"), await box("%is")];
+  expect(stage.left).toBeLessThan(dp.left);
+  expect(stage.top).toBeLessThan(dp.top);
+  expect(stage.right).toBeGreaterThan(dp.right);
+  expect(stage.bottom).toBeGreaterThan(dp.bottom);
+  expect(dp.titleTop - stage.titleTop).toBeGreaterThanOrEqual(17);
+});
+
 test("the usages of an instance say which groups it is a member of, and which groups those are within, indented", async ({ page }) => {
   await selectObject(page, "instance", "M1");
   const groups = page.locator('#usage-detail .usage-membership-row[data-kind="group"]');
