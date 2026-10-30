@@ -174,5 +174,15 @@
   ": every symbol as it is drawn, and the text that defines it": "：每個符號繪製出的外觀與定義原文",
   "Language standard 0.3": "語言標準 0.3",
   ": the formal text, also as PDF and Markdown downloads": "：正式規範文本，亦提供 PDF 與 Markdown 下載",
-  "Roadmap:": "發展藍圖："
+  "Roadmap:": "發展藍圖：",
+  "with the public packages": "含公開套件",
+  "The installers above offer the public packages when you install: the Windows installer on a page of its own, the MSI as a feature. These are the other variants, with the packages in the same download. They are the latest versions of the packages of rnl-packages when the release was built; the viewer never downloads them, and Help › Public Packages says which this build has.": "上面的安裝程式在安裝時可以選擇是否帶上公開套件：Windows 安裝程式有專門的一頁，MSI 是一個功能項。這裡是其他版本，公開套件就在同一個下載裡。它們是發佈建置時 rnl-packages 中各套件的最新版本；檢視器從不自行下載，說明 › 公開套件（Help › Public Packages）會說明本版帶有哪些。",
+  "Windows, portable": "Windows 可攜版",
+  "The single Windows file with a public-packages folder beside it, in a zip: unpack it and run the file.": "單一 Windows 可執行檔，旁邊附一個 public-packages 資料夾，打成 zip：解壓縮後執行該檔案。",
+  "AppImage, with the packages": "AppImage（含公開套件）",
+  "The same AppImage as above, with the public packages inside; make it executable and run it in the same way.": "與上面相同的 AppImage，公開套件在其中；同樣先賦予可執行權限再執行。",
+  "Debian package of the public packages": "公開套件的 Debian 安裝套件",
+  "For the viewer’s Debian package above, which looks for them in /usr/share/rnl-viewer. In the download directory, run <code>sudo apt install ./RNL-Viewer-{{viewer-version}}-linux-public-packages.deb</code>.": "與上面檢視器的 Debian 安裝套件配套，檢視器會在 /usr/share/rnl-viewer 中尋找。請在下載目錄執行 <code>sudo apt install ./RNL-Viewer-{{viewer-version}}-linux-public-packages.deb</code>。",
+  "Apple Silicon, with the packages": "Apple 晶片（含公開套件）",
+  "Intel, with the packages": "Intel（含公開套件）"
 }

@@ -2934,7 +2934,7 @@ dependencies = [
 
 [[package]]
 name = "rnl-viewer"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "rnl-cli",
  "rnl-runtime",
