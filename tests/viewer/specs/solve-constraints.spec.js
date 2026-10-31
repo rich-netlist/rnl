@@ -4,11 +4,14 @@
 // platforms list them, with no solve; after a solve the rows say what became of each fact, and a click on a row lights
 // up the objects it acts on and the usages it comes from in the drawing.
 
+import { readFileSync } from "node:fs";
 import { expect, test } from "../viewer.js";
 
 const DESKTOP = { platform: "desktop" };
 const T4 = "T4-miller-conflicts";
 const rows = (page) => page.locator("#constraints-list li.constraint");
+/** A text of a language's catalog of the viewer, which is what the page shows for the English text in that language. */
+const catalog = (lang) => JSON.parse(readFileSync(new URL(`../../../i18n/${lang}/viewer.json`, import.meta.url), "utf8"));
 const muted = (page) => page.locator(".drawing svg [data-id].usage-muted");
 
 /** The facts of the fixture's constraints, by level. */
@@ -152,15 +155,76 @@ test.describe("with a solve, on the desktop", () => {
     const discarded = report.filter((f) => f.status === "discarded").length;
     expect(discarded).toBeGreaterThan(0);
     await expect(page.locator("#constraints-list li.constraint.discarded")).toHaveCount(discarded);
-    await expect(page.locator("#constraints-list li.constraint.discarded .st").first()).toHaveText("✗");
+    await expect(page.locator("#constraints-list li.constraint.discarded .st").first()).toHaveText("!");
     await expect(page.locator("#constraints-list li.constraint.discarded .more").first()).toContainText("it conflicts with");
-    await expect(page.locator("#constraints-list li.constraint.kept .st").first()).toHaveText("✓");
+    // a kept fact that the report says holds on the drawing has the check; the solver measures them where it can
+    const holding = report.findIndex((f) => f.status === "kept" && f.holds === true);
+    expect(holding).toBeGreaterThanOrEqual(0);
+    await expect(rows(page).nth(holding).locator(".st")).toHaveText("✓");
     // the report is a button away, and so are the constraints again
     await page.locator("#solve-view-report").click();
     await expect(page.locator("#solve-report")).toBeVisible();
     await expect(page.locator("#solve-constraints")).toBeHidden();
     await page.locator("#solve-view-constraints").click();
     await expect(page.locator("#solve-constraints")).toBeVisible();
+  });
+
+  /** Every combination of what became of a fact and whether it holds, and the mark and the tooltip the row has for it. */
+  const COMBOS = [
+    { status: "kept", holds: true, glyph: "✓", tip: "Kept, and it holds on the drawing.", kind: "holds" },
+    { status: "kept", holds: false, glyph: "✗", tip: "Kept, but it does not hold on the drawing: a fault of the solver.", kind: "broken" },
+    { status: "kept", holds: null, glyph: "", tip: "Kept; it cannot be measured on the drawing.", kind: "unmeasured" },
+    { status: "discarded", holds: true, glyph: "!", tip: "Discarded: it conflicts with other constraints.", kind: "dropped" },
+    { status: "discarded", holds: null, glyph: "!", tip: "Discarded: it conflicts with other constraints.", kind: "dropped" },
+    { status: "failed", holds: false, glyph: "!", tip: "Failed: the constraint contradicts itself.", kind: "failed" },
+    { status: "undecided", holds: true, glyph: "?", tip: "Undecided: the check did not finish. Measured on the drawing, it holds.", kind: "undecided" },
+    { status: "undecided", holds: false, glyph: "?", tip: "Undecided: the check did not finish. Measured on the drawing, it does not hold.", kind: "undecided" },
+    { status: "undecided", holds: null, glyph: "?", tip: "Undecided: the check did not finish. It cannot be measured on the drawing.", kind: "undecided" },
+  ];
+
+  test("the mark of a row is told by its status first, and by whether it holds only when it is kept; the tooltip says it in words", async ({ page, viewer }) => {
+    // the report of the fixture, with each fact given one of the combinations
+    await page.route("**/fixtures/T4-miller-conflicts-preview.json", async (route) => {
+      const preview = await (await route.fetch()).json();
+      preview.report.levels[0].facts.forEach((f, k) => Object.assign(f, { status: COMBOS[k % COMBOS.length].status, holds: COMBOS[k % COMBOS.length].holds }));
+      await route.fulfill({ json: preview });
+    });
+    await solve(page);
+    const count = await rows(page).count();
+    expect(count).toBeGreaterThan(COMBOS.length);
+    for (let k = 0; k < count; k++) {
+      const want = COMBOS[k % COMBOS.length];
+      const mark = rows(page).nth(k).locator(".st");
+      await expect(mark, `row ${k}`).toHaveText(want.glyph);
+      await expect(mark, `row ${k}`).toHaveClass(new RegExp(`(^| )${want.kind}( |$)`));
+      await expect(mark, `row ${k}`).toHaveAttribute("title", want.tip);
+      await expect(mark, `row ${k}`).toHaveAttribute("aria-label", want.tip);
+    }
+    // a kept fact that does not hold is shown as the solver's fault: the colour of an error, and larger than the others
+    const broken = rows(page).nth(1).locator(".st");
+    const look = (el) => el.evaluate((e) => ({ color: getComputedStyle(e).color, size: parseFloat(getComputedStyle(e).fontSize) }));
+    const check = await look(rows(page).nth(0).locator(".st"));
+    const cross = await look(broken);
+    expect(cross.color).not.toBe(check.color);
+    expect(cross.size).toBeGreaterThan(check.size);
+    // the two tooltips of `!` say which it is
+    expect(COMBOS[3].tip).not.toBe(COMBOS[5].tip);
+    // the tooltips are the catalog's in another language, read from it, and a kept fact that cannot be measured has no symbol
+    await page.evaluate(() => window.viewer.command("language-zh"));
+    const zh = catalog("zh");
+    for (const want of COMBOS) {
+      expect(zh[want.tip], want.tip).toBeTruthy();
+      expect(zh[want.tip]).not.toBe(want.tip);
+    }
+    for (let k = 0; k < COMBOS.length; k++) {
+      await expect(rows(page).nth(k).locator(".st"), `row ${k}`).toHaveAttribute("title", zh[COMBOS[k].tip]);
+    }
+    // the report's own grouping, by status, is as it was
+    await page.evaluate(() => window.viewer.command("language-en"));
+    await page.locator("#solve-view-report").click();
+    // (the kept group is folded to begin with)
+    expect(await page.locator("#solve-report .solve-line.fact.kept").count()).toBeGreaterThan(0);
+    await expect(page.locator("#solve-report .solve-line.fact.discarded").first()).toBeVisible();
   });
 
   test("a click on a row lights up the objects it acts on and the usages it comes from, and dims the rest", async ({ page }) => {

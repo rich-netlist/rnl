@@ -1065,6 +1065,12 @@ body.solving, body.solving canvas { cursor: progress; }
 .solve-line.constraint .detail .struct { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .solve-line.constraint .detail .st { font-weight: 700; }
 .solve-line.constraint.kept .detail .st { color: var(--muted); }
+/* the marks of the results (statusMark): a kept fact that does not hold is the solver's fault, and shown as one */
+/* no mark, but a place to point at, for the tooltip that says why */
+.solve-line.constraint .detail .st.unmeasured { display: inline-block; width: 1em; height: 1em; align-self: center; }
+.solve-line.constraint .detail .st.broken { color: var(--error); font-size: 16px; line-height: 1; }
+.solve-line.constraint .detail .st.failed { color: var(--error); }
+.solve-line.constraint .detail .st.dropped, .solve-line.constraint .detail .st.undecided { color: var(--warning); }
 .solve-line.constraint.discarded .msg { text-decoration: line-through; color: var(--muted); }
 .solve-line.constraint .where { display: inline-flex; align-items: center; justify-content: center; align-self: center; width: 22px; height: 18px; padding: 0; border: 1px solid var(--line); border-radius: 3px; background: var(--tab); color: var(--fg); }
 .solve-line.constraint .where:hover { background: var(--hover); }

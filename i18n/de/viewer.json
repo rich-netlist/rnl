@@ -707,5 +707,13 @@
   "{0} constraints": "{0} Randbedingungen",
   "{0} of {1} constraints": "{0} von {1} Randbedingungen",
   "There are no constraints to show for this netlist.": "Für diese Netzliste gibt es keine Randbedingungen anzuzeigen.",
-  "These files are built in and are never overwritten: {0}. Their changes stay in the viewer.": "Diese Dateien sind eingebaut und werden nie überschrieben: {0}. Ihre Änderungen bleiben im Viewer."
+  "These files are built in and are never overwritten: {0}. Their changes stay in the viewer.": "Diese Dateien sind eingebaut und werden nie überschrieben: {0}. Ihre Änderungen bleiben im Viewer.",
+  "Kept, and it holds on the drawing.": "Behalten, und sie gilt in der Zeichnung.",
+  "Kept, but it does not hold on the drawing: a fault of the solver.": "Behalten, aber sie gilt in der Zeichnung nicht: ein Fehler des Lösers.",
+  "Kept; it cannot be measured on the drawing.": "Behalten; sie lässt sich in der Zeichnung nicht messen.",
+  "Discarded: it conflicts with other constraints.": "Verworfen: sie steht im Konflikt mit anderen Randbedingungen.",
+  "Failed: the constraint contradicts itself.": "Fehlgeschlagen: die Randbedingung widerspricht sich selbst.",
+  "Undecided: the check did not finish. Measured on the drawing, it holds.": "Unentschieden: die Prüfung wurde nicht beendet. In der Zeichnung gemessen, gilt sie.",
+  "Undecided: the check did not finish. Measured on the drawing, it does not hold.": "Unentschieden: die Prüfung wurde nicht beendet. In der Zeichnung gemessen, gilt sie nicht.",
+  "Undecided: the check did not finish. It cannot be measured on the drawing.": "Unentschieden: die Prüfung wurde nicht beendet. Sie lässt sich in der Zeichnung nicht messen."
 }

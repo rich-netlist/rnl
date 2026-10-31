@@ -707,5 +707,13 @@
   "{0} constraints": "{0} contraintes",
   "{0} of {1} constraints": "{0} contraintes sur {1}",
   "There are no constraints to show for this netlist.": "Cette netlist n'a aucune contrainte à afficher.",
-  "These files are built in and are never overwritten: {0}. Their changes stay in the viewer.": "Ces fichiers sont intégrés et ne sont jamais écrasés : {0}. Leurs modifications restent dans le visualiseur."
+  "These files are built in and are never overwritten: {0}. Their changes stay in the viewer.": "Ces fichiers sont intégrés et ne sont jamais écrasés : {0}. Leurs modifications restent dans le visualiseur.",
+  "Kept, and it holds on the drawing.": "Conservée, et elle est respectée dans le dessin.",
+  "Kept, but it does not hold on the drawing: a fault of the solver.": "Conservée, mais elle n'est pas respectée dans le dessin : un défaut du solveur.",
+  "Kept; it cannot be measured on the drawing.": "Conservée ; elle ne peut pas être mesurée dans le dessin.",
+  "Discarded: it conflicts with other constraints.": "Écartée : elle est en conflit avec d'autres contraintes.",
+  "Failed: the constraint contradicts itself.": "Échouée : la contrainte se contredit elle-même.",
+  "Undecided: the check did not finish. Measured on the drawing, it holds.": "Indécise : la vérification n'a pas abouti. Mesurée dans le dessin, elle est respectée.",
+  "Undecided: the check did not finish. Measured on the drawing, it does not hold.": "Indécise : la vérification n'a pas abouti. Mesurée dans le dessin, elle n'est pas respectée.",
+  "Undecided: the check did not finish. It cannot be measured on the drawing.": "Indécise : la vérification n'a pas abouti. Elle ne peut pas être mesurée dans le dessin."
 }

@@ -707,5 +707,13 @@
   "{0} constraints": "制約 {0} 件",
   "{0} of {1} constraints": "制約 {1} 件中 {0} 件",
   "There are no constraints to show for this netlist.": "このネットリストには表示できる制約がありません。",
-  "These files are built in and are never overwritten: {0}. Their changes stay in the viewer.": "これらのファイルは組み込みで、上書きされることはありません: {0}。変更はビューアに残ります。"
+  "These files are built in and are never overwritten: {0}. Their changes stay in the viewer.": "これらのファイルは組み込みで、上書きされることはありません: {0}。変更はビューアに残ります。",
+  "Kept, and it holds on the drawing.": "保持されており、図の上で成立しています。",
+  "Kept, but it does not hold on the drawing: a fault of the solver.": "保持されていますが、図の上で成立していません。ソルバーの不具合です。",
+  "Kept; it cannot be measured on the drawing.": "保持されています。図の上では測れません。",
+  "Discarded: it conflicts with other constraints.": "破棄されました: ほかの制約と衝突しています。",
+  "Failed: the constraint contradicts itself.": "失敗しました: この制約は自己矛盾しています。",
+  "Undecided: the check did not finish. Measured on the drawing, it holds.": "未判定: 検査が終わりませんでした。図の上で測ると、成立しています。",
+  "Undecided: the check did not finish. Measured on the drawing, it does not hold.": "未判定: 検査が終わりませんでした。図の上で測ると、成立していません。",
+  "Undecided: the check did not finish. It cannot be measured on the drawing.": "未判定: 検査が終わりませんでした。図の上では測れません。"
 }
