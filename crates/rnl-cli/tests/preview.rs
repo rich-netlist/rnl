@@ -179,6 +179,72 @@ fn the_time_limit_leaves_facts_undecided_in_the_report() {
         .filter(|f| f.status == "undecided")
         .all(|f| f.why.as_deref().is_some_and(|w| w.contains("time limit"))));
     assert!(!level.warnings.is_empty(), "{level:?}");
+    // a fact not decided is measured all the same
+    assert!(level.facts.iter().all(|f| f.holds.is_some()), "{:?}", level.facts);
+    let drawn: Vec<(&str, Option<bool>)> = level.facts.iter().map(|f| (f.status, f.holds)).collect();
+    assert!(drawn.contains(&("undecided", Some(false))) || drawn.contains(&("undecided", Some(true))), "{drawn:?}");
+}
+
+#[test]
+fn each_fact_is_measured_on_the_drawing_whatever_became_of_it() {
+    let dir = scratch("holds");
+    let file = dir.join("t.sp");
+    std::fs::write(&file, NET).unwrap();
+    let shown = preview(&path(&file), &FsProvider::new(&[]), &unlimited(), &WallClock::new(), &|_| true).unwrap();
+    let facts = &shown.report.levels[0].facts;
+    assert!(facts.iter().any(|f| f.status == "discarded"), "{facts:?}");
+    for f in facts {
+        assert_eq!(f.holds, Some(f.status == "kept"), "{f:?}");
+    }
+}
+
+#[test]
+fn every_fact_kept_in_the_solver_cases_holds_on_the_drawing() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/integration/solver");
+    let cases: Vec<PathBuf> = std::fs::read_dir(root)
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .filter(|p| p.is_file() && p.extension().is_some_and(|e| e == "sp"))
+        .collect();
+    assert!(!cases.is_empty());
+    for case in cases {
+        let shown = preview(&path(&case), &FsProvider::new(&[]), &unlimited(), &WallClock::new(), &|_| true).unwrap();
+        for level in &shown.report.levels {
+            for f in &level.facts {
+                if f.status == "kept" {
+                    assert_eq!(f.holds, Some(true), "{} / {}: {}", case.display(), level.title, f.text);
+                }
+            }
+        }
+    }
+}
+
+/// What is measured is the text: a record that says otherwise than the solver found is seen.
+#[test]
+fn the_measure_reads_the_text_written_and_not_the_solution() {
+    let dir = scratch("holds-text");
+    let file = dir.join("t.sp");
+    std::fs::write(&file, NET).unwrap();
+    let options = unlimited();
+    let entry = path(&file);
+    let shown = preview(&entry, &FsProvider::new(&[]), &options, &WallClock::new(), &|_| true).unwrap();
+    let text = &shown.copy.files[0].text;
+    let changed = text.replace("#R1 @PLACE(4, 0)", "#R1 @PLACE(3, 0)");
+    assert_ne!(&changed, text);
+    let files = rnl_runtime::source::MemoryProvider::new().with(&entry, &changed);
+    let formats = Default::default();
+    let read = |generated: bool| {
+        let with = rnl_runtime::Options { generated, problems: true, ..options.runtime() };
+        rnl_view::interpret_with(&entry, None, &formats, &files, &with).unwrap()
+    };
+    let (without, with) = (read(false), read(true));
+    let p = &without.problems[0];
+    let drawn = rnl_runtime::previous::drawn(p, &with);
+    let holds: Vec<Option<bool>> =
+        p.facts.iter().map(|f| rnl_solver::holds_as_drawn(p, &drawn, &f.kind, options.solver.tolerance)).collect();
+    let align = p.facts.iter().position(|f| f.kind.name() == "ALIGN").unwrap();
+    assert_eq!(holds[align], Some(false), "{:?}", p.facts[align]);
+    assert_eq!(shown.report.levels[0].facts[align].holds, Some(true));
 }
 
 #[test]

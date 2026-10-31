@@ -1232,9 +1232,20 @@ impl Interp<'_> {
 
     /// The anchor and whether at least one axis comes from the symbol's local position.
     fn text_anchor_source(&mut self, s: SceneId, t: ObjId) -> Option<(Pt, bool)> {
+        let (xy, from_symbol) = self.text_axes(s, t);
+        if let [Some(x), Some(y)] = xy {
+            return Some(((x, y), from_symbol));
+        }
+        // a free axis: where this implementation puts the text, on the axes the scene leaves free
         let att = self.text_attach(t);
-        let items = self.text_items(t);
-        let base = match self.o(att) {
+        let base = self.text_base(s, att);
+        let free = self.text_default_place(s, att, base)?;
+        Some(((xy[0].unwrap_or(free.0), xy[1].unwrap_or(free.1)), from_symbol))
+    }
+
+    /// The coordinate point of what a text is attached to, when it has one.
+    fn text_base(&mut self, s: SceneId, att: ObjId) -> Option<Pt> {
+        match self.o(att) {
             ObjData::Point { .. }
             | ObjData::Pos { .. }
             | ObjData::Term { .. }
@@ -1242,7 +1253,15 @@ impl Interp<'_> {
             | ObjData::Usage(_)
             | ObjData::Bundle { .. } => self.point_of(s, att),
             _ => None,
-        };
+        }
+    }
+
+    /// The axes of a text that the scene or the symbol give, None on those left free, and whether at
+    /// least one comes from the symbol's local position.
+    pub(crate) fn text_axes(&mut self, s: SceneId, t: ObjId) -> ([Option<f64>; 2], bool) {
+        let att = self.text_attach(t);
+        let items = self.text_items(t);
+        let base = self.text_base(s, att);
         // Each axis on its own (13.3): an absolute position (PLACE) or an offset (dx, dy), whichever was
         // written later, whatever the priority; failing both, the position the symbol gives a label it
         // defines, turned with the owner; failing that, the axis is free.
@@ -1277,12 +1296,7 @@ impl Interp<'_> {
                 }
             }
         }
-        if let [Some(x), Some(y)] = xy {
-            return Some(((x, y), from_symbol));
-        }
-        // a free axis: where this implementation puts the text, on the axes the scene leaves free
-        let free = self.text_default_place(s, att, base)?;
-        Some(((xy[0].unwrap_or(free.0), xy[1].unwrap_or(free.1)), from_symbol))
+        (xy, from_symbol)
     }
 
     /// Where this implementation puts a text whose position the scene and the symbol leave free:
