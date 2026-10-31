@@ -77,6 +77,79 @@ test("a group is drawn as a frame titled @GROUP: its id, and selecting one light
   await expect(page.locator("#selection")).toContainText("group");
 });
 
+test("selecting a group mutes the frames of the other groups as it mutes the rest of the drawing, and shows only its own title", async ({ page }) => {
+  const strokes = () => page.evaluate(() => Object.fromEntries([...document.querySelectorAll("#canvas .usage-frame")].map((f) => [f.querySelector(".usage-title text").textContent, {
+    muted: f.hasAttribute("data-muted"), stroke: f.querySelector(":scope > rect").getAttribute("stroke"), titled: f.querySelector(".usage-title").getAttribute("display") !== "none",
+    fill: document.querySelector(`#canvas rect.usage-fill[data-usage="${f.dataset.usage}"]`).getAttribute("fill") }])));
+  const before = await strokes();
+  expect(Object.values(before).some((f) => f.muted)).toBe(false);
+  await page.locator("#usage-list .usage-expand").last().click();
+  await row(page, "%amp").locator(".usage-name").click();
+  await expect(page.locator("#canvas .usage-frame.selected")).toHaveCount(1);
+  const light = await strokes();
+  for (const [title, f] of Object.entries(light)) {
+    const own = title === "@GROUP: %amp";
+    expect(f.muted, title).toBe(!own);
+    // the selected one keeps its colour and title; the others are the colour blended halfway to the white paper, frame and fill
+    // alike, and have no title
+    expect(f.titled, title).toBe(own);
+    if (own) expect(f).toMatchObject({ stroke: before[title].stroke, fill: before[title].fill });
+    else { expect(f.stroke, title).not.toBe(before[title].stroke); expect(f.fill).toBe(f.stroke); }
+  }
+  // on the dark background the same colours blend toward black, and the frames follow when the background is changed
+  await page.evaluate(() => window.viewer.command("background-dark"));
+  const dark = await strokes();
+  expect(dark["@GROUP: %core"].muted).toBe(true);
+  expect(dark["@GROUP: %core"].stroke).not.toBe(light["@GROUP: %core"].stroke);
+  expect(dark["@GROUP: %amp"].stroke).toBe(light["@GROUP: %amp"].stroke);
+  // pointing at a row of the usages of an object shows it as a selection would: the other frames go faint, and come back
+  await page.evaluate(() => window.viewer.command("background-light"));
+  await page.locator("#canvas").click({ position: { x: 2, y: 2 } });
+  await expect(page.locator("#canvas .usage-frame.selected")).toHaveCount(0);
+  await expect(page.locator("#canvas .usage-frame[data-muted]")).toHaveCount(0);
+  await selectObject(page, "instance", "M1");
+  await page.locator("#usage-detail .membership-row, #usage-detail .usage-membership-row").first().hover();
+  await expect(page.locator("#canvas .usage-frame:not([data-muted])")).toHaveCount(1);
+  // and back to the usages of the selected object
+  await page.locator("#usage-list").hover();
+  expect(await page.locator("#canvas .usage-frame:not([data-muted])").count()).toBeGreaterThan(1);
+});
+
+test("selecting a component keeps the frames and titles of the usages it is in, those its table lists, and mutes the rest", async ({ page }) => {
+  const state = () => page.evaluate(() => Object.fromEntries([...document.querySelectorAll("#canvas .usage-frame")].map((f) => [f.querySelector(".usage-title text")?.textContent ?? "?",
+    { muted: f.hasAttribute("data-muted"), titled: f.querySelector(".usage-title").getAttribute("display") !== "none" }])));
+  const all = await state();
+  expect(Object.values(all).some((f) => f.muted)).toBe(false);
+  // (a title that does not fit its frame is left out whatever is selected)
+  const fits = (title) => all[title].titled;
+  // the usages its table lists: M1 is in %core, %amp and %inp, and in the usages that use it, not in %bias, which has M5 and M6
+  const listed = () => page.evaluate(() => [...document.querySelectorAll("#usage-detail .membership-id")].map((b) => b.textContent));
+  const isListed = (ids, title) => ids.includes(title.slice(title.indexOf(": ") + 2));
+  await selectObject(page, "instance", "M1");
+  const m1 = await state();
+  const ids1 = await listed();
+  expect(ids1).toEqual(expect.arrayContaining(["%core", "%amp", "%inp"]));
+  expect(ids1).not.toContain("%bias");
+  for (const [title, f] of Object.entries(m1)) {
+    const lit = isListed(ids1, title);
+    expect({ title, ...f }).toEqual({ title, muted: !lit, titled: lit && fits(title) });
+  }
+  // M5 is in %core and %bias, not in %amp or %inp
+  await selectObject(page, "instance", "M5");
+  const m5 = await state();
+  const ids5 = await listed();
+  expect(ids5).toEqual(expect.arrayContaining(["%core", "%bias"]));
+  expect(ids5).not.toContain("%amp");
+  for (const [title, f] of Object.entries(m5)) {
+    const lit = isListed(ids5, title);
+    expect({ title, ...f }).toEqual({ title, muted: !lit, titled: lit && fits(title) });
+  }
+  // nothing selected: all of them again
+  await page.locator("#canvas").click({ position: { x: 2, y: 2 } });
+  await expect(page.locator("#canvas .usage-frame[data-muted]")).toHaveCount(0);
+  expect(await state()).toEqual(all);
+});
+
 test("the frames of nested groups are set out a level each, so that their labels do not lie on one another", async ({ page }) => {
   const box = (id) => page.evaluate((id) => {
     const object = window.viewer.doc.levels[0].usages.find((u) => u.id === id).object;

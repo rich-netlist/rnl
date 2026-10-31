@@ -5,7 +5,8 @@ import { select } from "./selection.js";
 import { setCheck } from "./commands.js";
 import { $, load, save, span, svgElement } from "./util.js";
 import { setPathText } from "./source-path.js";
-import { objectUsages, stateName } from "./usage-table.js";
+import { mutedColour } from "./background.js";
+import { objectUsages, relatedUsages, stateName } from "./usage-table.js";
 import { FRAME_STEP, frameSteps, TITLE_ROW, titleRows } from "./frame-layout.js";
 import { setPane } from "./panels.js";
 import { revealLine } from "./text.js";
@@ -27,6 +28,7 @@ let drawing = null;
 let layer = null;
 let underlay = null;
 let frames = [];
+let hovered = null; // the usage whose row is pointed at, in the usages of an object
 let layerDoc = null;
 let layerLevel = -1;
 let layerRevision = -1;
@@ -336,14 +338,46 @@ function mute(groups, keep) {
   }
 }
 /**
+ * The usages whose frames stay at full strength: the one in focus, the one a row of an object's usages is pointed at, or
+ * the usages of the selected object, those its table lists; null when nothing is selected, and no frame is muted.
+ */
+function litFrames() {
+  if (hovered !== null) return new Set([hovered]);
+  const u = chosen();
+  if (u) return new Set([u.object]);
+  // an object of the level shown, as the table of its usages is
+  if (selected !== null && doc?.objects[selected]?.level === doc.levels[current]?.host) return relatedUsages(doc, selected);
+  return null;
+}
+/**
+ * Dim the frames of every usage but those in `lit`, as `mute` dims the groups of the drawing: the same blend toward the
+ * paper, so a selected usage or group, or the usages of a selected object, stand out from the others as a selected
+ * component does; the titles of the muted ones are not shown, which `paintUsages` sees in `muted`. With null, dim none.
+ */
+function muteFrames(lit, force = false) {
+  for (const f of frames) {
+    const muted = lit !== null && !lit.has(f.entry.object);
+    if (!force && f.muted === muted) continue;
+    const colour = muted ? mutedColour(f.color) : f.color;
+    f.muted = muted;
+    f.group.toggleAttribute("data-muted", muted);
+    f.rect.setAttribute("stroke", colour);
+    f.fill.setAttribute("fill", colour);
+  }
+}
+// the drawing's background decides how far a muted colour goes
+globalThis.addEventListener?.("background-colors", () => { if (frames.length) muteFrames(litFrames(), true); });
+/**
  * Light up the members of a usage in the drawing while a row of the object's usages is pointed at, as a
  * selection does, without selecting it; with null, the drawing goes back to what is selected.
  */
 export function highlightUsage(object) {
+  hovered = object;
   if (!context || !doc) return;
   const [, , groups] = context;
-  const hovered = object === null ? chosen() : usages().find(u => u.object === object);
-  mute(groups, hovered ? focusSet(hovered) : null);
+  const lit = object === null ? chosen() : usages().find(u => u.object === object);
+  mute(groups, lit ? focusSet(lit) : null);
+  repaint(); // the frames that are muted, and the titles that are shown
 }
 
 // Net and terminal roles of a virtual symbol denote its local connections, not every
@@ -415,10 +449,11 @@ export function paintUsages(svg, view, groups) {
         anchor: r.anchor,
         ...badge(r.name, color, group, "usage-role-label", r.width),
       })) : [];
-      frames.push({ entry, bounds, rect, fill, title, roles, active, local, pad: (levels.get(entry.object) ?? 0) * FRAME_STEP });
+      frames.push({ entry, color, group, bounds, rect, fill, title, roles, active, local, pad: (levels.get(entry.object) ?? 0) * FRAME_STEP });
     }
     append(svg, currentLayer);
   }
+  muteFrames(litFrames());
   layer.setAttribute("transform", `translate(${view.x} ${view.y}) scale(${1 / view.k})`);
   underlay.setAttribute("transform", layer.getAttribute("transform"));
   const project = (x, y) => [(x - view.x) * view.k, (y - view.y) * view.k];
@@ -433,7 +468,7 @@ export function paintUsages(svg, view, groups) {
     const [titleX, titleY] = project(...f.entry.frame.title);
     f.titleAt = [titleX - f.pad, titleY - f.pad];
     placeBadge(f.title, ...f.titleAt, false);
-    const titleVisible = f.active || f.title.width + 16 <= right - x; // (the frame's own width, as the core decides for the image)
+    const titleVisible = !f.muted && (f.active || f.title.width + 16 <= right - x); // (the frame's own width, as the core decides for the image)
     f.title.g.setAttribute("display", titleVisible ? "inline" : "none");
     if (!titleVisible) f.title.screen = null;
     for (const role of f.roles) {

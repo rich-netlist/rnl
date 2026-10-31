@@ -87,6 +87,30 @@ export function roleNote(doc, o) {
 }
 
 /**
+ * The usages an object is in, as the table lists them: each entry of its `usages`, and under a usage its own, with the
+ * depth and the id of the usage they are of; once each, so that one that holds itself is cut.
+ */
+function* memberships(doc, o) {
+  const seen = new Set([o]);
+  function* walk(entries, depth, subject) {
+    for (const entry of entries) {
+      yield { entry, depth, subject };
+      if (entry.usage !== null && depth < MAX_DEPTH && !seen.has(entry.usage)) {
+        seen.add(entry.usage);
+        yield* walk(doc.objects[entry.usage]?.usages ?? [], depth + 1, entry.id);
+        seen.delete(entry.usage);
+      }
+    }
+  }
+  yield* walk(doc.objects[o].usages ?? [], 0, null);
+}
+
+/** The objects of the usages and groups listed in the table of the usages of object `o`. */
+export function relatedUsages(doc, o) {
+  return new Set([...memberships(doc, o)].map(({ entry }) => entry.usage).filter((u) => u !== null));
+}
+
+/**
  * The table of an object's usages: a heading, and a row for each usage, with its role, its id, its
  * definition, where its statement is and, when it is not in effect, why. `on` has the callbacks:
  * `select(object)` for a click on a usage, `hover(object | null)` when the pointer or the focus is on
@@ -101,19 +125,8 @@ export function objectUsages(doc, o, on) {
   append(out, title);
   const list = document.createElement("ul");
   list.className = "usage-membership-list";
-  const seen = new Set([o]);
-  const add = (entries, depth, subject) => {
-    for (const entry of entries) {
-      append(list, row(doc, entry, depth, subject, on));
-      // the usage's own memberships go under it, once each: one that holds itself is cut
-      if (entry.usage !== null && depth < MAX_DEPTH && !seen.has(entry.usage)) {
-        seen.add(entry.usage);
-        add(doc.objects[entry.usage]?.usages ?? [], depth + 1, entry.id);
-        seen.delete(entry.usage);
-      }
-    }
-  };
-  add(object.usages ?? [], 0, null);
+  // a usage's own memberships go under it
+  for (const { entry, depth, subject } of memberships(doc, o)) append(list, row(doc, entry, depth, subject, on));
   if (!list.children.length) append(out, span("placeholder", m("It is in no usage.")));
   else append(out, list);
   return out;
