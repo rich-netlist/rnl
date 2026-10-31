@@ -13,7 +13,7 @@ import { sourceOpened } from "./pool.js";
 import { adoptBuffers, changes, resetBuffers } from "./edits.js";
 import { confirmLeave } from "./editor.js";
 import { shell } from "./shell.js";
-import { bindings, current, doc, expanded, selected, selectedAsUsage, setDoc, setExpanded, setSelected, setViewCache, viewCache } from "./state.js";
+import { bindings, constraintsWanted, current, doc, expanded, selected, selectedAsUsage, setDoc, setExpanded, setSelected, setViewCache, viewCache } from "./state.js";
 import { clearDrawing, notice, showLevel, view } from "./drawing.js";
 import { renderHierarchy, rootPath } from "./hierarchy.js";
 import { setProblems } from "./panels.js";
@@ -65,7 +65,7 @@ export async function openSource(source, keep, edited, fresh = false, navigation
     d = await shell.build(source, edited, stage => {
       if (operation.signal.aborted) throw new Error('Opening superseded');
       progress.setStage(stage);
-    }, undefined, operation.signal, { fresh, bind: options.bind });
+    }, undefined, operation.signal, { fresh, bind: options.bind, ...(constraintsWanted ? { constraints: true } : {}) });
     if (operation.signal.aborted) return;
     if (options.bound) bindings.set(d, options.bound);
     await progress.stage("displaying");
@@ -102,6 +102,7 @@ export async function openSource(source, keep, edited, fresh = false, navigation
       loading = false;
       document.body.classList.remove("busy");
       if (d === doc) void offerMissingPackages(d, source, operation.signal);
+      window.dispatchEvent(new Event("open-finished"));
     }
   }
 }
@@ -150,6 +151,7 @@ export async function applyEdits() {
       loading = false;
       document.body.classList.remove("busy");
       if (d === doc) void offerMissingPackages(d, lastSource, operation.signal);
+      window.dispatchEvent(new Event("open-finished"));
     }
   }
   if (failed !== null) {
@@ -187,6 +189,7 @@ export function showBuilt(d, keep, navigation = null) {
   showDocument(before, navigation);
   // a file opened, not one read again: a phone shows its drawing
   if (!keep) window.dispatchEvent(new Event("viewer-navigate"));
+  window.dispatchEvent(new Event("document-shown"));
 }
 
 /** What a text from the clipboard can be read as, by the extension of the file it is opened as. */

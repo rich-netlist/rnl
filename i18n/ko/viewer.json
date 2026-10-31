@@ -695,5 +695,16 @@
   "Restore the values of {0}": "{0}의 값으로 되돌리기",
   "Edit Parameters...": "매개변수 편집...",
   "Subcircuit &Parameters...": "서브서킷 매개변수(&P)...",
-  "Some parameters have no default, so this view has no value for them. Write the values to use; a change applies to this view only, and the netlist is not changed.": "기본값이 없는 매개변수가 있어 이 보기에서는 값이 없습니다. 사용할 값을 입력하세요. 변경은 이 보기에만 적용되며 넷리스트는 바뀌지 않습니다."
+  "Some parameters have no default, so this view has no value for them. Write the values to use; a change applies to this view only, and the netlist is not changed.": "기본값이 없는 매개변수가 있어 이 보기에서는 값이 없습니다. 사용할 값을 입력하세요. 변경은 이 보기에만 적용되며 넷리스트는 바뀌지 않습니다.",
+  "Constraints": "제약",
+  "Report": "보고서",
+  "What the Solve view shows": "풀이 보기가 보여 주는 것",
+  "The constraints of this netlist as the solver takes them in, after the structures are expanded, in the order it takes them. Click one to light up the objects it acts on and the usages it comes from.": "이 넷리스트의 제약을, 구조를 펼친 뒤 솔버가 취하는 순서대로 나열합니다. 하나를 클릭하면 그 제약이 작용하는 객체와 그것이 비롯된 사용이 그림에서 강조됩니다.",
+  "Filter the constraints": "제약 필터",
+  "Filter the constraints by what they say, their priority, their structure or their result": "내용, 우선순위, 구조 또는 결과로 제약 거르기",
+  "written in the netlist": "넷리스트에 작성됨",
+  "1 constraint": "제약 1개",
+  "{0} constraints": "제약 {0}개",
+  "{0} of {1} constraints": "제약 {1}개 중 {0}개",
+  "There are no constraints to show for this netlist.": "이 넷리스트에는 표시할 제약이 없습니다."
 }

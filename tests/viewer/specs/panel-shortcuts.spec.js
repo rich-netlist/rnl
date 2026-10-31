@@ -6,7 +6,7 @@ for (const [resource, platform, key, pane] of [
   ["main.js", "web", "6", "unplaced"],
   ["commands.json", "web", "6", "unplaced"],
   ["commands.json", "desktop", "7", "solve"],
-  ["commands.json", "web", "7", "unplaced"],
+  ["commands.json", "web", "7", "solve"],
 ]) {
   test(`${platform}: startup preserves panel shortcut ${key} while ${resource} is loading`, async ({ page, viewer }) => {
     let release;
@@ -118,8 +118,7 @@ for (const platform of ["desktop", "web"]) {
   test(`${platform}: digits select panes and reopen the collapsed sidebar without rebuilding`, async ({ page, viewer }) => {
     await viewer.open("04-hierarchy", { platform });
     const builds = await viewer.builds();
-    const offered = platform === "desktop" ? panes : panes.slice(0, 6);
-    for (const [i, pane] of offered.entries()) {
+    for (const [i, pane] of panes.entries()) {
       await page.keyboard.press("Control+B");
       await expect(page.locator("#sidebar")).toBeHidden();
       await page.keyboard.press(String(i + 1));
@@ -130,15 +129,11 @@ for (const platform of ["desktop", "web"]) {
       expect(await viewer.stored("sidebar-shown")).toBe(true);
       expect(await page.evaluate(() => window.viewer.checked("toggle-netlist"))).toBe(true);
     }
-    if (platform === "desktop") {
-      await expect(page.locator("#solve-report")).toContainText("Run Solve (F9)");
-    } else {
-      await page.keyboard.press("7");
-      await expect(page.locator("#tab-solve")).toBeHidden();
-      await expect(page.locator("#pane-unplaced")).toBeVisible();
-    }
+    // the Solve view is on both platforms, with the constraints of the netlist; only the desktop can solve
+    await expect(page.locator("#solve-report")).toContainText(platform === "desktop" ? "Run Solve (F9)" : "There are no constraints to show");
     expect(await viewer.calls("solve")).toEqual([]);
-    expect(await viewer.builds()).toBe(builds);
+    // opening the Solve view builds the netlist once more, to ask the core for its constraints
+    await expect.poll(() => viewer.builds()).toBe(builds + 1);
   });
 }
 

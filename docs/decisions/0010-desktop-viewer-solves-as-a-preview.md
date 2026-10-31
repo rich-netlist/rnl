@@ -34,3 +34,7 @@ Solve › Settings sets the options and the time limit that point 1 says are `rn
 ## Note, 2026-10-17
 
 Point 2, that the viewer never writes into the files it opens, is changed by [decision 0011](0011-viewers-edit-the-text-and-write-only-what-the-user-saves.md): it writes a file only when the user has edited it and saves it. Solving still only previews, and a solved copy is saved as point 3 says.
+
+## Note, 2026-10-31
+
+Point 5 stands for the published web viewer. The web viewer served by `apps/web/serve.mjs --rnl PATH`, the development server, solves with the `rnl` at that path, run by a service of the server for the page that it served (see [apps/web](../../apps/web/README.md#solving-with-a-solver-you-build)), so that a change to the solver is seen without building the viewer. It shows the same preview and report; it saves no copy and has no settings dialog. The Solve view, on both viewers, lists the constraints of the netlist that the core gives with the Document, and after a solve what became of each; that does not need a solver.

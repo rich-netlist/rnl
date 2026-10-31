@@ -4,7 +4,7 @@ import { dialogGone, showSource } from "../viewer.js";
 // URL, files set on its file inputs, a folder and dropped files, and each Document is the one
 // `rnl view` builds for the same files but for the paths that name them in the workspace.
 
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
 import { createHash } from "node:crypto";
@@ -1645,4 +1645,64 @@ test("the files of a manifest are searched as the Library's: Auto Include finds 
   // a file of the computer that uses amp: the manifest's files are searched for it too
   await opened(page, () => page.locator("#file-input").setInputFiles({ name: "local.sp", mimeType: "text/plain", buffer: Buffer.from("* local\nX9 a b amp\n.end\n") }));
   expect(await defined()).toEqual([true]);
+});
+
+test("the Solve view lists the constraints of a netlist; only a development server with a solver gives the page a Solve", async ({ page }) => {
+  // two servers, two page loads in the engine, and a debug build of rnl solving: slow on a loaded runner
+  test.setTimeout(120000);
+  // the server of the site has no solver: the page asks it, finds none, and offers no Solve, but its Solve view lists the
+  // constraints the real core gives with the Document, with no solve
+  await page.goto(`${process.env.RNL_WEB_URL}/?url=samples/cases/10-constraints-and-priority.sp`);
+  await expect(page).toHaveTitle(/^10-constraints-and-priority\.sp/);
+  await expect(page.locator("#tab-solve")).toBeVisible();
+  await expect(page.locator("#menubar .menu-title")).not.toContainText(["Solve"]);
+  await page.keyboard.press("7");
+  await expect(page.locator("#pane-solve")).toBeVisible();
+  await expect(page.locator("#constraints-list li.constraint")).toHaveCount(18, { timeout: 30000 });
+  await expect(page.locator("#constraints-list .st")).toHaveCount(0);
+  await page.keyboard.press("F9");
+  await expect(page.locator("#preview-badge")).toBeHidden();
+  // the same site served with the rnl the tests built (serve.mjs --rnl), on a port of its own
+  const server = spawn(process.execPath, [path.join(root, "apps", "web", "serve.mjs"), "--port", "0", "--rnl", process.env.RNL_BIN, "--solver-options", "time_limit=none"], { stdio: ["ignore", "pipe", "inherit"] });
+  try {
+    const url = await new Promise((resolve, reject) => {
+      let out = "";
+      server.stdout.on("data", (chunk) => {
+        out += chunk;
+        const found = /(http:\/\/127\.0\.0\.1:\d+\/)/.exec(out);
+        if (found) resolve(found[1]);
+      });
+      server.on("exit", () => reject(new Error(`serve.mjs stopped: ${out}`)));
+    });
+    await page.goto(`${url}?url=samples/cases/10-constraints-and-priority.sp`);
+    await expect(page).toHaveTitle(/^10-constraints-and-priority\.sp/);
+    await expect(page.locator("#tab-solve")).toBeVisible();
+    await expect(page.locator("#menubar .menu-title")).toContainText(["Solve"]);
+    // the files the page read go to the service; what comes back is drawn as a preview, with the constraints listed
+    const posts = [];
+    page.on("request", (request) => { if (request.method() === "POST" && request.url().endsWith("rnl-solver/solve")) posts.push(request.postDataJSON()); });
+    await page.keyboard.press("F9");
+    await page.waitForFunction(() => document.body.classList.contains("preview") && !document.body.classList.contains("solving"));
+    expect(posts).toHaveLength(1);
+    expect(posts[0].entry).toMatch(/10-constraints-and-priority\.sp$/);
+    expect(posts[0].options).toBe("");
+    await expect(page.locator("#solve-views")).toBeVisible();
+    const rows = page.locator("#constraints-list li.constraint");
+    expect(await rows.count()).toBe(18);
+    await expect(page.locator("#constraints-count")).toHaveText("18 constraints");
+    // and each says what became of it
+    await expect(rows.first().locator(".st")).toHaveText(/^[✓✗?!]$/);
+    // a click on a row lights up what it acts on in the drawing, and a second click ends it
+    const row = rows.filter({ hasText: /\{#/ }).first();
+    await row.click();
+    await expect(row).toHaveClass(/selected/);
+    await expect.poll(() => page.locator(".drawing svg [data-id].usage-muted").count()).toBeGreaterThan(0);
+    await row.click();
+    await expect(page.locator(".drawing svg [data-id].usage-muted")).toHaveCount(0);
+    // Close Preview shows the netlist as read
+    await page.evaluate(() => window.viewer.command("solve-close"));
+    await expect(page.locator("#preview-badge")).toBeHidden();
+  } finally {
+    server.kill();
+  }
 });

@@ -695,5 +695,16 @@
   "Restore the values of {0}": "{0} の値に戻す",
   "Edit Parameters...": "パラメータを編集...",
   "Subcircuit &Parameters...": "サブサーキットのパラメータ(&P)...",
-  "Some parameters have no default, so this view has no value for them. Write the values to use; a change applies to this view only, and the netlist is not changed.": "既定値のないパラメータがあり、このビューでは値がありません。使う値を入力してください。変更はこのビューにだけ適用され、ネットリストは変更されません。"
+  "Some parameters have no default, so this view has no value for them. Write the values to use; a change applies to this view only, and the netlist is not changed.": "既定値のないパラメータがあり、このビューでは値がありません。使う値を入力してください。変更はこのビューにだけ適用され、ネットリストは変更されません。",
+  "Constraints": "制約",
+  "Report": "レポート",
+  "What the Solve view shows": "求解ビューの表示内容",
+  "The constraints of this netlist as the solver takes them in, after the structures are expanded, in the order it takes them. Click one to light up the objects it acts on and the usages it comes from.": "このネットリストの制約を、構造を展開したあと、ソルバーが取り上げる順に並べています。1 つクリックすると、その制約が作用するオブジェクトと、それが由来する用法が図で強調されます。",
+  "Filter the constraints": "制約を絞り込む",
+  "Filter the constraints by what they say, their priority, their structure or their result": "内容、優先度、構造、結果で制約を絞り込む",
+  "written in the netlist": "ネットリストに記述",
+  "1 constraint": "制約 1 件",
+  "{0} constraints": "制約 {0} 件",
+  "{0} of {1} constraints": "制約 {1} 件中 {0} 件",
+  "There are no constraints to show for this netlist.": "このネットリストには表示できる制約がありません。"
 }

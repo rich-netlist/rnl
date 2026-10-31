@@ -16,18 +16,20 @@ const dialog = (page) => page.locator("dialog.dialog");
 async function solve(page, how = () => page.evaluate(() => window.viewer.command("solve"))) {
   await how();
   await page.waitForFunction(() => document.body.classList.contains("preview") && !document.body.classList.contains("solving"));
+  // the Solve view shows the constraints after a solve; these tests read the report
+  await page.locator("#solve-view-report").click();
 }
 
 /** The solves the shell was asked for: [name, settings] each. */
 const solves = (viewer) => viewer.calls("solve");
 
-test("the web has no Solve menu, and its commands do nothing", async ({ page, viewer }) => {
+test("the web has no Solve menu, and its commands do nothing; the Solve view is there, for the constraints", async ({ page, viewer }) => {
   await viewer.open(T4);
   await expect(page.locator("#menubar .menu-title")).not.toContainText(["Solve"]);
   await page.evaluate(() => window.viewer.command("solve"));
   await page.keyboard.press("F9");
   expect(await solves(viewer)).toEqual([]);
-  await expect(page.locator("#tab-solve")).toBeHidden();
+  await expect(page.locator("#tab-solve")).toBeVisible();
   await expect(page.locator("#preview-badge")).toBeHidden();
 });
 

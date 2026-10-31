@@ -232,19 +232,21 @@ impl BuildCache {
         Ok(built)
     }
 
-    /// Build with the parameters of a subcircuit bound (`bind`), to show: it is the document whose drawings
-    /// are kept now, but it is not kept among the entries, which are the files' own, as the next time the
-    /// same file is opened its parameters are its own again.
-    pub fn build_bound(
+    /// Build with the parameters of a subcircuit bound (`bind`), to show, or with the constraints of the levels
+    /// (`constraints`), which the entries do not hold: it is the document whose drawings are kept now, but it is not
+    /// kept among the entries, which are the files' own, as the next time the same file is opened its parameters are
+    /// its own again.
+    pub fn build_unkept(
         &mut self,
         path: &str,
         files: &dyn Provider,
         formats: &Formats,
-        bind: &Bind,
+        bind: Option<&Bind>,
+        constraints: bool,
     ) -> Result<Built, String> {
         let path = normalize(path);
         self.misses += 1;
-        let entry = Prepared::build_with(&path, files, formats, Some(bind))?;
+        let entry = Prepared::build_with(&path, files, formats, bind, constraints)?;
         self.active = Some(entry.drawings.clone());
         Ok(Built { json: entry.json, name: entry.name, hit: false })
     }
@@ -275,14 +277,21 @@ impl BuildCache {
 
 impl Prepared {
     pub fn build(path: &str, files: &dyn Provider, formats: &Formats) -> Result<Self, String> {
-        Self::build_with(path, files, formats, None)
+        Self::build_with(path, files, formats, None, false)
     }
 
-    /// As `build`, with the parameters of a subcircuit bound.
-    fn build_with(path: &str, files: &dyn Provider, formats: &Formats, bind: Option<&Bind>) -> Result<Self, String> {
+    /// As `build`, with the parameters of a subcircuit bound, and the constraints of the levels.
+    fn build_with(
+        path: &str,
+        files: &dyn Provider,
+        formats: &Formats,
+        bind: Option<&Bind>,
+        constraints: bool,
+    ) -> Result<Self, String> {
         let path = normalize(path);
         let observed = Observed { files, inputs: RefCell::new(Inputs::default()) };
-        let options = BuildOptions { formats: formats.clone(), bind: bind.cloned(), ..BuildOptions::default() };
+        let options =
+            BuildOptions { formats: formats.clone(), bind: bind.cloned(), constraints, ..BuildOptions::default() };
         let (doc, drawings) = rnl_view::build_drawn(&path, &observed, &options)?;
         let json = serde_json::to_string(&doc).map_err(|e| e.to_string())?;
         let drawings = Arc::new(drawings);
@@ -418,10 +427,33 @@ mod tests {
         let own = cache.build("/p.sp", &files, &none(), false).unwrap();
         assert!(own.json.contains(r#""value":"1u""#));
         let bind = Bind { subckt: "amp".into(), params: BTreeMap::from([("w".to_string(), "2u".to_string())]) };
-        let bound = cache.build_bound("/p.sp", &files, &none(), &bind).unwrap();
+        let bound = cache.build_unkept("/p.sp", &files, &none(), Some(&bind), false).unwrap();
         assert!(!bound.hit);
         assert!(bound.json.contains(r#""value":"2u""#) && bound.json.contains(r#""from":"bound""#));
         // the entry is the file's own: opening it again is a hit, with its own parameters
+        let again = cache.build("/p.sp", &files, &none(), false).unwrap();
+        assert!(again.hit);
+        assert_eq!(again.json, own.json);
+        assert_eq!(cache.stats().entries, 1);
+    }
+
+    #[test]
+    fn a_build_with_constraints_has_them_and_is_not_kept() {
+        let mut cache = BuildCache::default();
+        let files = MemoryProvider::new().with(
+            "/p.sp",
+            "* p
+R1 a b 1k
+R2 b c 1k
+.end
+",
+        );
+        let own = cache.build("/p.sp", &files, &none(), false).unwrap();
+        assert!(!own.json.contains(r#""constraints""#));
+        let constrained = cache.build_unkept("/p.sp", &files, &none(), None, true).unwrap();
+        assert!(!constrained.hit);
+        assert!(constrained.json.contains(r#""constraints""#) && constrained.json.contains(r#""facts""#));
+        // the entry is the file's own: opening it again is a hit, without them
         let again = cache.build("/p.sp", &files, &none(), false).unwrap();
         assert!(again.hit);
         assert_eq!(again.json, own.json);

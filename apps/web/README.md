@@ -107,6 +107,19 @@ node apps/web/serve.mjs
 
 serves `apps/web/dist/` at `http://127.0.0.1:8000/`, on this computer only; `--port N` takes another port, 0 any free one. It sends the MIME types the site needs and tells the browser not to cache, so that a rebuilt site and a changed sample are read anew. With the samples built, `http://127.0.0.1:8000/?url=samples/cases/04-hierarchy.sp` opens a netlist and its include.
 
+### Solving with a solver you build
+
+```bash
+cargo build -p rnl-cli
+node apps/web/serve.mjs --rnl target/debug/rnl
+```
+
+gives the page a Solve (F9, the Solve menu and the Solve view of the side panel, as in the desktop viewer) that runs the `rnl` at that path on every press: a change to the solver is seen by building `rnl` again, about a quarter of a minute for the solver and the command, and pressing Solve in the page that is open, without building the viewer or starting the server again. `RNL_SOLVER` names the command too; `--solver-options S` gives every solve those settings, as `rnl solve --solver-options` reads them, such as `time_limit=none` for a build that is slow without optimisation (the page's own Solve settings are the desktop's, and not here). The path of `rnl` is the one server's: the page never names it.
+
+The page asks the server that served it, at `rnl-solver`, and only on this computer's own address, so the published site, which has no such server, asks nothing and has no Solve. A solve sends the files the last build read, with the text applied over them, to `rnl-solver/solve` ([`solver-service.mjs`](solver-service.mjs)); the service writes them into a directory of its own, runs `rnl preview` on the entry there as the desktop viewer does, gives back the Document of the netlist as solved, with the constraints of its levels, and the report, and removes the directory. Cancel drops the request, which stops the solver. It answers only the page of the server it is part of (the address and port of the request, the same origin, a JSON body), never takes an address from a request, and writes nothing but into its directory. The solve is a preview, as in the desktop viewer: nothing is written where a file was read from, Close Preview shows the netlist as read, and Save Solved Copy and the settings are the desktop's.
+
+The Solve view lists the constraints of the netlist on the published site too, with no solve ([Constraints](../viewer-ui/README.md#the-constraints-of-a-solve)); a solve adds what became of each.
+
 ## Deploying
 
 The project site publishes it at <https://rich-netlist.github.io/rnl/viewer/>, with the samples, so that <https://rich-netlist.github.io/rnl/viewer/?url=samples/cases/04-hierarchy.sp> opens one. [`pages.yml`](../../.github/workflows/pages.yml) builds it with `--samples` whenever it, the page, the bindings, the crates, the standard library, the font script or the conformance corpus changes on `main`, and puts `dist/` at the site's `viewer/`, which the site's [page of the tools](https://rich-netlist.github.io/rnl/en/tools.html) links to ([`site`](../../site/README.md)).
@@ -133,6 +146,7 @@ The page keeps the browser baseline of decision 0008: Chromium 109, the last Chr
 - **Its own menu bar.** The page shows the menu bar of the command table itself ([`menubar.js`](../viewer-ui/README.md#modules)); Alt or F10 moves to it. File has Include File, Include Folder, Include Public Package and Open URL, and no Exit; Help has Desktop Viewer; F5 reads the document again rather than reloading the page; Ctrl+R toggles usage overlays.
 - **File access.** A browser lets the page read only what the user chooses or drops, so included files must be chosen with the netlist, added to the pool, or be on the server of its URL. The desktop viewer reads any file by its path.
 - **Reload.** A file chosen with Open File or Include Folder cannot be read again once it has changed; open it again, or drop it, which Reload reads anew.
+- **Solve** is the desktop's only, solved natively in the app (decision 0010), but for a development server that runs an `rnl` of its own ([Solving with a solver you build](#solving-with-a-solver-you-build)); the published site never solves. Its Solve view lists the constraints of a netlist, as the desktop's does.
 - **About** is a dialog in the page, and the document names the browser tab instead of the window.
 
 ## Embedding
@@ -317,7 +331,8 @@ hover or keyboard focus.
 | Path | Content |
 | --- | --- |
 | `build.mjs` | Builds the core and assembles the site in `dist/`. |
-| `serve.mjs` | Serves `dist/` on this computer. |
+| `serve.mjs` | Serves `dist/` on this computer, and with `--rnl PATH` the page's Solve through `solver-service.mjs`. |
+| `solver-service.mjs` | The solver service of the development server: runs `rnl preview` on the files a solve sends. |
 | [`../viewer-ui/shells/web.js`](../viewer-ui/README.md#the-shell) | The web shell: opening files, a folder, a URL or what is dropped; reading only the files a document needs, with `collect`; building in the core's Worker; the About box; a web page in a new tab. |
 | [`../viewer-ui/dialog.js`](../viewer-ui/README.md#modules) | The dialogs the web shell asks with: which netlist, which address, About. |
 | [`../../bindings/runtime-wasm`](../../bindings/runtime-wasm/README.md) | The core as WebAssembly, and the modules that run it in a Worker and collect the files a document needs. |

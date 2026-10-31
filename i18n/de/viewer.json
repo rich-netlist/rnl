@@ -695,5 +695,16 @@
   "Restore the values of {0}": "Werte von {0} wiederherstellen",
   "Edit Parameters...": "Parameter bearbeiten...",
   "Subcircuit &Parameters...": "Teilschaltungs-&Parameter...",
-  "Some parameters have no default, so this view has no value for them. Write the values to use; a change applies to this view only, and the netlist is not changed.": "Einige Parameter haben keinen Standardwert, daher hat diese Ansicht keinen Wert für sie. Geben Sie die zu verwendenden Werte ein; eine Änderung gilt nur für diese Ansicht, die Netzliste wird nicht geändert."
+  "Some parameters have no default, so this view has no value for them. Write the values to use; a change applies to this view only, and the netlist is not changed.": "Einige Parameter haben keinen Standardwert, daher hat diese Ansicht keinen Wert für sie. Geben Sie die zu verwendenden Werte ein; eine Änderung gilt nur für diese Ansicht, die Netzliste wird nicht geändert.",
+  "Constraints": "Randbedingungen",
+  "Report": "Bericht",
+  "What the Solve view shows": "Was die Ansicht Lösen zeigt",
+  "The constraints of this netlist as the solver takes them in, after the structures are expanded, in the order it takes them. Click one to light up the objects it acts on and the usages it comes from.": "Die Randbedingungen dieser Netzliste, wie der Löser sie aufnimmt, nachdem die Strukturen aufgelöst sind, in der Reihenfolge, in der er sie nimmt. Ein Klick hebt die Objekte hervor, auf die sie wirkt, und die Verwendungen, aus denen sie stammt.",
+  "Filter the constraints": "Randbedingungen filtern",
+  "Filter the constraints by what they say, their priority, their structure or their result": "Randbedingungen nach Inhalt, Priorität, Struktur oder Ergebnis filtern",
+  "written in the netlist": "in der Netzliste geschrieben",
+  "1 constraint": "1 Randbedingung",
+  "{0} constraints": "{0} Randbedingungen",
+  "{0} of {1} constraints": "{0} von {1} Randbedingungen",
+  "There are no constraints to show for this netlist.": "Für diese Netzliste gibt es keine Randbedingungen anzuzeigen."
 }

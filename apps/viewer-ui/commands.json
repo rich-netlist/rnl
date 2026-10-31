@@ -103,7 +103,7 @@
             { "id": "panel-symbol", "label": "&Symbol", "keys": ["4"], "page": true, "check": true },
             { "id": "panel-usages", "label": "&Usage", "keys": ["5"], "page": true, "check": true },
             { "id": "panel-unplaced", "label": "Not &Drawn", "keys": ["6"], "page": true, "check": true },
-            { "id": "panel-solve", "label": "S&olve", "keys": ["7"], "page": true, "check": true, "platforms": ["desktop"] },
+            { "id": "panel-solve", "label": "S&olve", "keys": ["7"], "page": true, "check": true },
             "-",
             { "id": "panel-hide", "label": "&Hide" }
           ]
@@ -113,8 +113,8 @@
     {
       "label": "&Solve",
       "items": [
-        { "id": "solve", "label": "&Solve", "keys": ["F9"], "platforms": ["desktop"] },
-        { "id": "solve-close", "label": "&Close Preview", "platforms": ["desktop"] },
+        { "id": "solve", "label": "&Solve", "keys": ["F9"], "platforms": ["desktop"], "with": "solve" },
+        { "id": "solve-close", "label": "&Close Preview", "platforms": ["desktop"], "with": "solve" },
         "-",
         { "id": "solve-save", "label": "Save Solved &Copy As...", "keys": ["Ctrl+Shift+S"], "platforms": ["desktop"] },
         { "id": "solve-save-utf8", "label": "Save Solved Copy As UTF-8...", "platforms": ["desktop"] },

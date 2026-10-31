@@ -56,7 +56,8 @@ export const FILES = {
 /**
  * The previews of a solve, as the desktop's Solve menu shows them, each NAME-preview.json, the
  * Document of the files solved and the report, which `rnl preview` prints of the fixture NAME's
- * file: one with facts discarded, conflict groups and hints by statement.
+ * file: one with facts discarded, conflict groups and hints by statement. Each has NAME-constraints.json too,
+ * the Document of that file with the constraints of its levels (`rnl view --constraints`).
  */
 export const PREVIEWS = ["T4-miller-conflicts"];
 
@@ -446,6 +447,9 @@ export function writeFixtures(rnl, dir) {
       maxBuffer: 1 << 28,
     });
     fs.writeFileSync(path.join(dir, `${name}-preview.json`), out);
+    // the Document of the same netlist with the constraints of its levels, which a build that asks for them gives
+    const constrained = execFileSync(rnl, ["view", FILES[name], "--constraints"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 });
+    fs.writeFileSync(path.join(dir, `${name}-constraints.json`), constrained);
   }
 
   const solved = path.join(dir, "solved");

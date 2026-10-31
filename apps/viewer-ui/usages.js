@@ -29,6 +29,7 @@ let layer = null;
 let underlay = null;
 let frames = [];
 let hovered = null; // the usage whose row is pointed at, in the usages of an object
+let constraintLit = null; // the constraint of the Solve view that is clicked: { objects, usages } of the Document, or null
 let layerDoc = null;
 let layerLevel = -1;
 let layerRevision = -1;
@@ -331,6 +332,28 @@ function focusSet(u) {
   for (const h of doc.levels[current].hits) if (h.objects.includes(u.object) && h.id) keep.add(h.id);
   return keep;
 }
+/** The groups of the drawing that stay at full strength for a constraint: those that draw the objects it acts on. */
+function constraintFocus(c) {
+  const keep = new Set();
+  for (const h of doc.levels[current].hits) if (h.id && h.objects.some(o => c.objects.has(o))) keep.add(h.id);
+  return keep;
+}
+/** What the drawing shows when no usage is in focus: the clicked constraint's objects, else all of it. */
+const restingFocus = () => constraintLit ? constraintFocus(constraintLit) : null;
+/**
+ * Light up what a constraint of the Solve view acts on, as a usage's members are while its row is pointed at: the
+ * components that are `objects` (indexes into doc.objects) and the frames of the `usages` it comes from stay, the rest
+ * is dimmed. With null, the drawing goes back to what is selected. A selection, another level or another Document
+ * ends it, and the page is told (`constraint-cleared`).
+ */
+export function highlightConstraint(c) {
+  constraintLit = c;
+  if (!context || !doc) return;
+  const [, , groups] = context;
+  const u = chosen();
+  mute(groups, u ? focusSet(u) : restingFocus());
+  repaint();
+}
 /** Dim every group of the drawing that is not in `keep`; with none, dim none. */
 function mute(groups, keep) {
   for (const [id, elements] of groups) for (const g of elements) {
@@ -345,6 +368,7 @@ function litFrames() {
   if (hovered !== null) return new Set([hovered]);
   const u = chosen();
   if (u) return new Set([u.object]);
+  if (constraintLit) return new Set(constraintLit.usages);
   // an object of the level shown, as the table of its usages is
   if (selected !== null && doc?.objects[selected]?.level === doc.levels[current]?.host) return relatedUsages(doc, selected);
   return null;
@@ -389,7 +413,7 @@ export function highlightUsage(object) {
   if (!context || !doc) return;
   const [, , groups] = context;
   const lit = object === null ? chosen() : usages().find(u => u.object === object);
-  mute(groups, lit ? focusSet(lit) : null);
+  mute(groups, lit ? focusSet(lit) : restingFocus());
   repaint(); // the frames that are muted, and the titles that are shown
 }
 
@@ -449,6 +473,10 @@ export function paintUsages(svg, view, groups) {
     drawing = layerDoc = null; layerLevel = -1; layerRevision = -1; layerSelected = null; context = null;
     return;
   }
+  if (constraintLit && (selected !== null || layerDoc !== doc || layerLevel !== current)) {
+    constraintLit = null;
+    window.dispatchEvent(new Event("constraint-cleared"));
+  }
   const u = chosen();
   const focus = u?.object ?? null;
   const rebuild = drawing !== svg || layerDoc !== doc || layerLevel !== current ||
@@ -469,7 +497,7 @@ export function paintUsages(svg, view, groups) {
     layer = svgElement("g", { class: "usage-overlays", "pointer-events": "none" });
     append(svg, layer);
     drawing = svg; layerDoc = doc; layerLevel = current; layerRevision = revision; layerSelected = focus;
-    mute(groups, u ? focusSet(u) : null);
+    mute(groups, u ? focusSet(u) : restingFocus());
     frames = [];
     const levels = frameSteps(usages().filter((u) => u.frame?.bounds && !localSymbol(u) && (u.object === focus || visible(u))));
     for (const entry of [...usages()].sort((a, b) => Number(a.object === focus) - Number(b.object === focus))) {

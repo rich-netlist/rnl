@@ -695,5 +695,16 @@
   "Restore the values of {0}": "Rétablir les valeurs de {0}",
   "Edit Parameters...": "Modifier les paramètres...",
   "Subcircuit &Parameters...": "&Paramètres du sous-circuit...",
-  "Some parameters have no default, so this view has no value for them. Write the values to use; a change applies to this view only, and the netlist is not changed.": "Certains paramètres n’ont pas de valeur par défaut ; cette vue n’a donc aucune valeur pour eux. Écrivez les valeurs à utiliser ; une modification ne s’applique qu’à cette vue et la netlist n’est pas modifiée."
+  "Some parameters have no default, so this view has no value for them. Write the values to use; a change applies to this view only, and the netlist is not changed.": "Certains paramètres n’ont pas de valeur par défaut ; cette vue n’a donc aucune valeur pour eux. Écrivez les valeurs à utiliser ; une modification ne s’applique qu’à cette vue et la netlist n’est pas modifiée.",
+  "Constraints": "Contraintes",
+  "Report": "Rapport",
+  "What the Solve view shows": "Ce que montre la vue Résoudre",
+  "The constraints of this netlist as the solver takes them in, after the structures are expanded, in the order it takes them. Click one to light up the objects it acts on and the usages it comes from.": "Les contraintes de cette netlist telles que le solveur les prend en compte, une fois les structures développées, dans l'ordre où il les prend. Un clic met en évidence les objets sur lesquels elle agit et les usages dont elle vient.",
+  "Filter the constraints": "Filtrer les contraintes",
+  "Filter the constraints by what they say, their priority, their structure or their result": "Filtrer les contraintes selon leur contenu, leur priorité, leur structure ou leur résultat",
+  "written in the netlist": "écrite dans la netlist",
+  "1 constraint": "1 contrainte",
+  "{0} constraints": "{0} contraintes",
+  "{0} of {1} constraints": "{0} contraintes sur {1}",
+  "There are no constraints to show for this netlist.": "Cette netlist n'a aucune contrainte à afficher."
 }
