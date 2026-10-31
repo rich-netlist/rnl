@@ -398,15 +398,47 @@ export function highlightUsage(object) {
 function localSymbol(u) {
   return u.frame?.local ?? false;
 }
-function badge(text, color, parent, cls, width) {
+const HIDE_W = 22; // the width the button that hides a selected usage takes at the start of its title
+/**
+ * The button at the start of the selected usage's title: an eye with a slash, which hides the usage, as the switch in the
+ * Usage panel does, and, when the usage is hidden and shown only because it is selected, an eye, which shows it again.
+ * It takes the pointer events itself, so that a press on it is neither a click on the drawing, nor a drag.
+ */
+function hideButton(entry, color, parent) {
+  const on = setting(entry).visible;
+  const label = on ? m`Hide ${entry.id}` : m`Show ${entry.id}`;
+  const button = svgElement("g", { class: "usage-hide", role: "button", tabindex: 0, "aria-label": label, "pointer-events": "all", "data-usage": entry.object });
+  const hit = svgElement("rect", { x: -4, y: -9, width: HIDE_W, height: 18, rx: 3, fill: "transparent" });
+  const icon = svgElement("g", { fill: "none", stroke: color, "stroke-width": 1.4, "stroke-linecap": "round", "stroke-linejoin": "round", transform: "translate(0 0)" });
+  append(icon, svgElement("path", { d: "M0 0 Q7 -6 14 0 Q7 6 0 0 Z" }), svgElement("circle", { cx: 7, cy: 0, r: 2 }));
+  if (on) append(icon, svgElement("path", { d: "M1.5 5.5 L12.5 -5.5" }));
+  const tip = svgElement("title", {});
+  tip.textContent = label;
+  append(button, hit, icon, tip);
+  const toggle = (keyboard) => {
+    change(entry, { visible: !setting(entry).visible });
+    // (the layer is made again; the keyboard keeps its place on the new button)
+    if (keyboard) layer?.querySelector(".usage-hide")?.focus({ preventScroll: true });
+  };
+  for (const type of ["pointerdown", "pointerup", "pointercancel", "dblclick", "contextmenu"]) button.addEventListener(type, (e) => e.stopPropagation());
+  button.addEventListener("click", (e) => { e.stopPropagation(); toggle(false); });
+  button.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    e.stopPropagation();
+    toggle(true);
+  });
+  append(parent, button);
+}
+function badge(text, color, parent, cls, width, lead = 0) {
   const g = svgElement("g", { class: cls });
   const back = svgElement("rect", { rx: 3, fill: "var(--usage-label-bg)", "fill-opacity": .75 });
-  const label = svgElement("text", { fill: color, "font-size": 13, "font-family": "system-ui, sans-serif", "dominant-baseline": "central" });
+  const label = svgElement("text", { fill: color, "font-size": 13, "font-family": "system-ui, sans-serif", "dominant-baseline": "central", ...(lead ? { x: lead } : {}) });
   label.textContent = text;
   if (width > 0) { label.setAttribute("textLength", width); label.setAttribute("lengthAdjust", "spacingAndGlyphs"); }
   append(g, back, label);
   append(parent, g);
-  return { g, back, label, width };
+  return { g, back, label, width, lead };
 }
 
 /** Draw in screen pixels inside the scene SVG: the inverse view transform cancels its zoom. */
@@ -457,7 +489,9 @@ export function paintUsages(svg, view, groups) {
         "stroke-width": active ? 8 / 3 : 4 / 3, "stroke-dasharray": "1 5", "stroke-linecap": "round", rx: 10 });
       append(group, rect);
       append(layer, group);
-      const title = badge(labelOf(entry), color, group, "usage-title", entry.frame.title_width);
+      // (the selected usage's title has the button that hides it in front of its text)
+      const title = badge(labelOf(entry), color, group, "usage-title", entry.frame.title_width, active ? HIDE_W : 0);
+      if (active) hideButton(entry, color, title.g);
       const roles = active ? entry.roles.map((r, i) => ({ ...r, anchor: entry.frame.roles[i], width: entry.frame.role_widths[i] })).filter(r => r.anchor).map(r => ({
         anchor: r.anchor,
         ...badge(r.name, color, group, "usage-role-label", r.width),
@@ -498,14 +532,14 @@ export function paintUsages(svg, view, groups) {
  */
 function spreadTitles() {
   const shown = frames.filter((f) => f.title.screen);
-  const rows = titleRows(shown.map((f) => ({ key: f, x: f.titleAt[0], y: f.titleAt[1], width: f.title.width, first: (f.active ? 1e6 : 0) + f.pad })));
+  const rows = titleRows(shown.map((f) => ({ key: f, x: f.titleAt[0], y: f.titleAt[1], width: f.title.width + f.title.lead, first: (f.active ? 1e6 : 0) + f.pad })));
   for (const f of shown) if (rows.get(f)) placeBadge(f.title, f.titleAt[0], f.titleAt[1] + rows.get(f) * TITLE_ROW, false);
 }
 function placeBadge(b, x, y, centered) {
   const width = b.width ??= b.label.getComputedTextLength();
   b.g.setAttribute("transform", `translate(${centered ? x - width / 2 : x} ${y})`);
-  for (const [attr, value] of Object.entries({ x: -4, y: -9, width: width + 8, height: 18 })) b.back.setAttribute(attr, value);
-  b.screen = [centered ? x - width / 2 - 4 : x - 4, y - 9, centered ? x + width / 2 + 4 : x + width + 4, y + 9];
+  for (const [attr, value] of Object.entries({ x: -4, y: -9, width: width + 8 + b.lead, height: 18 })) b.back.setAttribute(attr, value);
+  b.screen = [centered ? x - width / 2 - 4 : x - 4, y - 9, centered ? x + width / 2 + 4 : x + width + 4 + b.lead, y + 9];
 }
 
 /** Only the border/title selects a usage; its filled interior keeps normal component picking. */

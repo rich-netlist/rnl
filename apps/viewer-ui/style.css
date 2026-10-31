@@ -235,6 +235,9 @@ button.membership-id { cursor: pointer; text-decoration: underline dotted; }
 .usage-more { margin: 4px 26px; color: var(--accent); }
 .canvas svg .usage-muted [stroke] { stroke: var(--usage-muted-stroke); }
 .canvas svg .usage-muted [fill] { fill: var(--usage-muted-fill); }
+/* the button that hides the selected usage, at the start of its title */
+.usage-hide { cursor: pointer; outline: none; }
+.usage-hide:hover rect, .usage-hide:focus-visible rect { fill: rgba(128, 128, 128, 0.3); }
 .usage-overlays { --usage-label-bg: white; }
 body[data-background="dark"] .usage-overlays { --usage-label-bg: black; }
 .netlist-pane {

@@ -485,6 +485,7 @@
   "GitHub's response is not a list of releases": "La réponse de GitHub n’est pas une liste de versions",
   "The releases are listed at ": "Les versions sont listées sur ",
   "Show all usages of {0}": "Afficher toutes les utilisations de {0}",
+  "Hide {0}": "Masquer {0}",
   "Show {0}": "Afficher {0}",
   "Show more ({0} of {1})": "Afficher plus ({0} sur {1})",
   "Set color to {0}": "Définir la couleur sur {0}",

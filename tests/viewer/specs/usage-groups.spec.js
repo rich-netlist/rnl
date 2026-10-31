@@ -193,6 +193,50 @@ test("a selected component and its texts are drawn over the frames and titles of
   expect((await order()).sel).toBe(0); // a selected usage lifts no component
 });
 
+test("the selected group's title has a button that hides it, as the switch in the Usage panel does, and shows it again", async ({ page }) => {
+  const button = page.locator("#canvas .usage-hide");
+  const shown = (id) => row(page, id).locator('input[type="checkbox"]');
+  await expect(button).toHaveCount(0);
+  await page.locator("#usage-list .usage-expand").last().click();
+  await row(page, "%amp").locator(".usage-name").click();
+  // only the selected one, at the start of its title
+  await expect(button).toHaveCount(1);
+  await expect(button).toHaveAttribute("aria-label", "Hide %amp");
+  await expect(button).toHaveAttribute("role", "button");
+  const where = await page.evaluate(() => {
+    const b = document.querySelector("#canvas .usage-hide").getBoundingClientRect();
+    const text = document.querySelector("#canvas .usage-frame.selected .usage-title text").getBoundingClientRect();
+    return { buttonRight: b.right, textLeft: text.left };
+  });
+  expect(where.buttonRight).toBeLessThanOrEqual(where.textLeft + 0.5);
+  await expect(shown("%amp")).toBeChecked();
+  const group = await page.evaluate(() => window.viewer.selected);
+  // the click turns it off in the panel, selects nothing else and does not unselect: the frame stays, as the selected one does
+  await button.click();
+  await expect(shown("%amp")).not.toBeChecked();
+  await expect(page.locator("#canvas .usage-frame.selected")).toHaveCount(1);
+  expect(await page.evaluate(() => window.viewer.selected)).toBe(group);
+  await expect(page.locator("#usage-detail h2")).toHaveText("@GROUP: %amp");
+  await expect(button).toHaveAttribute("aria-label", "Show %amp");
+  // the other way: the panel's switch changes the button
+  await shown("%amp").check();
+  await expect(button).toHaveAttribute("aria-label", "Hide %amp");
+  // from the keyboard, which keeps its place on the button
+  await button.focus();
+  await page.keyboard.press("Enter");
+  await expect(shown("%amp")).not.toBeChecked();
+  await expect(button).toBeFocused();
+  await page.keyboard.press("Space");
+  await expect(shown("%amp")).toBeChecked();
+  // the press does not reach the drawing: no zoom to fit, no new selection
+  await button.dblclick();
+  await expect(page.locator("#canvas .usage-frame.selected")).toHaveCount(1);
+  expect(await page.evaluate(() => window.viewer.selected)).toBe(group);
+  // not selected: no button
+  await page.locator("#canvas").click({ position: { x: 2, y: 2 } });
+  await expect(button).toHaveCount(0);
+});
+
 test("the frames of nested groups are set out a level each, so that their labels do not lie on one another", async ({ page }) => {
   const box = (id) => page.evaluate((id) => {
     const object = window.viewer.doc.levels[0].usages.find((u) => u.id === id).object;

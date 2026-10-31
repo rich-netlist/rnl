@@ -485,6 +485,7 @@
   "GitHub's response is not a list of releases": "GitHub의 응답이 릴리스 목록이 아닙니다",
   "The releases are listed at ": "릴리스 목록: ",
   "Show all usages of {0}": "{0}의 모든 용례 표시",
+  "Hide {0}": "{0} 숨기기",
   "Show {0}": "{0} 표시",
   "Show more ({0} of {1})": "더 보기 ({0} / {1})",
   "Set color to {0}": "색상을 {0}(으)로 설정",
