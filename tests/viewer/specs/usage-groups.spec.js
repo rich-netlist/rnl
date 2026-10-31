@@ -77,6 +77,202 @@ test("a group is drawn as a frame titled @GROUP: its id, and selecting one light
   await expect(page.locator("#selection")).toContainText("group");
 });
 
+test("selecting a group mutes the frames of the other groups as it mutes the rest of the drawing, and shows only its own title", async ({ page }) => {
+  const strokes = () => page.evaluate(() => Object.fromEntries([...document.querySelectorAll("#canvas .usage-frame")].map((f) => [f.querySelector(".usage-title text").textContent, {
+    muted: f.hasAttribute("data-muted"), stroke: f.querySelector(":scope > rect").getAttribute("stroke"), titled: f.querySelector(".usage-title").getAttribute("display") !== "none",
+    fill: document.querySelector(`#canvas rect.usage-fill[data-usage="${f.dataset.usage}"]`).getAttribute("fill") }])));
+  const before = await strokes();
+  expect(Object.values(before).some((f) => f.muted)).toBe(false);
+  await page.locator("#usage-list .usage-expand").last().click();
+  await row(page, "%amp").locator(".usage-name").click();
+  await expect(page.locator("#canvas .usage-frame.selected")).toHaveCount(1);
+  const light = await strokes();
+  for (const [title, f] of Object.entries(light)) {
+    const own = title === "@GROUP: %amp";
+    expect(f.muted, title).toBe(!own);
+    // the selected one keeps its colour and title; the others are one grey, frame and fill alike, and have no title
+    expect(f.titled, title).toBe(own);
+    if (own) expect(f).toMatchObject({ stroke: before[title].stroke, fill: before[title].fill });
+    else { expect(f.stroke, title).not.toBe(before[title].stroke); expect(f.fill).toBe(f.stroke); }
+  }
+  const greys = new Set(Object.values(light).filter((f) => f.muted).map((f) => f.stroke));
+  expect([...greys]).toHaveLength(1);
+  const [, r, g, b] = /^#(..)(..)(..)$/.exec([...greys][0]);
+  expect(r === g && g === b).toBe(true); // a grey
+  // on the dark background the grey is a darker one, and the frames follow when the background is changed
+  await page.evaluate(() => window.viewer.command("background-dark"));
+  const dark = await strokes();
+  expect(dark["@GROUP: %core"].muted).toBe(true);
+  expect(dark["@GROUP: %core"].stroke).not.toBe(light["@GROUP: %core"].stroke);
+  expect(dark["@GROUP: %core"].stroke).toBe(dark["@GROUP: %inp"].stroke);
+  expect(dark["@GROUP: %amp"].stroke).toBe(light["@GROUP: %amp"].stroke);
+  // pointing at a row of the usages of an object shows it as a selection would: the other frames go faint, and come back
+  await page.evaluate(() => window.viewer.command("background-light"));
+  await page.locator("#canvas").click({ position: { x: 2, y: 2 } });
+  await expect(page.locator("#canvas .usage-frame.selected")).toHaveCount(0);
+  await expect(page.locator("#canvas .usage-frame[data-muted]")).toHaveCount(0);
+  await selectObject(page, "instance", "M1");
+  await page.locator("#usage-detail .membership-row, #usage-detail .usage-membership-row").first().hover();
+  await expect(page.locator("#canvas .usage-frame:not([data-muted])")).toHaveCount(1);
+  // and back to the usages of the selected object
+  await page.locator("#usage-list").hover();
+  expect(await page.locator("#canvas .usage-frame:not([data-muted])").count()).toBeGreaterThan(1);
+});
+
+test("selecting a component keeps the frames and titles of the usages it is in, those its table lists, and mutes the rest", async ({ page }) => {
+  const state = () => page.evaluate(() => Object.fromEntries([...document.querySelectorAll("#canvas .usage-frame")].map((f) => [f.querySelector(".usage-title text")?.textContent ?? "?",
+    { muted: f.hasAttribute("data-muted"), titled: f.querySelector(".usage-title").getAttribute("display") !== "none" }])));
+  const all = await state();
+  expect(Object.values(all).some((f) => f.muted)).toBe(false);
+  // (a title that does not fit its frame is left out whatever is selected)
+  const fits = (title) => all[title].titled;
+  // the usages its table lists: M1 is in %core, %amp and %inp, and in the usages that use it, not in %bias, which has M5 and M6
+  const listed = () => page.evaluate(() => [...document.querySelectorAll("#usage-detail .membership-id")].map((b) => b.textContent));
+  const isListed = (ids, title) => ids.includes(title.slice(title.indexOf(": ") + 2));
+  await selectObject(page, "instance", "M1");
+  const m1 = await state();
+  const ids1 = await listed();
+  expect(ids1).toEqual(expect.arrayContaining(["%core", "%amp", "%inp"]));
+  expect(ids1).not.toContain("%bias");
+  for (const [title, f] of Object.entries(m1)) {
+    const lit = isListed(ids1, title);
+    expect({ title, ...f }).toEqual({ title, muted: !lit, titled: lit && fits(title) });
+  }
+  // M5 is in %core and %bias, not in %amp or %inp
+  await selectObject(page, "instance", "M5");
+  const m5 = await state();
+  const ids5 = await listed();
+  expect(ids5).toEqual(expect.arrayContaining(["%core", "%bias"]));
+  expect(ids5).not.toContain("%amp");
+  for (const [title, f] of Object.entries(m5)) {
+    const lit = isListed(ids5, title);
+    expect({ title, ...f }).toEqual({ title, muted: !lit, titled: lit && fits(title) });
+  }
+  // nothing selected: all of them again
+  await page.locator("#canvas").click({ position: { x: 2, y: 2 } });
+  await expect(page.locator("#canvas .usage-frame[data-muted]")).toHaveCount(0);
+  expect(await state()).toEqual(all);
+});
+
+test("a selected component and its texts are drawn over the frames and titles of the usages, and go back when it is not selected", async ({ page }) => {
+  // where the selected object's groups are against the layer of the usages: after it is over it
+  const order = () => page.evaluate(() => {
+    const svg = document.querySelector("#canvas > svg");
+    const layer = svg.querySelector(":scope > .usage-overlays");
+    const over = (el) => !!(layer.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING);
+    const sel = [...svg.querySelectorAll("g.sel")];
+    const currents = svg.querySelector(":scope > .current-overlays");
+    return { sel: sel.length, over: sel.map(over), overlay: over(svg.querySelector(":scope > .overlay")), currentsLast: !currents || svg.lastElementChild === currents,
+      groups: [...svg.querySelectorAll(":scope > g[data-id]")].map((g) => g.getAttribute("data-id")) };
+  });
+  const before = await order();
+  expect(before.sel).toBe(0);
+  await selectObject(page, "instance", "M1");
+  const lit = await order();
+  expect(lit.sel).toBeGreaterThan(1); // its symbol and its labels
+  expect(lit.over.every(Boolean)).toBe(true);
+  expect(lit.overlay).toBe(true);
+  expect(lit.currentsLast).toBe(true);
+  // another component: the first one goes back to its place, in the order it had
+  await selectObject(page, "instance", "M5");
+  expect((await order()).over.every(Boolean)).toBe(true);
+  await page.locator("#canvas").click({ position: { x: 2, y: 2 } });
+  const after = await order();
+  expect(after.sel).toBe(0);
+  expect(after.groups).toEqual(before.groups);
+  // a frame made again (the usages hidden and shown) keeps it over: the selected one is over the new layer
+  await selectObject(page, "instance", "M1");
+  await page.evaluate(() => window.viewer.command("toggle-usages"));
+  await page.evaluate(() => window.viewer.command("toggle-usages"));
+  expect((await order()).over.every(Boolean)).toBe(true);
+  // a selected group's own frame is over the other frames, whatever order they were made in
+  await page.locator("#usage-list .usage-expand").last().click();
+  await row(page, "%inp").locator(".usage-name").click();
+  const last = await page.evaluate(() => [...document.querySelectorAll("#canvas .usage-frame")].at(-1).querySelector(".usage-title text")?.textContent);
+  expect(last).toBe("@GROUP: %inp");
+  expect((await order()).sel).toBe(0); // a selected usage lifts no component
+});
+
+test("the selected group's title has a button that hides it and unselects it, as the switch in the Usage panel hides it", async ({ page }) => {
+  const button = page.locator("#canvas .usage-hide");
+  const shown = (id) => row(page, id).locator('input[type="checkbox"]');
+  const frame = (id) => page.locator("#canvas .usage-frame .usage-title text", { hasText: id });
+  const selected = () => page.evaluate(() => window.viewer.selected);
+  await expect(button).toHaveCount(0);
+  await page.locator("#usage-list .usage-expand").last().click();
+  await row(page, "%amp").locator(".usage-name").click();
+  // only the selected one, at the start of its title, with a box that makes it a button
+  await expect(button).toHaveCount(1);
+  await expect(button).toHaveAttribute("aria-label", "Hide %amp");
+  await expect(button).toHaveAttribute("role", "button");
+  const look = await page.evaluate(() => {
+    const b = document.querySelector("#canvas .usage-hide");
+    const box = b.querySelector(".usage-hide-box"), style = getComputedStyle(box);
+    const text = document.querySelector("#canvas .usage-frame.selected .usage-title text").getBoundingClientRect();
+    const title = document.querySelector("#canvas .usage-frame.selected .usage-title > rect").getBoundingClientRect();
+    return { right: box.getBoundingClientRect().right, textLeft: text.left, boxH: box.getBoundingClientRect().height, titleH: title.height,
+      fill: style.fill, stroke: style.stroke, strokeWidth: style.strokeWidth, cursor: getComputedStyle(b).cursor };
+  });
+  expect(look.right).toBeLessThan(look.textLeft);
+  expect(look.boxH).toBeLessThan(look.titleH); // within the title, which is a little taller
+  expect(look.boxH).toBeGreaterThan(look.titleH - 6);
+  expect(look.stroke).not.toBe("none");
+  expect(look.strokeWidth).toBe("1px");
+  expect(look.cursor).toBe("pointer");
+  // pointed at, and pressed, the box changes
+  const fillOf = () => page.evaluate(() => getComputedStyle(document.querySelector("#canvas .usage-hide-box")).fill);
+  await button.hover();
+  const hover = await fillOf();
+  expect(hover).not.toBe(look.fill);
+  await page.mouse.down();
+  const down = await fillOf();
+  expect(down).not.toBe(hover);
+  await page.mouse.move(2, 2); // (off the button, so that the release is not a click on it)
+  await page.mouse.up();
+  await expect(button).toHaveCount(1);
+  await expect(shown("%amp")).toBeChecked();
+  // a click hides it and unselects it: its frame goes, the panel's switch is off, nothing else is selected
+  await button.click();
+  await expect(shown("%amp")).not.toBeChecked();
+  await expect(frame("%amp")).toHaveCount(0);
+  await expect(button).toHaveCount(0);
+  await expect(page.locator("#canvas .usage-frame.selected")).toHaveCount(0);
+  expect(await selected()).toBeNull();
+  // (the drawing took no click: it did not zoom, and the selection is not another object's)
+  await expect(page.locator("#canvas .usage-frame[data-muted]")).toHaveCount(0);
+  // the way back is the panel's switch
+  await shown("%amp").check();
+  await expect(frame("%amp")).toHaveCount(1);
+  // from the keyboard: Enter, and then Space; the focus goes to the drawing
+  await row(page, "%amp").locator(".usage-name").click();
+  await button.focus();
+  await page.keyboard.press("Enter");
+  await expect(shown("%amp")).not.toBeChecked();
+  expect(await selected()).toBeNull();
+  await expect(page.locator("#canvas")).toBeFocused();
+  await shown("%amp").check();
+  await row(page, "%amp").locator(".usage-name").click();
+  await button.focus();
+  await page.keyboard.press("Space");
+  await expect(shown("%amp")).not.toBeChecked();
+  await expect(page.locator("#canvas")).toBeFocused();
+  // a double click on it reaches nothing of the drawing
+  await shown("%amp").check();
+  await row(page, "%amp").locator(".usage-name").click();
+  await button.dblclick();
+  await expect(shown("%amp")).not.toBeChecked();
+  // a usage that is turned off in the panel while it is selected stays selected and drawn, as it did, with no button
+  await shown("%amp").check();
+  await row(page, "%amp").locator(".usage-name").click();
+  await shown("%amp").uncheck();
+  await expect(page.locator("#canvas .usage-frame.selected")).toHaveCount(1);
+  await expect(button).toHaveCount(0);
+  expect(await selected()).not.toBeNull();
+  // not selected: no button
+  await page.locator("#canvas").click({ position: { x: 2, y: 2 } });
+  await expect(button).toHaveCount(0);
+});
+
 test("the frames of nested groups are set out a level each, so that their labels do not lie on one another", async ({ page }) => {
   const box = (id) => page.evaluate((id) => {
     const object = window.viewer.doc.levels[0].usages.find((u) => u.id === id).object;

@@ -485,6 +485,7 @@
   "GitHub's response is not a list of releases": "GitHubからの応答がリリース一覧の形式ではありません",
   "The releases are listed at ": "リリース一覧：",
   "Show all usages of {0}": "{0} のすべての適用オブジェクトを表示",
+  "Hide {0}": "{0} を非表示",
   "Show {0}": "{0} を表示",
   "Show more ({0} of {1})": "さらに表示（{0} / {1}）",
   "Set color to {0}": "色を {0} に設定",

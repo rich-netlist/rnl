@@ -485,6 +485,7 @@
   "GitHub's response is not a list of releases": "GitHub 的回應不是發布清單",
   "The releases are listed at ": "所有發布版本列於：",
   "Show all usages of {0}": "顯示 {0} 的所有用例",
+  "Hide {0}": "隱藏 {0}",
   "Show {0}": "顯示 {0}",
   "Show more ({0} of {1})": "顯示更多（已顯示 {0} / {1}）",
   "Set color to {0}": "將顏色設為 {0}",

@@ -1,11 +1,12 @@
 // Scope-local semantic groups. Display preferences never change the RNL source or its geometry.
 import { append, m, setAttr, setText } from "./i18n.js";
 import { current, doc, selected, selectedAsUsage } from "./state.js";
-import { select } from "./selection.js";
+import { clearSelection, select } from "./selection.js";
 import { setCheck } from "./commands.js";
 import { $, load, save, span, svgElement } from "./util.js";
 import { setPathText } from "./source-path.js";
-import { objectUsages, stateName } from "./usage-table.js";
+import { isDark, mutedColour } from "./background.js";
+import { objectUsages, relatedUsages, stateName } from "./usage-table.js";
 import { FRAME_STEP, frameSteps, TITLE_ROW, titleRows } from "./frame-layout.js";
 import { setPane } from "./panels.js";
 import { revealLine } from "./text.js";
@@ -27,6 +28,7 @@ let drawing = null;
 let layer = null;
 let underlay = null;
 let frames = [];
+let hovered = null; // the usage whose row is pointed at, in the usages of an object
 let layerDoc = null;
 let layerLevel = -1;
 let layerRevision = -1;
@@ -336,14 +338,59 @@ function mute(groups, keep) {
   }
 }
 /**
+ * The usages whose frames stay at full strength: the one in focus, the one a row of an object's usages is pointed at, or
+ * the usages of the selected object, those its table lists; null when nothing is selected, and no frame is muted.
+ */
+function litFrames() {
+  if (hovered !== null) return new Set([hovered]);
+  const u = chosen();
+  if (u) return new Set([u.object]);
+  // an object of the level shown, as the table of its usages is
+  if (selected !== null && doc?.objects[selected]?.level === doc.levels[current]?.host) return relatedUsages(doc, selected);
+  return null;
+}
+/**
+ * The grey of a muted frame: the ink of the drawing blended toward the paper twice by `mutedColour`, which dims the
+ * components once, so the frames are the fainter of the two and do not cover the components that are muted.
+ */
+const frameGrey = () => mutedColour(mutedColour(isDark() ? "#ffffff" : "#000000"));
+/**
+ * Dim the frames of every usage but those in `lit`, as `mute` dims the groups of the drawing: grey, and not the colour
+ * of the usage, so a selected usage or group, or the usages of a selected object, stand out from the others as a selected
+ * component does; the titles of the muted ones are not shown, which `paintUsages` sees in `muted`. With null, dim none.
+ */
+function muteFrames(lit, force = false) {
+  let changed = false;
+  const grey = frameGrey();
+  for (const f of frames) {
+    const muted = lit !== null && !lit.has(f.entry.object);
+    if (!force && f.muted === muted) continue;
+    const colour = muted ? grey : f.color;
+    f.muted = muted;
+    f.group.toggleAttribute("data-muted", muted);
+    f.rect.setAttribute("stroke", colour);
+    f.fill.setAttribute("fill", colour);
+    changed = true;
+  }
+  // the frames that stay lit are over those that are muted; with none muted, the frames are in the order they were made in
+  if (changed) {
+    for (const f of frames) if (f.muted) layer.append(f.group);
+    for (const f of frames) if (!f.muted) layer.append(f.group);
+  }
+}
+// the drawing's background decides how far a muted colour goes
+globalThis.addEventListener?.("background-colors", () => { if (frames.length) muteFrames(litFrames(), true); });
+/**
  * Light up the members of a usage in the drawing while a row of the object's usages is pointed at, as a
  * selection does, without selecting it; with null, the drawing goes back to what is selected.
  */
 export function highlightUsage(object) {
+  hovered = object;
   if (!context || !doc) return;
   const [, , groups] = context;
-  const hovered = object === null ? chosen() : usages().find(u => u.object === object);
-  mute(groups, hovered ? focusSet(hovered) : null);
+  const lit = object === null ? chosen() : usages().find(u => u.object === object);
+  mute(groups, lit ? focusSet(lit) : null);
+  repaint(); // the frames that are muted, and the titles that are shown
 }
 
 // Net and terminal roles of a virtual symbol denote its local connections, not every
@@ -351,15 +398,47 @@ export function highlightUsage(object) {
 function localSymbol(u) {
   return u.frame?.local ?? false;
 }
-function badge(text, color, parent, cls, width) {
+const HIDE_W = 24; // the width the button that hides a selected usage takes at the start of its title
+/**
+ * The button at the start of the selected usage's title, an eye with a slash on a box that looks like a button: it hides
+ * the usage, as the switch in the Usage panel does (the same `change`), and unselects it, since its frame goes with it;
+ * showing it again is the panel's. It takes the pointer events itself, so that a press on it is neither a click on the
+ * drawing nor a drag. The keyboard goes on to the drawing, where it was before the usage was selected.
+ */
+function hideButton(entry, color, parent) {
+  const label = m`Hide ${entry.id}`;
+  const button = svgElement("g", { class: "usage-hide", role: "button", tabindex: 0, "aria-label": label, "pointer-events": "all", "data-usage": entry.object });
+  // (the colours of the box are the style sheet's; these are for a page without it)
+  const box = svgElement("rect", { class: "usage-hide-box", x: -2, y: -7.5, width: 19, height: 15, rx: 3, fill: "#f4f4f6", stroke: "#8a8a92", "stroke-width": 1 });
+  const icon = svgElement("g", { fill: "none", stroke: color, "stroke-width": 1.4, "stroke-linecap": "round", "stroke-linejoin": "round", transform: "translate(0.5 0)", "pointer-events": "none" });
+  append(icon, svgElement("path", { d: "M0 0 Q7 -5 14 0 Q7 5 0 0 Z" }), svgElement("circle", { cx: 7, cy: 0, r: 1.8 }), svgElement("path", { d: "M1.5 5 L12.5 -5" }));
+  const tip = svgElement("title", {});
+  tip.textContent = label;
+  append(button, box, icon, tip);
+  const hide = () => {
+    change(entry, { visible: false });
+    clearSelection();
+    $("canvas")?.focus({ preventScroll: true });
+  };
+  for (const type of ["pointerdown", "pointerup", "pointercancel", "dblclick", "contextmenu"]) button.addEventListener(type, (e) => e.stopPropagation());
+  button.addEventListener("click", (e) => { e.stopPropagation(); hide(); });
+  button.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    e.stopPropagation();
+    hide();
+  });
+  append(parent, button);
+}
+function badge(text, color, parent, cls, width, lead = 0) {
   const g = svgElement("g", { class: cls });
   const back = svgElement("rect", { rx: 3, fill: "var(--usage-label-bg)", "fill-opacity": .75 });
-  const label = svgElement("text", { fill: color, "font-size": 13, "font-family": "system-ui, sans-serif", "dominant-baseline": "central" });
+  const label = svgElement("text", { fill: color, "font-size": 13, "font-family": "system-ui, sans-serif", "dominant-baseline": "central", ...(lead ? { x: lead } : {}) });
   label.textContent = text;
   if (width > 0) { label.setAttribute("textLength", width); label.setAttribute("lengthAdjust", "spacingAndGlyphs"); }
   append(g, back, label);
   append(parent, g);
-  return { g, back, label, width };
+  return { g, back, label, width, lead };
 }
 
 /** Draw in screen pixels inside the scene SVG: the inverse view transform cancels its zoom. */
@@ -410,15 +489,21 @@ export function paintUsages(svg, view, groups) {
         "stroke-width": active ? 8 / 3 : 4 / 3, "stroke-dasharray": "1 5", "stroke-linecap": "round", rx: 10 });
       append(group, rect);
       append(layer, group);
-      const title = badge(labelOf(entry), color, group, "usage-title", entry.frame.title_width);
+      // (the selected usage's title has the button that hides it in front of its text)
+      // (one that is turned off in the panel and shown only because it is selected has none: the panel turns it on)
+      const hideable = active && setting(entry).visible;
+      const title = badge(labelOf(entry), color, group, "usage-title", entry.frame.title_width, hideable ? HIDE_W : 0);
+      if (hideable) hideButton(entry, color, title.g);
       const roles = active ? entry.roles.map((r, i) => ({ ...r, anchor: entry.frame.roles[i], width: entry.frame.role_widths[i] })).filter(r => r.anchor).map(r => ({
         anchor: r.anchor,
         ...badge(r.name, color, group, "usage-role-label", r.width),
       })) : [];
-      frames.push({ entry, bounds, rect, fill, title, roles, active, local, pad: (levels.get(entry.object) ?? 0) * FRAME_STEP });
+      frames.push({ entry, color, group, bounds, rect, fill, title, roles, active, local, pad: (levels.get(entry.object) ?? 0) * FRAME_STEP });
     }
     append(svg, currentLayer);
+    window.dispatchEvent(new Event("usage-layer"));
   }
+  muteFrames(litFrames());
   layer.setAttribute("transform", `translate(${view.x} ${view.y}) scale(${1 / view.k})`);
   underlay.setAttribute("transform", layer.getAttribute("transform"));
   const project = (x, y) => [(x - view.x) * view.k, (y - view.y) * view.k];
@@ -433,7 +518,7 @@ export function paintUsages(svg, view, groups) {
     const [titleX, titleY] = project(...f.entry.frame.title);
     f.titleAt = [titleX - f.pad, titleY - f.pad];
     placeBadge(f.title, ...f.titleAt, false);
-    const titleVisible = f.active || f.title.width + 16 <= right - x; // (the frame's own width, as the core decides for the image)
+    const titleVisible = !f.muted && (f.active || f.title.width + 16 <= right - x); // (the frame's own width, as the core decides for the image)
     f.title.g.setAttribute("display", titleVisible ? "inline" : "none");
     if (!titleVisible) f.title.screen = null;
     for (const role of f.roles) {
@@ -449,14 +534,14 @@ export function paintUsages(svg, view, groups) {
  */
 function spreadTitles() {
   const shown = frames.filter((f) => f.title.screen);
-  const rows = titleRows(shown.map((f) => ({ key: f, x: f.titleAt[0], y: f.titleAt[1], width: f.title.width, first: (f.active ? 1e6 : 0) + f.pad })));
+  const rows = titleRows(shown.map((f) => ({ key: f, x: f.titleAt[0], y: f.titleAt[1], width: f.title.width + f.title.lead, first: (f.active ? 1e6 : 0) + f.pad })));
   for (const f of shown) if (rows.get(f)) placeBadge(f.title, f.titleAt[0], f.titleAt[1] + rows.get(f) * TITLE_ROW, false);
 }
 function placeBadge(b, x, y, centered) {
   const width = b.width ??= b.label.getComputedTextLength();
   b.g.setAttribute("transform", `translate(${centered ? x - width / 2 : x} ${y})`);
-  for (const [attr, value] of Object.entries({ x: -4, y: -9, width: width + 8, height: 18 })) b.back.setAttribute(attr, value);
-  b.screen = [centered ? x - width / 2 - 4 : x - 4, y - 9, centered ? x + width / 2 + 4 : x + width + 4, y + 9];
+  for (const [attr, value] of Object.entries({ x: -4, y: -9, width: width + 8 + b.lead, height: 18 })) b.back.setAttribute(attr, value);
+  b.screen = [centered ? x - width / 2 - 4 : x - 4, y - 9, centered ? x + width / 2 + 4 : x + width + 4 + b.lead, y + 9];
 }
 
 /** Only the border/title selects a usage; its filled interior keeps normal component picking. */

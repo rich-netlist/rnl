@@ -28,7 +28,7 @@ export function darkColour(colour) {
 }
 
 /** Shift RGB toward white/light or black/dark, preserving the drawing's alpha. */
-function mutedColour(colour) {
+export function mutedColour(colour) {
   const named = { white: "#ffffff", black: "#000000" };
   colour = named[colour] || colour;
   if (!/^#(?:[\da-f]{3,4}|[\da-f]{6}|[\da-f]{8})$/i.test(colour)) return colour;
@@ -84,4 +84,5 @@ export function setBackground(mode, { persist = true } = {}) {
   document.body.style.setProperty("--drawing-ink", dark ? darkColour(ink) : ink);
   for (const svg of document.querySelectorAll("#canvas > svg, .thumb svg, .symbol-preview svg")) colourDrawing(svg);
   refreshGridColours();
+  globalThis.dispatchEvent?.(new Event("background-colors"));
 }
