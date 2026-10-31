@@ -192,7 +192,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use num_traits::{One, Signed, Zero};
-use rnl_runtime::problem::{LevelProblem, ObjectKind, Sense};
+use rnl_runtime::problem::{LevelProblem, ObjectKind};
 use rnl_runtime::source::Provider;
 
 use crate::rational::{from_f64, int};
@@ -238,70 +238,12 @@ fn netlists(dir: &str, prefix: &str) -> Vec<PathBuf> {
     out
 }
 
-/// Whether a fact holds under a placement, exactly, as the standard says (14.1–14.5, 14.9): the
-/// constants within `tol` (11.7), the equalities between points (ALIGN, DISTRIBUTE) exact, as the
-/// model keeps them.
+/// Whether a fact holds under a placement, exactly: the constants within `tol` (11.7), the
+/// equalities between points (ALIGN, DISTRIBUTE) exact, as the model keeps them.
 fn holds_exactly(p: &LevelProblem, g: &crate::resolve::Geometry, kind: &FactKind, tol: &Q) -> bool {
-    let at = |m: &PointRef, axis: Axis| {
-        let a = usize::from(axis == Axis::Y);
-        point_value(p, g, m, a, 0).unwrap_or_else(|| panic!("no point for {m:?}"))
-    };
-    let num = |v: f64| from_f64(v).unwrap();
-    let ori = |k: usize| g.orient[k];
-    let near = |a: Q, b: Q| (a - b).abs() <= *tol;
-    match kind {
-        FactKind::Place { at: m, axis, value } => near(at(m, *axis), num(*value)),
-        FactKind::PointCoordinate { point, axis, value } => near(at(&PointRef::Origin(*point), *axis), num(*value)),
-        FactKind::Offset { text, from, axis, value } => {
-            near(at(&PointRef::Origin(*text), *axis) - at(from, *axis), num(*value))
-        }
-        FactKind::Orient { object, code } => ori(*object) == *code,
-        FactKind::OrientRelation { relation, from, to } => {
-            let (Some(a), Some(b)) = (from.first(), to.first()) else { return true };
-            from.iter().all(|k| ori(*k) == ori(*a))
-                && to.iter().all(|k| ori(*k) == ori(*b))
-                && ori(*b) == ori(*a).then(*relation)
-        }
-        FactKind::Align { axis, members } => {
-            let v: Vec<Q> = members.iter().map(|m| at(m, *axis)).collect();
-            v.iter().all(|x| *x == v[0])
-        }
-        FactKind::Order { axis, sense, members } => {
-            let v: Vec<Q> = members.iter().map(|m| at(m, *axis)).collect();
-            let step = Q::one() - tol;
-            let inc = v.windows(2).all(|w| &w[1] - &w[0] >= step);
-            let dec = v.windows(2).all(|w| &w[0] - &w[1] >= step);
-            match sense {
-                Sense::Increasing => inc,
-                Sense::Decreasing => dec,
-                Sense::Either => inc || dec,
-            }
-        }
-        FactKind::Distribute { axis, members } => {
-            let v: Vec<Q> = members.iter().map(|m| at(m, *axis)).collect();
-            v.len() < 3 || v.windows(2).all(|w| &w[1] - &w[0] == &v[1] - &v[0])
-        }
-        FactKind::Distance { axis, sense, min, max, from, to } => {
-            if from.is_empty() || to.is_empty() {
-                return true;
-            }
-            let extent = |ms: &[PointRef]| {
-                let v: Vec<Q> = ms.iter().map(|m| at(m, *axis)).collect();
-                (v.iter().min().unwrap().clone(), v.iter().max().unwrap().clone())
-            };
-            let (a, b) = (extent(from), extent(to));
-            let up = &b.0 - &a.1;
-            let down = &a.0 - &b.1;
-            let gaps = match sense {
-                Sense::Increasing => vec![up],
-                Sense::Decreasing => vec![down],
-                Sense::Either => vec![up, down],
-            };
-            // "x" or "y": one side has the lower bound; the upper bound holds of the largest gap
-            let largest = gaps.iter().max().unwrap().clone();
-            min.is_none_or(|m| gaps.iter().any(|g| *g >= num(m) - tol)) && max.is_none_or(|m| largest <= num(m) + tol)
-        }
-    }
+    let at = |m: &PointRef, axis: Axis| point_value(p, g, m, usize::from(axis == Axis::Y), 0);
+    crate::holds::check(kind, &at, &|k| Some(g.orient[k]), tol, &Q::zero())
+        .unwrap_or_else(|| panic!("no point for {kind:?}"))
 }
 
 /// Whether the facts kept leave no side to put two symbols apart, with the orientations the

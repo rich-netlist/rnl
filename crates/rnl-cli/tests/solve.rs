@@ -19,7 +19,7 @@ use rnl_cli::{interpret_file, path_str, FsProvider};
 use rnl_runtime::diag::Severity;
 use rnl_runtime::geom::{Orient, Pt};
 use rnl_runtime::problem::{
-    same_input, sig2, Axis, FactKind, Filler, LevelProblem, OrientSlot, PointRef, Position, Reference, Sense, Slot,
+    same_input, sig2, Axis, FactKind, Filler, LevelProblem, OrientSlot, PointRef, Position, Reference, Slot,
 };
 use rnl_runtime::solution::{write_record, Decision, Solution, Unsolved};
 use rnl_runtime::source::{normalize, Layered, MemoryProvider, Provider};
@@ -198,60 +198,9 @@ impl Placed<'_> {
         }
     }
 
-    /// Does the fact hold, the constants within `tol` (11.7, 14)?
+    /// Does the fact hold, within `tol` (11.7, 14)?
     fn holds(&self, kind: &FactKind, tol: f64) -> bool {
-        let c = |r: &PointRef, axis: Axis| self.coordinate(r, axis);
-        let extent = |rs: &[PointRef], axis: Axis| -> Option<(f64, f64)> {
-            let vs: Vec<f64> = rs.iter().map(|r| c(r, axis)).collect();
-            let lo = vs.iter().copied().fold(f64::INFINITY, f64::min);
-            let hi = vs.iter().copied().fold(f64::NEG_INFINITY, f64::max);
-            (!vs.is_empty()).then_some((lo, hi))
-        };
-        match kind {
-            FactKind::Place { at, axis, value } => (c(at, *axis) - value).abs() <= tol,
-            FactKind::PointCoordinate { point, axis, value } => {
-                (c(&PointRef::Origin(*point), *axis) - value).abs() <= tol
-            }
-            FactKind::Offset { text, from, axis, value } => {
-                (c(&PointRef::Origin(*text), *axis) - c(from, *axis) - value).abs() <= tol
-            }
-            FactKind::Orient { object, code } => self.orient(*object) == *code,
-            FactKind::Align { axis, members } => {
-                members.windows(2).all(|w| (c(&w[0], *axis) - c(&w[1], *axis)).abs() <= tol)
-            }
-            FactKind::Distribute { axis, members } => members.windows(3).all(|w| {
-                let (a, b, d) = (c(&w[0], *axis), c(&w[1], *axis), c(&w[2], *axis));
-                ((b - a) - (d - b)).abs() <= tol
-            }),
-            FactKind::Order { axis, sense, members } => {
-                let up = members.windows(2).all(|w| c(&w[1], *axis) - c(&w[0], *axis) >= 1.0 - tol);
-                let down = members.windows(2).all(|w| c(&w[0], *axis) - c(&w[1], *axis) >= 1.0 - tol);
-                match sense {
-                    Sense::Increasing => up,
-                    Sense::Decreasing => down,
-                    Sense::Either => up || down,
-                }
-            }
-            FactKind::Distance { axis, sense, min, max, from, to } => {
-                let (Some(a), Some(b)) = (extent(from, *axis), extent(to, *axis)) else { return true };
-                let within = |d: f64| min.is_none_or(|m| d >= m - tol) && max.is_none_or(|m| d <= m + tol);
-                // 14.5: from the extent of `from` to that of `to`, the gap between them
-                let (up, down) = (within(b.0 - a.1), within(a.0 - b.1));
-                match sense {
-                    Sense::Increasing => up,
-                    Sense::Decreasing => down,
-                    Sense::Either => up || down,
-                }
-            }
-            FactKind::OrientRelation { relation, from, to } => {
-                let one = |ks: &[usize]| ks.windows(2).all(|w| self.orient(w[0]) == self.orient(w[1]));
-                let turned = match (from.first(), to.first()) {
-                    (Some(a), Some(b)) => self.orient(*b) == self.orient(*a).then(*relation),
-                    _ => true,
-                };
-                one(from) && one(to) && turned
-            }
-        }
+        rnl_solver::fact_holds(kind, &|r, axis| Some(self.coordinate(r, axis)), &|k| Some(self.orient(k)), tol).unwrap()
     }
 }
 

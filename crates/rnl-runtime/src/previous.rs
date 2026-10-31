@@ -272,6 +272,36 @@ pub fn document_ids(p: &LevelProblem, shown: &Interpretation) -> DocumentIds {
     }
 }
 
+/// Where the level of `p`, the problem a solver reads, draws each of its objects as `with` reads the
+/// same document with its records of the solver, in the order of the objects of `p`, each found by
+/// its reference, as in [`previous`]. All of an object is unknown when nothing there is known to be
+/// it, and all of every object when the level has no record of the solver in `with`.
+pub fn drawn(p: &LevelProblem, with: &Interpretation) -> Vec<Drawn> {
+    let Some(result) = with.results.iter().find(|r| r.level == p.level) else {
+        return vec![Drawn::default(); p.objects.len()];
+    };
+    let names = generated_names(p);
+    p.objects
+        .iter()
+        .map(|o| {
+            let Some((at, orient)) = key(p, &names, &o.reference).and_then(|k| result.drawn.get(&k)) else {
+                return Drawn::default();
+            };
+            Drawn { at: *at, orient: o.orient.as_ref().map(|_| *orient) }
+        })
+        .collect()
+}
+
+/// Where a level draws an object, as its text says.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Drawn {
+    /// Its x and y. None on an axis with no position, or for a text on one that the scene and the
+    /// symbol leave to the viewer (13.3).
+    pub at: [Option<f64>; 2],
+    /// Its orientation, for the objects that have one (11.2).
+    pub orient: Option<Orient>,
+}
+
 /// What [`document_ids`] gives.
 #[derive(Clone, Debug, PartialEq)]
 pub struct DocumentIds {
@@ -346,6 +376,8 @@ pub(crate) struct RecordResult {
     pub wires: Vec<(Vec<String>, Vec<Pt>)>,
     /// The ids in the model of the objects and the usages of the level.
     pub ids: HashMap<Key, String>,
+    /// Where the objects are drawn, as [`Drawn`] says, with their orientations.
+    pub drawn: HashMap<Key, ([Option<f64>; 2], Orient)>,
 }
 
 /// The coordinates and the orientation that a record of the solver gives an object.
