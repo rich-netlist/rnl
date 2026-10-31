@@ -706,5 +706,6 @@
   "1 constraint": "1 条约束",
   "{0} constraints": "{0} 条约束",
   "{0} of {1} constraints": "{1} 条约束中的 {0} 条",
-  "There are no constraints to show for this netlist.": "这份网表没有可显示的约束。"
+  "There are no constraints to show for this netlist.": "这份网表没有可显示的约束。",
+  "These files are built in and are never overwritten: {0}. Their changes stay in the viewer.": "这些文件是内置的，不会被覆盖：{0}。它们的改动保留在查看器中。"
 }

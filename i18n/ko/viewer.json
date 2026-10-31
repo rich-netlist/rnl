@@ -706,5 +706,6 @@
   "1 constraint": "제약 1개",
   "{0} constraints": "제약 {0}개",
   "{0} of {1} constraints": "제약 {1}개 중 {0}개",
-  "There are no constraints to show for this netlist.": "이 넷리스트에는 표시할 제약이 없습니다."
+  "There are no constraints to show for this netlist.": "이 넷리스트에는 표시할 제약이 없습니다.",
+  "These files are built in and are never overwritten: {0}. Their changes stay in the viewer.": "이 파일들은 내장되어 있어 덮어쓰지 않습니다: {0}. 변경 내용은 뷰어에 남습니다."
 }

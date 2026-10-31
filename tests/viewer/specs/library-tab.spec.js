@@ -74,8 +74,10 @@ for (const platform of ["desktop", "web"]) {
     await expect(builtin(page).locator(".pool-badge")).toHaveText("read only");
     await expect(builtin(page).getByRole("button", { name: /Exclude/ })).toHaveCount(0);
     await viewer.build(() => builtin(page).locator(".pool-open").click());
+    // read only limits saving, not editing: the text of a built-in file can be edited
     await page.evaluate(() => window.viewer.command("toggle-edit"));
-    expect(await page.evaluate(() => window.viewer.checked("toggle-edit"))).toBe(false);
+    expect(await page.evaluate(() => window.viewer.checked("toggle-edit"))).toBe(true);
+    await page.evaluate(() => window.viewer.command("toggle-edit"));
     await page.locator("#tab-files").click();
     await expect(builtin(page).locator(".current")).toHaveAttribute("aria-current", "true");
     await expect(files(page).locator(".pool-row")).toHaveCount(1);

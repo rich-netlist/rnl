@@ -706,5 +706,6 @@
   "1 constraint": "制約 1 件",
   "{0} constraints": "制約 {0} 件",
   "{0} of {1} constraints": "制約 {1} 件中 {0} 件",
-  "There are no constraints to show for this netlist.": "このネットリストには表示できる制約がありません。"
+  "There are no constraints to show for this netlist.": "このネットリストには表示できる制約がありません。",
+  "These files are built in and are never overwritten: {0}. Their changes stay in the viewer.": "これらのファイルは組み込みで、上書きされることはありません: {0}。変更はビューアに残ります。"
 }
