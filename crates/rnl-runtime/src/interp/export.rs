@@ -583,6 +583,16 @@ impl Interp<'_> {
                 routes.push((k, path));
             }
         }
+        // where each object is drawn with the record, as far as the text says
+        let mut drawn = HashMap::new();
+        for (o, r) in objects {
+            let Some(k) = key(r) else { continue };
+            let at = match self.o(*o) {
+                ObjData::Text { .. } | ObjData::KeyText { .. } => self.text_axes(s, *o).0,
+                _ => self.scenes[s].pos.get(o).copied().unwrap_or([None, None]),
+            };
+            drawn.insert(k, (at, self.orientation(s, *o)));
+        }
         // what a problem read without the record finds each object and usage by, with its id here
         let level_ids = self.problem_ids(s, &objects.iter().map(|(o, _)| *o).collect::<Vec<_>>(), &[]);
         let mut ids: HashMap<Key, String> = HashMap::new();
@@ -598,7 +608,7 @@ impl Interp<'_> {
                 ids.insert(k, id);
             }
         }
-        Some(RecordResult { level: self.scenes[s].level, placed, routes, wires: written, ids })
+        Some(RecordResult { level: self.scenes[s].level, placed, routes, wires: written, ids, drawn })
     }
 
     /// A list of points of a wire as drawn with its mode (13.1); none when a point has no position.

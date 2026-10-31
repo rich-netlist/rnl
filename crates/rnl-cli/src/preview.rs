@@ -10,10 +10,12 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use rnl_runtime::diag::Loc;
+use rnl_runtime::previous::drawn;
 use rnl_runtime::problem::LevelProblem;
 use rnl_runtime::source::{dirname, normalize, relative_to, Layered, MemoryProvider, Provider};
+use rnl_runtime::{Interpretation, Options};
 pub use rnl_solver::Clock;
-use rnl_solver::Statement;
+use rnl_solver::{holds_as_drawn, Statement};
 use rnl_view::{BuildOptions, Document};
 use serde::Serialize;
 
@@ -81,8 +83,14 @@ pub struct LevelReport {
 pub struct FactLine {
     pub rank: usize,
     /// "kept", "discarded", "undecided" (discarded when its check did not finish within the time
-    /// limit, 8.5) or "failed" (it contradicts itself, 8.5, 7.6).
+    /// limit, 8.5) or "failed" (it contradicts itself, 8.5, 7.6): what the resolution decided, not
+    /// a measure of the drawing.
     pub status: &'static str,
+    /// Whether it holds on the drawing, whatever its status: measured where the texts of the
+    /// solve, read back, draw the objects, within the tolerance of the solver (11.7). None when a
+    /// point it needs has no position there or one that the viewer chooses (13.3), or the level has
+    /// no record of the solver in the texts.
+    pub holds: Option<bool>,
     pub text: String,
     /// For a fact discarded, its hint: the groups of facts it conflicts with, by rank.
     pub why: Option<String>,
@@ -132,13 +140,23 @@ pub fn preview(
     // those solved, at the lines where the Document shows them
     let again =
         rnl_view::interpret_with(entry, options.dialect.as_deref(), &options.formats, &both, &options.runtime())?;
-    let report = report(&run, &document, &again.problems);
+    // and with them, which is what is drawn: the facts are measured there
+    let with = Options { generated: true, problems: true, ..options.runtime() };
+    let with = rnl_view::interpret_with(entry, options.dialect.as_deref(), &options.formats, &both, &with)?;
+    let report = report(&run, &document, &again.problems, &with, options.solver.tolerance);
     Ok(Preview { copy: Copy::of(&run), document, report })
 }
 
 /// The report of a run, located in the texts of `document`; `problems` are those of these texts
-/// read as a solver reads them, which give each fact its line there.
-fn report(run: &SolveRun, document: &Document, problems: &[LevelProblem]) -> Report {
+/// read as a solver reads them, which give each fact its line there, and `with` is the same read
+/// with their records of the solver, which says where the facts are measured within `tolerance`.
+fn report(
+    run: &SolveRun,
+    document: &Document,
+    problems: &[LevelProblem],
+    with: &Interpretation,
+    tolerance: f64,
+) -> Report {
     let at = |loc: &Loc| -> Option<At> {
         let file_index = document.files.iter().position(|f| f.path == loc.file)?;
         (loc.line > 0).then_some(At { file_index, line: loc.line, col: loc.col })
@@ -147,6 +165,7 @@ fn report(run: &SolveRun, document: &Document, problems: &[LevelProblem]) -> Rep
     for level in &run.levels {
         let p = &level.problem;
         let r = &level.solved.report;
+        let drawn = drawn(p, with);
         // the same level of the texts written, whose facts are those solved, in the same order
         let q = problems.iter().find(|q| q.level == p.level && q.title == p.title && q.facts.len() == p.facts.len());
         let fact_at = |k: usize| q.unwrap_or(p).facts.get(k).and_then(|f| f.source.as_ref()).and_then(at);
@@ -169,7 +188,8 @@ fn report(run: &SolveRun, document: &Document, problems: &[LevelProblem]) -> Rep
                         conflicts(d)
                     }
                 });
-                FactLine { rank: k, status, text: describe_fact(p, k), why, at: fact_at(k) }
+                let holds = holds_as_drawn(p, &drawn, &p.facts[k].kind, tolerance);
+                FactLine { rank: k, status, holds, text: describe_fact(p, k), why, at: fact_at(k) }
             })
             .collect();
         let statements = r

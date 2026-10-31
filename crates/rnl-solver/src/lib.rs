@@ -44,6 +44,7 @@
 
 mod coords;
 mod driver;
+mod holds;
 mod model;
 mod objectives;
 mod options;
@@ -61,6 +62,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use rnl_runtime::problem::FactKind;
 
+pub use holds::{fact_holds, holds_as_drawn};
 pub use options::{Budget, Layer, Objectives, SolverOptions, DEFAULT_LAYERS, DEFAULT_TIME_LIMIT, OBJECTIVES};
 pub use resolve::Resolved;
 pub use rnl_runtime::problem::LevelProblem;
