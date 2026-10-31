@@ -9,7 +9,8 @@
 
 use std::collections::HashMap;
 
-use rnl_runtime::model::{quoted, LevelView};
+use rnl_runtime::geom::Pt;
+use rnl_runtime::model::{quoted, ItemView, LevelView};
 use rnl_runtime::previous::document_ids;
 use rnl_runtime::problem::{
     fact_statement, input_digest, FactKind, LevelProblem, PointRef, ProblemFact, Reference, RouteIntent,
@@ -17,6 +18,7 @@ use rnl_runtime::problem::{
 use rnl_runtime::Interpretation;
 use serde::Serialize;
 
+use crate::document::place;
 use crate::{Level, Object};
 
 /// The constraints of a level after expansion, what a solver takes in. **Experimental: not promised
@@ -60,6 +62,10 @@ pub struct ConstraintObject {
     /// What it is in `Document.objects`: an instance, the instances of a bundle, or a usage; empty
     /// for a point, a text, and an object without an id.
     pub objects: Vec<usize>,
+    /// Where each pin of its symbol is drawn, by `ConstraintPoint::Pin.pin`, in SVG pixels with y
+    /// down, as `Hit.points`, with or without a net on it. Empty when it has no position or no
+    /// symbol, so that it is not drawn.
+    pub pins: Vec<[f64; 2]>,
 }
 
 /// How the level's own text refers to something: what it writes, a usage made by a rule and the
@@ -301,6 +307,12 @@ pub(crate) fn level_constraints(
         .map(|(k, o)| (format!("#{}", quoted(&o.name)), k))
         .collect();
     let infos: HashMap<&str, &Vec<String>> = lv.objects.iter().map(|o| (o.id.as_str(), &o.host)).collect();
+    let px = |p: Pt| [p.0 * level.scale, -p.1 * level.scale];
+    let items: HashMap<&str, &ItemView> = lv.items.iter().map(|it| (it.object_id.as_str(), it)).collect();
+    let pins = |id: &str| -> Vec<[f64; 2]> {
+        let Some(it) = items.get(id) else { return Vec::new() };
+        lv.symbols[it.symbol].pins.iter().map(|pin| px(place(it.at, it.orient, pin.pos))).collect()
+    };
     let document = |id: &str| -> Vec<usize> {
         if let Some(&u) = usages.get(id) {
             return vec![u];
@@ -319,6 +331,7 @@ pub(crate) fn level_constraints(
                 reference: reference(&o.reference, numbers),
                 generated: o.generated,
                 objects: id.as_deref().map(document).unwrap_or_default(),
+                pins: id.as_deref().map(pins).unwrap_or_default(),
                 id: id.clone(),
             })
             .collect(),

@@ -272,6 +272,12 @@ export type Hit = {
    */
   points: Array<[number, number]>,
   /**
+   * For a "box", the registration point of the symbol it is drawn with, where the object is placed,
+   * in the same pixels; absent on the others. An object with no position has no hit. **Experimental:
+   * not promised to stay as it is.**
+   */
+  origin?: [number, number],
+  /**
    * The objects it stands for: an instance (several for a bundle), a usage followed by its
    * associated net, or nets. The first object is what clicking the hit selects. A usage's
    * label keeps its net first, so clicking a net label continues to select the net.
@@ -444,6 +450,12 @@ export type ConstraintObject = {
    * for a point, a text, and an object without an id.
    */
   objects: Array<number>,
+  /**
+   * Where each pin of its symbol is drawn, by `ConstraintPoint::Pin.pin`, in SVG pixels with y
+   * down, as `Hit.points`, with or without a net on it. Empty when it has no position or no
+   * symbol, so that it is not drawn.
+   */
+  pins: Array<[number, number]>,
 };
 
 /**
