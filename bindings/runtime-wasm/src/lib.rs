@@ -81,6 +81,10 @@ pub struct Request {
     /// (decision 0008); false when not given.
     #[serde(default)]
     pub status: bool,
+    /// Give each level its constraints after expansion, with no solver; experimental
+    /// ([`rnl_view::BuildOptions::constraints`]).
+    #[serde(default)]
+    pub constraints: bool,
     /// The values to build a subcircuit's parameters with, for showing
     /// ([`rnl_view::BuildOptions::bind`]): only the Document's lists of parameters change.
     #[serde(default)]
@@ -375,6 +379,7 @@ pub fn respond(request: &[u8]) -> Response {
         svg: request.svg,
         primitives: request.primitives,
         status: request.status,
+        constraints: request.constraints,
         bind: request.bind,
     };
     if let Some(p) = request.parts {
@@ -510,6 +515,7 @@ fn write(request: WriteRequest) -> Response {
         svg: request.svg,
         primitives: request.primitives,
         status: request.status,
+        constraints: false,
         bind: None,
     };
     match rnl_view::build(&entry, &files, &options) {
@@ -884,6 +890,15 @@ C1 a 0 1p
         let native = BuildOptions { status: true, ..BuildOptions::default() };
         let native = rnl_view::build("a.sp", &MemoryProvider::new().with("a.sp", NETLIST), &native).unwrap();
         assert_eq!(status["document"], wire(native));
+        // the constraints only when asked for
+        assert!(answer(json!({ "entry": "a.sp", "files": files }))["document"]["levels"][0]
+            .get("constraints")
+            .is_none());
+        let constraints = answer(json!({ "entry": "a.sp", "files": files, "constraints": true }));
+        assert!(constraints["document"]["levels"][0]["constraints"]["facts"].is_array());
+        let native = BuildOptions { constraints: true, ..BuildOptions::default() };
+        let native = rnl_view::build("a.sp", &MemoryProvider::new().with("a.sp", NETLIST), &native).unwrap();
+        assert_eq!(constraints["document"], wire(native));
         // a file of 0.3 is read without any switch; `draft`, which the core once accepted with no
         // effect, is ignored as every field it does not know
         let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\nR1 a 0 1k\n* @RNL { #R1 @PLACE(0, 0) }\n.end\n";

@@ -5,6 +5,7 @@
 //! The crate does no file I/O, so it builds for `wasm32-unknown-unknown`.
 
 mod catalog;
+mod constraints;
 mod document;
 mod formats;
 mod library;
@@ -32,6 +33,10 @@ use rnl_runtime::{Interpretation, Options};
 pub use catalog::{
     Catalog, CatalogDefinition, CatalogLabel, CatalogOptions, CatalogPackage, CatalogPin, CatalogSet, CatalogSymbol,
     Terminal,
+};
+pub use constraints::{
+    constraint, Constraint, ConstraintGroup, ConstraintKind, ConstraintObject, ConstraintPoint, ConstraintReference,
+    ConstraintRoute, ConstraintSource, ConstraintUsage, LevelConstraints,
 };
 pub use document::{
     AutoIncludeCandidate, Child, Diagnostic, Document, Drawings, Hit, InspectedLabel, InspectedPin, InspectedSymbol,
@@ -93,6 +98,10 @@ pub struct BuildOptions {
     /// to solve it (decision 0008); off by default. It takes the problems of the levels read
     /// without their records of the solver, so a document that has such records is read once more.
     pub status: bool,
+    /// Give each level its constraints after expansion ([`Level::constraints`]), with no solver;
+    /// off by default, and experimental. They are the problems of the levels read without their
+    /// records of the solver, so a document that has such records is read once more.
+    pub constraints: bool,
     /// The values to build a subcircuit's parameters with, for showing ([`Bind`]): only the
     /// Document's lists of parameters change ([`Level::params`], [`Child::effective`]).
     pub bind: Option<Bind>,
@@ -107,6 +116,7 @@ impl Default for BuildOptions {
             svg: true,
             primitives: false,
             status: false,
+            constraints: false,
             bind: None,
         }
     }
@@ -145,40 +155,46 @@ fn build_with(
         return Err(format!("cannot read {entry}"));
     }
     let reading = (options.dialect.as_deref(), &options.formats);
-    // the solve status takes the problems; built in this reading too, they change nothing else
-    let runtime = Options { problems: options.runtime.problems || options.status, ..options.runtime.clone() };
+    // the solve status and the constraints take the problems; built in this reading too, they
+    // change nothing else
+    let solver_view = options.status || options.constraints;
+    let runtime = Options { problems: options.runtime.problems || solver_view, ..options.runtime.clone() };
     let mut r = interpret_in(entry, reading, &ws, &runtime)?;
-    let solve = if options.status { solve_statuses(entry, reading, &ws, &runtime, &r)? } else { HashMap::new() };
+    // a document without records of the solver reads the same with them and without
+    let records = r.doc.levels.iter().any(|l| l.records.iter().any(|rec| record_type(rec) == "generated"));
+    let other = if !solver_view || !records {
+        None
+    } else if runtime.generated {
+        Some(interpret_in(entry, reading, &ws, &Options { generated: false, ..runtime.clone() })?)
+    } else {
+        Some(interpret_in(entry, reading, &ws, &Options { generated: true, problems: false, ..runtime.clone() })?)
+    };
+    let (with, without) = match &other {
+        None => (&r, &r),
+        Some(o) if runtime.generated => (&r, o),
+        Some(o) => (o, &r),
+    };
+    let solve = if options.status { solve_statuses(with, without) } else { HashMap::new() };
     let mut d = document::document(entry, &r, ws.missing.into_inner(), options, lazy);
     for level in &mut d.levels {
         level.solve = solve.get(&level.host).map(|s| s.as_str());
     }
+    if options.constraints {
+        for (k, lv) in r.model.levels.iter().enumerate() {
+            let Some(p) = without.problems.iter().find(|p| p.level == lv.level) else { continue };
+            let found = constraints::level_constraints(p, &r, lv, &d.levels[k], &d.objects);
+            d.levels[k].constraints = Some(found);
+        }
+    }
+    drop(other);
     let drawings = lazy.then(|| Drawings::take(&mut r.model.levels, &d, options));
     Ok((d, drawings))
 }
 
-/// The solve status of each drawing level of `r`, by host level ([`solve_status`]): its problem
-/// and model read without the records of the solver, against its record of the solver read with
-/// them. `r` was read with `runtime`, problems included; so a document without records of the
-/// solver, which reads the same with them and without, is not read again.
-fn solve_statuses(
-    entry: &str,
-    reading: Formats,
-    ws: &Workspace,
-    runtime: &Options,
-    r: &Interpretation,
-) -> Result<HashMap<usize, SolveStatus>, String> {
-    let records = r.doc.levels.iter().any(|l| l.records.iter().any(|rec| record_type(rec) == "generated"));
-    let other;
-    let (with, without) = if !records {
-        (r, r)
-    } else if runtime.generated {
-        other = interpret_in(entry, reading, ws, &Options { generated: false, ..runtime.clone() })?;
-        (r, &other)
-    } else {
-        other = interpret_in(entry, reading, ws, &Options { generated: true, problems: false, ..runtime.clone() })?;
-        (&other, r)
-    };
+/// The solve status of each drawing level, by host level ([`solve_status`]): its problem and model
+/// read without the records of the solver, `without`, against its record of the solver read with
+/// them, `with`.
+fn solve_statuses(with: &Interpretation, without: &Interpretation) -> HashMap<usize, SolveStatus> {
     let views: HashMap<usize, &LevelView> = without.model.levels.iter().map(|lv| (lv.level, lv)).collect();
     let mut out = HashMap::new();
     for p in &without.problems {
@@ -186,7 +202,7 @@ fn solve_statuses(
             out.insert(p.level, solve_status(p, view, with));
         }
     }
-    Ok(out)
+    out
 }
 
 /// The snapshot of `entry` for the editor interface, with the parts `parts` asks for, from the

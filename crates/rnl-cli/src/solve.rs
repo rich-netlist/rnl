@@ -793,20 +793,7 @@ pub fn write_with_encoding(run: &SolveRun, target: &Target, encoding: crate::cod
 /// A point of a fact, by its object's name when it has one, such as `%t` for a text named so, else
 /// as diagnostics show its object: `#M1`, `#M1:d`, `{#M1 #M2}` for a centre.
 fn point(p: &LevelProblem, r: &PointRef) -> String {
-    let label = |k: usize| {
-        p.objects.get(k).map_or_else(
-            || format!("object {k}"),
-            |o| match &o.reference {
-                Reference::Name(n) => n.clone(),
-                _ => o.label.clone(),
-            },
-        )
-    };
-    match r {
-        PointRef::Origin(k) => label(*k),
-        PointRef::Pin { object, terminal, .. } => format!("{}:{terminal}", label(*object)),
-        PointRef::Centre(points) => format!("{{{}}}", points.iter().map(|q| point(p, q)).collect::<Vec<_>>().join(" ")),
-    }
+    rnl_runtime::problem::point_name(p, r)
 }
 
 /// One fact as the report shows it: its rank, what it says, its priority and where it is
@@ -828,43 +815,7 @@ pub fn describe_fact(p: &LevelProblem, k: usize) -> String {
 /// A fact by its rank and what it says, without its context, such as `[9] ALIGN y {#M1 #M2}`.
 pub(crate) fn fact_what(p: &LevelProblem, k: usize) -> String {
     let Some(f) = p.facts.get(k) else { return format!("[{k}]") };
-    let list = |ms: &[PointRef]| format!("{{{}}}", ms.iter().map(|m| point(p, m)).collect::<Vec<_>>().join(" "));
-    let objects = |ks: &[usize]| list(&ks.iter().map(|k| PointRef::Origin(*k)).collect::<Vec<_>>());
-    let what = match &f.kind {
-        FactKind::Place { at, axis, value } => format!("the {} of {} = {}", axis.as_str(), point(p, at), num(*value)),
-        FactKind::PointCoordinate { point: k, axis, value } => {
-            format!("the {} of {} = {}", axis.as_str(), point(p, &PointRef::Origin(*k)), num(*value))
-        }
-        // the `dx` or `dy` of a text, from the point it is attached to (13.3)
-        FactKind::Offset { text, from, axis, value } => format!(
-            "the d{} of {} from {} = {}",
-            axis.as_str(),
-            point(p, &PointRef::Origin(*text)),
-            point(p, from),
-            num(*value)
-        ),
-        FactKind::Orient { object, code } => {
-            format!("the orientation {} of {}", code.as_str(), point(p, &PointRef::Origin(*object)))
-        }
-        FactKind::Align { axis, members } => format!("ALIGN {} {}", axis.as_str(), list(members)),
-        FactKind::Distribute { axis, members } => format!("DISTRIBUTE {} {}", axis.as_str(), list(members)),
-        FactKind::Order { axis, sense, members } => {
-            format!("ORDER {} {} {}", axis.as_str(), sense.as_str(), list(members))
-        }
-        FactKind::Distance { axis, sense, min, max, from, to } => {
-            let mut bounds = String::new();
-            if let Some(m) = min {
-                bounds.push_str(&format!(" min={}", num(*m)));
-            }
-            if let Some(m) = max {
-                bounds.push_str(&format!(" max={}", num(*m)));
-            }
-            format!("DISTANCE {} {}{bounds} {} {}", axis.as_str(), sense.as_str(), list(from), list(to))
-        }
-        FactKind::OrientRelation { relation, from, to } => {
-            format!("ORIENT-RELATION {} {} {}", relation.as_str(), objects(from), objects(to))
-        }
-    };
+    let what = rnl_runtime::problem::fact_statement(p, k);
     // a handle, such as %c1, or a label of its own; the label of a coordinate, an offset or an
     // orientation says what the fact says, so the fact is described once
     let own = matches!(
@@ -934,10 +885,6 @@ pub(crate) fn conflicts(d: &Discarded) -> String {
         why.push_str(" (the list is not complete: the time limit was reached)");
     }
     why
-}
-
-fn num(v: f64) -> String {
-    rnl_runtime::geom::fmt_num(v)
 }
 
 /// How many errors the solver reported over the levels of a run: the facts that contradict

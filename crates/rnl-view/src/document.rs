@@ -117,6 +117,13 @@ pub struct Level {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[cfg_attr(test, ts(as = "Option<Vec<SubcktParam>>", optional))]
     pub params: Vec<SubcktParam>,
+    /// The constraints of the level after expansion, what a solver takes in. **Experimental: not
+    /// promised to stay as it is.** Absent unless `BuildOptions::constraints` asks for them, and for
+    /// a package file, which has no problem; when asked for, every other level has them, with an
+    /// empty `facts` when it has none.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
+    pub constraints: Option<crate::LevelConstraints>,
     /// The objects of the level that are not drawn on it: those that have no position, each with
     /// its symbol drawn alone, in the order of the netlist (their number is the one `status`
     /// gives), then those that are not drawn at all, since no symbol can be chosen for them, each
@@ -930,6 +937,7 @@ impl<'a> Index<'a> {
             hits,
             children: Vec::new(),
             params: Vec::new(),
+            constraints: None,
             unplaced: self.unplaced(lv, &render, options, lazy),
         }
     }

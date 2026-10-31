@@ -457,6 +457,8 @@ impl Interp<'_> {
         } else {
             None
         };
+        let object_ids: Vec<ObjId> = objs.iter().map(|(o, _)| *o).collect();
+        let ids = self.problem_ids(s, &object_ids, &usages);
         let problem = LevelProblem {
             level: lv,
             title: level.title(),
@@ -477,6 +479,7 @@ impl Interp<'_> {
             groups,
             usages: entries,
             nets,
+            ids,
         };
         (problem, result)
     }
@@ -580,7 +583,22 @@ impl Interp<'_> {
                 routes.push((k, path));
             }
         }
-        Some(RecordResult { level: self.scenes[s].level, placed, routes, wires: written })
+        // what a problem read without the record finds each object and usage by, with its id here
+        let level_ids = self.problem_ids(s, &objects.iter().map(|(o, _)| *o).collect::<Vec<_>>(), &[]);
+        let mut ids: HashMap<Key, String> = HashMap::new();
+        for ((_, r), id) in objects.iter().zip(level_ids.objects) {
+            if let Some(k) = key(r) {
+                ids.insert(k, id);
+            }
+        }
+        let usages: Vec<ObjId> = ix.usages.keys().copied().collect();
+        let usage_ids = self.problem_ids(s, &[], &usages).usages;
+        for (a, id) in usages.iter().zip(usage_ids) {
+            if let Some(k) = ix.refs.get(a).and_then(key) {
+                ids.insert(k, id);
+            }
+        }
+        Some(RecordResult { level: self.scenes[s].level, placed, routes, wires: written, ids })
     }
 
     /// A list of points of a wire as drawn with its mode (13.1); none when a point has no position.

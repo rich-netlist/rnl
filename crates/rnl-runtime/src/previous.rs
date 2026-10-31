@@ -254,6 +254,31 @@ pub fn previous(p: &LevelProblem, with: &Interpretation) -> Option<Previous> {
     Some(out)
 }
 
+/// The ids in the model of `shown` of the objects and the usages of `p`, the problem a solver
+/// reads, in the order of their lists, as `shown` draws the same document: with the records of the
+/// solver or not. With no record of the solver of the level in it, they are those of `p`; with
+/// one, each is found by its reference, as in [`previous`], and is None when nothing there is known
+/// to be it, as for an object without a reference ([`Reference::Anonymous`]).
+pub fn document_ids(p: &LevelProblem, shown: &Interpretation) -> DocumentIds {
+    let known = |ids: &[String]| ids.iter().cloned().map(Some).collect();
+    let Some(result) = shown.results.iter().find(|r| r.level == p.level) else {
+        return DocumentIds { objects: known(&p.ids.objects), usages: known(&p.ids.usages) };
+    };
+    let names = generated_names(p);
+    let find = |r: &Reference| key(p, &names, r).and_then(|k| result.ids.get(&k).cloned());
+    DocumentIds {
+        objects: p.objects.iter().map(|o| find(&o.reference)).collect(),
+        usages: p.usages.iter().map(|u| find(&u.reference)).collect(),
+    }
+}
+
+/// What [`document_ids`] gives.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DocumentIds {
+    pub objects: Vec<Option<String>>,
+    pub usages: Vec<Option<String>>,
+}
+
 /// Both readings of a host document that a solver makes (2.8): without the records of the
 /// solver, whose [`Interpretation::problems`] it solves, and with them, which gives the previous
 /// result of each level ([`previous`]), in the order of the problems. `options` are those of both
@@ -319,6 +344,8 @@ pub(crate) struct RecordResult {
     pub routes: Vec<(Key, Vec<Pt>)>,
     /// The wires that the record writes itself: their nets and their points as drawn.
     pub wires: Vec<(Vec<String>, Vec<Pt>)>,
+    /// The ids in the model of the objects and the usages of the level.
+    pub ids: HashMap<Key, String>,
 }
 
 /// The coordinates and the orientation that a record of the solver gives an object.

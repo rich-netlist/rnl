@@ -3,6 +3,10 @@
 //! by ts-rs, which the types derive in the tests only. The test fails when a file is not what the
 //! types give; run it with `RNL_BLESS=1` to write the files after a change that is meant.
 
+use crate::{
+    Constraint, ConstraintGroup, ConstraintKind, ConstraintObject, ConstraintPoint, ConstraintReference,
+    ConstraintRoute, ConstraintSource, ConstraintUsage, LevelConstraints,
+};
 use crate::{CurrentArrow, UsageFrame};
 use crate::{FormatInfo, InspectedLabel, InspectedPin, InspectedSymbol, SourceInclude, Usage, UsageRole};
 use crate::{GroupView, MemberOf, RoleOf, RuleAt, UsageOf};
@@ -134,6 +138,16 @@ fn all() -> Vec<(String, String)> {
         one::<AutoIncludeCandidate>(&cfg),
         one::<SubcktParam>(&cfg),
         one::<ParamValue>(&cfg),
+        one::<LevelConstraints>(&cfg),
+        one::<ConstraintObject>(&cfg),
+        one::<ConstraintReference>(&cfg),
+        one::<ConstraintPoint>(&cfg),
+        one::<ConstraintKind>(&cfg),
+        one::<Constraint>(&cfg),
+        one::<ConstraintSource>(&cfg),
+        one::<ConstraintUsage>(&cfg),
+        one::<ConstraintRoute>(&cfg),
+        one::<ConstraintGroup>(&cfg),
         one::<Unplaced>(&cfg),
         one::<UnplacedDrawing>(&cfg),
         one::<SourceFile>(&cfg),
