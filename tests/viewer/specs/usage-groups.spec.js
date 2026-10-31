@@ -90,17 +90,21 @@ test("selecting a group mutes the frames of the other groups as it mutes the res
   for (const [title, f] of Object.entries(light)) {
     const own = title === "@GROUP: %amp";
     expect(f.muted, title).toBe(!own);
-    // the selected one keeps its colour and title; the others are the colour blended halfway to the white paper, frame and fill
-    // alike, and have no title
+    // the selected one keeps its colour and title; the others are one grey, frame and fill alike, and have no title
     expect(f.titled, title).toBe(own);
     if (own) expect(f).toMatchObject({ stroke: before[title].stroke, fill: before[title].fill });
     else { expect(f.stroke, title).not.toBe(before[title].stroke); expect(f.fill).toBe(f.stroke); }
   }
-  // on the dark background the same colours blend toward black, and the frames follow when the background is changed
+  const greys = new Set(Object.values(light).filter((f) => f.muted).map((f) => f.stroke));
+  expect([...greys]).toHaveLength(1);
+  const [, r, g, b] = /^#(..)(..)(..)$/.exec([...greys][0]);
+  expect(r === g && g === b).toBe(true); // a grey
+  // on the dark background the grey is a darker one, and the frames follow when the background is changed
   await page.evaluate(() => window.viewer.command("background-dark"));
   const dark = await strokes();
   expect(dark["@GROUP: %core"].muted).toBe(true);
   expect(dark["@GROUP: %core"].stroke).not.toBe(light["@GROUP: %core"].stroke);
+  expect(dark["@GROUP: %core"].stroke).toBe(dark["@GROUP: %inp"].stroke);
   expect(dark["@GROUP: %amp"].stroke).toBe(light["@GROUP: %amp"].stroke);
   // pointing at a row of the usages of an object shows it as a selection would: the other frames go faint, and come back
   await page.evaluate(() => window.viewer.command("background-light"));

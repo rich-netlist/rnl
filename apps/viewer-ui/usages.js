@@ -5,7 +5,7 @@ import { select } from "./selection.js";
 import { setCheck } from "./commands.js";
 import { $, load, save, span, svgElement } from "./util.js";
 import { setPathText } from "./source-path.js";
-import { mutedColour } from "./background.js";
+import { isDark, mutedColour } from "./background.js";
 import { objectUsages, relatedUsages, stateName } from "./usage-table.js";
 import { FRAME_STEP, frameSteps, TITLE_ROW, titleRows } from "./frame-layout.js";
 import { setPane } from "./panels.js";
@@ -350,16 +350,22 @@ function litFrames() {
   return null;
 }
 /**
- * Dim the frames of every usage but those in `lit`, as `mute` dims the groups of the drawing: the same blend toward the
- * paper, so a selected usage or group, or the usages of a selected object, stand out from the others as a selected
+ * The grey of a muted frame: the ink of the drawing blended toward the paper twice by `mutedColour`, which dims the
+ * components once, so the frames are the fainter of the two and do not cover the components that are muted.
+ */
+const frameGrey = () => mutedColour(mutedColour(isDark() ? "#ffffff" : "#000000"));
+/**
+ * Dim the frames of every usage but those in `lit`, as `mute` dims the groups of the drawing: grey, and not the colour
+ * of the usage, so a selected usage or group, or the usages of a selected object, stand out from the others as a selected
  * component does; the titles of the muted ones are not shown, which `paintUsages` sees in `muted`. With null, dim none.
  */
 function muteFrames(lit, force = false) {
   let changed = false;
+  const grey = frameGrey();
   for (const f of frames) {
     const muted = lit !== null && !lit.has(f.entry.object);
     if (!force && f.muted === muted) continue;
-    const colour = muted ? mutedColour(f.color) : f.color;
+    const colour = muted ? grey : f.color;
     f.muted = muted;
     f.group.toggleAttribute("data-muted", muted);
     f.rect.setAttribute("stroke", colour);
