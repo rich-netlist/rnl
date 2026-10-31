@@ -22,6 +22,14 @@ export function setCurrent(i) {
   current = i;
 }
 
+// whether builds ask the core for the constraints of the levels (`Level.constraints`): once the Solve view has been
+// opened, as they cost a second reading of a file that has records of the solver (solve.js)
+export let constraintsWanted = false;
+
+export function setConstraintsWanted(wanted) {
+  constraintsWanted = wanted;
+}
+
 export function setSelected(o, asUsage = false) {
   selected = o;
   selectedAsUsage = o !== null && asUsage;

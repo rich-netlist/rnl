@@ -98,6 +98,8 @@ export function setPane(name) {
     renderSymbol();
   } else if (view === "usages") {
     renderUsages();
+  } else if (view === "solve") {
+    window.dispatchEvent(new Event("solve-shown"));
   }
 }
 

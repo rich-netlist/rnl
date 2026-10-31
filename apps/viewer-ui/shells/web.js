@@ -35,6 +35,25 @@ if (embed) {
   append(document.head, style);
 }
 
+/**
+ * The solver a development server runs for the page (apps/web/solver-service.mjs, `serve.mjs --rnl PATH`): what it
+ * says of itself, or null. Asked only on this computer's own address, and only of the server that served the page,
+ * so that the published site, which has none, asks nothing; an address in the page's query is never taken.
+ */
+async function localSolver() {
+  if (embed || !["127.0.0.1", "localhost", "[::1]"].includes(location.hostname)) return null;
+  try {
+    const response = await fetch(new URL("rnl-solver", location.href), { cache: "no-store" });
+    const info = response.ok ? await response.json() : null;
+    return info && info.service === "rnl-solver" && info.version ? info : null;
+  } catch {
+    return null;
+  }
+}
+const solver = await localSolver();
+let lastBuilt = null; // the Document of a build the page accepted last: what a solve is of, not a preview of one
+let solving = null; // the AbortController of the solve under way
+
 const WARMUP = { entry: "/ready.sp", files: { "/ready.sp": "* Ready\n.end\n" }, svg: false };
 function warmCore() {
   const worker = startCore();
@@ -884,7 +903,7 @@ export default {
    * texts of `edits`, by the paths the Document names the files by, are those of the files, not what
    * is read.
    */
-  async build(source, edits, progress, suppliedPackages, signal, { bind } = {}) {
+  async build(source, edits, progress, suppliedPackages, signal, { bind, constraints } = {}) {
     const again = built.has(source);
     built.add(source);
     // a file at an address is asked for before the Library is indexed and the core is loaded, which take longer than it
@@ -928,6 +947,8 @@ export default {
         })) };
       // the parameters of a subcircuit to build with, for showing (params-dialog.js)
       if (bind) request.bind = bind;
+      // the constraints of each level, for the Solve view (constraints.js)
+      if (constraints) request.constraints = true;
       // API packages are request-local until the newest request commits them to Library.
       for (const item of suppliedPackages || []) {
         const path = `/<api>${item.path}`;
@@ -994,6 +1015,7 @@ export default {
   commitBuild(doc) {
     const candidate = candidates.get(doc);
     if (!candidate) return;
+    lastBuilt = doc;
     if (core) {
       if (!spare) spare = { worker: core, ready: Promise.resolve() };
       else core.terminate();
@@ -1012,6 +1034,38 @@ export default {
     pendingCores.delete(candidate);
     replenishCore();
   },
+  ...(solver ? {
+    /**
+     * Solve the netlist shown with the solver service of the server (solve.js): the files the last build read, with
+     * the text applied over them, are sent to it, and it gives the Document of the netlist as solved and the report,
+     * as the desktop's Solve does. Cancelling drops the request, and the service stops the solver.
+     */
+    async solve(_source, settings, edits) {
+      const request = lastBuilt && builtRequests.get(lastBuilt);
+      if (!request) throw "Open a netlist first.";
+      const dir = request.entry.slice(0, request.entry.lastIndexOf("/"));
+      const files = { ...request.files };
+      for (const [path, text] of Object.entries(edits || {})) files[joined(dir, path)] = text;
+      const own = new AbortController();
+      solving = own;
+      try {
+        const response = await fetch(new URL("rnl-solver/solve", location.href), { method: "POST", signal: own.signal,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ entry: request.entry, files, pool: request.pool, options: settings?.options || "" }) });
+        const answer = await response.json().catch(() => ({ error: `the solver service answered ${response.status}` }));
+        if (!response.ok) throw answer.error || `the solver service answered ${response.status}`;
+        return answer;
+      } catch (e) {
+        if (own.signal.aborted) throw "the solve was cancelled";
+        throw e instanceof TypeError ? "the solver service could not be reached; is serve.mjs still running?" : e;
+      } finally {
+        if (solving === own) solving = null;
+      }
+    },
+    cancelSolve() {
+      solving?.abort();
+    },
+  } : {}),
   /** The drawings of the objects the last Document lists without a position, which the core keeps. */
   unplacedDrawings: (level, items, names) => core.drawings({ drawings: { level, items, names } }),
   /** Download the files: the web cannot write them where they were read from (decision 0011). */

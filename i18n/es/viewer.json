@@ -695,5 +695,16 @@
   "Restore the values of {0}": "Restaurar los valores de {0}",
   "Edit Parameters...": "Editar parámetros...",
   "Subcircuit &Parameters...": "&Parámetros del subcircuito...",
-  "Some parameters have no default, so this view has no value for them. Write the values to use; a change applies to this view only, and the netlist is not changed.": "Algunos parámetros no tienen valor por defecto, así que esta vista no tiene valor para ellos. Escriba los valores que usar; un cambio se aplica solo a esta vista y la netlist no se modifica."
+  "Some parameters have no default, so this view has no value for them. Write the values to use; a change applies to this view only, and the netlist is not changed.": "Algunos parámetros no tienen valor por defecto, así que esta vista no tiene valor para ellos. Escriba los valores que usar; un cambio se aplica solo a esta vista y la netlist no se modifica.",
+  "Constraints": "Restricciones",
+  "Report": "Informe",
+  "What the Solve view shows": "Lo que muestra la vista Resolver",
+  "The constraints of this netlist as the solver takes them in, after the structures are expanded, in the order it takes them. Click one to light up the objects it acts on and the usages it comes from.": "Las restricciones de esta netlist tal como las toma el solucionador, una vez expandidas las estructuras, en el orden en que las toma. Un clic ilumina los objetos sobre los que actúa y los usos de los que procede.",
+  "Filter the constraints": "Filtrar las restricciones",
+  "Filter the constraints by what they say, their priority, their structure or their result": "Filtrar las restricciones por su contenido, su prioridad, su estructura o su resultado",
+  "written in the netlist": "escrita en la netlist",
+  "1 constraint": "1 restricción",
+  "{0} constraints": "{0} restricciones",
+  "{0} of {1} constraints": "{0} de {1} restricciones",
+  "There are no constraints to show for this netlist.": "No hay restricciones que mostrar para esta netlist."
 }

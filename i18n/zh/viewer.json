@@ -695,5 +695,16 @@
   "Restore the values of {0}": "恢复为 {0} 传入的值",
   "Edit Parameters...": "编辑参数...",
   "Subcircuit &Parameters...": "子电路参数(&P)...",
-  "Some parameters have no default, so this view has no value for them. Write the values to use; a change applies to this view only, and the netlist is not changed.": "有些参数没有默认值，所以这个视图里它们没有值。请填写要用的值；改动只对当前视图生效，网表不会被修改。"
+  "Some parameters have no default, so this view has no value for them. Write the values to use; a change applies to this view only, and the netlist is not changed.": "有些参数没有默认值，所以这个视图里它们没有值。请填写要用的值；改动只对当前视图生效，网表不会被修改。",
+  "Constraints": "约束",
+  "Report": "报告",
+  "What the Solve view shows": "求解视图显示的内容",
+  "The constraints of this netlist as the solver takes them in, after the structures are expanded, in the order it takes them. Click one to light up the objects it acts on and the usages it comes from.": "这份网表的约束，按结构展开之后、求解器取用的顺序排列。点击一条，可在图中点亮它作用的对象和它所属的用法。",
+  "Filter the constraints": "筛选约束",
+  "Filter the constraints by what they say, their priority, their structure or their result": "按约束的内容、优先级、结构或结果筛选约束",
+  "written in the netlist": "写在网表里",
+  "1 constraint": "1 条约束",
+  "{0} constraints": "{0} 条约束",
+  "{0} of {1} constraints": "{1} 条约束中的 {0} 条",
+  "There are no constraints to show for this netlist.": "这份网表没有可显示的约束。"
 }

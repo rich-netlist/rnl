@@ -104,7 +104,8 @@ const NETLISTS: [&str; 11] = ["sp", "spi", "spice", "cir", "ckt", "net", "netlis
 /// Read and draw a file, and name the window after it. With `edits`, the texts of some of its
 /// files are those, over what is on disk. The drawings of the objects it lists without a position
 /// are kept for `unplaced_drawings`, in place of those of the last document. With `bind`, the parameters of a
-/// subcircuit are built with those values, to show; such a document is not kept among those the cache reuses.
+/// subcircuit are built with those values, to show; with `constraints`, the levels have their constraints
+/// (`Level.constraints`), which the Solve view lists; such a document is not kept among those the cache reuses.
 #[tauri::command]
 // Tauri injects the window and managed state alongside the separate IPC arguments.
 #[allow(clippy::too_many_arguments)]
@@ -122,6 +123,7 @@ async fn open_document(
     fresh: Option<bool>,
     formats: Option<formats::Formats>,
     bind: Option<rnl_view::Bind>,
+    constraints: Option<bool>,
 ) -> Result<tauri::ipc::Response, String> {
     core.preload.cancel();
     let core = core.inner().clone();
@@ -148,9 +150,9 @@ async fn open_document(
                 rnl_view::LibraryProvider { files: &layered, index: &index, enabled: auto_include.unwrap_or(false) };
             let provider = load_progress::LoadingProvider::new(&layered, &progress_window, request_id.as_deref());
             drawn.set_limit(cache_limit);
-            let built = match &bind {
-                Some(bind) => drawn.build_bound(&entry, &provider, &formats, bind)?,
-                None => drawn.build(&entry, &provider, &formats, fresh.unwrap_or(false))?,
+            let built = match (&bind, constraints.unwrap_or(false)) {
+                (None, false) => drawn.build(&entry, &provider, &formats, fresh.unwrap_or(false))?,
+                (bind, constraints) => drawn.build_unkept(&entry, &provider, &formats, bind.as_ref(), constraints)?,
             };
             if built.hit {
                 provider.cached();
@@ -184,6 +186,7 @@ async fn open_text(
     fresh: Option<bool>,
     formats: Option<formats::Formats>,
     bind: Option<rnl_view::Bind>,
+    constraints: Option<bool>,
 ) -> Result<tauri::ipc::Response, String> {
     core.preload.cancel();
     let core = core.inner().clone();
@@ -205,9 +208,9 @@ async fn open_text(
                 rnl_view::LibraryProvider { files: &files, index: &index, enabled: auto_include.unwrap_or(false) };
             let provider = load_progress::LoadingProvider::new(&files, &progress_window, request_id.as_deref());
             drawn.set_limit(cache_limit);
-            let built = match &bind {
-                Some(bind) => drawn.build_bound(&entry, &provider, &formats, bind)?,
-                None => drawn.build(&entry, &provider, &formats, fresh.unwrap_or(false))?,
+            let built = match (&bind, constraints.unwrap_or(false)) {
+                (None, false) => drawn.build(&entry, &provider, &formats, fresh.unwrap_or(false))?,
+                (bind, constraints) => drawn.build_unkept(&entry, &provider, &formats, bind.as_ref(), constraints)?,
             };
             if built.hit {
                 provider.cached();

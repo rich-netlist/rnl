@@ -242,9 +242,22 @@ impl BuildCache {
         formats: &Formats,
         bind: &Bind,
     ) -> Result<Built, String> {
+        self.build_unkept(path, files, formats, Some(bind), false)
+    }
+
+    /// Build with the parameters of a subcircuit bound, or with the constraints of the levels (`constraints`),
+    /// which the entries do not hold: the document whose drawings are kept now, and not kept among the entries.
+    pub fn build_unkept(
+        &mut self,
+        path: &str,
+        files: &dyn Provider,
+        formats: &Formats,
+        bind: Option<&Bind>,
+        constraints: bool,
+    ) -> Result<Built, String> {
         let path = normalize(path);
         self.misses += 1;
-        let entry = Prepared::build_with(&path, files, formats, Some(bind))?;
+        let entry = Prepared::build_with(&path, files, formats, bind, constraints)?;
         self.active = Some(entry.drawings.clone());
         Ok(Built { json: entry.json, name: entry.name, hit: false })
     }
@@ -275,14 +288,20 @@ impl BuildCache {
 
 impl Prepared {
     pub fn build(path: &str, files: &dyn Provider, formats: &Formats) -> Result<Self, String> {
-        Self::build_with(path, files, formats, None)
+        Self::build_with(path, files, formats, None, false)
     }
 
-    /// As `build`, with the parameters of a subcircuit bound.
-    fn build_with(path: &str, files: &dyn Provider, formats: &Formats, bind: Option<&Bind>) -> Result<Self, String> {
+    /// As `build`, with the parameters of a subcircuit bound, and the constraints of the levels.
+    fn build_with(
+        path: &str,
+        files: &dyn Provider,
+        formats: &Formats,
+        bind: Option<&Bind>,
+        constraints: bool,
+    ) -> Result<Self, String> {
         let path = normalize(path);
         let observed = Observed { files, inputs: RefCell::new(Inputs::default()) };
-        let options = BuildOptions { formats: formats.clone(), bind: bind.cloned(), ..BuildOptions::default() };
+        let options = BuildOptions { formats: formats.clone(), bind: bind.cloned(), constraints, ..BuildOptions::default() };
         let (doc, drawings) = rnl_view::build_drawn(&path, &observed, &options)?;
         let json = serde_json::to_string(&doc).map_err(|e| e.to_string())?;
         let drawings = Arc::new(drawings);

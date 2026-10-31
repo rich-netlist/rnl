@@ -137,7 +137,7 @@ export function command(id, options = {}) {
     case "ascend": return ascend(options);
     case "edit-params": return editParameters();
     case "shortcuts": inform({ title: m("Keyboard Shortcuts"), paragraphs: [
-      m`${m`${m("1: Library. 2: Netlist. 3: Hierarchy. 4: Symbol. 5: Usage. 6: Not drawn.")}${shell.solve ? m(" 7: Solve.") : ""}`}${m(" These keys also expand a collapsed side panel; they do not run while typing.")}`,
+      m`${m`${m("1: Library. 2: Netlist. 3: Hierarchy. 4: Symbol. 5: Usage. 6: Not drawn.")}${m(" 7: Solve.")}`}${m(" These keys also expand a collapsed side panel; they do not run while typing.")}`,
       m("Ctrl+R: Show Usages. Shift+R: Show Current Directions. F5: Reload the netlist."),
       m("E or Enter: Open Subcircuit. Ctrl+E or Backspace: Up to Parent Level."),
       m("Shift+E or Shift+Enter: Open Subcircuit in New Window. Hold Shift during any circuit navigation to open its target in a new window."),
@@ -199,9 +199,13 @@ export function setEnabled(id, enabled) {
   shell?.setEnabled?.(id, enabled);
 }
 
-/** Whether this platform offers a command; one that names no platforms is offered on all. */
+/**
+ * Whether this platform offers a command; one that names no platforms is offered on all, and one that names `with` also
+ * wherever the shell has that capability (the web shell with a solver service has `solve`).
+ */
 function offered(item) {
-  return (!item.platforms || item.platforms.includes(shell.platform)) && (!item.windowsOnly || /Win/.test(navigator.platform));
+  const here = !item.platforms || item.platforms.includes(shell.platform) || (item.with !== undefined && !!shell[item.with]);
+  return here && (!item.windowsOnly || /Win/.test(navigator.platform));
 }
 
 /**

@@ -86,7 +86,7 @@ test.describe("on the web", () => {
           "Fit to WindowF", "Zoom InCtrl++", "Zoom OutCtrl+-", "Color Scheme...",
           "Background", "Light", "Dark",
           "Grid", "Show GridG", "", "None", "Dots", "Lines", "", "Axes", "", "Grid Settings...", "Show Names on Hover", "Show Roles on Hover", "Show UsagesCtrl+R", "Show Current DirectionsShift+R", "Language", ...uiLanguages(repository).map((l) => l.name), "",
-          "Side Panels", "Library1", "Netlist2", "Hierarchy3", "Symbol4", "Usage5", "Not Drawn6", "", "Hide",
+          "Side Panels", "Library1", "Netlist2", "Hierarchy3", "Symbol4", "Usage5", "Not Drawn6", "Solve7", "", "Hide",
         ],
       },
     ]);

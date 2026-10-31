@@ -110,6 +110,8 @@ const fake = {
   buildEdits: [],
   /** The format choices each build was given, in order, `{ path: format }`, as the shell sends them. */
   buildFormats: [],
+  /** Whether each build was asked for the constraints of the levels, in order. */
+  buildConstraints: [],
   /** The parameters each build was asked to bind, in order, `{ subckt, params }`, or undefined. */
   buildBinds: [],
   /** The default formats `detectFormat` gives, by path; otherwise by the `.scs` extension. */
@@ -328,10 +330,11 @@ export default {
     fake.calls.push(["pick", kind]);
     return source(fake.picks.shift());
   },
-  async build(src, edits, _progress, _packages, _signal, { bind } = {}) {
+  async build(src, edits, _progress, _packages, _signal, { bind, constraints } = {}) {
     fake.calls.push(src.text === undefined ? ["build", src.name] : ["build", src.name, src.text]);
     fake.buildEdits.push(edits);
     fake.buildBinds.push(bind);
+    fake.buildConstraints.push(!!constraints);
     const formats = fileFormats();
     fake.buildFormats.push(formats);
     const [fail, name] = [fake.fail, fake.next || src.fixture || (params.has("pool") ? "04-hierarchy" : undefined)];
@@ -339,7 +342,9 @@ export default {
     fake.next = null;
     // a plain message, as the desktop shell's invoke rejects with
     if (fail !== null) throw fail;
-    const response = await fetch(`/fixtures/${encodeURIComponent(name)}.json`);
+    // a build asked for the constraints gives the fixture NAME-constraints, `rnl view --constraints`, where there is one
+    let response = constraints ? await fetch(`/fixtures/${encodeURIComponent(name)}-constraints.json`) : { ok: false };
+    if (!response.ok) response = await fetch(`/fixtures/${encodeURIComponent(name)}.json`);
     if (!response.ok) throw `${src.name}: there is no such fixture`;
     const document = await response.json();
     if (params.has("pool") && src.temporary) {

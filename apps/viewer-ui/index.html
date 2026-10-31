@@ -223,7 +223,17 @@ if (new URLSearchParams(location.search).get("embed") !== "1") document.addEvent
         <span class="pane-title">Solve</span>
         <span id="solve-counts" class="counts"></span>
       </div>
+      <div id="solve-views" class="solve-views" role="group" aria-label="What the Solve view shows" hidden>
+        <button id="solve-view-constraints" type="button" aria-pressed="false">Constraints</button>
+        <button id="solve-view-report" type="button" aria-pressed="false" hidden>Report</button>
+        <span id="constraints-count" class="counts"></span>
+      </div>
       <div id="solve-report" class="solve-report"></div>
+      <div id="solve-constraints" class="solve-report solve-constraints" hidden>
+        <p class="constraints-note">The constraints of this netlist as the solver takes them in, after the structures are expanded, in the order it takes them. Click one to light up the objects it acts on and the usages it comes from.</p>
+        <input id="constraints-filter" type="search" placeholder="Filter the constraints" spellcheck="false" autocomplete="off" aria-label="Filter the constraints by what they say, their priority, their structure or their result">
+        <div id="constraints-list" class="constraints-list"></div>
+      </div>
     </div>
   </aside>
   <div id="vsplit" class="vsplit" role="separator" aria-orientation="vertical" title="Drag to resize"></div>

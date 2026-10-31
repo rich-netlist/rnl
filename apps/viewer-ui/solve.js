@@ -10,11 +10,12 @@ import { append, m, setAttr, setText, tr } from "./i18n.js";
 import { inform, modal } from "./dialog.js";
 import { changes, unappliedPaths } from "./edits.js";
 import { editing, stopEditing } from "./editor.js";
+import { hasConstraints, showConstraints } from "./constraints.js";
 import { currentSource, isLoading, openSource, showBuilt } from "./open.js";
 import { setPane } from "./panels.js";
 import { shell } from "./shell.js";
 import { solverSettings } from "./solve-settings.js";
-import { doc } from "./state.js";
+import { constraintsWanted, doc, setConstraintsWanted } from "./state.js";
 import { revealLine } from "./text.js";
 import { $, span } from "./util.js";
 
@@ -30,19 +31,54 @@ export function previewing() {
   return shown !== null;
 }
 
-/** Keep the desktop report reachable before the first solve, without running the solver. */
+/**
+ * Keep the Solve view reachable before any solve: its Constraints view lists the constraints of the netlist, which every
+ * shell can give, and its report appears when a solve is shown, where the shell can solve.
+ */
 export function startSolvePanel() {
-  $("tab-solve").hidden = !shell.solve;
+  $("tab-solve").hidden = false;
   emptyReport();
 }
 
 function emptyReport() {
   const note = document.createElement("p");
   note.className = "solve-note";
-  setText(note, m("Run Solve (F9) to show the preview report."));
+  setText(note, shell.solve ? m("Run Solve (F9) to show the preview report.") : m("There are no constraints to show for this netlist."));
   setText($("solve-counts"), "");
   $("solve-report").replaceChildren(note);
+  showConstraints(null);
 }
+
+// The constraints are asked of the core by the builds once the Solve view has been opened: a Document built without
+// them is built again, once, as File > Reload does, keeping the view and the selection (not while text is edited
+// and not applied, which a build would drop).
+// A Document that still has none after that, as a package file's has none, is not built again.
+const asked = new WeakSet();
+let rebuilding = false;
+function ensureConstraints() {
+  const source = currentSource();
+  if (rebuilding || !doc || !source || hasConstraints(doc) || asked.has(doc) || isLoading() || shown !== null || editing || unappliedPaths().length > 0) return;
+  rebuilding = true;
+  asked.add(doc);
+  openSource(source, true, changes(true)).finally(() => {
+    if (doc) asked.add(doc);
+    rebuilding = false;
+  });
+}
+window.addEventListener("solve-shown", () => {
+  setConstraintsWanted(true);
+  showConstraints();
+  ensureConstraints();
+});
+window.addEventListener("document-shown", () => {
+  if (!constraintsWanted) return;
+  showConstraints();
+  ensureConstraints();
+});
+// a build that was under way when the Solve view was opened has ended: the Document it shows may lack them
+window.addEventListener("open-finished", () => {
+  if (constraintsWanted) ensureConstraints();
+});
 
 /**
  * Solve the netlist shown (Solve > Solve, F9), or, while a preview is shown, solve its file
@@ -67,6 +103,7 @@ export async function solve() {
     shown = { source, report: solved.report };
     showBuilt(solved.document, true);
     renderReport(solved.report);
+    showConstraints(solved.report);
     showPreview(true);
     const r = solved.report;
     const discarded = r.levels.reduce((n, l) => n + l.facts.filter((f) => f.status !== "kept").length, 0);
