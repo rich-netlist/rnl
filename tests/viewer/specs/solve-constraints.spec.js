@@ -2,7 +2,7 @@
 // structures are expanded, one row for each, which the core gives with the Document when a build asks for them
 // (`Level.constraints`; the fixture T4-miller-conflicts-constraints is `rnl view --constraints` of the netlist). Both
 // platforms list them, with no solve; after a solve the rows say what became of each fact, and a click on a row lights
-// up the objects it acts on and the usages it comes from in the drawing.
+// up the objects it acts on in the drawing, and boxes them.
 
 import { expect, test } from "../viewer.js";
 
@@ -137,6 +137,100 @@ for (const platform of ["web", "desktop"]) {
   });
 }
 
+/** The box a chosen constraint has on the drawing: its title, the numbers beside the objects, and the frame. */
+const boxTexts = (page) => page.evaluate(() => [...document.querySelectorAll(".constraint-box text")].map((t) => t.textContent));
+const frameBox = (page) => page.locator(".constraint-box .constraint-frame");
+
+for (const platform of ["web", "desktop"]) {
+  test.describe(`the box of a chosen constraint, on the ${platform}`, () => {
+    test.beforeEach(async ({ page, viewer }) => {
+      await viewer.open(T4, { platform });
+      await open(page, viewer);
+    });
+
+    test("a box is drawn around what the constraint acts on, with its title, and the dashed frame of a usage", async ({ page }) => {
+      await expect(frameBox(page)).toHaveCount(0);
+      const row = rows(page).filter({ hasText: /ALIGN y \{#M1 #M2\}/ }).first();
+      await row.click();
+      await expect(frameBox(page)).toHaveCount(1);
+      const texts = await boxTexts(page);
+      expect(texts[0]).toBe("ALIGN y");
+      // the numbers follow the order of the members; the fixture as read draws M1 only
+      expect(texts.slice(1)).toEqual(["1"]);
+      await expect(frameBox(page)).toHaveAttribute("stroke-dasharray", "1 5");
+      // it holds the object it acts on
+      const held = await page.evaluate(() => {
+        const r = document.querySelector(".constraint-box .constraint-frame").getBoundingClientRect();
+        const m = window.viewer.doc.levels[window.viewer.level].hits.find((h) => h.kind === "box" && h.objects[0] === window.viewer.doc.objects.findIndex((o) => o.name === "M1" && o.kind === "instance"));
+        const drawing = document.querySelector(".constraint-box").ownerSVGElement;
+        const svg = drawing.getBoundingClientRect();
+        const vb = drawing.viewBox.baseVal;
+        const k = svg.width / vb.width;
+        const [[x0, y0], [x1, y1]] = m.points;
+        const box = [svg.left + (x0 - vb.x) * k, svg.top + (y0 - vb.y) * k, svg.left + (x1 - vb.x) * k, svg.top + (y1 - vb.y) * k];
+        return r.left <= box[0] && r.top <= box[1] && r.right >= box[2] && r.bottom >= box[3];
+      });
+      expect(held).toBe(true);
+    });
+
+    test("the box is the one frame at full strength: the usages' frames, the one the constraint comes from too, are dimmed and untitled", async ({ page }) => {
+      const frames = page.locator(".usage-overlays .usage-frame");
+      const total = await frames.count();
+      expect(total).toBeGreaterThan(0);
+      await expect(page.locator(".usage-overlays [data-muted]")).toHaveCount(0);
+      // a constraint that comes from a usage
+      await rows(page).filter({ has: page.locator(".struct:not(:text('written in the netlist'))") }).first().click();
+      await expect(page.locator(".usage-overlays [data-muted]")).toHaveCount(total);
+      await expect(page.locator(".usage-overlays .usage-title:not([display=none])")).toHaveCount(0);
+    });
+
+    test("the box takes no pointer events and is not in the way of a click on the drawing", async ({ page }) => {
+      await rows(page).filter({ hasText: /ALIGN y \{#M1 #M2\}/ }).first().click();
+      await expect(frameBox(page)).toHaveCount(1);
+      expect(await page.evaluate(() => getComputedStyle(document.querySelector(".constraint-box")).pointerEvents)).toBe("none");
+      expect(await page.evaluate(() => getComputedStyle(document.querySelector(".constraint-box .constraint-frame")).pointerEvents)).toBe("none");
+    });
+
+    test("it goes away with a second click, another row replaces it, and a selection ends it", async ({ page }) => {
+      const row = rows(page).filter({ hasText: /ALIGN y \{#M1 #M2\}/ }).first();
+      await row.click();
+      await expect(frameBox(page)).toHaveCount(1);
+      await row.click();
+      await expect(frameBox(page)).toHaveCount(0);
+      // another row replaces it: one box, with the title of the other
+      await row.click();
+      const other = rows(page).filter({ hasText: /ORIENT-RELATION MY \{#M1\}/ }).first();
+      await other.click();
+      await expect(frameBox(page)).toHaveCount(1);
+      expect(await boxTexts(page)).toEqual(["ORIENT-RELATION MY", "from1"]);
+      // a selection in the drawing
+      await row.click();
+      await expect(frameBox(page)).toHaveCount(1);
+      expect(await boxTexts(page)).toEqual(["ALIGN y", "1"]);
+      await expect(frameBox(page)).toHaveCount(1);
+      await page.evaluate(async () => {
+        const o = window.viewer.doc.objects.findIndex((x) => x.kind === "instance");
+        (await import("./selection.js")).select(o, "list", { usage: false });
+      });
+      await expect(frameBox(page)).toHaveCount(0);
+    });
+
+    test("a constraint none of whose objects is on the drawing has no box, and no error", async ({ page }) => {
+      test.setTimeout(120000); // (every row, twice: a slow engine takes its time)
+      const errors = [];
+      page.on("pageerror", (e) => errors.push(e.message));
+      // the rows of the levels that are not shown have no objects in the drawing
+      const all = await rows(page).count();
+      for (let k = 0; k < all; k++) {
+        await rows(page).nth(k).click();
+        await rows(page).nth(k).click();
+      }
+      expect(errors).toEqual([]);
+      await expect(frameBox(page)).toHaveCount(0);
+    });
+  });
+}
+
 test.describe("with a solve, on the desktop", () => {
   test.beforeEach(async ({ viewer }) => {
     await viewer.open(T4, DESKTOP);
@@ -163,7 +257,7 @@ test.describe("with a solve, on the desktop", () => {
     await expect(page.locator("#solve-constraints")).toBeVisible();
   });
 
-  test("a click on a row lights up the objects it acts on and the usages it comes from, and dims the rest", async ({ page }) => {
+  test("a click on a row lights up the objects it acts on, boxes them, and dims the rest", async ({ page }) => {
     // the netlist as solved draws every object; as the fixture is read, only M1 is placed
     await solve(page);
     await expect(muted(page)).toHaveCount(0);
@@ -172,11 +266,31 @@ test.describe("with a solve, on the desktop", () => {
     await expect.poll(() => muted(page).count()).toBeGreaterThan(0);
     const lit = await page.locator(".drawing svg [data-id]:not(.usage-muted)").count();
     expect(lit).toBeGreaterThan(0);
-    // the frames of the usages it comes from stay, the others are muted
+    // the frames of the usages are all muted, the one it comes from too: the box is the frame at full strength
     expect(await page.locator(".usage-overlays [data-muted]").count()).toBeGreaterThan(0);
     await row.click();
     await expect(muted(page)).toHaveCount(0);
     await expect(page.locator(".usage-overlays [data-muted]")).toHaveCount(0);
+  });
+
+  test("after a solve every object is on the drawing: the box numbers them in the order the constraint lists them", async ({ page }) => {
+    await solve(page);
+    await rows(page).filter({ hasText: /ALIGN y \{#M1 #M2\}/ }).first().click();
+    await expect(frameBox(page)).toHaveCount(1);
+    expect(await boxTexts(page)).toEqual(["ALIGN y", "1", "2"]);
+    // a distance has two lists, numbered each from its own start
+    await rows(page).filter({ hasText: /DISTANCE x increasing min=3 \{#M1 #M2 #M3 #M4 #M5\} \{#M6 #M7 #CC\}/ }).first().click();
+    expect(await boxTexts(page)).toEqual(["DISTANCE x increasing ≥ 3", "from1", "from2", "from3", "from4", "from5", "to1", "to2", "to3"]);
+    // a set in a list is one number for each of its objects
+    await rows(page).filter({ hasText: /^.*ORDER x increasing \{\{#VIP #VIN\}/ }).first().click();
+    expect(await boxTexts(page)).toEqual(["ORDER x increasing", "1", "1", "2", "2", "2", "2", "2", "3", "3", "3", "4"]);
+    // the pin of an object is marked at the pin
+    await rows(page).filter({ hasText: /DISTANCE y increasing min=2 max=2 \{#VDD:p\} \{%s:p\}/ }).first().click();
+    expect((await boxTexts(page))[0]).toBe("DISTANCE y increasing = 2");
+    // and the box goes with the preview
+    await page.evaluate(() => window.viewer.command("solve-close"));
+    await expect(page.locator("#preview-badge")).toBeHidden();
+    await expect(frameBox(page)).toHaveCount(0);
   });
 
   test("Close Preview keeps the constraints, without the results, and a later build still asks for them", async ({ page, viewer }) => {

@@ -699,7 +699,7 @@
   "Constraints": "約束",
   "Report": "報告",
   "What the Solve view shows": "求解檢視顯示的內容",
-  "The constraints of this netlist as the solver takes them in, after the structures are expanded, in the order it takes them. Click one to light up the objects it acts on and the usages it comes from.": "這份網表的約束，按結構展開之後、求解器取用的順序排列。點擊一條，可在圖中點亮它作用的物件和它所屬的用法。",
+  "The constraints of this netlist as the solver takes them in, after the structures are expanded, in the order it takes them. Click one to box the objects it acts on in the drawing, numbered in the order it lists them.": "這份網表的約束，按結構展開之後、求解器取用的順序排列。點擊一條，會在圖中用框框住它作用的物件，並按它列出的順序為物件編號。",
   "Filter the constraints": "篩選約束",
   "Filter the constraints by what they say, their priority, their structure or their result": "按約束的內容、優先順序、結構或結果篩選約束",
   "written in the netlist": "寫在網表裡",

@@ -699,7 +699,7 @@
   "Constraints": "制約",
   "Report": "レポート",
   "What the Solve view shows": "求解ビューの表示内容",
-  "The constraints of this netlist as the solver takes them in, after the structures are expanded, in the order it takes them. Click one to light up the objects it acts on and the usages it comes from.": "このネットリストの制約を、構造を展開したあと、ソルバーが取り上げる順に並べています。1 つクリックすると、その制約が作用するオブジェクトと、それが由来する用法が図で強調されます。",
+  "The constraints of this netlist as the solver takes them in, after the structures are expanded, in the order it takes them. Click one to box the objects it acts on in the drawing, numbered in the order it lists them.": "このネットリストの制約を、構造を展開したあと、ソルバーが取り上げる順に並べています。1 つクリックすると、その制約が作用するオブジェクトが図で枠に囲まれ、制約が挙げる順に番号が付きます。",
   "Filter the constraints": "制約を絞り込む",
   "Filter the constraints by what they say, their priority, their structure or their result": "内容、優先度、構造、結果で制約を絞り込む",
   "written in the netlist": "ネットリストに記述",

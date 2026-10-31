@@ -699,7 +699,7 @@
   "Constraints": "约束",
   "Report": "报告",
   "What the Solve view shows": "求解视图显示的内容",
-  "The constraints of this netlist as the solver takes them in, after the structures are expanded, in the order it takes them. Click one to light up the objects it acts on and the usages it comes from.": "这份网表的约束，按结构展开之后、求解器取用的顺序排列。点击一条，可在图中点亮它作用的对象和它所属的用法。",
+  "The constraints of this netlist as the solver takes them in, after the structures are expanded, in the order it takes them. Click one to box the objects it acts on in the drawing, numbered in the order it lists them.": "这份网表的约束，按结构展开之后、求解器取用的顺序排列。点击一条，会在图中用框框住它作用的对象，并按它列出的顺序给对象编号。",
   "Filter the constraints": "筛选约束",
   "Filter the constraints by what they say, their priority, their structure or their result": "按约束的内容、优先级、结构或结果筛选约束",
   "written in the netlist": "写在网表里",

@@ -699,7 +699,7 @@
   "Constraints": "제약",
   "Report": "보고서",
   "What the Solve view shows": "풀이 보기가 보여 주는 것",
-  "The constraints of this netlist as the solver takes them in, after the structures are expanded, in the order it takes them. Click one to light up the objects it acts on and the usages it comes from.": "이 넷리스트의 제약을, 구조를 펼친 뒤 솔버가 취하는 순서대로 나열합니다. 하나를 클릭하면 그 제약이 작용하는 객체와 그것이 비롯된 사용이 그림에서 강조됩니다.",
+  "The constraints of this netlist as the solver takes them in, after the structures are expanded, in the order it takes them. Click one to box the objects it acts on in the drawing, numbered in the order it lists them.": "이 넷리스트의 제약을, 구조를 펼친 뒤 솔버가 취하는 순서대로 나열합니다. 하나를 클릭하면 그 제약이 작용하는 객체가 그림에서 상자로 둘러싸이고, 제약이 나열하는 순서대로 번호가 매겨집니다.",
   "Filter the constraints": "제약 필터",
   "Filter the constraints by what they say, their priority, their structure or their result": "내용, 우선순위, 구조 또는 결과로 제약 거르기",
   "written in the netlist": "넷리스트에 작성됨",
