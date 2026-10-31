@@ -116,7 +116,6 @@ function makeEditor(path, name) {
   gutter.setAttribute("aria-hidden", "true");
   const area = document.createElement("textarea");
   area.className = "area";
-  area.readOnly = currentSource()?.readonly === true;
   area.spellcheck = false;
   area.autocomplete = "off";
   area.autocapitalize = "off";
@@ -226,7 +225,6 @@ export function note(text, duration = 6000) {
 
 /** Edit > Edit Text: enter editing, or apply pending text and return to reading. */
 export async function toggleEdit() {
-  if (currentSource()?.readonly) return;
   if (modal()) return;
   if (!editing) {
     if (!doc) {
@@ -304,6 +302,9 @@ function filesToSave() {
   return edits.dirty();
 }
 
+/** Whether a file of the document is one that Save never overwrites: a built-in one, which no file holds. */
+const builtIn = (path) => path.startsWith("<");
+
 /**
  * File > Save: write the files with changes not saved where they were read from, or download the
  * file shown on the web. A file that is no longer what was read, because another program changed
@@ -311,11 +312,22 @@ function filesToSave() {
  * True when saved.
  */
 export async function save(overwrite = false, encoding = "preserve") {
-  if (currentSource()?.readonly) return false;
   if (!doc || modal()) return false;
   const opened = currentSource();
-  if (shell.saveAs && opened && opened.text !== undefined) return saveAs(encoding);
+  // a read-only file may be edited but its source is not overwritten: the desktop saves it as another file, and the web,
+  // which overwrites nothing, downloads it
+  if (shell.saveAs && opened && (opened.text !== undefined || opened.readonly)) return saveAs(encoding);
   const files = filesToSave();
+  if (shell.platform !== "web") {
+    const kept = files.filter((f) => builtIn(f.path));
+    if (kept.length > 0) {
+      await inform({
+        title: m("Save"),
+        paragraphs: [m`These files are built in and are never overwritten: ${kept.map((f) => f.name).join(", ")}. Their changes stay in the viewer.`],
+      });
+      return false;
+    }
+  }
   if (files.length === 0) {
     note(edits.dirtyPaths().length === 0 ? m("No changes to save.") : "");
     return true;
@@ -366,7 +378,6 @@ async function changedOnDisk(names, encoding) {
  * belongs to the directory of the netlist as it was. True when it was saved.
  */
 export async function saveAs(encoding = "preserve") {
-  if (currentSource()?.readonly) return false;
   if (!doc || !shell.saveAs || modal()) return false;
   const entry = doc.files[0];
   const title = m("Save As");

@@ -1301,9 +1301,12 @@ test("the web library adds SKY130 without duplicating built-ins, which open read
   await page.locator("#tab-files").click();
   const builtin = await opened(page, () => page.getByRole("button", { name: "Open 0.3/rnl-std.rnl", exact: true }).click());
   expect(builtin.path).toContain("<bundled>");
-  await page.evaluate(() => window.viewer.command("toggle-edit"));
-  expect(await page.evaluate(() => window.viewer.checked("toggle-edit"))).toBe(false);
   await expect(page.locator("#source")).toContainText("@PACKAGE");
+  // read only limits saving, not editing
+  await page.evaluate(() => window.viewer.command("toggle-edit"));
+  expect(await page.evaluate(() => window.viewer.checked("toggle-edit"))).toBe(true);
+  await expect(page.locator("#source .editor:not([hidden]) textarea")).toHaveJSProperty("readOnly", false);
+  await page.evaluate(() => window.viewer.command("toggle-edit"));
 });
 
 test("a missing published Canvas package offers Include and rebuilds; other versions offer the File menu hint", async ({ page }, info) => {
@@ -1524,9 +1527,10 @@ test("?manifest= opens the files of a manifest: its pool and packages, its level
   await expect(group.locator(".lib-title")).toHaveText("From external manifest · demo · read only");
   await expect(group.locator(".pool-open")).toHaveText([".packages/demo-remote/2.0/demo-remote.rnl", "cells/amp.sp", "cells/stage.sp", "lib/models.inc", "pkg/demo-local.rnl", "top.sp"]);
   await expect(group.getByRole("button", { name: /Exclude/ })).toHaveCount(0);
-  // read only: the text cannot be edited
+  // read only limits saving, not editing: the text of a manifest's file is edited (below, with a solve)
   await page.evaluate(() => window.viewer.command("toggle-edit"));
-  await expect(page.locator("#source textarea")).toHaveCount(0);
+  await expect(page.locator("#source .editor:not([hidden]) textarea")).toHaveCount(1);
+  await page.evaluate(() => window.viewer.command("toggle-edit"));
   // Chinese: the title and the way back follow the language
   await page.evaluate(() => window.viewer.command("language-zh"));
   await expect(bar.locator(".manifest-title")).toHaveText("清单示例");
@@ -1647,6 +1651,21 @@ test("the files of a manifest are searched as the Library's: Auto Include finds 
   expect(await defined()).toEqual([true]);
 });
 
+/** The site served with the rnl the tests built (serve.mjs --rnl), on a port of its own: the process and the site's address. */
+async function solverServer() {
+  const server = spawn(process.execPath, [path.join(root, "apps", "web", "serve.mjs"), "--port", "0", "--rnl", process.env.RNL_BIN, "--solver-options", "time_limit=none"], { stdio: ["ignore", "pipe", "inherit"] });
+  const url = await new Promise((resolve, reject) => {
+    let out = "";
+    server.stdout.on("data", (chunk) => {
+      out += chunk;
+      const found = /(http:\/\/127\.0\.0\.1:\d+\/)/.exec(out);
+      if (found) resolve(found[1]);
+    });
+    server.on("exit", () => reject(new Error(`serve.mjs stopped: ${out}`)));
+  });
+  return { server, url };
+}
+
 test("the Solve view lists the constraints of a netlist; only a development server with a solver gives the page a Solve", async ({ page }) => {
   // two servers, two page loads in the engine, and a debug build of rnl solving: slow on a loaded runner
   test.setTimeout(120000);
@@ -1663,17 +1682,8 @@ test("the Solve view lists the constraints of a netlist; only a development serv
   await page.keyboard.press("F9");
   await expect(page.locator("#preview-badge")).toBeHidden();
   // the same site served with the rnl the tests built (serve.mjs --rnl), on a port of its own
-  const server = spawn(process.execPath, [path.join(root, "apps", "web", "serve.mjs"), "--port", "0", "--rnl", process.env.RNL_BIN, "--solver-options", "time_limit=none"], { stdio: ["ignore", "pipe", "inherit"] });
+  const { server, url } = await solverServer();
   try {
-    const url = await new Promise((resolve, reject) => {
-      let out = "";
-      server.stdout.on("data", (chunk) => {
-        out += chunk;
-        const found = /(http:\/\/127\.0\.0\.1:\d+\/)/.exec(out);
-        if (found) resolve(found[1]);
-      });
-      server.on("exit", () => reject(new Error(`serve.mjs stopped: ${out}`)));
-    });
     await page.goto(`${url}?url=samples/cases/10-constraints-and-priority.sp`);
     await expect(page).toHaveTitle(/^10-constraints-and-priority\.sp/);
     await expect(page.locator("#tab-solve")).toBeVisible();
@@ -1681,6 +1691,8 @@ test("the Solve view lists the constraints of a netlist; only a development serv
     // the files the page read go to the service; what comes back is drawn as a preview, with the constraints listed
     const posts = [];
     page.on("request", (request) => { if (request.method() === "POST" && request.url().endsWith("rnl-solver/solve")) posts.push(request.postDataJSON()); });
+    // a solve is not begun while the netlist is still being read
+    await page.waitForFunction(() => !document.body.classList.contains("busy"));
     await page.keyboard.press("F9");
     await page.waitForFunction(() => document.body.classList.contains("preview") && !document.body.classList.contains("solving"));
     expect(posts).toHaveLength(1);
@@ -1702,6 +1714,61 @@ test("the Solve view lists the constraints of a netlist; only a development serv
     // Close Preview shows the netlist as read
     await page.evaluate(() => window.viewer.command("solve-close"));
     await expect(page.locator("#preview-badge")).toBeHidden();
+  } finally {
+    server.kill();
+  }
+});
+
+test("a manifest's files are edited, downloaded and solved by a development server's solver, with the edit and the manifest's files and pool", async ({ page }) => {
+  test.setTimeout(120000);
+  const { server, url } = await solverServer();
+  try {
+    await manifestRoutes(page, demoManifest({ level: "(top)" }));
+    await page.goto(`${url}index.html?manifest=${encodeURIComponent(MANIFEST_URL)}`);
+    await shown(page);
+    await page.waitForFunction(() => !document.body.classList.contains("busy"));
+    await expect(page.locator("#menubar .menu-title")).toContainText(["Solve"]);
+    // read only limits saving, not editing: the text is edited, and the changes applied
+    await page.evaluate(() => window.viewer.command("toggle-edit"));
+    const area = page.locator("#source textarea:not([hidden])").first();
+    await area.fill((await area.inputValue()).replace("R9 out 0 10k", "R9 out 0 22k"));
+    await page.locator("#apply-edits").click();
+    await expect.poll(() => page.evaluate(() => window.viewer.doc.files[0].text.includes("R9 out 0 22k"))).toBe(true);
+    expect(await page.evaluate(() => window.viewer.edits.unsaved)).toEqual(["top.sp"]);
+    // Download File gives the edited text, and nothing is overwritten
+    const download = page.waitForEvent("download");
+    await page.evaluate(() => window.viewer.command("save"));
+    const file = await download;
+    expect(fs.readFileSync(await file.path(), "utf8")).toContain("R9 out 0 22k");
+    // the solve sends the manifest's files and pool, with the edit
+    const posts = [];
+    page.on("request", (request) => { if (request.method() === "POST" && request.url().endsWith("rnl-solver/solve")) posts.push(request.postDataJSON()); });
+    await page.evaluate(async () => (await import("./drawing.js")).zoomCenter(8));
+    const zoomed = await page.evaluate(async () => (await import("./drawing.js")).viewCentre());
+    await page.keyboard.press("F9");
+    await page.waitForFunction(() => document.body.classList.contains("preview") && !document.body.classList.contains("solving"));
+    expect(posts).toHaveLength(1);
+    expect(posts[0].entry).toBe("/demo/top.sp");
+    expect(posts[0].files["/demo/top.sp"]).toContain("R9 out 0 22k");
+    expect(Object.keys(posts[0].files)).toEqual(expect.arrayContaining(["/demo/cells/amp.sp", "/demo/cells/stage.sp", "/demo/lib/models.inc", "/demo/pkg/demo-local.rnl"]));
+    expect(posts[0].pool).toEqual(expect.arrayContaining(["/demo/lib/models.inc", "/demo/pkg/demo-local.rnl"]));
+    expect(await page.evaluate(() => window.viewer.doc.files[0].text)).toContain("R9 out 0 22k");
+    // the solved drawing is fitted to the window, not left in the view it had
+    const fitted = async () => {
+      const before = await page.evaluate(async () => (await import("./drawing.js")).viewCentre());
+      await page.evaluate(async () => (await import("./drawing.js")).fit());
+      return [before, await page.evaluate(async () => (await import("./drawing.js")).viewCentre())];
+    };
+    const [solved, refit] = await fitted();
+    expect(solved.scale).toBeCloseTo(refit.scale, 6);
+    expect(solved.scale).not.toBeCloseTo(zoomed.scale, 3);
+    // Close Preview: the netlist as edited, fitted too
+    await page.evaluate(async () => (await import("./drawing.js")).zoomCenter(8));
+    await page.evaluate(() => window.viewer.command("solve-close"));
+    await expect(page.locator("#preview-badge")).toBeHidden();
+    await expect.poll(() => page.evaluate(() => window.viewer.doc.files[0].text.includes("R9 out 0 22k"))).toBe(true);
+    const [closed, again] = await fitted();
+    expect(closed.scale).toBeCloseTo(again.scale, 6);
   } finally {
     server.kill();
   }

@@ -9,6 +9,7 @@ import { append, m, setAttr, setText, tr } from "./i18n.js";
 
 import { inform, modal } from "./dialog.js";
 import { changes, unappliedPaths } from "./edits.js";
+import { fit } from "./drawing.js";
 import { editing, stopEditing } from "./editor.js";
 import { hasConstraints, showConstraints } from "./constraints.js";
 import { currentSource, isLoading, openSource, showBuilt } from "./open.js";
@@ -86,7 +87,6 @@ window.addEventListener("open-finished", () => {
  * of the file as it is now.
  */
 export async function solve() {
-  if (currentSource()?.readonly) return;
   if (!shell || !shell.solve || running || modal() || isLoading()) return;
   const source = shown ? shown.source : currentSource();
   if (!source || !doc) {
@@ -99,9 +99,13 @@ export async function solve() {
   document.body.classList.add("solving");
   status(m`Solving ${source.name}…`, true);
   try {
-    const solved = await shell.solve(source, solverSettings(), changes(true));
+    // a built-in file is held by the page, not on disk: the solver is given its text
+    const given = source.text === undefined && source.path?.startsWith("<") ? { ...source, text: doc.files[0].text } : source;
+    const solved = await shell.solve(given, solverSettings(), changes(true));
     shown = { source, report: solved.report };
     showBuilt(solved.document, true);
+    // the solved layout can lie outside the view of the netlist as it was
+    fit();
     renderReport(solved.report);
     showConstraints(solved.report);
     showPreview(true);
@@ -131,10 +135,11 @@ export function cancelSolve() {
 }
 
 /** Solve > Close Preview: show the netlist again, the files as read with the changes applied to them. */
-export function closePreview() {
+export async function closePreview() {
   if (!shown) return;
   const source = shown.source;
-  openSource(source, true, changes(true));
+  // the layout goes back to the one the netlist has, which can lie outside the view of the solve
+  if (await openSource(source, true, changes(true))) fit();
 }
 
 /**

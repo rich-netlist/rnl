@@ -706,5 +706,6 @@
   "1 constraint": "1 contrainte",
   "{0} constraints": "{0} contraintes",
   "{0} of {1} constraints": "{0} contraintes sur {1}",
-  "There are no constraints to show for this netlist.": "Cette netlist n'a aucune contrainte à afficher."
+  "There are no constraints to show for this netlist.": "Cette netlist n'a aucune contrainte à afficher.",
+  "These files are built in and are never overwritten: {0}. Their changes stay in the viewer.": "Ces fichiers sont intégrés et ne sont jamais écrasés : {0}. Leurs modifications restent dans le visualiseur."
 }

@@ -706,5 +706,6 @@
   "1 constraint": "1 條約束",
   "{0} constraints": "{0} 條約束",
   "{0} of {1} constraints": "{1} 條約束中的 {0} 條",
-  "There are no constraints to show for this netlist.": "這份網表沒有可顯示的約束。"
+  "There are no constraints to show for this netlist.": "這份網表沒有可顯示的約束。",
+  "These files are built in and are never overwritten: {0}. Their changes stay in the viewer.": "這些檔案是內建的，不會被覆寫：{0}。它們的變更保留在檢視器中。"
 }

@@ -706,5 +706,6 @@
   "1 constraint": "1 Randbedingung",
   "{0} constraints": "{0} Randbedingungen",
   "{0} of {1} constraints": "{0} von {1} Randbedingungen",
-  "There are no constraints to show for this netlist.": "Für diese Netzliste gibt es keine Randbedingungen anzuzeigen."
+  "There are no constraints to show for this netlist.": "Für diese Netzliste gibt es keine Randbedingungen anzuzeigen.",
+  "These files are built in and are never overwritten: {0}. Their changes stay in the viewer.": "Diese Dateien sind eingebaut und werden nie überschrieben: {0}. Ihre Änderungen bleiben im Viewer."
 }
