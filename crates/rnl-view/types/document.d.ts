@@ -157,6 +157,13 @@ export type Level = {
    */
   params?: Array<SubcktParam>,
   /**
+   * The constraints of the level after expansion, what a solver takes in. **Experimental: not
+   * promised to stay as it is.** Absent unless `BuildOptions::constraints` asks for them, and for
+   * a package file, which has no problem; when asked for, every other level has them, with an
+   * empty `facts` when it has none.
+   */
+  constraints?: LevelConstraints,
+  /**
    * The objects of the level that are not drawn on it: those that have no position, each with
    * its symbol drawn alone, in the order of the netlist (their number is the one `status`
    * gives), then those that are not drawn at all, since no symbol can be chosen for them, each
@@ -371,6 +378,196 @@ export type SubcktParam = {
  * A parameter an instance writes, and the number it comes to where the instance is.
  */
 export type ParamValue = { name: string, value: string, number: number | null };
+
+/**
+ * The constraints of a level after expansion, what a solver takes in. **Experimental: not promised
+ * to stay as it is.** Facts with priority `"disabled"` and those that failed as they were read are
+ * not here: a usage turned off is in `Level.usages[]` with its `state`, and what failed is in
+ * `Document.diagnostics` and `SourceFile.failed`.
+ */
+export type LevelConstraints = {
+  /**
+   * The digest of the solver's input, the first part of the `sig2` hash (17). A solve's
+   * `report.levels[].input` being the same says that `report.levels[].facts[k]` is `facts[k]`.
+   */
+  input: string,
+  /**
+   * The objects that `facts`, `routes` and `groups` refer to by index.
+   */
+  objects: Array<ConstraintObject>,
+  /**
+   * The facts in the order of 8.5: the index of each is its rank.
+   */
+  facts: Array<Constraint>,
+  /**
+   * The usages made in the level, which `Constraint.chain` and `ConstraintUsage.parent` refer to
+   * by index.
+   */
+  usages: Array<ConstraintUsage>,
+  /**
+   * The nets to draw as wires (13.7).
+   */
+  routes: Array<ConstraintRoute>,
+  /**
+   * The sets given GROUP that are in effect (11.5).
+   */
+  groups: Array<ConstraintGroup>,
+};
+
+/**
+ * An object as the constraints refer to it, and where the Document has it.
+ */
+export type ConstraintObject = {
+  /**
+   * "instance", "bundle", "usage", "point" or "text".
+   */
+  kind: string,
+  /**
+   * As diagnostics show it.
+   */
+  label: string,
+  /**
+   * How the level's own text refers to it.
+   */
+  reference: ConstraintReference,
+  /**
+   * Made by a rule (10.5), alone or as part of a generated usage.
+   */
+  generated: boolean,
+  /**
+   * Its id in the Document's reading, as `Usage.id`: `#M1`, `%g0`, or for one without a name
+   * where it was made, `@file:line:col`. None when nothing there is known to be this object.
+   */
+  id: string | null,
+  /**
+   * What it is in `Document.objects`: an instance, the instances of a bundle, or a usage; empty
+   * for a point, a text, and an object without an id.
+   */
+  objects: Array<number>,
+};
+
+/**
+ * How the level's own text refers to something: what it writes, a usage made by a rule and the
+ * path through it, a number in a file of the draft 0.3 (5.9), or nothing.
+ */
+export type ConstraintReference =
+  | string
+  | { generated_by: number, path: string }
+  | { number: number, path: string }
+  | { generated_by: number, number: number, path: string }
+  | null;
+
+/**
+ * A point that a fact relates: the origin of an object, the pin of one of its terminals, or the
+ * centre of a set. `origin` and `object` are indexes in `LevelConstraints.objects`.
+ */
+export type ConstraintPoint =
+  | { origin: number }
+  | { object: number, pin: number, terminal: string }
+  | { centre: Array<ConstraintPoint> };
+
+/**
+ * What a fact says, by its kind. Objects are indexes in `LevelConstraints.objects`.
+ */
+export type ConstraintKind =
+  | { "kind": "PLACE-x", at: ConstraintPoint, value: number }
+  | { "kind": "PLACE-y", at: ConstraintPoint, value: number }
+  | { "kind": "POINT-x", point: number, value: number }
+  | { "kind": "POINT-y", point: number, value: number }
+  | { "kind": "TEXT-dx", text: number, from: ConstraintPoint, value: number }
+  | { "kind": "TEXT-dy", text: number, from: ConstraintPoint, value: number }
+  | { "kind": "ORIENT", object: number, code: string }
+  | { "kind": "ALIGN", axis: string, members: Array<ConstraintPoint> }
+  | { "kind": "ORDER", axis: string, sense: string, members: Array<ConstraintPoint> }
+  | { "kind": "DISTRIBUTE", axis: string, members: Array<ConstraintPoint> }
+  | { "kind": "DISTANCE", axis: string, sense: string, min: number | null, max: number | null, from: Array<ConstraintPoint>, to: Array<ConstraintPoint> }
+  | { "kind": "ORIENT-RELATION", relation: string, from: Array<number>, to: Array<number> };
+
+/**
+ * A constraint after expansion, as `rnl problem` prints it in `facts`, with `what`.
+ */
+export type Constraint = {
+  /**
+   * The effective priority (14.8).
+   */
+  priority: string,
+  /**
+   * As diagnostics show it, such as `%c1` or `the x of #M1 = 3`.
+   */
+  label: string,
+  /**
+   * What it says, in one line, such as `ALIGN x {#M1 #M2}`.
+   */
+  what: string,
+  /**
+   * For a constraint with a handle: how to refer to it.
+   */
+  reference?: ConstraintReference,
+  /**
+   * Where the statement is written; none for the coordinates of a point.
+   */
+  source: ConstraintSource | null,
+  /**
+   * The usages whose expansion made it, outermost first, by index in `LevelConstraints.usages`.
+   */
+  chain: Array<number>,
+} & ({ "kind": "PLACE-x", at: ConstraintPoint, value: number } | { "kind": "PLACE-y", at: ConstraintPoint, value: number } | { "kind": "POINT-x", point: number, value: number } | { "kind": "POINT-y", point: number, value: number } | { "kind": "TEXT-dx", text: number, from: ConstraintPoint, value: number } | { "kind": "TEXT-dy", text: number, from: ConstraintPoint, value: number } | { "kind": "ORIENT", object: number, code: string } | { "kind": "ALIGN", axis: string, members: Array<ConstraintPoint> } | { "kind": "ORDER", axis: string, sense: string, members: Array<ConstraintPoint> } | { "kind": "DISTRIBUTE", axis: string, members: Array<ConstraintPoint> } | { "kind": "DISTANCE", axis: string, sense: string, min: number | null, max: number | null, from: Array<ConstraintPoint>, to: Array<ConstraintPoint> } | { "kind": "ORIENT-RELATION", relation: string, from: Array<number>, to: Array<number> });
+
+/**
+ * A place in a file, as `Document.files[].path` names the file.
+ */
+export type ConstraintSource = { file: string, line: number, col: number };
+
+/**
+ * A usage that a constraint may come from.
+ */
+export type ConstraintUsage = {
+  /**
+   * The definition, such as `$GND_STUB`.
+   */
+  definition: string,
+  label: string,
+  reference: ConstraintReference,
+  /**
+   * Made by a rule (10.5), alone or in the expansion of a generated usage.
+   */
+  generated: boolean,
+  /**
+   * The usage whose expansion made it, by index in `LevelConstraints.usages`.
+   */
+  parent: number | null,
+  /**
+   * It in `Document.objects`, as `Level.usages[].object`, with or without a symbol. None when
+   * nothing in the Document's reading is known to be this usage.
+   */
+  object: number | null,
+};
+
+/**
+ * A net to draw as wires (13.7).
+ */
+export type ConstraintRoute = {
+  net: string,
+  /**
+   * A hint for the solver, with the values of WIRE.
+   */
+  mode: string,
+  /**
+   * The pins to join.
+   */
+  pins: Array<ConstraintPoint>,
+};
+
+/**
+ * A set given GROUP (11.5).
+ */
+export type ConstraintGroup = {
+  label: string,
+  /**
+   * Indexes in `LevelConstraints.objects`, nested sets followed down.
+   */
+  members: Array<number>,
+};
 
 /**
  * An object of a level that has no position yet, so it is not drawn there: an instance, a bundle

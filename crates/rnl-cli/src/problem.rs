@@ -75,67 +75,11 @@ fn position(p: &Position) -> Value {
     }
 }
 
-fn fact(f: &ProblemFact, numbers: bool) -> Value {
-    let mut v = json!({"kind": f.kind.name()});
-    let m = v.as_object_mut().unwrap();
-    match &f.kind {
-        FactKind::Place { at, value, .. } => {
-            m.insert("at".into(), point(at));
-            m.insert("value".into(), json!(value));
-        }
-        FactKind::PointCoordinate { point: k, value, .. } => {
-            m.insert("point".into(), json!(k));
-            m.insert("value".into(), json!(value));
-        }
-        FactKind::Offset { text, from, value, .. } => {
-            m.insert("text".into(), json!(text));
-            m.insert("from".into(), point(from));
-            m.insert("value".into(), json!(value));
-        }
-        FactKind::Orient { object, code } => {
-            m.insert("object".into(), json!(object));
-            m.insert("code".into(), json!(code.as_str()));
-        }
-        FactKind::Align { axis, members } | FactKind::Distribute { axis, members } => {
-            m.insert("axis".into(), json!(axis.as_str()));
-            m.insert("members".into(), points(members));
-        }
-        FactKind::Order { axis, sense, members } => {
-            m.insert("axis".into(), json!(axis.as_str()));
-            m.insert("sense".into(), json!(sense.as_str()));
-            m.insert("members".into(), points(members));
-        }
-        FactKind::Distance { axis, sense, min, max, from, to } => {
-            m.insert("axis".into(), json!(axis.as_str()));
-            m.insert("sense".into(), json!(sense.as_str()));
-            m.insert("min".into(), json!(min));
-            m.insert("max".into(), json!(max));
-            m.insert("from".into(), points(from));
-            m.insert("to".into(), points(to));
-        }
-        FactKind::OrientRelation { relation, from, to } => {
-            m.insert("relation".into(), json!(relation.as_str()));
-            m.insert("from".into(), json!(from));
-            m.insert("to".into(), json!(to));
-        }
-    }
-    m.insert("priority".into(), json!(f.priority.as_str()));
-    m.insert("label".into(), json!(f.label));
-    match &f.reference {
-        Some(Reference::Number { .. } | Reference::GeneratedNumber { .. }) if !numbers => {}
-        Some(r) => {
-            m.insert("reference".into(), reference(r, numbers));
-        }
-        None => {}
-    }
-    m.insert(
-        "source".into(),
-        match &f.source {
-            Some(l) => json!({"file": l.file, "line": l.line, "col": l.col}),
-            None => Value::Null,
-        },
-    );
-    m.insert("chain".into(), json!(f.chain));
+/// The fact of rank `k`, as the Document's constraints give it ([`rnl_view::constraint`]), without
+/// the line that says it.
+fn fact(p: &LevelProblem, k: usize) -> Value {
+    let mut v = serde_json::to_value(rnl_view::constraint(p, k)).unwrap();
+    v.as_object_mut().unwrap().remove("what");
     v
 }
 
@@ -195,7 +139,7 @@ pub fn level(p: &LevelProblem, solver_options: &str) -> Value {
             "default": s.default,
             "pins": s.pins.iter().map(|q| json!({"pos": [q.pos.0, q.pos.1], "dir": q.dir, "terminals": q.terminals, "label": q.label})).collect::<Vec<_>>(),
         })).collect::<Vec<_>>(),
-        "facts": p.facts.iter().map(|f| fact(f, numbers)).collect::<Vec<_>>(),
+        "facts": (0..p.facts.len()).map(|k| fact(p, k)).collect::<Vec<_>>(),
         "nets": p.nets.iter().map(|n| json!({
             "name": n.name, "reference": reference(&n.reference, numbers), "pins": points(&n.pins),
             "wires": n.wires, "routes": n.routes, "port": n.port,

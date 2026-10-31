@@ -501,6 +501,17 @@ pub struct LevelProblem {
     /// The nets of the level, in the order the netlist first names them: the ports of the
     /// subcircuit, then the nets of the instances, line by line.
     pub nets: Vec<ProblemNet>,
+    /// The ids the model gives the objects and the usages, in this reading. Like every place, they
+    /// are left out of the input digest ([`sig2`]).
+    pub ids: ProblemIds,
+}
+
+/// The ids of the objects and the usages of a problem in the model ([`crate::model::ObjectInfo::id`]),
+/// in the order of their lists: `#M1`, `%g0`, or for one without a name where it was made.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ProblemIds {
+    pub objects: Vec<String>,
+    pub usages: Vec<String>,
 }
 
 impl LevelProblem {
@@ -508,6 +519,72 @@ impl LevelProblem {
     /// solver refer to objects by number (5.9) and rewrite wires (13.1).
     pub fn follows_0_3(&self) -> bool {
         self.version == "0.3"
+    }
+}
+
+/// A point as the report of a solve names it: an object by its name, or else its label, `:` and
+/// the terminal for a pin, a set in braces.
+pub fn point_name(p: &LevelProblem, r: &PointRef) -> String {
+    let label = |k: usize| {
+        p.objects.get(k).map_or_else(
+            || format!("object {k}"),
+            |o| match &o.reference {
+                Reference::Name(n) => n.clone(),
+                _ => o.label.clone(),
+            },
+        )
+    };
+    match r {
+        PointRef::Origin(k) => label(*k),
+        PointRef::Pin { object, terminal, .. } => format!("{}:{terminal}", label(*object)),
+        PointRef::Centre(points) => {
+            format!("{{{}}}", points.iter().map(|q| point_name(p, q)).collect::<Vec<_>>().join(" "))
+        }
+    }
+}
+
+/// What the fact of rank `k` says, in one line, such as `ALIGN y {#M1 #M2}` or `the x of #M1 = 3`.
+pub fn fact_statement(p: &LevelProblem, k: usize) -> String {
+    let f = &p.facts[k];
+    let num = |v: f64| fmt_num(v);
+    let list = |ms: &[PointRef]| format!("{{{}}}", ms.iter().map(|m| point_name(p, m)).collect::<Vec<_>>().join(" "));
+    let objects = |ks: &[usize]| list(&ks.iter().map(|k| PointRef::Origin(*k)).collect::<Vec<_>>());
+    match &f.kind {
+        FactKind::Place { at, axis, value } => {
+            format!("the {} of {} = {}", axis.as_str(), point_name(p, at), num(*value))
+        }
+        FactKind::PointCoordinate { point: k, axis, value } => {
+            format!("the {} of {} = {}", axis.as_str(), point_name(p, &PointRef::Origin(*k)), num(*value))
+        }
+        // the `dx` or `dy` of a text, from the point it is attached to (13.3)
+        FactKind::Offset { text, from, axis, value } => format!(
+            "the d{} of {} from {} = {}",
+            axis.as_str(),
+            point_name(p, &PointRef::Origin(*text)),
+            point_name(p, from),
+            num(*value)
+        ),
+        FactKind::Orient { object, code } => {
+            format!("the orientation {} of {}", code.as_str(), point_name(p, &PointRef::Origin(*object)))
+        }
+        FactKind::Align { axis, members } => format!("ALIGN {} {}", axis.as_str(), list(members)),
+        FactKind::Distribute { axis, members } => format!("DISTRIBUTE {} {}", axis.as_str(), list(members)),
+        FactKind::Order { axis, sense, members } => {
+            format!("ORDER {} {} {}", axis.as_str(), sense.as_str(), list(members))
+        }
+        FactKind::Distance { axis, sense, min, max, from, to } => {
+            let mut bounds = String::new();
+            if let Some(m) = min {
+                bounds.push_str(&format!(" min={}", num(*m)));
+            }
+            if let Some(m) = max {
+                bounds.push_str(&format!(" max={}", num(*m)));
+            }
+            format!("DISTANCE {} {}{bounds} {} {}", axis.as_str(), sense.as_str(), list(from), list(to))
+        }
+        FactKind::OrientRelation { relation, from, to } => {
+            format!("ORIENT-RELATION {} {} {}", relation.as_str(), objects(from), objects(to))
+        }
     }
 }
 
@@ -1048,6 +1125,7 @@ mod tests {
             groups: Vec::new(),
             usages: Vec::new(),
             nets: Vec::new(),
+            ids: ProblemIds::default(),
         };
         let h = sig2(&p, "tolerance=0.000001");
         assert!(h.starts_with("sig2:"));
@@ -1096,6 +1174,7 @@ mod tests {
             groups: Vec::new(),
             usages: Vec::new(),
             nets: vec![net("a", None)],
+            ids: ProblemIds::default(),
         };
         let old = format!("{SIG1}:{}.{}", input_digest_sig1(&p), options_digest("o"));
         assert_eq!(same_input(&old, &p), Some(true));

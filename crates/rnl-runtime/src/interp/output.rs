@@ -6,6 +6,7 @@ use crate::geom::{Orient, Pt};
 use crate::host::LevelKind;
 use crate::markup;
 use crate::model::*;
+use crate::problem::ProblemIds;
 
 use super::obj::*;
 use super::unit::Place;
@@ -787,15 +788,9 @@ impl Interp<'_> {
         out
     }
 
-    fn level_view(&mut self, s: SceneId) -> LevelView {
-        let lv = self.scenes[s].level;
-        let level = self.doc.levels[lv].clone();
-        let mut table: HashMap<ObjId, usize> = HashMap::new();
-        let mut symbols: Vec<SymbolView> = Vec::new();
-        let mut items = Vec::new();
-        let last_symbol = self.last_symbol_pos(s);
-
-        // the objects of the editor interface, drawn or not, with ids unique in the level
+    /// The objects of the editor interface, drawn or not, and the named points, with the ids unique
+    /// in the level of those, the wires, the texts and the primitives.
+    fn level_ids(&mut self, s: SceneId) -> (Vec<ObjId>, Vec<ObjId>, HashMap<ObjId, String>) {
         let mut objs: Vec<ObjId> = self.inst_like(s).into_iter().filter(|o| !self.bundle_empty(*o)).collect();
         objs.extend(self.scenes[s].usages.iter().copied().filter(|a| !self.usage(*a).in_symbol));
         let named_points: Vec<ObjId> =
@@ -812,6 +807,27 @@ impl Interp<'_> {
         let prims = self.scenes[s].prims.clone();
         let prim_ids = self.unique_ids(s, &prims, &ids);
         ids.extend(prim_ids);
+        (objs, named_points, ids)
+    }
+
+    /// The ids in the model of the objects `objs` of a level and of its usages `usages`.
+    pub(super) fn problem_ids(&mut self, s: SceneId, objs: &[ObjId], usages: &[ObjId]) -> ProblemIds {
+        let ids = self.level_ids(s).2;
+        ProblemIds {
+            objects: objs.iter().map(|o| self.ref_id(s, *o, &ids)).collect(),
+            usages: usages.iter().map(|a| self.ref_id(s, *a, &ids)).collect(),
+        }
+    }
+
+    fn level_view(&mut self, s: SceneId) -> LevelView {
+        let lv = self.scenes[s].level;
+        let level = self.doc.levels[lv].clone();
+        let mut table: HashMap<ObjId, usize> = HashMap::new();
+        let mut symbols: Vec<SymbolView> = Vec::new();
+        let mut items = Vec::new();
+        let last_symbol = self.last_symbol_pos(s);
+
+        let (objs, named_points, ids) = self.level_ids(s);
         let (objects, points) = self.objects_of(s, &objs, &named_points, &ids);
         let failed_usages = self.failed_usages(s, &ids);
         let groups = self.groups(s, &ids);
@@ -901,7 +917,7 @@ impl Interp<'_> {
             }
         }
         let mut shapes = Vec::new();
-        for p in prims {
+        for p in self.scenes[s].prims.clone() {
             let ObjData::Prim { shape, points, params, .. } = self.o(p).clone() else { continue };
             let mut pts = Vec::new();
             let mut ok = true;

@@ -87,6 +87,7 @@ A call writes the request as UTF-8 JSON, calls `rnl_build`, and reads the answer
 | `svg` | Whether each level's SVG is written; true when not given. |
 | `primitives` | Whether each level's primitives are given; false when not given. |
 | `status` | Whether each level gets its solve status, `solve`, what a frontend decides from whether to solve it ([`rnl-view`](../../crates/rnl-view/README.md)); false when not given. |
+| `constraints` | Whether each level gets its constraints after expansion, `constraints` ([`rnl-view`](../../crates/rnl-view/README.md#the-constraints-of-a-level)); false when not given. Experimental. |
 | `lazy_unplaced` | Whether the Document leaves out the drawings of the objects without a position, `Level.unplaced[].svg` and `primitives`, which the core keeps to give on request ([below](#drawings-of-the-objects-without-a-position)); false when not given. |
 | `parts` | `{"drawing", "host", "model"}`: the parts of the editor interface's snapshot to give ([`rnl-view`](../../crates/rnl-view/README.md#snapshots)), the Document unless `drawing` is false, each level's host circuit and model when they are true. With it, the answer is a snapshot. |
 

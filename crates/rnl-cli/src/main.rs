@@ -57,6 +57,8 @@ view options:
   --primitives        give each level's primitives, in scene units with y up
   --no-svg            leave out each level's SVG
   --status            give each level its solve status: fixed, unsolved, solved or stale
+  --constraints       give each level its constraints after expansion, what a solver takes in, tied
+                      to the Document's objects; experimental, not promised to stay as it is
   --bind SUBCKT       show the parameters of the subcircuit SUBCKT with the values --param gives
   --param NAME=VALUE  a value for a parameter of the subcircuit --bind names, as text; repeatable.
                       Only the Document's lists of parameters change; nothing drawn does
@@ -129,6 +131,8 @@ struct Args {
     svg: bool,
     primitives: bool,
     status: bool,
+    /// `view`'s `--constraints`.
+    constraints: bool,
     level: Option<String>,
     /// As given; `problem` and `solve` each have their own default.
     solver_options: Option<String>,
@@ -157,6 +161,7 @@ fn parse_args() -> Result<Args, String> {
     }
     let mut positional = Vec::new();
     let mut json = false;
+    let mut constraints = false;
     let mut bind_subckt: Option<String> = None;
     let mut bind_params: BTreeMap<String, String> = BTreeMap::new();
     let mut out = None;
@@ -224,6 +229,7 @@ fn parse_args() -> Result<Args, String> {
             "--no-svg" => svg = false,
             "--primitives" => primitives = true,
             "--status" => status = true,
+            "--constraints" => constraints = true,
             "--previous" => previous = true,
             "--level" => level = Some(it.next().ok_or("--level needs a title")?),
             "--solver-options" => solver_options = Some(it.next().ok_or("--solver-options needs a text")?),
@@ -259,6 +265,9 @@ fn parse_args() -> Result<Args, String> {
     let file = positional.pop().map(PathBuf::from);
     if json && command != "explain" {
         return Err("--json is an option of explain".into());
+    }
+    if constraints && command != "view" {
+        return Err("--constraints is an option of view; rnl problem prints what a solver reads".into());
     }
     if (bind_subckt.is_some() || !bind_params.is_empty()) && command != "view" {
         return Err("--bind and --param are options of view".into());
@@ -301,6 +310,7 @@ fn parse_args() -> Result<Args, String> {
         svg,
         primitives,
         status,
+        constraints,
         level,
         solver_options,
         in_place,
@@ -478,6 +488,7 @@ fn run(args: &Args) -> Result<ExitCode, String> {
                 svg: args.svg,
                 primitives: args.primitives,
                 status: args.status,
+                constraints: args.constraints,
                 bind: args.bind.clone(),
             };
             let doc = rnl_view::build(&args.file.to_string_lossy(), &provider, &options)?;
@@ -492,6 +503,7 @@ fn run(args: &Args) -> Result<ExitCode, String> {
                 svg: false,
                 primitives: false,
                 status: false,
+                constraints: false,
                 bind: None,
             };
             let doc = rnl_view::build(&args.file.to_string_lossy(), &provider, &options)?;
@@ -524,6 +536,7 @@ fn run(args: &Args) -> Result<ExitCode, String> {
                 svg: args.svg,
                 primitives: args.primitives,
                 status: args.status,
+                constraints: false,
                 bind: None,
             };
             let snapshot = rnl_view::snapshot(&args.file.to_string_lossy(), &provider, &options, parts)?;

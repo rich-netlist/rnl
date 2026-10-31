@@ -55,6 +55,11 @@ pub struct LevelReport {
     pub title: String,
     /// "file" or "subckt".
     pub kind: &'static str,
+    /// The host level, as `Level.host` names it.
+    pub host: usize,
+    /// The digest of the input solved. When a level of a Document has the same in its
+    /// `constraints.input`, `facts[k]` here is `constraints.facts[k]` there.
+    pub input: String,
     /// Such as `5 kept, 1 discarded of 6 facts`.
     pub summary: String,
     /// Every fact, in the order of 8.5.
@@ -116,8 +121,12 @@ pub fn preview(
         written.insert(&f.path, &f.text);
     }
     let both = Layered { layers: vec![&written, files] };
-    let build =
-        BuildOptions { dialect: options.dialect.clone(), formats: options.formats.clone(), ..BuildOptions::default() };
+    let build = BuildOptions {
+        dialect: options.dialect.clone(),
+        formats: options.formats.clone(),
+        constraints: true,
+        ..BuildOptions::default()
+    };
     let document = rnl_view::build(entry, &both, &build)?;
     // the texts as a solver reads them, without the records of the solver, so that the facts are
     // those solved, at the lines where the Document shows them
@@ -192,6 +201,8 @@ fn report(run: &SolveRun, document: &Document, problems: &[LevelProblem]) -> Rep
         levels.push(LevelReport {
             title: p.title.clone(),
             kind: p.kind,
+            host: p.level,
+            input: rnl_runtime::problem::input_digest(p),
             summary: format!(
                 "{} kept, {} discarded{failed} of {} {noun}",
                 r.kept.len(),

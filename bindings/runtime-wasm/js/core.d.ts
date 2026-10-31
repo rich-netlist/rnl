@@ -68,6 +68,11 @@ export interface Request {
    */
   status?: boolean;
   /**
+   * Give each level its constraints after expansion, `constraints`, what a solver takes in, tied to
+   * the objects of this Document; no solver is needed. Experimental: not promised to stay as it is.
+   */
+  constraints?: boolean;
+  /**
    * The values to build a subcircuit's parameters with, for showing: `subckt`, its name, and
    * `params`, values for some of its parameters as text, such as "2u", "1e-06" or "{2*l}". Only
    * the Document's lists of parameters change (`Level.params`, `Child.effective`); nothing drawn
