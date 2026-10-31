@@ -60,6 +60,7 @@ find apps/viewer-ui -name '*.js' -print0 | xargs -0 -n 1 node --check
 | `formats.js` | The parse format chosen for each file in the Library, kept by path under `file-formats`, and the core's list of formats, whose titles it translates where they are words (`formatTitle`: Text; SPICE and Spectre are names); the choices that every request to the core carries (see **Parse formats**, after the Library's paragraphs). |
 | `package-offers.js` | Background web lookup of explicit missing packages and navigation-safe Library confirmations. |
 | `hierarchy.js` | The hierarchy view: the instance tree, with below it the subcircuits that the top level does not call as trees of their own, and the subcircuit index with its search and initials. |
+| `origins.js` | View › Show Registration Points: a small mark at the registration point of each instance and each usage with a symbol, from the `origin` of the box hits; painted with the other overlays by `usages.js`. |
 | `usages.js` | Scope-local usages grouped by definition, folded to begin with, and Expand All / Collapse All; editable Color, visibility preferences, source and roles; fixed-screen overlays and role labels, selection focus and border picking. |
 | `roots.js` | The subcircuits that the top level does not call, which start trees of their own, and the level a document opens on (see [Subcircuits that nothing calls](#subcircuits-that-nothing-calls)). |
 | `unplaced.js` | The Not drawn view: the objects of the level shown that have no position, each with its symbol and the nets at its terminals, in a list that loads a part at a time, with their drawings, and is searched by name (see [The objects not drawn](#the-objects-not-drawn)). |
@@ -131,6 +132,8 @@ hits put the usage first and retain the associated net for network highlighting.
 or pin still selects the net, marks its pins with circles, and draws no symbol frames; selecting
 a usage draws its own box without pin circles or an open-subcircuit badge. Usage labels keep the
 net first when present, preserving label clicks and network label highlighting.
+
+**View › Show Registration Points** (`origins.js`; off to begin with, kept with the other View settings as `origins-shown`, on the web and on the desktop) draws a small mark, a cross in a ring with a light halo, at the registration point of each instance and each usage with a symbol of the level shown: the point its position (`@PLACE`) is the place of, which the core gives as `Hit.origin` of its `box` hit, in SVG pixels like the hit's points. The mark is drawn at one size whatever the zoom, over the drawing and the usages' frames and under the current directions, takes no pointer events, and is not in File > Export Image, which the core draws; it is shown on the netlist's drawing and on a solve's preview alike. A box with no `origin` (an object with no position has no hit at all) has none.
 
 Zero and omitted line widths use the renderer's 1.2 CSS-pixel hairline, with SVG non-scaling strokes;
 double hairlines use two 1.2-pixel lines separated by a 1.2-pixel gap. Nonzero widths keep their

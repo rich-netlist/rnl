@@ -565,6 +565,7 @@
   "Show &Names on Hover": "마우스오버 시 이름 표시(&N)",
   "Show &Usages": "용례 표시(&U)",
   "Show Current &Directions": "전류 방향 표시(&D)",
+  "Show Registration &Points": "등록점 표시(&P)",
   "&Language": "언어(&L)",
   "Side P&anels": "사이드 패널(&A)",
   "&Library": "라이브러리(&L)",

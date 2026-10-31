@@ -25,6 +25,19 @@ async function exported(page, command) {
 }
 const count = (text, pattern) => (text.match(pattern) || []).length;
 
+test('the registration points of View > Show Registration Points are not in an exported image', async ({ page }) => {
+  await open(page);
+  await page.evaluate(() => { window.viewer.command('toggle-origins'); });
+  await expect(page.locator('#canvas .origin-marks .origin-mark').first()).toBeAttached();
+  const svg = await exported(page, 'export-svg');
+  const text = svg.bytes.toString();
+  expect(text.startsWith('<?xml')).toBe(true);
+  expect(text).not.toContain('origin-mark');
+  expect(text).not.toContain('origin-marks');
+  // the page's own marks are there still
+  await expect(page.locator('#canvas .origin-marks .origin-mark').first()).toBeAttached();
+});
+
 test('Export SVG draws the whole level with the usages and current directions the page shows, on or off', async ({ page }) => {
   await open(page);
   const shown = await page.evaluate(async () => {

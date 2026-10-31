@@ -85,7 +85,7 @@ test.describe("on the web", () => {
         items: [
           "Fit to WindowF", "Zoom InCtrl++", "Zoom OutCtrl+-", "Color Scheme...",
           "Background", "Light", "Dark",
-          "Grid", "Show GridG", "", "None", "Dots", "Lines", "", "Axes", "", "Grid Settings...", "Show Names on Hover", "Show Roles on Hover", "Show UsagesCtrl+R", "Show Current DirectionsShift+R", "Language", ...uiLanguages(repository).map((l) => l.name), "",
+          "Grid", "Show GridG", "", "None", "Dots", "Lines", "", "Axes", "", "Grid Settings...", "Show Names on Hover", "Show Roles on Hover", "Show UsagesCtrl+R", "Show Current DirectionsShift+R", "Show Registration Points", "Language", ...uiLanguages(repository).map((l) => l.name), "",
           "Side Panels", "Library1", "Netlist2", "Hierarchy3", "Symbol4", "Usage5", "Not Drawn6", "Solve7", "", "Hide",
         ],
       },
@@ -437,7 +437,7 @@ test.describe("with a native menu", () => {
       ["background-light", true], ["background-dark", false],
       ["toggle-netlist", true], ["toggle-problems", true], ["toggle-edit", false],
       ["toggle-grid", true], ["grid-none", false], ["grid-dots", true], ["grid-lines", false], ["grid-axes", false],
-      ["toggle-hover-names", true], ["toggle-hover-roles", false], ["toggle-usages", true], ["toggle-currents", false],
+      ["toggle-hover-names", true], ["toggle-hover-roles", false], ["toggle-usages", true], ["toggle-currents", false], ["toggle-origins", false],
       ...uiLanguages(repository).map((l, i) => [`language-${l.lang}`, i === 0]),
       ["toggle-auto-include", true],
     ];

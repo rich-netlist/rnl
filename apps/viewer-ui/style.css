@@ -241,6 +241,8 @@ button.membership-id { cursor: pointer; text-decoration: underline dotted; }
 .usage-hide:hover .usage-hide-box { fill: var(--usage-btn-hover); stroke: var(--usage-btn-line-hover); }
 .usage-hide:active .usage-hide-box { fill: var(--usage-btn-down); }
 .usage-hide:focus-visible .usage-hide-box { stroke: var(--accent); stroke-width: 2; }
+.origin-marks { --origin-color: #c2255c; --usage-label-bg: white; }
+body[data-background="dark"] .origin-marks { --origin-color: #ff6b9a; --usage-label-bg: black; }
 .usage-overlays, .constraint-box { --usage-label-bg: white; --usage-btn: #f2f2f5; --usage-btn-hover: #ffffff; --usage-btn-down: #d9d9e0; --usage-btn-line: #8a8a94; --usage-btn-line-hover: #4a4a54; }
 body[data-background="dark"] .usage-overlays, body[data-background="dark"] .constraint-box { --usage-label-bg: black; --usage-btn: #3a3a42; --usage-btn-hover: #4c4c56; --usage-btn-down: #26262c; --usage-btn-line: #9a9aa6; --usage-btn-line-hover: #d8d8e0; }
 .netlist-pane {
