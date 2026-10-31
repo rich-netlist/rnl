@@ -3,8 +3,9 @@ import { append, m, setAttr, setText, tr } from "./i18n.js";
 // the structures are expanded, which the core gives with the Document (`Level.constraints`, built when the build asks
 // for them: state.js `constraintsWanted`). One row for each fact, in the order the solver takes them (8.5): what it says,
 // its priority, the structure it comes from, and, once the netlist is solved, what became of it, which the solve's report
-// tells. A click on a row lights up the objects it acts on and the usages it comes from in the drawing, as pointing at a
-// row of the Usage view does (usages.js); a click on its place shows it in the netlist. Experimental, as the core's
+// tells. A click on a row lights up the objects it acts on in the drawing, as pointing at a row of the Usage view does
+// (usages.js), and boxes them, with what the constraint says at the box's corner and the order it lists them in (a
+// usage's frame is drawn so; constraint-box.js); a click on its place shows it in the netlist. Experimental, as the core's
 // interface is.
 
 import { clearSelection } from "./selection.js";
@@ -12,6 +13,7 @@ import { setPane } from "./panels.js";
 import { current, doc } from "./state.js";
 import { revealLine } from "./text.js";
 import { highlightConstraint } from "./usages.js";
+import { factTextIds } from "./constraint-box.js";
 import { $, span, svgElement } from "./util.js";
 
 /**
@@ -101,7 +103,8 @@ export function levelRows(level, report) {
       why: line?.why ?? null,
       at: placeOf(fact.source) ?? line?.at ?? null,
       objects: new Set([...factObjects(fact)].flatMap((o) => c.objects[o]?.objects ?? [])),
-      usages: new Set(fact.chain.map((u) => c.usages[u]?.object).filter((o) => o !== null && o !== undefined)),
+      texts: new Set(factTextIds(level, fact)),
+      fact,
     };
   });
 }
@@ -168,7 +171,7 @@ function rowElement(row, levelIndex) {
     li.classList.add("selected");
     li.setAttribute("aria-pressed", "true");
     // only the level shown has its objects in the drawing
-    highlightConstraint(levelIndex === current ? { objects: row.objects, usages: row.usages } : null);
+    highlightConstraint(levelIndex === current ? { objects: row.objects, texts: row.texts, fact: row.fact } : null);
   };
   li.addEventListener("click", choose);
   li.addEventListener("keydown", (e) => {

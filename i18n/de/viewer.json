@@ -699,7 +699,7 @@
   "Constraints": "Randbedingungen",
   "Report": "Bericht",
   "What the Solve view shows": "Was die Ansicht Lösen zeigt",
-  "The constraints of this netlist as the solver takes them in, after the structures are expanded, in the order it takes them. Click one to light up the objects it acts on and the usages it comes from.": "Die Randbedingungen dieser Netzliste, wie der Löser sie aufnimmt, nachdem die Strukturen aufgelöst sind, in der Reihenfolge, in der er sie nimmt. Ein Klick hebt die Objekte hervor, auf die sie wirkt, und die Verwendungen, aus denen sie stammt.",
+  "The constraints of this netlist as the solver takes them in, after the structures are expanded, in the order it takes them. Click one to box the objects it acts on in the drawing, numbered in the order it lists them.": "Die Randbedingungen dieser Netzliste, wie der Löser sie aufnimmt, nachdem die Strukturen aufgelöst sind, in der Reihenfolge, in der er sie nimmt. Ein Klick umrahmt in der Zeichnung die Objekte, auf die sie wirkt, und nummeriert sie in der Reihenfolge, in der sie sie aufführt.",
   "Filter the constraints": "Randbedingungen filtern",
   "Filter the constraints by what they say, their priority, their structure or their result": "Randbedingungen nach Inhalt, Priorität, Struktur oder Ergebnis filtern",
   "written in the netlist": "in der Netzliste geschrieben",
