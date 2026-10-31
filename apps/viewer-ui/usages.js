@@ -355,6 +355,7 @@ function litFrames() {
  * component does; the titles of the muted ones are not shown, which `paintUsages` sees in `muted`. With null, dim none.
  */
 function muteFrames(lit, force = false) {
+  let changed = false;
   for (const f of frames) {
     const muted = lit !== null && !lit.has(f.entry.object);
     if (!force && f.muted === muted) continue;
@@ -363,6 +364,12 @@ function muteFrames(lit, force = false) {
     f.group.toggleAttribute("data-muted", muted);
     f.rect.setAttribute("stroke", colour);
     f.fill.setAttribute("fill", colour);
+    changed = true;
+  }
+  // the frames that stay lit are over those that are muted; with none muted, the frames are in the order they were made in
+  if (changed) {
+    for (const f of frames) if (f.muted) layer.append(f.group);
+    for (const f of frames) if (!f.muted) layer.append(f.group);
   }
 }
 // the drawing's background decides how far a muted colour goes
@@ -452,6 +459,7 @@ export function paintUsages(svg, view, groups) {
       frames.push({ entry, color, group, bounds, rect, fill, title, roles, active, local, pad: (levels.get(entry.object) ?? 0) * FRAME_STEP });
     }
     append(svg, currentLayer);
+    window.dispatchEvent(new Event("usage-layer"));
   }
   muteFrames(litFrames());
   layer.setAttribute("transform", `translate(${view.x} ${view.y}) scale(${1 / view.k})`);

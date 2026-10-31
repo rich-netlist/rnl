@@ -6,7 +6,7 @@ import { append, m, setAttr, setText } from "./i18n.js";
 // labels attached to it, and a selected subcircuit instance gets the open badge. The grid under it
 // follows the view, and the status bar shows where the pointer is in the scene.
 
-import { current, doc, selected, setCurrent, setPath } from "./state.js";
+import { current, doc, selected, selectedAsUsage, setCurrent, setPath } from "./state.js";
 import { colourDrawing } from "./background.js";
 import { paintGrid } from "./grid.js";
 import { updateHierarchy } from "./hierarchy.js";
@@ -480,6 +480,7 @@ new ResizeObserver(() => {
 export function paintDrawingSelection() {
   badgeAt = null;
   positionBadge();
+  lower();
   if (!svg) return;
   for (const g of svg.querySelectorAll(".sel")) g.classList.remove("sel");
   overlay.replaceChildren();
@@ -507,8 +508,38 @@ export function paintDrawingSelection() {
       append(overlay, c);
     }
   }
+  // the object and its texts are drawn over the usages' frames and titles, not under them; a selected usage's own frame
+  // is already over the drawing
+  if (!selectedAsUsage) lift();
+  stack();
   positionBadge();
 }
+
+/**
+ * The selected object's groups of the drawing, with a comment in the place of each in the drawing, so that they go back
+ * to it. They are taken out of the drawing and put over the layer of the usages (usages.js).
+ */
+let lifted = [];
+function lower() {
+  for (const [g, mark] of lifted) mark.replaceWith(g);
+  lifted = [];
+}
+function lift() {
+  for (const g of svg.querySelectorAll(":scope > g.sel")) {
+    const mark = document.createComment("");
+    g.replaceWith(mark);
+    lifted.push([g, mark]);
+  }
+}
+/** The order of the top of the drawing: the usages' layer, over it what is lifted and the marks of the selection, the currents last. */
+function stack() {
+  if (!svg) return;
+  const top = svg.querySelector(":scope > .current-overlays");
+  for (const [g] of lifted) svg.insertBefore(g, top);
+  svg.insertBefore(overlay, top);
+}
+// the layer of the usages is made again when a usage is shown or hidden, over what was lifted
+window.addEventListener("usage-layer", stack);
 
 /** Put the open badge on its corner of the drawing, at the same size whatever the zoom. */
 function positionBadge() {

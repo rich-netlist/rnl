@@ -150,6 +150,45 @@ test("selecting a component keeps the frames and titles of the usages it is in, 
   expect(await state()).toEqual(all);
 });
 
+test("a selected component and its texts are drawn over the frames and titles of the usages, and go back when it is not selected", async ({ page }) => {
+  // where the selected object's groups are against the layer of the usages: after it is over it
+  const order = () => page.evaluate(() => {
+    const svg = document.querySelector("#canvas > svg");
+    const layer = svg.querySelector(":scope > .usage-overlays");
+    const over = (el) => !!(layer.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING);
+    const sel = [...svg.querySelectorAll("g.sel")];
+    const currents = svg.querySelector(":scope > .current-overlays");
+    return { sel: sel.length, over: sel.map(over), overlay: over(svg.querySelector(":scope > .overlay")), currentsLast: !currents || svg.lastElementChild === currents,
+      groups: [...svg.querySelectorAll(":scope > g[data-id]")].map((g) => g.getAttribute("data-id")) };
+  });
+  const before = await order();
+  expect(before.sel).toBe(0);
+  await selectObject(page, "instance", "M1");
+  const lit = await order();
+  expect(lit.sel).toBeGreaterThan(1); // its symbol and its labels
+  expect(lit.over.every(Boolean)).toBe(true);
+  expect(lit.overlay).toBe(true);
+  expect(lit.currentsLast).toBe(true);
+  // another component: the first one goes back to its place, in the order it had
+  await selectObject(page, "instance", "M5");
+  expect((await order()).over.every(Boolean)).toBe(true);
+  await page.locator("#canvas").click({ position: { x: 2, y: 2 } });
+  const after = await order();
+  expect(after.sel).toBe(0);
+  expect(after.groups).toEqual(before.groups);
+  // a frame made again (the usages hidden and shown) keeps it over: the selected one is over the new layer
+  await selectObject(page, "instance", "M1");
+  await page.evaluate(() => window.viewer.command("toggle-usages"));
+  await page.evaluate(() => window.viewer.command("toggle-usages"));
+  expect((await order()).over.every(Boolean)).toBe(true);
+  // a selected group's own frame is over the other frames, whatever order they were made in
+  await page.locator("#usage-list .usage-expand").last().click();
+  await row(page, "%inp").locator(".usage-name").click();
+  const last = await page.evaluate(() => [...document.querySelectorAll("#canvas .usage-frame")].at(-1).querySelector(".usage-title text")?.textContent);
+  expect(last).toBe("@GROUP: %inp");
+  expect((await order()).sel).toBe(0); // a selected usage lifts no component
+});
+
 test("the frames of nested groups are set out a level each, so that their labels do not lie on one another", async ({ page }) => {
   const box = (id) => page.evaluate((id) => {
     const object = window.viewer.doc.levels[0].usages.find((u) => u.id === id).object;
