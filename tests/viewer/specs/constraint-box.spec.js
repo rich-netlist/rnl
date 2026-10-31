@@ -21,7 +21,8 @@ X1 d e cell
 *   #R1 @PLACE(0, 0); #R2 @PLACE(9, 0); #R3 @PLACE(18, 0); #X1 @PLACE(27, 0);
 *   {#R1 #R2 #R3} @ALIGN("y");
 *   {#R3 #R1 #R2} @ORDER("left-to-right");
-*   #R1 #R2 @DISTANCE("x", min=2, max=4)
+*   #R1 #R2 @DISTANCE("x", min=2, max=4);
+*   {#R2 #R3 #R2} @ALIGN("y")
 * }
 .end
 `;
@@ -61,6 +62,50 @@ test('a box with a title and the numbers of the objects, in the order the constr
   // a second click on the row takes the box away
   await row(page, /DISTANCE x/).click();
   await expect(frame(page)).toHaveCount(0);
+});
+
+test("a number is at the centre of its object's box, and two numbers at one place are side by side", async ({ page }) => {
+  await open(page);
+  await row(page, /ALIGN y \{#R1 #R2 #R3\}/).click();
+  await expect(frame(page)).toHaveCount(1);
+  const marks = () => page.evaluate(() => {
+    const svg = document.querySelector('.constraint-box').ownerSVGElement;
+    const vb = svg.viewBox.baseVal;
+    const k = svg.getBoundingClientRect().width / vb.width;
+    const level = window.viewer.doc.levels[0];
+    const centre = (name) => {
+      const idx = window.viewer.doc.objects.findIndex((o) => o.kind === 'instance' && o.name === name);
+      const [[x0, y0], [x1, y1]] = level.hits.find((h) => h.kind === 'box' && h.objects[0] === idx).points;
+      return [(x0 + x1) / 2, (y0 + y1) / 2];
+    };
+    const at = (g) => {
+      const m = /translate\(([-\d.e]+)[ ,]([-\d.e]+)\)/.exec(g.getAttribute('transform'));
+      const b = g.querySelector('rect').getBBox();
+      return [Number(m[1]) + b.x + b.width / 2, Number(m[2])];
+    };
+    const layer = document.querySelector('.constraint-box');
+    const scale = layer.getAttribute('transform').match(/scale\(([-\d.e]+)\)/)[1];
+    return {
+      k, view: [vb.x, vb.y], scale: Number(scale),
+      marks: [...layer.querySelectorAll('.constraint-mark')].map((g) => ({ text: g.querySelector('text').textContent, at: at(g), box: g.getBoundingClientRect().toJSON() })),
+      centres: ['R1', 'R2', 'R3'].map(centre),
+    };
+  });
+  const one = await marks();
+  expect(one.marks.map((m) => m.text)).toEqual(['1', '2', '3']);
+  // the badge's centre, in screen pixels of the layer, is the centre of the object's box
+  one.marks.forEach((m, i) => {
+    const [cx, cy] = one.centres[i];
+    expect(m.at[0] * one.scale + one.view[0]).toBeCloseTo(cx, 0);
+    expect(m.at[1] * one.scale + one.view[1]).toBeCloseTo(cy, 0);
+  });
+  // an object listed twice: both numbers, in a row, not on each other
+  await row(page, /ALIGN y \{#R2 #R3 #R2\}/).click();
+  const two = (await marks()).marks;
+  expect(two.map((m) => m.text)).toEqual(['1', '2', '3']);
+  const same = two.filter((m) => m.text !== '2');
+  expect(same[0].box.right).toBeLessThanOrEqual(same[1].box.left + 0.5);
+  expect(Math.abs(same[0].box.top - same[1].box.top)).toBeLessThan(1);
 });
 
 test('the box is not in an exported image', async ({ page }) => {

@@ -567,7 +567,6 @@ export function paintUsages(svg, view, groups) {
   placeConstraintBox(project);
 }
 const CONSTRAINT_PAD = 14; // the pixels of the constraint's box around the objects
-const MARK_ROW = 14; // the pixels more below them, where their numbers are, when it has any
 const MARK_GAP = 3; // the pixels between the numbers at one place
 /** The rectangle a text of the drawing that the hits do not know covers: the one group that has the id; null when none or several. */
 function textBox(groups) {
@@ -598,29 +597,35 @@ function makeConstraintBox(svg, groups) {
   svg.insertBefore(constraintLayer, layer.nextSibling);
   constraintShown = { fill, rect, title, marks, box };
 }
-/** Put the box of the constraint on the view: around its objects, its title on the upper edge, the numbers at the objects' corners. */
+/** Put the box of the constraint on the view: around its objects, its title on the upper edge, the numbers at the objects' centres. */
 function placeConstraintBox(project) {
   if (!constraintShown) return;
   const { fill, rect, title, marks, box } = constraintShown;
   const [x0, y0] = project(box.bounds[0], box.bounds[1]);
   const [x1, y1] = project(box.bounds[2], box.bounds[3]);
-  const b = [x0 - CONSTRAINT_PAD, y0 - CONSTRAINT_PAD, x1 + CONSTRAINT_PAD, y1 + CONSTRAINT_PAD + (marks.length > 0 ? MARK_ROW : 0)];
+  const b = [x0 - CONSTRAINT_PAD, y0 - CONSTRAINT_PAD, x1 + CONSTRAINT_PAD, y1 + CONSTRAINT_PAD];
   const transform = layer.getAttribute("transform");
   constraintLayer.setAttribute("transform", transform);
   for (const [attr, value] of Object.entries({ x: b[0], y: b[1], width: b[2] - b[0], height: b[3] - b[1] })) {
     rect.setAttribute(attr, value); fill.setAttribute(attr, value);
   }
   placeBadge(title, b[0] + 12, b[1], false);
-  // a number at the lower left corner of each object, below it, in the band the box keeps for them (its title is above);
-  // the ones at one corner side by side
-  const used = new Map();
+  // a number at the centre of each object's own box (the point of a pin), as a usage's role is at its anchor; the ones at
+  // one place, an object listed twice, side by side in a row about that place
+  const at = new Map();
   for (const mark of marks) {
-    const [x, y] = project(mark.item.rect[0], mark.item.rect[3]);
+    const [x, y] = project((mark.item.rect[0] + mark.item.rect[2]) / 2, (mark.item.rect[1] + mark.item.rect[3]) / 2);
     const key = `${Math.round(x)} ${Math.round(y)}`;
-    const taken = used.get(key) ?? 0;
-    const width = (mark.width ??= mark.label.getComputedTextLength()) + 8;
-    placeBadge(mark, x - 4 + taken + width / 2, y + CONSTRAINT_PAD + MARK_ROW / 2, true);
-    used.set(key, taken + width + MARK_GAP);
+    if (!at.has(key)) at.set(key, { x, y, marks: [] });
+    at.get(key).marks.push(mark);
+  }
+  for (const { x, y, marks: here } of at.values()) {
+    const widths = here.map((mark) => (mark.width ??= mark.label.getComputedTextLength()) + 8);
+    let left = x - (widths.reduce((sum, w) => sum + w, 0) + MARK_GAP * (here.length - 1)) / 2;
+    here.forEach((mark, k) => {
+      placeBadge(mark, left + widths[k] / 2, y, true);
+      left += widths[k] + MARK_GAP;
+    });
   }
 }
 /**

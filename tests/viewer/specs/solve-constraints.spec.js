@@ -216,6 +216,7 @@ for (const platform of ["web", "desktop"]) {
     });
 
     test("a constraint none of whose objects is on the drawing has no box, and no error", async ({ page }) => {
+      test.setTimeout(120000); // (every row, twice: a slow engine takes its time)
       const errors = [];
       page.on("pageerror", (e) => errors.push(e.message));
       // the rows of the levels that are not shown have no objects in the drawing
