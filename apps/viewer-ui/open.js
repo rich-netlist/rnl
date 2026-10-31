@@ -65,7 +65,7 @@ export async function openSource(source, keep, edited, fresh = false, navigation
     d = await shell.build(source, edited, stage => {
       if (operation.signal.aborted) throw new Error('Opening superseded');
       progress.setStage(stage);
-    }, undefined, operation.signal, { fresh, bind: options.bind, constraints: constraintsWanted });
+    }, undefined, operation.signal, { fresh, bind: options.bind, ...(constraintsWanted ? { constraints: true } : {}) });
     if (operation.signal.aborted) return;
     if (options.bound) bindings.set(d, options.bound);
     await progress.stage("displaying");
