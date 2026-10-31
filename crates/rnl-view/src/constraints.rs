@@ -62,13 +62,9 @@ pub struct ConstraintObject {
     /// What it is in `Document.objects`: an instance, the instances of a bundle, or a usage; empty
     /// for a point, a text, and an object without an id.
     pub objects: Vec<usize>,
-    /// Where it is drawn on this level, in SVG pixels with y down, as `Hit.points`: the registration
-    /// point of a symbol, a point, the anchor of a text. None when it has no position, or has
-    /// nothing drawn there, such as a free point or a usage not placed. A centre has none: a
-    /// viewer marks the objects of the set.
-    pub at: Option<[f64; 2]>,
-    /// Where each pin of its symbol is drawn, by `ConstraintPoint::Pin.pin`, in the same pixels,
-    /// with or without a net on it. Empty when it is not drawn with a symbol.
+    /// Where each pin of its symbol is drawn, by `ConstraintPoint::Pin.pin`, in SVG pixels with y
+    /// down, as `Hit.points`, with or without a net on it. Empty when it has no position or no
+    /// symbol, so that it is not drawn.
     pub pins: Vec<[f64; 2]>,
 }
 
@@ -313,13 +309,6 @@ pub(crate) fn level_constraints(
     let infos: HashMap<&str, &Vec<String>> = lv.objects.iter().map(|o| (o.id.as_str(), &o.host)).collect();
     let px = |p: Pt| [p.0 * level.scale, -p.1 * level.scale];
     let items: HashMap<&str, &ItemView> = lv.items.iter().map(|it| (it.object_id.as_str(), it)).collect();
-    let points: HashMap<&str, Pt> =
-        lv.points.iter().chain(&lv.other_points).filter_map(|q| Some((q.id.as_str(), q.at?))).collect();
-    let mut texts: HashMap<&str, Pt> = HashMap::new();
-    for t in &lv.texts {
-        texts.entry(t.object_id.as_str()).or_insert(t.anchor);
-    }
-    let drawn = |id: &str| items.get(id).map(|it| it.at).or_else(|| points.get(id).or_else(|| texts.get(id)).copied());
     let pins = |id: &str| -> Vec<[f64; 2]> {
         let Some(it) = items.get(id) else { return Vec::new() };
         lv.symbols[it.symbol].pins.iter().map(|pin| px(place(it.at, it.orient, pin.pos))).collect()
@@ -342,7 +331,6 @@ pub(crate) fn level_constraints(
                 reference: reference(&o.reference, numbers),
                 generated: o.generated,
                 objects: id.as_deref().map(document).unwrap_or_default(),
-                at: id.as_deref().and_then(drawn).map(px),
                 pins: id.as_deref().map(pins).unwrap_or_default(),
                 id: id.clone(),
             })

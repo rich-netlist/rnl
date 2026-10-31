@@ -324,6 +324,12 @@ pub struct Hit {
     pub kind: &'static str,
     /// In SVG pixels, y down.
     pub points: Vec<[f64; 2]>,
+    /// For a "box", the registration point of the symbol it is drawn with, where the object is placed,
+    /// in the same pixels; absent on the others. An object with no position has no hit. **Experimental:
+    /// not promised to stay as it is.**
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
+    pub origin: Option<[f64; 2]>,
     /// The objects it stands for: an instance (several for a bundle), a usage followed by its
     /// associated net, or nets. The first object is what clicking the hit selects. A usage's
     /// label keeps its net first, so clicking a net label continues to select the net.
@@ -865,6 +871,7 @@ impl<'a> Index<'a> {
             hits.push(Hit {
                 kind: "box",
                 points: vec![px((left, top)), px((right, bottom))],
+                origin: Some(px(it.at)),
                 objects,
                 id: Some(it.id.clone()),
                 name,
@@ -875,7 +882,7 @@ impl<'a> Index<'a> {
                 }
                 let objects = nets.iter().map(|n| self.net(lv.level, n)).collect();
                 let points = vec![px(place(it.at, it.orient, pin.pos))];
-                hits.push(Hit { kind: "pin", points, objects, id: None, name: None });
+                hits.push(Hit { kind: "pin", points, origin: None, objects, id: None, name: None });
             }
         }
         for w in &lv.wires {
@@ -883,6 +890,7 @@ impl<'a> Index<'a> {
             hits.push(Hit {
                 kind: "wire",
                 points: w.points.iter().map(|p| px(*p)).collect(),
+                origin: None,
                 objects,
                 id: Some(w.id.clone()),
                 name: None,
@@ -914,6 +922,7 @@ impl<'a> Index<'a> {
             hits.push(Hit {
                 kind: "label",
                 points: vec![px((x0.min(x1), y0.max(y1))), px((x0.max(x1), y0.min(y1)))],
+                origin: None,
                 objects,
                 id: Some(t.id.clone()),
                 name: None,
