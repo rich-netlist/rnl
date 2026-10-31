@@ -27,6 +27,7 @@ import { bundledPackagesHelp } from "./bundled-packages.js";
 import { fileAssociations } from "./file-associations.js";
 import { memoryCache } from "./memory-cache.js";
 import { toggleUsages, toggleCurrents } from "./usages.js";
+import { toggleOrigins } from "./origins.js";
 import { netlistColors } from "./netlist-colors.js";
 import { downloadManifest, openManifest, openProject, saveProject } from "./project.js";
 import { exportImage } from "./export-image.js";
@@ -122,6 +123,7 @@ export function command(id, options = {}) {
     case "toggle-hover-roles": setHoverRoles(!hoverRolesOn()); break;
     case "toggle-usages": return toggleUsages();
     case "toggle-currents": return toggleCurrents();
+    case "toggle-origins": return toggleOrigins();
     case "toggle-netlist": setSidebar($("app").classList.contains("sidebar-hidden")); break;
     case "toggle-problems": setProblems($("pane-netlist").classList.contains("problems-folded")); break;
     case "panel-hide": return setSidebar(false);

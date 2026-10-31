@@ -11,6 +11,7 @@ import { FRAME_STEP, frameSteps, TITLE_ROW, titleRows } from "./frame-layout.js"
 import { setPane } from "./panels.js";
 import { revealLine } from "./text.js";
 import { constraintBox } from "./constraint-box.js";
+import { paintOrigins, startOrigins } from "./origins.js";
 
 export const USAGE_COLORS = ["#e03131", "#e5b500", "#4263eb", "#2f9e44", "#9c36b5", "#009ccc"];
 const MAX_PREFERENCES = 2000;
@@ -112,6 +113,7 @@ export function startUsages() {
   shown = load("usages-shown", true) !== false;
   currentsShown = load("currents-shown", false) === true;
   setCheck("toggle-currents", currentsShown);
+  startOrigins();
   setCheck("toggle-usages", shown);
   const height = Math.max(80, Math.min(800, Number(load("usage-list-height", 240)) || 240));
   document.documentElement.style.setProperty("--usage-list-h", `${height}px`);
@@ -476,6 +478,7 @@ export function paintUsages(svg, view, groups) {
   context = [svg, view, groups];
   if (!svg || !view) {
     frames = []; layer?.remove(); underlay?.remove(); currentLayer?.remove(); constraintLayer?.remove(); underlay = layer = currentLayer = constraintLayer = constraintShown = null;
+    paintOrigins(null, null);
     drawing = layerDoc = null; layerLevel = -1; layerRevision = -1; layerSelected = null; context = null;
     return;
   }
@@ -565,6 +568,7 @@ export function paintUsages(svg, view, groups) {
   }
   spreadTitles();
   placeConstraintBox(project);
+  paintOrigins(svg, view);
 }
 const CONSTRAINT_PAD = 14; // the pixels of the constraint's box around the objects
 const MARK_GAP = 3; // the pixels between the numbers at one place
@@ -673,4 +677,6 @@ function showSelected() {
   renderUsages();
 }
 window.addEventListener("viewer-selection", showSelected);
+// View > Show Registration Points (origins.js) is painted with the overlays
+window.addEventListener("origins-changed", repaint);
 window.addEventListener("language-changed", renderUsages);

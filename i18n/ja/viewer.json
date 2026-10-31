@@ -565,6 +565,7 @@
   "Show &Names on Hover": "ホバー時に名前を表示(&N)",
   "Show &Usages": "適用オブジェクトを表示(&U)",
   "Show Current &Directions": "電流方向を表示(&D)",
+  "Show Registration &Points": "登録点を表示(&P)",
   "&Language": "言語(&L)",
   "Side P&anels": "サイドパネル(&A)",
   "&Library": "ライブラリ(&L)",
