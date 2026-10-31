@@ -16,8 +16,35 @@ import { highlightConstraint } from "./usages.js";
 import { factTextIds } from "./constraint-box.js";
 import { $, span, svgElement } from "./util.js";
 
-const STATUS_MARKS = { kept: "✓", discarded: "✗", undecided: "?", failed: "!" };
-const STATUS_WORDS = { failed: tr("failed"), discarded: tr("discarded"), undecided: tr("undecided"), kept: tr("kept") };
+/**
+ * What the mark of a row says, from what became of the fact (`status`, which the solve's resolution decided) and whether
+ * it holds on the drawing as solved (`holds`, measured, which a solve's report gives apart from the status: true, false,
+ * or null when it cannot be measured). The mark is told by the status first, and `holds` only for a fact that is kept:
+ * ✓ kept and it holds; ✗ kept and it does not, the solver's own fault; ! discarded (it conflicts with others) or failed
+ * (it contradicts itself); ? undecided, even when the drawing happens to satisfy it, which the tooltip says; none for
+ * kept and not measurable, whose tooltip says so. `tip` is a key of the catalog, to be translated where it is shown.
+ */
+const MEASURED_TIPS = {
+  true: tr("Undecided: the check did not finish. Measured on the drawing, it holds."),
+  false: tr("Undecided: the check did not finish. Measured on the drawing, it does not hold."),
+  null: tr("Undecided: the check did not finish. It cannot be measured on the drawing."),
+};
+export function statusMark(status, holds = null) {
+  switch (status) {
+    case "kept":
+      if (holds === true) return { glyph: "✓", kind: "holds", tip: tr("Kept, and it holds on the drawing.") };
+      if (holds === false) return { glyph: "✗", kind: "broken", tip: tr("Kept, but it does not hold on the drawing: a fault of the solver.") };
+      return { glyph: "", kind: "unmeasured", tip: tr("Kept; it cannot be measured on the drawing.") };
+    case "discarded":
+      return { glyph: "!", kind: "dropped", tip: tr("Discarded: it conflicts with other constraints.") };
+    case "failed":
+      return { glyph: "!", kind: "failed", tip: tr("Failed: the constraint contradicts itself.") };
+    case "undecided":
+      return { glyph: "?", kind: "undecided", tip: MEASURED_TIPS[String(holds ?? null)] };
+    default:
+      return null;
+  }
+}
 
 /** Whether any level of a Document has its constraints: the build was asked for them. A package file has none either way. */
 export const hasConstraints = (d) => !!d && d.levels.some((l) => l.constraints);
@@ -72,6 +99,7 @@ export function levelRows(level, report) {
       structure: first ? `${first.definition}${named}` : null,
       chain: chain.map((u) => u.definition).join(" › "),
       status: line?.status ?? null,
+      holds: line?.holds ?? null,
       why: line?.why ?? null,
       at: placeOf(fact.source) ?? line?.at ?? null,
       objects: new Set([...factObjects(fact)].flatMap((o) => c.objects[o]?.objects ?? [])),
@@ -103,9 +131,12 @@ function rowElement(row, levelIndex) {
   detail.className = "detail";
   append(detail, span("pri", row.priority));
   append(detail, span("struct", row.structure || m("written in the netlist")));
-  if (row.status) {
-    const mark = span("st", STATUS_MARKS[row.status]);
-    setAttr(mark, "title", m(STATUS_WORDS[row.status]));
+  const status = row.status ? statusMark(row.status, row.holds) : null;
+  if (status) {
+    const mark = span(`st ${status.kind}`, status.glyph);
+    setAttr(mark, "title", m(status.tip));
+    setAttr(mark, "aria-label", m(status.tip));
+    mark.setAttribute("role", "img");
     append(detail, mark);
   }
   if (row.at) {

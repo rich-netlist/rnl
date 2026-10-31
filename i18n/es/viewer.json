@@ -707,5 +707,13 @@
   "{0} constraints": "{0} restricciones",
   "{0} of {1} constraints": "{0} de {1} restricciones",
   "There are no constraints to show for this netlist.": "No hay restricciones que mostrar para esta netlist.",
-  "These files are built in and are never overwritten: {0}. Their changes stay in the viewer.": "Estos archivos son integrados y nunca se sobrescriben: {0}. Sus cambios permanecen en el visor."
+  "These files are built in and are never overwritten: {0}. Their changes stay in the viewer.": "Estos archivos son integrados y nunca se sobrescriben: {0}. Sus cambios permanecen en el visor.",
+  "Kept, and it holds on the drawing.": "Conservada, y se cumple en el dibujo.",
+  "Kept, but it does not hold on the drawing: a fault of the solver.": "Conservada, pero no se cumple en el dibujo: un fallo del solucionador.",
+  "Kept; it cannot be measured on the drawing.": "Conservada; no se puede medir en el dibujo.",
+  "Discarded: it conflicts with other constraints.": "Descartada: entra en conflicto con otras restricciones.",
+  "Failed: the constraint contradicts itself.": "Fallida: la restricción se contradice a sí misma.",
+  "Undecided: the check did not finish. Measured on the drawing, it holds.": "Sin decidir: la comprobación no terminó. Medida en el dibujo, se cumple.",
+  "Undecided: the check did not finish. Measured on the drawing, it does not hold.": "Sin decidir: la comprobación no terminó. Medida en el dibujo, no se cumple.",
+  "Undecided: the check did not finish. It cannot be measured on the drawing.": "Sin decidir: la comprobación no terminó. No se puede medir en el dibujo."
 }

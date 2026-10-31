@@ -707,5 +707,13 @@
   "{0} constraints": "{0} 條約束",
   "{0} of {1} constraints": "{1} 條約束中的 {0} 條",
   "There are no constraints to show for this netlist.": "這份網表沒有可顯示的約束。",
-  "These files are built in and are never overwritten: {0}. Their changes stay in the viewer.": "這些檔案是內建的，不會被覆寫：{0}。它們的變更保留在檢視器中。"
+  "These files are built in and are never overwritten: {0}. Their changes stay in the viewer.": "這些檔案是內建的，不會被覆寫：{0}。它們的變更保留在檢視器中。",
+  "Kept, and it holds on the drawing.": "已保留，且在圖上成立。",
+  "Kept, but it does not hold on the drawing: a fault of the solver.": "已保留，但在圖上不成立：這是求解器的錯誤。",
+  "Kept; it cannot be measured on the drawing.": "已保留；在圖上無法量出。",
+  "Discarded: it conflicts with other constraints.": "已捨棄：它與其他約束衝突。",
+  "Failed: the constraint contradicts itself.": "失敗：這條約束自相矛盾。",
+  "Undecided: the check did not finish. Measured on the drawing, it holds.": "未判定：檢查沒有完成。在圖上量出來，它成立。",
+  "Undecided: the check did not finish. Measured on the drawing, it does not hold.": "未判定：檢查沒有完成。在圖上量出來，它不成立。",
+  "Undecided: the check did not finish. It cannot be measured on the drawing.": "未判定：檢查沒有完成。在圖上無法量出。"
 }
