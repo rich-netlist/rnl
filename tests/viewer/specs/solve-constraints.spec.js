@@ -108,13 +108,31 @@ for (const platform of ["web", "desktop"]) {
       await expect(row).toHaveClass(/selected/);
     });
 
-    test("the place of a row is a button that shows the line in the netlist", async ({ page, viewer }) => {
+    test("the place of a row is an arrow button, with no number, that shows the line in the netlist and does not choose the row", async ({ page, viewer }) => {
       await open(page, viewer);
       const row = rows(page).filter({ has: page.locator(".where") }).first();
-      const line = Number(await row.locator(".where").innerText());
-      await row.locator(".where").click();
+      const button = row.locator(".where");
+      await expect(button).toHaveText("");
+      await expect(button).toHaveAttribute("title", "Show in the netlist");
+      await expect(button).toHaveAttribute("aria-label", "Show in the netlist");
+      await expect(button.locator("svg")).toBeVisible();
+      // the line is the one the fact says, by the rank of the row
+      const rank = Number((await row.locator(".rank").innerText()).replace(/\D/g, ""));
+      const line = (await facts(page))[rank].source.line;
+      expect(line).toBeGreaterThan(0);
+      await button.click();
+      await expect(row).not.toHaveClass(/selected/);
       await expect(page.locator("#pane-netlist")).toBeVisible();
       await expect(viewer.line(line)).toHaveClass(/flash/);
+    });
+
+    test("a row with no place has no arrow button", async ({ page, viewer }) => {
+      await open(page, viewer);
+      const list = await facts(page);
+      const arrows = await page.locator("#constraints-list .where").count();
+      expect(arrows).toBeGreaterThan(0);
+      expect(arrows).toBeLessThanOrEqual(list.filter((f) => f.source).length);
+      expect(arrows).toBeLessThan(list.length);
     });
   });
 }

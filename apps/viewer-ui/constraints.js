@@ -12,7 +12,7 @@ import { setPane } from "./panels.js";
 import { current, doc } from "./state.js";
 import { revealLine } from "./text.js";
 import { highlightConstraint } from "./usages.js";
-import { $, span } from "./util.js";
+import { $, span, svgElement } from "./util.js";
 
 const STATUS_MARKS = { kept: "✓", discarded: "✗", undecided: "?", failed: "!" };
 const STATUS_WORDS = { failed: tr("failed"), discarded: tr("discarded"), undecided: tr("undecided"), kept: tr("kept") };
@@ -109,8 +109,12 @@ function rowElement(row, levelIndex) {
     const where = document.createElement("button");
     where.type = "button";
     where.className = "where";
-    setText(where, `${row.at.line}`);
+    // an arrow to the line, as the other icon buttons are drawn: no number, so the name is the label
+    const arrow = svgElement("svg", { viewBox: "0 0 16 16", "aria-hidden": "true" });
+    arrow.append(svgElement("path", { d: "M2.5 8H11M7.5 4.5 11 8 7.5 11.5M13.5 3v10", fill: "none", stroke: "currentColor", "stroke-width": 1.6, "stroke-linecap": "round", "stroke-linejoin": "round" }));
+    where.append(arrow);
     setAttr(where, "title", m("Show in the netlist"));
+    setAttr(where, "aria-label", m("Show in the netlist"));
     where.addEventListener("click", (e) => {
       e.stopPropagation();
       setPane("netlist");
