@@ -22,7 +22,8 @@ X1 d e cell
 *   {#R1 #R2 #R3} @ALIGN("y");
 *   {#R3 #R1 #R2} @ORDER("left-to-right");
 *   #R1 #R2 @DISTANCE("x", min=2, max=4);
-*   {#R2 #R3 #R2} @ALIGN("y")
+*   {#R2 #R3 #R2} @ALIGN("y");
+*   {#R3:n #R1:n} @ALIGN("x")
 * }
 .end
 `;
@@ -106,6 +107,32 @@ test("a number is at the centre of its object's box, and two numbers at one plac
   const same = two.filter((m) => m.text !== '2');
   expect(same[0].box.right).toBeLessThanOrEqual(same[1].box.left + 0.5);
   expect(Math.abs(same[0].box.top - same[1].box.top)).toBeLessThan(1);
+});
+
+test('a pin is numbered where the core has the pin, in the order of the list', async ({ page }) => {
+  await open(page);
+  await row(page, /ALIGN x \{#R3:n #R1:n\}/).click();
+  await expect(frame(page)).toHaveCount(1);
+  const got = await page.evaluate(() => {
+    const svg = document.querySelector('.constraint-box').ownerSVGElement;
+    const vb = svg.viewBox.baseVal;
+    const level = window.viewer.doc.levels[0];
+    const c = level.constraints;
+    const layer = document.querySelector('.constraint-box');
+    const scale = Number(layer.getAttribute('transform').match(/scale\(([-\d.e]+)\)/)[1]);
+    const marks = [...layer.querySelectorAll('.constraint-mark')].map((g) => {
+      const m = /translate\(([-\d.e]+)[ ,]([-\d.e]+)\)/.exec(g.getAttribute('transform'));
+      const b = g.querySelector('rect').getBBox();
+      return { text: g.querySelector('text').textContent, at: [(Number(m[1]) + b.x + b.width / 2) * scale + vb.x, Number(m[2]) * scale + vb.y] };
+    });
+    const fact = c.facts.find((f) => f.kind === 'ALIGN' && f.members.some((p) => 'pin' in p));
+    return { marks, pins: fact.members.map((p) => c.objects[p.object].pins[p.pin]) };
+  });
+  expect(got.marks.map((m) => m.text)).toEqual(['1', '2']);
+  got.marks.forEach((m, i) => {
+    expect(m.at[0]).toBeCloseTo(got.pins[i][0], 0);
+    expect(m.at[1]).toBeCloseTo(got.pins[i][1], 0);
+  });
 });
 
 test('the box is not in an exported image', async ({ page }) => {
