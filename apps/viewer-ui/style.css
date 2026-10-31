@@ -235,11 +235,14 @@ button.membership-id { cursor: pointer; text-decoration: underline dotted; }
 .usage-more { margin: 4px 26px; color: var(--accent); }
 .canvas svg .usage-muted [stroke] { stroke: var(--usage-muted-stroke); }
 .canvas svg .usage-muted [fill] { fill: var(--usage-muted-fill); }
-/* the button that hides the selected usage, at the start of its title */
+/* the button that hides the selected usage, at the start of its title: a box with a border, lighter when pointed at, darker when pressed */
 .usage-hide { cursor: pointer; outline: none; }
-.usage-hide:hover rect, .usage-hide:focus-visible rect { fill: rgba(128, 128, 128, 0.3); }
-.usage-overlays { --usage-label-bg: white; }
-body[data-background="dark"] .usage-overlays { --usage-label-bg: black; }
+.usage-hide-box { fill: var(--usage-btn); stroke: var(--usage-btn-line); stroke-width: 1; }
+.usage-hide:hover .usage-hide-box { fill: var(--usage-btn-hover); stroke: var(--usage-btn-line-hover); }
+.usage-hide:active .usage-hide-box { fill: var(--usage-btn-down); }
+.usage-hide:focus-visible .usage-hide-box { stroke: var(--accent); stroke-width: 2; }
+.usage-overlays { --usage-label-bg: white; --usage-btn: #f2f2f5; --usage-btn-hover: #ffffff; --usage-btn-down: #d9d9e0; --usage-btn-line: #8a8a94; --usage-btn-line-hover: #4a4a54; }
+body[data-background="dark"] .usage-overlays { --usage-label-bg: black; --usage-btn: #3a3a42; --usage-btn-hover: #4c4c56; --usage-btn-down: #26262c; --usage-btn-line: #9a9aa6; --usage-btn-line-hover: #d8d8e0; }
 .netlist-pane {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) 5px auto;

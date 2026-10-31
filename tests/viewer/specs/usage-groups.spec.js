@@ -193,45 +193,81 @@ test("a selected component and its texts are drawn over the frames and titles of
   expect((await order()).sel).toBe(0); // a selected usage lifts no component
 });
 
-test("the selected group's title has a button that hides it, as the switch in the Usage panel does, and shows it again", async ({ page }) => {
+test("the selected group's title has a button that hides it and unselects it, as the switch in the Usage panel hides it", async ({ page }) => {
   const button = page.locator("#canvas .usage-hide");
   const shown = (id) => row(page, id).locator('input[type="checkbox"]');
+  const frame = (id) => page.locator("#canvas .usage-frame .usage-title text", { hasText: id });
+  const selected = () => page.evaluate(() => window.viewer.selected);
   await expect(button).toHaveCount(0);
   await page.locator("#usage-list .usage-expand").last().click();
   await row(page, "%amp").locator(".usage-name").click();
-  // only the selected one, at the start of its title
+  // only the selected one, at the start of its title, with a box that makes it a button
   await expect(button).toHaveCount(1);
   await expect(button).toHaveAttribute("aria-label", "Hide %amp");
   await expect(button).toHaveAttribute("role", "button");
-  const where = await page.evaluate(() => {
-    const b = document.querySelector("#canvas .usage-hide").getBoundingClientRect();
+  const look = await page.evaluate(() => {
+    const b = document.querySelector("#canvas .usage-hide");
+    const box = b.querySelector(".usage-hide-box"), style = getComputedStyle(box);
     const text = document.querySelector("#canvas .usage-frame.selected .usage-title text").getBoundingClientRect();
-    return { buttonRight: b.right, textLeft: text.left };
+    const title = document.querySelector("#canvas .usage-frame.selected .usage-title > rect").getBoundingClientRect();
+    return { right: box.getBoundingClientRect().right, textLeft: text.left, boxH: box.getBoundingClientRect().height, titleH: title.height,
+      fill: style.fill, stroke: style.stroke, strokeWidth: style.strokeWidth, cursor: getComputedStyle(b).cursor };
   });
-  expect(where.buttonRight).toBeLessThanOrEqual(where.textLeft + 0.5);
+  expect(look.right).toBeLessThan(look.textLeft);
+  expect(look.boxH).toBeLessThan(look.titleH); // within the title, which is a little taller
+  expect(look.boxH).toBeGreaterThan(look.titleH - 6);
+  expect(look.stroke).not.toBe("none");
+  expect(look.strokeWidth).toBe("1px");
+  expect(look.cursor).toBe("pointer");
+  // pointed at, and pressed, the box changes
+  const fillOf = () => page.evaluate(() => getComputedStyle(document.querySelector("#canvas .usage-hide-box")).fill);
+  await button.hover();
+  const hover = await fillOf();
+  expect(hover).not.toBe(look.fill);
+  await page.mouse.down();
+  const down = await fillOf();
+  expect(down).not.toBe(hover);
+  await page.mouse.move(2, 2); // (off the button, so that the release is not a click on it)
+  await page.mouse.up();
+  await expect(button).toHaveCount(1);
   await expect(shown("%amp")).toBeChecked();
-  const group = await page.evaluate(() => window.viewer.selected);
-  // the click turns it off in the panel, selects nothing else and does not unselect: the frame stays, as the selected one does
+  // a click hides it and unselects it: its frame goes, the panel's switch is off, nothing else is selected
   await button.click();
   await expect(shown("%amp")).not.toBeChecked();
-  await expect(page.locator("#canvas .usage-frame.selected")).toHaveCount(1);
-  expect(await page.evaluate(() => window.viewer.selected)).toBe(group);
-  await expect(page.locator("#usage-detail h2")).toHaveText("@GROUP: %amp");
-  await expect(button).toHaveAttribute("aria-label", "Show %amp");
-  // the other way: the panel's switch changes the button
+  await expect(frame("%amp")).toHaveCount(0);
+  await expect(button).toHaveCount(0);
+  await expect(page.locator("#canvas .usage-frame.selected")).toHaveCount(0);
+  expect(await selected()).toBeNull();
+  // (the drawing took no click: it did not zoom, and the selection is not another object's)
+  await expect(page.locator("#canvas .usage-frame[data-muted]")).toHaveCount(0);
+  // the way back is the panel's switch
   await shown("%amp").check();
-  await expect(button).toHaveAttribute("aria-label", "Hide %amp");
-  // from the keyboard, which keeps its place on the button
+  await expect(frame("%amp")).toHaveCount(1);
+  // from the keyboard: Enter, and then Space; the focus goes to the drawing
+  await row(page, "%amp").locator(".usage-name").click();
   await button.focus();
   await page.keyboard.press("Enter");
   await expect(shown("%amp")).not.toBeChecked();
-  await expect(button).toBeFocused();
+  expect(await selected()).toBeNull();
+  await expect(page.locator("#canvas")).toBeFocused();
+  await shown("%amp").check();
+  await row(page, "%amp").locator(".usage-name").click();
+  await button.focus();
   await page.keyboard.press("Space");
-  await expect(shown("%amp")).toBeChecked();
-  // the press does not reach the drawing: no zoom to fit, no new selection
+  await expect(shown("%amp")).not.toBeChecked();
+  await expect(page.locator("#canvas")).toBeFocused();
+  // a double click on it reaches nothing of the drawing
+  await shown("%amp").check();
+  await row(page, "%amp").locator(".usage-name").click();
   await button.dblclick();
+  await expect(shown("%amp")).not.toBeChecked();
+  // a usage that is turned off in the panel while it is selected stays selected and drawn, as it did, with no button
+  await shown("%amp").check();
+  await row(page, "%amp").locator(".usage-name").click();
+  await shown("%amp").uncheck();
   await expect(page.locator("#canvas .usage-frame.selected")).toHaveCount(1);
-  expect(await page.evaluate(() => window.viewer.selected)).toBe(group);
+  await expect(button).toHaveCount(0);
+  expect(await selected()).not.toBeNull();
   // not selected: no button
   await page.locator("#canvas").click({ position: { x: 2, y: 2 } });
   await expect(button).toHaveCount(0);

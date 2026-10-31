@@ -1,7 +1,7 @@
 // Scope-local semantic groups. Display preferences never change the RNL source or its geometry.
 import { append, m, setAttr, setText } from "./i18n.js";
 import { current, doc, selected, selectedAsUsage } from "./state.js";
-import { select } from "./selection.js";
+import { clearSelection, select } from "./selection.js";
 import { setCheck } from "./commands.js";
 import { $, load, save, span, svgElement } from "./util.js";
 import { setPathText } from "./source-path.js";
@@ -398,35 +398,35 @@ export function highlightUsage(object) {
 function localSymbol(u) {
   return u.frame?.local ?? false;
 }
-const HIDE_W = 22; // the width the button that hides a selected usage takes at the start of its title
+const HIDE_W = 24; // the width the button that hides a selected usage takes at the start of its title
 /**
- * The button at the start of the selected usage's title: an eye with a slash, which hides the usage, as the switch in the
- * Usage panel does, and, when the usage is hidden and shown only because it is selected, an eye, which shows it again.
- * It takes the pointer events itself, so that a press on it is neither a click on the drawing, nor a drag.
+ * The button at the start of the selected usage's title, an eye with a slash on a box that looks like a button: it hides
+ * the usage, as the switch in the Usage panel does (the same `change`), and unselects it, since its frame goes with it;
+ * showing it again is the panel's. It takes the pointer events itself, so that a press on it is neither a click on the
+ * drawing nor a drag. The keyboard goes on to the drawing, where it was before the usage was selected.
  */
 function hideButton(entry, color, parent) {
-  const on = setting(entry).visible;
-  const label = on ? m`Hide ${entry.id}` : m`Show ${entry.id}`;
+  const label = m`Hide ${entry.id}`;
   const button = svgElement("g", { class: "usage-hide", role: "button", tabindex: 0, "aria-label": label, "pointer-events": "all", "data-usage": entry.object });
-  const hit = svgElement("rect", { x: -4, y: -9, width: HIDE_W, height: 18, rx: 3, fill: "transparent" });
-  const icon = svgElement("g", { fill: "none", stroke: color, "stroke-width": 1.4, "stroke-linecap": "round", "stroke-linejoin": "round", transform: "translate(0 0)" });
-  append(icon, svgElement("path", { d: "M0 0 Q7 -6 14 0 Q7 6 0 0 Z" }), svgElement("circle", { cx: 7, cy: 0, r: 2 }));
-  if (on) append(icon, svgElement("path", { d: "M1.5 5.5 L12.5 -5.5" }));
+  // (the colours of the box are the style sheet's; these are for a page without it)
+  const box = svgElement("rect", { class: "usage-hide-box", x: -2, y: -7.5, width: 19, height: 15, rx: 3, fill: "#f4f4f6", stroke: "#8a8a92", "stroke-width": 1 });
+  const icon = svgElement("g", { fill: "none", stroke: color, "stroke-width": 1.4, "stroke-linecap": "round", "stroke-linejoin": "round", transform: "translate(0.5 0)", "pointer-events": "none" });
+  append(icon, svgElement("path", { d: "M0 0 Q7 -5 14 0 Q7 5 0 0 Z" }), svgElement("circle", { cx: 7, cy: 0, r: 1.8 }), svgElement("path", { d: "M1.5 5 L12.5 -5" }));
   const tip = svgElement("title", {});
   tip.textContent = label;
-  append(button, hit, icon, tip);
-  const toggle = (keyboard) => {
-    change(entry, { visible: !setting(entry).visible });
-    // (the layer is made again; the keyboard keeps its place on the new button)
-    if (keyboard) layer?.querySelector(".usage-hide")?.focus({ preventScroll: true });
+  append(button, box, icon, tip);
+  const hide = () => {
+    change(entry, { visible: false });
+    clearSelection();
+    $("canvas")?.focus({ preventScroll: true });
   };
   for (const type of ["pointerdown", "pointerup", "pointercancel", "dblclick", "contextmenu"]) button.addEventListener(type, (e) => e.stopPropagation());
-  button.addEventListener("click", (e) => { e.stopPropagation(); toggle(false); });
+  button.addEventListener("click", (e) => { e.stopPropagation(); hide(); });
   button.addEventListener("keydown", (e) => {
     if (e.key !== "Enter" && e.key !== " ") return;
     e.preventDefault();
     e.stopPropagation();
-    toggle(true);
+    hide();
   });
   append(parent, button);
 }
@@ -490,8 +490,10 @@ export function paintUsages(svg, view, groups) {
       append(group, rect);
       append(layer, group);
       // (the selected usage's title has the button that hides it in front of its text)
-      const title = badge(labelOf(entry), color, group, "usage-title", entry.frame.title_width, active ? HIDE_W : 0);
-      if (active) hideButton(entry, color, title.g);
+      // (one that is turned off in the panel and shown only because it is selected has none: the panel turns it on)
+      const hideable = active && setting(entry).visible;
+      const title = badge(labelOf(entry), color, group, "usage-title", entry.frame.title_width, hideable ? HIDE_W : 0);
+      if (hideable) hideButton(entry, color, title.g);
       const roles = active ? entry.roles.map((r, i) => ({ ...r, anchor: entry.frame.roles[i], width: entry.frame.role_widths[i] })).filter(r => r.anchor).map(r => ({
         anchor: r.anchor,
         ...badge(r.name, color, group, "usage-role-label", r.width),
