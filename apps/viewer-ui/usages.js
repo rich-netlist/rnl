@@ -10,6 +10,7 @@ import { objectUsages, relatedUsages, stateName } from "./usage-table.js";
 import { FRAME_STEP, frameSteps, TITLE_ROW, titleRows } from "./frame-layout.js";
 import { setPane } from "./panels.js";
 import { revealLine } from "./text.js";
+import { constraintBox } from "./constraint-box.js";
 
 export const USAGE_COLORS = ["#e03131", "#e5b500", "#4263eb", "#2f9e44", "#9c36b5", "#009ccc"];
 const MAX_PREFERENCES = 2000;
@@ -29,7 +30,9 @@ let layer = null;
 let underlay = null;
 let frames = [];
 let hovered = null; // the usage whose row is pointed at, in the usages of an object
-let constraintLit = null; // the constraint of the Solve view that is clicked: { objects, usages } of the Document, or null
+let constraintLit = null; // the constraint of the Solve view that is clicked: { objects, texts, fact }, or null
+let constraintShown = null; // its box on the drawing, made with the layer: { layer, fill, rect, title, marks, box }, or null
+let constraintLayer = null;
 let layerDoc = null;
 let layerLevel = -1;
 let layerRevision = -1;
@@ -335,19 +338,21 @@ function focusSet(u) {
 /** The groups of the drawing that stay at full strength for a constraint: those that draw the objects it acts on. */
 function constraintFocus(c) {
   const keep = new Set();
-  for (const h of doc.levels[current].hits) if (h.id && h.objects.some(o => c.objects.has(o))) keep.add(h.id);
+  for (const h of doc.levels[current].hits) if (h.id && (h.objects.some(o => c.objects.has(o)) || c.texts.has(h.id))) keep.add(h.id);
   return keep;
 }
 /** What the drawing shows when no usage is in focus: the clicked constraint's objects, else all of it. */
 const restingFocus = () => constraintLit ? constraintFocus(constraintLit) : null;
 /**
  * Light up what a constraint of the Solve view acts on, as a usage's members are while its row is pointed at: the
- * components that are `objects` (indexes into doc.objects) and the frames of the `usages` it comes from stay, the rest
- * is dimmed. With null, the drawing goes back to what is selected. A selection, another level or another Document
- * ends it, and the page is told (`constraint-cleared`).
+ * components that are `objects` (indexes into doc.objects), and the labels `texts` (ids), stay, the rest is dimmed,
+ * every frame of the usages with its title too; and a box is drawn around what the `fact` acts on (`constraint-box.js`),
+ * with its title, and the order of its objects. With null, the drawing goes back to what is selected. A selection,
+ * another level or another Document ends it, and the page is told (`constraint-cleared`).
  */
 export function highlightConstraint(c) {
   constraintLit = c;
+  revision++; // (the box is made with the layer)
   if (!context || !doc) return;
   const [, , groups] = context;
   const u = chosen();
@@ -368,7 +373,8 @@ function litFrames() {
   if (hovered !== null) return new Set([hovered]);
   const u = chosen();
   if (u) return new Set([u.object]);
-  if (constraintLit) return new Set(constraintLit.usages);
+  // the box of the constraint is the one frame at full strength, the usage it comes from not excepted
+  if (constraintLit) return new Set();
   // an object of the level shown, as the table of its usages is
   if (selected !== null && doc?.objects[selected]?.level === doc.levels[current]?.host) return relatedUsages(doc, selected);
   return null;
@@ -469,12 +475,13 @@ function badge(text, color, parent, cls, width, lead = 0) {
 export function paintUsages(svg, view, groups) {
   context = [svg, view, groups];
   if (!svg || !view) {
-    frames = []; layer?.remove(); underlay?.remove(); currentLayer?.remove(); underlay = layer = currentLayer = null;
+    frames = []; layer?.remove(); underlay?.remove(); currentLayer?.remove(); constraintLayer?.remove(); underlay = layer = currentLayer = constraintLayer = constraintShown = null;
     drawing = layerDoc = null; layerLevel = -1; layerRevision = -1; layerSelected = null; context = null;
     return;
   }
   if (constraintLit && (selected !== null || layerDoc !== doc || layerLevel !== current)) {
     constraintLit = null;
+    revision++; // (the box goes: the layer is made again)
     window.dispatchEvent(new Event("constraint-cleared"));
   }
   const u = chosen();
@@ -528,6 +535,9 @@ export function paintUsages(svg, view, groups) {
       })) : [];
       frames.push({ entry, color, group, bounds, rect, fill, title, roles, active, local, pad: (levels.get(entry.object) ?? 0) * FRAME_STEP });
     }
+    constraintLayer?.remove();
+    constraintLayer = constraintShown = null;
+    if (constraintLit) makeConstraintBox(svg, groups);
     append(svg, currentLayer);
     window.dispatchEvent(new Event("usage-layer"));
   }
@@ -554,6 +564,64 @@ export function paintUsages(svg, view, groups) {
     }
   }
   spreadTitles();
+  placeConstraintBox(project);
+}
+const CONSTRAINT_PAD = 14; // the pixels of the constraint's box around the objects
+const MARK_ROW = 14; // the pixels more below them, where their numbers are, when it has any
+const MARK_GAP = 3; // the pixels between the numbers at one place
+/** The rectangle a text of the drawing that the hits do not know covers: the one group that has the id; null when none or several. */
+function textBox(groups) {
+  return (id) => {
+    const found = groups.get(id);
+    if (found?.length !== 1) return null;
+    const b = found[0].getBBox();
+    return b.width > 0 || b.height > 0 ? [b.x, b.y, b.x + b.width, b.y + b.height] : null;
+  };
+}
+/**
+ * Make the box of the constraint that is clicked, over the drawing in a layer of its own and under it a fill, as a
+ * usage's frame is drawn: dashed, with its title at its upper left, in the colour of a selection; and a number beside
+ * each object, in the order the constraint lists them. None when the level does not draw its objects.
+ */
+function makeConstraintBox(svg, groups) {
+  const box = constraintBox(doc.levels[current], constraintLit.fact, textBox(groups));
+  if (!box) return;
+  const color = "var(--select)";
+  constraintLayer = svgElement("g", { class: "constraint-box", "pointer-events": "none" });
+  const fill = svgElement("rect", { class: "constraint-fill", fill: color, "fill-opacity": .12, rx: 10 });
+  append(underlay, fill);
+  const rect = svgElement("rect", { class: "constraint-frame", fill: "none", stroke: color, "stroke-width": 8 / 3, "stroke-dasharray": "1 5", "stroke-linecap": "round", rx: 10 });
+  append(constraintLayer, rect);
+  const title = badge(box.title, color, constraintLayer, "constraint-title");
+  const marks = box.items.filter((item) => item.tag).map((item) => ({ item, ...badge(item.tag, color, constraintLayer, "constraint-mark") }));
+  // the layer is over the usages' and under the currents'
+  svg.insertBefore(constraintLayer, layer.nextSibling);
+  constraintShown = { fill, rect, title, marks, box };
+}
+/** Put the box of the constraint on the view: around its objects, its title on the upper edge, the numbers at the objects' corners. */
+function placeConstraintBox(project) {
+  if (!constraintShown) return;
+  const { fill, rect, title, marks, box } = constraintShown;
+  const [x0, y0] = project(box.bounds[0], box.bounds[1]);
+  const [x1, y1] = project(box.bounds[2], box.bounds[3]);
+  const b = [x0 - CONSTRAINT_PAD, y0 - CONSTRAINT_PAD, x1 + CONSTRAINT_PAD, y1 + CONSTRAINT_PAD + (marks.length > 0 ? MARK_ROW : 0)];
+  const transform = layer.getAttribute("transform");
+  constraintLayer.setAttribute("transform", transform);
+  for (const [attr, value] of Object.entries({ x: b[0], y: b[1], width: b[2] - b[0], height: b[3] - b[1] })) {
+    rect.setAttribute(attr, value); fill.setAttribute(attr, value);
+  }
+  placeBadge(title, b[0] + 12, b[1], false);
+  // a number at the lower left corner of each object, below it, in the band the box keeps for them (its title is above);
+  // the ones at one corner side by side
+  const used = new Map();
+  for (const mark of marks) {
+    const [x, y] = project(mark.item.rect[0], mark.item.rect[3]);
+    const key = `${Math.round(x)} ${Math.round(y)}`;
+    const taken = used.get(key) ?? 0;
+    const width = (mark.width ??= mark.label.getComputedTextLength()) + 8;
+    placeBadge(mark, x - 4 + taken + width / 2, y + CONSTRAINT_PAD + MARK_ROW / 2, true);
+    used.set(key, taken + width + MARK_GAP);
+  }
 }
 /**
  * The titles that would lie on another's go down a row each (titleRows), the outer frames' titles, and the selected

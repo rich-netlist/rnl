@@ -699,7 +699,7 @@
   "Constraints": "Contraintes",
   "Report": "Rapport",
   "What the Solve view shows": "Ce que montre la vue Résoudre",
-  "The constraints of this netlist as the solver takes them in, after the structures are expanded, in the order it takes them. Click one to light up the objects it acts on and the usages it comes from.": "Les contraintes de cette netlist telles que le solveur les prend en compte, une fois les structures développées, dans l'ordre où il les prend. Un clic met en évidence les objets sur lesquels elle agit et les usages dont elle vient.",
+  "The constraints of this netlist as the solver takes them in, after the structures are expanded, in the order it takes them. Click one to box the objects it acts on in the drawing, numbered in the order it lists them.": "Les contraintes de cette netlist telles que le solveur les prend en compte, une fois les structures développées, dans l'ordre où il les prend. Un clic encadre dans le dessin les objets sur lesquels elle agit et les numérote dans l'ordre où elle les énumère.",
   "Filter the constraints": "Filtrer les contraintes",
   "Filter the constraints by what they say, their priority, their structure or their result": "Filtrer les contraintes selon leur contenu, leur priorité, leur structure ou leur résultat",
   "written in the netlist": "écrite dans la netlist",
