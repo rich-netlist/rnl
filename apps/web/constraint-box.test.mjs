@@ -4,10 +4,10 @@ import { boxTitle, constraintBox, factMembers, factTextIds } from '../viewer-ui/
 
 // a level of three resistors in a row, a ground stub under the last, a free point and a text
 const objects = [
-  { kind: 'instance', label: '#R1', id: '#R1', objects: [0] },
-  { kind: 'instance', label: '#R2', id: '#R2', objects: [3] },
-  { kind: 'instance', label: '#R3', id: '#R3', objects: [5] },
-  { kind: 'usage', label: '%g', id: null, objects: [] },
+  { kind: 'instance', label: '#R1', id: '#R1', objects: [0], pins: [[0, 8], [80, 8]] },
+  { kind: 'instance', label: '#R2', id: '#R2', objects: [3], pins: [[100, 8], [180, 8]] },
+  { kind: 'instance', label: '#R3', id: '#R3', objects: [5], pins: [[200, 8], [280, 8]] }, // (its first pin has no net: the hits have none for it)
+  { kind: 'usage', label: '%g', id: null, objects: [], pins: [[310, 40]] },
   { kind: 'point', label: '%f', id: '%f', objects: [] },
   { kind: 'point', label: '(0, 6)', id: '@5', objects: [] },
   { kind: 'text', label: '#R1::name', id: '#R1::name', objects: [] },
@@ -17,10 +17,10 @@ const objects = [
 ];
 const box = (x0, y0, x1, y1) => ({ kind: 'box', points: [[x0, y0], [x1, y1]], objects: [], id: null });
 const hits = [
-  { ...box(0, 0, 80, 16), objects: [0], id: 'item-0' }, { kind: 'pin', points: [[0, 8]], objects: [1] }, { kind: 'pin', points: [[80, 8]], objects: [2] },
-  { ...box(100, 0, 180, 16), objects: [3], id: 'item-1' }, { kind: 'pin', points: [[100, 8]], objects: [2] }, { kind: 'pin', points: [[180, 8]], objects: [4] },
+  { ...box(0, 0, 80, 16), objects: [0], id: 'item-0' },
+  { ...box(100, 0, 180, 16), objects: [3], id: 'item-1' },
   { ...box(200, 0, 280, 16), objects: [5], id: 'item-2' },
-  { ...box(300, 40, 320, 60), objects: [30, 6], id: 'item-3' }, { kind: 'pin', points: [[310, 40]], objects: [6] },
+  { ...box(300, 40, 320, 60), objects: [30, 6], id: 'item-3' },
   { kind: 'label', points: [[2, -20], [30, -4]], objects: [0], id: '#R1::name' },
 ];
 const level = {
@@ -79,14 +79,18 @@ test('the box holds the objects the fact names, each with its number, in the SVG
   assert.deepEqual(b.bounds, [0, 0, 280, 16]);
 });
 
-test('a pin is the point of the hit after its symbol, and a set is one number for each of its objects', () => {
+test('a pin is where the core says the object has it, and a set is one number for each of its objects', () => {
   const b = constraintBox(level, {
     kind: 'DISTANCE', axis: 'x', sense: 'increasing', min: 20, max: 20, from: [pin(0, 1)], to: [{ centre: [origin(1), origin(2)] }],
   });
   assert.deepEqual(b.items, [
     { rect: [80, 8, 80, 8], tag: 'from1' }, { rect: [100, 0, 180, 16], tag: 'to1' }, { rect: [200, 0, 280, 16], tag: 'to1' },
   ]);
-  // a pin the hits do not give, which a pin with no net is, is the symbol's box
+  // a floating pin before it changes nothing: R3's first pin has no net, so the hits have no point for it, and its second pin is its second
+  assert.deepEqual(constraintBox(level, { kind: 'ALIGN', axis: 'x', members: [pin(2, 1), pin(2, 0)] }).items, [
+    { rect: [280, 8, 280, 8], tag: '1' }, { rect: [200, 8, 200, 8], tag: '2' },
+  ]);
+  // a pin the object does not have is its box
   assert.deepEqual(constraintBox(level, { kind: 'ALIGN', axis: 'x', members: [pin(2, 3)] }).items, [{ rect: [200, 0, 280, 16], tag: '1' }]);
 });
 

@@ -74,11 +74,10 @@ export function factMembers(fact) {
  * id (what a label stands for), and the point a literal `(x, y)` is written at.
  */
 function placesOf(level) {
-  const boxes = []; // [hit, the pins after it]
+  const boxes = [];
   const labels = new Map();
   for (const h of level.hits) {
-    if (h.kind === "box") boxes.push({ hit: h, pins: [] });
-    else if (h.kind === "pin") boxes.at(-1)?.pins.push(h.points[0]);
+    if (h.kind === "box") boxes.push(h);
     else if (h.kind === "label" && h.id) labels.set(h.id, h);
   }
   const corners = (h) => [h.points[0][0], h.points[0][1], h.points[1][0], h.points[1][1]];
@@ -91,8 +90,8 @@ function placesOf(level) {
     written.set(f.point, at);
   }
   return {
-    /** The boxes that draw a Document object (an instance, or a usage that has a symbol) and the point of its `k`th pin. */
-    boxOf: (d) => boxes.filter((b) => b.hit.objects.includes(d)).map((b) => ({ rect: corners(b.hit), pins: b.pins })),
+    /** The boxes that draw a Document object: an instance, or a usage that has a symbol. */
+    boxOf: (d) => boxes.filter((h) => h.objects.includes(d)).map(corners),
     /** The frame of a usage that is drawn as a frame only. */
     frameOf: (d) => level.usages.find((u) => u.object === d)?.frame?.bounds ?? null,
     /** The one usage of the level that has this definition and a symbol of its own; none when there are none or several. */
@@ -120,6 +119,9 @@ function rectsOf(member, c, places, textBox) {
   const index = pin ? pin.object : member.point ? member.point.origin : member.object;
   const o = c.objects[index];
   if (!o) return [];
+  // the pin a fact names is where the core draws it, with a net on it or not; the object's box when it says none
+  const at = pin ? o.pins?.[pin.pin] : null;
+  if (at) return [[at[0], at[1], at[0], at[1]]];
   // a usage that a rule made, such as the ground of a stub, has no id in the Document: its symbol is the level's only
   // usage of its definition that has one
   let held = o.objects;
@@ -130,10 +132,7 @@ function rectsOf(member, c, places, textBox) {
   }
   const drawn = held.flatMap((d) => {
     const boxes = places.boxOf(d);
-    if (boxes.length > 0) {
-      // the pin the fact names, where the symbol has it; the box when the hits do not tell which pin it is
-      return boxes.map((b) => (pin && b.pins[pin.pin] ? [...b.pins[pin.pin], ...b.pins[pin.pin]] : b.rect));
-    }
+    if (boxes.length > 0) return boxes;
     const frame = places.frameOf(d);
     return frame ? [frame] : [];
   });
