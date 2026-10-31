@@ -315,6 +315,9 @@ pub struct LevelView {
     pub objects: Vec<ObjectInfo>,
     /// The named points of the level.
     pub points: Vec<PointInfo>,
+    /// Its other points, such as those made in the body of a usage, with the ids a problem has them
+    /// by ([`crate::problem::ProblemIds`]).
+    pub other_points: Vec<PointInfo>,
     /// The applications of definitions written in the level's records that failed (7.2).
     pub failed_usages: Vec<FailedUsage>,
     /// The sets marked with GROUP (11.5), in the order of writing, those PRIORITY turns off too.

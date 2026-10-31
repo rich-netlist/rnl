@@ -1088,7 +1088,7 @@ pub(crate) fn with_page_ids(source: &LevelView) -> LevelView {
     lv
 }
 
-fn place(at: Pt, orient: Orient, p: Pt) -> Pt {
+pub(crate) fn place(at: Pt, orient: Orient, p: Pt) -> Pt {
     let d = orient.apply(p);
     (at.0 + d.0, at.1 + d.1)
 }

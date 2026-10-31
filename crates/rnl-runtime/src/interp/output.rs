@@ -829,6 +829,11 @@ impl Interp<'_> {
 
         let (objs, named_points, ids) = self.level_ids(s);
         let (objects, points) = self.objects_of(s, &objs, &named_points, &ids);
+        let others: Vec<ObjId> = self.scenes[s].points.iter().copied().filter(|p| !named_points.contains(p)).collect();
+        let other_points = others
+            .iter()
+            .map(|p| PointInfo { id: self.ref_id(s, *p, &ids), at: self.xy(s, *p), junction: false })
+            .collect();
         let failed_usages = self.failed_usages(s, &ids);
         let groups = self.groups(s, &ids);
         let mut terminal_names = vec![Vec::new(); level.instances.len()];
@@ -1074,6 +1079,7 @@ impl Interp<'_> {
             unplaced_symbols,
             objects,
             points,
+            other_points,
             failed_usages,
             groups,
             terminal_names,

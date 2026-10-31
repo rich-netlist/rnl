@@ -444,6 +444,18 @@ export type ConstraintObject = {
    * for a point, a text, and an object without an id.
    */
   objects: Array<number>,
+  /**
+   * Where it is drawn on this level, in SVG pixels with y down, as `Hit.points`: the registration
+   * point of a symbol, a point, the anchor of a text. None when it has no position, or has
+   * nothing drawn there, such as a free point or a usage not placed. A centre has none: a
+   * viewer marks the objects of the set.
+   */
+  at: [number, number] | null,
+  /**
+   * Where each pin of its symbol is drawn, by `ConstraintPoint::Pin.pin`, in the same pixels,
+   * with or without a net on it. Empty when it is not drawn with a symbol.
+   */
+  pins: Array<[number, number]>,
 };
 
 /**

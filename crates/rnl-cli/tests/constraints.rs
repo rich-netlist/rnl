@@ -10,7 +10,7 @@ use rnl_cli::preview::preview;
 use rnl_cli::solve::SolveOptions;
 use rnl_runtime::source::MemoryProvider;
 use rnl_solver::{Clock, SolverOptions};
-use rnl_view::{BuildOptions, ConstraintPoint, Document, LevelConstraints};
+use rnl_view::{BuildOptions, ConstraintKind, ConstraintPoint, Document, LevelConstraints};
 use serde_json::Value;
 
 /// A pair, a structure over it, a ground that a rule of the standard package makes, a semantic
@@ -152,6 +152,99 @@ impl Clock for NoTime {
     fn elapsed(&self) -> f64 {
         0.0
     }
+}
+
+/// A symbol whose first pin has a terminal the device does not have, so no net: R1 turned, R2 not,
+/// R3 and R4 and a point with no position.
+const POSITIONS: &str = "* positions
+* @RNL(type=\"header\") { @VERSION(\"0.3\")}
+R1 a b 1k
+R2 a b 1k
+R3 a b 1k
+R4 a b 1k
+* @RNL {
+*   $THREE = @DEFINE-SYMBOL(box=[-4, -4, 4, 4]) {
+*     (-2, 0) @PIN(terminal=9);
+*     (2, 0) @PIN(terminal=1);
+*     (0, 3) @PIN(terminal=2)
+*   };
+*   #R1 @SET-SYMBOL $THREE => @PLACE(10, 20) => @ORIENT(\"R90\");
+*   #R2 @SET-SYMBOL $THREE => @PLACE(30, 20);
+*   #R4 @SET-SYMBOL $THREE;
+*   %free = (5, _);
+*   %named = (7, 8);
+*   {#R1:1 #R2:1 %free %named} @ALIGN(\"y\");
+*   {#R1 #R3 #R4} @ALIGN(\"x\", priority=\"low\")
+* }
+.end
+";
+
+#[test]
+fn the_objects_of_the_constraints_have_where_they_are_drawn() {
+    let d = build(POSITIONS, "p.sp");
+    let level = &d.levels[0];
+    let c = constraints(&d);
+    let s = level.scale;
+    let object =
+        |label: &str| c.objects.iter().find(|o| o.label == label).unwrap_or_else(|| panic!("{label}: {:?}", c.objects));
+    // the registration point of a symbol, as pixels with y down
+    assert_eq!(object("#R1").at, Some([10.0 * s, -20.0 * s]));
+    assert_eq!(object("#R2").at, Some([30.0 * s, -20.0 * s]));
+    // the pins, in the order of the symbol: turned with R1, the first with no net
+    assert_eq!(object("#R2").pins, [[28.0 * s, -20.0 * s], [32.0 * s, -20.0 * s], [30.0 * s, -23.0 * s]]);
+    assert_eq!(object("#R1").pins, [[10.0 * s, -18.0 * s], [10.0 * s, -22.0 * s], [7.0 * s, -20.0 * s]]);
+    // a member of a fact finds its pin, past the one with no net, where the Document draws it
+    let ConstraintKind::Align { members, .. } = &c.facts.iter().find(|f| f.what.contains("#R1:p")).unwrap().fact else {
+        panic!("not an ALIGN")
+    };
+    let ConstraintPoint::Pin { object: k, pin, terminal } = &members[0] else { panic!("{:?}", members[0]) };
+    assert_eq!((*pin, terminal.as_str()), (1, "p"));
+    let at = c.objects[*k].pins[*pin];
+    assert_eq!(at, [10.0 * s, -22.0 * s]);
+    let hits: Vec<_> = level.hits.iter().filter(|h| h.kind == "pin").map(|h| h.points[0]).collect();
+    assert!(hits.contains(&at), "{at:?} is not in {hits:?}");
+    // the pin with no net is drawn and has no hit: the reason it cannot be found through them
+    assert!(!hits.contains(&object("#R1").pins[0]), "{hits:?}");
+    // a point: named with a position, and free
+    assert_eq!(object("%named").at, Some([7.0 * s, -8.0 * s]));
+    assert_eq!(object("%free").at, None);
+    assert!(object("%free").pins.is_empty());
+    // no position, with and without a symbol
+    for label in ["#R3", "#R4"] {
+        assert_eq!(object(label).at, None, "{label}");
+        assert!(object(label).pins.is_empty(), "{label}");
+    }
+}
+
+#[test]
+fn a_preview_has_the_positions_of_the_drawing_as_solved() {
+    let files = MemoryProvider::new().with("/w/a.sp", NETLIST);
+    let unsolved = build(NETLIST, "a.sp");
+    // nothing is placed yet, the usage a rule makes among them
+    let objects = &constraints(&unsolved).objects;
+    assert!(objects.iter().any(|o| o.kind == "usage"), "{objects:?}");
+    assert!(objects.iter().all(|o| o.at.is_none() && o.pins.is_empty()), "{objects:?}");
+    let options = SolveOptions { solver: SolverOptions::without_time_limit(), ..SolveOptions::default() };
+    let shown = preview("/w/a.sp", &files, &options, &rnl_cli::solve::WallClock::new(), &|_| true).unwrap();
+    let level = &shown.document.levels[0];
+    let c = level.constraints.as_ref().unwrap();
+    let boxes: Vec<_> = level.hits.iter().filter(|h| h.kind == "box").collect();
+    for o in c.objects.iter().filter(|o| o.kind == "instance") {
+        let at = o.at.unwrap_or_else(|| panic!("{} has no position", o.label));
+        // within the box of its symbol
+        assert!(
+            boxes.iter().any(|b| b.objects.first() == o.objects.first()
+                && b.points[0][0] <= at[0]
+                && at[0] <= b.points[1][0]
+                && b.points[0][1] <= at[1]
+                && at[1] <= b.points[1][1]),
+            "{}: {at:?}",
+            o.label
+        );
+        assert!(!o.pins.is_empty(), "{}", o.label);
+    }
+    // the usage a rule makes, written out in the record, is drawn too
+    assert!(c.objects.iter().any(|o| o.kind == "usage" && o.at.is_some()), "{:?}", c.objects);
 }
 
 #[test]
