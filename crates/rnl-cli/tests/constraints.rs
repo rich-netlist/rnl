@@ -155,7 +155,7 @@ impl Clock for NoTime {
 }
 
 /// A symbol whose first pin has a terminal the device does not have, so no net: R1 turned, R2 not,
-/// R3 and R4 with no position; a ground placed, and a point with no position.
+/// R3 and R4 with no position; a ground on a pin of R2, and a point with no position.
 const POSITIONS: &str = "* positions
 * @RNL(type=\"header\") { @VERSION(\"0.3\")}
 R1 a b 1k
@@ -171,7 +171,7 @@ R4 a b 1k
 *   #R1 @SET-SYMBOL $THREE => @PLACE(10, 20) => @ORIENT(\"R90\");
 *   #R2 @SET-SYMBOL $THREE => @PLACE(30, 20);
 *   #R4 @SET-SYMBOL $THREE;
-*   %g = $GROUND @ATTACH #R2:2 => @PLACE(40, 50);
+*   %g = $GROUND @ATTACH #R2:2;
 *   %free = (5, _);
 *   {#R1:1 #R2:1 %free} @ALIGN(\"y\");
 *   {#R1 #R3 #R4} @ALIGN(\"x\", priority=\"low\")
@@ -192,9 +192,9 @@ fn the_box_of_a_drawn_object_has_its_registration_point() {
     // an instance, turned or not, in pixels with y down, wherever its box is
     assert_eq!(origin_of(&d, "R1"), Some([10.0 * s, -20.0 * s]));
     assert_eq!(origin_of(&d, "R2"), Some([30.0 * s, -20.0 * s]));
-    // a usage with a symbol
+    // a usage with a symbol, drawn on the pin it is attached to
     let ground = d.levels[0].hits.iter().find(|h| h.kind == "box" && h.name.as_deref() == Some("g")).unwrap();
-    assert_eq!(ground.origin, Some([40.0 * s, -50.0 * s]));
+    assert_eq!(ground.origin, Some([30.0 * s, -23.0 * s]));
     // no position, with a symbol of its own or not: no box
     assert_eq!(origin_of(&d, "R3"), None);
     assert_eq!(origin_of(&d, "R4"), None);
