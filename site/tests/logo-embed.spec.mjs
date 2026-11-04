@@ -116,7 +116,6 @@ for (const lang of ["zh", "en"]) {
     await expect(button).toHaveAttribute("aria-expanded", "true");
     await expect(panel).toBeVisible();
     await expect(page.locator("#hero-title")).toBeHidden();
-    await expect(page.locator(".wordmark")).toBeHidden();
     const replacement = await panel.boundingBox();
     for (const key of ["x", "y", "width", "height"]) expect(replacement[key]).toBeCloseTo(beforeHeading[key], 1);
     expect(replacement.width / replacement.height).toBeGreaterThan(2);
@@ -249,3 +248,56 @@ test("a theme switch during core startup is applied when ready arrives", async (
   const frame = await loaded(page);
   await expect(frame.locator("body")).toHaveAttribute("data-background", "dark");
 });
+
+// The homepage's logo is the picture the viewer draws when it is clicked (site/render-logo.py): the circuit and "RNL" of the
+// static logo and of the viewer's drawing are in the same place, of the same size and in the same colours, so that the
+// replacement does not jump. Compared as masks of the ink in the two screenshots of the logo's box; "logo by RNL", which only
+// the viewer has, is to the right of where the static logo ends and is left out.
+async function inkOverlap(page, ink, box, still, live) {
+  return page.evaluate(async ({ ink, box, still, live }) => {
+    async function mask(base64) {
+      const bitmap = await createImageBitmap(await (await fetch(`data:image/png;base64,${base64}`)).blob());
+      const canvas = document.createElement("canvas");
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+      const context = canvas.getContext("2d");
+      context.drawImage(bitmap, 0, 0);
+      const { data } = context.getImageData(0, 0, bitmap.width, bitmap.height);
+      const keep = Math.floor(bitmap.width * 0.58), out = new Uint8Array(keep * bitmap.height);
+      for (let y = 0; y < bitmap.height; y++) for (let x = 0; x < keep; x++) {
+        const i = (y * bitmap.width + x) * 4;
+        const luminance = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+        const orange = data[i] > 180 && data[i + 1] < 140 && data[i + 2] < 90;
+        out[y * keep + x] = (ink === "dark" ? luminance < 110 : luminance > 150) || orange ? 1 : 0;
+      }
+      return out;
+    }
+    const [a, b] = [await mask(still), await mask(live)];
+    let both = 0, either = 0, ink1 = 0, ink2 = 0;
+    for (let i = 0; i < a.length; i++) { both += a[i] & b[i]; either += a[i] | b[i]; ink1 += a[i]; ink2 += b[i]; }
+    return { iou: both / either, ink1, ink2 };
+  }, { ink, box, still, live });
+}
+
+for (const lang of ["en", "zh"]) {
+  for (const [scheme, width] of [["light", 1440], ["dark", 1440], ["light", 390], ["dark", 390]]) {
+    test(`${lang}: the viewer's drawing replaces the static logo in the same place and size, ${scheme}, ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.goto(`/${lang}/`);
+      await brandReady(page);
+      const box = await page.locator("#hero-brand").boundingBox();
+      await page.mouse.move(0, 0);
+      const still = (await page.screenshot({ clip: box, animations: "disabled" })).toString("base64");
+      await page.locator("#hero-logo").click();
+      await loaded(page);
+      await page.mouse.move(0, 0);
+      await page.waitForTimeout(1500);
+      const live = (await page.screenshot({ clip: box, animations: "disabled" })).toString("base64");
+      const { iou, ink1, ink2 } = await inkOverlap(page, scheme, box, still, live);
+      expect(ink1).toBeGreaterThan(500);
+      expect(ink2).toBeGreaterThan(500);
+      expect(iou, `${lang} ${scheme} ${width}px: the ink of the two pictures (${ink1} and ${ink2} pixels)`).toBeGreaterThan(0.85);
+    });
+  }
+}

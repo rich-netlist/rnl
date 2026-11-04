@@ -50,11 +50,11 @@ for (const lang of ["zh", "en"]) {
     await expect(light).toBeVisible();
     await navTheme("light");
     await capture("light-390");
+    // the logo is one picture, the circuit and "RNL" (the text as outlines, site/render-logo.py), inside the screen
     const fits = await page.locator("#hero-title").evaluate(el => {
       const logo = el.querySelector(".hero-logo").getBoundingClientRect();
-      const text = el.querySelector(".wordmark").getBoundingClientRect();
-      return Math.abs(text.left - logo.right) < 1 && logo.top < text.bottom && logo.bottom > text.top &&
-        text.right <= innerWidth && document.documentElement.scrollWidth <= innerWidth;
+      return logo.left >= 0 && logo.right <= innerWidth && logo.width > 300 && logo.height > 60 && logo.height < 140 &&
+        document.documentElement.scrollWidth <= innerWidth;
     });
     expect(fits).toBe(true);
     for (const width of [641, 760, 761, 768, 960, 961, 1000, 1001]) {

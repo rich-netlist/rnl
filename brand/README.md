@@ -9,6 +9,7 @@ It defines its own symbols and styles and contains no text. Keep its circuit and
 | `rnl-logo.svg` | Transparent original colours for light backgrounds |
 | `rnl-logo-dark.svg` | Transparent colours for dark backgrounds, using the viewer's `darkColour` rule |
 | `rnl-logo-small.svg`, `rnl-logo-small-dark.svg` | Transparent, pixel-fitted light/dark logos for the site's 24px navigation mark |
+| `site/src/assets/brand/rnl-wordmark.svg`, `rnl-wordmark-dark.svg` | The homepage's logo: the circuit and “RNL” as the viewer's interactive logo draws them, the text as outlines; `python site/render-logo.py` writes them from `rnl-logo.sp` and the viewer's caption (`apps/web/build.mjs`), and `site/build.py` checks them. Not written by `scripts/brand.mjs` |
 | `rnl-logo-{16,24,32,48,64,128,256,512,1024}.png` | Transparent square PNGs in the original black/orange colours for light backgrounds |
 | `rnl-logo-white-{16,24,32,48,64,128,256,512,1024}.png` | The same square artwork on a fully opaque white (`#ffffff`) background |
 | `rnl-icon.svg` | Responsive 1024-unit icon, dark logo on `#132033`, corner radius 180 |

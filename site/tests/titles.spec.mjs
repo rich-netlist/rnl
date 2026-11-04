@@ -8,7 +8,6 @@ for (const lang of ["zh", "en"]) {
     test(`${lang}: page titles keep their own typography at ${width}px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 1000 });
       const titleSize = width === 1440 ? "84px" : "44px";
-      const wordmarkSize = width === 1440 ? 154.8 : 82.8;
       for (const file of pages) {
         await page.goto(`/${lang}/${file}`);
         const title = page.locator(".tour-h1");
@@ -20,12 +19,12 @@ for (const lang of ["zh", "en"]) {
           return Number.parseFloat(style.lineHeight) / Number.parseFloat(style.fontSize);
         })).toBeCloseTo(1.05, 2);
       }
+      // the homepage's "RNL" is the picture the viewer draws (site/render-logo.py), not text in a font of the page
       for (const file of ["index.html", "rnl-intro-standalone.html"]) {
         await page.goto(`/${lang}/${file}`);
-        const wordmark = page.locator(".wordmark");
-        expect(await wordmark.evaluate(el => Number.parseFloat(getComputedStyle(el).fontSize))).toBeCloseTo(wordmarkSize, 2);
-        await expect(wordmark).toHaveCSS("font-weight", "600");
-        await expect(page.locator("#hero-title")).toHaveCSS("display", "flex");
+        await expect(page.locator(".wordmark")).toHaveCount(0);
+        await expect(page.locator("#hero-title")).toHaveText("RNL");
+        await expect(page.locator("#hero-title .hero-logo img:visible")).toHaveCount(1);
       }
     });
   }

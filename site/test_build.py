@@ -254,6 +254,29 @@ class SiteExamples(unittest.TestCase):
         errors = build.check_ota(files, dict(ex, **{"ota5t-review-eda.sp": ex["ota5t-review-eda.sp"].replace("W=4u L=0.5u", "W=5u L=0.5u")}))
         self.assertTrue(any("ota5t-review-eda.sp" in e for e in errors), errors)
 
+    def test_the_homepage_logo_is_drawn_from_the_present_brand_source_and_caption(self):
+        import shutil
+        import tempfile
+        self.assertEqual(build.check_logo(), [])
+        root = Path(__file__).resolve().parent.parent
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            (tmp / "brand").mkdir()
+            (tmp / "apps" / "web").mkdir(parents=True)
+            (tmp / "site" / "src" / "assets" / "brand").mkdir(parents=True)
+            shutil.copy(root / "brand" / "rnl-logo.sp", tmp / "brand")
+            shutil.copy(root / "apps" / "web" / "build.mjs", tmp / "apps" / "web")
+            for name in build.LOGO_FILES:
+                shutil.copy(root / "site" / "src" / "assets" / "brand" / name, tmp / "site" / "src" / "assets" / "brand")
+            self.assertEqual(build.check_logo(tmp), [])
+            # the brand source changed, or the caption of the viewer's interactive logo: the logo has to be drawn again
+            (tmp / "brand" / "rnl-logo.sp").write_text((tmp / "brand" / "rnl-logo.sp").read_text(encoding="utf-8").replace("0.36", "0.40"), encoding="utf-8")
+            self.assertEqual(len(build.check_logo(tmp)), 2)
+            shutil.copy(root / "brand" / "rnl-logo.sp", tmp / "brand")
+            build_mjs = tmp / "apps" / "web" / "build.mjs"
+            build_mjs.write_text(build_mjs.read_text(encoding="utf-8").replace("logo by RNL", "logo by the RNL"), encoding="utf-8")
+            self.assertEqual(len(build.check_logo(tmp)), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

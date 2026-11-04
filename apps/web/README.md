@@ -314,10 +314,14 @@ Build with `--samples` to include those files.
 The same build also publishes `samples/brand/rnl-logo.sp`, with real RNL `@TEXT` annotations:
 a large **RNL**, followed on its lower right by “logo by RNL”.
 The canonical brand source used for icons stays text-free. On the project homepage, clicking
-the large logo replaces the static logo and wordmark with a short embedded viewer in that same
-row, keeping the following content in place. The frame is up to 640px wide and fills the available
-width on narrow screens; its initial view keeps the circuit logo close to the original icon's size.
-Closing with × or Escape restores the wordmark
+the large logo replaces the static logo with a short embedded viewer in that same
+row, keeping the following content in place. The static logo is this same drawing without
+“logo by RNL”, drawn by the core from the same source and caption (`site/render-logo.py` reads the
+caption from this file) with its text as outlines of the same Noto Sans SC Bold, so it looks the same on
+every machine; its viewBox is the painted bounds of the viewer's whole drawing, and with the
+2px fit margin of the viewer (and the 1px border of the frame's panel) the frame replaces it in the same place and size. The frame is up to 640px wide and fills the available
+width on narrow screens.
+Closing with × or Escape restores the static logo
 and keeps that iframe for the next click; theme changes reach it through the `background`
 message. No viewer files are requested until the first click.
 

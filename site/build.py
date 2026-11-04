@@ -84,6 +84,8 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 from site_i18n import LANGUAGES as I18N, SHOWN_IN_ENGLISH_BELOW  # noqa: E402
+sys.path.insert(0, str(HERE))
+from logo_inputs import inputs_hash  # noqa: E402
 SRC = HERE / "src"
 EXAMPLES = HERE / "examples"
 DEFAULT_OUT = HERE / "dist"
@@ -684,6 +686,23 @@ def check_ota(files, ex):
     return errors
 
 
+LOGO_FILES = ("rnl-wordmark.svg", "rnl-wordmark-dark.svg")
+
+
+def check_logo(root=ROOT):
+    """The logo of the homepage (site/render-logo.py) is the one drawn from the present brand/rnl-logo.sp and the caption
+    that apps/web/build.mjs gives the viewer's interactive logo: its SVGs carry a hash of both."""
+    want = inputs_hash(root)
+    errors = []
+    for name in LOGO_FILES:
+        path = Path(root) / "site" / "src" / "assets" / "brand" / name
+        m = re.search(r"sources sha256 ([0-9a-f]+)\)", path.read_text(encoding="utf-8")) if path.is_file() else None
+        if not m or m.group(1) != want:
+            errors.append("src/assets/brand/%s: not drawn from the present brand/rnl-logo.sp and the caption of apps/web/build.mjs; "
+                          "run python site/render-logo.py" % name)
+    return errors
+
+
 SIM = HERE / "sim" / "ota5t-review-tb.sp"
 
 
@@ -944,6 +963,7 @@ def build(version=None, incubating=False, online=False):
         if files[page].count("</header>{{ai-translation-notice}}") != 1:
             errors.append("src/%s needs exactly one {{ai-translation-notice}} marker, right after its top bar" % page)
     errors += check_examples(files, ex)
+    errors += check_logo()
     if errors:
         raise BuildError("\n".join(errors))
     result = {}

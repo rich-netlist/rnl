@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-44.52 -61.32 691.5 135.87">
+<!-- Written by site/render-logo.py from brand/rnl-logo.sp and the caption of the viewer's interactive logo (sources sha256 5860c6ca7807), drawn by the RNL core without "logo by RNL"; the text is outlines of Noto Sans SC Bold. Do not edit. -->
+<path d="M-14,-28 L11.9,-28" fill="none" stroke="#e0e0e2" stroke-width="5.04" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M-14,0 L11.9,0" fill="none" stroke="#e0e0e2" stroke-width="5.04" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M-5.6,0 L6.02,-7.84 L6.02,7.84 L-5.6,0 Z" fill="#e0e0e2" stroke="none"/>
+<path d="M11.9,9.52 L11.9,-37.52" fill="none" stroke="#e0e0e2" stroke-width="5.04" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M23.1,-1.68 L23.1,-26.32" fill="none" stroke="#e0e0e2" stroke-width="5.04" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M23.1,-14 L28,-14" fill="none" stroke="#e0e0e2" stroke-width="5.04" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M-14,-28 L-14,0 L-14,30.8 L42,30.8 L42,-14 L42,-58.8 L-42,-58.8 L-42,58.8 L12.6,58.8" fill="none" stroke="#e0e0e2" stroke-width="5.04" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M28,-14 L42,-14" fill="none" stroke="#e0e0e2" stroke-width="5.04" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M12.6,58.8 L25.2,58.8" fill="none" stroke="#e0e0e2" stroke-width="5.04" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M25.2,70.7 L25.2,46.9 L42,58.8 L25.2,70.7 Z" fill="none" stroke="#e0e0e2" stroke-width="5.04" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M99.81 1.8V-33H114.59C129.22 -33 137.23 -28.84 137.23 -16.52C137.23 -4.36 129.22 1.8 114.59 1.8ZM139.08 62.94H164.49L137.84 16.28C150.94 11.2 159.56 0.57 159.56 -16.52C159.56 -42.7 140.62 -51.17 116.59 -51.17H77.01V62.94H99.81V19.82H115.67ZM182.04 62.94H203.76V17.2C203.76 4.11 201.76 -10.21 200.83 -22.53H201.6L213.15 1.96L245.95 62.94H269.21V-51.17H247.65V-5.59C247.65 7.35 249.5 22.44 250.73 34.3H249.96L238.41 9.66L205.3 -51.17H182.04ZM297.39 62.94H366.54V43.84H320.18V-51.17H297.39Z" fill="#e0e0e2"/>
+<circle cx="-14" cy="-28" r="7" fill="#e8590c"/>
+<circle cx="-14" cy="0" r="7" fill="#e8590c"/>
+<circle cx="42" cy="-14" r="7" fill="#e8590c"/>
+</svg>

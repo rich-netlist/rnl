@@ -343,14 +343,16 @@ section[id] { scroll-margin-top: 72px; }
 .hero-grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(280px, 1fr); gap: 48px; align-items: end; }
 .eyebrow { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font: 600 12px/1 var(--f-mono); letter-spacing: .18em; color: var(--ink-2); }
 .hero-brand { position: relative; width: min(640px, 100%); margin-top: 14px; }
-#hero-title { margin: 0; display: flex; align-items: baseline; gap: 0; flex-wrap: nowrap; font: 700 clamp(92px, 14vw, 172px)/.8 var(--f-disp); }
+#hero-title { margin: 0; }
 .hero-brand h1, .hero-brand h1 * { transition-property: none; }
 .hero-brand.is-viewing h1 { visibility: hidden; }
-.wordmark { font: inherit; font-size: .9em; font-weight: 600; letter-spacing: -.015em; color: var(--ink); -webkit-user-select: none; user-select: none; }
-/* The SVG has 3.85% vertical padding per side: match its painted height to the font's capitals. */
-.hero-logo { display: block; flex: none; height: .756em; height: 1.083415cap; transform: translateY(3.84955%); }
-.hero-logo img { display: block; height: 100%; width: auto; }
-button.hero-logo { padding: 0; border: 0; background: none; cursor: pointer; }
+/* The logo is the picture the viewer draws when it is clicked (site/render-logo.py): RNL and the circuit, the text as outlines. Its
+   viewBox is what the viewer fits into its frame with a margin of 2px; the frame is inside the 1px border of the panel that
+   replaces this box. So 3px of padding here make the viewer's drawing replace the logo exactly: same place, same size. */
+.hero-logo { display: block; width: 100%; }
+.hero-logo img { display: block; width: 100%; height: auto; }
+button.hero-logo { padding: 3px; box-sizing: border-box; border: 0; background: none; cursor: pointer; }
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .hero-logo-panel {
   position: absolute; inset: 0;
 }
