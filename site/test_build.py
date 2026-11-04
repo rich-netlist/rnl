@@ -269,6 +269,13 @@ class SiteExamples(unittest.TestCase):
             for name in build.LOGO_FILES:
                 shutil.copy(root / "site" / "src" / "assets" / "brand" / name, tmp / "site" / "src" / "assets" / "brand")
             self.assertEqual(build.check_logo(tmp), [])
+            # the same files with the other line ends (Git writes CRLF on Windows checkouts, LF elsewhere): the same hash
+            for path in (tmp / "brand" / "rnl-logo.sp", tmp / "apps" / "web" / "build.mjs"):
+                text = path.read_bytes().replace(b"\r\n", b"\n")
+                path.write_bytes(text)
+                self.assertEqual(build.check_logo(tmp), [], path.name + " with LF")
+                path.write_bytes(text.replace(b"\n", b"\r\n"))
+                self.assertEqual(build.check_logo(tmp), [], path.name + " with CRLF")
             # the brand source changed, or the caption of the viewer's interactive logo: the logo has to be drawn again
             (tmp / "brand" / "rnl-logo.sp").write_text((tmp / "brand" / "rnl-logo.sp").read_text(encoding="utf-8").replace("0.36", "0.40"), encoding="utf-8")
             self.assertEqual(len(build.check_logo(tmp)), 2)

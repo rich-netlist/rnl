@@ -17,5 +17,6 @@ def caption(root=ROOT):
 
 
 def inputs_hash(root=ROOT):
-    source = (Path(root) / "brand" / "rnl-logo.sp").read_bytes()
+    # the text of the source, not its line ends: Git writes CRLF on Windows checkouts and LF on others
+    source = (Path(root) / "brand" / "rnl-logo.sp").read_bytes().replace(b"\r\n", b"\n")
     return hashlib.sha256(source + b"\0" + caption(root).encode("utf-8")).hexdigest()[:12]
