@@ -136,7 +136,7 @@ jobs:
           mkdir -p pkg work
           tar -xzf packages/rnl-viewer-local-${{ needs.build.outputs.version }}-linux-x86_64-with-firefox.tar.gz -C pkg --strip-components=1
           ls pkg
-          cp tests/integration/solver/T1-rc-lowpass.sp work/top.sp
+          cp apps/local/ci/smoke.sp work/top.sp
       - name: Start the program in the container, which starts the official Firefox itself
         run: |
           # (a container of its own: the program needs no more of the system than a user's login would)
