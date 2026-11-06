@@ -56,4 +56,22 @@ cargo test                                                           # the unit 
 npx --prefix ../../tests/viewer playwright test --config playwright.config.mjs   # the page against the program (RNL_LOCAL_BIN names it)
 ```
 
-The program has no dependency but the core's own crates and `serde`: no HTTP crate, no allocator crate. A static musl build is checked in CI to be static and to run in `centos:7`, `rockylinux:8` and `rockylinux:9` containers.
+The program has no dependency but the core's own crates and `serde`: no HTTP crate. A **static musl** build also has `mimalloc` as its allocator (a dependency of musl builds only): musl's own allocator made the solver, which allocates the most of the core, about a quarter slower than glibc's did.
+
+```
+rustup target add x86_64-unknown-linux-musl     # and musl-tools (musl-gcc) for mimalloc's C
+RNL_SITE_DIR=../web/dist CC_x86_64_unknown_linux_musl=musl-gcc cargo build --release --target x86_64-unknown-linux-musl
+```
+
+`local-linux.yml` checks in CI that the musl program is static, **times a solve with it against the glibc build** of the same program (the job fails if it is more than 1.3 times as slow; then the program is to be built for glibc 2.17 instead, so that it needs no more of a system than CentOS 7's), makes the packages, and tests the one with Firefox in containers of `centos:7`, `rockylinux:8` and `rockylinux:9`: the program starts the Firefox beside it itself, as a user would, and the page opens the netlist named on the command line and solves it (`ci/`: `container.sh`, `drive.mjs`, which looks at the page through Firefox's Marionette protocol, and `bench.mjs`). A container shares the kernel of the host (a recent one on GitHub's runners), so CentOS 7's own 3.10 kernel is not what is tried; what is tried is its C library (2.17) and its userland, which a static program uses nothing of but the system calls.
+
+## Packages
+
+The release has two files for Linux x86_64 (`local-release.yml`, from a tag `viewer-local-v<version>`, never marked as the repository's latest release, which the core's fixed download links use; the desktop viewer's release, `viewer-v*`, and what looks for the newest of it are not touched):
+
+| File | Holds |
+| --- | --- |
+| `rnl-viewer-local-VERSION-linux-x86_64.tar.gz` | the program, this README, the licenses, and `get-firefox.sh` with `firefox.lock`, which downloads Mozilla's official Firefox ESR, checks it against Mozilla's own checksum and unpacks it beside the program, where the program looks first (`--from FILE` for a computer with no network, which has the file copied from another) |
+| `rnl-viewer-local-VERSION-linux-x86_64-with-firefox.tar.gz` | the same with that Firefox already in the folder `firefox`, and `FIREFOX-NOTICE.txt` |
+
+The Firefox is **Mozilla's official ESR, unmodified**: it is unpacked as it is, nothing is added to it or taken from it, and the program starts it in a profile of its own, so that it is not changed either by use. Mozilla's [policy for the distribution of unaltered software](https://www.mozilla.org/en-US/foundation/trademarks/distribution-policy/) allows that if it is not changed, not charged for, no personal data is collected by the distribution, and **the most recent version** is distributed: so a release is made with the newest ESR that Mozilla publishes (`ci/firefox.lock`, which `local-release.yml` checks against Mozilla's own list of versions), and a package with Firefox is not to be kept for long; a computer whose own Firefox is 115 ESR or newer needs neither. Firefox is under its own licenses (the Mozilla Public License 2.0 and others: `about:license`), and its source is at <https://archive.mozilla.org/pub/firefox/releases/>.

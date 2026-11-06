@@ -1,0 +1,167 @@
+# The local viewer (apps/local) for older enterprise Linux (CentOS 7 / RHEL 8 / RHEL 9): builds it static (musl, with mimalloc) so that
+# it has no library to find on the machine, checks that it is static, and times a solve with it against a glibc build of the same
+# program (a static musl build with musl's own allocator was a quarter slower; the job fails if this one is much slower, and then the
+# program is to be built for glibc 2.17 instead). It makes the two packages (the program with get-firefox.sh, and the program with
+# Mozilla's official Firefox ESR, unmodified, beside it) and tests the one with Firefox in a container of each of centos:7,
+# rockylinux:8 and rockylinux:9: the program starts the Firefox itself, as a user would, and the page opens the netlist named on its
+# command line and solves it. It publishes nothing; local-release.yml, which calls this, does (from a tag).
+name: Local viewer, Linux
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/local/**"
+      - "apps/viewer-ui/**"
+      - "apps/web/**"
+      - "crates/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/local-linux.yml"
+  pull_request:
+    paths:
+      - "apps/local/**"
+      - "apps/viewer-ui/**"
+      - "apps/web/**"
+      - "crates/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/local-linux.yml"
+  workflow_dispatch:
+  workflow_call:
+    outputs:
+      version:
+        description: "The version of the program (apps/local/Cargo.toml)"
+        value: ${{ jobs.build.outputs.version }}
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_BUILD_JOBS: 4
+  # the most that the static program may take for a solve, as many times as the glibc build's
+  MAX_RATIO: "1.3"
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Download and verify locked public packages
+        run: python scripts/packages.py download
+      - name: Install Rust, and what a static build needs
+        run: |
+          rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown,x86_64-unknown-linux-musl
+          rustup default stable
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Write the web fonts
+        run: pip install fonttools==4.58.0 brotli==1.2.0 && python scripts/fonts.py web
+      - name: Build the web viewer
+        run: node apps/web/build.mjs
+      - name: The version
+        id: version
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' apps/local/Cargo.toml | head -1)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "the program is $version"
+      - name: Build the program, static (musl, with mimalloc) and for glibc
+        working-directory: apps/local
+        env:
+          RNL_SITE_DIR: ${{ github.workspace }}/apps/web/dist
+          CC_x86_64_unknown_linux_musl: musl-gcc
+        run: |
+          cargo build --release --locked --target x86_64-unknown-linux-musl
+          cargo build --release --locked
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          cp target/x86_64-unknown-linux-musl/release/rnl-viewer-local "$GITHUB_WORKSPACE/out/rnl-viewer-local"
+          cp target/release/rnl-viewer-local "$GITHUB_WORKSPACE/out/rnl-viewer-local-glibc"
+          file "$GITHUB_WORKSPACE/out/rnl-viewer-local" "$GITHUB_WORKSPACE/out/rnl-viewer-local-glibc"
+          # (ldd says "statically linked" of a static program and succeeds: ask file instead)
+          if file "$GITHUB_WORKSPACE/out/rnl-viewer-local" | grep -q "dynamically linked"; then echo "the musl program is dynamic"; exit 1; fi
+          "$GITHUB_WORKSPACE/out/rnl-viewer-local" --version
+      - name: Time a solve with each (the C library and the allocator are what differ)
+        run: |
+          node apps/local/ci/bench.mjs tests/integration/solver/T4-miller-conflicts.sp apps/web/dist 5 \
+            "glibc=$PWD/out/rnl-viewer-local-glibc" "musl=$PWD/out/rnl-viewer-local"
+      - name: Fetch the official Firefox ESR of firefox.lock, and check it
+        run: sh apps/local/ci/fetch-firefox.sh "$RUNNER_TEMP/firefox.tar.xz"
+      - name: Make the packages
+        run: sh apps/local/ci/package.sh out/rnl-viewer-local "${{ steps.version.outputs.version }}" packages "$RUNNER_TEMP/firefox.tar.xz"
+      - name: The plain package runs on this computer, and its own check of Firefox says what it should
+        run: |
+          mkdir -p "$RUNNER_TEMP/plain"
+          tar -xzf packages/rnl-viewer-local-${{ steps.version.outputs.version }}-linux-x86_64.tar.gz -C "$RUNNER_TEMP/plain"
+          "$RUNNER_TEMP/plain"/rnl-viewer-local-*/rnl-viewer-local --version
+          sh "$RUNNER_TEMP/plain"/rnl-viewer-local-*/get-firefox.sh --help
+          # (a file that is not Mozilla's Firefox is refused)
+          echo not-firefox > "$RUNNER_TEMP/bad.tar.xz"
+          if sh "$RUNNER_TEMP/plain"/rnl-viewer-local-*/get-firefox.sh --from "$RUNNER_TEMP/bad.tar.xz"; then echo "a file that is not Firefox was taken"; exit 1; fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: local-packages
+          path: packages/
+          if-no-files-found: error
+          retention-days: 14
+
+  system:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ["centos:7", "rockylinux:8", "rockylinux:9"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: local-packages
+          path: packages
+      - name: Unpack the package with Firefox, as a user would
+        run: |
+          mkdir -p pkg work
+          tar -xzf packages/rnl-viewer-local-${{ needs.build.outputs.version }}-linux-x86_64-with-firefox.tar.gz -C pkg --strip-components=1
+          ls pkg
+          cp tests/integration/solver/T1-rc-lowpass.sp work/top.sp
+      - name: Start the program in the container, which starts the official Firefox itself
+        run: |
+          # (a container of its own: the program needs no more of the system than a user's login would)
+          docker run -d --name el --network host -v "$PWD/pkg:/pkg:ro" -v "$PWD/work:/work:ro" -v "$PWD/apps/local/ci:/ci:ro" \
+            "${{ matrix.image }}" sh /ci/container.sh
+      - name: Wait for Firefox
+        run: |
+          for i in $(seq 1 300); do
+            if node -e 'require("net").connect(2828,"127.0.0.1").on("connect",function(){process.exit(0)}).on("error",function(){process.exit(1)})'; then echo "up after $i s"; break; fi
+            if ! docker ps -q -f name=el | grep -q .; then echo "the container stopped"; docker logs el; exit 1; fi
+            sleep 1
+          done
+          docker logs el
+      - name: The page opens the netlist, and a solve shows its preview
+        run: |
+          label=$(echo "${{ matrix.image }}" | tr ':' '-')
+          node apps/local/ci/drive.mjs out "$label" /work/top.sp
+      - name: What the container said
+        if: always()
+        run: |
+          docker logs el 2>&1 | tail -80 || true
+          { echo "### ${{ matrix.image }}"; echo '```'; docker logs el 2>&1 | grep -E '^(==|kernel|ldd|rnl-viewer-local|Mozilla|Opened|.*GLIBC)' | head -20; echo '```'; } >> "$GITHUB_STEP_SUMMARY" || true
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: local-system-${{ strategy.job-index }}
+          path: out
+          if-no-files-found: ignore

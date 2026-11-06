@@ -1,0 +1,8 @@
+# The Firefox that the local program is tested with, and that get-firefox.sh and the package with Firefox use: the official ESR
+# release of Mozilla, for Linux x86_64, unmodified. The checksum is Mozilla's own (the SHA256SUMS file of the release directory):
+# the workflows check the file against it and against Mozilla's file, both. A new ESR is a new line here, tested by the container
+# jobs of local-linux.yml before it is used.
+FIREFOX_VERSION=153.6.0esr
+FIREFOX_PATH=linux-x86_64/en-US/firefox-153.6.0esr.tar.xz
+FIREFOX_SHA256=31321cd9e2cef73df678417e810cdd1b5760aa5cc8063c8465669e5869cb8498
+FIREFOX_BASE=https://archive.mozilla.org/pub/firefox/releases

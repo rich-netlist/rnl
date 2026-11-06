@@ -32,3 +32,6 @@ opt-level = 2
 [profile.release]
 # the program is one file that a user copies
 strip = true
+
+[target.'cfg(target_env = "musl")'.dependencies]
+mimalloc = "0.1.52"

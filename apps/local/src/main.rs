@@ -33,6 +33,12 @@ use std::time::Duration;
 
 use app::App;
 
+// A static (musl) build allocates with mimalloc: musl's own allocator made the solver, which allocates the most of the core, about a
+// quarter slower than glibc's did (CI times a solve with each, and with each of the two libraries: local-linux.yml).
+#[cfg(target_env = "musl")]
+#[global_allocator]
+static ALLOCATOR: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// How many requests are served at once, once their heads are in: the page asks for its files in parallel.

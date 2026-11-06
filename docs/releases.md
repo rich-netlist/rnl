@@ -96,5 +96,12 @@ select its latest `viewer-v*` release rather than the repository's latest endpoi
 website continues to resolve Viewer downloads from those tags; CLI links use the fixed
 latest endpoints. Until the first core release, those CLI links have no matching assets.
 
+The local viewer for older enterprise Linux (`apps/local`, a static program that serves the web viewer on the
+loopback address, shown by a browser) is a line of its own: tags `viewer-local-v*`, built and published by
+`local-release.yml` with `--latest=false` and its own release notes (`apps/local/release-notes/`), so that neither the
+repository's latest endpoint, the desktop viewer's `viewer-v*` releases nor Help > Check for Updates is affected. It has two
+packages, one of which carries Mozilla's official Firefox ESR, unmodified, which is why a release is made with the newest ESR
+(`apps/local/ci/firefox.lock`; the workflow checks it). Each release needs the user's approval, as the others do.
+
 The CLI is unsigned. Windows may show SmartScreen. A macOS browser download may require
 `xattr -d com.apple.quarantine rnl` after verifying and extracting the archive.

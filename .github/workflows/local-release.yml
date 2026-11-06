@@ -1,0 +1,94 @@
+# Releases the local viewer (apps/local) for older enterprise Linux, apart from the desktop viewer and the core: a pushed tag
+# viewer-local-v<version>, the program's version (apps/local/Cargo.toml), builds the two packages with local-linux.yml (which also
+# tests them in containers of CentOS 7, Rocky 8 and Rocky 9) and makes the GitHub release "RNL Viewer, local <version>", with the
+# notes of apps/local/release-notes/<version>.md, never marked as the repository's latest release, which stays the core's, and with
+# its own tag prefix, which neither the desktop viewer's release (viewer-v*) nor Help > Check for Updates looks at. The workflow
+# viewer-release.yml is not touched. A release is made with the newest Firefox ESR that Mozilla publishes (Mozilla's policy for
+# unaltered software asks for the most recent version): the job that checks the tag fails if firefox.lock names an older one.
+# Run by hand, it only checks and builds, and never publishes.
+name: Local viewer release
+
+on:
+  push:
+    tags: ["viewer-local-v*"]
+  workflow_dispatch:
+    inputs:
+      candidate_tag:
+        description: "Optional viewer-local-vX.Y.Z to validate without pushing a tag (never publishes)"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      prerelease: ${{ steps.check.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: The tag, the version of the program and the release notes
+        id: check
+        env:
+          TAG: ${{ github.event.inputs.candidate_tag || github.ref_name }}
+          IS_TAG: ${{ github.ref_type == 'tag' }}
+        run: |
+          case "$TAG" in
+            viewer-local-v*) ;;
+            *) echo "the tag is $TAG, not viewer-local-v<version>"; if [ "$IS_TAG" = true ]; then exit 1; fi
+               echo "no candidate tag: checking the program's own version"; TAG="viewer-local-v$(sed -n 's/^version = "\(.*\)"/\1/p' apps/local/Cargo.toml | head -1)" ;;
+          esac
+          version=${TAG#viewer-local-v}
+          expected=$(sed -n 's/^version = "\(.*\)"/\1/p' apps/local/Cargo.toml | head -1)
+          [ "$version" = "$expected" ] || { echo "the tag says $version and apps/local/Cargo.toml $expected"; exit 1; }
+          echo "$version" | grep -Eq '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$' || { echo "$version is not a version"; exit 1; }
+          [ -f "apps/local/release-notes/$version.md" ] || { echo "apps/local/release-notes/$version.md is missing"; exit 1; }
+          case "$version" in *-*) echo "prerelease=true" >> "$GITHUB_OUTPUT" ;; *) echo "prerelease=false" >> "$GITHUB_OUTPUT" ;; esac
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: firefox.lock names the newest Firefox ESR
+        run: |
+          . apps/local/ci/firefox.lock
+          newest=$(curl -fsS --proto '=https' --tlsv1.2 https://product-details.mozilla.org/1.0/firefox_versions.json | python3 -c 'import json,sys; print(json.load(sys.stdin)["FIREFOX_ESR"])')
+          echo "the lock: $FIREFOX_VERSION; Mozilla's newest ESR: $newest"
+          if [ "$FIREFOX_VERSION" != "$newest" ]; then
+            echo "apps/local/ci/firefox.lock is not the newest Firefox ESR: set it to $newest, with Mozilla's checksum, and let local-linux.yml test it"
+            exit 1
+          fi
+
+  linux:
+    needs: validate
+    uses: ./.github/workflows/local-linux.yml
+
+  release:
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: [validate, linux]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: local-packages
+          path: assets
+      - name: Check the files against their sums
+        working-directory: assets
+        run: sha256sum --check SHA256SUMS.txt
+      # --latest=false: the repository's latest release belongs to the core, so that its fixed download links keep to it
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.validate.outputs.version }}
+          PRERELEASE: ${{ needs.validate.outputs.prerelease }}
+        run: |
+          flags=()
+          if [ "$PRERELEASE" = true ]; then flags+=(--prerelease); fi
+          gh release create "viewer-local-v$VERSION" assets/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "RNL Viewer, local $VERSION" \
+            --notes-file "apps/local/release-notes/$VERSION.md" \
+            --latest=false \
+            --verify-tag \
+            "${flags[@]}"
