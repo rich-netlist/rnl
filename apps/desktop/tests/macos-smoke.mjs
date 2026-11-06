@@ -38,8 +38,48 @@ end tell`);
 const menu=(name,item)=>osa(`tell application "System Events" to tell (first application process whose bundle identifier is "io.github.rich-netlist.viewer")
   click menu item ${JSON.stringify(item)} of menu 1 of menu bar item ${JSON.stringify(name)} of menu bar 1
 end tell`);
-async function observe(label,check) {
-  const end=Date.now()+90000; let last;
+const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+const appProcess='first application process whose bundle identifier is "io.github.rich-netlist.viewer"';
+// Whether the app is the frontmost one, asked again after it was told to be: a menu clicked while another
+// application still holds the menu bar has been seen to do nothing, with no error.
+async function toFront() {
+  const end=Date.now()+15000;
+  for(;;) {
+    osa(`tell application "System Events" to set frontmost of (${appProcess}) to true`);
+    if(osa(`tell application "System Events" to get frontmost of (${appProcess})`).trim()==='true') return true;
+    if(Date.now()>end) return false;
+    await sleep(250);
+  }
+}
+// Choose a menu item once the app is in front, and wait for what it shows (`check` of `observe`). A click that
+// showed nothing is made once more, up to three times; each try that failed keeps the window as it was seen
+// (LABEL-try-N.png) and what the system said of the windows (LABEL-try-N.txt), which the workflow keeps as artifacts.
+async function choose(name,item,label,check) {
+  let last;
+  for(let attempt=1;attempt<=3;attempt++) {
+    const front=await toFront();
+    try { menu(name,item); } catch(error) { last=`${name} > ${item}: ${error}`; }
+    try { return await observe(label,check,20); }
+    catch(error) {
+      last=String(error);
+      const shot=path.join(output,`${label}.png`);
+      if(fs.existsSync(shot)) fs.copyFileSync(shot,path.join(output,`${label}-try-${attempt}.png`));
+      let said;
+      try {
+        said=osa(`tell application "System Events"
+  set frontName to name of first application process whose frontmost is true
+  set windowNames to name of every window of (${appProcess})
+  return frontName & " | " & (windowNames as string)
+end tell`);
+      } catch(failure) { said=String(failure); }
+      fs.writeFileSync(path.join(output,`${label}-try-${attempt}.txt`),`app in front before the click: ${front}\nfront application and windows after: ${said}\n${last}\n`);
+      console.log(`${name} > ${item}: try ${attempt} showed nothing (app in front: ${front}); ${said.trim()}`);
+    }
+  }
+  throw new Error(`${name} > ${item} showed no ${label} in three tries: ${last}`);
+}
+async function observe(label,check,seconds=90) {
+  const end=Date.now()+seconds*1000; let last;
   while(Date.now()<end) {
     try {
       const result=execFileSync(observer,[path.join(output,`${label}.png`)],{encoding:'utf8',timeout:20000});
@@ -72,16 +112,14 @@ try {
   osa('tell application "System Events" to tell (first application process whose bundle identifier is "io.github.rich-netlist.viewer") to set frontmost to true');
   const menus=osa('tell application "System Events" to tell (first application process whose bundle identifier is "io.github.rich-netlist.viewer") to get name of every menu bar item of menu bar 1');
   fs.writeFileSync(path.join(output,'menus.txt'),menus);
-  menu('RNL Viewer','About RNL Viewer');
-  await observe('about',r=>/RNL core/.test(text(r)));
+  await choose('RNL Viewer','About RNL Viewer','about',r=>/RNL core/.test(text(r)));
   osa('tell application "System Events" to key code 53');
   // Cmd+B belongs to the native menu; physical Control+Q edits, leaving Cmd+Q to Quit.
   key('b','using command down');
   await observe('sidebar-hidden',r=>!r.words.some(w=>w.x<0.35 && /Netlist/.test(w.text)) && drawn(r,0.03));
   key('b','using command down');
   await observe('sidebar-restored',r=>r.words.some(w=>w.x<0.35 && /Netlist/.test(w.text)) && drawn(r));
-  menu('Help','Check for Updates...');
-  await observe('updates',r=>/Check for Updates/.test(text(r)) && /latest|newer|available|no release|could not/i.test(text(r)));
+  await choose('Help','Check for Updates...','updates',r=>/Check for Updates/.test(text(r)) && /latest|newer|available|no release|could not/i.test(text(r)));
   osa('tell application "System Events" to key code 53');
   key('q','using control down');
   await observe('editing',r=>/Apply and Exit/.test(text(r)));
