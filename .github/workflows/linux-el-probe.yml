@@ -48,7 +48,8 @@ jobs:
           cp target/x86_64-unknown-linux-musl/release/rnl probe/rnl
           cp target/release/rnl probe/rnl-glibc
           file probe/rnl probe/rnl-glibc
-          if ldd probe/rnl; then echo "the musl program is dynamic"; exit 1; fi
+          # (ldd says "statically linked" of a static program and succeeds: ask file instead)
+          if file probe/rnl | grep -q "dynamically linked"; then echo "the musl program is dynamic"; exit 1; fi
       - name: A musl program with mimalloc builds, is static and runs
         run: |
           # (outside the repository's own workspace)
@@ -58,7 +59,7 @@ jobs:
           printf 'use mimalloc::MiMalloc;\n#[global_allocator]\nstatic A: MiMalloc = MiMalloc;\nfn main() { let v: Vec<u64> = (0..1_000_000).collect(); println!("{}", v.iter().sum::<u64>()); }\n' > src/main.rs
           CC_x86_64_unknown_linux_musl=musl-gcc cargo build --release --target x86_64-unknown-linux-musl
           file target/x86_64-unknown-linux-musl/release/mimalloc-probe
-          if ldd target/x86_64-unknown-linux-musl/release/mimalloc-probe; then echo "dynamic"; exit 1; fi
+          if file target/x86_64-unknown-linux-musl/release/mimalloc-probe | grep -q "dynamically linked"; then echo "dynamic"; exit 1; fi
           ./target/x86_64-unknown-linux-musl/release/mimalloc-probe
       - name: Time a solve with each (the allocator and the C library are what differ)
         run: |
