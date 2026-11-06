@@ -331,17 +331,75 @@ fn write_replacing(at: &Path, bytes: &[u8]) -> Result<(), String> {
     write_in_place(at, bytes).map_err(say)
 }
 
-/// Write the bytes over the file, and read them back.
-fn write_in_place(at: &Path, bytes: &[u8]) -> std::io::Result<()> {
-    use std::io::Write;
-    let mut file = std::fs::OpenOptions::new().write(true).truncate(true).open(at)?;
-    file.write_all(bytes)?;
-    file.sync_all()?;
-    drop(file);
-    if std::fs::read(at)? != bytes {
-        return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "what was written is not what is read back"));
+/// What `overwrite` needs of a file, so that its failures can be tried: to read what it holds, to put bytes at its start, to cut
+/// it at a length, and to flush it.
+trait Target {
+    fn read_all(&mut self) -> std::io::Result<Vec<u8>>;
+    fn put(&mut self, bytes: &[u8]) -> std::io::Result<()>;
+    fn set_len(&mut self, len: u64) -> std::io::Result<()>;
+    fn sync(&mut self) -> std::io::Result<()>;
+}
+
+impl Target for std::fs::File {
+    fn read_all(&mut self) -> std::io::Result<Vec<u8>> {
+        use std::io::{Read, Seek, SeekFrom};
+        self.seek(SeekFrom::Start(0))?;
+        let mut bytes = Vec::new();
+        self.read_to_end(&mut bytes)?;
+        Ok(bytes)
+    }
+
+    fn put(&mut self, bytes: &[u8]) -> std::io::Result<()> {
+        use std::io::{Seek, SeekFrom, Write};
+        self.seek(SeekFrom::Start(0))?;
+        self.write_all(bytes)
+    }
+
+    fn set_len(&mut self, len: u64) -> std::io::Result<()> {
+        std::fs::File::set_len(self, len)
+    }
+
+    fn sync(&mut self) -> std::io::Result<()> {
+        self.sync_all()
+    }
+}
+
+/// Make a file hold `new`, in place, so that it holds that or what it held, and never less of either. The file is not
+/// emptied first: a disk that is full, a quota that is used up or a failing disk would leave it empty or cut off, and the file
+/// would be lost to a save. The new bytes are written over the old from the start, flushed, and only then is the file cut to
+/// the new length; read back, they must be what was meant. On any failure the old bytes, which are kept in memory, are put
+/// back and the length is restored, which takes no block that the file does not have already, and the error is given.
+fn overwrite<T: Target>(file: &mut T, new: &[u8]) -> std::io::Result<()> {
+    let old = file.read_all()?;
+    let written = (|| -> std::io::Result<()> {
+        file.put(new)?;
+        file.sync()?;
+        file.set_len(new.len() as u64)?;
+        file.sync()?;
+        if file.read_all()? != new {
+            return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "what was written is not what is read back"));
+        }
+        Ok(())
+    })();
+    if let Err(e) = written {
+        // (what cannot be put back, the error says too)
+        let restored = file.put(&old).and_then(|()| file.set_len(old.len() as u64)).and_then(|()| file.sync());
+        return Err(match restored {
+            Ok(()) => e,
+            Err(again) => std::io::Error::new(e.kind(), format!("{e}; and the old text could not be put back: {again}")),
+        });
     }
     Ok(())
+}
+
+/// Write the bytes over the file, in place (see `overwrite`).
+fn write_in_place(at: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    let mut file = std::fs::OpenOptions::new().read(true).write(true).open(at)?;
+    // (the old text is kept in memory while it is written over)
+    if file.metadata()?.len() > MAX_FILE {
+        return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "the file is too large to be saved in place"));
+    }
+    overwrite(&mut file, bytes)
 }
 
 /// Replace the file by a new one with the same owner, group and mode: Ok(true) when it is, Ok(false) when that cannot be
@@ -754,6 +812,84 @@ mod tests {
         let big = std::fs::File::create(dir.join("big.sp")).unwrap();
         big.set_len(MAX_FILE + 1).unwrap();
         assert!(!unchanged(&dir.join("big.sp"), ""));
+    }
+
+    /// A file that is a few bytes in memory, that fails as a disk does: a write that would take a block the file has not got, a
+    /// flush that fails.
+    struct Failing {
+        data: Vec<u8>,
+        /// The most the file may hold: the blocks it has (what a full disk lets it write over, and no more).
+        room: usize,
+        fail_sync: bool,
+        syncs: u32,
+    }
+
+    impl Target for Failing {
+        fn read_all(&mut self) -> std::io::Result<Vec<u8>> {
+            Ok(self.data.clone())
+        }
+
+        fn put(&mut self, bytes: &[u8]) -> std::io::Result<()> {
+            for (i, b) in bytes.iter().enumerate() {
+                if i >= self.room {
+                    return Err(std::io::Error::new(std::io::ErrorKind::StorageFull, "no space left on device"));
+                }
+                if i < self.data.len() {
+                    self.data[i] = *b;
+                } else {
+                    self.data.push(*b);
+                }
+            }
+            Ok(())
+        }
+
+        fn set_len(&mut self, len: u64) -> std::io::Result<()> {
+            self.data.resize(len as usize, 0);
+            Ok(())
+        }
+
+        fn sync(&mut self) -> std::io::Result<()> {
+            self.syncs += 1;
+            if self.fail_sync && self.syncs == 1 {
+                return Err(std::io::Error::other("input/output error"));
+            }
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn a_write_in_place_that_fails_leaves_the_file_as_it_was() {
+        // the disk is full: the new text is longer than the room the file has. Half of it has been written when it fails
+        let mut file = Failing { data: b"the old text of the file\n".to_vec(), room: 25, fail_sync: false, syncs: 0 };
+        let old = file.data.clone();
+        let err = overwrite(&mut file, b"a new text that is longer than the old one, and does not fit\n").unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::StorageFull);
+        assert_eq!(file.data, old, "byte for byte");
+        // a flush that fails after all of a shorter text was written over the start of the old one
+        let mut file = Failing { data: b"the old text of the file, which is long\n".to_vec(), room: 100, fail_sync: true, syncs: 0 };
+        let old = file.data.clone();
+        assert!(overwrite(&mut file, b"short\n").is_err());
+        assert_eq!(file.data, old, "byte for byte");
+        // what fits is written whole, cut to its length, and a longer file is made shorter
+        let mut file = Failing { data: b"the old text of the file, which is long\n".to_vec(), room: 100, fail_sync: false, syncs: 0 };
+        overwrite(&mut file, b"short\n").unwrap();
+        assert_eq!(file.data, b"short\n");
+        let mut file = Failing { data: b"ab".to_vec(), room: 100, fail_sync: false, syncs: 0 };
+        overwrite(&mut file, b"longer than it was\n").unwrap();
+        assert_eq!(file.data, b"longer than it was\n");
+    }
+
+    #[test]
+    fn a_write_in_place_on_a_real_file_goes_whole_and_is_cut_to_length() {
+        let dir = temp("inplace");
+        let top = dir.join("top.sp");
+        std::fs::write(&top, "a long old text, of many bytes\n").unwrap();
+        write_in_place(&top, b"short\n").unwrap();
+        assert_eq!(std::fs::read(&top).unwrap(), b"short\n");
+        write_in_place(&top, b"a longer text again\n").unwrap();
+        assert_eq!(std::fs::read(&top).unwrap(), b"a longer text again\n");
+        write_in_place(&top, b"").unwrap();
+        assert_eq!(std::fs::read(&top).unwrap(), b"");
     }
 
     #[test]

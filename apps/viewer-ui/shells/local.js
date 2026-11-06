@@ -96,12 +96,14 @@ const save = (key, value) => api("api/settings", { method: "PUT", body: { key, v
 const NETLISTS = /\.(sp|spi|spice|cir|ckt|net|netlist|scs|inc|lib|rnl)$/i;
 
 /** The netlists and packages in a folder, and in the folders below it, as the Library's Include Folder lists them. */
-async function folderFiles(dir, found = [], depth = 0) {
+async function folderFiles(dir, found = [], depth = 0, seen = { cut: 0 }) {
   const listing = await api(`api/ls?${new URLSearchParams({ dir })}`);
+  // (a folder with more entries than the program lists is included in part: said, with how many it lists)
+  if (listing.truncated) seen.cut = listing.entries.length;
   for (const entry of listing.entries) {
     const path = `${listing.dir.replace(/\/$/, "")}/${entry.name}`;
     if (entry.dir) {
-      if (depth < 8 && found.length < 2000) await folderFiles(path, found, depth + 1);
+      if (depth < 8 && found.length < 2000) await folderFiles(path, found, depth + 1, seen);
     } else if (NETLISTS.test(entry.name)) found.push(path);
   }
   return found;
@@ -162,7 +164,10 @@ export default {
       return [web.poolItem(serverSource(chosen.path))];
     }
     await api("api/allow", { method: "POST", body: { dir: chosen.path } });
-    return (await folderFiles(chosen.path)).map((path) => web.poolItem(serverSource(path)));
+    const seen = { cut: 0 };
+    const paths = await folderFiles(chosen.path, [], 0, seen);
+    if (seen.cut) note(m`Only the first ${seen.cut} entries are listed.`);
+    return paths.map((path) => web.poolItem(serverSource(path)));
   },
   // another file of the document, opened from the Library, a diagnostic or an include: read from the machine too
   sourceForFile(source, document, index) {
