@@ -716,5 +716,13 @@
   "Failed: the constraint contradicts itself.": "Échouée : la contrainte se contredit elle-même.",
   "Undecided: the check did not finish. Measured on the drawing, it holds.": "Indécise : la vérification n'a pas abouti. Mesurée dans le dessin, elle est respectée.",
   "Undecided: the check did not finish. Measured on the drawing, it does not hold.": "Indécise : la vérification n'a pas abouti. Mesurée dans le dessin, elle n'est pas respectée.",
-  "Undecided: the check did not finish. It cannot be measured on the drawing.": "Indécise : la vérification n'a pas abouti. Elle ne peut pas être mesurée dans le dessin."
+  "Undecided: the check did not finish. It cannot be measured on the drawing.": "Indécise : la vérification n'a pas abouti. Elle ne peut pas être mesurée dans le dessin.",
+  "Parent folder": "Dossier parent",
+  "Choose this folder": "Choisir ce dossier",
+  "Save in this folder": "Enregistrer dans ce dossier",
+  "Folder: {0}": "Dossier : {0}",
+  "From the computer of the browser…": "Depuis l'ordinateur du navigateur…",
+  "Choose Folder": "Choisir un dossier",
+  "Choose": "Choisir",
+  "{0} changed on disk. F5 reloads the netlist.": "{0} a changé sur le disque. F5 recharge la netlist."
 }

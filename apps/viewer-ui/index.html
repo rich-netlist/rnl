@@ -99,6 +99,44 @@ if (new URLSearchParams(location.search).get("embed") !== "1") document.addEvent
   <strong>RNL Viewer</strong>
   <small id="startup-version"></small>
 </div>
+<script>
+// A browser too old for the page. The scripts below use what came to the browsers in 2021 to 2023: top-level await,
+// Object.hasOwn, Array.prototype.at, and module Workers for the core, with optional chaining and logical assignment
+// besides. An older browser, such as Firefox 68 of 2020, stops at the first and shows nothing, so this script, which is
+// ES5 so that every browser reads it, says so on the page, with what to use instead (apps/viewer-ui/README.md).
+(function () {
+  var missing = [];
+  if (!Object.hasOwn) missing.push("Object.hasOwn");
+  if (![].at) missing.push("Array.prototype.at");
+  if (typeof WebAssembly !== "object") missing.push("WebAssembly");
+  if (typeof Worker !== "function") missing.push("Worker");
+  else if (!window.__TAURI__) {
+    // a browser that has module Workers reads the `type` of the options a Worker is made with, as one that has not does not
+    var modules = false;
+    try {
+      new Worker("data:,", { get type() { modules = true; return "classic"; } }).terminate();
+    } catch (e) { /* a policy may refuse the address: the options were read before that */ }
+    if (!modules) missing.push("module Workers");
+  }
+  if (missing.length === 0) return;
+  window.rnlTooOld = missing;
+  var card = document.createElement("div");
+  card.id = "too-old";
+  card.setAttribute("role", "alert");
+  card.style.cssText = "position:fixed;left:0;right:0;top:0;bottom:0;z-index:30;display:flex;align-items:center;justify-content:center;padding:24px;background:Canvas;color:CanvasText;font:16px/1.5 system-ui,sans-serif";
+  var box = document.createElement("div");
+  box.style.cssText = "max-width:34em";
+  var title = document.createElement("strong");
+  title.style.cssText = "display:block;font-size:22px;margin-bottom:8px";
+  title.appendChild(document.createTextNode("This browser is too old for RNL Viewer"));
+  var detail = document.createElement("p");
+  detail.appendChild(document.createTextNode("It lacks " + missing.join(", ") + ". Use Firefox 115 ESR or newer, Chrome or Edge 89 or newer, or Safari 15 or newer."));
+  box.appendChild(title);
+  box.appendChild(detail);
+  card.appendChild(box);
+  document.body.appendChild(card);
+})();
+</script>
 <div id="loading" class="loading" role="status" aria-live="polite" hidden>
   <span id="loading-stage">Reading files…</span>
   <div class="loading-track" role="progressbar" aria-label="Loading netlist"><span></span></div>

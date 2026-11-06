@@ -716,5 +716,13 @@
   "Failed: the constraint contradicts itself.": "Fallida: la restricción se contradice a sí misma.",
   "Undecided: the check did not finish. Measured on the drawing, it holds.": "Sin decidir: la comprobación no terminó. Medida en el dibujo, se cumple.",
   "Undecided: the check did not finish. Measured on the drawing, it does not hold.": "Sin decidir: la comprobación no terminó. Medida en el dibujo, no se cumple.",
-  "Undecided: the check did not finish. It cannot be measured on the drawing.": "Sin decidir: la comprobación no terminó. No se puede medir en el dibujo."
+  "Undecided: the check did not finish. It cannot be measured on the drawing.": "Sin decidir: la comprobación no terminó. No se puede medir en el dibujo.",
+  "Parent folder": "Carpeta superior",
+  "Choose this folder": "Elegir esta carpeta",
+  "Save in this folder": "Guardar en esta carpeta",
+  "Folder: {0}": "Carpeta: {0}",
+  "From the computer of the browser…": "Desde el equipo del navegador…",
+  "Choose Folder": "Elegir carpeta",
+  "Choose": "Elegir",
+  "{0} changed on disk. F5 reloads the netlist.": "{0} cambió en el disco. F5 recarga el netlist."
 }

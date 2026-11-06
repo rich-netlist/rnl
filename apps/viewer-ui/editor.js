@@ -11,7 +11,7 @@ import { setCheck, setEnabled } from "./commands.js";
 import { decide, inform, modal } from "./dialog.js";
 import { applyEdits, currentSource, openSource } from "./open.js";
 import * as edits from "./edits.js";
-import { shell } from "./shell.js";
+import { downloads, shell } from "./shell.js";
 import { previewing } from "./solve.js";
 import { doc } from "./state.js";
 import { fileShown, fileViews, showFile, sourceLineHeight, refreshSource, setRnlOnly } from "./text.js";
@@ -295,7 +295,7 @@ export async function discardChanges() {
 
 /** The files to write or download for File > Save: the files with changes not saved; on the web the file shown. */
 function filesToSave() {
-  if (shell.platform === "web") {
+  if (downloads()) {
     const f = doc.files[fileShown];
     return f ? [{ path: f.path, name: f.name, text: edits.fileText(f.path) }] : [];
   }
@@ -318,7 +318,7 @@ export async function save(overwrite = false, encoding = "preserve") {
   // which overwrites nothing, downloads it
   if (shell.saveAs && opened && (opened.text !== undefined || opened.readonly)) return saveAs(encoding);
   const files = filesToSave();
-  if (shell.platform !== "web") {
+  if (!downloads()) {
     const kept = files.filter((f) => builtIn(f.path));
     if (kept.length > 0) {
       await inform({
@@ -335,14 +335,14 @@ export async function save(overwrite = false, encoding = "preserve") {
   try {
     const result = await shell.save(opened, files, overwrite, encoding);
     if (result !== null && typeof result === "object") return changedOnDisk(result.changed, encoding);
-    edits.markSaved(files, shell.platform !== "web");
+    edits.markSaved(files, !downloads());
     refreshEditing();
-    note(shell.platform === "web"
+    note(downloads()
       ? files.length === 1 ? m`Downloaded ${files[0].name.split("/").pop()}.` : m`Downloaded ${files.length} files.`
       : result || m("Saved."));
     return true;
   } catch (e) {
-    await inform({ title: shell.platform === "web" ? m("Download File") : m("Save"), paragraphs: [m`The changes were not saved: ${e instanceof Error ? e.message : String(e)}`] });
+    await inform({ title: downloads() ? m("Download File") : m("Save"), paragraphs: [m`The changes were not saved: ${e instanceof Error ? e.message : String(e)}`] });
     return false;
   }
 }
@@ -422,7 +422,7 @@ export async function confirmLeave(what, signal) {
   if (files.length === 0) return true;
   if (modal()) return false;
   const names = files.map((f) => f.name).join(", ");
-  const can = shell.platform !== "web" && shell.save;
+  const can = !downloads() && shell.save;
   const choice = await decide({
     signal,
     title: m("Changes Not Saved"),

@@ -1050,7 +1050,8 @@ export default {
       solving = own;
       try {
         const response = await fetch(new URL("rnl-solver/solve", location.href), { method: "POST", signal: own.signal,
-          headers: { "Content-Type": "application/json" },
+          // (X-RNL: the local program, which serves the page to one browser, asks for it of every request that does anything)
+          headers: { "Content-Type": "application/json", "X-RNL": "1" },
           body: JSON.stringify({ entry: request.entry, files, pool: request.pool, options: settings?.options || "" }) });
         const answer = await response.json().catch(() => ({ error: `the solver service answered ${response.status}` }));
         if (!response.ok) throw answer.error || `the solver service answered ${response.status}`;

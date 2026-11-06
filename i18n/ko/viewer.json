@@ -716,5 +716,13 @@
   "Failed: the constraint contradicts itself.": "실패: 이 제약은 스스로 모순됩니다.",
   "Undecided: the check did not finish. Measured on the drawing, it holds.": "미결정: 검사가 끝나지 않았습니다. 그림에서 측정하면 성립합니다.",
   "Undecided: the check did not finish. Measured on the drawing, it does not hold.": "미결정: 검사가 끝나지 않았습니다. 그림에서 측정하면 성립하지 않습니다.",
-  "Undecided: the check did not finish. It cannot be measured on the drawing.": "미결정: 검사가 끝나지 않았습니다. 그림에서는 측정할 수 없습니다."
+  "Undecided: the check did not finish. It cannot be measured on the drawing.": "미결정: 검사가 끝나지 않았습니다. 그림에서는 측정할 수 없습니다.",
+  "Parent folder": "상위 폴더",
+  "Choose this folder": "이 폴더 선택",
+  "Save in this folder": "이 폴더에 저장",
+  "Folder: {0}": "폴더: {0}",
+  "From the computer of the browser…": "브라우저가 있는 컴퓨터에서…",
+  "Choose Folder": "폴더 선택",
+  "Choose": "선택",
+  "{0} changed on disk. F5 reloads the netlist.": "{0}이(가) 디스크에서 변경되었습니다. F5로 넷리스트를 새로 고칩니다."
 }

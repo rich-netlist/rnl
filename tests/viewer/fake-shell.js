@@ -237,6 +237,19 @@ export function pseudo(text) {
 const locales = async (name) => (await fetch(`locales/${name}`)).json();
 
 /** @type {import("../../apps/viewer-ui/shell.js").Shell} */
+/** Save As: the file is written where the user says, and the source of the file written is the netlist from then on. */
+async function saveAs(src, file, encoding) {
+  (fake.encodings ||= []).push(["saveAs", encoding]);
+  fake.calls.push(["saveAs", src.name]);
+  fake.writesAs.push(file);
+  const fail = fake.writeFail;
+  fake.writeFail = null;
+  if (fail !== null) throw fail;
+  const next = fake.savedAs;
+  fake.savedAs = null;
+  return source(next);
+}
+
 export default {
   async uiLanguages() {
     const languages = await locales("languages.json");
@@ -427,19 +440,11 @@ export default {
     if (fail !== null) throw fail;
     return `Saved ${files.map((f) => f.name).join(", ")}.`;
   },
+  // `overwrites=1`: a web page whose shell writes the files where they were read from, as the local shell does
+  ...(platform === "web" && params.get("overwrites") === "1" ? { overwrites: true, saveAs } : {}),
   ...(platform === "desktop"
     ? {
-        async saveAs(src, file, encoding) {
-          (fake.encodings ||= []).push(["saveAs", encoding]);
-          fake.calls.push(["saveAs", src.name]);
-          fake.writesAs.push(file);
-          const fail = fake.writeFail;
-          fake.writeFail = null;
-          if (fail !== null) throw fail;
-          const next = fake.savedAs;
-          fake.savedAs = null;
-          return source(next);
-        },
+        saveAs,
         onCloseRequested(h) {
           closing = h;
         },

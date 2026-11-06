@@ -1,0 +1,34 @@
+[package]
+name = "rnl-viewer-local"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+license = "MIT"
+publish = false
+description = "RNL Viewer for older enterprise Linux: a local server for the web viewer, drawn in a browser"
+build = "build.rs"
+
+# A workspace of its own, as the desktop viewer's is: its builds stay apart from the library crates'.
+[workspace]
+
+[dependencies]
+rnl-cli = { path = "../../crates/rnl-cli" }
+rnl-runtime = { path = "../../crates/rnl-runtime" }
+rnl-solver = { path = "../../crates/rnl-solver" }
+rnl-view = { path = "../../crates/rnl-view" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# the core is optimized in debug builds too: an unoptimized interpreter and solver are slow to try the program with
+[profile.dev.package.rnl-runtime]
+opt-level = 2
+
+[profile.dev.package.rnl-view]
+opt-level = 2
+
+[profile.dev.package.rnl-solver]
+opt-level = 2
+
+[profile.release]
+# the program is one file that a user copies
+strip = true

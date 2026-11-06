@@ -34,6 +34,9 @@
  * @property {(session: object, doc?: object) => Promise<unknown>} [newWindow] Open an independent viewer with a session.
  * @property {() => Promise<object | null>} [initialSession] Consume the one-use startup session, before initial().
  * @property {(id: string, enabled: boolean) => void} [setEnabled] Update a native command enabled state.
+ * @property {boolean} [overwrites] A shell of the "web" platform that writes the files where they were read from, as the
+ *   desktop's does (the local shell, whose server writes them): Save is Save, not Download File, and offers the desktop's
+ *   Save As; it has `save`, and `saveAs` when the user may choose another file.
  * @property {boolean} nativeMenu Whether the platform shows the menu bar itself; if not, the page shows
  *   its own (menubar.js).
  * @property {() => Promise<Source | null>} initial What to open at start, if anything: on the desktop,
@@ -206,6 +209,12 @@
 
 /** @type {Shell | null} the shell chosen at start */
 export let shell = null;
+
+/**
+ * Whether File > Save downloads the files, as the web shell does, rather than writes them where they were read from, as
+ * the desktop shell does and the local shell too, which says so with `overwrites`.
+ */
+export const downloads = () => shell.platform === "web" && !shell.overwrites;
 
 /**
  * Choose the shell and load it: shells/desktop.js when the page runs in the desktop viewer

@@ -716,5 +716,13 @@
   "Failed: the constraint contradicts itself.": "失败：这条约束自相矛盾。",
   "Undecided: the check did not finish. Measured on the drawing, it holds.": "未判定：检查没有完成。在图上量出来，它成立。",
   "Undecided: the check did not finish. Measured on the drawing, it does not hold.": "未判定：检查没有完成。在图上量出来，它不成立。",
-  "Undecided: the check did not finish. It cannot be measured on the drawing.": "未判定：检查没有完成。在图上无法量出。"
+  "Undecided: the check did not finish. It cannot be measured on the drawing.": "未判定：检查没有完成。在图上无法量出。",
+  "Parent folder": "上级文件夹",
+  "Choose this folder": "选择此文件夹",
+  "Save in this folder": "保存到此文件夹",
+  "Folder: {0}": "文件夹：{0}",
+  "From the computer of the browser…": "从浏览器所在的电脑选择…",
+  "Choose Folder": "选择文件夹",
+  "Choose": "选择",
+  "{0} changed on disk. F5 reloads the netlist.": "{0} 在磁盘上已更改。按 F5 重新加载网表。"
 }

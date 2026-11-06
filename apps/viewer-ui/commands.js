@@ -203,11 +203,12 @@ export function setEnabled(id, enabled) {
 
 /**
  * Whether this platform offers a command; one that names no platforms is offered on all, and one that names `with` also
- * wherever the shell has that capability (the web shell with a solver service has `solve`).
+ * wherever the shell has that capability (the web shell with a solver service has `solve`, and the local shell
+ * `overwrites`); one that names `unless` is not offered where the shell has that capability (Download File, where Save is).
  */
 function offered(item) {
   const here = !item.platforms || item.platforms.includes(shell.platform) || (item.with !== undefined && !!shell[item.with]);
-  return here && (!item.windowsOnly || /Win/.test(navigator.platform));
+  return here && !(item.unless !== undefined && !!shell[item.unless]) && (!item.windowsOnly || /Win/.test(navigator.platform));
 }
 
 /**

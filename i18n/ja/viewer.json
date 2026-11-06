@@ -716,5 +716,13 @@
   "Failed: the constraint contradicts itself.": "失敗しました: この制約は自己矛盾しています。",
   "Undecided: the check did not finish. Measured on the drawing, it holds.": "未判定: 検査が終わりませんでした。図の上で測ると、成立しています。",
   "Undecided: the check did not finish. Measured on the drawing, it does not hold.": "未判定: 検査が終わりませんでした。図の上で測ると、成立していません。",
-  "Undecided: the check did not finish. It cannot be measured on the drawing.": "未判定: 検査が終わりませんでした。図の上では測れません。"
+  "Undecided: the check did not finish. It cannot be measured on the drawing.": "未判定: 検査が終わりませんでした。図の上では測れません。",
+  "Parent folder": "親フォルダー",
+  "Choose this folder": "このフォルダーを選択",
+  "Save in this folder": "このフォルダーに保存",
+  "Folder: {0}": "フォルダー: {0}",
+  "From the computer of the browser…": "ブラウザーのあるコンピューターから…",
+  "Choose Folder": "フォルダーを選択",
+  "Choose": "選択",
+  "{0} changed on disk. F5 reloads the netlist.": "{0} がディスク上で変更されました。F5 でネットリストを再読み込みします。"
 }

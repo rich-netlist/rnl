@@ -716,5 +716,13 @@
   "Failed: the constraint contradicts itself.": "Fehlgeschlagen: die Randbedingung widerspricht sich selbst.",
   "Undecided: the check did not finish. Measured on the drawing, it holds.": "Unentschieden: die Prüfung wurde nicht beendet. In der Zeichnung gemessen, gilt sie.",
   "Undecided: the check did not finish. Measured on the drawing, it does not hold.": "Unentschieden: die Prüfung wurde nicht beendet. In der Zeichnung gemessen, gilt sie nicht.",
-  "Undecided: the check did not finish. It cannot be measured on the drawing.": "Unentschieden: die Prüfung wurde nicht beendet. Sie lässt sich in der Zeichnung nicht messen."
+  "Undecided: the check did not finish. It cannot be measured on the drawing.": "Unentschieden: die Prüfung wurde nicht beendet. Sie lässt sich in der Zeichnung nicht messen.",
+  "Parent folder": "Übergeordneter Ordner",
+  "Choose this folder": "Diesen Ordner wählen",
+  "Save in this folder": "In diesem Ordner speichern",
+  "Folder: {0}": "Ordner: {0}",
+  "From the computer of the browser…": "Vom Rechner des Browsers…",
+  "Choose Folder": "Ordner wählen",
+  "Choose": "Wählen",
+  "{0} changed on disk. F5 reloads the netlist.": "{0} wurde auf dem Datenträger geändert. F5 lädt die Netzliste neu."
 }

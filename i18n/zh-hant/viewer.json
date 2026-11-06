@@ -716,5 +716,13 @@
   "Failed: the constraint contradicts itself.": "失敗：這條約束自相矛盾。",
   "Undecided: the check did not finish. Measured on the drawing, it holds.": "未判定：檢查沒有完成。在圖上量出來，它成立。",
   "Undecided: the check did not finish. Measured on the drawing, it does not hold.": "未判定：檢查沒有完成。在圖上量出來，它不成立。",
-  "Undecided: the check did not finish. It cannot be measured on the drawing.": "未判定：檢查沒有完成。在圖上無法量出。"
+  "Undecided: the check did not finish. It cannot be measured on the drawing.": "未判定：檢查沒有完成。在圖上無法量出。",
+  "Parent folder": "上層資料夾",
+  "Choose this folder": "選擇此資料夾",
+  "Save in this folder": "儲存到此資料夾",
+  "Folder: {0}": "資料夾：{0}",
+  "From the computer of the browser…": "從瀏覽器所在的電腦選擇…",
+  "Choose Folder": "選擇資料夾",
+  "Choose": "選擇",
+  "{0} changed on disk. F5 reloads the netlist.": "{0} 在磁碟上已變更。按 F5 重新載入網表。"
 }
