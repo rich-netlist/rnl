@@ -1780,7 +1780,7 @@
           },
           {
             "id": "@09-buses-and-bundles.sp:69:5",
-            "attach": null,
+            "attach": "%dpt",
             "key": null,
             "markup": {
               "value": "D<3:0>",
@@ -3423,7 +3423,7 @@
           },
           {
             "id": "@09-buses-and-bundles.sp:41:5",
-            "attach": null,
+            "attach": "%dp",
             "key": null,
             "markup": {
               "value": "D<3:0>",
@@ -3456,7 +3456,7 @@
           },
           {
             "id": "@09-buses-and-bundles.sp:42:5",
-            "attach": null,
+            "attach": "%qp",
             "key": null,
             "markup": {
               "value": "Q<3:0>",

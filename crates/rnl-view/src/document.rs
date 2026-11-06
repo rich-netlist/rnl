@@ -900,9 +900,12 @@ impl<'a> Index<'a> {
         // nothing when that cannot be selected:
         // a click on it is then not a click on whatever is under it. with_page_ids gives each
         // text its own groups, including labels of repeated unnamed usages.
+        // a text at a point is no label: nothing to stand for, and no hit
+        let points: HashSet<&str> = lv.points.iter().map(|p| p.id.as_str()).collect();
         let boxes = rnl_render::text_boxes(lv, &render);
         for (t, bbox) in lv.texts.iter().zip(boxes) {
-            let (true, Some([x0, y0, x1, y1])) = (t.attach.is_some(), bbox) else { continue };
+            let label = t.attach.as_deref().is_some_and(|a| !points.contains(a));
+            let (true, Some([x0, y0, x1, y1])) = (label, bbox) else { continue };
             let objects = match &t.target {
                 Some(TextTarget::Item(i)) => item_objects.get(*i).cloned().unwrap_or_default(),
                 Some(TextTarget::Wire(i)) => {

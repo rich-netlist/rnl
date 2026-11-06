@@ -467,7 +467,9 @@ pub enum Vertex {
 pub struct TextView {
     /// `#M1::name` for a label with a key; else as an object's.
     pub id: String,
-    /// The id of the object it is attached to; null for a text at a point.
+    /// The id of the object it is attached to, or of the point, for a text at a point the level
+    /// names, such as `%j1`; null for a text at a point written in place, such as `(10, 0)`, or at
+    /// one that the level does not name alone.
     pub attach: Option<String>,
     /// The key of a label, such as "name".
     pub key: Option<String>,
@@ -1261,6 +1263,39 @@ R2 a vdd! 2k
             assert_ne!(revision(texts[0], &texts[1].replace("2k", "3k")), r, "{entry}");
             assert_ne!(revision(&texts[0].replace("1k", "3k"), texts[1]), r, "{entry}");
         }
+    }
+
+    /// A text at a point the level names is attached to it, as one on an instance is; one at a point
+    /// written in place is attached to nothing it can name. Neither is a label to click.
+    #[test]
+    fn a_text_at_a_named_point_says_which() {
+        let text = "* points\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\nR1 a b 1k\n\
+                    * @RNL {\n\
+                    *   #R1 @PLACE(0, 0);\n\
+                    *   %j1 = (10, 0); &b @WIRE {#R1:2 %j1}; %j1 @TEXT(\"VDD\", dx=-31, dy=1.5) => %t1;\n\
+                    *   (20, 0) @TEXT(\"here\") => %t2;\n\
+                    *   #R1 @TEXT(\"on R1\") => %t3\n\
+                    * }\n.end\n";
+        let files = MemoryProvider::new().with("/w/t.sp", text);
+        let parts = Parts { drawing: true, host: false, model: true };
+        let s =
+            serde_json::to_value(crate::snapshot("/w/t.sp", &files, &BuildOptions::default(), parts).unwrap()).unwrap();
+        let texts = s["levels"][0]["model"]["texts"].as_array().unwrap();
+        let attach = |id: &str| {
+            texts.iter().find(|t| t["id"] == id).unwrap_or_else(|| panic!("{id}: {texts:?}"))["attach"].clone()
+        };
+        assert_eq!(attach("%t1"), json!("%j1"));
+        assert_eq!(attach("%t2"), Value::Null);
+        assert_eq!(attach("%t3"), json!("#R1"));
+        // the point is one the snapshot lists, and the text is where it is drawn: its point and the offset
+        let points = s["levels"][0]["model"]["points"].as_array().unwrap();
+        assert!(points.iter().any(|p| p["id"] == "%j1"), "{points:?}");
+        let d = crate::build("/w/t.sp", &files, &BuildOptions::default()).unwrap();
+        let level = &d.levels[0];
+        // no hit for the texts at points: only the one on R1 among them is a label
+        let labels = level.hits.iter().filter(|h| h.kind == "label").count();
+        // R1's name and value, and %t3
+        assert_eq!(labels, 3, "{:?}", level.hits);
     }
 
     #[test]

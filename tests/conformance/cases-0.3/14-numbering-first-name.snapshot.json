@@ -395,7 +395,7 @@
         "texts": [
           {
             "id": "@14-numbering-first-name.sp:15:38",
-            "attach": null,
+            "attach": "%p",
             "key": null,
             "markup": {
               "value": "x",
@@ -778,7 +778,7 @@
         "texts": [
           {
             "id": "@14-numbering-first-name.sp:26:38",
-            "attach": null,
+            "attach": "%q",
             "key": null,
             "markup": {
               "value": "x",

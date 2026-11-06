@@ -1299,7 +1299,7 @@
           },
           {
             "id": "@11-header-alias-device.sp:30:5",
-            "attach": null,
+            "attach": "%vo",
             "key": null,
             "markup": {
               "value": "V_{out}",

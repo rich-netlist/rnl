@@ -724,7 +724,7 @@
           },
           {
             "id": "@01-rc-lowpass.sp:14:5",
-            "attach": null,
+            "attach": "%o",
             "key": null,
             "markup": {
               "value": "V_{out}",

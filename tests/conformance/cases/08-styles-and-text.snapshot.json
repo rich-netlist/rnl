@@ -1141,7 +1141,7 @@
           },
           {
             "id": "@08-styles-and-text.sp:50:5",
-            "attach": null,
+            "attach": "%vo",
             "key": null,
             "markup": {
               "value": "V_{out}",
@@ -1472,7 +1472,7 @@
           },
           {
             "id": "@08-styles-and-text.sp:59:5",
-            "attach": null,
+            "attach": "%p",
             "key": null,
             "markup": {
               "value": "this note is at (${x}, ${y})",

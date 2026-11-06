@@ -975,7 +975,12 @@ impl Interp<'_> {
             };
             let (key, attach) = match self.o(t) {
                 ObjData::KeyText { key, .. } => (Some(key.clone()), Some(self.ref_id(s, att, &ids))),
-                _ if matches!(self.o(att), ObjData::Point { .. } | ObjData::LevelObj { .. }) => (None, None),
+                // a point the level names, such as `%j1`, by its name; one written in place, such as
+                // `(10, 0)`, has no id to give
+                _ if matches!(self.o(att), ObjData::Point { .. }) => {
+                    (None, ids.get(&att).filter(|id| id.starts_with('%')).cloned())
+                }
+                _ if matches!(self.o(att), ObjData::LevelObj { .. }) => (None, None),
                 _ => (None, Some(self.ref_id(s, att, &ids))),
             };
             // a label the symbol gives has its layer (at -1) and a package's until the document

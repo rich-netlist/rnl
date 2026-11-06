@@ -542,7 +542,9 @@ export type TextView = {
    */
   id: string,
   /**
-   * The id of the object it is attached to; null for a text at a point.
+   * The id of the object it is attached to, or of the point, for a text at a point the level
+   * names, such as `%j1`; null for a text at a point written in place, such as `(10, 0)`, or at
+   * one that the level does not name alone.
    */
   attach: string | null,
   /**

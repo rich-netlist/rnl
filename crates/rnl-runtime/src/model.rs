@@ -242,7 +242,9 @@ pub struct TextView {
     pub id: String,
     /// Its id in the editor interface: [`ObjectInfo::id`], or `#M1::name` for a key text.
     pub object_id: String,
-    /// The id of the object it is attached to; None for a text at a point.
+    /// The id of the object it is attached to, or of the point, for a text at a point the level
+    /// names, such as `%j1`, as [`PointInfo::id`]; None for a text at a point written in place,
+    /// such as `(10, 0)`, or at one that the level does not name alone.
     pub attach: Option<String>,
     /// What a click on it stands for in the drawing: where the object it is attached to is drawn,
     /// its net, or for a terminal the pin it is drawn at. None for a text at a point, and for one

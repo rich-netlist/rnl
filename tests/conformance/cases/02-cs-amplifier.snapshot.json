@@ -1427,7 +1427,7 @@
         "texts": [
           {
             "id": "@02-cs-amplifier.sp:23:5",
-            "attach": null,
+            "attach": "%vo",
             "key": null,
             "markup": {
               "value": "V_{out}",
