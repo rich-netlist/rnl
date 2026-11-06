@@ -66,7 +66,7 @@ pub fn layered<'a>(edits: &'a MemoryProvider, disk: &'a dyn Provider) -> Layered
 /// A user choosing UTF-8 explicitly may change it. Encode before touching the destination.
 pub fn save_as(source: Option<&Path>, to: &Path, text: &str, encoding: OutputEncoding) -> Result<(), String> {
     let bytes = codec::encode_file(source, text, encoding)?;
-    std::fs::write(to, bytes).map_err(|e| format!("{}: {e}", to.display()))
+    crate::atomic::write(to, &bytes).map_err(|e| format!("{}: {e}", to.display()))
 }
 
 /// A text with its line ends as `\n`, as the page keeps it.
@@ -117,7 +117,7 @@ pub fn save_all_with_encoding(
         .collect();
     let mut done: Vec<&str> = Vec::new();
     for (f, at, bytes) in prepared? {
-        let written = std::fs::write(&at, bytes).map_err(|e| format!("{}: {e}", at.display()));
+        let written = crate::atomic::write(&at, &bytes).map_err(|e| format!("{}: {e}", at.display()));
         if let Err(e) = written {
             return Err(if done.is_empty() { e } else { format!("{e} (saved before it: {})", done.join(", ")) });
         }

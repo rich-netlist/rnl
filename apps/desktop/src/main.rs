@@ -9,6 +9,7 @@
 // Viewer is a GUI application, including local fast/debug builds. The CLI keeps its console.
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
+mod atomic;
 mod build_cache;
 mod core_thread;
 mod export;
