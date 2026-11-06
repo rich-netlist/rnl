@@ -25,7 +25,11 @@ const MAX_IN_PLACE: u64 = 256 * 1024 * 1024;
 /// Replace the contents of the file at `path` with `bytes`, or make it if it is not there. A link at `path` is followed, as
 /// writing to it was: the file it points to is the one written.
 pub fn write(path: &Path, bytes: &[u8]) -> Result<()> {
-    let at = if std::fs::symlink_metadata(path).is_ok_and(|m| m.file_type().is_symlink()) { std::fs::canonicalize(path)? } else { path.to_path_buf() };
+    let at = if std::fs::symlink_metadata(path).is_ok_and(|m| m.file_type().is_symlink()) {
+        std::fs::canonicalize(path)?
+    } else {
+        path.to_path_buf()
+    };
     let old = match std::fs::metadata(&at) {
         Ok(meta) => meta,
         Err(e) if e.kind() == ErrorKind::NotFound => return std::fs::write(&at, bytes),
@@ -46,7 +50,11 @@ pub fn write(path: &Path, bytes: &[u8]) -> Result<()> {
 fn temp_name(dir: &Path, attempt: u32) -> PathBuf {
     static COUNT: AtomicU64 = AtomicU64::new(0);
     let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.subsec_nanos());
-    dir.join(format!(".rnl-save-{}-{}-{nanos:08x}-{attempt}", std::process::id(), COUNT.fetch_add(1, Ordering::Relaxed)))
+    dir.join(format!(
+        ".rnl-save-{}-{}-{nanos:08x}-{attempt}",
+        std::process::id(),
+        COUNT.fetch_add(1, Ordering::Relaxed)
+    ))
 }
 
 /// Make the new file: `create_new`, which fails if the name is taken, and does not follow a link.
@@ -77,7 +85,9 @@ fn replaced_by_rename(at: &Path, bytes: &[u8], old: &std::fs::Metadata) -> Resul
     let (temp, mut file) = match create_temp(dir) {
         Ok(made) => made,
         // (a folder that is not the user's to write in, or whose sticky bit would not let the file be replaced)
-        Err(e) if e.kind() == ErrorKind::PermissionDenied || e.kind() == ErrorKind::ReadOnlyFilesystem => return Ok(false),
+        Err(e) if e.kind() == ErrorKind::PermissionDenied || e.kind() == ErrorKind::ReadOnlyFilesystem => {
+            return Ok(false)
+        }
         Err(e) => return Err(e),
     };
     let done = (|| -> Result<bool> {
@@ -150,9 +160,9 @@ fn replaced_by_rename(at: &Path, bytes: &[u8], old: &std::fs::Metadata) -> Resul
 /// file gets, are not counted), or the system does not say, in which case it is taken to have: it is then written in place.
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 fn has_extended_attributes(path: &Path) -> bool {
-    use std::ffi::{c_char, CString};
     #[cfg(target_os = "macos")]
     use std::ffi::c_int;
+    use std::ffi::{c_char, CString};
     use std::os::unix::ffi::OsStrExt;
     #[cfg(target_os = "linux")]
     extern "C" {
@@ -285,7 +295,10 @@ mod tests {
         }
 
         fn names(&self) -> Vec<String> {
-            let mut names: Vec<String> = std::fs::read_dir(&self.0).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect();
+            let mut names: Vec<String> = std::fs::read_dir(&self.0)
+                .unwrap()
+                .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+                .collect();
             names.sort();
             names
         }
@@ -375,8 +388,13 @@ mod tests {
             assert_ne!(after.ino(), before.ino());
         }
         // a group the user is in that is not the folder's: the new file is given it, as the old file had it
-        let groups = std::process::Command::new("id").arg("-G").output().map(|o| String::from_utf8_lossy(&o.stdout).into_owned()).unwrap_or_default();
-        if let Some(other) = groups.split_whitespace().filter_map(|g| g.parse::<u32>().ok()).find(|g| *g != after.gid()) {
+        let groups = std::process::Command::new("id")
+            .arg("-G")
+            .output()
+            .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
+            .unwrap_or_default();
+        if let Some(other) = groups.split_whitespace().filter_map(|g| g.parse::<u32>().ok()).find(|g| *g != after.gid())
+        {
             std::os::unix::fs::chown(&top, None, Some(other)).unwrap();
             write(&top, b"newer\n").unwrap();
             assert_eq!(std::fs::metadata(&top).unwrap().gid(), other, "the group of the file stays");
@@ -420,7 +438,13 @@ mod tests {
         use std::os::unix::ffi::OsStrExt;
         use std::os::unix::fs::MetadataExt;
         extern "C" {
-            fn setxattr(path: *const c_char, name: *const c_char, value: *const c_void, size: usize, flags: c_int) -> c_int;
+            fn setxattr(
+                path: *const c_char,
+                name: *const c_char,
+                value: *const c_void,
+                size: usize,
+                flags: c_int,
+            ) -> c_int;
         }
         let dir = Dir::new("xattr");
         let top = dir.file("top.sp");
@@ -507,12 +531,22 @@ mod tests {
         assert_eq!(err.kind(), ErrorKind::StorageFull);
         assert_eq!(file.data, old, "byte for byte");
         // a flush that fails after all of a shorter text was written over the start of the old one
-        let mut file = Failing { data: b"the old text of the file, which is long\n".to_vec(), room: 100, fail_sync: true, syncs: 0 };
+        let mut file = Failing {
+            data: b"the old text of the file, which is long\n".to_vec(),
+            room: 100,
+            fail_sync: true,
+            syncs: 0,
+        };
         let old = file.data.clone();
         assert!(overwrite(&mut file, b"short\n").is_err());
         assert_eq!(file.data, old, "byte for byte");
         // what fits is written whole, cut to its length, and a longer file is made shorter
-        let mut file = Failing { data: b"the old text of the file, which is long\n".to_vec(), room: 100, fail_sync: false, syncs: 0 };
+        let mut file = Failing {
+            data: b"the old text of the file, which is long\n".to_vec(),
+            room: 100,
+            fail_sync: false,
+            syncs: 0,
+        };
         overwrite(&mut file, b"short\n").unwrap();
         assert_eq!(file.data, b"short\n");
         let mut file = Failing { data: b"ab".to_vec(), room: 100, fail_sync: false, syncs: 0 };
