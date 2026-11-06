@@ -1,0 +1,144 @@
+# A probe, not a product: what an RNL viewer for older enterprise Linux (CentOS 7 / RHEL 8 / RHEL 9) can stand on. It
+# builds the command line program as a static musl binary and as a glibc one, times a solve with each, and then, in a
+# container of each system, checks that the static program runs, what Firefox the system has, and that the official
+# Firefox (unmodified, in the user's own directory) opens the web viewer and solves a netlist through the solver
+# service. It publishes nothing.
+name: Older enterprise Linux probe
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/linux-el-probe.yml"
+      - "scripts/linux-el-probe/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_BUILD_JOBS: 4
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Download and verify locked public packages
+        run: python scripts/packages.py download
+      - name: Install Rust
+        run: |
+          rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown,x86_64-unknown-linux-musl
+          rustup default stable
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Write the web fonts
+        run: pip install fonttools brotli && python scripts/fonts.py web
+      - name: Build the web viewer, with the samples
+        run: node apps/web/build.mjs --samples
+      - name: Build the command line program, static (musl) and glibc
+        run: |
+          cargo build --release -p rnl-cli --target x86_64-unknown-linux-musl
+          cargo build --release -p rnl-cli
+          mkdir -p probe
+          cp target/x86_64-unknown-linux-musl/release/rnl probe/rnl
+          cp target/release/rnl probe/rnl-glibc
+          file probe/rnl probe/rnl-glibc
+          if ldd probe/rnl; then echo "the musl program is dynamic"; exit 1; fi
+      - name: A musl program with mimalloc builds, is static and runs
+        run: |
+          # (outside the repository's own workspace)
+          cargo new --bin "$RUNNER_TEMP/mimalloc-probe"
+          cd "$RUNNER_TEMP/mimalloc-probe"
+          cargo add mimalloc
+          printf 'use mimalloc::MiMalloc;\n#[global_allocator]\nstatic A: MiMalloc = MiMalloc;\nfn main() { let v: Vec<u64> = (0..1_000_000).collect(); println!("{}", v.iter().sum::<u64>()); }\n' > src/main.rs
+          CC_x86_64_unknown_linux_musl=musl-gcc cargo build --release --target x86_64-unknown-linux-musl
+          file target/x86_64-unknown-linux-musl/release/mimalloc-probe
+          if ldd target/x86_64-unknown-linux-musl/release/mimalloc-probe; then echo "dynamic"; exit 1; fi
+          ./target/x86_64-unknown-linux-musl/release/mimalloc-probe
+      - name: Time a solve with each (the allocator and the C library are what differ)
+        run: |
+          # the solver is the part of the core that allocates the most
+          for exe in rnl rnl-glibc; do
+            for n in 1 2 3; do
+              start=$(date +%s.%N)
+              ./probe/$exe preview tests/integration/solver/T4-miller-conflicts.sp --solver-options "time_limit=none" > /dev/null 2>&1 || true
+              end=$(date +%s.%N)
+              printf '%s run %s: %.2f s\n' "$exe" "$n" "$(echo "$end - $start" | bc -l)" | tee -a probe/timing.txt
+            done
+          done
+          { echo '### Solve time, T4'; echo '```'; cat probe/timing.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: probe-inputs
+          path: |
+            probe/rnl
+            apps/web/dist
+          if-no-files-found: error
+
+  system:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ["centos:7", "rockylinux:8", "rockylinux:9"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: probe-inputs
+          path: inputs
+      - name: Lay the inputs out
+        run: |
+          # the artifact keeps the paths below its common root
+          find inputs -maxdepth 3 | head -20
+          mkdir -p apps/web probe
+          cp -r inputs/apps/web/dist apps/web/dist
+          cp inputs/probe/rnl probe/rnl
+          chmod +x probe/rnl
+          cp -r apps/web/dist/samples probe/samples
+      - name: Fetch the official Firefox (ESR), unmodified
+        run: |
+          curl -fL "https://download.mozilla.org/?product=firefox-esr-latest-ssl&os=linux64&lang=en-US" -o probe/firefox.tar.xz
+          ls -l probe/firefox.tar.xz
+      - name: Serve the viewer, with the static program as its solver
+        run: |
+          node apps/web/serve.mjs --port 8000 --rnl "$PWD/probe/rnl" > serve.log 2>&1 &
+          curl -fsS --retry 10 --retry-connrefused --retry-delay 1 -o /dev/null http://127.0.0.1:8000/
+      - name: Start the container, with the official Firefox
+        run: |
+          docker run -d --name el --network host -v "$PWD/probe:/probe:ro" -v "$PWD/scripts/linux-el-probe:/scripts:ro" \
+            "${{ matrix.image }}" sh /scripts/container.sh
+      - name: Wait for Firefox
+        run: |
+          for i in $(seq 1 240); do
+            if node -e 'require("net").connect(2828,"127.0.0.1").on("connect",function(){process.exit(0)}).on("error",function(){process.exit(1)})'; then echo "up after $i s"; break; fi
+            if ! docker ps -q -f name=el | grep -q .; then echo "the container stopped"; docker logs el; exit 1; fi
+            sleep 1
+          done
+          docker logs el
+      - name: Open the viewer and solve, with the official Firefox
+        run: |
+          label=$(echo "${{ matrix.image }}" | tr ':' '-')
+          node scripts/linux-el-probe/drive.mjs "http://127.0.0.1:8000/?url=samples/cases/04-hierarchy.sp" out "$label"
+      - name: What the container said, and the server
+        if: always()
+        run: |
+          docker logs el 2>&1 | tail -80 || true
+          tail -20 serve.log || true
+          { echo "### ${{ matrix.image }}"; echo '```'; docker logs el 2>&1 | grep -E '^(==|kernel|ldd|system Firefox|rnl |Mozilla|Firefox|.*GLIBC)' | head -20; echo '```'; } >> "$GITHUB_STEP_SUMMARY" || true
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: probe-${{ strategy.job-index }}
+          path: out
+          if-no-files-found: ignore
