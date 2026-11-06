@@ -112,11 +112,18 @@ try {
   if (loaded === true) {
     summary.path = await client.script("return window.wrappedJSObject.viewer.doc.path");
     check("the document is that file", !expected || String(summary.path).replaceAll("\\", "/").endsWith(expected), String(summary.path));
-    check("the drawing is an SVG", await client.script("return !!document.querySelector('#canvas > svg')"));
+    // (the document is there before the drawing is: the core builds in a Worker, and a solve asked for while it builds is not heard)
+    const drawn = await until(client, "return !!document.querySelector('#canvas > svg') && !document.body.classList.contains('busy')", 180);
+    check("the drawing is an SVG", drawn === true, String(drawn));
+    const state = "return JSON.stringify({ body: document.body.className, note: (document.getElementById('note') || {}).textContent, status: (document.getElementById('status') || {}).textContent })";
+    summary.beforeSolve = await client.script(state).catch((e) => e.message);
+    console.log("before the solve:", summary.beforeSolve);
     // a solve in the program, through its solver service
     await client.script("window.wrappedJSObject.viewer.command('solve'); return true");
     const solved = await until(client, "return document.body.classList.contains('preview') && !document.body.classList.contains('solving')", 300);
     check("a solve shows its preview", solved === true, String(solved));
+    summary.afterSolve = await client.script(state).catch((e) => e.message);
+    console.log("after the solve:", summary.afterSolve);
   } else {
     summary.page = await client.script("return document.body ? document.body.innerText.slice(0, 600) : 'no body'").catch((e) => e.message);
     console.log(summary.page);

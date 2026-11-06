@@ -177,13 +177,37 @@ pub fn open(browser: &Browser, url: &str, profile: &Path) -> Result<Child, Strin
     if browser.kind == Kind::Firefox {
         std::fs::write(profile.join("user.js"), FIREFOX_PREFS).map_err(|e| format!("{}: {e}", profile.display()))?;
     }
+    // (what the browser says is kept in a file of the profile, for the user to be told if it ends at once: a Firefox that lacks
+    // a library of the system says so there, and nowhere else)
+    let log = std::fs::File::create(profile.join(LOG)).map_err(|e| format!("{}: {e}", profile.display()))?;
+    let log_again = log.try_clone().map_err(|e| e.to_string())?;
     Command::new(&browser.path)
         .args(arguments(browser, url, profile))
         .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
+        .stdout(log)
+        .stderr(log_again)
         .spawn()
         .map_err(|e| format!("{} could not be started: {e}", browser.path.display()))
+}
+
+/// The name of the file of the profile that holds what the browser said.
+pub const LOG: &str = "rnl-browser.log";
+
+/// The words for a browser that ended as soon as it was started, which is not how one shows a page: what it said last, and what
+/// to do (a Firefox that does not start on a system that has none of the libraries of a desktop is the usual cause).
+pub fn ended_at_once(browser: &Browser, status: &std::process::ExitStatus, profile: &Path) -> String {
+    let said = std::fs::read_to_string(profile.join(LOG)).unwrap_or_default();
+    let tail: Vec<&str> = said.lines().filter(|l| !l.trim().is_empty()).collect();
+    let tail = tail[tail.len().saturating_sub(8)..].join("\n  ");
+    format!(
+        "{} ended as soon as it was started ({status}), and showed nothing.{}\n\
+         A browser that does not start on a computer with no desktop usually lacks libraries (Firefox needs GTK 3 and some X libraries: \
+         `{} --version` and the same without `--headless` tell which). Install them, or start the program with --no-browser, forward its port with\n\
+         ssh -L PORT:127.0.0.1:PORT THIS-HOST, and open the address it prints in a browser on your own computer.",
+        browser.path.display(),
+        if tail.is_empty() { String::new() } else { format!("\n  It said:\n  {tail}") },
+        browser.path.display()
+    )
 }
 
 /// The folder the program keeps its own files in (the browser profiles): `$XDG_CACHE_HOME/rnl-viewer-local`, else
@@ -528,6 +552,24 @@ mod tests {
             assert!(gone.exists(), "where the processes are not known, nothing is removed");
         }
         assert!(!host.contains('-') && !host.is_empty());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_browser_that_ends_at_once_is_told_with_what_it_said() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = scratch("ended");
+        let script = dir.join("firefox-that-lacks-a-library");
+        std::fs::write(&script, "#!/bin/sh\necho 'XPCOMGlueLoad error for file libxul.so: libX11-xcb.so.1: cannot open shared object file' >&2\nexit 127\n").unwrap();
+        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let profile = dir.join("profile");
+        std::fs::create_dir_all(&profile).unwrap();
+        let browser = Browser { path: script, kind: Kind::Other, major: None };
+        let mut child = open(&browser, "file:///x.html", &profile).unwrap();
+        let status = child.wait().unwrap();
+        assert!(!status.success());
+        let text = ended_at_once(&browser, &status, &profile);
+        assert!(text.contains("ended as soon as it was started") && text.contains("libX11-xcb.so.1") && text.contains("--no-browser") && text.contains("ssh -L"), "{text}");
     }
 
     #[test]

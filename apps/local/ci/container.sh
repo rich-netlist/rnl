@@ -24,17 +24,16 @@ case "$ID" in
     ;;
 esac
 
-$PM install -y gtk3 dbus-glib libXt libXtst alsa-lib libXcomposite libXdamage libXrandr libXi libXcursor xz bzip2 which \
+# (what Firefox needs of a desktop, which the program's README says: a stock minimal Rocky 8 has none of it, libX11-xcb among them)
+$PM install -y gtk3 dbus-glib libXt libXtst libX11-xcb alsa-lib libXcomposite libXdamage libXrandr libXi libXcursor xz bzip2 which \
   dejavu-sans-fonts >/tmp/install.log 2>&1 || { tail -30 /tmp/install.log; exit 1; }
 
 echo "== the static program"
 cd /pkg
 ./rnl-viewer-local --version
-if ldd ./rnl-viewer-local >/tmp/ldd.log 2>&1; then
-  echo "ldd says: dynamic"; cat /tmp/ldd.log
-else
-  echo "ldd says: $(cat /tmp/ldd.log)"
-fi
+# (ldd succeeds on a static program that is position independent, and says what it says: that the program is static is the
+# build job's check, with file; this is for the record)
+ldd ./rnl-viewer-local 2>&1 | head -3 | sed 's/^/ldd: /' || true
 
 echo "== the Firefox of the package"
 ./firefox/firefox --version

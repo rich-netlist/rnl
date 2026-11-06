@@ -203,6 +203,7 @@ fn run(options: Options) -> Result<(), String> {
     println!("RNL Viewer, local {VERSION}: serving on http://127.0.0.1:{port}/ (this computer only)");
     let address = format!("http://127.0.0.1:{port}/__start?t={token}");
     let mut browser_child = None;
+    let mut browser_started: Option<(launch::Browser, PathBuf)> = None;
     let mut address_file = None;
     if options.browser {
         let beside = std::env::current_exe().ok().and_then(|p| p.parent().map(PathBuf::from));
@@ -228,6 +229,7 @@ fn run(options: Options) -> Result<(), String> {
                     Ok(child) => {
                         println!("Opened in {} {}.", browser.path.display(), browser.major.map_or(String::new(), |v| v.to_string()));
                         browser_child = Some(child);
+                        browser_started = Some((browser.clone(), profile.clone()));
                         address_file = Some(file);
                     }
                     Err(message) => {
@@ -266,7 +268,15 @@ fn run(options: Options) -> Result<(), String> {
             let mut warned = false;
             loop {
                 std::thread::sleep(Duration::from_secs(2));
-                if watching && child.try_wait().is_ok_and(|status| status.is_some()) {
+                if let (true, Ok(Some(status))) = (watching, child.try_wait()) {
+                    // (a browser that ends at once, and not well, did not show the page: said, with what it said, and nobody waits)
+                    if started.elapsed() <= Duration::from_secs(5) && !status.success() {
+                        if let Some((browser, profile)) = &browser_started {
+                            eprintln!("{}", launch::ended_at_once(browser, &status, profile));
+                        }
+                        app.clean_up();
+                        std::process::exit(1);
+                    }
                     if started.elapsed() > Duration::from_secs(5) {
                         match app.has_unsaved() {
                             0 => println!("The browser was closed: stopping."),
