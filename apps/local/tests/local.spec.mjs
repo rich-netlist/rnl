@@ -85,7 +85,8 @@ test("an address that works once opens the page, and nothing is served to anyone
 test("the page opens the netlist named on the command line, and the files it includes beside it and above it, not those beyond", async ({ page }) => {
   await open(page);
   const doc = await document(page);
-  expect(doc.files[0].path.replaceAll("\\", "/")).toMatch(/proj\/sim\/top\.sp$/);
+  // (the Document names the entry by its path, and the files it holds by their paths below its folder)
+  expect(doc.path.replaceAll("\\", "/")).toMatch(/proj\/sim\/top\.sp$/);
   await expect(page.locator("#canvas > svg")).toBeVisible();
   const names = doc.files.map((f) => f.name);
   expect(names.join(" ")).toContain("extra.inc");
@@ -150,8 +151,8 @@ test("the chooser lists the machine's files, goes up and in, and opens the one c
   await dialog.getByRole("button", { name: "Open" }).click();
   await options.filter({ hasText: "sim/" }).dblclick();
   await options.filter({ hasText: "other.sp" }).dblclick();
-  await page.waitForFunction(() => window.viewer.doc?.files[0].path.endsWith("other.sp"));
-  expect((await document(page)).files[0].path.replaceAll("\\", "/")).toMatch(/proj\/sim\/other\.sp$/);
+  await page.waitForFunction(() => window.viewer.doc?.path.endsWith("other.sp"));
+  expect((await document(page)).path.replaceAll("\\", "/")).toMatch(/proj\/sim\/other\.sp$/);
 });
 
 test("the settings are kept in a file of the user's own, and survive the program", async ({ page }) => {

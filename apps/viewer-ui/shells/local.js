@@ -82,8 +82,8 @@ export function serverSource(path) {
   };
 }
 
-// the folder last chosen from, kept with the settings
-let lastDir = session.home || "";
+// the folder the chooser starts in: that of the file named on the command line, then the one last chosen from
+let lastDir = session.initial[0] ? session.initial[0].slice(0, session.initial[0].lastIndexOf("/")) || "/" : session.home || "";
 const remember = (dir) => {
   lastDir = dir;
   save("local-last-folder", dir).catch(() => {});
