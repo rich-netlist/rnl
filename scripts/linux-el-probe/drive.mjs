@@ -15,6 +15,7 @@ if (!url || !outDir) {
 }
 mkdirSync(outDir, { recursive: true });
 
+// (the page's own objects, such as window.viewer, are seen from Marionette's sandbox only through window.wrappedJSObject)
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 class Marionette {
@@ -103,13 +104,13 @@ try {
   summary.userAgent = await client.script("return navigator.userAgent");
   console.log(summary.userAgent);
   await client.send("WebDriver:Navigate", { url });
-  const loaded = await until(client, "return !!(window.viewer && window.viewer.doc && window.viewer.doc.levels.length > 0)", 180);
+  const loaded = await until(client, "var w = window.wrappedJSObject; return !!(w.viewer && w.viewer.doc && w.viewer.doc.levels.length > 0)", 180);
   check("the viewer opens a document", loaded === true, String(loaded));
   if (loaded === true) {
     check("the drawing is an SVG", await client.script("return !!document.querySelector('#canvas > svg')"));
-    summary.levels = await client.script("return window.viewer.doc.levels.length");
+    summary.levels = await client.script("return window.wrappedJSObject.viewer.doc.levels.length");
     // a solve through the development server's solver service (the page asks its own origin)
-    await client.script("window.viewer.command('solve'); return true");
+    await client.script("window.wrappedJSObject.viewer.command('solve'); return true");
     const solved = await until(
       client,
       "return document.body.classList.contains('preview') && !document.body.classList.contains('solving')",
