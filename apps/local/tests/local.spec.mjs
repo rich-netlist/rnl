@@ -73,13 +73,24 @@ test("an address that works once opens the page, and nothing is served to anyone
   // a wrong Host is no business of the program's
   const foreign = await request.get(`${base}/`, { headers: { Host: "example.com" } });
   expect(foreign.status()).toBe(403);
+  // a token that is wrong does not spend the right one (the next request is the user's own address, which still works)
+  expect((await request.get(`${base}/__start?t=${"0".repeat(64)}`, { maxRedirects: 0 })).status()).toBe(403);
   await open(page);
   // the token is spent
   const again = await request.get(address, { maxRedirects: 0 });
   expect(again.status()).toBe(403);
-  // the page has the session, and the address bar no longer holds the token
+  // the page has the key of the session, in its own storage, and the address bar no longer holds the token or the key
   expect(page.url()).not.toContain("__start");
-  expect(await page.evaluate(() => document.cookie)).not.toContain("rnl_session");
+  expect(page.url()).not.toContain("#k=");
+  expect(await page.evaluate(() => sessionStorage.getItem("rnl-local-key"))).toMatch(/^[0-9a-f]{64}$/);
+  // there is no cookie: a browser sends a cookie to every port of the address, and the key must not go to those
+  expect(await page.context().cookies(base)).toEqual([]);
+  expect(await page.evaluate(() => document.cookie)).toBe("");
+  // nothing frames the page, and what is put in its address by another site does not reach it
+  const home = await request.get(`${base}/?shell=local`);
+  expect(home.headers()["content-security-policy"]).toContain("frame-ancestors 'none'");
+  const stripped = await request.get(`${base}/?shell=local&url=https://evil.example/x.sp`, { maxRedirects: 0 });
+  expect([stripped.status(), stripped.headers().location]).toEqual([302, "/?shell=local"]);
 });
 
 test("the page opens the netlist named on the command line, and the files it includes beside it and above it, not those beyond", async ({ page }) => {
@@ -165,17 +176,69 @@ test("the settings are kept in a file of the user's own, and survive the program
   expect(await page.evaluate(() => window.viewer.checked("toggle-currents"))).toBe(true);
 });
 
-test("a page of another origin cannot change anything, though it holds the cookie", async ({ page, request }) => {
+test("a page of another origin cannot read or change anything, though it knows the key it is not given", async ({ page, request }) => {
   await open(page);
-  const cookies = await page.context().cookies(base);
-  const session = cookies.find((c) => c.name === "rnl_session");
-  expect(session?.httpOnly).toBe(true);
-  expect(session?.sameSite).toBe("Strict");
-  const header = { Cookie: `rnl_session=${session.value}`, "Content-Type": "application/json" };
+  const key = await page.evaluate(() => sessionStorage.getItem("rnl-local-key"));
+  const header = { "X-RNL-Key": key, "Content-Type": "application/json" };
   const body = JSON.stringify({ key: "x", value: 1 });
-  // no X-RNL header: refused though the cookie is right
+  // a cookie, or a wrong key, is nothing: what a page of another local port has is a cookie at most
+  expect((await request.get(`${base}/api/session`, { headers: { Cookie: `rnl_session=${key}` } })).status()).toBe(403);
+  expect((await request.get(`${base}/api/session`, { headers: { "X-RNL-Key": "0".repeat(64) } })).status()).toBe(403);
+  // the files are served with the key too, and not without it
+  const file = `${base}/f${join(work, "proj", "sim", "other.sp").replaceAll("\\", "/").replace(/^([^/])/, "/$1")}`;
+  expect((await request.get(file)).status()).toBe(403);
+  expect((await request.get(file, { headers: { "X-RNL-Key": key } })).status()).toBe(200);
+  // no X-RNL header: a change is refused though the key is right
   expect((await request.put(`${base}/api/settings`, { headers: header, data: body })).status()).toBe(403);
   // the header, but another origin
   expect((await request.put(`${base}/api/settings`, { headers: { ...header, "X-RNL": "1", Origin: "http://127.0.0.1:1" }, data: body })).status()).toBe(403);
   expect((await request.put(`${base}/api/settings`, { headers: { ...header, "X-RNL": "1" }, data: body })).status()).toBe(200);
+});
+
+test("a request is refused from its head, without waiting for the body it announces", async ({ request }) => {
+  // 400 MB announced, none sent: refused at once, as nothing of the user's is served to one with no key
+  const net = await import("node:net");
+  const port = Number(new URL(base).port);
+  const answer = await new Promise((ok, fail) => {
+    const socket = net.connect(port, "127.0.0.1", () => {
+      socket.write(`POST /api/save HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\nX-RNL: 1\r\nContent-Type: application/json\r\nContent-Length: 400000000\r\n\r\n`);
+    });
+    let text = "";
+    socket.on("data", (chunk) => {
+      text += chunk;
+      if (text.includes("\r\n\r\n")) {
+        socket.destroy();
+        ok(text.split("\r\n")[0]);
+      }
+    });
+    socket.on("error", fail);
+    setTimeout(() => fail(new Error("no answer: the program waited for the body")), 5000);
+  });
+  expect(answer).toContain("403");
+  // and the program goes on serving
+  expect((await request.get(`${base}/`, { maxRedirects: 0 })).status()).toBe(302);
+});
+
+test("Save As asks before it replaces a file, and nothing is written until the user says", async ({ page }) => {
+  await open(page);
+  const other = join(work, "proj", "sim", "other.sp");
+  const before = readFileSync(other, "utf8");
+  const dialog = page.locator("dialog.dialog");
+  const saveAs = async () => {
+    await page.evaluate(() => window.viewer.command("save-as"));
+    await dialog.locator(".dialog-option", { hasText: "Save in this folder" }).click();
+    await dialog.getByRole("button", { name: "Save" }).click();
+    await dialog.locator("input").fill("other.sp");
+    await dialog.getByRole("button", { name: "Save" }).click();
+  };
+  await saveAs();
+  await expect(dialog).toContainText("other.sp exists already");
+  expect(readFileSync(other, "utf8")).toBe(before);
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(readFileSync(other, "utf8")).toBe(before);
+  // again, and this time the user says to replace it
+  await saveAs();
+  await dialog.getByRole("button", { name: "Replace" }).click();
+  await expect.poll(() => readFileSync(other, "utf8")).toContain("A top level");
 });

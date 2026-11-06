@@ -1,3 +1,4 @@
+import "./local-key.js"; // (first: on the local program's page, the key goes with every request below; elsewhere it does nothing)
 import { append, m, setAttr, setText } from "../i18n.js";
 // The web shell: the page in a browser, served with the core next to it as core/ (apps/web). It opens
 // files the user chooses or drops, a folder, or a URL; reads only the files a document needs, as

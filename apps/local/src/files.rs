@@ -16,10 +16,25 @@ use std::sync::Mutex;
 use rnl_cli::codec::{self, OutputEncoding};
 use serde::{Deserialize, Serialize};
 
-/// The folders the page may use.
+/// The folders the page may use, and the single files it may use where their folder is too broad to give.
 #[derive(Default)]
 pub struct Roots {
     dirs: Mutex<Vec<PathBuf>>,
+    files: Mutex<Vec<PathBuf>>,
+}
+
+/// The largest file the page may read: a netlist, a Library file; not what fills the memory of a shared machine.
+pub const MAX_FILE: u64 = 256 * 1024 * 1024;
+
+/// Whether a path has a hidden part: a name that starts with a dot.
+fn hidden(path: &Path) -> bool {
+    path.components().any(|c| c.as_os_str().to_string_lossy().starts_with('.'))
+}
+
+/// Whether a folder is too broad to give to the page for a file it chose: the root of the file system, the user's home
+/// folder, or one that holds it. The user may give one with `--allow`, which is theirs to say.
+fn broad(dir: &Path) -> bool {
+    dir.parent().is_none() || home().and_then(|h| canonical(&h)).is_some_and(|h| h.starts_with(dir))
 }
 
 /// A path as the page names it: rooted, `/`-separated; on Windows, which only a development build runs on, `C:` is `/C:/a/b`.
@@ -83,12 +98,47 @@ impl Roots {
         let dir = file.parent().ok_or_else(|| format!("{} has no folder", file.display()))?.to_path_buf();
         self.allow(&dir)?;
         if let Some(up) = dir.parent() {
-            let broad = up.parent().is_none() || home().and_then(|h| canonical(&h)).is_some_and(|h| h.starts_with(up));
-            if !broad {
+            if !broad(up) {
                 self.allow(up)?;
             }
         }
         Ok(())
+    }
+
+    /// A file the page chose to open (not one named on the command line, which the user named): a regular file, with no
+    /// hidden part in its path. Its folder is allowed as for a file of the command line, unless that folder is too broad,
+    /// and then the file alone is.
+    pub fn open_file(&self, file: &Path) -> Result<PathBuf, String> {
+        let real = canonical(file).filter(|f| f.is_file()).ok_or_else(|| format!("{} is not a file", file.display()))?;
+        if hidden(&real) {
+            return Err("a hidden file, or one in a hidden folder, is not opened".into());
+        }
+        if std::fs::metadata(&real).is_ok_and(|m| m.len() > MAX_FILE) {
+            return Err(format!("{} is too large", real.display()));
+        }
+        let dir = real.parent().ok_or_else(|| format!("{} has no folder", real.display()))?;
+        if broad(dir) {
+            let mut files = self.files.lock().map_err(|e| e.to_string())?;
+            if !files.contains(&real) {
+                files.push(real.clone());
+            }
+        } else {
+            self.allow_file(&real)?;
+        }
+        Ok(real)
+    }
+
+    /// A folder the page chose to include: not the root, the user's home folder or one that holds it, and with no hidden
+    /// part in its path (a `.ssh` is not the page's to give away, though a session holder asks for it).
+    pub fn allow_chosen(&self, dir: &Path) -> Result<(), String> {
+        let real = canonical(dir).filter(|d| d.is_dir()).ok_or_else(|| format!("{} is not a folder", dir.display()))?;
+        if hidden(&real) {
+            return Err("a hidden folder is not given to the page".into());
+        }
+        if broad(&real) {
+            return Err(format!("{} is too much to give: choose the folder of a project (or start the program with --allow)", real.display()));
+        }
+        self.allow(&real)
     }
 
     /// The folders allowed, as they are.
@@ -109,12 +159,15 @@ impl Roots {
             let dir = canonical(path.parent().ok_or("the path has no folder")?).ok_or("the folder does not exist")?;
             dir.join(name)
         };
+        if self.files.lock().is_ok_and(|files| files.contains(&resolved)) {
+            return Ok(resolved);
+        }
         let dirs = self.list();
         let root = dirs.iter().find(|d| resolved.starts_with(d)).ok_or_else(|| {
             format!("{} is not in a folder the program was told to allow; start it with --allow FOLDER to add one", resolved.display())
         })?;
         let below = resolved.strip_prefix(root).unwrap_or(&resolved);
-        if below.components().any(|c| c.as_os_str().to_string_lossy().starts_with('.')) {
+        if hidden(below) {
             return Err("a hidden file or folder is not served".into());
         }
         Ok(resolved)
@@ -131,15 +184,16 @@ pub struct Entry {
     pub modified: u64,
 }
 
-/// What a folder holds, folders first, each in the order of its names: for the chooser. Hidden names are left out unless
-/// `hidden`. A folder that cannot be listed is an error that says why.
-pub fn list_dir(dir: &Path, hidden: bool) -> Result<(PathBuf, Vec<Entry>), String> {
+/// What a folder holds, folders first, each in the order of its names: for the chooser, which browses the whole machine to
+/// find what to open (the names, not the contents: those are the allowed folders'). Hidden names are left out. A folder
+/// that cannot be listed is an error that says why.
+pub fn list_dir(dir: &Path) -> Result<(PathBuf, Vec<Entry>), String> {
     let real = canonical(dir).filter(|d| d.is_dir()).ok_or_else(|| format!("{} is not a folder", dir.display()))?;
     let mut entries = Vec::new();
     for entry in std::fs::read_dir(&real).map_err(|e| format!("{}: {e}", real.display()))? {
         let Ok(entry) = entry else { continue };
         let name = entry.file_name().to_string_lossy().into_owned();
-        if !hidden && name.starts_with('.') {
+        if name.starts_with('.') {
             continue;
         }
         // (a link to a folder is a folder, as the chooser follows it)
@@ -208,6 +262,9 @@ pub fn save_all(roots: &Roots, entry: &str, files: &[SavedFile], overwrite: bool
     let mut targets = Vec::new();
     for f in files {
         let at = roots.check(&located(entry, &f.path), true).map_err(|e| format!("{}: {e}", f.name))?;
+        if !at.is_file() {
+            return Err(format!("{}: not a regular file", f.name));
+        }
         targets.push(at);
     }
     if !overwrite {
@@ -229,7 +286,7 @@ pub fn save_all(roots: &Roots, entry: &str, files: &[SavedFile], overwrite: bool
     }
     let mut done: Vec<&str> = Vec::new();
     for (f, at, bytes) in prepared {
-        if let Err(e) = std::fs::write(at, bytes) {
+        if let Err(e) = write_replacing(at, &bytes) {
             let before = if done.is_empty() { String::new() } else { format!(" ({} had been saved)", done.join(", ")) };
             return Err(format!("{}: {e}{before}", at.display()));
         }
@@ -242,13 +299,60 @@ pub fn save_all(roots: &Roots, entry: &str, files: &[SavedFile], overwrite: bool
     Ok(Saved { said: Some(said), changed: Vec::new() })
 }
 
+/// Replace the contents of a file that is there, whole or not at all: the bytes are written to a file of its folder that is new
+/// (and has its mode), flushed to the disk, and renamed over it, so that a program that stops, a disk that fills or a reader
+/// at that moment sees the old file or the new, never half. A file the user cannot write is not replaced either.
+fn write_replacing(at: &Path, bytes: &[u8]) -> Result<(), String> {
+    use std::io::Write;
+    let say = |e: std::io::Error| format!("{}: {e}", at.display());
+    // (a rename would replace a file the user may read only, as a write would not)
+    std::fs::OpenOptions::new().write(true).open(at).map_err(say)?;
+    let mode = std::fs::metadata(at).map_err(say)?.permissions();
+    let dir = at.parent().ok_or_else(|| format!("{} has no folder", at.display()))?;
+    let temp = dir.join(format!(".rnl-save-{}", &crate::security::random_hex()[..16]));
+    let written = (|| -> std::io::Result<()> {
+        let mut file = std::fs::OpenOptions::new().write(true).create_new(true).open(&temp)?;
+        file.set_permissions(mode)?;
+        file.write_all(bytes)?;
+        file.sync_all()?;
+        drop(file);
+        std::fs::rename(&temp, at)
+    })();
+    if let Err(e) = written {
+        let _ = std::fs::remove_file(&temp);
+        return Err(say(e));
+    }
+    Ok(())
+}
+
+/// What Save As came to: the file written, or the file that is there already, which is not replaced unless the user said so.
+#[derive(Debug, PartialEq)]
+pub enum SavedAs {
+    Written(PathBuf),
+    Exists(PathBuf),
+}
+
 /// Save As: the text of a netlist written to a file the user chose, which the folders allowed must hold, in the encoding
-/// of the netlist it came from (`source`), unless the user chose UTF-8. Encoded before the destination is touched.
-pub fn save_as(roots: &Roots, source: Option<&Path>, to: &Path, text: &str, encoding: OutputEncoding) -> Result<PathBuf, String> {
+/// of the netlist it came from (`source`, which must be a file the page may read too), unless the user chose UTF-8. Encoded
+/// before the destination is touched. A file of that name that is there is not replaced unless `overwrite`, and a link is
+/// never written through, whatever it points to: the name chosen is a file of its folder or it is not written.
+pub fn save_as(roots: &Roots, source: Option<&Path>, to: &Path, text: &str, encoding: OutputEncoding, overwrite: bool) -> Result<SavedAs, String> {
     let to = roots.check(to, false)?;
-    let bytes = codec::encode_file(source, text, encoding)?;
-    std::fs::write(&to, bytes).map_err(|e| format!("{}: {e}", to.display()))?;
-    Ok(to)
+    let source = source.and_then(|s| roots.check(s, true).ok()).filter(|s| std::fs::metadata(s).is_ok_and(|m| m.is_file() && m.len() <= MAX_FILE));
+    let bytes = codec::encode_file(source.as_deref(), text, encoding)?;
+    match std::fs::symlink_metadata(&to) {
+        Ok(meta) if meta.file_type().is_symlink() => return Err(format!("{} is a link: it is not written through; choose another name", to.display())),
+        Ok(meta) if !meta.is_file() => return Err(format!("{} is not a file", to.display())),
+        Ok(_) if !overwrite => return Ok(SavedAs::Exists(to)),
+        Ok(_) => write_replacing(&to, &bytes)?,
+        // (create_new does not follow a link that appeared since the look above: it fails)
+        Err(_) => {
+            use std::io::Write;
+            let mut file = std::fs::OpenOptions::new().write(true).create_new(true).open(&to).map_err(|e| format!("{}: {e}", to.display()))?;
+            file.write_all(&bytes).and_then(|()| file.sync_all()).map_err(|e| format!("{}: {e}", to.display()))?;
+        }
+    }
+    Ok(SavedAs::Written(to))
 }
 
 #[cfg(test)]
@@ -327,11 +431,9 @@ mod tests {
         std::fs::create_dir_all(dir.join("b")).unwrap();
         std::fs::write(dir.join("a.sp"), "x").unwrap();
         std::fs::write(dir.join(".hidden"), "x").unwrap();
-        let (_, entries) = list_dir(&dir, false).unwrap();
+        let (_, entries) = list_dir(&dir).unwrap();
         assert_eq!(entries.iter().map(|e| (e.name.as_str(), e.dir)).collect::<Vec<_>>(), vec![("b", true), ("a.sp", false)]);
-        let (_, all) = list_dir(&dir, true).unwrap();
-        assert_eq!(all.len(), 3);
-        assert!(list_dir(&dir.join("a.sp"), false).is_err());
+        assert!(list_dir(&dir.join("a.sp")).is_err());
     }
 
     fn saved(path: &str, text: &str, read: Option<&str>) -> SavedFile {
@@ -406,9 +508,109 @@ mod tests {
         std::fs::write(&from, b"* caf\xe9\n").unwrap();
         let roots = Roots::default();
         roots.allow(&dir).unwrap();
-        let to = save_as(&roots, Some(&from), &dir.join("copy.sp"), "* caf\u{e9}\n", OutputEncoding::Preserve).unwrap();
+        let SavedAs::Written(to) = save_as(&roots, Some(&from), &dir.join("copy.sp"), "* caf\u{e9}\n", OutputEncoding::Preserve, false).unwrap() else { panic!("not written") };
         assert_eq!(std::fs::read(to).unwrap(), b"* caf\xe9\n");
-        assert!(save_as(&roots, Some(&from), &dir.join("sub/x.sp"), "x", OutputEncoding::Utf8).is_err(), "its folder does not exist");
-        assert!(save_as(&roots, None, Path::new("/nope/x.sp"), "x", OutputEncoding::Utf8).is_err());
+        assert!(save_as(&roots, Some(&from), &dir.join("sub/x.sp"), "x", OutputEncoding::Utf8, false).is_err(), "its folder does not exist");
+        assert!(save_as(&roots, None, Path::new("/nope/x.sp"), "x", OutputEncoding::Utf8, false).is_err());
+    }
+
+    #[test]
+    fn save_as_does_not_replace_a_file_unasked_and_does_not_write_through_a_link() {
+        let dir = temp("saveas-exists");
+        let roots = Roots::default();
+        roots.allow(&dir).unwrap();
+        let there = dir.join("there.sp");
+        std::fs::write(&there, "mine\n").unwrap();
+        assert_eq!(save_as(&roots, None, &there, "new\n", OutputEncoding::Utf8, false).unwrap(), SavedAs::Exists(there.clone()));
+        assert_eq!(std::fs::read_to_string(&there).unwrap(), "mine\n");
+        assert_eq!(save_as(&roots, None, &there, "new\n", OutputEncoding::Utf8, true).unwrap(), SavedAs::Written(there.clone()));
+        assert_eq!(std::fs::read_to_string(&there).unwrap(), "new\n");
+        // a folder is no file to write
+        std::fs::create_dir_all(dir.join("folder")).unwrap();
+        assert!(save_as(&roots, None, &dir.join("folder"), "x", OutputEncoding::Utf8, true).is_err());
+        #[cfg(unix)]
+        {
+            let target = dir.join("precious.txt");
+            std::fs::write(&target, "precious\n").unwrap();
+            std::os::unix::fs::symlink(&target, dir.join("link.sp")).unwrap();
+            // (a link that dangles, which creating the file would follow to a place of the link's choosing)
+            std::os::unix::fs::symlink(dir.join("not-yet.txt"), dir.join("dangling.sp")).unwrap();
+            for name in ["link.sp", "dangling.sp"] {
+                for overwrite in [false, true] {
+                    let err = save_as(&roots, None, &dir.join(name), "x\n", OutputEncoding::Utf8, overwrite).unwrap_err();
+                    assert!(err.contains("link"), "{err}");
+                }
+            }
+            assert_eq!(std::fs::read_to_string(&target).unwrap(), "precious\n");
+            assert!(!dir.join("not-yet.txt").exists());
+        }
+    }
+
+    #[test]
+    fn a_save_replaces_the_file_whole_keeps_its_mode_and_leaves_nothing_beside_it() {
+        let dir = temp("atomic");
+        let top = dir.join("top.sp");
+        std::fs::write(&top, "old\n").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&top, std::fs::Permissions::from_mode(0o640)).unwrap();
+        }
+        write_replacing(&top, b"new text\n").unwrap();
+        assert_eq!(std::fs::read(&top).unwrap(), b"new text\n");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(std::fs::metadata(&top).unwrap().permissions().mode() & 0o777, 0o640);
+        }
+        let names: Vec<String> = std::fs::read_dir(&dir).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect();
+        assert_eq!(names, vec!["top.sp".to_string()], "no temporary file is left");
+        // a file the user may not write is not replaced, as a write would not (a read-only file)
+        let mut mode = std::fs::metadata(&top).unwrap().permissions();
+        mode.set_readonly(true);
+        std::fs::set_permissions(&top, mode).unwrap();
+        // (root may write what it likes: the check is the user's)
+        if std::fs::OpenOptions::new().write(true).open(&top).is_err() {
+            assert!(write_replacing(&top, b"x").is_err());
+            assert_eq!(std::fs::read(&top).unwrap(), b"new text\n");
+        }
+        let mut mode = std::fs::metadata(&top).unwrap().permissions();
+        #[allow(clippy::permissions_set_readonly_false)]
+        mode.set_readonly(false);
+        std::fs::set_permissions(&top, mode).unwrap();
+    }
+
+    #[test]
+    fn a_save_only_writes_regular_files() {
+        let dir = temp("regular");
+        std::fs::create_dir_all(dir.join("folder")).unwrap();
+        let roots = Roots::default();
+        roots.allow(&dir).unwrap();
+        let entry = dir.join("top.sp").to_string_lossy().into_owned();
+        let err = save_all(&roots, &entry, &[saved(&dir.join("folder").to_string_lossy(), "x", None)], true, OutputEncoding::Preserve).unwrap_err();
+        assert!(err.contains("regular file"), "{err}");
+    }
+
+    #[test]
+    fn a_file_the_page_chose_is_not_hidden_and_a_folder_too_broad_gives_only_that_file() {
+        let dir = temp("chosen");
+        std::fs::create_dir_all(dir.join(".ssh")).unwrap();
+        std::fs::write(dir.join(".ssh/id_rsa"), "secret").unwrap();
+        std::fs::write(dir.join("a.sp"), "x").unwrap();
+        std::fs::write(dir.join("b.sp"), "x").unwrap();
+        let roots = Roots::default();
+        assert!(roots.open_file(&dir.join(".ssh/id_rsa")).is_err());
+        assert!(roots.open_file(&dir).is_err(), "a folder is no file");
+        assert!(roots.allow_chosen(&dir.join(".ssh")).is_err());
+        assert!(roots.check(&dir.join(".ssh/id_rsa"), true).is_err());
+        // the folder of a project is given with the file
+        roots.open_file(&dir.join("a.sp")).unwrap();
+        assert!(roots.check(&dir.join("b.sp"), true).is_ok());
+        // the root of the file system is too broad for the folder of a file: that file alone is given
+        let root = dir.ancestors().last().unwrap().to_path_buf();
+        assert!(roots.allow_chosen(&root).is_err());
+        assert!(broad(&root));
+        assert!(home().and_then(|h| canonical(&h)).is_none_or(|h| broad(&h)));
+        assert!(!broad(&dir));
     }
 }

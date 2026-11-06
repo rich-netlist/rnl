@@ -4,8 +4,9 @@
 //! or newer, Chrome, Chromium or Edge 89 or newer. An older one is never opened onto a page that would stay blank; the
 //! program says what to do instead. A browser of Chromium's family is opened as an application window (`--app`), with a
 //! profile of its own; Firefox in a profile of its own, `--no-remote`, so that the user's own profile is never touched.
-//! The address, with its one-time token, is in a file of the user's own (mode 0600) that the browser is told to open,
-//! never on the command line, where `ps` would show it to the other users of the machine.
+//! The address, with its one-time token, is in a file of the user's own (mode 0600, in a new folder of mode 0700 that no one
+//! else could have made first) that the browser is told to open, never on the command line, where `ps` would show it to the
+//! other users of the machine. Each run has a browser profile of its own, which is removed when the run ends.
 
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -156,15 +157,28 @@ pub fn arguments(browser: &Browser, url: &str, profile: &Path) -> Vec<String> {
     }
 }
 
-/// Start the browser on `url`, with its profile below `profiles`.
-pub fn open(browser: &Browser, url: &str, profiles: &Path) -> Result<Child, String> {
-    let profile = profiles.join(match browser.kind {
-        Kind::Firefox => "profile-firefox",
-        _ => "profile-chromium",
-    });
-    std::fs::create_dir_all(&profile).map_err(|e| format!("{}: {e}", profile.display()))?;
+/// What a fresh Firefox profile is told, so that a profile made for one run starts on the page and on nothing else: no welcome
+/// page, no question about being the default browser, and no update of a Firefox that comes with the program.
+const FIREFOX_PREFS: &str = "\
+user_pref(\"browser.shell.checkDefaultBrowser\", false);
+user_pref(\"browser.startup.homepage_override.mstone\", \"ignore\");
+user_pref(\"startup.homepage_welcome_url\", \"\");
+user_pref(\"browser.aboutwelcome.enabled\", false);
+user_pref(\"datareporting.policy.firstRunURL\", \"\");
+user_pref(\"toolkit.telemetry.reportingpolicy.firstRun\", false);
+user_pref(\"app.update.auto\", false);
+user_pref(\"app.update.enabled\", false);
+user_pref(\"browser.tabs.warnOnClose\", false);
+";
+
+/// Start the browser on `url`, with `profile`, a folder for this run alone: a profile that other runs share is one that is
+/// locked by the one before it (Firefox then asks, in a window, whether to close it, and the page is never shown).
+pub fn open(browser: &Browser, url: &str, profile: &Path) -> Result<Child, String> {
+    if browser.kind == Kind::Firefox {
+        std::fs::write(profile.join("user.js"), FIREFOX_PREFS).map_err(|e| format!("{}: {e}", profile.display()))?;
+    }
     Command::new(&browser.path)
-        .args(arguments(browser, url, &profile))
+        .args(arguments(browser, url, profile))
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -172,40 +186,148 @@ pub fn open(browser: &Browser, url: &str, profiles: &Path) -> Result<Child, Stri
         .map_err(|e| format!("{} could not be started: {e}", browser.path.display()))
 }
 
-/// The folder the program keeps its own files in (the browser profiles, the address file): `$XDG_CACHE_HOME/rnl-viewer-local`,
-/// else `~/.cache/rnl-viewer-local`.
+/// The folder the program keeps its own files in (the browser profiles): `$XDG_CACHE_HOME/rnl-viewer-local`, else
+/// `~/.cache/rnl-viewer-local`, else a folder of the user's own number in the temporary folder.
 pub fn cache_dir() -> PathBuf {
     std::env::var_os("XDG_CACHE_HOME")
         .map(PathBuf::from)
         .filter(|p| p.is_absolute())
         .or_else(|| crate::files::home().map(|h| h.join(".cache")))
-        .unwrap_or_else(std::env::temp_dir)
-        .join("rnl-viewer-local")
+        .map(|p| p.join("rnl-viewer-local"))
+        .unwrap_or_else(|| std::env::temp_dir().join(format!("rnl-viewer-local-{}", euid().map_or_else(|| "user".to_string(), |u| u.to_string()))))
 }
 
-/// Write the file the browser is told to open: a page that goes on to `url`, readable by this user alone. In
-/// `$XDG_RUNTIME_DIR` when there is one, else the cache folder, whose mode is set to the user's alone as well.
-pub fn address_file(url: &str) -> Result<PathBuf, String> {
-    let dir = std::env::var_os("XDG_RUNTIME_DIR").map(PathBuf::from).filter(|p| p.is_dir()).unwrap_or_else(cache_dir);
-    std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+/// The user this process runs as (its effective user id), where the system says: on Linux, in `/proc`.
+fn euid() -> Option<u32> {
+    let status = std::fs::read_to_string("/proc/self/status").ok()?;
+    status.lines().find_map(|l| l.strip_prefix("Uid:"))?.split_whitespace().nth(1)?.parse().ok()
+}
+
+/// Whether a folder (not a link to one) belongs to this user, where that can be told.
+fn mine(meta: &std::fs::Metadata) -> bool {
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
-        let _ = std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700));
+        use std::os::unix::fs::MetadataExt;
+        euid().is_none_or(|u| meta.uid() == u)
     }
-    let path = dir.join(format!("rnl-viewer-{}.html", std::process::id()));
+    #[cfg(not(unix))]
+    {
+        let _ = meta;
+        true
+    }
+}
+
+/// Make a folder of this user's alone: created if it is not there (with what is above it), mode 0700 always, and refused
+/// if it is somebody else's, which a folder in a shared place (a temporary folder, a cache that was shared out) may be.
+pub fn private_dir(dir: &Path) -> Result<(), String> {
+    let say = |e: std::io::Error| format!("{}: {e}", dir.display());
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
+        std::fs::DirBuilder::new().recursive(true).mode(0o700).create(dir).map_err(say)?;
+        let meta = std::fs::metadata(dir).map_err(say)?;
+        if !meta.is_dir() || !mine(&meta) {
+            return Err(format!("{} is not a folder of yours: the program keeps nothing in it", dir.display()));
+        }
+        std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700)).map_err(say)?;
+    }
+    #[cfg(not(unix))]
+    std::fs::create_dir_all(dir).map_err(say)?;
+    Ok(())
+}
+
+/// A new folder below `parent`, of this run: a name nobody could have made before (the process and 64 random bits),
+/// created by the call that fails if it is there, readable by this user alone, and checked to be a folder of its own, not
+/// a link that somebody put there.
+fn fresh_dir(parent: &Path, prefix: &str) -> Result<PathBuf, String> {
+    for _ in 0..8 {
+        let path = parent.join(format!("{prefix}-{}-{}", std::process::id(), &crate::security::random_hex()[..16]));
+        let made = {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::DirBuilderExt;
+                std::fs::DirBuilder::new().mode(0o700).create(&path)
+            }
+            #[cfg(not(unix))]
+            {
+                std::fs::create_dir(&path)
+            }
+        };
+        match made {
+            Ok(()) => {
+                let meta = std::fs::symlink_metadata(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+                if !meta.is_dir() || !mine(&meta) {
+                    let _ = std::fs::remove_dir(&path);
+                    return Err(format!("{} is not a folder of yours", path.display()));
+                }
+                return Ok(path);
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(e) => return Err(format!("{}: {e}", path.display())),
+        }
+    }
+    Err(format!("no new folder could be made in {}", parent.display()))
+}
+
+/// The folder of a browser profile for this run, below the cache folder, which is made the user's own. The folders of runs
+/// that ended without removing theirs (Ctrl-C) are removed first: those of a process that is no longer there.
+pub fn profile_dir() -> Result<PathBuf, String> {
+    let parent = cache_dir().join("profiles");
+    private_dir(&parent)?;
+    remove_stale(&parent);
+    fresh_dir(&parent, "run")
+}
+
+/// Remove the `run-PID-…` folders of `parent` whose process is gone. Where the system does not say which processes there
+/// are (no `/proc`), none is removed.
+fn remove_stale(parent: &Path) {
+    if !Path::new("/proc/self").exists() {
+        return;
+    }
+    let Ok(entries) = std::fs::read_dir(parent) else { return };
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let Some(pid) = name.strip_prefix("run-").and_then(|r| r.split('-').next()).and_then(|p| p.parse::<u32>().ok()) else { continue };
+        let Ok(meta) = std::fs::symlink_metadata(entry.path()) else { continue };
+        if meta.is_dir() && mine(&meta) && !Path::new(&format!("/proc/{pid}")).exists() {
+            let _ = std::fs::remove_dir_all(entry.path());
+        }
+    }
+}
+
+/// Write the file the browser is told to open: a page that goes on to `url`, readable by this user alone. It is in a new
+/// folder of its own (see `fresh_dir`) in `$XDG_RUNTIME_DIR` when there is one, else in the cache folder; the folder it is
+/// in is not changed, only the new one is, so that nobody else's folder is made less than it was. The file is made by the
+/// call that fails if it is there, and does not follow a link.
+pub fn address_file(url: &str) -> Result<PathBuf, String> {
+    let parent = match std::env::var_os("XDG_RUNTIME_DIR").map(PathBuf::from).filter(|p| p.is_absolute() && p.is_dir()) {
+        Some(runtime) => runtime,
+        None => {
+            let cache = cache_dir();
+            private_dir(&cache)?;
+            cache
+        }
+    };
+    let dir = fresh_dir(&parent, "rnl-viewer")?;
+    let path = dir.join("open.html");
     let page = format!(
         "<!doctype html><meta charset=\"utf-8\"><title>RNL Viewer</title><meta http-equiv=\"refresh\" content=\"0;url={url}\"><p><a href=\"{url}\">Open RNL Viewer</a></p>\n"
     );
-    #[cfg(unix)]
-    {
+    let write = || -> std::io::Result<()> {
         use std::io::Write;
-        use std::os::unix::fs::OpenOptionsExt;
-        let mut file = std::fs::OpenOptions::new().write(true).create(true).truncate(true).mode(0o600).open(&path).map_err(|e| format!("{}: {e}", path.display()))?;
-        file.write_all(page.as_bytes()).map_err(|e| e.to_string())?;
+        let mut options = std::fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        options.open(&path)?.write_all(page.as_bytes())
+    };
+    if let Err(e) = write() {
+        let _ = std::fs::remove_dir_all(&dir);
+        return Err(format!("{}: {e}", path.display()));
     }
-    #[cfg(not(unix))]
-    std::fs::write(&path, page).map_err(|e| format!("{}: {e}", path.display()))?;
     Ok(path)
 }
 
@@ -264,6 +386,99 @@ mod tests {
         assert_eq!(kind_of(Path::new("/opt/firefox/firefox")), Kind::Firefox);
         assert_eq!(kind_of(Path::new("/usr/bin/google-chrome-stable")), Kind::Chromium);
         assert_eq!(kind_of(Path::new("/usr/bin/surf")), Kind::Other);
+    }
+
+    fn scratch(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("rnl-local-launch-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[cfg(unix)]
+    fn mode(path: &Path) -> u32 {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::metadata(path).unwrap().permissions().mode() & 0o777
+    }
+
+    #[test]
+    fn a_folder_of_a_run_is_new_private_and_never_the_same_twice() {
+        let parent = scratch("fresh");
+        let one = fresh_dir(&parent, "run").unwrap();
+        let two = fresh_dir(&parent, "run").unwrap();
+        assert_ne!(one, two);
+        assert!(one.starts_with(&parent) && one.is_dir());
+        assert!(one.file_name().unwrap().to_string_lossy().starts_with(&format!("run-{}-", std::process::id())));
+        #[cfg(unix)]
+        {
+            assert_eq!(mode(&one), 0o700);
+            // the folder it is made in is left as it was
+            assert_ne!(mode(&parent), 0o700);
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_file_with_the_address_is_private_in_a_folder_of_its_own_and_does_not_change_the_one_above() {
+        let runtime = scratch("runtime");
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&runtime, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        // (the environment is the process's: this is the only test that sets it)
+        std::env::set_var("XDG_RUNTIME_DIR", &runtime);
+        let file = address_file("http://127.0.0.1:1/__start?t=abc").unwrap();
+        std::env::remove_var("XDG_RUNTIME_DIR");
+        assert_eq!(mode(&file), 0o600);
+        let folder = file.parent().unwrap();
+        assert_eq!(mode(folder), 0o700);
+        assert_eq!(folder.parent().unwrap(), runtime);
+        assert_eq!(mode(&runtime), 0o755, "the runtime folder is not changed: it is not ours to change");
+        assert!(std::fs::read_to_string(&file).unwrap().contains("__start?t=abc"));
+        // another run is another folder, and a file that is there is never written over
+        std::env::set_var("XDG_RUNTIME_DIR", &runtime);
+        let other = address_file("http://127.0.0.1:1/__start?t=def").unwrap();
+        std::env::remove_var("XDG_RUNTIME_DIR");
+        assert_ne!(other.parent(), file.parent());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_private_folder_is_made_private_each_time_and_a_link_in_its_place_is_not_followed_into() {
+        let parent = scratch("private");
+        let cache = parent.join("cache");
+        std::fs::create_dir_all(&cache).unwrap();
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&cache, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        private_dir(&cache).unwrap();
+        assert_eq!(mode(&cache), 0o700);
+        let deep = parent.join("a/b/c");
+        private_dir(&deep).unwrap();
+        assert_eq!(mode(&deep), 0o700);
+        // a file in the place of the folder is no folder
+        std::fs::write(parent.join("file"), "x").unwrap();
+        assert!(private_dir(&parent.join("file")).is_err());
+    }
+
+    #[test]
+    fn the_profiles_of_runs_that_ended_are_removed_and_those_of_a_live_one_are_not() {
+        let parent = scratch("stale");
+        let live = parent.join(format!("run-{}-aaaa", std::process::id()));
+        // (a process number no system has: above the largest it gives)
+        let gone = parent.join("run-4294967290-bbbb");
+        let foreign = parent.join("keep-me");
+        for dir in [&live, &gone, &foreign] {
+            std::fs::create_dir_all(dir.join("inside")).unwrap();
+        }
+        remove_stale(&parent);
+        if Path::new("/proc/self").exists() {
+            assert!(live.exists() && foreign.exists());
+            assert!(!gone.exists());
+        } else {
+            assert!(gone.exists(), "where the processes are not known, nothing is removed");
+        }
     }
 
     #[test]

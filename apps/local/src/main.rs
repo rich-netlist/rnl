@@ -24,9 +24,10 @@ mod service;
 mod settings;
 mod watch;
 
-use std::net::{Ipv4Addr, SocketAddr, TcpListener, TcpStream};
+use std::cell::Cell;
+use std::net::{Ipv4Addr, Shutdown, SocketAddr, TcpListener, TcpStream};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -34,8 +35,48 @@ use app::App;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// How many connections are served at once: the page asks for its files in parallel.
-const MAX_CONNECTIONS: usize = 96;
+/// How many requests are served at once, once their heads are in: the page asks for its files in parallel.
+const MAX_ACTIVE: usize = 96;
+
+/// How many requests that are not of the session (the page's own files, which anyone who can reach the port may have) are
+/// served at once: fewer than `MAX_ACTIVE`, so that places are left for the page that holds the key, whatever the others do
+/// (a client that does not read its answer holds its place until the write times out).
+const MAX_ANONYMOUS: usize = 40;
+
+/// How many connections may be waiting for their request's head at once. When another comes, the one that has waited longest is
+/// closed: a client that sends a byte at a time cannot keep the places for itself, and the page, whose head comes in the first
+/// moment, always has one, so that the program stays the user's to use, and does not stop for want of the page's asking.
+const MAX_WAITING: usize = 48;
+
+/// The connections that are waiting for the head of a request, and the requests being served.
+#[derive(Default)]
+struct Gate {
+    waiting: Mutex<Vec<(u64, TcpStream)>>,
+    next: AtomicU64,
+    active: AtomicUsize,
+    anonymous: AtomicUsize,
+}
+
+impl Gate {
+    /// A connection comes: it waits for its head, in a place that is its own until the head has come or another has taken it.
+    fn enter(&self, stream: &TcpStream) -> Option<u64> {
+        let kept = stream.try_clone().ok()?;
+        let id = self.next.fetch_add(1, Ordering::Relaxed);
+        let mut waiting = self.waiting.lock().ok()?;
+        if waiting.len() >= MAX_WAITING {
+            let (_, oldest) = waiting.remove(0);
+            let _ = oldest.shutdown(Shutdown::Both);
+        }
+        waiting.push((id, kept));
+        Some(id)
+    }
+
+    fn leave(&self, id: u64) {
+        if let Ok(mut waiting) = self.waiting.lock() {
+            waiting.retain(|(i, _)| *i != id);
+        }
+    }
+}
 
 /// The page asks what changed every second, but a browser slows the timers of a tab it does not show to one a minute: a page
 /// that has not asked for this many seconds is gone.
@@ -145,6 +186,8 @@ fn run(options: Options) -> Result<(), String> {
         heartbeat: Mutex::new(None),
         version: format!("{VERSION} (core {} {})", rnl_cli::CORE_VERSION, rnl_cli::BUILD_COMMIT),
         address_file: Mutex::new(None),
+        run_dirs: Mutex::new(Vec::new()),
+        bodies: AtomicUsize::new(0),
     });
     for file in &app.initial {
         app.watcher.watch(file);
@@ -162,15 +205,27 @@ fn run(options: Options) -> Result<(), String> {
                     eprintln!("{}", launch::too_old(&browser));
                     std::process::exit(1);
                 }
-                let file = launch::address_file(&address)?;
-                match launch::open(&browser, &launch::file_url(&file), &launch::cache_dir()) {
+                let profile = launch::profile_dir()?;
+                let file = match launch::address_file(&address) {
+                    Ok(file) => file,
+                    Err(message) => {
+                        let _ = std::fs::remove_dir_all(&profile);
+                        return Err(message);
+                    }
+                };
+                // (a profile for this run alone: the one of an earlier run may still be locked)
+                if let Ok(mut dirs) = app.run_dirs.lock() {
+                    dirs.push(profile.clone());
+                }
+                match launch::open(&browser, &launch::file_url(&file), &profile) {
                     Ok(child) => {
                         println!("Opened in {} {}.", browser.path.display(), browser.major.map_or(String::new(), |v| v.to_string()));
                         browser_child = Some(child);
                         address_file = Some(file);
                     }
                     Err(message) => {
-                        let _ = std::fs::remove_file(&file);
+                        app.set_address_file(Some(file));
+                        app.clean_up();
                         return Err(message);
                     }
                 }
@@ -206,32 +261,31 @@ fn run(options: Options) -> Result<(), String> {
                 if watching && child.try_wait().is_ok_and(|status| status.is_some()) {
                     if started.elapsed() > Duration::from_secs(5) {
                         println!("The browser was closed: stopping.");
-                        app.remove_address_file();
+                        app.clean_up();
                         std::process::exit(0);
                     }
                     watching = false;
                 }
                 if app.quiet_for().is_some_and(|s| s > GONE_AFTER) {
                     println!("The page was closed: stopping.");
-                    app.remove_address_file();
+                    app.clean_up();
                     std::process::exit(0);
+                }
+                // (the browser that was started ended at once, and no page came: it was not shown, and nobody is to wait on it)
+                if app.quiet_for().is_none() && started.elapsed() > Duration::from_secs(GONE_AFTER) {
+                    eprintln!("The page was never opened: the browser did not show it. Stopping; start the program again, or with --no-browser.");
+                    app.clean_up();
+                    std::process::exit(1);
                 }
             }
         });
     }
 
-    let busy = Arc::new(AtomicUsize::new(0));
+    let gate = Arc::new(Gate::default());
     for stream in listener.incoming() {
         let Ok(stream) = stream else { continue };
-        if busy.load(Ordering::Relaxed) >= MAX_CONNECTIONS {
-            continue;
-        }
-        busy.fetch_add(1, Ordering::Relaxed);
-        let (app, busy) = (app.clone(), busy.clone());
-        std::thread::spawn(move || {
-            serve(&app, stream);
-            busy.fetch_sub(1, Ordering::Relaxed);
-        });
+        let (app, gate) = (app.clone(), gate.clone());
+        std::thread::spawn(move || serve(&app, &gate, stream));
     }
     Ok(())
 }
@@ -241,21 +295,32 @@ fn print_address(address: &str, port: u16) {
     println!("To use a browser on another computer, start the program with --port {port} (or any port) on both sides of\n  ssh -L {port}:127.0.0.1:{port} THIS-HOST\nand open the address in that computer's browser.");
 }
 
-/// One connection: one request, one answer.
-fn serve(app: &App, mut stream: TcpStream) {
-    let _ = stream.set_read_timeout(Some(Duration::from_secs(30)));
+/// One connection: one request, one answer. The head of the request has `http::HEAD_TIME` to come, in a place of the gate that
+/// is taken from it if too many wait; once it is in, the request is one of at most `MAX_ACTIVE`.
+fn serve(app: &App, gate: &Gate, mut stream: TcpStream) {
     let _ = stream.set_write_timeout(Some(Duration::from_secs(120)));
-    let request = match http::read_request(&mut stream, app::MAX_BODY) {
-        Ok(request) => request,
-        Err(http::Rejected(status, why)) => {
-            let _ = http::write_response(&mut stream, &http::Response::error(status, why), false);
-            return;
+    let waiting = gate.enter(&stream);
+    // (which count it is in: what the session's page asks is not kept waiting by what is not of it)
+    let counted: Cell<Option<&AtomicUsize>> = Cell::new(None);
+    let (response, head_only) = app::respond(app, &mut stream, |signed| {
+        if let Some(id) = waiting {
+            gate.leave(id);
         }
-    };
-    // (a solve runs for as long as it takes: nothing is read from the connection but to see that the page is still there)
-    let _ = stream.set_read_timeout(None);
-    let response = app::handle(app, &request, &stream);
-    let _ = http::write_response(&mut stream, &response, request.method == "HEAD");
+        let (count, most) = if signed { (&gate.active, MAX_ACTIVE) } else { (&gate.anonymous, MAX_ANONYMOUS) };
+        if count.fetch_add(1, Ordering::SeqCst) >= most {
+            count.fetch_sub(1, Ordering::SeqCst);
+            return false;
+        }
+        counted.set(Some(count));
+        true
+    });
+    if let Some(id) = waiting {
+        gate.leave(id);
+    }
+    let _ = http::write_response(&mut stream, &response, head_only);
+    if let Some(count) = counted.get() {
+        count.fetch_sub(1, Ordering::SeqCst);
+    }
 }
 
 #[cfg(test)]
@@ -264,6 +329,32 @@ mod tests {
 
     fn args(list: &[&str]) -> Result<Options, String> {
         parse(list.iter().map(|s| s.to_string()))
+    }
+
+    #[test]
+    fn when_too_many_wait_for_their_head_the_one_that_waited_longest_is_closed() {
+        use std::io::Read;
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let gate = Gate::default();
+        let mut clients = Vec::new();
+        let mut servers = Vec::new();
+        for _ in 0..MAX_WAITING + 1 {
+            clients.push(TcpStream::connect(listener.local_addr().unwrap()).unwrap());
+            let (server, _) = listener.accept().unwrap();
+            gate.enter(&server).unwrap();
+            servers.push(server);
+        }
+        assert_eq!(gate.waiting.lock().unwrap().len(), MAX_WAITING);
+        // the first was closed to make room for the last: it reads the end of the stream, the others still wait
+        servers[0].set_read_timeout(Some(Duration::from_millis(500))).unwrap();
+        assert_eq!(servers[0].read(&mut [0u8; 1]).unwrap_or(0), 0);
+        let last = servers.last_mut().unwrap();
+        last.set_read_timeout(Some(Duration::from_millis(100))).unwrap();
+        assert!(last.read(&mut [0u8; 1]).is_err(), "a place that was given is not closed");
+        // a connection that has its head leaves, and its place is free again
+        let id = gate.enter(&servers[1]).unwrap();
+        gate.leave(id);
+        assert!(gate.waiting.lock().unwrap().iter().all(|(i, _)| *i != id));
     }
 
     #[test]

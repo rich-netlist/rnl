@@ -3,20 +3,21 @@
 //!
 //! * its `Host` is this machine's own name for itself (`127.0.0.1`, `localhost`, `[::1]`), which keeps a page of another
 //!   site, reaching the program through a DNS name it controls, out;
-//! * it carries the session cookie, which the page gets once, by opening the address the program printed, whose token
-//!   works one time and is never on a command line, where `ps` shows it to the other users;
-//! * and a request that changes something also carries the header `X-RNL: 1`, which a page of another origin cannot
-//!   add without a preflight that nothing here allows, comes from this origin, and is not cross-site.
-//!
-//! The cookie is `HttpOnly` and `SameSite=Strict`; neither is enough alone, since another local port is the same site.
+//! * it carries the key of the session in the header `X-RNL-Key`, which the page gets once, by opening the address the
+//!   program printed, whose token works one time and is never on a command line, where `ps` shows it to the other users.
+//!   The key goes to the page in the fragment of an address (which no server is sent), and the page keeps it in its own
+//!   `sessionStorage`. It is not a cookie: a browser sends a cookie to every port of the same address, so any page the
+//!   browser has open from another local port, another user's server or another `ssh -L` tunnel, would be handed it;
+//! * and a request that changes something also carries the header `X-RNL: 1`, comes from this origin, and is not
+//!   cross-site.
 
 use std::io::Read;
 use std::sync::Mutex;
 
 use crate::http::Request;
 
-/// The name of the session cookie.
-pub const COOKIE: &str = "rnl_session";
+/// The header that carries the key of the session.
+pub const KEY_HEADER: &str = "x-rnl-key";
 
 /// 256 bits from the system: `/dev/urandom`, else the standard library's own seed, which it takes from the system too.
 pub fn random_hex() -> String {
@@ -61,9 +62,9 @@ pub fn host_ok(host: &str) -> bool {
     name_ok && port_ok
 }
 
-/// The one-time token and the session cookie.
+/// The one-time token and the key of the session.
 pub struct Auth {
-    session: String,
+    key: String,
     token: Mutex<Option<String>>,
 }
 
@@ -71,24 +72,24 @@ impl Auth {
     /// A new session, and the token that opens it once.
     pub fn new() -> (Auth, String) {
         let token = random_hex();
-        (Auth { session: random_hex(), token: Mutex::new(Some(token.clone())) }, token)
+        (Auth { key: random_hex(), token: Mutex::new(Some(token.clone())) }, token)
     }
 
-    /// Exchange the token for the cookie: the token is spent whether it was right or not, so that it cannot be guessed at.
+    /// Exchange the token for the key of the session. The token is spent by the one that is right and by nothing else: a
+    /// wrong one, which a page of another site or another user can send at will, must not use up the user's address
+    /// (it cannot be guessed at: 256 bits).
     pub fn exchange(&self, presented: &str) -> Option<String> {
         let mut token = self.token.lock().ok()?;
-        let expected = token.take()?;
-        same(&expected, presented).then(|| self.session.clone())
-    }
-
-    /// The `Set-Cookie` value of the session.
-    pub fn cookie(&self) -> String {
-        format!("{COOKIE}={}; HttpOnly; SameSite=Strict; Path=/", self.session)
+        if !token.as_deref().is_some_and(|expected| same(expected, presented)) {
+            return None;
+        }
+        *token = None;
+        Some(self.key.clone())
     }
 
     /// Whether the request is of the session.
     pub fn signed_in(&self, request: &Request) -> bool {
-        request.cookie(COOKIE).is_some_and(|c| same(c, &self.session))
+        request.header(KEY_HEADER).is_some_and(|k| same(k, &self.key))
     }
 }
 
@@ -132,19 +133,18 @@ mod tests {
     }
 
     #[test]
-    fn a_token_opens_a_session_once_and_a_wrong_one_spends_it() {
+    fn a_token_opens_a_session_once_and_only_the_right_one_spends_it() {
         let (auth, token) = Auth::new();
         assert_eq!(token.len(), 64);
         assert!(auth.exchange("nope").is_none());
-        assert!(auth.exchange(&token).is_none(), "spent by the wrong one");
-        let (auth, token) = Auth::new();
-        let cookie = auth.exchange(&token).unwrap();
+        assert!(auth.exchange("").is_none());
+        let key = auth.exchange(&token).expect("a wrong token did not spend the user's address");
         assert!(auth.exchange(&token).is_none(), "the second time");
-        let signed = request(&[("cookie", &format!("{COOKIE}={cookie}"))]);
-        assert!(auth.signed_in(&signed));
-        assert!(!auth.signed_in(&request(&[("cookie", &format!("{COOKIE}=wrong"))])));
+        assert!(auth.signed_in(&request(&[(KEY_HEADER, &key)])));
+        assert!(!auth.signed_in(&request(&[(KEY_HEADER, "wrong")])));
         assert!(!auth.signed_in(&request(&[])));
-        assert!(auth.cookie().contains("HttpOnly") && auth.cookie().contains("SameSite=Strict"));
+        // a cookie, which a browser sends to every port of the address, is no key
+        assert!(!auth.signed_in(&request(&[("cookie", &format!("rnl_session={key}"))])));
     }
 
     #[test]

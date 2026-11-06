@@ -724,5 +724,6 @@
   "From the computer of the browser…": "Desde el equipo del navegador…",
   "Choose Folder": "Elegir carpeta",
   "Choose": "Elegir",
-  "{0} changed on disk. F5 reloads the netlist.": "{0} cambió en el disco. F5 recarga el netlist."
+  "{0} changed on disk. F5 reloads the netlist.": "{0} cambió en el disco. F5 recarga el netlist.",
+  "{0} exists already. Replace it?": "{0} ya existe. ¿Reemplazarlo?"
 }

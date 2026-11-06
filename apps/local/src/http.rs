@@ -5,6 +5,7 @@
 
 use std::io::{self, Read, Write};
 use std::net::TcpStream;
+use std::time::{Duration, Instant};
 
 /// The most the request line and the headers may take.
 const MAX_HEAD: usize = 64 * 1024;
@@ -26,14 +27,6 @@ impl Request {
     /// The value of a header, by its name in lower case.
     pub fn header(&self, name: &str) -> Option<&str> {
         self.headers.iter().find(|(n, _)| n == name).map(|(_, v)| v.as_str())
-    }
-
-    /// The value of a cookie of the request.
-    pub fn cookie(&self, name: &str) -> Option<&str> {
-        self.headers.iter().filter(|(n, _)| n == "cookie").flat_map(|(_, v)| v.split(';')).find_map(|pair| {
-            let (k, v) = pair.split_once('=')?;
-            (k.trim() == name).then(|| v.trim())
-        })
     }
 
     /// The first value of a query parameter, decoded.
@@ -103,9 +96,11 @@ fn reason(status: u16) -> &'static str {
         411 => "Length Required",
         413 => "Content Too Large",
         415 => "Unsupported Media Type",
+        408 => "Request Timeout",
         431 => "Request Header Fields Too Large",
         500 => "Internal Server Error",
         501 => "Not Implemented",
+        503 => "Service Unavailable",
         _ => "Status",
     }
 }
@@ -121,7 +116,9 @@ pub fn write_response(stream: &mut TcpStream, response: &Response, head_only: bo
         head.push_str(&format!("{name}: {value}\r\n"));
     }
     head.push_str(&format!("Content-Length: {}\r\n", response.body.len()));
-    head.push_str("Connection: close\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nReferrer-Policy: no-referrer\r\n\r\n");
+    head.push_str("Connection: close\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nReferrer-Policy: no-referrer\r\n");
+    // (no page of another site may frame the program's: it would draw over what the user sees)
+    head.push_str("Content-Security-Policy: frame-ancestors 'none'\r\nX-Frame-Options: DENY\r\n\r\n");
     stream.write_all(head.as_bytes())?;
     if !head_only {
         stream.write_all(&response.body)?;
@@ -129,8 +126,47 @@ pub fn write_response(stream: &mut TcpStream, response: &Response, head_only: bo
     stream.flush()
 }
 
-/// Read one request from the stream.
-pub fn read_request(stream: &mut TcpStream, max_body: usize) -> Result<Request, Rejected> {
+/// How long a request's head may take to arrive, all of it: a client that sends a byte at a time, to keep a connection (and
+/// one of the program's few places for them) for as long as it can, is not served.
+pub const HEAD_TIME: Duration = Duration::from_secs(10);
+
+/// How long a body may take: a fixed time, and a second for each 4 MiB it says it has (an `ssh -L` is slower than the loopback).
+pub fn body_time(length: usize) -> Duration {
+    Duration::from_secs(30 + (length / (4 * 1024 * 1024)) as u64)
+}
+
+/// A request's head, read: the request without its body, the length of the body it says it has, and the first bytes of that
+/// body, which came with the head.
+#[derive(Debug)]
+pub struct Head {
+    pub request: Request,
+    pub length: usize,
+    early: Vec<u8>,
+}
+
+/// Read some bytes of the stream, no later than `deadline`.
+fn read_some(stream: &mut TcpStream, buffer: &mut [u8], deadline: Instant, what: &'static str) -> Result<usize, Rejected> {
+    let left = deadline.saturating_duration_since(Instant::now());
+    if left.is_zero() {
+        return Err(Rejected(408, "the request came too slowly"));
+    }
+    stream.set_read_timeout(Some(left)).map_err(|_| Rejected(400, what))?;
+    match stream.read(buffer) {
+        Ok(n) => Ok(n),
+        Err(e) if matches!(e.kind(), io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut) => Err(Rejected(408, "the request came too slowly")),
+        Err(_) => Err(Rejected(400, what)),
+    }
+}
+
+/// Read the head of a request from the stream, in `HEAD_TIME` at most. What the body is to be is for the caller to say, and
+/// the body is not read: a request that is not let in is answered without it.
+pub fn read_head(stream: &mut TcpStream) -> Result<Head, Rejected> {
+    read_head_within(stream, HEAD_TIME)
+}
+
+/// Read the head of a request from the stream, in `time` at most.
+pub fn read_head_within(stream: &mut TcpStream, time: Duration) -> Result<Head, Rejected> {
+    let deadline = Instant::now() + time;
     let mut buffer = Vec::with_capacity(4096);
     let mut chunk = [0u8; 4096];
     let end = loop {
@@ -140,7 +176,7 @@ pub fn read_request(stream: &mut TcpStream, max_body: usize) -> Result<Request, 
         if buffer.len() > MAX_HEAD {
             return Err(Rejected(431, "the headers are too long"));
         }
-        let n = stream.read(&mut chunk).map_err(|_| Rejected(400, "the request was not read"))?;
+        let n = read_some(stream, &mut chunk, deadline, "the request was not read")?;
         if n == 0 {
             return Err(Rejected(400, "the request ended too soon"));
         }
@@ -193,22 +229,40 @@ pub fn read_request(stream: &mut TcpStream, max_body: usize) -> Result<Request, 
         Some((_, v)) => v.parse::<usize>().map_err(|_| Rejected(400, "the Content-Length is not a number"))?,
         None => 0,
     };
-    if length > max_body {
-        return Err(Rejected(413, "the body is too large"));
-    }
-    let mut body = buffer[end + 4..].to_vec();
-    if body.len() > length {
+    let early = buffer[end + 4..].to_vec();
+    if early.len() > length {
         return Err(Rejected(400, "more was sent than the Content-Length says"));
     }
+    Ok(Head { request: Request { method: method.to_string(), path, query: query.to_string(), headers, body: Vec::new() }, length, early })
+}
+
+/// Read the body the head says it has, in `body_time` at most, and give the request whole.
+pub fn read_body(stream: &mut TcpStream, head: Head) -> Result<Request, Rejected> {
+    let Head { mut request, length, early } = head;
+    let deadline = Instant::now() + body_time(length);
+    let mut body = early;
+    body.reserve(length - body.len());
+    let mut chunk = [0u8; 16 * 1024];
     while body.len() < length {
         let want = (length - body.len()).min(chunk.len());
-        let n = stream.read(&mut chunk[..want]).map_err(|_| Rejected(400, "the body was not read"))?;
+        let n = read_some(stream, &mut chunk[..want], deadline, "the body was not read")?;
         if n == 0 {
             return Err(Rejected(400, "the body ended too soon"));
         }
         body.extend_from_slice(&chunk[..n]);
     }
-    Ok(Request { method: method.to_string(), path, query: query.to_string(), headers, body })
+    request.body = body;
+    Ok(request)
+}
+
+/// Read one request from the stream, whose body may be `max_body` bytes at most.
+#[cfg(test)]
+pub fn read_request(stream: &mut TcpStream, max_body: usize) -> Result<Request, Rejected> {
+    let head = read_head(stream)?;
+    if head.length > max_body {
+        return Err(Rejected(413, "the body is too large"));
+    }
+    read_body(stream, head)
 }
 
 fn find(haystack: &[u8], needle: &[u8]) -> Option<usize> {
@@ -279,17 +333,59 @@ mod tests {
         assert_eq!(encode_path("/a b"), "/a%20b");
     }
 
+    /// A client and the server's end of its connection.
+    fn pair() -> (TcpStream, TcpStream) {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let client = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+        let (server, _) = listener.accept().unwrap();
+        (client, server)
+    }
+
     #[test]
-    fn cookies_and_parameters_are_found_by_name() {
+    fn a_head_that_comes_a_byte_at_a_time_is_cut_off_as_a_whole_not_read_by_read() {
+        let (mut client, mut server) = pair();
+        let slow = std::thread::spawn(move || {
+            // each byte comes well inside any time for a single read, and the head never ends
+            for b in b"GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nX-A: ".iter().cycle().take(200) {
+                if client.write_all(&[*b]).is_err() {
+                    return;
+                }
+                std::thread::sleep(Duration::from_millis(20));
+            }
+        });
+        let started = Instant::now();
+        let Err(Rejected(status, _)) = read_head_within(&mut server, Duration::from_millis(400)) else { panic!("the head was taken") };
+        assert_eq!(status, 408);
+        assert!(started.elapsed() < Duration::from_secs(2), "{:?}", started.elapsed());
+        drop(server);
+        slow.join().unwrap();
+    }
+
+    #[test]
+    fn the_body_is_read_after_the_head_and_only_what_the_head_says() {
+        let (mut client, mut server) = pair();
+        client.write_all(b"POST /x HTTP/1.1\r\nHost: h\r\nContent-Length: 5\r\n\r\nab").unwrap();
+        let head = read_head(&mut server).unwrap();
+        assert_eq!((head.length, head.request.body.len()), (5, 0), "the head is read without the body");
+        client.write_all(b"cde").unwrap();
+        let request = read_body(&mut server, head).unwrap();
+        assert_eq!(request.body, b"abcde");
+        // more than the head says is not taken
+        let (mut client, mut server) = pair();
+        client.write_all(b"POST /x HTTP/1.1\r\nHost: h\r\nContent-Length: 1\r\n\r\nabc").unwrap();
+        assert!(matches!(read_head(&mut server), Err(Rejected(400, _))));
+    }
+
+    #[test]
+    fn parameters_are_found_by_name() {
         let r = Request {
             method: "GET".into(),
             path: "/".into(),
             query: "dir=%2Fhome%2Fu&x=1&flag".into(),
-            headers: vec![("cookie".into(), "a=1; rnl_session=abc; b=2".into())],
+            headers: vec![("x-a".into(), "1".into())],
             body: Vec::new(),
         };
-        assert_eq!(r.cookie("rnl_session"), Some("abc"));
-        assert_eq!(r.cookie("c"), None);
+        assert_eq!(r.header("x-a"), Some("1"));
         assert_eq!(r.param("dir").as_deref(), Some("/home/u"));
         assert_eq!(r.param("flag").as_deref(), Some(""));
         assert_eq!(r.param("nope"), None);

@@ -724,5 +724,6 @@
   "From the computer of the browser…": "ブラウザーのあるコンピューターから…",
   "Choose Folder": "フォルダーを選択",
   "Choose": "選択",
-  "{0} changed on disk. F5 reloads the netlist.": "{0} がディスク上で変更されました。F5 でネットリストを再読み込みします。"
+  "{0} changed on disk. F5 reloads the netlist.": "{0} がディスク上で変更されました。F5 でネットリストを再読み込みします。",
+  "{0} exists already. Replace it?": "{0} はすでに存在します。置き換えますか?"
 }

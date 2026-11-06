@@ -13,11 +13,12 @@ import { m, tr } from "../i18n.js";
 import web from "./web.js";
 import { decodeText } from "../core/client.js";
 import { chooseOnServer } from "../server-files.js";
+import { offer } from "../dialog.js";
 import { note } from "../editor.js";
 import { sourcePath } from "../source-path.js";
 import { doc } from "../state.js";
 
-/** The program's own API, as the page of the program may call it: its session cookie goes along, and the header it asks for. */
+/** The program's own API, as the page of the program may call it: with the header it asks of every request that does anything (the key of the session goes with every request: local-key.js). */
 async function api(path, { method = "GET", body } = {}) {
   const response = await fetch(new URL(path, location.href), {
     method,
@@ -191,10 +192,14 @@ export default {
       remember,
     });
     if (!chosen) return null;
-    const written = await api("api/save-as", {
-      method: "POST",
-      body: { source: onMachine(source?.path) ? source.path : null, to: chosen.path, text: file.text, encoding: encoding ?? "preserve" },
-    });
+    const body = { source: onMachine(source?.path) ? source.path : null, to: chosen.path, text: file.text, encoding: encoding ?? "preserve" };
+    let written = await api("api/save-as", { method: "POST", body });
+    if (written.exists) {
+      // a file of that name is there: nothing was written, and the user says whether it is to be replaced
+      const replace = await offer({ title: m("Save As"), paragraphs: [m`${written.exists} exists already. Replace it?`], action: tr("Replace") });
+      if (!replace) return null;
+      written = await api("api/save-as", { method: "POST", body: { ...body, overwrite: true } });
+    }
     await api("api/open", { method: "POST", body: { path: written.path } });
     return serverSource(written.path);
   },
