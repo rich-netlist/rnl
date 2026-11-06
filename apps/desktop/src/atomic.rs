@@ -156,10 +156,44 @@ fn replaced_by_rename(at: &Path, bytes: &[u8], old: &std::fs::Metadata) -> Resul
     }
 }
 
-/// Whether a file has extended attributes that a new file would not (on Linux and macOS: the system's own, which every new
-/// file gets, are not counted), or the system does not say, in which case it is taken to have: it is then written in place.
+/// Whether a file has extended attributes or an ACL that a new file would not (on Linux and macOS: the system's own, which
+/// every new file gets, are not counted), or the system does not say, in which case it is taken to have: it is then written
+/// in place. Linux keeps ACLs among the extended attributes (`system.posix_acl_access`); macOS keeps them where `listxattr`
+/// does not list them, and they are asked for by their own call.
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 fn has_extended_attributes(path: &Path) -> bool {
+    lists_extended_attributes(path) || has_acl(path)
+}
+
+#[cfg(target_os = "linux")]
+fn has_acl(_: &Path) -> bool {
+    false
+}
+
+#[cfg(target_os = "macos")]
+fn has_acl(path: &Path) -> bool {
+    use std::ffi::{c_char, c_int, c_void, CString};
+    use std::os::unix::ffi::OsStrExt;
+    extern "C" {
+        fn acl_get_link_np(path: *const c_char, kind: c_int) -> *mut c_void;
+        fn acl_free(acl: *mut c_void) -> c_int;
+    }
+    const ACL_TYPE_EXTENDED: c_int = 0x100;
+    let Ok(name) = CString::new(path.as_os_str().as_bytes()) else { return true };
+    // SAFETY: `name` is a C string that lives through the call; a non-null answer is an ACL that is freed here.
+    let acl = unsafe { acl_get_link_np(name.as_ptr(), ACL_TYPE_EXTENDED) };
+    if acl.is_null() {
+        // (no ACL is ENOENT, and a file system without ACLs says so; any other answer is not known to be none)
+        let kind = Error::last_os_error().kind();
+        return kind != ErrorKind::NotFound && kind != ErrorKind::Unsupported;
+    }
+    // SAFETY: `acl` came from `acl_get_link_np` and is freed once.
+    unsafe { acl_free(acl) };
+    true
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+fn lists_extended_attributes(path: &Path) -> bool {
     #[cfg(target_os = "macos")]
     use std::ffi::c_int;
     use std::ffi::{c_char, CString};
@@ -462,6 +496,30 @@ mod tests {
         assert_eq!(std::fs::read(&top).unwrap(), b"new\n");
         assert_eq!(std::fs::metadata(&top).unwrap().ino(), inode, "the file was written in place");
         assert!(has_extended_attributes(&top), "its attributes are still there");
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn a_file_with_an_acl_is_written_in_place_and_keeps_it() {
+        use std::os::unix::fs::MetadataExt;
+        let dir = Dir::new("acl");
+        let top = dir.file("top.sp");
+        std::fs::write(&top, "old\n").unwrap();
+        // (a file with no ACL is replaced whole)
+        assert!(!has_extended_attributes(&top), "a new file has no ACL");
+        let acl_of = |path: &Path| {
+            let listing = std::process::Command::new("ls").arg("-le").arg(path).output().unwrap();
+            String::from_utf8_lossy(&listing.stdout).contains("allow read")
+        };
+        let set = std::process::Command::new("chmod").args(["+a", "everyone allow read"]).arg(&top).status().unwrap();
+        assert!(set.success());
+        // (`listxattr` does not list it: the ACL is asked for by its own call)
+        assert!(has_extended_attributes(&top));
+        let inode = std::fs::metadata(&top).unwrap().ino();
+        write(&top, b"new\n").unwrap();
+        assert_eq!(std::fs::read(&top).unwrap(), b"new\n");
+        assert_eq!(std::fs::metadata(&top).unwrap().ino(), inode, "the file was written in place");
+        assert!(acl_of(&top), "its ACL is still there");
     }
 
     #[cfg(windows)]
