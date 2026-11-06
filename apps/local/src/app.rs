@@ -166,9 +166,9 @@ fn route(app: &App, request: &Request, stream: &TcpStream) -> Result<Response, F
             200,
             &json!({
                 "version": app.version,
-                "initial": app.initial.iter().map(|p| p.to_string_lossy()).collect::<Vec<_>>(),
-                "home": files::home().map(|h| h.to_string_lossy().into_owned()),
-                "allowed": app.roots.list().iter().map(|p| p.to_string_lossy().into_owned()).collect::<Vec<_>>(),
+                "initial": app.initial.iter().map(|p| files::page_path(p)).collect::<Vec<_>>(),
+                "home": files::home().map(|h| files::page_path(&h)),
+                "allowed": app.roots.list().iter().map(|p| files::page_path(p)).collect::<Vec<_>>(),
                 "settings": app.settings.path().to_string_lossy(),
             }),
         )),
@@ -184,11 +184,11 @@ fn route(app: &App, request: &Request, stream: &TcpStream) -> Result<Response, F
             Ok(Response::json(200, &json!({})))
         }
         "/api/ls" if get => {
-            let dir = request.param("dir").filter(|d| !d.is_empty()).map(PathBuf::from).or_else(files::home).ok_or_else(|| bad("which folder?"))?;
+            let dir = request.param("dir").filter(|d| !d.is_empty()).map(|d| files::machine_path(&d)).or_else(files::home).ok_or_else(|| bad("which folder?"))?;
             let (real, entries) = files::list_dir(&dir, request.param("hidden").as_deref() == Some("1")).map_err(bad)?;
             Ok(Response::json(
                 200,
-                &json!({ "dir": real.to_string_lossy(), "parent": real.parent().map(|p| p.to_string_lossy().into_owned()), "entries": entries }),
+                &json!({ "dir": files::page_path(&real), "parent": real.parent().map(files::page_path), "entries": entries }),
             ))
         }
         "/api/open" if method == "POST" => {
@@ -197,7 +197,7 @@ fn route(app: &App, request: &Request, stream: &TcpStream) -> Result<Response, F
                 path: String,
             }
             let open: Open = json_body(request)?;
-            let path = PathBuf::from(&open.path);
+            let path = files::machine_path(&open.path);
             if !path.is_absolute() {
                 return Err(bad("the path is not absolute"));
             }
@@ -207,7 +207,7 @@ fn route(app: &App, request: &Request, stream: &TcpStream) -> Result<Response, F
             app.roots.allow_file(&path).map_err(bad)?;
             let real = app.roots.check(&path, true).map_err(forbidden)?;
             app.watcher.watch(&real);
-            Ok(Response::json(200, &json!({ "path": real.to_string_lossy() })))
+            Ok(Response::json(200, &json!({ "path": files::page_path(&real) })))
         }
         "/api/allow" if method == "POST" => {
             #[derive(Deserialize)]
@@ -215,7 +215,7 @@ fn route(app: &App, request: &Request, stream: &TcpStream) -> Result<Response, F
                 dir: String,
             }
             let allow: Allow = json_body(request)?;
-            let dir = PathBuf::from(&allow.dir);
+            let dir = files::machine_path(&allow.dir);
             if !dir.is_absolute() {
                 return Err(bad("the path is not absolute"));
             }
@@ -253,10 +253,10 @@ fn route(app: &App, request: &Request, stream: &TcpStream) -> Result<Response, F
                 encoding: Option<String>,
             }
             let save: SaveAs = json_body(request)?;
-            let source = save.source.as_deref().map(Path::new);
-            let to = files::save_as(&app.roots, source, Path::new(&save.to), &save.text, encoding(&save.encoding)?).map_err(|e| Failure(500, e))?;
+            let source = save.source.as_deref().map(files::machine_path);
+            let to = files::save_as(&app.roots, source.as_deref(), &files::machine_path(&save.to), &save.text, encoding(&save.encoding)?).map_err(|e| Failure(500, e))?;
             app.watcher.watch(&to);
-            Ok(Response::json(200, &json!({ "path": to.to_string_lossy() })))
+            Ok(Response::json(200, &json!({ "path": files::page_path(&to) })))
         }
         "/api/changes" if get => {
             if let Ok(mut heartbeat) = app.heartbeat.lock() {
@@ -274,15 +274,13 @@ fn route(app: &App, request: &Request, stream: &TcpStream) -> Result<Response, F
 
 /// A file below the folders allowed, by its absolute path.
 fn file(app: &App, path: &str) -> Result<Response, Failure> {
-    // (a Windows path, `/C:\dirile`, which only a development build on Windows is asked for)
-    let path = if cfg!(windows) && path.as_bytes().get(2) == Some(&b':') { &path[1..] } else { path };
-    let real = app.roots.check(Path::new(path), true).map_err(forbidden)?;
+    let real = app.roots.check(&files::machine_path(path), true).map_err(forbidden)?;
     if !real.is_file() {
         return Err(Failure(404, format!("{} is not a file", real.display())));
     }
     let bytes = std::fs::read(&real).map_err(|e| Failure(404, format!("{}: {e}", real.display())))?;
     app.watcher.watch(&real);
-    Ok(Response::new(200, "application/octet-stream", bytes).header("X-RNL-Path", &encode_path(&real.to_string_lossy())))
+    Ok(Response::new(200, "application/octet-stream", bytes).header("X-RNL-Path", &encode_path(&files::page_path(&real))))
 }
 
 #[cfg(test)]
@@ -342,8 +340,7 @@ mod tests {
 
     /// The address of a file: `/f`, and its absolute path (a development build on Windows has the drive first).
     fn furl(path: &Path) -> String {
-        let text = path.to_string_lossy();
-        format!("/f{}{}", if text.starts_with('/') { "" } else { "/" }, encode_path(&text))
+        format!("/f{}", encode_path(&files::page_path(path)))
     }
 
     fn get(path: &str, cookie: Option<&str>) -> String {
@@ -399,7 +396,7 @@ mod tests {
         assert_eq!(ask(&app, &get(&furl(&outside), Some(&cookie)), b"").0, 403);
         assert_eq!(ask(&app, &get(&furl(&dir.join("../x")), Some(&cookie)), b"").0, 403);
         // a post without the header of the page is refused, though the cookie is right
-        let body = json!({ "path": outside.to_string_lossy() }).to_string();
+        let body = json!({ "path": files::page_path(&outside) }).to_string();
         let raw = format!(
             "POST /api/open HTTP/1.1\nHost: 127.0.0.1:1\nCookie: {}={cookie}\nContent-Type: application/json\nContent-Length: {}\n",
             security::COOKIE,
@@ -415,13 +412,13 @@ mod tests {
         let other = dir.join("lib");
         std::fs::create_dir_all(&other).unwrap();
         std::fs::write(other.join("m.inc"), "* m\n").unwrap();
-        let (head, body) = post("/api/open", &cookie, &json!({ "path": other.join("m.inc").to_string_lossy() }));
+        let (head, body) = post("/api/open", &cookie, &json!({ "path": files::page_path(&other.join("m.inc")) }));
         let (status, _, answer) = ask(&app, &head, &body);
         assert_eq!(status, 200, "{}", String::from_utf8_lossy(&answer));
         // a save with a file that is not what was read asks; with overwrite it writes
         let top = dir.join("top.sp");
         let save = |overwrite: bool| {
-            json!({ "entry": top.to_string_lossy(), "overwrite": overwrite,
+            json!({ "entry": files::page_path(&top), "overwrite": overwrite,
                 "files": [{ "path": "top.sp", "name": "top.sp", "text": "R1 a b 2k\n.end\n", "read": "R1 a b 9k\n.end\n" }] })
         };
         let (head, body) = post("/api/save", &cookie, &save(false));

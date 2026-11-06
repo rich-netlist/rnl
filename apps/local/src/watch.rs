@@ -53,7 +53,7 @@ impl Watcher {
                 inner.stamps.insert(path.clone(), stamp);
                 inner.version += 1;
                 let version = inner.version;
-                inner.log.push((version, path.to_string_lossy().into_owned()));
+                inner.log.push((version, crate::files::page_path(&path)));
                 if inner.log.len() > LOG {
                     inner.log.remove(0);
                 }
@@ -93,7 +93,7 @@ mod tests {
         watcher.poll();
         let (version, changed) = watcher.since(0);
         assert_eq!(version, 1);
-        assert_eq!(changed, vec![file.to_string_lossy().into_owned()]);
+        assert_eq!(changed, vec![crate::files::page_path(&file)]);
         assert!(watcher.since(1).1.is_empty(), "asked again after that version: nothing");
         // the program's own write
         std::fs::write(&file, "the program's text").unwrap();

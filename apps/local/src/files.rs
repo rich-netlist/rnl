@@ -22,6 +22,25 @@ pub struct Roots {
     dirs: Mutex<Vec<PathBuf>>,
 }
 
+/// A path as the page names it: rooted, `/`-separated; on Windows, which only a development build runs on, `C:` is `/C:/a/b`.
+pub fn page_path(path: &Path) -> String {
+    let text = path.to_string_lossy();
+    if cfg!(windows) {
+        format!("/{}", text.replace('\\', "/"))
+    } else {
+        text.into_owned()
+    }
+}
+
+/// The path on this machine of a path as the page names it: the inverse of [`page_path`].
+pub fn machine_path(text: &str) -> PathBuf {
+    if cfg!(windows) && text.as_bytes().get(2) == Some(&b':') {
+        PathBuf::from(text[1..].replace('/', "\\"))
+    } else {
+        PathBuf::from(text)
+    }
+}
+
 /// The user's home folder, as the environment names it.
 pub fn home() -> Option<PathBuf> {
     std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")).map(PathBuf::from).filter(|p| p.is_absolute())
@@ -165,9 +184,9 @@ pub struct Saved {
 /// The file at `path`, as the Document names it, of the netlist `entry`: where it is on disk; a path that is rooted is its own.
 pub fn located(entry: &str, path: &str) -> PathBuf {
     if path.starts_with('/') || Path::new(path).is_absolute() {
-        return PathBuf::from(path);
+        return machine_path(path);
     }
-    Path::new(entry).parent().unwrap_or(Path::new("/")).join(path)
+    machine_path(entry).parent().map_or_else(|| PathBuf::from("/"), Path::to_path_buf).join(path)
 }
 
 /// A text with its line ends as `\n`, as the page keeps it.
