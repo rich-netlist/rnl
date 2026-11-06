@@ -129,7 +129,7 @@ fn run(options: Options) -> Result<(), String> {
             return Err(format!("{} is not a file", file.display()));
         }
         roots.allow_file(&absolute)?;
-        initial.push(std::fs::canonicalize(&absolute).unwrap_or(absolute));
+        initial.push(files::canonical(&absolute).unwrap_or(absolute));
     }
 
     let listener = TcpListener::bind(SocketAddr::from((Ipv4Addr::LOCALHOST, options.port))).map_err(|e| format!("cannot listen on 127.0.0.1:{}: {e}", options.port))?;

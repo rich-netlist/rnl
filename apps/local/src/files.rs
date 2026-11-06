@@ -47,7 +47,7 @@ pub fn home() -> Option<PathBuf> {
 }
 
 /// The folder of a path that is a file, as it is on disk now.
-fn canonical(path: &Path) -> Option<PathBuf> {
+pub fn canonical(path: &Path) -> Option<PathBuf> {
     std::fs::canonicalize(path).ok().map(simple)
 }
 
