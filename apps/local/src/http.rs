@@ -105,8 +105,8 @@ fn reason(status: u16) -> &'static str {
     }
 }
 
-/// Write a response and flush it. Every response closes the connection and says it is never cached or sniffed.
-pub fn write_response(stream: &mut TcpStream, response: &Response, head_only: bool) -> io::Result<()> {
+/// The head of a response. Every response closes the connection and says it is never cached or sniffed.
+fn head_of(response: &Response) -> String {
     let mut head = format!("HTTP/1.1 {} {}\r\n", response.status, reason(response.status));
     for (name, value) in &response.headers {
         // (a header never holds a line end: the values are the program's own, but a path may reach one)
@@ -119,9 +119,37 @@ pub fn write_response(stream: &mut TcpStream, response: &Response, head_only: bo
     head.push_str("Connection: close\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nReferrer-Policy: no-referrer\r\n");
     // (no page of another site may frame the program's: it would draw over what the user sees)
     head.push_str("Content-Security-Policy: frame-ancestors 'none'\r\nX-Frame-Options: DENY\r\n\r\n");
-    stream.write_all(head.as_bytes())?;
+    head
+}
+
+/// Write a response and flush it. Each write may take as long as the stream's write timeout.
+pub fn write_response(stream: &mut TcpStream, response: &Response, head_only: bool) -> io::Result<()> {
+    stream.write_all(head_of(response).as_bytes())?;
     if !head_only {
         stream.write_all(&response.body)?;
+    }
+    stream.flush()
+}
+
+/// Write a response and flush it, all of it in `total` at most: for a client that is not of the session, whose answer is
+/// not worth a place for as long as a client likes to take. A reader that takes a byte now and then holds a place for as
+/// long as the write timeout of each write, which a response of megabytes is made of many; this is for all of them.
+pub fn write_response_within(stream: &mut TcpStream, response: &Response, head_only: bool, total: Duration) -> io::Result<()> {
+    let deadline = Instant::now() + total;
+    let mut send = |bytes: &[u8]| -> io::Result<()> {
+        for piece in bytes.chunks(16 * 1024) {
+            let left = deadline.saturating_duration_since(Instant::now());
+            if left.is_zero() {
+                return Err(io::Error::new(io::ErrorKind::TimedOut, "the response was taken too slowly"));
+            }
+            stream.set_write_timeout(Some(left))?;
+            stream.write_all(piece)?;
+        }
+        Ok(())
+    };
+    send(head_of(response).as_bytes())?;
+    if !head_only {
+        send(&response.body)?;
     }
     stream.flush()
 }
@@ -130,10 +158,18 @@ pub fn write_response(stream: &mut TcpStream, response: &Response, head_only: bo
 /// one of the program's few places for them) for as long as it can, is not served.
 pub const HEAD_TIME: Duration = Duration::from_secs(10);
 
-/// How long a body may take: a fixed time, and a second for each 4 MiB it says it has (an `ssh -L` is slower than the loopback).
-pub fn body_time(length: usize) -> Duration {
-    Duration::from_secs(30 + (length / (4 * 1024 * 1024)) as u64)
+/// How fast a body must come, which is not how soon it must be done: a save or a solve of hundreds of megabytes over an `ssh -L`
+/// is slow and no fault. A read that has nothing for `idle` ends it, and in each `window` at least `min_rate` bytes a second
+/// must have come on average; a client that sends a byte now and then, to keep a place, has neither.
+#[derive(Clone, Copy, Debug)]
+pub struct Pace {
+    pub idle: Duration,
+    pub window: Duration,
+    pub min_rate: u64,
 }
+
+/// What the program asks of the body of a request that is of the session.
+pub const BODY_PACE: Pace = Pace { idle: Duration::from_secs(30), window: Duration::from_secs(30), min_rate: 64 * 1024 };
 
 /// A request's head, read: the request without its body, the length of the body it says it has, and the first bytes of that
 /// body, which came with the head.
@@ -236,33 +272,35 @@ pub fn read_head_within(stream: &mut TcpStream, time: Duration) -> Result<Head, 
     Ok(Head { request: Request { method: method.to_string(), path, query: query.to_string(), headers, body: Vec::new() }, length, early })
 }
 
-/// Read the body the head says it has, in `body_time` at most, and give the request whole.
+/// Read the body the head says it has, at the pace `BODY_PACE` asks, and give the request whole.
 pub fn read_body(stream: &mut TcpStream, head: Head) -> Result<Request, Rejected> {
+    read_body_paced(stream, head, BODY_PACE)
+}
+
+/// Read the body the head says it has, at the pace given.
+pub fn read_body_paced(stream: &mut TcpStream, head: Head, pace: Pace) -> Result<Request, Rejected> {
     let Head { mut request, length, early } = head;
-    let deadline = Instant::now() + body_time(length);
     let mut body = early;
     body.reserve(length - body.len());
     let mut chunk = [0u8; 16 * 1024];
+    let (mut window_start, mut window_from) = (Instant::now(), body.len());
     while body.len() < length {
         let want = (length - body.len()).min(chunk.len());
-        let n = read_some(stream, &mut chunk[..want], deadline, "the body was not read")?;
+        let n = read_some(stream, &mut chunk[..want], Instant::now() + pace.idle, "the body was not read")?;
         if n == 0 {
             return Err(Rejected(400, "the body ended too soon"));
         }
         body.extend_from_slice(&chunk[..n]);
+        let seconds = window_start.elapsed();
+        if seconds >= pace.window {
+            if ((body.len() - window_from) as f64) < pace.min_rate as f64 * seconds.as_secs_f64() {
+                return Err(Rejected(408, "the body came too slowly"));
+            }
+            (window_start, window_from) = (Instant::now(), body.len());
+        }
     }
     request.body = body;
     Ok(request)
-}
-
-/// Read one request from the stream, whose body may be `max_body` bytes at most.
-#[cfg(test)]
-pub fn read_request(stream: &mut TcpStream, max_body: usize) -> Result<Request, Rejected> {
-    let head = read_head(stream)?;
-    if head.length > max_body {
-        return Err(Rejected(413, "the body is too large"));
-    }
-    read_body(stream, head)
 }
 
 fn find(haystack: &[u8], needle: &[u8]) -> Option<usize> {
@@ -359,6 +397,66 @@ mod tests {
         assert!(started.elapsed() < Duration::from_secs(2), "{:?}", started.elapsed());
         drop(server);
         slow.join().unwrap();
+    }
+
+    #[test]
+    fn a_body_that_comes_slowly_is_taken_while_it_comes_and_not_while_it_stops_or_trickles() {
+        let pace = Pace { idle: Duration::from_millis(300), window: Duration::from_millis(200), min_rate: 20_000 };
+        let head = |client: &mut TcpStream, server: &mut TcpStream, length: usize| {
+            client.write_all(format!("POST /x HTTP/1.1\r\nHost: h\r\nContent-Length: {length}\r\n\r\n").as_bytes()).unwrap();
+            read_head(server).unwrap()
+        };
+        // a body of 100 KB that takes a second (100 KB/s: slow, and far above the least): taken, though it takes longer than a fixed time would give
+        let (mut client, mut server) = pair();
+        let h = head(&mut client, &mut server, 100_000);
+        let sender = std::thread::spawn(move || {
+            for _ in 0..10 {
+                client.write_all(&[7u8; 10_000]).unwrap();
+                std::thread::sleep(Duration::from_millis(100));
+            }
+        });
+        assert_eq!(read_body_paced(&mut server, h, pace).unwrap().body.len(), 100_000);
+        sender.join().unwrap();
+        // a byte every 50 ms (20 B/s): it is not a body that is coming
+        let (mut client, mut server) = pair();
+        let h = head(&mut client, &mut server, 100_000);
+        let sender = std::thread::spawn(move || {
+            for _ in 0..100 {
+                if client.write_all(&[7u8]).is_err() {
+                    return;
+                }
+                std::thread::sleep(Duration::from_millis(50));
+            }
+        });
+        let started = Instant::now();
+        assert!(matches!(read_body_paced(&mut server, h, pace), Err(Rejected(408, _))));
+        assert!(started.elapsed() < Duration::from_secs(2));
+        drop(server);
+        sender.join().unwrap();
+        // nothing at all for longer than the idle time
+        let (mut client, mut server) = pair();
+        let h = head(&mut client, &mut server, 10);
+        assert!(matches!(read_body_paced(&mut server, h, pace), Err(Rejected(408, _))));
+        drop(client);
+    }
+
+    #[test]
+    fn a_response_that_is_not_read_is_given_up_whole_in_the_time_it_has() {
+        let (client, mut server) = pair();
+        let big = Response::new(200, "application/octet-stream", vec![0u8; 64 * 1024 * 1024]);
+        let started = Instant::now();
+        // (the client never reads: the buffers of the two ends fill, and what is left waits for a reader that is not there)
+        assert!(write_response_within(&mut server, &big, false, Duration::from_millis(500)).is_err());
+        assert!(started.elapsed() < Duration::from_secs(5), "{:?}", started.elapsed());
+        drop(client);
+        // one that is read is written whole
+        let (mut client, mut server) = pair();
+        let small = Response::text(200, "hello");
+        write_response_within(&mut server, &small, false, Duration::from_secs(5)).unwrap();
+        drop(server);
+        let mut text = String::new();
+        client.read_to_string(&mut text).unwrap();
+        assert!(text.starts_with("HTTP/1.1 200 OK") && text.ends_with("hello"), "{text}");
     }
 
     #[test]

@@ -47,7 +47,9 @@ export async function chooseOnServer(api, { kind = "file", start = "", title, na
       else if (kind === "file") items.push({ label: entry.name, value: { file: joinPath(dir, entry.name) } });
     }
     if (kind === "file" && browser) items.push({ label: m("From the computer of the browser…"), value: { browser: true } });
-    const picked = await choose({ title: title ?? m("Open Netlist"), text: m`Folder: ${dir}`, items: items.map((i) => ({ ...i, label: String(i.label) })), filter: true, action });
+    // (the program lists at most so many entries of a folder: said, so that a name that is not there is not taken for gone)
+    const text = listing.truncated ? `${m`Folder: ${dir}`} ${m`Only the first ${listing.entries.length} entries are listed.`}` : m`Folder: ${dir}`;
+    const picked = await choose({ title: title ?? m("Open Netlist"), text, items: items.map((i) => ({ ...i, label: String(i.label) })), filter: true, action });
     if (picked === null) return null;
     if (picked.go !== undefined) {
       dir = picked.go;

@@ -17,6 +17,7 @@ import { offer } from "../dialog.js";
 import { note } from "../editor.js";
 import { sourcePath } from "../source-path.js";
 import { doc } from "../state.js";
+import { dirtyPaths, unappliedPaths } from "../edits.js";
 
 /** The program's own API, as the page of the program may call it: with the header it asks of every request that does anything (the key of the session goes with every request: local-key.js). */
 async function api(path, { method = "GET", body } = {}) {
@@ -110,7 +111,8 @@ async function folderFiles(dir, found = [], depth = 0) {
 let version = 0;
 async function watchChanges() {
   try {
-    const { version: now, changed } = await api(`api/changes?since=${version}`);
+    const unsaved = new Set([...dirtyPaths(), ...unappliedPaths()]).size; // (the program does not stop while the page has changes in it that are saved nowhere)
+    const { version: now, changed } = await api(`api/changes?since=${version}&unsaved=${unsaved}`);
     version = now;
     if (doc && changed.length) {
       const shown = new Set(doc.files.map((f) => sourcePath(doc, f)));

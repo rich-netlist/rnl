@@ -725,5 +725,6 @@
   "Choose Folder": "选择文件夹",
   "Choose": "选择",
   "{0} changed on disk. F5 reloads the netlist.": "{0} 在磁盘上已更改。按 F5 重新加载网表。",
-  "{0} exists already. Replace it?": "{0} 已存在。是否替换？"
+  "{0} exists already. Replace it?": "{0} 已存在。是否替换？",
+  "Only the first {0} entries are listed.": "仅列出前 {0} 项。"
 }

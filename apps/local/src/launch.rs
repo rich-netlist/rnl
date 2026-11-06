@@ -197,18 +197,41 @@ pub fn cache_dir() -> PathBuf {
         .unwrap_or_else(|| std::env::temp_dir().join(format!("rnl-viewer-local-{}", euid().map_or_else(|| "user".to_string(), |u| u.to_string()))))
 }
 
-/// The user this process runs as (its effective user id), where the system says: on Linux, in `/proc`.
+/// The user this process runs as (its effective user id): on Linux, what `/proc` says; else, and if `/proc` cannot be read, the
+/// owner of a file this process has just made, which is the user the system makes files for.
 fn euid() -> Option<u32> {
-    let status = std::fs::read_to_string("/proc/self/status").ok()?;
-    status.lines().find_map(|l| l.strip_prefix("Uid:"))?.split_whitespace().nth(1)?.parse().ok()
+    static EUID: std::sync::OnceLock<Option<u32>> = std::sync::OnceLock::new();
+    *EUID.get_or_init(|| {
+        let from_proc = std::fs::read_to_string("/proc/self/status")
+            .ok()
+            .and_then(|status| status.lines().find_map(|l| l.strip_prefix("Uid:")).and_then(|v| v.split_whitespace().nth(1)?.parse().ok()));
+        from_proc.or_else(owner_of_a_new_file)
+    })
 }
 
-/// Whether a folder (not a link to one) belongs to this user, where that can be told.
+#[cfg(unix)]
+fn owner_of_a_new_file() -> Option<u32> {
+    use std::os::unix::fs::MetadataExt;
+    let path = std::env::temp_dir().join(format!("rnl-viewer-uid-{}-{}", std::process::id(), &crate::security::random_hex()[..16]));
+    let file = std::fs::OpenOptions::new().write(true).create_new(true).open(&path).ok()?;
+    let uid = file.metadata().ok().map(|m| m.uid());
+    drop(file);
+    let _ = std::fs::remove_file(&path);
+    uid
+}
+
+#[cfg(not(unix))]
+fn owner_of_a_new_file() -> Option<u32> {
+    None
+}
+
+/// Whether a folder (not a link to one) belongs to this user. Where the user cannot be told, nothing is: the program keeps its
+/// files in a folder it knows to be its user's, or not at all.
 fn mine(meta: &std::fs::Metadata) -> bool {
     #[cfg(unix)]
     {
         use std::os::unix::fs::MetadataExt;
-        euid().is_none_or(|u| meta.uid() == u)
+        euid().is_some_and(|u| meta.uid() == u)
     }
     #[cfg(not(unix))]
     {
@@ -225,7 +248,8 @@ pub fn private_dir(dir: &Path) -> Result<(), String> {
     {
         use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
         std::fs::DirBuilder::new().recursive(true).mode(0o700).create(dir).map_err(say)?;
-        let meta = std::fs::metadata(dir).map_err(say)?;
+        // (not `metadata`, which follows a link: a link in the place of the folder is somebody's choice, not the user's)
+        let meta = std::fs::symlink_metadata(dir).map_err(say)?;
         if !meta.is_dir() || !mine(&meta) {
             return Err(format!("{} is not a folder of yours: the program keeps nothing in it", dir.display()));
         }
@@ -269,25 +293,46 @@ fn fresh_dir(parent: &Path, prefix: &str) -> Result<PathBuf, String> {
     Err(format!("no new folder could be made in {}", parent.display()))
 }
 
-/// The folder of a browser profile for this run, below the cache folder, which is made the user's own. The folders of runs
-/// that ended without removing theirs (Ctrl-C) are removed first: those of a process that is no longer there.
+/// This computer's name, for the names of folders: letters, digits and dots, whatever else made an underscore (never a
+/// hyphen, which separates the parts of the name).
+fn host_name() -> String {
+    let name = ["/proc/sys/kernel/hostname", "/etc/hostname"]
+        .iter()
+        .find_map(|f| std::fs::read_to_string(f).ok())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .or_else(|| std::env::var("HOSTNAME").ok().filter(|s| !s.is_empty()))
+        .unwrap_or_else(|| "host".to_string());
+    name.chars().map(|c| if c.is_ascii_alphanumeric() || c == '.' { c } else { '_' }).collect()
+}
+
+/// The folder of a browser profile for this run, below the cache folder, which is made the user's own. Its name has this
+/// computer's name and the process: the cache folder may be one home folder shared by several computers (a network file
+/// system), where a process that is not here is not gone, only elsewhere. The folders of runs on this computer that ended
+/// without removing theirs (Ctrl-C) are removed first.
 pub fn profile_dir() -> Result<PathBuf, String> {
     let parent = cache_dir().join("profiles");
     private_dir(&parent)?;
-    remove_stale(&parent);
-    fresh_dir(&parent, "run")
+    remove_stale(&parent, &host_name());
+    fresh_dir(&parent, &format!("run-{}", host_name()))
 }
 
-/// Remove the `run-PID-…` folders of `parent` whose process is gone. Where the system does not say which processes there
-/// are (no `/proc`), none is removed.
-fn remove_stale(parent: &Path) {
+/// Remove the `run-HOST-PID-…` folders of `parent` made on this `host` whose process is gone. Those of another computer are
+/// never touched, nor are any where the system does not say which processes there are (no `/proc`).
+fn remove_stale(parent: &Path, host: &str) {
     if !Path::new("/proc/self").exists() {
         return;
     }
     let Ok(entries) = std::fs::read_dir(parent) else { return };
     for entry in entries.flatten() {
         let name = entry.file_name().to_string_lossy().into_owned();
-        let Some(pid) = name.strip_prefix("run-").and_then(|r| r.split('-').next()).and_then(|p| p.parse::<u32>().ok()) else { continue };
+        let Some(rest) = name.strip_prefix("run-") else { continue };
+        let mut parts = rest.rsplitn(3, '-');
+        let (Some(_random), Some(pid), Some(from)) = (parts.next(), parts.next(), parts.next()) else { continue };
+        let Ok(pid) = pid.parse::<u32>() else { continue };
+        if from != host {
+            continue;
+        }
         let Ok(meta) = std::fs::symlink_metadata(entry.path()) else { continue };
         if meta.is_dir() && mine(&meta) && !Path::new(&format!("/proc/{pid}")).exists() {
             let _ = std::fs::remove_dir_all(entry.path());
@@ -465,20 +510,24 @@ mod tests {
     #[test]
     fn the_profiles_of_runs_that_ended_are_removed_and_those_of_a_live_one_are_not() {
         let parent = scratch("stale");
-        let live = parent.join(format!("run-{}-aaaa", std::process::id()));
+        let host = host_name();
+        let live = parent.join(format!("run-{host}-{}-aaaa", std::process::id()));
         // (a process number no system has: above the largest it gives)
-        let gone = parent.join("run-4294967290-bbbb");
+        let gone = parent.join(format!("run-{host}-4294967290-bbbb"));
+        // the same number on another computer that shares the folder: a process that is there, not here
+        let elsewhere = parent.join("run-another-computer-4294967290-cccc");
         let foreign = parent.join("keep-me");
-        for dir in [&live, &gone, &foreign] {
+        for dir in [&live, &gone, &elsewhere, &foreign] {
             std::fs::create_dir_all(dir.join("inside")).unwrap();
         }
-        remove_stale(&parent);
+        remove_stale(&parent, &host);
+        assert!(live.exists() && foreign.exists() && elsewhere.exists(), "only this computer's own are removed");
         if Path::new("/proc/self").exists() {
-            assert!(live.exists() && foreign.exists());
             assert!(!gone.exists());
         } else {
             assert!(gone.exists(), "where the processes are not known, nothing is removed");
         }
+        assert!(!host.contains('-') && !host.is_empty());
     }
 
     #[test]

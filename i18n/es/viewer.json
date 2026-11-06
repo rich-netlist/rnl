@@ -725,5 +725,6 @@
   "Choose Folder": "Elegir carpeta",
   "Choose": "Elegir",
   "{0} changed on disk. F5 reloads the netlist.": "{0} cambió en el disco. F5 recarga el netlist.",
-  "{0} exists already. Replace it?": "{0} ya existe. ¿Reemplazarlo?"
+  "{0} exists already. Replace it?": "{0} ya existe. ¿Reemplazarlo?",
+  "Only the first {0} entries are listed.": "Solo se muestran las primeras {0} entradas."
 }

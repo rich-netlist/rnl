@@ -184,17 +184,27 @@ pub struct Entry {
     pub modified: u64,
 }
 
+/// The most entries of a folder that are listed: each is looked at (its size and time), on the thread of the request, and
+/// the folder may be on a network file system that takes a moment for each.
+pub const MAX_ENTRIES: usize = 10_000;
+
 /// What a folder holds, folders first, each in the order of its names: for the chooser, which browses the whole machine to
-/// find what to open (the names, not the contents: those are the allowed folders'). Hidden names are left out. A folder
-/// that cannot be listed is an error that says why.
-pub fn list_dir(dir: &Path) -> Result<(PathBuf, Vec<Entry>), String> {
+/// find what to open (the names, sizes and times, not the contents: those are the allowed folders'). Hidden names are left
+/// out. At most `MAX_ENTRIES` are listed, the first the system gives, which the last of the answer says. A folder that
+/// cannot be listed is an error that says why.
+pub fn list_dir(dir: &Path) -> Result<(PathBuf, Vec<Entry>, bool), String> {
     let real = canonical(dir).filter(|d| d.is_dir()).ok_or_else(|| format!("{} is not a folder", dir.display()))?;
     let mut entries = Vec::new();
+    let mut truncated = false;
     for entry in std::fs::read_dir(&real).map_err(|e| format!("{}: {e}", real.display()))? {
         let Ok(entry) = entry else { continue };
         let name = entry.file_name().to_string_lossy().into_owned();
         if name.starts_with('.') {
             continue;
+        }
+        if entries.len() >= MAX_ENTRIES {
+            truncated = true;
+            break;
         }
         // (a link to a folder is a folder, as the chooser follows it)
         let Ok(meta) = std::fs::metadata(entry.path()) else { continue };
@@ -206,7 +216,7 @@ pub fn list_dir(dir: &Path) -> Result<(PathBuf, Vec<Entry>), String> {
         entries.push(Entry { name, dir: meta.is_dir(), size: meta.len(), modified });
     }
     entries.sort_by(|a, b| b.dir.cmp(&a.dir).then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase())));
-    Ok((real, entries))
+    Ok((real, entries, truncated))
 }
 
 /// The modification time of a file in milliseconds since 1970: what the program watches for a change; None when it is gone.
@@ -251,7 +261,8 @@ fn lf(text: &str) -> String {
 /// Whether the file at `at` still holds `read`, which the page read from it, line ends apart: a file that is gone, or
 /// that another program changed since, does not.
 fn unchanged(at: &Path, read: &str) -> bool {
-    std::fs::read(at).is_ok_and(|bytes| lf(&codec::decode(&bytes)) == lf(read))
+    // (a file too large for the page to have read is not what it read)
+    std::fs::metadata(at).is_ok_and(|m| m.len() <= MAX_FILE) && std::fs::read(at).is_ok_and(|bytes| lf(&codec::decode(&bytes)) == lf(read))
 }
 
 /// Write the files of the netlist `entry` where they were read from, each in its own encoding, and say which were
@@ -299,30 +310,111 @@ pub fn save_all(roots: &Roots, entry: &str, files: &[SavedFile], overwrite: bool
     Ok(Saved { said: Some(said), changed: Vec::new() })
 }
 
-/// Replace the contents of a file that is there, whole or not at all: the bytes are written to a file of its folder that is new
-/// (and has its mode), flushed to the disk, and renamed over it, so that a program that stops, a disk that fills or a reader
-/// at that moment sees the old file or the new, never half. A file the user cannot write is not replaced either.
+/// Replace the contents of a file that is there. Where it can be done without changing anything else of the file, whole or
+/// not at all: the bytes are written to a new file of its folder with the owner, group and mode the file has, flushed to
+/// the disk, and renamed over it, so that a program that stops, a disk that fills or a reader at that moment sees the old
+/// file or the new, never half. A rename makes another file, so where that would change what is the file's (it has other
+/// names, hard links; it is another user's or another group's, which the user cannot give to the new one; the folder is
+/// not the user's to write in, or has the sticky bit), the bytes are written in place instead, and read back to see that
+/// they are what was meant. A file the user may not write is not replaced either way.
+///
+/// What a rename does not keep and nothing here can: ACLs and extended attributes (the new file has those of its folder's
+/// defaults). A group's netlist is the case it is for: the group stays, the mode stays.
 fn write_replacing(at: &Path, bytes: &[u8]) -> Result<(), String> {
-    use std::io::Write;
     let say = |e: std::io::Error| format!("{}: {e}", at.display());
     // (a rename would replace a file the user may read only, as a write would not)
     std::fs::OpenOptions::new().write(true).open(at).map_err(say)?;
-    let mode = std::fs::metadata(at).map_err(say)?.permissions();
-    let dir = at.parent().ok_or_else(|| format!("{} has no folder", at.display()))?;
+    let meta = std::fs::metadata(at).map_err(say)?;
+    if replaced_by_rename(at, bytes, &meta).map_err(say)? {
+        return Ok(());
+    }
+    write_in_place(at, bytes).map_err(say)
+}
+
+/// Write the bytes over the file, and read them back.
+fn write_in_place(at: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+    let mut file = std::fs::OpenOptions::new().write(true).truncate(true).open(at)?;
+    file.write_all(bytes)?;
+    file.sync_all()?;
+    drop(file);
+    if std::fs::read(at)? != bytes {
+        return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "what was written is not what is read back"));
+    }
+    Ok(())
+}
+
+/// Replace the file by a new one with the same owner, group and mode: Ok(true) when it is, Ok(false) when that cannot be
+/// done without changing something of the file (nothing is left of the attempt), and an error when it fails for another
+/// reason, such as a disk that is full.
+#[cfg(unix)]
+fn replaced_by_rename(at: &Path, bytes: &[u8], old: &std::fs::Metadata) -> std::io::Result<bool> {
+    use std::io::{ErrorKind, Write};
+    use std::os::unix::fs::{fchown, MetadataExt};
+    let Some(dir) = at.parent() else { return Ok(false) };
+    // another name of the file would keep the old contents
+    if old.nlink() > 1 {
+        return Ok(false);
+    }
     let temp = dir.join(format!(".rnl-save-{}", &crate::security::random_hex()[..16]));
-    let written = (|| -> std::io::Result<()> {
+    let mut file = match std::fs::OpenOptions::new().write(true).create_new(true).open(&temp) {
+        Ok(file) => file,
+        // (a folder that is not the user's to write in, or whose sticky bit would not let the file be replaced)
+        Err(e) if e.kind() == ErrorKind::PermissionDenied || e.kind() == ErrorKind::ReadOnlyFilesystem => return Ok(false),
+        Err(e) => return Err(e),
+    };
+    let done = (|| -> std::io::Result<bool> {
+        let now = file.metadata()?;
+        // the owner and group of the file, which the new one has not unless the user is the owner and the folder's group is
+        // the file's: set them, and where the system does not let the user (another user's file, a group the user is not in),
+        // the file is not replaced
+        if (now.uid(), now.gid()) != (old.uid(), old.gid()) {
+            match fchown(&file, Some(old.uid()), Some(old.gid())) {
+                Ok(()) => {}
+                Err(e) if e.kind() == ErrorKind::PermissionDenied => return Ok(false),
+                Err(e) => return Err(e),
+            }
+        }
+        // (after the owner: changing it may clear the mode's set-user-id and set-group-id)
+        file.set_permissions(old.permissions())?;
+        file.write_all(bytes)?;
+        file.sync_all()?;
+        match std::fs::rename(&temp, at) {
+            Ok(()) => {}
+            // (a folder with the sticky bit does not let one user replace the file of another)
+            Err(e) if e.kind() == ErrorKind::PermissionDenied => return Ok(false),
+            Err(e) => return Err(e),
+        }
+        // (the rename is in the folder: flushed too, so that it is not undone by a crash)
+        if let Ok(folder) = std::fs::File::open(dir) {
+            let _ = folder.sync_all();
+        }
+        Ok(true)
+    })();
+    drop(file);
+    if !matches!(done, Ok(true)) {
+        let _ = std::fs::remove_file(&temp);
+    }
+    done
+}
+
+#[cfg(not(unix))]
+fn replaced_by_rename(at: &Path, bytes: &[u8], old: &std::fs::Metadata) -> std::io::Result<bool> {
+    use std::io::Write;
+    let Some(dir) = at.parent() else { return Ok(false) };
+    let temp = dir.join(format!(".rnl-save-{}", &crate::security::random_hex()[..16]));
+    let done = (|| -> std::io::Result<()> {
         let mut file = std::fs::OpenOptions::new().write(true).create_new(true).open(&temp)?;
-        file.set_permissions(mode)?;
+        file.set_permissions(old.permissions())?;
         file.write_all(bytes)?;
         file.sync_all()?;
         drop(file);
         std::fs::rename(&temp, at)
     })();
-    if let Err(e) = written {
+    if done.is_err() {
         let _ = std::fs::remove_file(&temp);
-        return Err(say(e));
     }
-    Ok(())
+    done.map(|()| true)
 }
 
 /// What Save As came to: the file written, or the file that is there already, which is not replaced unless the user said so.
@@ -431,9 +523,28 @@ mod tests {
         std::fs::create_dir_all(dir.join("b")).unwrap();
         std::fs::write(dir.join("a.sp"), "x").unwrap();
         std::fs::write(dir.join(".hidden"), "x").unwrap();
-        let (_, entries) = list_dir(&dir).unwrap();
+        let (_, entries, truncated) = list_dir(&dir).unwrap();
         assert_eq!(entries.iter().map(|e| (e.name.as_str(), e.dir)).collect::<Vec<_>>(), vec![("b", true), ("a.sp", false)]);
+        assert!(!truncated);
         assert!(list_dir(&dir.join("a.sp")).is_err());
+    }
+
+    #[test]
+    fn a_folder_of_very_many_files_is_listed_up_to_a_limit_and_says_so() {
+        let dir = temp("many");
+        for i in 0..MAX_ENTRIES + 5 {
+            std::fs::write(dir.join(format!("f{i}.sp")), "").unwrap();
+        }
+        let (_, entries, truncated) = list_dir(&dir).unwrap();
+        assert_eq!((entries.len(), truncated), (MAX_ENTRIES, true));
+        std::fs::remove_file(dir.join("f0.sp")).unwrap();
+        std::fs::remove_file(dir.join("f1.sp")).unwrap();
+        std::fs::remove_file(dir.join("f2.sp")).unwrap();
+        std::fs::remove_file(dir.join("f3.sp")).unwrap();
+        std::fs::remove_file(dir.join("f4.sp")).unwrap();
+        std::fs::remove_file(dir.join("f5.sp")).unwrap();
+        let (_, entries, truncated) = list_dir(&dir).unwrap();
+        assert_eq!((entries.len(), truncated), (MAX_ENTRIES - 1, false));
     }
 
     fn saved(path: &str, text: &str, read: Option<&str>) -> SavedFile {
@@ -578,6 +689,71 @@ mod tests {
         #[allow(clippy::permissions_set_readonly_false)]
         mode.set_readonly(false);
         std::fs::set_permissions(&top, mode).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_save_keeps_the_owner_group_and_other_names_of_the_file() {
+        use std::os::unix::fs::{MetadataExt, PermissionsExt};
+        let dir = temp("shared");
+        let top = dir.join("top.sp");
+        std::fs::write(&top, "old\n").unwrap();
+        std::fs::set_permissions(&top, std::fs::Permissions::from_mode(0o660)).unwrap();
+        let before = std::fs::metadata(&top).unwrap();
+        write_replacing(&top, b"new\n").unwrap();
+        let after = std::fs::metadata(&top).unwrap();
+        assert_eq!((after.uid(), after.gid(), after.mode() & 0o7777), (before.uid(), before.gid(), 0o660));
+        assert_eq!(std::fs::read(&top).unwrap(), b"new\n");
+        assert_ne!(after.ino(), before.ino(), "a file that has no other name is replaced whole");
+        // a group the user is in that is not the folder's: the new file is given it, as the old file had it
+        let groups = std::process::Command::new("id").arg("-G").output().map(|o| String::from_utf8_lossy(&o.stdout).into_owned()).unwrap_or_default();
+        if let Some(other) = groups.split_whitespace().filter_map(|g| g.parse::<u32>().ok()).find(|g| *g != after.gid()) {
+            std::os::unix::fs::chown(&top, None, Some(other)).unwrap();
+            write_replacing(&top, b"newer\n").unwrap();
+            assert_eq!(std::fs::metadata(&top).unwrap().gid(), other, "the group of the file stays");
+        }
+        // a file with another name is written in place, so that the other name has the text too
+        let linked = dir.join("linked.sp");
+        std::fs::hard_link(&top, &linked).unwrap();
+        let inode = std::fs::metadata(&top).unwrap().ino();
+        write_replacing(&top, b"both\n").unwrap();
+        assert_eq!(std::fs::read(&linked).unwrap(), b"both\n");
+        assert_eq!(std::fs::metadata(&top).unwrap().ino(), inode);
+        assert_eq!(std::fs::metadata(&top).unwrap().nlink(), 2);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_file_in_a_folder_the_user_cannot_write_in_is_written_in_place() {
+        use std::os::unix::fs::{MetadataExt, PermissionsExt};
+        let dir = temp("readonly-folder");
+        let top = dir.join("top.sp");
+        std::fs::write(&top, "old\n").unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o555)).unwrap();
+        let inode = std::fs::metadata(&top).unwrap().ino();
+        // (the super-user may write in any folder: there, the file is replaced, which is as well)
+        let may_write_in_it = std::fs::File::create(dir.join("probe")).is_ok();
+        let _ = std::fs::remove_file(dir.join("probe"));
+        let saved = write_replacing(&top, b"new text\n");
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o755)).unwrap();
+        saved.unwrap();
+        assert_eq!(std::fs::read(&top).unwrap(), b"new text\n");
+        if !may_write_in_it {
+            assert_eq!(std::fs::metadata(&top).unwrap().ino(), inode, "the file was written, not replaced");
+        }
+        let names: Vec<String> = std::fs::read_dir(&dir).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect();
+        assert_eq!(names, vec!["top.sp".to_string()]);
+    }
+
+    #[test]
+    fn a_file_too_large_for_the_page_to_have_read_is_not_what_it_read() {
+        let dir = temp("large");
+        let top = dir.join("top.sp");
+        std::fs::write(&top, "R1 a b 1k\n").unwrap();
+        assert!(unchanged(&top, "R1 a b 1k\n"));
+        let big = std::fs::File::create(dir.join("big.sp")).unwrap();
+        big.set_len(MAX_FILE + 1).unwrap();
+        assert!(!unchanged(&dir.join("big.sp"), ""));
     }
 
     #[test]

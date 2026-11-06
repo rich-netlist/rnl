@@ -184,6 +184,7 @@ fn run(options: Options) -> Result<(), String> {
         watcher: watch::Watcher::default(),
         initial,
         heartbeat: Mutex::new(None),
+        unsaved: AtomicUsize::new(0),
         version: format!("{VERSION} (core {} {})", rnl_cli::CORE_VERSION, rnl_cli::BUILD_COMMIT),
         address_file: Mutex::new(None),
         run_dirs: Mutex::new(Vec::new()),
@@ -256,20 +257,38 @@ fn run(options: Options) -> Result<(), String> {
         let started = std::time::Instant::now();
         std::thread::spawn(move || {
             let mut watching = true;
+            let mut warned = false;
             loop {
                 std::thread::sleep(Duration::from_secs(2));
                 if watching && child.try_wait().is_ok_and(|status| status.is_some()) {
                     if started.elapsed() > Duration::from_secs(5) {
-                        println!("The browser was closed: stopping.");
+                        match app.has_unsaved() {
+                            0 => println!("The browser was closed: stopping."),
+                            n => println!("The browser was closed with {n} file(s) whose changes were not saved: stopping. Those changes are gone."),
+                        }
                         app.clean_up();
                         std::process::exit(0);
                     }
                     watching = false;
                 }
                 if app.quiet_for().is_some_and(|s| s > GONE_AFTER) {
-                    println!("The page was closed: stopping.");
-                    app.clean_up();
-                    std::process::exit(0);
+                    // (a page that was said to have changes not saved is not taken for gone: they are in it and nowhere else, and a
+                    // tab that is hidden or a computer that was asleep answers late, not never: the program waits, and says so once)
+                    if app.has_unsaved() > 0 {
+                        if !warned {
+                            warned = true;
+                            println!(
+                                "The page has said nothing for {GONE_AFTER} seconds and had {} file(s) with changes not saved: the program keeps running, so that they can still be saved. Press Ctrl-C to stop it.",
+                                app.has_unsaved()
+                            );
+                        }
+                    } else {
+                        println!("The page was closed: stopping.");
+                        app.clean_up();
+                        std::process::exit(0);
+                    }
+                } else {
+                    warned = false;
                 }
                 // (the browser that was started ended at once, and no page came: it was not shown, and nobody is to wait on it)
                 if app.quiet_for().is_none() && started.elapsed() > Duration::from_secs(GONE_AFTER) {
@@ -302,6 +321,7 @@ fn serve(app: &App, gate: &Gate, mut stream: TcpStream) {
     let waiting = gate.enter(&stream);
     // (which count it is in: what the session's page asks is not kept waiting by what is not of it)
     let counted: Cell<Option<&AtomicUsize>> = Cell::new(None);
+    let of_session = Cell::new(false);
     let (response, head_only) = app::respond(app, &mut stream, |signed| {
         if let Some(id) = waiting {
             gate.leave(id);
@@ -312,12 +332,19 @@ fn serve(app: &App, gate: &Gate, mut stream: TcpStream) {
             return false;
         }
         counted.set(Some(count));
+        of_session.set(signed);
         true
     });
     if let Some(id) = waiting {
         gate.leave(id);
     }
-    let _ = http::write_response(&mut stream, &response, head_only);
+    if of_session.get() {
+        let _ = http::write_response(&mut stream, &response, head_only);
+    } else {
+        // (what is not of the session is given a time for the whole answer, by its size: 30 seconds, and 64 KiB each second)
+        let total = Duration::from_secs(30 + response.body.len() as u64 / (64 * 1024));
+        let _ = http::write_response_within(&mut stream, &response, head_only, total);
+    }
     if let Some(count) = counted.get() {
         count.fetch_sub(1, Ordering::SeqCst);
     }

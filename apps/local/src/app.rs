@@ -50,6 +50,8 @@ pub struct App {
     pub initial: Vec<PathBuf>,
     /// When the page last asked what changed: it asks every second, so a page that is closed is known by that.
     pub heartbeat: Mutex<Option<Instant>>,
+    /// How many files with changes not saved the page said it had, the last time it asked what changed.
+    pub unsaved: AtomicUsize,
     pub version: String,
     /// The file the browser was told to open, which holds the one-time address: removed once the address is used.
     pub address_file: Mutex<Option<PathBuf>>,
@@ -83,6 +85,11 @@ impl App {
         for dir in self.run_dirs.lock().map(|mut d| std::mem::take(&mut *d)).unwrap_or_default() {
             let _ = std::fs::remove_dir_all(dir);
         }
+    }
+
+    /// Whether the page, the last time it asked, had changes that are not saved: they are in the page, and nowhere else.
+    pub fn has_unsaved(&self) -> usize {
+        self.unsaved.load(Ordering::Relaxed)
     }
 
     /// The seconds since a page last asked what changed; None before the first time.
@@ -131,7 +138,9 @@ pub fn respond(app: &App, stream: &mut TcpStream, head_read: impl FnOnce(bool) -
     };
     let head_only = head.request.method == "HEAD";
     // (the caller counts the request now: it is of the session, or it is not, which has fewer places)
-    if !head_read(app.auth.signed_in(&head.request)) {
+    // (the way in, `/__start`, has the session's places too: it is the user's own address, a request of a few bytes, and what
+    // fills the others must not be able to close it)
+    if !head_read(app.auth.signed_in(&head.request) || head.request.path == "/__start") {
         return (Response::error(503, "the program is busy with other requests: try again"), head_only);
     }
     let limit = match admit(app, &head.request) {
@@ -287,10 +296,10 @@ fn route(app: &App, request: &Request, stream: &TcpStream) -> Result<Response, F
         }
         "/api/ls" if get => {
             let dir = request.param("dir").filter(|d| !d.is_empty()).map(|d| files::machine_path(&d)).or_else(files::home).ok_or_else(|| bad("which folder?"))?;
-            let (real, entries) = files::list_dir(&dir).map_err(bad)?;
+            let (real, entries, truncated) = files::list_dir(&dir).map_err(bad)?;
             Ok(Response::json(
                 200,
-                &json!({ "dir": files::page_path(&real), "parent": real.parent().map(files::page_path), "entries": entries }),
+                &json!({ "dir": files::page_path(&real), "parent": real.parent().map(files::page_path), "entries": entries, "truncated": truncated }),
             ))
         }
         "/api/open" if method == "POST" => {
@@ -369,6 +378,9 @@ fn route(app: &App, request: &Request, stream: &TcpStream) -> Result<Response, F
             if let Ok(mut heartbeat) = app.heartbeat.lock() {
                 *heartbeat = Some(Instant::now());
             }
+            if let Some(unsaved) = request.param("unsaved").and_then(|n| n.parse().ok()) {
+                app.unsaved.store(unsaved, Ordering::Relaxed);
+            }
             let since = request.param("since").and_then(|s| s.parse().ok()).unwrap_or(0);
             let (version, changed) = app.watcher.since(since);
             Ok(Response::json(200, &json!({ "version": version, "changed": changed })))
@@ -417,6 +429,7 @@ mod tests {
             watcher: Watcher::default(),
             initial: vec![top.clone()],
             heartbeat: Mutex::new(None),
+            unsaved: AtomicUsize::new(0),
             version: "test".into(),
             address_file: Mutex::new(None),
             run_dirs: Mutex::new(Vec::new()),
@@ -654,6 +667,13 @@ mod tests {
         assert_eq!(status, 200);
         let listing = String::from_utf8_lossy(&body).into_owned();
         assert!(listing.contains("shown.sp") && !listing.contains(".ssh") && !listing.contains(".hidden.sp"), "{listing}");
+        assert!(listing.contains("\"truncated\":false"), "a listing says whether it is the whole of the folder: {listing}");
+        // the page says each time it asks what changed how many files it has with changes not saved: the program does not stop while it has
+        assert_eq!(app.has_unsaved(), 0);
+        assert_eq!(ask(&app, &get("/api/changes?since=0&unsaved=3", Some(&key)), b"").0, 200);
+        assert_eq!(app.has_unsaved(), 3);
+        assert_eq!(ask(&app, &get("/api/changes?since=0&unsaved=0", Some(&key)), b"").0, 200);
+        assert_eq!(app.has_unsaved(), 0);
     }
 
     #[test]
