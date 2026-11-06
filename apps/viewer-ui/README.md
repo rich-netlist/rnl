@@ -15,6 +15,8 @@ The startup styles are inline and the full stylesheets load without blocking tha
 Layout initialization waits for the main stylesheet. On Windows, the main window paints native
 name/version text before WebView2 starts, then reveals the initialized page in that same window.
 
+**A browser too old for the page** is told so, not left on a start-up screen that never goes: the scripts use what the browsers had by 2021 to 2023 (top-level `await`, `Object.hasOwn`, `Array.prototype.at`, module Workers for the core), so an older one, such as a Firefox of 2020, stops at the first of them and shows nothing. `index.html` has a script in ES5, which every browser reads, that checks for them and covers the page with a notice that names what is missing and what to use: Firefox 115 ESR or newer, Chrome or Edge 89 or newer, Safari 15 or newer. It checks for module Workers by whether the browser reads the `type` option of a Worker, as a browser that has them does and one that has not does not. On the desktop (`window.__TAURI__`) the Worker check is left out, as its policy may refuse the address; the app's WebView is its own.
+
 The page of the RNL viewers: the drawing, the netlist text, the problems and the subcircuit hierarchy, with a selected instance or net followed between the drawing and the text. The desktop viewer ([`apps/desktop`](../desktop/README.md)) and the web viewer ([`apps/web`](../web/README.md)) show it ([decision 0008](../../docs/decisions/0008-shared-core-per-platform-frontends.md)). The page shows a Document that its shell builds; it never reads files itself.
 
 It is plain HTML, CSS and ES modules, with no dependencies and no build step. It keeps to the browser baseline of decision 0008, Chromium 109 and Safari 16, so newer features such as JSON import attributes, CSS nesting or `Array.prototype.toSorted` are not used. `package.json` only makes Node read the scripts as modules, so that they can be checked:
@@ -34,6 +36,8 @@ find apps/viewer-ui -name '*.js' -print0 | xargs -0 -n 1 node --check
 | `loading.js` | Reading, parsing and displaying stages with an indeterminate bar; operation ownership prevents stale progress/completions from replacing a newer load. |
 | `shell.js` | The shell interface, and choosing the shell. |
 | `shells/desktop.js` | The desktop shell, the only module that uses `window.__TAURI__`. |
+| `shells/local.js` | The local shell, for the page that [`apps/local`](../local/README.md) serves to a browser: the web shell, with the files of the machine of that program behind it: its chooser (`server-files.js`), `Save` and `Save As` that write where the file was read from, a note when a file changed on disk, and the settings in the program's file. |
+| `server-files.js` | The file chooser of the local shell: the machine's folders as the program lists them, one at a time in the list dialog, whose first entries go up and choose the folder shown, and whose last, for a file to open, is the browser's own chooser. |
 | `shells/web.js` | The web shell: files, a folder, a URL or what is dropped, read as the core asks for them, and built by the core in a Worker. |
 | `state.js` | What the page shows: the Document, the level drawn, the selection, the hierarchy path to the level and the views kept by path. Modules read these bindings and change them through setters. |
 | `open.js` | Opening a source through the shell; reading it again keeps the level, the visit history while its circuits are there, the view and the selection. File › Load from Clipboard: the clipboard's text, shown with what it is guessed to be, opened as a source that holds it. |
@@ -246,6 +250,7 @@ Everything platform-specific goes through the shell, chosen at start: `shells/de
 | Member | |
 | --- | --- |
 | `platform` | `"desktop"` or `"web"`: which commands of the table it offers. |
+| `overwrites` | Optional, of a shell of the `"web"` platform that writes the files where they were read from (the local shell, whose program writes them): Save is *Save*, not *Download File*, with the desktop's Save As and the question before leaving files with changes that offers to save them (`downloads()` in `shell.js`; the commands of the table that name `with: "overwrites"` or `unless: "overwrites"`). |
 | `nativeMenu` | Whether the platform shows the menu bar itself; if not, the page shows its own. |
 | `initial()` | What to open at start, or null; on the desktop, the file on the command line. |
 | `pick(kind)` | Ask for something to open: `"file"`, and on the web also `"folder"` or `"url"`; null when nothing is chosen. |
