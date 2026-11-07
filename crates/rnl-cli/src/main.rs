@@ -5,15 +5,16 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use rnl_cli::codec::{decode, encode, OutputEncoding};
-use rnl_cli::solve::{SolveOptions, Target, WallClock};
 use rnl_cli::{dump, FsProvider};
 use rnl_runtime::diag::{Severity, Sink};
 use rnl_runtime::source::{Layered, MemoryProvider, Provider};
 use rnl_runtime::{Interpretation, Options};
-use rnl_solver::SolverOptions;
 use rnl_view::BuildOptions;
 
-const USAGE: &str = "usage:
+mod solver_args;
+
+const USAGE: &str = concat!(
+    "usage:
   rnl --version                   print the core version and build commit
   rnl check FILE [options]          print the diagnostics; exit 1 on errors
   rnl render FILE -o DIR [options]  write one SVG per drawing level
@@ -69,34 +70,9 @@ render options (inspection only; all disabled by default):
   --currents          show in/out terminal currents, including explicit subcircuit port symbols
   --usage-roles       show role labels on enabled usage frames
   --overlay-style FILE  JSON: palette, width, dashes, current_color; independent of RNL styles
-problem options (the levels are read without their type=\"generated\" records):
-  --level TITLE       only the level with this title: a subcircuit name, or the file name
-  --solver-options S  key=value;... over the solver's defaults, as for solve: the options the hash covers
-  --previous          give each level what its type=\"generated\" record decided, as hints
-solve options (the levels are read without their type=\"generated\" records; -o or --in-place is needed):
-  -o DIR              write the files solved under DIR, named as they are relative to FILE's directory,
-                      with a copy of the other files they read from there, such as includes
-  --in-place          write them over the files read instead
-  --level TITLE       only the level with this title
-  --solver-options S  key=value;... over the solver's defaults, for tolerance, grid, objectives, beam,
-                      budget and time_limit, as rnl-solver's canonical text writes them; the hash
-                      covers them. time_limit is the seconds the resolution of a level may spend on
-                      checking (8.5), 5 by default, or none for no limit: a fact whose check does not
-                      finish within it is discarded with a warning, and the result may then differ
-                      from one run to the next; when the conflict groups of a fact are not all found
-                      within it, its hint says that the list is not complete
-  --profile OUT.json  checkpoint solver timings and counters (solve only; may affect a wall-clock deadline)
-  --report            print what became of every fact, not only of the facts discarded, and the hints
-                      of the facts of priority low and of the statements only they lose (8.5), whose
-                      minimal conflict groups the solver then seeks all, not only the first
-  a fact that has no solution on its own contradicts itself and fails (8.5): solve prints an error line
-  for it, and solves the level and writes it back without it
-  solve exits with 1 when an error was reported, once the files are written: one of the netlist as a
-  solver reads it, whose number it gives on the standard error as rnl check --no-generated counts
-  them, or one of the solver
-  the solver is a preview, whose layouts may be poor: solve and preview say so in a line on the
-  standard error each time they solve; what they print on the standard output and write is the same
-saving options (solve and strip-generated only):
+",
+    solver_args::usage!(),
+    "saving options (solve and strip-generated only):
   --encoding MODE     preserve (default) or utf8; UTF-8 adds a BOM only to protect leading U+FEFF
                       copied includes that are not rewritten retain their original bytes
 explain options:
@@ -115,7 +91,8 @@ check reads a package file, with --no-std and --std-version):
   --all-versions      every version of each package, not only the newest
 write:
   REQUEST.json is {\"dialect\", \"netlist\", \"author\", \"ops\"}, the ops as the editor interface
-  draft writes them; --dialect (spice by default) and --author NAME give the fields it leaves out";
+  draft writes them; --dialect (spice by default) and --author NAME give the fields it leaves out"
+);
 
 struct Args {
     overlays: rnl_view::OverlayOptions,
@@ -138,12 +115,8 @@ struct Args {
     /// `view`'s `--constraints`.
     constraints: bool,
     level: Option<String>,
-    /// As given; `problem` and `solve` each have their own default.
-    solver_options: Option<String>,
-    in_place: bool,
-    report: bool,
-    profile: Option<PathBuf>,
-    previous: bool,
+    /// The options of `problem`, `solve` and `preview`.
+    solver: solver_args::SolverArgs,
     author: Option<String>,
     parts: Option<String>,
     /// `--package`: the names `catalog` lists; every name when there are none.
@@ -179,10 +152,7 @@ fn parse_args() -> Result<Args, String> {
     let (mut svg, mut primitives, mut status) = (true, false, false);
     let mut flylines = true;
     let mut level = None;
-    let mut previous = false;
-    let mut solver_options = None;
-    let mut profile = None;
-    let (mut in_place, mut report) = (false, false);
+    let mut solver = solver_args::SolverArgs::default();
     let mut author = None;
     let mut parts = None;
     let mut packages = Vec::new();
@@ -236,12 +206,7 @@ fn parse_args() -> Result<Args, String> {
             "--no-flylines" => flylines = false,
             "--status" => status = true,
             "--constraints" => constraints = true,
-            "--previous" => previous = true,
             "--level" => level = Some(it.next().ok_or("--level needs a title")?),
-            "--solver-options" => solver_options = Some(it.next().ok_or("--solver-options needs a text")?),
-            "--in-place" => in_place = true,
-            "--report" => report = true,
-            "--profile" => profile = Some(PathBuf::from(it.next().ok_or("--profile needs a JSON path")?)),
             "--author" => author = Some(it.next().ok_or("--author needs a name")?),
             "--parts" => parts = Some(it.next().ok_or("--parts needs a list, such as host,model")?),
             "--package" => packages.push(it.next().ok_or("--package needs a name, such as rnl-std-basic")?),
@@ -255,6 +220,7 @@ fn parse_args() -> Result<Args, String> {
             }
             "--encoding" => encoding = Some(it.next().ok_or("--encoding needs preserve or utf8")?.parse()?),
             _ if a.starts_with("--encoding=") => encoding = Some(a[11..].parse()?),
+            _ if solver.take(&a, &mut it)? => {}
             _ if a.starts_with('-') => return Err(format!("unknown option {a}\n{USAGE}")),
             _ => positional.push(a),
         }
@@ -282,9 +248,7 @@ fn parse_args() -> Result<Args, String> {
         return Err("--param needs --bind SUBCKT, the subcircuit whose parameters it gives".into());
     }
     let bind = bind_subckt.map(|subckt| rnl_view::Bind { subckt, params: bind_params });
-    if profile.is_some() && command != "solve" {
-        return Err("--profile is an option of solve".into());
-    }
+    solver.check(&command)?;
     if overlay_args && command != "render" {
         return Err("overlay options are options of render".into());
     }
@@ -319,11 +283,7 @@ fn parse_args() -> Result<Args, String> {
         status,
         constraints,
         level,
-        solver_options,
-        in_place,
-        report,
-        profile,
-        previous,
+        solver,
         author,
         parts,
         packages,
@@ -451,42 +411,7 @@ fn run(args: &Args) -> Result<ExitCode, String> {
             println!("{}", serde_json::to_string_pretty(&dump::interpretation(&r)).unwrap());
             Ok(ExitCode::SUCCESS)
         }
-        "problem" => {
-            // the options as the solver's canonical text writes them, so that the hash is the one
-            // `rnl solve` writes with the same options
-            let problem_options = SolverOptions::default()
-                .with_overrides(args.solver_options.as_deref().unwrap_or(""))
-                .map_err(|e| format!("--solver-options: {e}"))?
-                .canonical();
-            let options = Options { std: args.std, std_version: args.std_version.clone(), ..Options::solver() };
-            let (file, dialect) = (args.file.to_string_lossy(), args.dialect.as_deref());
-            let (r, previous) = if args.previous {
-                rnl_view::read_previous_with(&file, dialect, &args.formats, &provider, &options)?
-            } else {
-                (rnl_cli::interpret_file_with(&args.file, dialect, &args.formats, &provider, &options)?, Vec::new())
-            };
-            let levels: Vec<_> = r
-                .problems
-                .iter()
-                .enumerate()
-                .filter(|(_, p)| args.level.as_ref().is_none_or(|t| *t == p.title))
-                .map(|(k, p)| {
-                    let mut level = rnl_cli::problem::level(p, &problem_options);
-                    if args.previous {
-                        let hints = rnl_cli::problem::previous(previous.get(k).and_then(Option::as_ref));
-                        level.as_object_mut().unwrap().insert("previous".into(), hints);
-                    }
-                    level
-                })
-                .collect();
-            if levels.is_empty() {
-                if let Some(t) = &args.level {
-                    return Err(format!("no drawing level is titled {t}"));
-                }
-            }
-            println!("{}", serde_json::to_string_pretty(&serde_json::json!({ "levels": levels })).unwrap());
-            Ok(ExitCode::SUCCESS)
-        }
+        "problem" => solver_args::problem(args, &provider),
         "view" => {
             let options = BuildOptions {
                 dialect: args.dialect.clone(),
@@ -604,27 +529,8 @@ fn run(args: &Args) -> Result<ExitCode, String> {
             }
             Ok(ExitCode::SUCCESS)
         }
-        "solve" => solve(args, &provider),
-        "preview" => {
-            // as `rnl solve` solves, and nothing written: the Document of the files as solved and the
-            // report, which the desktop viewer shows (decision 0010)
-            let solver = SolverOptions::default()
-                .with_overrides(args.solver_options.as_deref().unwrap_or(""))
-                .map_err(|e| format!("--solver-options: {e}"))?;
-            let options = SolveOptions {
-                dialect: args.dialect.clone(),
-                formats: args.formats.clone(),
-                std: args.std,
-                level: args.level.clone(),
-                solver,
-            };
-            let entry = rnl_cli::path_str(&args.file);
-            eprintln!("{}", rnl_cli::SOLVER_PREVIEW_NOTICE);
-            let shown = rnl_cli::preview::preview(&entry, &provider, &options, &WallClock::new(), &|_| true)?;
-            let out = serde_json::json!({ "document": shown.document, "report": shown.report });
-            println!("{}", serde_json::to_string_pretty(&out).unwrap());
-            Ok(ExitCode::SUCCESS)
-        }
+        "solve" => solver_args::solve(args, &provider),
+        "preview" => solver_args::preview(args, &provider),
         "strip-generated" => {
             let out = args.out.clone().ok_or("strip-generated needs -o OUT")?;
             // Preserve the origin of the text actually read, not the adapter's display name
@@ -691,99 +597,6 @@ fn run(args: &Args) -> Result<ExitCode, String> {
             Ok(ExitCode::SUCCESS)
         }
         _ => Err(format!("unknown command {}\n{USAGE}", args.command)),
-    }
-}
-
-/// `rnl solve`: solve, print what became of each level, write the files (plan 5.10). Exits with 1
-/// when any error was reported, once the files are written: an error of the netlist as a solver
-/// reads it, counted as `rnl check --no-generated` counts them (7.6), or an error of the solver, a
-/// fact that contradicts itself (the draft 0.3, 8.5; 7.6); with 2 when a file cannot be read or
-/// written.
-fn solve(args: &Args, provider: &FsProvider) -> Result<ExitCode, String> {
-    let target = match (&args.out, args.in_place) {
-        (Some(_), true) => return Err("solve writes under -o DIR or --in-place, not both".into()),
-        (Some(dir), false) => Target::Dir(dir.clone()),
-        (None, true) => Target::InPlace,
-        (None, false) => return Err(
-            "solve needs -o DIR, to write the files solved under DIR, or --in-place, to write them over the files read"
-                .into(),
-        ),
-    };
-    let solver = SolverOptions::default()
-        .with_overrides(args.solver_options.as_deref().unwrap_or(""))
-        .map_err(|e| format!("--solver-options: {e}"))?;
-    // the groups of the facts of priority low are sought only for their hints (8.5, 7.6)
-    let solver = SolverOptions { hints_for_low: args.report, ..solver };
-    let options = SolveOptions {
-        dialect: args.dialect.clone(),
-        formats: args.formats.clone(),
-        std: args.std,
-        level: args.level.clone(),
-        solver,
-    };
-    let profile_clock = args
-        .profile
-        .as_ref()
-        .map(|path| {
-            if std::fs::canonicalize(path).ok().zip(std::fs::canonicalize(&args.file).ok()).is_some_and(|(a, b)| a == b)
-            {
-                return Err("--profile must differ from the input file".to_string());
-            }
-            rnl_cli::profile::ProfileClock::new(path)
-        })
-        .transpose()?;
-    eprintln!("{}", rnl_cli::SOLVER_PREVIEW_NOTICE);
-    let result = match &profile_clock {
-        Some(clock) => rnl_cli::solve::solve_with_clock(&args.file, provider, &options, clock),
-        None => rnl_cli::solve::solve(&args.file, provider, &options),
-    };
-    if let Some(clock) = &profile_clock {
-        clock.finish(result.is_ok())?;
-    }
-    let run = result?;
-    // nothing is written when a file has no place to go
-    let output_paths = rnl_cli::solve::all_destinations(&run, &target)?;
-    if let Some(profile) = &args.profile {
-        let profile = std::fs::canonicalize(profile).map_err(|e| format!("cannot resolve profile path: {e}"))?;
-        if output_paths.iter().any(|p| std::fs::canonicalize(p).is_ok_and(|p| p == profile)) {
-            return Err("--profile conflicts with a solved output path".into());
-        }
-    }
-    println!("solver options: {}", options.solver.canonical());
-    if run.levels.is_empty() && run.not_solved.is_empty() {
-        println!("{} has no drawing level to solve", run.entry);
-    }
-    for line in rnl_cli::solve::lines(&run, args.report) {
-        println!("{line}");
-    }
-    let writing = rnl_cli::solve::write_with_encoding(&run, &target, args.encoding);
-    for path in &writing.written {
-        println!("wrote {}", rnl_cli::path_str(path));
-    }
-    for path in &writing.copied {
-        println!("copied {}", rnl_cli::path_str(path));
-    }
-    if let Target::Dir(dir) = &target {
-        for path in &writing.outside {
-            eprintln!(
-                "warning: {} reads {path}, which is outside its directory and is not copied under {}",
-                run.entry,
-                rnl_cli::path_str(dir)
-            );
-        }
-    }
-    if run.errors > 0 {
-        eprintln!(
-            "{} errors in {} as a solver reads it; run `rnl check --no-generated` to see them",
-            run.errors, run.entry
-        );
-    }
-    // an error of the netlist, or a fact that contradicts itself (8.5, 7.6): the levels are written
-    // all the same
-    match writing.error {
-        Some(e) => Err(e),
-        None if run.errors + rnl_cli::solve::errors(&run) > 0 => Ok(ExitCode::from(1)),
-        None => Ok(ExitCode::SUCCESS),
     }
 }
 
