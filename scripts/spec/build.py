@@ -5,6 +5,7 @@
     python scripts/spec/build.py --version 0.3   only this version, as for the release of a tag spec-0.3-rN
     python scripts/spec/build.py --site DIR      also put the web pages and their downloads into a built site
     python scripts/spec/build.py --no-pdf        skip the PDFs
+    python scripts/spec/build.py --drafts        also build the versions that are not released yet
     python scripts/spec/build.py --stamp         stamp the Chinese parts, once they are in line with the English
 
 Input, the spec/ folder of the repository (or --spec DIR), with a folder for each version V, such as 0.2:
@@ -16,7 +17,11 @@ Input, the spec/ folder of the repository (or --spec DIR), with a folder for eac
 Output, for each version, in English and Chinese, all from the same chapters and with the same revision
 label: the combined Markdown, the chapters as a zip, one web page, a PDF, and SHA256SUMS. With --site, the
 Chinese page of version V goes to DIR/zh/spec/V/ and the English one to DIR/en/spec/V/, each with its
-downloads; DIR/zh/spec/ and DIR/en/spec/ lead to the newest version, and each page links to the others.
+downloads; DIR/zh/spec/ and DIR/en/spec/ lead to the newest released version, and each page links to the others.
+A version is released when its folder holds a file RELEASED (spec/0.3/RELEASED). Until then the site shows nothing of
+it: no pages, no downloads, no link from the pages of the others, and the addresses that lead to the newest version
+do not lead to it. The checks are of every version in spec/, released or not; --drafts builds the others too, and
+--version V builds V whether or not it is released, as the release of a tag does.
 The Chinese pages of the versions in MOVED_ZH were at DIR/spec/V/ until the Chinese pages of the site
 moved to zh/; their old addresses, and DIR/spec/, lead to the new ones, and their downloads are copied there.
 Next to the page of V go the pages that compare it with each earlier version W, compare-W.html, which
@@ -77,6 +82,7 @@ LANGS = {
 # The versions whose Chinese pages were published at spec/V/, at the root of the site, until the Chinese
 # pages moved to zh/ on 2026-10-18 (site/build.py); later versions have only the addresses under zh/.
 MOVED_ZH = ("0.2",)
+RELEASED = "RELEASED"  # the file that marks a version in spec/ as published, such as spec/0.3/RELEASED
 VERSION_DIR = re.compile(r"(0|[1-9]\d*)\.(0|[1-9]\d*)")  # a version folder of spec/, such as 0.2 (16.1)
 STAMP = re.compile(r"^<!-- translated from en/(\S+) sha256:([0-9a-f]{12}) -->\n")
 FENCE = re.compile(r"^([ \t]*)```([\w-]+)((?:[ \t]+\S+)+)[ \t]*$", re.M)
@@ -96,6 +102,21 @@ def versions(spec: Path) -> list[str]:
     found = [d.name for d in spec.iterdir()
              if d.is_dir() and VERSION_DIR.fullmatch(d.name) and (d / "en").is_dir() and (d / "zh").is_dir()]
     return sorted(found, key=lambda v: tuple(int(x) for x in v.split(".")))
+
+
+def released(spec: Path, v: str) -> bool:
+    """Whether version v is published: its folder holds a file RELEASED (the tag does not say, since the
+    build must work without the repository's tags). Until then the site shows nothing of it."""
+    return (spec / v / RELEASED).is_file()
+
+
+def shown_versions(spec: Path, all_versions: list[str], drafts: bool = False, asked: str | None = None) -> tuple[list[str], list[str]]:
+    """The versions the pages show and link to, and the released ones, oldest first. The pages show the released
+    versions, and with drafts or asked also the others, a version that is asked for; the addresses that lead to the
+    newest version lead to the newest released one in any case. The checks are of every version, drafts too, since
+    a draft is edited before it is released."""
+    return ([v for v in all_versions if drafts or released(spec, v) or v == asked],
+            [v for v in all_versions if released(spec, v)])
 
 
 def parts(spec: Path, v: str, lang: str = "en") -> list[str]:
@@ -614,6 +635,8 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--check", action="store_true", help="run the checks only")
     ap.add_argument("--no-pdf", action="store_true", help="skip the PDFs")
     ap.add_argument("--stamp", action="store_true", help="stamp the Chinese parts with the hashes of the English ones")
+    ap.add_argument("--drafts", action="store_true", help="also build the versions that are not released (no RELEASED file), "
+                    "and list them among the versions; the site's addresses still lead to the newest released one")
     args = ap.parse_args(argv)
     spec = args.spec.resolve()
     all_versions = versions(spec)
@@ -623,7 +646,12 @@ def main(argv: list[str]) -> int:
     if args.version and args.version not in all_versions:
         print(f"{spec}: no version {args.version}; there are {', '.join(all_versions)}")
         return 1
+    shown, newest = shown_versions(spec, all_versions, args.drafts, args.version)
+    if args.site and not newest:
+        print(f"{spec}: no released version, which holds a file {RELEASED}, for the site's addresses to lead to")
+        return 1
     chosen = [args.version] if args.version else all_versions
+    built = [args.version] if args.version else shown
     if args.stamp:
         for v in chosen:
             stamp(spec, v)
@@ -651,7 +679,7 @@ def main(argv: list[str]) -> int:
         return docs[x, lang]
 
     try:
-        for v in chosen:
+        for v in built:
             for f in own_files(out, v):
                 f.unlink()
             rev = revs[v] = revision(spec, v)
@@ -663,7 +691,7 @@ def main(argv: list[str]) -> int:
                 if not args.no_pdf:
                     build_pdf(src, lang, v, rev, out, work, fonts)
                 on_site = SITE_URL + L["site_dir"].format(v=v) + "/"
-                published = version_links(lang, v, all_versions, lambda x: SITE_URL + L["site_dir"].format(v=x) + "/",
+                published = version_links(lang, v, shown, lambda x: SITE_URL + L["site_dir"].format(v=x) + "/",
                                           lambda w: on_site + f"compare-{w}.html")
                 build_html(src, lang, v, rev, out / name(v, lang, ".html"),
                            SITE_URL + L["site_home"], published, out, work)
@@ -673,12 +701,12 @@ def main(argv: list[str]) -> int:
                     for ext in (".md", "-chapters.zip") + (() if args.no_pdf else (".pdf",)):
                         shutil.copyfile(out / name(v, lang, ext), d / name(v, lang, ext))
                     build_html(html_input(spec, v, lang, work, "../../"), lang, v, rev, d / "index.html", "../../",
-                               version_links(lang, v, all_versions, lambda x: f"../{x}/",
+                               version_links(lang, v, shown, lambda x: f"../{x}/",
                                              lambda w: f"compare-{w}.html"), out, work)
-                    for w in earlier(all_versions, v):
+                    for w in earlier(shown, v):
                         revs.setdefault(w, revision(spec, w))
                         page = f"compare-{w}.html"
-                        links = version_links(lang, v, all_versions, lambda x: "./" if x == v else f"../{x}/",
+                        links = version_links(lang, v, shown, lambda x: "./" if x == v else f"../{x}/",
                                               lambda x: f"compare-{x}.html", comparing=w)
                         found = build_compare(doc(w, lang), doc(v, lang), lang, v, w, revs, d / page, "../../", links, work)
                         print(f"built {v} compared with {w}, {lang}: " +
@@ -689,14 +717,14 @@ def main(argv: list[str]) -> int:
                 print(f"built {v} {lang}: {revision_label(lang, v, rev)}")
         if args.site:
             for lang in LANGS:
-                write_redirect(args.site / Path(LANGS[lang]["site_dir"].format(v="")), lang, all_versions[-1])
+                write_redirect(args.site / Path(LANGS[lang]["site_dir"].format(v="")), lang, newest[-1])
             # spec/, which led to the newest Chinese page before it moved
-            write_redirect(args.site / "spec", "zh", all_versions[-1], "../" + LANGS["zh"]["site_dir"].format(v=""))
+            write_redirect(args.site / "spec", "zh", newest[-1], "../" + LANGS["zh"]["site_dir"].format(v=""))
     except Failed as e:
         print(e)
         return 1
     write_sums(out)
-    for v in chosen:
+    for v in built:
         for p in own_files(out, v):
             print(f"  {p.name:28} {p.stat().st_size // 1024:6} KB")
     return 0

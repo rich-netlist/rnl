@@ -19,7 +19,9 @@ python scripts/spec/build.py --no-pdf        # skip the PDFs
 python scripts/spec/build.py --stamp         # after bringing the Chinese in line with the English
 ```
 
-Every version in `spec/` is built: the folders named `major.minor`, such as `0.2/`, that hold `en/` and `zh/`. Decision 0007 keeps the earlier versions published when a new one is added.
+Every version in `spec/` is checked: the folders named `major.minor`, such as `0.2/`, that hold `en/` and `zh/`. Decision 0007 keeps the earlier versions published when a new one is added.
+
+A version is **released** when its folder holds a file `RELEASED`, such as `spec/0.3/RELEASED`: add it in the change that publishes the version, and not before. Only the released versions are built, listed in the version line of the pages and compared with each other, and the addresses that lead to the newest version (`en/spec/`, `zh/spec/`, `spec/`) lead to the newest released one. A version in `spec/` without the file is a draft, which the site does not show at all, and which `site/gallery/build.mjs` gives the same rule for the standard series of the same number. `--drafts` builds the drafts too, to look at them; `--version V` builds V, released or not, as the release of a tag does. The checks are of every version, drafts included.
 
 Needs Python 3.10 or later (standard library only), [pandoc](https://pandoc.org/) 3.x and [Typst](https://typst.app/) 0.13 or later on PATH, and git. The CI workflows install pinned versions.
 

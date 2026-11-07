@@ -2,11 +2,15 @@
 // file under libraries/, read with package-file.mjs, and every symbol drawn by the core as
 // WebAssembly, the same core the web viewer runs.
 //
-//   node site/gallery/build.mjs [--core DIR] [--out DIR] [--libraries DIR]
+//   node site/gallery/build.mjs [--core DIR] [--out DIR] [--libraries DIR] [--spec DIR] [--drafts]
 //
 // --core is the built binding, bindings/runtime-wasm/dist/ by default (node bindings/runtime-wasm/
 // build.mjs, or node apps/web/build.mjs, writes it); --out is the built site, site/dist/ by default;
 // --libraries is the directory of the package files, libraries/ by default.
+// A standard series is shown when the standard of the same number is released, which its folder in spec/
+// says by a file RELEASED (scripts/spec/README.md): libraries/standard/0.4/ is left out until
+// spec/0.4/RELEASED exists. --spec is the spec/ directory (spec/ by default, or the one beside --libraries),
+// and --drafts shows the series that are not released too, to look at them.
 // It writes into OUT/gallery/: index.js, the list of the groups of packages, and one file for each
 // group, such as standard-0.2.js. A group is a directory of package files: libraries/standard/0.2/
 // is the standard series 0.2. They are scripts rather than JSON so that the page also works opened
@@ -26,16 +30,20 @@ import { publicGalleryPackages } from "./public-packages.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..", "..");
-const usage = "usage: node site/gallery/build.mjs [--core DIR] [--out DIR] [--libraries DIR]";
+const usage = "usage: node site/gallery/build.mjs [--core DIR] [--out DIR] [--libraries DIR] [--spec DIR] [--drafts]";
 
 let coreDir = join(root, "bindings", "runtime-wasm", "dist");
 let out = join(root, "site", "dist");
 let libraries = join(root, "libraries");
+let specDir = null;
+let drafts = false;
 const args = process.argv.slice(2);
 for (let i = 0; i < args.length; i++) {
   if (args[i] === "--core" && args[i + 1]) coreDir = args[++i];
   else if (args[i] === "--out" && args[i + 1]) out = args[++i];
   else if (args[i] === "--libraries" && args[i + 1]) libraries = args[++i];
+  else if (args[i] === "--spec" && args[i + 1]) specDir = args[++i];
+  else if (args[i] === "--drafts") drafts = true;
   else {
     console.error(usage);
     process.exit(2);
@@ -69,9 +77,17 @@ function compareVersions(a, b) {
 
 const posix = (p) => p.split(sep).join("/");
 
+/** Whether the standard of a series is released: spec/<series>/RELEASED (scripts/spec/build.py reads the same file). */
+const released = (series) => statSync(join(specDir ?? join(libraries, "..", "spec"), series, "RELEASED"), { throwIfNoEntry: false })?.isFile() ?? false;
+
 const groups = groupDirs(libraries).map(({ dir, files }) => {
   const rel = posix(join("libraries", relative(libraries, dir)));
-  const m = /^libraries\/standard\/([^/]+)$/.exec(rel);
+  return { dir, files, rel, m: /^libraries\/standard\/([^/]+)$/.exec(rel) };
+}).filter(({ rel, m }) => {
+  if (!m || drafts || released(m[1])) return true;
+  console.log(`${rel}: not shown, since spec/${m[1]}/RELEASED does not exist (--drafts shows it)`);
+  return false;
+}).map(({ dir, files, rel, m }) => {
   const packages = files
     .map((file) => ({ file, path: `${rel}/${file}`, ...readPackage(readFileSync(join(dir, file), "utf8")) }))
     .filter((p) => {

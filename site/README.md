@@ -248,7 +248,7 @@ node site/gallery/build.mjs                   # write site/dist/gallery/
 node --test site/gallery/package-file.test.mjs   # the tests of reading package files
 ```
 
-`--core DIR` takes the core from another directory, `--out DIR` writes into another built site, and `--libraries DIR` reads the package files of another checkout. Opened from the disk or served, `packages.html` then shows the gallery; without its data, it says how to build it.
+`--core DIR` takes the core from another directory, `--out DIR` writes into another built site, and `--libraries DIR` reads the package files of another checkout. A standard series is shown only when the standard of its number is released, which the file `spec/<series>/RELEASED` says, so that `libraries/standard/0.4/` can be in the repository while the site shows nothing of 0.4 (the pages of the standard follow the same file, [`scripts/spec/`](../scripts/spec/README.md)); `--spec DIR` names another `spec/` directory, and `--drafts` shows the unreleased series too, to look at them. Opened from the disk or served, `packages.html` then shows the gallery; without its data, it says how to build it.
 
 | Output in `site/dist/` | Content |
 | --- | --- |
