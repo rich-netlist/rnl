@@ -29,6 +29,11 @@ const RECORDS: &str = r#"@RNL(type="header") { @VERSION("0.2")}
 
 /// R1 a b, R2 b c, R3 c d, with RECORDS written in the main file.
 fn interpret_nets() -> Interpretation {
+    interpret_records(RECORDS)
+}
+
+/// R1 a b, R2 b c, R3 c d, with `records` written in the main file.
+fn interpret_records(records: &str) -> Interpretation {
     let mut sink = Sink::new();
     let mut main = Level::new(LevelKind::File, "nets.sp", "nets.sp", "nets.sp");
     main.circuit = true;
@@ -45,7 +50,7 @@ fn interpret_nets() -> Interpretation {
             ..Instance::default()
         });
     }
-    main.records = scan_run(&package_lines(RECORDS), "nets.sp", &mut sink);
+    main.records = scan_run(&package_lines(records), "nets.sp", &mut sink);
     let dialect = Dialect { name: "spice".into(), case_sensitive: false, ground_aliases: vec!["gnd".into()] };
     interpret(
         HostDocument::new(main, dialect),
@@ -84,4 +89,29 @@ fn a_route_joins_what_the_wires_of_its_net_leave_apart() {
     let lv = &r.model.levels[0];
     // b is wired already; on c the wire joins #R2:2 to (6, -1), and #R3:1 and the test point are left
     assert_eq!(lv.flylines, [((8.0, 1.0), (6.0, -1.0)), ((8.0, 1.0), (8.0, -4.0))]);
+}
+
+#[test]
+fn wires_through_junctions_leave_no_flyline() {
+    // #R1:2 and #R2:1 on b are wired through two junctions, and the wire from one junction to the
+    // other touches no pin: the ROUTE of b has nothing left to join
+    let wired = r#"@RNL(type="header") { @VERSION("0.3")}
+@RNL {
+  $BAR = @DEFINE-SYMBOL {(0, 1) @PIN(terminal=1, direction="up"); (0, -1) @PIN(terminal=2, direction="down"); @LINE {(0, 1) (0, -1)}};
+  # @SELECT-INSTANCE => @SET-SYMBOL $BAR;
+  #R1 @PLACE(0, 0); #R2 @PLACE(4, 0); #R3 @PLACE(8, 0);
+  %j1 = (0, -3); %j2 = (4, -3);
+  &b @WIRE {#R1:2 %j1};
+  &b @WIRE {%j1 %j2};
+  &b @WIRE {%j2 #R2:1};
+  &b @ROUTE
+}"#;
+    let r = interpret_records(wired);
+    let shown: Vec<String> = r.diagnostics().iter().map(|d| r.sink.render(d)).collect();
+    assert!(shown.is_empty(), "{shown:?}");
+    assert_eq!(r.model.levels[0].flylines, []);
+    // without the wire between the junctions, the two halves are apart: a flyline joins them where
+    // they are nearest, from junction to junction
+    let r = interpret_records(&wired.replace("  &b @WIRE {%j1 %j2};\n", ""));
+    assert_eq!(r.model.levels[0].flylines, [((0.0, -3.0), (4.0, -3.0))]);
 }

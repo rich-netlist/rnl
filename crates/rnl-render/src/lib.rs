@@ -30,11 +30,14 @@ pub use text::{lay_out, Face};
 pub struct RenderOptions {
     /// Pixels per scene unit in the SVG; the primitives give no dash shorter than a pixel at it.
     pub scale: f64,
+    /// Draw the level's flylines (13.7), each a primitive of its own and, in the SVG, a group of
+    /// class "flyline", which a viewer can hide; true by default.
+    pub flylines: bool,
 }
 
 impl Default for RenderOptions {
     fn default() -> RenderOptions {
-        RenderOptions { scale: 14.0 }
+        RenderOptions { scale: 14.0, flylines: true }
     }
 }
 
@@ -724,7 +727,7 @@ pub fn primitives(lv: &LevelView, o: &RenderOptions) -> Vec<Primitive> {
         segs.extend(w.points[1..].iter().map(|p| PathSeg::Line(*p)));
         out.path(&w.id, segs, e.strokes(o.scale), None, w.layer, w.order.clone(), &w.points);
     }
-    for (a, b) in &lv.flylines {
+    for (a, b) in lv.flylines.iter().filter(|_| o.flylines) {
         let kind = Kind::Flyline { a: *a, b: *b, strokes: vec![line::flyline()] };
         out.push("", Layer::Middle, vec![2.0, 0.0], kind, &[*a, *b]);
     }

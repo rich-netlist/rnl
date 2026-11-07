@@ -94,6 +94,9 @@ pub struct BuildOptions {
     pub svg: bool,
     /// Give each level's primitives ([`Level::primitives`]); off by default.
     pub primitives: bool,
+    /// Draw each level's flylines (13.7) in its SVG and primitives; on by default. In the SVG each
+    /// is a group of class "flyline", which a viewer can hide.
+    pub flylines: bool,
     /// Give each level its solve status ([`Level::solve`]), what a frontend decides from whether
     /// to solve it (decision 0008); off by default. It takes the problems of the levels read
     /// without their records of the solver, so a document that has such records is read once more.
@@ -115,6 +118,7 @@ impl Default for BuildOptions {
             runtime: Options::default(),
             svg: true,
             primitives: false,
+            flylines: true,
             status: false,
             constraints: false,
             bind: None,

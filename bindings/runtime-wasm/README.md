@@ -86,6 +86,7 @@ A call writes the request as UTF-8 JSON, calls `rnl_build`, and reads the answer
 | `std_version` | The version of the standard package at the root, whatever the files' language version, such as `"0.2"` to read a file of 0.3 with the series 0.2; a version pinned in a header record still comes first (16.3). By the language version when not given. |
 | `svg` | Whether each level's SVG is written; true when not given. |
 | `primitives` | Whether each level's primitives are given; false when not given. |
+| `flylines` | Whether each level's flylines (13.7) are drawn in its SVG and primitives; true when not given. Drawn, each is a group of class `flyline` in the SVG, which a viewer can also hide by that class. |
 | `status` | Whether each level gets its solve status, `solve`, what a frontend decides from whether to solve it ([`rnl-view`](../../crates/rnl-view/README.md)); false when not given. |
 | `constraints` | Whether each level gets its constraints after expansion, `constraints` ([`rnl-view`](../../crates/rnl-view/README.md#the-constraints-of-a-level)); false when not given. Experimental. |
 | `lazy_unplaced` | Whether the Document leaves out the drawings of the objects without a position, `Level.unplaced[].svg` and `primitives`, which the core keeps to give on request ([below](#drawings-of-the-objects-without-a-position)); false when not given. |
@@ -109,7 +110,7 @@ A request with a `write` field writes an edit transaction's ops into a netlist (
 }
 ```
 
-The netlist is the entry, under `/rnl-edit/netlist.sp`, or `.scs` for Spectre; a `file` in `write`, the name the netlist is saved under, such as `"file": "top.net"`, puts it under that name instead, so that a Spectre netlist that is not a `.scs` file is read in the SPICE mode up to its `simulator lang=spectre`, and its header and records go where that reading keeps them (2.2). A request without it writes as before; `files`, `package_dirs`, `std`, `std_version`, `svg`, `primitives` and `status` are a build's. The answer is `{"written": {"text": "...", "document": ...}}`: the netlist with the records written, and its Document, whose `diagnostics` say how the records read. An op that cannot be written is `{"error": "op 3 (set): ..."}`.
+The netlist is the entry, under `/rnl-edit/netlist.sp`, or `.scs` for Spectre; a `file` in `write`, the name the netlist is saved under, such as `"file": "top.net"`, puts it under that name instead, so that a Spectre netlist that is not a `.scs` file is read in the SPICE mode up to its `simulator lang=spectre`, and its header and records go where that reading keeps them (2.2). A request without it writes as before; `files`, `package_dirs`, `std`, `std_version`, `svg`, `primitives`, `flylines` and `status` are a build's. The answer is `{"written": {"text": "...", "document": ...}}`: the netlist with the records written, and its Document, whose `diagnostics` say how the records read. An op that cannot be written is `{"error": "op 3 (set): ..."}`.
 
 ### Catalog
 

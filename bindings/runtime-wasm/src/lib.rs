@@ -77,6 +77,10 @@ pub struct Request {
     /// Give each level's primitives; false when not given.
     #[serde(default)]
     pub primitives: bool,
+    /// Draw each level's flylines in its SVG and primitives, each a group of class "flyline" in
+    /// the SVG ([`rnl_view::BuildOptions::flylines`]); true when not given.
+    #[serde(default = "yes")]
+    pub flylines: bool,
     /// Give each level its solve status, what a frontend decides from whether to solve it
     /// (decision 0008); false when not given.
     #[serde(default)]
@@ -143,6 +147,8 @@ pub struct WriteRequest {
     pub svg: bool,
     #[serde(default)]
     pub primitives: bool,
+    #[serde(default = "yes")]
+    pub flylines: bool,
     #[serde(default)]
     pub status: bool,
 }
@@ -378,6 +384,7 @@ pub fn respond(request: &[u8]) -> Response {
         runtime: Options { std: request.std, std_version: request.std_version.clone(), ..Options::default() },
         svg: request.svg,
         primitives: request.primitives,
+        flylines: request.flylines,
         status: request.status,
         constraints: request.constraints,
         bind: request.bind,
@@ -514,6 +521,7 @@ fn write(request: WriteRequest) -> Response {
         runtime: Options { std: request.std, std_version: request.std_version.clone(), ..Options::default() },
         svg: request.svg,
         primitives: request.primitives,
+        flylines: request.flylines,
         status: request.status,
         constraints: false,
         bind: None,

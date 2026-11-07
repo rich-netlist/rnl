@@ -63,6 +63,11 @@ export interface Request {
   /** Give each level's primitives; false when not given. */
   primitives?: boolean;
   /**
+   * Draw each level's flylines in its SVG and primitives, each a group of class "flyline" in the
+   * SVG, which a viewer can hide; true when not given.
+   */
+  flylines?: boolean;
+  /**
    * Give each level its solve status, `solve`, what a frontend decides from whether to solve it
    * (decision 0008): "fixed", "unsolved", "solved" or "stale"; false when not given.
    */
@@ -241,6 +246,7 @@ export interface WriteRequest {
   std_version?: string;
   svg?: boolean;
   primitives?: boolean;
+  flylines?: boolean;
   status?: boolean;
 }
 

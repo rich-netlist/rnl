@@ -93,6 +93,26 @@ fn a_wire_whose_middle_point_is_free_is_drawn_in_two_runs() {
     let flylines =
         d.levels[0].primitives.as_ref().unwrap().iter().filter(|p| matches!(p.shape, rnl_view::Shape::Flyline { .. }));
     assert_eq!(flylines.count(), 1);
+
+    // in the SVG the flyline is a group of its own, which a viewer can hide; drawn without
+    // flylines, the level has none, and nothing else of it changes
+    let svg = rnl_render::svg(&lv, &rnl_render::RenderOptions::default());
+    assert_eq!(svg.matches("<g class=\"flyline\"><line ").count(), 1, "{svg}");
+    let without = rnl_render::RenderOptions { flylines: false, ..rnl_render::RenderOptions::default() };
+    let svg_without = rnl_render::svg(&lv, &without);
+    assert!(!svg_without.contains("flyline"));
+    let others = |svg: &str| svg.lines().filter(|l| !l.contains("flyline")).map(String::from).collect::<Vec<_>>();
+    assert_eq!(others(&svg), others(&svg_without));
+    assert!(!rnl_render::primitives(&lv, &without).iter().any(|p| matches!(p.kind, rnl_render::Kind::Flyline { .. })));
+    let options = rnl_view::BuildOptions { primitives: true, flylines: false, ..rnl_view::BuildOptions::default() };
+    let d = rnl_view::build("/w/t.sp", &files, &options).unwrap();
+    assert!(!d.levels[0].svg.as_deref().unwrap_or_default().contains("flyline"));
+    assert!(!d.levels[0]
+        .primitives
+        .as_ref()
+        .unwrap()
+        .iter()
+        .any(|p| matches!(p.shape, rnl_view::Shape::Flyline { .. })));
 }
 
 #[test]

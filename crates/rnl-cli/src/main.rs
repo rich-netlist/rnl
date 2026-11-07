@@ -56,6 +56,8 @@ options:
 view options:
   --primitives        give each level's primitives, in scene units with y up
   --no-svg            leave out each level's SVG
+  --no-flylines       draw no flylines (13.7) in the SVG and the primitives; view, snapshot and render
+                      take it. Drawn, each flyline is a group of class \"flyline\" in the SVG
   --status            give each level its solve status: fixed, unsolved, solved or stale
   --constraints       give each level its constraints after expansion, what a solver takes in, tied
                       to the Document's objects; experimental, not promised to stay as it is
@@ -130,6 +132,8 @@ struct Args {
     formats: BTreeMap<String, String>,
     svg: bool,
     primitives: bool,
+    /// `--no-flylines`: false.
+    flylines: bool,
     status: bool,
     /// `view`'s `--constraints`.
     constraints: bool,
@@ -173,6 +177,7 @@ fn parse_args() -> Result<Args, String> {
     let mut dialect = None;
     let mut formats = BTreeMap::new();
     let (mut svg, mut primitives, mut status) = (true, false, false);
+    let mut flylines = true;
     let mut level = None;
     let mut previous = false;
     let mut solver_options = None;
@@ -228,6 +233,7 @@ fn parse_args() -> Result<Args, String> {
             }
             "--no-svg" => svg = false,
             "--primitives" => primitives = true,
+            "--no-flylines" => flylines = false,
             "--status" => status = true,
             "--constraints" => constraints = true,
             "--previous" => previous = true,
@@ -309,6 +315,7 @@ fn parse_args() -> Result<Args, String> {
         formats,
         svg,
         primitives,
+        flylines,
         status,
         constraints,
         level,
@@ -487,6 +494,7 @@ fn run(args: &Args) -> Result<ExitCode, String> {
                 runtime: options(args),
                 svg: args.svg,
                 primitives: args.primitives,
+                flylines: args.flylines,
                 status: args.status,
                 constraints: args.constraints,
                 bind: args.bind.clone(),
@@ -502,6 +510,7 @@ fn run(args: &Args) -> Result<ExitCode, String> {
                 runtime: options(args),
                 svg: false,
                 primitives: false,
+                flylines: true,
                 status: false,
                 constraints: false,
                 bind: None,
@@ -535,6 +544,7 @@ fn run(args: &Args) -> Result<ExitCode, String> {
                 runtime: options(args),
                 svg: args.svg,
                 primitives: args.primitives,
+                flylines: args.flylines,
                 status: args.status,
                 constraints: false,
                 bind: None,
@@ -566,6 +576,7 @@ fn run(args: &Args) -> Result<ExitCode, String> {
                         dialect: args.dialect.clone(),
                         formats: args.formats.clone(),
                         runtime: options(args),
+                        flylines: args.flylines,
                         ..BuildOptions::default()
                     },
                 )?)
@@ -578,7 +589,10 @@ fn run(args: &Args) -> Result<ExitCode, String> {
             for (k, lv) in r.model.levels.iter().enumerate() {
                 let svg = match &overlays {
                     Some(d) => rnl_view::overlays::svg(&d.levels[k], &args.overlays)?,
-                    None => rnl_render::svg(lv, &rnl_render::RenderOptions::default()),
+                    None => rnl_render::svg(
+                        lv,
+                        &rnl_render::RenderOptions { flylines: args.flylines, ..rnl_render::RenderOptions::default() },
+                    ),
                 };
                 let name = if k == 0 { format!("{stem}.svg") } else { format!("{stem}.{}.svg", sanitize(&lv.title)) };
                 std::fs::write(out.join(&name), svg).map_err(|e| e.to_string())?;
