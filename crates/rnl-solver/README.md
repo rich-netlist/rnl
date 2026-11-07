@@ -65,8 +65,9 @@ The draft 0.3 lets an implementation limit the time it spends on checking for a 
 
 ## Exact arithmetic
 
-Every decision is taken with exact rationals (`num-rational` over `num-bigint`), never by comparing floating point, so native and WebAssembly builds decide alike.
+Every decision is taken with exact rationals, never by comparing floating point, so native and WebAssembly builds decide alike.
 
+- A rational is held in machine integers while it fits them, which is nearly always, the numbers of a level being small; an operation whose result does not fit is done again in big integers (`num-rational` over `num-bigint`), so that no result differs from that of big integers alone. A value has one form, so that comparing forms compares values. A unit test checks every operation against big integers, near the edges of what fits too.
 - A number of the problem is read as its shortest decimal representation, the digits `fmt_num` writes, so `0.1` is 1/10. A result goes back as the nearest `f64`, ties to even, so a number that came in goes back unchanged.
 - The tolerance (11.7) widens only the constant bounds of the facts: `x = v` becomes `v − tol ≤ x ≤ v + tol`, the `min` of DISTANCE is lowered and its `max` raised by it, and so is the one unit of ORDER; equalities between variables, such as ALIGN and DISTRIBUTE, stay exact.
 - The simplex is incremental and bounded, after Dutertre and de Moura: each linear form is one row, made once; a fact is bounds on rows, each with the tag of the fact. A check moves the variable whose pivot costs least, one with no bound in its way first, then the one in the fewest rows, so a row added late, such as `t ≥ |xᵢ − xⱼ|` for the wire length, is fixed by one pivot on its own `t`; once variables have left the basis again 1000 times within one check it takes Bland's rule, which terminates. The same input gives the same pivots. When the bounds have no solution, the tags of the bounds that hold the failing row are the explanation, a set of facts that conflict. Bounds are undone back to a checkpoint, and the same tableau minimises linear forms for the layers of the coordinate LP, with Bland's rule, each objective a row whose reduced costs the pivots keep up to date.
@@ -124,7 +125,7 @@ The objectives measured per group are measured in the groups only: the component
 | Module | Content | Stage |
 | --- | --- | --- |
 | `options` | `SolverOptions`, `Objectives`, `Budget`, the canonical text | S1 |
-| `rational` | `Q`, conversion from and to `f64` | S1 |
+| `rational` | `Q`, in machine integers while they fit, conversion from and to `f64` | S1 |
 | `simplex` | The incremental bounded simplex: rows, tagged bounds, explanations, undo, minimisation | S1 |
 | `model` | Variables per axis, points as linear forms, each fact as rows and bounds (14.1–14.5) | S2 |
 | `orient` | Orientation classes: a union-find labelled with the eight orientations (11.2, 14.9) | S2 |

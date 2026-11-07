@@ -3,7 +3,7 @@
 //! Gaussian elimination for equalities, Fourier–Motzkin elimination for small systems of any
 //! linear constraints and for the optimum of a linear objective.
 
-use num_traits::{Signed, Zero};
+use num_traits::Zero;
 
 use super::*;
 use crate::rational::{frac, int};

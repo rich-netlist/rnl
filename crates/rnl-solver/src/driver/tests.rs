@@ -191,7 +191,7 @@ fn a_text_whose_offset_is_discarded_is_written_on_that_axis() {
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use num_traits::{One, Signed, Zero};
+use num_traits::{One, Zero};
 use rnl_runtime::problem::{LevelProblem, ObjectKind};
 use rnl_runtime::source::Provider;
 
@@ -2348,7 +2348,6 @@ fn stage(version: &str) -> String {
 /// 2026-10-24: every ground was an element of the bottom row, and the transistors lay any way).
 #[test]
 fn the_stubs_of_the_series_0_3_hang_from_their_pins_by_their_drawing() {
-    use num_traits::Signed;
     let (p, solved, e) = solve_text(&stage("0.3"));
     let what = summary(&p, &solved, &e);
     let s = &e.structure;

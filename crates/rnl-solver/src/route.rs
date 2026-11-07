@@ -65,7 +65,7 @@ use std::collections::{BTreeMap, BTreeSet, BinaryHeap};
 
 use num_bigint::BigInt;
 use num_integer::Integer;
-use num_traits::{One, Signed, ToPrimitive, Zero};
+use num_traits::{One, ToPrimitive, Zero};
 use rnl_runtime::problem::{LevelProblem, ObjectKind, PointRef};
 use rnl_runtime::solution::{Branch, RoutedWire, WirePoint};
 
@@ -295,7 +295,7 @@ impl Lattice {
         }
         let mut unit = BigInt::one();
         for v in axes.iter().flatten() {
-            unit = unit.lcm(v.denom());
+            unit = unit.lcm(&v.denom());
             if unit > BigInt::from(MAX_UNIT) {
                 return Err(Failure::Lattice);
             }

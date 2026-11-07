@@ -46,7 +46,7 @@
 
 use std::collections::BTreeMap;
 
-use num_traits::{One, Signed, Zero};
+use num_traits::{One, Zero};
 
 use crate::rational::Q;
 

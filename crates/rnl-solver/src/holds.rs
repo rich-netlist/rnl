@@ -4,7 +4,7 @@
 //! placement of the solver, whose equalities between points are exact as its model keeps them
 //! ([`check`]). A fact with a point or an orientation that is not known has no answer.
 
-use num_traits::{One, Signed, Zero};
+use num_traits::{One, Zero};
 use rnl_runtime::geom::{Orient, TOL};
 use rnl_runtime::previous::Drawn;
 use rnl_runtime::problem::{Axis, FactKind, LevelProblem, PointRef, Sense};

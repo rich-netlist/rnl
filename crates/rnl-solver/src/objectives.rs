@@ -33,7 +33,7 @@
 
 use std::collections::BTreeSet;
 
-use num_traits::{Signed, Zero};
+use num_traits::Zero;
 use rnl_runtime::geom::Orient;
 
 use crate::model::PointId;

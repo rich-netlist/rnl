@@ -47,7 +47,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use num_traits::{One, Signed, Zero};
+use num_traits::{One, Zero};
 use rnl_runtime::geom::Orient;
 use rnl_runtime::markup::Run;
 use rnl_runtime::problem::{
