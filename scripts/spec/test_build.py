@@ -51,8 +51,9 @@ class Selection(unittest.TestCase):
         (self.spec / "0.4" / build.RELEASED).write_text("released\n", encoding="utf-8")
         self.assertEqual(build.shown_versions(self.spec, self.all), (["0.2", "0.3", "0.4"], ["0.2", "0.3", "0.4"]))
 
-    def test_every_version_in_the_repository_that_is_published_has_the_file(self):
-        for v in build.versions(REPO_SPEC):
+    def test_the_versions_published_so_far_have_the_file(self):
+        # not every folder: a draft in spec/ has none until it is released. Add a version here when it is.
+        for v in ("0.2", "0.3"):
             self.assertTrue(build.released(REPO_SPEC, v), f"spec/{v}/{build.RELEASED}: the file that marks it as released")
 
 
