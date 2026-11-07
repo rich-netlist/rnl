@@ -32,6 +32,7 @@ export const FILES = {
   "usage-ota5t": "site/examples/ota5t.sp",
   "package-pkg": "tests/viewer/inputs/acme.pkg",
   "wire-labels": "tests/viewer/inputs/wire-labels.sp",
+  "flylines": "tests/viewer/inputs/flylines.sp",
   "usage-inspector": "tests/viewer/inputs/usage-inspector.sp",
   "usage-anonymous": "tests/viewer/inputs/usage-anonymous.sp",
   "usage-virtual-roles": "tests/viewer/inputs/usage-virtual-roles.sp",

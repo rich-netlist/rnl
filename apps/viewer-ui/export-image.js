@@ -1,7 +1,7 @@
 import { m } from "./i18n.js";
 // File > Export Image > Export SVG / Export PNG: the whole of the level shown, as the core draws it
-// with the overlays (rnl_view::overlays::svg), not the part in view. Usages and current directions
-// are drawn as the page shows them, on or off, each usage shown in its colour; the selection, the
+// with the overlays (rnl_view::overlays::svg), not the part in view. Usages, current directions and
+// flylines are drawn as the page shows them, on or off, each usage shown in its colour; the selection, the
 // hover and the grid are not. The background is opaque, light or dark as the page's. The fonts the
 // page draws the texts with go into the image, so that a PNG, which the page makes from the SVG,
 // has the texts of the SVG and of the drawing on screen.
@@ -14,6 +14,7 @@ import { shell } from "./shell.js";
 import { FRAME_STEP, frameSteps, TITLE_ROW, titleRows } from "./frame-layout.js";
 import { current, doc } from "./state.js";
 import { overlayChoices } from "./usages.js";
+import { flylinesShown } from "./flylines.js";
 
 /** A PNG is drawn at twice the SVG's size, and no side longer than this many pixels. */
 export const PNG_SCALE = 2;
@@ -89,6 +90,7 @@ function asShown(svg, choices) {
     for (const text of el.querySelectorAll("text")) text.setAttribute("fill", choice.color);
   }
   setOut(svg, choices);
+  if (!flylinesShown()) for (const el of svg.querySelectorAll("g.flyline")) el.remove();
   if (isDark()) {
     for (const el of svg.querySelectorAll("[stroke], [fill]")) {
       if (el.closest(".usage-overlays, .usage-underlays, .current-overlays")) continue;

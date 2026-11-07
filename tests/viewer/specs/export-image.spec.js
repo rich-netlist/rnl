@@ -25,6 +25,23 @@ async function exported(page, command) {
 }
 const count = (text, pattern) => (text.match(pattern) || []).length;
 
+test('an exported image has the flylines when View > Show Flylines is on, and none when it is off', async ({ page }) => {
+  await page.goto(`${process.env.RNL_WEB_URL}/index.html`);
+  await expect(page.locator('#menubar')).toBeVisible();
+  const flylines = path.join(import.meta.dirname, '..', 'inputs', 'flylines.sp');
+  await page.locator('#file-input').setInputFiles({ name: 'flylines.sp', mimeType: 'text/plain', buffer: fs.readFileSync(flylines) });
+  await page.waitForFunction(() => window.viewer.doc && !document.body.classList.contains('busy'));
+  await expect(page.locator('#canvas g.flyline').first()).toBeAttached();
+  let text = (await exported(page, 'export-svg')).bytes.toString();
+  expect(count(text, /class="flyline"/g)).toBeGreaterThan(0);
+  await page.evaluate(() => { window.viewer.command('toggle-flylines'); });
+  text = (await exported(page, 'export-svg')).bytes.toString();
+  expect(text.startsWith('<?xml')).toBe(true);
+  expect(text).not.toContain('flyline');
+  // the page's own flylines are hidden, not gone
+  await expect(page.locator('#canvas g.flyline').first()).toBeAttached();
+});
+
 test('the registration points of View > Show Registration Points are not in an exported image', async ({ page }) => {
   await open(page);
   await page.evaluate(() => { window.viewer.command('toggle-origins'); });

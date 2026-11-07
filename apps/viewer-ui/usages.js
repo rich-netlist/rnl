@@ -12,6 +12,7 @@ import { setPane } from "./panels.js";
 import { revealLine } from "./text.js";
 import { constraintBox } from "./constraint-box.js";
 import { paintOrigins, startOrigins } from "./origins.js";
+import { startFlylines } from "./flylines.js";
 
 export const USAGE_COLORS = ["#e03131", "#e5b500", "#4263eb", "#2f9e44", "#9c36b5", "#009ccc"];
 const MAX_PREFERENCES = 2000;
@@ -114,6 +115,7 @@ export function startUsages() {
   currentsShown = load("currents-shown", false) === true;
   setCheck("toggle-currents", currentsShown);
   startOrigins();
+  startFlylines();
   setCheck("toggle-usages", shown);
   const height = Math.max(80, Math.min(800, Number(load("usage-list-height", 240)) || 240));
   document.documentElement.style.setProperty("--usage-list-h", `${height}px`);
