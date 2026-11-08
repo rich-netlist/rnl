@@ -437,7 +437,7 @@ test.describe("with a native menu", () => {
       ["background-light", true], ["background-dark", false],
       ["toggle-netlist", true], ["toggle-problems", true], ["toggle-edit", false],
       ["toggle-grid", true], ["grid-none", false], ["grid-dots", true], ["grid-lines", false], ["grid-axes", false],
-      ["toggle-hover-names", true], ["toggle-hover-roles", false], ["toggle-usages", true], ["toggle-currents", false], ["toggle-origins", false], ["toggle-flylines", true],
+      ["toggle-hover-names", true], ["toggle-hover-roles", false], ["toggle-usages", true], ["toggle-currents", false], ["toggle-origins", false], ["toggle-flylines", false],
       ...uiLanguages(repository).map((l, i) => [`language-${l.lang}`, i === 0]),
       ["toggle-auto-include", true],
     ];
