@@ -133,6 +133,8 @@ pub fn preview(
         dialect: options.dialect.clone(),
         formats: options.formats.clone(),
         constraints: true,
+        // the viewer shows it, with its flylines, which it hides by their class
+        flylines: true,
         ..BuildOptions::default()
     };
     let document = rnl_view::build(entry, &both, &build)?;
