@@ -2,7 +2,7 @@
 //! read. It claims the files whose suffix marks a hardware description language, so that one opened
 //! or included without a format set for it is not read as SPICE; a frontend may set it for any file.
 
-use crate::diag::Loc;
+use crate::diag::{codes, Loc};
 use crate::host::format::{FileRead, Format, Reading};
 use crate::host::{file_name, Dialect};
 
@@ -69,7 +69,7 @@ impl Format for Text {
             None => format!("`{shown}` is read as text, not as a netlist; it is not read"),
         };
         let loc = cx.doc.levels[file.level].include_site.clone().unwrap_or_else(|| Loc::line(&fname, 1));
-        cx.sink.hint(message, Some(loc));
+        cx.sink.hint(codes::HOST_TEXT_FILE_NOT_READ, message, Some(loc));
     }
 
     fn finish(&self, _cx: &mut Reading) {}

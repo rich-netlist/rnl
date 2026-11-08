@@ -5,7 +5,7 @@ Conformance corpus for RNL 0.3, the language standard in [`spec/`](../../spec/RE
 | Path | Content |
 | --- | --- |
 | `cases/NAME.sp` | A netlist with RNL records. Files it includes or packages it names sit next to it (`04-hierarchy-lib.inc`, `11-acme-style.rnl`). |
-| `cases/NAME.expected.json` | What the case must give: the effective model of every drawing level, and the level and place of every diagnostic. |
+| `cases/NAME.expected.json` | What the case must give: the effective model of every drawing level, and the level, kind and place of every diagnostic. |
 | `cases/NAME.snapshot.json` | The editor interface's snapshot of the case, with the host circuit and the model of every drawing level. |
 | `equivalence/NAME.sp`, `NAME.scs` | The same circuit in SPICE and in Spectre with the same RNL. Both must give the same effective model. |
 | `cases-0.3/NAME.sp`, `NAME.scs` | Cases of the language 0.3, read as the toolkit reads every file, with expected and snapshot files of their own. They use the standard series 0.3 of [`libraries/standard`](../../libraries/standard/README.md), which a file of 0.3 uses implicitly. |
@@ -21,9 +21,9 @@ Cases 13 to 24 were written by a contributor from outside the project against th
 An expected file is written by `rnl`'s conformance dump (`rnl_cli::dump::conformance`). It records:
 
 - for each drawing level, the symbols in use with their pins, graphics and boxes; the drawn instances, bundles and usages with their symbol, position, orientation, style and layer; the wires with their routed vertices; the scene graphics; the texts with their anchors and parsed content; the lines a viewer may draw for `ROUTE`; the constraint statuses; and the objects left without a position;
-- for each diagnostic shown to the user, its level, file, line and column.
+- for each diagnostic shown to the user, its level, its kind (`code`, the number of the toolkit's list of diagnostics such as `"RNL3120"`, none for a kind of 0.2 and 0.3 alone, and `name`, its short name), file, line and column.
 
-Messages are not recorded: the language fixes which items fail and where, not how a tool words it (7.6). Hints are recorded too, although the standard does not require them, because this corpus also guards the reference implementation against unintended changes.
+Messages are not recorded: the language fixes which items fail and where, not how a tool words it (7.6). The kind is recorded, so that a test tells the diagnostics apart by kind, not by place alone. Hints are recorded too, although the standard does not require them, because this corpus also guards the reference implementation against unintended changes.
 
 A snapshot file is what `rnl snapshot` prints for the case, the snapshot of the editor interface that a converter or an editor reads ([`rnl-view`](../../crates/rnl-view/README.md)): for each drawing level the host circuit, and the model by the ids a transaction writes back. The runtime's version, the revision and the diagnostics are left out: the first two change with the toolkit and its bundled packages rather than with the case, and the expected file holds the diagnostics. The snapshot is not a part of the language; its files guard the toolkit's interface, and the tests of the WebAssembly binding check that the WebAssembly core gives the same snapshots, the revision included.
 

@@ -1,0 +1,4360 @@
+{
+ "about": "The kinds of diagnostics of the toolkit: each with its number, RNL and four digits, and its short name, which are kept from one version to the next and never given to another kind; the severity and the message it is given with, as the code writes it; and the sections of the standard it is about. The thousands give the domain: 0 to 6 the domains of the standard, 7 the geometry hints, 8 the tools, 9 the kinds of the implementation of the domains 0 to 6 (9D00, D the domain). A kind of the versions 0.2 and 0.3 alone has no number.",
+ "kinds": [
+  {
+   "number": "RNL0000",
+   "name": "host-carrier-no-space",
+   "severity": "warning",
+   "message": "no space after the comment marker: this line is not a carrier and its @RNL is not a record entry (2.2)",
+   "sections": [
+    "2.2"
+   ]
+  },
+  {
+   "number": "RNL0001",
+   "name": "host-comment-in-statement",
+   "severity": "warning",
+   "message": "a comment line between a statement and its continuation: read, but hosts treat it differently (2.2)",
+   "sections": [
+    "2.2"
+   ]
+  },
+  {
+   "number": "RNL0002",
+   "name": "host-condition-unresolved",
+   "severity": "warning",
+   "message": "the preprocessing condition cannot be resolved without simulator settings; its {remaining }branches are not read (2.2)",
+   "sections": [
+    "2.2"
+   ]
+  },
+  {
+   "number": "RNL0003",
+   "name": "host-non-ascii-comment",
+   "severity": "hint",
+   "message": "non-ASCII characters in host comments have not been verified for the simulator/version used by this generic adapter; check compatibility before simulation (3.1)",
+   "sections": [
+    "3.1"
+   ]
+  },
+  {
+   "number": "RNL0004",
+   "name": "host-rnl-after-end",
+   "severity": "warning",
+   "message": "RNL after `.end` of the main file is not read (2.2)",
+   "sections": [
+    "2.2"
+   ]
+  },
+  {
+   "number": "RNL0005",
+   "name": "host-rnl-in-control-block",
+   "severity": "warning",
+   "message": "RNL inside `{block}` is not read (2.2)",
+   "sections": [
+    "2.2"
+   ]
+  },
+  {
+   "number": "RNL0006",
+   "name": "host-rnl-in-encrypted-text",
+   "severity": "warning",
+   "message": "RNL in encrypted text is not read (2.2)",
+   "sections": [
+    "2.2"
+   ]
+  },
+  {
+   "number": "RNL0007",
+   "name": "host-rnl-in-host-statement",
+   "severity": "warning",
+   "message": "@RNL in an end-of-line comment or a host statement is host text (2.2)",
+   "sections": [
+    "2.2"
+   ]
+  },
+  {
+   "number": "RNL0008",
+   "name": "host-rnl-in-inactive-branch",
+   "severity": "warning",
+   "message": "RNL in an inactive or unresolved preprocessing branch is not read (2.2)",
+   "sections": [
+    "2.2"
+   ]
+  },
+  {
+   "number": "RNL0009",
+   "name": "host-rnl-in-newjob-title",
+   "severity": "warning",
+   "message": "the line after `.newjob` is a title and is not read as RNL (2.2)",
+   "sections": [
+    "2.2"
+   ]
+  },
+  {
+   "number": "RNL0010",
+   "name": "host-rnl-in-preprocessor-directive",
+   "severity": "warning",
+   "message": "RNL in a preprocessing directive is not read (2.2)",
+   "sections": [
+    "2.2"
+   ]
+  },
+  {
+   "number": "RNL0011",
+   "name": "host-rnl-in-protected-region",
+   "severity": "warning",
+   "message": "RNL between `{open}` and `{close}` is read, but it is gone once the region is encrypted (2.2)",
+   "sections": [
+    "2.2"
+   ]
+  },
+  {
+   "number": "RNL0012",
+   "name": "host-rnl-in-reliability-block",
+   "severity": "warning",
+   "message": "RNL inside `reliability { ... }` is not read (2.2)",
+   "sections": [
+    "2.2"
+   ]
+  },
+  {
+   "number": "RNL0013",
+   "name": "host-rnl-in-unselected-section",
+   "severity": "warning",
+   "message": "RNL in a `.lib` section that is not selected is not read (2.2)",
+   "sections": [
+    "2.2"
+   ]
+  },
+  {
+   "number": "RNL0014",
+   "name": "host-rnl-on-first-line",
+   "severity": "warning",
+   "message": "the first line of a file is a title and is not read as RNL (2.2)",
+   "sections": [
+    "2.2"
+   ]
+  },
+  {
+   "number": "RNL0015",
+   "name": "host-rnl-outside-selected-section",
+   "severity": "warning",
+   "message": "RNL outside the selected `.lib` section is not read (2.2)",
+   "sections": [
+    "2.2"
+   ]
+  },
+  {
+   "number": "RNL0016",
+   "name": "host-unterminated-region",
+   "severity": "warning",
+   "message": "an unterminated host region is not writable through end of file (2.2)",
+   "sections": [
+    "2.2"
+   ]
+  },
+  {
+   "number": "RNL1000",
+   "name": "record-braces-mismatch",
+   "severity": "error",
+   "message": "the braces do not match: the whole record fails (7.4)",
+   "sections": [
+    "7.4"
+   ]
+  },
+  {
+   "number": "RNL1001",
+   "name": "record-comment-not-closed",
+   "severity": "error",
+   "message": "the comment is not closed, so the record is incomplete (2.4)",
+   "sections": [
+    "2.4",
+    "3.4"
+   ]
+  },
+  {
+   "number": "RNL1002",
+   "name": "record-cut-off",
+   "severity": "error",
+   "message": "incomplete record: cut off by a blank line, a host statement or the end of the file (2.4)",
+   "sections": [
+    "2.4"
+   ]
+  },
+  {
+   "number": "RNL1003",
+   "name": "record-free-word-like-name",
+   "severity": "warning",
+   "message": "the free-text word {word} is spelled like {what}: is a prefix missing? (3.3)",
+   "sections": [
+    "3.3"
+   ]
+  },
+  {
+   "number": "RNL1004",
+   "name": "record-header-field-bad-value",
+   "severity": "error",
+   "message": "record header field {name} cannot be {value:?}; treated as not written (2.8)",
+   "sections": [
+    "2.8"
+   ]
+  },
+  {
+   "number": "RNL1005",
+   "name": "record-header-field-not-string",
+   "severity": "error",
+   "message": "record header field {name} takes a string; treated as not written (2.8)",
+   "sections": [
+    "2.8"
+   ]
+  },
+  {
+   "number": "RNL1006",
+   "name": "record-header-field-twice",
+   "severity": "error",
+   "message": "record header field {name} is written more than once; treated as not written (2.8)",
+   "sections": [
+    "2.8"
+   ]
+  },
+  {
+   "number": "RNL1007",
+   "name": "record-header-field-unknown",
+   "severity": "warning",
+   "message": "unknown record header field {name} is ignored (2.8)[, did you mean {close}?]",
+   "sections": [
+    "2.8"
+   ]
+  },
+  {
+   "number": "RNL1008",
+   "name": "record-header-numbering-malformed",
+   "severity": "error",
+   "message": "record header field numbering holds a check of 16 hexadecimal digits (5.9), not {value:?}; treated as not written (2.8)",
+   "sections": [
+    "2.8",
+    "5.9"
+   ]
+  },
+  {
+   "number": "RNL1009",
+   "name": "record-header-numbering-not-generated",
+   "severity": "error",
+   "message": "record header field numbering is written only with type=\"generated\", in the record of the solver; treated as not written (2.8, 5.9)",
+   "sections": [
+    "2.8"
+   ]
+  },
+  {
+   "number": "RNL1010",
+   "name": "record-header-numbering-with-scope",
+   "severity": "error",
+   "message": "record header field numbering is not written in a record with scope=: the record of the solver is in the level's own text; treated as not written (2.6, 2.8, 5.9)",
+   "sections": [
+    "2.8"
+   ]
+  },
+  {
+   "number": "RNL1011",
+   "name": "record-header-positional",
+   "severity": "error",
+   "message": "record header fields are written by name; positional values are ignored (2.8)",
+   "sections": [
+    "2.8"
+   ]
+  },
+  {
+   "number": "RNL1012",
+   "name": "record-header-scope-in-subcircuit",
+   "severity": "error",
+   "message": "scope= is not written in a record inside a subcircuit, whose RNL covers only itself; treated as not written, so the record is the subcircuit's own (2.6, 2.8)",
+   "sections": [
+    "2.6"
+   ]
+  },
+  {
+   "number": "RNL1013",
+   "name": "record-line-ends-backslash",
+   "severity": "warning",
+   "message": "a line of RNL ends with `\\`: some hosts join the next line to this comment (2.2)",
+   "sections": [
+    "2.2"
+   ]
+  },
+  {
+   "number": "RNL1014",
+   "name": "record-new-before-end",
+   "severity": "error",
+   "message": "incomplete record: a new @RNL comes before this one ends (2.4)",
+   "sections": [
+    "2.4"
+   ]
+  },
+  {
+   "number": "RNL1015",
+   "name": "record-string-not-closed",
+   "severity": "error",
+   "message": "the string is not closed, so the record is incomplete (2.4, 3.7)",
+   "sections": [
+    "2.4",
+    "3.7"
+   ]
+  },
+  {
+   "number": "RNL1016",
+   "name": "record-tokens-after-record",
+   "severity": "error",
+   "message": "formal tokens after the record on the same line fail (2.4)",
+   "sections": [
+    "2.4"
+   ]
+  },
+  {
+   "number": "RNL1100",
+   "name": "syntax-angle-point",
+   "severity": "error",
+   "message": "a point is written `(x, y)` (3.8; it was `<x, y>` before round D)",
+   "sections": [
+    "4.1",
+    "3.8"
+   ]
+  },
+  {
+   "number": "RNL1101",
+   "name": "syntax-array-not-closed",
+   "severity": "error",
+   "message": "the array is not closed",
+   "sections": [
+    "4.1",
+    "7.4"
+   ]
+  },
+  {
+   "number": "RNL1102",
+   "name": "syntax-comment-not-closed",
+   "severity": "error",
+   "message": "comment not closed",
+   "sections": [
+    "3.4",
+    "4.1"
+   ]
+  },
+  {
+   "number": "RNL1103",
+   "name": "syntax-dot-after-reference",
+   "severity": "warning",
+   "message": "a reference followed by `.` and a name: terminals are written with `:`; this `.…` is free text (3.3)",
+   "sections": [
+    "3.3"
+   ]
+  },
+  {
+   "number": "RNL1104",
+   "name": "syntax-empty-segment",
+   "severity": "error",
+   "message": "a segment cannot be empty (4.2 rule 1)",
+   "sections": [
+    "4.2"
+   ]
+  },
+  {
+   "number": "RNL1105",
+   "name": "syntax-expected-name",
+   "severity": "error",
+   "message": "expected a name here (non-ASCII names in quotes, 3.6)",
+   "sections": [
+    "4.1",
+    "3.6"
+   ]
+  },
+  {
+   "number": "RNL1106",
+   "name": "syntax-expected-number",
+   "severity": "error",
+   "message": "expected a number here",
+   "sections": [
+    "4.1",
+    "3.7"
+   ]
+  },
+  {
+   "number": "RNL1107",
+   "name": "syntax-expected-object",
+   "severity": "error",
+   "message": "expected an object here",
+   "sections": [
+    "4.1"
+   ]
+  },
+  {
+   "number": "RNL1108",
+   "name": "syntax-expected-value",
+   "severity": "error",
+   "message": "expected a value here",
+   "sections": [
+    "4.1"
+   ]
+  },
+  {
+   "number": "RNL1109",
+   "name": "syntax-glued-character",
+   "severity": "warning",
+   "message": "a reference followed by `{char}`: a name with this character is written in quotes, such as `&\"vdd!\"`; here the `{char}` is free text (3.3)",
+   "sections": [
+    "3.3"
+   ]
+  },
+  {
+   "number": "RNL1110",
+   "name": "syntax-head-not-touching",
+   "severity": "error",
+   "message": "the record head must touch @RNL; remove the white space or comment (2.4)",
+   "sections": [
+    "2.4"
+   ]
+  },
+  {
+   "number": "RNL1111",
+   "name": "syntax-keyword-at-no-space",
+   "severity": "error",
+   "message": "the `@` of a keyword must follow a space (2.3)",
+   "sections": [
+    "2.3"
+   ]
+  },
+  {
+   "number": "RNL1112",
+   "name": "syntax-keyword-missing",
+   "severity": "error",
+   "message": "write a keyword after `@`",
+   "sections": [
+    "4.1",
+    "2.3"
+   ]
+  },
+  {
+   "number": "RNL1113",
+   "name": "syntax-keyword-space-paren",
+   "severity": "warning",
+   "message": "@{keyword} and the parenthesis after it are separated by whitespace: these parentheses are a point, not parameters; parameter parentheses touch the keyword (3.5)",
+   "sections": [
+    "3.5"
+   ]
+  },
+  {
+   "number": "RNL1114",
+   "name": "syntax-multiple-expanding-subscripts",
+   "severity": "error",
+   "message": "only one subscript in a reference may expand to a group (6.11)",
+   "sections": [
+    "4.2"
+   ]
+  },
+  {
+   "number": "RNL1115",
+   "name": "syntax-name-missing-after-prefix",
+   "severity": "error",
+   "message": "write a name after `{prefix}`",
+   "sections": [
+    "4.1",
+    "3.6"
+   ]
+  },
+  {
+   "number": "RNL1116",
+   "name": "syntax-named-segment-objects",
+   "severity": "error",
+   "message": "a named segment without a keyword holds one object; write several objects as `{…}` (4.2 rule 4)",
+   "sections": [
+    "4.2"
+   ]
+  },
+  {
+   "number": "RNL1117",
+   "name": "syntax-no-braces",
+   "severity": "error",
+   "message": "the record has no braces: write @RNL {…} (2.4)",
+   "sections": [
+    "2.4"
+   ]
+  },
+  {
+   "number": "RNL1118",
+   "name": "syntax-not-formal-token",
+   "severity": "error",
+   "message": "`{char}` is neither free text nor a formal token (3.3)",
+   "sections": [
+    "3.3",
+    "2.4"
+   ]
+  },
+  {
+   "number": "RNL1119",
+   "name": "syntax-number-out-of-range",
+   "severity": "error",
+   "message": "the number is outside this implementation's finite numeric range (3.7)",
+   "sections": [
+    "3.7"
+   ]
+  },
+  {
+   "number": "RNL1120",
+   "name": "syntax-number-subscript",
+   "severity": "error",
+   "message": "a number takes no subscript (6.11); a point is written `(x, y)`",
+   "sections": [
+    "4.2"
+   ]
+  },
+  {
+   "number": "RNL1121",
+   "name": "syntax-number-suffix",
+   "severity": "error",
+   "message": "a number takes no unit or suffix (3.7)",
+   "sections": [
+    "3.7"
+   ]
+  },
+  {
+   "number": "RNL1122",
+   "name": "syntax-number-too-large",
+   "severity": "error",
+   "message": "this number is larger than this implementation can hold (3.7)",
+   "sections": [
+    "3.7"
+   ]
+  },
+  {
+   "number": "RNL1123",
+   "name": "syntax-object-number-digits",
+   "severity": "error",
+   "message": "write the number of an object after `%#`, in digits only, such as %#3 (5.9)",
+   "sections": [
+    "4.1",
+    "5.9"
+   ]
+  },
+  {
+   "number": "RNL1124",
+   "name": "syntax-param-object",
+   "severity": "error",
+   "message": "parameters hold literals only; objects are written outside the parentheses (4.4)",
+   "sections": [
+    "4.1"
+   ]
+  },
+  {
+   "number": "RNL1125",
+   "name": "syntax-param-separator",
+   "severity": "error",
+   "message": "parameters are separated by `,`; there is no free text inside parentheses (3.3)",
+   "sections": [
+    "4.1",
+    "3.3"
+   ]
+  },
+  {
+   "number": "RNL1126",
+   "name": "syntax-param-twice",
+   "severity": "error",
+   "message": "parameter {name} is written twice (4.2 rule 9)",
+   "sections": [
+    "4.2"
+   ]
+  },
+  {
+   "number": "RNL1127",
+   "name": "syntax-pipe-bar",
+   "severity": "warning",
+   "message": "`|` in free text: a pipe is written `=>` (4.2 rule 3; it was `|` before round D)",
+   "sections": [
+    "3.3"
+   ]
+  },
+  {
+   "number": "RNL1128",
+   "name": "syntax-pipe-first-segment-objects",
+   "severity": "error",
+   "message": "the first segment of a pipe without a keyword holds one object (4.2 rule 3)",
+   "sections": [
+    "4.2"
+   ]
+  },
+  {
+   "number": "RNL1129",
+   "name": "syntax-pipe-segment-no-keyword",
+   "severity": "error",
+   "message": "a segment after a pipe has no keyword (4.2 rule 3)",
+   "sections": [
+    "4.2"
+   ]
+  },
+  {
+   "number": "RNL1130",
+   "name": "syntax-point-malformed",
+   "severity": "error",
+   "message": "a point is written `(x, y)` (3.8); parameter parentheses touch the keyword and role parentheses touch the object, parentheses after whitespace are a point (3.5)",
+   "sections": [
+    "3.8"
+   ]
+  },
+  {
+   "number": "RNL1131",
+   "name": "syntax-positional-after-named",
+   "severity": "error",
+   "message": "parameters written by position come before the named ones: after one name, every parameter is named (4.2 rule 9)",
+   "sections": [
+    "4.2"
+   ]
+  },
+  {
+   "number": "RNL1132",
+   "name": "syntax-rnl-name-subscript",
+   "severity": "error",
+   "message": "RNL names take no subscript (6.11); a point is written `(x, y)`",
+   "sections": [
+    "3.6",
+    "6.11"
+   ]
+  },
+  {
+   "number": "RNL1133",
+   "name": "syntax-role-after-pipe",
+   "severity": "error",
+   "message": "a segment after a pipe cannot label roles (4.2 rule 5)",
+   "sections": [
+    "4.2"
+   ]
+  },
+  {
+   "number": "RNL1134",
+   "name": "syntax-role-missing",
+   "severity": "error",
+   "message": "write a role name in the role parentheses",
+   "sections": [
+    "4.1"
+   ]
+  },
+  {
+   "number": "RNL1135",
+   "name": "syntax-role-not-closed",
+   "severity": "error",
+   "message": "the role parentheses are not closed",
+   "sections": [
+    "4.1",
+    "7.4"
+   ]
+  },
+  {
+   "number": "RNL1136",
+   "name": "syntax-role-starts-digit",
+   "severity": "error",
+   "message": "an unquoted role name cannot start with a digit (3.6)",
+   "sections": [
+    "3.6"
+   ]
+  },
+  {
+   "number": "RNL1137",
+   "name": "syntax-role-without-keyword",
+   "severity": "error",
+   "message": "roles are written only on the objects of a segment with a keyword (4.2 rule 5)",
+   "sections": [
+    "4.2"
+   ]
+  },
+  {
+   "number": "RNL1138",
+   "name": "syntax-set-not-closed",
+   "severity": "error",
+   "message": "the set is not closed (missing `}`)",
+   "sections": [
+    "7.4"
+   ]
+  },
+  {
+   "number": "RNL1139",
+   "name": "syntax-stray-equals",
+   "severity": "error",
+   "message": "`=` is only used in a naming `%name =` at the start of a member and in parameters; name in a pipe with `=> %name` (4.2 rule 8)",
+   "sections": [
+    "4.2"
+   ]
+  },
+  {
+   "number": "RNL1140",
+   "name": "syntax-string-not-closed",
+   "severity": "error",
+   "message": "the string is not closed (strings cannot span lines, 3.7)",
+   "sections": [
+    "3.7"
+   ]
+  },
+  {
+   "number": "RNL1141",
+   "name": "syntax-sub-name-missing",
+   "severity": "error",
+   "message": "write a name after `::` (non-ASCII names and aliases in quotes, 16.5)",
+   "sections": [
+    "4.1"
+   ]
+  },
+  {
+   "number": "RNL1142",
+   "name": "syntax-sub-name-subscript",
+   "severity": "error",
+   "message": "sub-object names take no subscript (6.11)",
+   "sections": [
+    "4.2"
+   ]
+  },
+  {
+   "number": "RNL1143",
+   "name": "syntax-subscript-item",
+   "severity": "error",
+   "message": "a subscript item is i, a:b or a:b:s with s at least 1 (6.11)",
+   "sections": [
+    "6.11"
+   ]
+  },
+  {
+   "number": "RNL1144",
+   "name": "syntax-subscript-not-closed",
+   "severity": "error",
+   "message": "the subscript is not closed",
+   "sections": [
+    "6.11",
+    "7.4"
+   ]
+  },
+  {
+   "number": "RNL1145",
+   "name": "syntax-subscript-not-integer",
+   "severity": "error",
+   "message": "a subscript holds unsigned integers, `,` and `:` only (6.11)",
+   "sections": [
+    "6.11"
+   ]
+  },
+  {
+   "number": "RNL1146",
+   "name": "syntax-two-keywords",
+   "severity": "error",
+   "message": "at most one keyword in a segment (4.2 rule 2)",
+   "sections": [
+    "4.2"
+   ]
+  },
+  {
+   "number": "RNL1147",
+   "name": "syntax-two-subscripts",
+   "severity": "error",
+   "message": "a name takes one subscript only (6.11)",
+   "sections": [
+    "6.11"
+   ]
+  },
+  {
+   "number": "RNL1148",
+   "name": "syntax-unexpected-char",
+   "severity": "error",
+   "message": "`{char}` cannot appear here",
+   "sections": [
+    "4.1"
+   ]
+  },
+  {
+   "number": "RNL1149",
+   "name": "syntax-usage-terminal-subscript",
+   "severity": "error",
+   "message": "usage terminal names take no subscript (6.11)",
+   "sections": [
+    "4.2",
+    "12.1"
+   ]
+  },
+  {
+   "number": "RNL1200",
+   "name": "codec-cannot-encode",
+   "severity": "error",
+   "message": "{path}: {encoding_error}",
+   "sections": [
+    "3.1"
+   ]
+  },
+  {
+   "number": "RNL1201",
+   "name": "codec-latin1-unrepresentable",
+   "severity": "error",
+   "message": "{file}: the source is Latin-1 and cannot represent {char:?}; explicitly select UTF-8 conversion to save it",
+   "sections": [
+    "3.1"
+   ]
+  },
+  {
+   "number": "RNL2000",
+   "name": "device-missing-params",
+   "severity": "error",
+   "message": "@DEVICE takes name and terminals (6.12)",
+   "sections": [
+    "5.3",
+    "6.12"
+   ]
+  },
+  {
+   "number": "RNL2001",
+   "name": "device-terminals-not-names",
+   "severity": "error",
+   "message": "the terminals of @DEVICE must be an array of names (strings) (6.12)",
+   "sections": [
+    "5.3",
+    "6.12"
+   ]
+  },
+  {
+   "number": "RNL2002",
+   "name": "header-keyword-not-allowed",
+   "severity": "error",
+   "message": "@{kw} cannot be written in a header record (2.8)",
+   "sections": [
+    "2.8"
+   ]
+  },
+  {
+   "number": "RNL2003",
+   "name": "header-member-not-statement",
+   "severity": "error",
+   "message": "a header record holds only VERSION, PACKAGE, USE-PACKAGE, USE-ALIASES, ALIAS and DEVICE (2.8)",
+   "sections": [
+    "2.8"
+   ]
+  },
+  {
+   "number": "RNL2004",
+   "name": "header-param-not-positional",
+   "severity": "error",
+   "message": "the parameters of @{kw} cannot be written by position; write each by name, such as {first}=… (4.2 rule 9)",
+   "sections": [
+    "4.2"
+   ]
+  },
+  {
+   "number": "RNL2005",
+   "name": "header-param-unknown",
+   "severity": "error",
+   "message": "@{kw} has no parameter {name}[, did you mean {close}?][; a header record is read in the standard form, without aliases (16.5) | ; is an alias package not loaded?] (16.4)",
+   "sections": [
+    "16.4"
+   ]
+  },
+  {
+   "number": "RNL2006",
+   "name": "header-record-in-subcircuit",
+   "severity": "error",
+   "message": "a header record is written at the file level, not inside a subcircuit (2.8); this one is ignored",
+   "sections": [
+    "2.8"
+   ]
+  },
+  {
+   "number": "RNL2007",
+   "name": "header-record-missing",
+   "severity": "hint",
+   "message": "the main file has no header record: it is read in the tool's default version {default}, and tools add the header when they write the file (16.1)",
+   "sections": [
+    "16.1"
+   ]
+  },
+  {
+   "number": "RNL2008",
+   "name": "header-record-not-first",
+   "severity": "error",
+   "message": "a header record is the first record of a file, and a record comes before this one (2.8); this one is ignored",
+   "sections": [
+    "2.8"
+   ]
+  },
+  {
+   "number": "RNL2009",
+   "name": "header-record-second",
+   "severity": "error",
+   "message": "a file has at most one header record (2.8); this one is ignored",
+   "sections": [
+    "2.8"
+   ]
+  },
+  {
+   "number": "RNL2010",
+   "name": "header-statement-takes-no-objects",
+   "severity": "error",
+   "message": "@{kw} takes no objects (2.8)",
+   "sections": [
+    "5.2.1"
+   ]
+  },
+  {
+   "number": "RNL2100",
+   "name": "version-declared-twice",
+   "severity": "error",
+   "message": "a file declares its version once (16.1): this VERSION is ignored, and the first one stands",
+   "sections": [
+    "16.1"
+   ]
+  },
+  {
+   "number": "RNL2101",
+   "name": "version-not-string",
+   "severity": "error",
+   "message": "@VERSION takes a string (16.1)",
+   "sections": [
+    "5.3",
+    "16.1"
+   ]
+  },
+  {
+   "number": "RNL2102",
+   "name": "version-unsupported",
+   "severity": "error",
+   "message": "unsupported version {version}: no RNL of this file is interpreted (16.1; this implementation reads {versions})",
+   "sections": [
+    "16.1"
+   ]
+  },
+  {
+   "number": "RNL2103",
+   "name": "std-not-used-04",
+   "severity": "error",
+   "message": "(the existing error for an unknown $ name, such as $GROUND, given once per standard name used)",
+   "sections": [
+    "16.3",
+    "6.6"
+   ]
+  },
+  {
+   "number": "RNL2200",
+   "name": "inline-package-references-package",
+   "severity": "error",
+   "message": "an inline package has no header record and cannot reference other packages; to use the definitions of another package, write them into its body (16.2)",
+   "sections": [
+    "16.2"
+   ]
+  },
+  {
+   "number": "RNL2201",
+   "name": "package-decl-outside-package-file",
+   "severity": "error",
+   "message": "@PACKAGE is written only in the header record of a package file (2.7)",
+   "sections": [
+    "2.7",
+    "16.2",
+    "5.3"
+   ]
+  },
+  {
+   "number": "RNL2202",
+   "name": "package-file-no-header",
+   "severity": "error",
+   "message": "{file} has no header record with @PACKAGE and is not a package (2.7, 16.2)",
+   "sections": [
+    "16.2"
+   ]
+  },
+  {
+   "number": "RNL2203",
+   "name": "package-hides-package",
+   "severity": "hint",
+   "message": "{name} in {package P | package P, which the USE-PACKAGE of Q brings in,} hides the definition of the same name in {the standard package rnl-std | the package R that the earlier USE-PACKAGE of S brings in | the earlier USE-PACKAGE of R} {at the root | in the same level}; this level and below use the one of {P} (16.2)",
+   "sections": [
+    "16.2",
+    "16.3",
+    "6.8"
+   ]
+  },
+  {
+   "number": "RNL2204",
+   "name": "package-no-version-newest",
+   "severity": "hint",
+   "message": "{USE-PACKAGE|USE-ALIASES|the reference to} {name} names no version; using the newest found, {version} ({section})",
+   "sections": [
+    "16.2",
+    "16.5"
+   ]
+  },
+  {
+   "number": "RNL2205",
+   "name": "package-not-found",
+   "severity": "error",
+   "message": "{package|alias package} {name}[ {version}] cannot be found: this {USE-PACKAGE|USE-ALIASES|reference} fails[; statements using its aliases fail | , and the statements of package {pkg} that use its names fail with it][; {merged-in-0.3 text}] ({section})",
+   "sections": [
+    "16.2",
+    "16.5"
+   ]
+  },
+  {
+   "number": "RNL2206",
+   "name": "package-own-hides-reference",
+   "severity": "hint",
+   "message": "{name} hides the definition of the same name in the referenced package {referenced}; package {package} uses this one (16.2)",
+   "sections": [
+    "16.2"
+   ]
+  },
+  {
+   "number": "RNL2207",
+   "name": "package-path-not-found",
+   "severity": "warning",
+   "message": "the file named by path= does not exist or its @PACKAGE does not match; looking the package up by name ({section})",
+   "sections": [
+    "16.2",
+    "16.5"
+   ]
+  },
+  {
+   "number": "RNL2208",
+   "name": "package-path-version-differs",
+   "severity": "warning",
+   "message": "{path} is {package|alias package} {name} {found}, not {wanted}: a different version may draw differently (16.2)",
+   "sections": [
+    "16.2"
+   ]
+  },
+  {
+   "number": "RNL2209",
+   "name": "package-record-scope-or-generated",
+   "severity": "error",
+   "message": "a package cannot use scope= or type=\"generated\" (16.2)",
+   "sections": [
+    "16.2"
+   ]
+  },
+  {
+   "number": "RNL2210",
+   "name": "package-reference-cycle",
+   "severity": "error",
+   "message": "packages reference each other in a cycle, {a} -> {b} -> ... -> {a}: this reference fails (16.2)",
+   "sections": [
+    "16.2"
+   ]
+  },
+  {
+   "number": "RNL2211",
+   "name": "package-reference-hides",
+   "severity": "hint",
+   "message": "{name} in package {later} hides the definition of the same name in package {earlier}, referenced before it; package {package} uses the one of {later} (16.2)",
+   "sections": [
+    "16.2"
+   ]
+  },
+  {
+   "number": "RNL2212",
+   "name": "package-reference-older-version",
+   "severity": "hint",
+   "message": "package {referrer} references package {name} {version}; of the references to it, the newest within that major version is {chosen}, which is used (16.2)",
+   "sections": [
+    "16.2"
+   ]
+  },
+  {
+   "number": "RNL2213",
+   "name": "package-reference-other-major-at-use",
+   "severity": "warning",
+   "message": "package {name} is {version} here, and package {referrer} references {referenced}: another major version, so {referrer} may use names that {name} {version} does not have (16.2)",
+   "sections": [
+    "16.2"
+   ]
+  },
+  {
+   "number": "RNL2214",
+   "name": "package-reference-other-major-fails",
+   "severity": "error",
+   "message": "package {referrer} references package {name} {version}, of another major version than the reference expanded first ({first-referrer} references {first-version}): this reference fails, and the statements of {referrer} that use its names fail with it (16.2)",
+   "sections": [
+    "16.2"
+   ]
+  },
+  {
+   "number": "RNL2215",
+   "name": "package-reference-with-body",
+   "severity": "error",
+   "message": "a reference to another package in the header record of a package file writes only name, version and path, without a body: this reference fails (16.2)",
+   "sections": [
+    "16.2"
+   ]
+  },
+  {
+   "number": "RNL2216",
+   "name": "package-version-substituted",
+   "severity": "warning",
+   "message": "{package|alias package} {name} has no version {wanted}; using {found}: a different version may draw differently (16.2)",
+   "sections": [
+    "16.2"
+   ]
+  },
+  {
+   "number": "RNL2300",
+   "name": "use-aliases-alias-is-added-word",
+   "severity": "error",
+   "message": "in alias package {package}, the alias {alias} is the name of a standard word in this file's language version {version}; the alias is not used (16.5)",
+   "sections": [
+    "16.5"
+   ]
+  },
+  {
+   "number": "RNL2301",
+   "name": "use-aliases-missing-name",
+   "severity": "error",
+   "message": "@USE-ALIASES takes name (16.5)",
+   "sections": [
+    "5.3",
+    "16.5"
+   ]
+  },
+  {
+   "number": "RNL2302",
+   "name": "use-aliases-not-alias-package",
+   "severity": "error",
+   "message": "package {name} is not an alias package: its header has only @VERSION, @PACKAGE and @ALIAS and there is no other record; this USE-ALIASES fails (16.5)",
+   "sections": [
+    "16.5"
+   ]
+  },
+  {
+   "number": "RNL2303",
+   "name": "use-aliases-original-not-in-version",
+   "severity": "error",
+   "message": "in alias package {package}, the original {original} of the alias {alias} is not a standard {keyword|word} in this file's language version {version}; the alias is not used (16.5)",
+   "sections": [
+    "16.5"
+   ]
+  },
+  {
+   "number": "RNL2304",
+   "name": "use-package-alias-package",
+   "severity": "error",
+   "message": "package {name} is an alias package; load it with @USE-ALIASES(name=\"{name}\") in the header record. This {USE-PACKAGE|reference} fails (16.5)",
+   "sections": [
+    "16.5"
+   ]
+  },
+  {
+   "number": "RNL2305",
+   "name": "use-package-body-not-one-set",
+   "severity": "error",
+   "message": "@USE-PACKAGE takes one set as its body (16.2)",
+   "sections": [
+    "5.3",
+    "16.2"
+   ]
+  },
+  {
+   "number": "RNL2306",
+   "name": "use-package-in-package-records",
+   "severity": "error",
+   "message": "USE-PACKAGE is not written in the records of a package other than its header record: a package file references other packages in its header record (16.2)",
+   "sections": [
+    "16.2"
+   ]
+  },
+  {
+   "number": "RNL2307",
+   "name": "use-package-missing-name",
+   "severity": "error",
+   "message": "@USE-PACKAGE takes name (16.2)",
+   "sections": [
+    "5.3",
+    "16.2"
+   ]
+  },
+  {
+   "number": "RNL2400",
+   "name": "alias-conflict",
+   "severity": "error",
+   "message": "[in alias package {package}, ]the alias {alias} is already declared for {old} and cannot also be {original} (16.5)",
+   "sections": [
+    "16.5"
+   ]
+  },
+  {
+   "number": "RNL2401",
+   "name": "alias-definition-not-dollar-name",
+   "severity": "error",
+   "message": "definition= names an ordinary definition by its `$` name, such as \"$DIFFPAIR\", not {definition:?} (16.5)",
+   "sections": [
+    "16.5"
+   ]
+  },
+  {
+   "number": "RNL2402",
+   "name": "alias-dollar-mismatch",
+   "severity": "error",
+   "message": "the alias and the original of a name both carry `$`, such as @ALIAS(\"$DP\", \"$DIFFERENTIAL_PAIR\") (16.5)",
+   "sections": [
+    "16.5"
+   ]
+  },
+  {
+   "number": "RNL2403",
+   "name": "alias-is-original",
+   "severity": "error",
+   "message": "[in alias package {package}, ]{alias} is already the original of another alias and cannot be an alias (16.5)",
+   "sections": [
+    "16.5"
+   ]
+  },
+  {
+   "number": "RNL2404",
+   "name": "alias-is-standard-word",
+   "severity": "error",
+   "message": "the alias {alias} is the name of a standard word (16.5)",
+   "sections": [
+    "16.5"
+   ]
+  },
+  {
+   "number": "RNL2405",
+   "name": "alias-keyword-mismatch",
+   "severity": "error",
+   "message": "the original and the alias of a keyword both carry `@`; other words carry neither (16.5)",
+   "sections": [
+    "16.5"
+   ]
+  },
+  {
+   "number": "RNL2406",
+   "name": "alias-malformed-or-keyword",
+   "severity": "error",
+   "message": "the alias {alias} is not well formed or is the name of a standard keyword (16.5)",
+   "sections": [
+    "16.5"
+   ]
+  },
+  {
+   "number": "RNL2407",
+   "name": "alias-of-outer-form-keyword",
+   "severity": "error",
+   "message": "{original} belongs to the outer form and cannot have an alias (16.5)",
+   "sections": [
+    "16.5"
+   ]
+  },
+  {
+   "number": "RNL2408",
+   "name": "alias-of-use-aliases",
+   "severity": "error",
+   "message": "@USE-ALIASES cannot have an alias: the aliases are not known before it is read (16.5)",
+   "sections": [
+    "16.5"
+   ]
+  },
+  {
+   "number": "RNL2409",
+   "name": "alias-original-is-alias",
+   "severity": "error",
+   "message": "[in alias package {package}, ]the alias {original} cannot also be an original (16.5)",
+   "sections": [
+    "16.5"
+   ]
+  },
+  {
+   "number": "RNL2410",
+   "name": "alias-original-not-standard",
+   "severity": "error",
+   "message": "the original {original} is not a standard {keyword|word} (16.5)",
+   "sections": [
+    "16.5"
+   ]
+  },
+  {
+   "number": "RNL2411",
+   "name": "alias-same-as-original",
+   "severity": "error",
+   "message": "the alias {alias} is the same as the original (16.5)",
+   "sections": [
+    "16.5"
+   ]
+  },
+  {
+   "number": "RNL2412",
+   "name": "alias-scoped-conflict",
+   "severity": "error",
+   "message": "[in alias package {package}, ]the alias {alias} in {definition} is already declared for {old} and cannot also be {original} (16.5)",
+   "sections": [
+    "16.5"
+   ]
+  },
+  {
+   "number": "RNL2413",
+   "name": "alias-scoped-like-own-name",
+   "severity": "error",
+   "message": "the alias {alias} is spelled like a role, parameter or local name of the definition {definition} itself; its meaning is not unique and the alias is not used (16.5)",
+   "sections": [
+    "16.5"
+   ]
+  },
+  {
+   "number": "RNL2414",
+   "name": "alias-scoped-like-priority",
+   "severity": "error",
+   "message": "[in alias package {package}, ]the alias {alias} is spelled like the standard parameter priority of AS, ATTACH or its alias; its meaning is not unique (16.5)",
+   "sections": [
+    "16.5"
+   ]
+  },
+  {
+   "number": "RNL2415",
+   "name": "alias-scoped-malformed",
+   "severity": "error",
+   "message": "alias {alias:?} is not well formed: an alias of a name in a definition must be writable unquoted in parentheses (16.5)",
+   "sections": [
+    "16.5",
+    "3.6"
+   ]
+  },
+  {
+   "number": "RNL2416",
+   "name": "alias-scoped-original-prefixed",
+   "severity": "error",
+   "message": "with definition=, the original is a role, parameter or local name without a prefix, not {original:?} (16.5)",
+   "sections": [
+    "16.5"
+   ]
+  },
+  {
+   "number": "RNL2417",
+   "name": "alias-takes-strings",
+   "severity": "error",
+   "message": "@ALIAS takes two strings: the alias and the original; definition= is a string too (16.5)",
+   "sections": [
+    "5.3",
+    "16.5"
+   ]
+  },
+  {
+   "number": "RNL2600",
+   "name": "number-cycle",
+   "severity": "error",
+   "message": "{ref}: the object with this number is made by a member that is still being read, through this one: a cycle (5.9, 6.6)",
+   "sections": [
+    "1.5",
+    "5.9"
+   ]
+  },
+  {
+   "number": "RNL2601",
+   "name": "number-in-definition-body",
+   "severity": "error",
+   "message": "{ref}: a number is written only in the statements of the record of the solver, not in a definition body (5.9)",
+   "sections": [
+    "5.9"
+   ]
+  },
+  {
+   "number": "RNL2602",
+   "name": "number-object-not-made",
+   "severity": "error",
+   "message": "{ref}: the object with this number is not made when the level is read with its records of the solver (5.9)",
+   "sections": [
+    "5.9"
+   ]
+  },
+  {
+   "number": "RNL2603",
+   "name": "number-out-of-range",
+   "severity": "error",
+   "message": "{ref}: no object without a name has this number; the level numbers {count} (5.9)",
+   "sections": [
+    "5.9"
+   ]
+  },
+  {
+   "number": "RNL2604",
+   "name": "number-outside-solver-record",
+   "severity": "error",
+   "message": "{ref}: a number is written only in the record of the solver, with type=\"generated\" and the field numbering, in the level's own text (2.6, 2.8, 5.9)",
+   "sections": [
+    "5.9"
+   ]
+  },
+  {
+   "number": "RNL2605",
+   "name": "numbering-record-stale",
+   "severity": "hint",
+   "message": "this record of the solver is out of date for the objects without a name: its numbering is not the check of the level, so its statements that use a number take no effect; solve the level again (5.9)",
+   "sections": [
+    "5.9"
+   ]
+  },
+  {
+   "number": "RNL2700",
+   "name": "cycle-of-sets",
+   "severity": "error",
+   "message": "a cycle of sets: {a} depends on {b} here, {b} on {c} at {loc}, and {c} on {a} at {loc}; taken in order of position, this statement closes it and fails (5.2.2)",
+   "sections": [
+    "5.2.2"
+   ]
+  },
+  {
+   "number": "RNL2800",
+   "name": "definition-hides-inherited",
+   "severity": "hint",
+   "message": "{name} hides the definition of the same name {in the package P | in the standard package rnl-std | in P of the standard package rnl-std | in the level above, L}; this level and below use this one (6.8)",
+   "sections": [
+    "6.8"
+   ]
+  },
+  {
+   "number": "RNL2801",
+   "name": "name-bound-twice",
+   "severity": "error",
+   "message": "{prefix}{name} is already bound to another object in this level; the first binding is kept (6.6)",
+   "sections": [
+    "6.6"
+   ]
+  },
+  {
+   "number": "RNL2900",
+   "name": "rule-uses-own-level-objects",
+   "severity": "warning",
+   "message": "this rule uses objects of the level it is written in, so it takes effect only there (10.5)",
+   "sections": [
+    "10.5"
+   ]
+  },
+  {
+   "number": "RNL2901",
+   "name": "scope-no-subcircuit",
+   "severity": "error",
+   "message": "scope=\"{target}\" finds no subcircuit below this level: the statements of the record fail (2.6)",
+   "sections": [
+    "2.6"
+   ]
+  },
+  {
+   "number": "RNL3000",
+   "name": "keyword-alias-original-not-standard",
+   "severity": "error",
+   "message": "unknown keyword @{kw}: the original of this alias in alias package {package} is not a standard keyword, so it is not used (16.5)",
+   "sections": [
+    "16.4",
+    "16.5"
+   ]
+  },
+  {
+   "number": "RNL3001",
+   "name": "keyword-bundle-empty-set",
+   "severity": "error",
+   "message": "BUNDLE received an empty set and fails (5.2.1, 11.8)",
+   "sections": [
+    "5.2.1"
+   ]
+  },
+  {
+   "number": "RNL3002",
+   "name": "keyword-bundle-member-failed",
+   "severity": "error",
+   "message": "a member of the bundle cannot be found: the whole bundle fails (11.8)",
+   "sections": [
+    "11.8"
+   ]
+  },
+  {
+   "number": "RNL3003",
+   "name": "keyword-bundle-member-not-instance",
+   "severity": "error",
+   "message": "the members of a bundle are host instances, not {object} (11.8)",
+   "sections": [
+    "11.8"
+   ]
+  },
+  {
+   "number": "RNL3004",
+   "name": "keyword-definition-has-role",
+   "severity": "error",
+   "message": "a definition is written last and carries no role (4.2 rule 7)",
+   "sections": [
+    "4.2"
+   ]
+  },
+  {
+   "number": "RNL3005",
+   "name": "keyword-definition-missing",
+   "severity": "error",
+   "message": "the definition of @{kw} is written last (5.6)",
+   "sections": [
+    "5.2.1",
+    "5.6"
+   ]
+  },
+  {
+   "number": "RNL3006",
+   "name": "keyword-definition-piped",
+   "severity": "error",
+   "message": "a definition cannot come down a pipe: the piped object fills the first position, and the definition of @{kw} is written after it (5.6)",
+   "sections": [
+    "5.6"
+   ]
+  },
+  {
+   "number": "RNL3007",
+   "name": "keyword-graphic-not-points",
+   "severity": "error",
+   "message": "the points of @{kw} are points (9.2.5)",
+   "sections": [
+    "5.2.4",
+    "9.2.5"
+   ]
+  },
+  {
+   "number": "RNL3008",
+   "name": "keyword-graphic-point-count",
+   "severity": "error",
+   "message": "@{kw} has the wrong number of points (9.2.5)",
+   "sections": [
+    "9.2.5"
+   ]
+  },
+  {
+   "number": "RNL3009",
+   "name": "keyword-graphic-points-selection",
+   "severity": "error",
+   "message": "the points of @{kw} take no selection (9.2.5)",
+   "sections": [
+    "9.2.5",
+    "10.4"
+   ]
+  },
+  {
+   "number": "RNL3010",
+   "name": "keyword-graphic-symbol-points",
+   "severity": "error",
+   "message": "graphics in a symbol body use points of the body (9.2.1)",
+   "sections": [
+    "9.2.1",
+    "9.2.2"
+   ]
+  },
+  {
+   "number": "RNL3011",
+   "name": "keyword-group-not-a-set",
+   "severity": "error",
+   "message": "GROUP takes a set (11.5)",
+   "sections": [
+    "11.5",
+    "5.2.1"
+   ]
+  },
+  {
+   "number": "RNL3012",
+   "name": "keyword-header-only",
+   "severity": "error",
+   "message": "@{kw} is written only in the header record (2.8)",
+   "sections": [
+    "2.8",
+    "16.1",
+    "6.12",
+    "16.5"
+   ]
+  },
+  {
+   "number": "RNL3013",
+   "name": "keyword-no-object",
+   "severity": "error",
+   "message": "@{kw} has no object: the signature does not match (5.2.1)",
+   "sections": [
+    "5.2.1"
+   ]
+  },
+  {
+   "number": "RNL3014",
+   "name": "keyword-object-failed",
+   "severity": "error",
+   "message": "the object of @{kw} failed",
+   "sections": [
+    "7.2"
+   ]
+  },
+  {
+   "number": "RNL3015",
+   "name": "keyword-pin-not-a-point",
+   "severity": "error",
+   "message": "PIN takes one point (9.2.4)",
+   "sections": [
+    "9.2.1",
+    "9.2.4"
+   ]
+  },
+  {
+   "number": "RNL3016",
+   "name": "keyword-pin-outside-symbol",
+   "severity": "error",
+   "message": "pins cannot be written in the scene; PIN is written only in a DEFINE-SYMBOL body (13.4)",
+   "sections": [
+    "9.2.2"
+   ]
+  },
+  {
+   "number": "RNL3017",
+   "name": "keyword-position-labelled-twice",
+   "severity": "error",
+   "message": "a role is labelled only once (4.2 rule 6)",
+   "sections": [
+    "4.2"
+   ]
+  },
+  {
+   "number": "RNL3018",
+   "name": "keyword-position-not-filled",
+   "severity": "error",
+   "message": "the {position} of @{kw} is not filled (5.3)",
+   "sections": [
+    "5.2.1",
+    "5.3"
+   ]
+  },
+  {
+   "number": "RNL3019",
+   "name": "keyword-scene-only-in-included-file",
+   "severity": "error",
+   "message": "the file level of an included file has no circuit: a statement that only draws a scene object has no level to draw in (6.1)",
+   "sections": [
+    "6.1"
+   ]
+  },
+  {
+   "number": "RNL3020",
+   "name": "keyword-scene-only-in-package",
+   "severity": "error",
+   "message": "a statement that only draws a scene object has no level to draw in, in a package (16.2)",
+   "sections": [
+    "16.2"
+   ]
+  },
+  {
+   "number": "RNL3021",
+   "name": "keyword-set-symbol-block-no-effect",
+   "severity": "warning",
+   "message": "only `# @SET-SYMBOL` in a subcircuit is a block symbol; a file level has no instances, so this has no effect (9.2.6)",
+   "sections": [
+    "9.2.6",
+    "6.9"
+   ]
+  },
+  {
+   "number": "RNL3022",
+   "name": "keyword-set-symbol-not-a-symbol",
+   "severity": "error",
+   "message": "the last object of SET-SYMBOL must be a symbol, not {object} (11.3){why}",
+   "sections": [
+    "5.6"
+   ]
+  },
+  {
+   "number": "RNL3023",
+   "name": "keyword-slot-count",
+   "severity": "error",
+   "message": "@{kw} has {slots} slots, and {n} objects are written (5.2.1){hint}",
+   "sections": [
+    "5.2.1",
+    "14.9"
+   ]
+  },
+  {
+   "number": "RNL3024",
+   "name": "keyword-slot-count-with-definition",
+   "severity": "error",
+   "message": "@{kw} has 2 slots, and {n} objects are written (5.2.1); for several objects, write {{{objects}}} @{kw} {definition}",
+   "sections": [
+    "5.2.1"
+   ]
+  },
+  {
+   "number": "RNL3025",
+   "name": "keyword-symbol-modifier-target",
+   "severity": "error",
+   "message": "in a symbol body @{kw} applies only to a text on `?` or a usage in the body (9.2.2)",
+   "sections": [
+    "9.2.2"
+   ]
+  },
+  {
+   "number": "RNL3026",
+   "name": "keyword-text-symbol-attach",
+   "severity": "error",
+   "message": "a TEXT in a symbol body is attached to a point or to `?` (9.2.5)",
+   "sections": [
+    "9.2.2",
+    "9.2.5"
+   ]
+  },
+  {
+   "number": "RNL3027",
+   "name": "keyword-unknown",
+   "severity": "error",
+   "message": "unknown keyword @{kw}{did_you_mean}{alias_hint} (16.4)",
+   "sections": [
+    "16.4"
+   ]
+  },
+  {
+   "number": "RNL3028",
+   "name": "keyword-unknown-missing-space",
+   "severity": "error",
+   "message": "unknown keyword @{kw}: is a space missing after `@{prefix}`? (16.5)",
+   "sections": [
+    "16.5"
+   ]
+  },
+  {
+   "number": "RNL3029",
+   "name": "keyword-unknown-position",
+   "severity": "error",
+   "message": "@{kw} has no position {role}{alias_hint} (5.3)",
+   "sections": [
+    "5.3"
+   ]
+  },
+  {
+   "number": "RNL3100",
+   "name": "param-bad-colour",
+   "severity": "error",
+   "message": "a colour is written like \"#RRGGBB\" (9.3), not {value}",
+   "sections": [
+    "9.3"
+   ]
+  },
+  {
+   "number": "RNL3101",
+   "name": "param-bad-enum",
+   "severity": "error",
+   "message": "the {name} of @{kw} cannot be {value}; one of {values} (16.4)",
+   "sections": [
+    "16.4",
+    "11.2",
+    "13.1"
+   ]
+  },
+  {
+   "number": "RNL3102",
+   "name": "param-bare-word",
+   "severity": "error",
+   "message": "`{word}` is written as a string: enumerations are in quotes (3.7)",
+   "sections": [
+    "3.7"
+   ]
+  },
+  {
+   "number": "RNL3103",
+   "name": "param-distance-exact-with-bounds",
+   "severity": "error",
+   "message": "exact of DISTANCE cannot be written with min or max (14.5)",
+   "sections": [
+    "14.5"
+   ]
+  },
+  {
+   "number": "RNL3104",
+   "name": "param-distance-min-above-max",
+   "severity": "error",
+   "message": "the min of DISTANCE cannot be greater than its max (14.5)",
+   "sections": [
+    "14.5"
+   ]
+  },
+  {
+   "number": "RNL3105",
+   "name": "param-distance-no-bound",
+   "severity": "error",
+   "message": "DISTANCE takes at least one of min, max and exact (14.5)",
+   "sections": [
+    "14.5"
+   ]
+  },
+  {
+   "number": "RNL3106",
+   "name": "param-graphic-width-height",
+   "severity": "error",
+   "message": "write both width and height of @{kw} (9.2.5)",
+   "sections": [
+    "9.2.5"
+   ]
+  },
+  {
+   "number": "RNL3107",
+   "name": "param-hole-is-role",
+   "severity": "error",
+   "message": "?{name} is a role and cannot stand where a literal goes (6.10)",
+   "sections": [
+    "6.10"
+   ]
+  },
+  {
+   "number": "RNL3108",
+   "name": "param-hole-not-number",
+   "severity": "error",
+   "message": "?{name} is not a number and cannot be a coordinate",
+   "sections": [
+    "9.4",
+    "3.8"
+   ]
+  },
+  {
+   "number": "RNL3109",
+   "name": "param-hole-unset-array-element",
+   "severity": "error",
+   "message": "?{name} has no value passed and no default: as an array element it has no definite meaning, so the statement fails (9.4)",
+   "sections": [
+    "9.4"
+   ]
+  },
+  {
+   "number": "RNL3110",
+   "name": "param-hole-unset-positional",
+   "severity": "error",
+   "message": "?{name} has no value passed and no default: in a positional parameter it has no definite meaning, so the statement fails (9.4)",
+   "sections": [
+    "9.4"
+   ]
+  },
+  {
+   "number": "RNL3111",
+   "name": "param-missing-required",
+   "severity": "error",
+   "message": "@{kw} lacks the parameter {name} (5.3)",
+   "sections": [
+    "5.3"
+   ]
+  },
+  {
+   "number": "RNL3112",
+   "name": "param-old-direction",
+   "severity": "error",
+   "message": "axis and direction of @{kw} are one parameter now, direction, written first by position, such as @ORDER(\"left-to-right\") or @DISTANCE(\"bottom-to-top\", min=2); with no sense write \"x\" or \"y\" ({section})",
+   "sections": [
+    "16.4",
+    "14.3"
+   ]
+  },
+  {
+   "number": "RNL3113",
+   "name": "param-pin-terminal-empty",
+   "severity": "error",
+   "message": "the terminal= array of a bus pin has at least one element (9.2.4)",
+   "sections": [
+    "9.2.4"
+   ]
+  },
+  {
+   "number": "RNL3114",
+   "name": "param-place-needs-x-or-y",
+   "severity": "error",
+   "message": "PLACE takes x, y or both (11.1)",
+   "sections": [
+    "11.1",
+    "5.3"
+   ]
+  },
+  {
+   "number": "RNL3115",
+   "name": "param-positional-not-allowed",
+   "severity": "error",
+   "message": "the parameters of @{kw} cannot be written by position; write each by name{example} (4.2 rule 9)",
+   "sections": [
+    "4.2"
+   ]
+  },
+  {
+   "number": "RNL3116",
+   "name": "param-symbol-box-malformed",
+   "severity": "error",
+   "message": "box= is written [x1, y1, x2, y2] (9.2.3)",
+   "sections": [
+    "9.2.3",
+    "5.3"
+   ]
+  },
+  {
+   "number": "RNL3117",
+   "name": "param-too-many-positional",
+   "severity": "error",
+   "message": "@{kw} takes at most {n} parameters by position ({names}), {m} are written (4.2 rule 9)",
+   "sections": [
+    "4.2"
+   ]
+  },
+  {
+   "number": "RNL3118",
+   "name": "param-unknown",
+   "severity": "error",
+   "message": "@{kw} has no parameter {name}{did_you_mean}{alias_hint} (16.4)",
+   "sections": [
+    "16.4",
+    "9.3",
+    "9.4"
+   ]
+  },
+  {
+   "number": "RNL3119",
+   "name": "param-written-twice",
+   "severity": "error",
+   "message": "parameter {name} of @{kw} is written twice (4.2 rule 9)",
+   "sections": [
+    "4.2"
+   ]
+  },
+  {
+   "number": "RNL3120",
+   "name": "param-wrong-type",
+   "severity": "error",
+   "message": "the {name} of @{kw} has the wrong type (5.3)",
+   "sections": [
+    "5.3"
+   ]
+  },
+  {
+   "number": "RNL3200",
+   "name": "ref-bare-hole-outside-symbol",
+   "severity": "error",
+   "message": "a bare `?` is written only in a symbol body, meaning the object the symbol draws (13.3)",
+   "sections": [
+    "4.1",
+    "9.4",
+    "13.3"
+   ]
+  },
+  {
+   "number": "RNL3201",
+   "name": "ref-define-self-no-outer",
+   "severity": "error",
+   "message": "a definition body does not see the name it defines: {name} in the body means the outer definition of that name (above or in a package), and there is none (6.9)",
+   "sections": [
+    "6.9"
+   ]
+  },
+  {
+   "number": "RNL3202",
+   "name": "ref-define-self-no-outer-local",
+   "severity": "error",
+   "message": "a definition body does not see the name it defines: {name} in the body means the outer definition of that name; `%` names are not inherited, and there is none (6.8, 6.9)",
+   "sections": [
+    "6.9",
+    "6.8"
+   ]
+  },
+  {
+   "number": "RNL3203",
+   "name": "ref-failed",
+   "severity": "error",
+   "message": "{prefix}{name} failed",
+   "sections": [
+    "7.2"
+   ]
+  },
+  {
+   "number": "RNL3204",
+   "name": "ref-hole-coord-not-param",
+   "severity": "error",
+   "message": "?{name} is not a parameter (6.10)",
+   "sections": [
+    "6.10"
+   ]
+  },
+  {
+   "number": "RNL3205",
+   "name": "ref-hole-not-a-param",
+   "severity": "error",
+   "message": "?{name} is not in the parameter list (6.10)",
+   "sections": [
+    "6.10"
+   ]
+  },
+  {
+   "number": "RNL3206",
+   "name": "ref-hole-outside-definition",
+   "severity": "error",
+   "message": "?{name} is written only in the body of an ordinary definition (6.10)",
+   "sections": [
+    "6.10"
+   ]
+  },
+  {
+   "number": "RNL3207",
+   "name": "ref-hole-param-as-object",
+   "severity": "error",
+   "message": "?{name} is a parameter and is written only where a literal goes (6.10)",
+   "sections": [
+    "6.10"
+   ]
+  },
+  {
+   "number": "RNL3208",
+   "name": "ref-hole-unknown",
+   "severity": "error",
+   "message": "?{name} is not in the role list or the parameter list (6.10)",
+   "sections": [
+    "6.10"
+   ]
+  },
+  {
+   "number": "RNL3209",
+   "name": "ref-host-in-body",
+   "severity": "error",
+   "message": "a definition body cannot reference host objects; they come in through roles (6.9)",
+   "sections": [
+    "6.9"
+   ]
+  },
+  {
+   "number": "RNL3210",
+   "name": "ref-host-in-included-file",
+   "severity": "error",
+   "message": "the file level of an included file has no circuit of its own: host references fail (6.1)",
+   "sections": [
+    "6.1"
+   ]
+  },
+  {
+   "number": "RNL3211",
+   "name": "ref-host-in-package",
+   "severity": "error",
+   "message": "a package has no circuit of its own: statements that name host objects fail (16.2)",
+   "sections": [
+    "16.2"
+   ]
+  },
+  {
+   "number": "RNL3212",
+   "name": "ref-missing-from-package",
+   "severity": "error",
+   "message": "${name} cannot be found: it is in package {package}, and the {package} in effect here does not have it (dropped, replaced, or its reference failed); this statement fails (16.2)",
+   "sections": [
+    "16.2"
+   ]
+  },
+  {
+   "number": "RNL3213",
+   "name": "ref-name-cycle",
+   "severity": "error",
+   "message": "the name refers to itself in a cycle (6.6)",
+   "sections": [
+    "1.5",
+    "5.2.2"
+   ]
+  },
+  {
+   "number": "RNL3214",
+   "name": "ref-no-circuit",
+   "severity": "error",
+   "message": "there is no circuit here",
+   "sections": [
+    "6.1",
+    "16.2"
+   ]
+  },
+  {
+   "number": "RNL3215",
+   "name": "ref-no-instance",
+   "severity": "error",
+   "message": "this level has no instance {name} (6.3)",
+   "sections": [
+    "6.3"
+   ]
+  },
+  {
+   "number": "RNL3216",
+   "name": "ref-no-net",
+   "severity": "error",
+   "message": "this level has no net {name} (6.3)",
+   "sections": [
+    "6.3"
+   ]
+  },
+  {
+   "number": "RNL3217",
+   "name": "ref-no-object",
+   "severity": "error",
+   "message": "{prefix}{name} produces no object",
+   "sections": [
+    "1.5",
+    "6.6"
+   ]
+  },
+  {
+   "number": "RNL3218",
+   "name": "ref-no-subobject",
+   "severity": "error",
+   "message": "{object} has no sub-object {name} (6.5)",
+   "sections": [
+    "6.5"
+   ]
+  },
+  {
+   "number": "RNL3219",
+   "name": "ref-no-terminal",
+   "severity": "error",
+   "message": "{object} has no terminal {name} (6.4, 6.12)",
+   "sections": [
+    "6.4"
+   ]
+  },
+  {
+   "number": "RNL3220",
+   "name": "ref-no-terminals",
+   "severity": "error",
+   "message": "{object} has no terminals (6.4)",
+   "sections": [
+    "6.4",
+    "12.1"
+   ]
+  },
+  {
+   "number": "RNL3221",
+   "name": "ref-not-found",
+   "severity": "error",
+   "message": "{prefix}{name} cannot be found{did_you_mean} (6.6)",
+   "sections": [
+    "6.6"
+   ]
+  },
+  {
+   "number": "RNL3222",
+   "name": "ref-owner-subobject",
+   "severity": "error",
+   "message": "the `?` of a symbol is only an object of TEXT (13.3)",
+   "sections": [
+    "13.3"
+   ]
+  },
+  {
+   "number": "RNL3300",
+   "name": "select-ancestor-scope-level",
+   "severity": "error",
+   "message": "the scope of SELECT-ANCESTOR-USAGE cannot be `#`: this level is no one's member (10.1)",
+   "sections": [
+    "10.1"
+   ]
+  },
+  {
+   "number": "RNL3301",
+   "name": "select-definition-not-definition",
+   "severity": "error",
+   "message": "the last object of {kw} must be an ordinary definition, not {object} (10.1)",
+   "sections": [
+    "10.1",
+    "5.6"
+   ]
+  },
+  {
+   "number": "RNL3302",
+   "name": "select-positional-condition",
+   "severity": "error",
+   "message": "the conditions of a selection are written by name only (10.1)",
+   "sections": [
+    "4.2",
+    "10.1"
+   ]
+  },
+  {
+   "number": "RNL3303",
+   "name": "select-usage-not-usage",
+   "severity": "hint",
+   "message": "SELECT-USAGE looks inward and {object} is not a usage, so nothing is selected; to find the usages it is in, use SELECT-ANCESTOR-USAGE (10.1)",
+   "sections": [
+    "10.1"
+   ]
+  },
+  {
+   "number": "RNL3304",
+   "name": "set-edit-target-not-set",
+   "severity": "error",
+   "message": "the target of {kw} must be a set; nothing is wrapped (5.2.2)",
+   "sections": [
+    "5.2.2"
+   ]
+  },
+  {
+   "number": "RNL3305",
+   "name": "set-empty-literal",
+   "severity": "warning",
+   "message": "an empty set written directly: nothing happens (5.2.1)",
+   "sections": [
+    "5.2.1"
+   ]
+  },
+  {
+   "number": "RNL3400",
+   "name": "define-body-host-ref",
+   "severity": "error",
+   "message": "the body of an ordinary definition cannot reference host objects; they come in through roles (6.9)",
+   "sections": [
+    "6.9"
+   ]
+  },
+  {
+   "number": "RNL3401",
+   "name": "define-body-not-one-set",
+   "severity": "error",
+   "message": "@{kw} takes one set as its body (9.1)",
+   "sections": [
+    "9.1",
+    "5.2.1"
+   ]
+  },
+  {
+   "number": "RNL3402",
+   "name": "define-body-pin",
+   "severity": "error",
+   "message": "PIN is written only in a DEFINE-SYMBOL body (9.2.4)",
+   "sections": [
+    "9.2.2"
+   ]
+  },
+  {
+   "number": "RNL3403",
+   "name": "define-local-name-clash",
+   "severity": "error",
+   "message": "the local name {name} is spelled like a role name or a standard sub-object name (9.4)",
+   "sections": [
+    "6.9"
+   ]
+  },
+  {
+   "number": "RNL3404",
+   "name": "define-local-name-twice",
+   "severity": "error",
+   "message": "the local name {name} is bound twice (6.6)",
+   "sections": [
+    "6.9"
+   ]
+  },
+  {
+   "number": "RNL3405",
+   "name": "define-param-malformed",
+   "severity": "error",
+   "message": "a parameter is a name or [name, default] (9.4)",
+   "sections": [
+    "6.9"
+   ]
+  },
+  {
+   "number": "RNL3406",
+   "name": "define-param-name-invalid",
+   "severity": "error",
+   "message": "the parameter name {name} cannot be used (9.4)",
+   "sections": [
+    "6.9"
+   ]
+  },
+  {
+   "number": "RNL3407",
+   "name": "define-role-malformed",
+   "severity": "error",
+   "message": "a role is a name or [name, kind] (9.4)",
+   "sections": [
+    "6.9"
+   ]
+  },
+  {
+   "number": "RNL3408",
+   "name": "define-role-name-invalid",
+   "severity": "error",
+   "message": "the role name {name} is used twice or is a standard sub-object name (9.4)",
+   "sections": [
+    "6.9"
+   ]
+  },
+  {
+   "number": "RNL3409",
+   "name": "define-role-unknown-kind",
+   "severity": "error",
+   "message": "unknown kind name {kind} (9.4)",
+   "sections": [
+    "6.9"
+   ]
+  },
+  {
+   "number": "RNL3410",
+   "name": "define-symbol-body-bad-object",
+   "severity": "error",
+   "message": "a symbol body holds only graphics, pins, points, merged symbols, usages that only draw and texts on `?` (9.2.2)",
+   "sections": [
+    "9.2.2"
+   ]
+  },
+  {
+   "number": "RNL3411",
+   "name": "define-symbol-body-bad-statement",
+   "severity": "error",
+   "message": "this statement cannot be written in a symbol body (9.2.2)",
+   "sections": [
+    "9.2.2"
+   ]
+  },
+  {
+   "number": "RNL3412",
+   "name": "define-symbol-cycle",
+   "severity": "error",
+   "message": "nested symbols form a cycle (9.2.7)",
+   "sections": [
+    "9.1",
+    "9.2.7"
+   ]
+  },
+  {
+   "number": "RNL3413",
+   "name": "define-symbol-depth-limit",
+   "severity": "error",
+   "message": "nested symbols exceed this implementation's limit of {limit} symbol levels (9.2.7)",
+   "sections": [
+    "3.7",
+    "9.2.7"
+   ]
+  },
+  {
+   "number": "RNL3414",
+   "name": "define-symbol-expansion-limit",
+   "severity": "error",
+   "message": "symbol expansion exceeds this implementation's limit of {limit} active symbol bodies (9.2.7)",
+   "sections": [
+    "3.7",
+    "9.2.7"
+   ]
+  },
+  {
+   "number": "RNL3415",
+   "name": "define-unnamed-unused",
+   "severity": "warning",
+   "message": "a definition at the top of a record without a name is never used (9.1)",
+   "sections": [
+    "9.1"
+   ]
+  },
+  {
+   "number": "RNL3500",
+   "name": "role-labels-mixed",
+   "severity": "error",
+   "message": "label the roles of all objects or of none (4.2 rule 6)",
+   "sections": [
+    "4.2"
+   ]
+  },
+  {
+   "number": "RNL3501",
+   "name": "usage-cyclic-application",
+   "severity": "error",
+   "message": "cyclic application: {path}; this application fails (9.4)",
+   "sections": [
+    "9.4"
+   ]
+  },
+  {
+   "number": "RNL3502",
+   "name": "usage-definition-has-role",
+   "severity": "error",
+   "message": "the definition of @{kw} is written {first_or_last} and carries no role (4.2 rule 7)",
+   "sections": [
+    "4.2"
+   ]
+  },
+  {
+   "number": "RNL3503",
+   "name": "usage-definition-piped",
+   "severity": "error",
+   "message": "the definition of @{kw} is written {first_or_last} and cannot come down a pipe (5.6)",
+   "sections": [
+    "5.6"
+   ]
+  },
+  {
+   "number": "RNL3504",
+   "name": "usage-generated-rule",
+   "severity": "error",
+   "message": "generation does not recurse: a rule in what a generation expands fails (10.5)",
+   "sections": [
+    "9.4"
+   ]
+  },
+  {
+   "number": "RNL3505",
+   "name": "usage-in-symbol-first-role-not-point",
+   "severity": "error",
+   "message": "a usage in a symbol body has its first role filled with a point of the body (9.2.7)",
+   "sections": [
+    "9.2.7"
+   ]
+  },
+  {
+   "number": "RNL3506",
+   "name": "usage-in-symbol-not-drawn",
+   "severity": "warning",
+   "message": "the usage of {definition} in a symbol body is given no symbol with SET-SYMBOL and is not drawn (9.2.7)",
+   "sections": [
+    "9.2.7"
+   ]
+  },
+  {
+   "number": "RNL3507",
+   "name": "usage-not-a-definition",
+   "severity": "error",
+   "message": "the object written {first_or_last} for @{kw} must be an ordinary definition, not {object} (5.6)",
+   "sections": [
+    "5.6"
+   ]
+  },
+  {
+   "number": "RNL3508",
+   "name": "usage-param-alias-ambiguous",
+   "severity": "error",
+   "message": "{name} is both a parameter of the definition {definition} and an alias of priority; its meaning is not unique (16.5)",
+   "sections": [
+    "16.5"
+   ]
+  },
+  {
+   "number": "RNL3509",
+   "name": "usage-role-failed-object",
+   "severity": "error",
+   "message": "the role {role} received a failed object",
+   "sections": [
+    "7.3",
+    "7.2"
+   ]
+  },
+  {
+   "number": "RNL3510",
+   "name": "usage-role-labelled-twice",
+   "severity": "error",
+   "message": "the role {role} of the ordinary definition {definition} is labelled twice (4.2 rule 6)",
+   "sections": [
+    "4.2"
+   ]
+  },
+  {
+   "number": "RNL3511",
+   "name": "usage-role-not-filled",
+   "severity": "error",
+   "message": "the single role {role} of the ordinary definition {definition} is not filled (9.4)",
+   "sections": [
+    "9.4"
+   ]
+  },
+  {
+   "number": "RNL3512",
+   "name": "usage-role-wrong-kind",
+   "severity": "error",
+   "message": "the role {role} of the ordinary definition {definition} takes {kinds}, not {object} ({kind}) (9.4)",
+   "sections": [
+    "9.4"
+   ]
+  },
+  {
+   "number": "RNL3513",
+   "name": "usage-several-set-roles",
+   "severity": "error",
+   "message": "at most one single role of an application receives a set of several members (5.2.1)",
+   "sections": [
+    "5.2.1"
+   ]
+  },
+  {
+   "number": "RNL3514",
+   "name": "usage-too-many-objects",
+   "severity": "error",
+   "message": "the ordinary definition {definition} has {n} roles, {m} objects are written (9.4)",
+   "sections": [
+    "9.4"
+   ]
+  },
+  {
+   "number": "RNL3515",
+   "name": "usage-unknown-role",
+   "severity": "error",
+   "message": "the ordinary definition {definition} has no role {role}{alias_hint} (9.4){quoted_hint}{renamed_hint}",
+   "sections": [
+    "9.4",
+    "16.5"
+   ]
+  },
+  {
+   "number": "RNL3600",
+   "name": "priority-target-not-allowed",
+   "severity": "error",
+   "message": "PRIORITY takes constraints, usages and grouped sets only, not {object} (14.8)[; several objects are spread into their members, so write one PRIORITY for each group (5.2.1)]",
+   "sections": [
+    "14.8"
+   ]
+  },
+  {
+   "number": "RNL3601",
+   "name": "style-body-not-style",
+   "severity": "error",
+   "message": "the set of DEFINE-STYLE only references other styles (9.3)",
+   "sections": [
+    "9.3"
+   ]
+  },
+  {
+   "number": "RNL3602",
+   "name": "style-set-style-not-a-style",
+   "severity": "error",
+   "message": "the last object of SET-STYLE must be a style, not {object} (11.3)",
+   "sections": [
+    "5.6"
+   ]
+  },
+  {
+   "number": "RNL3700",
+   "name": "attr-cannot-be-shown",
+   "severity": "error",
+   "message": "{object} cannot be shown; take one of its attributes, such as `::x`",
+   "sections": [
+    "13.6"
+   ]
+  },
+  {
+   "number": "RNL3701",
+   "name": "attr-not-host-parameter",
+   "severity": "error",
+   "message": "{object} is not a host instance and has no host parameter {name}",
+   "sections": [
+    "13.6"
+   ]
+  },
+  {
+   "number": "RNL3702",
+   "name": "attr-path-malformed",
+   "severity": "error",
+   "message": "`${{path}}` is not well formed",
+   "sections": [
+    "13.6"
+   ]
+  },
+  {
+   "number": "RNL3703",
+   "name": "attr-text-has-no-attributes",
+   "severity": "error",
+   "message": "text has no attributes; `::{name}` reaches nothing",
+   "sections": [
+    "13.6"
+   ]
+  },
+  {
+   "number": "RNL3704",
+   "name": "attr-unknown",
+   "severity": "error",
+   "message": "{object} has no attribute {name}",
+   "sections": [
+    "13.6"
+   ]
+  },
+  {
+   "number": "RNL3705",
+   "name": "markup-frac-braces",
+   "severity": "warning",
+   "message": "\\frac is followed by two braces, the numerator and the denominator (13.6)",
+   "sections": [
+    "13.6"
+   ]
+  },
+  {
+   "number": "RNL3706",
+   "name": "markup-unbalanced-braces",
+   "severity": "warning",
+   "message": "unbalanced braces are shown as written (13.6)",
+   "sections": [
+    "13.6"
+   ]
+  },
+  {
+   "number": "RNL3707",
+   "name": "markup-unknown-command",
+   "severity": "warning",
+   "message": "unknown markup \\{command} is shown as written (13.6)",
+   "sections": [
+    "13.6"
+   ]
+  },
+  {
+   "number": "RNL3800",
+   "name": "current-not-host-terminal",
+   "severity": "error",
+   "message": "CURRENT takes host terminals only, not {object} (15.2)",
+   "sections": [
+    "15.2"
+   ]
+  },
+  {
+   "number": "RNL4000",
+   "name": "symbol-model-card-missing",
+   "severity": "warning",
+   "message": "the model card `{model}` is not found, so the polarity of {instances}[ and {n} more] is not known and {it|they} {is|are} not drawn (a `.model` card or an include may be missing)",
+   "sections": [
+    "9.2.8"
+   ]
+  },
+  {
+   "number": "RNL4001",
+   "name": "symbol-no-model",
+   "severity": "warning",
+   "message": "{instances}[ and {n} more] name{s} no model, so the polarity is not known and {it|they} {is|are} not drawn",
+   "sections": [
+    "9.2.8"
+   ]
+  },
+  {
+   "number": "RNL4105",
+   "name": "pin-name-not-in-symbol-wire",
+   "severity": "error",
+   "message": "{object}::{name} has no pin in its symbol: the wire fails (9.2.4)",
+   "sections": [
+    "6.5",
+    "9.2.4"
+   ]
+  },
+  {
+   "number": "RNL4114",
+   "name": "pin-terminal-on-no-net",
+   "severity": "error",
+   "message": "{terminal} is on no net (5.2.4, 6.5)",
+   "sections": [
+    "5.2.4",
+    "11.8"
+   ]
+  },
+  {
+   "number": "RNL4200",
+   "name": "point-in-symbol-free-coordinate",
+   "severity": "error",
+   "message": "a point in a symbol body has numbers on both axes (9.2.1)",
+   "sections": [
+    "9.2.1"
+   ]
+  },
+  {
+   "number": "RNL4201",
+   "name": "wire-in-bundle",
+   "severity": "error",
+   "message": "{instance} is in a bundle; wires go to the terminals of the bundle (11.8)",
+   "sections": [
+    "11.8"
+   ]
+  },
+  {
+   "number": "RNL4202",
+   "name": "wire-net-empty-set",
+   "severity": "error",
+   "message": "the net of a wire is an empty set, so the wire fails (5.2.1, 13.1)",
+   "sections": [
+    "5.2.1"
+   ]
+  },
+  {
+   "number": "RNL4203",
+   "name": "wire-net-failed",
+   "severity": "error",
+   "message": "a net of the wire cannot be found: the whole wire fails (13.1)",
+   "sections": [
+    "13.1"
+   ]
+  },
+  {
+   "number": "RNL4204",
+   "name": "wire-net-mismatch",
+   "severity": "warning",
+   "message": "the wire is marked on net {wire_nets}, but the terminal {terminal} it reaches is on {terminal_nets} (13.1)",
+   "sections": [
+    "13.1"
+   ]
+  },
+  {
+   "number": "RNL4205",
+   "name": "wire-net-wrong-kind",
+   "severity": "error",
+   "message": "the net position of a wire received {object}, the wrong kind (13.1)",
+   "sections": [
+    "13.1"
+   ]
+  },
+  {
+   "number": "RNL4206",
+   "name": "wire-no-pin",
+   "severity": "error",
+   "message": "{terminal} has no pin in its symbol: the wire fails (9.2.4)",
+   "sections": [
+    "9.2.4",
+    "5.2.4"
+   ]
+  },
+  {
+   "number": "RNL4207",
+   "name": "wire-no-symbol",
+   "severity": "error",
+   "message": "{usage} has no symbol: a wire to its terminal fails (12.1)",
+   "sections": [
+    "12.1"
+   ]
+  },
+  {
+   "number": "RNL4208",
+   "name": "wire-point-failed",
+   "severity": "error",
+   "message": "a point of the wire failed",
+   "sections": [
+    "7.3",
+    "13.1"
+   ]
+  },
+  {
+   "number": "RNL4209",
+   "name": "wire-point-wrong-kind",
+   "severity": "error",
+   "message": "the points of a wire are terminals or points, not {object} (13.1)",
+   "sections": [
+    "13.1",
+    "5.2.4"
+   ]
+  },
+  {
+   "number": "RNL4210",
+   "name": "wire-rewrite-in-bundle",
+   "severity": "error",
+   "message": "{instance} is in a bundle, and wires go to the terminals of the bundle: this rewrite of {wire} fails and has no effect, its style parameters included; the wire keeps the list and mode of the latest rewrite that holds, or those it was made with (11.8, 5.8, 13.1)",
+   "sections": [
+    "13.1",
+    "11.8"
+   ]
+  },
+  {
+   "number": "RNL4211",
+   "name": "wire-rewrite-no-pin",
+   "severity": "error",
+   "message": "{terminal} has no pin in its symbol: this rewrite of {wire} fails and has no effect, its style parameters included; the wire keeps the list and mode of the latest rewrite that holds, or those it was made with (9.2.4, 5.8, 13.1)",
+   "sections": [
+    "13.1",
+    "9.2.4"
+   ]
+  },
+  {
+   "number": "RNL4212",
+   "name": "wire-rewrite-no-symbol",
+   "severity": "error",
+   "message": "{usage} has no symbol: this rewrite of {wire} fails and has no effect, its style parameters included; the wire keeps the list and mode of the latest rewrite that holds, or those it was made with (12.1, 5.8, 13.1)",
+   "sections": [
+    "13.1",
+    "12.1"
+   ]
+  },
+  {
+   "number": "RNL4213",
+   "name": "wire-too-few-points",
+   "severity": "error",
+   "message": "a wire has at least two points (13.1)",
+   "sections": [
+    "13.1"
+   ]
+  },
+  {
+   "number": "RNL4214",
+   "name": "wire-point-kind-04",
+   "severity": "error",
+   "message": "the points of a wire are pins, terminals or points, not {object} (13.1)",
+   "sections": [
+    "13.1",
+    "5.2.4"
+   ]
+  },
+  {
+   "number": "RNL4300",
+   "name": "place-not-taken",
+   "severity": "error",
+   "message": "PLACE does not take {object} (11.1)",
+   "sections": [
+    "11.1"
+   ]
+  },
+  {
+   "number": "RNL4301",
+   "name": "place-orient-not-taken",
+   "severity": "error",
+   "message": "ORIENT does not take {object} (11.2)",
+   "sections": [
+    "11.2"
+   ]
+  },
+  {
+   "number": "RNL4302",
+   "name": "place-usage-no-symbol",
+   "severity": "error",
+   "message": "{usage} has no symbol and no drawing meaning: {PLACE|ORIENT} fails (12.1)",
+   "sections": [
+    "11.2",
+    "12.1"
+   ]
+  },
+  {
+   "number": "RNL4400",
+   "name": "text-attach-not-allowed",
+   "severity": "error",
+   "message": "TEXT cannot be attached to {object} (13.3)",
+   "sections": [
+    "13.3"
+   ]
+  },
+  {
+   "number": "RNL4401",
+   "name": "text-attached-object-failed",
+   "severity": "error",
+   "message": "the object the TEXT is attached to failed",
+   "sections": [
+    "7.2"
+   ]
+  },
+  {
+   "number": "RNL4402",
+   "name": "text-attr-path-fails",
+   "severity": "error",
+   "message": "`${{path}}`: {reason}[; `${{path}}`: {reason}…]: this text fails (13.6)",
+   "sections": [
+    "13.6"
+   ]
+  },
+  {
+   "number": "RNL4403",
+   "name": "text-attr-path-fails-in-symbol",
+   "severity": "error",
+   "message": "`${{path}}`: {reason}[; …]: this text fails (13.6), the text is written in the symbol {symbol}",
+   "sections": [
+    "13.6"
+   ]
+  },
+  {
+   "number": "RNL4404",
+   "name": "text-key-alias-of-standard-subobject",
+   "severity": "error",
+   "message": "the text key {key} is an alias of the standard sub-object name {std}: `::` takes the alias first and cannot reach this text (13.3, 16.5)",
+   "sections": [
+    "6.5"
+   ]
+  },
+  {
+   "number": "RNL4405",
+   "name": "text-key-alias-of-usage-name",
+   "severity": "error",
+   "message": "the text key {key} is an alias of the {what} {name} of the usage {usage}: `::` takes the alias first and cannot reach this text (13.3, 16.5)",
+   "sections": [
+    "6.5"
+   ]
+  },
+  {
+   "number": "RNL4406",
+   "name": "text-key-like-usage-name",
+   "severity": "error",
+   "message": "the text key {key} is spelled like a {what} of the usage {usage}: `::` takes the {what} first and cannot reach this text (6.5, 13.3)",
+   "sections": [
+    "6.5"
+   ]
+  },
+  {
+   "number": "RNL4407",
+   "name": "text-key-standard-subobject",
+   "severity": "error",
+   "message": "a text key cannot be the standard sub-object name {key} (13.3)",
+   "sections": [
+    "6.5"
+   ]
+  },
+  {
+   "number": "RNL4408",
+   "name": "text-keytext-no-content",
+   "severity": "error",
+   "message": "{text} has no content: the symbol has no such key and the scene wrote no text= (13.3)",
+   "sections": [
+    "13.3"
+   ]
+  },
+  {
+   "number": "RNL4409",
+   "name": "text-missing-text",
+   "severity": "error",
+   "message": "the text= of TEXT must be written (13.3)",
+   "sections": [
+    "13.3"
+   ]
+  },
+  {
+   "number": "RNL4410",
+   "name": "text-on-bundle-member",
+   "severity": "error",
+   "message": "{instance} is in a bundle and is not drawn on its own: this TEXT fails (11.8)",
+   "sections": [
+    "11.8"
+   ]
+  },
+  {
+   "number": "RNL4411",
+   "name": "text-point-takes-no-key",
+   "severity": "error",
+   "message": "a text attached to a point takes no key= (13.3)",
+   "sections": [
+    "13.3"
+   ]
+  },
+  {
+   "number": "RNL4412",
+   "name": "text-symbol-key-clash",
+   "severity": "error",
+   "message": "{clash}; a text written in the symbol, drawn on {usage}",
+   "sections": [
+    "6.5"
+   ]
+  },
+  {
+   "number": "RNL4413",
+   "name": "text-terminal-no-pin",
+   "severity": "error",
+   "message": "{terminal} has no pin in its symbol: this TEXT fails (9.2.4, 13.3)",
+   "sections": [
+    "13.3",
+    "5.2.4"
+   ]
+  },
+  {
+   "number": "RNL4414",
+   "name": "text-usage-no-symbol",
+   "severity": "error",
+   "message": "{usage} has no symbol and no drawing meaning: this TEXT fails (12.1, 13.3)",
+   "sections": [
+    "13.3"
+   ]
+  },
+  {
+   "number": "RNL4415",
+   "name": "text-wire-net-no-offset",
+   "severity": "error",
+   "message": "a text attached to a wire or a net takes no dx, dy (13.3)",
+   "sections": [
+    "13.3"
+   ]
+  },
+  {
+   "number": "RNL4500",
+   "name": "layer-not-taken",
+   "severity": "error",
+   "message": "LAYER does not take {object} (11.6)",
+   "sections": [
+    "11.6"
+   ]
+  },
+  {
+   "number": "RNL4600",
+   "name": "bundle-empty",
+   "severity": "warning",
+   "message": "every member of the bundle was taken by later bundles; the empty bundle is not drawn (11.8)",
+   "sections": [
+    "11.8"
+   ]
+  },
+  {
+   "number": "RNL4601",
+   "name": "bundle-member-drawn-alone",
+   "severity": "error",
+   "message": "{member} is in a bundle and is not drawn on its own: this description fails (11.8)",
+   "sections": [
+    "11.8"
+   ]
+  },
+  {
+   "number": "RNL4602",
+   "name": "bundle-member-kind-differs",
+   "severity": "warning",
+   "message": "the bundle member {member} is not the same kind as {first_member} (11.8)",
+   "sections": [
+    "11.8"
+   ]
+  },
+  {
+   "number": "RNL4800",
+   "name": "net-terminal-on-no-net",
+   "severity": "error",
+   "message": "{terminal} is on no net (6.5)",
+   "sections": [
+    "6.5",
+    "11.8"
+   ]
+  },
+  {
+   "number": "RNL5000",
+   "name": "constraint-member-failed",
+   "severity": "error",
+   "message": "a member of {kw} failed, so the whole constraint fails (7.3)",
+   "sections": [
+    "7.3",
+    "8.5"
+   ]
+  },
+  {
+   "number": "RNL5001",
+   "name": "constraint-member-not-locatable",
+   "severity": "error",
+   "message": "a member of {constraint}: {why}; this constraint fails (14.1)",
+   "sections": [
+    "14.1",
+    "9.2.4",
+    "14.9"
+   ]
+  },
+  {
+   "number": "RNL5002",
+   "name": "constraint-self-contradiction",
+   "severity": "error",
+   "message": "{constraint} has no solution on its own: {why}; this constraint fails (8.5, {section})",
+   "sections": [
+    "8.5"
+   ]
+  },
+  {
+   "number": "RNL5100",
+   "name": "conflict-fact-discarded",
+   "severity": "hint",
+   "message": "{fact} conflicts with the facts taken in and is discarded in the order of 8.5{incomplete} (8.5)",
+   "sections": [
+    "8.5"
+   ]
+  },
+  {
+   "number": "RNL5101",
+   "name": "conflict-fact-discarded-low",
+   "severity": "hint",
+   "message": "discarded {fact}: of priority low, which is expected; {--report lists what it conflicts with (8.5)|the solver did not seek what it conflicts with (hints_for_low, which --report sets; 8.5)}",
+   "sections": [
+    "8.5"
+   ]
+  },
+  {
+   "number": "RNL5102",
+   "name": "conflict-fact-discarded-with-sets",
+   "severity": "hint",
+   "message": "{fact} is discarded in the order of 8.5: it has no solution with {sets}{incomplete} (8.5)",
+   "sections": [
+    "8.5"
+   ]
+  },
+  {
+   "number": "RNL5103",
+   "name": "conflict-fact-undecided",
+   "severity": "hint",
+   "message": "discarded {fact}: not decided within the time limit of the solver (8.5)",
+   "sections": [
+    "8.5"
+   ]
+  },
+  {
+   "number": "RNL5104",
+   "name": "conflict-statement-caused-discards",
+   "severity": "hint",
+   "message": "facts discarded in the order of 8.5 because of this statement: {facts} (8.5)",
+   "sections": [
+    "8.5"
+   ]
+  },
+  {
+   "number": "RNL5200",
+   "name": "contradiction-distance-sides-overlap",
+   "severity": "error",
+   "message": "{constraint} has no solution on its own: {X is on both of its sides | A and B, one on each side, are at one place | C is on one side, and the points it is the centre of on the other}, so the distance between them is at most 0, below {min|max}={value}; this constraint fails (8.5, 14.5)",
+   "sections": [
+    "8.5",
+    "14.5"
+   ]
+  },
+  {
+   "number": "RNL5201",
+   "name": "contradiction-distance-zero",
+   "severity": "error",
+   "message": "{constraint} has no solution on its own: it is a distance from {a} to {b|itself}, which is 0, and {min|max}={value} leaves 0 out; this constraint fails (8.5, 14.5)",
+   "sections": [
+    "8.5",
+    "14.5"
+   ]
+  },
+  {
+   "number": "RNL5202",
+   "name": "contradiction-order-one-place",
+   "severity": "error",
+   "message": "{constraint} has no solution on its own: {a} and {b} are at one place | {a} is a member twice, and a strict order cannot hold one place twice; this constraint fails (8.5, 14.3)",
+   "sections": [
+    "8.5",
+    "14.3"
+   ]
+  },
+  {
+   "number": "RNL5203",
+   "name": "contradiction-orient-relation-both-sides",
+   "severity": "error",
+   "message": "{constraint} has no solution on its own: {object} is on both of its sides, and its orientation cannot be its own turned by {relation}; this constraint fails (8.5, 14.9)",
+   "sections": [
+    "8.5",
+    "14.9"
+   ]
+  },
+  {
+   "number": "RNL5300",
+   "name": "orient-list-fact-text",
+   "severity": "hint",
+   "message": "the orientation {code} or {code}... of {object} is discarded in the order of 8.5: it has no solution with {sets of facts} (as in conflict hints and lost-to lists)",
+   "sections": [
+    "8.5",
+    "11.2"
+   ]
+  },
+  {
+   "number": "RNL7000",
+   "name": "close",
+   "severity": "hint",
+   "message": "{level}: {wire} and {other_wire} run {gap} apart for {length}: crowded",
+   "sections": []
+  },
+  {
+   "number": "RNL7001",
+   "name": "crossings",
+   "severity": "hint",
+   "message": "{level}: {1 crossing of wires|{n} crossings of wires}: {nets} with {nets} at {point}, …[ and {n} more]",
+   "sections": []
+  },
+  {
+   "number": "RNL7003",
+   "name": "looks-joined",
+   "severity": "warning",
+   "message": "{level}: {pin} of {nets} lies on {wire}, a wire of another net, at {point}: it looks joined  ||  {level}: {wire} ends on {other_wire}, a wire of another net, at {point}: it looks joined",
+   "sections": []
+  },
+  {
+   "number": "RNL7004",
+   "name": "loop",
+   "severity": "hint",
+   "message": "{level}: the wires of &{net} close a loop, or draw one stretch twice, near {point}: {wire}",
+   "sections": []
+  },
+  {
+   "number": "RNL7005",
+   "name": "name-only",
+   "severity": "hint",
+   "message": "{level}: {pin} is joined to &{net} by its name alone: no wire, port or label at it, so it looks unconnected; wire it, or give it a label ({$NET_LABEL @ATTACH {pin_key}|{pin_key} @TEXT(\"${net}\", key=\"netname\")})",
+   "sections": []
+  },
+  {
+   "number": "RNL7006",
+   "name": "no-dot",
+   "severity": "hint",
+   "message": "{level}: &{net} joins at {point} without a junction dot: {pins_and_wires} meet there; write $JUNCTION @ATTACH at the point",
+   "sections": []
+  },
+  {
+   "number": "RNL7007",
+   "name": "overlap",
+   "severity": "warning",
+   "message": "{level}: {wire} and {other_wire} run on one line for {length} at {point}: they look like one wire",
+   "sections": []
+  },
+  {
+   "number": "RNL7008",
+   "name": "partly-named",
+   "severity": "hint",
+   "message": "{level}: &{net} is drawn in {n} pieces joined only by its name: {{pins}} {wired|a label|a port|by name}, …; wire them, or draw the net by name alone",
+   "sections": []
+  },
+  {
+   "number": "RNL7009",
+   "name": "port-enclosed",
+   "severity": "hint",
+   "message": "{level}: the port {port}[ (line {n})] of {nets} is enclosed: something lies between it and the outside in every way ({way} {blocker}; …); place it at the edge of the drawing",
+   "sections": []
+  },
+  {
+   "number": "RNL7010",
+   "name": "port-inside",
+   "severity": "hint",
+   "message": "{level}: the port {port} of {nets} faces {way} into the drawing: {blocker} lies between it and the edge; place it at the edge, facing out (the way {free_ways} is free)  ||  {level}: the port {port} of {nets} is buried in the drawing: it faces {way}, but parts lie on its three other sides ({way} {blocker}; …) and the drawing goes on beyond it; place it at the edge of the drawing",
+   "sections": []
+  },
+  {
+   "number": "RNL7011",
+   "name": "silent-open",
+   "severity": "hint",
+   "message": "{level}: {wire} ends on {pin} at {point} without naming it, so they are not joined; write {pin_key} in the wire  ||  {level}: {wire} ends on {other_wire} at {point} but names no point of it, so they are not joined; name one point, such as %j = {point}, in both",
+   "sections": []
+  },
+  {
+   "number": "RNL7012",
+   "name": "text-over-text",
+   "severity": "hint",
+   "message": "{level}: {text} lies over {other_text}",
+   "sections": []
+  },
+  {
+   "number": "RNL7013",
+   "name": "wire-over-symbol",
+   "severity": "hint",
+   "message": "{level}: {wire} runs over the symbol of {part}[ (line {n})]",
+   "sections": []
+  },
+  {
+   "number": "RNL7014",
+   "name": "wire-over-text",
+   "severity": "hint",
+   "message": "{level}: {wire} runs over {text}",
+   "sections": []
+  },
+  {
+   "number": "RNL7015",
+   "name": "wrong-exit",
+   "severity": "hint",
+   "message": "{level}: {wire} leaves {pin} going {way}, against the pin, which points {way}",
+   "sections": []
+  },
+  {
+   "number": "RNL7016",
+   "name": "zero-length",
+   "severity": "hint",
+   "message": "{level}: {wire} has no length  ||  {level}: {wire} has a segment of no length at {point}",
+   "sections": []
+  },
+  {
+   "number": "RNL8000",
+   "name": "cli-cannot-read",
+   "severity": "error",
+   "message": "cannot read {file}: {reason}",
+   "sections": []
+  },
+  {
+   "number": "RNL8001",
+   "name": "cli-cannot-resolve-path",
+   "severity": "error",
+   "message": "cannot resolve {file}: {reason}",
+   "sections": []
+  },
+  {
+   "number": "RNL8002",
+   "name": "cli-command-takes-no-file",
+   "severity": "error",
+   "message": "rnl {command} takes no FILE, not {file}\n{usage}",
+   "sections": []
+  },
+  {
+   "number": "RNL8003",
+   "name": "cli-encoding-unknown",
+   "severity": "error",
+   "message": "unknown encoding {value:?}: use preserve or utf8",
+   "sections": []
+  },
+  {
+   "number": "RNL8004",
+   "name": "cli-explain-args",
+   "severity": "error",
+   "message": "rnl explain takes FILE and REF, such as rnl explain top.sp '#M1'\n{usage}",
+   "sections": []
+  },
+  {
+   "number": "RNL8005",
+   "name": "cli-explain-level-not-found",
+   "severity": "error",
+   "message": "no level is titled {title}; the levels are {titles}",
+   "sections": []
+  },
+  {
+   "number": "RNL8006",
+   "name": "cli-explain-not-found",
+   "severity": "error",
+   "message": "no object is {reference}; close names: {names}",
+   "sections": []
+  },
+  {
+   "number": "RNL8007",
+   "name": "cli-format-path-unused",
+   "severity": "warning",
+   "message": "rnl: warning: --format {path}={name}: {file} reads no such file",
+   "sections": []
+  },
+  {
+   "number": "RNL8008",
+   "name": "cli-io-error-bare",
+   "severity": "error",
+   "message": "{os_error}",
+   "sections": []
+  },
+  {
+   "number": "RNL8009",
+   "name": "cli-needs-out",
+   "severity": "error",
+   "message": "{command} needs -o {what}",
+   "sections": []
+  },
+  {
+   "number": "RNL8010",
+   "name": "cli-option-needs-value",
+   "severity": "error",
+   "message": "{option} needs {what}",
+   "sections": []
+  },
+  {
+   "number": "RNL8011",
+   "name": "cli-option-wrong-command",
+   "severity": "error",
+   "message": "{option} is an option of {command}",
+   "sections": []
+  },
+  {
+   "number": "RNL8012",
+   "name": "cli-overlay-style-unreadable",
+   "severity": "error",
+   "message": "{path}: {reason}",
+   "sections": []
+  },
+  {
+   "number": "RNL8013",
+   "name": "cli-param-needs-bind",
+   "severity": "error",
+   "message": "--param needs --bind SUBCKT, the subcircuit whose parameters it gives",
+   "sections": []
+  },
+  {
+   "number": "RNL8014",
+   "name": "cli-parts-unknown",
+   "severity": "error",
+   "message": "--parts: unknown part {part}; the parts are drawing, host and model",
+   "sections": []
+  },
+  {
+   "number": "RNL8015",
+   "name": "cli-preview-nothing-to-save",
+   "severity": "error",
+   "message": "the solve wrote no file: there is nothing to save",
+   "sections": []
+  },
+  {
+   "number": "RNL8016",
+   "name": "cli-preview-over-read-file",
+   "severity": "error",
+   "message": "a copy is never saved over a file that was read: choose another file or folder",
+   "sections": []
+  },
+  {
+   "number": "RNL8017",
+   "name": "cli-profile-conflicts-output",
+   "severity": "error",
+   "message": "--profile conflicts with a solved output path",
+   "sections": []
+  },
+  {
+   "number": "RNL8018",
+   "name": "cli-profile-create-failed",
+   "severity": "error",
+   "message": "cannot create new profile {path}: {reason}",
+   "sections": []
+  },
+  {
+   "number": "RNL8019",
+   "name": "cli-profile-path-unresolved",
+   "severity": "error",
+   "message": "cannot resolve profile path: {reason}",
+   "sections": []
+  },
+  {
+   "number": "RNL8020",
+   "name": "cli-profile-same-as-input",
+   "severity": "error",
+   "message": "--profile must differ from the input file",
+   "sections": []
+  },
+  {
+   "number": "RNL8021",
+   "name": "cli-profile-write-failed",
+   "severity": "error",
+   "message": "cannot write profile {path}: {reason}",
+   "sections": []
+  },
+  {
+   "number": "RNL8022",
+   "name": "cli-render-has-errors",
+   "severity": "warning",
+   "message": "{n} errors; run `rnl check` to see them",
+   "sections": []
+  },
+  {
+   "number": "RNL8023",
+   "name": "cli-request-invalid",
+   "severity": "error",
+   "message": "the request is not valid: {reason}",
+   "sections": []
+  },
+  {
+   "number": "RNL8024",
+   "name": "cli-request-not-json",
+   "severity": "error",
+   "message": "{file}: {reason}",
+   "sections": []
+  },
+  {
+   "number": "RNL8025",
+   "name": "cli-solve-netlist-errors",
+   "severity": "error",
+   "message": "{n} errors in {entry} as a solver reads it; run `rnl check --no-generated` to see them",
+   "sections": []
+  },
+  {
+   "number": "RNL8026",
+   "name": "cli-solve-no-level",
+   "severity": "hint",
+   "message": "{entry} has no drawing level to solve",
+   "sections": []
+  },
+  {
+   "number": "RNL8027",
+   "name": "cli-solve-outside-not-copied",
+   "severity": "warning",
+   "message": "warning: {entry} reads {path}, which is outside its directory and is not copied under {dir}",
+   "sections": []
+  },
+  {
+   "number": "RNL8028",
+   "name": "cli-solve-target-both",
+   "severity": "error",
+   "message": "solve writes under -o DIR or --in-place, not both",
+   "sections": []
+  },
+  {
+   "number": "RNL8029",
+   "name": "cli-solve-target-missing",
+   "severity": "error",
+   "message": "solve needs -o DIR, to write the files solved under DIR, or --in-place, to write them over the files read",
+   "sections": []
+  },
+  {
+   "number": "RNL8030",
+   "name": "cli-solve-unrouted",
+   "severity": "warning",
+   "message": "the net {net}: left in {n} parts, {the budget of the router ran out|no path joins them}",
+   "sections": []
+  },
+  {
+   "number": "RNL8031",
+   "name": "cli-solver-options-invalid",
+   "severity": "error",
+   "message": "--solver-options: {reason}",
+   "sections": []
+  },
+  {
+   "number": "RNL8032",
+   "name": "cli-unknown-command",
+   "severity": "error",
+   "message": "unknown command {command}\n{usage}",
+   "sections": []
+  },
+  {
+   "number": "RNL8033",
+   "name": "cli-unknown-option",
+   "severity": "error",
+   "message": "unknown option {option}\n{usage}",
+   "sections": []
+  },
+  {
+   "number": "RNL8034",
+   "name": "cli-usage",
+   "severity": "error",
+   "message": "{usage}",
+   "sections": []
+  },
+  {
+   "number": "RNL8100",
+   "name": "solve-cancelled",
+   "severity": "error",
+   "message": "the solve was cancelled",
+   "sections": []
+  },
+  {
+   "number": "RNL8101",
+   "name": "solve-cannot-copy",
+   "severity": "error",
+   "message": "cannot copy {path} to {copy}: {io_error}",
+   "sections": []
+  },
+  {
+   "number": "RNL8102",
+   "name": "solve-cannot-make-dir",
+   "severity": "error",
+   "message": "cannot make {dir}: {io_error}",
+   "sections": []
+  },
+  {
+   "number": "RNL8103",
+   "name": "solve-cannot-write",
+   "severity": "error",
+   "message": "cannot write {path}: {io_error}",
+   "sections": []
+  },
+  {
+   "number": "RNL8104",
+   "name": "solve-destination-outside-dir",
+   "severity": "error",
+   "message": "{path} is not in the directory of {entry}, so it has no name under {dir}; write it with --in-place",
+   "sections": []
+  },
+  {
+   "number": "RNL8105",
+   "name": "solve-fact-kept",
+   "severity": "hint",
+   "message": "kept {fact}",
+   "sections": []
+  },
+  {
+   "number": "RNL8106",
+   "name": "solve-inert-objective",
+   "severity": "hint",
+   "message": "{objective}",
+   "sections": []
+  },
+  {
+   "number": "RNL8107",
+   "name": "solve-level-not-interpreted",
+   "severity": "warning",
+   "message": "level {title} ({file|subckt} in {file}): not solved, and nothing is written for it: {declaring_file} declares the version {version}, which this reading does not interpret: none of its RNL is read, and it is kept as it is (16.1)",
+   "sections": []
+  },
+  {
+   "number": "RNL8108",
+   "name": "solve-level-not-read-again",
+   "severity": "error",
+   "message": "the level {title} is not read again after the levels before it were solved",
+   "sections": []
+  },
+  {
+   "number": "RNL8109",
+   "name": "solve-level-summary",
+   "severity": "hint",
+   "message": "level {title} ({file|subckt} in {file}): {kept} kept, {discarded} discarded[, {failed} failed] of {n} fact(s)",
+   "sections": []
+  },
+  {
+   "number": "RNL8110",
+   "name": "solve-no-level-titled",
+   "severity": "error",
+   "message": "no drawing level is titled {title}",
+   "sections": []
+  },
+  {
+   "number": "RNL8111",
+   "name": "solve-preview-notice",
+   "severity": "hint",
+   "message": "note: the solver is a preview, and its layouts may be poor; for comparison, have the model write the exact RNL placement directly",
+   "sections": []
+  },
+  {
+   "number": "RNL8112",
+   "name": "solve-route-not-auto",
+   "severity": "hint",
+   "message": "the route of {wire}: the wire is not \"auto\" but {mode}, so its route was not the solver's to choose (13.1); written as given",
+   "sections": []
+  },
+  {
+   "number": "RNL8113",
+   "name": "solve-route-reorders-points",
+   "severity": "hint",
+   "message": "the route of {wire} does not keep the points of the wire in order with bends only between them, as a solver should (13.1); written as given",
+   "sections": []
+  },
+  {
+   "number": "RNL8114",
+   "name": "solve-solver-note",
+   "severity": "hint",
+   "message": "{solver_note}",
+   "sections": []
+  },
+  {
+   "number": "RNL8115",
+   "name": "solve-solver-warning",
+   "severity": "warning",
+   "message": "warning: {solver_warning}",
+   "sections": [
+    "8.5",
+    "14.10"
+   ]
+  },
+  {
+   "number": "RNL8116",
+   "name": "solve-unrouted-budget",
+   "severity": "warning",
+   "message": "the net {net}: left in {n} parts, the budget of the router ran out",
+   "sections": []
+  },
+  {
+   "number": "RNL8117",
+   "name": "solve-unrouted-no-path",
+   "severity": "warning",
+   "message": "the net {net}: left in {n} parts, no path joins them",
+   "sections": []
+  },
+  {
+   "number": "RNL8200",
+   "name": "unsolved-anonymous",
+   "severity": "warning",
+   "message": "{decision}{label}: it cannot be referred to (5.7)",
+   "sections": []
+  },
+  {
+   "number": "RNL8201",
+   "name": "unsolved-bend-not-a-number",
+   "severity": "warning",
+   "message": "{decision}{label}: a bend of it: a coordinate is not a number of RNL, which has no NaN and no Infinity (3.7)",
+   "sections": []
+  },
+  {
+   "number": "RNL8202",
+   "name": "unsolved-branch-missing",
+   "severity": "warning",
+   "message": "{decision}{label}: its branch point {i} is not in the solution",
+   "sections": []
+  },
+  {
+   "number": "RNL8203",
+   "name": "unsolved-branch-not-a-number",
+   "severity": "warning",
+   "message": "{decision}{label}: its branch point {i}: a coordinate is not a number of RNL, which has no NaN and no Infinity (3.7)",
+   "sections": []
+  },
+  {
+   "number": "RNL8204",
+   "name": "unsolved-no-orientation",
+   "severity": "warning",
+   "message": "{decision}{label}: it has no orientation (11.2)",
+   "sections": []
+  },
+  {
+   "number": "RNL8205",
+   "name": "unsolved-not-a-number",
+   "severity": "warning",
+   "message": "{decision}{label}: a coordinate is not a number of RNL, which has no NaN and no Infinity (3.7)",
+   "sections": []
+  },
+  {
+   "number": "RNL8206",
+   "name": "unsolved-not-in-problem",
+   "severity": "warning",
+   "message": "{decision}{label}: it is not in the problem",
+   "sections": []
+  },
+  {
+   "number": "RNL8207",
+   "name": "unsolved-not-written-out",
+   "severity": "warning",
+   "message": "{decision}{label}: the usage made by a rule that it belongs to cannot be written out (10.5)",
+   "sections": []
+  },
+  {
+   "number": "RNL8208",
+   "name": "unsolved-old-record",
+   "severity": "warning",
+   "message": "{decision}{label}: it is an object of a record of the solver, which this record replaces: a solver reads the level without them (2.8)",
+   "sections": []
+  },
+  {
+   "number": "RNL8209",
+   "name": "unsolved-rule-text",
+   "severity": "warning",
+   "message": "{decision}{label}: a text without a key that a rule makes cannot be referred to: the solver does not decide its position, the viewer places it (13.3, 14.8)",
+   "sections": []
+  },
+  {
+   "number": "RNL8210",
+   "name": "unsolved-two-points",
+   "severity": "warning",
+   "message": "{decision}{label}: a wire has at least two points (13.1)",
+   "sections": []
+  },
+  {
+   "number": "RNL8211",
+   "name": "unsolved-wire-point-missing",
+   "severity": "warning",
+   "message": "{decision}{label}: a point of it is not in the problem",
+   "sections": []
+  },
+  {
+   "number": "RNL8212",
+   "name": "unsolved-wire-point-unreachable",
+   "severity": "warning",
+   "message": "{decision}{label}: its point {point}: {reach_reason}",
+   "sections": []
+  },
+  {
+   "number": "RNL8400",
+   "name": "writeback-region-encrypted",
+   "severity": "hint",
+   "message": "the record is not written: {level} lies in a region written to be encrypted, lines {a} to {b} of {file}, where a record is gone once the region is encrypted (2.2)",
+   "sections": []
+  },
+  {
+   "number": "RNL8401",
+   "name": "writeback-region-excluded",
+   "severity": "hint",
+   "message": "the record is not written: {level} lies in a host region excluded from writing, lines {a} to {b} of {file} (2.2)",
+   "sections": []
+  },
+  {
+   "number": "RNL8402",
+   "name": "writeback-section-not-found",
+   "severity": "hint",
+   "message": "the record is not written: the selected library section {section} was not found in {file} (2.2)",
+   "sections": []
+  },
+  {
+   "number": "RNL8500",
+   "name": "status-constraints",
+   "severity": "hint",
+   "message": "status {level}: [{n} without a position; ]constraints: {n} {status}[, {n} {status}…]",
+   "sections": []
+  },
+  {
+   "number": "RNL8501",
+   "name": "status-unplaced",
+   "severity": "hint",
+   "message": "status {level}: {n} without a position[; constraints: …]",
+   "sections": []
+  },
+  {
+   "number": "RNL8600",
+   "name": "edit-dialect-package",
+   "severity": "error",
+   "message": "dialect \"rnl\" is that of a package file (2.7), which is not a netlist; RNL is written here only into a netlist",
+   "sections": []
+  },
+  {
+   "number": "RNL8601",
+   "name": "edit-dialect-text",
+   "severity": "error",
+   "message": "dialect \"text\" is that of a file that is not a netlist; RNL is written only into a netlist",
+   "sections": []
+  },
+  {
+   "number": "RNL8602",
+   "name": "edit-dialect-unknown",
+   "severity": "error",
+   "message": "dialect \"{dialect}\" is not {formats}",
+   "sections": []
+  },
+  {
+   "number": "RNL8603",
+   "name": "edit-field-invalid",
+   "severity": "error",
+   "message": "op {k} ({op}): `{field}` {problem}",
+   "sections": []
+  },
+  {
+   "number": "RNL8604",
+   "name": "edit-field-missing",
+   "severity": "error",
+   "message": "op {k} ({op}): `{field}` is missing",
+   "sections": []
+  },
+  {
+   "number": "RNL8605",
+   "name": "edit-level-id-invalid",
+   "severity": "error",
+   "message": "op {k} ({op}): level \"{id}\" is not subckt:NAME or file:PATH",
+   "sections": []
+  },
+  {
+   "number": "RNL8606",
+   "name": "edit-level-no-subckt",
+   "severity": "error",
+   "message": "op {k} ({op}): the netlist has no subcircuit {name}",
+   "sections": []
+  },
+  {
+   "number": "RNL8607",
+   "name": "edit-netlist-has-records",
+   "severity": "error",
+   "message": "the netlist has RNL records already; this writer writes only into a netlist without them",
+   "sections": []
+  },
+  {
+   "number": "RNL8608",
+   "name": "edit-op-missing-op",
+   "severity": "error",
+   "message": "op {k}: no \"op\"",
+   "sections": []
+  },
+  {
+   "number": "RNL8609",
+   "name": "edit-op-no-level",
+   "severity": "error",
+   "message": "op {k} ({op}): no `level`",
+   "sections": []
+  },
+  {
+   "number": "RNL8610",
+   "name": "edit-op-not-object",
+   "severity": "error",
+   "message": "op {k}: not an object",
+   "sections": []
+  },
+  {
+   "number": "RNL8611",
+   "name": "edit-op-not-written-yet",
+   "severity": "error",
+   "message": "op {k} ({op}): {`field` is not written yet|not written yet}",
+   "sections": []
+  },
+  {
+   "number": "RNL8612",
+   "name": "edit-op-unknown",
+   "severity": "error",
+   "message": "op {k}: unknown op \"{op}\"",
+   "sections": []
+  },
+  {
+   "number": "RNL8613",
+   "name": "edit-op-unknown-field",
+   "severity": "error",
+   "message": "op {k} ({op}): unknown field `{field}`",
+   "sections": []
+  },
+  {
+   "number": "RNL8614",
+   "name": "edit-pin-invalid",
+   "severity": "error",
+   "message": "op {k} (define-symbol): pin {n}: {problem}",
+   "sections": []
+  },
+  {
+   "number": "RNL8615",
+   "name": "edit-region-encrypted",
+   "severity": "error",
+   "message": "op {k} ({op}): {title} lies in a region written to be encrypted, lines {a} to {b}, where a record is gone once the region is encrypted (2.2)",
+   "sections": []
+  },
+  {
+   "number": "RNL8616",
+   "name": "edit-region-excluded",
+   "severity": "error",
+   "message": "op {k} ({op}): {title} lies in a host region excluded from writing, lines {a} to {b} (2.2)",
+   "sections": []
+  },
+  {
+   "number": "RNL8617",
+   "name": "edit-reread-differs",
+   "severity": "error",
+   "message": "the netlist reads otherwise with its header",
+   "sections": []
+  },
+  {
+   "number": "RNL8618",
+   "name": "edit-section-not-found",
+   "severity": "error",
+   "message": "op {k} ({op}): the selected library section {section} was not found (2.2)",
+   "sections": []
+  },
+  {
+   "number": "RNL8619",
+   "name": "edit-set-nothing",
+   "severity": "error",
+   "message": "op {k} (set): nothing to set: no `symbol`, `style`, `at` or `orient`",
+   "sections": []
+  },
+  {
+   "number": "RNL8620",
+   "name": "edit-shape-invalid",
+   "severity": "error",
+   "message": "op {k} ({op}): [prim {n}: ]{problem}",
+   "sections": []
+  },
+  {
+   "number": "RNL8621",
+   "name": "edit-shape-points-count",
+   "severity": "error",
+   "message": "op {k} ({op}): [prim {n}: ]{n_points} points with these params do not make the shape {shape} (9.2.5)",
+   "sections": []
+  },
+  {
+   "number": "RNL8622",
+   "name": "edit-text-markup-and-lines",
+   "severity": "error",
+   "message": "op {k} (add-text): both `markup` and `lines`; give one",
+   "sections": []
+  },
+  {
+   "number": "RNL8623",
+   "name": "edit-text-no-content",
+   "severity": "error",
+   "message": "op {k} (add-text): no `markup` or `lines`",
+   "sections": []
+  },
+  {
+   "number": "RNL8624",
+   "name": "edit-text-no-place",
+   "severity": "error",
+   "message": "op {k} (add-text): neither `attach` nor `at`: the text has no place",
+   "sections": []
+  },
+  {
+   "number": "RNL8700",
+   "name": "view-autoinclude-added",
+   "severity": "warning",
+   "message": "Subcircuit {model} was not included; found in {file} and added by Auto Include",
+   "sections": []
+  },
+  {
+   "number": "RNL8701",
+   "name": "view-autoinclude-ambiguous",
+   "severity": "warning",
+   "message": "Auto Include: subcircuit {model} is defined {n} times in the Library ({file:line, ...}); enter the instance to choose one, or add an explicit include",
+   "sections": []
+  },
+  {
+   "number": "RNL8702",
+   "name": "view-autoinclude-conflict",
+   "severity": "warning",
+   "message": "Auto Include: {file} was not included for subcircuit {model} because its definition of {other} conflicts with an existing definition",
+   "sections": []
+  },
+  {
+   "number": "RNL8703",
+   "name": "view-autoinclude-unresolved",
+   "severity": "warning",
+   "message": "Auto Include could not resolve subcircuit {model} from {file}; reload Library to refresh its definitions",
+   "sections": []
+  },
+  {
+   "number": "RNL8704",
+   "name": "view-bind-no-subckt",
+   "severity": "warning",
+   "message": "no subcircuit {name} to bind parameters to",
+   "sections": []
+  },
+  {
+   "number": "RNL8705",
+   "name": "view-bind-param-unknown",
+   "severity": "warning",
+   "message": "bound parameter {name} is not a parameter of subcircuit {subckt}; it is ignored{; did you mean {close}?}",
+   "sections": []
+  },
+  {
+   "number": "RNL8706",
+   "name": "view-cannot-read",
+   "severity": "error",
+   "message": "cannot read {entry}",
+   "sections": []
+  },
+  {
+   "number": "RNL8707",
+   "name": "view-format-unknown",
+   "severity": "error",
+   "message": "unknown format \"{name}\" for {path}; the formats are {formats}",
+   "sections": []
+  },
+  {
+   "number": "RNL8708",
+   "name": "view-overlay-colors",
+   "severity": "error",
+   "message": "overlay colors must be hex colors; palette must not be empty",
+   "sections": []
+  },
+  {
+   "number": "RNL8709",
+   "name": "view-overlay-invalid-svg",
+   "severity": "error",
+   "message": "invalid SVG",
+   "sections": []
+  },
+  {
+   "number": "RNL8710",
+   "name": "view-overlay-needs-svg",
+   "severity": "error",
+   "message": "overlay export needs a level built with svg=true",
+   "sections": []
+  },
+  {
+   "number": "RNL8711",
+   "name": "view-overlay-width",
+   "severity": "error",
+   "message": "overlay width and dash lengths must be finite and positive",
+   "sections": []
+  },
+  {
+   "number": "RNL8712",
+   "name": "view-params-cycle",
+   "severity": "hint",
+   "message": "the parameters {names} of subcircuit {subckt} refer to each other, so they have no number",
+   "sections": []
+  },
+  {
+   "number": "RNL8713",
+   "name": "view-unplaced-names-count",
+   "severity": "error",
+   "message": "the objects and their names are not as many",
+   "sections": []
+  },
+  {
+   "number": "RNL8714",
+   "name": "view-unplaced-no-level",
+   "severity": "error",
+   "message": "the document has no level {level}",
+   "sections": []
+  },
+  {
+   "number": "RNL8715",
+   "name": "view-unplaced-no-object",
+   "severity": "error",
+   "message": "level {level} lists no unplaced object {i}",
+   "sections": []
+  },
+  {
+   "number": "RNL8716",
+   "name": "view-unplaced-stale",
+   "severity": "error",
+   "message": "unplaced object {i} of level {level} is {name}, not {asked}: the document was built again",
+   "sections": []
+  },
+  {
+   "number": "RNL9000",
+   "name": "host-element-defined-twice",
+   "severity": "error",
+   "message": "element {name} is defined twice",
+   "sections": []
+  },
+  {
+   "number": "RNL9001",
+   "name": "host-element-unsupported",
+   "severity": "warning",
+   "message": "element {name} is not in the supported SPICE subset and is skipped",
+   "sections": []
+  },
+  {
+   "number": "RNL9002",
+   "name": "host-include-cycle",
+   "severity": "error",
+   "message": "the include of {target} forms a cycle",
+   "sections": []
+  },
+  {
+   "number": "RNL9003",
+   "name": "host-include-not-found",
+   "severity": "error",
+   "message": "the included file {target} cannot be found",
+   "sections": []
+  },
+  {
+   "number": "RNL9004",
+   "name": "host-include-via-search-path",
+   "severity": "hint",
+   "message": "include {target} resolved through the file pool or PATH to {candidate}",
+   "sections": []
+  },
+  {
+   "number": "RNL9005",
+   "name": "host-milli-not-mega",
+   "severity": "hint",
+   "message": "{value} is milli in SPICE, as {value_lower} is: M is milli in either case, and mega is meg",
+   "sections": []
+  },
+  {
+   "number": "RNL9006",
+   "name": "host-model-not-unique",
+   "severity": "error",
+   "message": "the model name {name} is not unique: model cards at {file:line, ...}",
+   "sections": []
+  },
+  {
+   "number": "RNL9007",
+   "name": "host-section-not-found",
+   "severity": "error",
+   "message": "the selected library section {name} was not found; no records can be written there (2.2)",
+   "sections": []
+  },
+  {
+   "number": "RNL9008",
+   "name": "host-subckt-no-ends",
+   "severity": "error",
+   "message": "a subcircuit has no `.ends`",
+   "sections": []
+  },
+  {
+   "number": "RNL9009",
+   "name": "host-subckt-not-unique",
+   "severity": "error",
+   "message": "the subcircuit name {name} is not unique: defined at {file:line, ...}",
+   "sections": []
+  },
+  {
+   "number": "RNL9010",
+   "name": "host-text-file-not-read",
+   "severity": "hint",
+   "message": "`{file}` is not a netlist ({language}); it is not read",
+   "sections": []
+  },
+  {
+   "number": "RNL9011",
+   "name": "host-unmatched-directive",
+   "severity": "warning",
+   "message": "an unmatched preprocessing directive is not read (2.2)",
+   "sections": []
+  },
+  {
+   "number": "RNL9100",
+   "name": "record-at-not-after-space",
+   "severity": "warning",
+   "message": "@RNL is not preceded by a space, so it is not a record entry (2.3)",
+   "sections": []
+  },
+  {
+   "number": "RNL9101",
+   "name": "codec-source-unreadable",
+   "severity": "error",
+   "message": "{file}: cannot read {path} to preserve its encoding: {reason}; explicitly select UTF-8 conversion to save it",
+   "sections": []
+  },
+  {
+   "number": "RNL9102",
+   "name": "words-list-invalid",
+   "severity": "error",
+   "message": "{reason}",
+   "sections": []
+  },
+  {
+   "number": "RNL9200",
+   "name": "std-version-not-found",
+   "severity": "error",
+   "message": "the standard package rnl-std {version} that the reading asks for cannot be found, in the package directories or among the bundled packages: the files that do not pin a version of it are read without a standard package (16.3)",
+   "sections": []
+  },
+  {
+   "number": "RNL9201",
+   "name": "package-file-name-mismatch",
+   "severity": "warning",
+   "message": "{file}: filename suggests package {name}, but its @PACKAGE header does not match; continuing package search",
+   "sections": []
+  },
+  {
+   "number": "RNL9202",
+   "name": "package-included",
+   "severity": "error",
+   "message": "`{file}` is a package file and is not loaded with an include (2.7); USE-PACKAGE finds it (16.2)",
+   "sections": []
+  },
+  {
+   "number": "RNL9300",
+   "name": "keyword-not-usable-here",
+   "severity": "error",
+   "message": "@{kw} cannot be used here",
+   "sections": []
+  },
+  {
+   "number": "RNL9301",
+   "name": "keyword-pin-off-grid",
+   "severity": "hint",
+   "message": "pins are best placed on integer points (9.2.4)",
+   "sections": []
+  },
+  {
+   "number": "RNL9302",
+   "name": "select-role-without-usage-scope",
+   "severity": "warning",
+   "message": "role= means something only when the scope is a usage (K3.12)",
+   "sections": []
+  },
+  {
+   "number": "RNL9400",
+   "name": "symbol-subckt-undefined",
+   "severity": "hint",
+   "message": "no file read defines the subcircuit {master}, so {instances}[ and {n} more] {is|are} drawn as a box of its terminals; an include may be missing (6.4, 9.2.6)",
+   "sections": []
+  },
+  {
+   "number": "RNL9401",
+   "name": "bundle-member-in-several-bundles",
+   "severity": "hint",
+   "message": "{member} is written into several bundles and goes to the later one (11.8)",
+   "sections": []
+  },
+  {
+   "number": "RNL9402",
+   "name": "route-target-not-net",
+   "severity": "error",
+   "message": "ROUTE takes nets, not {object} (13.7)",
+   "sections": []
+  },
+  {
+   "number": "RNL9404",
+   "name": "unplaced-objects",
+   "severity": "hint",
+   "message": "{level}: {n} objects have no position and are left to a solver; they are not drawn: {objects}[, …]",
+   "sections": []
+  },
+  {
+   "number": "RNL9500",
+   "name": "constraint-needs-solver",
+   "severity": "hint",
+   "message": "{constraint} comes before some of the {coordinates|orientations} it involves in the order of 8.5, so they should change; without a solver the written {coordinates|orientations} are drawn",
+   "sections": []
+  },
+  {
+   "number": null,
+   "name": "cli-solve-raised",
+   "severity": "hint",
+   "message": "{file}: raised from 0.2 to 0.3, as a tool writes only 0.3 (16.1); {series}",
+   "sections": []
+  },
+  {
+   "number": null,
+   "name": "cli-solve-raised-word-clash",
+   "severity": "warning",
+   "message": "warning: {file}: {name}, has the spelling of a word that 0.3 adds (2.8): {raised to|read in} 0.3, it may mean something else (16.1)",
+   "sections": []
+  },
+  {
+   "number": null,
+   "name": "cli-solve-stays-0-2",
+   "severity": "warning",
+   "message": "warning: {file} stays at 0.2, so what only 0.3 can write is unsolved (16.1): {why}",
+   "sections": []
+  },
+  {
+   "number": null,
+   "name": "constraint-dropped",
+   "severity": "hint",
+   "message": "{constraint} conflicts with fixed {coordinates|orientations} and is dropped in the order of 8.5 (8.5)",
+   "sections": []
+  },
+  {
+   "number": null,
+   "name": "package-merged-in-0-3",
+   "severity": "warning",
+   "message": "{name} is no package of the standard series 0.3, which merged rnl-std-layout and rnl-std-semantics into rnl-std-structures: to turn the default drawing of a definition off, write a rule such as # @SELECT-USAGE $DIFFERENTIAL_PAIR => @PRIORITY(\"disabled\"); to do without the package and its definitions, write @USE-PACKAGE(name=\"rnl-std-structures\") {} (16.3)",
+   "sections": []
+  },
+  {
+   "number": null,
+   "name": "param-distance-negative-without-sense",
+   "severity": "error",
+   "message": "without a sense (\"x\", \"y\") the bounds of DISTANCE cannot be negative (14.5)",
+   "sections": []
+  },
+  {
+   "number": null,
+   "name": "place-fact-dropped",
+   "severity": "hint",
+   "message": "{fact} conflicts with {winner} and is dropped in the order of 8.5 (8.5)",
+   "sections": []
+  },
+  {
+   "number": null,
+   "name": "place-position-of-usage-at-point",
+   "severity": "error",
+   "message": "{usage} is drawn on the point of its main object: PLACE fails (12.1)",
+   "sections": []
+  },
+  {
+   "number": null,
+   "name": "place-usage-at-point",
+   "severity": "error",
+   "message": "{usage} is drawn on the point of its main object and has no position of its own: PLACE fails (12.1)",
+   "sections": []
+  },
+  {
+   "number": null,
+   "name": "rename-name-left-out",
+   "severity": "error",
+   "message": "${name} cannot be found: {what to write instead}, or pin the series 0.2 with @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\") in the header record (16.3)",
+   "sections": []
+  },
+  {
+   "number": null,
+   "name": "rename-name-moved",
+   "severity": "error",
+   "message": "${name} cannot be found: the standard series 0.3 has it in {package}, which rnl-std does not bring in: name {package} or rnl-std-full with @USE-PACKAGE in the header record, or pin the series 0.2 (16.3)",
+   "sections": []
+  },
+  {
+   "number": null,
+   "name": "rename-name-renamed",
+   "severity": "error",
+   "message": "${name} cannot be found: the standard series 0.3 calls it ${new}; write that, or pin the series 0.2 with @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\") in the header record (16.3)",
+   "sections": []
+  },
+  {
+   "number": null,
+   "name": "rename-role-renamed",
+   "severity": "error",
+   "message": "the ordinary definition {definition} has no role {role} (9.4); the standard series 0.3 calls it {new} (16.3)",
+   "sections": []
+  },
+  {
+   "number": null,
+   "name": "rename-symbol-now-definition",
+   "severity": "error",
+   "message": "the last object of SET-SYMBOL must be a symbol, not ${name} (11.3): in the standard series 0.3 ${name} is a definition, and ${symbol} the symbol that the series 0.2 called ${name} (16.3)",
+   "sections": []
+  },
+  {
+   "number": null,
+   "name": "unsolved-at-point",
+   "severity": "warning",
+   "message": "{decision}{label}: it is drawn at the point of its main object and has no position of its own (12.1)",
+   "sections": []
+  },
+  {
+   "number": null,
+   "name": "unsolved-no-numbers",
+   "severity": "warning",
+   "message": "{decision}{label}: it has no name, and a file of 0.2 cannot refer to it; the draft 0.3 refers to it by its number (5.9)",
+   "sections": []
+  },
+  {
+   "number": null,
+   "name": "unsolved-no-rewrite",
+   "severity": "warning",
+   "message": "the route of {wire}: a file of 0.2 cannot rewrite a wire; the draft 0.3 writes its route with WIRE given the wire (13.1)",
+   "sections": []
+  },
+  {
+   "number": null,
+   "name": "unsolved-wire-through-centre",
+   "severity": "warning",
+   "message": "{decision}{label}: a point of it is the centre of a set, which this writer does not write (6.5)",
+   "sections": []
+  },
+  {
+   "number": null,
+   "name": "upgrade-follower-reads-0-3",
+   "severity": "warning",
+   "message": "warning: {file}: it writes no VERSION and takes that of {raised_file}: it reads in 0.3 too, its text unchanged (16.1); @VERSION(\"0.2\") written in its header record keeps it at 0.2",
+   "sections": []
+  },
+  {
+   "number": null,
+   "name": "upgrade-follower-word-clash",
+   "severity": "warning",
+   "message": "warning: {file}: {what}, `{name}`, line {line}, has the spelling of a word that 0.3 adds (2.8): read in 0.3, it may mean something else (16.1)",
+   "sections": []
+  },
+  {
+   "number": null,
+   "name": "upgrade-raised",
+   "severity": "hint",
+   "message": "{file}[ ({section})]: raised from 0.2 to 0.3, as a tool writes only 0.3 (16.1); {its header record keeps the standard series 0.2 it was read with: @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\") (16.3)|the version of the standard package that it pins stays (16.3)}",
+   "sections": []
+  },
+  {
+   "number": null,
+   "name": "upgrade-stays-0-2",
+   "severity": "warning",
+   "message": "warning: {file} stays at 0.2, so what only 0.3 can write is unsolved (16.1): its header record cannot say 0.3 so",
+   "sections": []
+  },
+  {
+   "number": null,
+   "name": "upgrade-word-clash",
+   "severity": "warning",
+   "message": "warning: {file}: {what}, `{name}`, line {line}, has the spelling of a word that 0.3 adds (2.8): raised to 0.3, it may mean something else (16.1)",
+   "sections": []
+  }
+ ]
+}

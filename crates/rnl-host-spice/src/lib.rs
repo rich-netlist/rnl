@@ -13,7 +13,7 @@ pub mod regions;
 
 use std::collections::HashMap;
 
-use rnl_runtime::diag::{Loc, Sink};
+use rnl_runtime::diag::{codes, Loc, Sink};
 use rnl_runtime::host::format::{Card, FileRead, Format, Formats, Reading};
 use rnl_runtime::host::{Dialect, HostDocument, Instance, Level, LevelId, LevelKind};
 use rnl_runtime::records::{scan_run, CarrierLine};
@@ -72,7 +72,7 @@ pub fn hint_comment_compatibility(raw: &str, slash_comments: bool, file: &str, l
     else {
         return false;
     };
-    sink.hint(
+    sink.hint(codes::HOST_NON_ASCII_COMMENT,
         "non-ASCII characters in host comments have not been verified for the simulator/version used by this generic adapter; check compatibility before simulation (3.1)",
         Some(Loc::new(file, line, column as u32)),
     );
@@ -365,6 +365,7 @@ pub fn parse_element(body: &str, file: &str, line: u32, sink: &mut Sink) -> Opti
         'K' => return None,
         _ => {
             sink.warning(
+                codes::HOST_ELEMENT_UNSUPPORTED,
                 format!("element {name} is not in the supported SPICE subset and is skipped"),
                 Some(Loc::line(file, line)),
             );
@@ -453,6 +454,7 @@ fn note_milli(value: &str, file: &str, line: u32, sink: &mut Sink) {
             && !lower.starts_with("mil")
         {
             sink.hint(
+                codes::HOST_MILLI_NOT_MEGA,
                 format!(
                     "{t} is milli in SPICE, as {} is: M is milli in either case, and mega is meg",
                     t.to_ascii_lowercase()
@@ -678,6 +680,7 @@ impl Reader<'_, '_> {
             if no == 1 {
                 if raw.contains("@RNL") {
                     self.cx.sink.warning(
+                        codes::HOST_RNL_ON_FIRST_LINE,
                         "the first line of a file is a title and is not read as RNL (2.2)",
                         Some(Loc::line(&fname, 1)),
                     );
@@ -692,9 +695,8 @@ impl Reader<'_, '_> {
             }
             if ended {
                 if raw.contains("@RNL") {
-                    self.cx
-                        .sink
-                        .warning("RNL after `.end` of the main file is not read (2.2)", Some(Loc::line(&fname, no)));
+                    let message = "RNL after `.end` of the main file is not read (2.2)";
+                    self.cx.sink.warning(codes::HOST_RNL_AFTER_END, message, Some(Loc::line(&fname, no)));
                 }
                 continue;
             }
@@ -710,6 +712,7 @@ impl Reader<'_, '_> {
                         skip_lib = None;
                     } else if raw.contains("@RNL") {
                         self.cx.sink.warning(
+                            codes::HOST_RNL_IN_UNSELECTED_SECTION,
                             "RNL in a `.lib` section that is not selected is not read (2.2)",
                             Some(Loc::line(&fname, no)),
                         );
@@ -721,6 +724,7 @@ impl Reader<'_, '_> {
                     self.cx.doc.levels[level].section_lines.get_or_insert((no, 0));
                 } else if raw.contains("@RNL") {
                     self.cx.sink.warning(
+                        codes::HOST_RNL_OUTSIDE_SELECTED_SECTION,
                         "RNL outside the selected `.lib` section is not read (2.2)",
                         Some(Loc::line(&fname, no)),
                     );
@@ -739,17 +743,25 @@ impl Reader<'_, '_> {
             if let Some(rest) = raw.strip_prefix('*') {
                 if rest.trim().is_empty() || rest.starts_with(' ') {
                     if (pending.is_some() || subckt_more.is_some()) && continued.after(&lines, idx) {
-                        self.cx.sink.warning(COMMENT_IN_A_STATEMENT, Some(Loc::line(&fname, no)));
+                        self.cx.sink.warning(
+                            codes::HOST_COMMENT_IN_STATEMENT,
+                            COMMENT_IN_A_STATEMENT,
+                            Some(Loc::line(&fname, no)),
+                        );
                     }
                     if protect.is_some() && rest.contains("@RNL") {
-                        self.cx.sink.warning(PROTECTED, Some(Loc::line(&fname, no)));
+                        self.cx.sink.warning(
+                            codes::HOST_RNL_IN_PROTECTED_REGION,
+                            PROTECTED,
+                            Some(Loc::line(&fname, no)),
+                        );
                     }
                     run.push(CarrierLine { line: no, content: rest.to_string(), col: 1 });
                     continue;
                 }
                 self.flush_run(&mut run, &fname, cur);
                 if raw.contains("@RNL") {
-                    self.cx.sink.warning(
+                    self.cx.sink.warning(codes::HOST_CARRIER_NO_SPACE,
                         "no space after the comment marker: this line is not a carrier and its @RNL is not a record entry (2.2)",
                         Some(Loc::line(&fname, no)),
                     );
@@ -763,6 +775,7 @@ impl Reader<'_, '_> {
             }
             if raw.contains("@RNL") && !stripped.starts_with('+') {
                 self.cx.sink.warning(
+                    codes::HOST_RNL_IN_HOST_STATEMENT,
                     "@RNL in an end-of-line comment or a host statement is host text (2.2)",
                     Some(Loc::line(&fname, no)),
                 );
@@ -868,10 +881,15 @@ impl Reader<'_, '_> {
             self.cx.doc.protected.push((fname.clone(), start, lines.len() as u32 + 1));
         }
         if !sub_stack.is_empty() {
-            self.cx.sink.error("a subcircuit has no `.ends`", Some(Loc::line(&fname, lines.len() as u32)));
+            self.cx.sink.error(
+                codes::HOST_SUBCKT_NO_ENDS,
+                "a subcircuit has no `.ends`",
+                Some(Loc::line(&fname, lines.len() as u32)),
+            );
         }
         if let Some(name) = section.filter(|_| self.cx.doc.levels[level].section_lines.is_none()) {
             self.cx.sink.error(
+                codes::HOST_SECTION_NOT_FOUND,
                 format!("the selected library section {name} was not found; no records can be written there (2.2)"),
                 Some(Loc::line(&fname, 1)),
             );
@@ -952,7 +970,11 @@ impl Reader<'_, '_> {
         let file_level = self.cx.doc.file_level(cur);
         let lv = &mut self.cx.doc.levels[circ];
         if !self.cx.names.entry(circ).or_default().insert(lv.name_key(&el.inst.name)) {
-            self.cx.sink.error(format!("element {} is defined twice", el.inst.name), Some(Loc::line(fname, no)));
+            self.cx.sink.error(
+                codes::HOST_ELEMENT_DEFINED_TWICE,
+                format!("element {} is defined twice", el.inst.name),
+                Some(Loc::line(fname, no)),
+            );
             return;
         }
         let mut inst = el.inst;

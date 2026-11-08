@@ -870,84 +870,112 @@
   "diagnostics": [
     {
       "severity": "warning",
+      "code": "RNL0015",
+      "name": "host-rnl-outside-selected-section",
       "file": "19-header-and-lib-versions.lib",
       "line": 20,
       "col": 0
     },
     {
       "severity": "warning",
+      "code": "RNL0015",
+      "name": "host-rnl-outside-selected-section",
       "file": "19-header-and-lib-versions.lib",
       "line": 26,
       "col": 0
     },
     {
       "severity": "warning",
+      "code": "RNL0015",
+      "name": "host-rnl-outside-selected-section",
       "file": "19-header-and-lib-versions.lib",
       "line": 35,
       "col": 0
     },
     {
       "severity": "warning",
+      "code": "RNL0015",
+      "name": "host-rnl-outside-selected-section",
       "file": "19-header-and-lib-versions.lib",
       "line": 40,
       "col": 0
     },
     {
       "severity": "warning",
+      "code": "RNL0015",
+      "name": "host-rnl-outside-selected-section",
       "file": "19-header-and-lib-versions.lib",
       "line": 4,
       "col": 0
     },
     {
       "severity": "warning",
+      "code": "RNL0015",
+      "name": "host-rnl-outside-selected-section",
       "file": "19-header-and-lib-versions.lib",
       "line": 11,
       "col": 0
     },
     {
       "severity": "error",
+      "code": "RNL2100",
+      "name": "version-declared-twice",
       "file": "19-header-and-lib-versions.sp",
       "line": 12,
       "col": 5
     },
     {
       "severity": "error",
+      "code": "RNL2009",
+      "name": "header-record-second",
       "file": "19-header-and-lib-versions.sp",
       "line": 25,
       "col": 3
     },
     {
       "severity": "error",
+      "code": "RNL2404",
+      "name": "alias-is-standard-word",
       "file": "19-header-and-lib-versions.lib",
       "line": 22,
       "col": 5
     },
     {
       "severity": "error",
+      "code": "RNL2008",
+      "name": "header-record-not-first",
       "file": "19-header-and-lib-versions.lib",
       "line": 40,
       "col": 3
     },
     {
       "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
       "file": "19-header-and-lib-versions.sp",
       "line": 1,
       "col": 0
     },
     {
       "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
       "file": "19-header-and-lib-versions.lib",
       "line": 8,
       "col": 0
     },
     {
       "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
       "file": "19-header-and-lib-versions.lib",
       "line": 24,
       "col": 0
     },
     {
       "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
       "file": "19-header-and-lib-versions.lib",
       "line": 33,
       "col": 0

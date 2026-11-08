@@ -421,36 +421,48 @@
   "diagnostics": [
     {
       "severity": "hint",
+      "code": null,
+      "name": "place-fact-dropped",
       "file": "21-pipe-segments.sp",
       "line": 11,
       "col": 5
     },
     {
       "severity": "hint",
+      "code": null,
+      "name": "place-fact-dropped",
       "file": "21-pipe-segments.sp",
       "line": 11,
       "col": 5
     },
     {
       "severity": "hint",
+      "code": null,
+      "name": "place-fact-dropped",
       "file": "21-pipe-segments.sp",
       "line": 13,
       "col": 5
     },
     {
       "severity": "hint",
+      "code": null,
+      "name": "place-fact-dropped",
       "file": "21-pipe-segments.sp",
       "line": 14,
       "col": 44
     },
     {
       "severity": "hint",
+      "code": null,
+      "name": "place-fact-dropped",
       "file": "21-pipe-segments.sp",
       "line": 14,
       "col": 44
     },
     {
       "severity": "hint",
+      "code": null,
+      "name": "place-fact-dropped",
       "file": "21-pipe-segments.sp",
       "line": 12,
       "col": 26

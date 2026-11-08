@@ -13,7 +13,7 @@
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
-use crate::diag::{Extra, Loc, Severity};
+use crate::diag::{codes, Extra, Loc, Severity};
 use crate::host::{LevelId, LevelKind};
 
 use super::obj::{SceneId, UnitId};
@@ -389,7 +389,7 @@ impl Interp<'_> {
             return;
         }
         self.missing_std = Some((v.clone(), true));
-        self.sink.error(
+        self.sink.error(codes::STD_VERSION_NOT_FOUND,
             format!("the standard package rnl-std {v} that the reading asks for cannot be found, in the package directories or among the bundled packages: the files that do not pin a version of it are read without a standard package (16.3)"),
             None,
         );
@@ -466,6 +466,7 @@ impl Interp<'_> {
                 let loc = self.rec_loc(r.rec, r.offset);
                 self.diag_in(
                     Severity::Error,
+                    codes::PACKAGE_REFERENCE_CYCLE,
                     format!(
                         "packages reference each other in a cycle, {}: this reference fails (16.2)",
                         ring.join(" -> ")
@@ -663,7 +664,7 @@ impl Interp<'_> {
                     let (loc, pkg) = self.use_loc(uses[i].decl.as_ref(), c);
                     self.diag_in(
                         Severity::Warning,
-                        format!("package {n} is {wv} here, and package {who} references {cv}: another major version, so {who} may use names that {n} {wv} does not have (16.2)"),
+                        codes::PACKAGE_REFERENCE_OTHER_MAJOR_AT_USE, format!("package {n} is {wv} here, and package {who} references {cv}: another major version, so {who} may use names that {n} {wv} does not have (16.2)"),
                         loc,
                         &pkg,
                     );
@@ -683,7 +684,7 @@ impl Interp<'_> {
                     let origin = self.use_origin(uses[c.by].decl.as_ref());
                     self.sink.add(
                         Severity::Error,
-                        format!("package {who} references package {n} {cv}, of another major version than the reference expanded first ({fwho} references {fv}): this reference fails, and the statements of {who} that use its names fail with it (16.2)"),
+                        codes::PACKAGE_REFERENCE_OTHER_MAJOR_FAILS, format!("package {who} references package {n} {cv}, of another major version than the reference expanded first ({fwho} references {fv}): this reference fails, and the statements of {who} that use its names fail with it (16.2)"),
                         loc,
                         Extra { cause: None, origin, in_package: who },
                     );
@@ -691,7 +692,7 @@ impl Interp<'_> {
                     let (loc, pkg) = self.use_loc(uses[c.by].decl.as_ref(), c);
                     self.diag_in(
                         Severity::Hint,
-                        format!("package {who} references package {n} {cv}; of the references to it, the newest within that major version is {win}, which is used (16.2)"),
+                        codes::PACKAGE_REFERENCE_OLDER_VERSION, format!("package {who} references package {n} {cv}; of the references to it, the newest within that major version is {win}, which is used (16.2)"),
                         loc,
                         &pkg,
                     );
@@ -894,7 +895,7 @@ impl Interp<'_> {
                     let loc = self.rec_loc(r.rec, r.offset);
                     self.diag_in(
                         Severity::Hint,
-                        format!("{written} in package {pn} hides the definition of the same name in package {qn}, referenced before it; package {pkg} uses the one of {pn} (16.2)"),
+                        codes::PACKAGE_REFERENCE_HIDES, format!("{written} in package {pn} hides the definition of the same name in package {qn}, referenced before it; package {pkg} uses the one of {pn} (16.2)"),
                         loc,
                         &pkg,
                     );
@@ -911,7 +912,7 @@ impl Interp<'_> {
             let loc = self.rec_loc(b.rec, b.off);
             self.diag_in(
                 Severity::Hint,
-                format!("{} hides the definition of the same name in the referenced package {qn}; package {pkg} uses this one (16.2)", shown(&b)),
+                codes::PACKAGE_OWN_HIDES_REFERENCE, format!("{} hides the definition of the same name in the referenced package {qn}; package {pkg} uses this one (16.2)", shown(&b)),
                 loc,
                 &pkg,
             );

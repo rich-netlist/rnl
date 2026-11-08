@@ -350,6 +350,8 @@
   "diagnostics": [
     {
       "severity": "error",
+      "code": "RNL3221",
+      "name": "ref-not-found",
       "file": "16-ties.sp",
       "line": 32,
       "col": 21

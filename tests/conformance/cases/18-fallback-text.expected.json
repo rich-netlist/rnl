@@ -578,6 +578,8 @@
   "diagnostics": [
     {
       "severity": "hint",
+      "code": "RNL0003",
+      "name": "host-non-ascii-comment",
       "file": "18-fallback-text.sp",
       "line": 2,
       "col": 177

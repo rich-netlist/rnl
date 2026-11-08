@@ -29,7 +29,7 @@ pub mod unit;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::rc::Rc;
 
-use crate::diag::{DiagId, Sink};
+use crate::diag::{codes, DiagId, Sink};
 use crate::host::{HostDocument, Level, LevelId, LevelKind, Record};
 use crate::model::{FailedSpan, HostRef, Model};
 use crate::numbering::LevelNumbering;
@@ -578,6 +578,7 @@ impl<'p> Interp<'p> {
                 let at = w.m.m.segments.first().map(|sg| sg.start).unwrap_or(w.m.m.start);
                 let loc = self.rec_loc(w.m.rec, at);
                 self.sink.warning(
+                    codes::RULE_USES_OWN_LEVEL_OBJECTS,
                     "this rule uses objects of the level it is written in, so it takes effect only there (10.5)",
                     loc,
                 );
@@ -603,6 +604,7 @@ impl<'p> Interp<'p> {
                 if a != c {
                     let loc = self.rec_loc(b.rec, b.member.start);
                     self.sink.error(
+                        codes::NAME_BOUND_TWICE,
                         format!(
                             "{}{} is already bound to another object in this level; the first binding is kept (6.6)",
                             b.prefix, b.name
@@ -671,7 +673,7 @@ impl<'p> Interp<'p> {
                 // each subcircuit by the rules of the file it is written in
                 if !below.iter().any(|&d| self.doc.names_level(d, &target)) {
                     let loc = self.rec_loc(Some(rec), 0);
-                    self.sink.error(format!("scope=\"{target}\" finds no subcircuit below this level: the statements of the record fail (2.6)"), loc);
+                    self.sink.error(codes::SCOPE_NO_SUBCIRCUIT, format!("scope=\"{target}\" finds no subcircuit below this level: the statements of the record fail (2.6)"), loc);
                     let n = self.recs[rec].text.chars().count();
                     self.note_failed(Some(rec), 0, n, false);
                 }
@@ -710,7 +712,7 @@ impl<'p> Interp<'p> {
                 };
                 let written = packages::shown(&b);
                 let loc = self.rec_loc(b.rec, b.off);
-                self.sink.hint(format!("{written} hides the definition of the same name {wher}; this level and below use this one (6.8)"), loc);
+                self.sink.hint(codes::DEFINITION_HIDES_INHERITED, format!("{written} hides the definition of the same name {wher}; this level and below use this one (6.8)"), loc);
             }
         }
     }
@@ -771,7 +773,7 @@ impl<'p> Interp<'p> {
                             format!("package {pn}, which the USE-PACKAGE of {} brings in,", d.name)
                         };
                         let loc = self.rec_loc(d.rec, d.offset);
-                        self.sink.hint(format!("{written} in {who} hides the definition of the same name in {what} {at}; this level and below use the one of {pn} (16.2)"), loc);
+                        self.sink.hint(codes::PACKAGE_HIDES_PACKAGE, format!("{written} in {who} hides the definition of the same name in {what} {at}; this level and below use the one of {pn} (16.2)"), loc);
                     }
                 }
             }

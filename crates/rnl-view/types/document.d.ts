@@ -334,9 +334,14 @@ export type NetLabel = {
  */
 export type LevelHint = {
   /**
-   * What it is about, such as "looks-joined" or "wire-over-symbol" ([`crate::hints::Kind`]).
+   * What it is about, such as "looks-joined" or "wire-over-symbol" ([`crate::hints::Kind`]):
+   * its short name in the toolkit's list of diagnostics.
    */
   kind: string,
+  /**
+   * Its number in that list, such as "RNL7003".
+   */
+  code: string,
   /**
    * "warning" or "hint".
    */
@@ -911,6 +916,15 @@ export type Diagnostic = {
    * "error", "warning" or "hint".
    */
   severity: string,
+  /**
+   * Its kind's number in the toolkit's list of diagnostics, such as "RNL3120"; none for a kind of
+   * the versions 0.2 and 0.3 alone.
+   */
+  code: string | null,
+  /**
+   * Its kind's short name, such as "param-wrong-type".
+   */
+  name: string,
   /**
    * The file as shown: relative to the opened file's directory when it is inside it.
    */

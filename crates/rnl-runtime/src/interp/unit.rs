@@ -6,7 +6,7 @@
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
-use crate::diag::{Extra, Loc, Severity};
+use crate::diag::{codes, Code, Extra, Loc, Severity};
 use crate::host::{file_name, Level, LevelId, LevelKind};
 use crate::records::{package_lines, scan_run};
 use crate::source::{dirname, join, normalize};
@@ -419,14 +419,14 @@ pub fn scan_language_decl(text: &str) -> Option<String> {
 
 /// The parameters of `@kw` by name, those written by position named in its signature's order;
 /// nothing twice, none it does not have, and none it requires left out (4.2 rule 9, 5.3); or why
-/// they cannot be read. A header record is in the standard form (`std_form`); elsewhere `word` gives
-/// the standard form of a name written unquoted, which may be an alias (16.5).
+/// they cannot be read, with its kind. A header record is in the standard form (`std_form`);
+/// elsewhere `word` gives the standard form of a name written unquoted, which may be an alias (16.5).
 pub(crate) fn params_by_name(
     kw: &str,
     p: Option<&Params>,
     std_form: bool,
     word: impl Fn(&str) -> String,
-) -> Result<HashMap<String, Value>, String> {
+) -> Result<HashMap<String, Value>, (Code, String)> {
     let spec = words().keyword(kw).unwrap();
     let names: Vec<&str> = spec.param_list().iter().map(|q| q.name.as_str()).collect();
     let order = &spec.positional;
@@ -434,14 +434,20 @@ pub(crate) fn params_by_name(
     if let Some(p) = p {
         if !p.positional.is_empty() {
             if order.is_empty() {
-                return Err(format!("the parameters of @{kw} cannot be written by position; write each by name, such as {}=… (4.2 rule 9)", names[0]));
+                return Err((
+                    codes::HEADER_PARAM_NOT_POSITIONAL,
+                    format!("the parameters of @{kw} cannot be written by position; write each by name, such as {}=… (4.2 rule 9)", names[0]),
+                ));
             }
             if p.positional.len() > order.len() {
-                return Err(format!(
-                    "@{kw} takes at most {} parameters by position ({}), {} are written (4.2 rule 9)",
-                    order.len(),
-                    order.join(", "),
-                    p.positional.len()
+                return Err((
+                    codes::PARAM_TOO_MANY_POSITIONAL,
+                    format!(
+                        "@{kw} takes at most {} parameters by position ({}), {} are written (4.2 rule 9)",
+                        order.len(),
+                        order.join(", "),
+                        p.positional.len()
+                    ),
                 ));
             }
             for (name, v) in order.iter().zip(&p.positional) {
@@ -463,17 +469,20 @@ pub(crate) fn params_by_name(
                     }
                 }
                 msg.push_str(" (16.4)");
-                return Err(msg);
+                return Err((codes::HEADER_PARAM_UNKNOWN, msg));
             }
             if out.contains_key(&std) {
-                return Err(format!("parameter {std} of @{kw} is written twice (4.2 rule 9)"));
+                return Err((
+                    codes::PARAM_WRITTEN_TWICE,
+                    format!("parameter {std} of @{kw} is written twice (4.2 rule 9)"),
+                ));
             }
             out.insert(std, n.value.clone());
         }
     }
     for q in spec.param_list() {
         if q.required && !out.contains_key(&q.name) {
-            return Err(format!("@{kw} lacks the parameter {} (5.3)", q.name));
+            return Err((codes::PARAM_MISSING_REQUIRED, format!("@{kw} lacks the parameter {} (5.3)", q.name)));
         }
         if let Some(value) = out.get(&q.name) {
             let valid = match q.ty {
@@ -482,7 +491,7 @@ pub(crate) fn params_by_name(
                 _ => true,
             };
             if !valid {
-                return Err(format!("the {} of @{kw} has the wrong type (5.3)", q.name));
+                return Err((codes::PARAM_WRONG_TYPE, format!("the {} of @{kw} has the wrong type (5.3)", q.name)));
             }
         }
     }
@@ -516,11 +525,12 @@ impl Interp<'_> {
     pub(crate) fn diag_in(
         &mut self,
         sev: Severity,
+        code: Code,
         msg: impl Into<String>,
         loc: Option<Loc>,
         pkg: &str,
     ) -> crate::diag::DiagId {
-        self.sink.add(sev, msg, loc, Extra { in_package: pkg.to_string(), ..Extra::default() })
+        self.sink.add(sev, code, msg, loc, Extra { in_package: pkg.to_string(), ..Extra::default() })
     }
 
     /// Parse a record once. In a file of the draft 0.3, `%#3` is a number (5.9); in 0.2 it stays a
@@ -612,7 +622,7 @@ impl Interp<'_> {
                     )
                 });
                 let reads = read_versions();
-                self.sink.error(
+                self.sink.error(codes::VERSION_UNSUPPORTED,
                     format!("unsupported version {version}: no RNL of this file is interpreted (16.1; this implementation reads {reads})"),
                     Some(loc),
                 );
@@ -644,11 +654,11 @@ impl Interp<'_> {
                     }
                 }
                 let loc = self.recs[rec].loc(note.off);
-                self.diag_in(Severity::Warning, note.message.clone(), Some(loc), &pkg);
+                self.diag_in(Severity::Warning, note.code, note.message.clone(), Some(loc), &pkg);
             }
-            if let Some((msg, pos)) = &ast.error {
+            if let Some((e, pos)) = &ast.error {
                 let loc = self.recs[rec].loc(*pos);
-                self.diag_in(Severity::Error, msg.clone(), Some(loc), &pkg);
+                self.diag_in(Severity::Error, e.code, e.message.clone(), Some(loc), &pkg);
                 let n = self.recs[rec].text.chars().count();
                 self.note_failed(Some(rec), 0, n, false);
                 self.units[u].other_records += 1;
@@ -666,22 +676,37 @@ impl Interp<'_> {
                     .and_then(|h| h.named.iter().find(|n| n.name == "numbering"))
                     .map_or(0, |n| n.off);
                 let loc = self.recs[rec].loc(off);
-                self.diag_in(Severity::Hint, super::numbers::STALE_HINT, Some(loc), &pkg);
+                self.diag_in(
+                    Severity::Hint,
+                    codes::NUMBERING_RECORD_STALE,
+                    super::numbers::STALE_HINT,
+                    Some(loc),
+                    &pkg,
+                );
             }
             if header.type_ == "header" {
                 // at the file level, the first record of the whole file, and at most one (2.8)
                 let wrong = if !is_file_level {
-                    Some("a header record is written at the file level, not inside a subcircuit (2.8); this one is ignored")
+                    Some((
+                        codes::HEADER_RECORD_IN_SUBCIRCUIT,
+                        "a header record is written at the file level, not inside a subcircuit (2.8); this one is ignored",
+                    ))
                 } else if self.units[u].header_record.is_some() {
-                    Some("a file has at most one header record (2.8); this one is ignored")
+                    Some((
+                        codes::HEADER_RECORD_SECOND,
+                        "a file has at most one header record (2.8); this one is ignored",
+                    ))
                 } else if index != 0 || self.after_a_record_of_its_file(u, rec) {
-                    Some("a header record is the first record of a file, and a record comes before this one (2.8); this one is ignored")
+                    Some((
+                        codes::HEADER_RECORD_NOT_FIRST,
+                        "a header record is the first record of a file, and a record comes before this one (2.8); this one is ignored",
+                    ))
                 } else {
                     None
                 };
-                if let Some(msg) = wrong {
+                if let Some((code, msg)) = wrong {
                     let loc = self.recs[rec].loc(0);
-                    self.diag_in(Severity::Error, msg, Some(loc), &pkg);
+                    self.diag_in(Severity::Error, code, msg, Some(loc), &pkg);
                     self.units[u].other_records += 1;
                     continue;
                 }
@@ -713,7 +738,8 @@ impl Interp<'_> {
                 // at its place in this file (7.4); the other members go to the target
                 for m in ast_body.members.iter().filter(|m| m.error.is_some()) {
                     let loc = self.recs[rec].loc(m.error_pos);
-                    self.diag_in(Severity::Error, m.error.clone().unwrap(), Some(loc), &pkg);
+                    let e = m.error.as_ref().unwrap();
+                    self.diag_in(Severity::Error, e.code, e.message.clone(), Some(loc), &pkg);
                     self.note_failed(Some(rec), m.start, m.end, false);
                 }
                 let a = self.asts[rec].clone().unwrap();
@@ -726,7 +752,7 @@ impl Interp<'_> {
             for (k, m) in ast_body.members.iter().enumerate() {
                 if let Some(err) = &m.error {
                     let loc = self.recs[rec].loc(m.error_pos);
-                    self.diag_in(Severity::Error, err.clone(), Some(loc), &pkg);
+                    self.diag_in(Severity::Error, err.code, err.message.clone(), Some(loc), &pkg);
                     self.note_failed(Some(rec), m.start, m.end, false);
                     continue;
                 }
@@ -760,7 +786,7 @@ impl Interp<'_> {
         {
             // the header record may be left out; tools write it when they save the file (16.1, TR5)
             let file = self.doc.levels[0].file.clone();
-            self.sink.hint(
+            self.sink.hint(codes::HEADER_RECORD_MISSING,
                 format!("the main file has no header record: it is read in the tool's default version {DEFAULT_VERSION}, and tools add the header when they write the file (16.1)"),
                 Some(Loc::line(file, 2)),
             );
@@ -861,6 +887,7 @@ impl Interp<'_> {
                 let loc = self.recs[rec].loc(*off);
                 self.diag_in(
                     Severity::Warning,
+                    codes::RECORD_FREE_WORD_LIKE_NAME,
                     format!("the free-text word {word} is spelled like {what}: is a prefix missing? (3.3)"),
                     Some(loc),
                     &pkg,
@@ -933,6 +960,7 @@ impl Interp<'_> {
             let loc = self.recs[rec].loc(params.start);
             self.diag_in(
                 Severity::Error,
+                codes::RECORD_HEADER_POSITIONAL,
                 "record header fields are written by name; positional values are ignored (2.8)",
                 Some(loc),
                 &pkg,
@@ -950,6 +978,7 @@ impl Interp<'_> {
                 let hint = close.map(|c| format!(", did you mean {c}?")).unwrap_or_default();
                 self.diag_in(
                     Severity::Warning,
+                    codes::RECORD_HEADER_FIELD_UNKNOWN,
                     format!("unknown record header field {} is ignored (2.8){hint}", n.name),
                     Some(loc),
                     &pkg,
@@ -962,6 +991,7 @@ impl Interp<'_> {
                 if n.off == first.off {
                     self.diag_in(
                         Severity::Error,
+                        codes::RECORD_HEADER_FIELD_TWICE,
                         format!(
                             "record header field {} is written more than once; treated as not written (2.8)",
                             n.name
@@ -975,6 +1005,7 @@ impl Interp<'_> {
             let Value::Str(v) = &n.value else {
                 self.diag_in(
                     Severity::Error,
+                    codes::RECORD_HEADER_FIELD_NOT_STRING,
                     format!("record header field {} takes a string; treated as not written (2.8)", n.name),
                     Some(loc),
                     &pkg,
@@ -985,6 +1016,7 @@ impl Interp<'_> {
                 if !vals.contains(v) {
                     self.diag_in(
                         Severity::Error,
+                        codes::RECORD_HEADER_FIELD_BAD_VALUE,
                         format!("record header field {} cannot be {v:?}; treated as not written (2.8)", n.name),
                         Some(loc),
                         &pkg,
@@ -1003,7 +1035,7 @@ impl Interp<'_> {
                     if v.chars().count() != 16 || !v.chars().all(|c| c.is_ascii_hexdigit()) {
                         self.diag_in(
                             Severity::Error,
-                            format!("record header field numbering holds a check of 16 hexadecimal digits (5.9), not {v:?}; treated as not written (2.8)"),
+                            codes::RECORD_HEADER_NUMBERING_MALFORMED, format!("record header field numbering holds a check of 16 hexadecimal digits (5.9), not {v:?}; treated as not written (2.8)"),
                             Some(loc),
                             &pkg,
                         );
@@ -1020,7 +1052,7 @@ impl Interp<'_> {
         if let (Some(loc), Some(LevelKind::Subckt)) = (scope_at, self.unit_level_kind(u)) {
             self.diag_in(
                 Severity::Error,
-                "scope= is not written in a record inside a subcircuit, whose RNL covers only itself; treated as not written, so the record is the subcircuit's own (2.6, 2.8)",
+                codes::RECORD_HEADER_SCOPE_IN_SUBCIRCUIT, "scope= is not written in a record inside a subcircuit, whose RNL covers only itself; treated as not written, so the record is the subcircuit's own (2.6, 2.8)",
                 Some(loc),
                 &pkg,
             );
@@ -1028,19 +1060,25 @@ impl Interp<'_> {
         }
         // numbering is written only in the record of the solver, which is in the level's own text
         let wrong = if h.type_ != "generated" {
-            Some("record header field numbering is written only with type=\"generated\", in the record of the solver; treated as not written (2.8, 5.9)")
+            Some((codes::RECORD_HEADER_NUMBERING_NOT_GENERATED, "record header field numbering is written only with type=\"generated\", in the record of the solver; treated as not written (2.8, 5.9)"))
         } else if h.scope.is_some() {
-            Some("record header field numbering is not written in a record with scope=: the record of the solver is in the level's own text; treated as not written (2.6, 2.8, 5.9)")
+            Some((codes::RECORD_HEADER_NUMBERING_WITH_SCOPE, "record header field numbering is not written in a record with scope=: the record of the solver is in the level's own text; treated as not written (2.6, 2.8, 5.9)"))
         } else {
             None
         };
-        if let (Some(loc), Some(msg)) = (numbering_at, wrong) {
-            self.diag_in(Severity::Error, msg, Some(loc), &pkg);
+        if let (Some(loc), Some((code, msg))) = (numbering_at, wrong) {
+            self.diag_in(Severity::Error, code, msg, Some(loc), &pkg);
             h.numbering = None;
         }
         if self.units[u].kind == UnitKind::Package && (h.scope.is_some() || h.type_ == "generated") {
             let loc = self.recs[rec].loc(0);
-            self.diag_in(Severity::Error, "a package cannot use scope= or type=\"generated\" (16.2)", Some(loc), &pkg);
+            self.diag_in(
+                Severity::Error,
+                codes::PACKAGE_RECORD_SCOPE_OR_GENERATED,
+                "a package cannot use scope= or type=\"generated\" (16.2)",
+                Some(loc),
+                &pkg,
+            );
             h.scope = None;
             h.type_ = "authored".into();
         }
@@ -1054,7 +1092,7 @@ impl Interp<'_> {
         for (k, m) in body.members.iter().enumerate() {
             if let Some(err) = &m.error {
                 let loc = self.recs[rec].loc(m.error_pos);
-                self.diag_in(Severity::Error, err.clone(), Some(loc), &pkg);
+                self.diag_in(Severity::Error, err.code, err.message.clone(), Some(loc), &pkg);
                 self.note_failed(Some(rec), m.start, m.end, false);
                 self.units[u].header_kws.push("?".into());
                 continue;
@@ -1063,6 +1101,7 @@ impl Interp<'_> {
                 let loc = self.recs[rec].loc(m.start);
                 self.diag_in(
                     Severity::Error,
+                    codes::HEADER_MEMBER_NOT_STATEMENT,
                     "a header record holds only VERSION, PACKAGE, USE-PACKAGE, USE-ALIASES, ALIAS and DEVICE (2.8)",
                     Some(loc),
                     &pkg,
@@ -1078,6 +1117,7 @@ impl Interp<'_> {
             if !HEADER_KW.contains(&kw.as_str()) && kw != "USE-PACKAGE" {
                 self.diag_in(
                     Severity::Error,
+                    codes::HEADER_KEYWORD_NOT_ALLOWED,
                     format!("@{kw} cannot be written in a header record (2.8)"),
                     Some(loc),
                     &pkg,
@@ -1090,18 +1130,30 @@ impl Interp<'_> {
             }
             let Some(p) = self.header_params(&kw, call.params.as_ref(), u, &loc, true) else { continue };
             if !seg.args.is_empty() {
-                self.diag_in(Severity::Error, format!("@{kw} takes no objects (2.8)"), Some(loc), &pkg);
+                self.diag_in(
+                    Severity::Error,
+                    codes::HEADER_STATEMENT_TAKES_NO_OBJECTS,
+                    format!("@{kw} takes no objects (2.8)"),
+                    Some(loc),
+                    &pkg,
+                );
                 continue;
             }
             match kw.as_str() {
                 // a file declares its version once (16.1): the first VERSION of its header
                 // record stands, as the scan of the package directories takes it for a package file
                 "VERSION" if self.units[u].header_kws.iter().filter(|k| *k == "VERSION").count() > 1 => {
-                    self.diag_in(Severity::Error, SECOND_VERSION, Some(loc), &pkg);
+                    self.diag_in(Severity::Error, codes::VERSION_DECLARED_TWICE, SECOND_VERSION, Some(loc), &pkg);
                 }
                 "VERSION" => {
                     let Some(Value::Str(v)) = p.get("version") else {
-                        self.diag_in(Severity::Error, "@VERSION takes a string (16.1)", Some(loc), &pkg);
+                        self.diag_in(
+                            Severity::Error,
+                            codes::VERSION_NOT_STRING,
+                            "@VERSION takes a string (16.1)",
+                            Some(loc),
+                            &pkg,
+                        );
                         continue;
                     };
                     self.units[u].version = v.clone();
@@ -1109,7 +1161,7 @@ impl Interp<'_> {
                         let reads = read_versions();
                         self.diag_in(
                             Severity::Error,
-                            format!("unsupported version {v}: no RNL of this file is interpreted (16.1; this implementation reads {reads})"),
+                            codes::VERSION_UNSUPPORTED, format!("unsupported version {v}: no RNL of this file is interpreted (16.1; this implementation reads {reads})"),
                             Some(loc),
                             &pkg,
                         );
@@ -1118,8 +1170,8 @@ impl Interp<'_> {
                 }
                 "PACKAGE" => {
                     if self.units[u].kind != UnitKind::Package {
-                        self.sink
-                            .error("@PACKAGE is written only in the header record of a package file (2.7)", Some(loc));
+                        let message = "@PACKAGE is written only in the header record of a package file (2.7)";
+                        self.sink.error(codes::PACKAGE_DECL_OUTSIDE_PACKAGE_FILE, message, Some(loc));
                         continue;
                     }
                     let name = str_val(p.get("name")).unwrap_or_default();
@@ -1138,6 +1190,7 @@ impl Interp<'_> {
                     let (Some(alias), Some(orig)) = (str_val(p.get("alias")), str_val(p.get("original"))) else {
                         self.diag_in(
                             Severity::Error,
+                            codes::ALIAS_TAKES_STRINGS,
                             "@ALIAS takes two strings: the alias and the original; definition= is a string too (16.5)",
                             Some(loc),
                             &pkg,
@@ -1148,7 +1201,7 @@ impl Interp<'_> {
                         None => None,
                         Some(Value::Str(s)) => Some(s.clone()),
                         Some(_) => {
-                            self.diag_in(Severity::Error, "@ALIAS takes two strings: the alias and the original; definition= is a string too (16.5)", Some(loc), &pkg);
+                            self.diag_in(Severity::Error, codes::ALIAS_TAKES_STRINGS, "@ALIAS takes two strings: the alias and the original; definition= is a string too (16.5)", Some(loc), &pkg);
                             continue;
                         }
                     };
@@ -1171,12 +1224,19 @@ impl Interp<'_> {
                         _ => None,
                     };
                     let (Some(name), Some(terms)) = (name, terms) else {
-                        self.diag_in(Severity::Error, "@DEVICE takes name and terminals (6.12)", Some(loc), &pkg);
+                        self.diag_in(
+                            Severity::Error,
+                            codes::DEVICE_MISSING_PARAMS,
+                            "@DEVICE takes name and terminals (6.12)",
+                            Some(loc),
+                            &pkg,
+                        );
                         continue;
                     };
                     if terms.iter().any(|t| !matches!(t, Value::Str(_))) {
                         self.diag_in(
                             Severity::Error,
+                            codes::DEVICE_TERMINALS_NOT_NAMES,
                             "the terminals of @DEVICE must be an array of names (strings) (6.12)",
                             Some(loc),
                             &pkg,
@@ -1219,9 +1279,9 @@ impl Interp<'_> {
     ) -> Option<HashMap<String, Value>> {
         match params_by_name(kw, p, std_form, |n| self.word(n, u)) {
             Ok(out) => Some(out),
-            Err(msg) => {
+            Err((code, msg)) => {
                 let pkg = self.units[u].pkg().to_string();
-                self.diag_in(Severity::Error, msg, Some(loc.clone()), &pkg);
+                self.diag_in(Severity::Error, code, msg, Some(loc.clone()), &pkg);
                 None
             }
         }
@@ -1241,21 +1301,21 @@ impl Interp<'_> {
         check_original: bool,
         version: &str,
     ) -> Option<(String, String, Option<String>)> {
-        let bad = |s: &mut Self, msg: String| {
-            s.diag_in(Severity::Error, msg, Some(loc.clone()), pkg);
+        let bad = |s: &mut Self, code: Code, msg: String| {
+            s.diag_in(Severity::Error, code, msg, Some(loc.clone()), pkg);
             None
         };
         if let Some(def) = definition {
             // a name inside a definition: role, parameter or local name, used where that definition is applied
             if !def.starts_with('$') || def.chars().count() < 2 {
-                return bad(self, format!("definition= names an ordinary definition by its `$` name, such as \"$DIFFPAIR\", not {def:?} (16.5)"));
+                return bad(self, codes::ALIAS_DEFINITION_NOT_DOLLAR_NAME, format!("definition= names an ordinary definition by its `$` name, such as \"$DIFFPAIR\", not {def:?} (16.5)"));
             }
             let first_digit = alias.chars().next().is_some_and(|c| c.is_ascii_digit());
             if alias.is_empty() || !alias.chars().all(syntax::is_name_char) || first_digit {
-                return bad(self, format!("alias {alias:?} is not well formed: an alias of a name in a definition must be writable unquoted in parentheses (16.5)"));
+                return bad(self, codes::ALIAS_SCOPED_MALFORMED, format!("alias {alias:?} is not well formed: an alias of a name in a definition must be writable unquoted in parentheses (16.5)"));
             }
             if orig.is_empty() || "@$%?#&".contains(orig.chars().next().unwrap()) {
-                return bad(self, format!("with definition=, the original is a role, parameter or local name without a prefix, not {orig:?} (16.5)"));
+                return bad(self, codes::ALIAS_SCOPED_ORIGINAL_PREFIXED, format!("with definition=, the original is a role, parameter or local name without a prefix, not {orig:?} (16.5)"));
             }
             return Some((alias.into(), orig.into(), Some(def.into())));
         }
@@ -1264,47 +1324,70 @@ impl Interp<'_> {
                 || alias.chars().count() < 2
                 || orig.chars().count() < 2
             {
-                return bad(self, "the alias and the original of a name both carry `$`, such as @ALIAS(\"$DP\", \"$DIFFERENTIAL_PAIR\") (16.5)".into());
+                return bad(self, codes::ALIAS_DOLLAR_MISMATCH, "the alias and the original of a name both carry `$`, such as @ALIAS(\"$DP\", \"$DIFFERENTIAL_PAIR\") (16.5)".into());
             }
             if alias == orig {
-                return bad(self, format!("the alias {alias} is the same as the original (16.5)"));
+                return bad(
+                    self,
+                    codes::ALIAS_SAME_AS_ORIGINAL,
+                    format!("the alias {alias} is the same as the original (16.5)"),
+                );
             }
             return Some((alias.into(), orig.into(), None));
         }
         if orig.starts_with('@') != alias.starts_with('@') {
             return bad(
                 self,
+                codes::ALIAS_KEYWORD_MISMATCH,
                 "the original and the alias of a keyword both carry `@`; other words carry neither (16.5)".into(),
             );
         }
         if let Some(base) = orig.strip_prefix('@') {
             if matches!(base, "RNL" | "VERSION" | "ALIAS") {
-                return bad(self, format!("{orig} belongs to the outer form and cannot have an alias (16.5)"));
+                return bad(
+                    self,
+                    codes::ALIAS_OF_OUTER_FORM_KEYWORD,
+                    format!("{orig} belongs to the outer form and cannot have an alias (16.5)"),
+                );
             }
             if base == "USE-ALIASES" {
                 return bad(
                     self,
+                    codes::ALIAS_OF_USE_ALIASES,
                     "@USE-ALIASES cannot have an alias: the aliases are not known before it is read (16.5)".into(),
                 );
             }
             if check_original && !standard_original(orig) {
-                return bad(self, format!("the original {orig} is not a standard keyword (16.5)"));
+                return bad(
+                    self,
+                    codes::ALIAS_ORIGINAL_NOT_STANDARD,
+                    format!("the original {orig} is not a standard keyword (16.5)"),
+                );
             }
             let a = &alias[1..];
             if words().is_keyword(a) || a.is_empty() || !a.chars().all(syntax::is_word_char) {
                 return bad(
                     self,
+                    codes::ALIAS_MALFORMED_OR_KEYWORD,
                     format!("the alias {alias} is not well formed or is the name of a standard keyword (16.5)"),
                 );
             }
         } else {
             if check_original && !standard_original(orig) {
-                return bad(self, format!("the original {orig} is not a standard word (16.5)"));
+                return bad(
+                    self,
+                    codes::ALIAS_ORIGINAL_NOT_STANDARD,
+                    format!("the original {orig} is not a standard word (16.5)"),
+                );
             }
             // a word that 0.3 adds, `numbering`, is a standard word in a file of 0.3 (16.1): a file
             // of 0.2 raised to 0.3 with such an alias, with a warning, has it in error here
             if words().all_words().contains(alias) || added_word(alias, version) {
-                return bad(self, format!("the alias {alias} is the name of a standard word (16.5)"));
+                return bad(
+                    self,
+                    codes::ALIAS_IS_STANDARD_WORD,
+                    format!("the alias {alias} is the name of a standard word (16.5)"),
+                );
             }
         }
         Some((alias.into(), orig.into(), None))
@@ -1328,6 +1411,7 @@ impl Interp<'_> {
         if let Some(old) = self.units[u].aliases.get(&alias).cloned() {
             if old != orig {
                 self.sink.error(
+                    codes::ALIAS_CONFLICT,
                     format!("{wher}the alias {alias} is already declared for {old} and cannot also be {orig} (16.5)"),
                     Some(loc.clone()),
                 );
@@ -1336,11 +1420,16 @@ impl Interp<'_> {
         }
         if alias.starts_with('$') {
             if self.units[u].aliases.contains_key(&orig) {
-                self.sink.error(format!("{wher}the alias {orig} cannot also be an original (16.5)"), Some(loc.clone()));
+                self.sink.error(
+                    codes::ALIAS_ORIGINAL_IS_ALIAS,
+                    format!("{wher}the alias {orig} cannot also be an original (16.5)"),
+                    Some(loc.clone()),
+                );
                 return;
             }
             if self.units[u].aliases.values().any(|o| *o == alias) {
                 self.sink.error(
+                    codes::ALIAS_IS_ORIGINAL,
                     format!("{wher}{alias} is already the original of another alias and cannot be an alias (16.5)"),
                     Some(loc.clone()),
                 );
@@ -1362,7 +1451,7 @@ impl Interp<'_> {
             let key = self.units[u].aliases.get(&definition).cloned().unwrap_or(definition);
             if prio.contains(&alias) {
                 // the standard parameter of AS, ATTACH (14.8) is there for every definition
-                self.sink.error(
+                self.sink.error(codes::ALIAS_SCOPED_LIKE_PRIORITY,
                     format!("{wher}the alias {alias} is spelled like the standard parameter priority of AS, ATTACH or its alias; its meaning is not unique (16.5)"),
                     Some(loc),
                 );
@@ -1372,7 +1461,7 @@ impl Interp<'_> {
             if let Some((_, (o, _))) = table.iter().find(|(a, _)| *a == alias) {
                 if *o != orig {
                     let o = o.clone();
-                    self.sink.error(format!("{wher}the alias {alias} in {key} is already declared for {o} and cannot also be {orig} (16.5)"), Some(loc));
+                    self.sink.error(codes::ALIAS_SCOPED_CONFLICT, format!("{wher}the alias {alias} in {key} is already declared for {o} and cannot also be {orig} (16.5)"), Some(loc));
                 }
                 continue;
             }
@@ -1399,7 +1488,7 @@ impl Interp<'_> {
         let mut out = Vec::new();
         for (alias, (orig, loc)) in table {
             if taken.contains(&alias) {
-                self.sink.error(
+                self.sink.error(codes::ALIAS_SCOPED_LIKE_OWN_NAME,
                     format!("the alias {alias} is spelled like a role, parameter or local name of the definition {name} itself; its meaning is not unique and the alias is not used (16.5)"),
                     Some(loc),
                 );
@@ -1415,7 +1504,13 @@ impl Interp<'_> {
     fn use_aliases(&mut self, u: UnitId, p: &HashMap<String, Value>, loc: &Loc) {
         let pkg = self.units[u].pkg().to_string();
         let Some(name) = str_val(p.get("name")) else {
-            self.diag_in(Severity::Error, "@USE-ALIASES takes name (16.5)", Some(loc.clone()), &pkg);
+            self.diag_in(
+                Severity::Error,
+                codes::USE_ALIASES_MISSING_NAME,
+                "@USE-ALIASES takes name (16.5)",
+                Some(loc.clone()),
+                &pkg,
+            );
             return;
         };
         let decl = UseDecl {
@@ -1438,7 +1533,7 @@ impl Interp<'_> {
         if !is_alias_package(&self.units[pk]) {
             self.diag_in(
                 Severity::Error,
-                format!("package {name} is not an alias package: its header has only @VERSION, @PACKAGE and @ALIAS and there is no other record; this USE-ALIASES fails (16.5)"),
+                codes::USE_ALIASES_NOT_ALIAS_PACKAGE, format!("package {name} is not an alias package: its header has only @VERSION, @PACKAGE and @ALIAS and there is no other record; this USE-ALIASES fails (16.5)"),
                 Some(loc.clone()),
                 &pkg,
             );
@@ -1452,7 +1547,7 @@ impl Interp<'_> {
                 let what = if d.original.starts_with('@') { "standard keyword" } else { "standard word" };
                 self.diag_in(
                     Severity::Error,
-                    format!(
+                    codes::USE_ALIASES_ORIGINAL_NOT_IN_VERSION, format!(
                         "in alias package {name}, the original {} of the alias {} is not a {what} in this file's language version {version}; the alias is not used (16.5)",
                         d.original, d.alias
                     ),
@@ -1469,7 +1564,7 @@ impl Interp<'_> {
             if d.definition.is_none() && added_word(&d.alias, &version) {
                 self.diag_in(
                     Severity::Error,
-                    format!(
+                    codes::USE_ALIASES_ALIAS_IS_ADDED_WORD, format!(
                         "in alias package {name}, the alias {} is the name of a standard word in this file's language version {version}; the alias is not used (16.5)",
                         d.alias
                     ),
@@ -1587,7 +1682,7 @@ impl Interp<'_> {
         if reference && !in_header {
             self.diag_in(
                 Severity::Error,
-                "USE-PACKAGE is not written in the records of a package other than its header record: a package file references other packages in its header record (16.2)",
+                codes::USE_PACKAGE_IN_PACKAGE_RECORDS, "USE-PACKAGE is not written in the records of a package other than its header record: a package file references other packages in its header record (16.2)",
                 Some(loc),
                 &pkg,
             );
@@ -1595,7 +1690,13 @@ impl Interp<'_> {
         }
         let Some(p) = self.header_params("USE-PACKAGE", call.params.as_ref(), u, &loc, in_header) else { return };
         let Some(name) = str_val(p.get("name")) else {
-            self.diag_in(Severity::Error, "@USE-PACKAGE takes name (16.2)", Some(loc), &pkg);
+            self.diag_in(
+                Severity::Error,
+                codes::USE_PACKAGE_MISSING_NAME,
+                "@USE-PACKAGE takes name (16.2)",
+                Some(loc),
+                &pkg,
+            );
             return;
         };
         let mut body = None;
@@ -1604,7 +1705,7 @@ impl Interp<'_> {
                 // inline content has no version and cannot take part in choosing one (16.2)
                 self.diag_in(
                     Severity::Error,
-                    "a reference to another package in the header record of a package file writes only name, version and path, without a body: this reference fails (16.2)",
+                    codes::PACKAGE_REFERENCE_WITH_BODY, "a reference to another package in the header record of a package file writes only name, version and path, without a body: this reference fails (16.2)",
                     Some(loc),
                     &pkg,
                 );
@@ -1613,7 +1714,11 @@ impl Interp<'_> {
             match (seg.args.len(), &seg.args[0].obj) {
                 (1, ObjExpr::Set(s)) => body = Some(s.clone()),
                 _ => {
-                    self.sink.error("@USE-PACKAGE takes one set as its body (16.2)", Some(loc));
+                    self.sink.error(
+                        codes::USE_PACKAGE_BODY_NOT_ONE_SET,
+                        "@USE-PACKAGE takes one set as its body (16.2)",
+                        Some(loc),
+                    );
                     return;
                 }
             }
@@ -1637,14 +1742,20 @@ impl Interp<'_> {
         // found says so in its error
         if decl.pkg.is_some() {
             if let Some(merged) = self.merged_in_0_3(&decl) {
-                self.diag_in(Severity::Warning, format!("{merged} (16.3)"), Some(loc.clone()), &pkg);
+                self.diag_in(
+                    Severity::Warning,
+                    codes::PACKAGE_MERGED_IN_0_3,
+                    format!("{merged} (16.3)"),
+                    Some(loc.clone()),
+                    &pkg,
+                );
             }
         }
         if let (Some(pk), None) = (decl.pkg, &body) {
             if is_alias_package(&self.units[pk]) && self.units[pk].header_kws.iter().any(|k| k == "ALIAS") {
                 self.diag_in(
                     Severity::Error,
-                    format!("package {name} is an alias package; load it with @USE-ALIASES(name=\"{name}\") in the header record. This {what} fails (16.5)"),
+                    codes::USE_PACKAGE_ALIAS_PACKAGE, format!("package {name} is an alias package; load it with @USE-ALIASES(name=\"{name}\") in the header record. This {what} fails (16.5)"),
                     Some(loc),
                     &pkg,
                 );
@@ -1677,7 +1788,7 @@ impl Interp<'_> {
                 header
             };
             if file_name(&f) == format!("{name}.rnl") && header.as_ref().is_none_or(|(n, _)| n != name) {
-                self.sink.warning(format!("{f}: filename suggests package {name}, but its @PACKAGE header does not match; continuing package search"), Some(Loc::line(&f, 1)));
+                self.sink.warning(codes::PACKAGE_FILE_NAME_MISMATCH, format!("{f}: filename suggests package {name}, but its @PACKAGE header does not match; continuing package search"), Some(Loc::line(&f, 1)));
             }
             if let Some((n, v)) = header {
                 out.push((n, v, f));
@@ -1723,7 +1834,7 @@ impl Interp<'_> {
                             if *want != v {
                                 self.diag_in(
                                     Severity::Warning,
-                                    format!("{path} is {kind} {} {v}, not {want}: a different version may draw differently (16.2)", decl.name),
+                                    codes::PACKAGE_PATH_VERSION_DIFFERS, format!("{path} is {kind} {} {v}, not {want}: a different version may draw differently (16.2)", decl.name),
                                     Some(loc.clone()),
                                     &pkg,
                                 );
@@ -1736,7 +1847,7 @@ impl Interp<'_> {
             if cand.is_none() {
                 self.diag_in(
                     Severity::Warning,
-                    format!("the file named by path= does not exist or its @PACKAGE does not match; looking the package up by name ({sec})"),
+                    codes::PACKAGE_PATH_NOT_FOUND, format!("the file named by path= does not exist or its @PACKAGE does not match; looking the package up by name ({sec})"),
                     Some(loc.clone()),
                     &pkg,
                 );
@@ -1761,7 +1872,7 @@ impl Interp<'_> {
                     if let Some(c) = newer.first() {
                         self.diag_in(
                             Severity::Warning,
-                            format!("{kind} {} has no version {want}; using {}: a different version may draw differently (16.2)", decl.name, c.1),
+                            codes::PACKAGE_VERSION_SUBSTITUTED, format!("{kind} {} has no version {want}; using {}: a different version may draw differently (16.2)", decl.name, c.1),
                             Some(loc.clone()),
                             &pkg,
                         );
@@ -1774,6 +1885,7 @@ impl Interp<'_> {
                 let this = if what == "reference" { "the reference to".to_string() } else { what.to_string() };
                 self.diag_in(
                     Severity::Hint,
+                    codes::PACKAGE_NO_VERSION_NEWEST,
                     format!("{this} {} names no version; using the newest found, {} ({sec})", decl.name, c.1),
                     Some(loc.clone()),
                     &pkg,
@@ -1794,6 +1906,7 @@ impl Interp<'_> {
             let ver = decl.version.as_ref().map(|v| format!(" {v}")).unwrap_or_default();
             self.diag_in(
                 Severity::Error,
+                codes::PACKAGE_NOT_FOUND,
                 format!("{kind} {}{ver} cannot be found: this {what} fails{then} ({sec})", decl.name),
                 Some(loc),
                 &pkg,
@@ -1833,6 +1946,7 @@ impl Interp<'_> {
         self.read_unit(id);
         if self.units[id].header_record.is_none() || self.units[id].pkg_name.is_empty() {
             self.sink.error(
+                codes::PACKAGE_FILE_NO_HEADER,
                 format!("{fname} has no header record with @PACKAGE and is not a package (2.7, 16.2)"),
                 Some(Loc::line(fname.clone(), 1)),
             );
@@ -1853,7 +1967,13 @@ impl Interp<'_> {
                 continue;
             }
             let what = if orig.starts_with('@') { "standard keyword" } else { "standard word" };
-            self.diag_in(Severity::Error, format!("the original {orig} is not a {what} (16.5)"), Some(loc), &pkg);
+            self.diag_in(
+                Severity::Error,
+                codes::ALIAS_ORIGINAL_NOT_STANDARD,
+                format!("the original {orig} is not a {what} (16.5)"),
+                Some(loc),
+                &pkg,
+            );
             self.units[u].aliases.remove(&alias);
             self.units[u].alias_decls.retain(|d| !(d.alias == alias && d.definition.is_none()));
         }
@@ -1864,7 +1984,7 @@ impl Interp<'_> {
         for (k, m) in body.members.iter().enumerate() {
             if let Some(err) = &m.error {
                 let loc = self.rec_loc(rec, m.error_pos);
-                self.sink.error(err.clone(), loc);
+                self.sink.error(err.code, err.message.clone(), loc);
                 self.note_failed(rec, m.start, m.end, false);
                 continue;
             }
@@ -1872,7 +1992,7 @@ impl Interp<'_> {
             let call = m.segments.first().and_then(|s| s.call.as_ref()).filter(|_| m.segments.len() == 1);
             if let Some(call) = call.filter(|c| self.kw(&c.kw, u) == "USE-PACKAGE") {
                 let loc = self.rec_loc(rec, call.start);
-                self.sink.error(
+                self.sink.error(codes::INLINE_PACKAGE_REFERENCES_PACKAGE,
                     "an inline package has no header record and cannot reference other packages; to use the definitions of another package, write them into its body (16.2)",
                     loc,
                 );

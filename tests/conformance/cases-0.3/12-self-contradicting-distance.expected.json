@@ -516,12 +516,16 @@
   "diagnostics": [
     {
       "severity": "error",
+      "code": "RNL5002",
+      "name": "constraint-self-contradiction",
       "file": "12-self-contradicting-distance.sp",
       "line": 11,
       "col": 7
     },
     {
       "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
       "file": "12-self-contradicting-distance.sp",
       "line": 1,
       "col": 0

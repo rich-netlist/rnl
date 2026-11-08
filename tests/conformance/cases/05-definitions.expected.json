@@ -1772,6 +1772,8 @@
   "diagnostics": [
     {
       "severity": "hint",
+      "code": null,
+      "name": "constraint-dropped",
       "file": "05-definitions.sp",
       "line": 21,
       "col": 7

@@ -487,18 +487,24 @@
   "diagnostics": [
     {
       "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
       "file": "14-numbering-first-name.sp",
       "line": 1,
       "col": 0
     },
     {
       "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
       "file": "14-numbering-first-name.sp",
       "line": 11,
       "col": 0
     },
     {
       "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
       "file": "14-numbering-first-name.sp",
       "line": 22,
       "col": 0

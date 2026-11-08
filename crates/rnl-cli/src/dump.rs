@@ -82,6 +82,8 @@ pub fn interpretation(r: &Interpretation) -> Value {
         "levels": r.model.levels.iter().map(level).collect::<Vec<_>>(),
         "diagnostics": r.diagnostics().iter().map(|d| json!({
             "severity": d.severity.as_str(),
+            "code": d.code.number(),
+            "name": d.code.name(),
             "message": d.message,
             "file": d.loc.as_ref().map(|l| l.file.clone()),
             "line": d.loc.as_ref().map(|l| l.line),
@@ -91,14 +93,17 @@ pub fn interpretation(r: &Interpretation) -> Value {
     })
 }
 
-/// What the conformance corpus records (7.6): the effective model, and each diagnostic's level
-/// and place. Messages are left out: their wording is the implementation's.
+/// What the conformance corpus records (7.6): the effective model, and each diagnostic's level,
+/// kind and place. Messages are left out: their wording is the implementation's; the kind is its
+/// number in the toolkit's list (`rnl_runtime::diag::codes`), and its short name.
 pub fn conformance(r: &Interpretation) -> Value {
     json!({
         "failed": r.model.failed.is_some(),
         "levels": r.model.levels.iter().map(level).collect::<Vec<_>>(),
         "diagnostics": r.diagnostics().iter().map(|d| json!({
             "severity": d.severity.as_str(),
+            "code": d.code.number(),
+            "name": d.code.name(),
             "file": d.loc.as_ref().map(|l| l.file.clone()),
             "line": d.loc.as_ref().map(|l| l.line),
             "col": d.loc.as_ref().map(|l| l.col),

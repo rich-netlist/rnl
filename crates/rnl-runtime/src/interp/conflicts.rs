@@ -7,7 +7,7 @@
 
 use std::rc::Rc;
 
-use crate::diag::{Extra, Loc, Severity};
+use crate::diag::{codes, Extra, Loc, Severity};
 use crate::geom::Orient;
 
 use super::ctx::Ctx;
@@ -208,6 +208,7 @@ impl Interp<'_> {
         for (at, origin, discarded) in notes.items {
             self.sink.add(
                 Severity::Hint,
+                codes::CONFLICT_STATEMENT_CAUSED_DISCARDS,
                 format!(
                     "facts discarded in the order of 8.5 because of this statement: {} (8.5)",
                     discarded.join("; ")
@@ -241,10 +242,19 @@ impl Interp<'_> {
                 }
             })
             .collect();
-        let mut msg = if named.is_empty() {
-            format!("{what} conflicts with the facts taken in and is discarded in the order of 8.5")
+        let (code, mut msg) = if named.is_empty() {
+            (
+                codes::CONFLICT_FACT_DISCARDED,
+                format!("{what} conflicts with the facts taken in and is discarded in the order of 8.5"),
+            )
         } else {
-            format!("{what} is discarded in the order of 8.5: it has no solution with {}", named.join(", nor with "))
+            (
+                codes::CONFLICT_FACT_DISCARDED_WITH_SETS,
+                format!(
+                    "{what} is discarded in the order of 8.5: it has no solution with {}",
+                    named.join(", nor with ")
+                ),
+            )
         };
         if !complete {
             msg.push_str("; not every such set could be found, so this list may not be complete");
@@ -255,7 +265,7 @@ impl Interp<'_> {
         };
         // shown like the document's own, as the later phases' diagnostics are (7.6)
         let extra = Extra { cause: None, origin: origin.clone(), in_package: String::new() };
-        self.sink.add(Severity::Hint, format!("{msg} (8.5)"), at.clone(), extra);
+        self.sink.add(Severity::Hint, code, format!("{msg} (8.5)"), at.clone(), extra);
         let discarded = named_at(what.to_string(), at, &origin);
         for f in sets.iter().flatten() {
             let (at, origin) = self.fact_site(f);

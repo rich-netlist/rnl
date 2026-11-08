@@ -1006,6 +1006,8 @@
   "diagnostics": [
     {
       "severity": "hint",
+      "code": "RNL0003",
+      "name": "host-non-ascii-comment",
       "file": "01-rc-lowpass.sp",
       "line": 15,
       "col": 23

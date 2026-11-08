@@ -5,7 +5,10 @@
 //! or at the end of the enclosing set. Offsets are character indices into the record text.
 
 use std::collections::HashMap;
+use std::fmt;
 use std::rc::Rc;
+
+use crate::diag::{codes, Code};
 
 pub type Off = usize;
 
@@ -280,7 +283,7 @@ pub struct Member {
     pub segments: Vec<Segment>,
     pub start: Off,
     pub end: Off,
-    pub error: Option<String>,
+    pub error: Option<ParseError>,
     pub error_pos: Off,
     /// Free-text words with their offsets, for the recommended warnings of 3.3.
     pub free_words: Vec<(String, Off)>,
@@ -308,21 +311,37 @@ impl Member {
 /// A warning found while reading, with the keyword it concerns when there is one.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Note {
+    /// Its kind ([`codes`]).
+    pub code: Code,
     pub off: Off,
     pub message: String,
     pub kw: Option<String>,
+}
+
+/// A syntax error of a member or a record: its kind ([`codes`]) and its message.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ParseError {
+    pub code: Code,
+    pub message: String,
+}
+
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.message)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct RecordAst {
     pub header: Option<Params>,
     pub body: Option<Rc<SetExpr>>,
-    pub error: Option<(String, Off)>,
+    pub error: Option<(ParseError, Off)>,
     pub notes: Vec<Note>,
 }
 
 #[derive(Debug)]
 struct SyntaxErr {
+    code: Code,
     msg: String,
     pos: Off,
     /// "Expected a …": a point replaces it with its own hint.
@@ -381,16 +400,16 @@ impl Parser {
         matches!(self.peek(), None | Some(';') | Some('}'))
     }
 
-    fn err<T>(&self, msg: impl Into<String>) -> PResult<T> {
-        Err(SyntaxErr { msg: msg.into(), pos: self.i, expected: false })
+    fn err<T>(&self, code: Code, msg: impl Into<String>) -> PResult<T> {
+        Err(SyntaxErr { code, msg: msg.into(), pos: self.i, expected: false })
     }
 
-    fn err_at<T>(&self, msg: impl Into<String>, pos: Off) -> PResult<T> {
-        Err(SyntaxErr { msg: msg.into(), pos, expected: false })
+    fn err_at<T>(&self, code: Code, msg: impl Into<String>, pos: Off) -> PResult<T> {
+        Err(SyntaxErr { code, msg: msg.into(), pos, expected: false })
     }
 
-    fn expected<T>(&self, msg: impl Into<String>) -> PResult<T> {
-        Err(SyntaxErr { msg: msg.into(), pos: self.i, expected: true })
+    fn expected<T>(&self, code: Code, msg: impl Into<String>) -> PResult<T> {
+        Err(SyntaxErr { code, msg: msg.into(), pos: self.i, expected: true })
     }
 
     // ---------------- low level
@@ -403,7 +422,7 @@ impl Parser {
             } else if self.starts_with("/*") {
                 match self.find("*/", self.i + 2) {
                     Some(j) => self.i = j + 2,
-                    None => return self.err("comment not closed"),
+                    None => return self.err(codes::SYNTAX_COMMENT_NOT_CLOSED, "comment not closed"),
                 }
             } else {
                 break;
@@ -436,6 +455,7 @@ impl Parser {
             } else {
                 if c == '|' && words.is_some() {
                     self.notes.push(Note {
+                        code: codes::SYNTAX_PIPE_BAR,
                         off: self.i,
                         message: "`|` in free text: a pipe is written `=>` (4.2 rule 3; it was `|` before round D)"
                             .into(),
@@ -458,20 +478,28 @@ impl Parser {
             self.skip_ws()?;
             if self.peek() == Some('(') {
                 if self.i != 4 {
-                    return self.err("the record head must touch @RNL; remove the white space or comment (2.4)");
+                    return self.err(
+                        codes::SYNTAX_HEAD_NOT_TOUCHING,
+                        "the record head must touch @RNL; remove the white space or comment (2.4)",
+                    );
                 }
                 header = Some(self.params(true)?);
             }
             self.skip_ws()?;
             if self.peek() != Some('{') {
-                return self.err("the record has no braces: write @RNL {…} (2.4)");
+                return self.err(codes::SYNTAX_NO_BRACES, "the record has no braces: write @RNL {…} (2.4)");
             }
             Ok(Rc::new(self.set_expr()?))
         })();
         let notes = std::mem::take(&mut self.notes);
         match r {
             Ok(body) => RecordAst { header, body: Some(body), error: None, notes },
-            Err(e) => RecordAst { header, body: None, error: Some((e.msg, e.pos)), notes },
+            Err(e) => RecordAst {
+                header,
+                body: None,
+                error: Some((ParseError { code: e.code, message: e.msg }, e.pos)),
+                notes,
+            },
         }
     }
 
@@ -495,7 +523,7 @@ impl Parser {
                     self.i += 1;
                     return Ok(SetExpr { id, members, start, end: self.i });
                 }
-                None => return self.err("the set is not closed (missing `}`)"),
+                None => return self.err(codes::SYNTAX_SET_NOT_CLOSED, "the set is not closed (missing `}`)"),
                 // a member stopped on something unexpected: recover
                 Some(_) => self.i += 1,
             }
@@ -584,7 +612,7 @@ impl Parser {
                 break;
             }
             let c = self.peek().unwrap();
-            return self.err(format!("`{c}` cannot appear here"));
+            return self.err(codes::SYNTAX_UNEXPECTED_CHAR, format!("`{c}` cannot appear here"));
         }
         if let Some((prefix, name, off)) = front {
             binds.insert(0, Bind { prefix, name, off, after: segments.len() - 1 });
@@ -703,10 +731,11 @@ impl Parser {
             }
             if c == '@' {
                 if self.i == 0 || self.t[self.i - 1] != ' ' {
-                    return self.err("the `@` of a keyword must follow a space (2.3)");
+                    return self
+                        .err(codes::SYNTAX_KEYWORD_AT_NO_SPACE, "the `@` of a keyword must follow a space (2.3)");
                 }
                 if call.is_some() {
-                    return self.err("at most one keyword in a segment (4.2 rule 2)");
+                    return self.err(codes::SYNTAX_TWO_KEYWORDS, "at most one keyword in a segment (4.2 rule 2)");
                 }
                 let cl = self.call()?;
                 last_end = Some(cl.end);
@@ -720,6 +749,7 @@ impl Parser {
                         if cl.params.is_none() && last_end == Some(cl.end) && gap.trim().is_empty() {
                             // carries the keyword: after AS, ATTACH a point is an ordinary object (`$GND @ATTACH (0, 0)`)
                             self.notes.push(Note {
+                                code: codes::SYNTAX_KEYWORD_SPACE_PAREN,
                                 off: self.i,
                                 message: format!(
                                     "@{} and the parenthesis after it are separated by whitespace: these parentheses are a point, not parameters; parameter parentheses touch the keyword (3.5)",
@@ -736,17 +766,21 @@ impl Parser {
                 continue;
             }
             if c == '<' {
-                return self.err("a point is written `(x, y)` (3.8; it was `<x, y>` before round D)");
+                return self.err(
+                    codes::SYNTAX_ANGLE_POINT,
+                    "a point is written `(x, y)` (3.8; it was `<x, y>` before round D)",
+                );
             }
             if c == '=' {
-                return self.err(
+                return self.err(codes::SYNTAX_STRAY_EQUALS,
                     "`=` is only used in a naming `%name =` at the start of a member and in parameters; name in a pipe with `=> %name` (4.2 rule 8)",
                 );
             }
-            return self.err(format!("`{c}` is neither free text nor a formal token (3.3)"));
+            return self
+                .err(codes::SYNTAX_NOT_FORMAL_TOKEN, format!("`{c}` is neither free text nor a formal token (3.3)"));
         }
         if args.is_empty() && call.is_none() {
-            return self.err_at("a segment cannot be empty (4.2 rule 1)", start);
+            return self.err_at(codes::SYNTAX_EMPTY_SEGMENT, "a segment cannot be empty (4.2 rule 1)", start);
         }
         Ok(Segment { id, args, call, start, end: self.i, piped })
     }
@@ -765,17 +799,18 @@ impl Parser {
                 (self.string()?, true)
             } else {
                 if matches!(self.peek(), Some(c) if c.is_ascii_digit()) {
-                    return self.err("an unquoted role name cannot start with a digit (3.6)");
+                    return self
+                        .err(codes::SYNTAX_ROLE_STARTS_DIGIT, "an unquoted role name cannot start with a digit (3.6)");
                 }
                 let w = self.name_word();
                 if w.is_empty() {
-                    return self.err("write a role name in the role parentheses");
+                    return self.err(codes::SYNTAX_ROLE_MISSING, "write a role name in the role parentheses");
                 }
                 (w, false)
             };
             self.skip_ws()?;
             if self.peek() != Some(')') {
-                return self.err("the role parentheses are not closed");
+                return self.err(codes::SYNTAX_ROLE_NOT_CLOSED, "the role parentheses are not closed");
             }
             self.i += 1;
             return Ok(Arg { obj, role: Some(role), role_quoted: quoted, start, end: self.i });
@@ -784,6 +819,7 @@ impl Parser {
             // recommended warning: `#M1.d` (3.3)
             if self.peek() == Some('.') && matches!(self.peek_at(1), Some(c) if is_word_char(c) && c != '_') {
                 self.notes.push(Note {
+                    code: codes::SYNTAX_DOT_AFTER_REFERENCE,
                     off: self.i,
                     message: "a reference followed by `.` and a name: terminals are written with `:`; this `.…` is free text (3.3)".into(),
                     kw: None,
@@ -793,6 +829,7 @@ impl Parser {
             if let Some(c) = self.peek() {
                 if GLUED_NOTE.contains(c) {
                     self.notes.push(Note {
+                        code: codes::SYNTAX_GLUED_CHARACTER,
                         off: self.i,
                         message: format!(
                             "a reference followed by `{c}`: a name with this character is written in quotes, such as `&\"vdd!\"`; here the `{c}` is free text (3.3)"
@@ -810,7 +847,7 @@ impl Parser {
             Some('{') => Ok(ObjExpr::Set(Rc::new(self.set_expr()?))),
             Some('(') => Ok(ObjExpr::Point(self.point()?)),
             Some(c) if "#&%$?".contains(c) => Ok(ObjExpr::Ref(self.reference()?)),
-            _ => self.expected("expected an object here"),
+            _ => self.expected(codes::SYNTAX_EXPECTED_OBJECT, "expected an object here"),
         }
     }
 
@@ -843,13 +880,16 @@ impl Parser {
             Some(c) if is_ascii_word(c) => name = self.ascii_name(),
             Some('#') if prefix == '%' && self.numbers => number = Some(self.object_number()?),
             _ if prefix == '#' || prefix == '?' => {}
-            _ => return self.err(format!("write a name after `{prefix}`")),
+            _ => return self.err(codes::SYNTAX_NAME_MISSING_AFTER_PREFIX, format!("write a name after `{prefix}`")),
         }
         if name.is_some() && self.peek_in("<[") {
             if prefix == '#' || prefix == '&' {
                 sub = Some(self.subscript()?);
             } else {
-                return self.err("RNL names take no subscript (6.11); a point is written `(x, y)`");
+                return self.err(
+                    codes::SYNTAX_RNL_NAME_SUBSCRIPT,
+                    "RNL names take no subscript (6.11); a point is written `(x, y)`",
+                );
             }
         }
         let mut path = Vec::new();
@@ -862,12 +902,15 @@ impl Parser {
                     match self.ascii_name() {
                         Some(n) => (n, false),
                         None => {
-                            return self.err("write a name after `::` (non-ASCII names and aliases in quotes, 16.5)")
+                            return self.err(
+                                codes::SYNTAX_SUB_NAME_MISSING,
+                                "write a name after `::` (non-ASCII names and aliases in quotes, 16.5)",
+                            )
                         }
                     }
                 };
                 if self.peek_in("<[") {
-                    return self.err("sub-object names take no subscript (6.11)");
+                    return self.err(codes::SYNTAX_SUB_NAME_SUBSCRIPT, "sub-object names take no subscript (6.11)");
                 }
                 path.push(PathItem { sep: Sep::Sub, name: pn, quoted: pq, sub: None, number: None });
                 continue;
@@ -892,7 +935,10 @@ impl Parser {
                     if prefix == '#' {
                         psub = Some(self.subscript()?);
                     } else {
-                        return self.err("usage terminal names take no subscript (6.11)");
+                        return self.err(
+                            codes::SYNTAX_USAGE_TERMINAL_SUBSCRIPT,
+                            "usage terminal names take no subscript (6.11)",
+                        );
                     }
                 }
                 path.push(PathItem { sep: Sep::Term, name: pn, quoted: pq, sub: psub, number: num });
@@ -903,7 +949,11 @@ impl Parser {
         let expansions = usize::from(sub.as_ref().is_some_and(|s| s.single().is_none()))
             + path.iter().filter(|p| p.sub.as_ref().is_some_and(|s| s.single().is_none())).count();
         if expansions > 1 {
-            return self.err_at("only one subscript in a reference may expand to a group (6.11)", start);
+            return self.err_at(
+                codes::SYNTAX_MULTIPLE_EXPANDING_SUBSCRIPTS,
+                "only one subscript in a reference may expand to a group (6.11)",
+                start,
+            );
         }
         Ok(Ref { id, prefix, name, quoted, sub, path, start, end: self.i, written: None, number })
     }
@@ -917,15 +967,25 @@ impl Parser {
             self.i += 1;
         }
         if self.i == j0 || matches!(self.peek(), Some(c) if is_word_char(c)) {
-            return self.err("write the number of an object after `%#`, in digits only, such as %#3 (5.9)");
+            return self.err(
+                codes::SYNTAX_OBJECT_NUMBER_DIGITS,
+                "write the number of an object after `%#`, in digits only, such as %#3 (5.9)",
+            );
         }
         if self.peek_in("<[") {
-            return self.err("a number takes no subscript (6.11); a point is written `(x, y)`");
+            return self.err(
+                codes::SYNTAX_NUMBER_SUBSCRIPT,
+                "a number takes no subscript (6.11); a point is written `(x, y)`",
+            );
         }
         let digits: String = self.t[j0..self.i].iter().collect();
         match digits.parse() {
             Ok(k) => Ok(k),
-            Err(_) => self.err_at("this number is larger than this implementation can hold (3.7)", j0),
+            Err(_) => self.err_at(
+                codes::SYNTAX_NUMBER_TOO_LARGE,
+                "this number is larger than this implementation can hold (3.7)",
+                j0,
+            ),
         }
     }
 
@@ -951,7 +1011,12 @@ impl Parser {
             loop {
                 match self.number_u64() {
                     Some(k) => nums.push(k),
-                    None => return self.err("a subscript holds unsigned integers, `,` and `:` only (6.11)"),
+                    None => {
+                        return self.err(
+                            codes::SYNTAX_SUBSCRIPT_NOT_INTEGER,
+                            "a subscript holds unsigned integers, `,` and `:` only (6.11)",
+                        )
+                    }
                 }
                 self.skip_ws()?;
                 if self.peek() == Some(':') {
@@ -962,7 +1027,8 @@ impl Parser {
                 break;
             }
             if nums.len() > 3 || (nums.len() == 3 && nums[2] < 1) {
-                return self.err("a subscript item is i, a:b or a:b:s with s at least 1 (6.11)");
+                return self
+                    .err(codes::SYNTAX_SUBSCRIPT_ITEM, "a subscript item is i, a:b or a:b:s with s at least 1 (6.11)");
             }
             items.push(match nums.as_slice() {
                 [k] => SubItem::One(*k),
@@ -978,10 +1044,10 @@ impl Parser {
                 self.i += 1;
                 break;
             }
-            return self.err("the subscript is not closed");
+            return self.err(codes::SYNTAX_SUBSCRIPT_NOT_CLOSED, "the subscript is not closed");
         }
         if self.peek_in("<[") {
-            return self.err("a name takes one subscript only (6.11)");
+            return self.err(codes::SYNTAX_TWO_SUBSCRIPTS, "a name takes one subscript only (6.11)");
         }
         Ok(Sub { bracket, items })
     }
@@ -994,19 +1060,26 @@ impl Parser {
             let x = self.coord()?;
             self.skip_ws()?;
             if self.peek() != Some(',') {
-                return self.err(hint);
+                return self.err(codes::SYNTAX_POINT_MALFORMED, hint);
             }
             self.i += 1;
             let y = self.coord()?;
             self.skip_ws()?;
             if self.peek() != Some(')') {
-                return self.err(hint);
+                return self.err(codes::SYNTAX_POINT_MALFORMED, hint);
             }
             Ok((x, y))
         })();
         let (x, y) = match r {
             Ok(v) => v,
-            Err(e) if e.expected => return Err(SyntaxErr { msg: hint.into(), pos: e.pos, expected: false }),
+            Err(e) if e.expected => {
+                return Err(SyntaxErr {
+                    code: codes::SYNTAX_POINT_MALFORMED,
+                    msg: hint.into(),
+                    pos: e.pos,
+                    expected: false,
+                })
+            }
             Err(e) => return Err(e),
         };
         self.i += 1;
@@ -1045,7 +1118,7 @@ impl Parser {
             j += 1;
         }
         if j == self.i {
-            return self.err("write a keyword after `@`");
+            return self.err(codes::SYNTAX_KEYWORD_MISSING, "write a keyword after `@`");
         }
         let kw: String = self.t[self.i..j].iter().collect();
         self.i = j;
@@ -1096,6 +1169,7 @@ impl Parser {
                     // positional parameters come first; after the first `name=value` all are named (4.2 rule 9)
                     if !p.named.is_empty() {
                         return self.err_at(
+                            codes::SYNTAX_POSITIONAL_AFTER_NAMED,
                             "parameters written by position come before the named ones: after one name, every parameter is named (4.2 rule 9)",
                             off,
                         );
@@ -1104,7 +1178,11 @@ impl Parser {
                 }
                 Some(name) => {
                     if !record_head && p.named.iter().any(|x| x.name == name) {
-                        return self.err_at(format!("parameter {name} is written twice (4.2 rule 9)"), off);
+                        return self.err_at(
+                            codes::SYNTAX_PARAM_TWICE,
+                            format!("parameter {name} is written twice (4.2 rule 9)"),
+                            off,
+                        );
                     }
                     p.named.push(Named { name, value: val, quoted, off });
                 }
@@ -1120,7 +1198,10 @@ impl Parser {
                     break;
                 }
                 _ => {
-                    return self.err("parameters are separated by `,`; there is no free text inside parentheses (3.3)")
+                    return self.err(
+                        codes::SYNTAX_PARAM_SEPARATOR,
+                        "parameters are separated by `,`; there is no free text inside parentheses (3.3)",
+                    )
                 }
             }
         }
@@ -1149,7 +1230,7 @@ impl Parser {
                             self.i += 1;
                             return Ok(Value::Arr(items));
                         }
-                        _ => return self.err("the array is not closed"),
+                        _ => return self.err(codes::SYNTAX_ARRAY_NOT_CLOSED, "the array is not closed"),
                     }
                 }
             }
@@ -1170,10 +1251,11 @@ impl Parser {
                     _ => Value::Word(w),
                 })
             }
-            Some(c) if "#&%$({<".contains(c) => {
-                self.err("parameters hold literals only; objects are written outside the parentheses (4.4)")
-            }
-            _ => self.expected("expected a value here"),
+            Some(c) if "#&%$({<".contains(c) => self.err(
+                codes::SYNTAX_PARAM_OBJECT,
+                "parameters hold literals only; objects are written outside the parentheses (4.4)",
+            ),
+            _ => self.expected(codes::SYNTAX_EXPECTED_VALUE, "expected a value here"),
         }
     }
 
@@ -1204,7 +1286,7 @@ impl Parser {
             ok = int || frac;
         }
         if !ok {
-            return self.expected("expected a number here");
+            return self.expected(codes::SYNTAX_EXPECTED_NUMBER, "expected a number here");
         }
         if j < n && (self.t[j] == 'e' || self.t[j] == 'E') {
             let save = j;
@@ -1217,15 +1299,19 @@ impl Parser {
             }
         }
         if j < n && is_word_char(self.t[j]) {
-            return self.err_at("a number takes no unit or suffix (3.7)", s);
+            return self.err_at(codes::SYNTAX_NUMBER_SUFFIX, "a number takes no unit or suffix (3.7)", s);
         }
         let text: String = self.t[s..j].iter().collect();
         self.i = j;
         let nonzero = text.split(['e', 'E']).next().unwrap().chars().any(|c| matches!(c, '1'..='9'));
         match text.parse::<f64>() {
             Ok(v) if v.is_finite() && (v != 0.0 || !nonzero) => Ok((v, text)),
-            Ok(_) => self.err_at("the number is outside this implementation's finite numeric range (3.7)", s),
-            Err(_) => self.err_at("expected a number here", s),
+            Ok(_) => self.err_at(
+                codes::SYNTAX_NUMBER_OUT_OF_RANGE,
+                "the number is outside this implementation's finite numeric range (3.7)",
+                s,
+            ),
+            Err(_) => self.err_at(codes::SYNTAX_EXPECTED_NUMBER, "expected a number here", s),
         }
     }
 
@@ -1252,7 +1338,7 @@ impl Parser {
         }
         match self.ascii_name() {
             Some(n) => Ok((n, false)),
-            None => self.expected("expected a name here (non-ASCII names in quotes, 3.6)"),
+            None => self.expected(codes::SYNTAX_EXPECTED_NAME, "expected a name here (non-ASCII names in quotes, 3.6)"),
         }
     }
 
@@ -1261,7 +1347,12 @@ impl Parser {
         let mut out = String::new();
         loop {
             match self.t.get(j) {
-                None | Some('\n') => return self.err("the string is not closed (strings cannot span lines, 3.7)"),
+                None | Some('\n') => {
+                    return self.err(
+                        codes::SYNTAX_STRING_NOT_CLOSED,
+                        "the string is not closed (strings cannot span lines, 3.7)",
+                    )
+                }
                 Some('"') => {
                     if self.t.get(j + 1) == Some(&'"') {
                         out.push('"');
@@ -1288,7 +1379,7 @@ fn failed_member(id: NodeId, start: Off, end: Off, e: SyntaxErr, words: Vec<(Str
         segments: Vec::new(),
         start,
         end,
-        error: Some(e.msg),
+        error: Some(ParseError { code: e.code, message: e.msg }),
         error_pos: e.pos,
         free_words: words,
         written: HashMap::new(),
@@ -1296,26 +1387,43 @@ fn failed_member(id: NodeId, start: Off, end: Off, e: SyntaxErr, words: Vec<(Str
 }
 
 fn check_member(m: &Member) -> PResult<()> {
-    let err = |msg: &str, pos| Err(SyntaxErr { msg: msg.into(), pos, expected: false });
+    let err = |code, msg: &str, pos| Err(SyntaxErr { code, msg: msg.into(), pos, expected: false });
     for (k, seg) in m.segments.iter().enumerate() {
         if k > 0 && seg.call.is_none() {
-            return err("a segment after a pipe has no keyword (4.2 rule 3)", seg.start);
+            return err(
+                codes::SYNTAX_PIPE_SEGMENT_NO_KEYWORD,
+                "a segment after a pipe has no keyword (4.2 rule 3)",
+                seg.start,
+            );
         }
         if seg.call.is_none() && k == 0 && m.segments.len() > 1 && seg.args.len() != 1 {
-            return err("the first segment of a pipe without a keyword holds one object (4.2 rule 3)", seg.start);
+            return err(
+                codes::SYNTAX_PIPE_FIRST_SEGMENT_OBJECTS,
+                "the first segment of a pipe without a keyword holds one object (4.2 rule 3)",
+                seg.start,
+            );
         }
         if seg.call.is_none() && m.binds_after(k).next().is_some() && seg.args.len() != 1 {
             return err(
+                codes::SYNTAX_NAMED_SEGMENT_OBJECTS,
                 "a named segment without a keyword holds one object; write several objects as `{…}` (4.2 rule 4)",
                 seg.start,
             );
         }
         for a in &seg.args {
             if a.role.is_some() && seg.call.is_none() {
-                return err("roles are written only on the objects of a segment with a keyword (4.2 rule 5)", a.start);
+                return err(
+                    codes::SYNTAX_ROLE_WITHOUT_KEYWORD,
+                    "roles are written only on the objects of a segment with a keyword (4.2 rule 5)",
+                    a.start,
+                );
             }
             if a.role.is_some() && k > 0 {
-                return err("a segment after a pipe cannot label roles (4.2 rule 5)", a.start);
+                return err(
+                    codes::SYNTAX_ROLE_AFTER_PIPE,
+                    "a segment after a pipe cannot label roles (4.2 rule 5)",
+                    a.start,
+                );
             }
         }
         let mut roles: Vec<&String> = seg.args.iter().filter_map(|a| a.role.as_ref()).collect();
@@ -1323,7 +1431,7 @@ fn check_member(m: &Member) -> PResult<()> {
         roles.sort();
         roles.dedup();
         if roles.len() != n {
-            return err("a role is labelled only once (4.2 rule 6)", seg.start);
+            return err(codes::KEYWORD_POSITION_LABELLED_TWICE, "a role is labelled only once (4.2 rule 6)", seg.start);
         }
     }
     Ok(())
@@ -1647,9 +1755,9 @@ mod tests {
         let b = body("@RNL {#M1 @PLACE (10, 20); #M2 @PLACE(1, 2); #M3 @PLACE(x=1, 2)}");
         assert!(b.members[0].error.is_none()); // a point after PLACE: the keyword fails later
         assert!(b.members[1].error.is_none());
-        assert!(b.members[2].error.as_ref().unwrap().contains("by position"));
+        assert!(b.members[2].error.as_ref().unwrap().message.contains("by position"));
         let b = body("@RNL {#M1 => #M2; #M3}");
-        assert!(b.members[0].error.as_ref().unwrap().contains("no keyword"));
+        assert!(b.members[0].error.as_ref().unwrap().message.contains("no keyword"));
         assert!(b.members[1].error.is_none());
     }
 
@@ -1680,7 +1788,7 @@ mod tests {
             "@RNL/* gap */(priority=\"low\") {#M1 @PLACE(1, 2)}",
         ] {
             let r = parse_record(text);
-            assert!(r.error.as_ref().unwrap().0.contains("must touch @RNL"));
+            assert!(r.error.as_ref().unwrap().0.message.contains("must touch @RNL"));
             assert!(r.body.is_none());
         }
         assert!(parse_record("@RNL(priority=\"low\") {#M1 @PLACE(1, 2)}").error.is_none());
@@ -1701,7 +1809,7 @@ mod tests {
             "#M2 @PLACE(1e-300, -1e-300); #M3 @PLACE(0e999, -0e-999); #M4 @PLACE(5e-324, -5e-324)}"
         ));
         for m in &b.members[..4] {
-            let error = m.error.as_ref().unwrap();
+            let error = &m.error.as_ref().unwrap().message;
             assert!(error.contains("implementation") && error.contains("numeric range"), "{error}");
         }
         for (m, expected) in b.members[4..].iter().zip([
@@ -1722,7 +1830,7 @@ mod tests {
         let text = "@RNL {%#3 @PLACE(1, 2); %#5:p %#5::mid @ALIGN(\"x\"); %#2a; %# @PLACE(1, 2); #M1}";
         // as in 0.2, `%#` is a lexical error: the member fails, the others are read
         let b = body(text);
-        assert!(b.members[0].error.as_ref().unwrap().contains("write a name after `%`"));
+        assert!(b.members[0].error.as_ref().unwrap().message.contains("write a name after `%`"));
         assert!(b.members[4].error.is_none());
         let r = parse_record_with(text, true);
         let b = r.body.unwrap();
@@ -1733,8 +1841,8 @@ mod tests {
         assert_eq!((r1.number, r1.path[0].sep, r1.path[0].name.as_str()), (Some(5), Sep::Sub, "mid"));
         assert!(uses_number(&b.members[1]) && !uses_number(&b.members[4]));
         // digits only, and some of them
-        assert!(b.members[2].error.as_ref().unwrap().contains("digits only"));
-        assert!(b.members[3].error.as_ref().unwrap().contains("digits only"));
+        assert!(b.members[2].error.as_ref().unwrap().message.contains("digits only"));
+        assert!(b.members[3].error.as_ref().unwrap().message.contains("digits only"));
     }
 
     #[test]

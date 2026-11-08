@@ -26,6 +26,7 @@
 //! place. Then the interpretation is run again with that statement failing from the start
 //! (`Interp::closing`), so that what depends on it fails with it, whatever its order (7.2).
 
+use crate::diag::codes;
 use std::cmp::Reverse;
 use std::collections::{BinaryHeap, HashMap, HashSet};
 
@@ -87,7 +88,7 @@ impl Interp<'_> {
         match self.closing.get(&StmtKey::of(ctx, off)) {
             Some(msg) => {
                 let msg = msg.clone();
-                self.fail(ctx, msg, off)
+                self.fail(ctx, codes::CYCLE_OF_SETS, msg, off)
             }
             None => Ok(()),
         }
@@ -157,7 +158,7 @@ impl Interp<'_> {
             }
         }
         let msg = self.cycle_message(&deps, last, ctx, m.off);
-        self.fail(ctx, msg, m.off)
+        self.fail(ctx, codes::CYCLE_OF_SETS, msg, m.off)
     }
 
     /// Whether a set depends on another in a level, through any number of sets (5.2.2).

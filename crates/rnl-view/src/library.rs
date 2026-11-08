@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
-use rnl_runtime::diag::{Loc, Sink};
+use rnl_runtime::diag::{codes, Loc, Sink};
 use rnl_runtime::host::format::Reading;
 use rnl_runtime::host::{HostDocument, LevelKind};
 use rnl_runtime::source::{normalize, LibraryDefinition, LibraryLookup, MemoryProvider, Provider};
@@ -325,7 +325,8 @@ pub(crate) fn resolve(
                         candidates.len(),
                         names.join(", ")
                     );
-                    conflicts.push((model.to_string(), message, loc, Some((inst.case_sensitive, candidates))));
+                    let candidates = Some((inst.case_sensitive, candidates));
+                    conflicts.push((model.to_string(), codes::VIEW_AUTOINCLUDE_AMBIGUOUS, message, loc, candidates));
                 } else if let Some(def) = candidates.first() {
                     if extra.contains(&def.path) || normalize(path) == def.path {
                         continue;
@@ -361,7 +362,7 @@ pub(crate) fn resolve(
                         present || duplicate
                     });
                     if let Some(other) = conflict {
-                        conflicts.push((model.to_string(), format!("Auto Include: {} was not included for subcircuit {model} because its definition of {} conflicts with an existing definition", def.source, other.name), loc, None));
+                        conflicts.push((model.to_string(), codes::VIEW_AUTOINCLUDE_CONFLICT, format!("Auto Include: {} was not included for subcircuit {model} because its definition of {} conflicts with an existing definition", def.source, other.name), loc, None));
                     } else {
                         approved.insert(def.path.clone());
                         automatic.push((model.to_string(), def.source.clone(), loc));
@@ -380,9 +381,9 @@ pub(crate) fn resolve(
             continue;
         }
         *sink = parsed;
-        for (model, message, loc, candidates) in conflicts {
+        for (model, code, message, loc, candidates) in conflicts {
             if doc.subckt(&model).is_none() {
-                sink.warning(message, loc);
+                sink.warning(code, message, loc);
                 // for a viewer to offer the definitions when the instance is entered
                 if let Some((case_sensitive, candidates)) = candidates {
                     doc.library_candidates.push((model, case_sensitive, candidates));
@@ -390,12 +391,15 @@ pub(crate) fn resolve(
             }
         }
         for (model, file, loc) in automatic {
-            let message = if doc.subckt(&model).is_some() {
-                format!("Subcircuit {model} was not included; found in {file} and added by Auto Include")
+            let (code, message) = if doc.subckt(&model).is_some() {
+                (
+                    codes::VIEW_AUTOINCLUDE_ADDED,
+                    format!("Subcircuit {model} was not included; found in {file} and added by Auto Include"),
+                )
             } else {
-                format!("Auto Include could not resolve subcircuit {model} from {file}; reload Library to refresh its definitions")
+                (codes::VIEW_AUTOINCLUDE_UNRESOLVED, format!("Auto Include could not resolve subcircuit {model} from {file}; reload Library to refresh its definitions"))
             };
-            sink.warning(message, loc);
+            sink.warning(code, message, loc);
         }
         return Some(doc);
     }

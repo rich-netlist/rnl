@@ -816,12 +816,16 @@
   "diagnostics": [
     {
       "severity": "hint",
+      "code": "RNL2007",
+      "name": "header-record-missing",
       "file": "08-no-header.sp",
       "line": 2,
       "col": 0
     },
     {
       "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
       "file": "08-no-header.sp",
       "line": 1,
       "col": 0

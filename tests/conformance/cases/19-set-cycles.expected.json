@@ -927,30 +927,40 @@
   "diagnostics": [
     {
       "severity": "error",
+      "code": "RNL2700",
+      "name": "cycle-of-sets",
       "file": "19-set-cycles.sp",
       "line": 23,
       "col": 5
     },
     {
       "severity": "error",
+      "code": "RNL2700",
+      "name": "cycle-of-sets",
       "file": "19-set-cycles.sp",
       "line": 28,
       "col": 5
     },
     {
       "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
       "file": "19-set-cycles.sp",
       "line": 1,
       "col": 0
     },
     {
       "severity": "error",
+      "code": "RNL2700",
+      "name": "cycle-of-sets",
       "file": "19-set-cycles.sp",
       "line": 13,
       "col": 10
     },
     {
       "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
       "file": "19-set-cycles.sp",
       "line": 11,
       "col": 0

@@ -450,12 +450,16 @@
   "diagnostics": [
     {
       "severity": "error",
+      "code": "RNL2801",
+      "name": "name-bound-twice",
       "file": "21-scope-bindings.sp",
       "line": 26,
       "col": 23
     },
     {
       "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
       "file": "21-scope-bindings.sp",
       "line": 12,
       "col": 0

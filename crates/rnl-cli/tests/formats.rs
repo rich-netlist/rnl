@@ -565,7 +565,7 @@ fn check_of_a_verilog_a_file_prints_the_hint_and_succeeds() {
     assert_eq!(code, 0, "{out}{err}");
     assert_eq!(
         out,
-        "hint res.va:1: `res.va` is not a netlist (Verilog-A); it is not read
+        "hint res.va:1: RNL9010 host-text-file-not-read: `res.va` is not a netlist (Verilog-A); it is not read
 0 errors, 0 warnings, 1 hints
 "
     );

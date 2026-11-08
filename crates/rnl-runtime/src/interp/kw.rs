@@ -4,6 +4,7 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::rc::Rc;
 
+use crate::diag::codes;
 use crate::geom::Orient;
 use crate::syntax::{Member, ObjExpr, Segment, SetExpr, Value};
 use crate::words::{words, ParamSpec, ParamType, ParamsSpec, PositionSpec, Takes};
@@ -88,7 +89,7 @@ impl Interp<'_> {
                 let p = self.params(kw, seg, ctx, &sig_params(kw), None, false, None)?;
                 if get(&p, "x").is_none() && get(&p, "y").is_none() {
                     let at = seg.call.as_ref().unwrap().start;
-                    return self.fail(ctx, "PLACE takes x, y or both (11.1)", at);
+                    return self.fail(ctx, codes::PARAM_PLACE_NEEDS_X_OR_Y, "PLACE takes x, y or both (11.1)", at);
                 }
                 let priority = priority_of(&p, ctx);
                 let op = TargetOp::Place {
@@ -118,6 +119,7 @@ impl Interp<'_> {
                     let l = self.label(sty);
                     return self.fail(
                         ctx,
+                        codes::STYLE_SET_STYLE_NOT_A_STYLE,
                         format!("the last object of SET-STYLE must be a style, not {l} (11.3)"),
                         mapped["style"].off,
                     );
@@ -155,7 +157,7 @@ impl Interp<'_> {
                 let mapped = self.map_args(kw, &args, seg, ctx, sig_positions(kw))?;
                 let obj = mapped["members"].obj;
                 if !self.is_set(obj) {
-                    return self.fail(ctx, "GROUP takes a set (11.5)", seg.start);
+                    return self.fail(ctx, codes::KEYWORD_GROUP_NOT_A_SET, "GROUP takes a set (11.5)", seg.start);
                 }
                 let Some(s) = ctx.scene else {
                     if self.is_lazy(obj) {
@@ -219,12 +221,18 @@ impl Interp<'_> {
                 let Some(s) = ctx.scene else { return self.scene_only(ctx, seg.start) };
                 let members = if self.is_set(obj) { self.flatten(s, obj, 3, Some(ctx)) } else { vec![obj] };
                 if members.is_empty() {
-                    return self.fail(ctx, "BUNDLE received an empty set and fails (5.2.1, 11.8)", seg.start);
+                    return self.fail(
+                        ctx,
+                        codes::KEYWORD_BUNDLE_EMPTY_SET,
+                        "BUNDLE received an empty set and fails (5.2.1, 11.8)",
+                        seg.start,
+                    );
                 }
                 for m in &members {
                     if let Some(d) = self.failed_obj(*m) {
                         let id = self.err_cause(
                             ctx,
+                            codes::KEYWORD_BUNDLE_MEMBER_FAILED,
                             "a member of the bundle cannot be found: the whole bundle fails (11.8)",
                             seg.start,
                             d,
@@ -235,6 +243,7 @@ impl Interp<'_> {
                         let l = self.label(*m);
                         return self.fail(
                             ctx,
+                            codes::KEYWORD_BUNDLE_MEMBER_NOT_INSTANCE,
                             format!("the members of a bundle are host instances, not {l} (11.8)"),
                             seg.start,
                         );
@@ -250,7 +259,7 @@ impl Interp<'_> {
             }
             _ => {
                 let at = seg.call.as_ref().unwrap().start;
-                self.fail(ctx, format!("@{kw} cannot be used here"), at)
+                self.fail(ctx, codes::KEYWORD_NOT_USABLE_HERE, format!("@{kw} cannot be used here"), at)
             }
         }
     }
@@ -274,20 +283,35 @@ impl Interp<'_> {
     fn unnamed_definition_warning(&mut self, ctx: &Ctx, seg: &Segment, member: &Rc<Member>) {
         if member.bind().is_none() && ctx.frame.is_none() && ctx.nested.is_none() && member.segments.len() == 1 {
             let at = seg.call.as_ref().unwrap().start;
-            self.warn(ctx, "a definition at the top of a record without a name is never used (9.1)", at);
+            self.warn(
+                ctx,
+                codes::DEFINE_UNNAMED_UNUSED,
+                "a definition at the top of a record without a name is never used (9.1)",
+                at,
+            );
         }
     }
 
     fn body_arg(&mut self, kw: &str, args: &[ArgV], seg: &Segment, ctx: &Ctx) -> R<Option<Rc<SetExpr>>> {
         if seg.args.is_empty() {
             if !args.is_empty() {
-                return self.fail(ctx, format!("@{kw} takes one set as its body (9.1)"), seg.start);
+                return self.fail(
+                    ctx,
+                    codes::DEFINE_BODY_NOT_ONE_SET,
+                    format!("@{kw} takes one set as its body (9.1)"),
+                    seg.start,
+                );
             }
             return Ok(None);
         }
         match (&seg.args[0].obj, seg.args.len(), args.len()) {
             (ObjExpr::Set(s), 1, 1) => Ok(Some(s.clone())),
-            _ => self.fail(ctx, format!("@{kw} takes one set as its body (9.1)"), seg.start),
+            _ => self.fail(
+                ctx,
+                codes::DEFINE_BODY_NOT_ONE_SET,
+                format!("@{kw} takes one set as its body (9.1)"),
+                seg.start,
+            ),
         }
     }
 
@@ -310,7 +334,7 @@ impl Interp<'_> {
         if body.is_some() && self.symbol_expansions.len() >= MAX_SYMBOL_LEVELS {
             let id = self.err(
                 ctx,
-                format!("symbol expansion exceeds this implementation's limit of {MAX_SYMBOL_LEVELS} active symbol bodies (9.2.7)"),
+                codes::DEFINE_SYMBOL_EXPANSION_LIMIT, format!("symbol expansion exceeds this implementation's limit of {MAX_SYMBOL_LEVELS} active symbol bodies (9.2.7)"),
                 seg.start,
             );
             for failure in &mut self.symbol_expansions {
@@ -341,7 +365,12 @@ impl Interp<'_> {
             };
             if !ok {
                 let at = seg.call.as_ref().unwrap().start;
-                return self.fail(ctx, "box= is written [x1, y1, x2, y2] (9.2.3)", at);
+                return self.fail(
+                    ctx,
+                    codes::PARAM_SYMBOL_BOX_MALFORMED,
+                    "box= is written [x1, y1, x2, y2] (9.2.3)",
+                    at,
+                );
             }
         }
         if let Some(body) = body {
@@ -366,7 +395,7 @@ impl Interp<'_> {
                 if u.own_of == Some(sym) && u.sym_symbol.is_none() {
                     let site = u.site.clone().unwrap();
                     let l = self.label(u.definition);
-                    self.warn(&site, format!("the usage of {l} in a symbol body is given no symbol with SET-SYMBOL and is not drawn (9.2.7)"), u.off);
+                    self.warn(&site, codes::USAGE_IN_SYMBOL_NOT_DRAWN, format!("the usage of {l} in a symbol body is given no symbol with SET-SYMBOL and is not drawn (9.2.7)"), u.off);
                 }
             }
         }
@@ -391,14 +420,14 @@ impl Interp<'_> {
                 if depth > MAX_SYMBOL_LEVELS {
                     return self.fail(
                         ctx,
-                        format!("nested symbols exceed this implementation's limit of {MAX_SYMBOL_LEVELS} symbol levels (9.2.7)"),
+                        codes::DEFINE_SYMBOL_DEPTH_LIMIT, format!("nested symbols exceed this implementation's limit of {MAX_SYMBOL_LEVELS} symbol levels (9.2.7)"),
                         off,
                     );
                 }
                 depths.insert(sym, depth);
             } else {
                 if !active.insert(sym) {
-                    return self.fail(ctx, "nested symbols form a cycle (9.2.7)", off);
+                    return self.fail(ctx, codes::DEFINE_SYMBOL_CYCLE, "nested symbols form a cycle (9.2.7)", off);
                 }
                 pending.push((sym, true));
                 pending.extend(children.into_iter().rev().map(|(_, child, _, _)| (child, false)));
@@ -441,13 +470,17 @@ impl Interp<'_> {
         if let Some(body) = body {
             for m in body.members.iter() {
                 if let Some(err) = &m.error {
-                    let e = err.clone();
-                    self.err(ctx, e, m.error_pos);
+                    self.err(ctx, err.code, err.message.clone(), m.error_pos);
                     continue;
                 }
                 for sg in &m.segments {
                     if sg.call.is_some() || m.bind().is_some() || m.segments.len() != 1 {
-                        self.err(ctx, "the set of DEFINE-STYLE only references other styles (9.3)", m.start);
+                        self.err(
+                            ctx,
+                            codes::STYLE_BODY_NOT_STYLE,
+                            "the set of DEFINE-STYLE only references other styles (9.3)",
+                            m.start,
+                        );
                         break;
                     }
                     for a in &sg.args {
@@ -458,7 +491,12 @@ impl Interp<'_> {
                                 props.extend(p);
                             }
                             _ => {
-                                self.err(ctx, "the set of DEFINE-STYLE only references other styles (9.3)", a.start);
+                                self.err(
+                                    ctx,
+                                    codes::STYLE_BODY_NOT_STYLE,
+                                    "the set of DEFINE-STYLE only references other styles (9.3)",
+                                    a.start,
+                                );
                             }
                         }
                     }
@@ -499,22 +537,42 @@ impl Interp<'_> {
                         let kinds: Vec<String> = match &v[1] {
                             Lit::Arr(ks) => ks.iter().filter_map(|k| k.str().map(String::from)).collect(),
                             Lit::Str(k) => vec![k.as_str().to_string()],
-                            _ => return self.fail(ctx, "a role is a name or [name, kind] (9.4)", at),
+                            _ => {
+                                return self.fail(
+                                    ctx,
+                                    codes::DEFINE_ROLE_MALFORMED,
+                                    "a role is a name or [name, kind] (9.4)",
+                                    at,
+                                )
+                            }
                         };
                         for k in &kinds {
                             if !ROLE_KINDS.contains(&k.as_str()) {
-                                return self.fail(ctx, format!("unknown kind name {k} (9.4)"), at);
+                                return self.fail(
+                                    ctx,
+                                    codes::DEFINE_ROLE_UNKNOWN_KIND,
+                                    format!("unknown kind name {k} (9.4)"),
+                                    at,
+                                );
                             }
                         }
                         (v[0].str().unwrap().to_string(), Some(kinds))
                     }
-                    _ => return self.fail(ctx, "a role is a name or [name, kind] (9.4)", at),
+                    _ => {
+                        return self.fail(
+                            ctx,
+                            codes::DEFINE_ROLE_MALFORMED,
+                            "a role is a name or [name, kind] (9.4)",
+                            at,
+                        )
+                    }
                 };
                 let is_set = name.starts_with('{') && name.ends_with('}') && name.len() >= 2;
                 let name = if is_set { name[1..name.len() - 1].to_string() } else { name };
                 if seen.contains(&name) || name == "position" || name == "net" {
                     return self.fail(
                         ctx,
+                        codes::DEFINE_ROLE_NAME_INVALID,
                         format!("the role name {name} is used twice or is a standard sub-object name (9.4)"),
                         at,
                     );
@@ -531,11 +589,23 @@ impl Interp<'_> {
                         params.push((v[0].str().unwrap().to_string(), Some(v[1].clone())))
                     }
                     Lit::Str(s) => params.push((s.as_str().to_string(), None)),
-                    _ => return self.fail(ctx, "a parameter is a name or [name, default] (9.4)", at),
+                    _ => {
+                        return self.fail(
+                            ctx,
+                            codes::DEFINE_PARAM_MALFORMED,
+                            "a parameter is a name or [name, default] (9.4)",
+                            at,
+                        )
+                    }
                 }
                 let n = params.last().unwrap().0.clone();
                 if seen.contains(&n) || n == "priority" || n == "position" || n == "net" {
-                    return self.fail(ctx, format!("the parameter name {n} cannot be used (9.4)"), at);
+                    return self.fail(
+                        ctx,
+                        codes::DEFINE_PARAM_NAME_INVALID,
+                        format!("the parameter name {n} cannot be used (9.4)"),
+                        at,
+                    );
                 }
                 seen.push(n);
             }
@@ -569,8 +639,7 @@ impl Interp<'_> {
         let mut names: Vec<String> = Vec::new();
         for m in d.body.as_ref().unwrap().members.iter() {
             if let Some(err) = &m.error {
-                let e = err.clone();
-                self.err(ctx, e, m.error_pos);
+                self.err(ctx, err.code, err.message.clone(), m.error_pos);
                 self.note_failed(ctx.rec, m.start, m.end, false);
                 continue;
             }
@@ -578,6 +647,7 @@ impl Interp<'_> {
                 if roles.contains(&b.name) || b.name == "position" || b.name == "net" {
                     self.err(
                         ctx,
+                        codes::DEFINE_LOCAL_NAME_CLASH,
                         format!(
                             "the local name {} is spelled like a role name or a standard sub-object name (9.4)",
                             b.name
@@ -586,7 +656,12 @@ impl Interp<'_> {
                     );
                 }
                 if names.contains(&b.name) {
-                    self.err(ctx, format!("the local name {} is bound twice (6.6)", b.name), b.off);
+                    self.err(
+                        ctx,
+                        codes::DEFINE_LOCAL_NAME_TWICE,
+                        format!("the local name {} is bound twice (6.6)", b.name),
+                        b.off,
+                    );
                 }
                 names.push(b.name.clone());
             }
@@ -597,12 +672,17 @@ impl Interp<'_> {
                     crate::syntax::RefOrHole::Ref(r) => {
                         if r.number.is_some() {
                             // reported once here, and each expansion leaves the statement out (5.9)
-                            let diag = self.err(ctx, super::numbers::in_body_message(r), r.start);
+                            let diag = self.err(
+                                ctx,
+                                codes::NUMBER_IN_DEFINITION_BODY,
+                                super::numbers::in_body_message(r),
+                                r.start,
+                            );
                             self.body_errors.insert(super::eval::ptr(r), diag);
                             self.note_failed_at(ctx.rec, r.start, false);
                         }
                         if r.prefix == '#' || r.prefix == '&' {
-                            self.err(ctx, "the body of an ordinary definition cannot reference host objects; they come in through roles (6.9)", r.start);
+                            self.err(ctx, codes::DEFINE_BODY_HOST_REF, "the body of an ordinary definition cannot reference host objects; they come in through roles (6.9)", r.start);
                             self.note_failed_at(ctx.rec, r.start, false);
                         }
                         if r.prefix == '$' || r.prefix == '%' {
@@ -612,8 +692,8 @@ impl Interp<'_> {
                                     if let super::eval::Found::NoOuter =
                                         self.outer_lookup(r.prefix, &n, &member, unit, ctx.scene)
                                     {
-                                        let msg = super::eval::no_outer_message(r);
-                                        let diag = self.err(ctx, msg, r.start);
+                                        let (code, msg) = super::eval::no_outer_message(r);
+                                        let diag = self.err(ctx, code, msg, r.start);
                                         self.body_errors.insert(super::eval::ptr(r), diag);
                                         self.note_failed_at(ctx.rec, r.start, false);
                                     }
@@ -626,6 +706,7 @@ impl Interp<'_> {
                                     if params.contains(n) {
                                         self.err(
                                             ctx,
+                                            codes::REF_HOLE_PARAM_AS_OBJECT,
                                             format!(
                                                 "?{n} is a parameter and is written only where a literal goes (6.10)"
                                             ),
@@ -634,6 +715,7 @@ impl Interp<'_> {
                                     } else {
                                         self.err(
                                             ctx,
+                                            codes::REF_HOLE_UNKNOWN,
                                             format!("?{n} is not in the role list or the parameter list (6.10)"),
                                             r.start,
                                         );
@@ -644,7 +726,12 @@ impl Interp<'_> {
                     }
                     crate::syntax::RefOrHole::Hole(n) => {
                         if !params.iter().any(|p| p == n) && !roles.iter().any(|p| p == n) {
-                            self.err(ctx, format!("?{n} is not in the parameter list (6.10)"), 0);
+                            self.err(
+                                ctx,
+                                codes::REF_HOLE_NOT_A_PARAM,
+                                format!("?{n} is not in the parameter list (6.10)"),
+                                0,
+                            );
                         }
                     }
                 }
@@ -653,9 +740,19 @@ impl Interp<'_> {
                 if let Some(call) = &sg.call {
                     let k = self.kw(&call.kw, ctx.unit);
                     if !words().is_keyword(&k) {
-                        self.err(ctx, format!("unknown keyword @{} (16.4)", call.kw), call.start);
+                        self.err(
+                            ctx,
+                            codes::KEYWORD_UNKNOWN,
+                            format!("unknown keyword @{} (16.4)", call.kw),
+                            call.start,
+                        );
                     } else if k == "PIN" {
-                        self.err(ctx, "PIN is written only in a DEFINE-SYMBOL body (9.2.4)", call.start);
+                        self.err(
+                            ctx,
+                            codes::DEFINE_BODY_PIN,
+                            "PIN is written only in a DEFINE-SYMBOL body (9.2.4)",
+                            call.start,
+                        );
                     }
                 }
             }
@@ -715,6 +812,7 @@ impl Interp<'_> {
         if written.is_empty() {
             return self.fail(
                 ctx,
+                codes::USAGE_DEFINITION_PIPED,
                 format!("the definition of @{kw} is written {wher} and cannot come down a pipe (5.6)"),
                 seg.start,
             );
@@ -723,6 +821,7 @@ impl Interp<'_> {
         if dfn_arg.role.is_some() {
             return self.fail(
                 ctx,
+                codes::USAGE_DEFINITION_HAS_ROLE,
                 format!("the definition of @{kw} is written {wher} and carries no role (4.2 rule 7)"),
                 dfn_arg.off,
             );
@@ -732,6 +831,7 @@ impl Interp<'_> {
             let l = self.label(dfn);
             return self.fail(
                 ctx,
+                codes::USAGE_NOT_A_DEFINITION,
                 format!("the object written {wher} for @{kw} must be an ordinary definition, not {l} (5.6)"),
                 dfn_arg.off,
             );
@@ -760,7 +860,7 @@ impl Interp<'_> {
             }
             if prio.iter().any(|p| p == name) {
                 if own.iter().any(|p| p == name) {
-                    return s.fail(ctx, format!("{name} is both a parameter of the definition {dlabel} and an alias of priority; its meaning is not unique (16.5)"), off);
+                    return s.fail(ctx, codes::USAGE_PARAM_ALIAS_AMBIGUOUS, format!("{name} is both a parameter of the definition {dlabel} and an alias of priority; its meaning is not unique (16.5)"), off);
                 }
                 return Ok("priority".to_string());
             }
@@ -801,7 +901,12 @@ impl Interp<'_> {
         let mut filled: Vec<(String, ArgV)> = Vec::new();
         let labeled = objs.iter().filter(|a| a.role.is_some()).count();
         if labeled > 0 && labeled != objs.len() {
-            return self.fail(ctx, "label the roles of all objects or of none (4.2 rule 6)", seg.start);
+            return self.fail(
+                ctx,
+                codes::ROLE_LABELS_MIXED,
+                "label the roles of all objects or of none (4.2 rule 6)",
+                seg.start,
+            );
         }
         if labeled > 0 {
             for a in &objs {
@@ -824,6 +929,7 @@ impl Interp<'_> {
                     let renamed = self.role_renamed_in_0_3(&dlabel, &role, &names, ctx).unwrap_or_default();
                     return self.fail(
                         ctx,
+                        codes::USAGE_UNKNOWN_ROLE,
                         format!("the ordinary definition {dlabel} has no role {r}{more} (9.4){then}{renamed}"),
                         a.off,
                     );
@@ -831,6 +937,7 @@ impl Interp<'_> {
                 if filled.iter().any(|(n, _)| *n == role) {
                     return self.fail(
                         ctx,
+                        codes::USAGE_ROLE_LABELLED_TWICE,
                         format!("the role {role} of the ordinary definition {dlabel} is labelled twice (4.2 rule 6)"),
                         a.off,
                     );
@@ -841,6 +948,7 @@ impl Interp<'_> {
             if objs.len() > d.roles.len() {
                 return self.fail(
                     ctx,
+                    codes::USAGE_TOO_MANY_OBJECTS,
                     format!(
                         "the ordinary definition {dlabel} has {} roles, {} objects are written (9.4)",
                         d.roles.len(),
@@ -857,6 +965,7 @@ impl Interp<'_> {
             if !r.is_set && !filled.iter().any(|(n, _)| *n == r.name) {
                 return self.fail(
                     ctx,
+                    codes::USAGE_ROLE_NOT_FILLED,
                     format!("the single role {} of the ordinary definition {dlabel} is not filled (9.4)", r.name),
                     seg.start,
                 );
@@ -880,6 +989,7 @@ impl Interp<'_> {
         if multi.len() + lazy_roles.len() > 1 {
             return self.fail(
                 ctx,
+                codes::USAGE_SEVERAL_SET_ROLES,
                 "at most one single role of an application receives a set of several members (5.2.1)",
                 seg.start,
             );
@@ -1001,6 +1111,7 @@ impl Interp<'_> {
                     if let Some(dg) = self.failed_obj(a.obj) {
                         let id = self.err_cause(
                             ctx,
+                            codes::USAGE_ROLE_FAILED_OBJECT,
                             format!("the role {} received a failed object", r.name),
                             app.seg_start,
                             dg,
@@ -1066,6 +1177,7 @@ impl Interp<'_> {
                 path.push(self.label(dfn));
                 return self.fail(
                     ctx,
+                    codes::USAGE_CYCLIC_APPLICATION,
                     format!("cyclic application: {}; this application fails (9.4)", path.join(" -> ")),
                     off,
                 );
@@ -1097,6 +1209,7 @@ impl Interp<'_> {
             let ol = self.label(obj);
             return self.fail(
                 ctx,
+                codes::USAGE_ROLE_WRONG_KIND,
                 format!(
                     "the role {role} of the ordinary definition {dl} takes {}, not {ol} ({k}) (9.4)",
                     kinds.join("/")
@@ -1156,7 +1269,7 @@ impl Interp<'_> {
             return Ok(*v);
         }
         if self.tm_in_progress.contains(&key) {
-            return self.fail(ctx, "the name refers to itself in a cycle (6.6)", m.text_start());
+            return self.fail(ctx, codes::REF_NAME_CYCLE, "the name refers to itself in a cycle (6.6)", m.text_start());
         }
         self.tm_in_progress.insert(key);
         let dfn = fr.borrow().definition.unwrap();
@@ -1208,6 +1321,7 @@ impl Interp<'_> {
         let Some(pt) = pt.filter(|p| matches!(self.o(*p), ObjData::Point { .. })) else {
             return self.fail(
                 ctx,
+                codes::USAGE_IN_SYMBOL_FIRST_ROLE_NOT_POINT,
                 "a usage in a symbol body has its first role filled with a point of the body (9.2.7)",
                 seg.start,
             );
@@ -1268,8 +1382,7 @@ impl Interp<'_> {
         };
         for m in body.members.iter() {
             if let Some(err) = &m.error {
-                let e = err.clone();
-                self.err(ctx, e, m.error_pos);
+                self.err(ctx, err.code, err.message.clone(), m.error_pos);
                 continue;
             }
             if m.segments.len() == 1 && m.segments[0].call.is_none() && m.bind().is_none() {
@@ -1288,7 +1401,7 @@ impl Interp<'_> {
                         _ => {
                             self.err(
                                 &sctx,
-                                "a symbol body holds only graphics, pins, points, merged symbols, usages that only draw and texts on `?` (9.2.2)",
+                                codes::DEFINE_SYMBOL_BODY_BAD_OBJECT, "a symbol body holds only graphics, pins, points, merged symbols, usages that only draw and texts on `?` (9.2.2)",
                                 a.start,
                             );
                             break;
@@ -1304,7 +1417,12 @@ impl Interp<'_> {
             match r {
                 Ok(_) | Err(Stop::Fail(_)) => {}
                 Err(Stop::NoCircuit) => {
-                    self.err(&sctx, "this statement cannot be written in a symbol body (9.2.2)", m.start);
+                    self.err(
+                        &sctx,
+                        codes::DEFINE_SYMBOL_BODY_BAD_STATEMENT,
+                        "this statement cannot be written in a symbol body (9.2.2)",
+                        m.start,
+                    );
                 }
                 Err(Stop::LocalRef) => return Err(Stop::LocalRef),
                 Err(Stop::OwnLevel) => return Err(Stop::OwnLevel),
@@ -1318,6 +1436,7 @@ impl Interp<'_> {
             let at = seg.call.as_ref().unwrap().start;
             return self.fail(
                 ctx,
+                codes::KEYWORD_PIN_OUTSIDE_SYMBOL,
                 "pins cannot be written in the scene; PIN is written only in a DEFINE-SYMBOL body (13.4)",
                 at,
             );
@@ -1326,7 +1445,7 @@ impl Interp<'_> {
         let p = self.params(kw, seg, ctx, &sig_params(kw), None, false, None)?;
         let pt = mapped["position"].obj;
         let ObjData::Point { x: Some(x), y: Some(y), .. } = self.o(pt).clone() else {
-            return self.fail(ctx, "PIN takes one point (9.2.4)", seg.start);
+            return self.fail(ctx, codes::KEYWORD_PIN_NOT_A_POINT, "PIN takes one point (9.2.4)", seg.start);
         };
         let term = get(&p, "terminal").cloned().unwrap();
         let raw = match term {
@@ -1335,7 +1454,12 @@ impl Interp<'_> {
         };
         if raw.is_empty() {
             let at = seg.call.as_ref().unwrap().start;
-            return self.fail(ctx, "the terminal= array of a bus pin has at least one element (9.2.4)", at);
+            return self.fail(
+                ctx,
+                codes::PARAM_PIN_TERMINAL_EMPTY,
+                "the terminal= array of a bus pin has at least one element (9.2.4)",
+                at,
+            );
         }
         let terms: Vec<TermKey> = raw
             .iter()
@@ -1359,7 +1483,7 @@ impl Interp<'_> {
         let symbol = ctx.frame.as_ref().unwrap().borrow().symbol.unwrap();
         add_pin(self.symbol_mut(symbol), pin);
         if x != x.round() || y != y.round() {
-            self.hint_at(ctx, "pins are best placed on integer points (9.2.4)", seg.start);
+            self.hint_at(ctx, codes::KEYWORD_PIN_OFF_GRID, "pins are best placed on integer points (9.2.4)", seg.start);
         }
         Ok((pt, false))
     }
@@ -1373,7 +1497,12 @@ impl Interp<'_> {
         let mapped = self.map_args(kw, args, seg, ctx, &positions)?;
         let obj = mapped["points"].obj;
         if self.is_lazy(obj) {
-            return self.fail(ctx, format!("the points of @{kw} take no selection (9.2.5)"), seg.start);
+            return self.fail(
+                ctx,
+                codes::KEYWORD_GRAPHIC_POINTS_SELECTION,
+                format!("the points of @{kw} take no selection (9.2.5)"),
+                seg.start,
+            );
         }
         let (style, rest) = split_style(&p);
         let params = PrimParams {
@@ -1393,7 +1522,12 @@ impl Interp<'_> {
                 && !(params.width.is_some() && params.height.is_some())
             {
                 let at = seg.call.as_ref().unwrap().start;
-                return self.fail(ctx, format!("write both width and height of @{kw} (9.2.5)"), at);
+                return self.fail(
+                    ctx,
+                    codes::PARAM_GRAPHIC_WIDTH_HEIGHT,
+                    format!("write both width and height of @{kw} (9.2.5)"),
+                    at,
+                );
             }
             if self.is_set(obj) && pts.len() > 1 {
                 let mut outs = Vec::new();
@@ -1417,7 +1551,12 @@ impl Interp<'_> {
             Shape::Text => false,
         };
         if !ok {
-            return self.fail(ctx, format!("@{kw} has the wrong number of points (9.2.5)"), seg.start);
+            return self.fail(
+                ctx,
+                codes::KEYWORD_GRAPHIC_POINT_COUNT,
+                format!("@{kw} has the wrong number of points (9.2.5)"),
+                seg.start,
+            );
         }
         Ok((self.make_prim(shape, pts, &params, &style, ctx, seg, None)?, false))
     }
@@ -1427,7 +1566,12 @@ impl Interp<'_> {
             if self.is_set(obj) { self.set(obj).items.iter().map(|(o, _)| *o).collect() } else { vec![obj] };
         for p in &pts {
             if !matches!(self.o(*p), ObjData::Point { .. } | ObjData::Term { .. } | ObjData::Pos { .. }) {
-                return self.fail(ctx, format!("the points of @{kw} are points (9.2.5)"), seg.start);
+                return self.fail(
+                    ctx,
+                    codes::KEYWORD_GRAPHIC_NOT_POINTS,
+                    format!("the points of @{kw} are points (9.2.5)"),
+                    seg.start,
+                );
             }
         }
         Ok(pts)
@@ -1451,7 +1595,14 @@ impl Interp<'_> {
             for q in &pts {
                 match self.o(*q) {
                     ObjData::Point { x: Some(x), y: Some(y), local: true } => local.push((*x, *y)),
-                    _ => return self.fail(ctx, "graphics in a symbol body use points of the body (9.2.1)", seg.start),
+                    _ => {
+                        return self.fail(
+                            ctx,
+                            codes::KEYWORD_GRAPHIC_SYMBOL_POINTS,
+                            "graphics in a symbol body use points of the body (9.2.1)",
+                            seg.start,
+                        )
+                    }
                 }
             }
             let symbol = ctx.frame.as_ref().unwrap().borrow().symbol.unwrap();
@@ -1521,8 +1672,8 @@ impl Interp<'_> {
         };
         let key: Option<String> = key.and_then(|k| k.str().map(String::from));
         if let Some(k) = &key {
-            if let Some(clash) = self.key_clash(k, key_unit, None) {
-                return self.fail(ctx, clash, call_start);
+            if let Some((code, clash)) = self.key_clash(k, key_unit, None) {
+                return self.fail(ctx, code, clash, call_start);
             }
         }
         if ctx.in_symbol() {
@@ -1552,7 +1703,12 @@ impl Interp<'_> {
             }
             if let ObjData::Point { x: Some(x), y: Some(y), .. } = self.o(att.obj).clone() {
                 if key.is_some() {
-                    return self.fail(ctx, "a text attached to a point takes no key= (13.3)", call_start);
+                    return self.fail(
+                        ctx,
+                        codes::TEXT_POINT_TAKES_NO_KEY,
+                        "a text attached to a point takes no key= (13.3)",
+                        call_start,
+                    );
                 }
                 let d = off.unwrap_or((0.0, 0.0));
                 self.symbol_mut(symbol).push_prim(SymPrim {
@@ -1564,7 +1720,12 @@ impl Interp<'_> {
                 });
                 return Ok((att.obj, false));
             }
-            return self.fail(ctx, "a TEXT in a symbol body is attached to a point or to `?` (9.2.5)", seg.start);
+            return self.fail(
+                ctx,
+                codes::KEYWORD_TEXT_SYMBOL_ATTACH,
+                "a TEXT in a symbol body is attached to a point or to `?` (9.2.5)",
+                seg.start,
+            );
         }
         if self.is_lazy(att.obj) {
             if ctx.scene.is_none() {
@@ -1641,8 +1802,8 @@ impl Interp<'_> {
 
     pub(crate) fn check_markup(&mut self, text: &str, ctx: &Ctx, seg: &Segment) {
         let at = seg.call.as_ref().map(|c| c.start).unwrap_or(seg.start);
-        for msg in crate::markup::problems(text) {
-            self.warn(ctx, format!("{msg} (13.6)"), at);
+        for (code, msg) in crate::markup::problems(text) {
+            self.warn(ctx, code, format!("{msg} (13.6)"), at);
         }
     }
 
@@ -1677,7 +1838,7 @@ impl Interp<'_> {
     ) -> R<(ObjId, bool)> {
         let a = mapped[position].clone();
         if let Some(d) = self.failed_obj(a.obj) {
-            let id = self.err_cause(ctx, format!("the object of @{kw} failed"), a.off, d);
+            let id = self.err_cause(ctx, codes::KEYWORD_OBJECT_FAILED, format!("the object of @{kw} failed"), a.off, d);
             return Err(Stop::Fail(Some(id)));
         }
         if self.is_lazy(a.obj) {
@@ -1727,7 +1888,12 @@ impl Interp<'_> {
             let members = self.flatten(s, a.obj, 3, Some(ctx));
             let sd = self.set(a.obj);
             if members.is_empty() && sd.explicit && sd.items.is_empty() {
-                self.warn(ctx, "an empty set written directly: nothing happens (5.2.1)", a.off);
+                self.warn(
+                    ctx,
+                    codes::SET_EMPTY_LITERAL,
+                    "an empty set written directly: nothing happens (5.2.1)",
+                    a.off,
+                );
             }
             if let TargetOp::Priority { off, .. } = op {
                 // PRIORITY takes a set with GROUP as the group itself, any other set member by
@@ -1804,6 +1970,7 @@ impl Interp<'_> {
         }
         self.fail(
             ctx,
+            codes::KEYWORD_SYMBOL_MODIFIER_TARGET,
             format!("in a symbol body @{kw} applies only to a text on `?` or a usage in the body (9.2.2)"),
             seg.start,
         )
@@ -1819,6 +1986,7 @@ impl Interp<'_> {
             let why = why.map(|w| format!(": {w}")).unwrap_or_default();
             return self.fail(
                 ctx,
+                codes::KEYWORD_SET_SYMBOL_NOT_A_SYMBOL,
                 format!("the last object of SET-SYMBOL must be a symbol, not {l} (11.3){why}"),
                 mapped["symbol"].off,
             );
@@ -1845,7 +2013,7 @@ impl Interp<'_> {
             }
             _ => {
                 let at = seg.call.as_ref().unwrap().start;
-                self.warn(ctx, "only `# @SET-SYMBOL` in a subcircuit is a block symbol; a file level has no instances, so this has no effect (9.2.6)", at);
+                self.warn(ctx, codes::KEYWORD_SET_SYMBOL_BLOCK_NO_EFFECT, "only `# @SET-SYMBOL` in a subcircuit is a block symbol; a file level has no instances, so this has no effect (9.2.6)", at);
             }
         }
         LEVEL
@@ -1860,7 +2028,12 @@ impl Interp<'_> {
         let plain_set =
             matches!(self.o(target.obj), ObjData::Set(s) if matches!(s.kind, SetKind::Plain | SetKind::Select { .. }));
         if !plain_set {
-            return self.fail(ctx, format!("the target of {kw} must be a set; nothing is wrapped (5.2.2)"), target.off);
+            return self.fail(
+                ctx,
+                codes::SET_EDIT_TARGET_NOT_SET,
+                format!("the target of {kw} must be a set; nothing is wrapped (5.2.2)"),
+                target.off,
+            );
         }
         // a set from a package, edited level by level, is evaluated per level like a selection (10.3)
         let per_level = self.is_lazy(items) || (self.is_set(items) && !self.scene_bound(items));
@@ -1891,7 +2064,12 @@ impl Interp<'_> {
         let mapped = self.map_args(kw, args, seg, ctx, sig_positions(kw))?;
         let call = seg.call.as_ref().unwrap();
         if call.params.as_ref().is_some_and(|p| !p.positional.is_empty()) {
-            return self.fail(ctx, "the conditions of a selection are written by name only (10.1)", call.start);
+            return self.fail(
+                ctx,
+                codes::SELECT_POSITIONAL_CONDITION,
+                "the conditions of a selection are written by name only (10.1)",
+                call.start,
+            );
         }
         let p = self.params(kw, seg, ctx, &sig_params(kw), None, false, None)?;
         let scope = mapped["scope"].obj;
@@ -1902,6 +2080,7 @@ impl Interp<'_> {
                 let l = self.label(d);
                 return self.fail(
                     ctx,
+                    codes::SELECT_DEFINITION_NOT_DEFINITION,
                     format!("the last object of {kw} must be an ordinary definition, not {l} (10.1)"),
                     seg.start,
                 );
@@ -1909,6 +2088,7 @@ impl Interp<'_> {
             if kw == "SELECT-ANCESTOR-USAGE" && scope == LEVEL {
                 return self.fail(
                     ctx,
+                    codes::SELECT_ANCESTOR_SCOPE_LEVEL,
                     "the scope of SELECT-ANCESTOR-USAGE cannot be `#`: this level is no one's member (10.1)",
                     seg.start,
                 );
@@ -1918,7 +2098,12 @@ impl Interp<'_> {
         if get(&p, "role").is_some()
             && !(matches!(self.o(scope), ObjData::Usage(_)) || self.is_lazy(scope) || self.is_set(scope))
         {
-            self.warn(ctx, "role= means something only when the scope is a usage (K3.12)", call.start);
+            self.warn(
+                ctx,
+                codes::SELECT_ROLE_WITHOUT_USAGE_SCOPE,
+                "role= means something only when the scope is a usage (K3.12)",
+                call.start,
+            );
         }
         // a rule even where it fails for closing a cycle of sets (5.2.2), which it may not do below
         self.rules.insert(ctx.member_key.clone());
@@ -1974,6 +2159,7 @@ impl Interp<'_> {
             if nets.is_empty() {
                 return self.fail(
                     ctx,
+                    codes::WIRE_NET_EMPTY_SET,
                     "the net of a wire is an empty set, so the wire fails (5.2.1, 13.1)",
                     nets_a.off,
                 );
@@ -1986,6 +2172,7 @@ impl Interp<'_> {
             if let Some(d) = self.failed_obj(*n) {
                 let id = self.err_cause(
                     ctx,
+                    codes::WIRE_NET_FAILED,
                     "a net of the wire cannot be found: the whole wire fails (13.1)",
                     nets_a.off,
                     d,
@@ -1996,6 +2183,7 @@ impl Interp<'_> {
                 let l = self.label(*n);
                 return self.fail(
                     ctx,
+                    codes::WIRE_NET_WRONG_KIND,
                     format!("the net position of a wire received {l}, the wrong kind (13.1)"),
                     nets_a.off,
                 );
@@ -2003,17 +2191,18 @@ impl Interp<'_> {
         }
         let pts = if self.is_set(pts_a.obj) { self.flatten(s, pts_a.obj, 3, Some(ctx)) } else { vec![pts_a.obj] };
         if pts.len() < 2 {
-            return self.fail(ctx, "a wire has at least two points (13.1)", pts_a.off);
+            return self.fail(ctx, codes::WIRE_TOO_FEW_POINTS, "a wire has at least two points (13.1)", pts_a.off);
         }
         for q in &pts {
             if let Some(d) = self.failed_obj(*q) {
-                let id = self.err_cause(ctx, "a point of the wire failed", pts_a.off, d);
+                let id = self.err_cause(ctx, codes::WIRE_POINT_FAILED, "a point of the wire failed", pts_a.off, d);
                 return Err(Stop::Fail(Some(id)));
             }
             if !matches!(self.o(*q), ObjData::Term { .. } | ObjData::Point { .. } | ObjData::Pos { .. }) {
                 let l = self.label(*q);
                 return self.fail(
                     ctx,
+                    codes::WIRE_POINT_WRONG_KIND,
                     format!("the points of a wire are terminals or points, not {l} (13.1)"),
                     pts_a.off,
                 );
@@ -2071,22 +2260,38 @@ impl Interp<'_> {
             if let Some(e) = get(&p, "exact").and_then(Lit::num) {
                 // the exact distance, short for min = max (14.5, PR15)
                 if cp.min.is_some() || cp.max.is_some() {
-                    return self.fail(ctx, "exact of DISTANCE cannot be written with min or max (14.5)", call_start);
+                    return self.fail(
+                        ctx,
+                        codes::PARAM_DISTANCE_EXACT_WITH_BOUNDS,
+                        "exact of DISTANCE cannot be written with min or max (14.5)",
+                        call_start,
+                    );
                 }
                 cp.min = Some(e);
                 cp.max = Some(e);
             }
             if cp.min.is_none() && cp.max.is_none() {
-                return self.fail(ctx, "DISTANCE takes at least one of min, max and exact (14.5)", call_start);
+                return self.fail(
+                    ctx,
+                    codes::PARAM_DISTANCE_NO_BOUND,
+                    "DISTANCE takes at least one of min, max and exact (14.5)",
+                    call_start,
+                );
             }
             if let (Some(a), Some(b)) = (cp.min, cp.max) {
                 if a > b {
-                    return self.fail(ctx, "the min of DISTANCE cannot be greater than its max (14.5)", call_start);
+                    return self.fail(
+                        ctx,
+                        codes::PARAM_DISTANCE_MIN_ABOVE_MAX,
+                        "the min of DISTANCE cannot be greater than its max (14.5)",
+                        call_start,
+                    );
                 }
             }
             if cp.sense == Some("either") && (cp.min.unwrap_or(0.0) < 0.0 || cp.max.unwrap_or(0.0) < 0.0) {
                 return self.fail(
                     ctx,
+                    codes::PARAM_DISTANCE_NEGATIVE_WITHOUT_SENSE,
                     "without a sense (\"x\", \"y\") the bounds of DISTANCE cannot be negative (14.5)",
                     call_start,
                 );
@@ -2107,6 +2312,7 @@ impl Interp<'_> {
             if let Some(d) = self.failed_obj(*a) {
                 let id = self.err_cause(
                     ctx,
+                    codes::CONSTRAINT_MEMBER_FAILED,
                     format!("a member of {kw} failed, so the whole constraint fails (7.3)"),
                     seg.start,
                     d,
@@ -2159,7 +2365,7 @@ impl Interp<'_> {
             let sec = if kw == "ORDER" { "14.3" } else { "14.5" };
             return self.fail(
                 ctx,
-                format!("axis and direction of @{kw} are one parameter now, direction, written first by position, such as @ORDER(\"left-to-right\") or @DISTANCE(\"bottom-to-top\", min=2); with no sense write \"x\" or \"y\" ({sec})"),
+                codes::PARAM_OLD_DIRECTION, format!("axis and direction of @{kw} are one parameter now, direction, written first by position, such as @ORDER(\"left-to-right\") or @DISTANCE(\"bottom-to-top\", min=2); with no sense write \"x\" or \"y\" ({sec})"),
                 at,
             );
         }

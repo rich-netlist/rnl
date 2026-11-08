@@ -15,7 +15,7 @@
 
 use std::collections::HashMap;
 
-use rnl_runtime::diag::{Loc, Sink};
+use rnl_runtime::diag::{codes, Loc, Sink};
 use rnl_runtime::host::format::{Card, FileRead, Format, Formats, Found, Reading};
 use rnl_runtime::host::{file_name, Dialect, HostDocument, Instance, Level, LevelId, LevelKind};
 use rnl_runtime::records::{scan_run, CarrierLine};
@@ -503,9 +503,8 @@ impl Reader<'_, '_> {
             }
             if no == 1 {
                 if raw.contains("@RNL") {
-                    self.cx
-                        .sink
-                        .warning("the first line of a file is not read as RNL (2.2)", Some(Loc::line(&fname, 1)));
+                    let message = "the first line of a file is not read as RNL (2.2)";
+                    self.cx.sink.warning(codes::HOST_RNL_ON_FIRST_LINE, message, Some(Loc::line(&fname, 1)));
                 }
                 // the main file's first line is a title; an included file has none (S1 p51, p89)
                 // Encryption pragmas are meaningful even on a file's first comment line.
@@ -518,9 +517,8 @@ impl Reader<'_, '_> {
             }
             if ended {
                 if raw.contains("@RNL") {
-                    self.cx
-                        .sink
-                        .warning("RNL after `.end` of the main file is not read (2.2)", Some(Loc::line(&fname, no)));
+                    let message = "RNL after `.end` of the main file is not read (2.2)";
+                    self.cx.sink.warning(codes::HOST_RNL_AFTER_END, message, Some(Loc::line(&fname, no)));
                 }
                 continue;
             }
@@ -543,6 +541,7 @@ impl Reader<'_, '_> {
                         skip_section = None;
                     } else if raw.contains("@RNL") {
                         self.cx.sink.warning(
+                            codes::HOST_RNL_IN_UNSELECTED_SECTION,
                             "RNL in a library section that is not selected is not read (2.2)",
                             Some(Loc::line(&fname, no)),
                         );
@@ -558,6 +557,7 @@ impl Reader<'_, '_> {
                         st.mode = if first == "section" { Mode::Spectre } else { Mode::Spice };
                     } else if raw.contains("@RNL") {
                         self.cx.sink.warning(
+                            codes::HOST_RNL_OUTSIDE_SELECTED_SECTION,
                             "RNL outside the selected library section is not read (2.2)",
                             Some(Loc::line(&fname, no)),
                         );
@@ -595,17 +595,21 @@ impl Reader<'_, '_> {
                     // in SPICE mode, a comment line within a statement, as the SPICE adapter says (2.2)
                     let within = pending.is_some() || subckt_more.is_some();
                     if st.mode == Mode::Spice && within && continued.after(&lines, idx - 1) {
-                        self.cx.sink.warning(rnl_host_spice::COMMENT_IN_A_STATEMENT, Some(Loc::line(&fname, no)));
+                        self.cx.sink.warning(
+                            codes::HOST_COMMENT_IN_STATEMENT,
+                            rnl_host_spice::COMMENT_IN_A_STATEMENT,
+                            Some(Loc::line(&fname, no)),
+                        );
                     }
                     if let Some((_, warning)) = protect.filter(|_| rest.contains("@RNL")) {
-                        self.cx.sink.warning(warning, Some(Loc::line(&fname, no)));
+                        self.cx.sink.warning(codes::HOST_RNL_IN_PROTECTED_REGION, warning, Some(Loc::line(&fname, no)));
                     }
                     run.push(CarrierLine { line: no, content: rest.to_string(), col });
                     continue;
                 }
                 self.flush(&mut run, &fname, st.cur);
                 if raw.contains("@RNL") {
-                    self.cx.sink.warning(
+                    self.cx.sink.warning(codes::HOST_CARRIER_NO_SPACE,
                         "no space after the comment marker: this line is not a carrier and its @RNL is not a record entry (2.2)",
                         Some(Loc::line(&fname, no)),
                     );
@@ -618,6 +622,7 @@ impl Reader<'_, '_> {
             }
             if raw.contains("@RNL") {
                 self.cx.sink.warning(
+                    codes::HOST_RNL_IN_HOST_STATEMENT,
                     "@RNL in an end-of-line comment or a host statement is host text (2.2)",
                     Some(Loc::line(&fname, no)),
                 );
@@ -793,10 +798,15 @@ impl Reader<'_, '_> {
             self.cx.doc.spice_mode.push((fname.clone(), from, n as u32 + 1));
         }
         if !st.stack.is_empty() {
-            self.cx.sink.error("a subcircuit has no `ends`", Some(Loc::line(&fname, n as u32)));
+            self.cx.sink.error(
+                codes::HOST_SUBCKT_NO_ENDS,
+                "a subcircuit has no `ends`",
+                Some(Loc::line(&fname, n as u32)),
+            );
         }
         if let Some(name) = section.filter(|_| self.cx.doc.levels[level].section_lines.is_none()) {
             self.cx.sink.error(
+                codes::HOST_SECTION_NOT_FOUND,
                 format!("the selected library section {name} was not found; no records can be written there (2.2)"),
                 Some(Loc::line(&fname, 1)),
             );
@@ -1053,7 +1063,11 @@ impl Reader<'_, '_> {
         inst.file_level = Some(self.cx.doc.file_level(st.cur));
         let lv = &mut self.cx.doc.levels[circ];
         if !self.cx.names.entry(circ).or_default().insert(lv.name_key(&inst.name)) {
-            self.cx.sink.error(format!("instance {} is defined twice", inst.name), Some(Loc::line(fname, no)));
+            self.cx.sink.error(
+                codes::HOST_ELEMENT_DEFINED_TWICE,
+                format!("instance {} is defined twice", inst.name),
+                Some(Loc::line(fname, no)),
+            );
             return;
         }
         inst.order = lv.instances.len();

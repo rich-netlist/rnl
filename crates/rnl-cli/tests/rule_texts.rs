@@ -67,7 +67,7 @@ fn a_text_written_for_a_usage_without_a_symbol_still_fails() {
     // with a key, which rnl-std-no-labels gives the same usage a layer of, and without one
     for statement in ["%m @TEXT(\"mirror\", key=\"name\")", "%m @TEXT(\"mirror\")"] {
         let r = interpret(&netlist(true, &format!(";\n*   {statement}")));
-        let want = "error t.sp:17:5: %m has no symbol and no drawing meaning: this TEXT fails (12.1, 13.3)";
+        let want = "error t.sp:17:5: RNL4414 text-usage-no-symbol: %m has no symbol and no drawing meaning: this TEXT fails (12.1, 13.3)";
         assert_eq!(errors(&r), [want], "{statement}");
     }
 }

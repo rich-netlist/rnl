@@ -149,8 +149,11 @@ pub struct Level {
 #[derive(Serialize, Debug)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct LevelHint {
-    /// What it is about, such as "looks-joined" or "wire-over-symbol" ([`crate::hints::Kind`]).
+    /// What it is about, such as "looks-joined" or "wire-over-symbol" ([`crate::hints::Kind`]):
+    /// its short name in the toolkit's list of diagnostics.
     pub kind: &'static str,
+    /// Its number in that list, such as "RNL7003".
+    pub code: String,
     /// "warning" or "hint".
     pub severity: &'static str,
     pub message: String,
@@ -460,6 +463,11 @@ pub struct Span {
 pub struct Diagnostic {
     /// "error", "warning" or "hint".
     pub severity: &'static str,
+    /// Its kind's number in the toolkit's list of diagnostics, such as "RNL3120"; none for a kind of
+    /// the versions 0.2 and 0.3 alone.
+    pub code: Option<String>,
+    /// Its kind's short name, such as "param-wrong-type".
+    pub name: &'static str,
     /// The file as shown: relative to the opened file's directory when it is inside it.
     pub file: String,
     /// The file as the runtime knows it.
@@ -533,6 +541,7 @@ pub(crate) fn document(
                     let (file, line) = h.loc.map(|l| (l.file, l.line)).unwrap_or_default();
                     LevelHint {
                         kind: h.kind.as_str(),
+                        code: h.kind.code().number().unwrap_or_default(),
                         severity: h.severity.as_str(),
                         message: h.message,
                         file: shown_file(&file),
@@ -626,6 +635,8 @@ pub(crate) fn document(
         });
         Diagnostic {
             severity: d.severity.as_str(),
+            code: d.code.number(),
+            name: d.code.name(),
             file: shown_file(&file),
             file_index: file_index.get(&file).copied(),
             full_path: file,
@@ -637,10 +648,12 @@ pub(crate) fn document(
         }
     };
     let mut diagnostics: Vec<Diagnostic> = r.diagnostics().into_iter().map(|d| diagnostic(d, &r.sink)).collect();
-    for (severity, message, loc) in notes {
+    for (severity, code, message, loc) in notes {
         let (file, line) = loc.map(|l| (l.file, l.line)).unwrap_or_default();
         diagnostics.push(Diagnostic {
             severity,
+            code: code.number(),
+            name: code.name(),
             file: shown_file(&file),
             file_index: file_index.get(&file).copied(),
             full_path: file,

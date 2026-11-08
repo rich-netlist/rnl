@@ -1539,12 +1539,16 @@
   "diagnostics": [
     {
       "severity": "hint",
+      "code": "RNL0003",
+      "name": "host-non-ascii-comment",
       "file": "11-header-alias-device.sp",
       "line": 10,
       "col": 14
     },
     {
       "severity": "warning",
+      "code": "RNL2208",
+      "name": "package-path-version-differs",
       "file": "11-header-alias-device.sp",
       "line": 16,
       "col": 5

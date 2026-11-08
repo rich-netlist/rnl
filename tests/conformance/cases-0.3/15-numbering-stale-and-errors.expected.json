@@ -550,48 +550,64 @@
   "diagnostics": [
     {
       "severity": "error",
+      "code": "RNL1139",
+      "name": "syntax-stray-equals",
       "file": "15-numbering-stale-and-errors.sp",
       "line": 36,
       "col": 9
     },
     {
       "severity": "error",
+      "code": "RNL1129",
+      "name": "syntax-pipe-segment-no-keyword",
       "file": "15-numbering-stale-and-errors.sp",
       "line": 37,
       "col": 15
     },
     {
       "severity": "hint",
+      "code": "RNL2605",
+      "name": "numbering-record-stale",
       "file": "15-numbering-stale-and-errors.sp",
       "line": 18,
       "col": 43
     },
     {
       "severity": "error",
+      "code": "RNL2604",
+      "name": "number-outside-solver-record",
       "file": "15-numbering-stale-and-errors.sp",
       "line": 32,
       "col": 5
     },
     {
       "severity": "error",
+      "code": "RNL2601",
+      "name": "number-in-definition-body",
       "file": "15-numbering-stale-and-errors.sp",
       "line": 34,
       "col": 7
     },
     {
       "severity": "error",
+      "code": "RNL2603",
+      "name": "number-out-of-range",
       "file": "15-numbering-stale-and-errors.sp",
       "line": 40,
       "col": 5
     },
     {
       "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
       "file": "15-numbering-stale-and-errors.sp",
       "line": 1,
       "col": 0
     },
     {
       "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
       "file": "15-numbering-stale-and-errors.sp",
       "line": 11,
       "col": 0

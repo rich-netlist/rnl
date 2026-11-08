@@ -6,6 +6,8 @@
 //! does not pin the series 0.2, so a file of the series 0.2 is never told about 0.3, nor a file
 //! that defines a name of the same spelling itself.
 
+use crate::diag::{codes, Code};
+
 use super::ctx::Ctx;
 use super::obj::UnitId;
 use super::packages::STD_NAME;
@@ -85,27 +87,27 @@ impl Interp<'_> {
     }
 
     /// Why `$name` cannot be found, when it is a name of the series 0.2 and the series 0.3 is in
-    /// effect here: the name the series 0.3 gives it, or the package that has it.
-    pub(crate) fn renamed_in_0_3(&mut self, name: &str, ctx: &Ctx) -> Option<String> {
+    /// effect here: the name the series 0.3 gives it, or the package that has it, with its kind.
+    pub(crate) fn renamed_in_0_3(&mut self, name: &str, ctx: &Ctx) -> Option<(Code, String)> {
         if let Some(&(_, new)) = RENAMED.iter().find(|(old, _)| *old == name) {
             if self.of_series_0_3(new, ctx) {
-                return Some(format!(
+                return Some((codes::RENAME_NAME_RENAMED, format!(
                     "the standard series 0.3 calls it ${new}; write that, or pin the series 0.2 with @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\") in the header record (16.3)"
-                ));
+                )));
             }
         }
         if let Some(&(_, package)) = MOVED.iter().find(|(old, _)| *old == name) {
             if self.of_series_0_3(ONLY_IN_0_3, ctx) {
-                return Some(format!(
+                return Some((codes::RENAME_NAME_MOVED, format!(
                     "the standard series 0.3 has it in {package}, which rnl-std does not bring in: name {package} or rnl-std-full with @USE-PACKAGE in the header record, or pin the series 0.2 (16.3)"
-                ));
+                )));
             }
         }
         if let Some(&(_, instead)) = LEFT_OUT.iter().find(|(old, _)| *old == name) {
             if self.of_series_0_3("DIFFERENTIAL_PAIR", ctx) {
-                return Some(format!(
+                return Some((codes::RENAME_NAME_LEFT_OUT, format!(
                     "{instead}, or pin the series 0.2 with @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\") in the header record (16.3)"
-                ));
+                )));
             }
         }
         None

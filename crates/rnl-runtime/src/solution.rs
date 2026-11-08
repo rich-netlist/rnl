@@ -49,7 +49,7 @@
 
 use std::fmt;
 
-use crate::diag::Sink;
+use crate::diag::{codes, Code, Sink};
 use crate::geom::{fmt_num, Orient, Pt, TOL};
 use crate::host::{HostDocument, Record, Seg};
 use crate::interp::obj::Priority;
@@ -168,6 +168,8 @@ pub struct Unsolved {
     pub decision: Decision,
     /// The object, the wire, the ROUTE or the branch point, as diagnostics show it.
     pub label: String,
+    /// The kind of the reason ([`codes`]).
+    pub code: Code,
     /// Why the record cannot hold it, with the section of the standard.
     pub reason: String,
 }
@@ -177,7 +179,7 @@ impl Unsolved {
     /// object without a name, which 0.3 refers to by its number (5.9), or the route of a wire, which
     /// 0.3 writes with WIRE given the wire (13.1). A tool raises such a file to 0.3 (16.1).
     pub fn needs_0_3(&self) -> bool {
-        self.reason == NO_NUMBERS || self.reason == NO_REWRITE
+        self.code == codes::UNSOLVED_NO_NUMBERS || self.code == codes::UNSOLVED_NO_REWRITE
     }
 }
 
@@ -212,20 +214,29 @@ pub struct Written {
     pub notes: Vec<String>,
 }
 
-const NOT_IN_PROBLEM: &str = "it is not in the problem";
-const AT_POINT: &str = "it is drawn at the point of its main object and has no position of its own (12.1)";
-const NO_ORIENTATION: &str = "it has no orientation (11.2)";
-const ANONYMOUS: &str = "it cannot be referred to (5.7)";
-const RULE_TEXT: &str = "a text without a key that a rule makes cannot be referred to: the solver does not decide its position, the viewer places it (13.3, 14.8)";
-const NO_NUMBERS: &str =
-    "it has no name, and a file of 0.2 cannot refer to it; the draft 0.3 refers to it by its number (5.9)";
-const NOT_WRITTEN_OUT: &str = "the usage made by a rule that it belongs to cannot be written out (10.5)";
-const NO_REWRITE: &str =
-    "a file of 0.2 cannot rewrite a wire; the draft 0.3 writes its route with WIRE given the wire (13.1)";
-const OLD_RECORD: &str =
-    "it is an object of a record of the solver, which this record replaces: a solver reads the level without them (2.8)";
-const TWO_POINTS: &str = "a wire has at least two points (13.1)";
-const NOT_A_NUMBER: &str = "a coordinate is not a number of RNL, which has no NaN and no Infinity (3.7)";
+/// Why a decision is unsolved: its kind and the reason given.
+type Why = (Code, &'static str);
+
+const NOT_IN_PROBLEM: Why = (codes::UNSOLVED_NOT_IN_PROBLEM, "it is not in the problem");
+const AT_POINT: Why =
+    (codes::UNSOLVED_AT_POINT, "it is drawn at the point of its main object and has no position of its own (12.1)");
+const NO_ORIENTATION: Why = (codes::UNSOLVED_NO_ORIENTATION, "it has no orientation (11.2)");
+const ANONYMOUS: Why = (codes::UNSOLVED_ANONYMOUS, "it cannot be referred to (5.7)");
+const RULE_TEXT: Why = (codes::UNSOLVED_RULE_TEXT, "a text without a key that a rule makes cannot be referred to: the solver does not decide its position, the viewer places it (13.3, 14.8)");
+const NO_NUMBERS: Why = (
+    codes::UNSOLVED_NO_NUMBERS,
+    "it has no name, and a file of 0.2 cannot refer to it; the draft 0.3 refers to it by its number (5.9)",
+);
+const NOT_WRITTEN_OUT: Why =
+    (codes::UNSOLVED_NOT_WRITTEN_OUT, "the usage made by a rule that it belongs to cannot be written out (10.5)");
+const NO_REWRITE: Why = (
+    codes::UNSOLVED_NO_REWRITE,
+    "a file of 0.2 cannot rewrite a wire; the draft 0.3 writes its route with WIRE given the wire (13.1)",
+);
+const OLD_RECORD: Why = (codes::UNSOLVED_OLD_RECORD, "it is an object of a record of the solver, which this record replaces: a solver reads the level without them (2.8)");
+const TWO_POINTS: Why = (codes::UNSOLVED_TWO_POINTS, "a wire has at least two points (13.1)");
+const NOT_A_NUMBER: Why =
+    (codes::UNSOLVED_NOT_A_NUMBER, "a coordinate is not a number of RNL, which has no NaN and no Infinity (3.7)");
 
 /// A name for RNL made of any text: ASCII letters, digits and `_`, without runs of `_`.
 fn slug(text: &str) -> String {
@@ -275,7 +286,7 @@ fn coords((x, y): Pt) -> Result<String, String> {
     if x.is_finite() && y.is_finite() {
         Ok(format!("({}, {})", fmt_num(x), fmt_num(y)))
     } else {
-        Err(NOT_A_NUMBER.into())
+        Err(NOT_A_NUMBER.1.into())
     }
 }
 
@@ -300,7 +311,7 @@ struct Refs<'a> {
 impl Refs<'_> {
     /// Whether the record can write a reference, and the usage made by a rule that it goes
     /// through, which is then written out.
-    fn reach(&self, r: &Reference) -> Result<Option<usize>, &'static str> {
+    fn reach(&self, r: &Reference) -> Result<Option<usize>, Why> {
         match r {
             Reference::Name(_) => Ok(None),
             Reference::Number { .. } | Reference::GeneratedNumber { .. } if !self.numbers => Err(NO_NUMBERS),
@@ -342,21 +353,26 @@ impl Refs<'_> {
 
     /// The points of a wire of the solution as the record writes them, with the usages made by
     /// rules they go through; or why the wire cannot be written.
-    fn wire(&self, points: &[WirePoint], branches: &[Option<String>]) -> Result<(Vec<Piece>, Vec<usize>), String> {
+    fn wire(
+        &self,
+        points: &[WirePoint],
+        branches: &[Option<String>],
+    ) -> Result<(Vec<Piece>, Vec<usize>), (Code, String)> {
         if points.len() < 2 {
-            return Err(TWO_POINTS.into());
+            return Err((TWO_POINTS.0, TWO_POINTS.1.into()));
         }
+        let missing = || (codes::UNSOLVED_WIRE_POINT_MISSING, "a point of it is not in the problem".to_string());
         let mut pieces = Vec::new();
         let mut roots = Vec::new();
         for q in points {
             let (piece, label) = match q {
                 WirePoint::Anchor(PointRef::Pin { object, terminal, .. }) => {
-                    let o = self.p.objects.get(*object).ok_or("a point of it is not in the problem")?;
+                    let o = self.p.objects.get(*object).ok_or_else(missing)?;
                     let r = o.reference.then(&format!(":{}", written_name(terminal)));
                     (Piece::Ref(r), format!("{}:{terminal}", o.label))
                 }
                 WirePoint::Anchor(PointRef::Origin(k)) => {
-                    let o = self.p.objects.get(*k).ok_or("a point of it is not in the problem")?;
+                    let o = self.p.objects.get(*k).ok_or_else(missing)?;
                     let r = match o.kind {
                         ObjectKind::Point => o.reference.clone(),
                         _ => o.reference.then("::position"),
@@ -364,19 +380,34 @@ impl Refs<'_> {
                     (Piece::Ref(r), o.label.clone())
                 }
                 WirePoint::Anchor(PointRef::Centre(_)) => {
-                    return Err("a point of it is the centre of a set, which this writer does not write (6.5)".into())
+                    let why = "a point of it is the centre of a set, which this writer does not write (6.5)";
+                    return Err((codes::UNSOLVED_WIRE_THROUGH_CENTRE, why.into()));
                 }
                 WirePoint::Branch(i) => match branches.get(*i) {
                     Some(Some(name)) => (Piece::Text(format!("%{name}")), String::new()),
-                    Some(None) => return Err(format!("its branch point {i}: {NOT_A_NUMBER}")),
-                    None => return Err(format!("its branch point {i} is not in the solution")),
+                    Some(None) => {
+                        return Err((
+                            codes::UNSOLVED_BRANCH_NOT_A_NUMBER,
+                            format!("its branch point {i}: {}", NOT_A_NUMBER.1),
+                        ))
+                    }
+                    None => {
+                        return Err((
+                            codes::UNSOLVED_BRANCH_MISSING,
+                            format!("its branch point {i} is not in the solution"),
+                        ))
+                    }
                 },
                 WirePoint::Bend(at) => {
-                    (Piece::Text(coords(*at).map_err(|why| format!("a bend of it: {why}"))?), String::new())
+                    let at = coords(*at)
+                        .map_err(|why| (codes::UNSOLVED_BEND_NOT_A_NUMBER, format!("a bend of it: {why}")))?;
+                    (Piece::Text(at), String::new())
                 }
             };
             if let Piece::Ref(r) = &piece {
-                roots.extend(self.reach(r).map_err(|why| format!("its point {label}: {why}"))?);
+                let unreachable =
+                    |(_, why): Why| (codes::UNSOLVED_WIRE_POINT_UNREACHABLE, format!("its point {label}: {why}"));
+                roots.extend(self.reach(r).map_err(unreachable)?);
             }
             pieces.push(piece);
         }
@@ -463,8 +494,8 @@ pub fn write_record(p: &LevelProblem, solution: &Solution, author: &str, hash: &
     let mut unsolved = Vec::new();
     let mut notes = Vec::new();
     let mut needed = vec![false; p.usages.len()];
-    let mut lost = |decision: Decision, label: &str, reason: &str| {
-        unsolved.push(Unsolved { decision, label: label.to_string(), reason: reason.to_string() })
+    let mut lost = |decision: Decision, label: &str, (code, reason): (Code, &str)| {
+        unsolved.push(Unsolved { decision, label: label.to_string(), code, reason: reason.to_string() })
     };
 
     // the branch points, named so as not to clash with the level's names
@@ -575,7 +606,7 @@ pub fn write_record(p: &LevelProblem, solution: &Solution, author: &str, hash: &
                 }
                 routed.push((route, pieces));
             }
-            Err(why) => lost(decision, &label, &why),
+            Err((code, why)) => lost(decision, &label, (code, &why)),
         }
     }
 
@@ -602,8 +633,8 @@ pub fn write_record(p: &LevelProblem, solution: &Solution, author: &str, hash: &
         };
         let (pieces, roots) = match refs.wire(&wr.points, &branch_names) {
             Ok(found) => found,
-            Err(why) => {
-                lost(decision, &wire.label, &why);
+            Err((code, why)) => {
+                lost(decision, &wire.label, (code, &why));
                 continue;
             }
         };

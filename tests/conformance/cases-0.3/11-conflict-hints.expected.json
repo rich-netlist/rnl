@@ -307,48 +307,64 @@
   "diagnostics": [
     {
       "severity": "hint",
+      "code": "RNL5102",
+      "name": "conflict-fact-discarded-with-sets",
       "file": "11-conflict-hints.sp",
       "line": 10,
       "col": 5
     },
     {
       "severity": "hint",
+      "code": "RNL5102",
+      "name": "conflict-fact-discarded-with-sets",
       "file": "11-conflict-hints.sp",
       "line": 12,
       "col": 26
     },
     {
       "severity": "hint",
+      "code": "RNL5102",
+      "name": "conflict-fact-discarded-with-sets",
       "file": "11-conflict-hints.sp",
       "line": 9,
       "col": 11
     },
     {
       "severity": "hint",
+      "code": "RNL5104",
+      "name": "conflict-statement-caused-discards",
       "file": "11-conflict-hints.sp",
       "line": 10,
       "col": 5
     },
     {
       "severity": "hint",
+      "code": "RNL5104",
+      "name": "conflict-statement-caused-discards",
       "file": "11-conflict-hints.sp",
       "line": 11,
       "col": 5
     },
     {
       "severity": "hint",
+      "code": "RNL5104",
+      "name": "conflict-statement-caused-discards",
       "file": "11-conflict-hints.sp",
       "line": 12,
       "col": 5
     },
     {
       "severity": "hint",
+      "code": "RNL5104",
+      "name": "conflict-statement-caused-discards",
       "file": "11-conflict-hints.sp",
       "line": 13,
       "col": 5
     },
     {
       "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
       "file": "11-conflict-hints.sp",
       "line": 1,
       "col": 0

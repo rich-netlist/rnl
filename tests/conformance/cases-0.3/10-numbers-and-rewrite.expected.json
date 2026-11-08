@@ -326,6 +326,8 @@
   "diagnostics": [
     {
       "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
       "file": "10-numbers-and-rewrite.sp",
       "line": 1,
       "col": 0

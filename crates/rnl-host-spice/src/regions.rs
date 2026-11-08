@@ -3,12 +3,18 @@
 //! Shared by the SPICE adapter and Spectre's two language modes. Simulator syntax and the
 //! conservative treatment of conditions are documented in docs/host-regions.md.
 
-use rnl_runtime::diag::{Loc, Sink};
+use rnl_runtime::diag::{codes, Code, Loc, Sink};
 
-const CONDITIONAL: &str = "RNL in an inactive or unresolved preprocessing branch is not read (2.2)";
-const PREPROCESSOR: &str = "RNL in a preprocessing directive is not read (2.2)";
-const TITLE: &str = "the line after `.newjob` is a title and is not read as RNL (2.2)";
-const RELIABILITY: &str = "RNL inside `reliability { ... }` is not read (2.2)";
+const CONDITIONAL: (Code, &str) =
+    (codes::HOST_RNL_IN_INACTIVE_BRANCH, "RNL in an inactive or unresolved preprocessing branch is not read (2.2)");
+const PREPROCESSOR: (Code, &str) =
+    (codes::HOST_RNL_IN_PREPROCESSOR_DIRECTIVE, "RNL in a preprocessing directive is not read (2.2)");
+const TITLE: (Code, &str) =
+    (codes::HOST_RNL_IN_NEWJOB_TITLE, "the line after `.newjob` is a title and is not read as RNL (2.2)");
+const RELIABILITY: (Code, &str) =
+    (codes::HOST_RNL_IN_RELIABILITY_BLOCK, "RNL inside `reliability { ... }` is not read (2.2)");
+/// RNL in encrypted text (2.2).
+const ENCRYPTED: (Code, &str) = (codes::HOST_RNL_IN_ENCRYPTED_TEXT, "RNL in encrypted text is not read (2.2)");
 
 struct Conditional {
     start: u32,
@@ -22,7 +28,7 @@ struct Conditional {
 struct Block {
     start: u32,
     end: &'static str,
-    warning: &'static str,
+    warning: (Code, &'static str),
 }
 
 #[derive(Default)]
@@ -100,9 +106,9 @@ impl Regions {
     /// True if this physical line is not to be parsed as a circuit statement or RNL carrier.
     pub fn skip(&mut self, raw: &str, no: u32, spectre: bool, main: bool, file: &str, sink: &mut Sink) -> bool {
         let reason = self.classify(raw, no, spectre, main, file, sink);
-        if let Some(warning) = reason {
+        if let Some((code, warning)) = reason {
             if raw.contains("@RNL") {
-                sink.warning(warning, Some(Loc::line(file, no)));
+                sink.warning(code, warning, Some(Loc::line(file, no)));
             }
             true
         } else {
@@ -118,7 +124,7 @@ impl Regions {
         main: bool,
         file: &str,
         sink: &mut Sink,
-    ) -> Option<&'static str> {
+    ) -> Option<(Code, &'static str)> {
         if let Some(start) = self.title.take() {
             self.spans.push((start, no));
             return Some(TITLE);
@@ -134,7 +140,7 @@ impl Regions {
                 self.spans.push((start, no));
                 self.encrypted = None;
             }
-            return Some("RNL in encrypted text is not read (2.2)");
+            return Some(ENCRYPTED);
         }
         if let Some(start) = self.directive {
             if !raw.ends_with('\\') {
@@ -163,7 +169,7 @@ impl Regions {
                 "if" | "ifdef" | "ifndef" => {
                     let parent = self.conditionals.iter().all(|c| c.active);
                     if parent && selected.is_none() {
-                        sink.warning(
+                        sink.warning(codes::HOST_CONDITION_UNRESOLVED,
                             "the preprocessing condition cannot be resolved without simulator settings; its branches are not read (2.2)",
                             Some(Loc::line(file, no)),
                         );
@@ -183,6 +189,7 @@ impl Regions {
                         self.spans.push((c.start, no));
                     } else {
                         sink.warning(
+                            codes::HOST_UNMATCHED_DIRECTIVE,
                             "an unmatched preprocessing directive is not read (2.2)",
                             Some(Loc::line(file, no)),
                         );
@@ -193,7 +200,7 @@ impl Regions {
                         let branch = if key == "else" { Some(true) } else { selected };
                         c.active = c.parent && c.taken == Some(false) && branch == Some(true) && !c.otherwise;
                         if c.parent && c.taken == Some(false) && branch.is_none() {
-                            sink.warning(
+                            sink.warning(codes::HOST_CONDITION_UNRESOLVED,
                                 "the preprocessing condition cannot be resolved without simulator settings; its remaining branches are not read (2.2)",
                                 Some(Loc::line(file, no)),
                             );
@@ -206,6 +213,7 @@ impl Regions {
                         c.otherwise |= key == "else";
                     } else {
                         sink.warning(
+                            codes::HOST_UNMATCHED_DIRECTIVE,
                             "an unmatched preprocessing directive is not read (2.2)",
                             Some(Loc::line(file, no)),
                         );
@@ -228,7 +236,7 @@ impl Regions {
         }
         if protection && pragma.get(2) == Some(&"begin_protected") && self.block.is_none() && self.braces.is_none() {
             self.encrypted = Some(no);
-            return Some("RNL in encrypted text is not read (2.2)");
+            return Some(ENCRYPTED);
         }
         if let Some(block) = &self.block {
             let warning = block.warning;
@@ -253,6 +261,7 @@ impl Regions {
                 ".verilog" => Some((".endv", "RNL inside `.verilog` is not read (2.2)")),
                 _ => None,
             };
+            let block = block.map(|(end, warning)| (end, (codes::HOST_RNL_IN_CONTROL_BLOCK, warning)));
             if let Some((end, warning)) = block {
                 self.block = Some(Block { start: no, end, warning });
                 return Some(warning);
@@ -285,6 +294,7 @@ impl Regions {
         for start in unfinished {
             self.spans.push((start, past));
             sink.warning(
+                codes::HOST_UNTERMINATED_REGION,
                 "an unterminated host region is not writable through end of file (2.2)",
                 Some(Loc::line(file, start)),
             );

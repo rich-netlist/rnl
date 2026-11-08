@@ -1418,12 +1418,16 @@
   "diagnostics": [
     {
       "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
       "file": "07-virtuoso-netlist.scs",
       "line": 1,
       "col": 0
     },
     {
       "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
       "file": "07-virtuoso-netlist.scs",
       "line": 7,
       "col": 0

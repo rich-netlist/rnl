@@ -5,6 +5,7 @@
 //! records in comments. A package file is not loaded with an include (2.7): one that a netlist
 //! includes is kept as text and not read, and the include is an error.
 
+use crate::diag::codes;
 use crate::host::format::{FileRead, Format, Reading};
 use crate::host::{file_name, Dialect};
 
@@ -71,6 +72,7 @@ impl Format for Package {
         if let Some(site) = cx.doc.levels[file.level].include_site.clone() {
             let shown = file_name(&fname);
             cx.sink.error(
+                codes::PACKAGE_INCLUDED,
                 format!(
                     "`{shown}` is a package file and is not loaded with an include (2.7); USE-PACKAGE finds it (16.2)"
                 ),

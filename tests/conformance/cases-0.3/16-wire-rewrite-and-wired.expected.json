@@ -475,12 +475,16 @@
   "diagnostics": [
     {
       "severity": "error",
+      "code": "RNL4205",
+      "name": "wire-net-wrong-kind",
       "file": "16-wire-rewrite-and-wired.sp",
       "line": 36,
       "col": 5
     },
     {
       "severity": "error",
+      "code": "RNL4211",
+      "name": "wire-rewrite-no-pin",
       "file": "16-wire-rewrite-and-wired.sp",
       "line": 32,
       "col": 5

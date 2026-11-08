@@ -5,7 +5,7 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::rc::Rc;
 
-use crate::diag::DiagId;
+use crate::diag::{codes, DiagId};
 use crate::geom::Orient;
 use crate::host::{glob, LevelId};
 
@@ -88,7 +88,7 @@ pub struct Rewrite {
     pub site: Rc<Ctx>,
     pub off: usize,
     /// Why it fails, found in the geometry phase (9.2.4, 11.8, 12.1): the error it gives.
-    pub fault: Option<String>,
+    pub fault: Option<(crate::diag::Code, String)>,
     /// Its style parameters, as the fact in `Scene::styles` that makes them direct style of the
     /// wire (8.3), which a rewrite that fails takes back before the style queue (8.2).
     pub style: Option<usize>,
@@ -550,7 +550,7 @@ impl Interp<'_> {
                 }
                 let Some(&first) = nets.first() else {
                     let l = self.label(t);
-                    return self.fail(ctx, format!("{l} is on no net (6.5)"), off);
+                    return self.fail(ctx, codes::NET_TERMINAL_ON_NO_NET, format!("{l} is on no net (6.5)"), off);
                 };
                 if nets.iter().all(|n| *n == first) {
                     return Ok(first);
@@ -572,7 +572,7 @@ impl Interp<'_> {
             _ => {}
         }
         let l = self.label(t);
-        self.fail(ctx, format!("{l} is on no net (6.5)"), off)
+        self.fail(ctx, codes::NET_TERMINAL_ON_NO_NET, format!("{l} is on no net (6.5)"), off)
     }
 
     /// The nets a terminal is on (several for a bundle's terminal).
@@ -747,7 +747,13 @@ impl Interp<'_> {
     ) -> R<ObjId> {
         if let ObjData::Failed(d) = self.o(att) {
             let d = *d;
-            let id = self.err_cause(ctx, "the object the TEXT is attached to failed", 0, d);
+            let id = self.err_cause(
+                ctx,
+                codes::TEXT_ATTACHED_OBJECT_FAILED,
+                "the object the TEXT is attached to failed",
+                0,
+                d,
+            );
             return Err(Stop::Fail(Some(id)));
         }
         let site = Some(Rc::new(ctx.clone()));
@@ -755,10 +761,15 @@ impl Interp<'_> {
         let t = match kind {
             ObjData::Point { .. } | ObjData::Pos { .. } => {
                 if key.is_some() {
-                    return self.fail(ctx, "a text attached to a point takes no key= (13.3)", 0);
+                    return self.fail(
+                        ctx,
+                        codes::TEXT_POINT_TAKES_NO_KEY,
+                        "a text attached to a point takes no key= (13.3)",
+                        0,
+                    );
                 }
                 if items.text.is_none() {
-                    return self.fail(ctx, "the text= of TEXT must be written (13.3)", 0);
+                    return self.fail(ctx, codes::TEXT_MISSING_TEXT, "the text= of TEXT must be written (13.3)", 0);
                 }
                 self.new_obj(ObjData::Text {
                     attach: att,
@@ -781,8 +792,8 @@ impl Interp<'_> {
             | ObjData::Net { .. } => {
                 if let (Some(k), ObjData::Usage(_)) = (&key, &kind) {
                     // not spelled like a role or local name of the usage, or an alias of one (6.5, 13.3)
-                    if let Some(clash) = self.key_clash(k, key_unit, Some(att)) {
-                        return self.fail(ctx, clash, off);
+                    if let Some((code, clash)) = self.key_clash(k, key_unit, Some(att)) {
+                        return self.fail(ctx, code, clash, off);
                     }
                 }
                 if let Some(k) = &key {
@@ -806,11 +817,16 @@ impl Interp<'_> {
                     return Ok(kt);
                 }
                 if items.text.is_none() {
-                    return self.fail(ctx, "the text= of TEXT must be written (13.3)", 0);
+                    return self.fail(ctx, codes::TEXT_MISSING_TEXT, "the text= of TEXT must be written (13.3)", 0);
                 }
                 let has_offset = items.dx.is_some() || items.dy.is_some();
                 if has_offset && matches!(kind, ObjData::Wire { .. } | ObjData::Net { .. }) {
-                    return self.fail(ctx, "a text attached to a wire or a net takes no dx, dy (13.3)", 0);
+                    return self.fail(
+                        ctx,
+                        codes::TEXT_WIRE_NET_NO_OFFSET,
+                        "a text attached to a wire or a net takes no dx, dy (13.3)",
+                        0,
+                    );
                 }
                 self.new_obj(ObjData::Text {
                     attach: att,
@@ -826,7 +842,12 @@ impl Interp<'_> {
             }
             _ => {
                 let l = self.label(att);
-                return self.fail(ctx, format!("TEXT cannot be attached to {l} (13.3)"), 0);
+                return self.fail(
+                    ctx,
+                    codes::TEXT_ATTACH_NOT_ALLOWED,
+                    format!("TEXT cannot be attached to {l} (13.3)"),
+                    0,
+                );
             }
         };
         self.scenes[s].texts.push(t);
@@ -1052,7 +1073,12 @@ impl Interp<'_> {
                 };
                 if !ok {
                     let l = self.label(obj);
-                    return self.fail(ctx, format!("CURRENT takes host terminals only, not {l} (15.2)"), *off);
+                    return self.fail(
+                        ctx,
+                        codes::CURRENT_NOT_HOST_TERMINAL,
+                        format!("CURRENT takes host terminals only, not {l} (15.2)"),
+                        *off,
+                    );
                 }
                 self.scenes[s].currents.push((order_pos(&at, &ctx.segments), obj, direction.clone()));
             }
@@ -1068,6 +1094,7 @@ impl Interp<'_> {
                     };
                     return self.fail(
                         ctx,
+                        codes::PRIORITY_TARGET_NOT_ALLOWED,
                         format!("PRIORITY takes constraints, usages and grouped sets only, not {l} (14.8){hint}"),
                         *off,
                     );
@@ -1087,7 +1114,12 @@ impl Interp<'_> {
             TargetOp::Route { mode, style, off } => {
                 if !matches!(self.o(obj), ObjData::Net { .. }) {
                     let l = self.label(obj);
-                    return self.fail(ctx, format!("ROUTE takes nets, not {l} (13.7)"), *off);
+                    return self.fail(
+                        ctx,
+                        codes::ROUTE_TARGET_NOT_NET,
+                        format!("ROUTE takes nets, not {l} (13.7)"),
+                        *off,
+                    );
                 }
                 let r = self.new_obj(ObjData::Route {
                     net: obj,
@@ -1602,7 +1634,7 @@ impl Interp<'_> {
             if let (Some(first), Some(site)) = (others.first(), site) {
                 if self.scenes[s].hinted.insert(sel) {
                     let l = self.label(*first);
-                    self.hint_at(&site, format!("SELECT-USAGE looks inward and {l} is not a usage, so nothing is selected; to find the usages it is in, use SELECT-ANCESTOR-USAGE (10.1)"), off);
+                    self.hint_at(&site, codes::SELECT_USAGE_NOT_USAGE, format!("SELECT-USAGE looks inward and {l} is not a usage, so nothing is selected; to find the usages it is in, use SELECT-ANCESTOR-USAGE (10.1)"), off);
                 }
             }
             let ids: HashSet<ObjId> = usages.into_iter().collect();
@@ -1918,7 +1950,13 @@ impl Interp<'_> {
         out
     }
 
-    pub(crate) fn diag_fact(&mut self, sev: crate::diag::Severity, f: &Fact, msg: String) -> Option<DiagId> {
+    pub(crate) fn diag_fact(
+        &mut self,
+        sev: crate::diag::Severity,
+        code: crate::diag::Code,
+        f: &Fact,
+        msg: String,
+    ) -> Option<DiagId> {
         let c = f.ctx.clone()?;
         if sev == crate::diag::Severity::Error {
             self.note_failed_at(c.rec, f.off, false);
@@ -1927,6 +1965,7 @@ impl Interp<'_> {
         // shown like the document's own, as the later phases' diagnostics are (7.6)
         Some(self.sink.add(
             sev,
+            code,
             msg,
             loc,
             crate::diag::Extra { cause: None, origin: c.origin.to_string(), in_package: String::new() },

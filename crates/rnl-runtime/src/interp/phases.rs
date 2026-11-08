@@ -5,7 +5,7 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-use crate::diag::{Loc, Severity};
+use crate::diag::{codes, Code, Loc, Severity};
 use crate::geom::{fmt_num, route, Orient, Pt};
 
 use super::obj::*;
@@ -26,23 +26,31 @@ enum Fault {
 
 impl Fault {
     /// The error of a wire whose list fails so: the wire fails.
-    fn for_wire(&self) -> String {
+    fn for_wire(&self) -> (Code, String) {
         match self {
-            Fault::NoSymbol(l) => format!("{l} has no symbol: a wire to its terminal fails (12.1)"),
-            Fault::NoPin(l) => format!("{l} has no pin in its symbol: the wire fails (9.2.4)"),
-            Fault::InBundle(l) => format!("{l} is in a bundle; wires go to the terminals of the bundle (11.8)"),
+            Fault::NoSymbol(l) => {
+                (codes::WIRE_NO_SYMBOL, format!("{l} has no symbol: a wire to its terminal fails (12.1)"))
+            }
+            Fault::NoPin(l) => (codes::WIRE_NO_PIN, format!("{l} has no pin in its symbol: the wire fails (9.2.4)")),
+            Fault::InBundle(l) => {
+                (codes::WIRE_IN_BUNDLE, format!("{l} is in a bundle; wires go to the terminals of the bundle (11.8)"))
+            }
         }
     }
 
     /// The error of a rewrite of `wire` whose list fails so (the draft 0.3, 13.1): it has no
     /// effect, its style parameters included, and the wire does not fail.
-    fn for_rewrite(&self, wire: &str) -> String {
-        let (cause, section) = match self {
-            Fault::NoSymbol(l) => (format!("{l} has no symbol"), "12.1"),
-            Fault::NoPin(l) => (format!("{l} has no pin in its symbol"), "9.2.4"),
-            Fault::InBundle(l) => (format!("{l} is in a bundle, and wires go to the terminals of the bundle"), "11.8"),
+    fn for_rewrite(&self, wire: &str) -> (Code, String) {
+        let (code, cause, section) = match self {
+            Fault::NoSymbol(l) => (codes::WIRE_REWRITE_NO_SYMBOL, format!("{l} has no symbol"), "12.1"),
+            Fault::NoPin(l) => (codes::WIRE_REWRITE_NO_PIN, format!("{l} has no pin in its symbol"), "9.2.4"),
+            Fault::InBundle(l) => (
+                codes::WIRE_REWRITE_IN_BUNDLE,
+                format!("{l} is in a bundle, and wires go to the terminals of the bundle"),
+                "11.8",
+            ),
         };
-        format!("{cause}: this rewrite of {wire} fails and has no effect, its style parameters included; the wire keeps the list and mode of the latest rewrite that holds, or those it was made with ({section}, 5.8, 13.1)")
+        (code, format!("{cause}: this rewrite of {wire} fails and has no effect, its style parameters included; the wire keeps the list and mode of the latest rewrite that holds, or those it was made with ({section}, 5.8, 13.1)"))
     }
 }
 
@@ -107,14 +115,21 @@ impl Interp<'_> {
 
     /// A diagnostic of the later phases. It concerns what the statement does in this document, even
     /// when the statement is written in a package, so it is shown like the document's own (7.6).
-    fn diag_site(&mut self, sev: Severity, site: &Option<std::rc::Rc<super::ctx::Ctx>>, off: usize, msg: String) {
+    fn diag_site(
+        &mut self,
+        sev: Severity,
+        code: Code,
+        site: &Option<std::rc::Rc<super::ctx::Ctx>>,
+        off: usize,
+        msg: String,
+    ) {
         if sev == Severity::Error {
             if let Some(c) = site {
                 self.note_failed_at(c.rec, off, false);
             }
         }
         let (loc, origin, _pkg) = self.site_loc(site, off);
-        self.sink.add(sev, msg, loc, crate::diag::Extra { cause: None, origin, in_package: String::new() });
+        self.sink.add(sev, code, msg, loc, crate::diag::Extra { cause: None, origin, in_package: String::new() });
     }
 
     // ---- bundles (11.8)
@@ -131,6 +146,7 @@ impl Interp<'_> {
                         let l = self.label(m);
                         self.diag_site(
                             Severity::Hint,
+                            codes::BUNDLE_MEMBER_IN_SEVERAL_BUNDLES,
                             &site,
                             0,
                             format!("{l} is written into several bundles and goes to the later one (11.8)"),
@@ -147,6 +163,7 @@ impl Interp<'_> {
             if empty {
                 self.diag_site(
                     Severity::Warning,
+                    codes::BUNDLE_EMPTY,
                     &site,
                     0,
                     "every member of the bundle was taken by later bundles; the empty bundle is not drawn (11.8)"
@@ -169,6 +186,7 @@ impl Interp<'_> {
                     if !same {
                         self.diag_site(
                             Severity::Warning,
+                            codes::BUNDLE_MEMBER_KIND_DIFFERS,
                             &site,
                             0,
                             format!("the bundle member {} is not the same kind as {} (11.8)", i.name, f.name),
@@ -318,7 +336,7 @@ impl Interp<'_> {
             let shown = names.iter().take(8).cloned().collect::<Vec<_>>().join(", ");
             let more = if names.len() > 8 { format!(" and {} more", names.len() - 8) } else { String::new() };
             let verb = if names.len() == 1 { "is" } else { "are" };
-            self.sink.hint(
+            self.sink.hint(codes::SYMBOL_SUBCKT_UNDEFINED,
                 format!(
                     "no file read defines the subcircuit {master}, so {shown}{more} {verb} drawn as a box of its terminals; an include may be missing (6.4, 9.2.6)"
                 ),
@@ -349,16 +367,16 @@ impl Interp<'_> {
             let more = if names.len() > 8 { format!(" and {} more", names.len() - 8) } else { String::new() };
             let list = shown.iter().map(|n| n.as_str()).collect::<Vec<_>>().join(", ");
             let (what, verb) = if names.len() == 1 { ("it", "is") } else { ("they", "are") };
-            let message = match &model {
-                Some(m) => format!(
+            let (code, message) = match &model {
+                Some(m) => (codes::SYMBOL_MODEL_CARD_MISSING, format!(
                     "the model card `{m}` is not found, so the polarity of {list}{more} is not known and {what} {verb} not drawn (a `.model` card or an include may be missing)"
-                ),
-                None => format!(
+                )),
+                None => (codes::SYMBOL_NO_MODEL, format!(
                     "{list}{more} name{} no model, so the polarity is not known and {what} {verb} not drawn",
                     if names.len() == 1 { "s" } else { "" }
-                ),
+                )),
             };
-            self.sink.warning(message, Some(Loc::line(first.file.clone(), first.line.max(1))));
+            self.sink.warning(code, message, Some(Loc::line(first.file.clone(), first.line.max(1))));
         }
     }
 
@@ -419,6 +437,7 @@ impl Interp<'_> {
         let l = self.label(member);
         self.diag_fact(
             Severity::Error,
+            codes::BUNDLE_MEMBER_DRAWN_ALONE,
             f,
             format!("{l} is in a bundle and is not drawn on its own: this description fails (11.8)"),
         );
@@ -489,10 +508,12 @@ impl Interp<'_> {
                     if matches!(self.o(owner), ObjData::Usage(_)) && lab.site.is_some() {
                         // a key written in the symbol may not be spelled like a role or local name of the usage
                         // it is drawn on, or an alias of one; the text is left out (6.5, 13.3)
-                        if let Some(clash) = self.key_clash(key, lab.unit, Some(owner)) {
+                        // one kind of its own, whichever clash it is
+                        if let Some((_, clash)) = self.key_clash(key, lab.unit, Some(owner)) {
                             let l = self.label(owner);
                             self.diag_site(
                                 Severity::Error,
+                                codes::TEXT_SYMBOL_KEY_CLASH,
                                 &lab.site,
                                 lab.off,
                                 format!("{clash}; a text written in the symbol, drawn on {l}"),
@@ -786,6 +807,7 @@ impl Interp<'_> {
                     let ql = self.label(*q);
                     self.diag_site(
                         Severity::Warning,
+                        codes::WIRE_NET_MISMATCH,
                         &site,
                         off,
                         format!(
@@ -801,8 +823,8 @@ impl Interp<'_> {
             let mut rewrites = self.scenes[s].rewrites.get(&w).cloned().unwrap_or_default();
             rewrites.sort_by(|a, b| (&a.pos, a.seq).cmp(&(&b.pos, b.seq)));
             for r in &rewrites {
-                if let Some(msg) = &r.fault {
-                    self.diag_site(Severity::Error, &Some(r.site.clone()), r.off, msg.clone());
+                if let Some((code, msg)) = &r.fault {
+                    self.diag_site(Severity::Error, *code, &Some(r.site.clone()), r.off, msg.clone());
                 }
             }
             if rewrites.iter().any(|r| r.fault.is_none()) {
@@ -811,7 +833,8 @@ impl Interp<'_> {
             let Some(WireShape { points, site, off, .. }) = self.wire_shape(s, w) else { continue };
             for q in &points {
                 if let Some(fault) = self.term_fault(s, *q) {
-                    self.diag_site(Severity::Error, &site, off, fault.for_wire());
+                    let (code, msg) = fault.for_wire();
+                    self.diag_site(Severity::Error, code, &site, off, msg);
                     self.set_failed(w);
                     break;
                 }
@@ -839,6 +862,7 @@ impl Interp<'_> {
                         let l = self.label(att);
                         self.diag_site(
                             Severity::Error,
+                            codes::TEXT_USAGE_NO_SYMBOL,
                             &site,
                             off,
                             format!("{l} has no symbol and no drawing meaning: this TEXT fails (12.1, 13.3)"),
@@ -851,6 +875,7 @@ impl Interp<'_> {
                         let l = self.label(att);
                         self.diag_site(
                             Severity::Error,
+                            codes::TEXT_TERMINAL_NO_PIN,
                             &site,
                             off,
                             format!("{l} has no pin in its symbol: this TEXT fails (9.2.4, 13.3)"),
@@ -862,6 +887,7 @@ impl Interp<'_> {
                     let l = self.label(att);
                     self.diag_site(
                         Severity::Error,
+                        codes::TEXT_ON_BUNDLE_MEMBER,
                         &site,
                         off,
                         format!("{l} is in a bundle and is not drawn on its own: this TEXT fails (11.8)"),
@@ -886,6 +912,7 @@ impl Interp<'_> {
                         let l = self.label(t);
                         self.diag_site(
                             Severity::Error,
+                            codes::TEXT_KEYTEXT_NO_CONTENT,
                             &site,
                             off,
                             format!(
@@ -923,6 +950,7 @@ impl Interp<'_> {
             let shown: Vec<&String> = un.iter().take(12).collect();
             let more = if un.len() > 12 { ", …" } else { "" };
             self.sink.hint(
+                codes::UNPLACED_OBJECTS,
                 format!(
                     "{title}: {} objects have no position and are left to a solver; they are not drawn: {}{more}",
                     un.len(),
@@ -977,12 +1005,16 @@ impl Interp<'_> {
         self.set_failed(t);
         let msg = format!("{}: this text fails (13.6)", bad.join("; "));
         if site.is_some() {
-            self.diag_site(Severity::Error, site, off, msg);
+            self.diag_site(Severity::Error, codes::TEXT_ATTR_PATH_FAILS, site, off, msg);
         } else {
             let sym = self.scenes[s].symbol.get(&att).map(|x| self.label(*x)).unwrap_or_else(|| "?".into());
             let lv = &self.doc.levels[self.scenes[s].level];
             let loc = Loc::line(lv.file.clone(), lv.line.max(1));
-            self.sink.error(format!("{msg}, the text is written in the symbol {sym}"), Some(loc));
+            self.sink.error(
+                codes::TEXT_ATTR_PATH_FAILS_IN_SYMBOL,
+                format!("{msg}, the text is written in the symbol {sym}"),
+                Some(loc),
+            );
         }
     }
 
@@ -1004,6 +1036,7 @@ impl Interp<'_> {
         let b = self.fact_text(winner);
         self.diag_fact(
             Severity::Hint,
+            codes::PLACE_FACT_DROPPED,
             loser,
             format!("{a} conflicts with {b} and is dropped in the order of 8.5 (8.5)"),
         );
@@ -1032,6 +1065,7 @@ impl Interp<'_> {
                     let l = self.label(obj);
                     self.diag_fact(
                         Severity::Error,
+                        codes::PLACE_USAGE_NO_SYMBOL,
                         f,
                         format!("{l} has no symbol and no drawing meaning: {what} fails (12.1)"),
                     );
@@ -1039,7 +1073,7 @@ impl Interp<'_> {
                 }
                 if what == "PLACE" && self.at_point(obj) {
                     let l = self.label(obj);
-                    self.diag_fact(Severity::Error, f, format!("{l} is drawn on the point of its main object and has no position of its own: PLACE fails (12.1)"));
+                    self.diag_fact(Severity::Error, codes::PLACE_USAGE_AT_POINT, f, format!("{l} is drawn on the point of its main object and has no position of its own: PLACE fails (12.1)"));
                     return false;
                 }
             }
@@ -1047,6 +1081,7 @@ impl Interp<'_> {
                 let l = self.label(parent);
                 self.diag_fact(
                     Severity::Error,
+                    codes::PLACE_POSITION_OF_USAGE_AT_POINT,
                     f,
                     format!("{l} is drawn on the point of its main object: PLACE fails (12.1)"),
                 );
@@ -1066,13 +1101,18 @@ impl Interp<'_> {
         );
         if what == "PLACE" && !place_ok {
             let l = self.label(obj);
-            self.diag_fact(Severity::Error, f, format!("PLACE does not take {l} (11.1)"));
+            self.diag_fact(Severity::Error, codes::PLACE_NOT_TAKEN, f, format!("PLACE does not take {l} (11.1)"));
             return false;
         }
         if what == "ORIENT" && !matches!(self.o(obj), ObjData::Inst { .. } | ObjData::Usage(_) | ObjData::Bundle { .. })
         {
             let l = self.label(obj);
-            self.diag_fact(Severity::Error, f, format!("ORIENT does not take {l} (11.2)"));
+            self.diag_fact(
+                Severity::Error,
+                codes::PLACE_ORIENT_NOT_TAKEN,
+                f,
+                format!("ORIENT does not take {l} (11.2)"),
+            );
             return false;
         }
         true
@@ -1549,6 +1589,7 @@ impl Interp<'_> {
                 let l = self.label(c);
                 self.diag_site(
                     Severity::Error,
+                    codes::CONSTRAINT_MEMBER_NOT_LOCATABLE,
                     &site,
                     cd.off,
                     format!("a member of {l}: {why}; this constraint fails (14.1)"),
@@ -1562,6 +1603,7 @@ impl Interp<'_> {
                 let l = self.label(c);
                 self.diag_site(
                     Severity::Error,
+                    codes::CONSTRAINT_SELF_CONTRADICTION,
                     &site,
                     cd.off,
                     format!("{l} has no solution on its own: {}; this constraint fails (8.5, {})", no.why, no.section),
@@ -1621,6 +1663,7 @@ impl Interp<'_> {
                     } else {
                         self.diag_site(
                             Severity::Hint,
+                            codes::CONSTRAINT_DROPPED,
                             &site,
                             cd.off,
                             format!("{l} conflicts with fixed {what} and is dropped in the order of 8.5 (8.5)"),
@@ -1631,7 +1674,7 @@ impl Interp<'_> {
                 self.constraint_mut(c).status = Some("needs-solver");
                 self.diag_site(
                     Severity::Hint,
-                    &site,
+                    codes::CONSTRAINT_NEEDS_SOLVER, &site,
                     cd.off,
                     format!("{l} comes before some of the {what} it involves in the order of 8.5, so they should change; without a solver the written {what} are drawn"),
                 );
@@ -1925,7 +1968,12 @@ impl Interp<'_> {
             match self.o(o) {
                 ObjData::Point { .. } | ObjData::Net { .. } | ObjData::Constraint(_) => {
                     let l = self.label(o);
-                    self.diag_fact(Severity::Error, f, format!("LAYER does not take {l} (11.6)"));
+                    self.diag_fact(
+                        Severity::Error,
+                        codes::LAYER_NOT_TAKEN,
+                        f,
+                        format!("LAYER does not take {l} (11.6)"),
+                    );
                     continue;
                 }
                 ObjData::Inst { bundle: Some(_), .. } => {

@@ -1,5 +1,7 @@
 //! Text markup (standard 13.6): a subset of LaTeX text mode, and `${…}` attribute references.
 
+use crate::diag::{codes, Code};
+
 /// Marks text taken from an attribute: shown as written, never read as markup.
 pub const LITERAL: char = '\u{0}';
 
@@ -261,7 +263,7 @@ fn strip_refs(text: &str) -> String {
 }
 
 /// 13.6: unknown commands and unbalanced braces are shown as written, with a warning.
-pub fn problems(text: &str) -> Vec<String> {
+pub fn problems(text: &str) -> Vec<(Code, String)> {
     let mut out = Vec::new();
     let t: Vec<char> = strip_refs(text).replace("\\\\", "\n").chars().collect();
     let mut i = 0;
@@ -274,14 +276,17 @@ pub fn problems(text: &str) -> Vec<String> {
             if j > i + 1 {
                 let cmd: String = t[i + 1..j].iter().collect();
                 if !known(&cmd) {
-                    out.push(format!("unknown markup \\{cmd} is shown as written"));
+                    out.push((codes::MARKUP_UNKNOWN_COMMAND, format!("unknown markup \\{cmd} is shown as written")));
                 } else if cmd == "frac" {
                     let mut k = j;
                     while k < t.len() && t[k].is_whitespace() {
                         k += 1;
                     }
                     if t.get(k) != Some(&'{') {
-                        out.push("\\frac is followed by two braces, the numerator and the denominator".into());
+                        out.push((
+                            codes::MARKUP_FRAC_BRACES,
+                            "\\frac is followed by two braces, the numerator and the denominator".into(),
+                        ));
                     }
                 }
                 i = j;
@@ -309,7 +314,7 @@ pub fn problems(text: &str) -> Vec<String> {
         i += 1;
     }
     if depth != 0 {
-        out.push("unbalanced braces are shown as written".into());
+        out.push((codes::MARKUP_UNBALANCED_BRACES, "unbalanced braces are shown as written".into()));
     }
     out
 }

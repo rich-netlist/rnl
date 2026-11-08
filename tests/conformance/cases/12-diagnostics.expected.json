@@ -1337,330 +1337,440 @@
   "diagnostics": [
     {
       "severity": "hint",
+      "code": "RNL0003",
+      "name": "host-non-ascii-comment",
       "file": "12-diagnostics.sp",
       "line": 14,
       "col": 14
     },
     {
       "severity": "warning",
+      "code": "RNL1013",
+      "name": "record-line-ends-backslash",
       "file": "12-diagnostics.sp",
       "line": 63,
       "col": 75
     },
     {
       "severity": "error",
+      "code": "RNL1002",
+      "name": "record-cut-off",
       "file": "12-diagnostics.sp",
       "line": 65,
       "col": 26
     },
     {
       "severity": "error",
+      "code": "RNL1016",
+      "name": "record-tokens-after-record",
       "file": "12-diagnostics.sp",
       "line": 72,
       "col": 5
     },
     {
       "severity": "error",
+      "code": "RNL2407",
+      "name": "alias-of-outer-form-keyword",
       "file": "12-diagnostics.sp",
       "line": 14,
       "col": 5
     },
     {
       "severity": "error",
+      "code": "RNL2205",
+      "name": "package-not-found",
       "file": "12-diagnostics.sp",
       "line": 16,
       "col": 5
     },
     {
       "severity": "warning",
+      "code": "RNL1103",
+      "name": "syntax-dot-after-reference",
       "file": "12-diagnostics.sp",
       "line": 24,
       "col": 8
     },
     {
       "severity": "warning",
+      "code": "RNL1113",
+      "name": "syntax-keyword-space-paren",
       "file": "12-diagnostics.sp",
       "line": 53,
       "col": 16
     },
     {
       "severity": "warning",
+      "code": "RNL1127",
+      "name": "syntax-pipe-bar",
       "file": "12-diagnostics.sp",
       "line": 59,
       "col": 9
     },
     {
       "severity": "error",
+      "code": "RNL1131",
+      "name": "syntax-positional-after-named",
       "file": "12-diagnostics.sp",
       "line": 33,
       "col": 21
     },
     {
       "severity": "error",
+      "code": "RNL1116",
+      "name": "syntax-named-segment-objects",
       "file": "12-diagnostics.sp",
       "line": 49,
       "col": 11
     },
     {
       "severity": "error",
+      "code": "RNL1129",
+      "name": "syntax-pipe-segment-no-keyword",
       "file": "12-diagnostics.sp",
       "line": 52,
       "col": 12
     },
     {
       "severity": "error",
+      "code": "RNL1130",
+      "name": "syntax-point-malformed",
       "file": "12-diagnostics.sp",
       "line": 54,
       "col": 10
     },
     {
       "severity": "error",
+      "code": "RNL1100",
+      "name": "syntax-angle-point",
       "file": "12-diagnostics.sp",
       "line": 58,
       "col": 9
     },
     {
       "severity": "warning",
+      "code": "RNL1003",
+      "name": "record-free-word-like-name",
       "file": "12-diagnostics.sp",
       "line": 25,
       "col": 15
     },
     {
       "severity": "error",
+      "code": "RNL2901",
+      "name": "scope-no-subcircuit",
       "file": "12-diagnostics.sp",
       "line": 62,
       "col": 3
     },
     {
       "severity": "error",
+      "code": "RNL3027",
+      "name": "keyword-unknown",
       "file": "12-diagnostics.sp",
       "line": 20,
       "col": 15
     },
     {
       "severity": "error",
+      "code": "RNL3221",
+      "name": "ref-not-found",
       "file": "12-diagnostics.sp",
       "line": 21,
       "col": 21
     },
     {
       "severity": "error",
+      "code": "RNL3512",
+      "name": "usage-role-wrong-kind",
       "file": "12-diagnostics.sp",
       "line": 22,
       "col": 5
     },
     {
       "severity": "warning",
+      "code": "RNL3305",
+      "name": "set-empty-literal",
       "file": "12-diagnostics.sp",
       "line": 23,
       "col": 5
     },
     {
       "severity": "error",
+      "code": "RNL3104",
+      "name": "param-distance-min-above-max",
       "file": "12-diagnostics.sp",
       "line": 31,
       "col": 13
     },
     {
       "severity": "error",
+      "code": null,
+      "name": "param-distance-negative-without-sense",
       "file": "12-diagnostics.sp",
       "line": 32,
       "col": 13
     },
     {
       "severity": "error",
+      "code": "RNL3118",
+      "name": "param-unknown",
       "file": "12-diagnostics.sp",
       "line": 34,
       "col": 16
     },
     {
       "severity": "error",
+      "code": "RNL3101",
+      "name": "param-bad-enum",
       "file": "12-diagnostics.sp",
       "line": 35,
       "col": 16
     },
     {
       "severity": "error",
+      "code": "RNL3028",
+      "name": "keyword-unknown-missing-space",
       "file": "12-diagnostics.sp",
       "line": 36,
       "col": 15
     },
     {
       "severity": "error",
+      "code": "RNL3400",
+      "name": "define-body-host-ref",
       "file": "12-diagnostics.sp",
       "line": 38,
       "col": 33
     },
     {
       "severity": "error",
+      "code": "RNL3207",
+      "name": "ref-hole-param-as-object",
       "file": "12-diagnostics.sp",
       "line": 39,
       "col": 56
     },
     {
       "severity": "warning",
+      "code": "RNL3021",
+      "name": "keyword-set-symbol-block-no-effect",
       "file": "12-diagnostics.sp",
       "line": 40,
       "col": 7
     },
     {
       "severity": "warning",
+      "code": "RNL3415",
+      "name": "define-unnamed-unused",
       "file": "12-diagnostics.sp",
       "line": 41,
       "col": 5
     },
     {
       "severity": "error",
+      "code": "RNL3012",
+      "name": "keyword-header-only",
       "file": "12-diagnostics.sp",
       "line": 42,
       "col": 5
     },
     {
       "severity": "error",
+      "code": "RNL3016",
+      "name": "keyword-pin-outside-symbol",
       "file": "12-diagnostics.sp",
       "line": 43,
       "col": 12
     },
     {
       "severity": "error",
+      "code": "RNL3600",
+      "name": "priority-target-not-allowed",
       "file": "12-diagnostics.sp",
       "line": 44,
       "col": 29
     },
     {
       "severity": "error",
+      "code": "RNL3213",
+      "name": "ref-name-cycle",
       "file": "12-diagnostics.sp",
       "line": 45,
       "col": 5
     },
     {
       "severity": "warning",
+      "code": "RNL3506",
+      "name": "usage-in-symbol-not-drawn",
       "file": "12-diagnostics.sp",
       "line": 46,
       "col": 28
     },
     {
       "severity": "error",
+      "code": "RNL3114",
+      "name": "param-place-needs-x-or-y",
       "file": "12-diagnostics.sp",
       "line": 53,
       "col": 9
     },
     {
       "severity": "error",
+      "code": "RNL3507",
+      "name": "usage-not-a-definition",
       "file": "12-diagnostics.sp",
       "line": 55,
       "col": 5
     },
     {
       "severity": "error",
+      "code": "RNL3300",
+      "name": "select-ancestor-scope-level",
       "file": "12-diagnostics.sp",
       "line": 57,
       "col": 5
     },
     {
       "severity": "error",
+      "code": "RNL3014",
+      "name": "keyword-object-failed",
       "file": "12-diagnostics.sp",
       "line": 57,
       "col": 38
     },
     {
       "severity": "error",
+      "code": "RNL2801",
+      "name": "name-bound-twice",
       "file": "12-diagnostics.sp",
       "line": 26,
       "col": 16
     },
     {
       "severity": "error",
+      "code": "RNL4300",
+      "name": "place-not-taken",
       "file": "12-diagnostics.sp",
       "line": 30,
       "col": 5
     },
     {
       "severity": "hint",
+      "code": null,
+      "name": "place-fact-dropped",
       "file": "12-diagnostics.sp",
       "line": 44,
       "col": 5
     },
     {
       "severity": "hint",
+      "code": null,
+      "name": "place-fact-dropped",
       "file": "12-diagnostics.sp",
       "line": 44,
       "col": 5
     },
     {
       "severity": "hint",
+      "code": null,
+      "name": "place-fact-dropped",
       "file": "12-diagnostics.sp",
       "line": 59,
       "col": 5
     },
     {
       "severity": "hint",
+      "code": null,
+      "name": "place-fact-dropped",
       "file": "12-diagnostics.sp",
       "line": 59,
       "col": 5
     },
     {
       "severity": "hint",
+      "code": null,
+      "name": "place-fact-dropped",
       "file": "12-diagnostics.sp",
       "line": 60,
       "col": 5
     },
     {
       "severity": "hint",
+      "code": null,
+      "name": "place-fact-dropped",
       "file": "12-diagnostics.sp",
       "line": 60,
       "col": 5
     },
     {
       "severity": "error",
+      "code": "RNL5001",
+      "name": "constraint-member-not-locatable",
       "file": "12-diagnostics.sp",
       "line": 29,
       "col": 5
     },
     {
       "severity": "warning",
+      "code": "RNL4204",
+      "name": "wire-net-mismatch",
       "file": "12-diagnostics.sp",
       "line": 50,
       "col": 5
     },
     {
       "severity": "error",
+      "code": "RNL4413",
+      "name": "text-terminal-no-pin",
       "file": "12-diagnostics.sp",
       "line": 27,
       "col": 5
     },
     {
       "severity": "error",
+      "code": "RNL4402",
+      "name": "text-attr-path-fails",
       "file": "12-diagnostics.sp",
       "line": 37,
       "col": 5
     },
     {
       "severity": "error",
+      "code": "RNL4402",
+      "name": "text-attr-path-fails",
       "file": "12-diagnostics.sp",
       "line": 51,
       "col": 33
     },
     {
       "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
       "file": "12-diagnostics.sp",
       "line": 1,
       "col": 0
     },
     {
       "severity": "hint",
+      "code": "RNL3303",
+      "name": "select-usage-not-usage",
       "file": "12-diagnostics.sp",
       "line": 56,
       "col": 5
     },
     {
       "severity": "warning",
+      "code": "RNL2900",
+      "name": "rule-uses-own-level-objects",
       "file": "12-diagnostics.sp",
       "line": 48,
       "col": 5
     },
     {
       "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
       "file": "12-diagnostics.sp",
       "line": 8,
       "col": 0

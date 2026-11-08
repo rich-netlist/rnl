@@ -87,7 +87,7 @@ A call writes the request as UTF-8 JSON, calls `rnl_build`, and reads the answer
 | `svg` | Whether each level's SVG is written; true when not given. |
 | `primitives` | Whether each level's primitives are given; false when not given. |
 | `flylines` | Whether each level's flylines (13.3, 13.7) are drawn in its SVG and primitives, those of every net, to check what is not wired; false when not given. Drawn, each is a group of class `flyline` in the SVG, which a viewer can also hide by that class, with the `data-id` of its hit, of kind `flyline`, which stands for its nets as a wire's does. |
-| `hints` | Whether each level gets its geometry hints, `hints`, as `rnl check` prints them: `{kind, severity, message, file, file_index, line}`, such as where wires look joined; false when not given, and experimental. |
+| `hints` | Whether each level gets its geometry hints, `hints`, as `rnl check` prints them: `{kind, code, severity, message, file, file_index, line}`, `code` the number of the kind, such as `"RNL7003"`, such as where wires look joined; false when not given, and experimental. |
 | `status` | Whether each level gets its solve status, `solve`, what a frontend decides from whether to solve it ([`rnl-view`](../../crates/rnl-view/README.md)); false when not given. |
 | `constraints` | Whether each level gets its constraints after expansion, `constraints` ([`rnl-view`](../../crates/rnl-view/README.md#the-constraints-of-a-level)); false when not given. Experimental. |
 | `lazy_unplaced` | Whether the Document leaves out the drawings of the objects without a position, `Level.unplaced[].svg` and `primitives`, which the core keeps to give on request ([below](#drawings-of-the-objects-without-a-position)); false when not given. |

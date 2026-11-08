@@ -7,7 +7,7 @@ use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
-use crate::diag::{DiagId, Extra, Severity};
+use crate::diag::{codes, Code, DiagId, Extra, Severity};
 use crate::host::LevelId;
 use crate::model::{FailedSpan, HostRef, RefTarget};
 use crate::syntax::{Coord, Member, ObjExpr, Params, PathItem, Point, Ref, Segment, Sep, SetExpr, Value};
@@ -392,35 +392,39 @@ impl<'p> Interp<'p> {
         self.units[ctx.unit].pkg().to_string()
     }
 
-    pub(crate) fn err(&mut self, ctx: &Ctx, msg: impl Into<String>, off: usize) -> DiagId {
-        self.err_cause(ctx, msg, off, None)
+    pub(crate) fn err(&mut self, ctx: &Ctx, code: Code, msg: impl Into<String>, off: usize) -> DiagId {
+        self.err_cause(ctx, code, msg, off, None)
     }
 
-    pub(crate) fn err_cause(&mut self, ctx: &Ctx, msg: impl Into<String>, off: usize, cause: Option<DiagId>) -> DiagId {
+    pub(crate) fn err_cause(
+        &mut self,
+        ctx: &Ctx,
+        code: Code,
+        msg: impl Into<String>,
+        off: usize,
+        cause: Option<DiagId>,
+    ) -> DiagId {
         let loc = self.rec_loc(ctx.rec, off);
         let pkg = self.ctx_pkg(ctx);
-        self.sink.add(Severity::Error, msg, loc, Extra { cause, origin: ctx.origin.to_string(), in_package: pkg })
+        self.sink.add(Severity::Error, code, msg, loc, Extra { cause, origin: ctx.origin.to_string(), in_package: pkg })
     }
 
-    pub(crate) fn fail<T>(&mut self, ctx: &Ctx, msg: impl Into<String>, off: usize) -> R<T> {
-        Err(Stop::Fail(Some(self.err(ctx, msg, off))))
+    pub(crate) fn fail<T>(&mut self, ctx: &Ctx, code: Code, msg: impl Into<String>, off: usize) -> R<T> {
+        Err(Stop::Fail(Some(self.err(ctx, code, msg, off))))
     }
 
-    pub(crate) fn warn(&mut self, ctx: &Ctx, msg: impl Into<String>, off: usize) {
+    pub(crate) fn warn(&mut self, ctx: &Ctx, code: Code, msg: impl Into<String>, off: usize) {
         let loc = self.rec_loc(ctx.rec, off);
         let pkg = self.ctx_pkg(ctx);
-        self.sink.add(
-            Severity::Warning,
-            msg,
-            loc,
-            Extra { cause: None, origin: ctx.origin.to_string(), in_package: pkg },
-        );
+        let extra = Extra { cause: None, origin: ctx.origin.to_string(), in_package: pkg };
+        self.sink.add(Severity::Warning, code, msg, loc, extra);
     }
 
-    pub(crate) fn hint_at(&mut self, ctx: &Ctx, msg: impl Into<String>, off: usize) {
+    pub(crate) fn hint_at(&mut self, ctx: &Ctx, code: Code, msg: impl Into<String>, off: usize) {
         let loc = self.rec_loc(ctx.rec, off);
         let pkg = self.ctx_pkg(ctx);
-        self.sink.add(Severity::Hint, msg, loc, Extra { cause: None, origin: ctx.origin.to_string(), in_package: pkg });
+        let extra = Extra { cause: None, origin: ctx.origin.to_string(), in_package: pkg };
+        self.sink.add(Severity::Hint, code, msg, loc, extra);
     }
 
     // ------------------------------------------------------------------ names (6.2–6.9)
@@ -648,7 +652,7 @@ impl<'p> Interp<'p> {
         }
         if self.in_progress.contains(&skey) {
             let loc = self.rec_loc(rec, m.text_start());
-            let d = self.sink.error("the name refers to itself in a cycle (6.6)", loc);
+            let d = self.sink.error(codes::REF_NAME_CYCLE, "the name refers to itself in a cycle (6.6)", loc);
             return Err(Stop::Fail(Some(d)));
         }
         self.in_progress.insert(skey.clone());
@@ -837,7 +841,7 @@ impl<'p> Interp<'p> {
                 if let Some(src) = self.units[f].alias_rejected.get(&format!("@{written}")).cloned() {
                     return self.fail(
                         ctx,
-                        format!("unknown keyword @{written}: the original of this alias in alias package {src} is not a standard keyword, so it is not used (16.5)"),
+                        codes::KEYWORD_ALIAS_ORIGINAL_NOT_STANDARD, format!("unknown keyword @{written}: the original of this alias in alias package {src} is not a standard keyword, so it is not used (16.5)"),
                         call.start,
                     );
                 }
@@ -850,6 +854,7 @@ impl<'p> Interp<'p> {
             if let Some(pre) = pre {
                 return self.fail(
                     ctx,
+                    codes::KEYWORD_UNKNOWN_MISSING_SPACE,
                     format!("unknown keyword @{written}: is a space missing after `@{pre}`? (16.5)"),
                     call.start,
                 );
@@ -863,13 +868,18 @@ impl<'p> Interp<'p> {
                 msg.push_str(" Is an alias package not loaded?");
             }
             msg.push_str(" (16.4)");
-            return self.fail(ctx, msg, call.start);
+            return self.fail(ctx, codes::KEYWORD_UNKNOWN, msg, call.start);
         }
         if matches!(kw.as_str(), "VERSION" | "PACKAGE" | "ALIAS" | "DEVICE" | "USE-ALIASES" | "USE-PACKAGE") {
             if kw == "USE-PACKAGE" {
                 return Ok((NOTHING, false)); // handled when reading (16.2)
             }
-            return self.fail(ctx, format!("@{kw} is written only in the header record (2.8)"), call.start);
+            return self.fail(
+                ctx,
+                codes::KEYWORD_HEADER_ONLY,
+                format!("@{kw} is written only in the header record (2.8)"),
+                call.start,
+            );
         }
         self.keyword(&kw, args, seg, ctx, member)
     }
@@ -889,7 +899,12 @@ impl<'p> Interp<'p> {
         let y = self.coord(&e.y, ctx, e.start)?;
         let local = ctx.in_symbol();
         if local && (x.is_none() || y.is_none()) {
-            return self.fail(ctx, "a point in a symbol body has numbers on both axes (9.2.1)", e.start);
+            return self.fail(
+                ctx,
+                codes::POINT_IN_SYMBOL_FREE_COORDINATE,
+                "a point in a symbol body has numbers on both axes (9.2.1)",
+                e.start,
+            );
         }
         let p = self.new_obj(ObjData::Point { x, y, local });
         if let (Some(s), false) = (ctx.scene, local) {
@@ -906,7 +921,12 @@ impl<'p> Interp<'p> {
             Coord::Hole(name) => match self.hole_value(name, ctx, off)? {
                 None => Ok(None),
                 Some(Lit::Num(x)) => Ok(Some(x)),
-                Some(_) => self.fail(ctx, format!("?{name} is not a number and cannot be a coordinate"), off),
+                Some(_) => self.fail(
+                    ctx,
+                    codes::PARAM_HOLE_NOT_NUMBER,
+                    format!("?{name} is not a number and cannot be a coordinate"),
+                    off,
+                ),
             },
         }
     }
@@ -917,6 +937,7 @@ impl<'p> Interp<'p> {
             _ => {
                 return self.fail(
                     ctx,
+                    codes::REF_HOLE_OUTSIDE_DEFINITION,
                     format!("?{name} is written only in the body of an ordinary definition (6.10)"),
                     off,
                 )
@@ -925,7 +946,7 @@ impl<'p> Interp<'p> {
         let v = fr.borrow().param(name).cloned();
         match v {
             Some(v) => Ok(v),
-            None => self.fail(ctx, format!("?{name} is not a parameter (6.10)"), off),
+            None => self.fail(ctx, codes::REF_HOLE_COORD_NOT_PARAM, format!("?{name} is not a parameter (6.10)"), off),
         }
     }
 
@@ -944,8 +965,7 @@ impl<'p> Interp<'p> {
         }
         for (k, m) in e.members.iter().enumerate() {
             if let Some(err) = &m.error {
-                let msg = err.clone();
-                self.err(ctx, msg, m.error_pos);
+                self.err(ctx, err.code, err.message.clone(), m.error_pos);
                 self.note_failed(ctx.rec, m.start, m.end, false);
                 let f = self.new_obj(ObjData::Failed(None));
                 items.push((f, false));
@@ -1029,8 +1049,8 @@ impl<'p> Interp<'p> {
                     let d = match d {
                         Some(d) => d,
                         None => {
-                            let msg = no_outer_message(e);
-                            self.err(ctx, msg, e.start)
+                            let (code, msg) = no_outer_message(e);
+                            self.err(ctx, code, msg, e.start)
                         }
                     };
                     return Err(Stop::Fail(Some(d)));
@@ -1040,13 +1060,13 @@ impl<'p> Interp<'p> {
                     if let Some(gone) = (e.prefix == '$').then(|| self.missing_from_reference(&name, u)).flatten() {
                         return self.fail(
                             ctx,
-                            format!("${name} cannot be found: it is in package {gone}, and the {gone} in effect here does not have it (dropped, replaced, or its reference failed); this statement fails (16.2)"),
+                            codes::REF_MISSING_FROM_PACKAGE, format!("${name} cannot be found: it is in package {gone}, and the {gone} in effect here does not have it (dropped, replaced, or its reference failed); this statement fails (16.2)"),
                             e.start,
                         );
                     }
                     // a name of the standard series 0.2 where the series 0.3 is in effect
-                    if let Some(why) = (e.prefix == '$').then(|| self.renamed_in_0_3(&name, ctx)).flatten() {
-                        return self.fail(ctx, format!("${name} cannot be found: {why}"), e.start);
+                    if let Some((code, why)) = (e.prefix == '$').then(|| self.renamed_in_0_3(&name, ctx)).flatten() {
+                        return self.fail(ctx, code, format!("${name} cannot be found: {why}"), e.start);
                     }
                     let close = {
                         let mut names: Vec<String> = self.units[ctx.unit]
@@ -1060,7 +1080,12 @@ impl<'p> Interp<'p> {
                         closest(&name, names.iter().map(String::as_str))
                     };
                     let hint = close.map(|c| format!(", did you mean {}{c}?", e.prefix)).unwrap_or_default();
-                    return self.fail(ctx, format!("{}{name} cannot be found{hint} (6.6)", e.prefix), e.start);
+                    return self.fail(
+                        ctx,
+                        codes::REF_NOT_FOUND,
+                        format!("{}{name} cannot be found{hint} (6.6)", e.prefix),
+                        e.start,
+                    );
                 }
                 Some(Found::Nested(Nested::Member(m, k))) => {
                     let nested = ctx.nested.clone().unwrap();
@@ -1076,12 +1101,12 @@ impl<'p> Interp<'p> {
                 Some(f) => obj = self.binding_value(&f, ctx)?,
             }
             if obj == NOTHING {
-                return self.fail(ctx, format!("{}{name} produces no object", e.prefix), e.start);
+                return self.fail(ctx, codes::REF_NO_OBJECT, format!("{}{name} produces no object", e.prefix), e.start);
             }
             if let ObjData::Failed(d) = self.o(obj) {
                 let d = *d;
                 let msg = format!("{}{name} failed", e.prefix);
-                let id = self.err_cause(ctx, msg, e.start, d);
+                let id = self.err_cause(ctx, codes::REF_FAILED, msg, e.start, d);
                 return Err(Stop::Fail(Some(id)));
             }
             sel = self.is_lazy(obj);
@@ -1101,6 +1126,7 @@ impl<'p> Interp<'p> {
             if fk != Some(FrameKind::Symbol) {
                 return self.fail(
                     ctx,
+                    codes::REF_BARE_HOLE_OUTSIDE_SYMBOL,
                     "a bare `?` is written only in a symbol body, meaning the object the symbol draws (13.3)",
                     e.start,
                 );
@@ -1110,6 +1136,7 @@ impl<'p> Interp<'p> {
         if fk != Some(FrameKind::Definition) {
             return self.fail(
                 ctx,
+                codes::REF_HOLE_OUTSIDE_DEFINITION,
                 format!("?{name} is written only in the body of an ordinary definition (6.10)"),
                 e.start,
             );
@@ -1125,17 +1152,24 @@ impl<'p> Interp<'p> {
         if is_param {
             return self.fail(
                 ctx,
+                codes::REF_HOLE_PARAM_AS_OBJECT,
                 format!("?{name} is a parameter and is written only where a literal goes (6.10)"),
                 e.start,
             );
         }
-        self.fail(ctx, format!("?{name} is not in the role list or the parameter list (6.10)"), e.start)
+        self.fail(
+            ctx,
+            codes::REF_HOLE_UNKNOWN,
+            format!("?{name} is not in the role list or the parameter list (6.10)"),
+            e.start,
+        )
     }
 
     fn resolve_host(&mut self, e: &Ref, ctx: &Ctx) -> R<ObjId> {
         if matches!(ctx.frame_kind(), Some(FrameKind::Definition) | Some(FrameKind::Symbol)) {
             return self.fail(
                 ctx,
+                codes::REF_HOST_IN_BODY,
                 "a definition body cannot reference host objects; they come in through roles (6.9)",
                 e.start,
             );
@@ -1147,12 +1181,14 @@ impl<'p> Interp<'p> {
             if self.units[ctx.unit].kind == UnitKind::Package {
                 return self.fail(
                     ctx,
+                    codes::REF_HOST_IN_PACKAGE,
                     "a package has no circuit of its own: statements that name host objects fail (16.2)",
                     e.start,
                 );
             }
             return self.fail(
                 ctx,
+                codes::REF_HOST_IN_INCLUDED_FILE,
                 "the file level of an included file has no circuit of its own: host references fail (6.1)",
                 e.start,
             );
@@ -1178,14 +1214,23 @@ impl<'p> Interp<'p> {
                     None => self.scenes[scene].levelobj,
                     Some(n) => match self.scene_inst(scene, n) {
                         Some(o) => o,
-                        None => return self.fail(ctx, format!("this level has no instance {n} (6.3)"), e.start),
+                        None => {
+                            return self.fail(
+                                ctx,
+                                codes::REF_NO_INSTANCE,
+                                format!("this level has no instance {n} (6.3)"),
+                                e.start,
+                            )
+                        }
                     },
                 }
             } else {
                 let n = nm.unwrap_or_default();
                 match self.scene_net(scene, &n) {
                     Some(o) => o,
-                    None => return self.fail(ctx, format!("this level has no net {n} (6.3)"), e.start),
+                    None => {
+                        return self.fail(ctx, codes::REF_NO_NET, format!("this level has no net {n} (6.3)"), e.start)
+                    }
                 }
             };
             objs.push(o);
@@ -1328,12 +1373,14 @@ impl<'p> Interp<'p> {
         }
         if name == "net" {
             if matches!(self.o(obj), ObjData::Term { .. }) {
-                let Some(s) = ctx.scene else { return self.fail(ctx, "there is no circuit here", e.start) };
+                let Some(s) = ctx.scene else {
+                    return self.fail(ctx, codes::REF_NO_CIRCUIT, "there is no circuit here", e.start);
+                };
                 return self.term_net(s, obj, ctx, e.start);
             }
             let written = if p.name == "net" { "net".to_string() } else { format!("{} (net)", p.name) };
             let l = self.label(obj);
-            return self.fail(ctx, format!("{l} has no sub-object {written} (6.5)"), e.start);
+            return self.fail(ctx, codes::REF_NO_SUBOBJECT, format!("{l} has no sub-object {written} (6.5)"), e.start);
         }
         if let ObjData::Usage(u) = self.o(obj) {
             if let Some(r) = u.role(&name) {
@@ -1354,15 +1401,22 @@ impl<'p> Interp<'p> {
                 | ObjData::Net { .. }
         );
         if keyable {
-            let Some(s) = ctx.scene else { return self.fail(ctx, "there is no circuit here", e.start) };
+            let Some(s) = ctx.scene else {
+                return self.fail(ctx, codes::REF_NO_CIRCUIT, "there is no circuit here", e.start);
+            };
             return Ok(self.scene_keytext(s, obj, &name));
         }
         if obj == OWNER {
-            return self.fail(ctx, "the `?` of a symbol is only an object of TEXT (13.3)", e.start);
+            return self.fail(
+                ctx,
+                codes::REF_OWNER_SUBOBJECT,
+                "the `?` of a symbol is only an object of TEXT (13.3)",
+                e.start,
+            );
         }
         let written = if p.name == name { name.clone() } else { format!("{} ({name})", p.name) };
         let l = self.label(obj);
-        self.fail(ctx, format!("{l} has no sub-object {written} (6.5)"), e.start)
+        self.fail(ctx, codes::REF_NO_SUBOBJECT, format!("{l} has no sub-object {written} (6.5)"), e.start)
     }
 
     /// The name after `::`, read through the aliases of the file that writes it (6.5, 16.5): the
@@ -1415,26 +1469,29 @@ impl<'p> Interp<'p> {
 
     /// Why a text key cannot be used, or None (6.5, 13.3): it may not be spelled like a name that
     /// `::` finds before the text keys.
-    pub(crate) fn key_clash(&mut self, key: &str, unit: UnitId, owner: Option<ObjId>) -> Option<String> {
+    pub(crate) fn key_clash(&mut self, key: &str, unit: UnitId, owner: Option<ObjId>) -> Option<(Code, String)> {
         if words().is_subobject(key) {
-            return Some(format!("a text key cannot be the standard sub-object name {key} (13.3)"));
+            return Some((
+                codes::TEXT_KEY_STANDARD_SUBOBJECT,
+                format!("a text key cannot be the standard sub-object name {key} (13.3)"),
+            ));
         }
         if let Some(o) = owner {
             if matches!(self.o(o), ObjData::Usage(_)) {
                 let (own, scoped) = self.usage_subnames(o, unit);
                 let l = self.label(o);
                 if let Some((_, what)) = own.iter().find(|(n, _)| n == key) {
-                    return Some(format!("the text key {key} is spelled like a {what} of the usage {l}: `::` takes the {what} first and cannot reach this text (6.5, 13.3)"));
+                    return Some((codes::TEXT_KEY_LIKE_USAGE_NAME, format!("the text key {key} is spelled like a {what} of the usage {l}: `::` takes the {what} first and cannot reach this text (6.5, 13.3)")));
                 }
                 if let Some((_, orig)) = scoped.iter().find(|(a, _)| a == key) {
                     let what = own.iter().find(|(n, _)| n == orig).map(|(_, w)| *w).unwrap_or("name");
-                    return Some(format!("the text key {key} is an alias of the {what} {orig} of the usage {l}: `::` takes the alias first and cannot reach this text (13.3, 16.5)"));
+                    return Some((codes::TEXT_KEY_ALIAS_OF_USAGE_NAME, format!("the text key {key} is an alias of the {what} {orig} of the usage {l}: `::` takes the alias first and cannot reach this text (13.3, 16.5)")));
                 }
             }
         }
         let std = self.word(key, unit);
         if std != key && words().is_subobject(&std) {
-            return Some(format!("the text key {key} is an alias of the standard sub-object name {std}: `::` takes the alias first and cannot reach this text (13.3, 16.5)"));
+            return Some((codes::TEXT_KEY_ALIAS_OF_STANDARD_SUBOBJECT, format!("the text key {key} is an alias of the standard sub-object name {std}: `::` takes the alias first and cannot reach this text (13.3, 16.5)")));
         }
         None
     }
@@ -1444,7 +1501,7 @@ impl<'p> Interp<'p> {
         if obj == LEVEL {
             match ctx.scene {
                 Some(s) => obj = self.scenes[s].levelobj,
-                None => return self.fail(ctx, "there is no circuit here", e.start),
+                None => return self.fail(ctx, codes::REF_NO_CIRCUIT, "there is no circuit here", e.start),
             }
         }
         let names: Vec<String> = match &p.sub {
@@ -1460,7 +1517,7 @@ impl<'p> Interp<'p> {
         );
         if !ok_owner {
             let l = self.label(obj);
-            return self.fail(ctx, format!("{l} has no terminals (6.4)"), e.start);
+            return self.fail(ctx, codes::REF_NO_TERMINALS, format!("{l} has no terminals (6.4)"), e.start);
         }
         let mut out = Vec::new();
         for nm in &names {
@@ -1472,7 +1529,12 @@ impl<'p> Interp<'p> {
                 Some(t) => out.push(t),
                 None => {
                     let l = self.label(obj);
-                    return self.fail(ctx, format!("{l} has no terminal {nm} (6.4, 6.12)"), e.start);
+                    return self.fail(
+                        ctx,
+                        codes::REF_NO_TERMINAL,
+                        format!("{l} has no terminal {nm} (6.4, 6.12)"),
+                        e.start,
+                    );
                 }
             }
         }
@@ -1525,18 +1587,28 @@ impl<'p> Interp<'p> {
         }
         if let Some(d0) = defs.first() {
             if objs.is_empty() {
-                return self.fail(ctx, format!("the definition of @{kw} is written last (5.6)"), seg.start);
+                return self.fail(
+                    ctx,
+                    codes::KEYWORD_DEFINITION_MISSING,
+                    format!("the definition of @{kw} is written last (5.6)"),
+                    seg.start,
+                );
             }
             if seg.piped && objs.len() == 1 {
                 return self.fail(
                     ctx,
-                    format!("a definition cannot come down a pipe: the piped object fills the first position, and the definition of @{kw} is written after it (5.6)"),
+                    codes::KEYWORD_DEFINITION_PIPED, format!("a definition cannot come down a pipe: the piped object fills the first position, and the definition of @{kw} is written after it (5.6)"),
                     seg.start,
                 );
             }
             let last = objs.pop().unwrap();
             if last.role.is_some() {
-                return self.fail(ctx, "a definition is written last and carries no role (4.2 rule 7)", last.off);
+                return self.fail(
+                    ctx,
+                    codes::KEYWORD_DEFINITION_HAS_ROLE,
+                    "a definition is written last and carries no role (4.2 rule 7)",
+                    last.off,
+                );
             }
             mapped.insert(d0.name.clone(), last);
         }
@@ -1544,7 +1616,12 @@ impl<'p> Interp<'p> {
             positions.iter().filter(|p| !matches!(p.takes, Takes::Def(_))).collect();
         let labeled = objs.iter().filter(|a| a.role.is_some()).count();
         if labeled > 0 && labeled != objs.len() {
-            return self.fail(ctx, "label the roles of all objects or of none (4.2 rule 6)", seg.start);
+            return self.fail(
+                ctx,
+                codes::ROLE_LABELS_MIXED,
+                "label the roles of all objects or of none (4.2 rule 6)",
+                seg.start,
+            );
         }
         if labeled > 0 {
             for a in &objs {
@@ -1553,16 +1630,31 @@ impl<'p> Interp<'p> {
                 let role = if a.role_quoted { r.clone() } else { self.word(&r, ctx.unit) };
                 if !rest.iter().any(|p| p.name == role) {
                     let more = if !a.role_quoted && !r.is_ascii() { "; is an alias package not loaded?" } else { "" };
-                    return self.fail(ctx, format!("@{kw} has no position {r}{more} (5.3)"), a.off);
+                    return self.fail(
+                        ctx,
+                        codes::KEYWORD_UNKNOWN_POSITION,
+                        format!("@{kw} has no position {r}{more} (5.3)"),
+                        a.off,
+                    );
                 }
                 if mapped.contains_key(&role) {
-                    return self.fail(ctx, "a role is labelled only once (4.2 rule 6)", a.off);
+                    return self.fail(
+                        ctx,
+                        codes::KEYWORD_POSITION_LABELLED_TWICE,
+                        "a role is labelled only once (4.2 rule 6)",
+                        a.off,
+                    );
                 }
                 mapped.insert(role, a.clone());
             }
             for p in &rest {
                 if !mapped.contains_key(&p.name) && !p.optional {
-                    return self.fail(ctx, format!("the {} of @{kw} is not filled (5.3)", p.name), seg.start);
+                    return self.fail(
+                        ctx,
+                        codes::KEYWORD_POSITION_NOT_FILLED,
+                        format!("the {} of @{kw} is not filled (5.3)", p.name),
+                        seg.start,
+                    );
                 }
             }
             return Ok(mapped);
@@ -1596,7 +1688,12 @@ impl<'p> Interp<'p> {
                 if p.optional {
                     return Ok(mapped);
                 }
-                return self.fail(ctx, format!("@{kw} has no object: the signature does not match (5.2.1)"), seg.start);
+                return self.fail(
+                    ctx,
+                    codes::KEYWORD_NO_OBJECT,
+                    format!("@{kw} has no object: the signature does not match (5.2.1)"),
+                    seg.start,
+                );
             }
             if objs.len() == 1 && unpacked_from.is_none() {
                 mapped.insert(p.name.clone(), objs[0].clone());
@@ -1612,7 +1709,7 @@ impl<'p> Interp<'p> {
                     objs.len() + 1,
                     these.join(" ")
                 );
-                return self.fail(ctx, msg, seg.start);
+                return self.fail(ctx, codes::KEYWORD_SLOT_COUNT_WITH_DEFINITION, msg, seg.start);
             } else {
                 let items: Vec<(ObjId, bool)> = objs.iter().map(|a| (a.obj, !a.explicit)).collect();
                 let sel = objs.iter().any(|a| a.sel);
@@ -1632,7 +1729,12 @@ impl<'p> Interp<'p> {
             let (slots, written) = (rest.len() + def, objs.len() + def);
             let objects = if written == 1 { "1 object is".to_string() } else { format!("{written} objects are") };
             let hint = if written > slots { "; the objects of one slot are written in {…}" } else { "" };
-            return self.fail(ctx, format!("@{kw} has {slots} slots, and {objects} written (5.2.1){hint}"), seg.start);
+            return self.fail(
+                ctx,
+                codes::KEYWORD_SLOT_COUNT,
+                format!("@{kw} has {slots} slots, and {objects} written (5.2.1){hint}"),
+                seg.start,
+            );
         }
         for (p, a) in rest.iter().zip(objs) {
             mapped.insert(p.name.clone(), a);
@@ -1689,6 +1791,7 @@ impl<'p> Interp<'p> {
                 };
                 return self.fail(
                     ctx,
+                    codes::PARAM_POSITIONAL_NOT_ALLOWED,
                     format!(
                         "the parameters of @{kw} cannot be written by position; write each by name{ex} (4.2 rule 9)"
                     ),
@@ -1698,6 +1801,7 @@ impl<'p> Interp<'p> {
             if p.positional.len() > order.len() {
                 return self.fail(
                     ctx,
+                    codes::PARAM_TOO_MANY_POSITIONAL,
                     format!(
                         "@{kw} takes at most {} parameters by position ({}), {} are written (4.2 rule 9)",
                         order.len(),
@@ -1715,7 +1819,7 @@ impl<'p> Interp<'p> {
                     let hole = if let Value::Hole(h) = v { h.clone() } else { String::new() };
                     return self.fail(
                         ctx,
-                        format!("?{hole} has no value passed and no default: in a positional parameter it has no definite meaning, so the statement fails (9.4)"),
+                        codes::PARAM_HOLE_UNSET_POSITIONAL, format!("?{hole} has no value passed and no default: in a positional parameter it has no definite meaning, so the statement fails (9.4)"),
                         p.start,
                     );
                 }
@@ -1748,11 +1852,16 @@ impl<'p> Interp<'p> {
                     msg.push_str(" Is an alias package not loaded?");
                 }
                 msg.push_str(" (16.4)");
-                return self.fail(ctx, msg, n.off);
+                return self.fail(ctx, codes::PARAM_UNKNOWN, msg, n.off);
             }
             if out.iter().any(|(k, _)| *k == std) {
                 // by position and by name, or under two names: the same parameter twice (4.2 rule 9)
-                return self.fail(ctx, format!("parameter {std} of @{kw} is written twice (4.2 rule 9)"), n.off);
+                return self.fail(
+                    ctx,
+                    codes::PARAM_WRITTEN_TWICE,
+                    format!("parameter {std} of @{kw} is written twice (4.2 rule 9)"),
+                    n.off,
+                );
             }
             let v = self.value(&n.value, ctx, n.off)?;
             out.push((std, v));
@@ -1776,7 +1885,12 @@ impl<'p> Interp<'p> {
         for sp in spec {
             if sp.required && !have.contains(&sp.name) {
                 let at = seg.call.as_ref().map(|c| c.start).unwrap_or(seg.start);
-                return self.fail(ctx, format!("@{kw} lacks the parameter {} (5.3)", sp.name), at);
+                return self.fail(
+                    ctx,
+                    codes::PARAM_MISSING_REQUIRED,
+                    format!("@{kw} lacks the parameter {} (5.3)", sp.name),
+                    at,
+                );
             }
         }
         Ok(())
@@ -1805,6 +1919,7 @@ impl<'p> Interp<'p> {
                     .collect();
                 return self.fail(
                     ctx,
+                    codes::PARAM_BAD_ENUM,
                     format!("the {name} of @{kw} cannot be {}; one of {} (16.4)", val.show(), shown.join(", ")),
                     off,
                 );
@@ -1819,6 +1934,7 @@ impl<'p> Interp<'p> {
                     if !is_color(s.as_str()) {
                         return self.fail(
                             ctx,
+                            codes::PARAM_BAD_COLOUR,
                             format!("a colour is written like \"#RRGGBB\" (9.3), not {:?}", s.as_str()),
                             off,
                         );
@@ -1844,7 +1960,12 @@ impl<'p> Interp<'p> {
             _ => true,
         };
         if !ok {
-            return self.fail(ctx, format!("the {name} of @{kw} has the wrong type (5.3)"), off);
+            return self.fail(
+                ctx,
+                codes::PARAM_WRONG_TYPE,
+                format!("the {name} of @{kw} has the wrong type (5.3)"),
+                off,
+            );
         }
         Ok(val)
     }
@@ -1864,7 +1985,7 @@ impl<'p> Interp<'p> {
                             let hole = if let Value::Hole(h) = x { h.clone() } else { String::new() };
                             return self.fail(
                                 ctx,
-                                format!("?{hole} has no value passed and no default: as an array element it has no definite meaning, so the statement fails (9.4)"),
+                                codes::PARAM_HOLE_UNSET_ARRAY_ELEMENT, format!("?{hole} has no value passed and no default: as an array element it has no definite meaning, so the statement fails (9.4)"),
                                 off,
                             );
                         }
@@ -1878,6 +1999,7 @@ impl<'p> Interp<'p> {
                     _ => {
                         return self.fail(
                             ctx,
+                            codes::REF_HOLE_OUTSIDE_DEFINITION,
                             format!("?{name} is written only in the body of an ordinary definition (6.10)"),
                             off,
                         )
@@ -1893,18 +2015,24 @@ impl<'p> Interp<'p> {
                 if is_role {
                     return self.fail(
                         ctx,
+                        codes::PARAM_HOLE_IS_ROLE,
                         format!("?{name} is a role and cannot stand where a literal goes (6.10)"),
                         off,
                     );
                 }
-                self.fail(ctx, format!("?{name} is not in the parameter list (6.10)"), off)
+                self.fail(ctx, codes::REF_HOLE_NOT_A_PARAM, format!("?{name} is not in the parameter list (6.10)"), off)
             }
             Value::Word(w) => {
                 let std = self.word(w, ctx.unit);
                 match std.as_str() {
                     "true" => Ok(Some(Lit::Bool(true))),
                     "false" => Ok(Some(Lit::Bool(false))),
-                    _ => self.fail(ctx, format!("`{w}` is written as a string: enumerations are in quotes (3.7)"), off),
+                    _ => self.fail(
+                        ctx,
+                        codes::PARAM_BARE_WORD,
+                        format!("`{w}` is written as a string: enumerations are in quotes (3.7)"),
+                        off,
+                    ),
                 }
             }
         }
@@ -1915,18 +2043,24 @@ impl<'p> Interp<'p> {
         if self.units[ctx.unit].kind == UnitKind::Package {
             return self.fail(
                 ctx,
+                codes::KEYWORD_SCENE_ONLY_IN_PACKAGE,
                 "a statement that only draws a scene object has no level to draw in, in a package (16.2)",
                 off,
             );
         }
-        self.fail(ctx, "the file level of an included file has no circuit: a statement that only draws a scene object has no level to draw in (6.1)", off)
+        self.fail(ctx, codes::KEYWORD_SCENE_ONLY_IN_INCLUDED_FILE, "the file level of an included file has no circuit: a statement that only draws a scene object has no level to draw in (6.1)", off)
     }
 
     /// A statement whose input is a selection: evaluated at its phase (8.2, 10.4).
     pub(crate) fn defer(&mut self, ctx: &Ctx, phase: usize, task: super::scene::Task) -> R<()> {
         self.rules.insert(ctx.member_key.clone());
         if ctx.frame_generated() {
-            return self.fail(ctx, "generation does not recurse: a rule in what a generation expands fails (10.5)", 0);
+            return self.fail(
+                ctx,
+                codes::USAGE_GENERATED_RULE,
+                "generation does not recurse: a rule in what a generation expands fails (10.5)",
+                0,
+            );
         }
         if let Some(s) = ctx.scene {
             self.scenes[s].tasks[phase].push((ctx.pos.clone(), task));
@@ -1949,14 +2083,14 @@ impl<'p> Interp<'p> {
     }
 }
 
-pub fn no_outer_message(e: &Ref) -> String {
+pub fn no_outer_message(e: &Ref) -> (Code, String) {
     let name = format!("{}{}", e.prefix, e.name.clone().unwrap_or_default());
     let written = e.written.clone().unwrap_or_else(|| name.clone());
     let shown = if written == name { name.clone() } else { format!("{written} ({name})") };
     if e.prefix == '$' {
-        format!("a definition body does not see the name it defines: {shown} in the body means the outer definition of that name (above or in a package), and there is none (6.9)")
+        (codes::REF_DEFINE_SELF_NO_OUTER, format!("a definition body does not see the name it defines: {shown} in the body means the outer definition of that name (above or in a package), and there is none (6.9)"))
     } else {
-        format!("a definition body does not see the name it defines: {shown} in the body means the outer definition of that name; `%` names are not inherited, and there is none (6.8, 6.9)")
+        (codes::REF_DEFINE_SELF_NO_OUTER_LOCAL, format!("a definition body does not see the name it defines: {shown} in the body means the outer definition of that name; `%` names are not inherited, and there is none (6.8, 6.9)"))
     }
 }
 

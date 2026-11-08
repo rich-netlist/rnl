@@ -1,6 +1,7 @@
 //! Access to files without touching the file system (architecture 4.1): the embedding
 //! application supplies a [`Provider`]; paths are `/`-separated strings.
 
+use crate::diag::codes;
 use std::collections::BTreeMap;
 
 /// An opt-in viewer library lookup. Ordinary providers do not enable automatic includes.
@@ -122,7 +123,11 @@ pub fn resolve_include(
     }
     for candidate in provider.include_candidates(target) {
         if provider.read(&candidate).is_some() {
-            sink.hint(format!("include {target} resolved through the file pool or PATH to {candidate}"), Some(loc));
+            sink.hint(
+                codes::HOST_INCLUDE_VIA_SEARCH_PATH,
+                format!("include {target} resolved through the file pool or PATH to {candidate}"),
+                Some(loc),
+            );
             return candidate;
         }
     }

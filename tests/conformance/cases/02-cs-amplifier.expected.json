@@ -1791,6 +1791,8 @@
   "diagnostics": [
     {
       "severity": "hint",
+      "code": "RNL0003",
+      "name": "host-non-ascii-comment",
       "file": "02-cs-amplifier.sp",
       "line": 31,
       "col": 21

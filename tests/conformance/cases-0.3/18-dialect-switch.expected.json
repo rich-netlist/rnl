@@ -1268,60 +1268,80 @@
   "diagnostics": [
     {
       "severity": "warning",
+      "code": "RNL0015",
+      "name": "host-rnl-outside-selected-section",
       "file": "18-dialect-switch-sec.inc",
       "line": 19,
       "col": 0
     },
     {
       "severity": "warning",
+      "code": "RNL0015",
+      "name": "host-rnl-outside-selected-section",
       "file": "18-dialect-switch-sec.inc",
       "line": 24,
       "col": 0
     },
     {
       "severity": "warning",
+      "code": "RNL0015",
+      "name": "host-rnl-outside-selected-section",
       "file": "18-dialect-switch-sec.inc",
       "line": 6,
       "col": 0
     },
     {
       "severity": "warning",
+      "code": "RNL0015",
+      "name": "host-rnl-outside-selected-section",
       "file": "18-dialect-switch-sec.inc",
       "line": 11,
       "col": 0
     },
     {
       "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
       "file": "18-dialect-switch.scs",
       "line": 22,
       "col": 0
     },
     {
       "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
       "file": "18-dialect-switch.scs",
       "line": 29,
       "col": 0
     },
     {
       "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
       "file": "18-dialect-switch-sp.inc",
       "line": 6,
       "col": 0
     },
     {
       "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
       "file": "18-dialect-switch-sp.inc",
       "line": 9,
       "col": 0
     },
     {
       "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
       "file": "18-dialect-switch-sec.inc",
       "line": 9,
       "col": 0
     },
     {
       "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
       "file": "18-dialect-switch-sec.inc",
       "line": 22,
       "col": 0

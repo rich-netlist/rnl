@@ -677,6 +677,8 @@
   "diagnostics": [
     {
       "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
       "file": "23-generation-set-difference.sp",
       "line": 15,
       "col": 0

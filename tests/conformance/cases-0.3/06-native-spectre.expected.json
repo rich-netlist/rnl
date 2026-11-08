@@ -5305,6 +5305,8 @@
   "diagnostics": [
     {
       "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
       "file": "06-native-spectre.scs",
       "line": 1,
       "col": 0

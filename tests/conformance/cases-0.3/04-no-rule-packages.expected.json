@@ -410,12 +410,16 @@
   "diagnostics": [
     {
       "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
       "file": "04-no-rule-packages.scs",
       "line": 1,
       "col": 0
     },
     {
       "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
       "file": "04-no-rule-packages.scs",
       "line": 5,
       "col": 0

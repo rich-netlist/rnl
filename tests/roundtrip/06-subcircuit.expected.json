@@ -220,12 +220,16 @@
   "diagnostics": [
     {
       "severity": "hint",
+      "code": "RNL0003",
+      "name": "host-non-ascii-comment",
       "file": "06-subcircuit.sp",
       "line": 10,
       "col": 16
     },
     {
       "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
       "file": "06-subcircuit.sp",
       "line": 1,
       "col": 0

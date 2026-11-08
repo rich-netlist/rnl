@@ -42,7 +42,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
-use rnl_runtime::diag::{Loc, Severity};
+use rnl_runtime::diag::{codes, Code, Loc, Severity};
 use rnl_runtime::geom::{fmt_num, Pt};
 use rnl_runtime::markup;
 use rnl_runtime::model::{Attach, ItemView, LevelView, ObjectInfo, SymbolView, TextTarget, Vertex};
@@ -117,6 +117,28 @@ impl Kind {
         }
     }
 
+    /// Its kind in the toolkit's list of diagnostics, such as RNL7003 looks-joined.
+    pub fn code(self) -> Code {
+        match self {
+            Kind::WireOverSymbol => codes::WIRE_OVER_SYMBOL,
+            Kind::LooksJoined => codes::LOOKS_JOINED,
+            Kind::WireOverText => codes::WIRE_OVER_TEXT,
+            Kind::TextOverText => codes::TEXT_OVER_TEXT,
+            Kind::Overlap => codes::OVERLAP,
+            Kind::Close => codes::CLOSE,
+            Kind::Crossings => codes::CROSSINGS,
+            Kind::WrongExit => codes::WRONG_EXIT,
+            Kind::NoDot => codes::NO_DOT,
+            Kind::SilentOpen => codes::SILENT_OPEN,
+            Kind::PortInside => codes::PORT_INSIDE,
+            Kind::PortEnclosed => codes::PORT_ENCLOSED,
+            Kind::PartlyNamed => codes::PARTLY_NAMED,
+            Kind::NameOnly => codes::NAME_ONLY,
+            Kind::ZeroLength => codes::ZERO_LENGTH,
+            Kind::Loop => codes::LOOP,
+        }
+    }
+
     /// A count of hints of this kind, such as `3 wires over symbols` or `1 crossing`.
     pub fn count(self, n: usize) -> String {
         if n != 1 {
@@ -178,11 +200,12 @@ pub struct Hint {
 }
 
 impl Hint {
-    /// As `rnl check` prints a diagnostic: `hint file.sp:12:3: …`.
+    /// As `rnl check` prints a diagnostic: `hint file.sp:12:3: RNL7013 wire-over-symbol: …`.
     pub fn render(&self) -> String {
+        let code = self.kind.code();
         match &self.loc {
-            Some(l) => format!("{} {l}: {}", self.severity.as_str(), self.message),
-            None => format!("{}: {}", self.severity.as_str(), self.message),
+            Some(l) => format!("{} {l}: {code}: {}", self.severity.as_str(), self.message),
+            None => format!("{}: {code}: {}", self.severity.as_str(), self.message),
         }
     }
 }

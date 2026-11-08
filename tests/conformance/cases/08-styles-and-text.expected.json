@@ -2201,18 +2201,24 @@
   "diagnostics": [
     {
       "severity": "hint",
+      "code": "RNL0003",
+      "name": "host-non-ascii-comment",
       "file": "08-styles-and-text.sp",
       "line": 55,
       "col": 32
     },
     {
       "severity": "warning",
+      "code": "RNL3707",
+      "name": "markup-unknown-command",
       "file": "08-styles-and-text.sp",
       "line": 57,
       "col": 14
     },
     {
       "severity": "warning",
+      "code": "RNL3707",
+      "name": "markup-unknown-command",
       "file": "08-styles-and-text.sp",
       "line": 57,
       "col": 14

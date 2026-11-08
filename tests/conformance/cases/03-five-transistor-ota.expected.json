@@ -2966,6 +2966,8 @@
   "diagnostics": [
     {
       "severity": "hint",
+      "code": null,
+      "name": "constraint-dropped",
       "file": "03-five-transistor-ota.sp",
       "line": 36,
       "col": 5

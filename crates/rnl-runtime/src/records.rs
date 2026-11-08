@@ -4,7 +4,7 @@
 //! after it; what is left of a run of consecutive carrier lines is handed here. This part is the
 //! same for every host: the record entry, braces, strings, comments and the disabling `/* */`.
 
-use crate::diag::{Loc, Sink};
+use crate::diag::{codes, Code, Loc, Sink};
 use crate::host::{Record, Seg};
 
 /// One carrier line: its number, its content after the comment marker, and the 0-based column
@@ -80,6 +80,7 @@ pub fn scan_run(run: &[CarrierLine], file: &str, sink: &mut Sink) -> Vec<Record>
             if i == 0 || t[i - 1] != ' ' || glued {
                 if !glued {
                     sink.warning(
+                        codes::RECORD_AT_NOT_AFTER_SPACE,
                         "@RNL is not preceded by a space, so it is not a record entry (2.3)",
                         Some(line_of(i)),
                     );
@@ -88,8 +89,8 @@ pub fn scan_run(run: &[CarrierLine], file: &str, sink: &mut Sink) -> Vec<Record>
                 continue;
             }
             match record_extent(&t, i, &mut unclosed) {
-                Err((msg, pos)) => {
-                    sink.error(msg, Some(line_of(pos)));
+                Err((code, msg, pos)) => {
+                    sink.error(code, msg, Some(line_of(pos)));
                     if pos > i {
                         i = if starts(pos, "@RNL") { pos } else { pos + 1 };
                     } else {
@@ -107,6 +108,7 @@ pub fn scan_run(run: &[CarrierLine], file: &str, sink: &mut Sink) -> Vec<Record>
                             }
                             if k > i && t[k - 1] == '\\' {
                                 sink.warning(
+                                    codes::RECORD_LINE_ENDS_BACKSLASH,
                                     "a line of RNL ends with `\\`: some hosts join the next line to this comment (2.2)",
                                     Some(line_of(nl - 1)),
                                 );
@@ -129,7 +131,11 @@ pub fn scan_run(run: &[CarrierLine], file: &str, sink: &mut Sink) -> Vec<Record>
                         }
                         let ch = t[j];
                         if !(ch.is_alphanumeric() || " \t_,.，。".contains(ch)) {
-                            sink.error("formal tokens after the record on the same line fail (2.4)", Some(line_of(j)));
+                            sink.error(
+                                codes::RECORD_TOKENS_AFTER_RECORD,
+                                "formal tokens after the record on the same line fail (2.4)",
+                                Some(line_of(j)),
+                            );
                             while j < n && t[j] != '\n' {
                                 j += 1;
                             }
@@ -150,7 +156,7 @@ pub fn scan_run(run: &[CarrierLine], file: &str, sink: &mut Sink) -> Vec<Record>
 /// The end of the record starting at `start`, or why it is incomplete (2.4). No `*/` starts at
 /// `unclosed` or after it; a comment found not closed moves `unclosed` back to that comment, so
 /// that the records of a run that each leave a comment open do not each look to its end.
-fn record_extent(t: &[char], start: usize, unclosed: &mut usize) -> Result<usize, (String, usize)> {
+fn record_extent(t: &[char], start: usize, unclosed: &mut usize) -> Result<usize, (Code, String, usize)> {
     let n = t.len();
     let mut i = start + 4;
     let mut depth = 0i64;
@@ -163,7 +169,11 @@ fn record_extent(t: &[char], start: usize, unclosed: &mut usize) -> Result<usize
             let mut j = i + 1;
             loop {
                 if j >= n || t[j] == '\n' {
-                    return Err(("the string is not closed, so the record is incomplete (2.4, 3.7)".into(), i));
+                    return Err((
+                        codes::RECORD_STRING_NOT_CLOSED,
+                        "the string is not closed, so the record is incomplete (2.4, 3.7)".into(),
+                        i,
+                    ));
                 }
                 if t[j] == '"' {
                     if j + 1 < n && t[j + 1] == '"' {
@@ -185,12 +195,20 @@ fn record_extent(t: &[char], start: usize, unclosed: &mut usize) -> Result<usize
                 }
                 None => {
                     *unclosed = (*unclosed).min(i + 2);
-                    return Err(("the comment is not closed, so the record is incomplete (2.4)".into(), i));
+                    return Err((
+                        codes::RECORD_COMMENT_NOT_CLOSED,
+                        "the comment is not closed, so the record is incomplete (2.4)".into(),
+                        i,
+                    ));
                 }
             }
         }
         if starts(i, "@RNL") && i > 0 && t[i - 1] == ' ' && !(i + 4 < n && name_char(t[i + 4])) {
-            return Err(("incomplete record: a new @RNL comes before this one ends (2.4)".into(), i));
+            return Err((
+                codes::RECORD_NEW_BEFORE_END,
+                "incomplete record: a new @RNL comes before this one ends (2.4)".into(),
+                i,
+            ));
         }
         match c {
             '(' => paren += 1,
@@ -205,14 +223,22 @@ fn record_extent(t: &[char], start: usize, unclosed: &mut usize) -> Result<usize
                     return Ok(i + 1);
                 }
                 if depth < 0 {
-                    return Err(("the braces do not match: the whole record fails (7.4)".into(), i));
+                    return Err((
+                        codes::RECORD_BRACES_MISMATCH,
+                        "the braces do not match: the whole record fails (7.4)".into(),
+                        i,
+                    ));
                 }
             }
             _ => {}
         }
         i += 1;
     }
-    Err(("incomplete record: cut off by a blank line, a host statement or the end of the file (2.4)".into(), n))
+    Err((
+        codes::RECORD_CUT_OFF,
+        "incomplete record: cut off by a blank line, a host statement or the end of the file (2.4)".into(),
+        n,
+    ))
 }
 
 fn rebase(segs: &[Seg], start: usize, end: usize) -> Vec<Seg> {

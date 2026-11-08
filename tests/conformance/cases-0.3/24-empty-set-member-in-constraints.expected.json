@@ -327,12 +327,16 @@
   "diagnostics": [
     {
       "severity": "hint",
+      "code": "RNL9500",
+      "name": "constraint-needs-solver",
       "file": "24-empty-set-member-in-constraints.sp",
       "line": 27,
       "col": 18
     },
     {
       "severity": "error",
+      "code": "RNL5002",
+      "name": "constraint-self-contradiction",
       "file": "24-empty-set-member-in-constraints.sp",
       "line": 28,
       "col": 18

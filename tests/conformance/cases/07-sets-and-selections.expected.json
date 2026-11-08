@@ -2215,6 +2215,8 @@
   "diagnostics": [
     {
       "severity": "hint",
+      "code": "RNL0003",
+      "name": "host-non-ascii-comment",
       "file": "07-sets-and-selections.sp",
       "line": 26,
       "col": 18

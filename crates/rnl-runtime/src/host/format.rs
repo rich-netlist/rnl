@@ -11,7 +11,7 @@
 use std::any::{Any, TypeId};
 use std::collections::{HashMap, HashSet};
 
-use crate::diag::{Loc, Sink};
+use crate::diag::{codes, Loc, Sink};
 use crate::host::{file_name, Dialect, FileFormat, HostDocument, Level, LevelId, LevelKind};
 use crate::source::{dirname, normalize, relative_to, resolve_include, Provider};
 
@@ -226,11 +226,19 @@ impl<'a> Reading<'a> {
         let full = resolve_include(self.provider, path, target, self.sink, Loc::line(fname, no));
         let key = format!("{}#{}", full, section.unwrap_or("").to_lowercase());
         if stack.contains(&key) {
-            self.sink.error(format!("the include of {target} forms a cycle"), Some(Loc::line(fname, no)));
+            self.sink.error(
+                codes::HOST_INCLUDE_CYCLE,
+                format!("the include of {target} forms a cycle"),
+                Some(Loc::line(fname, no)),
+            );
             return;
         }
         let Some(text) = self.provider.read(&full) else {
-            self.sink.error(format!("the included file {target} cannot be found"), Some(Loc::line(fname, no)));
+            self.sink.error(
+                codes::HOST_INCLUDE_NOT_FOUND,
+                format!("the included file {target} cannot be found"),
+                Some(Loc::line(fname, no)),
+            );
             return;
         };
         let display = self.display(&full);
@@ -300,8 +308,8 @@ impl<'a> Reading<'a> {
         let mut found = self.card_candidates(name, case_sensitive);
         if found.len() > 1 {
             let at: Vec<String> = found.iter().map(|c| format!("{}:{}", c.file, c.line)).collect();
-            self.sink
-                .error(format!("the model name {name} is not unique: model cards at {}", at.join(", ")), Some(loc));
+            let message = format!("the model name {name} is not unique: model cards at {}", at.join(", "));
+            self.sink.error(codes::HOST_MODEL_NOT_UNIQUE, message, Some(loc));
             return Found::NotUnique;
         }
         found.pop().map_or(Found::Missing, Found::One)
@@ -331,7 +339,7 @@ impl<'a> Reading<'a> {
             }
         }
         for (message, loc) in errors {
-            self.sink.error(message, Some(loc));
+            self.sink.error(codes::HOST_SUBCKT_NOT_UNIQUE, message, Some(loc));
         }
     }
 }

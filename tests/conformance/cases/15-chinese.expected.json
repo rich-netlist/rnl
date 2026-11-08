@@ -2749,12 +2749,16 @@
   "diagnostics": [
     {
       "severity": "hint",
+      "code": "RNL0003",
+      "name": "host-non-ascii-comment",
       "file": "15-chinese.sp",
       "line": 3,
       "col": 43
     },
     {
       "severity": "warning",
+      "code": "RNL1003",
+      "name": "record-free-word-like-name",
       "file": "15-chinese.sp",
       "line": 67,
       "col": 5

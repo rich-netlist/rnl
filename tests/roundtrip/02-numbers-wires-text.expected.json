@@ -205,6 +205,8 @@
   "diagnostics": [
     {
       "severity": "hint",
+      "code": "RNL0003",
+      "name": "host-non-ascii-comment",
       "file": "02-numbers-wires-text.scs",
       "line": 10,
       "col": 17

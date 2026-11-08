@@ -743,36 +743,48 @@
   "diagnostics": [
     {
       "severity": "hint",
+      "code": "RNL0003",
+      "name": "host-non-ascii-comment",
       "file": "10-constraints-and-priority.sp",
       "line": 47,
       "col": 24
     },
     {
       "severity": "hint",
+      "code": null,
+      "name": "place-fact-dropped",
       "file": "10-constraints-and-priority.sp",
       "line": 31,
       "col": 5
     },
     {
       "severity": "hint",
+      "code": null,
+      "name": "place-fact-dropped",
       "file": "10-constraints-and-priority.sp",
       "line": 40,
       "col": 5
     },
     {
       "severity": "hint",
+      "code": null,
+      "name": "place-fact-dropped",
       "file": "10-constraints-and-priority.sp",
       "line": 30,
       "col": 5
     },
     {
       "severity": "hint",
+      "code": null,
+      "name": "constraint-dropped",
       "file": "10-constraints-and-priority.sp",
       "line": 13,
       "col": 10
     },
     {
       "severity": "hint",
+      "code": "RNL9500",
+      "name": "constraint-needs-solver",
       "file": "10-constraints-and-priority.sp",
       "line": 21,
       "col": 43

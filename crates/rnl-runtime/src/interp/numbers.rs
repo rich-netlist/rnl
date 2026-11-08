@@ -34,6 +34,7 @@
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
+use crate::diag::codes;
 use crate::host::LevelId;
 use crate::numbering::{check, LevelNumbering, RecordNumbering};
 use crate::problem::written_name;
@@ -419,7 +420,7 @@ impl Interp<'_> {
         if ctx.frame.is_some() {
             let d = match self.body_errors.get(&super::eval::ptr(e)).copied() {
                 Some(d) => d,
-                None => self.err(ctx, in_body_message(e), e.start),
+                None => self.err(ctx, codes::NUMBER_IN_DEFINITION_BODY, in_body_message(e), e.start),
             };
             return Err(Stop::Fail(Some(d)));
         }
@@ -432,13 +433,13 @@ impl Interp<'_> {
         });
         let (Some(g), Some(s)) = (solver, ctx.scene) else {
             let msg = format!("{}: a number is written only in the record of the solver, with type=\"generated\" and the field numbering, in the level's own text (2.6, 2.8, 5.9)", e.text());
-            return self.fail(ctx, msg, e.start);
+            return self.fail(ctx, codes::NUMBER_OUTSIDE_SOLVER_RECORD, msg, e.start);
         };
         let u = ctx.unit;
         let beyond = |it: &mut Self, count: usize| -> R<ObjId> {
             let msg =
                 format!("{}: no object without a name has this number; the level numbers {count} (5.9)", e.text());
-            it.fail(ctx, msg, e.start)
+            it.fail(ctx, codes::NUMBER_OUT_OF_RANGE, msg, e.start)
         };
         // the objects of the authored records, as the level reads without its records of the solver
         let lv = self.scenes[s].level;
@@ -500,7 +501,7 @@ impl Interp<'_> {
         let key = (c.root.clone(), Some(s));
         if self.in_progress.contains(&key) {
             let msg = format!("{}: the object with this number is made by a member that is still being read, through this one: a cycle (5.9, 6.6)", e.text());
-            return self.fail(ctx, msg, e.start);
+            return self.fail(ctx, codes::NUMBER_CYCLE, msg, e.start);
         }
         if let (false, MemberKey::M { unit, rec, k, embedded }) = (self.memo.contains_key(&key), c.root.clone()) {
             let m = self.units[unit]
@@ -524,7 +525,7 @@ impl Interp<'_> {
             "{}: the object with this number is not made when the level is read with its records of the solver (5.9)",
             e.text()
         );
-        self.fail(ctx, msg, e.start)
+        self.fail(ctx, codes::NUMBER_OBJECT_NOT_MADE, msg, e.start)
     }
 
     /// Read the members of the level of scene `s` that `which` takes, by record and place, each

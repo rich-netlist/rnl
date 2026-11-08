@@ -9,7 +9,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
-use rnl_runtime::diag::Loc;
+use rnl_runtime::diag::{codes, Code, Loc};
 use rnl_runtime::host::{HostDocument, Instance, LevelId, LevelKind};
 use serde::{Deserialize, Serialize};
 
@@ -120,8 +120,8 @@ pub(crate) struct Params<'d> {
     globals: Vec<(String, String)>,
 }
 
-/// A diagnostic of the parameters: its severity, its message and where it is.
-pub(crate) type Note = (&'static str, String, Option<Loc>);
+/// A diagnostic of the parameters: its severity, its kind, its message and where it is.
+pub(crate) type Note = (&'static str, Code, String, Option<Loc>);
 
 impl<'d> Params<'d> {
     pub(crate) fn new(doc: &'d HostDocument, bind: Option<&'d Bind>) -> (Params<'d>, Vec<Note>) {
@@ -135,7 +135,8 @@ impl<'d> Params<'d> {
             .collect();
         let bound = bind.and_then(|b| {
             let Some(lv) = doc.subckt_for(&b.subckt, doc.dialect.case_sensitive) else {
-                notes.push(("warning", format!("no subcircuit {} to bind parameters to", b.subckt), None));
+                let message = format!("no subcircuit {} to bind parameters to", b.subckt);
+                notes.push(("warning", codes::VIEW_BIND_NO_SUBCKT, message, None));
                 return None;
             };
             let level = &doc.levels[lv];
@@ -150,6 +151,7 @@ impl<'d> Params<'d> {
                         .unwrap_or_default();
                     notes.push((
                         "warning",
+                        codes::VIEW_BIND_PARAM_UNKNOWN,
                         format!(
                             "bound parameter {name} is not a parameter of subcircuit {}; it is ignored{close}",
                             level.name
@@ -171,6 +173,7 @@ impl<'d> Params<'d> {
                 let names: Vec<String> = env.cycles.iter().cloned().collect();
                 notes.push((
                     "hint",
+                    codes::VIEW_PARAMS_CYCLE,
                     format!(
                         "the parameters {} of subcircuit {} refer to each other, so they have no number",
                         names.join(", "),

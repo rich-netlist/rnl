@@ -1159,48 +1159,64 @@
   "diagnostics": [
     {
       "severity": "error",
+      "code": "RNL5002",
+      "name": "constraint-self-contradiction",
       "file": "17-conflict-priority-and-tolerance.sp",
       "line": 27,
       "col": 5
     },
     {
       "severity": "error",
+      "code": "RNL5002",
+      "name": "constraint-self-contradiction",
       "file": "17-conflict-priority-and-tolerance.sp",
       "line": 28,
       "col": 5
     },
     {
       "severity": "hint",
+      "code": "RNL9500",
+      "name": "constraint-needs-solver",
       "file": "17-conflict-priority-and-tolerance.sp",
       "line": 37,
       "col": 18
     },
     {
       "severity": "hint",
+      "code": "RNL9500",
+      "name": "constraint-needs-solver",
       "file": "17-conflict-priority-and-tolerance.sp",
       "line": 39,
       "col": 18
     },
     {
       "severity": "hint",
+      "code": "RNL5102",
+      "name": "conflict-fact-discarded-with-sets",
       "file": "17-conflict-priority-and-tolerance.sp",
       "line": 24,
       "col": 5
     },
     {
       "severity": "hint",
+      "code": "RNL5102",
+      "name": "conflict-fact-discarded-with-sets",
       "file": "17-conflict-priority-and-tolerance.sp",
       "line": 26,
       "col": 5
     },
     {
       "severity": "hint",
+      "code": "RNL5104",
+      "name": "conflict-statement-caused-discards",
       "file": "17-conflict-priority-and-tolerance.sp",
       "line": 17,
       "col": 5
     },
     {
       "severity": "hint",
+      "code": "RNL5104",
+      "name": "conflict-statement-caused-discards",
       "file": "17-conflict-priority-and-tolerance.sp",
       "line": 26,
       "col": 28
