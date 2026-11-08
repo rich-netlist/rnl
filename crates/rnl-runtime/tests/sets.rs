@@ -110,7 +110,7 @@ fn at(line: u32, statements: &str, stmt: &str) -> String {
 /// The error of a statement that closes a cycle of sets, written at `place`, with its cycle.
 fn closes(errors: &[String], place: &str, cycle: &str) {
     let want = format!(
-        "error {place}: a cycle of sets: {cycle}; taken in order of position, this statement closes it and fails (5.2.2)"
+        "error {place}: RNL2700 cycle-of-sets: a cycle of sets: {cycle}; taken in order of position, this statement closes it and fails (5.2.2)"
     );
     assert!(errors.contains(&want), "{want}\nnot in {errors:#?}");
 }
@@ -252,7 +252,8 @@ fn a_set_of_a_package_comes_where_the_package_is_used() {
     assert_eq!(r.errors.len(), 2, "{:?}", r.errors);
     let cycle = format!("$A depends on $B here, and $B on $A at {}", at(2, s, "$A @ADD-TO $B"));
     closes(&r.errors, &at(2, s, "{$B}"), &cycle);
-    assert!(r.errors.iter().any(|e| e.starts_with(&format!("error {}: $A failed", at(2, s, "$A @ADD-TO $B")))));
+    let failed = format!("error {}: RNL3203 ref-failed: $A failed", at(2, s, "$A @ADD-TO $B"));
+    assert!(r.errors.iter().any(|e| e.starts_with(&failed)), "{:?}", r.errors);
     assert_eq!(r.unplaced[0], ["#R2", "#R3"]);
 }
 
@@ -265,7 +266,8 @@ fn a_set_made_after_an_edit_that_names_it_closes_the_cycle() {
     assert_eq!(r.errors.len(), 2, "{:?}", r.errors);
     let cycle = format!("%b depends on %a here, and %a on %b at {}", at(2, s, "%b @ADD-TO %a"));
     closes(&r.errors, &at(2, s, "{%a #R2}"), &cycle);
-    assert!(r.errors[1].starts_with(&format!("error {}: %b failed", at(2, s, "%b @ADD-TO %a"))), "{:?}", r.errors);
+    let failed = format!("error {}: RNL3203 ref-failed: %b failed", at(2, s, "%b @ADD-TO %a"));
+    assert!(r.errors[1].starts_with(&failed), "{:?}", r.errors);
     assert_eq!(r.unplaced[0], ["#R2"]);
 }
 
