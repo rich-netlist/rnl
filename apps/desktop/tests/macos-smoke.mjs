@@ -51,14 +51,22 @@ async function toFront() {
     await sleep(250);
   }
 }
+// One look at the window, as `observe` takes it, or null when it could not be taken.
+function peek(label) {
+  try { return JSON.parse(execFileSync(observer,[path.join(output,`${label}.png`)],{encoding:'utf8',timeout:20000})); } catch { return null; }
+}
 // Choose a menu item once the app is in front, and wait for what it shows (`check` of `observe`). A click that
-// showed nothing is made once more, up to three times; each try that failed keeps the window as it was seen
-// (LABEL-try-N.png) and what the system said of the windows (LABEL-try-N.txt), which the workflow keeps as artifacts.
-async function choose(name,item,label,check) {
+// showed nothing is made once more, up to three times, unless the window already shows what `open` looks for: a box
+// that is open, though Vision did not read it as `check` wants (it has read "RNLcore" for "RNL core"), would be
+// opened a second time, and a second box is not closed by one Escape. Each try that failed keeps the window as it was
+// seen (LABEL-try-N.png) and what the system said of the windows (LABEL-try-N.txt), which the workflow keeps as artifacts.
+async function choose(name,item,label,check,open) {
   let last;
   for(let attempt=1;attempt<=3;attempt++) {
     const front=await toFront();
-    try { menu(name,item); } catch(error) { last=`${name} > ${item}: ${error}`; }
+    const seen=attempt>1 && open ? peek(label) : null;
+    if(seen && open(seen)) console.log(`${name} > ${item}: shown already, not chosen again`);
+    else try { menu(name,item); } catch(error) { last=`${name} > ${item}: ${error}`; }
     try { return await observe(label,check,20); }
     catch(error) {
       last=String(error);
@@ -78,6 +86,16 @@ end tell`);
   }
   throw new Error(`${name} > ${item} showed no ${label} in three tries: ${last}`);
 }
+// Close a box with Escape, and go on only when the window is seen without it, at most three times: a box left open keeps
+// the keys of the window, and the next step times out for it.
+async function dismiss(label,gone) {
+  for(let attempt=1;attempt<=3;attempt++) {
+    osa('tell application "System Events" to key code 53');
+    try { await observe(`${label}-closed`,gone,8); return; }
+    catch(error) { console.log(`${label}: Escape ${attempt} left the box open`); }
+  }
+  throw new Error(`The ${label} box stayed open after three Escapes`);
+}
 async function observe(label,check,seconds=90) {
   const end=Date.now()+seconds*1000; let last;
   while(Date.now()<end) {
@@ -92,6 +110,10 @@ async function observe(label,check,seconds=90) {
   throw new Error(`Timed out: ${label}: ${JSON.stringify(last)}`);
 }
 const text=r=>r.words.map(w=>w.text).join(' ');
+// The About box: its versions line, as Vision reads it with or without the space ("RNL core", "RNLcore"), or its title with
+// its Close button; and whether it is there at all, by its title.
+const aboutShown=r=>/RNL\s*core/i.test(text(r)) || (/About RNL Viewer/.test(text(r)) && /\bClose\b/.test(text(r)));
+const aboutOpen=r=>/About RNL Viewer/.test(text(r));
 const drawn=(r,left=0.38)=>{
   const labels=r.words.filter(w=>w.x>left), amps=labels.filter(w=>/\bam[il]?p\b/.test(w.text));
   // X1/X2 are only ~10 pixels high on the runner's 1024px desktop and Vision can omit them.
@@ -112,8 +134,8 @@ try {
   osa('tell application "System Events" to tell (first application process whose bundle identifier is "io.github.rich-netlist.viewer") to set frontmost to true');
   const menus=osa('tell application "System Events" to tell (first application process whose bundle identifier is "io.github.rich-netlist.viewer") to get name of every menu bar item of menu bar 1');
   fs.writeFileSync(path.join(output,'menus.txt'),menus);
-  await choose('RNL Viewer','About RNL Viewer','about',r=>/RNL core/.test(text(r)));
-  osa('tell application "System Events" to key code 53');
+  await choose('RNL Viewer','About RNL Viewer','about',aboutShown,aboutOpen);
+  await dismiss('about',r=>!aboutOpen(r) && drawn(r));
   // Cmd+B belongs to the native menu; physical Control+Q edits, leaving Cmd+Q to Quit.
   key('b','using command down');
   await observe('sidebar-hidden',r=>!r.words.some(w=>w.x<0.35 && /Netlist/.test(w.text)) && drawn(r,0.03));
