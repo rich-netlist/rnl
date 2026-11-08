@@ -860,7 +860,28 @@
           "layer": "middle"
         }
       ],
-      "flylines": [],
+      "flylines": [
+        [
+          [
+            0.0,
+            2.0
+          ],
+          [
+            7.0,
+            0.0
+          ]
+        ],
+        [
+          [
+            0.0,
+            -2.0
+          ],
+          [
+            13.0,
+            0.0
+          ]
+        ]
+      ],
       "constraints": [],
       "unplaced": [
         "a usage of $IO_PORT",

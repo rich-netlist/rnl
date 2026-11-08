@@ -456,7 +456,18 @@
           "layer": "middle"
         }
       ],
-      "flylines": [],
+      "flylines": [
+        [
+          [
+            5.0,
+            3.0
+          ],
+          [
+            10.0,
+            2.0
+          ]
+        ]
+      ],
       "constraints": [],
       "unplaced": []
     }
