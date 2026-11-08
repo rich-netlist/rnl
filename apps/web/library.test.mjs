@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -20,4 +20,35 @@ test("the published library describes every package and separates built-ins from
       assert.ok(bundled[`<bundled>/${path}`]);
     assert.ok(Object.keys(bundled).every((path) => /^<bundled>\/0\.[23]\/rnl-/.test(path)));
   } finally { rmSync(out, { recursive: true, force: true }); }
+});
+
+test("a series whose standard is not released is published only when RNL_DRAFT_SERIES names it", () => {
+  const root = mkdtempSync(join(tmpdir(), "rnl-library-"));
+  try {
+    for (const series of ["0.3", "0.4"]) {
+      mkdirSync(join(root, "libraries", "standard", series), { recursive: true });
+      writeFileSync(join(root, "libraries", "standard", series, "rnl-std.rnl"),
+        `@RNL(type="header") { @VERSION("${series}"); @PACKAGE(name="rnl-std", version="${series}")}\n`);
+    }
+    mkdirSync(join(root, "spec", "0.3"), { recursive: true });
+    writeFileSync(join(root, "spec", "0.3", "RELEASED"), "released\n");
+    const published = (options) => {
+      const out = mkdtempSync(join(root, "out-"));
+      publishLibrary(join(root, "libraries"), out, options);
+      return Object.keys(JSON.parse(readFileSync(join(out, "bundled.json"), "utf8")));
+    };
+    const both = ["<bundled>/0.3/rnl-std.rnl", "<bundled>/0.4/rnl-std.rnl"];
+    const before = process.env.RNL_DRAFT_SERIES;
+    try {
+      delete process.env.RNL_DRAFT_SERIES;
+      assert.deepEqual(published(), ["<bundled>/0.3/rnl-std.rnl"]);
+      assert.deepEqual(published({ drafts: ["0.4"] }), both);
+      process.env.RNL_DRAFT_SERIES = "0.4";
+      assert.deepEqual(published(), both);
+      assert.deepEqual(published({ drafts: [] }), ["<bundled>/0.3/rnl-std.rnl"]);
+    } finally {
+      if (before === undefined) delete process.env.RNL_DRAFT_SERIES;
+      else process.env.RNL_DRAFT_SERIES = before;
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });

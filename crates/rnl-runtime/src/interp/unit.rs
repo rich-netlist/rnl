@@ -25,9 +25,10 @@ pub const READ_VERSIONS: [&str; 3] = ["0.2", "0.3", "0.4"];
 pub const DEFAULT_VERSION: &str = "0.3";
 
 /// Does a file of the language version `version` keep the rules that 0.3 changes? 0.3 and every
-/// version after it do, by the order of versions (16.1); 0.2 does not.
+/// version after it that this implementation reads do, by the order of versions (16.1); 0.2 does
+/// not, nor a version it does not read, none of whose RNL is interpreted.
 pub fn keeps_0_3(version: &str) -> bool {
-    version_key(version) >= (0, 3)
+    READ_VERSIONS.contains(&version) && version_key(version) >= (0, 3)
 }
 
 /// The versions this implementation reads, as a message lists them: "0.2, 0.3 and 0.4".
