@@ -42,6 +42,7 @@ import json
 import shutil
 import struct
 import sys
+import time
 import urllib.request
 from pathlib import Path
 
@@ -53,7 +54,13 @@ LICENSE = ROOT / "LICENSES" / "OFL-1.1.txt"
 
 FAMILY = "Noto Sans SC"
 TAG = "Sans2.004"
-URL = "https://raw.githubusercontent.com/notofonts/noto-cjk/%s/Sans/SubsetOTF/SC/%s"
+# Where the files come from, in the order to try: GitHub's raw files, then the same files at the same tag from jsDelivr, which
+# serves the repository too. Whichever answers, the file must have the SHA-256 pinned below.
+URLS = [
+    "https://raw.githubusercontent.com/notofonts/noto-cjk/%s/Sans/SubsetOTF/SC/%s",
+    "https://cdn.jsdelivr.net/gh/notofonts/noto-cjk@%s/Sans/SubsetOTF/SC/%s",
+]
+ATTEMPTS = 3  # for each source, 5 seconds apart
 # (file, CSS font weight, SHA-256 of the file at TAG)
 FACES = [
     ("NotoSansSC-Regular.otf", 400, "faa6c9df652116dde789d351359f3d7e5d2285a2b2a1f04a2d7244df706d5ea9"),
@@ -70,6 +77,34 @@ def sha256(path):
     return h.hexdigest()
 
 
+def download(name, path, want):
+    """Write the file `name` of the pinned tag to `path`, from the first source that gives one with the SHA-256 `want`."""
+    part = path.with_name(name + ".part")
+    failures = []
+    for source in URLS:
+        url = source % (TAG, name)
+        for attempt in range(ATTEMPTS):
+            if attempt:
+                time.sleep(5)
+            print("downloading %s" % url, file=sys.stderr)
+            try:
+                with urllib.request.urlopen(url, timeout=300) as r, open(part, "wb") as f:
+                    shutil.copyfileobj(r, f)
+            except OSError as e:  # URLError and HTTPError are OSErrors, as are a reset and a timeout
+                failures.append("%s: %s" % (url, e))
+                print("  %s" % failures[-1], file=sys.stderr)
+                continue
+            got = sha256(part)
+            if got == want:
+                part.replace(path)
+                return
+            part.unlink()
+            failures.append("%s: SHA-256 %s, not the pinned %s" % (url, got, want))
+            print("  %s" % failures[-1], file=sys.stderr)
+            break  # a file that is not the pinned one is not fetched again from that source
+    sys.exit("could not fetch %s:\n  %s" % (name, "\n  ".join(failures)))
+
+
 def fetch():
     """The paths of the fonts in the cache, downloaded first when missing or not as pinned."""
     CACHE.mkdir(parents=True, exist_ok=True)
@@ -77,16 +112,7 @@ def fetch():
     for name, _, want in FACES:
         path = CACHE / name
         if not path.exists() or sha256(path) != want:
-            url = URL % (TAG, name)
-            print("downloading %s" % url, file=sys.stderr)
-            part = path.with_name(name + ".part")
-            with urllib.request.urlopen(url, timeout=300) as r, open(part, "wb") as f:
-                shutil.copyfileobj(r, f)
-            got = sha256(part)
-            if got != want:
-                part.unlink()
-                sys.exit("%s: SHA-256 %s, not the pinned %s" % (url, got, want))
-            part.replace(path)
+            download(name, path, want)
         paths.append(path)
     return paths
 

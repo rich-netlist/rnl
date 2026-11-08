@@ -20,11 +20,17 @@ runs:
         curl_net=(--connect-timeout 30 --speed-limit 1024 --speed-time 30 --max-time 600 --retry 5 --retry-delay 5 --retry-all-errors)
         dir="$HOME/.local/share/fonts/noto-cjk"
         mkdir -p "$dir"
-        base=https://raw.githubusercontent.com/notofonts/noto-cjk
+        # GitHub's raw files first, then the same file at the same tag from jsDelivr, which serves the repository too: the
+        # downloads of an Actions run have been answered 504 by GitHub for hours. Whichever answers, the file must have the
+        # SHA-256 below, or the step fails.
+        get() { # URL, file, SHA-256
+          curl -fsSL "${curl_net[@]}" -o "$2" "$1" && echo "$3  $2" | sha256sum --check --strict
+        }
         # path under the repository at its tag, then the SHA-256 of the file
         while read -r path sha; do
-          curl -fsSL "${curl_net[@]}" -o "$dir/$(basename "$path")" "$base/$path"
-          echo "$sha  $dir/$(basename "$path")" | sha256sum --check --strict
+          file="$dir/$(basename "$path")"
+          get "https://raw.githubusercontent.com/notofonts/noto-cjk/$path" "$file" "$sha" \
+            || get "https://cdn.jsdelivr.net/gh/notofonts/noto-cjk@${path%%/*}/${path#*/}" "$file" "$sha"
         done <<'EOF'
         Sans2.004/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf 2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b
         Sans2.004/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Bold.otf b5f0d1a190a7f9b43c310a8850630af12553df32c4c050543f9059732d9b4c0a
