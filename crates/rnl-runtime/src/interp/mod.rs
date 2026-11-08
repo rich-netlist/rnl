@@ -18,6 +18,8 @@ mod numbers;
 pub mod obj;
 mod output;
 mod packages;
+/// The name of the standard package that the setting of 16.3 brings in at the root.
+pub use packages::STD_NAME;
 pub mod phases;
 mod renames;
 pub mod scene;

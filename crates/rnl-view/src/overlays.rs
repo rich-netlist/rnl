@@ -96,6 +96,15 @@ pub(crate) fn usage_frame(
     })
 }
 
+/// Whether a role's attachment is the object `id`, or a set with it among its members.
+fn attached_to(a: &rnl_runtime::model::Attach, id: &str) -> bool {
+    match a {
+        rnl_runtime::model::Attach::Object(o) => o == id,
+        rnl_runtime::model::Attach::Set(items) => items.iter().any(|x| attached_to(x, id)),
+        rnl_runtime::model::Attach::At(_) => false,
+    }
+}
+
 pub(crate) fn currents(lv: &LevelView, scale: f64) -> Vec<CurrentArrow> {
     let mut arrows = Vec::new();
     for c in &lv.currents {
@@ -104,11 +113,10 @@ pub(crate) fn currents(lv: &LevelView, scale: f64) -> Vec<CurrentArrow> {
             places.push((at, dir));
         }
         if let Some(net) = &c.port_net {
-            // Declaration ports have no scene point. Use only explicit port usages on this net.
+            // Declaration ports have no scene point: the usages that stand for this net draw it, those
+            // with a role attached to the net, such as a port symbol, whatever their definition
             for o in &lv.objects {
-                if o.kind != "usage"
-                    || !matches!(o.definition.as_deref(), Some("$IO_PORT" | "$INPUT_PORT" | "$OUTPUT_PORT"))
-                {
+                if o.kind != "usage" || !o.attach.iter().any(|(_, a)| attached_to(a, net)) {
                     continue;
                 }
                 for p in &o.pins {
@@ -395,6 +403,26 @@ mod tests {
         let empty = crate::build("empty.sp", &MemoryProvider::new().with("empty.sp", source), &BuildOptions::default())
             .unwrap();
         assert!(empty.levels.iter().all(|lv| lv.currents.is_empty()));
+    }
+
+    #[test]
+    fn a_ports_current_is_drawn_at_any_usage_attached_to_its_net() {
+        // a port tag of the file's own definition, not of a standard package: the arrow of the
+        // port's CURRENT is drawn at its pin
+        let source = "* own port tag\n.subckt cell a\n* @RNL {\n\
+                      *   $TAG_SYM = @DEFINE-SYMBOL {(0, 0) @PIN(terminal=\"p\", direction=\"right\"); @LINE {(0, 0) (-1, 0)}};\n\
+                      *   $TAG = @DEFINE(roles=[[\"p\", \"net\"]]) {};\n\
+                      *   # @SELECT-USAGE $TAG => @SET-SYMBOL $TAG_SYM;\n\
+                      *   $TAG @ATTACH &a => @PLACE(-4, 0);\n\
+                      *   #:a @CURRENT(\"in\")\n* }\n.ends\nX1 n cell\n.end\n";
+        let options = BuildOptions {
+            runtime: rnl_runtime::Options { std: false, ..rnl_runtime::Options::default() },
+            ..BuildOptions::default()
+        };
+        let d = crate::build("own.sp", &MemoryProvider::new().with("own.sp", source), &options).unwrap();
+        let cell = d.levels.iter().find(|lv| lv.title == "cell").unwrap();
+        let arrows: Vec<&str> = cell.currents.iter().map(|c| c.terminal.as_str()).collect();
+        assert_eq!(arrows, ["#:a"], "{:?}", d.diagnostics);
     }
 
     #[test]

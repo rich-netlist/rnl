@@ -43,11 +43,13 @@ export type CatalogPackage = {
    */
   references: Array<string>,
   /**
-   * A package of the standard series: `rnl-std` or `rnl-std-*` (16.3).
+   * A package of the standard series the core comes with (16.3): read from the bundled files,
+   * not from a package directory, whatever its name.
    */
   series: boolean,
   /**
-   * The standard package, `rnl-std`, used implicitly at the root (16.3).
+   * The package that the setting of 16.3 brings in at the root of a document, the standard
+   * package, when the catalog's reading has that setting on (`CatalogOptions::runtime`).
    */
   implicit: boolean,
 };

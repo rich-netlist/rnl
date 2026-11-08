@@ -57,9 +57,11 @@ pub struct CatalogPackage {
     pub file: String,
     /// The packages its header record references with USE-PACKAGE, by name, in order (16.2).
     pub references: Vec<String>,
-    /// A package of the standard series: `rnl-std` or `rnl-std-*` (16.3).
+    /// A package of the standard series the core comes with (16.3): read from the bundled files,
+    /// not from a package directory, whatever its name.
     pub series: bool,
-    /// The standard package, `rnl-std`, used implicitly at the root (16.3).
+    /// The package that the setting of 16.3 brings in at the root of a document, the standard
+    /// package, when the catalog's reading has that setting on (`CatalogOptions::runtime`).
     pub implicit: bool,
 }
 
@@ -159,25 +161,29 @@ pub struct CatalogSet {
 
 /// The catalog of the packages of a workspace, which has the bundled ones.
 pub(crate) fn catalog(ws: &Workspace, options: &CatalogOptions) -> Catalog {
-    let mut read: Vec<(PackageContents, String)> = listed(ws, options)
+    // each package's contents, its file name, and whether it is one of the bundled files
+    let mut read: Vec<(PackageContents, String, bool)> = listed(ws, options)
         .iter()
-        .filter_map(|path| Some((package_contents(path, ws, &options.runtime)?, file_name(path).to_string())))
+        .filter_map(|path| {
+            let contents = package_contents(path, ws, &options.runtime)?;
+            Some((contents, file_name(path).to_string(), path.starts_with(crate::BUNDLED_DIR)))
+        })
         .collect();
-    read.sort_by(|(a, _), (b, _)| {
+    read.sort_by(|(a, ..), (b, ..)| {
         let key = |c: &PackageContents| (c.name.clone(), version_key(&c.version), c.version.clone());
         key(a).cmp(&key(b))
     });
     // what the rules draw with what, across the packages listed; of several rules, the first
     let mut definition_of: HashMap<&DefinedName, &str> = HashMap::new();
     let mut symbol_of: HashMap<&DefinedName, &str> = HashMap::new();
-    for (c, _) in &read {
+    for (c, ..) in &read {
         for rule in &c.usage_symbols {
             definition_of.entry(&rule.symbol).or_insert(&rule.definition.name);
             symbol_of.entry(&rule.definition).or_insert(&rule.symbol.name);
         }
     }
     let mut out = Catalog::default();
-    for (c, file) in &read {
+    for (c, file, bundled) in &read {
         let named =
             |name: &str| DefinedName { name: name.to_string(), package: c.name.clone(), version: c.version.clone() };
         out.packages.push(CatalogPackage {
@@ -186,8 +192,8 @@ pub(crate) fn catalog(ws: &Workspace, options: &CatalogOptions) -> Catalog {
             language: c.language.clone(),
             file: file.clone(),
             references: c.references.clone(),
-            series: c.name == "rnl-std" || c.name.starts_with("rnl-std-"),
-            implicit: c.name == "rnl-std",
+            series: *bundled,
+            implicit: options.runtime.std && c.name == rnl_runtime::interp::STD_NAME,
         });
         for s in &c.symbols {
             out.symbols.push(CatalogSymbol {
