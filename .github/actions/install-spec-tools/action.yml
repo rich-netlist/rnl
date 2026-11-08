@@ -20,7 +20,7 @@ runs:
         curl_net=(--connect-timeout 30 --speed-limit 1024 --speed-time 30 --max-time 600 --retry 5 --retry-delay 5 --retry-all-errors)
         dir="$HOME/.local/share/fonts/noto-cjk"
         mkdir -p "$dir"
-        base=https://github.com/notofonts/noto-cjk/raw
+        base=https://raw.githubusercontent.com/notofonts/noto-cjk
         # path under the repository at its tag, then the SHA-256 of the file
         while read -r path sha; do
           curl -fsSL "${curl_net[@]}" -o "$dir/$(basename "$path")" "$base/$path"
