@@ -53,7 +53,7 @@ LICENSE = ROOT / "LICENSES" / "OFL-1.1.txt"
 
 FAMILY = "Noto Sans SC"
 TAG = "Sans2.004"
-URL = "https://github.com/notofonts/noto-cjk/raw/%s/Sans/SubsetOTF/SC/%s"
+URL = "https://raw.githubusercontent.com/notofonts/noto-cjk/%s/Sans/SubsetOTF/SC/%s"
 # (file, CSS font weight, SHA-256 of the file at TAG)
 FACES = [
     ("NotoSansSC-Regular.otf", 400, "faa6c9df652116dde789d351359f3d7e5d2285a2b2a1f04a2d7244df706d5ea9"),
