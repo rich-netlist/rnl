@@ -1,6 +1,6 @@
 // What a point of the drawing is on. The core gives a level its hits (`Level.hits`): the boxes of the
-// symbols, their pins, the wires and the labels, each standing for objects. A click selects the first
-// of what is under it, in this order: a pin, a label, a wire, a symbol box. When it is on several
+// symbols, their pins, the wires, the flylines and the labels, each standing for objects. A click selects the first
+// of what is under it, in this order: a pin, a label, a wire or a flyline, a symbol box. When it is on several
 // objects, the list beside the pointer (picker.js) lets the user choose. Nothing here knows the DOM:
 // the view is the drawing's, { x, y, k }, with the top-left corner in drawing units and the pixels
 // per unit, and a point is in canvas pixels.
@@ -14,14 +14,15 @@ const EDGE = 2; // pixels inside a box's outline that are the outline: a wire al
 /**
  * What the canvas point `p` is on in `level`, as { hits, blocked }: the hits that stand for some
  * object, in the order a click prefers them, and whether a label that stands for nothing is there.
- * A pin or a wire is hit within HIT_SLOP pixels, a label within LABEL_SLOP, a symbol box inside it
+ * A pin, a wire or a flyline is hit within HIT_SLOP pixels, a label within LABEL_SLOP, a symbol box inside it
  * by more than EDGE pixels, but for the boxes a pin is on: a pin is a part of its symbol, on its
  * outline, and a click on it is on the net. Only where nothing else is, the symbol box around the
  * point with HIT_SLOP pixels more, its outline included, is. A label
  * of something that cannot be selected is no hit, but a click on it, with nothing else under it,
- * does nothing, which `blocked` says.
+ * does nothing, which `blocked` says. A flyline stands for its net as a wire does, but only while the flylines are shown
+ * (`options.flylines`): one the page hides is not under the pointer.
  */
-export function hitsAt(level, view, p) {
+export function hitsAt(level, view, p, { flylines = false } = {}) {
   const none = { hits: [], blocked: false };
   if (!level || !view) return none;
   const u = view.x + p.x / view.k;
@@ -47,7 +48,7 @@ export function hitsAt(level, view, p) {
     if (h.kind === "pin") {
       const d = Math.hypot(u - h.points[0][0], v - h.points[0][1]);
       if (d <= slop) pins.push([d, h]);
-    } else if (h.kind === "wire") {
+    } else if (h.kind === "wire" || (h.kind === "flyline" && flylines)) {
       let d = Infinity;
       for (let k = 1; k < h.points.length; k++) d = Math.min(d, segmentDistance(u, v, h.points[k - 1], h.points[k]));
       if (d <= slop) wires.push([d, h]);

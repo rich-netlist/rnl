@@ -29,6 +29,7 @@ import { memoryCache } from "./memory-cache.js";
 import { toggleUsages, toggleCurrents } from "./usages.js";
 import { toggleOrigins } from "./origins.js";
 import { toggleFlylines } from "./flylines.js";
+import { toggleNetLabels } from "./net-labels.js";
 import { netlistColors } from "./netlist-colors.js";
 import { downloadManifest, openManifest, openProject, saveProject } from "./project.js";
 import { exportImage } from "./export-image.js";
@@ -126,6 +127,7 @@ export function command(id, options = {}) {
     case "toggle-currents": return toggleCurrents();
     case "toggle-origins": return toggleOrigins();
     case "toggle-flylines": return toggleFlylines();
+    case "toggle-net-labels": return toggleNetLabels();
     case "toggle-netlist": setSidebar($("app").classList.contains("sidebar-hidden")); break;
     case "toggle-problems": setProblems($("pane-netlist").classList.contains("problems-folded")); break;
     case "panel-hide": return setSidebar(false);
@@ -143,6 +145,7 @@ export function command(id, options = {}) {
     case "shortcuts": inform({ title: m("Keyboard Shortcuts"), paragraphs: [
       m`${m`${m("1: Library. 2: Netlist. 3: Hierarchy. 4: Symbol. 5: Usage. 6: Not drawn.")}${m(" 7: Solve.")}`}${m(" These keys also expand a collapsed side panel; they do not run while typing.")}`,
       m("Ctrl+R: Show Usages. Shift+R: Show Current Directions. F5: Reload the netlist."),
+      m("G: Show Grid. L: Show Flylines. N: Show Net Names. These keys do not run while typing."),
       m("E or Enter: Open Subcircuit. Ctrl+E or Backspace: Up to Parent Level."),
       m("Shift+E or Shift+Enter: Open Subcircuit in New Window. Hold Shift during any circuit navigation to open its target in a new window."),
       m("Ctrl+Q: Edit Text (the physical Control key on macOS too). Ctrl+Enter: Apply and Exit Editing."),

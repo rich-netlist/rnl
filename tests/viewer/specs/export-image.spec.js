@@ -42,6 +42,25 @@ test('an exported image has none of the flylines until View > Show Flylines is o
   expect(count(text, /class="flyline"/g)).toBeGreaterThan(0);
 });
 
+test('an exported image has the net names when View > Show Net Names is on, and none until then', async ({ page }) => {
+  await open(page);
+  let text = (await exported(page, 'export-svg')).bytes.toString();
+  expect(text).not.toContain('net-labels');
+  await page.evaluate(() => { window.viewer.command('toggle-net-labels'); });
+  const names = await page.evaluate(() => {
+    const { doc, level } = window.viewer;
+    return doc.levels[level].net_labels.map((l) => doc.objects[l.net]?.name).filter(Boolean);
+  });
+  expect(names.length).toBeGreaterThan(0);
+  text = (await exported(page, 'export-svg')).bytes.toString();
+  expect(text.startsWith('<?xml')).toBe(true);
+  expect(text).toContain('class="net-labels"');
+  const written = [...text.matchAll(/<text[^>]*paint-order="stroke"[^>]*>([^<]*)<\/text>/g)].map((match) => match[1]);
+  expect(written).toEqual(names);
+  // the page's own names are there still
+  await expect(page.locator('#canvas .net-labels text').first()).toBeAttached();
+});
+
 test('the registration points of View > Show Registration Points are not in an exported image', async ({ page }) => {
   await open(page);
   await page.evaluate(() => { window.viewer.command('toggle-origins'); });

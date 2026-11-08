@@ -85,7 +85,8 @@
         { "id": "toggle-usages", "label": "Show &Usages", "keys": ["Ctrl+R"], "check": true },
         { "id": "toggle-currents", "label": "Show Current &Directions", "keys": ["Shift+R"], "check": true, "page": true },
         { "id": "toggle-origins", "label": "Show Registration &Points", "check": true, "page": true },
-        { "id": "toggle-flylines", "label": "Show Fl&ylines", "check": true, "page": true },
+        { "id": "toggle-flylines", "label": "Show Fl&ylines", "keys": ["L"], "check": true, "page": true },
+        { "id": "toggle-net-labels", "label": "Show Net Na&mes", "keys": ["N"], "check": true, "page": true },
         {
           "label": "&Language",
           "english": "Language",

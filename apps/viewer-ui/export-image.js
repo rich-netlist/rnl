@@ -1,7 +1,7 @@
 import { m } from "./i18n.js";
 // File > Export Image > Export SVG / Export PNG: the whole of the level shown, as the core draws it
 // with the overlays (rnl_view::overlays::svg), not the part in view. Usages, current directions and
-// flylines are drawn as the page shows them, on or off, each usage shown in its colour; the selection, the
+// flylines are drawn as the page shows them, on or off, and so are the net names, each usage shown in its colour; the selection, the
 // hover and the grid are not. The background is opaque, light or dark as the page's. The fonts the
 // page draws the texts with go into the image, so that a PNG, which the page makes from the SVG,
 // has the texts of the SVG and of the drawing on screen.
@@ -15,6 +15,7 @@ import { FRAME_STEP, frameSteps, TITLE_ROW, titleRows } from "./frame-layout.js"
 import { current, doc } from "./state.js";
 import { overlayChoices } from "./usages.js";
 import { flylinesShown } from "./flylines.js";
+import { addNetLabels, netLabelsShown } from "./net-labels.js";
 
 /** A PNG is drawn at twice the SVG's size, and no side longer than this many pixels. */
 export const PNG_SCALE = 2;
@@ -100,6 +101,8 @@ function asShown(svg, choices) {
       }
     }
   }
+  // the net names the page shows, over the drawing, in the image's pixels
+  if (netLabelsShown()) addNetLabels(svg, doc, doc.levels[current], isDark());
   // the paper: the page's drawing background, opaque
   const paper = getComputedStyle(document.body).getPropertyValue("--drawing-background").trim() || "#ffffff";
   const backdrop = svg.querySelector("rect.backdrop");

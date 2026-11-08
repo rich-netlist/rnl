@@ -13,6 +13,7 @@ import { revealLine } from "./text.js";
 import { constraintBox } from "./constraint-box.js";
 import { paintOrigins, startOrigins } from "./origins.js";
 import { startFlylines } from "./flylines.js";
+import { paintNetLabels, startNetLabels } from "./net-labels.js";
 
 export const USAGE_COLORS = ["#e03131", "#e5b500", "#4263eb", "#2f9e44", "#9c36b5", "#009ccc"];
 const MAX_PREFERENCES = 2000;
@@ -116,6 +117,7 @@ export function startUsages() {
   setCheck("toggle-currents", currentsShown);
   startOrigins();
   startFlylines();
+  startNetLabels();
   setCheck("toggle-usages", shown);
   const height = Math.max(80, Math.min(800, Number(load("usage-list-height", 240)) || 240));
   document.documentElement.style.setProperty("--usage-list-h", `${height}px`);
@@ -481,6 +483,7 @@ export function paintUsages(svg, view, groups) {
   if (!svg || !view) {
     frames = []; layer?.remove(); underlay?.remove(); currentLayer?.remove(); constraintLayer?.remove(); underlay = layer = currentLayer = constraintLayer = constraintShown = null;
     paintOrigins(null, null);
+    paintNetLabels(null, null);
     drawing = layerDoc = null; layerLevel = -1; layerRevision = -1; layerSelected = null; context = null;
     return;
   }
@@ -571,6 +574,7 @@ export function paintUsages(svg, view, groups) {
   spreadTitles();
   placeConstraintBox(project);
   paintOrigins(svg, view);
+  paintNetLabels(svg, view);
 }
 const CONSTRAINT_PAD = 14; // the pixels of the constraint's box around the objects
 const MARK_GAP = 3; // the pixels between the numbers at one place
@@ -681,4 +685,6 @@ function showSelected() {
 window.addEventListener("viewer-selection", showSelected);
 // View > Show Registration Points (origins.js) is painted with the overlays
 window.addEventListener("origins-changed", repaint);
+// and so is View > Show Net Names (net-labels.js)
+window.addEventListener("net-labels-changed", repaint);
 window.addEventListener("language-changed", renderUsages);

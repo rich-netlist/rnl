@@ -10,6 +10,7 @@ import { current, doc, selected, selectedAsUsage, setCurrent, setPath } from "./
 import { colourDrawing } from "./background.js";
 import { paintGrid } from "./grid.js";
 import { updateHierarchy } from "./hierarchy.js";
+import { flylinesShown } from "./flylines.js";
 import { boxAt, hitsAt, nameOf, objectsOf } from "./hits.js";
 import { hideTip, hoverNamesOn, hoverRolesOn, showTip } from "./hover.js";
 import { roleNote } from "./usage-table.js";
@@ -269,7 +270,9 @@ export function showView({ center, scale }) {
 export function showSelection() {
   cancelGesture();
   if (!svg || !view || selected === null) return;
-  const points = doc.levels[current].hits.filter((h) => h.objects.includes(selected)).flatMap((h) => h.points);
+  // (a flyline the page hides is not part of what is selected)
+  const points = doc.levels[current].hits
+    .filter((h) => h.objects.includes(selected) && (h.kind !== "flyline" || flylinesShown())).flatMap((h) => h.points);
   if (!points.length) return;
   const xs = points.map((p) => p[0]), ys = points.map((p) => p[1]);
   const x0 = Math.min(...xs), y0 = Math.min(...ys), x1 = Math.max(...xs), y1 = Math.max(...ys);
@@ -397,7 +400,7 @@ function endPress(e, cancelled) {
 
 /** A click, or a tap, at the event's point: select what is there, or ask which, or clear the selection. */
 function clickAt(e) {
-  const { hits, blocked } = hitsAt(doc && doc.levels[current], view, canvasPoint(e));
+  const { hits, blocked } = hitsAt(doc && doc.levels[current], view, canvasPoint(e), { flylines: flylinesShown() });
   const objects = hits.length ? objectsOf(hits) : !blocked ? usagesAt(canvasPoint(e)) : [];
   if (e.shiftKey && objects.some((o) => canOpen(o))) return; // Shift-double-click leaves this viewer unchanged
   if (objects.length > 1) {
@@ -438,7 +441,7 @@ const gestures = touchGestures({
 function pointOut(e, point) {
   // a move the browser makes of a tap names nothing: a finger does not hover
   if (performance.now() - gestures.touchedAt() < TOUCH_CLICK_MS) { hideTip(); return; }
-  const { hits } = hitsAt(doc && doc.levels[current], view, point);
+  const { hits } = hitsAt(doc && doc.levels[current], view, point, { flylines: flylinesShown() });
   canvas.classList.toggle("over-object", hits.length > 0 || usageAt(point) !== null);
   const name = hoverNamesOn() ? nameOf(doc, hits[0]) : null;
   if (name === null) { hideTip(); return; }

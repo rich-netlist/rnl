@@ -245,6 +245,9 @@ button.membership-id { cursor: pointer; text-decoration: underline dotted; }
 body[data-background="dark"] .origin-marks { --origin-color: #ff6b9a; --usage-label-bg: black; }
 /* View > Show Flylines (flylines.js): the core draws each flyline as a group of this class */
 .flylines-hidden g.flyline { display: none; }
+/* View > Show Net Names (net-labels.js) */
+.net-labels { --net-label-color: #6b6b6b; --net-label-halo: white; }
+body[data-background="dark"] .net-labels { --net-label-color: #a8a8a8; --net-label-halo: black; }
 .usage-overlays, .constraint-box { --usage-label-bg: white; --usage-btn: #f2f2f5; --usage-btn-hover: #ffffff; --usage-btn-down: #d9d9e0; --usage-btn-line: #8a8a94; --usage-btn-line-hover: #4a4a54; }
 body[data-background="dark"] .usage-overlays, body[data-background="dark"] .constraint-box { --usage-label-bg: black; --usage-btn: #3a3a42; --usage-btn-hover: #4c4c56; --usage-btn-down: #26262c; --usage-btn-line: #9a9aa6; --usage-btn-line-hover: #d8d8e0; }
 .netlist-pane {
