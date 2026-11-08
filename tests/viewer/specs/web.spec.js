@@ -1764,7 +1764,9 @@ test("a manifest's files are edited, downloaded and solved by a development serv
     expect(solved.scale).not.toBeCloseTo(zoomed.scale, 3);
     // Close Preview: the netlist as edited, fitted too
     await page.evaluate(async () => (await import("./drawing.js")).zoomCenter(8));
-    await page.evaluate(() => window.viewer.command("solve-close"));
+    // closePreview is awaited, not the command or the badge: the badge goes as the netlist is opened, the text
+    // has the edit before and after, and the fit comes last, so any of those would measure the view too early
+    await page.evaluate(async () => (await import("./solve.js")).closePreview());
     await expect(page.locator("#preview-badge")).toBeHidden();
     await expect.poll(() => page.evaluate(() => window.viewer.doc.files[0].text.includes("R9 out 0 22k"))).toBe(true);
     const [closed, again] = await fitted();
