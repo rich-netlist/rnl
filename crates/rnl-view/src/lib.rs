@@ -19,7 +19,7 @@ mod snapshot;
 mod types;
 
 use std::cell::RefCell;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use rnl_runtime::diag::Sink;
 use rnl_runtime::host::format::Reading;
@@ -76,6 +76,20 @@ pub fn bundled() -> MemoryProvider {
         }
     }
     p
+}
+
+/// The bundled package files of a draft series, by their paths in [`bundled`], such as
+/// `<bundled>/0.4/rnl-std.rnl`: those written in a language version newer than the tool's default
+/// (16.1), whose standard is not released yet. A frontend that lists the bundled packages, as the
+/// desktop viewer does, leaves them out, as the web viewer's library does; the core reads them all
+/// the same, so a file of that version uses them (16.3).
+pub fn bundled_drafts() -> BTreeSet<String> {
+    let key = rnl_runtime::interp::catalog::version_key;
+    let draft = |text: &str| {
+        let language = rnl_runtime::interp::unit::scan_language_decl(text);
+        language.is_some_and(|l| key(&l) > key(rnl_runtime::interp::unit::DEFAULT_VERSION))
+    };
+    bundled().files.into_iter().filter(|(_, text)| draft(text)).map(|(path, _)| path).collect()
 }
 
 /// How to build a Document, and what to give of each level's drawing.
@@ -842,6 +856,21 @@ R1 p q 1k
     }
 
     #[test]
+    fn the_bundled_drafts_are_the_series_newer_than_the_default() {
+        // a series is written in the language version of its directory's name (16.1, 16.3)
+        let key = rnl_runtime::interp::catalog::version_key;
+        let default = key(rnl_runtime::interp::unit::DEFAULT_VERSION);
+        let newer: BTreeSet<String> = BUNDLED
+            .iter()
+            .filter(|(path, _)| key(path.split('/').next().unwrap()) > default)
+            .map(|(path, _)| format!("{BUNDLED_DIR}/{path}"))
+            .collect();
+        assert_eq!(bundled_drafts(), newer);
+        // the files of a draft are still bundled, for the core to read
+        assert!(newer.iter().all(|path| bundled().files.contains_key(path)));
+    }
+
+    #[test]
     fn a_bundled_package_file_is_read_like_any_host_file() {
         let mut sink = Sink::new();
         let path = format!("{BUNDLED_DIR}/0.2/rnl-std.rnl");
@@ -882,13 +911,11 @@ R1 p q 1k
         let r = interpret("untitled-1", None, &files, &Options::default()).unwrap();
         assert!(r.diagnostics().iter().all(|d| d.severity != Severity::Error), "{:?}", r.diagnostics());
         assert_eq!(r.model.levels[0].items.iter().filter(|i| !i.host.is_empty()).count(), 2);
-        for (path, text) in BUNDLED {
+        let drafts = bundled_drafts();
+        for (path, _) in BUNDLED {
             // Every bundled standard package reads without diagnostics, but those of a draft series,
-            // written in a version newer than the default, which the rnl command's conformance
-            // tests check against what is not read yet.
-            let language = rnl_runtime::interp::unit::scan_language_decl(text).unwrap();
-            let key = rnl_runtime::interp::catalog::version_key;
-            if key(&language) > key(rnl_runtime::interp::unit::DEFAULT_VERSION) {
+            // which the rnl command's conformance tests check against what is not read yet.
+            if drafts.contains(&format!("{BUNDLED_DIR}/{path}")) {
                 continue;
             }
             let options = Options::default();

@@ -69,9 +69,12 @@ pub async fn pick_pool(window: WebviewWindow, kind: String) -> Result<Vec<String
     .map_err(|e| e.to_string())?
 }
 
+/// The bundled packages the Library lists as built in: all but those of a draft series, such as 0.4
+/// before its standard is released (`rnl_view::bundled_drafts`), which the core reads all the same.
 #[tauri::command]
 pub fn bundled_files() -> std::collections::BTreeMap<String, String> {
-    rnl_view::bundled().files
+    let drafts = rnl_view::bundled_drafts();
+    rnl_view::bundled().files.into_iter().filter(|(path, _)| !drafts.contains(path)).collect()
 }
 
 /// What a PATH directory lists in the Library: its packages and netlists, and whether it was added
