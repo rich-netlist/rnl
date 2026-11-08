@@ -194,8 +194,9 @@ export async function startEmbed() {
     const grid = params.get("grid");
     setGrid({ shown: grid === "dots" || grid === "lines", style: grid === "lines" ? "lines" : "dots" });
     setHoverNames(params.get("names") !== "0");
-    // an embedded drawing starts without the usage frames and with the current directions, unless the address says otherwise
-    showOverlays({ usages: params.get("usages") === "1", currents: params.get("currents") !== "0" });
+    // an embedded drawing starts without the usage frames and without the current directions, as the complete viewer does,
+    // unless the address says otherwise
+    showOverlays({ usages: params.get("usages") === "1", currents: params.get("currents") === "1" });
     window.addEventListener("viewer-level", updateLevel);
     api = startViewerApi({ version, open, onError: message => error(message.replace(/^Could not open the netlist: /, "")), begin(signal) {
       const operation = beginOpenOperation();

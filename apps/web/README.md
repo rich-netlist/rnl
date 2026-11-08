@@ -168,7 +168,7 @@ or native settings. The ordinary web viewer and desktop viewer keep their usual 
 | `grid` | `dots`, `lines`, `off` | `off` | Canvas grid. |
 | `names` | `1`, `0` | `1` | Show names on hover. |
 | `usages` | `1`, `0` | `0` | Show the usage frames, as View › Show Usages. An embedded drawing starts without them, and so does the complete viewer (every display aid but View › Show Names on Hover is off to begin with; a choice the user kept is kept). |
-| `currents` | `1`, `0` | `1` | Show the current directions, as View › Show Current Directions. `0` starts without them. The complete viewer's default is unchanged. |
+| `currents` | `1`, `0` | `0` | Show the current directions, as View › Show Current Directions. An embedded drawing starts without them, as the complete viewer does; an embedding page that was written when they were shown writes `currents=1`. |
 | `origin` | An exact origin, e.g. `https://example.com` | Any origin | Accept messages only from this origin and reply to it. |
 
 Send object messages to the iframe's `contentWindow`, each with `rnl: 1`:
