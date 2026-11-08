@@ -601,9 +601,12 @@ async function opened(page, action) {
   return shown(page);
 }
 
-/** The Document that `rnl view` prints for a file, named as given, from the repository's root. */
+/**
+ * The Document that `rnl view` prints for a file, named as given, from the repository's root, with
+ * its flylines, as the page asks for them.
+ */
 function rnlView(file) {
-  const out = execFileSync(process.env.RNL_BIN, ["view", file], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 });
+  const out = execFileSync(process.env.RNL_BIN, ["view", file, "--flylines"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 });
   return JSON.parse(out);
 }
 

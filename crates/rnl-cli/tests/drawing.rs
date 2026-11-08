@@ -124,8 +124,8 @@ fn a_wire_whose_middle_point_is_free_is_drawn_in_two_runs() {
     // flylines, as by default, the level has none, and nothing else of it changes
     let with = rnl_render::RenderOptions { flylines: true, ..rnl_render::RenderOptions::default() };
     let svg = rnl_render::svg(&lv, &with);
-    assert_eq!(svg.matches("<g class=\"flyline\" data-id=\"flyline-0\"><line ").count(), 1, "{svg}");
-    assert_eq!(svg.matches("<g class=\"flyline\"").count(), lv.flylines.len(), "{svg}");
+    assert_eq!(svg.matches("<g data-id=\"flyline-0\" class=\"flyline\"><line ").count(), 1, "{svg}");
+    assert_eq!(svg.matches(" class=\"flyline\">").count(), lv.flylines.len(), "{svg}");
     let without = rnl_render::RenderOptions::default();
     let svg_without = rnl_render::svg(&lv, &without);
     assert!(!svg_without.contains("flyline"));
