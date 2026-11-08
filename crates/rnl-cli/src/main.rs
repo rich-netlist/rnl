@@ -57,8 +57,9 @@ options:
 view options:
   --primitives        give each level's primitives, in scene units with y up
   --no-svg            leave out each level's SVG
-  --no-flylines       draw no flylines (13.7) in the SVG and the primitives; view, snapshot and render
-                      take it. Drawn, each flyline is a group of class \"flyline\" in the SVG
+  --flylines          draw the flylines (13.3, 13.7) of every net in the SVG and the primitives, to
+                      check what is not wired; view, snapshot and render take it. Each is a group of
+                      class \"flyline\" in the SVG
   --status            give each level its solve status: fixed, unsolved, solved or stale
   --constraints       give each level its constraints after expansion, what a solver takes in, tied
                       to the Document's objects; experimental, not promised to stay as it is
@@ -109,7 +110,7 @@ struct Args {
     formats: BTreeMap<String, String>,
     svg: bool,
     primitives: bool,
-    /// `--no-flylines`: false.
+    /// `--flylines`.
     flylines: bool,
     status: bool,
     /// `view`'s `--constraints`.
@@ -150,7 +151,7 @@ fn parse_args() -> Result<Args, String> {
     let mut dialect = None;
     let mut formats = BTreeMap::new();
     let (mut svg, mut primitives, mut status) = (true, false, false);
-    let mut flylines = true;
+    let mut flylines = false;
     let mut level = None;
     let mut solver = solver_args::SolverArgs::default();
     let mut author = None;
@@ -203,7 +204,7 @@ fn parse_args() -> Result<Args, String> {
             }
             "--no-svg" => svg = false,
             "--primitives" => primitives = true,
-            "--no-flylines" => flylines = false,
+            "--flylines" => flylines = true,
             "--status" => status = true,
             "--constraints" => constraints = true,
             "--level" => level = Some(it.next().ok_or("--level needs a title")?),

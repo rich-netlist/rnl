@@ -82,8 +82,9 @@ fn every_level_solved_and_written_back_is_drawn_with_its_wires() {
             assert!(errors.is_empty(), "{what}: {errors:?}\n{record}");
             let lv = r.model.levels.iter().find(|l| l.level == p.level).unwrap();
             assert!(lv.unplaced.is_empty(), "{what}: {:?}", lv.unplaced);
-            // the ROUTEs are wired: a viewer has no flight line left to draw
-            assert!(lv.flylines.is_empty(), "{what}: {:?}\n{record}", lv.flylines);
+            // the ROUTEs are wired: a viewer has no flight line left to draw on their nets
+            let routed = |f: &rnl_runtime::model::FlylineView| p.routes.iter().any(|r| f.nets.contains(&r.net));
+            assert!(!lv.flylines.iter().any(routed), "{what}: {:?}\n{record}", lv.flylines);
             // the wires routed are drawn as written, straight between their bends
             let straight = lv.wires.iter().filter(|w| w.mode == "straight").count();
             assert_eq!(straight, solved.solution.wires.len(), "{what}");
@@ -149,7 +150,8 @@ fn the_netlists_of_the_review_are_routed_whole_and_read_back() {
         assert!(errors.is_empty(), "{body}: {errors:?}\n{record}");
         let lv = r.model.levels.iter().find(|l| l.level == p.level).unwrap();
         assert!(lv.unplaced.is_empty(), "{body}: {:?}", lv.unplaced);
-        assert!(lv.flylines.is_empty(), "{body}: {:?}\n{record}", lv.flylines);
+        let routed = |f: &rnl_runtime::model::FlylineView| p.routes.iter().any(|r| f.nets.contains(&r.net));
+        assert!(!lv.flylines.iter().any(routed), "{body}: {:?}\n{record}", lv.flylines);
         let straight = lv.wires.iter().filter(|w| w.mode == "straight").count();
         assert_eq!(straight, solved.solution.wires.len(), "{body}");
         let dots = lv.items.iter().filter(|i| i.kind == "usage" && lv.symbols[i.symbol].name == "$JUNCTION_DOT");

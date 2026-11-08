@@ -40,7 +40,7 @@ pub use constraints::{
 };
 pub use document::{
     AutoIncludeCandidate, Child, Diagnostic, Document, Drawings, Hit, InspectedLabel, InspectedPin, InspectedSymbol,
-    Level, MemberOf, Object, RoleOf, RuleAt, SourceFile, SourceInclude, Span, Unplaced, UnplacedDrawing, Usage,
+    Level, MemberOf, NetLabel, Object, RoleOf, RuleAt, SourceFile, SourceInclude, Span, Unplaced, UnplacedDrawing, Usage,
     UsageRole,
 };
 pub use formats::{detect_format, formats, FormatInfo};
@@ -94,8 +94,9 @@ pub struct BuildOptions {
     pub svg: bool,
     /// Give each level's primitives ([`Level::primitives`]); off by default.
     pub primitives: bool,
-    /// Draw each level's flylines (13.7) in its SVG and primitives; on by default. In the SVG each
-    /// is a group of class "flyline", which a viewer can hide.
+    /// Draw each level's flylines (13.3, 13.7) in its SVG and primitives, those of every net, to
+    /// check what is not wired; off by default. In the SVG each is a group of class "flyline",
+    /// which a viewer can hide, and each has a hit ([`Hit`]).
     pub flylines: bool,
     /// Give each level its solve status ([`Level::solve`]), what a frontend decides from whether
     /// to solve it (decision 0008); off by default. It takes the problems of the levels read
@@ -118,7 +119,7 @@ impl Default for BuildOptions {
             runtime: Options::default(),
             svg: true,
             primitives: false,
-            flylines: true,
+            flylines: false,
             status: false,
             constraints: false,
             bind: None,
@@ -909,24 +910,24 @@ R1 p q 1k
         // by default the SVG and no primitives, as the viewers have read the Document so far
         let default = BuildOptions::default();
         let l = level(default.svg, default.primitives);
-        assert_eq!(keys(&l), "usages host title kind lines svg scale empty status hits children unplaced");
+        assert_eq!(keys(&l), "usages host title kind lines svg scale empty status hits net_labels children unplaced");
         let l = level(true, true);
-        assert_eq!(keys(&l), "usages host title kind lines svg primitives scale empty status hits children unplaced");
+        assert_eq!(keys(&l), "usages host title kind lines svg primitives scale empty status hits net_labels children unplaced");
         assert_eq!(l["scale"], 14.0);
         assert!(l["primitives"].as_array().is_some_and(|p| p.len() > 2));
         assert_eq!(
             keys(&level(false, true)),
-            "usages host title kind lines primitives scale empty status hits children unplaced"
+            "usages host title kind lines primitives scale empty status hits net_labels children unplaced"
         );
         assert_eq!(
             keys(&level(false, false)),
-            "usages host title kind lines scale empty status hits children unplaced"
+            "usages host title kind lines scale empty status hits net_labels children unplaced"
         );
         // the solve status when asked for: the resistor and the capacitor are placed, not turned
         let options = BuildOptions { svg: false, status: true, ..BuildOptions::default() };
         let d = serde_json::to_value(build("a.sp", &files, &options).unwrap()).unwrap();
         let l = d["levels"][0].as_object().unwrap();
-        assert_eq!(keys(l), "usages host title kind lines scale empty status solve hits children unplaced");
+        assert_eq!(keys(l), "usages host title kind lines scale empty status solve hits net_labels children unplaced");
         assert_eq!(l["solve"], "unsolved");
     }
 

@@ -166,6 +166,26 @@ pub struct ItemView {
     pub pin_nets: Vec<Vec<String>>,
 }
 
+/// A line a viewer may draw for a connection not drawn as a wire (`LevelView::flylines`).
+#[derive(Clone, Debug, PartialEq)]
+pub struct FlylineView {
+    pub a: Pt,
+    pub b: Pt,
+    /// The nets it connects, as they are displayed: its net, or those of the wire over whose gap
+    /// it is drawn.
+    pub nets: Vec<String>,
+}
+
+/// Where a viewer may label one connected part of a net with its name (`LevelView::net_labels`):
+/// of the middles of the part's segments as drawn and of its pins, the one nearest the centre of
+/// its vertices and pins.
+#[derive(Clone, Debug, PartialEq)]
+pub struct NetLabelView {
+    /// The net, as it is displayed.
+    pub net: String,
+    pub at: Pt,
+}
+
 /// A wire, or a part of one: a wire some of whose points have no position yet, such as a free
 /// point before the level is solved, is drawn in its runs of consecutive points that have one,
 /// each run of two points or more a WireView with the wire's id, nets, mode and style, and a
@@ -295,11 +315,17 @@ pub struct LevelView {
     pub wires: Vec<WireView>,
     pub shapes: Vec<ShapeView>,
     pub texts: Vec<TextView>,
-    /// Lines a viewer may draw for connections not drawn as wires, not wires themselves: over the
-    /// gaps of a wire some of whose points have no position yet, from the last point before a gap
-    /// that has one to the first after it, those of the wires first; then for the nets that a ROUTE
-    /// asks to wire (13.7).
-    pub flylines: Vec<(Pt, Pt)>,
+    /// Lines a viewer may draw for connections not drawn as wires, not wires themselves (13.3,
+    /// 13.7), to check what is not wired: over the gaps of a wire some of whose points have no
+    /// position yet, from the last point before a gap that has one to the first after it, those of
+    /// the wires first; then between the connected parts of each net, as for `net_labels`, net by
+    /// net in the order of the level.
+    pub flylines: Vec<FlylineView>,
+    /// Where a viewer may label each connected part of a net with the net's name: each wire of
+    /// the net with those that meet it at an end or a bend of both as drawn, and the pins at those,
+    /// is one part, and so is each pin on the net that no wire meets so; a wire that ends on the
+    /// middle of another is apart from it. One label per part, of every net drawn on the level.
+    pub net_labels: Vec<NetLabelView>,
     pub constraints: Vec<ConstraintView>,
     /// Drawn objects without a position, left to a solver.
     pub unplaced: Vec<String>,

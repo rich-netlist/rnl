@@ -63,8 +63,9 @@ export interface Request {
   /** Give each level's primitives; false when not given. */
   primitives?: boolean;
   /**
-   * Draw each level's flylines in its SVG and primitives, each a group of class "flyline" in the
-   * SVG, which a viewer can hide; true when not given.
+   * Draw each level's flylines in its SVG and primitives, those of every net, to check what is
+   * not wired: each a group of class "flyline" in the SVG, which a viewer can hide, with a hit of
+   * kind "flyline"; false when not given.
    */
   flylines?: boolean;
   /**

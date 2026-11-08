@@ -505,8 +505,8 @@ fn a_routed_net_written_back_reads_back() {
     let (_, r) = write_back(&f, p, &written);
     let lv = &r.model.levels[0];
     assert!(lv.unplaced.is_empty(), "{:?}", lv.unplaced);
-    // the ROUTEs are wired now: no flight lines are left
-    assert!(lv.flylines.is_empty(), "{:?}", lv.flylines);
+    // the ROUTEs are wired now: no flight lines are left on their nets
+    assert!(!lv.flylines.iter().any(|f| p.routes.iter().any(|r| f.nets.contains(&r.net))), "{:?}", lv.flylines);
     let straight: Vec<&Vec<Pt>> = lv.wires.iter().filter(|w| w.mode == "straight").map(|w| &w.points).collect();
     assert_eq!(
         straight,

@@ -271,8 +271,9 @@ pub fn svg_document(prims: &[Primitive], o: &RenderOptions) -> String {
     for p in prims {
         s.push('\n');
         if matches!(p.kind, Kind::Flyline { .. }) {
-            // a flyline is an object of its own, which a viewer can hide by its class
-            let _ = write!(s, "<g class=\"flyline\">{}</g>", w.prim(p));
+            // a flyline is an object of its own, which a viewer can hide by its class and find
+            // by its id
+            let _ = write!(s, "<g class=\"flyline\" data-id=\"{}\">{}</g>", esc(&p.owner), w.prim(p));
         } else if p.owner.is_empty() {
             s.push_str(&w.prim(p));
         } else {

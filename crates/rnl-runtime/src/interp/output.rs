@@ -891,7 +891,8 @@ impl Interp<'_> {
             // every point of the wire has a position: it is drawn whole, as one run
             let whole = shape.points.iter().all(|&q| self.point_of(s, q).is_some());
             let (runs, gaps) = self.wire_drawing(s, w);
-            flylines.extend(gaps);
+            let shown: Vec<String> = nets.iter().map(|n| self.net_display(*n)).collect();
+            flylines.extend(gaps.into_iter().map(|(a, b)| FlylineView { a, b, nets: shown.clone() }));
             for points in runs {
                 wire_of.entry(w).or_insert(wires.len());
                 wires.push(WireView {
@@ -909,12 +910,16 @@ impl Interp<'_> {
                 });
             }
         }
-        let routes = self.scenes[s].routes.clone();
-        if !routes.is_empty() {
-            let terms = self.route_terms(s);
-            for r in routes {
-                flylines.extend(self.flywires(s, r, &terms));
-            }
+        // the connected parts of each net: flylines between them, to check what is not wired
+        // (13.3, 13.7), and a place for the net's name on each
+        let terms = self.route_terms(s);
+        let mut net_labels = Vec::new();
+        for net in self.scenes[s].nets.clone() {
+            let shown = self.net_display(net);
+            let islands = self.islands(s, net, &terms);
+            let lines = super::islands::spanning(&islands);
+            flylines.extend(lines.into_iter().map(|(a, b)| FlylineView { a, b, nets: vec![shown.clone()] }));
+            net_labels.extend(islands.iter().filter_map(|i| i.label_at()).map(|at| NetLabelView { net: shown.clone(), at }));
         }
         let mut shapes = Vec::new();
         for p in self.scenes[s].prims.clone() {
@@ -1072,6 +1077,7 @@ impl Interp<'_> {
             shapes,
             texts,
             flylines,
+            net_labels,
             constraints,
             unplaced: self.scenes[s].unplaced.clone(),
             undrawn: self.undrawn_views(s),

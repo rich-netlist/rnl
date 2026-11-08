@@ -22,11 +22,12 @@ use serde::Serialize;
 #[derive(Serialize, Clone, Debug, PartialEq)]
 #[cfg_attr(test, derive(serde::Deserialize, ts_rs::TS))]
 pub struct Primitive {
-    /// The `data-id` of the SVG group that draws it; empty for a shape written in the scene and
-    /// for a flyline. A symbol's drawing, its pin names included, has its item, such as "item-3",
-    /// and a wire's drawing its wire, such as "wire-0", as `Hit::id` names them. Any other text
-    /// has the name the diagnostics give it, such as "#R1::name" for an instance's name or
-    /// "a text" for a text written in the scene: several texts can share it, and no hit has it.
+    /// The `data-id` of the SVG group that draws it; empty for a shape written in the scene. A
+    /// symbol's drawing, its pin names included, has its item, such as "item-3", a wire's drawing
+    /// its wire, such as "wire-0", and a flyline its own id, such as "flyline-0", as `Hit::id`
+    /// names them. Any other text has the name the diagnostics give it, such as "#R1::name" for
+    /// an instance's name or "a text" for a text written in the scene: several texts can share
+    /// it, and no hit has it.
     pub owner: String,
     pub layer: Layer,
     /// Its place within the layer, compared element by element (11.6).

@@ -148,6 +148,14 @@ export type Level = {
    */
   hits: Array<Hit>,
   /**
+   * Where a viewer may label each connected part of a net with the net's name, in SVG pixels:
+   * each wire of the net with those that touch it as drawn and the pins on them is one part,
+   * and so is each pin on the net that no wire reaches; one label per part, of every net drawn
+   * on the level (`rnl_runtime::model::LevelView::net_labels`). **Experimental: not promised to
+   * stay as it is.**
+   */
+  net_labels: Array<NetLabel>,
+  /**
    * The subcircuit instances of the level, in netlist order: the hierarchy below it.
    */
   children: Array<Child>,
@@ -261,10 +269,12 @@ export type CurrentArrow = {
 export type Hit = {
   /**
    * "box": a symbol, given by its top-left and bottom-right corners; "pin": a pin, one point;
-   * "wire": a wire, its vertices; "label": a label of an object, given by its top-left and
-   * bottom-right corners, which stands for what that object stands for: for a terminal, the nets
-   * of its pin, as the pin does; and for nothing when it is not an instance, a bundle, a usage, a
-   * wire, a net or a terminal drawn at a pin with a net.
+   * "wire": a wire, its vertices; "flyline": a flyline, its two ends, which stands for its
+   * nets as a wire does, there only when the flylines are drawn; "label": a label of an
+   * object, given by its top-left and bottom-right corners, which stands for what that object
+   * stands for: for a terminal, the nets of its pin, as the pin does; and for nothing when it
+   * is not an instance, a bundle, a usage, a wire, a net or a terminal drawn at a pin with a
+   * net.
    */
   kind: string,
   /**
@@ -294,6 +304,21 @@ export type Hit = {
    * others, the usages that are not named among them.
    */
   name?: string,
+};
+
+/**
+ * Where a viewer may label one connected part of a net with its name ([`Level::net_labels`]).
+ */
+export type NetLabel = {
+  /**
+   * The net, as `Object` numbers it.
+   */
+  net: number,
+  /**
+   * In SVG pixels, y down: of the middles of the part's segments as drawn and of its pins, the
+   * one nearest the centre of its vertices and pins.
+   */
+  at: [number, number],
 };
 
 /**
@@ -887,11 +912,12 @@ export type Diagnostic = {
  */
 export type Primitive = {
   /**
-   * The `data-id` of the SVG group that draws it; empty for a shape written in the scene and
-   * for a flyline. A symbol's drawing, its pin names included, has its item, such as "item-3",
-   * and a wire's drawing its wire, such as "wire-0", as `Hit::id` names them. Any other text
-   * has the name the diagnostics give it, such as "#R1::name" for an instance's name or
-   * "a text" for a text written in the scene: several texts can share it, and no hit has it.
+   * The `data-id` of the SVG group that draws it; empty for a shape written in the scene. A
+   * symbol's drawing, its pin names included, has its item, such as "item-3", a wire's drawing
+   * its wire, such as "wire-0", and a flyline its own id, such as "flyline-0", as `Hit::id`
+   * names them. Any other text has the name the diagnostics give it, such as "#R1::name" for
+   * an instance's name or "a text" for a text written in the scene: several texts can share
+   * it, and no hit has it.
    */
   owner: string,
   layer: Layer,

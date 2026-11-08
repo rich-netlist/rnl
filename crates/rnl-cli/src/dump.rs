@@ -70,7 +70,7 @@ pub fn level(lv: &LevelView) -> Value {
             "id": t.id, "anchor": pt(&t.anchor), "lines": lines(&t.lines), "halign": t.halign, "valign": t.valign,
             "rotate": t.rotate, "orient": t.orient.as_str(), "style": style(&t.style), "layer": t.layer.as_str(),
         })).collect::<Vec<_>>(),
-        "flylines": lv.flylines.iter().map(|(a, b)| json!([pt(a), pt(b)])).collect::<Vec<_>>(),
+        "flylines": lv.flylines.iter().map(|f| json!([pt(&f.a), pt(&f.b)])).collect::<Vec<_>>(),
         "constraints": lv.constraints.iter().map(|c| json!({"label": c.label, "kind": c.kind, "status": c.status, "priority": c.priority})).collect::<Vec<_>>(),
         "unplaced": lv.unplaced,
     })

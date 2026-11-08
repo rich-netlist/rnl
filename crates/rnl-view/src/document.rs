@@ -110,6 +110,12 @@ pub struct Level {
     pub solve: Option<&'static str>,
     /// What can be clicked on the drawing, in SVG pixels.
     pub hits: Vec<Hit>,
+    /// Where a viewer may label each connected part of a net with the net's name, in SVG pixels:
+    /// each wire of the net with those that touch it as drawn and the pins on them is one part,
+    /// and so is each pin on the net that no wire reaches; one label per part, of every net drawn
+    /// on the level (`rnl_runtime::model::LevelView::net_labels`). **Experimental: not promised to
+    /// stay as it is.**
+    pub net_labels: Vec<NetLabel>,
     /// The subcircuit instances of the level, in netlist order: the hierarchy below it.
     pub children: Vec<Child>,
     /// For a subcircuit, its parameters: their defaults, the values bound to them
@@ -129,6 +135,17 @@ pub struct Level {
     /// gives), then those that are not drawn at all, since no symbol can be chosen for them, each
     /// with its `reason` and no symbol.
     pub unplaced: Vec<Unplaced>,
+}
+
+/// Where a viewer may label one connected part of a net with its name ([`Level::net_labels`]).
+#[derive(Serialize, Debug)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct NetLabel {
+    /// The net, as `Object` numbers it.
+    pub net: usize,
+    /// In SVG pixels, y down: of the middles of the part's segments as drawn and of its pins, the
+    /// one nearest the centre of its vertices and pins.
+    pub at: [f64; 2],
 }
 
 /// An object of a level that has no position yet, so it is not drawn there: an instance, a bundle
@@ -317,10 +334,12 @@ pub struct AutoIncludeCandidate {
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Hit {
     /// "box": a symbol, given by its top-left and bottom-right corners; "pin": a pin, one point;
-    /// "wire": a wire, its vertices; "label": a label of an object, given by its top-left and
-    /// bottom-right corners, which stands for what that object stands for: for a terminal, the nets
-    /// of its pin, as the pin does; and for nothing when it is not an instance, a bundle, a usage, a
-    /// wire, a net or a terminal drawn at a pin with a net.
+    /// "wire": a wire, its vertices; "flyline": a flyline, its two ends, which stands for its
+    /// nets as a wire does, there only when the flylines are drawn; "label": a label of an
+    /// object, given by its top-left and bottom-right corners, which stands for what that object
+    /// stands for: for a terminal, the nets of its pin, as the pin does; and for nothing when it
+    /// is not an instance, a bundle, a usage, a wire, a net or a terminal drawn at a pin with a
+    /// net.
     pub kind: &'static str,
     /// In SVG pixels, y down.
     pub points: Vec<[f64; 2]>,
@@ -896,6 +915,19 @@ impl<'a> Index<'a> {
                 name: None,
             });
         }
+        // a flyline stands for its nets, as a wire does
+        for (k, f) in lv.flylines.iter().enumerate().filter(|_| render.flylines) {
+            hits.push(Hit {
+                kind: "flyline",
+                points: vec![px(f.a), px(f.b)],
+                origin: None,
+                objects: f.nets.iter().map(|n| self.net(lv.level, n)).collect(),
+                id: Some(rnl_render::flyline_id(k)),
+                name: None,
+            });
+        }
+        let net_labels =
+            lv.net_labels.iter().map(|l| NetLabel { net: self.net(lv.level, &l.net), at: px(l.at) }).collect();
         // a label stands for what it is attached to (a terminal's for its pin's nets), and for
         // nothing when that cannot be selected:
         // a click on it is then not a click on whatever is under it. with_page_ids gives each
@@ -947,6 +979,7 @@ impl<'a> Index<'a> {
             status: crate::level_status(lv),
             solve: None,
             hits,
+            net_labels,
             children: Vec::new(),
             params: Vec::new(),
             constraints: None,

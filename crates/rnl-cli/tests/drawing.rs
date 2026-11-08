@@ -32,6 +32,11 @@ fn level(r: &Interpretation, title: &str) -> LevelView {
     r.model.levels.iter().find(|l| l.title == title).unwrap().clone()
 }
 
+/// The ends of the flylines of a level on out.
+fn ends(lv: &LevelView) -> Vec<(Pt, Pt)> {
+    lv.flylines.iter().filter(|f| f.nets == ["out"]).map(|f| (f.a, f.b)).collect()
+}
+
 /// The parts of the wires on a net.
 fn on_net<'a>(lv: &'a LevelView, net: &str) -> Vec<&'a WireView> {
     lv.wires.iter().filter(|w| w.nets == [net]).collect()
@@ -52,16 +57,16 @@ fn a_wire_through_a_free_point_is_a_flyline() {
     // no part of it has two points with a position: nothing drawn as the wire, a flyline over the
     // free point; the wire is not an object without a position, and neither is the point
     assert!(on_net(&lv, "out").is_empty(), "{:?}", lv.wires);
-    assert_eq!(lv.flylines, [(m1, r1)]);
+    assert_eq!(ends(&lv), [(m1, r1)]);
     assert!(lv.unplaced.is_empty(), "{:?}", lv.unplaced);
     // with the point placed, the wire is drawn whole, without a flyline
     let r = read(&netlist("0.2", &record("&out @WIRE {#M1:1 (5, 5) #R1:2}")), &Options::default());
     let lv = level(&r, "t.sp");
-    assert_eq!((on_net(&lv, "out").len(), lv.flylines.len()), (1, 0));
+    assert_eq!((on_net(&lv, "out").len(), ends(&lv).len()), (1, 0));
     // a wire with no point that has a position draws nothing
     let r = read(&netlist("0.2", &record("&in @WIRE {(_, _) (_, 3)}")), &Options::default());
     let lv = level(&r, "t.sp");
-    assert!(on_net(&lv, "in").is_empty() && lv.flylines.is_empty());
+    assert!(on_net(&lv, "in").is_empty() && lv.flylines.iter().all(|f| f.nets != ["in"]));
 }
 
 #[test]
@@ -80,33 +85,57 @@ fn a_wire_whose_middle_point_is_free_is_drawn_in_two_runs() {
         assert_eq!((w.id.as_str(), w.mode.as_str()), ("a wire", "horizontal-vertical"));
         assert_eq!(w.style.get("linestyle").and_then(|v| v.str()), Some("bold"));
     }
-    assert_eq!(lv.flylines, [((2.0, 5.0), (8.0, 5.0))]);
+    assert_eq!(ends(&lv), [((2.0, 5.0), (8.0, 5.0))]);
 
-    // the Document has a hit for each run, on the net, and draws the flyline
+    // the Document has a hit for each run, on the net, and draws the flyline when asked
     let files = MemoryProvider::new().with("/w/t.sp", &netlist("0.2", &record(wire)));
-    let options = rnl_view::BuildOptions { primitives: true, ..rnl_view::BuildOptions::default() };
+    let options = rnl_view::BuildOptions { primitives: true, flylines: true, ..rnl_view::BuildOptions::default() };
     let d = rnl_view::build("/w/t.sp", &files, &options).unwrap();
     let out = d.objects.iter().position(|o| o.kind == "net" && o.name == "out").unwrap();
     let hits: Vec<&rnl_view::Hit> = d.levels[0].hits.iter().filter(|h| h.kind == "wire").collect();
     assert_eq!(hits.len(), 2);
     assert!(hits.iter().all(|h| h.objects == [out]));
-    let flylines =
-        d.levels[0].primitives.as_ref().unwrap().iter().filter(|p| matches!(p.shape, rnl_view::Shape::Flyline { .. }));
-    assert_eq!(flylines.count(), 1);
+    // the flyline over the gap is the first, and stands for its net, as the wire does: a hit of
+    // its own, by the id of its group; those of the other nets follow
+    let flylines: Vec<&str> = d.levels[0]
+        .primitives
+        .as_ref()
+        .unwrap()
+        .iter()
+        .filter(|p| matches!(p.shape, rnl_view::Shape::Flyline { .. }))
+        .map(|p| p.owner.as_str())
+        .collect();
+    assert_eq!(flylines.len(), lv.flylines.len());
+    assert_eq!(flylines[0], "flyline-0");
+    let on_out: Vec<&rnl_view::Hit> =
+        d.levels[0].hits.iter().filter(|h| h.kind == "flyline" && h.objects == [out]).collect();
+    let scale = d.levels[0].scale;
+    assert_eq!(on_out.len(), 1);
+    assert_eq!(on_out[0].id.as_deref(), Some("flyline-0"));
+    assert_eq!(on_out[0].points, [[2.0 * scale, -5.0 * scale], [8.0 * scale, -5.0 * scale]]);
+    // the wire, its flyline over the free point and the pins at its ends are one part of out,
+    // labelled once, where the model says, in pixels
+    let labels: Vec<&rnl_view::NetLabel> = d.levels[0].net_labels.iter().filter(|l| l.net == out).collect();
+    let at = lv.net_labels.iter().find(|l| l.net == "out").unwrap().at;
+    assert_eq!(labels.len(), 1);
+    assert_eq!(labels[0].at, [at.0 * scale, -at.1 * scale]);
 
-    // in the SVG the flyline is a group of its own, which a viewer can hide; drawn without
-    // flylines, the level has none, and nothing else of it changes
-    let svg = rnl_render::svg(&lv, &rnl_render::RenderOptions::default());
-    assert_eq!(svg.matches("<g class=\"flyline\"><line ").count(), 1, "{svg}");
-    let without = rnl_render::RenderOptions { flylines: false, ..rnl_render::RenderOptions::default() };
+    // in the SVG each flyline is a group of its own, which a viewer can hide; drawn without
+    // flylines, as by default, the level has none, and nothing else of it changes
+    let with = rnl_render::RenderOptions { flylines: true, ..rnl_render::RenderOptions::default() };
+    let svg = rnl_render::svg(&lv, &with);
+    assert_eq!(svg.matches("<g class=\"flyline\" data-id=\"flyline-0\"><line ").count(), 1, "{svg}");
+    assert_eq!(svg.matches("<g class=\"flyline\"").count(), lv.flylines.len(), "{svg}");
+    let without = rnl_render::RenderOptions::default();
     let svg_without = rnl_render::svg(&lv, &without);
     assert!(!svg_without.contains("flyline"));
     let others = |svg: &str| svg.lines().filter(|l| !l.contains("flyline")).map(String::from).collect::<Vec<_>>();
     assert_eq!(others(&svg), others(&svg_without));
     assert!(!rnl_render::primitives(&lv, &without).iter().any(|p| matches!(p.kind, rnl_render::Kind::Flyline { .. })));
-    let options = rnl_view::BuildOptions { primitives: true, flylines: false, ..rnl_view::BuildOptions::default() };
+    let options = rnl_view::BuildOptions { primitives: true, ..rnl_view::BuildOptions::default() };
     let d = rnl_view::build("/w/t.sp", &files, &options).unwrap();
     assert!(!d.levels[0].svg.as_deref().unwrap_or_default().contains("flyline"));
+    assert!(!d.levels[0].hits.iter().any(|h| h.kind == "flyline"));
     assert!(!d.levels[0]
         .primitives
         .as_ref()
@@ -140,7 +169,7 @@ fn a_stale_numbering_leaves_the_free_point_free_and_the_wire_drawn_in_part() {
     let runs = on_net(&lv, "out");
     assert_eq!(runs.len(), 1);
     assert_eq!((runs[0].points[0], runs[0].points[runs[0].points.len() - 1]), (m1, (1.0, 3.0)));
-    assert_eq!(lv.flylines, [((1.0, 3.0), r1)]);
+    assert_eq!(ends(&lv), [((1.0, 3.0), r1)]);
     // the labels fall back beside M1 and R1, which keep their places by name
     let label =
         |name: &str| lv.texts.iter().find(|t| t.id == "a text" && rnl_runtime::markup::plain(&t.lines[0]) == name);

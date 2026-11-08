@@ -38,8 +38,9 @@ options:
 view options:
   --primitives        give each level's primitives, in scene units with y up
   --no-svg            leave out each level's SVG
-  --no-flylines       draw no flylines (13.7) in the SVG and the primitives; view, snapshot and render
-                      take it. Drawn, each flyline is a group of class "flyline" in the SVG
+  --flylines          draw the flylines (13.3, 13.7) of every net in the SVG and the primitives, to
+                      check what is not wired; view, snapshot and render take it. Each is a group of
+                      class "flyline" in the SVG
   --status            give each level its solve status: fixed, unsolved, solved or stale
   --constraints       give each level its constraints after expansion, what a solver takes in, tied
                       to the Document's objects; experimental, not promised to stay as it is
