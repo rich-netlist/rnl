@@ -140,6 +140,12 @@
    "note": "Only 2 texts, both headings."
   },
   {
+   "en": "flyline",
+   "term": "chevelu",
+   "kind": "general",
+   "note": "The flylines together, as French EDA tools name them (Afficher le chevelu); one of them is une ligne du chevelu."
+  },
+  {
    "en": "free text",
    "term": "texte libre",
    "kind": "rnl"

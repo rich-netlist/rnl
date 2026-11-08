@@ -145,6 +145,12 @@
    "kind": "rnl"
   },
   {
+   "en": "flyline",
+   "term": "フライライン",
+   "kind": "general",
+   "note": "A line drawn from pin to pin of a net where no wire joins them yet; View › Show Flylines."
+  },
+  {
    "en": "free text",
    "term": "自由テキスト",
    "kind": "rnl"

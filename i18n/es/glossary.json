@@ -143,6 +143,12 @@
    "kind": "rnl"
   },
   {
+   "en": "flyline",
+   "term": "línea de conexión",
+   "kind": "general",
+   "note": "A line drawn from pin to pin of a net where no wire joins them yet; View › Show Flylines. Plural: líneas de conexión."
+  },
+  {
    "en": "free text",
    "term": "texto libre",
    "kind": "rnl"

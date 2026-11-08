@@ -148,6 +148,12 @@
    "kind": "rnl"
   },
   {
+   "en": "flyline",
+   "term": "Luftlinie",
+   "kind": "general",
+   "note": "A line drawn from pin to pin of a net where no wire joins them yet; View › Show Flylines. Plural: Luftlinien."
+  },
+  {
    "en": "free text",
    "term": "Freitext",
    "kind": "rnl"
