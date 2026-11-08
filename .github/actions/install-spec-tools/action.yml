@@ -22,7 +22,8 @@ runs:
         mkdir -p "$dir"
         # GitHub's raw files first, then the same file at the same tag from jsDelivr, which serves the repository too: the
         # downloads of an Actions run have been answered 504 by GitHub for hours. Whichever answers, the file must have the
-        # SHA-256 below, or the step fails.
+        # SHA-256 below, or the step fails. (jsDelivr serves files of up to 20 MB: the two Serif files, 24 MB, answer 403
+        # there and come from GitHub only.)
         get() { # URL, file, SHA-256
           curl -fsSL "${curl_net[@]}" -o "$2" "$1" && echo "$3  $2" | sha256sum --check --strict
         }
