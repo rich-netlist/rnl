@@ -17,8 +17,8 @@
 //! - the crossings: two segments of different wires crossing inside both, one summary line;
 //! - a wire leaving a pin against the pin's direction: its first segment does not go the way the
 //!   pin points;
-//! - a T-join without a junction dot, and a dot that joins nothing: at a point, the ends of wires,
-//!   twice the wires that pass through it, and the pins, of one net, three or more need a dot;
+//! - a T-join without a junction dot: at a point, the ends of wires, twice the wires that pass
+//!   through it, and the pins, of one net, three or more, and no mark at the point, such as a dot;
 //! - a silent open: a wire whose end lies on a wire or a pin of its net that it does not name, so
 //!   that the two are not joined although they look it;
 //! - a port that faces into the drawing (a symbol or another net's wire between it and the outside
@@ -30,16 +30,22 @@
 //!   not placed yet, and those a ROUTE asks to wire, which a solver joins;
 //! - a wire of no length, or with a segment of none, and the wires of a net that close a loop.
 //!
-//! The objects are told apart by the names of the standard series' definitions, such as
-//! `$JUNCTION`, `$IO_PORT`, `$GROUND` and `$SUPPLY`, or by their symbols' names: a known limit,
-//! as the core otherwise reads no standard name.
+//! The objects are told apart by their structure, as the language gives it, never by the names of
+//! a package's definitions or symbols ([`classify`]): an instance or a bundle is a device; a usage
+//! attached to a net, or whose pins all lie at its own point and are on a net, stands for that net,
+//! a port when a role is attached to a port of the level itself, and a rail otherwise, such as a
+//! ground attached to a terminal; a usage whose pins all lie at its own point and are on no net, or that has none,
+//! marks the point it is drawn at, such as a junction dot, a no-connect or an arrow head; any other
+//! usage is a device.
+//! So a dot is any such mark: whether a mark is a dot is up to a package, and whether a point with
+//! two wires has one is up to the author (13.2), so a dot that joins fewer is not said.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use rnl_runtime::diag::{Loc, Severity};
 use rnl_runtime::geom::{fmt_num, Pt};
 use rnl_runtime::markup;
-use rnl_runtime::model::{Attach, LevelView, ObjectInfo, TextTarget, Vertex};
+use rnl_runtime::model::{Attach, ItemView, LevelView, ObjectInfo, SymbolView, TextTarget, Vertex};
 use rnl_runtime::problem::{FactKind, LevelProblem, PointRef, Position, Slot};
 
 const EPS: f64 = 1e-6;
@@ -60,7 +66,6 @@ pub enum Kind {
     Crossings,
     WrongExit,
     NoDot,
-    IdleDot,
     SilentOpen,
     PortInside,
     PortEnclosed,
@@ -71,7 +76,7 @@ pub enum Kind {
 }
 
 impl Kind {
-    pub const ALL: [Kind; 17] = [
+    pub const ALL: [Kind; 16] = [
         Kind::PortEnclosed,
         Kind::PortInside,
         Kind::NameOnly,
@@ -81,7 +86,6 @@ impl Kind {
         Kind::WireOverSymbol,
         Kind::SilentOpen,
         Kind::NoDot,
-        Kind::IdleDot,
         Kind::WrongExit,
         Kind::WireOverText,
         Kind::TextOverText,
@@ -103,7 +107,6 @@ impl Kind {
             Kind::Crossings => "crossings",
             Kind::WrongExit => "wrong-exit",
             Kind::NoDot => "no-dot",
-            Kind::IdleDot => "idle-dot",
             Kind::SilentOpen => "silent-open",
             Kind::PortInside => "port-inside",
             Kind::PortEnclosed => "port-enclosed",
@@ -129,7 +132,6 @@ impl Kind {
             Kind::Crossings => "crossing",
             Kind::WrongExit => "wire leaving a pin against its direction",
             Kind::NoDot => "T-join without a junction dot",
-            Kind::IdleDot => "junction dot that joins nothing",
             Kind::SilentOpen => "silent open",
             Kind::PortInside => "port facing into the drawing or buried",
             Kind::PortEnclosed => "port enclosed",
@@ -153,7 +155,6 @@ impl Kind {
             Kind::Crossings => "crossings",
             Kind::WrongExit => "wires leaving a pin against its direction",
             Kind::NoDot => "T-joins without a junction dot",
-            Kind::IdleDot => "junction dots that join nothing",
             Kind::SilentOpen => "silent opens",
             Kind::PortInside => "ports facing into the drawing or buried",
             Kind::PortEnclosed => "ports enclosed",
@@ -220,7 +221,6 @@ enum Class {
     Device,
     Port,
     Rail,
-    Junction,
     /// A mark drawn on a wire or a pin: no connection, a current arrow, an arrow head.
     Mark,
 }
@@ -228,6 +228,9 @@ enum Class {
 struct Part {
     name: String,
     class: Class,
+    /// For a usage, whether a role is attached to a port of the level, as a port tag's is: such a
+    /// usage stands for the port and blocks no other port.
+    on_port: bool,
     bbox: [f64; 4],
     /// Indexes into [`Drawing::pins`].
     pins: Vec<usize>,
@@ -308,7 +311,8 @@ struct Drawing<'a> {
     wires: Vec<WireAt>,
     texts: Vec<TextAt>,
     segs: Vec<Seg>,
-    junctions: Vec<Pt>,
+    /// Where the marks are drawn ([`Class::Mark`]), such as junction dots.
+    marks: Vec<Pt>,
     level_loc: Loc,
     /// The pins by their point.
     pin_at: HashMap<(i64, i64), Vec<usize>>,
@@ -318,23 +322,19 @@ struct Drawing<'a> {
     seg_cells: HashMap<(i64, i64), Vec<usize>>,
     /// The texts by the cells their boxes cover.
     text_cells: HashMap<(i64, i64), Vec<usize>>,
-    /// Whether the files are of a version whose standard series labels a net with a symbol,
-    /// `$NET_LABEL`, from 0.4, rather than with a text of key `netname`.
-    label_symbol: bool,
     /// The nets a ROUTE asks to wire (13.7), as the problem names them: a solver joins their pins.
     routed: BTreeSet<String>,
 }
 
 /// The geometry hints of one level as it is drawn; `problem` is what a solver reads of it, read
-/// with the records of the solver, for the line of the record that places each object, and
-/// `language` the version the main file declares (`Model::language`), for the fixes the hints
-/// give. A level with nothing placed has none.
-pub fn level_hints(lv: &LevelView, problem: Option<&LevelProblem>, language: &str) -> LevelHints {
+/// with the records of the solver, for the line of the record that places each object and for the
+/// ports of the level. A level with nothing placed has none.
+pub fn level_hints(lv: &LevelView, problem: Option<&LevelProblem>) -> LevelHints {
     let mut out = LevelHints { title: lv.title.clone(), ..LevelHints::default() };
     if lv.items.is_empty() && lv.wires.is_empty() {
         return out;
     }
-    let d = Drawing::new(lv, problem, language);
+    let d = Drawing::new(lv, problem);
     let mut hints = Vec::new();
     d.ports(&mut hints);
     d.name_joins(&mut hints);
@@ -359,18 +359,80 @@ pub fn interpretation_hints(r: &rnl_runtime::Interpretation) -> Vec<LevelHints> 
     r.model
         .levels
         .iter()
-        .map(|lv| {
-            level_hints(lv, r.problems.iter().find(|p| p.level == lv.level && p.title == lv.title), &r.model.language)
-        })
+        .map(|lv| level_hints(lv, r.problems.iter().find(|p| p.level == lv.level && p.title == lv.title)))
         .collect()
 }
 
 // ---------------------------------------------------------------- geometry
 
-/// Whether a version such as "0.3" is `min` or later; one not given is not.
-fn at_least(version: &str, min: (u32, u32)) -> bool {
-    let mut parts = version.split('.').map(|p| p.parse::<u32>().unwrap_or(0));
-    (parts.next().unwrap_or(0), parts.next().unwrap_or(0)) >= min
+/// The nets a usage's roles are attached to, as `&name`.
+fn role_nets(o: &ObjectInfo) -> Vec<&str> {
+    fn nets<'b>(a: &'b Attach, out: &mut Vec<&'b str>) {
+        match a {
+            Attach::Object(id) if id.starts_with('&') => out.push(id),
+            Attach::Set(items) => items.iter().for_each(|x| nets(x, out)),
+            _ => {}
+        }
+    }
+    let mut out = Vec::new();
+    for (_, a) in &o.attach {
+        nets(a, &mut out);
+    }
+    out
+}
+
+/// Whether a usage stands for a net: one of its roles is attached to a net, or its symbol has pins,
+/// all at the usage's own point, on a net, such as a ground attached to a terminal.
+fn stands_for_net(o: &ObjectInfo, it: &ItemView, sym: &SymbolView) -> bool {
+    o.kind == "usage"
+        && (!role_nets(o).is_empty()
+            || (pins_at_own_point(sym) && !sym.pins.is_empty() && it.pin_nets.iter().any(|n| !n.is_empty())))
+}
+
+/// The nets a usage that stands for a net stands for, as `&name`: those its roles are attached to,
+/// and those of its pins.
+fn standing_nets(o: &ObjectInfo, it: &ItemView) -> Vec<String> {
+    let mut nets: Vec<String> = role_nets(o).iter().map(|n| n.to_string()).collect();
+    nets.extend(it.pin_nets.iter().flatten().map(|n| format!("&{n}")));
+    nets.sort();
+    nets.dedup();
+    nets
+}
+
+/// Whether every pin of a symbol lies at its own point, the point it is placed at; one with no pin
+/// has none elsewhere.
+fn pins_at_own_point(sym: &SymbolView) -> bool {
+    sym.pins.iter().all(|p| near(p.pos, (0.0, 0.0)))
+}
+
+/// What a drawn object is, from its structure as the language gives it, not from the names of a
+/// package's definitions or symbols:
+/// - an instance or a bundle is a device;
+/// - a usage with a role attached to a net, or whose pins all lie at its own point and are on a
+///   net, such as a ground attached to a terminal, stands for that net: a port when a role is
+///   attached to a port of the level itself (`ports`, as `&name`) and no other usage stands for
+///   that net (`standing`, how many do), as a port tag does; a rail, such as a ground or a supply,
+///   otherwise, the grounds drawn on a port `vss` included;
+/// - a usage whose pins all lie at its own point and are on no net, or that has none, marks that
+///   point, such as a junction dot, a no-connect or an arrow head;
+/// - any other usage is a device.
+fn classify(
+    it: &ItemView,
+    info: Option<&ObjectInfo>,
+    sym: &SymbolView,
+    ports: &BTreeSet<String>,
+    standing: &HashMap<String, usize>,
+) -> Class {
+    let Some(o) = info.filter(|o| o.kind == "usage") else { return Class::Device };
+    if stands_for_net(o, it, sym) {
+        let port = role_nets(o).iter().any(|n| ports.contains(*n) && standing.get(*n) == Some(&1));
+        return if port { Class::Port } else { Class::Rail };
+    }
+    if pins_at_own_point(sym) {
+        Class::Mark
+    } else {
+        Class::Device
+    }
 }
 
 fn near(a: Pt, b: Pt) -> bool {
@@ -522,8 +584,7 @@ fn words(def: &str) -> String {
 // ---------------------------------------------------------------- reading the level
 
 impl<'a> Drawing<'a> {
-    fn new(lv: &'a LevelView, problem: Option<&LevelProblem>, language: &str) -> Drawing<'a> {
-        let label_symbol = at_least(language, (0, 4));
+    fn new(lv: &'a LevelView, problem: Option<&LevelProblem>) -> Drawing<'a> {
         let by_id: HashMap<&str, &ObjectInfo> = lv.objects.iter().map(|o| (o.id.as_str(), o)).collect();
         let level_loc = Loc::line(lv.file.clone(), lv.line.max(1));
         // where each object is placed: the first PLACE of its origin in the order of 8.5
@@ -557,31 +618,33 @@ impl<'a> Drawing<'a> {
             wires: Vec::new(),
             texts: Vec::new(),
             segs: Vec::new(),
-            junctions: Vec::new(),
+            marks: Vec::new(),
             level_loc,
             pin_at: HashMap::new(),
             vertex_at: HashMap::new(),
             seg_cells: HashMap::new(),
             text_cells: HashMap::new(),
-            label_symbol,
             routed: problem.map(|p| p.routes.iter().map(|r| r.net.clone()).collect()).unwrap_or_default(),
         };
+        // the ports of the level, for what each object is (`classify`)
+        let ports: BTreeSet<String> = problem
+            .map(|p| p.nets.iter().filter(|n| n.port.is_some()).map(|n| format!("&{}", n.name)).collect())
+            .unwrap_or_default();
+        // how many drawn usages stand for each net
+        let mut standing: HashMap<String, usize> = HashMap::new();
+        for it in &lv.items {
+            let sym = &lv.symbols[it.symbol];
+            if let Some(o) = by_id.get(it.object_id.as_str()).filter(|o| stands_for_net(o, it, sym)) {
+                for n in standing_nets(o, it) {
+                    *standing.entry(n).or_default() += 1;
+                }
+            }
+        }
         for it in &lv.items {
             let sym = &lv.symbols[it.symbol];
             let info = (!it.object_id.is_empty()).then(|| by_id.get(it.object_id.as_str()).copied()).flatten();
-            let def = info.and_then(|o| o.definition.as_deref()).unwrap_or("");
-            let sname = sym.name.to_ascii_uppercase();
-            let class = match def {
-                "$JUNCTION" => Class::Junction,
-                "$IO_PORT" => Class::Port,
-                "$GROUND" | "$SUPPLY" => Class::Rail,
-                "$NO_CONNECT" | "$CURRENT_ARROW" | "$ARROW" => Class::Mark,
-                _ if sname.contains("JUNCTION") => Class::Junction,
-                _ if sname.contains("IO_PORT") => Class::Port,
-                _ if sname.contains("GROUND") || sname.contains("SUPPLY") => Class::Rail,
-                _ if sname.contains("NO_CONNECT") || sname.contains("ARROW") => Class::Mark,
-                _ => Class::Device,
-            };
+            let class = classify(it, info, sym, &ports, &standing);
+            let on_port = info.is_some_and(|o| role_nets(o).iter().any(|n| ports.contains(*n)));
             let corners = [
                 (sym.bbox[0], sym.bbox[1]),
                 (sym.bbox[0], sym.bbox[3]),
@@ -622,7 +685,7 @@ impl<'a> Drawing<'a> {
                 }
                 let pin_name = shown.first().cloned().unwrap_or_else(|| format!("{name}:{}", j + 1));
                 pins.push(d.pins.len());
-                if class != Class::Junction {
+                if class != Class::Mark {
                     d.pin_at.entry(key(pos)).or_default().push(d.pins.len());
                 }
                 d.pins.push(PinAt {
@@ -634,17 +697,10 @@ impl<'a> Drawing<'a> {
                     keys,
                 });
             }
-            if class == Class::Junction {
-                d.junctions.push(it.at);
+            if class == Class::Mark {
+                d.marks.push(it.at);
             }
-            d.parts.push(Part { name, class, bbox, pins, loc });
-        }
-        for p in &lv.points {
-            if let (true, Some(at)) = (p.junction, p.at) {
-                if !d.junctions.iter().any(|q| near(*q, at)) {
-                    d.junctions.push(at);
-                }
-            }
+            d.parts.push(Part { name, class, on_port, bbox, pins, loc });
         }
         // where each vertex a wire names is: a pin by its key, a named point
         let mut at_key: HashMap<String, Pt> = HashMap::new();
@@ -801,7 +857,7 @@ impl<'a> Drawing<'a> {
         }
     }
 
-    /// The pins at a point, junctions left out.
+    /// The pins at a point, marks left out.
     fn pins_at(&self, q: Pt) -> impl Iterator<Item = (usize, &PinAt)> {
         self.pin_at
             .get(&key(q))
@@ -847,7 +903,7 @@ impl<'a> Drawing<'a> {
     fn over_symbols(&self, out: &mut Vec<Hint>) {
         let mut seen = BTreeSet::new();
         for (k, p) in self.parts.iter().enumerate() {
-            if matches!(p.class, Class::Junction | Class::Mark) {
+            if p.class == Class::Mark {
                 continue;
             }
             let shrunk = [p.bbox[0] + 0.05, p.bbox[1] + 0.05, p.bbox[2] - 0.05, p.bbox[3] - 0.05];
@@ -880,7 +936,7 @@ impl<'a> Drawing<'a> {
     /// joined.
     fn looks_joined(&self, out: &mut Vec<Hint>) {
         for p in &self.pins {
-            if p.nets.is_empty() || self.parts[p.part].class == Class::Junction {
+            if p.nets.is_empty() || self.parts[p.part].class == Class::Mark {
                 continue;
             }
             for w in self.wires_at(p.pos) {
@@ -1113,7 +1169,7 @@ impl<'a> Drawing<'a> {
         by
     }
 
-    /// T-joins without a dot and dots that join nothing.
+    /// T-joins without a mark at the point, such as a junction dot.
     fn dots(&self, out: &mut Vec<Hint>) {
         let mut points: BTreeMap<(i64, i64), Pt> = BTreeMap::new();
         for w in &self.wires {
@@ -1124,20 +1180,11 @@ impl<'a> Drawing<'a> {
         for p in &self.pins {
             points.insert(key(p.pos), p.pos);
         }
-        let dots: BTreeSet<(i64, i64)> = self.junctions.iter().map(|j| key(*j)).collect();
-        for q in points.values() {
-            let dot = dots.contains(&key(*q));
-            let mut joins = false;
+        let dots: BTreeSet<(i64, i64)> = self.marks.iter().map(|j| key(*j)).collect();
+        for q in points.values().filter(|q| !dots.contains(&key(**q))) {
             for (n, (ends, through)) in self.incidence(*q) {
-                if ends + 2 * through < 3 || ends + through < 2 {
-                    continue;
-                }
                 // two wires that pass through each other without an end there are a crossing
-                if ends == 0 && !dot {
-                    continue;
-                }
-                joins = true;
-                if dot {
+                if ends + 2 * through < 3 || ends + through < 2 || ends == 0 {
                     continue;
                 }
                 let wires: Vec<usize> =
@@ -1154,52 +1201,14 @@ impl<'a> Drawing<'a> {
                     Severity::Hint,
                     wires.first().and_then(|&w| self.wires[w].loc.as_ref()),
                     format!(
-                        "&{} joins at {} without a junction dot: {} meet there; write $JUNCTION @ATTACH at the point",
+                        "&{} joins at {} without a junction dot: {} meet there; draw a junction dot at the point",
                         rnl_runtime::model::quoted(n),
                         pt(*q),
                         list(&what)
                     ),
                 );
             }
-            // a dot of a drawing not done may wait for a wire to a part not placed yet
-            if dot && !joins && self.lv.unplaced.is_empty() {
-                self.idle_dot(out, *q);
-            }
         }
-        // a dot off every wire and pin
-        for j in self.junctions.iter().filter(|_| self.lv.unplaced.is_empty()) {
-            if !points.contains_key(&key(*j)) && self.wires_at(*j).is_empty() {
-                self.hint(
-                    out,
-                    Kind::IdleDot,
-                    Severity::Hint,
-                    None,
-                    format!("the junction dot at {} lies on no wire", pt(*j)),
-                );
-            }
-        }
-    }
-
-    fn idle_dot(&self, out: &mut Vec<Hint>, q: Pt) {
-        let pins: Vec<String> = self.pins_at(q).map(|(_, p)| p.name.clone()).collect();
-        let mut by_net: Vec<String> =
-            self.wires_at(q).into_iter().flat_map(|w| self.wires[w].nets.iter().cloned()).collect();
-        by_net.sort();
-        by_net.dedup();
-        let why = if !pins.is_empty() {
-            format!("it lies on the pin {}, where a single wire needs none", list(&pins))
-        } else if by_net.len() >= 2 {
-            format!("it lies on a crossing of {}, which it does not join", nets(&by_net))
-        } else {
-            "fewer than three wires or pins of one net meet there".to_string()
-        };
-        self.hint(
-            out,
-            Kind::IdleDot,
-            Severity::Hint,
-            None,
-            format!("the junction dot at {} joins nothing: {why}", pt(q)),
-        );
     }
 
     /// Which wires and pins the language joins: those that name a vertex in common, a point or a
@@ -1285,7 +1294,7 @@ impl<'a> Drawing<'a> {
             }
         };
         for (k, p) in self.parts.iter().enumerate() {
-            if k == own || matches!(p.class, Class::Junction | Class::Mark | Class::Port) {
+            if k == own || matches!(p.class, Class::Mark | Class::Port) || p.on_port {
                 continue;
             }
             // a symbol all of whose pins are on the port's net stands for it
@@ -1390,11 +1399,8 @@ impl<'a> Drawing<'a> {
                     b[1] < p.bbox[1] - 0.5
                 }
             };
-            let further = self
-                .parts
-                .iter()
-                .enumerate()
-                .any(|(j, q)| j != k && !matches!(q.class, Class::Junction | Class::Mark) && beyond(&q.bbox));
+            let further =
+                self.parts.iter().enumerate().any(|(j, q)| j != k && q.class != Class::Mark && beyond(&q.bbox));
             if free.len() == 1 && further {
                 let said: Vec<String> =
                     blocked.iter().filter_map(|(d, b)| b.as_ref().map(|b| format!("{} {b}", way(*d)))).collect();
@@ -1530,19 +1536,12 @@ impl<'a> Drawing<'a> {
                     Kind::NameOnly,
                     Severity::Hint,
                     self.parts[p.part].loc.as_ref(),
-                    {
-                        let at = p.keys.first().map_or(p.name.as_str(), |k| k.as_str());
-                        let label = if self.label_symbol {
-                            format!("$NET_LABEL @ATTACH {at}")
-                        } else {
-                            format!("{at} @TEXT(\"${{net}}\", key=\"netname\")")
-                        };
-                        format!(
-                            "{} is joined to &{} by its name alone: no wire, port or label at it, so it looks unconnected; wire it, or give it a label ({label})",
-                            p.name,
-                            rnl_runtime::model::quoted(n),
-                        )
-                    },
+                    format!(
+                        "{} is joined to &{} by its name alone: no wire, port or label at it, so it looks unconnected; wire it, or give it a label at {}",
+                        p.name,
+                        rnl_runtime::model::quoted(n),
+                        p.keys.first().map_or(p.name.as_str(), |k| k.as_str())
+                    ),
                 );
             }
         }

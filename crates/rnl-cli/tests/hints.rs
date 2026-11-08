@@ -11,11 +11,26 @@ use rnl_view::hints::{interpretation_hints, Hint, Kind};
 
 /// A file of 0.3 with these devices and this record, read as `rnl check` reads it.
 fn hints(devices: &str, record: &str) -> Vec<Hint> {
-    let text = format!(
-        "* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\") }}\n{devices}* @RNL {{\n{}\n* }}\n.end\n",
-        record.lines().map(|l| format!("*   {}", l.trim())).collect::<Vec<_>>().join("\n")
-    );
-    let files = MemoryProvider::new().with("/w/t.sp", &text);
+    hints_of(&format!("* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\") }}\n{devices}{}.end\n", records(record)))
+}
+
+/// [`hints`] of a subcircuit whose ports are `ports`, with these devices and this record; the top
+/// level only calls it.
+fn hints_in_cell(ports: &str, devices: &str, record: &str) -> Vec<Hint> {
+    hints_of(&format!(
+        "* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\") }}\n.subckt cell {ports}\n{devices}{}.ends\nX1 {ports} cell\n.end\n",
+        records(record)
+    ))
+}
+
+/// `record` as a record of comment lines.
+fn records(record: &str) -> String {
+    format!("* @RNL {{\n{}\n* }}\n", record.lines().map(|l| format!("*   {}", l.trim())).collect::<Vec<_>>().join("\n"))
+}
+
+/// The hints of `text` read as `rnl check` reads it, which must read without errors.
+fn hints_of(text: &str) -> Vec<Hint> {
+    let files = MemoryProvider::new().with("/w/t.sp", text);
     let r =
         rnl_cli::interpret_file(Path::new("/w/t.sp"), None, &files, &Options { problems: true, ..Options::default() })
             .unwrap();
@@ -92,7 +107,7 @@ R3 e f 1k
 }
 
 #[test]
-fn a_t_join_needs_a_dot_and_a_dot_on_a_corner_joins_nothing() {
+fn a_t_join_needs_a_dot_and_a_dot_on_a_corner_is_the_authors() {
     let hs = hints(
         "R1 a b 1k\nR2 a c 1k\nR3 a d 1k\n",
         "#R1 @PLACE(0, 0);\n#R2 @PLACE(6, 0);\n#R3 @PLACE(12, 0);\n%j = (6, 4);\n%k = (0, 4);\n\
@@ -100,7 +115,8 @@ fn a_t_join_needs_a_dot_and_a_dot_on_a_corner_joins_nothing() {
          $JUNCTION @ATTACH %k",
     );
     assert!(has(&hs, Kind::NoDot, &["&a joins at (6, 4) without a junction dot"]), "{hs:#?}");
-    assert!(has(&hs, Kind::IdleDot, &["(0, 4) joins nothing"]), "{hs:#?}");
+    // a dot where only two wires meet is the author's to draw (13.2): nothing is said of it
+    assert_eq!(kinds(&hs), [Kind::NoDot], "{hs:#?}");
     // with the dot where the wires meet, and none on the corner, nothing is said
     let hs = hints(
         "R1 a b 1k\nR2 a c 1k\nR3 a d 1k\n",
@@ -108,7 +124,7 @@ fn a_t_join_needs_a_dot_and_a_dot_on_a_corner_joins_nothing() {
          &a @WIRE(mode=\"straight\") {#R1:1 (0, 4) %j (12, 4) #R3:1};\n&a @WIRE(mode=\"straight\") {%j #R2:1};\n\
          $JUNCTION @ATTACH %j",
     );
-    assert!(!kinds(&hs).iter().any(|k| matches!(k, Kind::NoDot | Kind::IdleDot)), "{hs:#?}");
+    assert!(!kinds(&hs).contains(&Kind::NoDot), "{hs:#?}");
 }
 
 #[test]
@@ -129,7 +145,9 @@ fn a_wire_end_on_its_net_that_it_does_not_name_is_a_silent_open() {
 
 #[test]
 fn a_port_enclosed_or_facing_into_the_drawing() {
-    let hs = hints(
+    // e and m are ports of the subcircuit, and the usages attached to them stand for them
+    let hs = hints_in_cell(
+        "e m",
         "R1 a b 1k
 R2 a c 1k
 R3 f g 1k
@@ -159,13 +177,9 @@ fn a_net_partly_wired_and_a_pin_joined_by_name_alone() {
                   &b @WIRE(mode=\"straight\") {#R1:2 (0, -3) (4, -3) #R2:1}";
     let hs = hints(devices, placed);
     assert!(has(&hs, Kind::PartlyNamed, &["&b is drawn in 2 pieces", "#R3:p"]), "{hs:#?}");
-    // the fix it gives is a net-name text, as the series 0.3 labels a pin
+    // the fix it gives names the pin, and no definition of a package
     assert!(
-        has(
-            &hs,
-            Kind::NameOnly,
-            &["#R3:p is joined to &b by its name alone", "#R3:1 @TEXT(\"${net}\", key=\"netname\")"]
-        ),
+        has(&hs, Kind::NameOnly, &["#R3:p is joined to &b by its name alone", "give it a label at #R3:1"]),
         "{hs:#?}"
     );
     // a net-name text at the pin names it: no longer headless, though the net is still in pieces
@@ -224,7 +238,8 @@ fn check_prints_the_hints_and_counts_them_but_does_not_fail() {
 /// Ports in a column at the edge, each facing out: none is buried or enclosed by its neighbours.
 #[test]
 fn ports_side_by_side_at_the_edge_are_not_buried() {
-    let hs = hints(
+    let hs = hints_in_cell(
+        "a b c",
         "R1 a o 1k\nR2 b o 1k\nR3 c o 1k\n",
         "%pa = $IO_PORT @ATTACH &a;\n%pb = $IO_PORT @ATTACH &b;\n%pc = $IO_PORT @ATTACH &c;\n\
          %pa @PLACE(-6, 6);\n%pb @PLACE(-6, 3);\n%pc @PLACE(-6, 0);\n\
@@ -347,4 +362,32 @@ fn a_document_has_the_hints_when_asked() {
     let d = rnl_view::build("/w/t.sp", &files, &rnl_view::BuildOptions::default()).unwrap();
     assert!(d.levels[0].hints.is_empty());
     assert!(serde_json::to_value(&d).unwrap()["levels"][0].get("hints").is_none());
+}
+
+/// The hints tell objects apart by their structure, not by the names of a package's definitions: a
+/// usage of a definition of the file's own, with its pin at its own point, marks the point it sits
+/// on, as a junction dot of the standard series does; attached to a net, it stands for the net.
+#[test]
+fn a_junction_dot_or_a_net_symbol_of_any_name() {
+    let own = "$DOT_SYM = @DEFINE-SYMBOL {(0, 0) @PIN(terminal=\"p\"); (0, 0) @CIRCLE(radius=0.2)};\n\
+               $DOT = @DEFINE(roles=[[\"p\", [\"point\", \"net\", \"terminal\"]]]) {};\n\
+               # @SELECT-USAGE $DOT => @SET-SYMBOL $DOT_SYM;\n";
+    let tee = "#R1 @PLACE(0, 0);\n#R2 @PLACE(6, 0);\n#R3 @PLACE(12, 0);\n%j = (6, 4);\n\
+               &a @WIRE(mode=\"straight\") {#R1:1 (0, 4) %j (12, 4) #R3:1};\n&a @WIRE(mode=\"straight\") {%j #R2:1}";
+    let devices = "R1 a b 1k\nR2 a c 1k\nR3 a d 1k\n";
+    // without a dot, the T-join wants one; with one of the file's own definition, it has one
+    assert!(has(&hints(devices, &format!("{own}{tee}")), Kind::NoDot, &["&a joins at (6, 4)"]));
+    let hs = hints(devices, &format!("{own}{tee};\n$DOT @ATTACH %j"));
+    assert!(!kinds(&hs).contains(&Kind::NoDot), "{hs:#?}");
+    // attached to a net, the same usage stands for it: its net is left out of the joins by name
+    let pieces = "#R1 @PLACE(0, 0);\n#R2 @PLACE(4, 0) => @ORIENT(\"R180\");\n#R3 @PLACE(8, 0);\n\
+                  &b @WIRE(mode=\"straight\") {#R1:2 (0, -3) (4, -3) #R2:1}";
+    let devices = "R1 a b 1k\nR2 b c 1k\nR3 b d 1k\n";
+    assert!(has(&hints(devices, &format!("{own}{pieces}")), Kind::PartlyNamed, &["&b"]));
+    let hs = hints(devices, &format!("{own}{pieces};\n%n = $DOT @ATTACH &b;\n%n @PLACE(8, -3)"));
+    assert!(!kinds(&hs).iter().any(|k| matches!(k, Kind::NameOnly | Kind::PartlyNamed)), "{hs:#?}");
+    // attached to a terminal, its pin at its own point on the terminal's net, it stands for the
+    // net too, as a ground or a supply drawn on a pin does
+    let hs = hints(devices, &format!("{own}{pieces};\n$DOT @ATTACH #R3:1"));
+    assert!(!kinds(&hs).iter().any(|k| matches!(k, Kind::NameOnly | Kind::PartlyNamed)), "{hs:#?}");
 }

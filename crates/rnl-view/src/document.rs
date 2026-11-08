@@ -526,7 +526,7 @@ pub(crate) fn document(
     if options.hints {
         for (k, lv) in r.model.levels.iter().enumerate() {
             let problem = r.problems.iter().find(|p| p.level == lv.level && p.title == lv.title);
-            levels[k].hints = crate::hints::level_hints(lv, problem, &r.model.language)
+            levels[k].hints = crate::hints::level_hints(lv, problem)
                 .hints
                 .into_iter()
                 .map(|h| {
