@@ -156,6 +156,14 @@ export type Level = {
    */
   net_labels: Array<NetLabel>,
   /**
+   * The geometry hints of the level as it is drawn, as `rnl check` prints them
+   * ([`crate::hints`]): where wires look joined, run over symbols or texts, leave a pin the
+   * wrong way, and the like. Read-only, they never block. Only when
+   * [`crate::BuildOptions::hints`] asks for them; left out when there are none.
+   * **Experimental: not promised to stay as it is.**
+   */
+  hints?: Array<LevelHint>,
+  /**
    * The subcircuit instances of the level, in netlist order: the hierarchy below it.
    */
   children: Array<Child>,
@@ -319,6 +327,31 @@ export type NetLabel = {
    * one nearest the centre of its vertices and pins.
    */
   at: [number, number],
+};
+
+/**
+ * A geometry hint of a level ([`Level::hints`]).
+ */
+export type LevelHint = {
+  /**
+   * What it is about, such as "looks-joined" or "wire-over-symbol" ([`crate::hints::Kind`]).
+   */
+  kind: string,
+  /**
+   * "warning" or "hint".
+   */
+  severity: string,
+  message: string,
+  /**
+   * The file of the record that draws or places the first thing it names, or of the level, as
+   * [`Diagnostic::file`] shows it.
+   */
+  file: string,
+  /**
+   * The index of the file in `Document::files`, when it is one of them.
+   */
+  file_index: number | null,
+  line: number,
 };
 
 /**

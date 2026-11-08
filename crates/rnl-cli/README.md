@@ -9,7 +9,7 @@ built from a source archive without Git metadata.
 
 ```text
 rnl --version                   print the core version and build commit
-rnl check FILE [options]          print the diagnostics; exit 1 on errors
+rnl check FILE [options]          print the diagnostics and the drawing's geometry hints; exit 1 on errors
 rnl render FILE -o DIR [options]  write one SVG per drawing level
 rnl dump FILE [options]           print the effective model and diagnostics as JSON
 rnl view FILE [options]           print the Document a viewer shows, as JSON
@@ -41,6 +41,7 @@ view options:
   --flylines          draw the flylines (13.3, 13.7) of every net in the SVG and the primitives, to
                       check what is not wired; view, snapshot and render take it. Each is a group of
                       class "flyline" in the SVG
+  --hints             give each level its geometry hints, as check prints them; experimental
   --status            give each level its solve status: fixed, unsolved, solved or stale
   --constraints       give each level its constraints after expansion, what a solver takes in, tied
                       to the Document's objects; experimental, not promised to stay as it is

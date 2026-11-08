@@ -16,7 +16,7 @@ mod solver_args;
 const USAGE: &str = concat!(
     "usage:
   rnl --version                   print the core version and build commit
-  rnl check FILE [options]          print the diagnostics; exit 1 on errors
+  rnl check FILE [options]          print the diagnostics and the drawing's geometry hints; exit 1 on errors
   rnl render FILE -o DIR [options]  write one SVG per drawing level
   rnl dump FILE [options]           print the effective model and diagnostics as JSON
   rnl view FILE [options]           print the Document a viewer shows, as JSON
@@ -60,6 +60,7 @@ view options:
   --flylines          draw the flylines (13.3, 13.7) of every net in the SVG and the primitives, to
                       check what is not wired; view, snapshot and render take it. Each is a group of
                       class \"flyline\" in the SVG
+  --hints             give each level its geometry hints, as check prints them; experimental
   --status            give each level its solve status: fixed, unsolved, solved or stale
   --constraints       give each level its constraints after expansion, what a solver takes in, tied
                       to the Document's objects; experimental, not promised to stay as it is
@@ -112,6 +113,8 @@ struct Args {
     primitives: bool,
     /// `--flylines`.
     flylines: bool,
+    /// `view`'s `--hints`.
+    hints: bool,
     status: bool,
     /// `view`'s `--constraints`.
     constraints: bool,
@@ -151,7 +154,7 @@ fn parse_args() -> Result<Args, String> {
     let mut dialect = None;
     let mut formats = BTreeMap::new();
     let (mut svg, mut primitives, mut status) = (true, false, false);
-    let mut flylines = false;
+    let (mut flylines, mut hints) = (false, false);
     let mut level = None;
     let mut solver = solver_args::SolverArgs::default();
     let mut author = None;
@@ -205,6 +208,7 @@ fn parse_args() -> Result<Args, String> {
             "--no-svg" => svg = false,
             "--primitives" => primitives = true,
             "--flylines" => flylines = true,
+            "--hints" => hints = true,
             "--status" => status = true,
             "--constraints" => constraints = true,
             "--level" => level = Some(it.next().ok_or("--level needs a title")?),
@@ -281,6 +285,7 @@ fn parse_args() -> Result<Args, String> {
         svg,
         primitives,
         flylines,
+        hints,
         status,
         constraints,
         level,
@@ -394,12 +399,24 @@ fn run(args: &Args) -> Result<ExitCode, String> {
     check_formats(args, &provider)?;
     match args.command.as_str() {
         "check" => {
-            let r = interpret(args, &provider)?;
+            // read with the problems too, for the lines of the records that place the objects the
+            // geometry hints name
+            let read = Options { problems: true, ..options(args) };
+            let r = rnl_cli::interpret_file_with(&args.file, args.dialect.as_deref(), &args.formats, &provider, &read)?;
             let shown = r.diagnostics();
             for d in &shown {
                 println!("{}", r.sink.render(d));
             }
-            let count = |sev| shown.iter().filter(|d| d.severity == sev).count();
+            // the geometry hints of the drawing, read-only: they never block
+            let geometry: Vec<rnl_view::hints::Hint> =
+                rnl_view::hints::interpretation_hints(&r).into_iter().flat_map(|l| l.hints).collect();
+            for g in &geometry {
+                println!("{}", g.render());
+            }
+            let count = |sev| {
+                shown.iter().filter(|d| d.severity == sev).count()
+                    + geometry.iter().filter(|g| g.severity == sev).count()
+            };
             let (e, w, h) = (count(Severity::Error), count(Severity::Warning), count(Severity::Hint));
             for line in rnl_cli::status_lines(&r) {
                 println!("{line}");
@@ -421,6 +438,7 @@ fn run(args: &Args) -> Result<ExitCode, String> {
                 svg: args.svg,
                 primitives: args.primitives,
                 flylines: args.flylines,
+                hints: args.hints,
                 status: args.status,
                 constraints: args.constraints,
                 bind: args.bind.clone(),
@@ -437,6 +455,7 @@ fn run(args: &Args) -> Result<ExitCode, String> {
                 svg: false,
                 primitives: false,
                 flylines: true,
+                hints: false,
                 status: false,
                 constraints: false,
                 bind: None,
@@ -471,6 +490,7 @@ fn run(args: &Args) -> Result<ExitCode, String> {
                 svg: args.svg,
                 primitives: args.primitives,
                 flylines: args.flylines,
+                hints: false,
                 status: args.status,
                 constraints: false,
                 bind: None,

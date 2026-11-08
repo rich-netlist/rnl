@@ -82,6 +82,10 @@ pub struct Request {
     /// given.
     #[serde(default)]
     pub flylines: bool,
+    /// Give each level its geometry hints, as `rnl check` prints them
+    /// ([`rnl_view::BuildOptions::hints`]); false when not given, and experimental.
+    #[serde(default)]
+    pub hints: bool,
     /// Give each level its solve status, what a frontend decides from whether to solve it
     /// (decision 0008); false when not given.
     #[serde(default)]
@@ -150,6 +154,8 @@ pub struct WriteRequest {
     pub primitives: bool,
     #[serde(default)]
     pub flylines: bool,
+    #[serde(default)]
+    pub hints: bool,
     #[serde(default)]
     pub status: bool,
 }
@@ -386,6 +392,7 @@ pub fn respond(request: &[u8]) -> Response {
         svg: request.svg,
         primitives: request.primitives,
         flylines: request.flylines,
+        hints: request.hints,
         status: request.status,
         constraints: request.constraints,
         bind: request.bind,
@@ -523,6 +530,7 @@ fn write(request: WriteRequest) -> Response {
         svg: request.svg,
         primitives: request.primitives,
         flylines: request.flylines,
+        hints: request.hints,
         status: request.status,
         constraints: false,
         bind: None,

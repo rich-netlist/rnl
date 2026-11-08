@@ -116,6 +116,14 @@ pub struct Level {
     /// on the level (`rnl_runtime::model::LevelView::net_labels`). **Experimental: not promised to
     /// stay as it is.**
     pub net_labels: Vec<NetLabel>,
+    /// The geometry hints of the level as it is drawn, as `rnl check` prints them
+    /// ([`crate::hints`]): where wires look joined, run over symbols or texts, leave a pin the
+    /// wrong way, and the like. Read-only, they never block. Only when
+    /// [`crate::BuildOptions::hints`] asks for them; left out when there are none.
+    /// **Experimental: not promised to stay as it is.**
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(test, ts(as = "Option<Vec<LevelHint>>", optional))]
+    pub hints: Vec<LevelHint>,
     /// The subcircuit instances of the level, in netlist order: the hierarchy below it.
     pub children: Vec<Child>,
     /// For a subcircuit, its parameters: their defaults, the values bound to them
@@ -135,6 +143,23 @@ pub struct Level {
     /// gives), then those that are not drawn at all, since no symbol can be chosen for them, each
     /// with its `reason` and no symbol.
     pub unplaced: Vec<Unplaced>,
+}
+
+/// A geometry hint of a level ([`Level::hints`]).
+#[derive(Serialize, Debug)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct LevelHint {
+    /// What it is about, such as "looks-joined" or "wire-over-symbol" ([`crate::hints::Kind`]).
+    pub kind: &'static str,
+    /// "warning" or "hint".
+    pub severity: &'static str,
+    pub message: String,
+    /// The file of the record that draws or places the first thing it names, or of the level, as
+    /// [`Diagnostic::file`] shows it.
+    pub file: String,
+    /// The index of the file in `Document::files`, when it is one of them.
+    pub file_index: Option<usize>,
+    pub line: u32,
 }
 
 /// Where a viewer may label one connected part of a net with its name ([`Level::net_labels`]).
@@ -497,6 +522,27 @@ pub(crate) fn document(
         ix.spans.push(Span { object, file, line: h.loc.line, col: h.loc.col, len: h.len, kind: "ref" });
     }
     let mut levels: Vec<Level> = r.model.levels.iter().map(|lv| ix.level(lv, options, lazy)).collect();
+    // the geometry hints, read on the levels as drawn with their problems (BuildOptions::hints)
+    if options.hints {
+        for (k, lv) in r.model.levels.iter().enumerate() {
+            let problem = r.problems.iter().find(|p| p.level == lv.level && p.title == lv.title);
+            levels[k].hints = crate::hints::level_hints(lv, problem, &r.model.language)
+                .hints
+                .into_iter()
+                .map(|h| {
+                    let (file, line) = h.loc.map(|l| (l.file, l.line)).unwrap_or_default();
+                    LevelHint {
+                        kind: h.kind.as_str(),
+                        severity: h.severity.as_str(),
+                        message: h.message,
+                        file: shown_file(&file),
+                        file_index: file_index.get(&file).copied(),
+                        line,
+                    }
+                })
+                .collect();
+        }
+    }
     let (params, notes) = Params::new(&r.doc, options.bind.as_ref());
     let drawn: HashMap<usize, usize> = r.model.levels.iter().enumerate().map(|(k, lv)| (lv.level, k)).collect();
     for (k, lv) in r.model.levels.iter().enumerate() {
@@ -980,6 +1026,7 @@ impl<'a> Index<'a> {
             solve: None,
             hits,
             net_labels,
+            hints: Vec::new(),
             children: Vec::new(),
             params: Vec::new(),
             constraints: None,

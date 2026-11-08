@@ -69,6 +69,11 @@ export interface Request {
    */
   flylines?: boolean;
   /**
+   * Give each level its geometry hints, `hints`, as `rnl check` prints them: where wires look
+   * joined, run over symbols or texts, and the like; false when not given, and experimental.
+   */
+  hints?: boolean;
+  /**
    * Give each level its solve status, `solve`, what a frontend decides from whether to solve it
    * (decision 0008): "fixed", "unsolved", "solved" or "stale"; false when not given.
    */
@@ -248,6 +253,7 @@ export interface WriteRequest {
   svg?: boolean;
   primitives?: boolean;
   flylines?: boolean;
+  hints?: boolean;
   status?: boolean;
 }
 

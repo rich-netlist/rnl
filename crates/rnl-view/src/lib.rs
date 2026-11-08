@@ -8,6 +8,7 @@ mod catalog;
 mod constraints;
 mod document;
 mod formats;
+pub mod hints;
 mod library;
 pub mod overlays;
 mod params;
@@ -40,8 +41,8 @@ pub use constraints::{
 };
 pub use document::{
     AutoIncludeCandidate, Child, Diagnostic, Document, Drawings, Hit, InspectedLabel, InspectedPin, InspectedSymbol,
-    Level, MemberOf, NetLabel, Object, RoleOf, RuleAt, SourceFile, SourceInclude, Span, Unplaced, UnplacedDrawing,
-    Usage, UsageRole,
+    Level, LevelHint, MemberOf, NetLabel, Object, RoleOf, RuleAt, SourceFile, SourceInclude, Span, Unplaced,
+    UnplacedDrawing, Usage, UsageRole,
 };
 pub use formats::{detect_format, formats, FormatInfo};
 pub use library::{LibraryIndex, LibraryProvider};
@@ -98,6 +99,10 @@ pub struct BuildOptions {
     /// check what is not wired; off by default. In the SVG each is a group of class "flyline",
     /// which a viewer can hide, and each has a hit ([`Hit`]).
     pub flylines: bool,
+    /// Give each level its geometry hints ([`Level::hints`], [`hints`]), as `rnl check` prints
+    /// them; off by default, and experimental. They take the problems of the levels, for the lines
+    /// of the records that place the objects they name.
+    pub hints: bool,
     /// Give each level its solve status ([`Level::solve`]), what a frontend decides from whether
     /// to solve it (decision 0008); off by default. It takes the problems of the levels read
     /// without their records of the solver, so a document that has such records is read once more.
@@ -120,6 +125,7 @@ impl Default for BuildOptions {
             svg: true,
             primitives: false,
             flylines: false,
+            hints: false,
             status: false,
             constraints: false,
             bind: None,
@@ -163,7 +169,8 @@ fn build_with(
     // the solve status and the constraints take the problems; built in this reading too, they
     // change nothing else
     let solver_view = options.status || options.constraints;
-    let runtime = Options { problems: options.runtime.problems || solver_view, ..options.runtime.clone() };
+    let runtime =
+        Options { problems: options.runtime.problems || solver_view || options.hints, ..options.runtime.clone() };
     let mut r = interpret_in(entry, reading, &ws, &runtime)?;
     // a document without records of the solver reads the same with them and without
     let records = r.doc.levels.iter().any(|l| l.records.iter().any(|rec| record_type(rec) == "generated"));

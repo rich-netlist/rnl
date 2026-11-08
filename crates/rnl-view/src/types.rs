@@ -9,7 +9,7 @@ use crate::{
 };
 use crate::{CurrentArrow, UsageFrame};
 use crate::{FormatInfo, InspectedLabel, InspectedPin, InspectedSymbol, SourceInclude, Usage, UsageRole};
-use crate::{GroupView, MemberOf, NetLabel, RoleOf, RuleAt, UsageOf};
+use crate::{GroupView, LevelHint, MemberOf, NetLabel, RoleOf, RuleAt, UsageOf};
 use std::path::Path;
 
 use ts_rs::{Config, TS};
@@ -135,6 +135,7 @@ fn all() -> Vec<(String, String)> {
         one::<CurrentArrow>(&cfg),
         one::<Hit>(&cfg),
         one::<NetLabel>(&cfg),
+        one::<LevelHint>(&cfg),
         one::<Child>(&cfg),
         one::<AutoIncludeCandidate>(&cfg),
         one::<SubcktParam>(&cfg),
