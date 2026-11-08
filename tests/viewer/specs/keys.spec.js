@@ -56,20 +56,20 @@ test("a key with Ctrl and a letter counts only with the Shift it names", async (
 
 test("G shows and hides the grid, but not while Ctrl or Alt is held, nor in a text box", async ({ page, viewer }) => {
   const shown = () => page.evaluate(() => window.viewer.grid.shown);
-  expect(await shown()).toBe(true);
+  expect(await shown()).toBe(false);
   for (const key of ["Control+G", "Alt+G"]) {
     await page.keyboard.press(key);
-    expect(await shown()).toBe(true);
+    expect(await shown()).toBe(false);
   }
   await page.keyboard.press("g");
-  expect(await shown()).toBe(false);
-  await page.keyboard.press("g");
   expect(await shown()).toBe(true);
+  await page.keyboard.press("g");
+  expect(await shown()).toBe(false);
   await page.locator("#tab-hierarchy").click();
   await page.locator("#search").click();
   await page.keyboard.type("gg");
   await expect(page.locator("#search")).toHaveValue("gg");
-  expect(await shown()).toBe(true);
+  expect(await shown()).toBe(false);
 });
 
 test("in a text box only keys with Ctrl count", async ({ page, viewer }) => {

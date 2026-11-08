@@ -167,7 +167,7 @@ or native settings. The ordinary web viewer and desktop viewer keep their usual 
 | `background` | `light`, `dark` | `light` | Drawing background, as in View › Background; also colours the floating controls. |
 | `grid` | `dots`, `lines`, `off` | `off` | Canvas grid. |
 | `names` | `1`, `0` | `1` | Show names on hover. |
-| `usages` | `1`, `0` | `0` | Show the usage frames, as View › Show Usages. An embedded drawing starts without them; an embedding page that was written when they were shown writes `usages=1`. The complete viewer's default is unchanged. |
+| `usages` | `1`, `0` | `0` | Show the usage frames, as View › Show Usages. An embedded drawing starts without them, and so does the complete viewer (every display aid but View › Show Names on Hover is off to begin with; a choice the user kept is kept). |
 | `currents` | `1`, `0` | `1` | Show the current directions, as View › Show Current Directions. `0` starts without them. The complete viewer's default is unchanged. |
 | `origin` | An exact origin, e.g. `https://example.com` | Any origin | Accept messages only from this origin and reply to it. |
 

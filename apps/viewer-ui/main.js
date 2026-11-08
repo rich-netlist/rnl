@@ -61,7 +61,7 @@ async function start() {
   setIndexHeight(load("index-height", 260));
   // the grid: dots at the integer points, and no axes, since the origin means nothing in particular
   setGrid({
-    shown: load("grid-shown", true),
+    shown: load("grid-shown", false),
     style: load("grid-style", "dots"),
     spacing: load("grid-spacing", "auto"),
     major: load("grid-major", 5),

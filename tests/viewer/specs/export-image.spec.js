@@ -75,6 +75,7 @@ test('the registration points of View > Show Registration Points are not in an e
 });
 
 test('Export SVG draws the whole level with the usages and current directions the page shows, on or off', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('usages-shown', 'true')); // kept on: the usage frames are off to begin with
   await open(page);
   const shown = await page.evaluate(async () => {
     const { overlayChoices } = await import('./usages.js');
@@ -114,6 +115,7 @@ test('Export SVG draws the whole level with the usages and current directions th
 });
 
 test('Export SVG sets nested frames out as the page does: each frame outside the ones in it, no two titles on one another, all in the image', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('usages-shown', 'true')); // kept on: the usage frames are off to begin with
   await page.goto(`${process.env.RNL_WEB_URL}/index.html`);
   await expect(page.locator('#menubar')).toBeVisible();
   await page.locator('#file-input').setInputFiles({ name: 'ota-groups.sp', mimeType: 'text/plain', buffer: fs.readFileSync(path.join(import.meta.dirname, '..', 'inputs', 'ota-groups.sp')) });

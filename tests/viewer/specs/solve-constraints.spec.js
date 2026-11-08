@@ -7,6 +7,8 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "../viewer.js";
 
+test.use({ keptSettings: { "usages-shown": true } }); // the usage frames are off to begin with: here the user keeps them on
+
 const DESKTOP = { platform: "desktop" };
 const T4 = "T4-miller-conflicts";
 const rows = (page) => page.locator("#constraints-list li.constraint");

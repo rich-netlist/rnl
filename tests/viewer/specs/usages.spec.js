@@ -1,6 +1,8 @@
 import { expect, test } from "../viewer.js";
 import { zh } from "../zh.js";
 
+test.use({ keptSettings: { "usages-shown": true } }); // the usage frames are off to begin with: here the user keeps them on
+
 const row = (page, name) => page.locator('.usage-row').filter({ has: page.getByRole('button', { name, exact: true }) });
 const frame = (page, id) => page.locator(`#canvas .usage-frame[data-usage="${id}"]`);
 async function usage(page, name) {

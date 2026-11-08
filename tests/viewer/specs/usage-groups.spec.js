@@ -8,6 +8,8 @@
 import { expect, test } from "../viewer.js";
 import { repository, translated, uiLanguages, zh } from "../zh.js";
 
+test.use({ keptSettings: { "usages-shown": true } }); // the usage frames are off to begin with: here the user keeps them on
+
 const NEW = ["Show all groups", "member of group {0}", "member (through terminal {0}) of group {1}", "{0} is in turn a member of group {1}",
   "{0} is in turn within group {1}", "within group {0}", "group"];
 const row = (page, id) => page.locator("#usage-list .usage-row", { hasText: id });

@@ -19,7 +19,7 @@ export const USAGE_COLORS = ["#e03131", "#e5b500", "#4263eb", "#2f9e44", "#9c36b
 const MAX_PREFERENCES = 2000;
 let preferences = new Map();
 const activeSettings = new WeakMap();
-let shown = true;
+let shown = false;
 let currentsShown = false;
 let currentLayer = null;
 let revision = 0;
@@ -112,7 +112,7 @@ function repaint() { if (context) paintUsages(...context); }
 export function startUsages() {
   preferences = new Map(Object.entries(load("usage-preferences", {})).filter(([, v]) =>
     v && /^#[0-9a-f]{6}$/i.test(v.color) && typeof v.visible === "boolean").slice(-MAX_PREFERENCES));
-  shown = load("usages-shown", true) !== false;
+  shown = load("usages-shown", false) === true;
   currentsShown = load("currents-shown", false) === true;
   setCheck("toggle-currents", currentsShown);
   startOrigins();

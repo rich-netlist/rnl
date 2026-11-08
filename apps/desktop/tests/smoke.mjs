@@ -469,7 +469,7 @@ async function drive(app, port, profile, t0, session) {
   // the native menu: the command table's items, with the page's check marks
   const ids = commands(table.menus.flatMap((m) => m.items)).filter((c) => c.check).map((c) => c.id);
   const marks = await page.evaluate(`Object.fromEntries(${JSON.stringify(ids)}.map((id) => [id, window.viewer.checked(id)]))`);
-  same(marks["grid-dots"] && !marks["grid-lines"], true, "the grid's marks at start");
+  same(marks["grid-none"] && !marks["grid-dots"] && !marks["grid-lines"], true, "the grid's marks at start: off");
   const want = tableMenus(marks);
   same(nativeMenu(app.pid), want, "the native menu");
   // a key in the page clears a check mark, and an item chosen in the menu reaches the page

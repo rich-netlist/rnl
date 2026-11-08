@@ -60,6 +60,7 @@ test("panel keys work at once while the WebAssembly core is still loading", asyn
 });
 
 test('usage inspection and overlay selection work with the real WASM core', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('usages-shown', 'true')); // kept on: the usage frames are off to begin with
   await start(page);
   const doc = await opened(page, () => page.locator('#file-input').setInputFiles({
     name: 'usage-inspector.sp', mimeType: 'text/plain',

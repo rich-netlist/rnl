@@ -40,6 +40,18 @@ class Viewer {
     if (fixture) await this.idle();
   }
 
+  /**
+   * Settings the user is taken to have kept, put in the browser's storage before the page starts (a display aid is off to
+   * begin with, and a test of one that is shown keeps it on); a value already stored, such as one a test has changed, stays.
+   */
+  keep(settings) {
+    return this.page.addInitScript((values) => {
+      for (const [key, value] of Object.entries(values)) {
+        try { if (localStorage.getItem(key) === null) localStorage.setItem(key, JSON.stringify(value)); } catch { /* no storage */ }
+      }
+    }, settings);
+  }
+
   /** Wait until the page has started: its shell has the command handler and the menu is built. */
   async started() {
     await this.page.waitForFunction(() => window.fakeShell && window.fakeShell.calls.some((c) => c[0] === "initial"));
@@ -308,7 +320,11 @@ class Viewer {
 
 /** Playwright's test, with `viewer`, the page with the fake shell. */
 export const test = base.extend({
-  viewer: async ({ page }, use) => {
-    await use(new Viewer(page));
+  /** The settings the user is taken to have kept (`test.use({ keptSettings: { "usages-shown": true } })`); none to begin with. */
+  keptSettings: [{}, { option: true }],
+  viewer: async ({ page, keptSettings }, use) => {
+    const viewer = new Viewer(page);
+    if (Object.keys(keptSettings).length) await viewer.keep(keptSettings);
+    await use(viewer);
   },
 });

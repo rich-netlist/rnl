@@ -37,6 +37,7 @@ test('Download Project writes the display settings when asked; Open Project offe
   await page.evaluate(async () => {
     window.viewer.command('background-dark');
     window.viewer.command('toggle-currents');
+    window.viewer.command('toggle-usages'); // off to begin with
     window.viewer.command('grid-lines');
     (await import('./netlist-colors.js')).showColors({ component: '#123456' });
   });

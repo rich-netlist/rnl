@@ -54,8 +54,8 @@ function apply(display, keys) {
 function restoreOwn() {
   setBackground(load("background", "light"), { persist: false });
   showOwnColors();
-  showOverlays({ usages: load("usages-shown", true) !== false, currents: load("currents-shown", false) === true });
-  setGrid({ shown: load("grid-shown", true), style: load("grid-style", "dots") }, { persist: false });
+  showOverlays({ usages: load("usages-shown", false) === true, currents: load("currents-shown", false) === true });
+  setGrid({ shown: load("grid-shown", false), style: load("grid-style", "dots") }, { persist: false });
 }
 
 /** Show the settings the user kept of `scope`; its view only when it was just opened. */

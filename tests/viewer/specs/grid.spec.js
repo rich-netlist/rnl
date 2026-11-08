@@ -5,6 +5,8 @@
 
 import { expect, test } from "../viewer.js";
 
+test.use({ keptSettings: { "grid-shown": true } }); // the grid is off to begin with (display-defaults.spec.js): here the user keeps it on
+
 const TOP = "04-hierarchy.sp";
 const SCALE = 14; // pixels of the SVG per unit, as the core draws it
 
@@ -44,7 +46,7 @@ test.beforeEach(async ({ viewer }) => {
   await viewer.open("04-hierarchy");
 });
 
-test("the grid is dots at the integer points by default, a pin and the origin on them", async ({ page, viewer }) => {
+test("the grid is dots at the integer points when shown, a pin and the origin on them", async ({ page, viewer }) => {
   expect(await page.evaluate(() => window.viewer.grid)).toMatchObject({ shown: true, style: "dots", spacing: "auto", axes: false, step: 1 });
   const dot = await colour(page, "--grid-dot");
   // X2's pin "in" is at (10, 0): the core draws it at 140 pixels of the SVG, and a dot is there

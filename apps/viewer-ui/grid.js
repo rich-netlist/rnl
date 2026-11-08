@@ -25,7 +25,7 @@ const MAX_MAJOR = 100; // lines, the most a major line may be apart
  * The settings: whether the grid is shown, as "dots" or "lines", its spacing in units ("auto" for 1),
  * every how many lines a major one comes, and whether the axes are shown.
  */
-const settings = { shown: true, style: "dots", spacing: "auto", major: 5, axes: false };
+const settings = { shown: false, style: "dots", spacing: "auto", major: 5, axes: false };
 let shownView = null; // the view the grid was last drawn for, and the drawing's pixels per unit
 let drawn = null; // the step of the grid drawn and of its major lines, in units
 let colours = null; // the colours of the dots, the lines, the major lines and the axes, from style.css

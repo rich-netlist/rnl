@@ -324,8 +324,8 @@ test.describe("on the web", () => {
     const [e, first] = [await entry(page, "Grid").boundingBox(), await viewer.menuItem("toggle-grid").boundingBox()];
     expect(first.x).toBeGreaterThanOrEqual(e.x + e.width - 4);
     expect(Math.abs(first.y - e.y)).toBeLessThanOrEqual(1);
-    // the marks: the grid shown, as dots, without the axes
-    for (const [id, checked] of [["toggle-grid", "true"], ["grid-none", "false"], ["grid-dots", "true"], ["grid-lines", "false"], ["grid-axes", "false"]]) {
+    // the marks: the grid off, as it is to begin with, and no axes
+    for (const [id, checked] of [["toggle-grid", "false"], ["grid-none", "true"], ["grid-dots", "false"], ["grid-lines", "false"], ["grid-axes", "false"]]) {
       await expect(viewer.menuItem(id)).toHaveAttribute("aria-checked", checked);
     }
     // pointing at an item marks it, and its entry stays marked; pointing at another entry closes it
@@ -436,8 +436,8 @@ test.describe("with a native menu", () => {
     const marks = [
       ["background-light", true], ["background-dark", false],
       ["toggle-netlist", true], ["toggle-problems", true], ["toggle-edit", false],
-      ["toggle-grid", true], ["grid-none", false], ["grid-dots", true], ["grid-lines", false], ["grid-axes", false],
-      ["toggle-hover-names", true], ["toggle-hover-roles", false], ["toggle-usages", true], ["toggle-currents", false], ["toggle-origins", false], ["toggle-flylines", false], ["toggle-net-labels", false],
+      ["toggle-grid", false], ["grid-none", true], ["grid-dots", false], ["grid-lines", false], ["grid-axes", false],
+      ["toggle-hover-names", true], ["toggle-hover-roles", false], ["toggle-usages", false], ["toggle-currents", false], ["toggle-origins", false], ["toggle-flylines", false], ["toggle-net-labels", false],
       ...uiLanguages(repository).map((l, i) => [`language-${l.lang}`, i === 0]),
       ["toggle-auto-include", true],
     ];

@@ -1,5 +1,7 @@
 import { expect, test } from '../viewer.js';
 
+test.use({ keptSettings: { 'usages-shown': true } }); // the usage frames are off to begin with: here the user keeps them on
+
 const row = (page, name) => page.locator('.usage-row').filter({ has: page.getByRole('button', { name, exact: true }) });
 const frame = (page, object) => page.locator(`#canvas .usage-frame[data-usage="${object}"]`);
 const ordinary = page => page.locator('#canvas .overlay rect:not(.label)');
