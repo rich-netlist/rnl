@@ -276,8 +276,8 @@ fn without_a_group_among_the_objects_the_error_says_nothing_of_groups() {
 
 #[test]
 fn a_file_of_a_version_not_read_is_of_an_unsupported_version() {
-    let r = solve_in("0.4", TWO_GROUPS);
+    let r = solve_in("9.9", TWO_GROUPS);
     assert_eq!(r.errors.len(), 1, "{:?}", r.errors);
-    assert!(r.errors[0].contains("unsupported version 0.4: no RNL of this file is interpreted"), "{:?}", r.errors);
+    assert!(r.errors[0].contains("unsupported version 9.9: no RNL of this file is interpreted"), "{:?}", r.errors);
     assert!(r.groups().is_empty());
 }

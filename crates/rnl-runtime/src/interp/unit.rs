@@ -16,13 +16,38 @@ use crate::words::{words, ParamType};
 use super::obj::{Lit, MemberKey, Priority, RecId, UnitId};
 use super::Interp;
 
-/// The versions of the language this implementation reads (16.1): 0.2, and 0.3, whose text is
-/// still a draft. Every rule that 0.3 changes applies only to the files of 0.3, so a file of 0.2
-/// reads as it did before 0.3 was read.
-pub const READ_VERSIONS: [&str; 2] = ["0.2", "0.3"];
+/// The versions of the language this implementation reads (16.1): 0.2, 0.3, and 0.4, whose text
+/// is still a draft. Every rule that 0.3 changes applies to the files of 0.3 and of the
+/// versions after it ([`keeps_0_3`]), so a file of 0.2 reads as it did before 0.3 was read.
+pub const READ_VERSIONS: [&str; 3] = ["0.2", "0.3", "0.4"];
 /// The version a main file, or a package file, without a header record is read in: the tool's
 /// default (16.1). An included file without one follows the file that includes it.
 pub const DEFAULT_VERSION: &str = "0.3";
+
+/// Does a file of the language version `version` keep the rules that 0.3 changes? 0.3 and every
+/// version after it do, by the order of versions (16.1); 0.2 does not.
+pub fn keeps_0_3(version: &str) -> bool {
+    version_key(version) >= (0, 3)
+}
+
+/// The versions this implementation reads, as a message lists them: "0.2, 0.3 and 0.4".
+fn read_versions() -> String {
+    match READ_VERSIONS.split_last() {
+        Some((last, [])) => last.to_string(),
+        Some((last, rest)) => format!("{} and {last}", rest.join(", ")),
+        None => String::new(),
+    }
+}
+
+/// Is a package file written in the language version `language` found without `version=` by a
+/// file of the version `reader` (16.2)? A version newer than the tool's default is still a draft,
+/// so its packages, such as the standard series 0.4, are found only by the files of that version or
+/// a later one, or by a `version=` that names them; the files of 0.2 and 0.3 find the packages they
+/// found before.
+fn finds_unnamed(language: &str, reader: &str) -> bool {
+    let key = version_key(language);
+    key <= version_key(DEFAULT_VERSION) || key <= version_key(reader)
+}
 const HEADER_KW: [&str; 5] = ["VERSION", "PACKAGE", "ALIAS", "DEVICE", "USE-ALIASES"];
 /// A second VERSION in a header record (16.1).
 pub const SECOND_VERSION: &str =
@@ -585,7 +610,7 @@ impl Interp<'_> {
                         self.doc.levels[lv].section_lines.map_or(1, |(start, _)| start + 1),
                     )
                 });
-                let reads = READ_VERSIONS.join(" and ");
+                let reads = read_versions();
                 self.sink.error(
                     format!("unsupported version {version}: no RNL of this file is interpreted (16.1; this implementation reads {reads})"),
                     Some(loc),
@@ -1080,7 +1105,7 @@ impl Interp<'_> {
                     };
                     self.units[u].version = v.clone();
                     if version_key(v).0 < 0 || !READ_VERSIONS.contains(&v.as_str()) {
-                        let reads = READ_VERSIONS.join(" and ");
+                        let reads = read_versions();
                         self.diag_in(
                             Severity::Error,
                             format!("unsupported version {v}: no RNL of this file is interpreted (16.1; this implementation reads {reads})"),
@@ -1537,11 +1562,11 @@ impl Interp<'_> {
         DEFAULT_VERSION.to_string()
     }
 
-    /// Does a unit follow 0.3? When the file the unit's text is in is read in 0.3
-    /// ([`Self::version_of`]): every rule that 0.3 changes applies only there, so a file of 0.2
-    /// reads as it did before 0.3 was read.
+    /// Does a unit follow 0.3? When the file the unit's text is in is read in 0.3 or a later version
+    /// ([`Self::version_of`], [`keeps_0_3`]): every rule that 0.3 changes applies only there, so a
+    /// file of 0.2 reads as it did before 0.3 was read.
     pub fn follows_0_3(&self, u: UnitId) -> bool {
-        self.version_of(Some(u)) == "0.3"
+        keeps_0_3(&self.version_of(Some(u)))
     }
 
     /// Does the text a statement is written in follow the draft 0.3? That is the file of its
@@ -1719,6 +1744,10 @@ impl Interp<'_> {
         if cand.is_none() {
             let same: Vec<(String, String, String)> =
                 self.pkg_files[&decl.name].iter().filter(|c| c.0 == decl.name).cloned().collect();
+            let reader = self.version_of(Some(decl.unit));
+            let found = |c: &&(String, String, String)| {
+                finds_unnamed(self.pkg_languages.get(&c.2).map_or(DEFAULT_VERSION, String::as_str), &reader)
+            };
             if let Some(want) = &decl.version {
                 if let Some(c) = same.iter().find(|c| c.1 == *want) {
                     cand = Some(c.clone());
@@ -1738,7 +1767,7 @@ impl Interp<'_> {
                         cand = Some((*c).clone());
                     }
                 }
-            } else if let Some(c) = same.iter().min_by_key(|c| std::cmp::Reverse(version_key(&c.1))) {
+            } else if let Some(c) = same.iter().filter(found).min_by_key(|c| std::cmp::Reverse(version_key(&c.1))) {
                 // the newest found, and of its copies the one of the first package directory, as
                 // for a version named (16.2)
                 let this = if what == "reference" { "the reference to".to_string() } else { what.to_string() };
@@ -1965,9 +1994,9 @@ impl Interp<'_> {
 }
 
 /// Is a word one that the language version `version` adds, `numbering` in 0.3 (16.1)? It is a
-/// standard word in a file of that version, which no alias may be spelled as (16.5).
+/// standard word in a file of that version or a later one, which no alias may be spelled as (16.5).
 pub fn added_word(word: &str, version: &str) -> bool {
-    version == "0.3" && crate::words::draft_header_fields().iter().any(|f| f.name == word)
+    keeps_0_3(version) && crate::words::draft_header_fields().iter().any(|f| f.name == word)
 }
 
 /// Is an alias original a standard keyword (written with `@`) or a standard word (16.1, 16.5)?

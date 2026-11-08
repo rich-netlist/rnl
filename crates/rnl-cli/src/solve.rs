@@ -417,7 +417,7 @@ pub fn solve_watched(
     let reads_0_3 = |level: usize| {
         let doc = &original.doc;
         let of = |l: usize| doc.file_level(l) == level;
-        run.levels.iter().any(|l| of(l.problem.level) && l.problem.version == "0.3")
+        run.levels.iter().any(|l| of(l.problem.level) && l.problem.follows_0_3())
     };
     // the files without a VERSION that take the version of one raised read in 0.3 with it (16.1)
     let apart: Vec<usize> = raised.iter().filter(|(_, v)| v.raised).map(|(level, _)| *level).collect();

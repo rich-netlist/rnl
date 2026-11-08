@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use rnl_runtime::host::file_name;
 use rnl_runtime::interp::catalog::{package_contents, version_key, DefinedName, PackageContents, PackageSymbol};
 use rnl_runtime::interp::obj::TermKey;
-use rnl_runtime::interp::unit::scan_package_decl;
+use rnl_runtime::interp::unit::{scan_language_decl, scan_package_decl, DEFAULT_VERSION};
 use rnl_runtime::source::Provider;
 use rnl_runtime::Options;
 use serde::Serialize;
@@ -23,7 +23,8 @@ use crate::Workspace;
 pub struct CatalogOptions {
     /// Only the packages of these names; every package when None.
     pub packages: Option<Vec<String>>,
-    /// Every version of each package, not only the newest.
+    /// Every version of each package, not only the newest (of the versions written in a language
+    /// version not newer than the tool's default, when a package has one).
     pub all_versions: bool,
     /// The runtime's options each package file is checked with, as `rnl check` checks it: with the
     /// standard package of its language version unless `std` is false (16.3).
@@ -247,7 +248,10 @@ pub(crate) fn catalog(ws: &Workspace, options: &CatalogOptions) -> Catalog {
 /// The package files a catalog lists: of each name and version the first the package directories
 /// have, the frontend's before the bundled ones, as the runtime finds a package by name (16.2); of
 /// each name the newest version, by the runtime's order of versions, or every version with
-/// `all_versions`; and only the names `packages` gives, when it gives them.
+/// `all_versions`; and only the names `packages` gives, when it gives them. A version written in a
+/// language version newer than the tool's default, a draft such as the standard series 0.4, is the
+/// newest only for a name that has no other, as a file of the default version finds a package that
+/// names no version (16.2).
 fn listed(ws: &Workspace, options: &CatalogOptions) -> Vec<String> {
     let mut found: Vec<(String, String, String)> = Vec::new();
     for path in ws.package_files() {
@@ -266,11 +270,17 @@ fn listed(ws: &Workspace, options: &CatalogOptions) -> Vec<String> {
         }
     }
     if !options.all_versions {
-        let newest = |name: &str| found.iter().filter(|f| f.0 == name).map(|f| version_key(&f.1)).max();
+        let by_default = |path: &str| {
+            let language = ws.read(path).as_deref().and_then(scan_language_decl);
+            version_key(language.as_deref().unwrap_or(DEFAULT_VERSION)) <= version_key(DEFAULT_VERSION)
+        };
+        let rank: HashMap<&str, (bool, (i64, i64))> =
+            found.iter().map(|f| (f.2.as_str(), (by_default(&f.2), version_key(&f.1)))).collect();
+        let newest = |name: &str| found.iter().filter(|f| f.0 == name).map(|f| rank[f.2.as_str()]).max();
         // of versions equally new, the first found
         let mut kept: Vec<&(String, String, String)> = Vec::new();
         for f in &found {
-            if Some(version_key(&f.1)) == newest(&f.0) && !kept.iter().any(|k| k.0 == f.0) {
+            if Some(rank[f.2.as_str()]) == newest(&f.0) && !kept.iter().any(|k| k.0 == f.0) {
                 kept.push(f);
             }
         }
@@ -465,6 +475,8 @@ mod tests {
         let c = default();
         let listed = packages(&c);
         assert!(listed.contains(&("rnl-std", "0.3")) && !listed.contains(&("rnl-std", "0.2")), "{listed:?}");
+        // the draft series 0.4, written in a version newer than the default, is not the newest
+        assert!(listed.iter().all(|(_, version)| *version != "0.4"), "{listed:?}");
         // one version of each name, rnl-zh's 0.3; a name only the series 0.2 has keeps its version
         let mut names: Vec<&str> = listed.iter().map(|p| p.0).collect();
         names.dedup();
@@ -490,12 +502,13 @@ mod tests {
         };
         assert_eq!(*std, want);
 
-        // every version: both series
+        // every version: every series, the draft 0.4 too
         let all = every_version();
         let listed = packages(&all);
         assert_eq!(listed.len(), crate::BUNDLED.len());
         let at = |p: (&str, &str)| listed.iter().position(|q| *q == p).unwrap();
         assert_eq!(at(("rnl-std", "0.2")) + 1, at(("rnl-std", "0.3")));
+        assert_eq!(at(("rnl-std", "0.3")) + 1, at(("rnl-std", "0.4")));
         assert_eq!(all.packages[at(("rnl-std", "0.2"))].language, "0.2");
         // a name of the series 0.2 for a symbol, and one of the series 0.3 for a definition
         let ground: Vec<(&str, &str)> = all

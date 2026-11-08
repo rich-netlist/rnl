@@ -101,16 +101,16 @@ fn files_of_0_3_are_read() {
 
 #[test]
 fn a_version_that_is_not_read_is_unsupported() {
-    let f = Path::new(env!("CARGO_TARGET_TMPDIR")).join("version-0.4.sp");
+    let f = Path::new(env!("CARGO_TARGET_TMPDIR")).join("version-9.9.sp");
     let text =
-        "* a file of 0.4\nR1 a b 1k\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\n* @RNL { #R1 @PLACE(3, 4)}\n.end\n";
+        "* a file of 9.9\nR1 a b 1k\n* @RNL(type=\"header\") { @VERSION(\"9.9\")}\n* @RNL { #R1 @PLACE(3, 4)}\n.end\n";
     std::fs::write(&f, text).unwrap();
     let f = f.to_string_lossy();
     // no RNL of the file is read (16.1)
     let (code, out) = rnl(&["check", &f]);
     assert_eq!(code, 1, "{out}");
     let message =
-        "unsupported version 0.4: no RNL of this file is interpreted (16.1; this implementation reads 0.2 and 0.3)";
+        "unsupported version 9.9: no RNL of this file is interpreted (16.1; this implementation reads 0.2, 0.3 and 0.4)";
     assert!(out.contains(message), "{out}");
 }
 
@@ -150,7 +150,9 @@ fn catalog_prints_the_packages_the_core_has() {
     let c = json(&out);
     let symbols = c["symbols"].as_array().unwrap();
     let resistor = symbols.iter().find(|s| s["symbol"] == "$RESISTOR").unwrap();
-    assert_eq!((resistor["package"].as_str(), resistor["version"].as_str()), (Some("rnl-std-basic"), Some("0.3")));
+    // of the series that a file of the tool's default version uses (16.1, 16.3)
+    let default = Some(rnl_runtime::interp::unit::DEFAULT_VERSION);
+    assert_eq!((resistor["package"].as_str(), resistor["version"].as_str()), (Some("rnl-std-basic"), default));
     // what rnl-view lists, read back from the same text
     let native = rnl_view::catalog(&rnl_cli::FsProvider::new(&[]), &rnl_view::CatalogOptions::default());
     assert_eq!(c, json(&serde_json::to_string_pretty(&native).unwrap()));
@@ -164,8 +166,11 @@ fn catalog_prints_the_packages_the_core_has() {
         .iter()
         .map(|p| (p["name"].as_str().unwrap().to_string(), p["version"].as_str().unwrap().to_string()))
         .collect();
-    let want = [("rnl-std", "0.2"), ("rnl-std", "0.3"), ("rnl-zh", "0.2"), ("rnl-zh", "0.3")]
-        .map(|(n, v)| (n.to_string(), v.to_string()));
+    // each series bundled, a directory of its own, has both
+    let series: Vec<String> =
+        rnl_view::bundled().package_dirs.iter().map(|d| d.rsplit('/').next().unwrap().to_string()).collect();
+    let want: Vec<(String, String)> =
+        ["rnl-std", "rnl-zh"].iter().flat_map(|n| series.iter().map(|v| (n.to_string(), v.clone()))).collect();
     assert_eq!(listed, want);
 
     // a package of a package directory

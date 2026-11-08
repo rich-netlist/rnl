@@ -125,7 +125,7 @@ A request with a `catalog` field lists the symbols, ordinary definitions and set
 }
 ```
 
-`catalog.packages` keeps only the packages of these names, every package when it is not given; of each name only the newest version is listed, and every version with `catalog.all_versions`. `files`, `package_dirs`, `std` and `std_version` are a build's: each package file is read as `rnl check` reads it, checked on its own with the standard package of its language version, unless `std` or `std_version` say otherwise (2.7, 16.3). The answer is `{"catalog": {"packages": [...], "symbols": [...], "definitions": [...], "sets": [...]}}`, the catalog `rnl catalog` prints, declared in `catalog.d.ts`; a symbol comes with its pins in terminal order, its box and its labels, as the drawings have them:
+`catalog.packages` keeps only the packages of these names, every package when it is not given; of each name only the newest version is listed, of the versions written in a language version not newer than the tool's default when it has one (the series 0.3, not the draft 0.4), and every version with `catalog.all_versions`. `files`, `package_dirs`, `std` and `std_version` are a build's: each package file is read as `rnl check` reads it, checked on its own with the standard package of its language version, unless `std` or `std_version` say otherwise (2.7, 16.3). The answer is `{"catalog": {"packages": [...], "symbols": [...], "definitions": [...], "sets": [...]}}`, the catalog `rnl catalog` prints, declared in `catalog.d.ts`; a symbol comes with its pins in terminal order, its box and its labels, as the drawings have them:
 
 ```json
 { "symbol": "$RESISTOR", "package": "rnl-std-basic", "version": "0.3", "file": "rnl-std-basic.rnl", "definition": null,
@@ -223,7 +223,7 @@ A build or snapshot request may include `pool: string[]`, the paths of explicitl
 
 ## Upgrading after 0.1.0-preview.13
 
-Only the standard series 0.2 and 0.3, including `rnl-zh`, remain built into the default core.
+Only the standard series 0.2, 0.3 and the draft 0.4, including `rnl-zh`, remain built into the default core.
 `analog-canvas-extensions` 0.1 is available through the [public catalog](https://rich-netlist.github.io/rnl-packages/catalog.json). The next npm version after preview.14 removes its optional data file and export; already published preview.14 remains unchanged. Analog Canvas and other frontends that export its USE-PACKAGE record
 must download and verify that file using the catalog SHA-256, put its text into the request's `files`, and add its path to `pool` for every
 build/snapshot/rebuild. The package name, version and exported netlist records stay unchanged.

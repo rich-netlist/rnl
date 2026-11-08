@@ -469,8 +469,8 @@ pub struct LevelProblem {
     pub name: String,
     /// The language version the level's file is read in (16.1): what it declares; for an included
     /// file that declares none, the version of the file that includes it; else the toolkit's
-    /// default, "0.3". Only the record of the solver of a file of the draft 0.3 writes numbers
-    /// ([`Reference::Number`]).
+    /// default, "0.3". Only the record of the solver of a file of the draft 0.3, or of a later
+    /// version, writes numbers ([`Reference::Number`]).
     pub version: String,
     /// How many objects the authored records of the level number (5.9): the record of the solver
     /// numbers its own objects from the next number on ([`Reference::GeneratedNumber`]).
@@ -515,10 +515,10 @@ pub struct ProblemIds {
 }
 
 impl LevelProblem {
-    /// Does the level's file follow 0.3 ([`Self::version`])? Only there does the record of the
-    /// solver refer to objects by number (5.9) and rewrite wires (13.1).
+    /// Does the level's file follow 0.3 ([`Self::version`]): is it of 0.3 or a later version? Only
+    /// there does the record of the solver refer to objects by number (5.9) and rewrite wires (13.1).
     pub fn follows_0_3(&self) -> bool {
-        self.version == "0.3"
+        crate::interp::unit::keeps_0_3(&self.version)
     }
 }
 

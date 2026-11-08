@@ -1,0 +1,14 @@
+/* rnl-std-full 0.4, a package of the standard series 0.4 (16.3).
+   Made from the files of the series 0.3 (libraries/standard/0.3), which say what they were
+   generated from, and edited in rnl, whose files are the source.
+   The fuller collection (16.3): rnl-std and the packages of fields. A file names it with
+   USE-PACKAGE in its header record; what the implicit rnl-std brings in is not brought in twice. */
+@RNL(type="header") {
+  @VERSION("0.4");
+  @PACKAGE(name="rnl-std-full", version="0.4");
+  @USE-PACKAGE(name="rnl-std", version="0.4");
+  @USE-PACKAGE(name="rnl-std-functional", version="0.4");
+  @USE-PACKAGE(name="rnl-std-rf", version="0.4");
+  @USE-PACKAGE(name="rnl-std-logic", version="0.4");
+  @USE-PACKAGE(name="rnl-std-signal-flow", version="0.4")
+}

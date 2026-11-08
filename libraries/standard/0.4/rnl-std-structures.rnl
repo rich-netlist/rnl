@@ -1,0 +1,263 @@
+/* rnl-std-structures 0.4, a package of the standard series 0.4.
+   The definitions of circuit structures and of their default drawings. A default drawing is the
+   constraints of a body, all of priority low: the author's own facts come before them, PRIORITY("disabled")
+   on a usage turns them off for that usage, and a rule such as
+   # @SELECT-USAGE $DIFFERENTIAL_PAIR_N => @PRIORITY("disabled") does so for every usage of a definition.
+   Every position fact here gives its direction; for a drawing the other way round, use the variant or write
+   the roles the other way round. An orientation may allow several (an ORIENT-RELATION with a list).
+   Each definition's comment begins with what it draws: "Places" when it has position facts (ALIGN,
+   ORDER, DISTRIBUTE, DISTANCE, ORIENT-RELATION), "routes" when it joins its members' shared nets with
+   wires (ROUTE-OBJECT), "a group" when it makes one, and "Meaning only" when it draws nothing. A
+   structure routes no ground or supply net: rnl-std-fill draws those with symbols, by an UNROUTE of
+   priority high, unless a file writes a ROUTE of priority high or a WIRE. */
+@RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="rnl-std-structures", version="0.4")}
+
+/* ---------------------------------------------------------------- matching, symmetry, pairs and branches */
+@RNL {
+  /* Meaning only: places and routes nothing. Devices or sub-structures matched in electrical parameters and layout. */
+  $MATCHED = @DEFINE(roles=[["{members}", ["instance", "usage"]]]) {};
+
+  /* Places; routes nothing. Two symmetric objects at one height, mirror images about an optional axis: left on the left of the axis, right on the right; with no axis, left is on the left of right. Write the roles the other way round to swap the sides. */
+  $MIRRORED = @DEFINE(roles=[["left", ["instance", "usage"]], ["right", ["instance", "usage"]], ["{axis}", ["point", "instance", "usage", "net"]]]) { {?left ?right} @ALIGN("y", priority="low"); {?left {?axis} ?right} @DISTRIBUTE("left-to-right", priority="low"); ?left ?right @ORIENT-RELATION("MY", priority="low") };
+
+  /* Places and routes; a group. A matched pair driven differentially, mirrored about its tail, with the tail below the pair as an NMOS pair is drawn. left and right are the sides of the drawing, not the polarity of the inputs. */
+  $DIFFERENTIAL_PAIR_N = @DEFINE(roles=[["left", "instance"], ["right", "instance"], ["{tail}", ["instance", "usage"]]]) { {?left ?right} @AS $MATCHED; ?left(left) ?right(right) {?tail}(axis) @AS $MIRRORED; {{?left ?right} ?tail} @ORDER("top-to-bottom", priority="low"); {?left ?right ?tail} @ROUTE-OBJECT(priority="low"); {?left ?right ?tail} @GROUP };
+
+  /* Places and routes; a group. The differential pair with the tail above the pair, as a PMOS pair is drawn. */
+  $DIFFERENTIAL_PAIR_P = @DEFINE(roles=[["left", "instance"], ["right", "instance"], ["{tail}", ["instance", "usage"]]]) { {?left ?right} @AS $MATCHED; ?left(left) ?right(right) {?tail}(axis) @AS $MIRRORED; {{?left ?right} ?tail} @ORDER("bottom-to-top", priority="low"); {?left ?right ?tail} @ROUTE-OBJECT(priority="low"); {?left ?right ?tail} @GROUP };
+
+  /* Places and routes. Copies or scales current from reference transistors to outputs sharing a gate or base node. */
+  $CURRENT_MIRROR = @DEFINE(roles=[["{ref}", "instance"], ["{out}", "instance"]]) { {?ref ?out} @ALIGN("y", priority="low"); ?ref{1} {?out} @ORIENT-RELATION(["R0", "MY"], priority="low"); ?ref{1} ?ref{2:end} @ORIENT-RELATION("R0", priority="low"); {?ref ?out} @ROUTE-OBJECT(priority="low") };
+
+  /* Places and routes. A DC branch: members in series, in one column, from the top down in the order written; write them the other way round to draw the branch the other way up. */
+  $BRANCH = @DEFINE(roles=[["{members}", ["instance", "usage"]]]) { ?members @AS $SERIES; ?members @ALIGN("x", priority="low"); ?members @ORDER("top-to-bottom", priority="low") };
+
+  /* Places and routes. The branch drawn as a row: members in series at one height, from left to right in the order written. */
+  $BRANCH_HORIZONTAL = @DEFINE(roles=[["{members}", ["instance", "usage"]]]) { ?members @AS $SERIES; ?members @ALIGN("y", priority="low"); ?members @ORDER("left-to-right", priority="low") };
+
+  /* Meaning only: places and routes nothing. A cascade of macro stages along a multi-stage signal path. It states no order. */
+  $CASCADE = @DEFINE(roles=[["{stages}", ["instance", "usage"]]]) {}
+}
+
+@RNL {
+  /* Routes; places nothing. Two-terminal elements or sub-usages connected end-to-end in series along one current path, without geometric placement constraints. */
+  $SERIES = @DEFINE(roles=[["{members}", ["instance", "usage"]]]) { {?members} @ROUTE-OBJECT(priority="low") };
+
+  /* Routes; places nothing. Single transistor with its gate/base tied to its drain/collector; the local gate-to-drain (or base-to-collector) net on ?device is drawn as an explicit internal wire. A ground or supply net among them is not: rnl-std-fill leaves it unwired, drawn with symbols, unless the file writes &net @ROUTE-NET(priority="high") or a WIRE. */
+  $DIODE_CONNECTED = @DEFINE(roles=[["device", "instance"]]) { {?device} @ROUTE-OBJECT(priority="low") };
+
+  /* Places and routes. Complementary MOS inverter formed by a pull-up PMOS and a pull-down NMOS; the shared input gate net and shared output drain net between ?pmos and ?nmos are drawn as explicit wires; drawn in one column, the PMOS above the NMOS (side by side: $CMOS_INVERTER_HORIZONTAL). A ground or supply net among them is not: rnl-std-fill leaves it unwired, drawn with symbols, unless the file writes &net @ROUTE-NET(priority="high") or a WIRE. */
+  $CMOS_INVERTER = @DEFINE(roles=[["pmos", "instance"], ["nmos", "instance"]]) { {?pmos ?nmos} @ROUTE-OBJECT(priority="low"); {?pmos ?nmos} @ALIGN("x", priority="low"); {?pmos ?nmos} @ORDER("top-to-bottom", priority="low") };
+
+  /* Places and routes. The CMOS inverter drawn side by side at one height, the PMOS on the left. */
+  $CMOS_INVERTER_HORIZONTAL = @DEFINE(roles=[["pmos", "instance"], ["nmos", "instance"]]) { {?pmos ?nmos} @ROUTE-OBJECT(priority="low"); {?pmos ?nmos} @ALIGN("y", priority="low"); {?pmos ?nmos} @ORDER("left-to-right", priority="low") };
+
+  /* Routes; places nothing. Elements or sub-usages connected in parallel across shared terminals (no alignment or orientation constraint); the two shared terminal nets connecting ?members are drawn as explicit wires. A ground or supply net among them is not: rnl-std-fill leaves it unwired, drawn with symbols, unless the file writes &net @ROUTE-NET(priority="high") or a WIRE. */
+  $PARALLEL = @DEFINE(roles=[["{members}", ["instance", "usage"]]]) { {?members} @ROUTE-OBJECT(priority="low") };
+  /* Places and routes. Members side by side at one height, the usage's own point at that height, so that the usage stands for them as one place in a column such as a $BRANCH (a lone ? in a definition's body is the usage itself). It binds y alone: the point's x is free, so the column may stand apart from the members. */
+  $PARALLEL_HORIZONTAL = @DEFINE(roles=[["{members}", "instance"]]) { {?members} @AS $PARALLEL; {?members ?} @ALIGN("y", priority="low") };
+
+  /* Routes; places nothing. Series stack of source device(s)/usage(s) and a cascode transistor with embedded $COMMON_GATE semantics; the internal drain-to-source net between ?source and ?cascode is drawn as an explicit wire. A ground or supply net among them is not: rnl-std-fill leaves it unwired, drawn with symbols, unless the file writes &net @ROUTE-NET(priority="high") or a WIRE. */
+  $CASCODE = @DEFINE(roles=[["{source}", ["instance", "usage"]], ["cascode", "instance"]]) { ?cascode @AS $COMMON_GATE; {?source ?cascode} @AS $SERIES; {?source ?cascode} @ROUTE-OBJECT(priority="low") };
+
+  /* Meaning only: places and routes nothing. Switch (single FET or usage such as $TRANSMISSION_GATE) that passes or blocks a signal between its two sides; it says nothing else. */
+  $PASS_SWITCH = @DEFINE(roles=[["device", ["instance", "usage"]]]) { /* pass or select switch; carries no other semantics */ };
+
+  /* Meaning only: places and routes nothing. Single-MOSFET common-source transconductance/gain stage (input at gate, output at drain). */
+  $COMMON_SOURCE = @DEFINE(roles=[["device", "instance"]]) { /* single-transistor common-source stage */ };
+
+  /* Meaning only: places and routes nothing. Active or passive load element or sub-structure driven by an amplifier stage or terminating a $FLOW path. */
+  $LOAD = @DEFINE(roles=[["element", ["instance", "usage"]]]) { /* stage or path load */ };
+
+  /* Meaning only: places and routes nothing. Signal or bias source endpoint initiating a circuit stage or a $FLOW path. */
+  $SOURCE = @DEFINE(roles=[["element", ["instance", "usage"]]]) { /* signal or bias source endpoint */ };
+
+  /* Places and routes. Bidirectional CMOS pass switch formed by complementary PMOS and NMOS transistors; the shared source-to-source and drain-to-drain nets joining ?pmos and ?nmos are drawn as explicit wires; drawn in one column, the PMOS above the NMOS (side by side: $TRANSMISSION_GATE_HORIZONTAL). A ground or supply net among them is not: rnl-std-fill leaves it unwired, drawn with symbols, unless the file writes &net @ROUTE-NET(priority="high") or a WIRE. */
+  $TRANSMISSION_GATE = @DEFINE(roles=[["pmos", ["instance", "usage"]], ["nmos", ["instance", "usage"]]]) { {?pmos ?nmos} @ROUTE-OBJECT(priority="low"); {?pmos ?nmos} @ALIGN("x", priority="low"); {?pmos ?nmos} @ORDER("top-to-bottom", priority="low") };
+
+  /* Places and routes. The transmission gate drawn side by side at one height, the PMOS on the left. */
+  $TRANSMISSION_GATE_HORIZONTAL = @DEFINE(roles=[["pmos", ["instance", "usage"]], ["nmos", ["instance", "usage"]]]) { {?pmos ?nmos} @ROUTE-OBJECT(priority="low"); {?pmos ?nmos} @ALIGN("y", priority="low"); {?pmos ?nmos} @ORDER("left-to-right", priority="low") };
+
+  /* Routes; places nothing. Two matched transistors with each gate connected to the other's drain (no left-right order constraint); the cross-coupled gate-to-drain nets (?a:G to ?b:D and ?b:G to ?a:D) are drawn as explicit internal wires. A ground or supply net among them is not: rnl-std-fill leaves it unwired, drawn with symbols, unless the file writes &net @ROUTE-NET(priority="high") or a WIRE. */
+  $CROSS_COUPLED_PAIR = @DEFINE(roles=[["a", "instance"], ["b", "instance"]]) { {?a ?b} @AS $MATCHED; {?a ?b} @ROUTE-OBJECT(priority="low") };
+
+  /* Routes; places nothing; a group. Static or clocked complementary MOS logic gate: a pull-up network and a pull-down network meeting at the output. Each network is as its devices are joined, in series or in parallel (a NOR's pull-down is parallel, a NAND's in series), and the gate asserts neither: write each network as a usage, such as {#M3 #M4} @AS $PARALLEL_HORIZONTAL or @AS $BRANCH, and the pull-up above the pull-down with an ORDER of the devices, such as {#M1 #M2 {#M3 #M4}} @ORDER("top-to-bottom"); the gate joins the nets its devices share. A ground or supply net among them is not: rnl-std-fill leaves it unwired, drawn with symbols, unless the file writes &net @ROUTE-NET(priority="high") or a WIRE. */
+  $CMOS_GATE = @DEFINE(roles=[["{pull_up}", ["instance", "usage"]], ["{pull_down}", ["instance", "usage"]]]) { {?pull_up ?pull_down} @ROUTE-OBJECT(priority="low"); {?pull_up ?pull_down} @GROUP };
+
+  /* Meaning only: places and routes nothing. Clocked precharge, equalization, or reset transistor that initializes internal or output nodes during a reset phase. */
+  $RESET_SWITCH = @DEFINE(roles=[["device", "instance"]]) { /* clocked precharge or reset switch */ };
+
+  /* Meaning only: places and routes nothing. Inductor (RF choke) or bias resistor (single device or usage) that feeds a DC supply or bias voltage to an active node and, for that reason, blocks the AC/RF signal from the DC rail; it says nothing else. */
+  $DC_FEED = @DEFINE(roles=[["device", ["instance", "usage"]]]) { /* DC bias or supply feed element; carries no other semantics */ };
+
+  /* Meaning only: places and routes nothing. Decoupling or bypass capacitor (single capacitor or usage such as $PARALLEL) connected between a DC supply or bias node and AC ground/supply to shunt AC/RF fluctuations; it says nothing else. */
+  $DECAP = @DEFINE(roles=[["device", ["instance", "usage"]]]) { /* decoupling or bypass capacitor; carries no other semantics */ };
+
+  /* Meaning only: places and routes nothing. Series coupling capacitor (single capacitor or usage) that passes an AC signal between a port and a stage or between stages and, for that reason, blocks DC between them; it says nothing else. */
+  $AC_COUPLE = @DEFINE(roles=[["device", ["instance", "usage"]]]) { /* AC coupling capacitor; carries no other semantics */ };
+
+  /* Meaning only: places and routes nothing; a group. Non-grounded transfer capacitor switched between clock phases by top-plate and bottom-plate switches (no drawing constraint). */
+  $FLYING_CAPACITOR = @DEFINE(roles=[["capacitor", ["instance", "usage"]], ["{switches}", ["instance", "usage"]]]) { /* flying capacitor and phase switches */ {?capacitor ?switches} @GROUP };
+
+  /* Routes; places nothing. Two-branch ratio divider (resistive, capacitive, or inductive) connected in $SERIES with roles upper and lower; the shared midpoint net between ?upper and ?lower is drawn as an explicit wire. A ground or supply net among them is not: rnl-std-fill leaves it unwired, drawn with symbols, unless the file writes &net @ROUTE-NET(priority="high") or a WIRE. */
+  $DIVIDER = @DEFINE(roles=[["upper", ["instance", "usage"]], ["lower", ["instance", "usage"]]]) { {?upper ?lower} @AS $SERIES; {?upper ?lower} @ROUTE-OBJECT(priority="low") };
+
+  /* Meaning only: places and routes nothing. Low-side footer switch connected directly to a ground/return rail to gate return current or discharge a node. */
+  $GROUND_SWITCH = @DEFINE(roles=[["device", "instance"]]) { /* low-side ground switch */ };
+
+  /* Routes; places nothing; a group. First-order passive RC low-pass filter section (series resistor, shunt capacitor) specializing $DIVIDER, with semantics only and no drawing constraint. */
+  $FILTER_LOWPASS_RC = @DEFINE(roles=[["resistor", ["instance", "usage"]], ["capacitor", ["instance", "usage"]]]) { ?resistor(upper) ?capacitor(lower) @AS $DIVIDER; {?resistor ?capacitor} @GROUP };
+
+  /* Meaning only: places and routes nothing. High-side header switch connected directly to a positive supply rail to gate power or charge a circuit node. */
+  $POWER_SWITCH = @DEFINE(roles=[["device", "instance"]]) { /* high-side supply switch */ };
+
+  /* Meaning only: places and routes nothing. Abstract voltage-follower transistor stage (superclass of $COMMON_DRAIN and $COMMON_COLLECTOR). */
+  $FOLLOWER = @DEFINE(roles=[["device", "instance"]]) { /* abstract voltage-follower stage */ };
+
+  /* Meaning only: places and routes nothing; a group. Switched-capacitor sampling cell pairing sampling switch(es) {switch} with sampling capacitor(s) {capacitor} (no drawing constraint). */
+  $SC_SAMPLER = @DEFINE(roles=[["{switch}", ["instance", "usage"]], ["{capacitor}", ["instance", "usage"]]]) { /* switched-capacitor sampling cell */ {?switch ?capacitor} @GROUP };
+
+  /* Routes; places nothing; a group. Charge-redistribution network where capacitor groups ?cap_a and ?cap_b share charge through switch(es) ?switch (no drawing constraint); the shared charge-sharing nets connecting ?cap_a, ?switch, and ?cap_b are drawn as explicit wires. A ground or supply net among them is not: rnl-std-fill leaves it unwired, drawn with symbols, unless the file writes &net @ROUTE-NET(priority="high") or a WIRE. */
+  $CHARGE_SHARING = @DEFINE(roles=[["{cap_a}", ["instance", "usage"]], ["{switch}", ["instance", "usage"]], ["{cap_b}", ["instance", "usage"]]]) { {?cap_a ?switch ?cap_b} @ROUTE-OBJECT(priority="low"); {?cap_a ?switch ?cap_b} @GROUP };
+
+  /* Routes; places nothing; a group. Parallel RLC (or LC) resonant tank with optional damping resistor(s), inductor(s), and capacitor(s) in $PARALLEL; the shared tank terminal nets are drawn as explicit wires. A ground or supply net among them is not: rnl-std-fill leaves it unwired, drawn with symbols, unless the file writes &net @ROUTE-NET(priority="high") or a WIRE. */
+  $RLC_TANK = @DEFINE(roles=[["{resistors}", ["instance", "usage"]], ["{inductors}", ["instance", "usage"]], ["{capacitors}", ["instance", "usage"]]]) { {?resistors ?inductors ?capacitors} @AS $PARALLEL; {?resistors ?inductors ?capacitors} @ROUTE-OBJECT(priority="low"); {?resistors ?inductors ?capacitors} @GROUP };
+
+  /* Places and routes; a group. H-bridge source/emitter-degenerated differential stage (not a $DIFFERENTIAL_PAIR_N or _P, and no $SERIES): matched inputs, matched tails, MY between inputs only, each input aligned with its tail in x, inputs aligned in y, tails aligned in y, and the bridge in the middle between the inputs, left on the left (left and right are sides of the drawing, as for the differential pair); horizontal bridge nets are drawn as explicit wires. A ground or supply net among them is not: rnl-std-fill leaves it unwired, drawn with symbols, unless the file writes &net @ROUTE-NET(priority="high") or a WIRE. */
+  $DEGENERATED_DIFFERENTIAL_PAIR_TYPE_H = @DEFINE(roles=[["left", "instance"], ["right", "instance"], ["{tail_left}", ["instance", "usage"]], ["{tail_right}", ["instance", "usage"]], ["{bridge}", ["instance", "usage"]]]) { {?left ?right} @AS $MATCHED; {?tail_left ?tail_right} @AS $MATCHED; ?left ?right @ORIENT-RELATION("MY", priority="low"); {?left ?tail_left} @ALIGN("x", priority="low"); {?right ?tail_right} @ALIGN("x", priority="low"); {?left ?right} @ALIGN("y", priority="low"); {?tail_left ?tail_right} @ALIGN("y", priority="low"); {?left {?bridge} ?right} @DISTRIBUTE("left-to-right", priority="low"); {?left ?right ?tail_left ?tail_right ?bridge} @ROUTE-OBJECT(priority="low"); {?left ?right ?tail_left ?tail_right ?bridge} @GROUP };
+
+  /* Routes; places nothing; a group. First-order passive RC high-pass filter section (series capacitor, shunt resistor) specializing $DIVIDER, with semantics only and no drawing constraint. */
+  $FILTER_HIGHPASS_RC = @DEFINE(roles=[["capacitor", ["instance", "usage"]], ["resistor", ["instance", "usage"]]]) { ?capacitor(upper) ?resistor(lower) @AS $DIVIDER; {?capacitor ?resistor} @GROUP };
+
+  /* Places; routes nothing. Top-bottom counterpart of $MIRRORED: two symmetric objects in one column, mirror images about an optional horizontal axis, top above the axis and bottom below (swap the roles to swap the sides). */
+  $MIRRORED_VERTICAL = @DEFINE(roles=[["top", ["instance", "usage"]], ["bottom", ["instance", "usage"]], ["{axis}", ["point", "instance", "usage", "net"]]]) { {?top ?bottom} @ALIGN("x", priority="low"); {?top {?axis} ?bottom} @DISTRIBUTE("top-to-bottom", priority="low"); ?top ?bottom @ORIENT-RELATION("MX", priority="low") };
+
+  /* Meaning only: places and routes nothing. Single-BJT common-base stage (input at emitter, output at collector, AC-grounded bias at base). */
+  $COMMON_BASE = @DEFINE(roles=[["device", "instance"]]) { /* single-BJT common-base stage */ };
+
+  /* Routes; places nothing. Source- or emitter-degenerated Widlar bias stage (does not apply $CURRENT_MIRROR); the shared gate/base net between ?ref and ?out, the diode connection on ?ref, and the series net between ?out and ?degenerator are drawn as explicit internal wires. A ground or supply net among them is not: rnl-std-fill leaves it unwired, drawn with symbols, unless the file writes &net @ROUTE-NET(priority="high") or a WIRE. */
+  $WIDLAR_CURRENT_MIRROR = @DEFINE(roles=[["{ref}", "instance"], ["{out}", "instance"], ["{degenerator}", ["instance", "usage"]]]) { {?out ?degenerator} @AS $SERIES; {?ref ?out ?degenerator} @ROUTE-OBJECT(priority="low") };
+
+  /* Meaning only: places and routes nothing. Two BJTs, or a BJT and a group of parallel BJTs, whose sizes are in a ratio (neither $WIDLAR_CURRENT_MIRROR nor $MATCHED). */
+  $RATIO_BJT = @DEFINE(roles=[["unit", "instance"], ["{array}", "instance"]]) { /* two BJTs, or a BJT and a parallel BJT array, whose sizes are in a ratio */ };
+
+  /* Meaning only: places and routes nothing. Single-BJT emitter-follower (common-collector) stage specializing $FOLLOWER. */
+  $COMMON_COLLECTOR = @DEFINE(roles=[["device", "instance"]]) { ?device @AS $FOLLOWER };
+
+  /* Meaning only: places and routes nothing. Single-MOSFET source-follower (common-drain) stage specializing $FOLLOWER. */
+  $COMMON_DRAIN = @DEFINE(roles=[["device", "instance"]]) { ?device @AS $FOLLOWER };
+
+  /* Meaning only: places and routes nothing. Single-BJT common-emitter transconductance/gain stage (input at base, output at collector). */
+  $COMMON_EMITTER = @DEFINE(roles=[["device", "instance"]]) { /* single-BJT common-emitter stage */ };
+
+  /* Meaning only: places and routes nothing. Single-MOSFET common-gate stage (input at source, output at drain, AC-grounded bias at gate). */
+  $COMMON_GATE = @DEFINE(roles=[["device", "instance"]]) { /* single-transistor common-gate stage */ };
+
+  /* Routes; places nothing; a group. Rail-to-rail differential input stage combining a PMOS differential pair (pmos) and an NMOS differential pair (nmos) with no position constraint; the shared differential input gate nets connecting ?pmos and ?nmos are drawn as explicit wires. A ground or supply net among them is not: rnl-std-fill leaves it unwired, drawn with symbols, unless the file writes &net @ROUTE-NET(priority="high") or a WIRE. */
+  $COMPLEMENTARY_DIFFERENTIAL_PAIR = @DEFINE(roles=[["pmos", "usage"], ["nmos", "usage"]]) { {?pmos ?nmos} @ROUTE-OBJECT(priority="low"); {?pmos ?nmos} @GROUP };
+
+  /* Meaning only: places and routes nothing. Matched symmetric pair of input transistors driven differentially without a tail current source. */
+  $PSEUDO_DIFFERENTIAL_PAIR = @DEFINE(roles=[["in_p", "instance"], ["in_n", "instance"]]) { {?in_p ?in_n} @AS $MATCHED };
+
+  /* Places and routes; a group. Multi-tap series string of three or more resistors providing stepped reference voltages, drawn as a $BRANCH: one column, from the top down in the order written (as a row: $RESISTOR_LADDER_HORIZONTAL). */
+  $RESISTOR_LADDER = @DEFINE(roles=[["{resistors}", "instance"]]) { ?resistors @AS $BRANCH; {?resistors} @GROUP };
+
+  /* Places and routes; a group. The resistor ladder drawn as a row, a $BRANCH_HORIZONTAL. */
+  $RESISTOR_LADDER_HORIZONTAL = @DEFINE(roles=[["{resistors}", "instance"]]) { ?resistors @AS $BRANCH_HORIZONTAL; {?resistors} @GROUP };
+
+  /* Routes; places nothing; a group. Three-branch passive Pi network (shunt_in, series bridge, shunt_out) with no drawing constraint; the shared terminal nets joining ?shunt_in to ?series and ?series to ?shunt_out are drawn as explicit internal wires. A ground or supply net among them is not: rnl-std-fill leaves it unwired, drawn with symbols, unless the file writes &net @ROUTE-NET(priority="high") or a WIRE. */
+  $PI_NETWORK = @DEFINE(roles=[["shunt_in", ["instance", "usage"]], ["series", ["instance", "usage"]], ["shunt_out", ["instance", "usage"]]]) { {?shunt_in ?series ?shunt_out} @ROUTE-OBJECT(priority="low"); {?shunt_in ?series ?shunt_out} @GROUP };
+
+  /* Places and routes. Floating class-AB or Gilbert translinear loop formed by two transistor pairs in $PARALLEL, every member of pair_a in one column with every member of pair_b (at one height: $TRANS_LINEAR_LOOP_HORIZONTAL); their internal loop nets are drawn as explicit wires. A ground or supply net among them is not: rnl-std-fill leaves it unwired, drawn with symbols, unless the file writes &net @ROUTE-NET(priority="high") or a WIRE. */
+  $TRANS_LINEAR_LOOP = @DEFINE(roles=[["{pair_a}", ["instance", "usage"]], ["{pair_b}", ["instance", "usage"]]]) { {?pair_a ?pair_b} @AS $PARALLEL; {?pair_a ?pair_b} @ALIGN("x", priority="low"); {?pair_a ?pair_b} @ROUTE-OBJECT(priority="low") };
+
+  /* Places and routes. The translinear loop with every member of pair_a at one height with every member of pair_b. */
+  $TRANS_LINEAR_LOOP_HORIZONTAL = @DEFINE(roles=[["{pair_a}", ["instance", "usage"]], ["{pair_b}", ["instance", "usage"]]]) { {?pair_a ?pair_b} @AS $PARALLEL; {?pair_a ?pair_b} @ALIGN("y", priority="low"); {?pair_a ?pair_b} @ROUTE-OBJECT(priority="low") };
+
+  /* Routes; places nothing; a group. Three-branch passive T network (series_in, central shunt branch, series_out) with no drawing constraint; the shared central T-junction net connecting ?series_in, ?shunt, and ?series_out is drawn as an explicit internal wire. A ground or supply net among them is not: rnl-std-fill leaves it unwired, drawn with symbols, unless the file writes &net @ROUTE-NET(priority="high") or a WIRE. */
+  $T_NETWORK = @DEFINE(roles=[["series_in", ["instance", "usage"]], ["shunt", ["instance", "usage"]], ["series_out", ["instance", "usage"]]]) { {?series_in ?shunt ?series_out} @ROUTE-OBJECT(priority="low"); {?series_in ?shunt ?series_out} @GROUP };
+
+  /* Meaning only: places and routes nothing; a group. Four-switch polarity-reversing modulator/demodulator bridge holding only the matched semantics on ?straight and ?crossed, with no drawing constraint. */
+  $CHOPPER = @DEFINE(roles=[["{straight}", ["instance", "usage"]], ["{crossed}", ["instance", "usage"]]]) { ?straight @AS $MATCHED; ?crossed @AS $MATCHED; {?straight ?crossed} @GROUP };
+
+  /* Places; routes nothing; a group. T-type source/emitter-degenerated differential stage (not a $DIFFERENTIAL_PAIR_N or _P, with no $SERIES and no @ORDER): matched inputs, matched degeneration elements, and the tail in the middle between the inputs, left on the left (left and right are sides of the drawing, as for the differential pair). */
+  $DEGENERATED_DIFFERENTIAL_PAIR_TYPE_T = @DEFINE(roles=[["left", "instance"], ["right", "instance"], ["deg_left", ["instance", "usage"]], ["deg_right", ["instance", "usage"]], ["{tail}", ["instance", "usage"]]]) { {?left ?right} @AS $MATCHED; {?deg_left ?deg_right} @AS $MATCHED; {?left {?tail} ?right} @DISTRIBUTE("left-to-right", priority="low"); {?left ?right ?deg_left ?deg_right ?tail} @GROUP };
+
+  /* Routes; places nothing; a group. Second-order passive LC high-pass L-section (series capacitor, shunt inductor) specializing $DIVIDER, with semantics only and no drawing constraint. */
+  $FILTER_HIGHPASS_LC = @DEFINE(roles=[["capacitor", ["instance", "usage"]], ["inductor", ["instance", "usage"]]]) { ?capacitor(upper) ?inductor(lower) @AS $DIVIDER; {?capacitor ?inductor} @GROUP };
+
+  /* Routes; places nothing; a group. Second-order passive LC low-pass L-section (series inductor, shunt capacitor) specializing $DIVIDER, with semantics only and no drawing constraint. */
+  $FILTER_LOWPASS_LC = @DEFINE(roles=[["inductor", ["instance", "usage"]], ["capacitor", ["instance", "usage"]]]) { ?inductor(upper) ?capacitor(lower) @AS $DIVIDER; {?inductor ?capacitor} @GROUP };
+
+  /* Routes; places nothing. Series-resonant RLC (or LC) tank section with optional resistor(s), inductor(s), and capacitor(s), without $SERIES semantics since the branch may be folded; internal tank nets are drawn as explicit wires. A ground or supply net among them is not: rnl-std-fill leaves it unwired, drawn with symbols, unless the file writes &net @ROUTE-NET(priority="high") or a WIRE. */
+  $SERIES_RLC_TANK = @DEFINE(roles=[["{resistors}", ["instance", "usage"]], ["{inductors}", ["instance", "usage"]], ["{capacitors}", ["instance", "usage"]]]) { {?resistors ?inductors ?capacitors} @ROUTE-OBJECT(priority="low") };
+
+  /* Routes; places nothing; a group. Divider-type passive RC band-pass filter section specializing $DIVIDER, where upper is a series RC ($SERIES usage) and lower is a parallel RC ($PARALLEL usage), with semantics only and no drawing constraint. */
+  $FILTER_BANDPASS_RC = @DEFINE(roles=[["upper", "usage"], ["lower", "usage"]]) { ?upper(upper) ?lower(lower) @AS $DIVIDER; {?upper ?lower} @GROUP };
+
+  /* Routes; places nothing; a group. Divider-type passive LC band-pass filter section specializing $DIVIDER, where upper is a series LC ($SERIES usage) and lower is a parallel LC ($PARALLEL usage), with semantics only and no drawing constraint. */
+  $FILTER_BANDPASS_LC = @DEFINE(roles=[["upper", "usage"], ["lower", "usage"]]) { ?upper(upper) ?lower(lower) @AS $DIVIDER; {?upper ?lower} @GROUP };
+
+  /* Routes; places nothing; a group. Divider-type passive RLC band-pass filter section specializing $DIVIDER in either of two forms (upper is R and lower is parallel LC, or upper is series LC and lower is R), with semantics only and no drawing constraint. */
+  $FILTER_BANDPASS_RLC = @DEFINE(roles=[["upper", ["instance", "usage"]], ["lower", ["instance", "usage"]]]) { ?upper(upper) ?lower(lower) @AS $DIVIDER; {?upper ?lower} @GROUP };
+
+  /* Routes; places nothing; a group. Divider-type passive LC band-stop filter section specializing $DIVIDER, where upper is a parallel LC ($PARALLEL usage) and lower is a series LC ($SERIES usage), with semantics only and no drawing constraint. */
+  $FILTER_BANDSTOP_LC = @DEFINE(roles=[["upper", "usage"], ["lower", "usage"]]) { ?upper(upper) ?lower(lower) @AS $DIVIDER; {?upper ?lower} @GROUP };
+
+  /* Routes; places nothing; a group. Divider-type passive RLC band-stop filter section specializing $DIVIDER in either of two forms (upper is R and lower is series LC, or upper is parallel LC and lower is R), with semantics only and no drawing constraint. */
+  $FILTER_BANDSTOP_RLC = @DEFINE(roles=[["upper", ["instance", "usage"]], ["lower", ["instance", "usage"]]]) { ?upper(upper) ?lower(lower) @AS $DIVIDER; {?upper ?lower} @GROUP };
+
+  /* Routes; places nothing; a group. First-order passive RL high-pass filter section (series resistor, shunt inductor) specializing $DIVIDER, with semantics only and no drawing constraint. */
+  $FILTER_HIGHPASS_RL = @DEFINE(roles=[["resistor", ["instance", "usage"]], ["inductor", ["instance", "usage"]]]) { ?resistor(upper) ?inductor(lower) @AS $DIVIDER; {?resistor ?inductor} @GROUP };
+
+  /* Routes; places nothing; a group. First-order passive RL low-pass filter section (series inductor, shunt resistor) specializing $DIVIDER, with semantics only and no drawing constraint. */
+  $FILTER_LOWPASS_RL = @DEFINE(roles=[["inductor", ["instance", "usage"]], ["resistor", ["instance", "usage"]]]) { ?inductor(upper) ?resistor(lower) @AS $DIVIDER; {?inductor ?resistor} @GROUP };
+
+  /* Meaning only: places and routes nothing. Unidirectional signal flow path accepting both instances and usages without @ORDER; the parameter direction (default "left-to-right", one of the four directions) draws nothing. */
+  $FLOW = @DEFINE(roles=[["{path}", ["instance", "usage"]]], parameters=[["direction", "left-to-right"]]) { /* {path} accepts instances and usages; it states no order */ };
+
+  /* Meaning only: places and routes nothing. Closed-loop feedback topology pairing a forward gain path with a return feedback network, with no default drawing constraint. */
+  $FEEDBACK_LOOP = @DEFINE(roles=[["{forward}", ["instance", "usage"]], ["{feedback}", ["instance", "usage"]]]) { /* closed-loop forward and feedback paths */ };
+
+  /* Routes; places nothing. Common-source amplifier stage: a semantic variant of $TRANSCONDUCTOR_Z_AMPLIFIER whose transconductor is a MOSFET common-source stage, without $SERIES semantics since it may be folded (the BJT counterpart is $COMMON_EMITTER_AMPLIFIER). */
+  $COMMON_SOURCE_AMPLIFIER = @DEFINE(roles=[["input", ["instance", "usage"]], ["load", ["instance", "usage"]]]) { ?input(transconductor) ?load(load) @AS $TRANSCONDUCTOR_Z_AMPLIFIER };
+
+  /* Meaning only: places and routes nothing; a group. Two-stage Miller-compensated amplifier branch combining a gain stage and its Miller compensation network across input and output, specializing $FEEDBACK_LOOP. */
+  $MILLER_AMPLIFIER = @DEFINE(roles=[["stage", ["instance", "usage"]], ["{compensation}", ["instance", "usage"]]]) { ?stage(forward) ?compensation(feedback) @AS $FEEDBACK_LOOP; {?stage ?compensation} @GROUP };
+
+  /* Routes; places nothing. Complementary class-A/AB output branch stacking a high-side pull-up driver and a low-side pull-down driver in $SERIES. */
+  $PUSH_PULL_STAGE = @DEFINE(roles=[["pull_up", ["instance", "usage"]], ["pull_down", ["instance", "usage"]]]) { {?pull_up ?pull_down} @AS $SERIES };
+
+  /* Routes; places nothing; a group. Single-sided folded-cascode stage where ?source folds into ?cascode (with embedded $COMMON_GATE semantics) biased by ?bias, without $SERIES or @ORDER constraints; the shared folding-node net joining ?source, ?bias, and ?cascode is drawn as an explicit internal wire. A ground or supply net among them is not: rnl-std-fill leaves it unwired, drawn with symbols, unless the file writes &net @ROUTE-NET(priority="high") or a WIRE. */
+  $FOLDED_CASCODE = @DEFINE(roles=[["{source}", ["instance", "usage"]], ["cascode", "instance"], ["{bias}", ["instance", "usage"]]]) { ?cascode @AS $COMMON_GATE; {?source ?cascode ?bias} @ROUTE-OBJECT(priority="low"); {?source ?cascode ?bias} @GROUP };
+
+  /* Meaning only: places and routes nothing; a group. Multi-throw switch (2:1 MUX or reference selector) whose throws share a common pole node and each act as a $PASS_SWITCH, with no drawing constraint. */
+  $MULTI_POLE_SWITCH = @DEFINE(roles=[["{throws}", ["instance", "usage"]]]) { ?throws @AS $PASS_SWITCH; {?throws} @GROUP };
+
+  /* Meaning only: places and routes nothing; a group. Positive-feedback bistable regeneration core (abstract superclass of $SR_LATCH and $INVERTER_LATCH, or back-to-back PMOS/NMOS cross-coupled latch core), with no drawing constraint; {others} holds the devices of the latch that are not its core, such as switches in series between its pairs, so that its group holds them too. */
+  $LATCH = @DEFINE(roles=[["{core}", ["instance", "usage"]], ["{others}", ["instance", "usage"]]]) { /* abstract bistable regeneration core */ {?core ?others} @GROUP };
+
+  /* Meaning only: places and routes nothing; a group. Constant-Vgs bootstrapped sampling switch with main pass transistor (switch), bootstrap capacitor (cap), and auxiliary control switches ({others}). */
+  $BOOTSTRAPPED_SWITCH = @DEFINE(roles=[["switch", "instance"], ["cap", "instance"], ["{others}", ["instance", "usage"]]]) { /* bootstrapped sampling switch cell */ {?switch ?cap ?others} @GROUP };
+
+  /* Meaning only: places and routes nothing; a group. Negative-Gm LC oscillator combining a resonant tank usage and active cross-coupled pair usage(s), with no drawing constraint. */
+  $LC_OSCILLATOR = @DEFINE(roles=[["tank", "usage"], ["{active}", "usage"]]) { /* LC tank and active negative-Gm core */ {?tank ?active} @GROUP };
+
+  /* Meaning only: places and routes nothing. Sequential chain of flip-flops or delay latches clocked in series, with no drawing constraint. */
+  $SHIFT_REGISTER = @DEFINE(roles=[["{stages}", ["instance", "usage"]]]) { /* sequential shift-register stages */ };
+
+  /* Routes; places nothing. Single-ended transconductor-Z amplifier stage with source or emitter degeneration; {degenerator} is the impedance between the transconductor's source or emitter and its return, with no $SERIES and no drawing constraint. */
+  $DEGENERATED_TRANSCONDUCTOR_Z_AMPLIFIER = @DEFINE(roles=[["{transconductor}", ["instance", "usage"]], ["{load}", ["instance", "usage"]], ["{degenerator}", ["instance", "usage"]]]) { ?transconductor(transconductor) ?load(load) @AS $TRANSCONDUCTOR_Z_AMPLIFIER };
+
+  /* Routes; places nothing. Semantic transconductor-load amplifier stage pairing ?transconductor with ?load (superclass of $COMMON_SOURCE_AMPLIFIER and $COMMON_EMITTER_AMPLIFIER); the internal output/interstage nets connecting ?transconductor and ?load are drawn as explicit wires. A ground or supply net among them is not: rnl-std-fill leaves it unwired, drawn with symbols, unless the file writes &net @ROUTE-NET(priority="high") or a WIRE. */
+  $TRANSCONDUCTOR_Z_AMPLIFIER = @DEFINE(roles=[["{transconductor}", ["instance", "usage"]], ["{load}", ["instance", "usage"]]]) { {?transconductor ?load} @ROUTE-OBJECT(priority="low") };
+
+  /* Routes; places nothing; a group. Cross-coupled two-gate (NAND or NOR) SR bistable latch specializing $LATCH, with no drawing constraint; cross-coupled feedback nets are drawn as explicit internal wires. A ground or supply net among them is not: rnl-std-fill leaves it unwired, drawn with symbols, unless the file writes &net @ROUTE-NET(priority="high") or a WIRE. */
+  $SR_LATCH = @DEFINE(roles=[["gate_a", ["instance", "usage"]], ["gate_b", ["instance", "usage"]]]) { {?gate_a ?gate_b} @AS $LATCH; {?gate_a ?gate_b} @ROUTE-OBJECT(priority="low"); {?gate_a ?gate_b} @GROUP };
+
+  /* Routes; places nothing; a group. Back-to-back cross-coupled inverter keeper/storage loop specializing $LATCH, with no drawing constraint; cross-coupled loop nets are drawn as explicit internal wires. A ground or supply net among them is not: rnl-std-fill leaves it unwired, drawn with symbols, unless the file writes &net @ROUTE-NET(priority="high") or a WIRE. */
+  $INVERTER_LATCH = @DEFINE(roles=[["inv_a", ["instance", "usage"]], ["inv_b", ["instance", "usage"]]]) { {?inv_a ?inv_b} @AS $LATCH; {?inv_a ?inv_b} @ROUTE-OBJECT(priority="low"); {?inv_a ?inv_b} @GROUP };
+
+  /* Routes; places nothing. Common-emitter amplifier stage: the BJT counterpart of $COMMON_SOURCE_AMPLIFIER, a variant of $TRANSCONDUCTOR_Z_AMPLIFIER for a bipolar input device. */
+  $COMMON_EMITTER_AMPLIFIER = @DEFINE(roles=[["input", ["instance", "usage"]], ["load", ["instance", "usage"]]]) { ?input(transconductor) ?load(load) @AS $TRANSCONDUCTOR_Z_AMPLIFIER }
+}

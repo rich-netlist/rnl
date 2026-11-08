@@ -136,7 +136,9 @@ impl Interp<'_> {
     pub(crate) fn merged_in_0_3(&self, decl: &UseDecl) -> Option<String> {
         let (merged, into) = MERGED;
         let name = decl.name.as_str();
-        if !merged.contains(&name) || !self.follows_0_3(decl.unit) || self.pins_another_series(decl.unit) {
+        // the series 0.3 is in effect in a file of 0.3: a file of 0.4 has the series 0.4 (16.3)
+        let in_0_3 = self.version_of(Some(decl.unit)) == "0.3";
+        if !merged.contains(&name) || !in_0_3 || self.pins_another_series(decl.unit) {
             return None;
         }
         if decl.version.as_deref().is_some_and(|v| v != "0.3") {

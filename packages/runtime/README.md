@@ -101,7 +101,7 @@ const resistor = catalog.symbols.find((s) => s.symbol === "$RESISTOR");
 // resistor.pins [{ terminal: 1, at: [0, 2], direction: "up" }, { terminal: 2, at: [0, -2], direction: "down" }]
 ```
 
-Of each name only the newest version is listed; `{ catalog: { packages: ["rnl-std-basic"], all_versions: true } }` keeps the packages of these names, every version of each. A symbol's `definition` names the definition whose usages a rule of the packages draws with it, such as `$GROUND` for `$GROUND_SYMBOL`.
+Of each name only the newest version is listed, of the versions written in a language version not newer than the tool's default when it has one (the series 0.3, not the draft 0.4); `{ catalog: { packages: ["rnl-std-basic"], all_versions: true } }` keeps the packages of these names, every version of each. A symbol's `definition` names the definition whose usages a rule of the packages draws with it, such as `$GROUND` for `$GROUND_SYMBOL`.
 
 ## Objects without a position
 

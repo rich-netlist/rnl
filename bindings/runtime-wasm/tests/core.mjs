@@ -304,10 +304,15 @@ test("a catalog request lists the packages, through the core and through the Wor
   assert.deepEqual(resistor.labels.map((l) => l.key), ["name", "value"]);
   assert.equal(c.symbols.find((s) => s.symbol === "$GROUND_SYMBOL").definition, "$GROUND");
   assert.equal(c.definitions.find((d) => d.definition === "$GROUND").symbol, "$GROUND_SYMBOL");
-  // of each name the newest version: rnl-std 0.3, not 0.2
+  // of each name the newest version, of those a file of the default version finds: rnl-std 0.3,
+  // not 0.2, nor the draft 0.4
   const versions = (catalog, name) => catalog.packages.filter((p) => p.name === name).map((p) => p.version);
   assert.deepEqual(versions(c, "rnl-std"), ["0.3"]);
-  assert.deepEqual(versions(core.catalog({ catalog: { all_versions: true } }), "rnl-std"), ["0.2", "0.3"]);
+  // every version: rnl-std of each series bundled
+  const all = core.catalog({ catalog: { all_versions: true } });
+  const series = [...new Set(all.packages.filter((p) => p.series).map((p) => p.version))];
+  assert.deepEqual(series.slice(0, 3), ["0.2", "0.3", "0.4"]);
+  assert.deepEqual(versions(all, "rnl-std"), series);
   // a request's own package, by name
   const acme = '@RNL(type="header") { @VERSION("0.3"); @PACKAGE(name="acme", version="1.0")}\n@RNL { $ACME = @DEFINE-SYMBOL { (0, 0) @PIN(terminal=1, direction="up") } }\n';
   const own = { catalog: { packages: ["acme"] }, files: { "/p/acme.rnl": acme }, package_dirs: ["/p"] };

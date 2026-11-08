@@ -1107,7 +1107,12 @@ R1 a 0 1k
             .iter()
             .map(|p| (p["name"].as_str().unwrap(), p["version"].as_str().unwrap()))
             .collect();
-        assert_eq!(listed, [("acme", "1.0"), ("rnl-std", "0.2"), ("rnl-std", "0.3")]);
+        // and rnl-std of each series bundled, a directory of its own
+        let bundled = rnl_view::bundled();
+        let series: Vec<&str> = bundled.package_dirs.iter().map(|d| d.rsplit('/').next().unwrap()).collect();
+        let mut want = vec![("acme", "1.0")];
+        want.extend(series.iter().map(|v| ("rnl-std", *v)));
+        assert_eq!(listed, want);
         // a catalog request of another shape is not valid
         let v = answer(json!({ "catalog": { "all_versions": "yes" } }));
         assert!(v["error"].as_str().unwrap().starts_with("the request is not valid: "), "{v}");

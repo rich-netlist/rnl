@@ -167,10 +167,10 @@ fn a_package_directory_hides_the_bundled_series_of_the_same_version() {
 fn a_package_that_is_not_read_uses_no_series() {
     // a package of a version that the toolkit does not read, checked on its own, is not read
     // (16.1): its version is the one error, and no standard series is used
-    let package = "@RNL(type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"p\", version=\"1.0\")}\n";
+    let package = "@RNL(type=\"header\") { @VERSION(\"9.9\"); @PACKAGE(name=\"p\", version=\"1.0\")}\n";
     let r = read(&MemoryProvider::new().with("p.rnl", package), "p.rnl", &Options::default());
     let e = errors(&r);
-    assert!(e.len() == 1 && e[0].contains("unsupported version 0.4"), "{e:?}");
+    assert!(e.len() == 1 && e[0].contains("unsupported version 9.9"), "{e:?}");
     assert!(!r.sources.iter().any(|(f, _)| f.starts_with("rnl-std")), "{:?}", r.sources);
 }
 

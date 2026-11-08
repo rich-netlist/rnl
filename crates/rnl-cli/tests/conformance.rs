@@ -14,6 +14,8 @@
 use std::path::{Path, PathBuf};
 
 use rnl_cli::{dump, interpret_file, FsProvider};
+use rnl_runtime::interp::catalog::version_key;
+use rnl_runtime::interp::unit::{scan_language_decl, DEFAULT_VERSION};
 use rnl_runtime::Options;
 use serde_json::Value;
 
@@ -159,21 +161,67 @@ fn spice_and_spectre_give_the_same_model() {
     }
 }
 
-#[test]
-fn standard_packages_check_clean() {
-    // every version of the standard series, in a directory of its own, each written in the
-    // language of its version
+/// The package files of the standard series, every version in a directory of its own, each written
+/// in the language of its version: those of the versions up to the tool's default, and those of the
+/// drafts after it.
+fn standard_packages() -> (Vec<PathBuf>, Vec<PathBuf>) {
     let lib = corpus().join("../../libraries/standard");
-    let mut checked = 0;
+    let mut out = (Vec::new(), Vec::new());
     for dir in std::fs::read_dir(lib).unwrap().map(|e| e.unwrap().path()).filter(|p| p.is_dir()) {
         for f in files(&dir, &["rnl"]) {
-            let provider = FsProvider::new(&[]);
-            let r = interpret_file(&f, None, &provider, &Options::default()).unwrap();
-            // not even a hint, such as one for a pin off the integer points (9.2.4)
-            let d: Vec<String> = r.diagnostics().iter().map(|d| r.sink.render(d)).collect();
-            assert!(d.is_empty(), "{}: {d:?}", f.display());
-            checked += 1;
+            let language = scan_language_decl(&std::fs::read_to_string(&f).unwrap()).unwrap();
+            if version_key(&language) <= version_key(DEFAULT_VERSION) {
+                out.0.push(f);
+            } else {
+                out.1.push(f);
+            }
         }
     }
-    assert!(checked >= 25, "only {checked} package files");
+    out
+}
+
+#[test]
+fn standard_packages_check_clean() {
+    let packages = standard_packages().0;
+    for f in &packages {
+        let r = interpret_file(f, None, &FsProvider::new(&[]), &Options::default()).unwrap();
+        // not even a hint, such as one for a pin off the integer points (9.2.4)
+        let d: Vec<String> = r.diagnostics().iter().map(|d| r.sink.render(d)).collect();
+        assert!(d.is_empty(), "{}: {d:?}", f.display());
+    }
+    assert!(packages.len() >= 25, "only {} package files", packages.len());
+}
+
+/// The keywords of the draft language 0.4 that the draft series 0.4 writes and the toolkit does not
+/// read yet: those of the selective routing (13.7) and SELECT-PIN (10.1). Each change that reads
+/// one takes it out here, and with it the aliases rnl-zh gives it (16.5).
+const KEYWORDS_NOT_READ_YET: [&str; 5] = ["ROUTE-NET", "ROUTE-OBJECT", "UNROUTE-NET", "UNROUTE-OBJECT", "SELECT-PIN"];
+
+/// The other statements of 0.4 that the draft series writes and the toolkit does not read yet: the
+/// pins as objects (5.1, 9.2.4) and the rules in the body of a definition (6.9).
+const NOT_READ_YET: [&str; 3] = [
+    "unknown kind name pin (9.4)",
+    "@PIN lacks the parameter terminal (5.3)",
+    "the body of an ordinary definition cannot reference host objects; they come in through roles (6.9)",
+];
+
+#[test]
+fn the_draft_standard_series_has_only_what_is_not_read_yet() {
+    // checked on its own, each package of a draft series gives no diagnostic but those of the
+    // statements of its language the toolkit does not read yet, or of a statement that fails
+    // because of one (its upstream cause)
+    let mut known: Vec<String> = NOT_READ_YET.iter().map(|n| n.to_string()).collect();
+    for k in KEYWORDS_NOT_READ_YET {
+        known.push(format!("unknown keyword @{k}"));
+        known.push(format!("the original @{k} is not a standard keyword (16.5)"));
+    }
+    let drafts = standard_packages().1;
+    assert!(drafts.len() >= 16, "only {} package files", drafts.len());
+    for f in drafts {
+        let r = interpret_file(&f, None, &FsProvider::new(&[]), &Options::default()).unwrap();
+        for d in r.diagnostics() {
+            let said = r.sink.render(d);
+            assert!(known.iter().any(|n| said.contains(n.as_str())), "{}: {said}", f.display());
+        }
+    }
 }

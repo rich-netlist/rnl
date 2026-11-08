@@ -791,8 +791,8 @@ R1 p q 1k
 
     #[test]
     fn the_bundled_packages_are_by_version() {
-        // the series 0.2 and the series 0.3, each with its Chinese aliases in its own directory, and
-        // Analog Canvas's package in one of its own
+        // each series of libraries/standard with its Chinese aliases in a directory of its own, by
+        // version: 0.2, 0.3 and the draft 0.4
         let names: Vec<&str> = BUNDLED.iter().map(|(path, _)| *path).collect();
         let series = |v: &str| names.iter().filter(|n| n.starts_with(&format!("{v}/"))).count();
         assert_eq!(
@@ -809,17 +809,34 @@ R1 p q 1k
                 "0.2/rnl-zh.rnl",
             ]
         );
-        // the series 0.3: the packages of 16.3 of the language 0.3, and rnl-zh 0.3
-        assert_eq!(series("0.3"), 16);
-        for name in
-            ["rnl-std", "rnl-std-core", "rnl-std-basic", "rnl-std-spice", "rnl-std-spectre", "rnl-std-full", "rnl-zh"]
-        {
-            assert!(names.contains(&format!("0.3/{name}.rnl").as_str()), "{name}");
+        let mut dirs: Vec<&str> = Vec::new();
+        for name in &names {
+            let dir = name.split('/').next().unwrap();
+            if !dirs.contains(&dir) {
+                dirs.push(dir);
+            }
         }
-        assert!(names.iter().all(|name| name.starts_with("0.2/") || name.starts_with("0.3/")));
-        assert_eq!(names.len(), 9 + 16);
+        assert_eq!(dirs[..3], ["0.2", "0.3", "0.4"]);
+        let key = rnl_runtime::interp::catalog::version_key;
+        assert!(dirs.windows(2).all(|d| key(d[0]) < key(d[1])), "{dirs:?}");
+        // from 0.3 on, each series has the packages of 16.3 of the language 0.3, and its rnl-zh
+        assert_eq!(series("0.3"), 16);
+        for dir in &dirs[1..] {
+            for name in [
+                "rnl-std",
+                "rnl-std-core",
+                "rnl-std-basic",
+                "rnl-std-spice",
+                "rnl-std-spectre",
+                "rnl-std-full",
+                "rnl-zh",
+            ] {
+                assert!(names.contains(&format!("{dir}/{name}.rnl").as_str()), "{dir}/{name}");
+            }
+        }
+        assert_eq!(names.len(), 9 + dirs[1..].iter().map(|d| series(d)).sum::<usize>());
         let p = bundled();
-        let dirs = ["0.2", "0.3"].map(|d| format!("{BUNDLED_DIR}/{d}"));
+        let dirs: Vec<String> = dirs.iter().map(|d| format!("{BUNDLED_DIR}/{d}")).collect();
         assert_eq!(p.package_dirs, dirs);
         assert_eq!(p.package_files().len(), names.len());
     }
@@ -865,8 +882,15 @@ R1 p q 1k
         let r = interpret("untitled-1", None, &files, &Options::default()).unwrap();
         assert!(r.diagnostics().iter().all(|d| d.severity != Severity::Error), "{:?}", r.diagnostics());
         assert_eq!(r.model.levels[0].items.iter().filter(|i| !i.host.is_empty()).count(), 2);
-        for (path, _) in BUNDLED {
-            // Every bundled standard package reads without diagnostics.
+        for (path, text) in BUNDLED {
+            // Every bundled standard package reads without diagnostics, but those of a draft series,
+            // written in a version newer than the default, which the rnl command's conformance
+            // tests check against what is not read yet.
+            let language = rnl_runtime::interp::unit::scan_language_decl(text).unwrap();
+            let key = rnl_runtime::interp::catalog::version_key;
+            if key(&language) > key(rnl_runtime::interp::unit::DEFAULT_VERSION) {
+                continue;
+            }
             let options = Options::default();
             let package = interpret(&format!("{BUNDLED_DIR}/{path}"), None, &MemoryProvider::new(), &options);
             let package = package.unwrap();
