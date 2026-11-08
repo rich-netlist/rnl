@@ -290,8 +290,14 @@ impl Prepared {
     ) -> Result<Self, String> {
         let path = normalize(path);
         let observed = Observed { files, inputs: RefCell::new(Inputs::default()) };
-        let options =
-            BuildOptions { formats: formats.clone(), bind: bind.cloned(), constraints, ..BuildOptions::default() };
+        // flylines are asked for, not left to the core's default: View > Show Flylines hides them (flylines.js)
+        let options = BuildOptions {
+            formats: formats.clone(),
+            bind: bind.cloned(),
+            constraints,
+            flylines: true,
+            ..BuildOptions::default()
+        };
         let (doc, drawings) = rnl_view::build_drawn(&path, &observed, &options)?;
         let json = serde_json::to_string(&doc).map_err(|e| e.to_string())?;
         let drawings = Arc::new(drawings);

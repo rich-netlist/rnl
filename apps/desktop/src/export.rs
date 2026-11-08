@@ -33,7 +33,8 @@ pub async fn export_svg(
     let paths = settings.paths()?;
     let library = library.snapshot()?;
     let pool = pool.unwrap_or_default();
-    let options = rnl_view::BuildOptions { formats: formats.unwrap_or_default(), ..Default::default() };
+    // flylines are asked for, so that the export can leave them out as the page shows (export-image.js)
+    let options = rnl_view::BuildOptions { formats: formats.unwrap_or_default(), flylines: true, ..Default::default() };
     tauri::async_runtime::spawn_blocking(move || {
         let edits = edits.unwrap_or_default();
         let (entry, held) = match (path, name, text) {
