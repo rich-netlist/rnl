@@ -112,6 +112,19 @@ writeFileSync(join(out, "public-packages.json"), JSON.stringify({
   url: fixture ? "public-packages/catalog.json" : process.env.RNL_PACKAGE_CATALOG || "https://rich-netlist.github.io/rnl-packages/catalog.json",
 }) + "\n");
 
+// What the page puts before the names of the values it keeps in the browser's storage: none, unless RNL_STORAGE_PREFIX says,
+// as a frozen older build beside the current one needs (apps/viewer-ui/storage-prefix.js).
+const prefix = process.env.RNL_STORAGE_PREFIX ?? "";
+if (prefix !== "") {
+  if (!/^[A-Za-z0-9._-]{1,32}$/.test(prefix)) {
+    console.error("RNL_STORAGE_PREFIX is 1 to 32 letters, digits, dots, hyphens or underscores");
+    process.exit(2);
+  }
+  writeFileSync(join(out, "storage-prefix.js"), `// written by apps/web/build.mjs from RNL_STORAGE_PREFIX
+export const STORAGE_PREFIX = ${JSON.stringify(prefix)};
+`);
+}
+
 // the page asks for its scripts, the core and the files it reads at start all at once (preload-hints.mjs)
 const hints = addPreloadHints(out);
 const all = files(out);

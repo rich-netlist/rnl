@@ -93,6 +93,10 @@ Without it the build says so, and the drawing falls back on the fonts installed 
 | `--no-core` | Take the core as `bindings/runtime-wasm/build.mjs` last built it, without building it again. |
 | `--samples` | Copy the conformance corpus's [`cases`](../../tests/conformance/README.md) and `equivalence` files into `samples/`, for trying the viewer and for tests. |
 
+| Environment | |
+| --- | --- |
+| `RNL_STORAGE_PREFIX` | Put this (1 to 32 letters, digits, `.`, `-` or `_`) before the name of every value the page keeps in the browser's storage, so that this build and another on the same origin, such as a frozen older Viewer beside the current one, keep their settings apart. None by default, and the default build is the same as before. It does not apply to the desktop viewer, which keeps its settings in its own file. |
+
 The site is 26 files and 1.36 MB, the licence of the fonts' metrics in `fonts/OFL.txt` among them, of which the core is 1.22 MB, 412 KB gzip-compressed; the web fonts add 232 files and 17.6 MB, of which a browser downloads only the slices a drawing uses, and the samples 0.70 MB.
 
 ## Preload hints

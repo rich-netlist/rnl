@@ -1,4 +1,5 @@
 import { setText } from "./i18n.js";
+import { STORAGE_PREFIX } from "./storage-prefix.js";
 // Small helpers for building the page.
 
 export const $ = (id) => document.getElementById(id);
@@ -44,7 +45,7 @@ export async function startSettings(shell) {
   settingsPath = loaded.path;
   persist = shell.saveSetting;
   for (const key of keys) {
-    try { localStorage.removeItem(key); } catch { /* browser storage may be disabled */ }
+    try { localStorage.removeItem(STORAGE_PREFIX + key); } catch { /* browser storage may be disabled */ }
   }
 }
 
@@ -56,7 +57,7 @@ export function load(key, fallback) {
   if (ephemeral) return fallback;
   if (preferences) return Object.hasOwn(preferences, key) ? preferences[key] : fallback;
   try {
-    const v = localStorage.getItem(key);
+    const v = localStorage.getItem(STORAGE_PREFIX + key);
     return v === null ? fallback : JSON.parse(v);
   } catch {
     return fallback;
@@ -81,7 +82,7 @@ export function save(key, value) {
     return pending;
   }
   try {
-    localStorage.setItem(key, JSON.stringify(value));
+    localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(value));
   } catch {
     // the next start has the default
   }

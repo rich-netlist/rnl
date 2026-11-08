@@ -80,6 +80,7 @@ find apps/viewer-ui -name '*.js' -print0 | xargs -0 -n 1 node --check
 | `menubar.js` | The page's own menu bar. |
 | `dialog.js` | Dialogs in the page's style for what a shell or the page asks: one of a list, with a filter; a line of text; several values in a form, such as the grid's settings; a message; a message with a button that acts. They are modal: the page's keys and its menu bar wait while one is shown. |
 | `updates.js` | Help > Check for Updates: the newest release of the viewer on GitHub against the version that runs, compared by Semantic Versioning, in a dialog. |
+| `storage-prefix.js` | The prefix of the names the page keeps in the browser's storage (`util.js`): none, and the web build writes the one `RNL_STORAGE_PREFIX` names over it, for a frozen build beside the current one. |
 | `util.js` | Small helpers for building the page, and for keeping values in the shell’s settings store (native `settings.json` on desktop, `localStorage` on web), read and written so that a page without it starts from its defaults. |
 | `embed.js`, `embed.css` | Web-only canvas controls, hierarchy path and postMessage API; started only when the web shell has `embed=1`. See [Embedding](../web/README.md#embedding). |
 | `commands.json` | The command table. |
