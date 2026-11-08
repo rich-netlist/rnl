@@ -1,38 +1,51 @@
 import { append, m, setAttr, setText, tr } from "./i18n.js";
 // The problems list: the errors, warnings and hints, the most serious first; clicking one shows
-// its line in the text. The line numbers of the lines they are on are coloured.
+// its line in the text. The line numbers of the lines they are on are coloured. The geometry hints of
+// the level shown (`Level.hints`, what `rnl check` prints about the drawing) are in the list too, each
+// with a small "geo" tag that says where it comes from and its own severity, "warning" or "hint". The
+// counts of the heading are by severity alone, as `rnl check` counts, so a geometry hint is counted in
+// its severity. Each count is a switch: it shows only the rows of that severity, and again shows all.
+// (The levels are the one list SEVERITIES: another, such as the "violation" of 0.4, is one more entry.)
 
 import { markSourceDiagnostics, revealLine } from "./text.js";
+import { current, doc } from "./state.js";
 import { $, span } from "./util.js";
 import { shell } from "./shell.js";
 import { includePublicPackage } from "./pool.js";
 import { matchingPackage, missingPackage } from "./public-packages.js";
 
-const SEVERITY_ORDER = { error: 0, warning: 1, hint: 2 };
+/** The severities, the most serious first: the order of the list, and of the counts in the heading. */
+const SEVERITIES = [
+  ["error", tr("{0} error"), tr("{0} errors")],
+  ["warning", tr("{0} warning"), tr("{0} warnings")],
+  ["hint", tr("{0} hint"), tr("{0} hints")],
+];
+const SEVERITY_ORDER = Object.fromEntries(SEVERITIES.map(([s], i) => [s, i]));
 let renderVersion = 0;
 const BATCH = 100;
 const body = $("problems-body"), ul = $("diags");
-let diagnostics = [], shown = 0, more = null, frame = 0;
 
-// Thousands of diagnostics must not all take part in the first layout after navigation.
-// Keep every diagnostic in the model and append another batch as the list is read.
+// Thousands of rows must not all take part in the first layout after navigation.
+// Keep every row in the model and append another batch as the list is read.
+let rows = [], shown = 0, more = null, frame = 0;
+
+/** The node or nodes of a row of the list: a diagnostic's, with the hint to look for a package it may have, or a geometry hint's. */
+function nodesOf(row) {
+  return row.geo ? [hintRow(row.item)] : [diagnosticRow(row.item), packageHint(row.item, renderVersion)];
+}
+
 function appendBatch() {
   more?.remove();
   more = null;
   const fragment = document.createDocumentFragment();
-  const end = Math.min(shown + BATCH, diagnostics.length);
-  for (; shown < end; shown++) {
-    const d = diagnostics[shown];
-    append(fragment, diagnosticRow(d));
-    const hint = packageHint(d, renderVersion);
-    if (hint) append(fragment, hint);
-  }
-  if (shown < diagnostics.length) {
+  const end = Math.min(shown + BATCH, rows.length);
+  for (; shown < end; shown++) append(fragment, ...nodesOf(rows[shown]).filter(Boolean));
+  if (shown < rows.length) {
     more = document.createElement("li");
     more.className = "diagnostics-more";
     const button = document.createElement("button");
     button.type = "button";
-    setText(button, m`${shown} of ${diagnostics.length} shown: scroll for more`);
+    setText(button, m`${shown} of ${rows.length} shown: scroll for more`);
     button.addEventListener("click", appendBatch);
     append(more, button);
     append(fragment, more);
@@ -82,34 +95,91 @@ function packageHint(d, version) {
   return li;
 }
 
+let diagnosticList = [];
+let hints = []; // the geometry hints of the level shown
+let hintsOf = undefined; // the `hints` of the level they are from, to tell whether another level is shown
+let filter = null; // the severity whose count is on, so that only its rows are listed; null shows all
+
+const hintsOfLevel = () => doc?.levels?.[current]?.hints;
+
 export function renderDiagnostics(list) {
   ++renderVersion;
-  diagnostics = list
-    .map((d, i) => ({ d, i }))
-    .sort((a, b) => SEVERITY_ORDER[a.d.severity] - SEVERITY_ORDER[b.d.severity] || a.i - b.i)
-    .map((x) => x.d);
+  diagnosticList = list;
+  hintsOf = hintsOfLevel();
+  hints = hintsOf ?? [];
+  refresh();
+}
+
+/** The geometry hints of another level, when one is shown. */
+function levelChanged() {
+  if (hintsOfLevel() === hintsOf) return;
+  hintsOf = hintsOfLevel();
+  hints = hintsOf ?? [];
+  refresh();
+}
+window.addEventListener("viewer-level", levelChanged);
+
+/** The rows of the list: by severity, the diagnostics before the geometry hints of a severity; only one severity's when a count is on. */
+function listed() {
+  const all = [
+    ...diagnosticList.map((item, i) => ({ item, geo: false, i })),
+    ...hints.map((item, i) => ({ item, geo: true, i })),
+  ].sort((a, b) => SEVERITY_ORDER[a.item.severity] - SEVERITY_ORDER[b.item.severity] || a.geo - b.geo || a.i - b.i);
+  return filter ? all.filter((r) => r.item.severity === filter) : all;
+}
+
+/** Make the list and the counts again, from the first row. */
+function refresh() {
+  // a switch whose count is gone, such as the hints of a level that has none, is off
+  if (filter && ![...diagnosticList, ...hints].some((r) => r.severity === filter)) filter = null;
   cancelAnimationFrame(frame);
   frame = 0;
   more = null;
   shown = 0;
+  rows = listed();
   ul.replaceChildren();
   body.scrollTop = 0;
-  appendBatch();
-  if (diagnostics.length === 0) {
+  if (diagnosticList.length === 0 && hints.length === 0) {
     const li = document.createElement("li");
     li.className = "nothing";
     setText(li, m("No errors, warnings or hints."));
     append(ul, li);
   }
+  appendBatch();
+  renderCounts();
+}
+
+/** One count of the heading, which is a switch: it shows only the rows of its severity, and all again. */
+function count(kind, text) {
+  const el = span(`n-${kind} chip${filter === kind ? " on" : ""}`, text);
+  el.setAttribute("role", "button");
+  el.tabIndex = 0;
+  el.setAttribute("aria-pressed", String(filter === kind));
+  setAttr(el, "title", m("Show only these; click again for all"));
+  const toggle = (e) => {
+    // the heading is a button that folds the problems: a switch in it does not
+    e.preventDefault();
+    e.stopPropagation();
+    const focused = document.activeElement === el;
+    filter = filter === kind ? null : kind;
+    refresh();
+    // the counts are made again: a switch that had the focus keeps it, for the keyboard
+    if (focused) $("counts").querySelector(`.n-${kind}`)?.focus();
+  };
+  el.addEventListener("click", toggle);
+  el.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") toggle(e); });
+  return el;
+}
+
+function renderCounts() {
   const counts = $("counts");
   counts.replaceChildren();
-  const n = (s) => list.filter((d) => d.severity === s).length;
-  for (const [s, one, many] of [["error", tr("{0} error"), tr("{0} errors")], ["warning", tr("{0} warning"), tr("{0} warnings")],
-    ["hint", tr("{0} hint"), tr("{0} hints")]]) {
-    const k = n(s);
-    if (k) append(counts, span(`n-${s}`, m(k === 1 ? one : many, k)));
+  const every = [...diagnosticList, ...hints];
+  for (const [s, one, many] of SEVERITIES) {
+    const k = every.filter((r) => r.severity === s).length;
+    if (k) append(counts, count(s, m(k === 1 ? one : many, k)));
   }
-  if (list.length === 0) append(counts, span("none", m("none")));
+  if (every.length === 0) append(counts, span("none", m("none")));
 }
 
 // the levels of diagnostics (7.6), as a row names them
@@ -134,7 +204,27 @@ function diagnosticRow(d) {
   return li;
 }
 
-/** Colour the line numbers of lines with diagnostics, by the most serious one. */
+/**
+ * A geometry hint's row: its own severity, the "geo" tag and the core's message, without the file it begins with, which the
+ * place below it names; a click shows the line in the text, and its kind is the tooltip.
+ */
+function hintRow(h) {
+  const li = document.createElement("li");
+  li.className = `diag geo ${h.severity}`;
+  const message = h.file && h.message.startsWith(`${h.file}: `) ? h.message.slice(h.file.length + 2) : h.message;
+  const msg = span("msg", "");
+  msg.append(span("tag", "geo"), message);
+  append(li, span("sev", m(SEVERITY[h.severity] ?? h.severity)), msg);
+  if (h.file) append(li, span("loc", `${h.file}:${h.line}`));
+  if (h.file_index !== null && h.file_index !== undefined && h.line) {
+    li.classList.add("located");
+    li.addEventListener("click", () => revealLine(h.file_index, h.line, true));
+  }
+  li.title = h.kind;
+  return li;
+}
+
+/** Colour the line numbers of lines with diagnostics, by the most serious one; the geometry hints are not among them. */
 export function markDiagnostics(list) {
   const worst = new Map();
   for (const d of list) {

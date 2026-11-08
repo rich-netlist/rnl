@@ -100,8 +100,7 @@ test("a reading that fails is shown, and the next one shows the document from it
   await expect(page.locator("#level-name")).toHaveText(TOP);
   await expect(page.locator("#canvas > svg")).toHaveCount(1);
   // the fixture has no problems: its comments are ASCII
-  await expect(page.locator("#counts")).toHaveText("none");
-  await expect(page.locator("#diags li.diag")).toHaveCount(0);
-  await expect(page.locator("#diags li.nothing")).toHaveText("No errors, warnings or hints.");
+  await expect(page.locator("#counts > .n-error, #counts > .n-warning")).toHaveCount(0);
+  await expect(page.locator("#diags li.diag:not(.geo)")).toHaveCount(0);
   await viewer.selected(null);
 });

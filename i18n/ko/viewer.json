@@ -262,6 +262,7 @@
   "This package is published. ": "이 패키지는 공개 패키지로 배포되어 있습니다. ",
   "Include": "포함",
   "No errors, warnings or hints.": "오류, 경고 또는 힌트가 없습니다.",
+  "Show only these; click again for all": "이것만 표시. 다시 클릭하면 모두 표시",
   "{0} error": "오류 {0}개",
   "{0} errors": "오류 {0}개",
   "{0} warning": "경고 {0}개",

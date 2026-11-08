@@ -17,11 +17,14 @@ test('large Problems lists load on demand, retain total counts and reveal later 
   await page.evaluate(() => {
     for (let i = 0; i < 15; i++) document.querySelector('.diagnostics-more button')?.click();
   });
-  await expect(page.locator('#diags .diag')).toHaveCount(1500);
+  await expect(page.locator('#diags .diag:not(.geo)')).toHaveCount(1500);
   await expect(page.locator('.diagnostics-more')).toHaveCount(0);
-  await expect(page.locator('#diags .diag').last()).toContainText('Warning 1499');
-  await page.evaluate(async () => (await import('./problems.js')).renderDiagnostics([]));
-  await expect(page.locator('#diags')).toHaveText('No errors, warnings or hints.');
+  await expect(page.locator('#diags .diag:not(.geo)').last()).toContainText('Warning 1499');
+  await page.evaluate(async () => {
+    window.viewer.doc.levels[window.viewer.level].hints = []; // (the geometry hints of the level are rows too)
+    (await import('./problems.js')).renderDiagnostics([]);
+  });
+  await expect(page.locator('#diags > li.nothing')).toHaveText('No errors, warnings or hints.');
 });
 
 test('token-heavy files below a thousand lines also keep a bounded viewport', async ({ page, viewer }) => {

@@ -262,6 +262,7 @@
   "This package is published. ": "此套件已公開發布。",
   "Include": "引入",
   "No errors, warnings or hints.": "沒有任何錯誤、警告或提示。",
+  "Show only these; click again for all": "僅顯示這些；再次點擊顯示全部",
   "{0} error": "{0} 個錯誤",
   "{0} errors": "{0} 個錯誤",
   "{0} warning": "{0} 個警告",

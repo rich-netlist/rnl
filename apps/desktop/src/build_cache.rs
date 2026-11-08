@@ -290,12 +290,14 @@ impl Prepared {
     ) -> Result<Self, String> {
         let path = normalize(path);
         let observed = Observed { files, inputs: RefCell::new(Inputs::default()) };
-        // flylines are asked for, not left to the core's default: View > Show Flylines hides them (flylines.js)
+        // flylines and the layout hints are asked for, not left to the core's default: View > Show Flylines hides the flylines (flylines.js),
+        // and the problems list has the hints (problems.js)
         let options = BuildOptions {
             formats: formats.clone(),
             bind: bind.cloned(),
             constraints,
             flylines: true,
+            hints: true,
             ..BuildOptions::default()
         };
         let (doc, drawings) = rnl_view::build_drawn(&path, &observed, &options)?;

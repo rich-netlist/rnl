@@ -604,10 +604,10 @@ async function opened(page, action) {
 
 /**
  * The Document that `rnl view` prints for a file, named as given, from the repository's root, with
- * its flylines, as the page asks for them.
+ * its flylines and hints, as the page asks for them.
  */
 function rnlView(file) {
-  const out = execFileSync(process.env.RNL_BIN, ["view", file, "--flylines"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 });
+  const out = execFileSync(process.env.RNL_BIN, ["view", file, "--flylines", "--hints"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 });
   return JSON.parse(out);
 }
 
@@ -698,7 +698,7 @@ async function showsDocument(page, doc) {
   const lines = doc.files[0].text.replace(/\r?\n$/, "").split(/\r?\n/).length;
   await expect(page.locator("#source .file:not([hidden]) .ln")).toHaveCount(lines);
   // Core diagnostics retain their counts; viewer-only package remedies follow the relevant error.
-  await expect(page.locator("#diags .diag:not(.package-hint)")).toHaveCount(doc.diagnostics.length + (doc.failed ? 1 : 0));
+  await expect(page.locator("#diags .diag:not(.package-hint):not(.geo)")).toHaveCount(doc.diagnostics.length + (doc.failed ? 1 : 0));
   // the hierarchy: the top level, and every subcircuit in the index
   await page.locator("#tab-hierarchy").click();
   await expect(page.locator("#tree .tree-row").first()).toContainText(doc.levels[0].title);

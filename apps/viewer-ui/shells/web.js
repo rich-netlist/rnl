@@ -939,8 +939,8 @@ export default {
         files[poolPath(path)] = text;
         pool.push(poolPath(path));
       }
-      // flylines are asked for, not left to the core's default: View > Show Flylines hides them (flylines.js)
-      const request = { entry: entry.path, files, pool, svg: true, primitives: false, flylines: true, lazy_unplaced: true,
+      // flylines and the layout hints are asked for, not left to the core's default: View > Show Flylines hides the flylines (flylines.js), and the problems list has the hints (problems.js)
+      const request = { entry: entry.path, files, pool, svg: true, primitives: false, flylines: true, hints: true, lazy_unplaced: true,
         auto_include: load("auto-include", true) === true, library_prefix: source.fromPool ? "" : "/<pool>",
         formats: requestFormats(source.url ? new URL(source.url).origin : null, poolPath),
         library_edits: Object.fromEntries(Object.entries(edits || {}).map(([path, text]) => {

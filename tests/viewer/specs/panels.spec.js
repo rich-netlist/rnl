@@ -127,12 +127,13 @@ test("the folded problems keep their header within reach, above the status bar",
   // in a low window too
   await page.setViewportSize({ width: 1200, height: 360 });
   await expect.poll(reachable).toBe(true);
-  await head.click();
+  // (its title: the counts in the middle of it are switches of their own)
+  await head.locator(".pane-title").click();
   await expect(head).toHaveAttribute("aria-expanded", "true");
   await expect(page.locator("#problems-body")).toBeVisible();
   expect(await viewer.stored("problems-shown")).toBe(true);
   // the stored folding is kept for the next start
-  await head.click();
+  await head.locator(".pane-title").click();
   await viewer.open("12-diagnostics");
   await expect(head).toHaveAttribute("aria-expanded", "false");
   await expect.poll(reachable).toBe(true);

@@ -23,9 +23,9 @@ test("opening shows the drawing, the text and the problems", async ({ page, view
   await expect(page.locator("#source .file:not([hidden]) .ln")).toHaveCount(lines);
   await expect(viewer.line(49)).toHaveText(/X1 a b vdd 0 amp/);
   // the fixture has no problems: its comments are ASCII
-  await expect(page.locator("#counts")).toHaveText("none");
-  await expect(page.locator("#diags li.diag")).toHaveCount(0);
-  await expect(page.locator("#diags li.nothing")).toHaveText("No errors, warnings or hints.");
+  // (the geometry hints of the level are rows of the list and are counted, but no diagnostic is)
+  await expect(page.locator("#counts > .n-error, #counts > .n-warning")).toHaveCount(0);
+  await expect(page.locator("#diags li.diag:not(.geo)")).toHaveCount(0);
 
   // the other file
   await showSource(page, "04-hierarchy-lib.inc");
@@ -38,8 +38,11 @@ test("the problems are listed, the most serious first, and their lines are colou
   const count = (s) => diags.filter((d) => d.severity === s).length;
   const [errors, warnings, hints] = [count("error"), count("warning"), count("hint")];
   expect(errors && warnings && hints).toBeTruthy();
-  await expect(page.locator("#counts")).toHaveText(`${errors} errors${warnings} warnings${hints} hints`);
-  const items = page.locator("#diags li.diag:not(.package-hint)");
+  // the counts are by severity, the geometry hints of the level counted in theirs
+  const geo = await page.evaluate(() => (window.viewer.doc.levels[window.viewer.level].hints ?? []).map((h) => h.severity));
+  const [warningsAll, hintsAll] = [warnings + geo.filter((s) => s === "warning").length, hints + geo.filter((s) => s === "hint").length];
+  await expect(page.locator("#counts > *")).toHaveText([`${errors} errors`, `${warningsAll} warnings`, `${hintsAll} hints`]);
+  const items = page.locator("#diags li.diag:not(.package-hint):not(.geo)");
   await expect(items).toHaveCount(diags.length);
   const shown = await items.evaluateAll((els) => els.map((e) => e.classList[1]));
   expect(shown).toEqual([...Array(errors).fill("error"), ...Array(warnings).fill("warning"), ...Array(hints).fill("hint")]);

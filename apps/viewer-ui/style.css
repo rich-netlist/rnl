@@ -794,6 +794,13 @@ body[data-background="dark"] .unplaced-row .thumb { background: var(--drawing-ba
 .diags .nothing { padding: 6px 10px; color: var(--muted); }
 .diagnostics-more { padding: 6px 10px; }
 .diagnostics-more button { color: var(--muted); text-align: left; }
+/* The counts of the problems' heading are switches (problems.js), and the geometry hints are rows of the list with a tag */
+#counts { gap: 4px; }
+.counts .chip { cursor: pointer; border-radius: 3px; padding: 0 3px; }
+.counts .chip:hover { background: var(--hover); }
+.counts .chip.on { font-weight: 600; box-shadow: inset 0 -2px 0 currentColor; }
+.counts .chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.diag .msg .tag { font-size: 10px; font-weight: 600; color: var(--muted); border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; margin-right: 6px; vertical-align: 1px; }
 
 /* ------------------------------------------------------------------ status bar */
 

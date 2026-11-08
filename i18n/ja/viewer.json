@@ -262,6 +262,7 @@
   "This package is published. ": "このパッケージは公開されています。",
   "Include": "インクルード",
   "No errors, warnings or hints.": "エラー、警告、ヒントはありません。",
+  "Show only these; click again for all": "これだけを表示。もう一度クリックですべて表示",
   "{0} error": "エラー {0}",
   "{0} errors": "エラー {0}",
   "{0} warning": "警告 {0}",

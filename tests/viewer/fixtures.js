@@ -332,10 +332,10 @@ export function buildRnl() {
 
 /**
  * The Document of a file as `rnl view` prints it, the file named relative to `cwd`, with its
- * flylines, as the desktop shell builds it.
+ * flylines and hints, as the desktop shell builds it.
  */
 function view(rnl, file, cwd) {
-  return execFileSync(rnl, ["view", file, "--flylines"], { cwd, encoding: "utf8", maxBuffer: 1 << 28 });
+  return execFileSync(rnl, ["view", file, "--flylines", "--hints"], { cwd, encoding: "utf8", maxBuffer: 1 << 28 });
 }
 
 /**
@@ -357,18 +357,18 @@ export function writeFixtures(rnl, dir) {
   fs.writeFileSync(path.join(dir, 'semantics-virtual.json'), view(rnl, 'semantics-virtual.sp', dir));
   // No standard package stylesheet: exercise the renderer's omitted-width default itself.
   fs.writeFileSync(path.join(dir, "view-hairlines.json"), execFileSync(rnl,
-    ["view", "tests/viewer/inputs/default-hairlines.sp", "--no-std", "--flylines"], { cwd: root, encoding: "utf8" }));
+    ["view", "tests/viewer/inputs/default-hairlines.sp", "--no-std", "--flylines", "--hints"], { cwd: root, encoding: "utf8" }));
   for (const [name, file] of Object.entries(FILES)) {
     fs.writeFileSync(path.join(dir, `${name}.json`), view(rnl, file, root));
   }
 
   // a Verilog-A file read as SPICE, as the user can set it, and a netlist that includes one
   const va = "tests/viewer/inputs/resistor.va";
-  fs.writeFileSync(path.join(dir, "verilog-a-spice.json"), execFileSync(rnl, ["view", va, "--format", `${va}=spice`, "--flylines"],
+  fs.writeFileSync(path.join(dir, "verilog-a-spice.json"), execFileSync(rnl, ["view", va, "--format", `${va}=spice`, "--flylines", "--hints"],
     { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 }));
   // a package file of another suffix, as the core read it before the format rnl: as SPICE
   const pkg = "tests/viewer/inputs/acme.pkg";
-  fs.writeFileSync(path.join(dir, "package-pkg-spice.json"), execFileSync(rnl, ["view", pkg, "--format", `${pkg}=spice`, "--flylines"],
+  fs.writeFileSync(path.join(dir, "package-pkg-spice.json"), execFileSync(rnl, ["view", pkg, "--format", `${pkg}=spice`, "--flylines", "--hints"],
     { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 }));
   fs.copyFileSync(path.join(root, va), path.join(dir, "resistor.va"));
   fs.writeFileSync(path.join(dir, "includes-verilog-a.sp"), [
@@ -452,7 +452,7 @@ export function writeFixtures(rnl, dir) {
     });
     fs.writeFileSync(path.join(dir, `${name}-preview.json`), out);
     // the Document of the same netlist with the constraints of its levels, which a build that asks for them gives
-    const constrained = execFileSync(rnl, ["view", FILES[name], "--constraints", "--flylines"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 });
+    const constrained = execFileSync(rnl, ["view", FILES[name], "--constraints", "--flylines", "--hints"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 });
     fs.writeFileSync(path.join(dir, `${name}-constraints.json`), constrained);
   }
 

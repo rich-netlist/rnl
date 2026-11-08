@@ -262,6 +262,7 @@
   "This package is published. ": "Ce paquet est publié. ",
   "Include": "Inclure",
   "No errors, warnings or hints.": "Aucune erreur, aucun avertissement ni aucune indication.",
+  "Show only these; click again for all": "Afficher seulement ceux-ci ; cliquer à nouveau pour tout afficher",
   "{0} error": "{0} erreur",
   "{0} errors": "{0} erreurs",
   "{0} warning": "{0} avertissement",
