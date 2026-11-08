@@ -40,8 +40,8 @@ pub use constraints::{
 };
 pub use document::{
     AutoIncludeCandidate, Child, Diagnostic, Document, Drawings, Hit, InspectedLabel, InspectedPin, InspectedSymbol,
-    Level, MemberOf, NetLabel, Object, RoleOf, RuleAt, SourceFile, SourceInclude, Span, Unplaced, UnplacedDrawing, Usage,
-    UsageRole,
+    Level, MemberOf, NetLabel, Object, RoleOf, RuleAt, SourceFile, SourceInclude, Span, Unplaced, UnplacedDrawing,
+    Usage, UsageRole,
 };
 pub use formats::{detect_format, formats, FormatInfo};
 pub use library::{LibraryIndex, LibraryProvider};
@@ -912,7 +912,10 @@ R1 p q 1k
         let l = level(default.svg, default.primitives);
         assert_eq!(keys(&l), "usages host title kind lines svg scale empty status hits net_labels children unplaced");
         let l = level(true, true);
-        assert_eq!(keys(&l), "usages host title kind lines svg primitives scale empty status hits net_labels children unplaced");
+        assert_eq!(
+            keys(&l),
+            "usages host title kind lines svg primitives scale empty status hits net_labels children unplaced"
+        );
         assert_eq!(l["scale"], 14.0);
         assert!(l["primitives"].as_array().is_some_and(|p| p.len() > 2));
         assert_eq!(

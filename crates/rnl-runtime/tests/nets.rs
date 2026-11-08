@@ -195,7 +195,12 @@ fn wires_that_meet_at_their_ends_are_one_part_and_others_are_not() {
     // wire that ends on the middle of the first is nearest to the crossing one; then the pins
     assert_eq!(
         lines,
-        [((0.0, -3.0), (2.0, -1.0)), ((2.0, -5.0), (4.0, -6.0)), ((8.0, -3.0), (20.0, -1.0)), ((20.0, -1.0), (30.0, 1.0))]
+        [
+            ((0.0, -3.0), (2.0, -1.0)),
+            ((2.0, -5.0), (4.0, -6.0)),
+            ((8.0, -3.0), (20.0, -1.0)),
+            ((20.0, -1.0), (30.0, 1.0))
+        ]
     );
     // the label of the first two is on the middle of the segment nearest the centre of their
     // points, (16/3, -4); the others' on their middles; a pin's on it
@@ -209,7 +214,6 @@ fn every_net_has_flylines_whether_a_route_asks_to_wire_it_or_not() {
     // no ROUTE: R1:2 and R2:1 on b, apart, have one flyline, and so has c between R2:2 and R3:1
     let r = interpret_records(&bars("#R1 @PLACE(0, 0); #R2 @PLACE(4, 0); #R3 @PLACE(8, 0)"));
     let lv = &r.model.levels[0];
-    let lines: Vec<(&str, (f64, f64), (f64, f64))> =
-        lv.flylines.iter().map(|f| (f.nets[0].as_str(), f.a, f.b)).collect();
+    let lines: Vec<_> = lv.flylines.iter().map(|f| (f.nets[0].as_str(), f.a, f.b)).collect();
     assert_eq!(lines, [("b", (0.0, -1.0), (4.0, 1.0)), ("c", (4.0, -1.0), (8.0, 1.0))]);
 }

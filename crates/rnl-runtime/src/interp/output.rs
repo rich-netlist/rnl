@@ -919,7 +919,8 @@ impl Interp<'_> {
             let islands = self.islands(s, net, &terms);
             let lines = super::islands::spanning(&islands);
             flylines.extend(lines.into_iter().map(|(a, b)| FlylineView { a, b, nets: vec![shown.clone()] }));
-            net_labels.extend(islands.iter().filter_map(|i| i.label_at()).map(|at| NetLabelView { net: shown.clone(), at }));
+            net_labels
+                .extend(islands.iter().filter_map(|i| i.label_at()).map(|at| NetLabelView { net: shown.clone(), at }));
         }
         let mut shapes = Vec::new();
         for p in self.scenes[s].prims.clone() {
