@@ -1,8 +1,9 @@
-//! Diagnostics (standard 7.6): three levels, a kind, a location, and an optional upstream cause.
+//! Diagnostics (standard 7.6): four levels, a kind, a location, and an optional upstream cause.
 //!
 //! Checking and interpreting are one process, so the same list serves a linter and a viewer.
-//! An error means an item failed; a warning flags something legal that is probably not what the
-//! author meant; a hint reports a common override, shadowing or trade-off. Each diagnostic is of a
+//! An error means an item failed; a violation, that a statement the file makes about the circuit
+//! does not hold, while nothing fails; a warning flags something legal that is probably not what
+//! the author meant; a hint reports a common override, shadowing or trade-off. Each diagnostic is of a
 //! kind of the toolkit's list (`data/diagnostics.json`), [`codes`], by which a tool or a test tells
 //! it apart from the others, whatever its message says.
 
@@ -13,6 +14,9 @@ use std::fmt;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Severity {
     Error,
+    /// A statement about the circuit that does not hold (7.6): nothing fails, and it is reported as
+    /// an error is, ranked after errors and before warnings.
+    Violation,
     Warning,
     Hint,
 }
@@ -21,6 +25,7 @@ impl Severity {
     pub fn as_str(self) -> &'static str {
         match self {
             Severity::Error => "error",
+            Severity::Violation => "violation",
             Severity::Warning => "warning",
             Severity::Hint => "hint",
         }
@@ -188,12 +193,14 @@ impl Sink {
         &self.items
     }
 
-    /// What a document shows (7.6): inside a package the document uses, only errors; warnings and
-    /// hints about a package are given when that package itself is checked.
+    /// What a document shows (7.6): inside a package the document uses, only errors and violations,
+    /// which are about the document's circuit; warnings and hints about a package are given when that
+    /// package itself is checked.
     pub fn shown(&self, checking_package: &str) -> Vec<&Diag> {
+        let always = |s: Severity| matches!(s, Severity::Error | Severity::Violation);
         self.items
             .iter()
-            .filter(|d| d.in_package.is_empty() || d.in_package == checking_package || d.severity == Severity::Error)
+            .filter(|d| d.in_package.is_empty() || d.in_package == checking_package || always(d.severity))
             .collect()
     }
 

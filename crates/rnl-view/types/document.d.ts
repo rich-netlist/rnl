@@ -913,7 +913,7 @@ export type Span = {
 
 export type Diagnostic = {
   /**
-   * "error", "warning" or "hint".
+   * "error", "violation", "warning" or "hint", in that rank (7.6).
    */
   severity: string,
   /**

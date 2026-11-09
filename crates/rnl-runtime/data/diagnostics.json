@@ -3108,6 +3108,16 @@
    ]
   },
   {
+   "number": "RNL6003",
+   "name": "violation-current-one-way",
+   "severity": "violation",
+   "message": "the current of &{net} goes one way: every terminal on it, {terminals}, has a CURRENT that moves current {into|out of} the net, which gives it nowhere to go (15.2)",
+   "sections": [
+    "15.2",
+    "7.6"
+   ]
+  },
+  {
    "number": "RNL7000",
    "name": "close",
    "severity": "hint",

@@ -31,6 +31,12 @@ pub fn keeps_0_3(version: &str) -> bool {
     READ_VERSIONS.contains(&version) && version_key(version) >= (0, 3)
 }
 
+/// Does a file of the language version `version` follow the rules that 0.4 changes? 0.4 and every
+/// version after it that this implementation reads do, by the order of versions (16.1).
+pub fn keeps_0_4(version: &str) -> bool {
+    READ_VERSIONS.contains(&version) && version_key(version) >= (0, 4)
+}
+
 /// The versions this implementation reads, as a message lists them: "0.2, 0.3 and 0.4".
 fn read_versions() -> String {
     match READ_VERSIONS.split_last() {
@@ -1663,6 +1669,13 @@ impl Interp<'_> {
     /// file of 0.2 reads as it did before 0.3 was read.
     pub fn follows_0_3(&self, u: UnitId) -> bool {
         keeps_0_3(&self.version_of(Some(u)))
+    }
+
+    /// Does a unit follow 0.4? When the file the unit's text is in is read in 0.4 or a later version
+    /// ([`keeps_0_4`]): every rule that 0.4 changes applies only there, so a file of 0.2 or 0.3 reads
+    /// as it did before 0.4 was read.
+    pub fn follows_0_4(&self, u: UnitId) -> bool {
+        keeps_0_4(&self.version_of(Some(u)))
     }
 
     /// Does the text a statement is written in follow the draft 0.3? That is the file of its

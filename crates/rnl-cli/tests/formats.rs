@@ -572,7 +572,7 @@ fn check_of_a_verilog_a_file_prints_the_hint_and_succeeds() {
     assert_eq!(
         out,
         "hint res.va:1: RNL9010 host-text-file-not-read: `res.va` is not a netlist (Verilog-A); it is not read
-0 errors, 0 warnings, 1 hints
+0 errors, 0 violations, 0 warnings, 1 hints
 "
     );
     // a format set for it reads it as SPICE, with SPICE's warnings
@@ -713,7 +713,7 @@ fn check_of_a_package_file_of_any_suffix() {
     assert_eq!(code, 0, "{by_suffix}");
     let (code, out, err) = rnl(&["check", &pkg]);
     assert_eq!((code, out.as_str(), err.as_str()), (0, by_suffix.replace("acme.rnl", "acme.pkg").as_str(), ""));
-    assert!(out.ends_with("0 errors, 0 warnings, 0 hints\n"), "{out}");
+    assert!(out.ends_with("0 errors, 0 violations, 0 warnings, 0 hints\n"), "{out}");
     // a netlist finds it by name when it is set to rnl, and is not warned of as a file it does not read
     let top = file("top.sp", USES_ACME);
     let (code, out, _) = rnl(&["check", &top]);

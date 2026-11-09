@@ -9,7 +9,7 @@ built from a source archive without Git metadata.
 
 ```text
 rnl --version                   print the core version and build commit
-rnl check FILE [options]          print the diagnostics and the drawing's geometry hints; exit 1 on errors
+rnl check FILE [options]          print the diagnostics and the drawing's geometry hints; exit 1 on errors or violations
 rnl render FILE -o DIR [options]  write one SVG per drawing level
 rnl dump FILE [options]           print the effective model and diagnostics as JSON
 rnl view FILE [options]           print the Document a viewer shows, as JSON
@@ -127,7 +127,7 @@ $ rnl explain site/examples/ota5t.sp '#M1'
 
 `snapshot` prints the snapshot of [`rnl-view`](../rnl-view/README.md#snapshots): the host circuit and the model of each drawing level, by ids a transaction can write back. `catalog` prints the catalog of [`rnl-view`](../rnl-view/README.md#catalog): the symbols, with their pins, boxes and labels, the ordinary definitions and the sets of the bundled packages and of those in the directories `--package-dir` gives, each package file read as `rnl check PACKAGE.rnl` reads it; of each name the newest version, every version with `--all-versions`, and only the names `--package` gives, when it gives any. It is the catalog the WebAssembly core gives for a catalog request. `write` writes the ops into the netlist with [`rnl-edit`](../rnl-edit/README.md) and saves the result as OUT, reading the netlist under the name of OUT when the request names no `file`, so that a Spectre netlist saved without the `.scs` suffix gets its header where Spectre reads it (2.2); `rnl check OUT` then says how it reads.
 
-`check` prints each diagnostic with its place and its kind, the number and the short name of the toolkit's list ([`rnl-runtime`](../rnl-runtime/README.md)), such as `error t.sp:3:5: RNL3120 param-wrong-type: …`; a geometry hint the same way, with its kind of the 7000s. `dump` gives each diagnostic's `code` and `name` too.
+`check` prints each diagnostic, a violation (7.6) among them, with its place and its kind, the number and the short name of the toolkit's list ([`rnl-runtime`](../rnl-runtime/README.md)), such as `error t.sp:3:5: RNL3120 param-wrong-type: …`; a geometry hint the same way, with its kind of the 7000s. `dump` gives each diagnostic's `code` and `name` too.
 
 What the command says of its own, on the standard error, is written the same way, without a place: `error: RNL8010 cli-option-needs-value: --level needs a title`, `warning: RNL8007 cli-format-path-unused: …`, and the line `rnl solve` prints for a file with no drawing level, `hint: RNL8026 cli-solve-no-level: …`. Such an error exits with 2: an unknown command, said so with a FILE or without one, an unknown option, an option without its value or given to a command that does not take it, and an error reading or writing a file. An error that a library of the toolkit gives, such as a netlist that cannot be read or an edit that `write` cannot make, is printed as `error: …` without a kind for now. `rnl --help` prints the usage on the standard output and exits with 0.
 

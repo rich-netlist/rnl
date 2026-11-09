@@ -5,7 +5,7 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::rc::Rc;
 
-use crate::diag::{codes, DiagId};
+use crate::diag::{codes, DiagId, Loc};
 use crate::geom::Orient;
 use crate::host::{glob, LevelId};
 
@@ -138,8 +138,9 @@ pub struct Scene {
     pub styles: Vec<Fact>,
     pub layers: Vec<Fact>,
     pub prioritys: Vec<Fact>,
-    /// CURRENT on host terminals, each with its place in the order of writing (5.5, 15.2).
-    pub currents: Vec<(Pos, ObjId, String)>,
+    /// CURRENT on host terminals, each with its place in the order of writing (5.5, 15.2) and where
+    /// it is written.
+    pub currents: Vec<(Pos, ObjId, String, Option<Loc>)>,
     /// The sets given GROUP (11.5), in the order of writing.
     pub groups: Vec<GroupFact>,
     pub tasks: Vec<Vec<(Pos, Task)>>,
@@ -1080,7 +1081,8 @@ impl Interp<'_> {
                         *off,
                     );
                 }
-                self.scenes[s].currents.push((order_pos(&at, &ctx.segments), obj, direction.clone()));
+                let loc = self.rec_loc(ctx.rec, *off);
+                self.scenes[s].currents.push((order_pos(&at, &ctx.segments), obj, direction.clone(), loc));
             }
             TargetOp::Priority { priority, off, spread } => {
                 if !matches!(self.o(obj), ObjData::Constraint(_) | ObjData::Usage(_) | ObjData::Set(_)) {
@@ -1866,7 +1868,7 @@ impl Interp<'_> {
 
     pub(crate) fn current_of(&self, s: SceneId, t: ObjId) -> String {
         let mut best: Option<(&Pos, &String)> = None;
-        for (p, term, d) in &self.scenes[s].currents {
+        for (p, term, d, _) in &self.scenes[s].currents {
             if *term == t && best.is_none_or(|b| p > b.0) {
                 best = Some((p, d));
             }

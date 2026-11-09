@@ -461,7 +461,7 @@ pub struct Span {
 #[derive(Serialize, Debug, Clone)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Diagnostic {
-    /// "error", "warning" or "hint".
+    /// "error", "violation", "warning" or "hint", in that rank (7.6).
     pub severity: &'static str,
     /// Its kind's number in the toolkit's list of diagnostics, such as "RNL3120"; none for a kind of
     /// the versions 0.2 and 0.3 alone.

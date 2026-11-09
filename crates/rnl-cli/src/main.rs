@@ -16,7 +16,7 @@ mod solver_args;
 const USAGE: &str = concat!(
     "usage:
   rnl --version                   print the core version and build commit
-  rnl check FILE [options]          print the diagnostics and the drawing's geometry hints; exit 1 on errors
+  rnl check FILE [options]          print the diagnostics and the drawing's geometry hints; exit 1 on errors or violations
   rnl render FILE -o DIR [options]  write one SVG per drawing level
   rnl dump FILE [options]           print the effective model and diagnostics as JSON
   rnl view FILE [options]           print the Document a viewer shows, as JSON
@@ -515,12 +515,14 @@ fn run(args: &Args) -> Result<ExitCode, Said> {
                 shown.iter().filter(|d| d.severity == sev).count()
                     + geometry.iter().filter(|g| g.severity == sev).count()
             };
-            let (e, w, h) = (count(Severity::Error), count(Severity::Warning), count(Severity::Hint));
+            let (e, v) = (count(Severity::Error), count(Severity::Violation));
+            let (w, h) = (count(Severity::Warning), count(Severity::Hint));
             for line in rnl_cli::status_lines(&r) {
                 println!("{line}");
             }
-            println!("{e} errors, {w} warnings, {h} hints");
-            Ok(if e > 0 { ExitCode::from(1) } else { ExitCode::SUCCESS })
+            println!("{e} errors, {v} violations, {w} warnings, {h} hints");
+            // a violation fails the check as an error does: an assertion is written to be checked (7.6)
+            Ok(if e > 0 || v > 0 { ExitCode::from(1) } else { ExitCode::SUCCESS })
         }
         "dump" => {
             let r = interpret(args, &provider)?;

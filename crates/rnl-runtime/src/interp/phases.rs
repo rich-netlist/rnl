@@ -790,6 +790,7 @@ impl Interp<'_> {
         // parameters included: the wire keeps the list and mode of the latest rewrite that holds,
         // or those it was made with, and is warned about and checked by them, there (5.8, 13.1)
         self.check_rewrites(s);
+        self.check_currents(s);
         for w in self.scenes[s].wires.clone() {
             let ObjData::Wire { nets, .. } = self.o(w).clone() else { continue };
             let Some(WireShape { points, generated, site, off, .. }) = self.wire_shape(s, w) else { continue };
@@ -1154,6 +1155,71 @@ impl Interp<'_> {
             return Some(Fault::InBundle(self.label(owner)));
         }
         None
+    }
+
+    /// The CURRENT statements of a net together are an assertion (15.2): in a file of 0.4, when every
+    /// terminal on the net, the ports of this level included, has a CURRENT of "in" or "out", and all
+    /// of them move current the same way with respect to the net, the current has nowhere to go. That
+    /// is a violation (7.6), which names the net and its terminals, at the latest of those CURRENTs;
+    /// nothing fails, and the CURRENTs stay in effect. A device terminal with "in" takes current out of
+    /// the net, a port of this level with "in" brings current into it.
+    fn check_currents(&mut self, s: SceneId) {
+        if self.scenes[s].currents.is_empty() || !self.follows_0_4(self.level_unit[self.scenes[s].level]) {
+            return;
+        }
+        let levelobj = self.scenes[s].levelobj;
+        let mut owners = self.scenes[s].insts.clone();
+        owners.push(levelobj);
+        // each net with its terminals, in the order of the netlist
+        let mut nets: Vec<(ObjId, Vec<ObjId>)> = Vec::new();
+        for owner in owners {
+            for t in self.terms_of(s, owner) {
+                let [net] = self.tnets(s, t)[..] else { continue };
+                match nets.iter_mut().find(|(n, _)| *n == net) {
+                    Some((_, terms)) => terms.push(t),
+                    None => nets.push((net, vec![t])),
+                }
+            }
+        }
+        for (net, terms) in nets {
+            // 1 for a terminal that brings current into the net, -1 for one that takes it out
+            let ways: Vec<i8> = terms
+                .iter()
+                .map(|&t| {
+                    let way = match self.current_of(s, t).as_str() {
+                        "in" => -1,
+                        "out" => 1,
+                        _ => 0,
+                    };
+                    let port = matches!(self.o(t), ObjData::Term { owner, .. } if *owner == levelobj);
+                    if port {
+                        -way
+                    } else {
+                        way
+                    }
+                })
+                .collect();
+            if !(ways.iter().all(|w| *w > 0) || ways.iter().all(|w| *w < 0)) {
+                continue;
+            }
+            let loc = self.scenes[s]
+                .currents
+                .iter()
+                .filter(|c| terms.contains(&c.1))
+                .max_by(|a, b| a.0.cmp(&b.0))
+                .and_then(|c| c.3.clone());
+            let names = terms.iter().map(|t| self.label(*t)).collect::<Vec<_>>().join(", ");
+            let into = if ways[0] > 0 { "into" } else { "out of" };
+            let net = self.label(net);
+            let msg = format!("the current of {net} goes one way: every terminal on it, {names}, has a CURRENT that moves current {into} the net, which gives it nowhere to go (15.2)");
+            self.sink.add(
+                Severity::Violation,
+                codes::VIOLATION_CURRENT_ONE_WAY,
+                msg,
+                loc,
+                crate::diag::Extra::default(),
+            );
+        }
     }
 
     /// Find which rewrites of the wires of scene `s` fail (the draft 0.3, 13.1): those whose list
