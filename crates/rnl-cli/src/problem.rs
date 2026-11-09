@@ -137,7 +137,13 @@ pub fn level(p: &LevelProblem, solver_options: &str) -> Value {
             "box": s.bbox,
             "box_written": s.box_written,
             "default": s.default,
-            "pins": s.pins.iter().map(|q| json!({"pos": [q.pos.0, q.pos.1], "dir": q.dir, "terminals": q.terminals, "label": q.label})).collect::<Vec<_>>(),
+            "pins": s.pins.iter().map(|q| {
+                let mut pin = json!({"pos": [q.pos.0, q.pos.1], "dir": q.dir, "terminals": q.terminals, "label": q.label});
+                if q.label_name_formats {
+                    pin["label_name_formats"] = json!(true);
+                }
+                pin
+            }).collect::<Vec<_>>(),
         })).collect::<Vec<_>>(),
         "facts": (0..p.facts.len()).map(|k| fact(p, k)).collect::<Vec<_>>(),
         "nets": p.nets.iter().map(|n| json!({

@@ -50,7 +50,13 @@ pub fn level(lv: &LevelView) -> Value {
             "box_written": s.box_written,
 
             "default": s.default,
-            "pins": s.pins.iter().map(|p| json!({"pos": pt(&p.pos), "terminals": p.terminals, "label": p.label, "dir": p.dir})).collect::<Vec<_>>(),
+            "pins": s.pins.iter().map(|p| {
+                let mut pin = json!({"pos": pt(&p.pos), "terminals": p.terminals, "label": p.label, "dir": p.dir});
+                if p.label_name_formats {
+                    pin["label_name_formats"] = json!(true);
+                }
+                pin
+            }).collect::<Vec<_>>(),
             "prims": s.prims.iter().map(|p| json!({"shape": p.shape.as_str(), "points": p.points.iter().map(pt).collect::<Vec<_>>(), "style": style(&p.style)})).collect::<Vec<_>>(),
             "nested": s.nested.iter().map(|n| json!({"symbol": n.symbol, "at": pt(&n.at), "orient": n.orient.as_str()})).collect::<Vec<_>>(),
         })).collect::<Vec<_>>(),

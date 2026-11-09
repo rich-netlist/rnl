@@ -607,6 +607,7 @@ impl Interp<'_> {
             .map(|p| PinView {
                 pos: p.pos,
                 label: p.label.clone(),
+                label_name_formats: p.label_name_formats,
                 dir: p.dir,
                 terminals: p
                     .terms
@@ -703,8 +704,7 @@ impl Interp<'_> {
                 continue;
             }
             let Some(t) = p.text.as_ref().and_then(|t| t.text.clone()) else { continue };
-            let expanded = self.expand_text(s, &t, owner);
-            out.insert(format!("{prefix}{k}"), markup::parse(&expanded));
+            out.insert(format!("{prefix}{k}"), self.text_lines(s, &t, owner));
         }
         for (n, (_, inner, _, _)) in self.symbol_children(sym).into_iter().enumerate() {
             self.symbol_texts(s, inner, owner, &format!("{prefix}{n}/"), out);
@@ -962,7 +962,7 @@ impl Interp<'_> {
             let att = self.text_attach(t);
             let drawable_att = matches!(self.o(att), ObjData::Inst { .. } | ObjData::Usage(_) | ObjData::Bundle { .. });
             let orient = if from_symbol { self.orientation(s, att) } else { Orient::R0 };
-            let expanded = self.expand_text(s, &text, att);
+            let lines = self.text_lines(s, &text, att);
             let mut layer = self.layer_of(s, t);
             if drawable_att && layer == Layer::Middle {
                 layer = self.layer_of(s, att);
@@ -1007,7 +1007,7 @@ impl Interp<'_> {
                 markup: text.as_str().to_string(),
                 written,
                 anchor,
-                lines: markup::parse(&expanded),
+                lines,
                 halign: it.halign.clone().unwrap_or_else(|| "start".into()),
                 valign: it.valign.clone().unwrap_or_else(|| "baseline".into()),
                 rotate: it.rotate.unwrap_or(0.0),

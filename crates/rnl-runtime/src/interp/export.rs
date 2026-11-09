@@ -237,7 +237,7 @@ impl Interp<'_> {
                         };
                     }
                     let lines = match &items.text {
-                        Some(t) => crate::markup::parse(&self.expand_text(s, t, att)),
+                        Some(t) => self.text_lines(s, t, att),
                         None => Vec::new(),
                     };
                     let style = self.scenes[s]
@@ -796,6 +796,7 @@ impl Interp<'_> {
                 .map(|p| crate::model::PinView {
                     pos: p.pos,
                     label: p.label.clone(),
+                    label_name_formats: p.label_name_formats,
                     dir: p.dir,
                     terminals: p
                         .terms

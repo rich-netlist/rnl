@@ -633,7 +633,7 @@ impl Out {
             self.text(
                 owner,
                 place(base, code, at),
-                markup::parse(label),
+                markup::parse_with_name_formats(label, pin.label_name_formats),
                 halign,
                 valign,
                 0.0,

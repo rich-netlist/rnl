@@ -99,13 +99,20 @@ fn symbol(cmd: &str) -> Option<char> {
     GREEK.iter().chain(SYMS.iter()).find(|(n, _)| *n == cmd).map(|(_, c)| *c)
 }
 
-fn known(cmd: &str) -> bool {
-    symbol(cmd).is_some() || matches!(cmd, "textbf" | "textit" | "overline" | "frac")
+fn name_format(cmd: &str) -> bool {
+    matches!(cmd, "subrest" | "subdigits")
+}
+
+fn known(cmd: &str, name_formats: bool) -> bool {
+    symbol(cmd).is_some()
+        || matches!(cmd, "textbf" | "textit" | "overline" | "frac")
+        || (name_formats && name_format(cmd))
 }
 
 struct P<'a> {
     t: &'a [char],
     lines: Vec<Line>,
+    name_formats: bool,
 }
 
 impl P<'_> {
@@ -151,6 +158,28 @@ impl P<'_> {
                 }
                 if j > i + 1 {
                     let cmd: String = t[i + 1..j].iter().collect();
+                    if self.name_formats && name_format(&cmd) {
+                        if let Some((start, end)) = name_group(t, j) {
+                            self.emit(&mut buf, style);
+                            let mut inner = P { t: &t[start + 1..end], lines: vec![Vec::new()], name_formats: true };
+                            inner.parse(0, style, false);
+                            let shown = inner.lines.iter().map(|line| plain(line)).collect::<Vec<_>>().join("\n");
+                            let mut keep = if cmd == "subrest" {
+                                usize::from(!shown.is_empty())
+                            } else {
+                                shown.chars().count() - shown.chars().rev().take_while(char::is_ascii_digit).count()
+                            };
+                            for (line, runs) in inner.lines.into_iter().enumerate() {
+                                if line != 0 {
+                                    keep = keep.saturating_sub(1);
+                                    self.lines.push(Vec::new());
+                                }
+                                self.lines.last_mut().unwrap().extend(subscript_after(runs, &mut keep));
+                            }
+                            i = end + 1;
+                            continue;
+                        }
+                    }
                     if cmd == "frac" && t.get(j) == Some(&'{') {
                         // \frac{numerator}{denominator}: one run holding both parts
                         self.emit(&mut buf, style);
@@ -202,6 +231,65 @@ impl P<'_> {
     }
 }
 
+/// The braced content of a name format. Attribute values are opaque, including their braces.
+fn name_group(t: &[char], mut i: usize) -> Option<(usize, usize)> {
+    while t.get(i).is_some_and(|c| matches!(c, ' ' | '\t')) {
+        i += 1;
+    }
+    if t.get(i) != Some(&'{') {
+        return None;
+    }
+    let start = i;
+    let mut depth = 1;
+    i += 1;
+    while i < t.len() {
+        match t[i] {
+            LITERAL => i = (i + 1..t.len()).find(|&j| t[j] == LITERAL)?,
+            '\\' if t.get(i + 1).is_some_and(|c| "_{}$%&#^\\".contains(*c)) => i += 1,
+            '{' => depth += 1,
+            '}' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some((start, i));
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    None
+}
+
+/// Split the displayed characters, retaining every other style and never reparsing literal text.
+fn subscript_after(runs: Vec<Run>, keep: &mut usize) -> Vec<Run> {
+    let mut out = Vec::new();
+    for run in runs {
+        match run {
+            Run::Text { text, mut style } => {
+                let split = text.char_indices().nth(*keep).map_or(text.len(), |(i, _)| i);
+                *keep = keep.saturating_sub(text.chars().count());
+                if split != 0 {
+                    out.push(Run::Text { text: text[..split].into(), style });
+                }
+                if split != text.len() {
+                    style.level -= 1;
+                    out.push(Run::Text { text: text[split..].into(), style });
+                }
+            }
+            Run::Frac { num, den, mut style } => {
+                if *keep == 0 {
+                    style.level -= 1;
+                }
+                let num = subscript_after(num, keep);
+                *keep = keep.saturating_sub(1); // the slash in the plain representation
+                let den = subscript_after(den, keep);
+                out.push(Run::Frac { num, den, style });
+            }
+        }
+    }
+    out
+}
+
 /// LaTeX habit (13.6): spaces after a command name are swallowed, then one empty `{}`.
 fn after_command(t: &[char], mut j: usize) -> usize {
     while j < t.len() && (t[j] == ' ' || t[j] == '\t') {
@@ -215,8 +303,13 @@ fn after_command(t: &[char], mut j: usize) -> usize {
 
 /// Lines of runs for a text whose attribute values are already wrapped in [`LITERAL`].
 pub fn parse(text: &str) -> Vec<Line> {
+    parse_with_name_formats(text, false)
+}
+
+/// Parse with the name formats of 0.4 enabled only for text written in that version (13.6).
+pub fn parse_with_name_formats(text: &str, name_formats: bool) -> Vec<Line> {
     let chars: Vec<char> = text.chars().collect();
-    let mut p = P { t: &chars, lines: vec![Vec::new()] };
+    let mut p = P { t: &chars, lines: vec![Vec::new()], name_formats };
     p.parse(0, RunStyle::default(), false);
     p.lines
 }
@@ -264,6 +357,11 @@ fn strip_refs(text: &str) -> String {
 
 /// 13.6: unknown commands and unbalanced braces are shown as written, with a warning.
 pub fn problems(text: &str) -> Vec<(Code, String)> {
+    problems_with_name_formats(text, false)
+}
+
+/// Diagnose markup in the same version as the text that will be drawn.
+pub fn problems_with_name_formats(text: &str, name_formats: bool) -> Vec<(Code, String)> {
     let mut out = Vec::new();
     let t: Vec<char> = strip_refs(text).replace("\\\\", "\n").chars().collect();
     let mut i = 0;
@@ -275,7 +373,7 @@ pub fn problems(text: &str) -> Vec<(Code, String)> {
             }
             if j > i + 1 {
                 let cmd: String = t[i + 1..j].iter().collect();
-                if !known(&cmd) {
+                if !known(&cmd, name_formats) || (name_formats && name_format(&cmd) && name_group(&t, j).is_none()) {
                     out.push((codes::MARKUP_UNKNOWN_COMMAND, format!("unknown markup \\{cmd} is shown as written")));
                 } else if cmd == "frac" {
                     let mut k = j;
@@ -391,5 +489,76 @@ mod tests {
         let e = expand("${name}_{x} \\${k}", |p| p.to_uppercase());
         assert_eq!(e, "\u{0}NAME\u{0}_{x} ${k}");
         assert_eq!(texts(&parse(&e)[0]), vec![("NAME".into(), 0), ("x".into(), -1), (" ${k}".into(), 0)]);
+    }
+
+    #[test]
+    fn name_formats_split_displayed_characters() {
+        for (command, value, expected) in [
+            ("subrest", "M1", vec![("M", 0), ("1", -1)]),
+            ("subrest", "VDD", vec![("V", 0), ("DD", -1)]),
+            ("subrest", "电源", vec![("电", 0), ("源", -1)]),
+            ("subrest", "😀12", vec![("😀", 0), ("12", -1)]),
+            ("subrest", "V", vec![("V", 0)]),
+            ("subrest", "", vec![]),
+            ("subdigits", "R12", vec![("R", 0), ("12", -1)]),
+            ("subdigits", "Vout1", vec![("Vout", 0), ("1", -1)]),
+            ("subdigits", "R1x", vec![("R1x", 0)]),
+            ("subdigits", "123", vec![("123", -1)]),
+            ("subdigits", "", vec![]),
+        ] {
+            let input = format!("\\{command}{{{value}}}");
+            let actual = parse_with_name_formats(&input, true);
+            assert_eq!(
+                texts(&actual[0]),
+                expected.into_iter().map(|(s, l)| (s.to_string(), l)).collect::<Vec<_>>(),
+                "{input}"
+            );
+            assert!(problems_with_name_formats(&input, true).is_empty(), "{input}");
+            assert_eq!(plain(&parse(&input)[0]), input);
+            assert_eq!(problems(&input)[0].0, codes::MARKUP_UNKNOWN_COMMAND);
+        }
+    }
+
+    #[test]
+    fn name_formats_keep_styles_and_attribute_values_opaque() {
+        let name = r"V_{DD}\alpha}";
+        let input = expand(r"\textit{\textbf{\subrest{${name}}}}", |_| name.into());
+        let lines = parse_with_name_formats(&input, true);
+        assert_eq!(plain(&lines[0]), name);
+        assert_eq!(texts(&lines[0]), vec![("V".into(), 0), (r"_{DD}\alpha}".into(), -1)]);
+        assert!(lines[0].iter().all(|r| matches!(r, Run::Text { style, .. } if style.italic && style.bold)));
+
+        let input = expand(r"\subdigits{V${name}34}", |_| "out12".into());
+        assert_eq!(texts(&parse_with_name_formats(&input, true)[0]), vec![("Vout".into(), 0), ("1234".into(), -1)]);
+        assert_eq!(
+            texts(&parse_with_name_formats(r"\subrest{\Omega12}", true)[0]),
+            vec![("Ω".into(), 0), ("12".into(), -1)]
+        );
+        assert_eq!(
+            texts(&parse_with_name_formats(r"\subdigits{\textit{Vout}12}", true)[0]),
+            vec![("Vout".into(), 0), ("12".into(), -1)]
+        );
+        assert_eq!(
+            texts(&parse_with_name_formats(r"x_{\subrest{VDD}}", true)[0]),
+            vec![("x".into(), 0), ("V".into(), -1), ("DD".into(), -2)]
+        );
+    }
+
+    #[test]
+    fn name_formats_require_closed_groups_and_accept_command_spaces() {
+        for text in [r"\subrest", r"\subdigits R1", r"\subrest{R1", r"\subdigit{R1}"] {
+            assert_eq!(plain(&parse_with_name_formats(text, true)[0]), text);
+            assert!(
+                problems_with_name_formats(text, true).iter().any(|p| p.0 == codes::MARKUP_UNKNOWN_COMMAND),
+                "{text}"
+            );
+        }
+        assert_eq!(
+            texts(&parse_with_name_formats(r"\subrest  {R1} next", true)[0]),
+            vec![("R".into(), 0), ("1".into(), -1), (" next".into(), 0)]
+        );
+        let lines = parse_with_name_formats(r"\subdigits{R1\\C23}", true);
+        assert_eq!(texts(&lines[0]), vec![("R1".into(), 0)]);
+        assert_eq!(texts(&lines[1]), vec![("C".into(), 0), ("23".into(), -1)]);
     }
 }

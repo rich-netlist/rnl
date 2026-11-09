@@ -72,6 +72,17 @@ fn written_in(v: &Lit, unit: UnitId) -> Lit {
 }
 
 impl Interp<'_> {
+    /// A scoped record can write into a level of another version (2.6, 13.6). Keep the old
+    /// string provenance for released files, and the source file across a 0.4 boundary.
+    fn text_source_unit(&self, ctx: &Ctx) -> UnitId {
+        let source = ctx.rec.map_or(ctx.unit, |r| self.rec_unit[r]);
+        if self.follows_0_4(source) || self.follows_0_4(ctx.unit) {
+            source
+        } else {
+            ctx.unit
+        }
+    }
+
     pub(crate) fn keyword(
         &mut self,
         kw: &str,
@@ -911,14 +922,17 @@ impl Interp<'_> {
                 (
                     n.clone(),
                     match get(&p, n) {
-                        Some(v) => Some(written_in(v, ctx.unit)),
+                        Some(v) => Some(written_in(v, self.text_source_unit(ctx))),
                         None => def.clone(),
                     },
                 )
             })
             .collect();
-        let given: Vec<(String, Lit)> =
-            d.params.iter().filter_map(|(n, _)| get(&p, n).map(|v| (n.clone(), written_in(v, ctx.unit)))).collect();
+        let given: Vec<(String, Lit)> = d
+            .params
+            .iter()
+            .filter_map(|(n, _)| get(&p, n).map(|v| (n.clone(), written_in(v, self.text_source_unit(ctx)))))
+            .collect();
         // roles (5.2.1, 9.4)
         let mut filled: Vec<(String, ArgV)> = Vec::new();
         let labeled = objs.iter().filter(|a| a.role.is_some()).count();
@@ -1491,17 +1505,22 @@ impl Interp<'_> {
                 _ => None,
             })
             .collect();
-        let label = get(&p, "label").and_then(Lit::str).map(String::from);
-        if let Some(l) = &label {
+        let label = get(&p, "label").and_then(|v| match v {
+            Lit::Str(s) => Some(s),
+            _ => None,
+        });
+        if let Some(l) = label {
             self.check_markup(l, ctx, seg);
         }
+        let label_name_formats = label.is_some_and(|l| self.follows_0_4(l.unit.unwrap_or(self.text_source_unit(ctx))));
+        let label = label.map(|l| l.as_str().to_string());
         let dir = get(&p, "direction").and_then(Lit::str).map(|d| match d {
             "right" => 0,
             "up" => 90,
             "left" => 180,
             _ => 270,
         });
-        let pin = Pin { terms: terms.clone(), pos: (x, y), label, dir };
+        let pin = Pin { terms: terms.clone(), pos: (x, y), label, label_name_formats, dir };
         let symbol = ctx.frame.as_ref().unwrap().borrow().symbol.unwrap();
         add_pin(self.symbol_mut(symbol), pin);
         if x != x.round() || y != y.round() {
@@ -1670,7 +1689,7 @@ impl Interp<'_> {
         let key = get(&rest, "key").cloned();
         let mut items = TextItems {
             text: get(&rest, "text").and_then(|v| match v {
-                Lit::Str(s) => Some(match written_in(&Lit::Str(s.clone()), ctx.unit) {
+                Lit::Str(s) => Some(match written_in(&Lit::Str(s.clone()), self.text_source_unit(ctx)) {
                     Lit::Str(w) => w,
                     _ => unreachable!(),
                 }),
@@ -1684,8 +1703,7 @@ impl Interp<'_> {
         };
         let call_start = seg.call.as_ref().unwrap().start;
         if let Some(t) = &items.text {
-            let t = t.as_str().to_string();
-            self.check_markup(&t, ctx, seg);
+            self.check_markup(t, ctx, seg);
         }
         // the file the key is written in: its aliases decide what `::` finds first (13.3, 16.5)
         let key_unit = match &key {
@@ -1822,9 +1840,10 @@ impl Interp<'_> {
         }
     }
 
-    pub(crate) fn check_markup(&mut self, text: &str, ctx: &Ctx, seg: &Segment) {
+    pub(crate) fn check_markup(&mut self, text: &WStr, ctx: &Ctx, seg: &Segment) {
         let at = seg.call.as_ref().map(|c| c.start).unwrap_or(seg.start);
-        for (code, msg) in crate::markup::problems(text) {
+        let name_formats = self.follows_0_4(text.unit.unwrap_or(self.text_source_unit(ctx)));
+        for (code, msg) in crate::markup::problems_with_name_formats(text.as_str(), name_formats) {
             self.warn(ctx, code, format!("{msg} (13.6)"), at);
         }
     }

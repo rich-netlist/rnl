@@ -467,6 +467,7 @@ impl Interp<'_> {
                     terms: vec![TermKey::Num(*idx)],
                     pos: (x0, y),
                     label: name.clone(),
+                    label_name_formats: false,
                     dir: Some(dir),
                 });
                 sym.push_prim(SymPrim {

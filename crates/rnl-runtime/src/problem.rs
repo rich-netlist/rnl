@@ -755,6 +755,9 @@ pub fn canonical_sig1(p: &LevelProblem) -> String {
             c.num(pin.pos.0);
             c.num(pin.pos.1);
             c.opt_str(pin.label.as_deref());
+            if pin.label_name_formats {
+                c.word("label-name-formats");
+            }
             match pin.dir {
                 Some(d) => c.word(&d.to_string()),
                 None => c.word("-"),

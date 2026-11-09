@@ -207,6 +207,8 @@ pub struct Pin {
     pub terms: Vec<TermKey>,
     pub pos: (f64, f64),
     pub label: Option<String>,
+    /// The label was written in a file that reads the name formats of 0.4 (13.6).
+    pub label_name_formats: bool,
     /// Exit direction in degrees: 0 right, 90 up, 180 left, 270 down.
     pub dir: Option<u16>,
 }

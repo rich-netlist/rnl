@@ -69,6 +69,8 @@ pub struct SymbolPrim {
 pub struct PinView {
     pub pos: Pt,
     pub label: Option<String>,
+    /// Read `\subrest` and `\subdigits` in the label (13.6); false for files before 0.4.
+    pub label_name_formats: bool,
     /// Exit direction in degrees: 0 right, 90 up, 180 left, 270 down.
     pub dir: Option<u16>,
     pub terminals: Vec<String>,

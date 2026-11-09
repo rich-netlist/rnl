@@ -236,4 +236,10 @@ impl Interp<'_> {
             v
         })
     }
+
+    /// Read markup by the version of the file that wrote the text, including passed parameters.
+    pub(crate) fn text_lines(&mut self, s: SceneId, text: &WStr, att: ObjId) -> Vec<crate::markup::Line> {
+        let name_formats = text.unit.is_some_and(|u| self.follows_0_4(u));
+        crate::markup::parse_with_name_formats(&self.expand_text(s, text, att), name_formats)
+    }
 }

@@ -47,6 +47,7 @@ fn symbol() -> ProblemSymbol {
     let pin = |x: f64, y: f64, dir: u16, t: &str| PinView {
         pos: (x, y),
         label: None,
+        label_name_formats: false,
         dir: Some(dir),
         terminals: vec![t.to_string()],
     };
