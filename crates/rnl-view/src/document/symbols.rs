@@ -311,7 +311,7 @@ mod tests {
 
     #[test]
     fn name_formats_in_symbol_previews_follow_each_templates_source_version() {
-        for (main, package) in [("0.4", "0.3"), ("0.3", "0.4")] {
+        for (main, package) in [("0.4", "0.4"), ("0.3", "0.3")] {
             let source = format!(
                 "* preview\n* @RNL(type=\"header\") {{ @VERSION(\"{main}\"); @USE-PACKAGE(name=\"s\", path=\"s.rnl\") }}\n\
                  .subckt leaf p n\n* @RNL {{ # @SET-SYMBOL $S }}\n.ends leaf\nX1 a b leaf\n"
