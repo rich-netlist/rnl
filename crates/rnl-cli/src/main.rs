@@ -13,6 +13,7 @@ use rnl_runtime::{Interpretation, Options};
 use rnl_view::BuildOptions;
 
 mod solver_args;
+mod upgrade_args;
 
 const USAGE: &str = concat!(
     "usage:
@@ -25,6 +26,7 @@ const USAGE: &str = concat!(
                                     #M5:d or %dp1, written as RNL refers to it
   rnl problem FILE [options]        print what a solver reads of each level, with its hash, as JSON
   rnl solve FILE -o DIR [options]   solve each drawing level and write its record of the solver back
+  rnl upgrade FILE (-o DIR | --in-place) [--report REPORT.json]  migrate RNL records to 0.4
   rnl preview FILE [options]        print the solve as the desktop viewer previews it, as JSON; writes nothing
   rnl snapshot FILE [options]       print the editor interface's snapshot, as JSON
   rnl catalog [options]             print the symbols, definitions and sets of the packages, as JSON
@@ -144,6 +146,7 @@ struct Args {
     level: Option<String>,
     /// The options of `problem`, `solve` and `preview`.
     solver: solver_args::SolverArgs,
+    upgrade_report: Option<PathBuf>,
     author: Option<String>,
     /// `replace-records`' `--records`: the file of the new records.
     records: Option<PathBuf>,
@@ -211,7 +214,7 @@ fn unknown_encoding(text: String) -> Said {
 }
 
 /// The commands, as `run` takes them.
-const COMMANDS: [&str; 14] = [
+const COMMANDS: [&str; 15] = [
     "check",
     "dump",
     "problem",
@@ -222,6 +225,7 @@ const COMMANDS: [&str; 14] = [
     "catalog",
     "render",
     "solve",
+    "upgrade",
     "preview",
     "strip-generated",
     "write",
@@ -252,6 +256,7 @@ fn parse_args() -> Result<Args, Said> {
     let (mut png, mut scale) = (false, None);
     let mut level = None;
     let mut solver = solver_args::SolverArgs::default();
+    let mut upgrade_report = None;
     let mut author = None;
     let mut records = None;
     let mut parts = None;
@@ -349,6 +354,10 @@ fn parse_args() -> Result<Args, Said> {
                 )
             }
             _ if a.starts_with("--encoding=") => encoding = Some(a[11..].parse().map_err(unknown_encoding)?),
+            "--report" if command == "upgrade" => {
+                upgrade_report =
+                    Some(PathBuf::from(it.next().ok_or_else(|| needs("upgrade --report needs a JSON path"))?));
+            }
             _ if solver.take(&a, &mut it)? => {}
             _ if a.starts_with('-') => {
                 return Err(Said::new(codes::CLI_UNKNOWN_OPTION, format!("unknown option {a}\n{USAGE}")))
@@ -366,6 +375,9 @@ fn parse_args() -> Result<Args, Said> {
     } else {
         None
     };
+    if command == "upgrade" && positional.len() != 1 {
+        return Err(needs("upgrade takes exactly one input FILE"));
+    }
     let file = positional.pop().map(PathBuf::from);
     if json && command != "explain" {
         return Err(Said::new(codes::CLI_OPTION_WRONG_COMMAND, "--json is an option of explain"));
@@ -405,6 +417,7 @@ fn parse_args() -> Result<Args, Said> {
     };
     let formats = formats.into_iter().map(|(path, name)| (format_path(&path, &file), name)).collect();
     Ok(Args {
+        upgrade_report,
         overlays,
         command,
         file,
@@ -710,6 +723,7 @@ fn run(args: &Args) -> Result<ExitCode, Said> {
             Ok(ExitCode::SUCCESS)
         }
         "solve" => solver_args::solve(args, &provider),
+        "upgrade" => upgrade_args::run(args, &provider),
         "preview" => solver_args::preview(args, &provider),
         "replace-records" => replace_records(args, &provider),
         "strip-generated" => {

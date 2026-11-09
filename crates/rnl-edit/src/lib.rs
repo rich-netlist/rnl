@@ -29,6 +29,7 @@
 pub mod form;
 pub mod ops;
 pub mod replace;
+pub mod upgrade;
 
 use std::collections::BTreeMap;
 
