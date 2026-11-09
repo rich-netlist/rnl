@@ -46,14 +46,16 @@ fn read_versions() -> String {
     }
 }
 
-/// Is a package file written in the language version `language` found without `version=` by a
-/// file of the version `reader` (16.2)? A version newer than the tool's default is still a draft,
-/// so its packages, such as the standard series 0.4, are found only by the files of that version or
-/// a later one, or by a `version=` that names them; the files of 0.2 and 0.3 find the packages they
-/// found before.
+/// The draft 0.4 and earlier languages have no package compatibility. Keep the published
+/// 0.2/0.3 compatibility within the older languages (16.1).
+pub(super) fn package_languages_match(language: &str, reader: &str) -> bool {
+    (language == "0.4") == (reader == "0.4")
+}
+
+/// Prefer packages on the reader's side of the 0.4 language boundary (16.1).
 fn finds_unnamed(language: &str, reader: &str) -> bool {
-    let key = version_key(language);
-    key <= version_key(DEFAULT_VERSION) || key <= version_key(reader)
+    package_languages_match(language, reader)
+        && (version_key(language) <= version_key(DEFAULT_VERSION) || version_key(language) <= version_key(reader))
 }
 const HEADER_KW: [&str; 5] = ["VERSION", "PACKAGE", "ALIAS", "DEVICE", "USE-ALIASES"];
 /// A second VERSION in a header record (16.1).
@@ -1190,7 +1192,8 @@ impl Interp<'_> {
                     // standard package's, find by its name and version; one that a USE-PACKAGE
                     // or a reference found is there already (16.2)
                     if !name.is_empty() {
-                        self.packages.entry((name, version)).or_insert(u);
+                        let language = self.version_of(Some(u));
+                        self.packages.entry((name, version, language == "0.4")).or_insert(u);
                     }
                 }
                 "USE-ALIASES" => self.use_aliases(u, &p, &loc),
@@ -1871,7 +1874,7 @@ impl Interp<'_> {
         if cand.is_none() {
             let same: Vec<(String, String, String)> =
                 self.pkg_files[&decl.name].iter().filter(|c| c.0 == decl.name).cloned().collect();
-            let reader = self.version_of(Some(decl.unit));
+            let reader = self.version_of(Some(self.use_writer(decl)));
             let found = |c: &&(String, String, String)| {
                 finds_unnamed(self.pkg_languages.get(&c.2).map_or(DEFAULT_VERSION, String::as_str), &reader)
             };
@@ -1894,7 +1897,18 @@ impl Interp<'_> {
                         cand = Some((*c).clone());
                     }
                 }
-            } else if let Some(c) = same.iter().filter(found).min_by_key(|c| std::cmp::Reverse(version_key(&c.1))) {
+            } else if let Some(c) =
+                same.iter().filter(found).min_by_key(|c| std::cmp::Reverse(version_key(&c.1))).or_else(|| {
+                    same.iter()
+                        .filter(|c| {
+                            !package_languages_match(
+                                self.pkg_languages.get(&c.2).map_or(DEFAULT_VERSION, String::as_str),
+                                &reader,
+                            )
+                        })
+                        .min_by_key(|c| std::cmp::Reverse(version_key(&c.1)))
+                })
+            {
                 // the newest found, and of its copies the one of the first package directory, as
                 // for a version named (16.2)
                 let this = if what == "reference" { "the reference to".to_string() } else { what.to_string() };
@@ -1928,16 +1942,50 @@ impl Interp<'_> {
             );
             return None;
         };
-        if let Some(&u) = self.packages.get(&(n.clone(), v.clone())) {
+        let language = self
+            .provider
+            .read(&path)
+            .and_then(|t| scan_language_decl(&t))
+            .unwrap_or_else(|| DEFAULT_VERSION.to_string());
+        let reader = self.version_of(Some(self.use_writer(decl)));
+        if self.reject_package_language(&n, &reader, &language, Some(loc), &pkg, what) {
+            return None;
+        }
+        if let Some(&u) = self.packages.get(&(n.clone(), v.clone(), language == "0.4")) {
             return Some(u);
         }
         Some(self.load_package_file(&path, Some((n, v))))
+    }
+
+    pub(super) fn use_writer(&self, decl: &UseDecl) -> UnitId {
+        decl.rec.map_or(decl.unit, |r| self.rec_unit[r])
+    }
+
+    /// Keep 0.4 package references separate from the published 0.2/0.3 behavior (16.1).
+    pub(super) fn reject_package_language(
+        &mut self,
+        name: &str,
+        reader: &str,
+        language: &str,
+        loc: Option<Loc>,
+        pkg: &str,
+        what: &str,
+    ) -> bool {
+        // Unsupported versions keep their own diagnostic when the package is read.
+        if package_languages_match(language, reader) || !READ_VERSIONS.contains(&language) {
+            return false;
+        }
+        self.diag_in(Severity::Error, codes::PACKAGE_LANGUAGE_MISMATCH,
+            format!("package {name} is written in language {language}, but this file uses {reader}: language 0.4 cannot use packages of earlier languages or be used by them; this {what} fails (16.1, 16.2, 16.3)"),
+            loc, pkg);
+        true
     }
 
     /// Read a package file into a unit (2.7). `key`, the name and version it is found by, holds it
     /// before its header record is read, so that a reference back to it finds it (16.2).
     pub(crate) fn load_package_file(&mut self, path: &str, key: Option<(String, String)>) -> UnitId {
         let text = self.provider.read(path).unwrap_or_default();
+        let language = scan_language_decl(&text).unwrap_or_else(|| DEFAULT_VERSION.to_string());
         let fname = file_name(path).to_string();
         let mut lv = Level::new(LevelKind::Package, &fname, &fname, normalize(path));
         let recs = scan_run(&package_lines(&text), &fname, &mut self.sink);
@@ -1950,11 +1998,16 @@ impl Interp<'_> {
             self.pkg_sources.push((fname.clone(), text));
         }
         let mut u = Unit::new(UnitKind::Package, &fname);
+        // Mark the 0.4 boundary before reading references written ahead of VERSION in the
+        // header. Leave the published 0.2/0.3 header handling as it was.
+        if language == "0.4" {
+            u.version = language.clone();
+        }
         u.pkg_level = Some(pl);
         let id = self.units.len();
         self.units.push(u);
-        if let Some(key) = key {
-            self.packages.insert(key, id);
+        if let Some((name, version)) = key {
+            self.packages.insert((name, version, language == "0.4"), id);
         }
         let rec_ids: Vec<RecId> = recs.into_iter().map(|r| self.add_record(r, id)).collect();
         self.unit_recs.push(rec_ids);

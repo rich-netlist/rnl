@@ -205,8 +205,8 @@ impl Interp<'_> {
     /// (16.3): the newest version in the package directories of the standard series written in
     /// that version, as the header record of its `rnl-std` declares, so that a file of 0.2 uses
     /// the series 0.2 and a file of 0.3 the series 0.3; or the version that the reading asks for
-    /// ([`crate::Options::std_version`]), whatever the language version. Reading it reads the
-    /// packages it references.
+    /// ([`crate::Options::std_version`]). The implicit reference checks the 0.4 boundary before
+    /// making its names available. Reading it reads the packages it references.
     pub(crate) fn std_package(&mut self, language: &str) -> Option<UnitId> {
         if !self.std_enabled {
             return None;
@@ -224,8 +224,7 @@ impl Interp<'_> {
             }
         }
         let chosen = if let Some(v) = self.std_version.clone() {
-            // a reading that asks for a version takes that one, whatever the language version of
-            // the file (16.3: the version of the standard package is the tool's default)
+            // Select the requested package version; implicit_std checks its language separately.
             let c = found.iter().find(|c| c.1 == v).cloned();
             if c.is_none() && self.missing_std.is_none() {
                 // said on the first chain that would use it ([`Self::tell_missing_std`]): a version
@@ -260,10 +259,11 @@ impl Interp<'_> {
             best.cloned()
         };
         let out = chosen.map(|(n, v, path)| {
-            let key = (n, v);
+            let language = self.pkg_languages[&path].clone();
+            let key = (n.clone(), v.clone(), language == "0.4");
             match self.packages.get(&key) {
                 Some(&u) => u,
-                None => self.load_package_file(&path, Some(key)),
+                None => self.load_package_file(&path, Some((n, v))),
             }
         });
         self.std_units.insert(language.to_string(), out);
@@ -283,6 +283,7 @@ impl Interp<'_> {
         };
         let language = self.version_of(Some(unit));
         self.std_package(&language)
+            .filter(|&p| super::unit::package_languages_match(&self.version_of(Some(p)), &language))
     }
 
     /// A package's version: what its PACKAGE says, or the `version=` of the USE-PACKAGE of an
@@ -330,6 +331,7 @@ impl Interp<'_> {
         }
         match key {
             EffKey::Level(level) => {
+                let language = self.version_of(Some(self.level_unit[level]));
                 let mut chain = self.doc.ancestors(level);
                 chain.reverse();
                 chain.push(level);
@@ -340,6 +342,13 @@ impl Interp<'_> {
                     }
                     for header in [true, false] {
                         for d in unit.uses.iter().filter(|d| d.in_header == header) {
+                            // Includes can cross the 0.4 boundary, but their packages cannot.
+                            if !super::unit::package_languages_match(
+                                &self.version_of(Some(self.use_writer(d))),
+                                &language,
+                            ) {
+                                continue;
+                            }
                             let at = if header { At::Root } else { At::Level(lv) };
                             uses.push(Use { decl: Some(d.clone()), unit: d.pkg, at, name: d.name.clone() });
                         }
@@ -369,7 +378,27 @@ impl Interp<'_> {
             }
         }
         self.tell_missing_std(key, &uses);
+        self.tell_std_language(key, &uses);
         uses
+    }
+
+    fn tell_std_language(&mut self, key: EffKey, uses: &[Use]) {
+        if uses.iter().any(|u| u.name == STD_NAME) {
+            return;
+        }
+        let unit = match key {
+            EffKey::Level(level) if self.file_ok(level) => self.level_unit[level],
+            EffKey::Alone(u) if self.package_main == Some(u) && self.units[u].ok => u,
+            _ => return,
+        };
+        let reader = self.version_of(Some(unit));
+        let Some(p) = self.std_units.get(&reader).copied().flatten() else { return };
+        let language = self.version_of(Some(p));
+        let writer = self.file_unit(unit).unwrap_or(unit);
+        if !super::unit::package_languages_match(&language, &reader) && self.std_language_reported.insert(writer) {
+            let loc = self.units[writer].header_record.and_then(|r| self.rec_loc(Some(r), 0));
+            self.reject_package_language(STD_NAME, &reader, &language, loc, "", "implicit reference");
+        }
     }
 
     /// Say that the version of the standard package that the reading asks for cannot be found,

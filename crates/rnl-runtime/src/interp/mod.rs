@@ -67,7 +67,7 @@ pub struct Options {
     /// The version of the standard package at the root, instead of the newest of the series written
     /// in the file's language version (16.3: its version is the tool's default), such as "0.2" to
     /// read a file of 0.3 with the series 0.2. A version pinned in a header record still comes
-    /// first. None: by the language version.
+    /// first. None: by the language version. The draft 0.4 cannot cross this language boundary.
     pub std_version: Option<String>,
     /// Read the records with `type="generated"`, the solver's results. A solver interprets a level
     /// without them (2.8, 14.8): every file of the document is read as if they were not written.
@@ -182,7 +182,9 @@ pub struct Interp<'p> {
     pub(crate) rec_chars: Vec<Option<Rc<[char]>>>,
     pub(crate) pkg_levels: Vec<Level>,
     pub(crate) pkg_sources: Vec<(String, String)>,
-    pub(crate) packages: HashMap<(String, String), UnitId>,
+    /// Package name, package version, and whether its language is 0.4. Keep the published
+    /// shared cache for 0.2/0.3; a mixed-version include must not reuse it for a 0.4 package.
+    pub(crate) packages: HashMap<(String, String, bool), UnitId>,
     pub(crate) pkg_files: HashMap<String, Vec<(String, String, String)>>,
     pub(crate) pkg_headers: HashMap<String, Option<(String, String)>>,
     /// The language version each package file of the package directories is written in (16.1).
@@ -232,6 +234,7 @@ pub struct Interp<'p> {
     /// The version of the standard package that the reading asks for ([`Options::std_version`]),
     /// when it cannot be found, and whether a chain that would use it has said so (16.3).
     pub(crate) missing_std: Option<(String, bool)>,
+    pub(crate) std_language_reported: HashSet<UnitId>,
     /// The packages in effect on each chain of levels, and the number of units they were found
     /// among (16.2).
     pub(crate) effs: HashMap<EffKey, Rc<Eff>>,
@@ -348,6 +351,7 @@ impl<'p> Interp<'p> {
             tol: options.tolerance,
             std_units: HashMap::new(),
             missing_std: None,
+            std_language_reported: HashSet::new(),
             effs: HashMap::new(),
             effs_units: 0,
             expansions: HashMap::new(),

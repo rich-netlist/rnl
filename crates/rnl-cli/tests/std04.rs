@@ -64,14 +64,17 @@ fn a_package_that_names_no_version_is_found_in_the_series_the_file_can_use() {
         root(level(&r)).iter().map(|(n, v)| format!("{n} {v}")).collect::<Vec<_>>()
     };
     let unnamed = "@USE-PACKAGE(name=\"rnl-std-rf\")";
-    // the newest version not written in a language version newer than the tool's default, as before
-    // the series 0.4 was bundled, for a file of 0.2 and of 0.3; the series 0.4 for a file of 0.4
+    // The published 0.2/0.3 lookup stays; 0.4 uses its own series.
     for (version, want) in [("0.2", "0.3"), ("0.3", "0.3"), ("0.4", "0.4")] {
         assert_eq!(rf(version, unnamed), [format!("rnl-std-rf {want}")], "{version}");
     }
-    // named, a version of the series 0.4 is found in any file
+    // An explicit package version cannot cross the language boundary either.
     let named = "@USE-PACKAGE(name=\"rnl-std-rf\", version=\"0.4\")";
-    assert_eq!(rf("0.3", named), ["rnl-std-rf 0.4"]);
+    for (version, header) in [("0.2", named), ("0.3", named)] {
+        let r = read(&MemoryProvider::new().with("t.sp", &netlist(version, header)), &options);
+        assert!(errors(&r).iter().any(|e| e.contains("RNL2308")), "{:?}", errors(&r));
+        assert!(root(level(&r)).is_empty());
+    }
 }
 
 #[test]

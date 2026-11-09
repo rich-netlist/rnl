@@ -79,7 +79,7 @@ fn literal_attributes_are_split_after_expansion_without_becoming_markup() {
 
 #[test]
 fn package_symbols_keep_their_own_text_and_pin_label_version() {
-    for (main, included) in [("0.4", "0.3"), ("0.3", "0.4")] {
+    for (main, included) in [("0.4", "0.4"), ("0.3", "0.3")] {
         let source = file(main, r#"@USE-PACKAGE(name="s", path="s.rnl"); #R12 @SET-SYMBOL $S => @PLACE(0,0)"#);
         let symbol = format!(
             "@RNL(type=\"header\") {{ @VERSION(\"{included}\"); @PACKAGE(name=\"s\", version=\"1.0\") }}\n@RNL {{\n\
@@ -118,7 +118,7 @@ fn package_symbols_keep_their_own_text_and_pin_label_version() {
 
 #[test]
 fn a_text_parameter_keeps_the_version_of_its_caller() {
-    for (main, included) in [("0.4", "0.3"), ("0.3", "0.4")] {
+    for (main, included) in [("0.4", "0.4"), ("0.3", "0.3")] {
         let source = file(main, r#"@USE-PACKAGE(name="d", path="d.rnl"); $D @ATTACH(caption="\subrest{VDD}") (0,0)"#);
         let definition = format!(
             "@RNL(type=\"header\") {{ @VERSION(\"{included}\"); @PACKAGE(name=\"d\", version=\"1.0\") }}\n\

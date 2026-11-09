@@ -1195,6 +1195,17 @@
    ]
   },
   {
+   "number": "RNL2308",
+   "name": "package-language-mismatch",
+   "severity": "error",
+   "message": "package {package} is written in language {language}, but this file uses {reader}: language 0.4 cannot use packages of earlier languages or be used by them; this {reference} fails (16.1, 16.2, 16.3)",
+   "sections": [
+    "16.1",
+    "16.2",
+    "16.3"
+   ]
+  },
+  {
    "number": "RNL2400",
    "name": "alias-conflict",
    "severity": "error",
