@@ -51,10 +51,9 @@ const PENDING_0_4: &[&str] = &[
     "UNROUTE-NET",
     "UNROUTE-OBJECT",
     "removed",
-    // assertions (15.3, 15.4)
+    // the topology assertion (15.4), and symbol= and drawn of ASSERT-INSTANCE, which come with those of
+    // SELECT-INSTANCE (10.1)
     "ASSERT-INSTANCE",
-    "ASSERT-TERMINAL",
-    "ASSERT-NET",
     "ASSERT-TOPOLOGY",
     // groups and tables (11.5, 14.11)
     "GROUP",
@@ -399,7 +398,7 @@ fn compare(p: &Value, version: &str, pending: &[&str]) {
     }
     all_words.extend(p["reserved"].as_array().unwrap().iter().map(|v| v.as_str().unwrap().to_string()));
     if !pending("all_words") {
-        assert_eq!(&all_words, w.all_words(), "all standard/reserved words");
+        assert_eq!(all_words, w.all_words_in(version), "all standard/reserved words");
     }
 }
 

@@ -258,7 +258,7 @@ impl Words {
             by_name,
             all: BTreeSet::new(),
         };
-        w.all = w.collect_all();
+        w.all = w.collect_all(None);
         Ok(w)
     }
 
@@ -321,14 +321,20 @@ impl Words {
 
     /// Every standard word other than the keywords (16.5): parameter names and values, position
     /// names, style properties, kinds, sub-object names, attribute names, `true` and `false`.
+    /// Those of every version read; [`Words::all_words_in`] for those of one version.
     pub fn all_words(&self) -> &BTreeSet<String> {
         &self.all
     }
 
-    fn collect_all(&self) -> BTreeSet<String> {
+    /// The standard words other than the keywords of a file of the language version `version`.
+    pub fn all_words_in(&self, version: &str) -> BTreeSet<String> {
+        self.collect_all(Some(version))
+    }
+
+    fn collect_all(&self, version: Option<&str>) -> BTreeSet<String> {
         let mut out = BTreeSet::new();
-        for k in &self.keywords {
-            for p in k.param_list() {
+        for k in self.keywords.iter().filter(|k| version.is_none_or(|v| k.in_version(v))) {
+            for p in k.param_list().iter().filter(|p| version.is_none_or(|v| p.in_version(v))) {
                 out.insert(p.name.clone());
                 if let ParamType::Enum(vals) = &p.ty {
                     for v in vals {
@@ -497,10 +503,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn embedded_list_has_46_keywords() {
+    fn embedded_list_has_46_keywords_of_0_2_and_0_3() {
         let w = words();
         assert_eq!(w.language_version, "0.2");
-        assert_eq!(w.keywords.len(), 46);
+        assert_eq!(w.keywords_in("0.2").count(), 46);
+        assert_eq!(w.keywords_in("0.3").count(), 46);
+        // and the assertions of 0.4 (15.3)
+        let added: Vec<_> = w.keywords.iter().filter(|k| !k.in_version("0.3")).map(|k| k.name.as_str()).collect();
+        assert_eq!(added, ["ASSERT-INSTANCE", "ASSERT-TERMINAL", "ASSERT-NET"]);
+        assert!(!w.all_words_in("0.3").contains("different") && w.all_words_in("0.4").contains("different"));
         let place = w.keyword("PLACE").unwrap();
         assert_eq!(place.positional, vec!["x", "y"]);
         assert!(matches!(w.keyword("AS").unwrap().positions, Positions::Definition));

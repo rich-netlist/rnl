@@ -257,6 +257,7 @@ impl Interp<'_> {
             "ALIGN" | "ORDER" | "DISTRIBUTE" | "DISTANCE" | "ORIENT-RELATION" => {
                 self.kw_constraint(kw, &args, seg, ctx)
             }
+            "ASSERT-INSTANCE" | "ASSERT-TERMINAL" | "ASSERT-NET" => self.kw_assert(kw, &args, seg, ctx),
             _ => {
                 let at = seg.call.as_ref().unwrap().start;
                 self.fail(ctx, codes::KEYWORD_NOT_USABLE_HERE, format!("@{kw} cannot be used here"), at)

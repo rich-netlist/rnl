@@ -1388,7 +1388,7 @@ impl Interp<'_> {
             }
             // a word that 0.3 adds, `numbering`, is a standard word in a file of 0.3 (16.1): a file
             // of 0.2 raised to 0.3 with such an alias, with a warning, has it in error here
-            if words().all_words().contains(alias) || added_word(alias, version) {
+            if words().all_words_in(version).contains(alias) || added_word(alias, version) {
                 return bad(
                     self,
                     codes::ALIAS_IS_STANDARD_WORD,

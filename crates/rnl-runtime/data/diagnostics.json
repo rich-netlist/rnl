@@ -2584,6 +2584,63 @@
    ]
   },
   {
+   "number": "RNL3801",
+   "name": "assert-attribute-not-of-kind",
+   "severity": "error",
+   "message": "{same|different}= of @{kw} names the attribute {attribute}, but {a terminal has the attribute net|a net has the attribute name} only (13.6, 15.3)",
+   "sections": [
+    "13.6",
+    "15.3"
+   ]
+  },
+  {
+   "number": "RNL3802",
+   "name": "assert-list-item-not-name",
+   "severity": "error",
+   "message": "{same|different|has}= of @{kw} is a list of attribute names, such as {same|different|has}=[\"model\"], and {item} is none (15.3)",
+   "sections": [
+    "15.3"
+   ]
+  },
+  {
+   "number": "RNL3803",
+   "name": "assert-list-written-as-string",
+   "severity": "error",
+   "message": "{same|different|has}= of @{kw} is a list of attribute names, written [\"{value}\"], not \"{value}\" (15.3)",
+   "sections": [
+    "15.3"
+   ]
+  },
+  {
+   "number": "RNL3804",
+   "name": "assert-member-failed",
+   "severity": "error",
+   "message": "a member of @{kw} failed, so the assertion checks nothing (7.3, 15.3)",
+   "sections": [
+    "7.3",
+    "15.3"
+   ]
+  },
+  {
+   "number": "RNL3805",
+   "name": "assert-member-wrong-kind",
+   "severity": "error",
+   "message": "@{kw} checks {instance|terminal|net}s, and {members} {is|are} not: the assertion is not checked (15.3)",
+   "sections": [
+    "15.3"
+   ]
+  },
+  {
+   "number": "RNL3806",
+   "name": "assert-terminals-not-whole",
+   "severity": "error",
+   "message": "terminals= of @{kw} is a whole number of terminals, such as terminals=4, not {n} (10.1, 15.3)",
+   "sections": [
+    "10.1",
+    "15.3"
+   ]
+  },
+  {
    "number": "RNL4000",
    "name": "symbol-model-card-missing",
    "severity": "warning",
@@ -3108,12 +3165,52 @@
    ]
   },
   {
+   "number": "RNL6000",
+   "name": "violation-condition",
+   "severity": "violation",
+   "message": "@{kw} does not hold{ in {usage}, a usage of {definition} at {file}:{line}}: every member should {condition}, but {member} {what it has}[, ...]{; {message}} (15.3)",
+   "sections": [
+    "15.3",
+    "7.6"
+   ]
+  },
+  {
+   "number": "RNL6001",
+   "name": "violation-different",
+   "severity": "violation",
+   "message": "@{kw} does not hold{where}: any two members should have a different {attribute}, but {member} is among them more than once / {members} have the same {attribute} {value} / {members} have no {attribute}{; {message}} (15.3)",
+   "sections": [
+    "15.3",
+    "7.6"
+   ]
+  },
+  {
+   "number": "RNL6002",
+   "name": "violation-same",
+   "severity": "violation",
+   "message": "@{kw} does not hold{where}: the members should have the same {attribute}, but {members} {has|have} {value} and ...{; {message}} (15.3)",
+   "sections": [
+    "15.3",
+    "7.6"
+   ]
+  },
+  {
    "number": "RNL6003",
    "name": "violation-current-one-way",
    "severity": "violation",
    "message": "the current of &{net} goes one way: every terminal on it, {terminals}, has a CURRENT that moves current {into|out of} the net, which gives it nowhere to go (15.2)",
    "sections": [
     "15.2",
+    "7.6"
+   ]
+  },
+  {
+   "number": "RNL6004",
+   "name": "violation-has",
+   "severity": "violation",
+   "message": "@{kw} does not hold{where}: every member should have a {attribute}, but {members} {has|have} none{; {message}} (15.3)",
+   "sections": [
+    "15.3",
     "7.6"
    ]
   },

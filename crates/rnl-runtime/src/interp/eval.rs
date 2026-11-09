@@ -848,6 +848,13 @@ impl<'p> Interp<'p> {
                     );
                 }
             }
+            // a keyword that a later version adds
+            if let Some(since) = words().keyword(&kw).and_then(|k| k.since.clone()) {
+                if crate::interp::unit::version_key(&since) > crate::interp::unit::version_key(&version) {
+                    let msg = format!("unknown keyword @{written}: the language {since} adds it, and this file is of {version} (16.1)");
+                    return self.fail(ctx, codes::KEYWORD_UNKNOWN, msg, call.start);
+                }
+            }
             let pre = known
                 .iter()
                 .filter(|k| written.starts_with(k.as_str()) && written.len() > k.len())
