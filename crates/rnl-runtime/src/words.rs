@@ -4,6 +4,11 @@
 //! It is a data file released with each language version. Checking, the reference documents and
 //! the writing brief are derived from it, so adding or changing a keyword means editing the file
 //! and adding a handler, not editing tables in code.
+//!
+//! One list serves every version read (16.1): a keyword or a parameter that a version adds carries
+//! `since`, one that a version removes carries `until`, the last version that has it, and the list
+//! `removed` names each removed word with the section that replaces it. A word is in a version from
+//! its `since` (0.2 when not written) through its `until`.
 
 use std::collections::{BTreeSet, HashMap};
 use std::sync::OnceLock;
@@ -39,6 +44,22 @@ pub struct ParamSpec {
     pub name: String,
     pub ty: ParamType,
     pub required: bool,
+    /// The version that adds it, none for 0.2.
+    pub since: Option<String>,
+    /// The last version that has it, none while it is kept.
+    pub until: Option<String>,
+}
+
+impl ParamSpec {
+    /// An optional parameter of every version.
+    pub fn new(name: impl Into<String>, ty: ParamType) -> ParamSpec {
+        ParamSpec { name: name.into(), ty, required: false, since: None, until: None }
+    }
+
+    /// Whether a file of the language version `version` has this parameter.
+    pub fn in_version(&self, version: &str) -> bool {
+        in_version(&self.since, &self.until, version)
+    }
 }
 
 /// What an object position takes (5.2.1).
@@ -92,7 +113,15 @@ pub struct KeywordSig {
     pub params: ParamsSpec,
     /// The parameters that may be written by position, in order (4.2 rule 9).
     pub positional: Vec<String>,
-    pub at_least_one: Vec<String>,
+    /// Groups of parameters of which each needs at least one written (4.2), such as DISTANCE's
+    /// `min`, `max` and `exact`.
+    pub at_least_one: Vec<Vec<String>>,
+    /// Whether it takes parameters beyond its list, which the keyword checks itself (SOLVER-CONFIG).
+    pub open_params: bool,
+    /// The version that adds it, none for 0.2.
+    pub since: Option<String>,
+    /// The last version that has it, none while it is kept.
+    pub until: Option<String>,
     /// The group of style properties written as parameters: line_style, area_style, wire_style, text_style.
     pub style: Option<String>,
     pub output: String,
@@ -115,6 +144,26 @@ impl KeywordSig {
             Positions::Definition => &[],
         }
     }
+
+    /// Whether a file of the language version `version` has this keyword.
+    pub fn in_version(&self, version: &str) -> bool {
+        in_version(&self.since, &self.until, version)
+    }
+
+    /// The parameters a file of the language version `version` has.
+    pub fn params_in(&self, version: &str) -> Vec<ParamSpec> {
+        self.param_list().iter().filter(|p| p.in_version(version)).cloned().collect()
+    }
+}
+
+/// A word that a version removes (16.1): the word, what it was, the last version that has it, and the
+/// section that says what replaces it.
+#[derive(Clone, Debug)]
+pub struct Removed {
+    pub word: String,
+    pub what: String,
+    pub until: String,
+    pub see: String,
 }
 
 #[derive(Clone, Debug)]
@@ -140,6 +189,7 @@ pub struct Words {
     pub style_props: Vec<StyleProp>,
     pub groups: HashMap<String, Vec<String>>,
     pub keywords: Vec<KeywordSig>,
+    pub removed: Vec<Removed>,
     by_name: HashMap<String, usize>,
     all: BTreeSet<String>,
 }
@@ -184,6 +234,11 @@ impl Words {
         for (name, spec) in obj.get("keywords").and_then(Value::as_object).ok_or("keywords")? {
             keywords.push(keyword(name, spec)?);
         }
+        let mut removed = Vec::new();
+        for r in obj.get("removed").and_then(Value::as_array).into_iter().flatten() {
+            let field = |key: &str| str_of(r.get(key)).ok_or_else(|| format!("removed: {key}"));
+            removed.push(Removed { word: field("word")?, what: field("what")?, until: field("until")?, see: field("see")? });
+        }
         let by_name = keywords.iter().enumerate().map(|(i, k)| (k.name.clone(), i)).collect();
         let mut w = Words {
             language_version,
@@ -194,6 +249,7 @@ impl Words {
             style_props,
             groups,
             keywords,
+            removed,
             by_name,
             all: BTreeSet::new(),
         };
@@ -201,8 +257,30 @@ impl Words {
         Ok(w)
     }
 
+    /// The keyword `name` of any version read; [`Words::keyword_in`] for that of one version.
     pub fn keyword(&self, name: &str) -> Option<&KeywordSig> {
         self.by_name.get(name).map(|&i| &self.keywords[i])
+    }
+
+    /// The keyword `name` as a file of the language version `version` has it.
+    pub fn keyword_in(&self, name: &str, version: &str) -> Option<&KeywordSig> {
+        self.keyword(name).filter(|k| k.in_version(version))
+    }
+
+    /// Whether `name` is a keyword in a file of the language version `version`.
+    pub fn is_keyword_in(&self, name: &str, version: &str) -> bool {
+        self.keyword_in(name, version).is_some()
+    }
+
+    /// The keywords a file of the language version `version` has.
+    pub fn keywords_in<'a>(&'a self, version: &'a str) -> impl Iterator<Item = &'a KeywordSig> + 'a {
+        self.keywords.iter().filter(move |k| k.in_version(version))
+    }
+
+    /// The entries of `removed` for `word` that a file of the language version `version` no
+    /// longer has, the word removed in that version or an earlier one after its own.
+    pub fn removed_in<'a>(&'a self, word: &'a str, version: &'a str) -> impl Iterator<Item = &'a Removed> + 'a {
+        self.removed.iter().filter(move |r| r.word == word && !in_version(&None, &Some(r.until.clone()), version))
     }
 
     /// Fixed parameters accepted by AS/ATTACH in addition to a definition's own parameters.
@@ -282,6 +360,13 @@ fn str_of(v: Option<&Value>) -> Option<String> {
     v.and_then(Value::as_str).map(String::from)
 }
 
+/// Whether the language version `version` is within `since` (0.2 when none) and `until` (no end
+/// when none), by the order of versions (16.1).
+fn in_version(since: &Option<String>, until: &Option<String>, version: &str) -> bool {
+    let key = crate::interp::unit::version_key;
+    since.as_deref().is_none_or(|s| key(version) >= key(s)) && until.as_deref().is_none_or(|u| key(version) <= key(u))
+}
+
 fn param_type(spec: &Value) -> ParamType {
     if let Some(vals) = spec.get("values").and_then(Value::as_array) {
         return ParamType::Enum(
@@ -348,6 +433,8 @@ fn keyword(name: &str, spec: &Value) -> Result<KeywordSig, String> {
                     name: str_of(p.get("name")).unwrap_or_default(),
                     ty: param_type(p),
                     required: p.get("required").and_then(Value::as_bool).unwrap_or(false),
+                    since: str_of(p.get("since")),
+                    until: str_of(p.get("until")),
                 })
                 .collect(),
         ),
@@ -366,7 +453,18 @@ fn keyword(name: &str, spec: &Value) -> Result<KeywordSig, String> {
         definition_at: str_of(spec.get("definition_at")),
         params,
         positional: list("positional"),
-        at_least_one: list("at_least_one"),
+        // one group written as a list of names, or several as a list of lists
+        at_least_one: match spec.get("at_least_one").and_then(Value::as_array) {
+            Some(a) if a.iter().all(Value::is_array) => a
+                .iter()
+                .map(|g| g.as_array().unwrap().iter().filter_map(|x| x.as_str().map(String::from)).collect())
+                .collect(),
+            Some(_) => vec![list("at_least_one")],
+            None => Vec::new(),
+        },
+        open_params: spec.get("open_params").and_then(Value::as_bool).unwrap_or(false),
+        since: str_of(spec.get("since")),
+        until: str_of(spec.get("until")),
         style: str_of(spec.get("style")),
         output: str_of(spec.get("output")).unwrap_or_default(),
         override_: str_of(spec.get("override")),
@@ -404,5 +502,34 @@ mod tests {
         assert!(w.all_words().contains("left-to-right"));
         assert!(w.all_words().contains("position"));
         assert!(!w.all_words().contains("PLACE"));
+        // DISTANCE's group as one list of names
+        assert_eq!(w.keyword("DISTANCE").unwrap().at_least_one, vec![vec!["min", "max", "exact"]]);
+    }
+
+    #[test]
+    fn a_word_is_in_the_versions_from_since_through_until() {
+        let mut v: Value = serde_json::from_str(WORDS_0_2).unwrap();
+        let kws = v["keywords"].as_object_mut().unwrap();
+        let mut table = kws["GROUP"].clone();
+        table["since"] = "0.4".into();
+        table["at_least_one"] = serde_json::json!([["a", "b"], ["c"]]);
+        table["open_params"] = true.into();
+        kws.insert("TABLE".into(), table);
+        kws["ROUTE"]["until"] = "0.3".into();
+        kws["PRIORITY"]["params"][0]["since"] = "0.3".into();
+        v["removed"] = serde_json::json!([{"word": "ROUTE", "what": "keyword", "until": "0.3", "see": "13.7"}]);
+        let w = Words::parse(&v.to_string()).unwrap();
+        assert!(!w.is_keyword_in("TABLE", "0.3") && w.is_keyword_in("TABLE", "0.4"));
+        assert!(w.is_keyword_in("ROUTE", "0.3") && !w.is_keyword_in("ROUTE", "0.4"));
+        // a keyword of any version read is still a standard word, which no alias may be spelled as
+        assert!(w.is_keyword("TABLE") && w.is_keyword("ROUTE"));
+        assert!(w.keywords_in("0.4").all(|k| k.name != "ROUTE"));
+        assert_eq!(w.removed_in("ROUTE", "0.3").count(), 0);
+        assert_eq!(w.removed_in("ROUTE", "0.4").map(|r| r.see.as_str()).collect::<Vec<_>>(), ["13.7"]);
+        let table = w.keyword("TABLE").unwrap();
+        assert_eq!(table.at_least_one, vec![vec!["a", "b"], vec!["c"]]);
+        assert!(table.open_params && !w.keyword("GROUP").unwrap().open_params);
+        let priority = w.keyword("PRIORITY").unwrap();
+        assert!(priority.params_in("0.2").is_empty() && priority.params_in("0.3").len() == 1);
     }
 }

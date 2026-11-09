@@ -830,10 +830,12 @@ impl<'p> Interp<'p> {
             return Ok((NOTHING, false));
         };
         let kw = self.kw(&call.kw, ctx.unit);
-        if !words().is_keyword(&kw) {
+        // a keyword is one of the version of the file it is written in (16.1)
+        let version = self.version_of(Some(ctx.unit));
+        if !words().is_keyword_in(&kw, &version) {
             let written = call.kw.clone();
             let fu = self.file_unit(ctx.unit);
-            let mut known: Vec<String> = words().keywords.iter().map(|k| k.name.clone()).collect();
+            let mut known: Vec<String> = words().keywords_in(&version).map(|k| k.name.clone()).collect();
             if let Some(f) = fu {
                 known.extend(self.units[f].aliases.keys().filter_map(|a| a.strip_prefix('@').map(String::from)));
             }
@@ -859,8 +861,12 @@ impl<'p> Interp<'p> {
                     call.start,
                 );
             }
-            let close = closest(&kw, words().keywords.iter().map(|k| k.name.as_str()));
+            let close = closest(&kw, words().keywords_in(&version).map(|k| k.name.as_str()));
             let mut msg = format!("unknown keyword @{written}");
+            if let Some(r) = words().removed_in(&kw, &version).next() {
+                let msg = format!("unknown keyword @{written}: a file of {version} no longer has it, the last version with it is {} ({})", r.until, r.see);
+                return self.fail(ctx, codes::KEYWORD_UNKNOWN, msg, call.start);
+            }
             if let Some(c) = close {
                 msg.push_str(&format!(", did you mean @{c}?"));
             }
@@ -1870,7 +1876,7 @@ impl<'p> Interp<'p> {
         for (name, val) in out {
             let Some(val) = val else { continue };
             let sp = spec.iter().find(|s| s.name == name).cloned().or_else(|| {
-                words().style_prop(&name).map(|s| ParamSpec { name: s.name.clone(), ty: s.ty.clone(), required: false })
+                words().style_prop(&name).map(|s| ParamSpec::new(s.name.clone(), s.ty.clone()))
             });
             let v = self.check_value(kw, &name, val, sp.as_ref(), ctx, p.start)?;
             done.push((name, v));

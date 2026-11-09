@@ -35,7 +35,7 @@ fn style_specs(group: &str) -> Vec<ParamSpec> {
         .group(group)
         .iter()
         .filter_map(|n| words().style_prop(n))
-        .map(|s| ParamSpec { name: s.name.clone(), ty: s.ty.clone(), required: false })
+        .map(|s| ParamSpec::new(s.name.clone(), s.ty.clone()))
         .collect()
 }
 
@@ -868,7 +868,7 @@ impl Interp<'_> {
         };
         // parameters: the definition's parameter list plus `priority` (9.4, 14.8)
         let mut pspec: Vec<ParamSpec> =
-            d.params.iter().map(|(n, _)| ParamSpec { name: n.clone(), ty: ParamType::Any, required: false }).collect();
+            d.params.iter().map(|(n, _)| ParamSpec::new(n.clone(), ParamType::Any)).collect();
         pspec.extend(words().usage_params());
         let order: Vec<String> = d.params.iter().map(|(n, _)| n.clone()).collect();
         let p = self.params(kw, seg, ctx, &pspec, Some(&order), false, Some(&resolve))?;

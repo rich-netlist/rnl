@@ -1,4 +1,5 @@
-//! Published 0.3 vocabulary versus the signatures actually used by the interpreter.
+//! Published vocabulary versus the signatures actually used by the interpreter: that of 0.3 whole,
+//! and that of the draft 0.4 but for the parts the changes still to come bring.
 //! Handler-owned defaults and cross-parameter rules are checked through execution below.
 //! This is vocabulary parity, not exhaustive semantic conformance.
 
@@ -16,6 +17,62 @@ use serde_json::{json, Value};
 fn published() -> Value {
     serde_json::from_str(include_str!("../../../spec/rnl-words-0.3.json")).unwrap()
 }
+
+fn published_0_4() -> Value {
+    serde_json::from_str(include_str!("../../../spec/rnl-words-0.4.json")).unwrap()
+}
+
+/// What the draft 0.4 has that the runtime does not yet: keywords by name, and the parts of the list
+/// that change with them. A change that brings one takes it off this list, so that the comparison
+/// covers it from then on; the list is empty when 0.4 is released.
+const PENDING_0_4: &[&str] = &[
+    // pins, as objects and in the slots that take points (9.2.4, 10.1)
+    "kinds",
+    "PIN",
+    "SELECT-PIN",
+    "ARC",
+    "BEZIER",
+    "CIRCLE",
+    "ELLIPSE",
+    "LINE",
+    "RECTANGLE",
+    "TEXT",
+    "WIRE",
+    "ORIENT",
+    "ORIENT-RELATION",
+    // constraints written with a direction (14.3, 14.4, 14.5)
+    "ORDER",
+    "DISTRIBUTE",
+    "DISTANCE",
+    // routing (13.7)
+    "ROUTE",
+    "ROUTE-NET",
+    "ROUTE-OBJECT",
+    "UNROUTE-NET",
+    "UNROUTE-OBJECT",
+    "removed",
+    // assertions (15.3, 15.4)
+    "ASSERT-INSTANCE",
+    "ASSERT-TERMINAL",
+    "ASSERT-NET",
+    "ASSERT-TOPOLOGY",
+    // groups and tables (11.5, 14.11)
+    "GROUP",
+    "TABLE",
+    // the settings of the solver (5.9)
+    "SOLVER-CONFIG",
+    // the rest of the changes of 0.4
+    "record",
+    "DEVICE",
+    "SET-SYMBOL",
+    "SELECT-INSTANCE",
+    "SELECT-TERMINAL",
+    "SELECT-USAGE",
+    // gathered from the keywords compared, so whole only when none of them is pending
+    "pseudo_kinds",
+    "takes",
+    "all_words",
+];
 
 // Every field is accounted for. These are the only prose-only exemptions: descriptions,
 // human-readable form/sentence templates (with ellipses), and explanations of keys/array items.
@@ -78,16 +135,38 @@ fn parameter(actual: &ParamSpec, expected: &Value) {
     assert_eq!(kind, expected["type"].as_str().unwrap(), "{} type", actual.name);
     assert_eq!(values, number_normalized(&expected["values"]), "{} enum", actual.name);
     assert_eq!(actual.required, expected["required"].as_bool().unwrap_or(false), "{} required", actual.name);
-    // All fixed parameter words belong to the embedded 0.2 vocabulary. The supported 0.3
-    // additions are the header supplement below, not a silently ignored `since` field.
-    assert_eq!(expected["since"], words().language_version, "{} version", actual.name);
+    // A parameter's version is its own `since`, the embedded 0.2 vocabulary's when it has none. The
+    // supported 0.3 additions are the header supplement below, not a silently ignored `since` field.
+    let since = actual.since.as_deref().unwrap_or(&words().language_version);
+    assert_eq!(expected["since"], since, "{} version", actual.name);
+}
+
+/// `at_least_one` as groups: one group may be written as a list of names (0.3), several as a list of
+/// lists (0.4).
+fn at_least_one(value: Option<&Value>) -> Value {
+    match value.and_then(Value::as_array) {
+        Some(a) if a.iter().all(Value::is_array) => json!(a),
+        Some(a) => json!([a]),
+        None => json!([]),
+    }
 }
 
 #[test]
 fn runtime_signatures_match_every_published_word_and_structured_field() {
-    let p = published();
+    compare(&published(), "0.3", &[]);
+}
+
+#[test]
+fn runtime_signatures_match_the_draft_0_4_but_for_the_pending_parts() {
+    compare(&published_0_4(), "0.4", PENDING_0_4);
+}
+
+/// The published list `p` of the language version `version` against the runtime's signatures as a
+/// file of that version has them, leaving out the keywords and the parts of the list in `pending`.
+fn compare(p: &Value, version: &str, pending: &[&str]) {
+    let pending = |name: &str| pending.contains(&name);
     keys(
-        &p,
+        p,
         &[
             "$schema",
             "language",
@@ -103,14 +182,25 @@ fn runtime_signatures_match_every_published_word_and_structured_field() {
             "style_properties",
             "style_groups",
             "reserved",
+            "removed",
             "keywords",
         ],
     );
-    assert_eq!(p["$schema"], "rnl-words.schema.json");
+    let schema = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../spec").join(p["$schema"].as_str().unwrap());
+    assert!(schema.is_file(), "{}", schema.display());
     assert_eq!(p["language"], "RNL");
-    assert!(READ_VERSIONS.contains(&p["version"].as_str().unwrap()));
+    assert_eq!(p["version"], version);
+    assert!(READ_VERSIONS.contains(&version));
     let w = words();
+    if !pending("removed") {
+        let removed: Vec<_> =
+            w.removed.iter().map(|r| json!({"word":r.word, "what":r.what, "until":r.until, "see":r.see})).collect();
+        assert_eq!(json!(removed), p.get("removed").cloned().unwrap_or(json!([])), "removed");
+    }
     for (category, actual) in [("kinds", &w.kinds), ("subobjects", &w.subobjects), ("attributes", &w.attributes)] {
+        if pending(category) {
+            continue;
+        }
         assert_eq!(strings(actual), names(&p[category]), "{category}");
         for item in p[category].as_array().unwrap() {
             keys(item, &["name", "since"]);
@@ -119,13 +209,19 @@ fn runtime_signatures_match_every_published_word_and_structured_field() {
     }
     let record = &p["record"];
     keys(record, &["marker", "section", "fields"]);
+    let mut record_fields = record["fields"].as_array().unwrap().clone();
+    if pending("record") {
+        record_fields.clear();
+    }
     // Exercise the marker as syntax, not a duplicated expected string.
     assert!(rnl_runtime::syntax::parse_record(&format!("{} {{}}", record["marker"].as_str().unwrap())).error.is_none());
     assert_eq!(record["section"], "2.8");
     let headers: BTreeMap<_, _> =
         w.header_fields.iter().chain(draft_header_fields()).map(|f| (f.name.as_str(), f)).collect();
-    assert_eq!(headers.len(), record["fields"].as_array().unwrap().len());
-    for field in record["fields"].as_array().unwrap() {
+    if !pending("record") {
+        assert_eq!(headers.len(), record_fields.len());
+    }
+    for field in &record_fields {
         keys(field, &["name", "type", "values", "default", "affects_interpretation", "since"]);
         let name = field["name"].as_str().unwrap();
         let actual = headers.get(name).unwrap_or_else(|| panic!("missing header field {name}"));
@@ -138,11 +234,20 @@ fn runtime_signatures_match_every_published_word_and_structured_field() {
     assert_eq!(w.style_props.len(), p["style_properties"].as_array().unwrap().len());
     for prop in p["style_properties"].as_array().unwrap() {
         let actual = w.style_prop(prop["name"].as_str().unwrap()).unwrap();
-        parameter(&ParamSpec { name: actual.name.clone(), ty: actual.ty.clone(), required: false }, prop);
+        parameter(&ParamSpec::new(actual.name.clone(), actual.ty.clone()), prop);
     }
     let groups: BTreeMap<_, _> = w.groups.iter().map(|(k, v)| (k.strip_suffix("_style").unwrap(), v)).collect();
     assert_eq!(json!(groups), p["style_groups"]);
-    assert_eq!(w.keywords.len(), p["keywords"].as_array().unwrap().len());
+    let published_names: BTreeSet<&str> = p["keywords"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|k| k["keyword"].as_str().unwrap())
+        .filter(|n| !pending(n))
+        .collect();
+    let runtime_names: BTreeSet<&str> =
+        w.keywords_in(version).map(|k| k.name.as_str()).filter(|n| !pending(n)).collect();
+    assert_eq!(runtime_names, published_names, "keywords of {version}");
     let mut pseudo = BTreeSet::new();
     let mut takes = BTreeSet::new();
     let mut all_words = BTreeSet::new();
@@ -163,6 +268,7 @@ fn runtime_signatures_match_every_published_word_and_structured_field() {
                 "style",
                 "positional",
                 "at_least_one",
+                "open_params",
                 "together",
                 "exclusive",
                 "shape_params",
@@ -178,16 +284,20 @@ fn runtime_signatures_match_every_published_word_and_structured_field() {
             ],
         );
         let name = k["keyword"].as_str().unwrap();
-        let a = w.keyword(name).unwrap_or_else(|| panic!("missing keyword {name}"));
-        assert_eq!(k["since"], w.language_version, "{name} since");
+        if pending(name) {
+            continue;
+        }
+        let a = w.keyword_in(name, version).unwrap_or_else(|| panic!("missing keyword {name}"));
+        assert_eq!(k["since"], a.since.as_deref().unwrap_or(&w.language_version), "{name} since");
         assert_eq!(k["section"], a.section, "{name} section");
         assert_eq!(k["where"], json!(a.where_), "{name} contexts");
         assert_eq!(k.get("positional").cloned().unwrap_or(json!([])), json!(a.positional), "{name} positional");
-        assert_eq!(k.get("at_least_one").cloned().unwrap_or(json!([])), json!(a.at_least_one), "{name} at_least_one");
+        assert_eq!(at_least_one(k.get("at_least_one")), json!(a.at_least_one), "{name} at_least_one");
+        assert_eq!(k["open_params"].as_bool().unwrap_or(false), a.open_params, "{name} open params");
         assert_eq!(k["override"], json!(a.override_), "{name} override");
         let dynamic = matches!(a.params, ParamsSpec::Definition);
         assert_eq!(k["definition_params"].as_bool().unwrap_or(false), dynamic, "{name} definition params");
-        let params = if dynamic { w.usage_params() } else { a.param_list().to_vec() };
+        let params = if dynamic { w.usage_params() } else { a.params_in(version) };
         assert_eq!(params.len(), k["params"].as_array().unwrap().len(), "{name} params");
         for e in k["params"].as_array().unwrap() {
             parameter(params.iter().find(|v| e["name"] == v.name).unwrap(), e);
@@ -260,8 +370,12 @@ fn runtime_signatures_match_every_published_word_and_structured_field() {
         };
         assert_eq!(a.output, output, "{name} output");
     }
-    assert_eq!(pseudo, names(&p["pseudo_kinds"]));
-    assert_eq!(takes, names(&p["takes"]));
+    if !pending("pseudo_kinds") {
+        assert_eq!(pseudo, names(&p["pseudo_kinds"]));
+    }
+    if !pending("takes") {
+        assert_eq!(takes, names(&p["takes"]));
+    }
     for list in ["pseudo_kinds", "takes"] {
         for item in p[list].as_array().unwrap() {
             keys(item, &["name", "meaning"]);
@@ -284,7 +398,9 @@ fn runtime_signatures_match_every_published_word_and_structured_field() {
         all_words.insert(name.into());
     }
     all_words.extend(p["reserved"].as_array().unwrap().iter().map(|v| v.as_str().unwrap().to_string()));
-    assert_eq!(&all_words, w.all_words(), "all standard/reserved words");
+    if !pending("all_words") {
+        assert_eq!(&all_words, w.all_words(), "all standard/reserved words");
+    }
 }
 
 fn interpret(body: &str, head: &str) -> Interpretation {
