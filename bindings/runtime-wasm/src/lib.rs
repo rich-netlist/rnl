@@ -1,6 +1,7 @@
 //! The core for WebAssembly (decision 0008): [`rnl_view::build`], [`rnl_edit::write`] with a build
-//! of what it wrote, [`rnl_view::catalog`], and the drawings of the objects a build lists without a
-//! position, on request, behind a small C-style interface over linear memory,
+//! of what it wrote, [`rnl_edit::replace::replace_records`], [`rnl_view::catalog`], and the drawings
+//! of the objects a build lists without a position, on request, behind a small C-style interface
+//! over linear memory,
 //! a JSON request in and a JSON response out. It needs no generated glue: the module imports
 //! nothing, and a page or a Worker calls its exports as `js/core.js` does.
 //!
@@ -168,6 +169,52 @@ pub struct Written {
     pub document: Document,
 }
 
+/// What to replace: the records of one level of the netlist at `entry`, in the file that holds the
+/// level ([`rnl_edit::replace::replace_records`]). The other fields are those of a [`Request`], but
+/// the ones that only a viewer's library needs.
+#[derive(Deserialize, Debug)]
+pub struct ReplaceRequest {
+    pub replace_records: ReplaceQuery,
+    /// The path of the main file of the netlist, as the frontend names it.
+    pub entry: String,
+    /// Explicit temporary files, searched before package directories (a build's `pool`).
+    #[serde(default)]
+    pub pool: Vec<String>,
+    /// The texts of the workspace by path, the entry's among them.
+    #[serde(default)]
+    pub files: BTreeMap<String, String>,
+    #[serde(default)]
+    pub package_dirs: Vec<String>,
+    /// "spice" or "spectre", instead of guessing from the entry.
+    pub dialect: Option<String>,
+    #[serde(default)]
+    pub formats: BTreeMap<String, String>,
+    #[serde(default = "yes")]
+    pub std: bool,
+    #[serde(default)]
+    pub std_version: Option<String>,
+}
+
+/// The level whose records are replaced, and the records that take their place.
+#[derive(Deserialize, Debug)]
+pub struct ReplaceQuery {
+    /// The title of the level: a subcircuit name, or the name of its file for a file level.
+    pub level: String,
+    /// The new records, RNL source without comment markers: one or more `@RNL(…) {…}`.
+    pub records: String,
+}
+
+/// What a replace answers: the file that holds the level, with its new text, and how many records
+/// were taken out and put in. The caller writes the file; no other file changes.
+#[derive(Serialize, Debug)]
+pub struct Replaced {
+    /// The path of the file, as the workspace names it, normalized.
+    pub path: String,
+    pub text: String,
+    pub removed: usize,
+    pub added: usize,
+}
+
 /// What to list: the catalog of the packages the core has ([`rnl_view::catalog`]), those of
 /// `package_dirs` among `files` and the bundled ones under them, as a build finds packages by name.
 #[derive(Deserialize, Debug)]
@@ -236,7 +283,8 @@ pub struct FormatList {
 }
 
 /// The answer to a request: `{"document": ...}`, `{"snapshot": ...}`, `{"written": ...}`,
-/// `{"catalog": ...}`, `{"drawings": ...}`, `{"formats": ...}` or `{"error": "..."}`.
+/// `{"replaced": ...}`, `{"catalog": ...}`, `{"drawings": ...}`, `{"formats": ...}` or
+/// `{"error": "..."}`.
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum Response {
@@ -247,6 +295,8 @@ pub enum Response {
     Snapshot(Box<Snapshot>),
     /// The netlist a [`WriteRequest`] wrote, and its Document.
     Written(Box<Written>),
+    /// The file a [`ReplaceRequest`] replaced the records of a level in.
+    Replaced(Box<Replaced>),
     /// The catalog a [`CatalogRequest`] asks for.
     Catalog(Box<Catalog>),
     /// The drawings a [`DrawingsRequest`] asks for, one for each object it names, in order.
@@ -254,8 +304,10 @@ pub enum Response {
     /// The formats a [`FormatsRequest`] asks for.
     Formats(Box<FormatList>),
     /// Why there is none: the request is not a [`Request`], a [`WriteRequest`], a
-    /// [`CatalogRequest`] or a [`DrawingsRequest`], the entry cannot be read, an op cannot be
-    /// written, or no build kept the drawings asked for.
+    /// [`ReplaceRequest`], a [`CatalogRequest`] or a [`DrawingsRequest`], the entry cannot be read,
+    /// an op cannot be written, the records cannot be replaced (the message begins with the kind of
+    /// the refusal, such as `RNL8405 writeback-replace-region-encrypted`), or no build kept the
+    /// drawings asked for.
     Error(String),
 }
 
@@ -266,9 +318,9 @@ thread_local! {
     static DRAWN: RefCell<Option<Drawings>> = const { RefCell::new(None) };
 }
 
-/// Answer a request given as JSON: a write when it has a `write` field, a catalog when it has a
-/// `catalog` field, drawings when it has a `drawings` field, the formats when it has a `formats`
-/// field and no `entry`, else a build.
+/// Answer a request given as JSON: a write when it has a `write` field, a replace when it has a
+/// `replace_records` field, a catalog when it has a `catalog` field, drawings when it has a
+/// `drawings` field, the formats when it has a `formats` field and no `entry`, else a build.
 pub fn respond(request: &[u8]) -> Response {
     let invalid = |e: serde_json::Error| Response::Error(format!("the request is not valid: {e}"));
     let value: serde_json::Value = match serde_json::from_slice(request) {
@@ -315,6 +367,12 @@ pub fn respond(request: &[u8]) -> Response {
     if value.get("write").is_some() {
         return match serde_json::from_value(value) {
             Ok(w) => write(w),
+            Err(e) => invalid(e),
+        };
+    }
+    if value.get("replace_records").is_some() {
+        return match serde_json::from_value(value) {
+            Ok(r) => replace_records(r),
             Err(e) => invalid(e),
         };
     }
@@ -545,6 +603,31 @@ fn write(request: WriteRequest) -> Response {
             Response::Written(Box::new(Written { text, document }))
         }
         Err(e) => Response::Error(e),
+    }
+}
+
+/// Replace the records of a level in the file that holds it, with the records the request gives.
+fn replace_records(request: ReplaceRequest) -> Response {
+    let files = request.files.into_iter().map(|(path, text)| (normalize(&path), text)).collect();
+    let files = MemoryProvider { files, package_dirs: request.package_dirs };
+    let paths: Vec<String> = request.pool.iter().map(|p| normalize(p)).collect();
+    let files = rnl_runtime::source::FilePool { files: &files, paths: &paths };
+    let options = Options { std: request.std, std_version: request.std_version, ..Options::default() };
+    let reading = rnl_edit::replace::Reading {
+        entry: &request.entry,
+        dialect: request.dialect.as_deref(),
+        formats: &request.formats,
+        options: &options,
+    };
+    let query = &request.replace_records;
+    match rnl_edit::replace::replace_records(&reading, &files, &query.level, &query.records) {
+        Ok(done) => Response::Replaced(Box::new(Replaced {
+            path: done.path,
+            text: done.text,
+            removed: done.removed,
+            added: done.added,
+        })),
+        Err(e) => Response::Error(e.to_string()),
     }
 }
 
@@ -1042,6 +1125,48 @@ R1 a 0 1k
             "* t\nsimulator lang=spectre\n// @RNL(type=\"header\") { @VERSION(\"0.3\")}\nr1 (a 0) resistor r=1k\n"
         );
         assert_eq!(errors(&v["written"]["document"]), 0, "{v}");
+    }
+
+    const TOP: &str = "* top\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\n.include \"amp.inc\"\nX1 a b amp\n.end\n";
+    const AMP: &str = ".subckt amp in out\r\nR1 in out 1k\r\n* @RNL { #R1 @PLACE(0, 0) }\r\n.ends amp\r\n";
+
+    #[test]
+    fn a_replace_answers_the_file_of_the_level_with_its_new_text() {
+        let request = |level: &str, records: &str| {
+            json!({ "replace_records": { "level": level, "records": records }, "entry": "/w/top.sp",
+                    "files": { "/w/top.sp": TOP, "/w/amp.inc": AMP } })
+        };
+        let v = answer(request("amp", "@RNL(author=\"ac\") { #R1 @PLACE(2, 2) }\n"));
+        let keys: Vec<&str> = v.as_object().unwrap().keys().map(String::as_str).collect();
+        assert_eq!(keys, ["replaced"]);
+        assert_eq!(
+            v["replaced"],
+            json!({ "path": "/w/amp.inc", "removed": 1, "added": 1,
+                    "text": ".subckt amp in out\r\nR1 in out 1k\r\n* @RNL(author=\"ac\") { #R1 @PLACE(2, 2) }\r\n.ends amp\r\n" })
+        );
+        // the file level of the main file is a level too; the same request gives the same answer
+        let main = answer(request("top.sp", "@RNL { #X1 @PLACE(0, 0) }"));
+        assert_eq!(main["replaced"]["path"], "/w/top.sp");
+        assert_eq!(main["replaced"]["text"], TOP.replace(".end\n", "* @RNL { #X1 @PLACE(0, 0) }\n.end\n"));
+        assert_eq!(answer(request("amp", "@RNL(author=\"ac\") { #R1 @PLACE(2, 2) }\n")), v);
+        // a refusal is an error that begins with its kind, and the files are not touched
+        assert_eq!(
+            answer(request("none", "@RNL {}")),
+            json!({ "error": "RNL8403 writeback-replace-level-not-found: no level is titled none; the levels are top.sp, amp.inc, amp" })
+        );
+        let v = answer(request("amp", "@RNL { #R9 @PLACE(0, 0) }"));
+        assert!(
+            v["error"]
+                .as_str()
+                .unwrap()
+                .starts_with("RNL8410 writeback-replace-records-unread: the records given do not read"),
+            "{v}"
+        );
+        // an entry that is not there, and a request that is not one
+        let gone = json!({ "replace_records": { "level": "amp", "records": "" }, "entry": "/w/none.sp", "files": {} });
+        assert_eq!(answer(gone), json!({ "error": "cannot read /w/none.sp" }));
+        let v = answer(json!({ "replace_records": { "level": "amp" }, "entry": "/w/top.sp" }));
+        assert!(v["error"].as_str().unwrap().starts_with("the request is not valid: missing field `records`"), "{v}");
     }
 
     #[test]

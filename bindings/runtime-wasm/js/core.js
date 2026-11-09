@@ -1,7 +1,8 @@
 // The core as WebAssembly: the module the binding builds (rnl_runtime_wasm.wasm), behind one call
 // that takes a request and returns the Document, for a write the netlist written and its Document,
-// for a catalog request the catalog of the packages the core has, or for a drawings request the
-// drawings of objects an earlier build kept. The call is synchronous, so
+// for a replace-records request the file of a level with the level's records replaced, for a catalog
+// request the catalog of the packages the core has, or for a drawings request the drawings of
+// objects an earlier build kept. The call is synchronous, so
 // the web viewer runs it in a Worker (worker.js); the tests run it in Node.
 
 /**
@@ -58,6 +59,24 @@
  */
 
 /**
+ * What to replace: the records of one level of a netlist that has records already, in the file that
+ * holds the level. The netlist is read from `entry` among `files`, as a build reads it.
+ *
+ * @typedef {object} ReplaceRecordsRequest
+ * @property {{ level: string, records: string }} replace_records `level`: the title of the level, a
+ *   subcircuit name or, for a file level, the name of its file. `records`: the new records, RNL
+ *   source without comment markers, one or more `@RNL(...) {...}`, the level's whole new drawing.
+ * @property {string} entry The path of the main file of the netlist, as the frontend names it.
+ * @property {Record<string, string>} [files] The texts of the workspace by path, the entry's among them.
+ * @property {string[]} [pool] Explicit temporary files searched before package directories.
+ * @property {string[]} [package_dirs]
+ * @property {"spice" | "spectre"} [dialect] The format of the entry, instead of guessing it.
+ * @property {Record<string, string>} [formats]
+ * @property {boolean} [std]
+ * @property {string} [std_version]
+ */
+
+/**
  * What to list: the catalog of the packages the core has, those of `package_dirs` among `files`
  * and the bundled ones, the standard series (catalog.d.ts).
  *
@@ -92,6 +111,17 @@
  */
 
 /**
+ * The file a replace-records request replaced the records of a level in.
+ *
+ * @typedef {object} Replaced
+ * @property {string} path The path of the file that holds the level, as the workspace names it.
+ * @property {string} text Its new text: the level's records are the records given, and every other
+ *   byte of the file is as it was, line endings included. No other file changes.
+ * @property {number} removed How many records of the level were taken out.
+ * @property {number} added How many records were put in.
+ */
+
+/**
  * The core, loaded.
  *
  * @typedef {object} Core
@@ -103,6 +133,12 @@
  * @property {(request: WriteRequest | string) => { text: string, document: object }} write Write the
  *   ops of a request into its netlist, and build what was written. Throws an Error with the core's
  *   message when an op cannot be written.
+ * @property {(request: ReplaceRecordsRequest | string) => Replaced} replaceRecords Replace the records
+ *   of a level of a netlist that has records already, in the file that holds the level, and give that
+ *   file's new text. Throws an Error when it refuses, with a message that begins with the kind of
+ *   the refusal, such as `RNL8405 writeback-replace-region-encrypted: ...`: the level is not found, or
+ *   not one, has no place for a record (in a region written to be encrypted), or the records given
+ *   do not read (the netlist is read again with them, and no error may lie in their lines).
  * @property {(request: CatalogRequest | string) => object} catalog List the symbols, definitions and
  *   sets of the packages the core has, as a catalog request asks.
  * @property {(request: DrawingsRequest | string) => object[]} drawings The drawings of the objects a
@@ -112,9 +148,9 @@
  * @property {(request: {library: {reload?: boolean, refresh?: string[]}, pool: string[], files: Record<string, string>, formats?: Record<string, string>} | string) => string[]} library Update the viewer library index, reading its files with the formats set for them; returns read errors.
  * @property {(request: FormatsRequest | string) => { list: object[], detected: Record<string, string> }} formats
  *   The formats a file can be read with, and the format each file of `detect` has when none is set.
- * @property {(request: Request | WriteRequest | CatalogRequest | DrawingsRequest | string) => object} respond
- *   The core's answer as it gives it: `{ document }`, `{ snapshot }`, `{ written }`, `{ catalog }`,
- *   `{ drawings }` or `{ error }`. Throws only when the core stops.
+ * @property {(request: Request | WriteRequest | ReplaceRecordsRequest | CatalogRequest | DrawingsRequest | string) => object} respond
+ *   The core's answer as it gives it: `{ document }`, `{ snapshot }`, `{ written }`, `{ replaced }`,
+ *   `{ catalog }`, `{ drawings }` or `{ error }`. Throws only when the core stops.
  */
 
 const encoder = new TextEncoder();
@@ -124,6 +160,7 @@ const ASKS = {
   document: "a build without parts",
   snapshot: "a build with parts",
   written: "a write",
+  replaced: "a replace-records request",
   catalog: "a catalog request",
   drawings: "a drawings request",
   library: "a library update",
@@ -201,6 +238,7 @@ export async function loadCore(wasm) {
     build: (request) => part(request, "document"),
     snapshot: (request) => part(request, "snapshot"),
     write: (request) => part(request, "written"),
+    replaceRecords: (request) => part(request, "replaced"),
     catalog: (request) => part(request, "catalog"),
     drawings: (request) => part(request, "drawings"),
     library: (request) => part(request, "library"),

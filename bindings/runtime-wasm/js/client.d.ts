@@ -8,6 +8,8 @@ import type {
   FormatList,
   FormatsRequest,
   LibraryRequest,
+  ReplaceRecordsRequest,
+  Replaced,
   Request,
   Snapshot,
   UnplacedDrawing,
@@ -29,6 +31,8 @@ export type {
   OverlayOptions,
   OverlayStyle,
   Point,
+  ReplaceRecordsRequest,
+  Replaced,
   Request,
   Run,
   RunStyle,
@@ -47,6 +51,13 @@ export interface CoreWorker {
   snapshot(request: Request): Promise<Snapshot>;
   /** Write the ops into the netlist and build what was written; rejects when an op cannot be written. */
   write(request: WriteRequest): Promise<Written>;
+  /**
+   * Replace the records of a level of a netlist that has records already, in the file that holds the
+   * level: the path of that file and its new text. Rejects with the core's message, which begins with
+   * the kind of the refusal, when the level is not found, has no place for a record, or the records
+   * given do not read.
+   */
+  replaceRecords(request: ReplaceRecordsRequest): Promise<Replaced>;
   /** List the symbols, definitions and sets of the packages the core has. */
   catalog(request: CatalogRequest): Promise<Catalog>;
   /** The drawings of the objects without a position that the last build with `lazy_unplaced` listed, as the request names them. */

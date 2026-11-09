@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use rnl_cli::codec::{decode, encode, OutputEncoding};
+use rnl_cli::solve::Target;
 use rnl_cli::{dump, FsProvider};
 use rnl_runtime::diag::{codes, Code, Severity, Sink};
 use rnl_runtime::source::{Layered, MemoryProvider, Provider};
@@ -30,6 +31,8 @@ const USAGE: &str = concat!(
   rnl formats                       print the formats a file can be read with, as JSON
   rnl strip-generated FILE -o OUT [options] write FILE without its type=\"generated\" records
   rnl write REQUEST.json -o OUT     write an edit transaction's ops into its netlist
+  rnl replace-records FILE --level TITLE --records RECORDS (-o DIR | --in-place) [options]
+                                    replace the RNL records of one level with the records in RECORDS
 
 FILE is a SPICE netlist, a Spectre netlist (.scs) or a package file (.rnl), which is checked on its
 own; catalog and formats take none. A package file is one of the format rnl: a .rnl file, or a file
@@ -79,7 +82,7 @@ render options for inspection (all disabled by default):
   --overlay-style FILE  JSON: palette, width, dashes, current_color; independent of RNL styles
 ",
     solver_args::usage!(),
-    "saving options (solve and strip-generated only):
+    "saving options (solve, strip-generated and replace-records only):
   --encoding MODE     preserve (default) or utf8; UTF-8 adds a BOM only to protect leading U+FEFF
                       copied includes that are not rewritten retain their original bytes
 explain options:
@@ -98,7 +101,19 @@ check reads a package file, with --no-std and --std-version):
   --all-versions      every version of each package, not only the newest
 write:
   REQUEST.json is {\"dialect\", \"netlist\", \"author\", \"ops\"}, the ops as the editor interface
-  draft writes them; --dialect (spice by default) and --author NAME give the fields it leaves out"
+  draft writes them; --dialect (spice by default) and --author NAME give the fields it leaves out
+replace-records options (FILE may have RNL records already; -o DIR or --in-place is needed, as for solve):
+  --level TITLE       the level whose records are replaced, a subcircuit name or the file name; needed
+  --records FILE      the new records, RNL source without comment markers: one or more @RNL(...) {...},
+                      the level's whole new drawing; needed
+  every record of the level in the file that holds it goes, authored or type=\"generated\"; the header
+  record, the records of other levels and every other line stay as they are. The new records are
+  written at the end of the level's own text, behind the comment marker of the file. It refuses,
+  writing nothing, with a message that begins with the kind of the refusal, and exits with 1, where no
+  level has the title or several do, where the level has no place for a record (in a region written
+  to be encrypted, for one), where the records would come before the header record of the file, where
+  the file declares a language version that is not interpreted, and where the records given do not
+  read: the netlist is read again with them, and an error in their lines refuses"
 );
 
 struct Args {
@@ -130,6 +145,8 @@ struct Args {
     /// The options of `problem`, `solve` and `preview`.
     solver: solver_args::SolverArgs,
     author: Option<String>,
+    /// `replace-records`' `--records`: the file of the new records.
+    records: Option<PathBuf>,
     parts: Option<String>,
     /// `--package`: the names `catalog` lists; every name when there are none.
     packages: Vec<String>,
@@ -194,7 +211,7 @@ fn unknown_encoding(text: String) -> Said {
 }
 
 /// The commands, as `run` takes them.
-const COMMANDS: [&str; 13] = [
+const COMMANDS: [&str; 14] = [
     "check",
     "dump",
     "problem",
@@ -208,6 +225,7 @@ const COMMANDS: [&str; 13] = [
     "preview",
     "strip-generated",
     "write",
+    "replace-records",
 ];
 
 fn parse_args() -> Result<Args, Said> {
@@ -235,6 +253,7 @@ fn parse_args() -> Result<Args, Said> {
     let mut level = None;
     let mut solver = solver_args::SolverArgs::default();
     let mut author = None;
+    let mut records = None;
     let mut parts = None;
     let mut packages = Vec::new();
     let mut all_versions = false;
@@ -307,6 +326,7 @@ fn parse_args() -> Result<Args, Said> {
             "--constraints" => constraints = true,
             "--level" => level = Some(it.next().ok_or_else(|| needs("--level needs a title"))?),
             "--author" => author = Some(it.next().ok_or_else(|| needs("--author needs a name"))?),
+            "--records" => records = Some(PathBuf::from(it.next().ok_or_else(|| needs("--records needs a file"))?)),
             "--parts" => parts = Some(it.next().ok_or_else(|| needs("--parts needs a list, such as host,model"))?),
             "--package" => {
                 packages.push(it.next().ok_or_else(|| needs("--package needs a name, such as rnl-std-basic"))?)
@@ -367,8 +387,12 @@ fn parse_args() -> Result<Args, Said> {
         return Err(Said::new(codes::CLI_OPTION_WRONG_COMMAND, "overlay options are options of render"));
     }
     overlays.validate()?;
-    if encoding.is_some() && !matches!(command.as_str(), "solve" | "strip-generated") {
-        return Err(Said::new(codes::CLI_OPTION_WRONG_COMMAND, "--encoding is only for solve and strip-generated"));
+    if encoding.is_some() && !matches!(command.as_str(), "solve" | "strip-generated" | "replace-records") {
+        let text = "--encoding is only for solve, strip-generated and replace-records";
+        return Err(Said::new(codes::CLI_OPTION_WRONG_COMMAND, text));
+    }
+    if records.is_some() && command != "replace-records" {
+        return Err(Said::new(codes::CLI_OPTION_WRONG_COMMAND, "--records is an option of replace-records"));
     }
     // the catalog reads the package directories and the bundled packages, not a file
     let file = match (command.as_str(), file) {
@@ -403,6 +427,7 @@ fn parse_args() -> Result<Args, Said> {
         level,
         solver,
         author,
+        records,
         parts,
         packages,
         all_versions,
@@ -686,6 +711,7 @@ fn run(args: &Args) -> Result<ExitCode, Said> {
         }
         "solve" => solver_args::solve(args, &provider),
         "preview" => solver_args::preview(args, &provider),
+        "replace-records" => replace_records(args, &provider),
         "strip-generated" => {
             let out =
                 args.out.clone().ok_or_else(|| Said::new(codes::CLI_NEEDS_OUT, "strip-generated needs -o OUT"))?;
@@ -760,6 +786,74 @@ fn run(args: &Args) -> Result<ExitCode, Said> {
             Ok(ExitCode::SUCCESS)
         }
         _ => Err(Said::new(codes::CLI_UNKNOWN_COMMAND, format!("unknown command {}\n{USAGE}", args.command))),
+    }
+}
+
+/// `rnl replace-records`: the records of one level replaced in the file that holds it, written as
+/// `rnl solve` writes (`-o DIR` or `--in-place`). Exits with 1, writing nothing, when it refuses; with
+/// 2 when a file cannot be read or written or the arguments do not read.
+fn replace_records(args: &Args, provider: &FsProvider) -> Result<ExitCode, Said> {
+    let target = match (&args.out, args.solver.in_place) {
+        (Some(_), true) => {
+            let text = "replace-records writes under -o DIR or --in-place, not both";
+            return Err(Said::new(codes::CLI_REPLACE_TARGET_BOTH, text));
+        }
+        (Some(dir), false) => Target::Dir(dir.clone()),
+        (None, true) => Target::InPlace,
+        (None, false) => {
+            let text = "replace-records needs -o DIR, to write the file under DIR, or --in-place, to write it over the file read";
+            return Err(Said::new(codes::CLI_REPLACE_TARGET_MISSING, text));
+        }
+    };
+    let command = "replace-records";
+    let Some(level) = &args.level else {
+        let text = format!("{command} needs --level TITLE, the level whose records are replaced");
+        return Err(Said::new(codes::CLI_COMMAND_NEEDS_OPTION, text));
+    };
+    let Some(records) = &args.records else {
+        let text = format!("{command} needs --records FILE, the RNL source of the new records");
+        return Err(Said::new(codes::CLI_COMMAND_NEEDS_OPTION, text));
+    };
+    let bytes = std::fs::read(records)
+        .map_err(|e| Said::new(codes::CLI_CANNOT_READ, format!("cannot read {}: {e}", records.display())))?;
+    let options = rnl_cli::replace::ReplaceOptions {
+        dialect: args.dialect.clone(),
+        formats: args.formats.clone(),
+        runtime: options(args),
+    };
+    let done = match rnl_cli::replace::replace_records(&args.file, provider, &options, level, &decode(&bytes)) {
+        Ok(done) => done,
+        Err(rnl_edit::replace::Failure::Refused(refused)) => {
+            eprintln!("error: {refused}");
+            return Ok(ExitCode::from(1));
+        }
+        Err(rnl_edit::replace::Failure::Unreadable(why)) => return Err(why.into()),
+    };
+    let writing = rnl_cli::solve::write_with_encoding(&done.run, &target, args.encoding);
+    if let Some(path) = writing.written.first() {
+        let was = &done.run.files[0].path;
+        let line = format!("replaced the records of {level} in {was}: {} removed, {} added", done.removed, done.added);
+        match target {
+            Target::InPlace => println!("{line}"),
+            Target::Dir(_) => println!("{line}; wrote {}", rnl_cli::path_str(path)),
+        }
+    }
+    for path in &writing.copied {
+        println!("copied {}", rnl_cli::path_str(path));
+    }
+    if let Target::Dir(dir) = &target {
+        for path in &writing.outside {
+            eprintln!(
+                "warning: {}: {} reads {path}, which is outside its directory and is not copied under {}",
+                codes::CLI_SOLVE_OUTSIDE_NOT_COPIED,
+                done.run.entry,
+                rnl_cli::path_str(dir)
+            );
+        }
+    }
+    match writing.error {
+        Some(e) => Err(e.into()),
+        None => Ok(ExitCode::SUCCESS),
     }
 }
 

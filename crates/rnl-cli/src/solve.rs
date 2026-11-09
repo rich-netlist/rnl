@@ -268,9 +268,15 @@ impl Clock for WallClock {
 }
 
 /// The files given by another provider, with the paths of those it gave noted.
-struct Noting<'a> {
-    files: &'a dyn Provider,
-    read: RefCell<Vec<String>>,
+pub(crate) struct Noting<'a> {
+    pub(crate) files: &'a dyn Provider,
+    pub(crate) read: RefCell<Vec<String>>,
+}
+
+impl<'a> Noting<'a> {
+    pub(crate) fn new(files: &'a dyn Provider) -> Noting<'a> {
+        Noting { files, read: RefCell::new(Vec::new()) }
+    }
 }
 
 impl Provider for Noting<'_> {
@@ -453,7 +459,7 @@ fn pass(
     let entry = path_str(file);
     let runtime = options.runtime();
     let canonical = options.solver.canonical();
-    let files = Noting { files, read: RefCell::new(Vec::new()) };
+    let files = Noting::new(files);
     let mut memory = MemoryProvider::new();
     for (path, text) in raised {
         memory.insert(path, text);

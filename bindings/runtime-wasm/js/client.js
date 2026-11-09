@@ -17,6 +17,11 @@ import { requestText } from "./core.js";
  *   write Write the ops of a request into its netlist, and build what was written: the netlist
  *   written and its Document, whose diagnostics say how it reads. Rejects with the core's message
  *   when an op cannot be written.
+ * @property {(request: import("./core.js").ReplaceRecordsRequest) => Promise<import("./core.js").Replaced>}
+ *   replaceRecords Replace the records of a level of a netlist that has records already, in the file
+ *   that holds the level: the path of that file and its new text. Rejects with the core's message, which
+ *   begins with the kind of the refusal, when the level is not found, has no place for a record, or the
+ *   records given do not read.
  * @property {(request: import("./core.js").CatalogRequest) => Promise<object>} catalog List the
  *   symbols, definitions and sets of the packages the core has, the bundled ones and those of the
  *   request's package directories (catalog.d.ts).
@@ -90,6 +95,7 @@ export function startCore(options = {}) {
     build: (request) => send(request, "document"),
     snapshot: (request) => send(request, "snapshot"),
     write: (request) => send(request, "written"),
+    replaceRecords: (request) => send(request, "replaced"),
     catalog: (request) => send(request, "catalog"),
     drawings: (request) => send(request, "drawings"),
     library: (request) => send(request, "library"),

@@ -264,6 +264,52 @@ export interface Written {
 }
 
 /**
+ * What to replace: the records of one level of a netlist that has records already, in the file that
+ * holds the level. The netlist is read from `entry` among `files`, as a build reads it.
+ */
+export interface ReplaceRecordsRequest {
+  replace_records: {
+    /** The title of the level: a subcircuit name or, for a file level, the name of its file. */
+    level: string;
+    /**
+     * The new records, RNL source without comment markers: one or more `@RNL(...) {...}`, the level's
+     * whole new drawing. Every record of the level in its file goes, authored or `type="generated"`,
+     * but a header record. Empty, it only takes them out.
+     */
+    records: string;
+  };
+  /** The path of the main file of the netlist, as the frontend names it, such as `/w/top.sp`. */
+  entry: string;
+  /** The texts of the workspace by path, the entry's among them. */
+  files?: Record<string, string>;
+  /** Explicit temporary files, searched before package directories. */
+  pool?: string[];
+  package_dirs?: string[];
+  /** The format of the entry, instead of guessing it from the entry. */
+  dialect?: "spice" | "spectre";
+  /** The format set for files, by path as in `files`. */
+  formats?: Record<string, string>;
+  std?: boolean;
+  std_version?: string;
+}
+
+/**
+ * The file a replace-records request replaced the records of a level in. The new records go at the end
+ * of the level's own text, behind the comment marker the file uses for RNL; the header record, the
+ * records of the other levels and every other byte stay, line endings included. No other file changes.
+ */
+export interface Replaced {
+  /** The path of the file that holds the level, as the workspace names it, normalized. */
+  path: string;
+  /** Its new text. */
+  text: string;
+  /** How many records of the level were taken out. */
+  removed: number;
+  /** How many records were put in. */
+  added: number;
+}
+
+/**
  * What to list: the catalog of the packages the core has, those of `package_dirs` among `files`
  * and the bundled ones under them, the standard series, each read as
  * `rnl check` reads a package file, checked on its own (2.7).
@@ -322,6 +368,15 @@ export interface Core {
   snapshot(request: Request | string): Snapshot;
   /** Write the ops into the netlist and build it; throws an Error when an op cannot be written. */
   write(request: WriteRequest | string): Written;
+  /**
+   * Replace the records of a level of a netlist that has records already, in the file that holds the
+   * level, and give that file's new text. Throws an Error when it refuses, with a message that begins
+   * with the kind of the refusal, such as `RNL8405 writeback-replace-region-encrypted: ...`: the level
+   * is not found (RNL8403) or not one (RNL8404), has no place for a record (RNL8405 to RNL8407), the
+   * records would come before the file's header record (RNL8408), the file declares a language
+   * version that is not interpreted (RNL8409), or the records given do not read (RNL8410, RNL8411).
+   */
+  replaceRecords(request: ReplaceRecordsRequest | string): Replaced;
   /** List the symbols, definitions and sets of the packages the core has. */
   catalog(request: CatalogRequest | string): Catalog;
   /** The drawings of the objects a request names, from the last build that kept them; throws when none did. */
@@ -332,11 +387,20 @@ export interface Core {
   formats(request: FormatsRequest | string): FormatList;
   /** The core's answer as it gives it; throws only when the core stops. */
   respond(
-    request: Request | WriteRequest | CatalogRequest | DrawingsRequest | LibraryRequest | FormatsRequest | string,
+    request:
+      | Request
+      | WriteRequest
+      | ReplaceRecordsRequest
+      | CatalogRequest
+      | DrawingsRequest
+      | LibraryRequest
+      | FormatsRequest
+      | string,
   ):
     | { document: Document }
     | { snapshot: Snapshot }
     | { written: Written }
+    | { replaced: Replaced }
     | { catalog: Catalog }
     | { drawings: UnplacedDrawing[] }
     | { library: string[] }
@@ -349,5 +413,12 @@ export function loadCore(wasm: string | URL | Response | BufferSource | WebAssem
 
 /** A request as the JSON text the core reads. */
 export function requestText(
-  request: Request | WriteRequest | CatalogRequest | DrawingsRequest | LibraryRequest | FormatsRequest,
+  request:
+    | Request
+    | WriteRequest
+    | ReplaceRecordsRequest
+    | CatalogRequest
+    | DrawingsRequest
+    | LibraryRequest
+    | FormatsRequest,
 ): string;

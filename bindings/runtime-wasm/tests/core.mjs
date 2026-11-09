@@ -204,6 +204,43 @@ test("a write gives the netlist written and its Document", () => {
   assert.ok("written" in core.respond(rcWrite([placeR1])));
 });
 
+const TOP = '* top\n* @RNL(type="header") { @VERSION("0.3")}\n.include "amp.inc"\nX1 a b amp\n.end\n';
+const AMP = ".subckt amp in out\r\nR1 in out 1k\r\n* @RNL { #R1 @PLACE(0, 0) }\r\n.ends amp\r\n";
+const replace = (level, records) => ({
+  replace_records: { level, records },
+  entry: "/w/top.sp",
+  files: { "/w/top.sp": TOP, "/w/amp.inc": AMP },
+});
+const given = '@RNL(author="ac") { #R1 @PLACE(2, 2) }\n';
+
+test("replaceRecords gives the file of a level with its records replaced, through the core and through the Worker", async () => {
+  const done = core.replaceRecords(replace("amp", given));
+  // the included file, in its line endings, with the one record of the level replaced
+  assert.deepEqual(done, {
+    path: "/w/amp.inc",
+    text: '.subckt amp in out\r\nR1 in out 1k\r\n* @RNL(author="ac") { #R1 @PLACE(2, 2) }\r\n.ends amp\r\n',
+    removed: 1,
+    added: 1,
+  });
+  // read back, the netlist has no error; the file level of the entry is a level too, and its file comes back
+  const back = core.build({ entry: "/w/top.sp", files: { "/w/top.sp": TOP, "/w/amp.inc": done.text } });
+  assert.deepEqual(back.diagnostics.filter((d) => d.severity === "error"), []);
+  assert.equal(core.replaceRecords(replace("top.sp", "@RNL { #X1 @PLACE(0, 0) }")).path, "/w/top.sp");
+  // a refusal is an Error that begins with its kind; a build and a replace each want their own answer
+  assert.throws(() => core.replaceRecords(replace("none", "@RNL {}")), /^Error: RNL8403 writeback-replace-level-not-found: no level is titled none/);
+  assert.throws(() => core.replaceRecords(replace("amp", "@RNL { #R9 @PLACE(0, 0) }")), /^Error: RNL8410 writeback-replace-records-unread: the records given do not read/);
+  assert.throws(() => core.replaceRecords(untitled), /the request is not a replace-records request/);
+  assert.throws(() => core.build(replace("amp", given)), /the request is not a build without parts/);
+  assert.ok("replaced" in core.respond(replace("amp", given)));
+  const worker = startCore();
+  try {
+    assert.deepEqual(await worker.replaceRecords(replace("amp", given)), done);
+    await assert.rejects(worker.replaceRecords(replace("none", "@RNL {}")), /^Error: RNL8403 writeback-replace-level-not-found/);
+  } finally {
+    worker.terminate();
+  }
+});
+
 test("parts ask for a snapshot, through the core and through the Worker", async () => {
   const request = { ...untitled, parts: { drawing: false, host: true, model: true } };
   const s = core.snapshot(request);

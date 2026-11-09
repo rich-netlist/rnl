@@ -24,3 +24,24 @@ The `style` of `set` and `add-usage` is style properties (9.3), such as `{"linec
 A line that cannot break outside brackets breaks after a comma inside them, such as between the parameters of a long TEXT. An op that cannot be written refuses the whole request with the reason and the op's index: an unknown op or field, a level the netlist does not have, a graphic whose points do not fit its shape, a field of the draft not written yet (`layer` of `set`, `add-usage` and `add-wire`; `unset` and `remove`). So is an op whose level lies in a region written to be encrypted, such as a subcircuit whose `.subckt` lies in one, which has no place for a record that is not gone once the region is encrypted (2.2). A netlist that has RNL records already is refused too. Merging with them, `replace_own`, `base` and refusing ops that do not take effect are set aside (2026-10-17): Analog Canvas, which writes with this crate, reads RNL into its own format and writes it anew, and is no RNL editor ([roadmap](../../docs/roadmap.md)).
 
 `rnl write REQUEST.json -o OUT` ([`rnl-cli`](../rnl-cli/README.md)) and the `write` request of the [WebAssembly binding](../../bindings/runtime-wasm/README.md) call it.
+
+## Replacing the records of a level
+
+`write` refuses a netlist that has RNL records already, as a tool that writes anew has no use for merging. The one thing this crate does with such a netlist is narrow: a tool that holds the whole new drawing of one level, such as Analog Canvas after an engineer tidied one subcircuit, puts it back into the netlist's own files, which may be several with includes, and changes nothing else.
+
+```rust
+pub fn replace::replace_records(
+    reading: &replace::Reading,
+    files: &dyn Provider,
+    title: &str,
+    records: &str,
+) -> Result<replace::Replacement, replace::Failure>
+```
+
+`reading` names the main file of the netlist (`entry`), its dialect and formats, and the runtime's options; `files` reads it and what it includes. `title` is the level as the commands take it: a subcircuit name, which compares by the case rule of its dialect, or the name of a file for a file level. `records` is RNL source without comment markers, one or more `@RNL(…) {…}`, the level's whole new drawing. The answer is the one file that holds the level, `path` and `text`, with how many records went (`removed`) and came (`added`); the caller writes it, and no other file changes.
+
+Every record of the level in its file goes, the authored ones and the solver's (`type="generated"`, and one written for the level with `scope=` above it in the same file), but a header record. The records given are written at the end of the level's own text (17), where `writeback::record_line` puts a record, behind the comment marker the file uses for RNL, in the file's line endings. The header record, the records of every other level, host statements, comments and every other byte stay, and nothing is merged into the records that were there. The records given with nothing in them only take the old ones out. A file of the language version 0.3 or the draft 0.4 is written alike: the version is read from the files.
+
+It refuses, giving no text, a `Failure::Refused` with the kind and the reason of the refusal (`rnl_runtime::writeback::Refused`, RNL8403 to RNL8411): no level has the title, or several do; the level has no place for a record, as its text lies in a region written to be encrypted (`.prot … .unprot`), a host region excluded from writing, or a library section the netlist lacks (2.2); the records would come before the header record of their file (2.8); the file declares a language version that is not interpreted (16.1); or the records do not read. For the last, the netlist is read again with the new text of the file, and the records are refused when an error lies in the new lines or when they read back otherwise than they were given; the reason names the lines of the records given. A netlist that cannot be read at all is `Failure::Unreadable`. The runtime half, which works on a host document and a function that reads it again, is `rnl_runtime::writeback::replace_records`.
+
+`rnl replace-records` ([`rnl-cli`](../rnl-cli/README.md#replace-records)) and the `replace_records` request of the [WebAssembly binding](../../bindings/runtime-wasm/README.md#replacing-the-records-of-a-level) call it.

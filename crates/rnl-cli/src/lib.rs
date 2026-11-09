@@ -10,6 +10,7 @@ pub mod preview;
 pub mod problem;
 pub mod profile;
 pub mod provider;
+pub mod replace;
 pub mod solve;
 
 /// Core version and source revision shared by the CLI and the desktop About dialog.

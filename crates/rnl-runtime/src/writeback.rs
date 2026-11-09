@@ -15,6 +15,14 @@
 //! makes both changes in one pass ([`replace_generated_with_header`],
 //! [`remove_generated_with_header`]); one that writes several levels of a file first moves the
 //! header that the record of one of them would come before ([`move_header_for`]).
+//!
+//! A tool that is given a level's whole drawing replaces the records of the level, the authored
+//! ones and the solver's, by the records it is given, and changes no other line
+//! ([`replace_records`], [`find_level`]).
+
+mod replace;
+
+pub use replace::{find_level, replace_records, Refused, Replaced};
 
 use crate::host::{HostDocument, LevelId, LevelKind, Record};
 use crate::syntax::{parse_record, Value};
@@ -1714,5 +1722,151 @@ mod tests {
         );
         let plain = "* t\n* @RNL { #R1 @TEXT(\"numbering\", key=\"name\") }\n.end\n";
         assert!(spelled_like_new_words(&doc(plain, "a.sp", "*"), 0, &[]).is_empty());
+    }
+
+    /// The document of `text` read again, with no standard package: what `replace_records` is given
+    /// to check the records it writes.
+    fn read_again(
+        file: &'static str,
+        marker: &'static str,
+    ) -> impl FnOnce(&str) -> Result<crate::Interpretation, String> {
+        move |text| {
+            let files = crate::source::MemoryProvider::new();
+            let options = crate::Options { std: false, ..crate::Options::default() };
+            Ok(crate::interpret(doc(text, file, marker), &files, &options, crate::diag::Sink::new()))
+        }
+    }
+
+    const LEVELS: &str = "* t\r\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\r\n.subckt s a b\r\nR1 a b 1k\r\n\
+                          * @RNL(author=\"x\") {}\r\n* @RNL(type=\"generated\") {}\r\n.ends\r\n.subckt u a b\r\n\
+                          * @RNL(author=\"y\") {}\r\n.ends\r\nX1 a b s\r\n* @RNL(author=\"z\") {}\r\n.end\r\n";
+
+    /// The document of [`LEVELS`], the second subcircuit named `u`.
+    fn levels() -> HostDocument {
+        let mut d = doc(LEVELS, "a.sp", "*");
+        d.levels[2].name = "u".into();
+        d
+    }
+
+    #[test]
+    fn the_records_of_one_level_are_replaced_and_nothing_else() {
+        let d = levels();
+        assert_eq!((find_level(&d, "s"), find_level(&d, "U"), find_level(&d, "a.sp")), (Ok(1), Ok(2), Ok(0)));
+        let new = "@RNL(author=\"ac\") {\n  /* the drawing */\n}\n";
+        let done = replace_records(&d, 1, LEVELS, new, read_again("a.sp", "*")).unwrap();
+        // the authored record and the solver's go; the new one, in the file's line endings and behind
+        // its carrier, is the last thing of the subcircuit; the header and every other level stay
+        assert_eq!(
+            done.text,
+            LEVELS.replace(
+                "* @RNL(author=\"x\") {}\r\n* @RNL(type=\"generated\") {}\r\n",
+                "* @RNL(author=\"ac\") {\r\n*   /* the drawing */\r\n* }\r\n"
+            )
+        );
+        assert_eq!((done.removed, done.added, done.lines), (2, 1, Some((5, 7))));
+        // the file level keeps its own record, and the subcircuits theirs
+        let top = replace_records(&d, 0, LEVELS, "@RNL(author=\"ac\") {}", read_again("a.sp", "*")).unwrap();
+        assert_eq!(top.text, LEVELS.replace("* @RNL(author=\"z\") {}\r\n", "* @RNL(author=\"ac\") {}\r\n"));
+        assert_eq!(top.lines, Some((12, 12)));
+        // the records given with nothing in them take the old ones out
+        let gone = replace_records(&d, 1, LEVELS, " \n\n", read_again("a.sp", "*")).unwrap();
+        assert_eq!(gone.text, LEVELS.replace("* @RNL(author=\"x\") {}\r\n* @RNL(type=\"generated\") {}\r\n", ""));
+        assert_eq!((gone.removed, gone.added, gone.lines), (2, 0, None));
+        // and the new ones read back as given, the same every time
+        let again =
+            replace_records(&doc(&done.text, "a.sp", "*"), 1, &done.text, new, read_again("a.sp", "*")).unwrap();
+        assert_eq!((again.text, again.removed, again.added), (done.text.clone(), 1, 1));
+    }
+
+    #[test]
+    fn a_solver_record_with_scope_above_the_level_goes_with_it() {
+        let net = "* t\n.subckt s a b\nR1 a b 1k\n* @RNL {}\n.ends\n* @RNL(type=\"generated\", scope=\"s\") {}\n\
+                   * @RNL(scope=\"s\") {}\nX1 a b s\n.end\n";
+        let d = doc(net, "a.sp", "*");
+        let done = replace_records(&d, 1, net, "@RNL {}", read_again("a.sp", "*")).unwrap();
+        // the authored record with scope= written above is the file level's own
+        assert_eq!(done.text, net.replace("* @RNL(type=\"generated\", scope=\"s\") {}\n", ""));
+        assert_eq!((done.removed, done.added), (2, 1));
+    }
+
+    #[test]
+    fn a_level_is_found_by_its_title_and_only_one() {
+        let d = levels();
+        let err = find_level(&d, "v").unwrap_err();
+        assert_eq!(err.code, crate::diag::codes::WRITEBACK_REPLACE_LEVEL_NOT_FOUND);
+        assert_eq!(err.message, "no level is titled v; the levels are a.sp, s, u");
+        let net = ".subckt s a b\n.ends\n.subckt s a b\n.ends\n";
+        let err = find_level(&doc(net, "a.sp", "*"), "s").unwrap_err();
+        assert_eq!(err.code, crate::diag::codes::WRITEBACK_REPLACE_LEVEL_AMBIGUOUS);
+        assert_eq!(err.message, "2 levels are titled s, in a.sp line 1, a.sp line 3; the level to replace is not one");
+    }
+
+    #[test]
+    fn a_level_without_a_place_for_a_record_is_refused() {
+        let net =
+            "* t\n.prot\n.subckt s a b\nR1 a b 1k\n* @RNL(type=\"generated\") {}\n.ends\n.unprot\nX1 a b s\n.end\n";
+        let d = doc(net, "a.sp", "*");
+        let err = replace_records(&d, 1, net, "@RNL {}", read_again("a.sp", "*")).unwrap_err();
+        assert_eq!(err.code, crate::diag::codes::WRITEBACK_REPLACE_REGION_ENCRYPTED);
+        assert_eq!(
+            err.to_string(),
+            "RNL8405 writeback-replace-region-encrypted: the records are not replaced: s lies in a region written to \
+             be encrypted, lines 2 to 7 of a.sp, where a record is gone once the region is encrypted (2.2)"
+        );
+        // a record before the region is the file level's, which is written
+        assert!(replace_records(&d, 0, net, "@RNL {}", read_again("a.sp", "*")).is_ok());
+    }
+
+    #[test]
+    fn records_come_after_the_header_record_of_their_file() {
+        // the header is written below the subcircuit: records put at its end would come before it
+        let net = "* t\n.subckt s a b\nR1 a b 1k\n.ends\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\n.end\n";
+        let d = doc(net, "a.sp", "*");
+        let err = replace_records(&d, 1, net, "@RNL {}", read_again("a.sp", "*")).unwrap_err();
+        assert_eq!(err.code, crate::diag::codes::WRITEBACK_REPLACE_BEFORE_HEADER);
+        assert!(err.message.contains("header record of a.sp, line 5"), "{err}");
+        // the file level's own records come after it
+        assert!(replace_records(&d, 0, net, "@RNL {}", read_again("a.sp", "*")).is_ok());
+    }
+
+    #[test]
+    fn records_that_do_not_read_are_refused_and_nothing_is_given() {
+        let d = levels();
+        let kind = |new: &str| replace_records(&d, 1, LEVELS, new, read_again("a.sp", "*")).unwrap_err();
+        // a statement that does not exist, on the second line of the records given
+        let err = kind("@RNL(author=\"ac\") {\n  @NO-SUCH-STATEMENT(1)\n}");
+        assert_eq!(err.code, crate::diag::codes::WRITEBACK_REPLACE_RECORDS_UNREAD);
+        assert!(err.message.starts_with("the records given do not read, and nothing is written: line 2: "), "{err}");
+        // a text that is no record, and a record left open
+        let err = kind("a drawing");
+        assert_eq!(err.code, crate::diag::codes::WRITEBACK_REPLACE_RECORDS_UNREAD);
+        assert!(err.message.contains("holds no RNL record"), "{err}");
+        assert_eq!(kind("@RNL {").code, crate::diag::codes::WRITEBACK_REPLACE_RECORDS_UNREAD);
+        // a reading that fails, and one that reads otherwise
+        let err = replace_records(&d, 1, LEVELS, "@RNL {}", |_| Err("gone".into())).unwrap_err();
+        assert_eq!(err.code, crate::diag::codes::WRITEBACK_REPLACE_REREAD_DIFFERS);
+        assert!(err.message.ends_with("it cannot be read again: gone"), "{err}");
+        let reads = |text: &str| read_again("a.sp", "*")(&text.replace(".subckt s", "* s"));
+        let err = replace_records(&d, 1, LEVELS, "@RNL {}", reads).unwrap_err();
+        assert_eq!(err.code, crate::diag::codes::WRITEBACK_REPLACE_REREAD_DIFFERS);
+        assert!(err.message.ends_with("its levels are not the ones it had"), "{err}");
+    }
+
+    #[test]
+    fn a_file_of_a_version_that_is_not_read_is_kept() {
+        let net = LEVELS.replace("0.3", "9.9");
+        let d = doc(&net, "a.sp", "*");
+        let err = replace_records(&d, 1, &net, "@RNL {}", read_again("a.sp", "*")).unwrap_err();
+        assert_eq!(err.code, crate::diag::codes::WRITEBACK_REPLACE_VERSION_UNSUPPORTED);
+        assert!(err.message.contains("a.sp declares the version 9.9"), "{err}");
+    }
+
+    #[test]
+    fn spectre_records_are_carried_by_slashes() {
+        let net = "// t\nsubckt s (a b)\nr1 (a b) resistor r=1k\n// @RNL {}\nends s\n";
+        let d = doc(net, "a.scs", "//");
+        assert_eq!(find_level(&d, "S"), Ok(1));
+        let done = replace_records(&d, 1, net, "@RNL(author=\"ac\") {}", read_again("a.scs", "//")).unwrap();
+        assert_eq!(done.text, net.replace("// @RNL {}", "// @RNL(author=\"ac\") {}"));
     }
 }

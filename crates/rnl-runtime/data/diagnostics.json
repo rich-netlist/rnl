@@ -3641,6 +3641,27 @@
    "sections": []
   },
   {
+   "number": "RNL8036",
+   "name": "cli-command-needs-option",
+   "severity": "error",
+   "message": "{command} needs {option}, {what}",
+   "sections": []
+  },
+  {
+   "number": "RNL8037",
+   "name": "cli-replace-target-both",
+   "severity": "error",
+   "message": "replace-records writes under -o DIR or --in-place, not both",
+   "sections": []
+  },
+  {
+   "number": "RNL8038",
+   "name": "cli-replace-target-missing",
+   "severity": "error",
+   "message": "replace-records needs -o DIR, to write the file under DIR, or --in-place, to write it over the file read",
+   "sections": []
+  },
+  {
    "number": "RNL8100",
    "name": "solve-cancelled",
    "severity": "error",
@@ -3879,6 +3900,79 @@
    "name": "writeback-section-not-found",
    "severity": "hint",
    "message": "the record is not written: the selected library section {section} was not found in {file} (2.2)",
+   "sections": []
+  },
+  {
+   "number": "RNL8403",
+   "name": "writeback-replace-level-not-found",
+   "severity": "error",
+   "message": "no level is titled {title}; the levels are {titles}",
+   "sections": []
+  },
+  {
+   "number": "RNL8404",
+   "name": "writeback-replace-level-ambiguous",
+   "severity": "error",
+   "message": "{n} levels are titled {title}, in {places}; the level to replace is not one",
+   "sections": []
+  },
+  {
+   "number": "RNL8405",
+   "name": "writeback-replace-region-encrypted",
+   "severity": "error",
+   "message": "the records are not replaced: {level} lies in a region written to be encrypted, lines {a} to {b} of {file}, where a record is gone once the region is encrypted (2.2)",
+   "sections": [
+    "2.2"
+   ]
+  },
+  {
+   "number": "RNL8406",
+   "name": "writeback-replace-region-excluded",
+   "severity": "error",
+   "message": "the records are not replaced: {level} lies in a host region excluded from writing, lines {a} to {b} of {file} (2.2)",
+   "sections": [
+    "2.2"
+   ]
+  },
+  {
+   "number": "RNL8407",
+   "name": "writeback-replace-section-not-found",
+   "severity": "error",
+   "message": "the records are not replaced: the selected library section {section} was not found in {file} (2.2)",
+   "sections": [
+    "2.2"
+   ]
+  },
+  {
+   "number": "RNL8408",
+   "name": "writeback-replace-before-header",
+   "severity": "error",
+   "message": "the records are not replaced: they would come before the header record of {file}, line {line}, which stays the first record of its file (2.8)",
+   "sections": [
+    "2.8"
+   ]
+  },
+  {
+   "number": "RNL8409",
+   "name": "writeback-replace-version-unsupported",
+   "severity": "error",
+   "message": "the records are not replaced: {file} declares the version {version}, which this reading does not interpret: none of its RNL is read, and it is kept as it is (16.1)",
+   "sections": [
+    "16.1"
+   ]
+  },
+  {
+   "number": "RNL8410",
+   "name": "writeback-replace-records-unread",
+   "severity": "error",
+   "message": "the records given do not read, and nothing is written: {problems}",
+   "sections": []
+  },
+  {
+   "number": "RNL8411",
+   "name": "writeback-replace-reread-differs",
+   "severity": "error",
+   "message": "the file does not read back with the records as given: {reason}",
    "sections": []
   },
   {

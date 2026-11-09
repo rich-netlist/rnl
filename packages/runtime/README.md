@@ -103,6 +103,24 @@ const resistor = catalog.symbols.find((s) => s.symbol === "$RESISTOR");
 
 Of each name only the newest version is listed, of the versions written in a language version not newer than the tool's default when it has one (the series 0.3, not the draft 0.4); `{ catalog: { packages: ["rnl-std-basic"], all_versions: true } }` keeps the packages of these names, every version of each. A symbol's `definition` names the definition whose usages a rule of the packages draws with it, such as `$GROUND` for `$GROUND_SYMBOL`.
 
+## Replacing one level's records
+
+A netlist that has RNL records already, which a person or a tool edited, can have the drawing of one level put back without touching anything else. `replaceRecords` takes the level by its title, a subcircuit name or, for a file level, the name of its file, and the new records as RNL source without comment markers, and gives the one file that holds the level, with its new text:
+
+```js
+const done = await core.replaceRecords({
+  replace_records: { level: "amp", records: '@RNL(author="analog-canvas") {\n  #R1 @PLACE(2, 2)\n}\n' },
+  entry: "/top.sp",
+  files, // the netlist's files, the entry among them, an included file too
+});
+// done.path is "/lib/amp.inc", the file that holds the subcircuit amp, done.text its new text,
+// done.removed the records of amp that went and done.added the records that took their place
+```
+
+Every record of the level in that file goes, the ones an author wrote and the solver's (`type="generated"`), and the records given are written at the end of the level's own text, behind the comment marker the file uses for RNL, in its line endings. The header record, the records of every other level and every other byte stay, and no other file changes: the caller writes `done.text` over the file. Nothing is merged into the records that were there.
+
+It rejects, with a message that begins with the kind of the refusal such as `RNL8405 writeback-replace-region-encrypted`, and gives no text, when no level has the title (RNL8403) or several do (RNL8404), when the level has no place for a record, as in a region written to be encrypted (RNL8405 to RNL8407), when the records would come before the header record of the file (RNL8408), when the file declares a language version that is not interpreted (RNL8409), and when the records given do not read: the netlist is read again with the new text, and an error in the new lines, or records that read back otherwise than they were given, refuses (RNL8410, RNL8411). The request takes the fields of a build that read the files: `pool`, `package_dirs`, `dialect`, `formats`, `std` and `std_version`.
+
 ## Objects without a position
 
 A netlist that has no positions yet lists every object in `Level.unplaced`, each with its symbol drawn alone as `svg`, about 1.3 KB each. A frontend that shows a few of them at a time builds with `lazy_unplaced: true`, which leaves those drawings out of the Document and keeps them in the core, and asks for the drawings of the objects it shows, by their places in the level's list and their names, which the core checks against the build it kept:

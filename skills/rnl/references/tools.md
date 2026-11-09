@@ -145,6 +145,8 @@ rnl view FILE [options]           print the Document a viewer shows, as JSON
 rnl dump FILE [options]           print the effective model and diagnostics as JSON
 rnl catalog [options]             print the symbols, definitions and sets of the packages, as JSON
 rnl strip-generated FILE -o OUT   write FILE without its type="generated" records
+rnl replace-records FILE --level TITLE --records RECORDS --in-place
+                                  replace the RNL records of one level of a netlist that has them
 rnl problem | solve | snapshot | write | ...   what a solver reads, solving, the editor interface
 ```
 

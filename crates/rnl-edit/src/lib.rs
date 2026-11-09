@@ -21,10 +21,14 @@
 //!
 //! Merging with records already in the file, `replace_own`, `base` and the refusal of ops that do
 //! not take effect are set aside, as Analog Canvas, which writes with this crate, reads RNL into its
-//! own format and writes it anew: a netlist that has RNL records is refused.
+//! own format and writes it anew: a netlist that has RNL records is refused. The one thing it does
+//! with a netlist that has records is [`replace::replace_records`]: the whole new drawing of one
+//! level put in place of the records of that level, in the file that holds it, with no merging and
+//! no other line changed.
 
 pub mod form;
 pub mod ops;
+pub mod replace;
 
 use std::collections::BTreeMap;
 
