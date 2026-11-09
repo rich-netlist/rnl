@@ -8,6 +8,7 @@ use rnl_runtime::{Interpretation, Options};
 use std::path::Path;
 
 fn read(version: &str, body: &str) -> Interpretation {
+    let body = body.replace('\n', "\n* ");
     let source = format!("* places\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\") }}\nR1 a b 1k\nR2 b c 1k\nR3 c d 1k\nR4 d 0 1k\n* @RNL {{ {body} }}\n.end\n");
     let files = MemoryProvider::new().with("t.sp", &source);
     interpret_file(Path::new("t.sp"), None, &files, &Options { std: false, ..Options::solver() }).unwrap()
@@ -249,4 +250,23 @@ fn the_source_file_version_controls_places_in_scoped_records() {
             .unwrap();
         assert_eq!(names, if outer == "0.4" { ["#R2", "#R1"] } else { ["#R1", "#R2"] });
     }
+}
+
+#[test]
+fn inline_package_members_keep_distinct_edit_dependencies() {
+    let r = read(
+        "0.4",
+        r##"
+        @USE-PACKAGE(name="p") {
+            $A = @DEFINE-STYLE(linecolor="#111111") {};
+            $B = @DEFINE-STYLE(linecolor="#222222") {};
+            $C = @DEFINE-STYLE(linecolor="#333333") {};
+            $S = {$A}; {$B} @ADD-TO $S; $LAST = $S{end}; {$C} @ADD-TO $S
+        };
+        $SYM = @DEFINE-SYMBOL { @RECTANGLE {(-1,-1) (1,1)} };
+        #R1 @SET-SYMBOL $SYM => @SET-STYLE $LAST => @PLACE(0,0)
+    "##,
+    );
+    assert_eq!(errors(&r), Vec::new());
+    assert_eq!(r.model.levels[0].items[0].style.get("linecolor").and_then(|v| v.str()), Some("#333333"));
 }

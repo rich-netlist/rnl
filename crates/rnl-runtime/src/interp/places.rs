@@ -15,7 +15,6 @@ use crate::diag::codes;
 use crate::syntax::{Member, MemberPlaces, SetExpr};
 
 use super::ctx::{Ctx, NestedRef};
-use super::cycles::StmtKey;
 use super::eval::{pos_of_ints, Stop, R};
 use super::obj::*;
 use super::unit::UnitMember;
@@ -24,13 +23,23 @@ use super::Interp;
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 struct Site {
     scene: Option<SceneId>,
+    member: MemberKey,
     pos: Pos,
 }
 
 impl Site {
     fn of(ctx: &Ctx) -> Self {
-        Self { scene: ctx.scene, pos: order_pos(&ctx.pos, &ctx.segments) }
+        Self { scene: ctx.scene, member: ctx.member_key.clone(), pos: order_pos(&ctx.pos, &ctx.segments) }
     }
+}
+
+/// Inline-package members can have the same position. Both the root member and the pipe
+/// segments belong to a reference's identity, including references inside repeated usages.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub(super) struct Query {
+    site: Site,
+    rec: Option<RecId>,
+    off: usize,
 }
 
 #[derive(Clone, Default)]
@@ -40,7 +49,7 @@ pub(super) struct Plan {
 }
 
 struct Read {
-    key: StmtKey,
+    key: Query,
     source: ObjId,
     seen: HashSet<Site>,
 }
@@ -55,7 +64,7 @@ enum Task {
 #[derive(Default)]
 pub(super) struct Places {
     pub enabled: bool,
-    pub plans: HashMap<StmtKey, Plan>,
+    pub plans: HashMap<Query, Plan>,
     /// Bindings that need the drawing level because they read its final set membership.
     pub rules: HashSet<MemberKey>,
     reads: Vec<Read>,
@@ -72,7 +81,7 @@ impl Interp<'_> {
             Some(s) => self.position_of(s, u, m.rec, if m.embedded { None } else { Some(m.k) }),
             None => pos_of_ints(&[9, 0, m.rec.map_or(0, |r| r as i64), m.k as i64]),
         };
-        self.places.tasks.insert(Site { scene, pos }, Task::Root(u, m.clone(), scene));
+        self.places.tasks.insert(Site { scene, member: m.key(u), pos }, Task::Root(u, m.clone(), scene));
     }
 
     pub(super) fn register_place_body(&mut self, body: &SetExpr, ctx: &Ctx) {
@@ -167,7 +176,7 @@ impl Interp<'_> {
     pub(super) fn settle_places(&mut self) -> bool {
         let mut changed = false;
         for read in std::mem::take(&mut self.places.reads) {
-            let (edits, selection) = self.place_dependencies(read.source, read.key.scene);
+            let (edits, selection) = self.place_dependencies(read.source, read.key.site.scene);
             let plan = self.places.plans.entry(read.key).or_default();
             for edit in edits.difference(&read.seen) {
                 changed |= plan.edits.insert(edit.clone());
@@ -200,12 +209,12 @@ impl Interp<'_> {
                 off,
             );
         }
-        let key = StmtKey::of(ctx, off);
+        let key = Query { site: Site::of(ctx), rec: ctx.rec, off };
         let plan = self.places.plans.get(&key).cloned().unwrap_or_default();
         let (already, selection) = self.place_dependencies(source, ctx.scene);
         if !plan.selection && !selection {
             let mut edits: Vec<_> = plan.edits.difference(&already).cloned().collect();
-            edits.sort_by(|a, b| a.pos.cmp(&b.pos));
+            edits.sort_by(|a, b| (&a.pos, &a.member).cmp(&(&b.pos, &b.member)));
             for edit in edits {
                 self.place_edit(&edit, ctx, off)?;
             }
@@ -265,7 +274,10 @@ impl Interp<'_> {
             }
         };
         let mut edits = set.mods_by_scene.get(&scene).cloned().unwrap_or_default();
-        edits.sort_by_cached_key(|&k| order_pos(&set.mods[k].pos, &set.mods[k].ctx.segments));
+        edits.sort_by_cached_key(|&k| {
+            let m = &set.mods[k];
+            (order_pos(&m.pos, &m.ctx.segments), m.ctx.member_key.clone(), m.off)
+        });
         for k in edits {
             let edit = &set.mods[k];
             let members = self.written_members(edit.source, scene, busy);
