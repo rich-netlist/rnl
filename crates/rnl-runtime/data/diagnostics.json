@@ -2797,6 +2797,48 @@
    ]
   },
   {
+   "number": "RNL4101",
+   "name": "pin-name-is-subobject",
+   "severity": "error",
+   "message": "the pin name {name} is {standard name or alias}: `::` finds it before the pin; this SET-SYMBOL fails (6.5, 11.3, 16.5)",
+   "sections": [
+    "6.5",
+    "11.3",
+    "16.5"
+   ]
+  },
+  {
+   "number": "RNL4102",
+   "name": "pin-name-is-text-key-scene",
+   "severity": "error",
+   "message": "the text key {key} of {owner} is a pin name of its symbol: `::` finds the pin first; this TEXT fails (6.5, 13.3)",
+   "sections": [
+    "6.5",
+    "13.3"
+   ]
+  },
+  {
+   "number": "RNL4103",
+   "name": "pin-name-is-text-key-symbol",
+   "severity": "error",
+   "message": "the text key {key} of the symbol drawn on {owner} is a pin name: `::` finds the pin first; this TEXT fails (6.5, 13.3)",
+   "sections": [
+    "6.5",
+    "13.3"
+   ]
+  },
+  {
+   "number": "RNL4104",
+   "name": "pin-name-is-usage-name",
+   "severity": "error",
+   "message": "the pin name {name} is {role, local name or alias} of the usage {owner}: `::` finds it before the pin; this SET-SYMBOL fails (6.5, 11.3, 16.5)",
+   "sections": [
+    "6.5",
+    "11.3",
+    "16.5"
+   ]
+  },
+  {
    "number": "RNL4105",
    "name": "pin-name-not-in-symbol-wire",
    "severity": "error",

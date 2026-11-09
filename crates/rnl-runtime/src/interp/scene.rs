@@ -188,6 +188,7 @@ pub struct Scene {
     pub items_cache: HashMap<(ObjId, usize), Vec<ObjId>>,
     pub pos_cache: HashMap<ObjId, ObjId>,
     pub symbol: HashMap<ObjId, ObjId>,
+    pub(crate) pin_text_sources: Vec<super::pin_names::PinTextSource>,
     pub default_symbol: HashSet<ObjId>,
     pub pos: HashMap<ObjId, [Option<f64>; 2]>,
     pub ori: HashMap<ObjId, Orient>,
@@ -297,6 +298,7 @@ impl Scene {
             items_cache: HashMap::new(),
             pos_cache: HashMap::new(),
             symbol: HashMap::new(),
+            pin_text_sources: Vec::new(),
             default_symbol: HashSet::new(),
             pos: HashMap::new(),
             ori: HashMap::new(),
@@ -844,6 +846,13 @@ impl Interp<'_> {
                 }
                 if let Some(k) = &key {
                     let kt = self.scene_keytext(s, att, k);
+                    self.scenes[s].pin_text_sources.push(super::pin_names::PinTextSource {
+                        text: kt,
+                        order: order_pos(&at, &ctx.segments),
+                        ctx: Rc::new(ctx.clone()),
+                        off,
+                        generated,
+                    });
                     if let ObjData::KeyText { layers, site: ks, generated: g, direct, .. } = self.om(kt) {
                         // its place in the order of writing, where a later segment is later (5.5)
                         layers.push((order_pos(&at, &ctx.segments), items, style));
@@ -1099,6 +1108,7 @@ impl Interp<'_> {
                 });
             }
             TargetOp::Symbol { symbol, map, off } => {
+                self.check_symbol_pin_names(*symbol, Some(obj), ctx, *off)?;
                 let symbol = if let Some(map) = map {
                     let target = self.map_target(s, obj);
                     self.mapped_symbol(*symbol, map, &target, ctx, *off)?

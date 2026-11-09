@@ -2025,15 +2025,15 @@ impl Interp<'_> {
                 }
                 return Ok((a.obj, a.sel));
             }
-            let mapped_symbols = matches!(op, TargetOp::Symbol { map: Some(_), .. });
+            let member_symbols = matches!(op, TargetOp::Symbol { .. }) && self.follows_0_4(self.source_unit(ctx));
             let mut results = Vec::new();
             let mut failed = false;
             for (k, m) in members.into_iter().enumerate() {
                 match self.apply_op(s, &op, m, pos_plus(&ctx.pos, "e", k as i64), !a.sel, ctx) {
                     Ok(()) => results.push((m, true)),
-                    Err(Stop::Fail(diag)) if mapped_symbols => {
-                        // A map can be valid for a usage but invalid for a case-insensitive
-                        // host. Each member is its own description (5.2.1, 7.3).
+                    Err(Stop::Fail(diag)) if member_symbols => {
+                        // Names and mappings can be valid for one owner but not another.
+                        // Each member is its own description (5.2.1, 7.3).
                         results.push((self.new_obj(ObjData::Failed(diag)), true));
                         failed = true;
                     }
@@ -2074,6 +2074,7 @@ impl Interp<'_> {
                 return Ok(obj);
             }
             ("SET-SYMBOL", ObjData::Usage(u), TargetOp::Symbol { symbol, map, off }) if u.in_symbol => {
+                self.check_symbol_pin_names(*symbol, Some(obj), ctx, *off)?;
                 let sym = if let Some(map) = map {
                     let target = super::terminal_maps::MapTarget::roles(self.def(u.definition));
                     self.mapped_symbol(*symbol, map, &target, ctx, *off)?
@@ -2143,6 +2144,7 @@ impl Interp<'_> {
         let level = self.units[u].level.filter(|_| self.units[u].kind == super::unit::UnitKind::Level);
         match level {
             Some(lv) if ctx.frame.is_none() && self.doc.levels[lv].kind == crate::host::LevelKind::Subckt => {
+                self.check_symbol_pin_names(sym, None, ctx, seg.start)?;
                 let sym = if let Some(map) = map {
                     let level = &self.doc.levels[lv];
                     let target = super::terminal_maps::MapTarget {

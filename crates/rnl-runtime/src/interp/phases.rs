@@ -89,6 +89,7 @@ impl Interp<'_> {
         self.resolve_symbols(s, true);
         self.note_overridden_symbols(s);
         self.symbol_labels(s);
+        self.check_scene_pin_text_names(s);
         self.scenes[s].phase = 7;
         self.materialize_constraints(s);
         self.run_tasks(s, 7);
@@ -552,6 +553,14 @@ impl Interp<'_> {
             let labels = self.symbol(sym).labels.clone();
             for lab in labels {
                 if let Some(key) = &lab.key {
+                    if lab.site.as_ref().is_some_and(|ctx| self.follows_0_4(self.source_unit(ctx)))
+                        && self.symbol_has_pin_name(sym, key)
+                    {
+                        let label = self.label(owner);
+                        self.diag_site(Severity::Error, codes::PIN_NAME_IS_TEXT_KEY_SYMBOL, &lab.site, lab.off,
+                            format!("the text key {key} of the symbol drawn on {label} is a pin name: `::` finds the pin first; this TEXT fails (6.5, 13.3)"));
+                        continue;
+                    }
                     if matches!(self.o(owner), ObjData::Usage(_)) && lab.site.is_some() {
                         // a key written in the symbol may not be spelled like a role or local name of the usage
                         // it is drawn on, or an alias of one; the text is left out (6.5, 13.3)
@@ -894,6 +903,9 @@ impl Interp<'_> {
             }
         }
         for t in self.scenes[s].texts.clone() {
+            if self.is_obj_failed(t) {
+                continue;
+            }
             // `by_rule`: only rules gave the text, a TEXT for what a selection reached (10.4); one
             // that lands on a usage without a symbol or a terminal without a pin does nothing then,
             // and says nothing, as SET-STYLE does on a semantic usage (8.3), such as the rules of
