@@ -8,6 +8,8 @@ mod edit;
 mod mechanical;
 mod references;
 mod rewrite;
+mod selections;
+mod sets;
 mod standard;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -214,7 +216,12 @@ pub fn upgrade(entry: &str, files: &dyn Provider, options: &UpgradeOptions) -> R
             package_docs.insert(dependency, doc);
         }
     }
-    let context = rewrite::Context { std: options.std, packages, references: references::References::new(&before) };
+    let context = rewrite::Context {
+        std: options.std,
+        packages,
+        references: references::References::new(&before),
+        sets: sets::Sets::new(&before, &entry),
+    };
     let mut output = BTreeMap::new();
     let mut report = Report { schema_version: 1, files: Vec::new(), diagnostics: Vec::new(), differences: Vec::new() };
     let mut read = Vec::new();

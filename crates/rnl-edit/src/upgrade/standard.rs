@@ -65,7 +65,7 @@ fn bound(member: &Member, names: &mut BTreeSet<String>) -> bool {
     aliases
 }
 
-pub(super) fn role_changes(input: &Interpretation) -> BTreeMap<(usize, String), Changes> {
+pub(super) fn shadows(input: &Interpretation) -> (BTreeSet<String>, bool) {
     let bundled = rnl_view::bundled();
     let mut shadowed = BTreeSet::new();
     let mut aliases = !input.imported_aliases.is_empty();
@@ -85,6 +85,12 @@ pub(super) fn role_changes(input: &Interpretation) -> BTreeMap<(usize, String), 
             }
         }
     }
+    (shadowed, aliases)
+}
+
+pub(super) fn role_changes(input: &Interpretation) -> BTreeMap<(usize, String), Changes> {
+    let bundled = rnl_view::bundled();
+    let (shadowed, aliases) = shadows(input);
     // Aliases can change what a familiar spelling resolves to. Such sources need
     // alias-aware migration before applying name-based role changes.
     if aliases {

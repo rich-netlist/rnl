@@ -14,13 +14,14 @@ pub(super) struct Context {
     pub std: bool,
     pub packages: BTreeSet<String>,
     pub references: References,
+    pub sets: super::sets::Sets,
 }
 
 fn pending(member: &Member) -> Option<(&'static str, &'static str)> {
     if mechanical::mixed_recursion(member) {
         return Some(("recursive", "mixed local and recursive selections need rule-level migration (10.1)"));
     }
-    for segment in &member.segments {
+    for (index, segment) in member.segments.iter().enumerate() {
         let Some(call) = &segment.call else { continue };
         if let Some(reason) = mechanical::distance_bound(call) {
             return Some(("distance-interval", reason));
@@ -40,7 +41,10 @@ fn pending(member: &Member) -> Option<(&'static str, &'static str)> {
             "AS" | "ATTACH" => {
                 return Some(("usage", "the definition, roles and usage point need migration review (9.4, 12.1)"))
             }
-            "SELECT-TERMINAL" if parameters.is_some_and(|p| p.get("wired").is_some()) => {
+            "SELECT-TERMINAL"
+                if parameters.is_some_and(|p| p.get("wired").is_some())
+                    && !super::selections::drawing_selection(member, index) =>
+            {
                 return Some(("pin-selection", "wired is a pin-selection condition in 0.4 (10.1)"));
             }
             _ => {}
@@ -49,7 +53,7 @@ fn pending(member: &Member) -> Option<(&'static str, &'static str)> {
     None
 }
 
-fn value(v: &Value) -> String {
+pub(super) fn value(v: &Value) -> String {
     match v {
         Value::Num { text, .. } => text.clone(),
         Value::Str(s) => written_string(s),
@@ -179,13 +183,21 @@ pub(super) fn file(
                 Ok(found) => edits.extend(found),
                 Err(e) => error = Some(e),
             }
-            for segment in &member.segments {
+            for (index, segment) in member.segments.iter().enumerate() {
                 match context.references.role_arguments(path, source, record, segment) {
                     Ok(found) => edits.extend(found),
                     Err(e) => error = Some(e),
                 }
                 for arg in &segment.args {
                     if let ObjExpr::Ref(reference) = &arg.obj {
+                        match context.sets.reference(source, record, reference) {
+                            Ok(Some(edit)) => {
+                                edits.push(edit);
+                                continue;
+                            }
+                            Ok(None) => {}
+                            Err(e) => error = Some(e),
+                        }
                         match context.references.role_reference(path, source, record, reference) {
                             Ok(Some(edit)) => {
                                 edits.push(edit);
@@ -202,8 +214,12 @@ pub(super) fn file(
                     }
                 }
                 let Some(call) = &segment.call else { continue };
-                let mut found = vec![mechanical::route(source, record, call)];
-                if !local_selection_spans.iter().any(|range| range.contains(&call.start)) {
+                let drawing = super::selections::drawing_selection(member, index);
+                let mut found = vec![
+                    mechanical::route(source, record, call),
+                    super::selections::drawing_pins(source, record, member, index),
+                ];
+                if !drawing && !local_selection_spans.iter().any(|range| range.contains(&call.start)) {
                     found.push(mechanical::recursive(source, record, call));
                 }
                 for edit in found {
@@ -255,13 +271,32 @@ pub(super) fn file(
             )?);
         }
     }
+    if let (Some((record, _)), Some(seed)) = (header, context.sets.seed(path)) {
+        let at = record.text.chars().count();
+        let location = record.loc(at);
+        let marker = carrier_at(doc, path, source, location.line);
+        let eol = if source.contains("\r\n") { "\r\n" } else { "\n" };
+        let prefix = if marker.is_empty() { String::new() } else { format!("{marker} ") };
+        edits.push(record_edit(source, record, at..at, format!("{eol}{prefix}{seed}"), "explicit-fill-policy")?);
+    }
     let mut text = apply(source, &mut edits)?;
     report.changes.extend(edits.into_iter().map(|e| e.change));
     if header.is_none() {
         let old = text.clone();
-        text = add_header(doc, path, &text, |_| format!("@RNL(type=\"header\") {{ {} }}", declarations.join("; ")));
+        text = add_header(doc, path, &text, |_| {
+            let header = format!("@RNL(type=\"header\") {{ {} }}", declarations.join("; "));
+            context.sets.seed(path).map_or(header.clone(), |seed| format!("{header}\n{seed}"))
+        });
         if text == old {
             return Err(format!("cannot insert a header in {path}"));
+        }
+        if let Some(seed) = context.sets.seed(path) {
+            report.changes.push(Change {
+                rule: "explicit-fill-policy".into(),
+                line: old.lines().zip(text.lines()).take_while(|(a, b)| a == b).count() as u32 + 1,
+                before: String::new(),
+                after: seed.into(),
+            });
         }
         report.changes.push(Change {
             rule: "explicit-header".into(),

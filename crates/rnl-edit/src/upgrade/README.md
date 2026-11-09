@@ -6,7 +6,7 @@ An upgrade is successful only when all changes are supported, target interpretat
 
 ## Implementation status
 
-The implementation changes language headers and standard package references, renames ROUTE, makes implicit recursive selections explicit when their rule has no mixed recursion, and separates references from adjacent sets. Standard usage terminal paths become named pins when package provenance and the binding are known; supported standard role renames update both arguments and references. Local overrides keep their own names. Distance intervals that cannot be carried across directly are retained with a specific explanation. The inventory below is the remaining migration plan, not a claim that every rule is implemented. Known unsupported constructs receive notes and report entries; target diagnostics and structural differences also prevent success. The native writer preserves the supported UTF-8 (including BOM) and Latin-1 encodings.
+The implementation changes language headers and standard package references, renames ROUTE, makes implicit recursive selections explicit when their rule has no mixed recursion, and separates references from adjacent sets. Standard usage terminal paths become named pins when package provenance and the binding are known; supported standard role renames update both arguments and references. Local overrides keep their own names. With a verified, uniform series 0.3 fill environment, removed routing sets become fresh file-owned sets with the same selection and exclusions, and automatic port tags get an explicit generation rule. Included references share that entry policy; aliases, inline overrides and mixed package environments are left for contextual migration. A wired terminal selection used directly by TEXT becomes electrical filtering followed by SELECT-PIN; selections that escape through bindings or feed electrical consumers remain explicitly unsupported. Distance intervals that cannot be carried across directly are retained with a specific explanation. The inventory below is the remaining migration plan, not a claim that every rule is implemented. Known unsupported constructs receive notes and report entries; target diagnostics and structural differences also prevent success. The native writer preserves the supported UTF-8 (including BOM) and Latin-1 encodings.
 
 ## Rewrite inventory
 
@@ -29,6 +29,8 @@ Sections refer to RNL 0.4. Standard package changes refer to the bundled series 
 | Ordinary definition's absolute coordinates | Lift absolute facts to each usage when its expansion and priority can be preserved | Context | 9.4, 12.1 |
 | Usage terminal reference | Corresponding named symbol pin | Context | 6.4, 9.2.4, 12.1 |
 | Custom symbol pin binding roles by number | Name the pin and bind its corresponding role | Context | 9.2.4, 11.3 |
+| Names bound to PIN or fixed TEXT results | Preserve separately named input points; give pins and text their own names | Context | 9.2.4, 9.2.5 |
+| Reused local names or names inherited from symbols | Rename distinct results and references before conflicting inclusion | Context | 9.2.7 |
 | Repeated PIN bindings in a symbol | Remove displaced bindings from earlier pins; retain points still referenced | Context | 9.2.4 |
 | Symbol inheritance overriding a terminal's pin | Materialize equivalent nonduplicating pins, otherwise report | Context | 9.2.7 |
 | SELECT-TERMINAL wired | SELECT-PIN, preserving electrical consumers where applicable | Context | 10.1, 10.2 |
@@ -44,8 +46,8 @@ Sections refer to RNL 0.4. Standard package changes refer to the bundled series 
 | MIRRORED roles a/b | left/right (or vertical variant when equivalent) | Context | Standard series |
 | CHAIN, SUPPLY_HIGH, SUPPLY_LOW | No replacement definition; retain and report | Unsupported | Standard series |
 | FLOW with a positional direction | Preserve meaning and add corresponding explicit positional facts | Context | Standard series |
-| WIRE_NET_SET modification / route | ROUTE-NET or UNROUTE-NET with equivalent priority and membership | Context | Standard series, 13.7 |
-| Automatically generated port tags | Explicit tags preserving original positions | Context | Standard series, 12.4 |
+| WIRE_NET_SET modification / route | Explicit file-owned selection and exclusions, preserving user edits and ROUTE-NET | Context | Standard series, 13.7 |
+| Automatically generated port tags | Explicit selection and generation, with exclusions for supplies, grounds and existing tags | Context | Standard series, 12.4 |
 | Ground/supply attached to a terminal | Explicit constraints that preserve its original point | Context | 12.1, 12.3 |
 | Generated numbered references | Resolve old object identity; report when it cannot be carried across | Context | 5.9 |
 | New assertion violations or changed default fill | Report every target diagnostic and semantic difference | Verification | 7.6, 15.2-15.4 |
