@@ -452,7 +452,22 @@ pub struct ConstraintParams {
     pub sense: Option<&'static str>,
     pub min: Option<f64>,
     pub max: Option<f64>,
+    /// The relation of ORIENT-RELATION, the first of its list (14.9).
     pub relation: Option<Orient>,
+    /// Every relation of a list written in a file of 0.4, two or more, of which one is to hold
+    /// (14.9); empty for one relation.
+    pub relations: Vec<Orient>,
+}
+
+impl ConstraintParams {
+    /// The relations of ORIENT-RELATION of which one is to hold (14.9).
+    pub fn relations(&self) -> Vec<Orient> {
+        if self.relations.is_empty() {
+            self.relation.into_iter().collect()
+        } else {
+            self.relations.clone()
+        }
+    }
 }
 
 #[derive(Clone, Debug)]

@@ -507,7 +507,7 @@ fn a_differential_pair_puts_its_tail_under_its_middle_as_a_low_default() {
             // the usage written, no usage that a rule makes
             let pair = &p.usages[f.chain[0]];
             assert!(pair.definition == "$DIFFERENTIAL_PAIR" && !pair.generated, "{pair:?}");
-            let FactKind::Distribute { axis: Axis::X, members } = &f.kind else { panic!("{:?}", f.kind) };
+            let FactKind::Distribute { axis: Axis::X, members, .. } = &f.kind else { panic!("{:?}", f.kind) };
             members.iter().map(|m| written(p, m)).collect()
         })
         .collect();

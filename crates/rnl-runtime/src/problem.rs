@@ -47,9 +47,9 @@ impl Axis {
     }
 }
 
-/// The sense of ORDER and DISTANCE along their axis (14.3, 14.5): `"left-to-right"` and
-/// `"bottom-to-top"` increase, `"right-to-left"` and `"top-to-bottom"` decrease, `"x"` and `"y"`
-/// take either.
+/// The sense of ORDER, DISTANCE and, in a file of 0.4, DISTRIBUTE along their axis (14.3, 14.4,
+/// 14.5): `"left-to-right"` and `"bottom-to-top"` increase, `"right-to-left"` and `"top-to-bottom"`
+/// decrease, `"x"` and `"y"` of 0.3 take either.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Sense {
     Increasing,
@@ -330,8 +330,9 @@ pub enum FactKind {
     Align { axis: Axis, members: Vec<PointRef> },
     /// ORDER (14.3): strictly monotonic, neighbours at least one unit apart.
     Order { axis: Axis, sense: Sense, members: Vec<PointRef> },
-    /// DISTRIBUTE (14.4): equal steps between neighbours.
-    Distribute { axis: Axis, members: Vec<PointRef> },
+    /// DISTRIBUTE (14.4): equal steps between neighbours; with a sense, which a file of 0.4 writes,
+    /// the members also follow one another strictly in it, as for ORDER.
+    Distribute { axis: Axis, sense: Sense, members: Vec<PointRef> },
     /// DISTANCE (14.5) between the extents of the points of `from` and of `to`.
     Distance { axis: Axis, sense: Sense, min: Option<f64>, max: Option<f64>, from: Vec<PointRef>, to: Vec<PointRef> },
     /// ORIENT-RELATION (14.9): each side shares one orientation, and `to` is `from` turned by
@@ -501,6 +502,11 @@ pub struct LevelProblem {
     /// The nets of the level, in the order the netlist first names them: the ports of the
     /// subcircuit, then the nets of the instances, line by line.
     pub nets: Vec<ProblemNet>,
+    /// The ORIENT and ORIENT-RELATION facts written with a list of codes in a file of 0.4 (11.2,
+    /// 14.9), by their index in `facts`: every code of the list, two or more, of which one is to
+    /// hold. The fact itself has the first, which is what a solver that does not read the lists
+    /// takes. Empty in a problem without such lists, which leaves the input digest as it was.
+    pub orient_lists: Vec<(usize, Vec<Orient>)>,
     /// The ids the model gives the objects and the usages, in this reading. Like every place, they
     /// are left out of the input digest ([`sig2`]).
     pub ids: ProblemIds,
@@ -568,7 +574,12 @@ pub fn fact_statement(p: &LevelProblem, k: usize) -> String {
             format!("the orientation {} of {}", code.as_str(), point_name(p, &PointRef::Origin(*object)))
         }
         FactKind::Align { axis, members } => format!("ALIGN {} {}", axis.as_str(), list(members)),
-        FactKind::Distribute { axis, members } => format!("DISTRIBUTE {} {}", axis.as_str(), list(members)),
+        FactKind::Distribute { axis, sense: Sense::Either, members } => {
+            format!("DISTRIBUTE {} {}", axis.as_str(), list(members))
+        }
+        FactKind::Distribute { axis, sense, members } => {
+            format!("DISTRIBUTE {} {} {}", axis.as_str(), sense.as_str(), list(members))
+        }
         FactKind::Order { axis, sense, members } => {
             format!("ORDER {} {} {}", axis.as_str(), sense.as_str(), list(members))
         }
@@ -830,8 +841,14 @@ pub fn canonical_sig1(p: &LevelProblem) -> String {
                 c.index(*object);
                 c.word(code.as_str());
             }
-            FactKind::Align { axis, members } | FactKind::Distribute { axis, members } => {
+            // without a sense, as a file of 0.3 writes it, as it was, so that the digest stays
+            FactKind::Align { axis, members } | FactKind::Distribute { axis, sense: Sense::Either, members } => {
                 c.word(axis.as_str());
+                c.points(members);
+            }
+            FactKind::Distribute { axis, sense, members } => {
+                c.word(axis.as_str());
+                c.word(sense.as_str());
                 c.points(members);
             }
             FactKind::Order { axis, sense, members } => {
@@ -860,6 +877,17 @@ pub fn canonical_sig1(p: &LevelProblem) -> String {
             Some(r) => c.reference(r),
         }
         c.indexes(&f.chain);
+    }
+    // the lists of codes of 0.4, only when there are any, so that the digest of a problem without
+    // them is as it was (11.2, 14.9)
+    if !p.orient_lists.is_empty() {
+        c.word("orient-lists");
+        for (k, codes) in &p.orient_lists {
+            c.index(*k);
+            for code in codes {
+                c.word(code.as_str());
+            }
+        }
     }
     c.word("wires");
     for w in &p.wires {
@@ -1125,6 +1153,7 @@ mod tests {
             groups: Vec::new(),
             usages: Vec::new(),
             nets: Vec::new(),
+            orient_lists: Vec::new(),
             ids: ProblemIds::default(),
         };
         let h = sig2(&p, "tolerance=0.000001");
@@ -1174,6 +1203,7 @@ mod tests {
             groups: Vec::new(),
             usages: Vec::new(),
             nets: vec![net("a", None)],
+            orient_lists: Vec::new(),
             ids: ProblemIds::default(),
         };
         let old = format!("{SIG1}:{}.{}", input_digest_sig1(&p), options_digest("o"));

@@ -109,14 +109,22 @@ impl Interp<'_> {
         members: &[ObjId],
     ) -> Option<Contradiction> {
         match cd.kind {
-            // all the members at one coordinate hold them
+            // all the members at one coordinate hold them; not a DISTRIBUTE with a sense, which
+            // orders its members as ORDER does (14.4)
+            ConstraintKind::Distribute if cd.params.sense.is_some_and(|x| x != "either") => {
+                self.order_contradiction(s, members)
+            }
             ConstraintKind::Align | ConstraintKind::Distribute => None,
             ConstraintKind::Order => self.order_contradiction(s, members),
             ConstraintKind::Distance => self.distance_contradiction(s, cd),
             ConstraintKind::OrientRelation => {
                 // an object on both sides would have its own orientation turned by the relation,
-                // which only R0 leaves as it is (14.9)
-                let relation = cd.params.relation.filter(|r| *r != Orient::R0)?;
+                // which only R0 leaves as it is (14.9): of a list, when none is R0
+                let relations = cd.params.relations();
+                if relations.contains(&Orient::R0) {
+                    return None;
+                }
+                let relation = *relations.first()?;
                 let mut sides = Vec::new();
                 for &a in &cd.args {
                     sides.push(if self.is_set(a) { self.flatten(s, a, 7, None) } else { vec![a] });

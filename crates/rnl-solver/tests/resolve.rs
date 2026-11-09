@@ -106,7 +106,7 @@ fn holds(p: &LevelProblem, r: &Resolved, kind: &FactKind, tol: f64) -> bool {
                 Sense::Either => inc || dec,
             }
         }
-        FactKind::Distribute { axis, members } => {
+        FactKind::Distribute { axis, members, .. } => {
             let v: Vec<f64> = members.iter().map(|m| at(m, *axis)).collect();
             v.len() < 3 || v.windows(2).all(|w| ((w[1] - w[0]) - (v[1] - v[0])).abs() <= tol)
         }

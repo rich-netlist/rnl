@@ -384,9 +384,20 @@ impl Interp<'_> {
                         // one step between neighbours (14.4): the mean steps between the members
                         // fixed are the same
                         let mut steps = at.windows(2).map(|w| (w[1].1 - w[0].1) / (w[1].0 - w[0].0));
-                        let Some(first) = steps.next() else { return true };
+                        // with a sense, which a file of 0.4 writes, the members follow one
+                        // another in it as for ORDER (14.4)
+                        let ordered = match cd.params.sense {
+                            Some("increasing") => {
+                                at.windows(2).all(|w| w[1].1 - w[0].1 >= (w[1].0 - w[0].0) * (1.0 - tol))
+                            }
+                            Some("decreasing") => {
+                                at.windows(2).all(|w| w[0].1 - w[1].1 >= (w[1].0 - w[0].0) * (1.0 - tol))
+                            }
+                            _ => true,
+                        };
+                        let Some(first) = steps.next() else { return ordered };
                         let (lo, hi) = steps.fold((first, first), |(lo, hi), v| (lo.min(v), hi.max(v)));
-                        items.len() < 3 || hi - lo <= tol
+                        ordered && (items.len() < 3 || hi - lo <= tol)
                     }
                 }
                 ConstraintKind::Distance => {
@@ -428,8 +439,10 @@ impl Interp<'_> {
                         }
                         codes.push(code);
                     }
-                    match (codes.first().copied().flatten(), codes.get(1).copied().flatten(), cd.params.relation) {
-                        (Some(a), Some(b), Some(rel)) => b == a.then(rel),
+                    // of a list of relations, one is to hold (14.9)
+                    let relations = cd.params.relations();
+                    match (codes.first().copied().flatten(), codes.get(1).copied().flatten()) {
+                        (Some(a), Some(b)) if !relations.is_empty() => relations.iter().any(|rel| b == a.then(*rel)),
                         _ => true,
                     }
                 }

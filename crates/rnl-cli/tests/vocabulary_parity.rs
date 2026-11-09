@@ -40,10 +40,6 @@ const PENDING_0_4: &[&str] = &[
     "WIRE",
     "ORIENT",
     "ORIENT-RELATION",
-    // constraints written with a direction (14.3, 14.4, 14.5)
-    "ORDER",
-    "DISTRIBUTE",
-    "DISTANCE",
     // routing (13.7)
     "ROUTE",
     "ROUTE-NET",
@@ -288,7 +284,11 @@ fn compare(p: &Value, version: &str, pending: &[&str]) {
         assert_eq!(k["since"], a.since.as_deref().unwrap_or(&w.language_version), "{name} since");
         assert_eq!(k["section"], a.section, "{name} section");
         assert_eq!(k["where"], json!(a.where_), "{name} contexts");
-        assert_eq!(k.get("positional").cloned().unwrap_or(json!([])), json!(a.positional), "{name} positional");
+        assert_eq!(
+            k.get("positional").cloned().unwrap_or(json!([])),
+            json!(a.positional_in(version)),
+            "{name} positional"
+        );
         assert_eq!(at_least_one(k.get("at_least_one")), json!(a.at_least_one), "{name} at_least_one");
         assert_eq!(k["open_params"].as_bool().unwrap_or(false), a.open_params, "{name} open params");
         assert_eq!(k["override"], json!(a.override_), "{name} override");

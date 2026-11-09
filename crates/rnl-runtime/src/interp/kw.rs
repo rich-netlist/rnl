@@ -30,6 +30,18 @@ pub fn direction(d: &str) -> Option<(char, &'static str)> {
     })
 }
 
+/// An orientation code of ORIENT, or a word for one of the four turns, which is another spelling of
+/// it for an object: `"left"` is `"R0"`, `"down"` `"R90"`, `"right"` `"R180"` and `"up"` `"R270"` (11.2).
+fn orient_code(s: &str) -> Option<Orient> {
+    match s {
+        "left" => Some(Orient::R0),
+        "down" => Some(Orient::R90),
+        "right" => Some(Orient::R180),
+        "up" => Some(Orient::R270),
+        _ => Orient::parse(s),
+    }
+}
+
 fn style_specs(group: &str) -> Vec<ParamSpec> {
     words()
         .group(group)
@@ -86,7 +98,7 @@ impl Interp<'_> {
             "LINE" | "RECTANGLE" | "CIRCLE" | "ELLIPSE" | "ARC" | "BEZIER" => self.kw_prim(kw, &args, seg, ctx),
             "TEXT" => self.kw_text(kw, &args, seg, ctx),
             "PLACE" => {
-                let p = self.params(kw, seg, ctx, &sig_params(kw), None, false, None)?;
+                let p = self.params(kw, seg, ctx, &self.sig_params(kw, ctx), None, false, None)?;
                 if get(&p, "x").is_none() && get(&p, "y").is_none() {
                     let at = seg.call.as_ref().unwrap().start;
                     return self.fail(ctx, codes::PARAM_PLACE_NEEDS_X_OR_Y, "PLACE takes x, y or both (11.1)", at);
@@ -101,13 +113,21 @@ impl Interp<'_> {
                 self.target_each(kw, &args, seg, ctx, 7, op, "target")
             }
             "ORIENT" => {
-                let p = self.params(kw, seg, ctx, &sig_params(kw), None, false, None)?;
-                let code = Orient::parse(get(&p, "code").and_then(Lit::str).unwrap_or("R0")).unwrap_or_default();
-                let op = TargetOp::Orient { code, priority: priority_of(&p, ctx), off: seg.start };
+                let p = self.params(kw, seg, ctx, &self.sig_params(kw, ctx), None, false, None)?;
+                // a code, or in a file of 0.4 a list of them of which one is to hold, where a word for
+                // a turn is another spelling of its code (11.2)
+                let codes: Vec<Orient> = match get(&p, "code") {
+                    Some(Lit::Arr(items)) => items.iter().filter_map(|v| v.str().and_then(orient_code)).collect(),
+                    Some(v) => v.str().and_then(orient_code).into_iter().collect(),
+                    None => Vec::new(),
+                };
+                let code = codes.first().copied().unwrap_or_default();
+                let codes = if codes.len() > 1 { codes } else { Vec::new() };
+                let op = TargetOp::Orient { code, codes, priority: priority_of(&p, ctx), off: seg.start };
                 self.target_each(kw, &args, seg, ctx, 7, op, "target")
             }
             "LAYER" => {
-                let p = self.params(kw, seg, ctx, &sig_params(kw), None, false, None)?;
+                let p = self.params(kw, seg, ctx, &self.sig_params(kw, ctx), None, false, None)?;
                 let layer = get(&p, "layer").and_then(Lit::str).unwrap_or("middle").to_string();
                 self.target_each(kw, &args, seg, ctx, 8, TargetOp::Layer { layer, off: seg.start }, "target")
             }
@@ -135,12 +155,12 @@ impl Interp<'_> {
                 )
             }
             "CURRENT" => {
-                let p = self.params(kw, seg, ctx, &sig_params(kw), None, false, None)?;
+                let p = self.params(kw, seg, ctx, &self.sig_params(kw, ctx), None, false, None)?;
                 let d = get(&p, "direction").and_then(Lit::str).unwrap_or("unspecified").to_string();
                 self.target_each(kw, &args, seg, ctx, 3, TargetOp::Current { direction: d, off: seg.start }, "terminal")
             }
             "PRIORITY" => {
-                let p = self.params(kw, seg, ctx, &sig_params(kw), None, false, None)?;
+                let p = self.params(kw, seg, ctx, &self.sig_params(kw, ctx), None, false, None)?;
                 let pr = Priority::parse(get(&p, "priority").and_then(Lit::str).unwrap_or("normal"))
                     .unwrap_or(Priority::Normal);
                 // several objects make one set in which they are spread (5.2.1), so a set with GROUP
@@ -201,7 +221,7 @@ impl Interp<'_> {
             k if k.starts_with("SELECT-") => self.kw_select(kw, &args, seg, ctx),
             "WIRE" => self.kw_wire(kw, &args, seg, ctx),
             "ROUTE" => {
-                let mut spec = sig_params(kw);
+                let mut spec = self.sig_params(kw, ctx);
                 spec.extend(style_specs("wire_style"));
                 let p = self.params(kw, seg, ctx, &spec, None, false, None)?;
                 let (style, rest) = split_style(&p);
@@ -329,7 +349,7 @@ impl Interp<'_> {
         if let Some(&s) = self.node_memo.get(&key) {
             return Ok((s, false));
         }
-        let p = self.params(kw, seg, ctx, &sig_params(kw), None, false, None)?;
+        let p = self.params(kw, seg, ctx, &self.sig_params(kw, ctx), None, false, None)?;
         let body = self.body_arg(kw, args, seg, ctx)?;
         // A graph check after evaluation cannot protect the call stack while uncached,
         // forward references are still expanding their definitions.
@@ -526,7 +546,7 @@ impl Interp<'_> {
         if let Some(&d) = self.node_memo.get(&key) {
             return Ok((d, false));
         }
-        let p = self.params(kw, seg, ctx, &sig_params(kw), None, false, None)?;
+        let p = self.params(kw, seg, ctx, &self.sig_params(kw, ctx), None, false, None)?;
         let body = self.body_arg(kw, args, seg, ctx)?;
         let at = seg.call.as_ref().unwrap().start;
         let mut roles = Vec::new();
@@ -1444,7 +1464,7 @@ impl Interp<'_> {
             );
         }
         let mapped = self.map_args(kw, args, seg, ctx, sig_positions(kw))?;
-        let p = self.params(kw, seg, ctx, &sig_params(kw), None, false, None)?;
+        let p = self.params(kw, seg, ctx, &self.sig_params(kw, ctx), None, false, None)?;
         let pt = mapped["position"].obj;
         let ObjData::Point { x: Some(x), y: Some(y), .. } = self.o(pt).clone() else {
             return self.fail(ctx, codes::KEYWORD_PIN_NOT_A_POINT, "PIN takes one point (9.2.4)", seg.start);
@@ -1641,7 +1661,7 @@ impl Interp<'_> {
     // ------------------------------------------------------------------ TEXT (13.3)
 
     fn kw_text(&mut self, kw: &str, args: &[ArgV], seg: &Segment, ctx: &Ctx) -> R<(ObjId, bool)> {
-        let mut spec = sig_params(kw);
+        let mut spec = self.sig_params(kw, ctx);
         spec.extend(style_specs("text_style"));
         let p = self.params(kw, seg, ctx, &spec, None, false, None)?;
         let mapped = self.map_args(kw, args, seg, ctx, sig_positions(kw))?;
@@ -1953,7 +1973,7 @@ impl Interp<'_> {
         mapped: &HashMap<String, ArgV>,
         op: &TargetOp,
     ) -> R<ObjId> {
-        let _ = self.params(kw, seg, ctx, &sig_params(kw), None, false, None)?;
+        let _ = self.params(kw, seg, ctx, &self.sig_params(kw, ctx), None, false, None)?;
         match (kw, self.o(obj).clone(), op) {
             ("PLACE", ObjData::SymLabel { symbol, index }, TargetOp::Place { x, y, .. }) => {
                 self.symbol_mut(symbol).labels[index].position = Some((x.unwrap_or(0.0), y.unwrap_or(0.0)));
@@ -2073,7 +2093,7 @@ impl Interp<'_> {
                 call.start,
             );
         }
-        let p = self.params(kw, seg, ctx, &sig_params(kw), None, false, None)?;
+        let p = self.params(kw, seg, ctx, &self.sig_params(kw, ctx), None, false, None)?;
         let scope = mapped["scope"].obj;
         let mut dfn = mapped.get("definition").map(|a| a.obj);
         if (kw == "SELECT-USAGE" && dfn.is_some()) || kw == "SELECT-ANCESTOR-USAGE" {
@@ -2137,7 +2157,7 @@ impl Interp<'_> {
     // ------------------------------------------------------------------ wires, constraints
 
     fn kw_wire(&mut self, kw: &str, args: &[ArgV], seg: &Segment, ctx: &Ctx) -> R<(ObjId, bool)> {
-        let mut spec = sig_params(kw);
+        let mut spec = self.sig_params(kw, ctx);
         spec.extend(style_specs("wire_style"));
         let p = self.params(kw, seg, ctx, &spec, None, false, None)?;
         let mapped = self.map_args(kw, args, seg, ctx, sig_positions(kw))?;
@@ -2236,13 +2256,19 @@ impl Interp<'_> {
 
     fn kw_constraint(&mut self, kw: &str, args: &[ArgV], seg: &Segment, ctx: &Ctx) -> R<(ObjId, bool)> {
         let call_start = seg.call.as_ref().unwrap().start;
+        let follows_0_4 = self.follows_0_4(ctx.unit);
         if kw == "ORDER" || kw == "DISTANCE" {
             self.old_direction(kw, seg, ctx)?;
         }
-        let p = self.params(kw, seg, ctx, &sig_params(kw), None, false, None)?;
-        let mut cp = ConstraintParams { axis: None, sense: None, min: None, max: None, relation: None };
+        if follows_0_4 && matches!(kw, "ORDER" | "DISTRIBUTE" | "DISTANCE") {
+            self.axis_without_direction(kw, seg, ctx)?;
+        }
+        let p = self.params(kw, seg, ctx, &self.sig_params(kw, ctx), None, false, None)?;
+        let mut cp =
+            ConstraintParams { axis: None, sense: None, min: None, max: None, relation: None, relations: Vec::new() };
         match kw {
-            "ORDER" | "DISTANCE" => {
+            // in a file of 0.4 DISTRIBUTE takes a direction as ORDER does (14.4)
+            "ORDER" | "DISTANCE" | "DISTRIBUTE" if get(&p, "direction").is_some() => {
                 let (axis, sense) =
                     direction(get(&p, "direction").and_then(Lit::str).unwrap_or("x")).unwrap_or(('x', "either"));
                 cp.axis = Some(axis);
@@ -2251,8 +2277,17 @@ impl Interp<'_> {
             "ALIGN" | "DISTRIBUTE" => {
                 cp.axis = get(&p, "axis").and_then(Lit::str).and_then(|a| a.chars().next());
             }
+            // one relation, or in a file of 0.4 a list of them of which one is to hold (14.9)
             "ORIENT-RELATION" => {
-                cp.relation = get(&p, "relation").and_then(Lit::str).and_then(Orient::parse);
+                let codes: Vec<Orient> = match get(&p, "relation") {
+                    Some(Lit::Arr(items)) => items.iter().filter_map(|v| v.str().and_then(Orient::parse)).collect(),
+                    Some(v) => v.str().and_then(Orient::parse).into_iter().collect(),
+                    None => Vec::new(),
+                };
+                cp.relation = codes.first().copied();
+                if codes.len() > 1 {
+                    cp.relations = codes;
+                }
             }
             _ => {}
         }
@@ -2344,6 +2379,33 @@ impl Interp<'_> {
 
     /// ORDER and DISTANCE take one `direction` now: axis= and "increasing", "decreasing",
     /// "either" fail with a hint (14.3, 14.5).
+    /// In a file of 0.4 ORDER, DISTRIBUTE and DISTANCE take a direction, which writes the sense: the
+    /// axis alone, `"x"` or `"y"`, or DISTRIBUTE's `axis=` of 0.3, is an error (14.1, 14.3).
+    fn axis_without_direction(&mut self, kw: &str, seg: &Segment, ctx: &Ctx) -> R<()> {
+        let Some(p) = seg.call.as_ref().and_then(|c| c.params.as_ref()) else { return Ok(()) };
+        let mut bad = None;
+        if let Some(Value::Str(s)) = p.positional.first() {
+            if s == "x" || s == "y" {
+                bad = Some((format!("{s:?}"), p.start));
+            }
+        }
+        for n in &p.named {
+            let std = if n.quoted { n.name.clone() } else { self.word(&n.name, ctx.unit) };
+            match (std.as_str(), &n.value) {
+                ("direction", Value::Str(s)) if s == "x" || s == "y" => bad = Some((format!("{s:?}"), n.off)),
+                ("axis", _) if kw == "DISTRIBUTE" => bad = Some(("axis=".to_string(), n.off)),
+                _ => {}
+            }
+        }
+        let Some((written, at)) = bad else { return Ok(()) };
+        self.fail(
+            ctx,
+            codes::PARAM_AXIS_WITHOUT_DIRECTION,
+            format!("@{kw} takes a direction, one of \"left-to-right\", \"right-to-left\", \"bottom-to-top\" and \"top-to-bottom\", not {written}: a file of 0.4 writes the sense (14.1, 14.3)"),
+            at,
+        )
+    }
+
     fn old_direction(&mut self, kw: &str, seg: &Segment, ctx: &Ctx) -> R<()> {
         let Some(p) = seg.call.as_ref().and_then(|c| c.params.as_ref()) else { return Ok(()) };
         let mut bad = None;
@@ -2365,9 +2427,11 @@ impl Interp<'_> {
         }
         if let Some(at) = bad {
             let sec = if kw == "ORDER" { "14.3" } else { "14.5" };
+            // a file of 0.4 writes the sense: "x" and "y" are no longer read (14.1)
+            let no_sense = if self.follows_0_4(ctx.unit) { "" } else { "; with no sense write \"x\" or \"y\"" };
             return self.fail(
                 ctx,
-                codes::PARAM_OLD_DIRECTION, format!("axis and direction of @{kw} are one parameter now, direction, written first by position, such as @ORDER(\"left-to-right\") or @DISTANCE(\"bottom-to-top\", min=2); with no sense write \"x\" or \"y\" ({sec})"),
+                codes::PARAM_OLD_DIRECTION, format!("axis and direction of @{kw} are one parameter now, direction, written first by position, such as @ORDER(\"left-to-right\") or @DISTANCE(\"bottom-to-top\", min=2){no_sense} ({sec})"),
                 at,
             );
         }
@@ -2404,8 +2468,12 @@ pub struct Application {
     pub seg: Segment,
 }
 
-fn sig_params(kw: &str) -> Vec<ParamSpec> {
-    words().keyword(kw).map(|s| s.param_list().to_vec()).unwrap_or_default()
+impl Interp<'_> {
+    /// The parameters of keyword `kw` as the file of `ctx` has them, by its language version (16.1).
+    fn sig_params(&self, kw: &str, ctx: &Ctx) -> Vec<ParamSpec> {
+        let version = self.version_of(Some(ctx.unit));
+        words().keyword(kw).map(|s| s.params_in(&version)).unwrap_or_default()
+    }
 }
 
 fn sig_positions(kw: &str) -> &'static [PositionSpec] {

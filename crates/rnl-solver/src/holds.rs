@@ -53,9 +53,16 @@ pub(crate) fn check(kind: &FactKind, at: At, ori: Ori, tol: &Q, equal: &Q) -> Op
                 Sense::Either => inc || dec,
             }
         }
-        FactKind::Distribute { axis, members } => {
+        FactKind::Distribute { axis, sense, members } => {
             let v = along(members, *axis)?;
-            v.len() < 3 || v.windows(2).all(|w| ((&w[1] - &w[0]) - (&v[1] - &v[0])).abs() <= *equal)
+            let step = Q::one() - tol;
+            // with a sense the members also follow one another in it (14.4)
+            let ordered = match sense {
+                Sense::Increasing => v.windows(2).all(|w| &w[1] - &w[0] >= step),
+                Sense::Decreasing => v.windows(2).all(|w| &w[0] - &w[1] >= step),
+                Sense::Either => true,
+            };
+            ordered && (v.len() < 3 || v.windows(2).all(|w| ((&w[1] - &w[0]) - (&v[1] - &v[0])).abs() <= *equal))
         }
         FactKind::Distance { axis, sense, min, max, from, to } => {
             if from.is_empty() || to.is_empty() {
@@ -186,9 +193,19 @@ mod tests {
     fn digits_written_for_a_value_without_a_finite_form_count_as_equal() {
         let p = three();
         let drawn = [at(0.0, 0.0), at(0.333333333, 0.0), at(0.666666667, 0.0)];
-        let kind = FactKind::Distribute { axis: Axis::X, members: origins(&[0, 1, 2]) };
+        let kind = FactKind::Distribute { axis: Axis::X, sense: Sense::Either, members: origins(&[0, 1, 2]) };
         assert_eq!(holds_as_drawn(&p, &drawn, &kind, 1e-6), Some(true));
         assert_eq!(holds_as_drawn(&p, &drawn, &kind, 1e-12), Some(false));
+    }
+
+    #[test]
+    fn a_distribute_with_a_sense_also_orders_its_members() {
+        let p = three();
+        let drawn = [at(0.0, 0.0), at(2.0, 0.0), at(4.0, 0.0)];
+        let distribute = |sense| FactKind::Distribute { axis: Axis::X, sense, members: origins(&[0, 1, 2]) };
+        assert_eq!(holds_as_drawn(&p, &drawn, &distribute(Sense::Increasing), 1e-6), Some(true));
+        assert_eq!(holds_as_drawn(&p, &drawn, &distribute(Sense::Decreasing), 1e-6), Some(false));
+        assert_eq!(holds_as_drawn(&p, &drawn, &distribute(Sense::Either), 1e-6), Some(true));
     }
 
     #[test]

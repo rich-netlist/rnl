@@ -248,7 +248,7 @@ fn kind(f: &ProblemFact) -> ConstraintKind {
         FactKind::Order { axis, sense, members } => {
             ConstraintKind::Order { axis: axis.as_str(), sense: sense.as_str(), members: points_of(members) }
         }
-        FactKind::Distribute { axis, members } => {
+        FactKind::Distribute { axis, members, .. } => {
             ConstraintKind::Distribute { axis: axis.as_str(), members: points_of(members) }
         }
         FactKind::Distance { axis, sense, min, max, from, to } => ConstraintKind::Distance {

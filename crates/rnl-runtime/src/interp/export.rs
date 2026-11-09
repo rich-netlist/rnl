@@ -160,7 +160,7 @@ impl Interp<'_> {
             object_symbol.push(Some(k));
         }
 
-        let facts = self.problem_facts(s, &ix, &objs);
+        let (facts, orient_lists) = self.problem_facts(s, &ix, &objs);
 
         // the first coordinate fact of each object and axis, and the first ORIENT, in the order of 8.5;
         // the axes of the texts that an offset places (13.3)
@@ -479,6 +479,7 @@ impl Interp<'_> {
             groups,
             usages: entries,
             nets,
+            orient_lists,
             ids,
         };
         (problem, result)
@@ -815,8 +816,18 @@ impl Interp<'_> {
     }
 
     /// The geometric facts of a scene in the order of resolution of 8.5.
-    fn problem_facts(&mut self, s: SceneId, ix: &Index, objs: &[(ObjId, ObjectKind)]) -> Vec<ProblemFact> {
+    /// The facts of scene `s` in the order of 8.5, and the lists of codes of those of them written
+    /// with one ([`LevelProblem::orient_lists`]).
+    #[allow(clippy::type_complexity)]
+    fn problem_facts(
+        &mut self,
+        s: SceneId,
+        ix: &Index,
+        objs: &[(ObjId, ObjectKind)],
+    ) -> (Vec<ProblemFact>, Vec<(usize, Vec<Orient>)>) {
         let mut ranked: Vec<Ranked> = Vec::new();
+        // the lists of codes of 0.4 (11.2, 14.9), by the number each fact is collected with
+        let mut lists: HashMap<usize, Vec<Orient>> = HashMap::new();
         let rank = |p: Priority| p as u8;
         // the texts whose offset on an axis replaces their PLACE on that axis, or the reverse; either
         // replaces the position that the symbol gives a text on that axis (13.3)
@@ -935,6 +946,9 @@ impl Interp<'_> {
             let FactData::Orient(code) = f.data else { continue };
             let Some(&object) = ix.objects.get(&f.target) else { continue };
             let source = f.ctx.as_ref().and_then(|c| self.rec_loc(c.rec, f.off));
+            if let Some(codes) = self.scenes[s].orient_codes.get(&k) {
+                lists.insert(ranked.len(), codes.clone());
+            }
             ranked.push(Ranked {
                 key: (rank(p), f.order(), 2, 0, ranked.len()),
                 fact: ProblemFact {
@@ -968,6 +982,9 @@ impl Interp<'_> {
             if let Some(site) = &cd.site {
                 pos = order_pos(&pos, &site.segments);
             }
+            if !cd.params.relations.is_empty() {
+                lists.insert(ranked.len(), cd.params.relations.clone());
+            }
             ranked.push(Ranked {
                 key: (rank(p), pos, 3, 0, ranked.len()),
                 fact: ProblemFact {
@@ -983,7 +1000,18 @@ impl Interp<'_> {
 
         // higher priority first, then the later first (8.5)
         ranked.sort_by(|a, b| b.key.cmp(&a.key));
-        ranked.into_iter().map(|r| r.fact).collect()
+        let mut orient_lists = Vec::new();
+        let facts = ranked
+            .into_iter()
+            .enumerate()
+            .map(|(i, r)| {
+                if let Some(codes) = lists.remove(&r.key.4) {
+                    orient_lists.push((i, codes));
+                }
+                r.fact
+            })
+            .collect();
+        (facts, orient_lists)
     }
 
     fn text_off(&self, t: ObjId) -> usize {
@@ -1013,7 +1041,7 @@ impl Interp<'_> {
         Some(match cd.kind {
             ConstraintKind::Align => FactKind::Align { axis, members: members(self)? },
             ConstraintKind::Order => FactKind::Order { axis, sense, members: members(self)? },
-            ConstraintKind::Distribute => FactKind::Distribute { axis, members: members(self)? },
+            ConstraintKind::Distribute => FactKind::Distribute { axis, sense, members: members(self)? },
             ConstraintKind::Distance => FactKind::Distance {
                 axis,
                 sense,

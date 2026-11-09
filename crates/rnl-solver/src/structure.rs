@@ -1652,7 +1652,7 @@ fn even_sets(problem: &LevelProblem, s: &Structure) -> Vec<Vec<usize>> {
     let mut joined = Joined::new(&s.elements);
     let is_element = |k: usize| s.objects.get(k).is_some_and(|o| o.role == Role::Element);
     for &f in &s.kept {
-        let FactKind::Distribute { axis: Axis::X, members } = &problem.facts[f].kind else { continue };
+        let FactKind::Distribute { axis: Axis::X, members, .. } = &problem.facts[f].kind else { continue };
         let mut ks = Vec::new();
         for m in members {
             elements_of(m, &mut ks);
@@ -2106,7 +2106,7 @@ fn precedence(problem: &LevelProblem, s: &Structure) -> (BTreeSet<(usize, usize)
                 pairs.extend(before(&b, &a));
                 (*sense, pairs)
             }
-            FactKind::Distribute { axis: Axis::X, members } => {
+            FactKind::Distribute { axis: Axis::X, members, .. } => {
                 // with fewer than three members it holds wherever they are (14.4)
                 if members.len() < 3 {
                     continue;
@@ -2479,7 +2479,7 @@ pub(crate) mod tests {
                 distance(Increasing, Some(2.0), None, 0, 1),
                 // no side: within 5 of each other, either way; and a DISTRIBUTE, an ALIGN
                 distance(Either, None, Some(5.0), 2, 3),
-                fact(FactKind::Distribute { axis: Axis::X, members: vec![o(2), o(3), o(4)] }),
+                fact(FactKind::Distribute { axis: Axis::X, sense: Sense::Either, members: vec![o(2), o(3), o(4)] }),
                 fact(FactKind::Align { axis: Axis::X, members: vec![o(5), o(6)] }),
                 // a side left open: reversible
                 fact(FactKind::Order { axis: Axis::X, sense: Either, members: vec![o(6), o(7)] }),
@@ -2520,7 +2520,8 @@ pub(crate) mod tests {
     #[test]
     fn a_distribute_orders_its_elements_either_way() {
         let o = |k| PointRef::Origin(k);
-        let distribute = |members: Vec<PointRef>| fact(FactKind::Distribute { axis: Axis::X, members });
+        let distribute =
+            |members: Vec<PointRef>| fact(FactKind::Distribute { axis: Axis::X, sense: Sense::Either, members });
         let order = |sense, members: Vec<PointRef>| fact(FactKind::Order { axis: Axis::X, sense, members });
         use rnl_runtime::problem::Sense::{Either, Increasing};
         let mut objects: Vec<_> = (0..9).map(|_| instance()).collect();
@@ -2557,7 +2558,7 @@ pub(crate) mod tests {
     fn a_distribute_at_one_x_runs_the_way_of_the_netlist() {
         let distribute = |members: &[usize]| {
             let members = members.iter().map(|&k| PointRef::Origin(k)).collect();
-            fact(FactKind::Distribute { axis: Axis::X, members })
+            fact(FactKind::Distribute { axis: Axis::X, sense: Sense::Either, members })
         };
         // the pairs of the reversible facts, and the precedences, of some DISTRIBUTEs on 0..6 and a
         // point 6, all at x 0 at the witness

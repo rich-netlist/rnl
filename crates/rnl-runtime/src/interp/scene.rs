@@ -23,14 +23,45 @@ pub type Task = Rc<dyn Fn(&mut Interp, SceneId, usize)>;
 /// like any other set (5.2.1), a set with GROUP too.
 #[derive(Clone, Debug)]
 pub enum TargetOp {
-    Place { x: Option<f64>, y: Option<f64>, priority: Option<Priority>, off: usize },
-    Orient { code: Orient, priority: Option<Priority>, off: usize },
-    Layer { layer: String, off: usize },
-    Symbol { symbol: ObjId, off: usize },
-    Style { style: ObjId, off: usize },
-    Current { direction: String, off: usize },
-    Priority { priority: Priority, off: usize, spread: Vec<ObjId> },
-    Route { mode: String, style: StyleMap, off: usize },
+    Place {
+        x: Option<f64>,
+        y: Option<f64>,
+        priority: Option<Priority>,
+        off: usize,
+    },
+    /// `codes`, two or more, when a file of 0.4 writes a list of them, of which `code` is the first (11.2).
+    Orient {
+        code: Orient,
+        codes: Vec<Orient>,
+        priority: Option<Priority>,
+        off: usize,
+    },
+    Layer {
+        layer: String,
+        off: usize,
+    },
+    Symbol {
+        symbol: ObjId,
+        off: usize,
+    },
+    Style {
+        style: ObjId,
+        off: usize,
+    },
+    Current {
+        direction: String,
+        off: usize,
+    },
+    Priority {
+        priority: Priority,
+        off: usize,
+        spread: Vec<ObjId>,
+    },
+    Route {
+        mode: String,
+        style: StyleMap,
+        off: usize,
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -134,6 +165,9 @@ pub struct Scene {
     /// The indexes in `at` of each object's facts, in order; `add_at` keeps it.
     pub at_by_target: HashMap<ObjId, Vec<usize>>,
     pub orient: Vec<Fact>,
+    /// The ORIENT facts written with a list of codes in a file of 0.4 (11.2), by their index in
+    /// `orient`: every code, two or more, of which one is to hold; the fact's own is the first.
+    pub orient_codes: HashMap<usize, Vec<Orient>>,
     pub appear: Vec<Fact>,
     pub styles: Vec<Fact>,
     pub layers: Vec<Fact>,
@@ -244,6 +278,7 @@ impl Scene {
             at: Vec::new(),
             at_by_target: HashMap::new(),
             orient: Vec::new(),
+            orient_codes: HashMap::new(),
             appear: Vec::new(),
             styles: Vec::new(),
             layers: Vec::new(),
@@ -1013,7 +1048,11 @@ impl Interp<'_> {
                     });
                 }
             }
-            TargetOp::Orient { code, priority, off } => {
+            TargetOp::Orient { code, codes, priority, off } => {
+                if codes.len() > 1 {
+                    let k = self.scenes[s].orient.len();
+                    self.scenes[s].orient_codes.insert(k, codes.clone());
+                }
                 self.scenes[s].orient.push(Fact {
                     pos: at,
                     target: obj,

@@ -112,6 +112,7 @@ pub(crate) fn problem_of(objects: Vec<ProblemObject>, facts: Vec<ProblemFact>) -
         name: String::new(),
         version: "0.2".to_string(),
         authored_numbers: 0,
+        orient_lists: Vec::new(),
         ids: Default::default(),
         file: "t.sp".to_string(),
         line: 1,
@@ -150,7 +151,7 @@ fn distance(sense: Sense, min: Option<f64>, max: Option<f64>, from: Vec<PointRef
 }
 
 fn distribute(members: Vec<PointRef>) -> ProblemFact {
-    fact(FactKind::Distribute { axis: Axis::X, members })
+    fact(FactKind::Distribute { axis: Axis::X, sense: Sense::Either, members })
 }
 
 fn orient(object: usize, code: Orient) -> ProblemFact {
@@ -254,7 +255,7 @@ pub(crate) fn semantic_holds(problem: &LevelProblem, kind: &FactKind, g: &Geomet
                 Sense::Either => inc || dec,
             }
         }
-        FactKind::Distribute { axis, members } => {
+        FactKind::Distribute { axis, members, .. } => {
             let vals: Vec<Q> = members.iter().map(|m| v(m, axis_of(axis))).collect();
             vals.windows(3).all(|w| &w[2] - &w[1] == &w[1] - &w[0])
         }
@@ -539,7 +540,11 @@ fn a_fact_against_a_kept_bound_that_a_held_orientation_tightened() {
                 from: vec![o(1), pin(0, 0)],
                 to: vec![o(0)],
             }),
-            fact(FactKind::Distribute { axis: Axis::Y, members: vec![o(0), pin(0, 0), pin(0, 0)] }),
+            fact(FactKind::Distribute {
+                axis: Axis::Y,
+                sense: Sense::Either,
+                members: vec![o(0), pin(0, 0), pin(0, 0)],
+            }),
         ],
     );
     let r = check(&p, &SolverOptions::without_time_limit());
@@ -1572,7 +1577,9 @@ fn random_problem(rng: &mut Rng) -> LevelProblem {
                 sense: senses[rng.below(3)],
                 members: (0..2 + rng.below(2)).map(|_| refs(rng, true)).collect(),
             },
-            4 => FactKind::Distribute { axis, members: (0..3).map(|_| refs(rng, false)).collect() },
+            4 => {
+                FactKind::Distribute { axis, sense: Sense::Either, members: (0..3).map(|_| refs(rng, false)).collect() }
+            }
             5 | 6 => {
                 let min = (rng.below(3) > 0).then(|| rng.below(4) as f64);
                 let max = if min.is_none() || rng.below(2) == 0 {

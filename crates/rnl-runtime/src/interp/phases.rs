@@ -1669,6 +1669,32 @@ impl Interp<'_> {
                 self.constraint_mut(c).failed = true;
                 continue;
             }
+            // in a file of 0.4 ORIENT-RELATION relates one object to one object: a set of more than
+            // one member in both slots is an error (5.2.1, 14.9)
+            if relation && site.as_ref().is_some_and(|c| self.follows_0_4(c.unit)) {
+                let mut sides = Vec::new();
+                for a in &cd.args[..2] {
+                    sides.push(if self.is_set(*a) { self.flatten(s, *a, 7, ctx) } else { vec![*a] });
+                }
+                if sides.iter().all(|side| side.len() > 1) {
+                    let l = self.label(c);
+                    let shown: Vec<String> = sides
+                        .iter()
+                        .map(|side| {
+                            format!("{{{}}}", side.iter().map(|m| self.label(*m)).collect::<Vec<_>>().join(" "))
+                        })
+                        .collect();
+                    self.diag_site(
+                        Severity::Error,
+                        codes::CONSTRAINT_ORIENT_RELATION_SETS_BOTH_SIDES,
+                        &site,
+                        cd.off,
+                        format!("{l} relates one object to one object, and both its slots have more than one member, {} and {}: pairing them in order and relating every pair would both make sense; this constraint fails (5.2.1, 14.9)", shown[0], shown[1]),
+                    );
+                    self.constraint_mut(c).failed = true;
+                    continue;
+                }
+            }
             // checked on its own first: one without a solution of its own fails and takes no part
             // in the resolution, nor in what a solver is given (8.5)
             if let Some(no) = self.self_contradiction(s, &cd, &members) {
@@ -1854,8 +1880,10 @@ impl Interp<'_> {
                 }
                 fixed.push(codes.into_iter().next());
             }
-            if let (Some(a), Some(b), Some(rel)) = (fixed[0], fixed[1], cd.params.relation) {
-                if b != a.then(rel) {
+            // of a list of relations, one is to hold (14.9)
+            let relations = cd.params.relations();
+            if let (Some(a), Some(b)) = (fixed[0], fixed[1]) {
+                if !relations.is_empty() && !relations.iter().any(|rel| b == a.then(*rel)) {
                     return Some(false);
                 }
             }
@@ -1897,11 +1925,18 @@ impl Interp<'_> {
                 })
             }
             ConstraintKind::Distribute => {
+                // with a sense, which a file of 0.4 writes, the members follow one another in it as
+                // for ORDER (14.4)
+                let ordered = match cd.params.sense {
+                    Some("increasing") => vals.windows(2).all(|w| w[1] - w[0] >= 1.0 - tol),
+                    Some("decreasing") => vals.windows(2).all(|w| w[0] - w[1] >= 1.0 - tol),
+                    _ => true,
+                };
                 if vals.len() < 3 {
-                    return Some(true);
+                    return Some(ordered);
                 }
                 let d0 = vals[1] - vals[0];
-                Some(vals.windows(2).all(|w| ((w[1] - w[0]) - d0).abs() <= tol))
+                Some(ordered && vals.windows(2).all(|w| ((w[1] - w[0]) - d0).abs() <= tol))
             }
             _ => Some(true),
         }

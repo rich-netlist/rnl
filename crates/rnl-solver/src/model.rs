@@ -626,9 +626,18 @@ impl Model {
                 }
                 on.extend(ps.iter().map(|p| (a, *p)));
             }
-            FactKind::Distribute { axis, members } => {
+            FactKind::Distribute { axis, sense, members } => {
                 let a = ax(*axis);
                 let ps = self.points_of(problem, members);
+                // with a sense, which a file of 0.4 writes, the members follow one another strictly
+                // in it, as for ORDER (14.4)
+                if *sense != Sense::Either {
+                    let step = Q::one() - &tol;
+                    for w in ps.windows(2) {
+                        let (lo, hi) = if *sense == Sense::Increasing { (w[0], w[1]) } else { (w[1], w[0]) };
+                        fixed.push(Bound::at_least(a, LinExpr::diff(self.var(hi), self.var(lo)), step.clone()));
+                    }
+                }
                 for w in ps.windows(3) {
                     let e = LinExpr::from_terms(
                         [(self.var(w[2]), Q::one()), (self.var(w[1]), int(-2)), (self.var(w[0]), Q::one())],

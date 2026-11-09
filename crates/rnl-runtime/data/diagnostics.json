@@ -1912,6 +1912,29 @@
    ]
   },
   {
+   "number": "RNL3121",
+   "name": "param-empty-list",
+   "severity": "error",
+   "message": "the {name} of @{kw} is a list of at least one value, not [] (5.3)",
+   "sections": [
+    "5.3",
+    "11.2",
+    "14.9"
+   ]
+  },
+  {
+   "number": "RNL3122",
+   "name": "param-axis-without-direction",
+   "severity": "error",
+   "message": "@{kw} takes a direction, one of \"left-to-right\", \"right-to-left\", \"bottom-to-top\" and \"top-to-bottom\", not {written}: a file of 0.4 writes the sense (14.1, 14.3)",
+   "sections": [
+    "14.1",
+    "14.3",
+    "14.4",
+    "14.5"
+   ]
+  },
+  {
    "number": "RNL3200",
    "name": "ref-bare-hole-outside-symbol",
    "severity": "error",
@@ -3086,6 +3109,16 @@
    "message": "{constraint} has no solution on its own: {why}; this constraint fails (8.5, {section})",
    "sections": [
     "8.5"
+   ]
+  },
+  {
+   "number": "RNL5003",
+   "name": "constraint-orient-relation-sets-both-sides",
+   "severity": "error",
+   "message": "{constraint} relates one object to one object, and both its slots have more than one member, {from} and {to}: pairing them in order and relating every pair would both make sense; this constraint fails (5.2.1, 14.9)",
+   "sections": [
+    "5.2.1",
+    "14.9"
    ]
   },
   {

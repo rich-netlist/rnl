@@ -48,17 +48,51 @@ pub struct ParamSpec {
     pub since: Option<String>,
     /// The last version that has it, none while it is kept.
     pub until: Option<String>,
+    /// Whether it takes a list of its values as well as one, such as ORIENT's codes in 0.4 (11.2).
+    pub list: bool,
+    /// Of an enumeration, the values a version adds or removes: each with the version that adds it
+    /// and the last that has it, as `values_since` and `values_until` write them.
+    pub value_versions: Vec<(String, Option<String>, Option<String>)>,
+    /// The version from which it takes a list, as `list_since` writes it.
+    pub list_since: Option<String>,
 }
 
 impl ParamSpec {
     /// An optional parameter of every version.
     pub fn new(name: impl Into<String>, ty: ParamType) -> ParamSpec {
-        ParamSpec { name: name.into(), ty, required: false, since: None, until: None }
+        ParamSpec {
+            name: name.into(),
+            ty,
+            required: false,
+            since: None,
+            until: None,
+            list: false,
+            value_versions: Vec::new(),
+            list_since: None,
+        }
     }
 
     /// Whether a file of the language version `version` has this parameter.
     pub fn in_version(&self, version: &str) -> bool {
         in_version(&self.since, &self.until, version)
+    }
+
+    /// The parameter as a file of the language version `version` has it: the values of an
+    /// enumeration of that version, and whether it takes a list there.
+    pub fn as_in(&self, version: &str) -> ParamSpec {
+        let mut p = self.clone();
+        if let ParamType::Enum(vals) = &mut p.ty {
+            vals.retain(|v| match v {
+                Literal::Str(s) => self
+                    .value_versions
+                    .iter()
+                    .find(|(w, _, _)| w == s)
+                    .is_none_or(|(_, since, until)| in_version(since, until, version)),
+                Literal::Num(_) => true,
+            });
+        }
+        p.list = self.list_since.as_deref().is_some_and(|s| in_version(&Some(s.to_string()), &None, version));
+        p
     }
 }
 
@@ -152,7 +186,14 @@ impl KeywordSig {
 
     /// The parameters a file of the language version `version` has.
     pub fn params_in(&self, version: &str) -> Vec<ParamSpec> {
-        self.param_list().iter().filter(|p| p.in_version(version)).cloned().collect()
+        self.param_list().iter().filter(|p| p.in_version(version)).map(|p| p.as_in(version)).collect()
+    }
+
+    /// The parameters that may be written by position in a file of the language version
+    /// `version`: those of `positional` that the version has, in order.
+    pub fn positional_in(&self, version: &str) -> Vec<String> {
+        let params = self.params_in(version);
+        self.positional.iter().filter(|n| params.iter().any(|p| &p.name == *n)).cloned().collect()
     }
 }
 
@@ -371,6 +412,24 @@ fn str_of(v: Option<&Value>) -> Option<String> {
     v.and_then(Value::as_str).map(String::from)
 }
 
+/// The values of an enumeration that a version adds or removes: `values_since` and `values_until`
+/// map a value to the version that adds it or the last that has it.
+fn value_versions(spec: &Value) -> Vec<(String, Option<String>, Option<String>)> {
+    let mut out: Vec<(String, Option<String>, Option<String>)> = Vec::new();
+    for (key, since) in [("values_since", true), ("values_until", false)] {
+        for (word, v) in spec.get(key).and_then(Value::as_object).into_iter().flatten() {
+            let v = v.as_str().map(String::from);
+            match out.iter_mut().find(|(w, _, _)| w == word) {
+                Some(e) if since => e.1 = v,
+                Some(e) => e.2 = v,
+                None if since => out.push((word.clone(), v, None)),
+                None => out.push((word.clone(), None, v)),
+            }
+        }
+    }
+    out
+}
+
 /// Whether the language version `version` is within `since` (0.2 when none) and `until` (no end
 /// when none), by the order of versions (16.1).
 fn in_version(since: &Option<String>, until: &Option<String>, version: &str) -> bool {
@@ -446,6 +505,9 @@ fn keyword(name: &str, spec: &Value) -> Result<KeywordSig, String> {
                     required: p.get("required").and_then(Value::as_bool).unwrap_or(false),
                     since: str_of(p.get("since")),
                     until: str_of(p.get("until")),
+                    list: false,
+                    value_versions: value_versions(p),
+                    list_since: str_of(p.get("list_since")),
                 })
                 .collect(),
         ),

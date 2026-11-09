@@ -1793,7 +1793,18 @@ impl<'p> Interp<'p> {
             self.require(kw, spec, &[], seg, ctx)?;
             return Ok(Vec::new());
         };
-        let default_order = words().keyword(kw).map(|s| s.positional.clone()).unwrap_or_default();
+        // the positional parameters of the file's version: not one that the version does not have
+        let version = self.version_of(Some(ctx.unit));
+        let default_order = words()
+            .keyword(kw)
+            .map(|s| {
+                let has = |n: &String| {
+                    let mut of = s.param_list().iter().filter(|p| &p.name == n).peekable();
+                    of.peek().is_none() || of.any(|p| p.in_version(&version))
+                };
+                s.positional.iter().filter(|n| has(n)).cloned().collect()
+            })
+            .unwrap_or_default();
         let order: Vec<String> = positional.map(|p| p.to_vec()).unwrap_or(default_order);
         if !p.positional.is_empty() {
             if order.is_empty() {
@@ -1913,6 +1924,24 @@ impl<'p> Interp<'p> {
 
     fn check_value(&mut self, kw: &str, name: &str, val: Lit, sp: Option<&ParamSpec>, ctx: &Ctx, off: usize) -> R<Lit> {
         let Some(sp) = sp else { return Ok(val) };
+        // a list of values where the version takes one, such as ORIENT's codes (11.2): each checked,
+        // at least one; a list of one is that value
+        if let (true, Lit::Arr(items)) = (sp.list, &val) {
+            if items.is_empty() {
+                return self.fail(
+                    ctx,
+                    codes::PARAM_EMPTY_LIST,
+                    format!("the {name} of @{kw} is a list of at least one value, not [] (5.3)"),
+                    off,
+                );
+            }
+            let one = ParamSpec { list: false, ..sp.clone() };
+            let mut out = Vec::new();
+            for item in items.clone() {
+                out.push(self.check_value(kw, name, item, Some(&one), ctx, off)?);
+            }
+            return Ok(if out.len() == 1 { out.remove(0) } else { Lit::Arr(out) });
+        }
         if let ParamType::Enum(vals) = &sp.ty {
             let v = match &val {
                 // a value passed into a definition is read with the aliases of the file that wrote it (16.5)
