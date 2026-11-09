@@ -26,3 +26,4 @@ Decisions made before this log started, including those from the first architect
 | [0016](0016-english-terms-are-normative-each-language-keeps-a-glossary.md) | The English terms are the only normative ones; each language keeps its own glossary | proposed |
 | [0017](0017-isolate-language-0-4-packages.md) | Language 0.4 packages stay separate from earlier languages; published 0.2/0.3 behavior stays | accepted |
 | [0018](0018-usage-points-and-body-coordinates.md) | Usages in 0.4 have their own points; general body coordinates translate from them | accepted |
+| [0019](0019-pin-identity-in-language-0-4.md) | Pins in 0.4 keep their identity through symbol bindings, geometry and writeback | proposed; implementation in progress |
