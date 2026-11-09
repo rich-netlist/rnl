@@ -27,6 +27,7 @@ pub mod phases;
 mod renames;
 pub mod scene;
 mod selfcheck;
+mod symbol_pins;
 mod topology;
 pub mod unit;
 mod usage_points;

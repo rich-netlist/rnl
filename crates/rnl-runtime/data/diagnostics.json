@@ -2787,6 +2787,27 @@
    ]
   },
   {
+   "number": "RNL4106",
+   "name": "pin-name-twice",
+   "severity": "error",
+   "message": "the local name {name} is already bound to another object of this symbol; the first binding is kept (6.6, 9.2.4)",
+   "sections": [
+    "6.6",
+    "9.2.4"
+   ]
+  },
+  {
+   "number": "RNL4107",
+   "name": "pin-name-twice-included",
+   "severity": "error",
+   "message": "the included pin name {name} is already bound in this symbol; this inclusion fails (6.6, 9.2.4, 9.2.7)",
+   "sections": [
+    "6.6",
+    "9.2.4",
+    "9.2.7"
+   ]
+  },
+  {
    "number": "RNL4110",
    "name": "pin-number-binds-no-role",
    "severity": "warning",

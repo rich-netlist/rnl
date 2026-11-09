@@ -149,6 +149,7 @@ impl<'p> Interp<'p> {
             ObjData::Inst { .. } => "instance",
             ObjData::Net { .. } => "net",
             ObjData::Term { .. } => "terminal",
+            ObjData::SymbolPin { .. } => "pin",
             ObjData::Point { .. } => "point",
             ObjData::Pos { .. } => "position",
             ObjData::Wire { .. } => "wire",
@@ -214,6 +215,7 @@ impl<'p> Interp<'p> {
                 }
             }
             ObjData::Pos { parent } => format!("{}::position", self.label(*parent)),
+            ObjData::SymbolPin { .. } => named("a pin"),
             ObjData::Wire { .. } => named("a wire"),
             ObjData::Route { net, .. } => {
                 if o.name.is_empty() {
@@ -782,6 +784,7 @@ impl<'p> Interp<'p> {
                             | ObjData::Text { .. }
                             | ObjData::Prim { .. }
                             | ObjData::Point { .. }
+                            | ObjData::SymbolPin { .. }
                             | ObjData::Symbol(_)
                             | ObjData::Style(_)
                             | ObjData::Definition(_)

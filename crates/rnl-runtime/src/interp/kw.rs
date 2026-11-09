@@ -1360,7 +1360,7 @@ impl Interp<'_> {
         let d = self.def(app.dfn).clone();
         let first = d.roles.first().map(|r| r.name.clone());
         let pt = first.as_ref().and_then(|f| app.filled.iter().find(|(n, _)| n == f).map(|(_, a)| a.obj));
-        let Some(pt) = pt.filter(|p| matches!(self.o(*p), ObjData::Point { .. })) else {
+        let Some(pt) = pt.filter(|p| self.symbol_point(*p).is_some()) else {
             return self.fail(
                 ctx,
                 codes::USAGE_IN_SYMBOL_FIRST_ROLE_NOT_POINT,
@@ -1437,9 +1437,13 @@ impl Interp<'_> {
                     match self.o(obj) {
                         ObjData::Symbol(other) => {
                             let other = (**other).clone();
+                            if self.symbol(sym).independent_pins && !self.include_pin_names(sym, &other, &sctx, a.start)
+                            {
+                                continue;
+                            }
                             merge_symbol(self.symbol_mut(sym), &other);
                         }
-                        ObjData::Point { .. } => {}
+                        ObjData::Point { .. } | ObjData::SymbolPin { .. } => {}
                         _ => {
                             self.err(
                                 &sctx,
@@ -1454,6 +1458,15 @@ impl Interp<'_> {
             }
             let (r, bound) = self.eval_member(m, &sctx);
             for (key, v) in bound {
+                let off = m
+                    .binds
+                    .iter()
+                    .rev()
+                    .find(|b| (b.prefix, &b.name) == (key.0, &key.1))
+                    .map_or(m.text_start(), |b| b.off);
+                if self.symbol(sym).independent_pins && !self.bind_symbol_name(sym, &key, v, &sctx, off) {
+                    continue;
+                }
                 nested.borrow_mut().insert(key, Nested::Val(v));
             }
             match r {
@@ -1486,7 +1499,7 @@ impl Interp<'_> {
         let mapped = self.map_args(kw, args, seg, ctx, sig_positions(kw))?;
         let p = self.params(kw, seg, ctx, &self.sig_params(kw, ctx), None, false, None)?;
         let pt = mapped["position"].obj;
-        let ObjData::Point { x: Some(x), y: Some(y), .. } = self.o(pt).clone() else {
+        let Some((x, y)) = self.symbol_point(pt) else {
             return self.fail(ctx, codes::KEYWORD_PIN_NOT_A_POINT, "PIN takes one point (9.2.4)", seg.start);
         };
         let raw = match get(&p, "terminal").cloned() {
@@ -1526,13 +1539,16 @@ impl Interp<'_> {
             "left" => 180,
             _ => 270,
         });
-        let pin = Pin { terms: terms.clone(), pos: (x, y), label, label_name_formats, dir };
+        let pin = Pin { names: Vec::new(), terms: terms.clone(), pos: (x, y), label, label_name_formats, dir };
         let symbol = ctx.frame.as_ref().unwrap().borrow().symbol.unwrap();
+        let independent = self.symbol(symbol).independent_pins;
+        let index = self.symbol(symbol).pins.len();
         add_pin(self.symbol_mut(symbol), pin);
         if x != x.round() || y != y.round() {
             self.hint_at(ctx, codes::KEYWORD_PIN_OFF_GRID, "pins are best placed on integer points (9.2.4)", seg.start);
         }
-        Ok((pt, false))
+        let result = if independent { self.new_obj(ObjData::SymbolPin { symbol, index }) } else { pt };
+        Ok((result, false))
     }
 
     fn kw_prim(&mut self, kw: &str, args: &[ArgV], seg: &Segment, ctx: &Ctx) -> R<(ObjId, bool)> {
@@ -1612,7 +1628,10 @@ impl Interp<'_> {
         let pts: Vec<ObjId> =
             if self.is_set(obj) { self.set(obj).items.iter().map(|(o, _)| *o).collect() } else { vec![obj] };
         for p in &pts {
-            if !matches!(self.o(*p), ObjData::Point { .. } | ObjData::Term { .. } | ObjData::Pos { .. }) {
+            if !matches!(
+                self.o(*p),
+                ObjData::Point { .. } | ObjData::SymbolPin { .. } | ObjData::Term { .. } | ObjData::Pos { .. }
+            ) {
                 return self.fail(
                     ctx,
                     codes::KEYWORD_GRAPHIC_NOT_POINTS,
@@ -1640,8 +1659,8 @@ impl Interp<'_> {
         if ctx.in_symbol() {
             let mut local = Vec::new();
             for q in &pts {
-                match self.o(*q) {
-                    ObjData::Point { x: Some(x), y: Some(y), local: true } => local.push((*x, *y)),
+                match self.symbol_point(*q) {
+                    Some(p) => local.push(p),
                     _ => {
                         return self.fail(
                             ctx,
@@ -1747,7 +1766,7 @@ impl Interp<'_> {
                 let index = sm.labels.len() - 1;
                 return Ok((self.new_obj(ObjData::SymLabel { symbol, index }), false));
             }
-            if let ObjData::Point { x: Some(x), y: Some(y), .. } = self.o(att.obj).clone() {
+            if let Some((x, y)) = self.symbol_point(att.obj) {
                 if key.is_some() {
                     return self.fail(
                         ctx,
@@ -1761,9 +1780,23 @@ impl Interp<'_> {
                     shape: Shape::Text,
                     points: vec![(x + d.0, y + d.1)],
                     params: PrimParams::default(),
-                    style,
+                    style: style.clone(),
                     text: Some(items),
                 });
+                if self.follows_0_4(self.source_unit(ctx)) {
+                    // Naming this graphic must not add a name to the pin it uses (5.1).
+                    return Ok((
+                        self.new_obj(ObjData::Prim {
+                            shape: Shape::Text,
+                            points: vec![att.obj],
+                            params: PrimParams::default(),
+                            style,
+                            site: Some(Rc::new(ctx.clone())),
+                            off: seg.start,
+                        }),
+                        false,
+                    ));
+                }
                 return Ok((att.obj, false));
             }
             return self.fail(

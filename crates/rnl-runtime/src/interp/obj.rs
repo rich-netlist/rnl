@@ -203,6 +203,8 @@ impl TextItems {
 /// A pin of a symbol (9.2.4).
 #[derive(Clone, Debug, PartialEq)]
 pub struct Pin {
+    /// Local names bound to this pin, in binding order (6.5, 9.2.4).
+    pub names: Vec<String>,
     /// Terminals: numbers or names; several for a bus pin.
     pub terms: Vec<TermKey>,
     pub pos: (f64, f64),
@@ -621,6 +623,11 @@ pub enum ObjData {
         x: Option<f64>,
         y: Option<f64>,
         local: bool,
+    },
+    /// A PIN result inside a symbol body, distinct from its input point (9.2.4).
+    SymbolPin {
+        symbol: ObjId,
+        index: usize,
     },
     /// `X::position` (6.5).
     Pos {

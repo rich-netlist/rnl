@@ -651,8 +651,8 @@ impl Interp<'_> {
                 if !matches!(self.o(inner), ObjData::Symbol(_)) {
                     return None;
                 }
-                let ObjData::Point { x: Some(x), y: Some(y), .. } = self.o(*pt) else { return None };
-                Some((index, inner, (*x, *y), u.sym_orient))
+                let point = self.symbol_point(*pt)?;
+                Some((index, inner, point, u.sym_orient))
             })
             .collect()
     }

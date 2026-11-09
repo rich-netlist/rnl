@@ -509,6 +509,7 @@ impl Interp<'_> {
             for (k, (idx, name)) in side.iter().enumerate() {
                 let y = h / 2.0 - 1.0 - 2.0 * k as f64;
                 sym.pins.push(Pin {
+                    names: Vec::new(),
                     terms: vec![TermKey::Num(*idx)],
                     pos: (x0, y),
                     label: name.clone(),
