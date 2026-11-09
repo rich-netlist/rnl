@@ -457,7 +457,7 @@ fn check_wires(p: &LevelProblem, solved: &Solved, e: &Exact, what: &str) {
             k
         }
         let key = |q: &PointRef| match q {
-            PointRef::Pin { object, pin, .. } => Some((0u8, *object, *pin)),
+            PointRef::Pin { object, pin, .. } | PointRef::SymbolPin { object, pin, .. } => Some((0u8, *object, *pin)),
             PointRef::Origin(k) if p.objects[*k].kind == ObjectKind::Point => Some((1, *k, 0)),
             _ => None,
         };

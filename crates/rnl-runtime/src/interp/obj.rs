@@ -310,6 +310,8 @@ pub struct SymLabel {
 
 #[derive(Clone, Debug, Default)]
 pub struct SymbolDef {
+    /// Every PIN keeps its identity in a symbol defined in 0.4 (9.2.4).
+    pub independent_pins: bool,
     /// The unit executing DEFINE-SYMBOL, not a later binding that aliases its value.
     pub unit: Option<UnitId>,
     /// The defining member, in original source coordinates.

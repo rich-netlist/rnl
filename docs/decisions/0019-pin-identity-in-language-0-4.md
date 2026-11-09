@@ -1,6 +1,6 @@
 # Pins keep their own identity in language 0.4
 
-Status: proposed; implementation in progress.
+Status: accepted; implementation in steps.
 
 ## Context
 
@@ -26,6 +26,21 @@ reference when writing a solver's pin endpoint. That cannot identify every pin.
   for relations between the owners' full orientations.
 - Keep earlier language output and problem digests unchanged. Keep the Viewer
   editing interface separate until its corresponding pin update is implemented.
+
+## Implementation steps
+
+The first change preserves every pin and its bindings, permits an omitted
+`terminal=`, and exports all connected pins to the solver. A terminal still gives
+its last pin; an earlier bus pin may use another terminal for which it is last.
+Otherwise `PointRef::SymbolPin` carries its identity and an anonymous reference,
+which the solution writer reports as unsolved. The solver handles both forms by
+owner and pin index. The constraint view and its TypeScript declaration carry
+the explicit reference form as well.
+
+Named pin objects and `::` lookup, local pin-name validation, `SET-SYMBOL` terminal
+maps, pin direction facts, selections and the pin editing interface remain later
+steps. Until named lookup is implemented, naming a local point used by PIN does
+not make that pin reachable from the scene.
 
 ## Consequences
 

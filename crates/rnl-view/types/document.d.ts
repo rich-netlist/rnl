@@ -539,6 +539,7 @@ export type ConstraintReference =
 export type ConstraintPoint =
   | { origin: number }
   | { object: number, pin: number, terminal: string }
+  | { object: number, pin: number, reference: ConstraintReference }
   | { centre: Array<ConstraintPoint> };
 
 /**

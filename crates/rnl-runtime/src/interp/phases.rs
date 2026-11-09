@@ -292,6 +292,7 @@ impl Interp<'_> {
                     self.scenes[s].symbol_won.insert(k);
                 }
                 self.set_symbol(s, o, sym);
+                self.warn_pin_bindings(s, o, fact.map(|k| &appear[k]));
             } else if matches!(self.o(o), ObjData::Inst { .. } | ObjData::Bundle { .. }) {
                 if self.inst_of(base).model_missing {
                     // nothing tells which symbol this device has, and the renderer's own would
@@ -406,6 +407,49 @@ impl Interp<'_> {
             self.symbol_order.entry(s).or_default().push(o);
         }
         self.scenes[s].symbol.insert(o, sym);
+    }
+
+    /// Matching uses the owner's electrical terminal names, or a usage's role names (11.3).
+    /// An unmatched binding leaves the pin drawn, with no connection for that binding.
+    fn warn_pin_bindings(&mut self, s: SceneId, owner: ObjId, fact: Option<&Fact>) {
+        let sym = self.scenes[s].symbol[&owner];
+        if !self.symbol(sym).independent_pins {
+            return;
+        }
+        let usage = matches!(self.o(owner), ObjData::Usage(_));
+        let terms = self.owner_terms(s, owner);
+        let cs = self.host_case(owner);
+        for (i, pin) in self.symbol(sym).pins.clone().iter().enumerate() {
+            for key in &pin.terms {
+                let bound = terms.iter().any(|(index, name)| match key {
+                    TermKey::Num(n) => !usage && n == index,
+                    TermKey::Name(n) => {
+                        name.as_ref().is_some_and(|name| if cs { name == n } else { name.eq_ignore_ascii_case(n) })
+                    }
+                });
+                if bound {
+                    continue;
+                }
+                let (code, target, binding) = match key {
+                    TermKey::Num(n) if usage => (codes::PIN_NUMBER_BINDS_NO_ROLE, "role", n.to_string()),
+                    TermKey::Name(n) if usage => (codes::PIN_TERMINAL_NAMES_NO_ROLE, "role", n.clone()),
+                    TermKey::Num(n) => (codes::PIN_TERMINAL_NOT_IN_OWNER, "terminal", n.to_string()),
+                    TermKey::Name(n) => (codes::PIN_TERMINAL_NOT_IN_OWNER, "terminal", n.clone()),
+                };
+                let message = format!(
+                    "pin {} of {}: terminal={binding} binds no {target} of {}; this binding is unconnected (11.3)",
+                    i + 1,
+                    self.label(sym),
+                    self.label(owner)
+                );
+                if let Some(f) = fact {
+                    self.diag_fact(Severity::Warning, code, f, message);
+                } else {
+                    let loc = self.symbol(sym).source.as_ref().map(|(start, _)| start.clone());
+                    self.sink.warning(code, message, loc);
+                }
+            }
+        }
     }
 
     /// The defining file does not decide how terminal names match. Retain both `P` and `p`

@@ -36,7 +36,7 @@ fn on(p: &LevelProblem, name: &str) -> Vec<String> {
     net.pins
         .iter()
         .map(|q| match q {
-            PointRef::Pin { object, .. } => p.objects[*object].label.clone(),
+            PointRef::Pin { object, .. } | PointRef::SymbolPin { object, .. } => p.objects[*object].label.clone(),
             other => panic!("not a pin: {other:?}"),
         })
         .collect()
@@ -61,7 +61,7 @@ fn the_nets_of_a_level_with_their_pins_wires_routes_and_ports() {
     assert!(vss.iter().any(|l| l == "a usage of $GND"), "{vss:?}");
     let mut sorted = p.nets.iter().find(|n| n.name == "vss").unwrap().pins.clone();
     sorted.sort_by_key(|q| match q {
-        PointRef::Pin { object, pin, .. } => (*object, *pin),
+        PointRef::Pin { object, pin, .. } | PointRef::SymbolPin { object, pin, .. } => (*object, *pin),
         _ => (usize::MAX, 0),
     });
     assert_eq!(sorted, p.nets.iter().find(|n| n.name == "vss").unwrap().pins);

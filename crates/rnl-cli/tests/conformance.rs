@@ -199,9 +199,8 @@ const KEYWORDS_NOT_READ_YET: [&str; 5] = ["ROUTE-NET", "ROUTE-OBJECT", "UNROUTE-
 
 /// The other statements of 0.4 that the draft series writes and the toolkit does not read yet: the
 /// pins as objects (5.1, 9.2.4) and the rules in the body of a definition (6.9).
-const NOT_READ_YET: [&str; 3] = [
+const NOT_READ_YET: [&str; 2] = [
     "unknown kind name pin (9.4)",
-    "@PIN lacks the parameter terminal (5.3)",
     "the body of an ordinary definition cannot reference host objects; they come in through roles (6.9)",
 ];
 

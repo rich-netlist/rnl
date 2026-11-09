@@ -21,6 +21,9 @@ fn point(r: &PointRef) -> Value {
     match r {
         PointRef::Origin(k) => json!({"origin": k}),
         PointRef::Pin { object, pin, terminal } => json!({"object": object, "pin": pin, "terminal": terminal}),
+        PointRef::SymbolPin { object, pin, reference: r } => {
+            json!({"object": object, "pin": pin, "reference": reference(r, true)})
+        }
         PointRef::Centre(points) => json!({"centre": points.iter().map(point).collect::<Vec<_>>()}),
     }
 }

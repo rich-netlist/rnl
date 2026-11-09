@@ -1388,7 +1388,7 @@ pub(crate) fn point_value(problem: &LevelProblem, g: &Geometry, r: &PointRef, ax
     };
     match r {
         PointRef::Origin(k) => origin(*k),
-        PointRef::Pin { object, pin, .. } => {
+        PointRef::Pin { object, pin, .. } | PointRef::SymbolPin { object, pin, .. } => {
             let o = problem.objects.get(*object)?;
             let pos = problem.symbols.get(o.symbol?)?.pins.get(*pin)?.pos;
             let local = (from_f64(pos.0)?, from_f64(pos.1)?);

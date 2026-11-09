@@ -317,19 +317,20 @@ impl Interp<'_> {
                     })
                     .collect();
                 for t in self.terms_of(s, o) {
-                    let Some(k) = self.pin_for(s, o, t) else { continue };
                     let ObjData::Term { owner, index, name } = self.o(t).clone() else { continue };
                     let term = match self.o(owner) {
                         ObjData::Usage(_) => name.unwrap_or_else(|| index.to_string()),
                         _ => format!("{}:{index}", self.ref_id(s, owner, ids)),
                     };
-                    if !pins[k].terminals.contains(&term) {
-                        pins[k].terminals.push(term);
-                    }
-                    for n in self.term_nets(s, t) {
-                        let net = self.ref_id(s, n, ids);
-                        if !pins[k].nets.contains(&net) {
-                            pins[k].nets.push(net);
+                    for k in self.pins_for(s, o, t) {
+                        if !pins[k].terminals.contains(&term) {
+                            pins[k].terminals.push(term.clone());
+                        }
+                        for n in self.term_nets(s, t) {
+                            let net = self.ref_id(s, n, ids);
+                            if !pins[k].nets.contains(&net) {
+                                pins[k].nets.push(net);
+                            }
                         }
                     }
                 }
@@ -750,7 +751,7 @@ impl Interp<'_> {
         };
         let mut pin_nets = vec![Vec::new(); self.symbol(sym).pins.len()];
         for t in self.terms_of(s, o) {
-            if let Some(k) = self.pin_for(s, o, t) {
+            for k in self.pins_for(s, o, t) {
                 for n in self.term_nets(s, t) {
                     let d = self.net_display(n);
                     if !pin_nets[k].contains(&d) {
