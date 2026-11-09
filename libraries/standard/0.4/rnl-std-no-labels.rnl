@@ -12,12 +12,13 @@
    (13.3). A usage drawn with a device's symbol, such as a $FIGURE with $RESISTOR, has no value or
    model to show, and its label would fail (13.6); empty, it reads nothing. A block's formula stays:
    it is part of the drawing. A symbol without one of these keys gets an empty label for it, which
-   draws nothing. */
+   draws nothing. Only objects that are drawn are selected (drawn=true, 10.1, 16.3), so that no empty
+   text lands on a usage without a symbol, such as a differential pair. */
 @RNL {
-  # @SELECT-INSTANCE(recursive=true) => @TEXT("", key="name");
-  # @SELECT-INSTANCE(recursive=true) => @TEXT("", key="value");
-  # @SELECT-INSTANCE(recursive=true) => @TEXT("", key="model");
-  # @SELECT-USAGE(recursive=true) => @TEXT("", key="name");
-  # @SELECT-USAGE(recursive=true) => @TEXT("", key="value");
-  # @SELECT-USAGE(recursive=true) => @TEXT("", key="model")
+  # @SELECT-INSTANCE(drawn=true, recursive=true) => @TEXT("", key="name");
+  # @SELECT-INSTANCE(drawn=true, recursive=true) => @TEXT("", key="value");
+  # @SELECT-INSTANCE(drawn=true, recursive=true) => @TEXT("", key="model");
+  # @SELECT-USAGE(drawn=true, recursive=true) => @TEXT("", key="name");
+  # @SELECT-USAGE(drawn=true, recursive=true) => @TEXT("", key="value");
+  # @SELECT-USAGE(drawn=true, recursive=true) => @TEXT("", key="model")
 }

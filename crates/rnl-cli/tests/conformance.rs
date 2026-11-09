@@ -198,8 +198,13 @@ fn standard_packages_check_clean() {
 const KEYWORDS_NOT_READ_YET: [&str; 5] = ["ROUTE-NET", "ROUTE-OBJECT", "UNROUTE-NET", "UNROUTE-OBJECT", "SELECT-PIN"];
 
 /// The other statements of 0.4 that the draft series writes and the toolkit does not read yet: the
-/// pins as objects (5.1, 9.2.4) and the rules in the body of a definition (6.9).
-const NOT_READ_YET: [&str; 3] = [
+/// pins as objects (5.1, 9.2.4), definition-body objects and rules (6.9, 9.4), drawn selections
+/// (10.1), and solver configuration in package headers (14.10, 16.2).
+const NOT_READ_YET: [&str; 7] = [
+    "@SOLVER-CONFIG cannot be written in a header record (2.8)",
+    "@SELECT-INSTANCE has no parameter drawn (16.4)",
+    "@SELECT-USAGE has no parameter drawn (16.4)",
+    "a statement that only draws a scene object has no level to draw in, in a package (16.2)",
     "unknown kind name pin (9.4)",
     "@PIN lacks the parameter terminal (5.3)",
     "the body of an ordinary definition cannot reference host objects; they come in through roles (6.9)",

@@ -1,10 +1,10 @@
 /* rnl-std 0.4, a package of the standard series 0.4 (16.3).
    Made from the files of the series 0.3 (libraries/standard/0.3), which say what they were
    generated from, and edited in rnl, whose files are the source.
-   The standard package of the series, used implicitly at the root of every file of the language
-   version 0.4 (16.3). A package collection: it has no content of its own and references
-   rnl-std-core, then rnl-std-fill and rnl-std-structures. Used, it brings them in in that order,
-   each once (16.2). */
+   The standard package of the series 0.4: a package collection with no content of its own that
+   brings in rnl-std-core, then rnl-std-fill and rnl-std-structures, each once (16.2). A file of the
+   language version 0.4 uses it only through USE-PACKAGE or a tool's setting (16.3); no file of 0.4
+   uses it implicitly. */
 @RNL(type="header") {
   @VERSION("0.4");
   @PACKAGE(name="rnl-std", version="0.4");

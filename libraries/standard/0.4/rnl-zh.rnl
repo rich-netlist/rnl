@@ -233,7 +233,6 @@
   @ALIAS("$电源补位集", "$SUPPLY_FILL_SET");
   @ALIAS("$带标签地网络集", "$NAMED_GROUND_NET_SET");
   @ALIAS("$带标签端子集", "$LABEL_TERMINAL_SET");
-  @ALIAS("$接线网络集", "$WIRE_NET_SET");
   @ALIAS("$N型差分对", "$DIFFERENTIAL_PAIR_N");
   @ALIAS("$P型差分对", "$DIFFERENTIAL_PAIR_P");
   @ALIAS("$电流镜", "$CURRENT_MIRROR");
@@ -296,9 +295,9 @@
   @ALIAS("端子", "t", definition="$NO_CONNECT");
   @ALIAS("挂点", "p", definition="$JUNCTION");
   @ALIAS("挂点", "p", definition="$CURRENT_ARROW");
-  @ALIAS("挂点", "p", definition="$ARROW");
-  @ALIAS("挂点", "p", definition="$SPDT_SWITCH");
-  @ALIAS("挂点", "p", definition="$FIGURE");
+  @ALIAS("挂点", "at", definition="$ARROW");
+  @ALIAS("挂点", "at", definition="$SPDT_SWITCH");
+  @ALIAS("挂点", "at", definition="$FIGURE");
   @ALIAS("端子", "t", definition="$GROUND_STUB");
   @ALIAS("间距", "gap", definition="$GROUND_STUB");
   @ALIAS("地", "g", definition="$GROUND_STUB");
@@ -325,9 +324,9 @@
   @ALIAS("轴", "axis", definition="$MIRRORED");
   @ALIAS("路径", "path", definition="$FLOW");
   @ALIAS("方向", "direction", definition="$FLOW");
-  @ALIAS("挂点", "p", definition="$DELAY_CELL");
-  @ALIAS("挂点", "p", definition="$INTEGRATOR");
-  @ALIAS("挂点", "p", definition="$DISCRETE_TIME_INTEGRATOR");
-  @ALIAS("挂点", "p", definition="$QUANTIZER");
-  @ALIAS("挂点", "p", definition="$UNIT_DELAY")
+  @ALIAS("挂点", "at", definition="$DELAY_CELL");
+  @ALIAS("挂点", "at", definition="$INTEGRATOR");
+  @ALIAS("挂点", "at", definition="$DISCRETE_TIME_INTEGRATOR");
+  @ALIAS("挂点", "at", definition="$QUANTIZER");
+  @ALIAS("挂点", "at", definition="$UNIT_DELAY")
 }

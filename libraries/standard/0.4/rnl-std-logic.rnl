@@ -3,17 +3,20 @@
    generated from, and edited in rnl, whose files are the source.
    Gates, buffer, inverter, D flip-flops, and the drawing-only delay cell.
    In rnl-std-full; a file that wants it alone names it with USE-PACKAGE (16.2).
-   Coordinates are y-up; one unit is one grid step, ten Analog Canvas units. Pins bind by terminal
-   number, so a symbol fits any dialect. */
+   Coordinates are y-up; one unit is one grid step, ten Analog Canvas units. The pins are named with
+   Analog Canvas's terminal names, which the comment above each symbol lists in order (a supply
+   terminal in brackets has no pin), and bind the terminal of that name (9.2.4, 11.3). A subcircuit
+   instance drawn with one of these symbols needs ports of these names, or terminals= on its
+   SET-SYMBOL (11.3). */
 @RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="rnl-std-logic", version="0.4")}
 
 /* ---------------------------------------------------------------- symbols (9.2) drawn from Analog Canvas */
 @RNL {
-  /* a b y (vp) (vn); from Analog Canvas and-gate */
+  /* An AND gate of two inputs. a b y (vp) (vn); from Analog Canvas and-gate */
   $AND_2INPUT = @DEFINE-SYMBOL(box=[-3, -2.4, 2, 2.4]) {
-    (-3, 1) @PIN(terminal=1, direction="left");
-    (-3, -1) @PIN(terminal=2, direction="left");
-    (2, 0) @PIN(terminal=3, direction="right");
+    %a = (-3, 1) @PIN(terminal="a", direction="left");
+    %b = (-3, -1) @PIN(terminal="b", direction="left");
+    %y = (2, 0) @PIN(terminal="y", direction="right");
     @LINE(linewidth=0.24) {(0, 1.5) (-2, 1.5) (-2, -1.5) (0, -1.5)};
     @ARC(linewidth=0.24) {(0, 1.5) (1.5, 0) (0, -1.5)};
     @LINE {(-3, 1) (-2, 1)};
@@ -22,12 +25,12 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(-0.5, 1.85)
   };
 
-  /* a b c y (vp) (vn); from Analog Canvas and-gate-3 */
+  /* An AND gate of three inputs. a b c y (vp) (vn); from Analog Canvas and-gate-3 */
   $AND_3INPUT = @DEFINE-SYMBOL(box=[-3, -2.4, 2, 2.4]) {
-    (-3, 1) @PIN(terminal=1, direction="left");
-    (-3, 0) @PIN(terminal=2, direction="left");
-    (-3, -1) @PIN(terminal=3, direction="left");
-    (2, 0) @PIN(terminal=4, direction="right");
+    %a = (-3, 1) @PIN(terminal="a", direction="left");
+    %b = (-3, 0) @PIN(terminal="b", direction="left");
+    %c = (-3, -1) @PIN(terminal="c", direction="left");
+    %y = (2, 0) @PIN(terminal="y", direction="right");
     @LINE(linewidth=0.24) {(0, 1.5) (-2, 1.5) (-2, -1.5) (0, -1.5)};
     @ARC(linewidth=0.24) {(0, 1.5) (1.5, 0) (0, -1.5)};
     @LINE {(-3, 1) (-2, 1)};
@@ -37,11 +40,11 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(-0.5, 1.85)
   };
 
-  /* a b y (vp) (vn); from Analog Canvas nand-gate */
+  /* A NAND gate of two inputs. a b y (vp) (vn); from Analog Canvas nand-gate */
   $NAND_2INPUT = @DEFINE-SYMBOL(box=[-3, -2.4, 3, 2.4]) {
-    (-3, 1) @PIN(terminal=1, direction="left");
-    (-3, -1) @PIN(terminal=2, direction="left");
-    (3, 0) @PIN(terminal=3, direction="right");
+    %a = (-3, 1) @PIN(terminal="a", direction="left");
+    %b = (-3, -1) @PIN(terminal="b", direction="left");
+    %y = (3, 0) @PIN(terminal="y", direction="right");
     @LINE(linewidth=0.24) {(0, 1.5) (-2, 1.5) (-2, -1.5) (0, -1.5)};
     @ARC(linewidth=0.24) {(0, 1.5) (1.5, 0) (0, -1.5)};
     (2.05, 0) @CIRCLE(radius=0.3375, linewidth=0.24);
@@ -51,12 +54,12 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(0, 1.85)
   };
 
-  /* a b c y (vp) (vn); from Analog Canvas nand-gate-3 */
+  /* A NAND gate of three inputs. a b c y (vp) (vn); from Analog Canvas nand-gate-3 */
   $NAND_3INPUT = @DEFINE-SYMBOL(box=[-3, -2.4, 3, 2.4]) {
-    (-3, 1) @PIN(terminal=1, direction="left");
-    (-3, 0) @PIN(terminal=2, direction="left");
-    (-3, -1) @PIN(terminal=3, direction="left");
-    (3, 0) @PIN(terminal=4, direction="right");
+    %a = (-3, 1) @PIN(terminal="a", direction="left");
+    %b = (-3, 0) @PIN(terminal="b", direction="left");
+    %c = (-3, -1) @PIN(terminal="c", direction="left");
+    %y = (3, 0) @PIN(terminal="y", direction="right");
     @LINE(linewidth=0.24) {(0, 1.5) (-2, 1.5) (-2, -1.5) (0, -1.5)};
     @ARC(linewidth=0.24) {(0, 1.5) (1.5, 0) (0, -1.5)};
     (2.05, 0) @CIRCLE(radius=0.3375, linewidth=0.24);
@@ -67,11 +70,11 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(0, 1.85)
   };
 
-  /* a b y (vp) (vn); from Analog Canvas or-gate */
+  /* An OR gate of two inputs. a b y (vp) (vn); from Analog Canvas or-gate */
   $OR_2INPUT = @DEFINE-SYMBOL(box=[-3, -2.4, 2, 2.4]) {
-    (-3, 1) @PIN(terminal=1, direction="left");
-    (-3, -1) @PIN(terminal=2, direction="left");
-    (2, 0) @PIN(terminal=3, direction="right");
+    %a = (-3, 1) @PIN(terminal="a", direction="left");
+    %b = (-3, -1) @PIN(terminal="b", direction="left");
+    %y = (2, 0) @PIN(terminal="y", direction="right");
     @ARC(linewidth=0.24, cap="round") {(-2, 1.78) (-1.25, 0) (-2, -1.78)};
     @ARC(linewidth=0.24, cap="round") {(-2, 1.78) (0.03, 1.18) (1.58, 0)};
     @ARC(linewidth=0.24, cap="round") {(-2, -1.78) (0.03, -1.18) (1.58, 0)};
@@ -81,12 +84,12 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(-0.5, 2.15)
   };
 
-  /* a b c y (vp) (vn); from Analog Canvas or-gate-3 */
+  /* An OR gate of three inputs. a b c y (vp) (vn); from Analog Canvas or-gate-3 */
   $OR_3INPUT = @DEFINE-SYMBOL(box=[-3, -2.4, 2, 2.4]) {
-    (-3, 1) @PIN(terminal=1, direction="left");
-    (-3, 0) @PIN(terminal=2, direction="left");
-    (-3, -1) @PIN(terminal=3, direction="left");
-    (2, 0) @PIN(terminal=4, direction="right");
+    %a = (-3, 1) @PIN(terminal="a", direction="left");
+    %b = (-3, 0) @PIN(terminal="b", direction="left");
+    %c = (-3, -1) @PIN(terminal="c", direction="left");
+    %y = (2, 0) @PIN(terminal="y", direction="right");
     @ARC(linewidth=0.24, cap="round") {(-2, 1.78) (-1.25, 0) (-2, -1.78)};
     @ARC(linewidth=0.24, cap="round") {(-2, 1.78) (0.03, 1.18) (1.58, 0)};
     @ARC(linewidth=0.24, cap="round") {(-2, -1.78) (0.03, -1.18) (1.58, 0)};
@@ -97,11 +100,11 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(-0.5, 2.15)
   };
 
-  /* a b y (vp) (vn); from Analog Canvas nor-gate */
+  /* A NOR gate of two inputs. a b y (vp) (vn); from Analog Canvas nor-gate */
   $NOR_2INPUT = @DEFINE-SYMBOL(box=[-3, -2.4, 3, 2.4]) {
-    (-3, 1) @PIN(terminal=1, direction="left");
-    (-3, -1) @PIN(terminal=2, direction="left");
-    (3, 0) @PIN(terminal=3, direction="right");
+    %a = (-3, 1) @PIN(terminal="a", direction="left");
+    %b = (-3, -1) @PIN(terminal="b", direction="left");
+    %y = (3, 0) @PIN(terminal="y", direction="right");
     @ARC(linewidth=0.24, cap="round") {(-2, 1.78) (-1.25, 0) (-2, -1.78)};
     @ARC(linewidth=0.24, cap="round") {(-2, 1.78) (0.03, 1.18) (1.58, 0)};
     @ARC(linewidth=0.24, cap="round") {(-2, -1.78) (0.03, -1.18) (1.58, 0)};
@@ -112,12 +115,12 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(0, 2.15)
   };
 
-  /* a b c y (vp) (vn); from Analog Canvas nor-gate-3 */
+  /* A NOR gate of three inputs. a b c y (vp) (vn); from Analog Canvas nor-gate-3 */
   $NOR_3INPUT = @DEFINE-SYMBOL(box=[-3, -2.4, 3, 2.4]) {
-    (-3, 1) @PIN(terminal=1, direction="left");
-    (-3, 0) @PIN(terminal=2, direction="left");
-    (-3, -1) @PIN(terminal=3, direction="left");
-    (3, 0) @PIN(terminal=4, direction="right");
+    %a = (-3, 1) @PIN(terminal="a", direction="left");
+    %b = (-3, 0) @PIN(terminal="b", direction="left");
+    %c = (-3, -1) @PIN(terminal="c", direction="left");
+    %y = (3, 0) @PIN(terminal="y", direction="right");
     @ARC(linewidth=0.24, cap="round") {(-2, 1.78) (-1.25, 0) (-2, -1.78)};
     @ARC(linewidth=0.24, cap="round") {(-2, 1.78) (0.03, 1.18) (1.58, 0)};
     @ARC(linewidth=0.24, cap="round") {(-2, -1.78) (0.03, -1.18) (1.58, 0)};
@@ -129,11 +132,11 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(0, 2.15)
   };
 
-  /* a b y (vp) (vn); from Analog Canvas xor-gate */
+  /* An XOR gate of two inputs. a b y (vp) (vn); from Analog Canvas xor-gate */
   $XOR_2INPUT = @DEFINE-SYMBOL(box=[-3, -2.4, 3, 2.4]) {
-    (-3, 1) @PIN(terminal=1, direction="left");
-    (-3, -1) @PIN(terminal=2, direction="left");
-    (3, 0) @PIN(terminal=3, direction="right");
+    %a = (-3, 1) @PIN(terminal="a", direction="left");
+    %b = (-3, -1) @PIN(terminal="b", direction="left");
+    %y = (3, 0) @PIN(terminal="y", direction="right");
     @ARC(linewidth=0.24, cap="round") {(-1.35, 1.78) (-0.6, 0) (-1.35, -1.78)};
     @ARC(linewidth=0.24, cap="round") {(-1.35, 1.78) (0.68, 1.18) (2.23, 0)};
     @ARC(linewidth=0.24, cap="round") {(-1.35, -1.78) (0.68, -1.18) (2.23, 0)};
@@ -144,12 +147,12 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(0, 2.15)
   };
 
-  /* a b c y (vp) (vn); from Analog Canvas xor-gate-3 */
+  /* An XOR gate of three inputs. a b c y (vp) (vn); from Analog Canvas xor-gate-3 */
   $XOR_3INPUT = @DEFINE-SYMBOL(box=[-3, -2.4, 3, 2.4]) {
-    (-3, 1) @PIN(terminal=1, direction="left");
-    (-3, 0) @PIN(terminal=2, direction="left");
-    (-3, -1) @PIN(terminal=3, direction="left");
-    (3, 0) @PIN(terminal=4, direction="right");
+    %a = (-3, 1) @PIN(terminal="a", direction="left");
+    %b = (-3, 0) @PIN(terminal="b", direction="left");
+    %c = (-3, -1) @PIN(terminal="c", direction="left");
+    %y = (3, 0) @PIN(terminal="y", direction="right");
     @ARC(linewidth=0.24, cap="round") {(-1.35, 1.78) (-0.6, 0) (-1.35, -1.78)};
     @ARC(linewidth=0.24, cap="round") {(-1.35, 1.78) (0.68, 1.18) (2.23, 0)};
     @ARC(linewidth=0.24, cap="round") {(-1.35, -1.78) (0.68, -1.18) (2.23, 0)};
@@ -161,11 +164,11 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(0, 2.15)
   };
 
-  /* a b y (vp) (vn); from Analog Canvas xnor-gate */
+  /* An XNOR gate of two inputs. a b y (vp) (vn); from Analog Canvas xnor-gate */
   $XNOR_2INPUT = @DEFINE-SYMBOL(box=[-3, -2.4, 4, 2.4]) {
-    (-3, 1) @PIN(terminal=1, direction="left");
-    (-3, -1) @PIN(terminal=2, direction="left");
-    (4, 0) @PIN(terminal=3, direction="right");
+    %a = (-3, 1) @PIN(terminal="a", direction="left");
+    %b = (-3, -1) @PIN(terminal="b", direction="left");
+    %y = (4, 0) @PIN(terminal="y", direction="right");
     @ARC(linewidth=0.24, cap="round") {(-1.35, 1.78) (-0.6, 0) (-1.35, -1.78)};
     @ARC(linewidth=0.24, cap="round") {(-1.35, 1.78) (0.68, 1.18) (2.23, 0)};
     @ARC(linewidth=0.24, cap="round") {(-1.35, -1.78) (0.68, -1.18) (2.23, 0)};
@@ -177,12 +180,12 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(0.5, 2.15)
   };
 
-  /* a b c y (vp) (vn); from Analog Canvas xnor-gate-3 */
+  /* An XNOR gate of three inputs. a b c y (vp) (vn); from Analog Canvas xnor-gate-3 */
   $XNOR_3INPUT = @DEFINE-SYMBOL(box=[-3, -2.4, 4, 2.4]) {
-    (-3, 1) @PIN(terminal=1, direction="left");
-    (-3, 0) @PIN(terminal=2, direction="left");
-    (-3, -1) @PIN(terminal=3, direction="left");
-    (4, 0) @PIN(terminal=4, direction="right");
+    %a = (-3, 1) @PIN(terminal="a", direction="left");
+    %b = (-3, 0) @PIN(terminal="b", direction="left");
+    %c = (-3, -1) @PIN(terminal="c", direction="left");
+    %y = (4, 0) @PIN(terminal="y", direction="right");
     @ARC(linewidth=0.24, cap="round") {(-1.35, 1.78) (-0.6, 0) (-1.35, -1.78)};
     @ARC(linewidth=0.24, cap="round") {(-1.35, 1.78) (0.68, 1.18) (2.23, 0)};
     @ARC(linewidth=0.24, cap="round") {(-1.35, -1.78) (0.68, -1.18) (2.23, 0)};
@@ -195,20 +198,20 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(0.5, 2.15)
   };
 
-  /* a y (vp) (vn); from Analog Canvas buffer */
+  /* A buffer. a y (vp) (vn); from Analog Canvas buffer */
   $BUFFER = @DEFINE-SYMBOL(box=[-3, -2.4, 1, 2.4]) {
-    (-3, 0) @PIN(terminal=1, direction="left");
-    (1, 0) @PIN(terminal=2, direction="right");
+    %a = (-3, 0) @PIN(terminal="a", direction="left");
+    %y = (1, 0) @PIN(terminal="y", direction="right");
     @LINE {(-3, 0) (-2, 0)};
     @LINE(linewidth=0.24) {(0.375, 0) (-2, -1.4999) (-2, 1.375) (0.375, 0)};
     @LINE {(0.375, 0) (1, 0)};
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(-1, 1.7)
   };
 
-  /* a y (vp) (vn); from Analog Canvas inverter */
+  /* An inverter (a NOT gate). a y (vp) (vn); from Analog Canvas inverter */
   $INVERTER = @DEFINE-SYMBOL(box=[-3, -2.4, 2, 2.4]) {
-    (-3, 0) @PIN(terminal=1, direction="left");
-    (2, 0) @PIN(terminal=2, direction="right");
+    %a = (-3, 0) @PIN(terminal="a", direction="left");
+    %y = (2, 0) @PIN(terminal="y", direction="right");
     @LINE {(-3, 0) (-2, 0)};
     @LINE(linewidth=0.24) {(0.3751, 0) (-2, 1.5) (-2, -1.3748) (0.3751, 0)};
     (0.7522, -0.001) @CIRCLE(radius=0.375, linewidth=0.24);
@@ -216,12 +219,12 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(-0.5, 1.85)
   };
 
-  /* d ck q qb (vp) (vn); from Analog Canvas d-flip-flop */
+  /* A D flip-flop with the outputs Q and its complement. d ck q qb (vp) (vn); from Analog Canvas d-flip-flop */
   $D_FLIP_FLOP = @DEFINE-SYMBOL(box=[-4, -2.7, 4, 2.7]) {
-    (-4, 1) @PIN(terminal=1, direction="left");
-    (-4, -1) @PIN(terminal=2, direction="left");
-    (4, 1) @PIN(terminal=3, direction="right");
-    (4, -1) @PIN(terminal=4, direction="right");
+    %d = (-4, 1) @PIN(terminal="d", direction="left");
+    %ck = (-4, -1) @PIN(terminal="ck", direction="left");
+    %q = (4, 1) @PIN(terminal="q", direction="right");
+    %qb = (4, -1) @PIN(terminal="qb", direction="right");
     @LINE {(-4, 1) (-2.5001, 1)};
     @LINE {(-4, -1) (-2.5001, -1)};
     @LINE(linewidth=0.24) {(-2.5001, 2.5) (2.5001, 2.5) (2.5001, -2.5) (-2.5001, -2.5) (-2.5001, 2.5)};
@@ -234,11 +237,11 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(0, 2.85)
   };
 
-  /* d ck q (vp) (vn); from Analog Canvas d-flip-flop-q */
+  /* A D flip-flop with the output Q only. d ck q (vp) (vn); from Analog Canvas d-flip-flop-q */
   $D_FLIP_FLOP_Q_ONLY = @DEFINE-SYMBOL(box=[-4, -2.7, 4, 2.7]) {
-    (-4, 1) @PIN(terminal=1, direction="left");
-    (-4, -1) @PIN(terminal=2, direction="left");
-    (4, 0) @PIN(terminal=3, direction="right");
+    %d = (-4, 1) @PIN(terminal="d", direction="left");
+    %ck = (-4, -1) @PIN(terminal="ck", direction="left");
+    %q = (4, 0) @PIN(terminal="q", direction="right");
     @LINE {(-4, 1) (-2.5001, 1)};
     @LINE {(-4, -1) (-2.5001, -1)};
     @LINE(linewidth=0.24) {(-2.5001, 2.5) (2.5001, 2.5) (2.5001, -2.5) (-2.5001, -2.5) (-2.5001, 2.5)};
@@ -249,13 +252,13 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(0, 2.85)
   };
 
-  /* d ck rst q qb (vp) (vn); from Analog Canvas d-flip-flop-reset */
+  /* A D flip-flop with a reset. d ck rst q qb (vp) (vn); from Analog Canvas d-flip-flop-reset */
   $D_FLIP_FLOP_WITH_RESET = @DEFINE-SYMBOL(box=[-4, -5, 4, 2.7]) {
-    (-4, 1) @PIN(terminal=1, direction="left");
-    (-4, -1) @PIN(terminal=2, direction="left");
-    (0, -5) @PIN(terminal=3, direction="down");
-    (4, 1) @PIN(terminal=4, direction="right");
-    (4, -1) @PIN(terminal=5, direction="right");
+    %d = (-4, 1) @PIN(terminal="d", direction="left");
+    %ck = (-4, -1) @PIN(terminal="ck", direction="left");
+    %rst = (0, -5) @PIN(terminal="rst", direction="down");
+    %q = (4, 1) @PIN(terminal="q", direction="right");
+    %qb = (4, -1) @PIN(terminal="qb", direction="right");
     @LINE {(-4, 1) (-2.5001, 1)};
     @LINE {(-4, -1) (-2.5001, -1)};
     @LINE(linewidth=0.24) {(-2.5001, 2.5) (2.5001, 2.5) (2.5001, -3.5) (-2.5001, -3.5) (-2.5001, 2.5)};
@@ -270,8 +273,8 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(0, 2.85)
   };
 
-  /* draws $DELAY_CELL; a y, pins that bind nothing and are wired by name (9.2.4); from Analog
-     Canvas delay-cell */
+  /* The symbol of $DELAY_CELL: a box marked as a delay. Its pins a y bind nothing and are wired by name
+     (9.2.4); from Analog Canvas delay-cell */
   $DELAY_CELL_SYMBOL = @DEFINE-SYMBOL(box=[-4, -2.4, 4, 2.4]) {
     %a = (-4, 0) @PIN(direction="left");
     %y = (4, 0) @PIN(direction="right");
@@ -292,14 +295,14 @@
      ("import_only" in its list), and draws them as $CANVAS_AND_4INPUT and the others of
      analog-canvas-extensions */
 
-  /* a b c d y (vp) (vn); from Analog Canvas and-gate-4, the inputs on integer points: the
-     outer two reach the input side drawn on to them */
+  /* An AND gate of four inputs. a b c d y (vp) (vn); from Analog Canvas and-gate-4, the inputs on integer
+     points: the outer two reach the input side drawn on to them */
   $AND_4INPUT = @DEFINE-SYMBOL(box=[-3, -2.4, 2, 2.4]) {
-    (-3, 2) @PIN(terminal=1, direction="left");
-    (-3, 1) @PIN(terminal=2, direction="left");
-    (-3, -1) @PIN(terminal=3, direction="left");
-    (-3, -2) @PIN(terminal=4, direction="left");
-    (2, 0) @PIN(terminal=5, direction="right");
+    %a = (-3, 2) @PIN(terminal="a", direction="left");
+    %b = (-3, 1) @PIN(terminal="b", direction="left");
+    %c = (-3, -1) @PIN(terminal="c", direction="left");
+    %d = (-3, -2) @PIN(terminal="d", direction="left");
+    %y = (2, 0) @PIN(terminal="y", direction="right");
     @LINE(linewidth=0.24) {(0, 1.5) (-2, 1.5) (-2, -1.5) (0, -1.5)};
     @ARC(linewidth=0.24) {(0, 1.5) (1.5, 0) (0, -1.5)};
     @LINE {(-3, 2) (-2, 2)};
@@ -312,14 +315,14 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(-0.5, 1.85)
   };
 
-  /* a b c d y (vp) (vn); from Analog Canvas nand-gate-4, the inputs on integer points: the
-     outer two reach the input side drawn on to them */
+  /* A NAND gate of four inputs. a b c d y (vp) (vn); from Analog Canvas nand-gate-4, the inputs on integer
+     points: the outer two reach the input side drawn on to them */
   $NAND_4INPUT = @DEFINE-SYMBOL(box=[-3, -2.4, 3, 2.4]) {
-    (-3, 2) @PIN(terminal=1, direction="left");
-    (-3, 1) @PIN(terminal=2, direction="left");
-    (-3, -1) @PIN(terminal=3, direction="left");
-    (-3, -2) @PIN(terminal=4, direction="left");
-    (3, 0) @PIN(terminal=5, direction="right");
+    %a = (-3, 2) @PIN(terminal="a", direction="left");
+    %b = (-3, 1) @PIN(terminal="b", direction="left");
+    %c = (-3, -1) @PIN(terminal="c", direction="left");
+    %d = (-3, -2) @PIN(terminal="d", direction="left");
+    %y = (3, 0) @PIN(terminal="y", direction="right");
     @LINE(linewidth=0.24) {(0, 1.5) (-2, 1.5) (-2, -1.5) (0, -1.5)};
     @ARC(linewidth=0.24) {(0, 1.5) (1.5, 0) (0, -1.5)};
     (2.05, 0) @CIRCLE(radius=0.3375, linewidth=0.24);
@@ -333,14 +336,14 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(0, 1.85)
   };
 
-  /* a b c d y (vp) (vn); from Analog Canvas or-gate-4, the inputs on integer points: the
-     outer two reach the input side drawn on to them */
+  /* An OR gate of four inputs. a b c d y (vp) (vn); from Analog Canvas or-gate-4, the inputs on integer
+     points: the outer two reach the input side drawn on to them */
   $OR_4INPUT = @DEFINE-SYMBOL(box=[-3, -2.4, 2, 2.4]) {
-    (-3, 2) @PIN(terminal=1, direction="left");
-    (-3, 1) @PIN(terminal=2, direction="left");
-    (-3, -1) @PIN(terminal=3, direction="left");
-    (-3, -2) @PIN(terminal=4, direction="left");
-    (2, 0) @PIN(terminal=5, direction="right");
+    %a = (-3, 2) @PIN(terminal="a", direction="left");
+    %b = (-3, 1) @PIN(terminal="b", direction="left");
+    %c = (-3, -1) @PIN(terminal="c", direction="left");
+    %d = (-3, -2) @PIN(terminal="d", direction="left");
+    %y = (2, 0) @PIN(terminal="y", direction="right");
     @ARC(linewidth=0.24, cap="round") {(-2, 1.78) (-1.25, 0) (-2, -1.78)};
     @ARC(linewidth=0.24, cap="round") {(-2, 1.78) (0.03, 1.18) (1.58, 0)};
     @ARC(linewidth=0.24, cap="round") {(-2, -1.78) (0.03, -1.18) (1.58, 0)};
@@ -354,14 +357,14 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(-0.5, 2.15)
   };
 
-  /* a b c d y (vp) (vn); from Analog Canvas nor-gate-4, the inputs on integer points: the
-     outer two reach the input side drawn on to them */
+  /* A NOR gate of four inputs. a b c d y (vp) (vn); from Analog Canvas nor-gate-4, the inputs on integer
+     points: the outer two reach the input side drawn on to them */
   $NOR_4INPUT = @DEFINE-SYMBOL(box=[-3, -2.4, 3, 2.4]) {
-    (-3, 2) @PIN(terminal=1, direction="left");
-    (-3, 1) @PIN(terminal=2, direction="left");
-    (-3, -1) @PIN(terminal=3, direction="left");
-    (-3, -2) @PIN(terminal=4, direction="left");
-    (3, 0) @PIN(terminal=5, direction="right");
+    %a = (-3, 2) @PIN(terminal="a", direction="left");
+    %b = (-3, 1) @PIN(terminal="b", direction="left");
+    %c = (-3, -1) @PIN(terminal="c", direction="left");
+    %d = (-3, -2) @PIN(terminal="d", direction="left");
+    %y = (3, 0) @PIN(terminal="y", direction="right");
     @ARC(linewidth=0.24, cap="round") {(-2, 1.78) (-1.25, 0) (-2, -1.78)};
     @ARC(linewidth=0.24, cap="round") {(-2, 1.78) (0.03, 1.18) (1.58, 0)};
     @ARC(linewidth=0.24, cap="round") {(-2, -1.78) (0.03, -1.18) (1.58, 0)};
@@ -376,14 +379,14 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(0, 2.15)
   };
 
-  /* a b c d y (vp) (vn); from Analog Canvas xor-gate-4, the inputs on integer points: the
-     outer two reach the input side drawn on to them */
+  /* An XOR gate of four inputs. a b c d y (vp) (vn); from Analog Canvas xor-gate-4, the inputs on integer
+     points: the outer two reach the input side drawn on to them */
   $XOR_4INPUT = @DEFINE-SYMBOL(box=[-3, -2.4, 3, 2.4]) {
-    (-3, 2) @PIN(terminal=1, direction="left");
-    (-3, 1) @PIN(terminal=2, direction="left");
-    (-3, -1) @PIN(terminal=3, direction="left");
-    (-3, -2) @PIN(terminal=4, direction="left");
-    (3, 0) @PIN(terminal=5, direction="right");
+    %a = (-3, 2) @PIN(terminal="a", direction="left");
+    %b = (-3, 1) @PIN(terminal="b", direction="left");
+    %c = (-3, -1) @PIN(terminal="c", direction="left");
+    %d = (-3, -2) @PIN(terminal="d", direction="left");
+    %y = (3, 0) @PIN(terminal="y", direction="right");
     @ARC(linewidth=0.24, cap="round") {(-1.35, 1.78) (-0.6, 0) (-1.35, -1.78)};
     @ARC(linewidth=0.24, cap="round") {(-1.35, 1.78) (0.68, 1.18) (2.23, 0)};
     @ARC(linewidth=0.24, cap="round") {(-1.35, -1.78) (0.68, -1.18) (2.23, 0)};
@@ -398,14 +401,14 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(0, 2.15)
   };
 
-  /* a b c d y (vp) (vn); from Analog Canvas xnor-gate-4, the inputs on integer points: the
-     outer two reach the input side drawn on to them */
+  /* An XNOR gate of four inputs. a b c d y (vp) (vn); from Analog Canvas xnor-gate-4, the inputs on integer
+     points: the outer two reach the input side drawn on to them */
   $XNOR_4INPUT = @DEFINE-SYMBOL(box=[-3, -2.4, 4, 2.4]) {
-    (-3, 2) @PIN(terminal=1, direction="left");
-    (-3, 1) @PIN(terminal=2, direction="left");
-    (-3, -1) @PIN(terminal=3, direction="left");
-    (-3, -2) @PIN(terminal=4, direction="left");
-    (4, 0) @PIN(terminal=5, direction="right");
+    %a = (-3, 2) @PIN(terminal="a", direction="left");
+    %b = (-3, 1) @PIN(terminal="b", direction="left");
+    %c = (-3, -1) @PIN(terminal="c", direction="left");
+    %d = (-3, -2) @PIN(terminal="d", direction="left");
+    %y = (4, 0) @PIN(terminal="y", direction="right");
     @ARC(linewidth=0.24, cap="round") {(-1.35, 1.78) (-0.6, 0) (-1.35, -1.78)};
     @ARC(linewidth=0.24, cap="round") {(-1.35, 1.78) (0.68, 1.18) (2.23, 0)};
     @ARC(linewidth=0.24, cap="round") {(-1.35, -1.78) (0.68, -1.18) (2.23, 0)};
@@ -424,8 +427,8 @@
 
 /* ---------------------------------------------------------------- rnl-std-logic: drawing-only parts (9.2.7, 13.4) */
 @RNL {
-  /* only drawn, with no netlist line: a usage on a point, drawn by the definition's _SYMBOL at
-     its own point, which the body ties to the point (12.1 item 5) */
-  $DELAY_CELL = @DEFINE(roles=[["p", "point"]]) { {? ?p} @ALIGN("x"); {? ?p} @ALIGN("y") };
+  /* A delay cell drawn as a figure on a point, with no netlist line. It is a usage on a point, drawn by the
+     definition's _SYMBOL at its own point, which the body ties to the point (12.1 item 5) */
+  $DELAY_CELL = @DEFINE(roles=[["at", "point"]]) { {? ?at} @ALIGN("x"); {? ?at} @ALIGN("y") };
   # @SELECT-USAGE(recursive=true) $DELAY_CELL => @SET-SYMBOL $DELAY_CELL_SYMBOL
 }

@@ -9,10 +9,15 @@
   /* lines as Analog Canvas draws them (razavi-textbook-v1): wires and normal strokes 0.16 wide, with
      butt caps and miter joins. A symbol writes the width of its emphasis (0.24) and ground (0.2907)
      strokes, and a round cap or join, itself; a bus is "bold", twice as wide (9.3) */
+  /* The base style of every object: lines, texts and fills as Analog Canvas draws them. */
   $base = @DEFINE-STYLE(linecolor="#1d1d1f", textcolor="#1d1d1f", fillcolor="#ffffff", linewidth=0.16, cap="butt", join="miter", size=1) {};
+  /* The style of a bus: its lines bold. */
   $bus = @DEFINE-STYLE(linestyle="bold") {};
+  /* A style for signal wires: blue and bold. */
   $signal = @DEFINE-STYLE(linecolor="#1f4fd8", linestyle="bold") {$base};
+  /* A style for notes: grey, smaller text. */
   $note = @DEFINE-STYLE(textcolor="#555555", size=0.9) {};
+  /* A grey style for lines and texts. */
   $grey = @DEFINE-STYLE(linecolor="#9a9a9a", textcolor="#9a9a9a") {};
 
   /* style first, so every later rule and user statement overrides it */

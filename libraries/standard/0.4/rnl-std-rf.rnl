@@ -3,17 +3,20 @@
    generated from, and edited in rnl, whose files are the source.
    RF parts: the center-tap inductor and the T-coil.
    In rnl-std-full; a file that wants it alone names it with USE-PACKAGE (16.2).
-   Coordinates are y-up; one unit is one grid step, ten Analog Canvas units. Pins bind by terminal
-   number, so a symbol fits any dialect. */
+   Coordinates are y-up; one unit is one grid step, ten Analog Canvas units. The pins are named with
+   Analog Canvas's terminal names, which the comment above each symbol lists in order (a supply
+   terminal in brackets has no pin), and bind the terminal of that name (9.2.4, 11.3). A subcircuit
+   instance drawn with one of these symbols needs ports of these names, or terminals= on its
+   SET-SYMBOL (11.3). */
 @RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="rnl-std-rf", version="0.4")}
 
 /* ---------------------------------------------------------------- symbols (9.2) drawn from Analog Canvas */
 @RNL {
-  /* n1 n2 tap; from Analog Canvas center-tap-inductor */
+  /* An inductor with a center tap. n1 n2 tap; from Analog Canvas center-tap-inductor */
   $CENTER_TAP_INDUCTOR = @DEFINE-SYMBOL(box=[-5, -2, 5, 1.6]) {
-    (-5, 0) @PIN(terminal=1, direction="left");
-    (5, 0) @PIN(terminal=2, direction="right");
-    (0, -2) @PIN(terminal=3, direction="down");
+    %n1 = (-5, 0) @PIN(terminal="n1", direction="left");
+    %n2 = (5, 0) @PIN(terminal="n2", direction="right");
+    %tap = (0, -2) @PIN(terminal="tap", direction="down");
     @LINE {(-5, 0) (-4.5, 0)};
     @ARC(cap="round") {(-4.5, 0) (-4.3536, 0.3536) (-4, 0.5)};
     @ARC {(-4, 0.5) (-3.6464, 0.3536) (-3.5, 0)};
@@ -34,11 +37,11 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(0, 0.85)
   };
 
-  /* n1 n2 tap; from Analog Canvas tcoil */
+  /* A T-coil: two coupled coils with a center tap and a bridging capacitor. n1 n2 tap; from Analog Canvas tcoil */
   $T_COIL = @DEFINE-SYMBOL(box=[-9, -2, 9, 5.6]) {
-    (-9, 0) @PIN(terminal=1, direction="left");
-    (9, 0) @PIN(terminal=2, direction="right");
-    (0, -2) @PIN(terminal=3, direction="down");
+    %n1 = (-9, 0) @PIN(terminal="n1", direction="left");
+    %n2 = (9, 0) @PIN(terminal="n2", direction="right");
+    %tap = (0, -2) @PIN(terminal="tap", direction="down");
     @LINE {(-9, 0) (-6.0624, 0)};
     @ARC(cap="round") {(-6.0624, 0) (-5.916, -0.3536) (-5.5624, -0.5)};
     @ARC {(-5.5624, -0.5) (-5.2089, -0.3536) (-5.0624, 0)};
