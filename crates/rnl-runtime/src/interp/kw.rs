@@ -1284,6 +1284,11 @@ impl Interp<'_> {
             u.frame = Some(fr.clone());
             u.ctx_origin = origin.clone();
         }
+        let mut body_ctx = ctx.clone();
+        body_ctx.frame = Some(fr.clone());
+        body_ctx.origin = origin.clone();
+        body_ctx.nested = None;
+        self.register_place_body(body, &body_ctx);
         for (k, m) in body.members.iter().enumerate() {
             if m.error.is_some() {
                 continue;

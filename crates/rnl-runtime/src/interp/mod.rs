@@ -19,6 +19,7 @@ mod numbers;
 pub mod obj;
 mod output;
 mod packages;
+mod places;
 /// The name of the standard package that the setting of 16.3 brings in at the root.
 pub use packages::STD_NAME;
 pub mod phases;
@@ -213,6 +214,8 @@ pub struct Interp<'p> {
     /// A statement found to close a cycle of sets after a statement placed before it was
     /// evaluated: the run stops, and the interpretation is run again with it in `closing`.
     pub(crate) restart: Option<(cycles::StmtKey, String)>,
+    /// Dependencies of member-place references on edits, including edits written later (5.2.3).
+    places: places::Places,
     pub(crate) std_enabled: bool,
     /// [`Options::std_version`].
     pub(crate) std_version: Option<String>,
@@ -334,6 +337,7 @@ impl<'p> Interp<'p> {
             later_sources: HashMap::new(),
             closing: HashMap::new(),
             restart: None,
+            places: places::Places::default(),
             std_enabled: options.std,
             std_version: options.std_version.clone(),
             read_generated: options.generated,
@@ -508,15 +512,24 @@ impl<'p> Interp<'p> {
 
     /// [`Self::run_settled`] without the output: the interpreter of the last run.
     fn settled(mut self, again: impl Fn(Interp<'p>) -> Interp<'p>) -> Interp<'p> {
-        self.run();
-        while let Some((key, msg)) = self.restart.take() {
+        loop {
+            self.run();
+            let restart = self.restart.take();
+            let changed = restart.is_none() && self.settle_places();
+            if restart.is_none() && !changed {
+                return self;
+            }
             let mut closing = std::mem::take(&mut self.closing);
-            closing.insert(key, msg);
+            if let Some((key, msg)) = restart {
+                closing.insert(key, msg);
+                // A dropped edit may remove a dependency discovered by a provisional reading.
+                self.places.plans.clear();
+            }
+            let plans = std::mem::take(&mut self.places.plans);
             self = again(self);
             self.closing = closing;
-            self.run();
+            self.places.plans = plans;
         }
-        self
     }
 
     /// Evaluate the statements of a unit without a circuit once: definitions, rules, errors.
@@ -525,6 +538,9 @@ impl<'p> Interp<'p> {
             return;
         }
         self.units[u].classified = true;
+        for m in self.units[u].members.clone() {
+            self.register_place_root(u, &m, None);
+        }
         for m in self.units[u].members.clone() {
             let _ = self.eval_member_at(u, m.rec, m.k, m.embedded, &m.m, None, m.header.clone(), None, "");
         }
@@ -563,6 +579,9 @@ impl<'p> Interp<'p> {
         // members are its own as well, evaluated in its unit
         let own = self.units[unit].members.iter().chain(&self.units[unit].scope_members);
         work.extend(own.map(|m| Work { u: unit, m: m.clone() }));
+        for w in &work {
+            self.register_place_root(w.u, &w.m, Some(s));
+        }
         for w in work {
             if self.restart.is_some() {
                 return;

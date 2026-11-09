@@ -38,7 +38,7 @@ use crate::diag::codes;
 use crate::host::LevelId;
 use crate::numbering::{check, LevelNumbering, RecordNumbering};
 use crate::problem::written_name;
-use crate::syntax::{statement_tokens, uses_number, Ref};
+use crate::syntax::{statement_tokens_features, uses_number, Ref};
 
 use super::ctx::{Ctx, StmtSpan};
 use super::eval::{Stop, R};
@@ -700,7 +700,10 @@ impl Interp<'_> {
         };
         if let Some(st) = b.stmt {
             let text = texts.entry(st).or_insert_with(|| match st.rec {
-                Some(rec) => statement_tokens(&self.record_chars(rec), st.start, st.end).join(" "),
+                Some(rec) => {
+                    let places = self.follows_0_4(self.rec_unit[rec]);
+                    statement_tokens_features(&self.record_chars(rec), st.start, st.end, places).join(" ")
+                }
                 None => String::new(),
             });
             line.push_str(text);

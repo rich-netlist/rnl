@@ -599,10 +599,24 @@ impl<'p> Interp<'p> {
             _ => return Ok(NOTHING),
         };
         let home = self.home_scene(b.owner);
-        let scene = if home.is_some() && ctx.scene == home { ctx.scene } else { home };
         let mkey = b.key();
-        let val =
-            self.eval_member_at(b.owner, b.rec, b.index, b.embedded, &b.member, scene, b.header.clone(), None, "")?;
+        let scene = if self.places.rules.contains(&mkey) { ctx.scene } else { home };
+        let val = match self.eval_member_at(
+            b.owner,
+            b.rec,
+            b.index,
+            b.embedded,
+            &b.member,
+            scene,
+            b.header.clone(),
+            None,
+            "",
+        ) {
+            Err(Stop::NoCircuit) if ctx.scene.is_some() && scene != ctx.scene && self.places.rules.contains(&mkey) => {
+                return self.binding_value(found, ctx);
+            }
+            other => other?,
+        };
         let val = self.bound_value(&mkey, scene, b.prefix, &b.name, val);
         if ctx.scene.is_some() && scene != ctx.scene && self.scene_bound(val) {
             return Err(Stop::LocalRef);
@@ -976,6 +990,7 @@ impl<'p> Interp<'p> {
                     .insert((b.prefix, b.name.clone()), Nested::Member(MemberRef { rec: ctx.rec, m: m.clone() }, k));
             }
         }
+        self.register_place_nested(e, ctx, &nested);
         for (k, m) in e.members.iter().enumerate() {
             if let Some(err) = &m.error {
                 self.err(ctx, err.code, err.message.clone(), m.error_pos);
@@ -1123,6 +1138,10 @@ impl<'p> Interp<'p> {
                 return Err(Stop::Fail(Some(id)));
             }
             sel = self.is_lazy(obj);
+        }
+        if let Some(places) = &e.places {
+            obj = self.member_places(obj, places, e.start, ctx)?;
+            sel = false;
         }
         for p in &e.path {
             obj = self.subobject(obj, p, ctx, e)?;

@@ -546,7 +546,9 @@ impl Interp<'_> {
             return a.clone();
         }
         let numbers = self.follows_0_3(self.rec_unit[rec]);
-        let a = Rc::new(syntax::parse_record_with(&self.recs[rec].text, numbers));
+        let places = self.follows_0_4(self.rec_unit[rec]);
+        self.places.enabled |= places;
+        let a = Rc::new(syntax::parse_record_features(&self.recs[rec].text, numbers, places));
         self.asts[rec] = Some(a.clone());
         a
     }

@@ -72,6 +72,74 @@ pub struct Sub {
     pub items: Vec<SubItem>,
 }
 
+/// A place counted from the beginning or the end of a set (5.2.3).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MemberPlace {
+    Index(u64),
+    End(u64),
+}
+
+impl MemberPlace {
+    fn value(self, len: usize) -> i128 {
+        match self {
+            Self::Index(n) => i128::from(n),
+            Self::End(back) => len as i128 - i128::from(back),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum PlaceItem {
+    One(MemberPlace),
+    Range(MemberPlace, MemberPlace, u64),
+}
+
+/// Member places in braces directly after a reference (5.2.3).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MemberPlaces {
+    pub items: Vec<PlaceItem>,
+}
+
+impl MemberPlaces {
+    pub fn single(&self) -> bool {
+        matches!(self.items.as_slice(), [PlaceItem::One(_)])
+    }
+
+    /// Zero-based positions that exist, in written order, including repeats. Clip a range before
+    /// walking it, so an out-of-range end cannot make the work exceed the set's own size.
+    pub fn expand(&self, len: usize) -> Vec<usize> {
+        let mut out = Vec::new();
+        let last = len as i128;
+        for item in &self.items {
+            match *item {
+                PlaceItem::One(p) => {
+                    let p = p.value(len);
+                    if p >= 1 && p <= last {
+                        out.push((p - 1) as usize);
+                    }
+                }
+                PlaceItem::Range(a, b, step) => {
+                    let (a, b, step) = (a.value(len), b.value(len), i128::from(step));
+                    if a <= b {
+                        let mut p = a + ((1 - a).max(0) + step - 1) / step * step;
+                        while p <= b.min(last) {
+                            out.push((p - 1) as usize);
+                            p += step;
+                        }
+                    } else {
+                        let mut p = a - ((a - last).max(0) + step - 1) / step * step;
+                        while p >= b.max(1) {
+                            out.push((p - 1) as usize);
+                            p -= step;
+                        }
+                    }
+                }
+            }
+        }
+        out
+    }
+}
+
 impl Sub {
     /// The one number of a subscript that names a single host name, such as `<3>`.
     pub fn single(&self) -> Option<u64> {
@@ -142,6 +210,7 @@ pub struct Ref {
     pub name: Option<String>,
     pub quoted: bool,
     pub sub: Option<Sub>,
+    pub places: Option<MemberPlaces>,
     pub path: Vec<PathItem>,
     pub start: Off,
     pub end: Off,
@@ -164,6 +233,9 @@ impl Ref {
         }
         if self.sub.is_some() {
             s.push_str("<…>");
+        }
+        if self.places.is_some() {
+            s.push_str("{…}");
         }
         for p in &self.path {
             s.push_str(if p.sep == Sep::Term { ":" } else { "::" });
@@ -360,11 +432,12 @@ struct Parser {
     /// Read `%#` and a number as a reference, as a file of the draft 0.3 does (5.9); otherwise `%#`
     /// is a lexical error, as in 0.2.
     numbers: bool,
+    member_places: bool,
 }
 
 impl Parser {
     fn new(text: &str, numbers: bool) -> Parser {
-        Parser { t: text.chars().collect(), i: 0, notes: Vec::new(), next_id: 0, numbers }
+        Parser { t: text.chars().collect(), i: 0, notes: Vec::new(), next_id: 0, numbers, member_places: false }
     }
 
     fn id(&mut self) -> NodeId {
@@ -892,6 +965,21 @@ impl Parser {
                 );
             }
         }
+        let places =
+            if self.member_places && self.peek() == Some('{') && name.is_some() && matches!(prefix, '%' | '$' | '?') {
+                let opening = self.i;
+                match self.places() {
+                    Ok(places) => Some(places),
+                    Err(error) => {
+                        // Recovery must see this opening brace, or its closing brace would end the
+                        // surrounding record and discard the statements after the malformed places.
+                        self.i = opening;
+                        return Err(error);
+                    }
+                }
+            } else {
+                None
+            };
         let mut path = Vec::new();
         loop {
             if self.starts_with("::") {
@@ -955,7 +1043,94 @@ impl Parser {
                 start,
             );
         }
-        Ok(Ref { id, prefix, name, quoted, sub, path, start, end: self.i, written: None, number })
+        if self.member_places && self.peek() == Some('{') {
+            return self.err(
+                codes::SYNTAX_PLACES_TOUCHING_BRACES,
+                "member places touch a named reference, before its path; write a space before a separate set (5.2.3)",
+            );
+        }
+        Ok(Ref { id, prefix, name, quoted, sub, places, path, start, end: self.i, written: None, number })
+    }
+
+    fn places(&mut self) -> PResult<MemberPlaces> {
+        self.i += 1;
+        let mut items = Vec::new();
+        loop {
+            self.skip_ws()?;
+            if self.peek_in("#&%$?{(") {
+                return self.err(
+                    codes::SYNTAX_PLACES_TOUCHING_BRACES,
+                    "braces touching a reference hold member places; write a space before a separate set (5.2.3)",
+                );
+            }
+            let a = self.member_place()?;
+            self.skip_ws()?;
+            let item = if self.peek() == Some(':') {
+                self.i += 1;
+                self.skip_ws()?;
+                let b = self.member_place()?;
+                self.skip_ws()?;
+                let step = if self.peek() == Some(':') {
+                    self.i += 1;
+                    self.skip_ws()?;
+                    match self.number_u64() {
+                        Some(n) if n > 0 => n,
+                        _ => {
+                            return self.err(
+                                codes::SYNTAX_PLACES_INVALID,
+                                "the step of member places is an integer of at least 1 (5.2.3)",
+                            )
+                        }
+                    }
+                } else {
+                    1
+                };
+                PlaceItem::Range(a, b, step)
+            } else {
+                PlaceItem::One(a)
+            };
+            items.push(item);
+            self.skip_ws()?;
+            match self.peek() {
+                Some(',') => self.i += 1,
+                Some('}') => {
+                    self.i += 1;
+                    return Ok(MemberPlaces { items });
+                }
+                None => return self.err(codes::SYNTAX_PLACES_NOT_CLOSED, "the member places are not closed (5.2.3)"),
+                _ => {
+                    return self.err(
+                        codes::SYNTAX_PLACES_INVALID,
+                        "member places are i, a:b or a:b:s, separated by commas (5.2.3)",
+                    )
+                }
+            }
+        }
+    }
+
+    fn member_place(&mut self) -> PResult<MemberPlace> {
+        if self.starts_with("end") {
+            self.i += 3;
+            self.skip_ws()?;
+            let back = if self.peek() == Some('-') {
+                self.i += 1;
+                self.skip_ws()?;
+                match self.number_u64() {
+                    Some(n) => n,
+                    None => {
+                        return self
+                            .err(codes::SYNTAX_PLACES_INVALID, "end- is followed by an unsigned integer (5.2.3)")
+                    }
+                }
+            } else {
+                0
+            };
+            return Ok(MemberPlace::End(back));
+        }
+        match self.number_u64() {
+            Some(n) if n > 0 => Ok(MemberPlace::Index(n)),
+            _ => self.err(codes::SYNTAX_PLACES_INVALID, "a member place is a positive integer, end or end-k (5.2.3)"),
+        }
     }
 
     /// The number of `%#3`, at the `#` (the draft 0.3, 5.9): digits, which take no subscript and
@@ -1448,6 +1623,13 @@ pub fn parse_record_with(text: &str, numbers: bool) -> RecordAst {
     Parser::new(text, numbers).record()
 }
 
+/// Parse the versioned forms of references: object numbers since 0.3, member places since 0.4.
+pub fn parse_record_features(text: &str, numbers: bool, member_places: bool) -> RecordAst {
+    let mut parser = Parser::new(text, numbers);
+    parser.member_places = member_places;
+    parser.record()
+}
+
 /// Does a member use a number, such as `%#3`, anywhere in it, definition bodies included (the
 /// draft 0.3, 5.9)?
 pub fn uses_number(m: &Member) -> bool {
@@ -1472,6 +1654,12 @@ pub fn uses_number(m: &Member) -> bool {
 ///   `=` is a token, and so is each string (in its quotes, a `"` doubled as written), number,
 ///   name, `_` and placeholder, so the point `(_, _)` is `( _ , _ )`.
 pub fn statement_tokens(t: &[char], start: usize, end: usize) -> Vec<String> {
+    statement_tokens_features(t, start, end, false)
+}
+
+/// The tokens of a statement with the member-place parts of 0.4 included (5.9). Earlier files
+/// keep their original checks: digits and `end` between ordinary set braces were free text.
+pub fn statement_tokens_features(t: &[char], start: usize, end: usize, member_places: bool) -> Vec<String> {
     let end = end.min(t.len());
     let at = |j: usize| if j < end { Some(t[j]) } else { None };
     let text = |a: usize, b: usize| -> String { t[a..b].iter().collect() };
@@ -1479,6 +1667,9 @@ pub fn statement_tokens(t: &[char], start: usize, end: usize) -> Vec<String> {
     let mut i = start.min(end);
     // inside the brackets of a point, of parameters or of a role, where nothing is free text
     let mut depth = 0usize;
+    let mut places = false;
+    let mut after_reference = None;
+    let mut after_places = None;
     while i < end {
         let c = t[i];
         if matches!(c, ' ' | '\t' | '\n' | '\r') {
@@ -1487,6 +1678,35 @@ pub fn statement_tokens(t: &[char], start: usize, end: usize) -> Vec<String> {
         }
         if c == '/' && at(i + 1) == Some('*') {
             i = (i + 2..end.saturating_sub(1)).find(|&j| t[j] == '*' && t[j + 1] == '/').map_or(end, |j| j + 2);
+            continue;
+        }
+        if member_places && c == '{' && after_reference == Some(i) {
+            places = true;
+            out.push("{".into());
+            i += 1;
+            continue;
+        }
+        if places {
+            let j = if c.is_ascii_digit() || c.is_ascii_alphabetic() { word_end(t, i, end) } else { i + 1 };
+            out.push(text(i, j));
+            if c == '}' {
+                places = false;
+                after_places = Some(j);
+            }
+            i = j;
+            continue;
+        }
+        if c == ':' && after_places == Some(i) {
+            let mut j = i;
+            while at(j) == Some(':') {
+                j += 1;
+                if at(j) == Some(':') {
+                    j += 1;
+                }
+                j = if at(j) == Some('"') { string_end(t, j, end) } else { word_end(t, j, end) };
+            }
+            out.push(text(i, j));
+            i = j;
             continue;
         }
         if c == '"' {
@@ -1552,6 +1772,7 @@ pub fn statement_tokens(t: &[char], start: usize, end: usize) -> Vec<String> {
                 let (j, token) = reference_token(t, i, end);
                 out.push(token);
                 i = j;
+                after_reference = Some(j);
             }
             // free text
             _ => i += 1,
@@ -1716,6 +1937,59 @@ fn walk_val<'a>(v: &'a Value, out: &mut Vec<RefOrHole<'a>>) {
 mod tests {
     use super::*;
 
+    fn places(text: &str) -> MemberPlaces {
+        let r = parse_record_features(&format!("@RNL {{ %a{{{text}}} }}"), true, true);
+        assert!(r.error.is_none(), "{:?}", r.error);
+        let body = r.body.unwrap();
+        assert!(body.members[0].error.is_none(), "{:?}", body.members[0].error);
+        let ObjExpr::Ref(r) = &body.members[0].segments[0].args[0].obj else { panic!() };
+        r.places.clone().unwrap()
+    }
+
+    #[test]
+    fn member_places_keep_order_repeats_and_clip_ranges_without_overflow() {
+        assert_eq!(places("1, end, end-1, 3:1, 1:5:2").expand(4), [0, 3, 2, 2, 1, 0, 0, 2]);
+        assert_eq!(places("end-9:2:2").expand(4), [0]);
+        assert_eq!(places("18446744073709551615:1:2").expand(4), [2, 0]);
+        assert_eq!(places("1:18446744073709551615:2").expand(4), [0, 2]);
+        assert!(places("1, end, end-1, 3:1").expand(0).is_empty());
+        assert!(places("5, end-5").expand(4).is_empty());
+        assert!(places("end").single());
+        assert!(!places("1:1").single());
+        assert_eq!(places("1 /* comment */, end - 0").expand(3), [0, 2]);
+    }
+
+    #[test]
+    fn member_places_are_only_read_when_enabled() {
+        let source = "@RNL { %a{#b}; $S{#b}; ?ref{#b} }";
+        for numbers in [false, true] {
+            let old = parse_record_with(source, numbers);
+            assert!(old.error.is_none(), "{:?}", old.error);
+            assert!(old.body.unwrap().members.iter().all(|m| m.error.is_none()));
+        }
+        let new = parse_record_features(source, true, true);
+        assert!(new.body.unwrap().members.iter().all(|m| m.error.is_some()));
+        let new = parse_record_features("@RNL { %a {#b}; $S{1}; ?ref{end}::position; %\"a b\"{1:1} }", true, true);
+        let body = new.body.unwrap();
+        assert!(body.members.iter().all(|m| m.error.is_none()), "{body:?}");
+        assert_eq!(body.members[0].segments[0].args.len(), 2);
+        let ObjExpr::Ref(r) = &body.members[2].segments[0].args[0].obj else { panic!() };
+        assert!(r.places.is_some());
+        assert_eq!(r.path[0].name, "position");
+    }
+
+    #[test]
+    fn malformed_member_places_fail_without_changing_the_next_statement() {
+        for text in ["", "0", "-1", "1.5", "1,", "1:2:0", "1:2:-1", "1:2:3:4", "end-x", "end1", "#b", "1 2"] {
+            let r = parse_record_features(&format!("@RNL {{ %a{{{text}}}; (0,0) @TEXT(\"kept\") }}"), true, true);
+            let body = r.body.unwrap();
+            assert!(body.members[0].error.is_some(), "{text}");
+            assert!(body.members.last().unwrap().error.is_none(), "{text}: {body:?}");
+        }
+        let mut parser = Parser::new("{1, end", true);
+        assert_eq!(parser.places().unwrap_err().code, codes::SYNTAX_PLACES_NOT_CLOSED);
+    }
+
     fn body(text: &str) -> Rc<SetExpr> {
         let r = parse_record(text);
         assert!(r.error.is_none(), "{:?}", r.error);
@@ -1874,5 +2148,17 @@ mod tests {
         // a `:` without a name, and a `-` that ends a keyword, are free text
         assert_eq!(tokens("#M1: the left one {#M1 #M2} @GROUP- the pair"), "#M1 { #M1 #M2 } @GROUP");
         assert_eq!(tokens("%#2 @WIRE {%#3::mid (12, 2)}"), "%#2 @WIRE { %#3::mid ( 12 , 2 ) }");
+    }
+
+    #[test]
+    fn member_place_tokens_are_versioned_and_keep_written_integers() {
+        let t: Vec<_> = "%a{02 : end /* last */ - 1, 4:1:2}::position @TEXT(\"a\")".chars().collect();
+        assert_eq!(
+            statement_tokens_features(&t, 0, t.len(), true).join(" "),
+            "%a { 02 : end - 1 , 4 : 1 : 2 } ::position @TEXT ( \"a\" )"
+        );
+        assert_eq!(statement_tokens(&t, 0, t.len()).join(" "), "%a { } @TEXT ( \"a\" )");
+        let t: Vec<_> = "%a {end 1} @GROUP".chars().collect();
+        assert_eq!(statement_tokens_features(&t, 0, t.len(), true).join(" "), "%a { } @GROUP");
     }
 }

@@ -775,6 +775,34 @@
    ]
   },
   {
+   "number": "RNL1150",
+   "name": "syntax-places-invalid",
+   "severity": "error",
+   "message": "member places are positive integers, end or end-k, in items i, a:b or a:b:s separated by commas (5.2.3)",
+   "sections": [
+    "5.2.3"
+   ]
+  },
+  {
+   "number": "RNL1151",
+   "name": "syntax-places-not-closed",
+   "severity": "error",
+   "message": "the member places are not closed (5.2.3)",
+   "sections": [
+    "5.2.3",
+    "4.1"
+   ]
+  },
+  {
+   "number": "RNL1152",
+   "name": "syntax-places-touching-braces",
+   "severity": "error",
+   "message": "braces touching a named reference hold member places; write a space before a separate set (5.2.3)",
+   "sections": [
+    "5.2.3"
+   ]
+  },
+  {
    "number": "RNL1200",
    "name": "codec-cannot-encode",
    "severity": "error",
@@ -2202,6 +2230,24 @@
    "message": "an empty set written directly: nothing happens (5.2.1)",
    "sections": [
     "5.2.1"
+   ]
+  },
+  {
+   "number": "RNL3308",
+   "name": "set-places-of-selection",
+   "severity": "error",
+   "message": "member places cannot be taken from a selection or a set that depends on a selection (5.2.3)",
+   "sections": [
+    "5.2.3"
+   ]
+  },
+  {
+   "number": "RNL3310",
+   "name": "set-places-wrong-kind",
+   "severity": "error",
+   "message": "member places require a set, not {object} ({kind}) (5.2.3)",
+   "sections": [
+    "5.2.3"
    ]
   },
   {

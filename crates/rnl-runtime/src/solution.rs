@@ -56,7 +56,7 @@ use crate::interp::obj::Priority;
 use crate::numbering::level_check;
 use crate::problem::*;
 use crate::source::Provider;
-use crate::syntax::{parse_record_with, uses_number};
+use crate::syntax::{parse_record_features, uses_number};
 use crate::writeback::record_type;
 use crate::Options;
 
@@ -843,7 +843,7 @@ pub fn finish_record(
     p: &LevelProblem,
     record: &str,
 ) -> String {
-    let ast = parse_record_with(record, true);
+    let ast = parse_record_features(record, true, crate::interp::unit::keeps_0_4(&p.version));
     let uses_numbers = ast.body.as_ref().is_some_and(|b| b.members.iter().any(|m| uses_number(m)));
     if !p.follows_0_3() || !uses_numbers {
         return record.to_string();
