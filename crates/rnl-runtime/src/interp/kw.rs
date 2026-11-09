@@ -73,8 +73,8 @@ fn written_in(v: &Lit, unit: UnitId) -> Lit {
 
 impl Interp<'_> {
     /// A scoped record can write into a level of another version (2.6, 13.6). Keep the old
-    /// string provenance for released files, and the source file across a 0.4 boundary.
-    fn text_source_unit(&self, ctx: &Ctx) -> UnitId {
+    /// behavior for released files, and the source file across a 0.4 boundary.
+    pub(super) fn source_unit(&self, ctx: &Ctx) -> UnitId {
         let source = ctx.rec.map_or(ctx.unit, |r| self.rec_unit[r]);
         if self.follows_0_4(source) || self.follows_0_4(ctx.unit) {
             source
@@ -922,7 +922,7 @@ impl Interp<'_> {
                 (
                     n.clone(),
                     match get(&p, n) {
-                        Some(v) => Some(written_in(v, self.text_source_unit(ctx))),
+                        Some(v) => Some(written_in(v, self.source_unit(ctx))),
                         None => def.clone(),
                     },
                 )
@@ -931,7 +931,7 @@ impl Interp<'_> {
         let given: Vec<(String, Lit)> = d
             .params
             .iter()
-            .filter_map(|(n, _)| get(&p, n).map(|v| (n.clone(), written_in(v, self.text_source_unit(ctx)))))
+            .filter_map(|(n, _)| get(&p, n).map(|v| (n.clone(), written_in(v, self.source_unit(ctx)))))
             .collect();
         // roles (5.2.1, 9.4)
         let mut filled: Vec<(String, ArgV)> = Vec::new();
@@ -1517,7 +1517,7 @@ impl Interp<'_> {
         if let Some(l) = label {
             self.check_markup(l, ctx, seg);
         }
-        let label_name_formats = label.is_some_and(|l| self.follows_0_4(l.unit.unwrap_or(self.text_source_unit(ctx))));
+        let label_name_formats = label.is_some_and(|l| self.follows_0_4(l.unit.unwrap_or(self.source_unit(ctx))));
         let label = label.map(|l| l.as_str().to_string());
         let dir = get(&p, "direction").and_then(Lit::str).map(|d| match d {
             "right" => 0,
@@ -1694,7 +1694,7 @@ impl Interp<'_> {
         let key = get(&rest, "key").cloned();
         let mut items = TextItems {
             text: get(&rest, "text").and_then(|v| match v {
-                Lit::Str(s) => Some(match written_in(&Lit::Str(s.clone()), self.text_source_unit(ctx)) {
+                Lit::Str(s) => Some(match written_in(&Lit::Str(s.clone()), self.source_unit(ctx)) {
                     Lit::Str(w) => w,
                     _ => unreachable!(),
                 }),
@@ -1847,7 +1847,7 @@ impl Interp<'_> {
 
     pub(crate) fn check_markup(&mut self, text: &WStr, ctx: &Ctx, seg: &Segment) {
         let at = seg.call.as_ref().map(|c| c.start).unwrap_or(seg.start);
-        let name_formats = self.follows_0_4(text.unit.unwrap_or(self.text_source_unit(ctx)));
+        let name_formats = self.follows_0_4(text.unit.unwrap_or(self.source_unit(ctx)));
         for (code, msg) in crate::markup::problems_with_name_formats(text.as_str(), name_formats) {
             self.warn(ctx, code, format!("{msg} (13.6)"), at);
         }
@@ -2280,7 +2280,7 @@ impl Interp<'_> {
 
     fn kw_constraint(&mut self, kw: &str, args: &[ArgV], seg: &Segment, ctx: &Ctx) -> R<(ObjId, bool)> {
         let call_start = seg.call.as_ref().unwrap().start;
-        let follows_0_4 = self.follows_0_4(ctx.unit);
+        let follows_0_4 = self.follows_0_4(self.source_unit(ctx));
         if kw == "ORDER" || kw == "DISTANCE" {
             self.old_direction(kw, seg, ctx)?;
         }
@@ -2338,6 +2338,19 @@ impl Interp<'_> {
                     "DISTANCE takes at least one of min, max and exact (14.5)",
                     call_start,
                 );
+            }
+            if follows_0_4 {
+                for name in ["min", "max", "exact"] {
+                    if let Some(value) = get(&p, name).and_then(Lit::num).filter(|v| *v < 0.0) {
+                        return self.fail(
+                            ctx,
+                            codes::DISTANCE_NEGATIVE_BOUND_04,
+                            format!("{name}={value} of DISTANCE is negative: its bounds must be nonnegative; for the other way, write the other direction (14.5)"),
+                            call_start,
+                        );
+                    }
+                }
+                cp.min.get_or_insert(0.0);
             }
             if let (Some(a), Some(b)) = (cp.min, cp.max) {
                 if a > b {
@@ -2452,7 +2465,8 @@ impl Interp<'_> {
         if let Some(at) = bad {
             let sec = if kw == "ORDER" { "14.3" } else { "14.5" };
             // a file of 0.4 writes the sense: "x" and "y" are no longer read (14.1)
-            let no_sense = if self.follows_0_4(ctx.unit) { "" } else { "; with no sense write \"x\" or \"y\"" };
+            let no_sense =
+                if self.follows_0_4(self.source_unit(ctx)) { "" } else { "; with no sense write \"x\" or \"y\"" };
             return self.fail(
                 ctx,
                 codes::PARAM_OLD_DIRECTION, format!("axis and direction of @{kw} are one parameter now, direction, written first by position, such as @ORDER(\"left-to-right\") or @DISTANCE(\"bottom-to-top\", min=2){no_sense} ({sec})"),
@@ -2495,7 +2509,7 @@ pub struct Application {
 impl Interp<'_> {
     /// The parameters of keyword `kw` as the file of `ctx` has them, by its language version (16.1).
     fn sig_params(&self, kw: &str, ctx: &Ctx) -> Vec<ParamSpec> {
-        let version = self.version_of(Some(ctx.unit));
+        let version = self.version_of(Some(self.source_unit(ctx)));
         words().keyword(kw).map(|s| s.params_in(&version)).unwrap_or_default()
     }
 }

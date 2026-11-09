@@ -3263,6 +3263,15 @@
    ]
   },
   {
+   "number": "RNL5501",
+   "name": "distance-negative-bound-04",
+   "severity": "error",
+   "message": "{bound}={value} of DISTANCE is negative: its bounds must be nonnegative; for the other way, write the other direction (14.5)",
+   "sections": [
+    "14.5"
+   ]
+  },
+  {
    "number": "RNL6000",
    "name": "violation-condition",
    "severity": "violation",

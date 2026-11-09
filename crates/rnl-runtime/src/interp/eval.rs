@@ -845,7 +845,7 @@ impl<'p> Interp<'p> {
         };
         let kw = self.kw(&call.kw, ctx.unit);
         // a keyword is one of the version of the file it is written in (16.1)
-        let version = self.version_of(Some(ctx.unit));
+        let version = self.version_of(Some(self.source_unit(ctx)));
         if !words().is_keyword_in(&kw, &version) {
             let written = call.kw.clone();
             let fu = self.file_unit(ctx.unit);
@@ -1813,7 +1813,7 @@ impl<'p> Interp<'p> {
             return Ok(Vec::new());
         };
         // the positional parameters of the file's version: not one that the version does not have
-        let version = self.version_of(Some(ctx.unit));
+        let version = self.version_of(Some(self.source_unit(ctx)));
         let default_order = words()
             .keyword(kw)
             .map(|s| {
