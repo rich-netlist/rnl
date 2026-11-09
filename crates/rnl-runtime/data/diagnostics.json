@@ -2242,6 +2242,16 @@
    ]
   },
   {
+   "number": "RNL3309",
+   "name": "set-position-04",
+   "severity": "error",
+   "message": "a set has no position; give its members to a constraint (5.2, 14.1)",
+   "sections": [
+    "5.2",
+    "14.1"
+   ]
+  },
+  {
    "number": "RNL3310",
    "name": "set-places-wrong-kind",
    "severity": "error",
@@ -3165,6 +3175,25 @@
    "sections": [
     "5.2.1",
     "14.9"
+   ]
+  },
+  {
+   "number": "RNL5004",
+   "name": "constraint-expansion-too-many",
+   "severity": "error",
+   "message": "{constraint} exceeds this implementation's limit of {limit} expanded constraints in one statement (3.7, 14.1)",
+   "sections": [
+    "3.7",
+    "14.1"
+   ]
+  },
+  {
+   "number": "RNL5005",
+   "name": "constraint-expansion-too-few-places",
+   "severity": "hint",
+   "message": "{constraint} has fewer than two items after empty sets are omitted, so its constraints hold trivially (14.1)",
+   "sections": [
+    "14.1"
    ]
   },
   {

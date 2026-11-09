@@ -365,6 +365,7 @@ impl Interp<'_> {
             SetKind::Select { keyword, .. } => format!("a {keyword}"),
             SetKind::Union { .. } => "a UNION".to_string(),
             SetKind::Gen { .. } => "a generated set".to_string(),
+            SetKind::Constraints { .. } => "a set of constraints".to_string(),
             SetKind::Plain if s.explicit => "{…}".to_string(),
             SetKind::Plain => "a set".to_string(),
         }

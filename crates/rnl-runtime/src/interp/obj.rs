@@ -484,6 +484,8 @@ pub struct ConstraintData {
     pub failed: bool,
     pub site: Option<Rc<Ctx>>,
     pub off: usize,
+    /// The collection whose name the expanded constraints inherit (14.1).
+    pub name_owner: Option<ObjId>,
 }
 
 /// One ADD-TO or REMOVE-FROM on a set (5.2.2).
@@ -500,6 +502,12 @@ pub struct SetMod {
 #[derive(Clone, Debug)]
 pub enum SetKind {
     Plain,
+    /// Expanded constraints. `items` holds their inputs
+    /// for dependency checks; the resulting constraints are the members (14.1).
+    Constraints {
+        members: Vec<ObjId>,
+        selected: bool,
+    },
     /// A selection (10.1): evaluated where and when it is used.
     Select {
         keyword: String,
@@ -576,7 +584,7 @@ impl SetData {
     /// of usages and depends on no set.
     pub fn made_of(&self) -> impl Iterator<Item = ObjId> + '_ {
         let (items, other) = match &self.kind {
-            SetKind::Plain => (&self.items[..], None),
+            SetKind::Plain | SetKind::Constraints { .. } => (&self.items[..], None),
             SetKind::Union { source } => (&[][..], Some(*source)),
             SetKind::Select { scope, .. } => (&[][..], Some(*scope)),
             SetKind::Gen { .. } => (&[][..], None),

@@ -1906,7 +1906,16 @@ impl Interp<'_> {
                     let _ = it.apply_op(s, &op2, m, pos_plus(&c.pos, "g", k as i64), false, &c);
                 }
             });
-            self.defer(ctx, phase, task)?;
+            if phase == 7
+                && matches!(op, TargetOp::Priority { .. })
+                && ctx.frame_generated()
+                && self.follows_0_4(self.source_unit(ctx))
+            {
+                // This runs after generation and makes no objects, so it does not recurse (10.5).
+                self.scenes[ctx.scene.unwrap()].tasks[phase].push((ctx.pos.clone(), task));
+            } else {
+                self.defer(ctx, phase, task)?;
+            }
             if let TargetOp::Symbol { .. } = op {
                 // the same symbol queue runs again over generated objects (8.2 step 6)
                 let c = Rc::new(ctx.clone());
@@ -2071,8 +2080,8 @@ impl Interp<'_> {
         let mapped = self.map_args(kw, args, seg, ctx, sig_positions(kw))?;
         let items = mapped["items"].obj;
         let target = mapped["target"].clone();
-        let plain_set =
-            matches!(self.o(target.obj), ObjData::Set(s) if matches!(s.kind, SetKind::Plain | SetKind::Select { .. }));
+        let plain_set = matches!(self.o(target.obj), ObjData::Set(s) if
+            self.follows_0_4(self.source_unit(ctx)) || matches!(s.kind, SetKind::Plain | SetKind::Select { .. }));
         if !plain_set {
             return self.fail(
                 ctx,
@@ -2371,6 +2380,29 @@ impl Interp<'_> {
                 );
             }
         }
+        if follows_0_4 {
+            if ctx.scene.is_none() {
+                return Err(self.final_set_needs_scene());
+            }
+            let mut selected = false;
+            for (k, arg) in args.iter().enumerate() {
+                selected |= self.constraint_input(arg.obj, seg.start, k, ctx)? || self.is_lazy(arg.obj);
+            }
+            let template = ConstraintData {
+                kind: ConstraintKind::parse(kw).unwrap(),
+                args: Vec::new(),
+                params: cp,
+                priority_param: priority_of(&p, ctx),
+                chain: self.apply_chain(ctx),
+                status: None,
+                eff: None,
+                failed: false,
+                site: Some(Rc::new(ctx.clone())),
+                off: seg.start,
+                name_owner: None,
+            };
+            return self.constraint_call(template, args, seg, ctx, selected);
+        }
         let positions = sig_positions(kw);
         let mapped = self.map_args(kw, args, seg, ctx, positions)?;
         let arglist: Vec<ObjId> = positions.iter().map(|q| mapped[&q.name].obj).collect();
@@ -2405,6 +2437,7 @@ impl Interp<'_> {
             failed: false,
             site: Some(Rc::new(ctx.clone())),
             off: seg.start,
+            name_owner: None,
         };
         let id = self.new_obj(ObjData::Constraint(Box::new(c)));
         self.scene_add_constraint(s, id, ctx.pos.clone(), ctx);
@@ -2514,7 +2547,7 @@ impl Interp<'_> {
     }
 }
 
-fn sig_positions(kw: &str) -> &'static [PositionSpec] {
+pub(super) fn sig_positions(kw: &str) -> &'static [PositionSpec] {
     words().keyword(kw).map(|s| s.position_list()).unwrap_or(&[])
 }
 

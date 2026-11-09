@@ -90,6 +90,7 @@ impl Interp<'_> {
         self.note_overridden_symbols(s);
         self.symbol_labels(s);
         self.scenes[s].phase = 7;
+        self.materialize_constraints(s);
         self.run_tasks(s, 7);
         self.resolve_geometry(s);
         self.scenes[s].phase = 8;
@@ -1652,7 +1653,23 @@ impl Interp<'_> {
             let leaves = self.leaves(s, &members);
             let mut bad = None;
             for &m in &leaves {
-                let why = if relation { self.orientable(s, m) } else { self.locatable(s, m) };
+                let why = if relation {
+                    self.orientable(s, m)
+                } else if site.as_ref().is_some_and(|c| self.follows_0_4(self.source_unit(c)))
+                    && matches!(
+                        self.o(m),
+                        ObjData::Prim { .. }
+                            | ObjData::Definition(_)
+                            | ObjData::Symbol(_)
+                            | ObjData::Style(_)
+                            | ObjData::LevelObj { .. }
+                            | ObjData::Marker
+                    )
+                {
+                    Some(format!("{} cannot be located", self.label(m)))
+                } else {
+                    self.locatable(s, m)
+                };
                 if why.is_some() {
                     bad = why;
                     break;
@@ -1672,7 +1689,7 @@ impl Interp<'_> {
             }
             // in a file of 0.4 ORIENT-RELATION relates one object to one object: a set of more than
             // one member in both slots is an error (5.2.1, 14.9)
-            if relation && site.as_ref().is_some_and(|c| self.follows_0_4(c.unit)) {
+            if relation && site.as_ref().is_some_and(|c| self.follows_0_4(self.source_unit(c))) {
                 let mut sides = Vec::new();
                 for a in &cd.args[..2] {
                     sides.push(if self.is_set(*a) { self.flatten(s, *a, 7, ctx) } else { vec![*a] });

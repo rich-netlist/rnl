@@ -975,7 +975,7 @@ impl Interp<'_> {
             }
             let Some(kind) = self.constraint_kind(s, ix, &cd) else { continue };
             let source = cd.site.as_ref().and_then(|ctx| self.rec_loc(ctx.rec, cd.off));
-            let reference = match ix.refs.get(&c) {
+            let reference = match ix.refs.get(&c).or_else(|| cd.name_owner.and_then(|p| ix.refs.get(&p))) {
                 Some(Reference::Anonymous) | None => None,
                 Some(r) => Some(r.clone()),
             };

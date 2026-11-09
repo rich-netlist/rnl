@@ -242,43 +242,16 @@ impl Interp<'_> {
         Some(nets)
     }
 
-    /// A set whose one item, as written, is a set: that set, split one level (5.2.1).
-    fn single_item_set(&self, s: SceneId, obj: ObjId) -> ObjId {
-        let ObjData::Set(set) = self.o(obj) else { return obj };
-        if !matches!(set.kind, SetKind::Plain) || set.mods_by_scene.get(&Some(s)).is_some_and(|m| !m.is_empty()) {
-            return obj;
-        }
-        let items: Vec<ObjId> =
-            set.items.iter().map(|(o, _)| *o).filter(|o| *o != LEVEL && !self.is_failed(*o)).collect();
-        match items.as_slice() {
-            [one] if self.is_set(*one) => *one,
-            _ => obj,
-        }
-    }
-
-    /// The members of an ASSERT-TOPOLOGY (15.4): the items of the set as written, a set among them
-    /// one member, not spread; the result of a selection one member for each object it selects.
-    fn topology_items(&mut self, s: SceneId, root: ObjId, site: &Ctx) -> Vec<ObjId> {
-        if !self.is_set(root) {
-            return vec![root];
-        }
-        let sd = self.set(root);
-        let edited = sd.mods_by_scene.get(&Some(s)).is_some_and(|m| !m.is_empty());
-        if matches!(sd.kind, SetKind::Plain) && !edited {
-            let items: Vec<ObjId> = sd.items.iter().map(|(o, _)| *o).collect();
-            return items.into_iter().filter(|o| *o != LEVEL && !self.is_failed(*o)).collect();
-        }
-        self.items_of(s, root, 7, Some(site))
-    }
-
     /// An ASSERT-TOPOLOGY checked in a scene (15.4): a violation when the members are not connected
     /// as it says.
     fn check_topology(&mut self, s: SceneId, t: &Topology) {
         if !t.chain.is_empty() && self.eff_priority(s, None, &t.chain, None) == Priority::Disabled {
             return;
         }
-        let root = self.single_item_set(s, t.members);
-        let items = self.topology_items(s, root, &t.site);
+        let mut items = self.written_items(s, t.members, 7, &t.site);
+        if items.len() == 1 && self.is_set(items[0]) {
+            items = self.written_items(s, items[0], 7, &t.site);
+        }
         let lv = self.scenes[s].level;
         let ports: HashSet<ObjId> = self.doc.levels[lv].ports.clone().iter().map(|p| self.net_obj(s, p)).collect();
         let all = self.level_terminals(s);

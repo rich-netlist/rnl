@@ -1193,6 +1193,7 @@ impl Interp<'_> {
 
     /// Members of a set one level deep: references to sets are spread, written `{…}` stay.
     pub(crate) fn items_of(&mut self, s: SceneId, obj: ObjId, phase: usize, ctx: Option<&Ctx>) -> Vec<ObjId> {
+        self.materialize_constraint(obj);
         if obj == LEVEL {
             return vec![self.scenes[s].levelobj];
         }
@@ -1218,6 +1219,7 @@ impl Interp<'_> {
             ks.into_iter().map(|k| (sd.mods[k].add, sd.mods[k].source, sd.mods[k].ctx.clone())).collect()
         };
         let mut base: Vec<ObjId> = match &self.set(obj).kind {
+            SetKind::Constraints { members, .. } => members.clone(),
             SetKind::Select { .. } => self.select(s, obj, phase, ctx),
             SetKind::Gen { by_scene } => {
                 if phase >= 5 {
@@ -1293,7 +1295,7 @@ impl Interp<'_> {
 
     // ------------------------------------------------------------------ selections (10.1)
 
-    fn select(&mut self, s: SceneId, sel: ObjId, phase: usize, ctx: Option<&Ctx>) -> Vec<ObjId> {
+    pub(super) fn select(&mut self, s: SceneId, sel: ObjId, phase: usize, ctx: Option<&Ctx>) -> Vec<ObjId> {
         let SetKind::Select { keyword, scope, params, writer, definition, site, off } = self.set(sel).kind.clone()
         else {
             unreachable!()

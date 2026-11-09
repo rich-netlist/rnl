@@ -9,6 +9,7 @@ mod assertions;
 pub mod attrs;
 pub mod catalog;
 mod conflicts;
+mod constraints;
 pub mod ctx;
 pub mod cycles;
 pub mod eval;
@@ -216,6 +217,7 @@ pub struct Interp<'p> {
     pub(crate) restart: Option<(cycles::StmtKey, String)>,
     /// Dependencies of member-place references on edits, including edits written later (5.2.3).
     places: places::Places,
+    pending_constraints: HashMap<ObjId, constraints::Pending>,
     pub(crate) std_enabled: bool,
     /// [`Options::std_version`].
     pub(crate) std_version: Option<String>,
@@ -338,6 +340,7 @@ impl<'p> Interp<'p> {
             closing: HashMap::new(),
             restart: None,
             places: places::Places::default(),
+            pending_constraints: HashMap::new(),
             std_enabled: options.std,
             std_version: options.std_version.clone(),
             read_generated: options.generated,

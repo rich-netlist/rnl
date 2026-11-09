@@ -95,6 +95,16 @@ fn members_not_connected_as_said_are_a_violation() {
 }
 
 #[test]
+fn edits_preserve_black_box_items() {
+    for body in [
+        "%branches = {#R8}; %branches @ASSERT-TOPOLOGY(\"parallel\"); {#R6 #R7} @ADD-TO %branches",
+        "%branches = {{#R6 #R7 #R4} #R8}; %branches @ASSERT-TOPOLOGY(\"parallel\"); #R4 @REMOVE-FROM %branches",
+    ] {
+        assert_eq!(violations(body), Vec::new(), "{body}");
+    }
+}
+
+#[test]
 fn exclude_takes_out_terminals_of_a_type() {
     // the pair shares d1, s1 and 0: in series only with the drains and bulks taken out
     assert_eq!(violations("{#M3 #M4} @ASSERT-TOPOLOGY(\"series\")").len(), 1);

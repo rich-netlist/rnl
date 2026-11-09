@@ -239,7 +239,11 @@ impl<'p> Interp<'p> {
             ObjData::Bundle { .. } => named("a bundle"),
             ObjData::Constraint(c) => {
                 if o.name.is_empty() {
-                    c.kind.as_str().to_string()
+                    match c.name_owner.map(|p| &self.objs[p.0 as usize].name).filter(|n| !n.is_empty()) {
+                        Some(name) if name.starts_with('$') => name.clone(),
+                        Some(name) => format!("%{name}"),
+                        None => c.kind.as_str().to_string(),
+                    }
                 } else {
                     format!("%{}", o.name)
                 }
@@ -249,6 +253,7 @@ impl<'p> Interp<'p> {
                     match &s.kind {
                         SetKind::Select { keyword, .. } => keyword.clone(),
                         SetKind::Gen { .. } => "a generated set".into(),
+                        SetKind::Constraints { .. } => "a set of constraints".into(),
                         _ => "a set".into(),
                     }
                 } else if o.name.starts_with('$') || matches!(s.kind, SetKind::Select { .. } | SetKind::Gen { .. }) {
@@ -297,19 +302,22 @@ impl<'p> Interp<'p> {
                     || self.own_level_only(*scope, s, seen)
             }
             SetKind::Union { source } => self.own_level_only(*source, s, seen),
-            SetKind::Plain => set.items.iter().any(|(o, _)| self.own_level_only(*o, s, seen)),
+            SetKind::Plain | SetKind::Constraints { .. } => {
+                set.items.iter().any(|(o, _)| self.own_level_only(*o, s, seen))
+            }
             SetKind::Gen { .. } => false,
         }
     }
 
     /// A selection or generated set, or a set that holds one: evaluated where and when used (10.3).
     pub(crate) fn is_lazy(&self, id: ObjId) -> bool {
-        if id == LEVEL {
+        if id == LEVEL || self.pending_constraints.contains_key(&id) {
             return true;
         }
         match self.o(id) {
             ObjData::Set(s) => match &s.kind {
                 SetKind::Select { .. } | SetKind::Gen { .. } => true,
+                SetKind::Constraints { selected, .. } => *selected,
                 SetKind::Union { source } => self.is_lazy(*source),
                 SetKind::Plain => {
                     // a set that stays not lazy, such as $SUPPLY_NET_SET, which has no members, does
@@ -347,6 +355,7 @@ impl<'p> Interp<'p> {
         match self.o(id) {
             ObjData::Set(s) => match &s.kind {
                 SetKind::Select { .. } | SetKind::Gen { .. } => false,
+                SetKind::Constraints { selected, .. } => !selected,
                 SetKind::Union { source } => self.stays_not_lazy(*source),
                 SetKind::Plain => s.not_lazy,
             },
@@ -362,6 +371,7 @@ impl<'p> Interp<'p> {
         match self.o(id) {
             ObjData::Set(s) => match &s.kind {
                 SetKind::Select { .. } | SetKind::Gen { .. } => true,
+                SetKind::Constraints { selected, .. } => *selected,
                 SetKind::Union { source } => self.lazy_for_good(*source),
                 SetKind::Plain => false,
             },
@@ -1382,6 +1392,20 @@ impl<'p> Interp<'p> {
     }
 
     fn subobject(&mut self, obj: ObjId, p: &PathItem, ctx: &Ctx, e: &Ref) -> R<ObjId> {
+        if self.is_set(obj)
+            && p.sep == Sep::Sub
+            && self.follows_0_4(self.source_unit(ctx))
+            && e.sub.is_none()
+            && e.path.iter().all(|part| part.sub.is_none())
+            && self.subobject_name(obj, &p.name, ctx) == "position"
+        {
+            return self.fail(
+                ctx,
+                codes::SET_POSITION_04,
+                "a set has no position; give its members to a constraint (5.2, 14.1)",
+                e.start,
+            );
+        }
         if let ObjData::Set(s) = self.o(obj) {
             if !self.is_lazy(obj) && !s.explicit {
                 // an expanded group: take the sub-object of each member (6.11)
@@ -1694,9 +1718,21 @@ impl<'p> Interp<'p> {
         // 5.2.1 rule 2: a single set object is unpacked one level
         let mut unpacked_from: Option<ArgV> = None;
         let total = objs.len() + usize::from(!defs.is_empty());
-        if total == 1 && objs.len() == 1 && self.is_set(objs[0].obj) && !self.is_lazy(objs[0].obj) {
+        let constraint_items = self.follows_0_4(self.source_unit(ctx)) && ConstraintKind::parse(kw).is_some();
+        let phase = ctx.scene.map_or(3, |s| self.scenes[s].phase.max(3));
+        if total == 1
+            && objs.len() == 1
+            && self.is_set(objs[0].obj)
+            && (!self.is_lazy(objs[0].obj) || (constraint_items && phase >= 7))
+        {
             let a = objs[0].clone();
-            let items = self.set(a.obj).items.clone();
+            let items = if constraint_items {
+                self.written_items(ctx.scene.unwrap(), a.obj, phase, ctx).into_iter().map(|o| (o, false)).collect()
+            } else if matches!(self.set(a.obj).kind, SetKind::Constraints { .. }) {
+                self.written_members(a.obj, ctx.scene, &mut HashSet::new()).into_iter().map(|o| (o, false)).collect()
+            } else {
+                self.set(a.obj).items.clone()
+            };
             objs = items
                 .into_iter()
                 .map(|(o, spread)| ArgV {
