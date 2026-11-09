@@ -74,6 +74,16 @@ fn a_port_with_in_brings_current_into_the_net() {
 }
 
 #[test]
+fn a_global_net_is_not_checked() {
+    // R2's other terminal is on 0, and R3's on the net g that .global declares: the current may
+    // leave through the terminals of other levels
+    for (decl, net) in [("", "0"), (".global g\n", "g")] {
+        let text = netlist("0.4", "#R2:2 @CURRENT(\"in\")", "").replace("R2 b 0 1k", &format!("{decl}R2 b {net} 1k"));
+        assert_eq!(violations(&read(&text)), Vec::<String>::new(), "{net}");
+    }
+}
+
+#[test]
 fn files_of_0_2_and_0_3_have_no_such_check() {
     for version in ["0.2", "0.3"] {
         let r = read(&netlist(version, "#R1:2 @CURRENT(\"in\"); #R2:1 @CURRENT(\"in\")", ""));

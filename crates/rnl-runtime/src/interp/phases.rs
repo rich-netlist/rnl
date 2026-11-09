@@ -1162,7 +1162,9 @@ impl Interp<'_> {
     /// of them move current the same way with respect to the net, the current has nowhere to go. That
     /// is a violation (7.6), which names the net and its terminals, at the latest of those CURRENTs;
     /// nothing fails, and the CURRENTs stay in effect. A device terminal with "in" takes current out of
-    /// the net, a port of this level with "in" brings current into it.
+    /// the net, a port of this level with "in" brings current into it. A global net (6.3), such as
+    /// `0`, is not checked: it is the same node in every level, so the current may leave through the
+    /// terminals of other levels.
     fn check_currents(&mut self, s: SceneId) {
         if self.scenes[s].currents.is_empty() || !self.follows_0_4(self.level_unit[self.scenes[s].level]) {
             return;
@@ -1181,7 +1183,11 @@ impl Interp<'_> {
                 }
             }
         }
+        let lv = self.scenes[s].level;
         for (net, terms) in nets {
+            if matches!(self.o(net), ObjData::Net { key, .. } if self.doc.is_global(lv, key)) {
+                continue;
+            }
             // 1 for a terminal that brings current into the net, -1 for one that takes it out
             let ways: Vec<i8> = terms
                 .iter()
