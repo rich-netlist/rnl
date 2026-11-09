@@ -51,10 +51,8 @@ const PENDING_0_4: &[&str] = &[
     "UNROUTE-NET",
     "UNROUTE-OBJECT",
     "removed",
-    // the topology assertion (15.4), and symbol= and drawn of ASSERT-INSTANCE, which come with those of
-    // SELECT-INSTANCE (10.1)
+    // symbol= and drawn of ASSERT-INSTANCE, which come with those of SELECT-INSTANCE (10.1)
     "ASSERT-INSTANCE",
-    "ASSERT-TOPOLOGY",
     // groups and tables (11.5, 14.11)
     "GROUP",
     "TABLE",

@@ -25,6 +25,7 @@ pub mod phases;
 mod renames;
 pub mod scene;
 mod selfcheck;
+mod topology;
 pub mod unit;
 
 use std::collections::{BTreeMap, HashMap, HashSet};

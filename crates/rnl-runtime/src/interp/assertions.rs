@@ -79,7 +79,7 @@ fn quoted(v: &str) -> String {
 }
 
 /// Names joined for a message: `#M1`, `#M1 and #M2`, `#M1, #M2 and #M3`.
-fn and_list(items: &[String]) -> String {
+pub(super) fn and_list(items: &[String]) -> String {
     match items {
         [] => String::new(),
         [one] => one.clone(),
@@ -258,7 +258,7 @@ impl Interp<'_> {
 
     /// Where an assertion is checked, as its message says it: in the body of a usage, the usage, its
     /// definition and where the usage is written, such as ` in %dp1, a usage of $PAIR at t.sp:12`.
-    fn assertion_where(&self, site: &Ctx) -> String {
+    pub(super) fn assertion_where(&self, site: &Ctx) -> String {
         let Some(u) = site.frame_usage() else { return String::new() };
         let ud = self.usage(u);
         let def = self.label(ud.definition);

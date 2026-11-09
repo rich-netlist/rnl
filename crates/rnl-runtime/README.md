@@ -138,6 +138,7 @@ A violation (7.6) is a statement about the circuit that does not hold: nothing f
 
 - The CURRENT statements of a net that send all its current one way (15.2), RNL6003 `violation-current-one-way`: every terminal on the net, the ports of the level included, has a CURRENT of `in` or `out`, and all of them move current into the net, or all out of it; it is given at the latest of them. A global net, such as `0`, is not checked.
 - The assertions ASSERT-INSTANCE, ASSERT-TERMINAL and ASSERT-NET (15.3), in `interp::assertions`, checked after the geometry phase: a condition a member does not meet (RNL6000), an attribute of `same` that differs (RNL6002), one of `different` that two members share (RNL6001), and one of `has` that a member lacks (RNL6004). In the body of a general definition an assertion is checked for each application, and the message names the usage. `symbol=` and `drawn` of ASSERT-INSTANCE are not read yet.
+- ASSERT-TOPOLOGY (15.4), in `interp::topology`, checked with them: members that are not in series, in parallel, a star or a single loop as it says (RNL6005). A member is an instance, or a usage or a set taken as a black box, whose nets are those it shares with the rest of the level; `exclude` takes out terminals by type.
 
 `interp::unit::keeps_0_4` and `Interp::follows_0_4` say which files follow 0.4; the word list (`words`) says which keywords and parameters a version has.
 
