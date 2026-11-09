@@ -74,7 +74,7 @@ fn spectre_comments_and_host_statements_stay_intact() {
 
 #[test]
 fn target_errors_are_reported_and_prevent_success() {
-    let source = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\n* @RNL { (0, 0) (1, 0) @DISTANCE(\"x\", min=1) }\n.end\n";
+    let source = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\n* @RNL { (_, _) (_, _) @DISTANCE(\"x\", min=1) }\n.end\n";
     let result = upgrade("t.sp", &MemoryProvider::new().with("t.sp", source), &options()).unwrap();
     assert!(!result.report.successful());
     assert!(result.report.diagnostics.iter().any(|d| d.severity == "error"));

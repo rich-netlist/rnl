@@ -78,7 +78,7 @@ fn report_collisions_are_rejected_before_writeback() {
 #[test]
 fn an_unconverted_statement_is_retained_and_reported() {
     let dir = scratch("unconverted");
-    let statement = "(0, 0) (1, 0) @DISTANCE(\"x\", min=1)";
+    let statement = "(_, _) (_, _) @DISTANCE(\"x\", min=1)";
     let source = format!("* title\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\") }}\n* @RNL {{ {statement} }}\n.end\n");
     std::fs::write(dir.join("top.sp"), &source).unwrap();
     let output = run(&dir, &["top.sp", "--no-std", "-o", "out", "--report", "report.json"]);

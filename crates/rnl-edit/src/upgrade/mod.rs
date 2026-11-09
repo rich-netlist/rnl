@@ -4,7 +4,9 @@
 //! any output is prepared. Target diagnostics and semantic differences remain in the report.
 
 mod compare;
+mod directions;
 mod edit;
+mod manual;
 mod mechanical;
 mod references;
 mod rewrite;

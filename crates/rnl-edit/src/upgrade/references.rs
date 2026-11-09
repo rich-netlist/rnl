@@ -19,6 +19,7 @@ pub(super) struct References {
     pins: BTreeMap<(usize, String, String), String>,
     roles: BTreeMap<(usize, String, String), String>,
     definitions: BTreeMap<(usize, String), super::standard::Changes>,
+    usage_reviews: BTreeMap<(usize, String, u32, u32), Vec<super::manual::Reason>>,
 }
 
 fn target_pins() -> BTreeMap<SymbolKey, Pins> {
@@ -100,6 +101,24 @@ fn target_pins() -> BTreeMap<SymbolKey, Pins> {
 impl References {
     pub(super) fn new(input: &Interpretation) -> Self {
         let mut result = Self { definitions: super::standard::role_changes(input), ..Self::default() };
+        let reviews = super::standard::definition_reviews(input);
+        for problem in &input.problems {
+            for usage in &problem.usages {
+                let Some(loc) = &usage.source else { continue };
+                let reasons =
+                    result.usage_reviews.entry((problem.level, normalize(&loc.file), loc.line, loc.col)).or_default();
+                if let Some(reason) = reviews.get(&(problem.level, usage.definition.clone())) {
+                    reasons.push(*reason);
+                }
+                if usage
+                    .object
+                    .and_then(|i| problem.objects.get(i))
+                    .is_some_and(|o| matches!(o.position, rnl_runtime::problem::Position::At(_)))
+                {
+                    reasons.push(("usage-main-point", "this usage followed its main role's point; 0.4 gives it an independent point, so preserve that relation explicitly (12.1)"));
+                }
+            }
+        }
         let targets = target_pins();
         let bundled = rnl_view::bundled();
         for (index, level) in input.doc.levels.iter().enumerate() {
@@ -165,6 +184,39 @@ impl References {
             }
         }
         result
+    }
+
+    pub(super) fn usage_reviews(
+        &self,
+        path: &str,
+        record: &Record,
+        member: &rnl_runtime::syntax::Member,
+    ) -> Vec<super::manual::Reason> {
+        if !member.segments.iter().any(|s| s.call.as_ref().is_some_and(|c| matches!(c.kw.as_str(), "AS" | "ATTACH"))) {
+            return Vec::new();
+        }
+        let start = record.loc(member.text_start());
+        let end = record.loc(member.end);
+        let Some(readings) = self.readings.get(&(normalize(path), record.lines.0, record.lines.1)) else {
+            return Vec::new();
+        };
+        let mut reasons = Vec::new();
+        for ((level, file, line, col), found) in &self.usage_reviews {
+            // Diagnostic locations use the adapter's display filename, which
+            // need not be the provider path. The reading level disambiguates it.
+            if readings.contains(level)
+                && *file == normalize(&start.file)
+                && (*line, *col) >= (start.line, start.col)
+                && (*line, *col) <= (end.line, end.col)
+            {
+                for reason in found {
+                    if !reasons.contains(reason) {
+                        reasons.push(*reason);
+                    }
+                }
+            }
+        }
+        reasons
     }
 
     pub(super) fn role_arguments(

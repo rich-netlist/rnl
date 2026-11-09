@@ -69,7 +69,7 @@ fn strings_and_comments_are_not_rewritten_as_calls() {
 
 #[test]
 fn distance_intervals_that_change_meaning_are_retained_and_reported() {
-    for bounds in ["min=-2, max=3", "exact=-2", "max=3"] {
+    for bounds in ["min=-2, max=3", "max=3"] {
         let statement = format!("(0, 0) (1, 0) @DISTANCE(\"left-to-right\", {bounds})");
         let result = convert(&statement);
         assert!(result.files["t.sp"].contains(&statement));

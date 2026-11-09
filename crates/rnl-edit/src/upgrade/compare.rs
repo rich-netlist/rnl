@@ -2,12 +2,40 @@
 
 use std::collections::BTreeMap;
 
+use rnl_runtime::problem::{FactKind, PointRef, Sense};
 use rnl_runtime::Interpretation;
 use serde_json::{json, Value};
 
 use super::Difference;
 
 type Key = (String, String, String, String);
+
+fn canonical_fact(kind: &FactKind) -> FactKind {
+    let mut kind = kind.clone();
+    if let FactKind::Distance { sense, min, max, from, to, .. } = &mut kind {
+        if *sense == Sense::Decreasing
+            && from.len() == 1
+            && to.len() == 1
+            && !matches!(from[0], PointRef::Centre(_))
+            && !matches!(to[0], PointRef::Centre(_))
+        {
+            let old_min = *min;
+            *min = max.map(|n| if n == 0.0 { 0.0 } else { -n });
+            *max = old_min.map(|n| if n == 0.0 { 0.0 } else { -n });
+            *sense = Sense::Increasing;
+        }
+    }
+    kind
+}
+
+fn symbol(table: &[rnl_runtime::model::SymbolView], index: usize, depth: usize) -> Value {
+    let Some(s) = table.get(index).filter(|_| depth < 65) else { return Value::Null };
+    json!({"box":s.bbox,
+        "pins":s.pins.iter().map(|p|json!({"at":p.pos,"direction":p.dir,"label":p.label})).collect::<Vec<_>>(),
+        "labels":s.labels.iter().map(|l|json!({"key":l.key,"text":l.text,"at":l.at,"halign":l.halign,"valign":l.valign,"rotate":l.rotate,"style":format!("{:?}",l.style)})).collect::<Vec<_>>(),
+        "primitives":s.prims.iter().map(|p|json!({"order":p.order,"shape":p.shape.as_str(),"points":p.points,"params":format!("{:?}",p.params),"style":format!("{:?}",p.style),"text":p.text,"halign":p.halign,"valign":p.valign,"rotate":p.rotate})).collect::<Vec<_>>(),
+        "nested":s.nested.iter().map(|n|json!({"order":n.order,"at":n.at,"orientation":n.orient.as_str(),"symbol":symbol(table,n.symbol,depth+1)})).collect::<Vec<_>>()})
+}
 
 fn snapshot(read: &Interpretation) -> BTreeMap<Key, Value> {
     let mut out = BTreeMap::new();
@@ -43,13 +71,22 @@ fn snapshot(read: &Interpretation) -> BTreeMap<Key, Value> {
                     "roles":format!("{:?}",object.attach),
                     "parameters":format!("{:?}",object.params),"disabled":object.disabled,
                     "style":format!("{:?}",object.own_style),
-                    "geometry":object.symbol_view.and_then(|i| level.symbols.get(i)).map(|s| json!({
-                        "box":s.bbox,"primitives":s.prims.iter().map(|p| json!({
-                            "shape":p.shape.as_str(),"points":p.points,"params":format!("{:?}",p.params),
-                            "style":format!("{:?}",p.style),"text":p.text,"halign":p.halign,"valign":p.valign,"rotate":p.rotate
-                        })).collect::<Vec<_>>(),"nested":format!("{:?}",s.nested)
-                    })),
+                    "geometry":object.symbol_view.map(|i|symbol(&level.symbols,i,0)),
                     "pins":object.pins.iter().map(|p| json!({"at":p.at,"nets":p.nets,"direction":p.dir})).collect::<Vec<_>>()}),
+            );
+        }
+        // Objects with free positions still have meaningful local geometry,
+        // label templates and pin networks. They are absent from drawn symbols.
+        for (index, item) in level.unplaced_items.iter().enumerate() {
+            put(
+                "unplaced-drawings",
+                index.to_string(),
+                json!({
+                    "kind":item.kind,"host":item.host,"orientation":item.orient.as_str(),
+                    "style":format!("{:?}",item.style),"layer":item.layer.as_str(),
+                    "texts":format!("{:?}",item.texts),"pin_nets":item.pin_nets,
+                    "symbol":symbol(&level.unplaced_symbols,item.symbol,0)
+                }),
             );
         }
         for (index, point) in level.points.iter().enumerate() {
@@ -87,7 +124,7 @@ fn snapshot(read: &Interpretation) -> BTreeMap<Key, Value> {
             put(
                 "facts",
                 index.to_string(),
-                json!({"kind":format!("{:?}",fact.kind),"priority":format!("{:?}",fact.priority),"chain":fact.chain}),
+                json!({"kind":format!("{:?}",canonical_fact(&fact.kind)),"priority":format!("{:?}",fact.priority),"chain":fact.chain}),
             );
         }
         for net in &problem.nets {

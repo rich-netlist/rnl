@@ -23,8 +23,10 @@ fn pending(member: &Member) -> Option<(&'static str, &'static str)> {
     }
     for (index, segment) in member.segments.iter().enumerate() {
         let Some(call) = &segment.call else { continue };
-        if let Some(reason) = mechanical::distance_bound(call) {
-            return Some(("distance-interval", reason));
+        if super::directions::replacement(member, index).is_none() {
+            if let Some(reason) = mechanical::distance_bound(call) {
+                return Some(("distance-interval", reason));
+            }
         }
         let parameters = call.params.as_ref();
         let axis = parameters.is_some_and(|p| {
@@ -34,12 +36,11 @@ fn pending(member: &Member) -> Option<(&'static str, &'static str)> {
                 .any(|v| matches!(v, Value::Str(s) if s == "x" || s == "y"))
         });
         match call.kw.as_str() {
-            "DISTRIBUTE" => return Some(("direction", "DISTRIBUTE needs an explicit direction (14.4)")),
-            "ORDER" | "DISTANCE" if axis => {
-                return Some(("direction", "an axis does not determine a direction (14.3, 14.5)"))
+            "DISTRIBUTE" if super::directions::replacement(member, index).is_none() => {
+                return Some(("direction", "DISTRIBUTE needs an explicit direction (14.4)"))
             }
-            "AS" | "ATTACH" => {
-                return Some(("usage", "the definition, roles and usage point need migration review (9.4, 12.1)"))
+            "ORDER" | "DISTANCE" if axis && super::directions::replacement(member, index).is_none() => {
+                return Some(("direction", "an axis does not determine a direction (14.3, 14.5)"))
             }
             "SELECT-TERMINAL"
                 if parameters.is_some_and(|p| p.get("wired").is_some())
@@ -161,7 +162,10 @@ pub(super) fn file(
             }
         });
         visit(&body.members, &mut |member| {
-            if let Some((rule, reason)) = pending(member) {
+            let mut reasons = super::manual::reasons(member);
+            reasons.extend(context.references.usage_reviews(path, record, member));
+            reasons.extend(pending(member));
+            for (rule, reason) in reasons {
                 let at = member.text_start();
                 let location = record.loc(at);
                 let marker = carrier_at(doc, path, source, location.line);
@@ -217,6 +221,7 @@ pub(super) fn file(
                 let drawing = super::selections::drawing_selection(member, index);
                 let mut found = vec![
                     mechanical::route(source, record, call),
+                    super::directions::edit(source, record, member, index),
                     super::selections::drawing_pins(source, record, member, index),
                 ];
                 if !drawing && !local_selection_spans.iter().any(|range| range.contains(&call.start)) {
