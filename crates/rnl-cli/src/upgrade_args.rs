@@ -39,7 +39,10 @@ pub(crate) fn run(args: &Args, provider: &FsProvider) -> Result<ExitCode, Said> 
         || args.solver.solver_options.is_some()
         || args.solver.previous
     {
-        return Err("upgrade reads the complete document with its declared versions and generated records".into());
+        return Err(
+            "upgrade validates the complete source before discarding solver records and checking the authored result"
+                .into(),
+        );
     }
     let result = upgrade(
         &path_str(&args.file),
@@ -106,12 +109,13 @@ pub(crate) fn run(args: &Args, provider: &FsProvider) -> Result<ExitCode, Said> 
         }
         std::fs::write(path, json).map_err(|e| e.to_string())?;
     }
+    let needs_solve = result.report.files.iter().filter(|f| f.needs_solve).count();
     let changes: usize = result.report.files.iter().map(|f| f.changes.len()).sum();
     let unconverted: usize = result.report.files.iter().map(|f| f.unconverted.len()).sum();
     let errors =
         result.report.diagnostics.iter().filter(|d| matches!(d.severity.as_str(), "error" | "violation")).count();
     println!(
-        "{} files written, {changes} changes, {unconverted} unconverted, {errors} target errors, {} differences",
+        "{} files written, {changes} changes, {unconverted} unconverted, {errors} target errors, {} differences, {needs_solve} files need solving",
         written.written.len() + written.copied.len(),
         result.report.differences.len()
     );

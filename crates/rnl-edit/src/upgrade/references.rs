@@ -1,0 +1,297 @@
+//! Resolve standard usage terminals to named pins through the source interpretation.
+use std::collections::BTreeMap;
+
+use rnl_runtime::host::Record;
+use rnl_runtime::interp::unit::scan_package_decl;
+use rnl_runtime::model::SymbolOrigin;
+use rnl_runtime::source::normalize;
+use rnl_runtime::syntax::{parse_record_features, ObjExpr, Ref, Segment, Sep, Value};
+use rnl_runtime::Interpretation;
+
+use super::edit::{record_edit, Edit};
+
+type SymbolKey = (String, String);
+type Pins = Vec<(String, String)>;
+
+#[derive(Default)]
+pub(super) struct References {
+    readings: BTreeMap<(String, u32, u32), Vec<usize>>,
+    pins: BTreeMap<(usize, String, String), String>,
+    roles: BTreeMap<(usize, String, String), String>,
+    definitions: BTreeMap<(usize, String), super::standard::Changes>,
+}
+
+fn target_pins() -> BTreeMap<SymbolKey, Pins> {
+    let mut direct = BTreeMap::new();
+    let mut inherited: BTreeMap<SymbolKey, Vec<String>> = BTreeMap::new();
+    for (path, source) in &rnl_view::bundled().files {
+        if !path.starts_with("<bundled>/0.4/") {
+            continue;
+        }
+        let Some((package, _)) = scan_package_decl(source) else { continue };
+        let records = rnl_runtime::records::scan_run(
+            &rnl_runtime::records::package_lines(source),
+            path,
+            &mut rnl_runtime::diag::Sink::default(),
+        );
+        for record in records {
+            let ast = parse_record_features(&record.text, true, true);
+            let Some(body) = ast.body else { continue };
+            for member in &body.members {
+                let Some(binding) = member.binds.iter().find(|b| b.prefix == '$') else { continue };
+                for segment in &member.segments {
+                    if segment.call.as_ref().is_none_or(|c| c.kw != "DEFINE-SYMBOL") {
+                        continue;
+                    }
+                    let key = (package.clone(), format!("${}", binding.name));
+                    let pins = direct.entry(key.clone()).or_insert_with(Vec::new);
+                    for arg in &segment.args {
+                        let ObjExpr::Set(body) = &arg.obj else { continue };
+                        for statement in &body.members {
+                            for segment in &statement.segments {
+                                if let Some(call) = &segment.call {
+                                    if call.kw == "PIN" {
+                                        let terminal = call.params.as_ref().and_then(|p| p.get("terminal"));
+                                        let name = statement.binds.iter().find(|b| b.prefix == '%');
+                                        if let (Some(Value::Str(terminal)), Some(name)) = (terminal, name) {
+                                            pins.push((terminal.clone(), name.name.clone()));
+                                        }
+                                    }
+                                } else {
+                                    for arg in &segment.args {
+                                        if let ObjExpr::Ref(r) = &arg.obj {
+                                            if r.prefix == '$' && r.path.is_empty() {
+                                                if let Some(name) = &r.name {
+                                                    inherited.entry(key.clone()).or_default().push(format!("${name}"));
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    // The packaged symbol graph is finite. Iterate to propagate inherited named pins.
+    for _ in 0..direct.len() {
+        let mut changed = false;
+        for (key, parents) in &inherited {
+            for parent in parents {
+                let inherited = direct.get(&(key.0.clone(), parent.clone())).cloned().unwrap_or_default();
+                for pin in inherited {
+                    let pins = direct.entry(key.clone()).or_default();
+                    if !pins.contains(&pin) {
+                        pins.push(pin);
+                        changed = true;
+                    }
+                }
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+    direct
+}
+
+impl References {
+    pub(super) fn new(input: &Interpretation) -> Self {
+        let mut result = Self { definitions: super::standard::role_changes(input), ..Self::default() };
+        let targets = target_pins();
+        let bundled = rnl_view::bundled();
+        for (index, level) in input.doc.levels.iter().enumerate() {
+            for record in &level.records {
+                let mut drawing = index;
+                while !input.doc.levels[drawing].circuit {
+                    let Some(parent) = input.doc.levels[drawing].parent else { break };
+                    drawing = parent;
+                }
+                let ast = parse_record_features(&record.text, true, false);
+                let scope = ast.header.as_ref().and_then(|p| p.get("scope"));
+                let readings =
+                    result.readings.entry((normalize(&level.path), record.lines.0, record.lines.1)).or_default();
+                if let Some(Value::Str(scope)) = scope {
+                    readings.extend(
+                        input
+                            .doc
+                            .levels
+                            .iter()
+                            .enumerate()
+                            .filter(|(_, l)| l.circuit && l.same_name(&l.name, scope))
+                            .map(|(i, _)| i),
+                    );
+                } else {
+                    readings.push(drawing);
+                }
+            }
+        }
+        for level in &input.model.levels {
+            for object in &level.objects {
+                if object.kind != "usage" {
+                    continue;
+                }
+                if let Some(changes) =
+                    object.definition.as_ref().and_then(|d| result.definitions.get(&(level.level, d.clone())))
+                {
+                    for (old, new) in changes {
+                        result.roles.insert((level.level, object.id.clone(), old.clone()), new.clone());
+                    }
+                }
+                let Some(symbol) = &object.symbol else { continue };
+                let SymbolOrigin::Package(package) = &symbol.origin else { continue };
+                let Some(pins) = targets.get(&(package.clone(), symbol.name.clone())) else { continue };
+                // Resolve provenance, not just a familiar definition or symbol name. A custom
+                // package or a local override must never inherit a standard-package rewrite.
+                let sources: Vec<_> = input
+                    .sources
+                    .iter()
+                    .filter(|(_, text)| scan_package_decl(text).is_some_and(|(name, _)| &name == package))
+                    .collect();
+                let known = !sources.is_empty()
+                    && sources.iter().all(|(_, text)| bundled.files.values().any(|original| original == text));
+                if !known {
+                    continue;
+                }
+                for (number, (role, _)) in object.attach.iter().enumerate() {
+                    let matching: Vec<_> = pins.iter().filter(|(terminal, _)| terminal == role).collect();
+                    if let [(_, pin)] = matching.as_slice() {
+                        result.pins.insert((level.level, object.id.clone(), role.clone()), pin.clone());
+                        result.pins.insert((level.level, object.id.clone(), (number + 1).to_string()), pin.clone());
+                    }
+                }
+            }
+        }
+        result
+    }
+
+    pub(super) fn role_arguments(
+        &self,
+        path: &str,
+        source: &str,
+        record: &Record,
+        segment: &Segment,
+    ) -> Result<Vec<Edit>, String> {
+        if segment.call.as_ref().is_none_or(|c| !matches!(c.kw.as_str(), "AS" | "ATTACH")) {
+            return Ok(Vec::new());
+        }
+        let Some(definition) = segment.args.iter().find_map(|a| match &a.obj {
+            ObjExpr::Ref(r) if r.prefix == '$' && r.path.is_empty() => r.name.as_ref().map(|n| format!("${n}")),
+            _ => None,
+        }) else {
+            return Ok(Vec::new());
+        };
+        let Some(readings) = self.readings.get(&(normalize(path), record.lines.0, record.lines.1)) else {
+            return Ok(Vec::new());
+        };
+        let mut out = Vec::new();
+        for arg in &segment.args {
+            let Some(role) = &arg.role else { continue };
+            let mut replacements = readings
+                .iter()
+                .map(|level| self.definitions.get(&(*level, definition.clone())).and_then(|changes| changes.get(role)));
+            let Some(Some(new)) = replacements.next() else { continue };
+            if replacements.any(|other| other != Some(new)) {
+                continue;
+            }
+            let chars: Vec<_> = record.text.chars().collect();
+            let Some(offset) = chars[arg.start..arg.end].iter().rposition(|c| *c == '(') else { continue };
+            out.push(record_edit(
+                source,
+                record,
+                arg.start + offset..arg.end,
+                format!("({new})"),
+                "standard-role-name",
+            )?);
+        }
+        Ok(out)
+    }
+
+    pub(super) fn role_reference(
+        &self,
+        path: &str,
+        source: &str,
+        record: &Record,
+        reference: &Ref,
+    ) -> Result<Option<Edit>, String> {
+        if reference.prefix != '%'
+            || reference.sub.is_some()
+            || reference.places.is_some()
+            || reference.number.is_some()
+        {
+            return Ok(None);
+        }
+        let Some(name) = &reference.name else { return Ok(None) };
+        let Some(first) = reference.path.first() else { return Ok(None) };
+        if first.sep != Sep::Sub || first.sub.is_some() || reference.path.iter().any(|p| p.sub.is_some()) {
+            return Ok(None);
+        }
+        let object = format!("%{}", rnl_runtime::problem::written_name(name));
+        let Some(readings) = self.readings.get(&(normalize(path), record.lines.0, record.lines.1)) else {
+            return Ok(None);
+        };
+        let mut replacements =
+            readings.iter().map(|level| self.roles.get(&(*level, object.clone(), first.name.clone())));
+        let Some(Some(new)) = replacements.next() else { return Ok(None) };
+        if replacements.any(|other| other != Some(new)) {
+            return Ok(None);
+        }
+        let mut text = object;
+        for (i, part) in reference.path.iter().enumerate() {
+            text.push_str(if part.sep == Sep::Sub { "::" } else { ":" });
+            text.push_str(&rnl_runtime::problem::written_name(if i == 0 { new } else { &part.name }));
+        }
+        record_edit(source, record, reference.start..reference.end, text, "standard-role-reference").map(Some)
+    }
+
+    pub(super) fn usage_pin(
+        &self,
+        path: &str,
+        source: &str,
+        record: &Record,
+        reference: &Ref,
+    ) -> Result<Option<Edit>, String> {
+        if reference.prefix != '%'
+            || reference.sub.is_some()
+            || reference.places.is_some()
+            || reference.number.is_some()
+        {
+            return Ok(None);
+        }
+        let Some(name) = &reference.name else { return Ok(None) };
+        let Some((terminal, parents)) = reference.path.split_last() else { return Ok(None) };
+        if terminal.sep != Sep::Term
+            || terminal.sub.is_some()
+            || parents.iter().any(|p| p.sep != Sep::Sub || p.sub.is_some())
+        {
+            return Ok(None);
+        }
+        let mut object = format!("%{}", rnl_runtime::problem::written_name(name));
+        for part in parents {
+            object.push_str("::");
+            object.push_str(&rnl_runtime::problem::written_name(&part.name));
+        }
+        let Some(readings) = self.readings.get(&(normalize(path), record.lines.0, record.lines.1)) else {
+            return Ok(None);
+        };
+        let mut resolved = None;
+        for level in readings {
+            let Some(pin) = self.pins.get(&(*level, object.clone(), terminal.name.clone())) else { return Ok(None) };
+            if resolved.as_ref().is_some_and(|old| old != pin) {
+                return Ok(None);
+            }
+            resolved = Some(pin.clone());
+        }
+        let Some(pin) = resolved else { return Ok(None) };
+        record_edit(
+            source,
+            record,
+            reference.start..reference.end,
+            format!("{object}::{}", rnl_runtime::problem::written_name(&pin)),
+            "usage-named-pin",
+        )
+        .map(Some)
+    }
+}

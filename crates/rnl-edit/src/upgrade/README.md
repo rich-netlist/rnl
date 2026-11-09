@@ -6,7 +6,7 @@ An upgrade is successful only when all changes are supported, target interpretat
 
 ## Implementation status
 
-The initial implementation changes language headers and standard package references. The inventory below is the remaining migration plan, not a claim that every rule is implemented. Known unsupported constructs receive notes and report entries; target diagnostics and structural differences also prevent success. The native writer preserves the supported UTF-8 (including BOM) and Latin-1 encodings.
+The implementation changes language headers and standard package references, renames ROUTE, makes implicit recursive selections explicit when their rule has no mixed recursion, and separates references from adjacent sets. Standard usage terminal paths become named pins when package provenance and the binding are known; supported standard role renames update both arguments and references. Local overrides keep their own names. Distance intervals that cannot be carried across directly are retained with a specific explanation. The inventory below is the remaining migration plan, not a claim that every rule is implemented. Known unsupported constructs receive notes and report entries; target diagnostics and structural differences also prevent success. The native writer preserves the supported UTF-8 (including BOM) and Latin-1 encodings.
 
 ## Rewrite inventory
 
@@ -29,6 +29,7 @@ Sections refer to RNL 0.4. Standard package changes refer to the bundled series 
 | Ordinary definition's absolute coordinates | Lift absolute facts to each usage when its expansion and priority can be preserved | Context | 9.4, 12.1 |
 | Usage terminal reference | Corresponding named symbol pin | Context | 6.4, 9.2.4, 12.1 |
 | Custom symbol pin binding roles by number | Name the pin and bind its corresponding role | Context | 9.2.4, 11.3 |
+| Repeated PIN bindings in a symbol | Remove displaced bindings from earlier pins; retain points still referenced | Context | 9.2.4 |
 | Symbol inheritance overriding a terminal's pin | Materialize equivalent nonduplicating pins, otherwise report | Context | 9.2.7 |
 | SELECT-TERMINAL wired | SELECT-PIN, preserving electrical consumers where applicable | Context | 10.1, 10.2 |
 | Other terminal selections | Check the effect of selecting all electrical terminals | Context | 10.1 |
@@ -50,6 +51,10 @@ Sections refer to RNL 0.4. Standard package changes refer to the bundled series 
 | New assertion violations or changed default fill | Report every target diagnostic and semantic difference | Verification | 7.6, 15.2-15.4 |
 
 Additive language features (TABLE, orientation lists, assertions, solver settings, pin orientation, text rotation and math) require no rewrite unless an old spelling gains different meaning. Clarifications still participate in validation. Do not alter host netlist lines to hide a difference.
+
+## Solver records
+
+After validating the source, migration discards its solver-generated records. The report marks each affected file with `needs_solve: true`; this requests a new solve and does not count as a conversion failure. Verification compares the authored inputs on both sides, so discarded solver decisions do not create artificial differences.
 
 ## Report
 

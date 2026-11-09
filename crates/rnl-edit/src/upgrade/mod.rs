@@ -5,7 +5,10 @@
 
 mod compare;
 mod edit;
+mod mechanical;
+mod references;
 mod rewrite;
+mod standard;
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -16,7 +19,7 @@ use rnl_runtime::source::{dirname, join, normalize, Layered, MemoryProvider, Pro
 use rnl_runtime::{Interpretation, Options};
 use serde::Serialize;
 
-/// Inputs to the reader; generated records always participate in migration.
+/// Inputs to the reader. Solver records are validated, then discarded before verification.
 #[derive(Clone, Debug)]
 pub struct UpgradeOptions {
     pub dialect: Option<String>,
@@ -53,6 +56,8 @@ pub struct FileReport {
     pub to: String,
     pub changes: Vec<Change>,
     pub unconverted: Vec<Unconverted>,
+    /// Solver records were discarded; solving the upgraded document again is required.
+    pub needs_solve: bool,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -141,6 +146,11 @@ pub fn upgrade(entry: &str, files: &dyn Provider, options: &UpgradeOptions) -> R
     if !errors.is_empty() || before.model.failed.is_some() || before.unsupported.iter().any(Option::is_some) {
         return Err(format!("cannot upgrade an unreadable source; nothing was written\n{}", errors.join("\n")));
     }
+    let authored = Options { generated: false, ..runtime.clone() };
+    if before.doc.levels.iter().flat_map(|l| &l.records).any(|r| rnl_runtime::writeback::record_type(r) == "generated")
+    {
+        before = rnl_view::interpret_with(&entry, options.dialect.as_deref(), &options.formats, files, &authored)?;
+    }
     // Package checking keeps its parsed units outside the host document. Recover their
     // carrier locations through the same scanner used by the package reader.
     let package_entry = rnl_view::entry_format(&entry, options.dialect.as_deref(), &options.formats, files)? == "rnl";
@@ -204,6 +214,7 @@ pub fn upgrade(entry: &str, files: &dyn Provider, options: &UpgradeOptions) -> R
             package_docs.insert(dependency, doc);
         }
     }
+    let context = rewrite::Context { std: options.std, packages, references: references::References::new(&before) };
     let mut output = BTreeMap::new();
     let mut report = Report { schema_version: 1, files: Vec::new(), diagnostics: Vec::new(), differences: Vec::new() };
     let mut read = Vec::new();
@@ -230,15 +241,16 @@ pub fn upgrade(entry: &str, files: &dyn Provider, options: &UpgradeOptions) -> R
             to: "0.4".into(),
             changes: Vec::new(),
             unconverted: Vec::new(),
+            needs_solve: false,
         };
         let doc = package_docs.get(&path).unwrap_or(&before.doc);
-        let text = rewrite::file(doc, &path, &source, &records, options.std, &packages, &mut file_report)?;
+        let text = rewrite::file(doc, &path, &source, &records, &context, &mut file_report)?;
         output.insert(path, text);
         report.files.push(file_report);
     }
     let overlay = MemoryProvider { files: output.clone(), package_dirs: Vec::new() };
     let provider = Layered { layers: vec![&overlay, files] };
-    let target_options = Options { std: false, ..runtime };
+    let target_options = Options { std: false, ..authored };
     let after =
         rnl_view::interpret_with(&entry, options.dialect.as_deref(), &options.formats, &provider, &target_options)?;
     report.diagnostics = diagnostics(&after);

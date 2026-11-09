@@ -111,3 +111,18 @@ fn a_package_entry_uses_its_own_header() {
     assert_eq!(result.files["custom.rnl"], source.replace("0.3", "0.4"));
     assert!(result.report.successful(), "{:?}", result.report);
 }
+
+#[test]
+fn solver_records_are_discarded_and_request_solving_without_a_conversion_failure() {
+    let source="* title\r\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\r\n* @RNL { %p = (_, _); %p @TEXT(\"authored\") }\r\n* @RNL(type=\"generated\") {\r\n* %p @PLACE(3, 4)\r\n* }\r\nR1 a 0 1k\r\n.end\r\n";
+    let result = upgrade("t.sp", &MemoryProvider::new().with("t.sp", source), &options()).unwrap();
+    let output = &result.files["t.sp"];
+    assert!(!output.contains("generated"));
+    assert!(!output.contains("@PLACE(3, 4)"));
+    assert!(output.contains("%p = (_, _); %p @TEXT(\"authored\")"));
+    assert!(output.ends_with("R1 a 0 1k\r\n.end\r\n"));
+    assert_eq!(output.lines().count(), source.lines().count());
+    assert!(result.report.files[0].needs_solve);
+    assert!(result.report.files[0].changes.iter().any(|c| c.rule == "discard-solver-record" && c.line == 4));
+    assert!(result.report.successful(), "{:?}", result.report);
+}

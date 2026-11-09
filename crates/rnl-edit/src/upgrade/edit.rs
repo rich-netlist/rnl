@@ -57,3 +57,11 @@ pub(super) fn apply(source: &str, edits: &mut Vec<Edit>) -> Result<String, Strin
     }
     Ok(text)
 }
+
+/// Remove only the solver record, retaining line boundaries and surrounding host text.
+pub(super) fn discard_generated(source: &str, record: &Record) -> Result<Edit, String> {
+    let mut edit = record_edit(source, record, 0..record.text.chars().count(), String::new(), "discard-solver-record")?;
+    edit.replacement = edit.change.before.chars().filter(|c| matches!(c, '\r' | '\n')).collect();
+    edit.change.after = edit.replacement.clone();
+    Ok(edit)
+}

@@ -120,3 +120,16 @@ fn utf16_is_rejected_without_corrupting_the_file() {
     assert_eq!(output.status.code(), Some(2), "{output:?}");
     assert_eq!(std::fs::read(dir.join("top.sp")).unwrap(), bytes);
 }
+
+#[test]
+fn removing_solver_records_is_reported_as_needing_a_new_solve() {
+    let dir = scratch("solver-records");
+    let source="* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\n* @RNL { %p=(_, _); %p @TEXT(\"note\") }\n* @RNL(type=\"generated\") { %p @PLACE(2, 3) }\n.end\n";
+    std::fs::write(dir.join("top.sp"), source).unwrap();
+    let output = run(&dir, &["top.sp", "--no-std", "-o", "out", "--report", "report.json"]);
+    assert!(output.status.success(), "{output:?}");
+    assert!(String::from_utf8(output.stdout).unwrap().contains("1 files need solving"));
+    let report: serde_json::Value = serde_json::from_slice(&std::fs::read(dir.join("report.json")).unwrap()).unwrap();
+    assert_eq!(report["files"][0]["needs_solve"], true);
+    assert!(!std::fs::read_to_string(dir.join("out/top.sp")).unwrap().contains("generated"));
+}
