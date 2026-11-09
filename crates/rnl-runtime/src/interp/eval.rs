@@ -1875,9 +1875,11 @@ impl<'p> Interp<'p> {
         let mut done = Vec::new();
         for (name, val) in out {
             let Some(val) = val else { continue };
-            let sp = spec.iter().find(|s| s.name == name).cloned().or_else(|| {
-                words().style_prop(&name).map(|s| ParamSpec::new(s.name.clone(), s.ty.clone()))
-            });
+            let sp = spec
+                .iter()
+                .find(|s| s.name == name)
+                .cloned()
+                .or_else(|| words().style_prop(&name).map(|s| ParamSpec::new(s.name.clone(), s.ty.clone())));
             let v = self.check_value(kw, &name, val, sp.as_ref(), ctx, p.start)?;
             done.push((name, v));
         }

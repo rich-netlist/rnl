@@ -237,7 +237,12 @@ impl Words {
         let mut removed = Vec::new();
         for r in obj.get("removed").and_then(Value::as_array).into_iter().flatten() {
             let field = |key: &str| str_of(r.get(key)).ok_or_else(|| format!("removed: {key}"));
-            removed.push(Removed { word: field("word")?, what: field("what")?, until: field("until")?, see: field("see")? });
+            removed.push(Removed {
+                word: field("word")?,
+                what: field("what")?,
+                until: field("until")?,
+                see: field("see")?,
+            });
         }
         let by_name = keywords.iter().enumerate().map(|(i, k)| (k.name.clone(), i)).collect();
         let mut w = Words {
