@@ -218,14 +218,16 @@ fn explain_gives_json_with_the_chain_in_outer() {
 fn explain_refuses_an_unknown_reference_with_the_names_close_to_it() {
     let file = netlist();
     let (code, _, err) = rnl(&["explain", &file, "#R9"]);
-    assert_eq!((code, err.trim()), (2, "rnl: no object is #R9; close names: #R1, #R2, #R3, #M1"));
+    let want = "error: RNL8006 cli-explain-not-found: no object is #R9; close names: #R1, #R2, #R3, #M1";
+    assert_eq!((code, err.trim()), (2, want));
     let (code, _, err) = rnl(&["explain", &file, "#R1", "--level", "amp"]);
-    assert_eq!((code, err.trim()), (2, "rnl: no level is titled amp; the levels are explain.sp"));
+    let want = "error: RNL8005 cli-explain-level-not-found: no level is titled amp; the levels are explain.sp";
+    assert_eq!((code, err.trim()), (2, want));
     let (code, _, err) = rnl(&["explain", &file]);
     assert_eq!(code, 2);
-    assert!(err.starts_with("rnl explain takes FILE and REF"), "{err}");
+    assert!(err.starts_with("error: RNL8004 cli-explain-args: rnl explain takes FILE and REF"), "{err}");
     let (code, _, err) = rnl(&["check", &file, "--json"]);
-    assert_eq!((code, err.trim()), (2, "--json is an option of explain"));
+    assert_eq!((code, err.trim()), (2, "error: RNL8011 cli-option-wrong-command: --json is an option of explain"));
 }
 
 #[test]

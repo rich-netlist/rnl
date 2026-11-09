@@ -195,7 +195,12 @@ fn rnl_view_binds_parameters() {
     assert_eq!(buf["params"][0]["from"], "bound");
     assert_eq!(buf["params"][0]["value"], "5u");
     let (code, _, err) = rnl(&["view", &file, "--param", "wn=5u"]);
-    assert_eq!((code, err.trim()), (2, "--param needs --bind SUBCKT, the subcircuit whose parameters it gives"));
+    let want =
+        "error: RNL8013 cli-param-needs-bind: --param needs --bind SUBCKT, the subcircuit whose parameters it gives";
+    assert_eq!((code, err.trim()), (2, want));
     let (code, _, err) = rnl(&["check", &file, "--bind", "buf"]);
-    assert_eq!((code, err.trim()), (2, "--bind and --param are options of view"));
+    assert_eq!(
+        (code, err.trim()),
+        (2, "error: RNL8011 cli-option-wrong-command: --bind and --param are options of view")
+    );
 }

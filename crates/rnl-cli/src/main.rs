@@ -6,7 +6,7 @@ use std::process::ExitCode;
 
 use rnl_cli::codec::{decode, encode, OutputEncoding};
 use rnl_cli::{dump, FsProvider};
-use rnl_runtime::diag::{Severity, Sink};
+use rnl_runtime::diag::{codes, Code, Severity, Sink};
 use rnl_runtime::source::{Layered, MemoryProvider, Provider};
 use rnl_runtime::{Interpretation, Options};
 use rnl_view::BuildOptions;
@@ -134,11 +134,79 @@ struct Args {
     bind: Option<rnl_view::Bind>,
 }
 
-fn parse_args() -> Result<Args, String> {
+/// What the `rnl` command says of its own, printed as `error: RNL8010 cli-option-needs-value: …`:
+/// its kind, and its text. A message of a library the command calls has no kind yet and is printed
+/// without one.
+pub(crate) struct Said {
+    code: Option<Code>,
+    text: String,
+}
+
+impl Said {
+    pub(crate) fn new(code: Code, text: impl Into<String>) -> Said {
+        Said { code: Some(code), text: text.into() }
+    }
+}
+
+impl From<String> for Said {
+    fn from(text: String) -> Said {
+        Said { code: None, text }
+    }
+}
+
+impl From<(Code, String)> for Said {
+    fn from((code, text): (Code, String)) -> Said {
+        Said { code: Some(code), text }
+    }
+}
+
+impl From<&str> for Said {
+    fn from(text: &str) -> Said {
+        Said { code: None, text: text.into() }
+    }
+}
+
+impl std::fmt::Display for Said {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.code {
+            Some(code) => write!(f, "{code}: {}", self.text),
+            None => f.write_str(&self.text),
+        }
+    }
+}
+
+/// An option that is last on the command line, or whose value has the wrong shape.
+pub(crate) fn needs(text: &str) -> Said {
+    Said::new(codes::CLI_OPTION_NEEDS_VALUE, text)
+}
+
+/// An `--encoding` that is neither preserve nor utf8.
+fn unknown_encoding(text: String) -> Said {
+    Said::new(codes::CLI_ENCODING_UNKNOWN, text)
+}
+
+/// The commands, as `run` takes them.
+const COMMANDS: [&str; 13] = [
+    "check",
+    "dump",
+    "problem",
+    "view",
+    "explain",
+    "snapshot",
+    "formats",
+    "catalog",
+    "render",
+    "solve",
+    "preview",
+    "strip-generated",
+    "write",
+];
+
+fn parse_args() -> Result<Args, Said> {
     let mut it = std::env::args().skip(1);
-    let command = it.next().ok_or(USAGE)?;
-    if command == "-h" || command == "--help" {
-        return Err(USAGE.into());
+    let command = it.next().ok_or_else(|| Said::new(codes::CLI_USAGE, USAGE))?;
+    if !COMMANDS.contains(&command.as_str()) && !command.starts_with('-') {
+        return Err(Said::new(codes::CLI_UNKNOWN_COMMAND, format!("unknown command {command}\n{USAGE}")));
     }
     let mut positional = Vec::new();
     let mut json = false;
@@ -171,7 +239,7 @@ fn parse_args() -> Result<Args, String> {
                 overlays.usages = match it.next().as_deref() {
                     Some("all") => rnl_view::UsageMode::All,
                     Some("semantic") => rnl_view::UsageMode::Semantic,
-                    _ => return Err("--usages needs all or semantic".into()),
+                    _ => return Err(needs("--usages needs all or semantic")),
                 };
             }
             "--currents" => {
@@ -184,25 +252,34 @@ fn parse_args() -> Result<Args, String> {
             }
             "--overlay-style" => {
                 overlay_args = true;
-                let path = it.next().ok_or("--overlay-style needs a JSON file")?;
-                let text = std::fs::read_to_string(&path).map_err(|e| format!("{path}: {e}"))?;
-                overlays.style = serde_json::from_str(&text).map_err(|e| format!("{path}: {e}"))?;
+                let path = it.next().ok_or_else(|| needs("--overlay-style needs a JSON file"))?;
+                let text = std::fs::read_to_string(&path)
+                    .map_err(|e| Said::new(codes::CLI_OVERLAY_STYLE_UNREADABLE, format!("{path}: {e}")))?;
+                overlays.style = serde_json::from_str(&text)
+                    .map_err(|e| Said::new(codes::CLI_OVERLAY_STYLE_UNREADABLE, format!("{path}: {e}")))?;
             }
-            "-o" | "--out" => out = Some(PathBuf::from(it.next().ok_or("-o needs a path")?)),
-            "--package-dir" => package_dirs.push(PathBuf::from(it.next().ok_or("--package-dir needs a directory")?)),
+            "-o" | "--out" => out = Some(PathBuf::from(it.next().ok_or_else(|| needs("-o needs a path"))?)),
+            "--package-dir" => {
+                package_dirs.push(PathBuf::from(it.next().ok_or_else(|| needs("--package-dir needs a directory"))?))
+            }
             "--path" => {
-                let dir = PathBuf::from(it.next().ok_or("--path needs a directory")?);
+                let dir = PathBuf::from(it.next().ok_or_else(|| needs("--path needs a directory"))?);
                 package_dirs.push(dir.clone());
                 search_paths.push(dir);
             }
             "--no-std" => std = false,
-            "--std-version" => std_version = Some(it.next().ok_or("--std-version needs a version, such as 0.2")?),
+            "--std-version" => {
+                std_version = Some(it.next().ok_or_else(|| needs("--std-version needs a version, such as 0.2"))?)
+            }
             "--no-generated" => generated = false,
-            "--dialect" => dialect = Some(it.next().ok_or("--dialect needs spice, spectre, rnl or text")?),
+            "--dialect" => {
+                dialect = Some(it.next().ok_or_else(|| needs("--dialect needs spice, spectre, rnl or text"))?)
+            }
             "--format" => {
-                let set = it.next().ok_or("--format needs PATH=NAME, such as models.inc=spectre")?;
-                let (path, name) =
-                    set.rsplit_once('=').ok_or("--format needs PATH=NAME, such as models.inc=spectre")?;
+                let set = it.next().ok_or_else(|| needs("--format needs PATH=NAME, such as models.inc=spectre"))?;
+                let (path, name) = set
+                    .rsplit_once('=')
+                    .ok_or_else(|| needs("--format needs PATH=NAME, such as models.inc=spectre"))?;
                 formats.insert(path.to_string(), name.to_string());
             }
             "--no-svg" => svg = false,
@@ -211,29 +288,42 @@ fn parse_args() -> Result<Args, String> {
             "--hints" => hints = true,
             "--status" => status = true,
             "--constraints" => constraints = true,
-            "--level" => level = Some(it.next().ok_or("--level needs a title")?),
-            "--author" => author = Some(it.next().ok_or("--author needs a name")?),
-            "--parts" => parts = Some(it.next().ok_or("--parts needs a list, such as host,model")?),
-            "--package" => packages.push(it.next().ok_or("--package needs a name, such as rnl-std-basic")?),
+            "--level" => level = Some(it.next().ok_or_else(|| needs("--level needs a title"))?),
+            "--author" => author = Some(it.next().ok_or_else(|| needs("--author needs a name"))?),
+            "--parts" => parts = Some(it.next().ok_or_else(|| needs("--parts needs a list, such as host,model"))?),
+            "--package" => {
+                packages.push(it.next().ok_or_else(|| needs("--package needs a name, such as rnl-std-basic"))?)
+            }
             "--all-versions" => all_versions = true,
             "--json" => json = true,
-            "--bind" => bind_subckt = Some(it.next().ok_or("--bind needs a subcircuit name")?),
+            "--bind" => bind_subckt = Some(it.next().ok_or_else(|| needs("--bind needs a subcircuit name"))?),
             "--param" => {
-                let set = it.next().ok_or("--param needs NAME=VALUE, such as w=2u")?;
-                let (name, value) = set.split_once('=').ok_or("--param needs NAME=VALUE, such as w=2u")?;
+                let set = it.next().ok_or_else(|| needs("--param needs NAME=VALUE, such as w=2u"))?;
+                let (name, value) =
+                    set.split_once('=').ok_or_else(|| needs("--param needs NAME=VALUE, such as w=2u"))?;
                 bind_params.insert(name.to_string(), value.to_string());
             }
-            "--encoding" => encoding = Some(it.next().ok_or("--encoding needs preserve or utf8")?.parse()?),
-            _ if a.starts_with("--encoding=") => encoding = Some(a[11..].parse()?),
+            "--encoding" => {
+                encoding = Some(
+                    it.next()
+                        .ok_or_else(|| needs("--encoding needs preserve or utf8"))?
+                        .parse()
+                        .map_err(unknown_encoding)?,
+                )
+            }
+            _ if a.starts_with("--encoding=") => encoding = Some(a[11..].parse().map_err(unknown_encoding)?),
             _ if solver.take(&a, &mut it)? => {}
-            _ if a.starts_with('-') => return Err(format!("unknown option {a}\n{USAGE}")),
+            _ if a.starts_with('-') => {
+                return Err(Said::new(codes::CLI_UNKNOWN_OPTION, format!("unknown option {a}\n{USAGE}")))
+            }
             _ => positional.push(a),
         }
     }
     // explain takes FILE and REF; another command FILE, the last one given
     let reference = if command == "explain" {
         if positional.len() != 2 {
-            return Err(format!("rnl explain takes FILE and REF, such as rnl explain top.sp '#M1'\n{USAGE}"));
+            let text = format!("rnl explain takes FILE and REF, such as rnl explain top.sp '#M1'\n{USAGE}");
+            return Err(Said::new(codes::CLI_EXPLAIN_ARGS, text));
         }
         positional.pop()
     } else {
@@ -241,33 +331,36 @@ fn parse_args() -> Result<Args, String> {
     };
     let file = positional.pop().map(PathBuf::from);
     if json && command != "explain" {
-        return Err("--json is an option of explain".into());
+        return Err(Said::new(codes::CLI_OPTION_WRONG_COMMAND, "--json is an option of explain"));
     }
     if constraints && command != "view" {
-        return Err("--constraints is an option of view; rnl problem prints what a solver reads".into());
+        let text = "--constraints is an option of view; rnl problem prints what a solver reads";
+        return Err(Said::new(codes::CLI_OPTION_WRONG_COMMAND, text));
     }
     if (bind_subckt.is_some() || !bind_params.is_empty()) && command != "view" {
-        return Err("--bind and --param are options of view".into());
+        return Err(Said::new(codes::CLI_OPTION_WRONG_COMMAND, "--bind and --param are options of view"));
     }
     if !bind_params.is_empty() && bind_subckt.is_none() {
-        return Err("--param needs --bind SUBCKT, the subcircuit whose parameters it gives".into());
+        let text = "--param needs --bind SUBCKT, the subcircuit whose parameters it gives";
+        return Err(Said::new(codes::CLI_PARAM_NEEDS_BIND, text));
     }
     let bind = bind_subckt.map(|subckt| rnl_view::Bind { subckt, params: bind_params });
     solver.check(&command)?;
     if overlay_args && command != "render" {
-        return Err("overlay options are options of render".into());
+        return Err(Said::new(codes::CLI_OPTION_WRONG_COMMAND, "overlay options are options of render"));
     }
     overlays.validate()?;
     if encoding.is_some() && !matches!(command.as_str(), "solve" | "strip-generated") {
-        return Err("--encoding is only for solve and strip-generated".into());
+        return Err(Said::new(codes::CLI_OPTION_WRONG_COMMAND, "--encoding is only for solve and strip-generated"));
     }
     // the catalog reads the package directories and the bundled packages, not a file
     let file = match (command.as_str(), file) {
         ("catalog" | "formats", None) => PathBuf::new(),
         (c @ ("catalog" | "formats"), Some(f)) => {
-            return Err(format!("rnl {c} takes no FILE, not {}\n{USAGE}", f.display()))
+            let text = format!("rnl {c} takes no FILE, not {}\n{USAGE}", f.display());
+            return Err(Said::new(codes::CLI_COMMAND_TAKES_NO_FILE, text));
         }
-        (_, file) => file.ok_or(USAGE)?,
+        (_, file) => file.ok_or_else(|| Said::new(codes::CLI_USAGE, USAGE))?,
     };
     let formats = formats.into_iter().map(|(path, name)| (format_path(&path, &file), name)).collect();
     Ok(Args {
@@ -307,17 +400,15 @@ fn main() -> ExitCode {
         println!("rnl {} ({})", rnl_cli::CORE_VERSION, rnl_cli::BUILD_COMMIT);
         return ExitCode::SUCCESS;
     }
-    let args = match parse_args() {
-        Ok(a) => a,
-        Err(msg) => {
-            eprintln!("{msg}");
-            return ExitCode::from(2);
-        }
-    };
-    match run(&args) {
+    // asked for, the usage is the answer, not an error
+    if argv.first().is_some_and(|a| a == "-h" || a == "--help") {
+        print!("{USAGE}");
+        return ExitCode::SUCCESS;
+    }
+    match parse_args().and_then(|args| run(&args)) {
         Ok(code) => code,
-        Err(msg) => {
-            eprintln!("rnl: {msg}");
+        Err(said) => {
+            eprintln!("error: {said}");
             ExitCode::from(2)
         }
     }
@@ -358,13 +449,14 @@ fn format_path(path: &str, file: &std::path::Path) -> String {
 /// Check the `--format`s before a command reads FILE: an unknown format name is an error, and each
 /// path that FILE's netlist does not read is warned of, as it sets nothing, but for one set to `rnl`,
 /// a package that USE-PACKAGE finds by name. A package file FILE reads no other file.
-fn check_formats(args: &Args, provider: &FsProvider) -> Result<(), String> {
+fn check_formats(args: &Args, provider: &FsProvider) -> Result<(), Said> {
     if args.formats.is_empty() || matches!(args.command.as_str(), "catalog" | "formats" | "write") {
         return Ok(());
     }
     let names: Vec<String> = rnl_view::formats().into_iter().map(|f| f.name).collect();
     if let Some((path, name)) = args.formats.iter().find(|(_, name)| !names.contains(name)) {
-        return Err(format!("unknown format \"{name}\" for {path}; the formats are {}", names.join(", ")));
+        let text = format!("unknown format \"{name}\" for {path}; the formats are {}", names.join(", "));
+        return Err(Said::new(codes::VIEW_FORMAT_UNKNOWN, text));
     }
     let format =
         rnl_view::entry_format(&args.file.to_string_lossy(), args.dialect.as_deref(), &args.formats, provider)?;
@@ -388,13 +480,19 @@ fn check_formats(args: &Args, provider: &FsProvider) -> Result<(), String> {
     for (path, name) in args.formats.iter().filter(|(_, name)| *name != rnl_runtime::host::package::NAME) {
         let key = provider.path_key(&rnl_runtime::source::normalize(path));
         if !read.contains(&key) {
-            eprintln!("rnl: warning: --format {path}={name}: {} reads no such file", args.file.display());
+            let code = codes::CLI_FORMAT_PATH_UNUSED;
+            eprintln!("warning: {code}: --format {path}={name}: {} reads no such file", args.file.display());
         }
     }
     Ok(())
 }
 
-fn run(args: &Args) -> Result<ExitCode, String> {
+/// An error of the operating system writing a file or a directory.
+fn io(e: std::io::Error) -> Said {
+    Said::new(codes::CLI_IO_ERROR_BARE, e.to_string())
+}
+
+fn run(args: &Args) -> Result<ExitCode, Said> {
     let provider = FsProvider::new(&args.package_dirs).with_search_paths(&args.search_paths);
     check_formats(args, &provider)?;
     match args.command.as_str() {
@@ -480,7 +578,10 @@ fn run(args: &Args) -> Result<ExitCode, String> {
                     "drawing" => parts.drawing = true,
                     "host" => parts.host = true,
                     "model" => parts.model = true,
-                    _ => return Err(format!("--parts: unknown part {p}; the parts are drawing, host and model")),
+                    _ => {
+                        let text = format!("--parts: unknown part {p}; the parts are drawing, host and model");
+                        return Err(Said::new(codes::CLI_PARTS_UNKNOWN, text));
+                    }
                 }
             }
             let options = BuildOptions {
@@ -529,8 +630,8 @@ fn run(args: &Args) -> Result<ExitCode, String> {
             } else {
                 None
             };
-            let out = args.out.clone().ok_or("render needs -o DIR")?;
-            std::fs::create_dir_all(&out).map_err(|e| e.to_string())?;
+            let out = args.out.clone().ok_or_else(|| Said::new(codes::CLI_NEEDS_OUT, "render needs -o DIR"))?;
+            std::fs::create_dir_all(&out).map_err(io)?;
             let stem = args.file.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "out".into());
             for (k, lv) in r.model.levels.iter().enumerate() {
                 let svg = match &overlays {
@@ -541,19 +642,20 @@ fn run(args: &Args) -> Result<ExitCode, String> {
                     ),
                 };
                 let name = if k == 0 { format!("{stem}.svg") } else { format!("{stem}.{}.svg", sanitize(&lv.title)) };
-                std::fs::write(out.join(&name), svg).map_err(|e| e.to_string())?;
+                std::fs::write(out.join(&name), svg).map_err(io)?;
                 println!("{}", out.join(&name).display());
             }
             let errors = r.diagnostics().iter().filter(|d| d.severity == Severity::Error).count();
             if errors > 0 {
-                eprintln!("{errors} errors; run `rnl check` to see them");
+                eprintln!("warning: {}: {errors} errors; run `rnl check` to see them", codes::CLI_RENDER_HAS_ERRORS);
             }
             Ok(ExitCode::SUCCESS)
         }
         "solve" => solver_args::solve(args, &provider),
         "preview" => solver_args::preview(args, &provider),
         "strip-generated" => {
-            let out = args.out.clone().ok_or("strip-generated needs -o OUT")?;
+            let out =
+                args.out.clone().ok_or_else(|| Said::new(codes::CLI_NEEDS_OUT, "strip-generated needs -o OUT"))?;
             // Preserve the origin of the text actually read, not the adapter's display name
             // (which can be a basename). Disk wins over an exact virtual-package lookup.
             let entry = rnl_cli::path_str(&args.file);
@@ -564,7 +666,9 @@ fn run(args: &Args) -> Result<ExitCode, String> {
                 }
                 Err(e) => {
                     let text = if args.file.exists() { None } else { rnl_cli::bundled().read(&entry) };
-                    let text = text.ok_or_else(|| format!("cannot read {}: {e}", args.file.display()))?;
+                    let cannot =
+                        || Said::new(codes::CLI_CANNOT_READ, format!("cannot read {}: {e}", args.file.display()));
+                    let text = text.ok_or_else(cannot)?;
                     (None, text)
                 }
             };
@@ -572,7 +676,9 @@ fn run(args: &Args) -> Result<ExitCode, String> {
             // reader reserves the <bundled> prefix, so use a physical absolute path for disk
             // sources. Do not canonicalize: relative includes retain the entered directory.
             let read_path = if original.is_some() {
-                std::path::absolute(&args.file).map_err(|e| format!("cannot resolve {}: {e}", args.file.display()))?
+                std::path::absolute(&args.file).map_err(|e| {
+                    Said::new(codes::CLI_CANNOT_RESOLVE_PATH, format!("cannot resolve {}: {e}", args.file.display()))
+                })?
             } else {
                 args.file.clone()
             };
@@ -587,20 +693,23 @@ fn run(args: &Args) -> Result<ExitCode, String> {
                 args.formats.iter().map(|(p, f)| (format_path(p, &read_path), f.clone())).collect();
             let doc = rnl_view::read_host_with(&read, args.dialect.as_deref(), &formats, &files, &mut sink)?;
             let main = doc.main().file.clone();
-            let text = doc.source(&main).ok_or_else(|| format!("cannot read {}", args.file.display()))?;
+            let cannot = || Said::new(codes::VIEW_CANNOT_READ, format!("cannot read {}", args.file.display()));
+            let text = doc.source(&main).ok_or_else(cannot)?;
             let stripped = rnl_runtime::writeback::strip_generated(&doc, &main, text);
             let bytes = encode(original.as_deref(), &stripped, args.encoding)
-                .map_err(|e| format!("{}: {e}", args.file.display()))?;
-            std::fs::write(&out, bytes).map_err(|e| e.to_string())?;
+                .map_err(|e| Said::new(codes::CODEC_LATIN1_UNREPRESENTABLE, format!("{}: {e}", args.file.display())))?;
+            std::fs::write(&out, bytes).map_err(io)?;
             Ok(ExitCode::SUCCESS)
         }
         "write" => {
-            let out = args.out.clone().ok_or("write needs -o OUT")?;
-            let text =
-                std::fs::read_to_string(&args.file).map_err(|e| format!("cannot read {}: {e}", args.file.display()))?;
-            let mut request: serde_json::Value =
-                serde_json::from_str(&text).map_err(|e| format!("{}: {e}", args.file.display()))?;
-            let fields = request.as_object_mut().ok_or("the request is not a JSON object")?;
+            let out = args.out.clone().ok_or_else(|| Said::new(codes::CLI_NEEDS_OUT, "write needs -o OUT"))?;
+            let text = std::fs::read_to_string(&args.file)
+                .map_err(|e| Said::new(codes::CLI_CANNOT_READ, format!("cannot read {}: {e}", args.file.display())))?;
+            let mut request: serde_json::Value = serde_json::from_str(&text)
+                .map_err(|e| Said::new(codes::CLI_REQUEST_NOT_JSON, format!("{}: {e}", args.file.display())))?;
+            let fields = request
+                .as_object_mut()
+                .ok_or_else(|| Said::new(codes::CLI_REQUEST_NOT_JSON, "the request is not a JSON object"))?;
             if let Some(d) = &args.dialect {
                 fields.insert("dialect".into(), d.clone().into());
             }
@@ -612,12 +721,12 @@ fn run(args: &Args) -> Result<ExitCode, String> {
             if let Some(name) = out.file_name().and_then(|n| n.to_str()) {
                 fields.entry("file").or_insert_with(|| name.into());
             }
-            let request: rnl_edit::WriteRequest =
-                serde_json::from_value(request).map_err(|e| format!("the request is not valid: {e}"))?;
-            std::fs::write(&out, rnl_edit::write(&request)?).map_err(|e| e.to_string())?;
+            let request: rnl_edit::WriteRequest = serde_json::from_value(request)
+                .map_err(|e| Said::new(codes::CLI_REQUEST_INVALID, format!("the request is not valid: {e}")))?;
+            std::fs::write(&out, rnl_edit::write(&request)?).map_err(io)?;
             Ok(ExitCode::SUCCESS)
         }
-        _ => Err(format!("unknown command {}\n{USAGE}", args.command)),
+        _ => Err(Said::new(codes::CLI_UNKNOWN_COMMAND, format!("unknown command {}\n{USAGE}", args.command))),
     }
 }
 

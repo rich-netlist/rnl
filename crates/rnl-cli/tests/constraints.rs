@@ -143,7 +143,8 @@ fn rnl_problem_prints_the_same_facts_without_what() {
     let level = problem.as_array().map_or(&problem["levels"][0], |levels| &levels[0]);
     assert_eq!(Value::Array(facts), level["facts"]);
     let (code, _, err) = rnl(&["check", &file, "--constraints"]);
-    assert_eq!((code, err.trim()), (2, "--constraints is an option of view; rnl problem prints what a solver reads"));
+    let want = "error: RNL8011 cli-option-wrong-command: --constraints is an option of view; rnl problem prints what a solver reads";
+    assert_eq!((code, err.trim()), (2, want));
 }
 
 struct NoTime;

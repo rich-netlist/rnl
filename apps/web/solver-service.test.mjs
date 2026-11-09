@@ -14,7 +14,8 @@ const fs = require("fs");
 if (args[0] === "--version") { console.log("rnl 0.0.0 (fake)"); process.exit(0); }
 const entry = args[1] || args[0];
 const text = fs.existsSync(entry) ? fs.readFileSync(entry, "utf8") : null;
-if (/fail/.test(text || "")) { console.error("the solver is a preview, whose layouts may be poor\\nerror: the netlist fails"); process.exit(1); }
+if (/old-fail/.test(text || "")) { console.error("the solver is a preview, whose layouts may be poor\\nnote: a note\\nerror: the netlist fails"); process.exit(1); }
+if (/fail/.test(text || "")) { console.error("hint: RNL8111 solve-preview-notice: the solver is a preview, and its layouts may be poor\\nerror: the netlist fails"); process.exit(1); }
 if (/slow/.test(text || "")) { fs.writeFileSync(process.env.FAKE_STARTED, "1"); setTimeout(() => {}, 60000); return; }
 const seen = { args: args.slice(1), cwd: process.cwd(), files: fs.readdirSync(".").sort(), text };
 console.log(JSON.stringify({ document: { path: entry, seen }, report: { levels: [] } }));
@@ -95,6 +96,9 @@ test("a netlist the solver fails on gives its message, and nothing is left behin
     assert.equal(status, 400);
     assert.equal(json.error, "error: the netlist fails");
     assert.deepEqual(await readdir(join(s.dir, "work")), []);
+    // the notice of an rnl from before the diagnostics had kinds is left out too
+    const old = await call(s.port, "POST", SOLVE, { entry: "/top.sp", files: { "/top.sp": "old-fail" } });
+    assert.equal(old.json.error, "error: the netlist fails");
   } finally { await s.close(); }
 });
 

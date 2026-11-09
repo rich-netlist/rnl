@@ -434,7 +434,13 @@ fn the_command_line_sets_formats_and_lists_them() {
     let (code, _, err) = rnl(&["check", &top, "--format", &format!("{cells}=verilog")]);
     assert_eq!(
         (code, err.trim()),
-        (2, format!("rnl: unknown format \"verilog\" for {cells}; the formats are spice, spectre, rnl, text").as_str())
+        (
+            2,
+            format!(
+                "error: RNL8707 view-format-unknown: unknown format \"verilog\" for {cells}; the formats are spice, spectre, rnl, text"
+            )
+            .as_str()
+        )
     );
     // a path the netlist does not read sets nothing, and is warned of, by its path made absolute
     // as FILE is

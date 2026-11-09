@@ -729,7 +729,8 @@ fn a_write_that_fails_says_what_it_wrote_before() {
         rnl(&["solve", &path_str(&f), "-o", &path_str(&dir), "--solver-options", "time_limit=none"]);
     assert_eq!(code, 2, "{stdout}{stderr}");
     assert!(stdout.ends_with(&format!("wrote {}\n", path_str(&dir.join("04-hierarchy.sp")))), "{stdout}");
-    assert!(stderr.contains("rnl: cannot write "), "{stderr}");
+    // an error of the library that writes, without its kind for now
+    assert!(stderr.contains("\nerror: cannot write "), "{stderr}");
 }
 
 fn rnl(args: &[&str]) -> (i32, String, String) {
@@ -2390,10 +2391,9 @@ fn a_library_section_is_raised_as_a_file_of_its_own() {
 
 #[test]
 fn solve_and_preview_say_on_the_standard_error_that_the_solver_is_a_preview() {
-    assert_eq!(
-        rnl_cli::SOLVER_PREVIEW_NOTICE,
-        "note: the solver is a preview, and its layouts may be poor; for comparison, have the model write the exact RNL placement directly"
-    );
+    let text = "the solver is a preview, and its layouts may be poor; for comparison, have the model write the exact RNL placement directly";
+    let kind = rnl_runtime::diag::codes::SOLVE_PREVIEW_NOTICE;
+    assert_eq!(rnl_cli::SOLVER_PREVIEW_NOTICE, format!("hint: {kind}: {text}"));
     let notice = format!("{}\n", rnl_cli::SOLVER_PREVIEW_NOTICE);
     let f = path_str(&case("T1-rc-lowpass"));
     let dir = scratch("preview-notice");

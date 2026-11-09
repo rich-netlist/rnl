@@ -6,6 +6,7 @@
 
 use std::collections::HashSet;
 
+use rnl_runtime::diag::{codes, Code};
 use rnl_runtime::model::quoted;
 use rnl_view::{Document, MemberOf};
 use serde_json::{json, Value};
@@ -30,13 +31,14 @@ fn id_of(doc: &Document, object: usize) -> String {
 
 /// The objects `reference` names, one in each level that has it: in the level titled `level` only,
 /// when it is given. A reference that names none is an error that lists the names closest to it.
-pub fn find(doc: &Document, reference: &str, level: Option<&str>) -> Result<Vec<Found>, String> {
+pub fn find(doc: &Document, reference: &str, level: Option<&str>) -> Result<Vec<Found>, (Code, String)> {
     if let Some(t) = level {
         if !doc.objects.iter().any(|o| o.level_title == t) {
             let mut titles: Vec<&str> = doc.levels.iter().map(|l| l.title.as_str()).collect();
             titles.sort();
             titles.dedup();
-            return Err(format!("no level is titled {t}; the levels are {}", titles.join(", ")));
+            let text = format!("no level is titled {t}; the levels are {}", titles.join(", "));
+            return Err((codes::CLI_EXPLAIN_LEVEL_NOT_FOUND, text));
         }
     }
     let in_level = |k: &usize| level.is_none_or(|t| doc.objects[*k].level_title == t);
@@ -65,7 +67,7 @@ pub fn find(doc: &Document, reference: &str, level: Option<&str>) -> Result<Vec<
         found = by(false);
     }
     if found.is_empty() {
-        return Err(not_found(doc, reference, &candidates));
+        return Err((codes::CLI_EXPLAIN_NOT_FOUND, not_found(doc, reference, &candidates)));
     }
     Ok(found.into_iter().map(|object| Found { object, terminal: terminal.map(String::from) }).collect())
 }

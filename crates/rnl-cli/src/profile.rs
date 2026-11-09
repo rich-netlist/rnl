@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
+use rnl_runtime::diag::{codes, Code};
 use rnl_solver::profile::{ProfileEvent, ProfileHandle, ProfileObserver};
 use rnl_solver::Clock;
 use serde::Serialize;
@@ -64,13 +65,12 @@ struct Writer {
 pub struct ProfileClock(Rc<Writer>);
 
 impl ProfileClock {
-    pub fn new(path: &Path) -> Result<Self, String> {
+    /// The clock writing its profile to `path`, a new file; or why it cannot, with its kind.
+    pub fn new(path: &Path) -> Result<Self, (Code, String)> {
         // Reserve only a new path: a profile must never replace an input/include/package file.
-        std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(path)
-            .map_err(|e| format!("cannot create new profile {}: {e}", path.display()))?;
+        std::fs::OpenOptions::new().write(true).create_new(true).open(path).map_err(|e| {
+            (codes::CLI_PROFILE_CREATE_FAILED, format!("cannot create new profile {}: {e}", path.display()))
+        })?;
         let writer = Rc::new(Writer {
             clock: WallClock::new(),
             path: path.to_path_buf(),
@@ -78,17 +78,17 @@ impl ProfileClock {
         });
         writer.flush(true);
         if let Some(error) = writer.state.borrow().error.clone() {
-            return Err(error);
+            return Err((codes::CLI_PROFILE_WRITE_FAILED, error));
         }
         Ok(Self(writer))
     }
 
     /// Finishes even an unsuccessful run, retaining all completed and partial observations.
-    pub fn finish(&self, success: bool) -> Result<(), String> {
+    pub fn finish(&self, success: bool) -> Result<(), (Code, String)> {
         self.0.state.borrow_mut().status = if success { "complete" } else { "error" }.into();
         self.0.flush(true);
         match &self.0.state.borrow().error {
-            Some(e) => Err(e.clone()),
+            Some(e) => Err((codes::CLI_PROFILE_WRITE_FAILED, e.clone())),
             None => Ok(()),
         }
     }

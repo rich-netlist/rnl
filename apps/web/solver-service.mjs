@@ -62,7 +62,7 @@ function run(rnl, prefix, args, cwd, signal) {
       signal.removeEventListener("abort", stop);
       if (signal.aborted) return fail(new Error("the solve was cancelled"));
       if (code === 0) return done(Buffer.concat(out).toString("utf8"));
-      const text = Buffer.concat(err).toString("utf8").trim().split("\n").filter((l) => !/^(the solver is a preview|note: )/i.test(l)).join("\n");
+      const text = Buffer.concat(err).toString("utf8").trim().split("\n").filter((l) => !/^(the solver is a preview|note: |hint: RNL\d{4} solve-preview-notice:)/i.test(l)).join("\n");
       fail(new Error(text || `rnl ${args[0]} failed with exit code ${code}`));
     });
   });

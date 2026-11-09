@@ -44,6 +44,24 @@ fn check_fails_on_errors_and_lists_unplaced_objects() {
 fn usage_errors_exit_with_two() {
     assert_eq!(rnl(&["check"]).0, 2);
     assert_eq!(rnl(&["frobnicate", &case("01-rc-lowpass.sp")]).0, 2);
+    // a command that does not exist is said so, with a FILE or without one, and each error with its
+    // kind; the usage asked for is printed on the standard output and is no error
+    let run = |args: &[&str]| Command::new(env!("CARGO_BIN_EXE_rnl")).args(args).output().unwrap();
+    for args in [&["frobnicate"][..], &["frobnicate", "x.sp"][..]] {
+        let out = run(args);
+        let err = String::from_utf8_lossy(&out.stderr);
+        assert_eq!(out.status.code(), Some(2), "{err}");
+        assert!(err.starts_with("error: RNL8032 cli-unknown-command: unknown command frobnicate\n"), "{err}");
+    }
+    let err = String::from_utf8_lossy(&run(&["check"]).stderr).to_string();
+    assert!(err.starts_with("error: RNL8034 cli-usage: "), "{err}");
+    let err = String::from_utf8_lossy(&run(&["check", "x.sp", "--level"]).stderr).to_string();
+    assert_eq!(err.trim(), "error: RNL8010 cli-option-needs-value: --level needs a title");
+    for flag in ["--help", "-h"] {
+        let help = run(&[flag]);
+        assert!(help.status.success() && help.stderr.is_empty(), "{flag}");
+        assert!(String::from_utf8_lossy(&help.stdout).contains("rnl check"), "{flag}");
+    }
 }
 
 #[test]
@@ -96,7 +114,7 @@ fn files_of_0_3_are_read() {
     let (code, out) = rnl(&["check", &f, "--draft"]);
     assert_eq!(code, 2, "{out}");
     let help = Command::new(env!("CARGO_BIN_EXE_rnl")).arg("--help").output().unwrap();
-    assert!(!String::from_utf8_lossy(&help.stderr).contains("--draft"));
+    assert!(!String::from_utf8_lossy(&help.stdout).contains("--draft"));
 }
 
 #[test]
