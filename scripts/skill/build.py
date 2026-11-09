@@ -51,7 +51,7 @@ FENCE = re.compile(r"^(```+)([^\n]*)\n(.*?)^\1[ \t]*$", re.M | re.S)
 RULE = re.compile(r'#\s*@SELECT-INSTANCE\((\w+)="([^"]*)"\)\s*=>\s*@SET-SYMBOL\s+(\$\w+)')
 ALIAS = re.compile(r'@ALIAS\("([^"]+)",\s*"([^"]+)"\)')
 PACKAGE = re.compile(r'@PACKAGE\(name="([^"]+)",\s*version="([^"]+)"\)')
-COUNTS = re.compile(r"(\d+) errors?, (\d+) warnings?, (\d+) hints?")
+COUNTS = re.compile(r"(\d+) errors?, (\d+) violations?, (\d+) warnings?, (\d+) hints?")
 
 
 class Failed(Exception):
@@ -383,12 +383,12 @@ def check_netlists(rnl: Path) -> list[str]:
             if not m:
                 errors.append(f"{where}: rnl check printed no summary:\n{r.stdout}{r.stderr}")
                 continue
-            n_err, n_warn = int(m.group(1)), int(m.group(2))
+            n_err, n_vio, n_warn = int(m.group(1)), int(m.group(2)), int(m.group(3))
             if expect_error and n_err == 0:
                 errors.append(f"{where}: marked `error`, but rnl check finds no error")
-            elif not expect_error and (n_err or n_warn):
-                errors.append(f"{where}: rnl check finds {n_err} errors and {n_warn} warnings:\n"
-                              + "\n".join(l for l in r.stdout.splitlines() if l.startswith(("error", "warning"))))
+            elif not expect_error and (n_err or n_vio or n_warn):
+                errors.append(f"{where}: rnl check finds {n_err} errors, {n_vio} violations and {n_warn} warnings:\n"
+                              + "\n".join(l for l in r.stdout.splitlines() if l.startswith(("error", "violation", "warning"))))
         print(f"checked {len(netlists())} netlists with rnl check")
     return errors
 

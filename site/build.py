@@ -566,7 +566,7 @@ def examples():
 
 
 SAMPLES_SITE = re.compile(r"(?:samples/site/|')(ota5t[\w.-]*\.sp)")
-COUNTS = re.compile(r"(\d+) errors?, (\d+) warnings?, (\d+) hints?")
+COUNTS = re.compile(r"(\d+) errors?, (\d+) violations?, (\d+) warnings?, (\d+) hints?")
 
 
 def check_examples(files, ex):
@@ -735,7 +735,7 @@ def find_rnl(given):
 
 
 def check_examples_rnl(rnl):
-    """Check that every file in site/examples/*.sp passes `rnl check` with 0 errors and 0 warnings
+    """Check that every file in site/examples/*.sp passes `rnl check` with 0 errors, 0 violations and 0 warnings
     and renders with `rnl render`."""
     errors = []
     with tempfile.TemporaryDirectory() as tmp:
@@ -754,11 +754,11 @@ def check_examples_rnl(rnl):
             if not m:
                 errors.append("%s: rnl check printed no summary:\n%s%s" % (rel, chk.stdout, chk.stderr))
                 continue
-            n_err, n_warn = int(m.group(1)), int(m.group(2))
-            if n_err or n_warn:
-                errors.append("%s: rnl check finds %d errors and %d warnings:\n%s"
-                              % (rel, n_err, n_warn, "\n".join(
-                                  l for l in chk.stdout.splitlines() if l.startswith(("error", "warning")))))
+            n_err, n_vio, n_warn = int(m.group(1)), int(m.group(2)), int(m.group(3))
+            if n_err or n_vio or n_warn:
+                errors.append("%s: rnl check finds %d errors, %d violations and %d warnings:\n%s"
+                              % (rel, n_err, n_vio, n_warn, "\n".join(
+                                  l for l in chk.stdout.splitlines() if l.startswith(("error", "violation", "warning")))))
             out_dir = Path(tmp) / str(idx)
             rnd = subprocess.run([str(rnl), "render", str(path), "--out", str(out_dir), *paths],
                                  capture_output=True, text=True, encoding="utf-8")
