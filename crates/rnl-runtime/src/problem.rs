@@ -143,7 +143,7 @@ impl Position {
 pub enum ObjectKind {
     Instance,
     Bundle,
-    /// A usage with a symbol: a virtual part (12.1).
+    /// A usage with a symbol, or any usage in 0.4, by its own point (12.1, 14.1).
     Usage,
     Point,
     /// A text: a label attached to an object, or an annotation attached to a point (13.3).
@@ -334,6 +334,8 @@ pub enum FactKind {
     /// the members also follow one another strictly in it, as for ORDER.
     Distribute { axis: Axis, sense: Sense, members: Vec<PointRef> },
     /// DISTANCE (14.5) between the extents of the points of `from` and of `to`.
+    /// Exact one-point distances also encode body coordinate offsets from the usage point
+    /// (0.4, 9.4), keeping the coordinate statement's label, source and rank.
     Distance { axis: Axis, sense: Sense, min: Option<f64>, max: Option<f64>, from: Vec<PointRef>, to: Vec<PointRef> },
     /// ORIENT-RELATION (14.9): each side shares one orientation, and `to` is `from` turned by
     /// `relation` in the frame of the drawing.

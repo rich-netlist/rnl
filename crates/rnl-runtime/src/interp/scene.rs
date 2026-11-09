@@ -67,6 +67,8 @@ pub enum TargetOp {
 #[derive(Clone, Debug)]
 pub enum FactData {
     Coord(char, f64),
+    /// A coordinate in a general definition body, relative to its usage (0.4, 9.4).
+    RelativeCoord(char, f64, ObjId),
     Orient(Orient),
     Layer(String),
     Symbol(ObjId),
@@ -199,6 +201,9 @@ pub struct Scene {
     pub symbol_won: HashSet<usize>,
     /// The fact kept per (object, axis) and per object's orientation: (priority, position, index).
     pub at_best: HashMap<(ObjId, char), (Priority, Pos, usize)>,
+    /// Coordinate proofs when relative body coordinates connect several objects.
+    pub coordinate_proofs: HashMap<(ObjId, char), Vec<usize>>,
+    pub relative_kept: HashSet<usize>,
     pub ori_best: HashMap<ObjId, (Priority, Pos, usize)>,
     /// The indexes in `at` and `orient` of the facts whose objects PLACE and ORIENT take, as the
     /// geometry phase finds them (7.1, 12.1, 11.8).
@@ -302,6 +307,8 @@ impl Scene {
             symbol_weighed: HashSet::new(),
             symbol_won: HashSet::new(),
             at_best: HashMap::new(),
+            coordinate_proofs: HashMap::new(),
+            relative_kept: HashSet::new(),
             ori_best: HashMap::new(),
             at_live: Vec::new(),
             orient_live: Vec::new(),
@@ -717,6 +724,8 @@ impl Interp<'_> {
             ObjData::Point { x, y, .. } => (*x, *y),
             _ => return,
         };
+        let base = self.coordinate_base(ctx);
+        let chain = if base.is_some() { self.apply_chain(ctx) } else { Vec::new() };
         let sc = &mut self.scenes[s];
         sc.points.push(p);
         sc.note_created(p, at.clone(), ctx);
@@ -727,12 +736,12 @@ impl Interp<'_> {
                 sc.add_at(Fact {
                     pos: fp.clone(),
                     target: p,
-                    data: FactData::Coord(axis, v),
+                    data: base.map_or(FactData::Coord(axis, v), |b| FactData::RelativeCoord(axis, v, b)),
                     priority: None,
-                    ctx: None,
-                    off: 0,
+                    ctx: base.map(|_| Rc::new(ctx.clone())),
+                    off: base.and(ctx.stmt).map_or(0, |st| st.start),
                     direct: true,
-                    chain: Vec::new(),
+                    chain: chain.clone(),
                     segments: ctx.segments.clone(),
                 });
             }
@@ -1017,6 +1026,16 @@ impl Interp<'_> {
         let site = Some(Rc::new(ctx.clone()));
         match op {
             TargetOp::Place { x, y, priority, off } => {
+                let obj = if self.follows_0_4(self.source_unit(ctx)) { self.coordinate_object(obj) } else { obj };
+                let base = self.coordinate_base(ctx);
+                if base.is_some_and(|b| self.coordinate_object(obj) == b) {
+                    return self.fail(
+                        ctx,
+                        codes::PLACE_SELF_RELATIVE_04,
+                        "PLACE on the usage's own point in its body would be relative to itself and fails (9.4, 11.1)",
+                        *off,
+                    );
+                }
                 let mut px = at.clone();
                 px.push(PosElem::Int(0));
                 let mut py = at;
@@ -1025,7 +1044,7 @@ impl Interp<'_> {
                     self.scenes[s].add_at(Fact {
                         pos: px,
                         target: obj,
-                        data: FactData::Coord('x', *x),
+                        data: base.map_or(FactData::Coord('x', *x), |b| FactData::RelativeCoord('x', *x, b)),
                         priority: *priority,
                         ctx: site.clone(),
                         off: *off,
@@ -1038,7 +1057,7 @@ impl Interp<'_> {
                     self.scenes[s].add_at(Fact {
                         pos: py,
                         target: obj,
-                        data: FactData::Coord('y', *y),
+                        data: base.map_or(FactData::Coord('y', *y), |b| FactData::RelativeCoord('y', *y, b)),
                         priority: *priority,
                         ctx: site,
                         off: *off,

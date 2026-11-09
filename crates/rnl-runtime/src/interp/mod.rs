@@ -29,6 +29,7 @@ pub mod scene;
 mod selfcheck;
 mod topology;
 pub mod unit;
+mod usage_points;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::rc::Rc;

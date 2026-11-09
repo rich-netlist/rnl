@@ -20,6 +20,7 @@ use super::Interp;
 /// once the level's geometry is resolved, when the facts kept are known (`report_discards`).
 #[derive(Default)]
 pub(crate) struct Conflicts {
+    coordinates: Vec<(SceneId, Fact, Vec<Vec<Fact>>, bool)>,
     /// The objects and axes whose facts were found in a conflict, `'o'` for the orientation, by
     /// scene, in the order found.
     keys: Vec<(SceneId, ObjId, char)>,
@@ -75,6 +76,9 @@ fn next_combination(idx: &mut [usize], n: usize) -> bool {
 }
 
 impl Interp<'_> {
+    pub(super) fn note_coordinate_conflict(&mut self, s: SceneId, f: Fact, sets: Vec<Vec<Fact>>, complete: bool) {
+        self.conflicts.coordinates.push((s, f, sets, complete));
+    }
     /// Does the level of scene `s` follow the draft 0.3? Then the hint of a fact discarded in a
     /// conflict names every set of facts taken in that it conflicts with, and the statements in
     /// these sets are told; a level of 0.2 gives the hints it always gave.
@@ -152,6 +156,19 @@ impl Interp<'_> {
             return;
         }
         let mut notes = Notes::default();
+        let (coordinates, rest): (Vec<_>, Vec<_>) =
+            std::mem::take(&mut self.conflicts.coordinates).into_iter().partition(|c| c.0 == s);
+        self.conflicts.coordinates = rest;
+        for (_, f, sets, complete) in coordinates {
+            if self.fact_priority(s, &f) == Priority::Low {
+                continue;
+            }
+            self.scenes[s].dropped += 1;
+            if let Some(c) = &f.ctx {
+                self.note_failed_at(c.rec, f.off, true);
+            }
+            self.discard_hint(&f.ctx, f.off, &self.fact_text(&f), &sets, complete, &mut notes);
+        }
         let (keys, rest): (Vec<_>, Vec<_>) =
             std::mem::take(&mut self.conflicts.keys).into_iter().partition(|k| k.0 == s);
         self.conflicts.keys = rest;
@@ -293,6 +310,12 @@ impl Interp<'_> {
         const MOST_FACTS: usize = 16;
         const MOST_CHECKS: usize = 4096;
         let relation = cd.kind == ConstraintKind::OrientRelation;
+        // A relative coordinate can violate a constraint even without any absolute anchor.
+        // Finding its minimal groups needs the solver; do not mislabel a coordinate path as
+        // the complete conflict. The exported facts retain all their ranks for that resolution.
+        if !relation && involved.iter().any(|f| matches!(f.data, FactData::RelativeCoord(..))) {
+            return (Vec::new(), false);
+        }
         let axis = cd.params.axis.unwrap_or('x');
         // the facts that fix the members, by index in `at`, or in `orient` for ORIENT-RELATION;
         // a member's bits are those of its facts

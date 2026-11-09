@@ -1165,11 +1165,20 @@ impl<'p> Interp<'p> {
     fn resolve_hole(&mut self, e: &Ref, ctx: &Ctx) -> R<ObjId> {
         let fk = ctx.frame_kind();
         let Some(name) = &e.name else {
+            if fk == Some(FrameKind::Definition) && self.follows_0_4(self.source_unit(ctx)) {
+                if let Some(usage) = ctx.frame_usage() {
+                    return Ok(usage);
+                }
+            }
             if fk != Some(FrameKind::Symbol) {
                 return self.fail(
                     ctx,
                     codes::REF_BARE_HOLE_OUTSIDE_SYMBOL,
-                    "a bare `?` is written only in a symbol body, meaning the object the symbol draws (13.3)",
+                    if self.follows_0_4(self.source_unit(ctx)) {
+                        "a bare `?` is written only in a general definition body or a symbol body (9.4, 13.3)"
+                    } else {
+                        "a bare `?` is written only in a symbol body, meaning the object the symbol draws (13.3)"
+                    },
                     e.start,
                 );
             }

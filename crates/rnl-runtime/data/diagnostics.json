@@ -1977,7 +1977,7 @@
    "number": "RNL3200",
    "name": "ref-bare-hole-outside-symbol",
    "severity": "error",
-   "message": "a bare `?` is written only in a symbol body, meaning the object the symbol draws (13.3)",
+   "message": "a bare `?` is written only in a general definition body or a symbol body (9.4, 13.3); in 0.2/0.3: a bare `?` is written only in a symbol body, meaning the object the symbol draws (13.3)",
    "sections": [
     "4.1",
     "9.4",
@@ -2566,6 +2566,15 @@
    ]
   },
   {
+   "number": "RNL3517",
+   "name": "usage-point-idle-04",
+   "severity": "hint",
+   "message": "{usage} has no symbol, and its point is tied to nothing that is drawn: the constraints on it change nothing drawn (14.1)",
+   "sections": [
+    "14.1"
+   ]
+  },
+  {
    "number": "RNL3600",
    "name": "priority-target-not-allowed",
    "severity": "error",
@@ -2955,6 +2964,16 @@
    "sections": [
     "11.2",
     "12.1"
+   ]
+  },
+  {
+   "number": "RNL4306",
+   "name": "place-self-relative-04",
+   "severity": "error",
+   "message": "PLACE on the usage's own point in its body would be relative to itself and fails (9.4, 11.1)",
+   "sections": [
+    "9.4",
+    "11.1"
    ]
   },
   {

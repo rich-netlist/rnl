@@ -1073,6 +1073,7 @@ fn object_infos(problem: &LevelProblem, model: &Model, kept: &[usize]) -> Vec<Ob
                 (ObjectKind::Usage, Some(Hang::Above)) => Role::Supply,
                 (ObjectKind::Usage, Some(Hang::Beside)) => Role::Port,
                 (ObjectKind::Usage, None) if own && o.symbol.is_some() => Role::Element,
+                (ObjectKind::Usage, None) if own && o.symbol.is_none() && o.orient.is_none() => Role::Point,
                 (ObjectKind::Usage, None) => Role::Other,
                 (ObjectKind::Instance | ObjectKind::Bundle, _) if own => Role::Element,
                 (ObjectKind::Instance | ObjectKind::Bundle, _) => Role::Other,

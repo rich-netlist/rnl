@@ -116,7 +116,7 @@ impl Interp<'_> {
 
     /// A diagnostic of the later phases. It concerns what the statement does in this document, even
     /// when the statement is written in a package, so it is shown like the document's own (7.6).
-    fn diag_site(
+    pub(super) fn diag_site(
         &mut self,
         sev: Severity,
         code: Code,
@@ -673,9 +673,11 @@ impl Interp<'_> {
         self.scenes[s].orient_live = live_or.clone();
         // 2. coordinates: per object and axis the fact with the highest priority (8.5)
         let tol = self.tol;
+        let coordinate_graph = at.iter().any(|f| matches!(f.data, FactData::RelativeCoord(..)))
+            || self.scenes[s].usages.iter().any(|&u| self.usage_own_point(u));
         let mut best: HashMap<(ObjId, char), (Priority, Pos, usize)> = HashMap::new();
         let mut best_order: Vec<(ObjId, char)> = Vec::new();
-        for k in live_at {
+        for k in live_at.into_iter().filter(|_| !coordinate_graph) {
             let f = &at[k];
             let p = self.fact_priority(s, f);
             if p == Priority::Disabled {
@@ -771,7 +773,10 @@ impl Interp<'_> {
                 }
             }
         }
-        // 3. usages drawn on their main object (12.1 rule 5)
+        if coordinate_graph {
+            self.resolve_body_coordinates(s);
+        }
+        // 3. usages drawn on their main object in earlier languages (12.1 rule 5)
         for a in self.scenes[s].usages.clone() {
             if self.usage(a).in_symbol {
                 continue;
@@ -928,6 +933,7 @@ impl Interp<'_> {
             }
         }
         // 6. unplaced drawn objects
+        self.hint_idle_usage_points(s);
         let mut un = Vec::new();
         let undrawn: Vec<ObjId> = self.scenes[s].undrawn.iter().map(|(o, _)| *o).collect();
         for o in self.inst_like(s) {
@@ -1048,6 +1054,12 @@ impl Interp<'_> {
     pub(super) fn fact_text(&self, f: &Fact) -> String {
         match &f.data {
             FactData::Coord(axis, v) => format!("the {axis} of {} = {}", self.label(f.target), fmt_num(*v)),
+            FactData::RelativeCoord(axis, v, base) => format!(
+                "the {axis} of {} = the {axis} of {} + {}",
+                self.label(f.target),
+                self.label(*base),
+                fmt_num(*v)
+            ),
             FactData::Orient(c) => format!("the orientation {} of {}", c.as_str(), self.label(f.target)),
             _ => self.label(f.target),
         }
@@ -1064,7 +1076,7 @@ impl Interp<'_> {
                 return false;
             }
             ObjData::Usage(_) => {
-                if !self.scenes[s].symbol.contains_key(&obj) {
+                if !self.scenes[s].symbol.contains_key(&obj) && (what != "PLACE" || !self.usage_own_point(obj)) {
                     let l = self.label(obj);
                     self.diag_fact(
                         Severity::Error,
@@ -1129,6 +1141,9 @@ impl Interp<'_> {
     }
 
     pub(crate) fn at_point(&self, a: ObjId) -> bool {
+        if self.usage_own_point(a) {
+            return false;
+        }
         match self.main_of(a) {
             Some(m) => matches!(
                 self.o(m),
@@ -1392,7 +1407,7 @@ impl Interp<'_> {
                     .flatten()
                     .map(|&j| &sc.at[j])
                     .filter(|f| {
-                        matches!(f.data, FactData::Coord(a, _) if a == axis)
+                        matches!(f.data, FactData::Coord(a, _) | FactData::RelativeCoord(a, _, _) if a == axis)
                             && self.fact_priority(s, f) != Priority::Disabled
                     })
                     .map(|f| f.order())
@@ -1617,6 +1632,9 @@ impl Interp<'_> {
         for (&(o, _), &(_, _, k)) in &self.scenes[s].at_best {
             kept.entry(o).or_default().push(k);
         }
+        for (&(o, _), proof) in &self.scenes[s].coordinate_proofs {
+            kept.entry(o).or_default().extend(proof);
+        }
         for c in self.scenes[s].constraints.clone() {
             let ObjData::Constraint(cd) = self.o(c).clone() else { continue };
             let site = cd.site.clone();
@@ -1755,10 +1773,12 @@ impl Interp<'_> {
                 } else {
                     let target = match self.o(*m) {
                         ObjData::Term { owner, .. } => *owner,
+                        _ if !self.scenes[s].coordinate_proofs.is_empty() => self.coordinate_object(*m),
                         _ => *m,
                     };
                     let mut ks = kept.get(&target).cloned().unwrap_or_default();
                     ks.sort();
+                    ks.dedup();
                     for k in ks {
                         involved.push(self.scenes[s].at[k].clone());
                     }
@@ -1822,7 +1842,7 @@ impl Interp<'_> {
         let l = self.label(m);
         match self.o(m).clone() {
             ObjData::Usage(_) => {
-                if !self.scenes[s].symbol.contains_key(&m) {
+                if !self.scenes[s].symbol.contains_key(&m) && !self.usage_own_point(m) {
                     return Some(format!("{l} has no symbol"));
                 }
                 if self.at_point(m) {

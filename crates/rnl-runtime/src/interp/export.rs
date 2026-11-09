@@ -79,7 +79,7 @@ impl Interp<'_> {
         usages.sort();
         usages.dedup();
         for &a in &usages {
-            if self.scenes[s].symbol.contains_key(&a) {
+            if self.scenes[s].symbol.contains_key(&a) || self.usage_own_point(a) {
                 objs.push((a, ObjectKind::Usage));
             }
         }
@@ -184,6 +184,18 @@ impl Interp<'_> {
         }
 
         // the objects themselves
+        // A relative PLACE also replaces a label's symbol coordinate on that axis (13.3),
+        // although it is represented by a DISTANCE rather than an absolute fixed slot.
+        for &k in &self.scenes[s].at_live {
+            let f = &self.scenes[s].at[k];
+            if let FactData::RelativeCoord(axis, _, _) = f.data {
+                if self.fact_priority(s, f) != Priority::Disabled {
+                    if let Some(&object) = ix.objects.get(&f.target) {
+                        offset.insert((object, Axis::of(axis)));
+                    }
+                }
+            }
+        }
         let mut objects = Vec::new();
         for (k, (o, kind)) in objs.iter().enumerate() {
             let slot = |axis: Axis| match first_coord.get(&(k, axis)) {
@@ -193,6 +205,7 @@ impl Interp<'_> {
             let own = Position::Own { x: slot(Axis::X), y: slot(Axis::Y) };
             let orient = match kind {
                 ObjectKind::Point | ObjectKind::Text => None,
+                ObjectKind::Usage if object_symbol[k].is_none() => None,
                 _ => Some(match first_orient.get(&k) {
                     Some(&(code, fact)) => OrientSlot::Fixed { code, fact },
                     None => OrientSlot::Free,
@@ -850,7 +863,7 @@ impl Interp<'_> {
                     .flatten()
                     .map(|&j| &sc.at[j])
                     .filter(|f| {
-                        matches!(f.data, FactData::Coord(a, _) if a == axis)
+                        matches!(f.data, FactData::Coord(a, _) | FactData::RelativeCoord(a, _, _) if a == axis)
                             && self.fact_priority(s, f) != Priority::Disabled
                     })
                     .map(|f| f.order())
@@ -868,19 +881,34 @@ impl Interp<'_> {
             if p == Priority::Disabled {
                 continue;
             }
-            let FactData::Coord(axis, value) = f.data else { continue };
+            let (axis, value, base) = match f.data {
+                FactData::Coord(axis, value) => (axis, value, None),
+                FactData::RelativeCoord(axis, value, base) => (axis, value, Some(base)),
+                _ => continue,
+            };
             if offset_wins.get(&(f.target, axis)) == Some(&true) {
                 continue;
             }
             let point = f.ctx.is_none() && matches!(self.o(f.target), ObjData::Point { .. });
-            let kind = if point {
+            let kind = if let Some(base) = base {
+                let Some(from) = self.point_ref(s, ix, base) else { continue };
+                let Some(to) = self.point_ref(s, ix, f.target) else { continue };
+                FactKind::Distance {
+                    axis: Axis::of(axis),
+                    sense: if value < 0.0 { Sense::Decreasing } else { Sense::Increasing },
+                    min: Some(value.abs()),
+                    max: Some(value.abs()),
+                    from: vec![from],
+                    to: vec![to],
+                }
+            } else if point {
                 let Some(&point) = ix.objects.get(&f.target) else { continue };
                 FactKind::PointCoordinate { point, axis: Axis::of(axis), value }
             } else {
                 let Some(at) = self.point_ref(s, ix, f.target) else { continue };
                 FactKind::Place { at, axis: Axis::of(axis), value }
             };
-            let label = format!("the {axis} of {} = {}", self.label(f.target), crate::geom::fmt_num(value));
+            let label = self.fact_text(f);
             let source = f.ctx.as_ref().and_then(|c| self.rec_loc(c.rec, f.off));
             ranked.push(Ranked {
                 key: (rank(p), f.order(), 0, (axis == 'y') as u8, ranked.len()),
