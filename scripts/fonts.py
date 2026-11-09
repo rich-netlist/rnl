@@ -51,6 +51,7 @@ CACHE = ROOT / "target" / "fonts"
 METRICS = ROOT / "crates" / "rnl-render" / "fonts" / "noto-sans-sc.metrics"
 WEB = ROOT / "apps" / "viewer-ui" / "fonts"
 LICENSE = ROOT / "LICENSES" / "OFL-1.1.txt"
+PNG = ROOT / "crates" / "rnl-cli" / "fonts"
 
 FAMILY = "Noto Sans SC"
 TAG = "Sans2.004"
@@ -318,21 +319,67 @@ def web(out):
         "%d: %s" % (w, kib(sizes["ui-%s-%d.woff2" % (code, w)])) for _, w, _ in FACES)) for code, n in ui.items()))
 
 
+# The characters of the faces the command line draws PNG images with: Latin, Greek, and the
+# punctuation, arrows, mathematical and technical signs of schematics. CJK is left out, to keep the
+# command small; a PNG image draws CJK text as empty boxes.
+PNG_RANGES = [
+    (0x0020, 0x007E), (0x00A0, 0x024F), (0x0370, 0x03FF), (0x2000, 0x206F), (0x2070, 0x209F),
+    (0x20A0, 0x20CF), (0x2100, 0x214F), (0x2150, 0x218F), (0x2190, 0x21FF), (0x2200, 0x22FF),
+    (0x2300, 0x23FF), (0x2460, 0x24FF), (0x2500, 0x257F), (0x25A0, 0x25FF),
+]
+
+
+def png(check):
+    """Write the faces the command line draws PNG images with, crates/rnl-cli/fonts/: each face of
+    the fonts subset to PNG_RANGES, its outlines as they are and without the layout tables, so that
+    a text is as wide in an image as the renderer lays it out (it lays out by advances alone).
+    With `check`, fail when they are not what the pinned fonts give."""
+    from fontTools import subset
+
+    PNG.mkdir(parents=True, exist_ok=True)
+    stale = []
+    for path, (_, weight, _) in zip(fetch(), FACES):
+        options = subset.Options()
+        options.layout_features = []
+        options.name_IDs = ["*"]
+        options.notdef_outline = True
+        options.drop_tables += ["GSUB", "GPOS", "GDEF", "BASE", "VORG", "vhea", "vmtx"]
+        font = subset.load_font(str(path), options)
+        sub = subset.Subsetter(options)
+        sub.populate(unicodes=[cp for lo, hi in PNG_RANGES for cp in range(lo, hi + 1)])
+        sub.subset(font)
+        buf = io.BytesIO()
+        font.save(buf)
+        out = PNG / ("noto-sans-sc-latin-%d.otf" % weight)
+        if check:
+            if not out.exists() or out.read_bytes() != buf.getvalue():
+                stale.append(out)
+        else:
+            out.write_bytes(buf.getvalue())
+            print("%s: %d bytes" % (out.relative_to(ROOT), len(buf.getvalue())))
+    if stale:
+        sys.exit("not current, run python scripts/fonts.py png: " + ", ".join(str(p.relative_to(ROOT)) for p in stale))
+
+
 def main():
     ap = argparse.ArgumentParser(description="Fetch the fonts shipped with the core, and write their "
-                                             "metrics and web fonts.")
+                                             "metrics, web fonts and the faces of PNG images.")
     sub = ap.add_subparsers(dest="command", required=True)
     sub.add_parser("fetch", help="download the fonts into target/fonts/, unless they are there already")
     m = sub.add_parser("metrics", help="write the metrics the renderer lays out text with")
     m.add_argument("--check", action="store_true", help="check that the metrics file is current; write nothing")
     w = sub.add_parser("web", help="write the web fonts of the viewers' page")
     w.add_argument("--out", type=Path, default=WEB, help="write them into OUT instead of apps/viewer-ui/fonts/")
+    p = sub.add_parser("png", help="write the faces the command line draws PNG images with")
+    p.add_argument("--check", action="store_true", help="check that they are current; write nothing")
     args = ap.parse_args()
     if args.command == "fetch":
         for path in fetch():
             print(path)
     elif args.command == "metrics":
         metrics(args.check)
+    elif args.command == "png":
+        png(args.check)
     else:
         web(args.out.resolve())
 

@@ -106,6 +106,7 @@ The [roadmap](docs/roadmap.md) is the list, and says what is done and what is no
 | Specification text and project documentation | `spec/`, `docs/` | [CC-BY-4.0](LICENSES/CC-BY-4.0.txt) |
 | Data: standard libraries and test corpora | `libraries/`, `tests/` | [CC0-1.0](LICENSES/CC0-1.0.txt) |
 | The metrics of the fonts shipped with the core, Noto Sans SC, copyright 2014-2021 Adobe ([decision 0009](docs/decisions/0009-fonts-shipped-with-the-core.md)) | `crates/rnl-render/fonts/noto-sans-sc.metrics` | [OFL-1.1](LICENSES/OFL-1.1.txt) |
+| The faces the command line draws PNG images with, subsets of Noto Sans SC, copyright 2014-2021 Adobe ([decision 0009](docs/decisions/0009-fonts-shipped-with-the-core.md)) | `crates/rnl-cli/fonts/` | [OFL-1.1](LICENSES/OFL-1.1.txt) |
 
 [`REUSE.toml`](REUSE.toml) records this mapping, and `reuse lint` checks it. The documents migrated from Analog Canvas are published here under CC-BY-4.0 by their copyright holder; the frozen copies in Analog Canvas remain under that repository's AGPL-3.0 license. See [decision 0002](docs/decisions/0002-licenses.md).
 

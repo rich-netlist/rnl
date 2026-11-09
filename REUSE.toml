@@ -26,6 +26,13 @@ path = "crates/rnl-render/fonts/noto-sans-sc.metrics"
 SPDX-FileCopyrightText = "2014-2021 Adobe (http://www.adobe.com/)"
 SPDX-License-Identifier = "OFL-1.1"
 
+# The faces the command line draws PNG images with: the fonts shipped with the core, Noto Sans SC,
+# subset by scripts/fonts.py (decision 0009).
+[[annotations]]
+path = "crates/rnl-cli/fonts/**"
+SPDX-FileCopyrightText = "2014-2021 Adobe (http://www.adobe.com/)"
+SPDX-License-Identifier = "OFL-1.1"
+
 # The RNL skill package (skills/rnl/): the copy of the short guide to the language is the standard's text,
 # the reference to the standard packages, the examples and the copies of the licence texts are data; the rest
 # of the package keeps the default above (MIT). skills/rnl/LICENSE.md says so for the folder on its own.

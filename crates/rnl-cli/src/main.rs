@@ -17,7 +17,7 @@ const USAGE: &str = concat!(
     "usage:
   rnl --version                   print the core version and build commit
   rnl check FILE [options]          print the diagnostics and the drawing's geometry hints; exit 1 on errors or violations
-  rnl render FILE -o DIR [options]  write one SVG per drawing level
+  rnl render FILE -o DIR [options]  write one SVG per drawing level, or one PNG image with --png
   rnl dump FILE [options]           print the effective model and diagnostics as JSON
   rnl view FILE [options]           print the Document a viewer shows, as JSON
   rnl explain FILE REF [options]    print the usages and groups the object REF is in, such as #M1, &vdd,
@@ -67,7 +67,12 @@ view options:
   --bind SUBCKT       show the parameters of the subcircuit SUBCKT with the values --param gives
   --param NAME=VALUE  a value for a parameter of the subcircuit --bind names, as text; repeatable.
                       Only the Document's lists of parameters change; nothing drawn does
-render options (inspection only; all disabled by default):
+render options:
+  --png               write a PNG image of each level instead of its SVG, drawn by the command
+                      itself with the fonts it holds, so that it needs no font of the computer;
+                      CJK text is drawn in it as empty boxes
+  --scale N           the pixels of the PNG image for a unit of the SVG, 2 by default; at most 16
+render options for inspection (all disabled by default):
   --usages MODE       usage frames: semantic (no drawing of their own) or all
   --currents          show in/out terminal currents, including explicit subcircuit port symbols
   --usage-roles       show role labels on enabled usage frames
@@ -113,6 +118,9 @@ struct Args {
     primitives: bool,
     /// `--flylines`.
     flylines: bool,
+    /// `render`'s `--png`, and its `--scale`.
+    png: bool,
+    scale: f32,
     /// `view`'s `--hints`.
     hints: bool,
     status: bool,
@@ -223,6 +231,7 @@ fn parse_args() -> Result<Args, Said> {
     let mut formats = BTreeMap::new();
     let (mut svg, mut primitives, mut status) = (true, false, false);
     let (mut flylines, mut hints) = (false, false);
+    let (mut png, mut scale) = (false, None);
     let mut level = None;
     let mut solver = solver_args::SolverArgs::default();
     let mut author = None;
@@ -285,6 +294,14 @@ fn parse_args() -> Result<Args, Said> {
             "--no-svg" => svg = false,
             "--primitives" => primitives = true,
             "--flylines" => flylines = true,
+            "--png" => png = true,
+            "--scale" => {
+                let n = it.next().ok_or_else(|| needs("--scale needs a number, such as 2"))?;
+                scale = match n.parse::<f32>() {
+                    Ok(n) if n > 0.0 && n <= 16.0 => Some(n),
+                    _ => return Err(needs("--scale needs a number above 0 and at most 16, such as 2")),
+                };
+            }
             "--hints" => hints = true,
             "--status" => status = true,
             "--constraints" => constraints = true,
@@ -378,6 +395,8 @@ fn parse_args() -> Result<Args, Said> {
         svg,
         primitives,
         flylines,
+        png,
+        scale: scale.unwrap_or(2.0),
         hints,
         status,
         constraints,
@@ -643,8 +662,20 @@ fn run(args: &Args) -> Result<ExitCode, Said> {
                         &rnl_render::RenderOptions { flylines: args.flylines, ..rnl_render::RenderOptions::default() },
                     ),
                 };
-                let name = if k == 0 { format!("{stem}.svg") } else { format!("{stem}.{}.svg", sanitize(&lv.title)) };
-                std::fs::write(out.join(&name), svg).map_err(io)?;
+                let suffix = if args.png { "png" } else { "svg" };
+                let name = if k == 0 {
+                    format!("{stem}.{suffix}")
+                } else {
+                    format!("{stem}.{}.{suffix}", sanitize(&lv.title))
+                };
+                if args.png {
+                    let image = rnl_cli::png::png(&svg, args.scale).map_err(|e| {
+                        Said::new(codes::CLI_RENDER_PNG_FAILED, format!("{name}: no PNG image is drawn: {e}"))
+                    })?;
+                    std::fs::write(out.join(&name), image).map_err(io)?;
+                } else {
+                    std::fs::write(out.join(&name), svg).map_err(io)?;
+                }
                 println!("{}", out.join(&name).display());
             }
             let errors = r.diagnostics().iter().filter(|d| d.severity == Severity::Error).count();

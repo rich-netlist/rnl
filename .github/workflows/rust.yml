@@ -1,6 +1,6 @@
 # Builds and tests the Rust workspace: formatting, lints and tests on three platforms; the core for
 # WebAssembly, whose Documents must be those of the native build (decision 0008); and checks that the
-# renderer's font metrics are those of the shipped fonts (decision 0009).
+# renderer's font metrics, and the faces of PNG images, are those of the shipped fonts (decision 0009).
 name: Rust
 
 on:
@@ -155,11 +155,15 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
+      # pinned, since the faces of PNG images are fontTools' subsets, which a later version may write
+      # otherwise
       - name: Install fontTools
-        run: pip install fonttools
+        run: pip install fonttools==4.58.0
       # downloads the pinned fonts and fails when crates/rnl-render/fonts/ is not what they give
       - name: The renderer's font metrics are those of the shipped fonts
         run: python scripts/fonts.py metrics --check
+      - name: The faces of PNG images are subsets of the shipped fonts
+        run: python scripts/fonts.py png --check
 
   performance-harness:
     if: github.event_name != 'workflow_dispatch' || (!inputs.solver_performance && !inputs.solver_profile_work && !inputs.solver_build_only)

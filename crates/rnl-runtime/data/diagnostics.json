@@ -3601,6 +3601,13 @@
    "sections": []
   },
   {
+   "number": "RNL8035",
+   "name": "cli-render-png-failed",
+   "severity": "error",
+   "message": "{file}: no PNG image is drawn: {reason}",
+   "sections": []
+  },
+  {
    "number": "RNL8100",
    "name": "solve-cancelled",
    "severity": "error",

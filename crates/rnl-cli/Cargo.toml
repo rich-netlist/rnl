@@ -4,7 +4,9 @@ description = "Command-line checking and rendering of Rich Netlist (RNL) documen
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-license.workspace = true
+# the code under MIT, and the faces it draws PNG images with, fonts/, under the fonts' licence
+# (decision 0009)
+license = "MIT AND OFL-1.1"
 repository.workspace = true
 publish.workspace = true
 
@@ -24,3 +26,6 @@ rnl-edit.workspace = true
 rnl-solver.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+# PNG images of the drawings (rnl render --png): the SVG rasterized in Rust, with the fonts the command
+# holds, fonts/ (OFL-1.1), and no font of the computer
+resvg = { version = "0.45.1", default-features = false, features = ["text"] }

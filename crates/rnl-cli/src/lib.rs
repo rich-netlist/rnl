@@ -5,6 +5,7 @@
 pub mod codec;
 pub mod dump;
 pub mod explain;
+pub mod png;
 pub mod preview;
 pub mod problem;
 pub mod profile;

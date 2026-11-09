@@ -10,7 +10,7 @@ built from a source archive without Git metadata.
 ```text
 rnl --version                   print the core version and build commit
 rnl check FILE [options]          print the diagnostics and the drawing's geometry hints; exit 1 on errors or violations
-rnl render FILE -o DIR [options]  write one SVG per drawing level
+rnl render FILE -o DIR [options]  write one SVG per drawing level, or one PNG image with --png
 rnl dump FILE [options]           print the effective model and diagnostics as JSON
 rnl view FILE [options]           print the Document a viewer shows, as JSON
 rnl explain FILE REF [options]    print the usages and groups the object REF is in, such as #M1, &vdd,
@@ -48,7 +48,12 @@ view options:
   --bind SUBCKT       show the parameters of the subcircuit SUBCKT with the values --param gives
   --param NAME=VALUE  a value for a parameter of the subcircuit --bind names, as text; repeatable.
                       Only the Document's lists of parameters change; nothing drawn does
-render options (inspection only; all disabled by default):
+render options:
+  --png               write a PNG image of each level instead of its SVG, drawn by the command
+                      itself with the fonts it holds, so that it needs no font of the computer;
+                      CJK text is drawn in it as empty boxes
+  --scale N           the pixels of the PNG image for a unit of the SVG, 2 by default; at most 16
+render options for inspection (all disabled by default):
   --usages MODE       usage frames: semantic (no drawing of their own) or all
   --currents          show in/out terminal currents, including explicit subcircuit port symbols
   --usage-roles       show role labels on enabled usage frames
@@ -130,6 +135,8 @@ $ rnl explain site/examples/ota5t.sp '#M1'
 `check` prints each diagnostic, a violation (7.6) among them, with its place and its kind, the number and the short name of the toolkit's list ([`rnl-runtime`](../rnl-runtime/README.md)), such as `error t.sp:3:5: RNL3120 param-wrong-type: …`; a geometry hint the same way, with its kind of the 7000s. `dump` gives each diagnostic's `code` and `name` too.
 
 What the command says of its own, on the standard error, is written the same way, without a place: `error: RNL8010 cli-option-needs-value: --level needs a title`, `warning: RNL8007 cli-format-path-unused: …`, and the line `rnl solve` prints for a file with no drawing level, `hint: RNL8026 cli-solve-no-level: …`. Such an error exits with 2: an unknown command, said so with a FILE or without one, an unknown option, an option without its value or given to a command that does not take it, and an error reading or writing a file. An error that a library of the toolkit gives, such as a netlist that cannot be read or an edit that `write` cannot make, is printed as `error: …` without a kind for now. `rnl --help` prints the usage on the standard output and exits with 0.
+
+`render --png` writes a PNG image of each level instead of its SVG, for a reader that takes images, such as a model: the command rasterizes the SVG itself with [resvg](https://github.com/linebender/resvg), in Rust, on white, `--scale` pixels for a unit of it, 2 by default. It draws text in the faces it holds in [`fonts/`](fonts/), Noto Sans SC Regular and Bold subset to Latin, Greek and the signs of schematics (OFL-1.1, [decision 0009](../../docs/decisions/0009-fonts-shipped-with-the-core.md)), whatever family a drawing names and with no font of the computer, so an image is the same offline and everywhere; a CJK character is drawn as an empty box.
 
 Without a solver, `render` draws only what has coordinates. `check` says what is missing: after the diagnostics it prints, for each drawing level, how many objects have no position and how many constraints hold, need a solver to move something, or could not be checked. `view` prints the Document of [`rnl-view`](../rnl-view/README.md), what the desktop viewer shows, for tools and for comparing builds; with `--primitives` each level has its primitives as well, with `--no-svg` no SVG, with `--status` its solve status, `solve`: `fixed`, `unsolved`, `solved` or `stale`, with `--flylines` the flylines of every net, each with a hit of kind `flyline` (off by default, as in `render` and `snapshot`), and with `--constraints` its constraints after expansion ([`rnl-view`](../rnl-view/README.md#the-constraints-of-a-level), experimental). The standard packages in [`libraries/standard`](../../libraries/standard/README.md) are built into the command through `rnl-view`; this crate adds the files and package directories on disk (`FsProvider`).
 
