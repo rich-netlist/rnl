@@ -30,16 +30,24 @@ fn a_crossing_directed_interval_is_retained() {
     assert!(r.report.files[0].unconverted.iter().any(|u| u.rule == "distance-interval"));
 }
 #[test]
-fn literal_points_justify_each_axis_direction() {
-    for (points, axis, direction) in [
-        ("{(0, 0) (2, 0) (4, 0)}", "x", "left-to-right"),
-        ("{(4, 0) (2, 0) (0, 0)}", "x", "right-to-left"),
-        ("{(0, 0) (0, 2) (0, 4)}", "y", "bottom-to-top"),
-        ("{(0, 4) (0, 2) (0, 0)}", "y", "top-to-bottom"),
+fn literal_coordinates_do_not_choose_a_discardable_direction() {
+    for statement in [
+        "{(0, 0) (2, 0) (4, 0)} @DISTRIBUTE(axis=\"x\")",
+        "{(0, 4) (0, 2) (0, 0)} @DISTRIBUTE(axis=\"y\")",
+        "(0, 0) (2, 0) @ORDER(\"x\")",
+        "(0, 0) (2, 0) @DISTANCE(\"x\", min=1)",
     ] {
-        let r = convert(&format!("{points} @DISTRIBUTE(axis=\"{axis}\")"));
-        assert!(r.files["t.sp"].contains(&format!("@DISTRIBUTE(\"{direction}\")")), "{}", r.files["t.sp"]);
-        assert!(r.report.files[0].unconverted.is_empty());
+        let r = convert(statement);
+        assert!(r.files["t.sp"].contains(statement));
+        assert!(r.report.files[0].unconverted.iter().any(|u| u.rule == "direction"));
+    }
+}
+#[test]
+fn zero_axis_distance_has_an_equivalent_direction() {
+    for (axis, direction) in [("x", "left-to-right"), ("y", "bottom-to-top")] {
+        let r = convert(&format!("(_, _) (_, _) @DISTANCE(\"{axis}\", exact=0)"));
+        assert!(r.files["t.sp"].contains(&format!("@DISTANCE(\"{direction}\", exact=0)")));
+        assert!(r.report.successful(), "{:?}", r.report);
     }
 }
 #[test]

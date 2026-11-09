@@ -13,6 +13,16 @@ type Key = (String, String, String, String);
 fn canonical_fact(kind: &FactKind) -> FactKind {
     let mut kind = kind.clone();
     if let FactKind::Distance { sense, min, max, from, to, .. } = &mut kind {
+        if *sense == Sense::Either
+            && *min == Some(0.0)
+            && *max == Some(0.0)
+            && from.len() == 1
+            && to.len() == 1
+            && !matches!(from[0], PointRef::Centre(_))
+            && !matches!(to[0], PointRef::Centre(_))
+        {
+            *sense = Sense::Increasing;
+        }
         if *sense == Sense::Decreasing
             && from.len() == 1
             && to.len() == 1

@@ -1,7 +1,7 @@
-//! Direction changes with an algebraic or literal-coordinate justification (14.3–14.5).
+//! Direction changes with an algebraic justification (14.3–14.5).
 use super::edit::{record_edit, Edit};
 use rnl_runtime::host::Record;
-use rnl_runtime::syntax::{Call, Coord, Member, ObjExpr, Value};
+use rnl_runtime::syntax::{Call, Member, ObjExpr, Value};
 
 fn number(value: Option<&Value>) -> Option<f64> {
     match value {
@@ -9,30 +9,17 @@ fn number(value: Option<&Value>) -> Option<f64> {
         _ => None,
     }
 }
-fn coordinate(object: &ObjExpr, axis: &str) -> Option<f64> {
-    let ObjExpr::Point(point) = object else { return None };
-    match if axis == "x" { &point.x } else { &point.y } {
-        Coord::Num(n) => Some(*n),
-        _ => None,
-    }
-}
-fn literal_coordinates(member: &Member, index: usize, axis: &str) -> Option<Vec<f64>> {
+fn individual_points(member: &Member, index: usize) -> bool {
     let segment = &member.segments[index];
-    if segment.piped {
-        return None;
-    }
-    let mut objects = segment.args.iter().map(|a| &a.obj).collect::<Vec<_>>();
-    if let [ObjExpr::Set(set)] = objects.as_slice() {
-        let mut inner = Vec::new();
-        for m in &set.members {
-            if !m.binds.is_empty() || m.segments.len() != 1 || m.segments[0].call.is_some() {
-                return None;
+    !segment.piped
+        && segment.args.len() == 2
+        && segment.args.iter().all(|a| match &a.obj {
+            ObjExpr::Point(_) => true,
+            ObjExpr::Ref(r) => {
+                r.prefix == '#' && r.name.is_some() && r.sub.is_none() && r.places.is_none() && r.path.is_empty()
             }
-            inner.extend(m.segments[0].args.iter().map(|a| &a.obj));
-        }
-        objects = inner;
-    }
-    objects.into_iter().map(|o| coordinate(o, axis)).collect()
+            _ => false,
+        })
 }
 fn opposite(direction: &str) -> Option<&'static str> {
     Some(match direction {
@@ -57,18 +44,8 @@ pub(super) fn replacement(member: &Member, index: usize) -> Option<String> {
     let mut direction = axis.clone();
     let mut interval: Option<Vec<(String, f64)>> = None;
     if call.kw == "DISTANCE" && opposite(axis).is_some() {
-        let segment = &member.segments[index];
         // Extent gaps of sets do not negate like the signed distance of two points.
-        if segment.piped
-            || segment.args.len() != 2
-            || !segment.args.iter().all(|a| match &a.obj {
-                ObjExpr::Point(_) => true,
-                ObjExpr::Ref(r) => {
-                    r.prefix == '#' && r.name.is_some() && r.sub.is_none() && r.places.is_none() && r.path.is_empty()
-                }
-                _ => false,
-            })
-        {
+        if !individual_points(member, index) {
             return None;
         }
         if let Some(exact) = number(params.get("exact")).filter(|n| *n < 0.0) {
@@ -88,35 +65,17 @@ pub(super) fn replacement(member: &Member, index: usize) -> Option<String> {
             interval = Some(values);
         }
     } else if matches!(axis.as_str(), "x" | "y") {
-        let points = literal_coordinates(member, index, axis)?;
-        if points.len() < 2 {
+        // Coordinates are discardable facts. They cannot choose one half of an
+        // undirected constraint without changing conflict resolution. Only a
+        // zero point distance is independent of which direction is chosen.
+        let zero = number(params.get("exact")) == Some(0.0)
+            || (params.get("exact").is_none()
+                && number(params.get("min")) == Some(0.0)
+                && number(params.get("max")) == Some(0.0));
+        if call.kw != "DISTANCE" || !zero || !individual_points(member, index) {
             return None;
         }
-        let increasing = points.windows(2).all(|p| p[1] - p[0] >= 1.0);
-        let decreasing = points.windows(2).all(|p| p[0] - p[1] >= 1.0);
-        let sense = if call.kw == "DISTANCE" && points.len() == 2 {
-            points[1] >= points[0]
-        } else if increasing {
-            true
-        } else if decreasing {
-            false
-        } else {
-            return None;
-        };
-        if call.kw == "DISTANCE"
-            && ["min", "max", "exact"]
-                .iter()
-                .any(|k| matches!(params.get(k),Some(v) if !matches!(v,Value::Num{value,..} if *value>=0.0)))
-        {
-            return None;
-        }
-        direction = match (axis.as_str(), sense) {
-            ("x", true) => "left-to-right",
-            ("x", false) => "right-to-left",
-            ("y", true) => "bottom-to-top",
-            _ => "top-to-bottom",
-        }
-        .into();
+        direction = if axis == "x" { "left-to-right" } else { "bottom-to-top" }.into();
     }
     if direction == *axis {
         return None;
