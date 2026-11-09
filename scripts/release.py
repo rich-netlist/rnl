@@ -94,7 +94,7 @@ def smoke(exe, version, commit):
     assert (code, stdout.strip(), stderr) == (0, f"rnl {version} ({commit})".encode(), b""), (code, stdout, stderr)
     case = ROOT / "tests/conformance/cases/01-rc-lowpass.sp"
     code, stdout, stderr = run(exe, "check", case)
-    assert code == 0 and b"0 errors, 0 warnings" in stdout and not stderr, (code, stdout, stderr)
+    assert code == 0 and b"0 errors, 0 violations, 0 warnings" in stdout and not stderr, (code, stdout, stderr)
     code, stdout, stderr = run(exe, "check", ROOT / "tests/conformance/cases/12-diagnostics.sp")
     assert code == 1 and b"error " in stdout and b"no-such-package" in stdout, (code, stdout, stderr)
     with tempfile.TemporaryDirectory() as tmp:

@@ -150,12 +150,12 @@ rnl problem | solve | snapshot | write | ...   what a solver reads, solving, the
 
 FILE is a SPICE netlist, a Spectre netlist (`.scs`) or a package file (`.rnl`). Options worth knowing: `--package-dir DIR` looks for packages in DIR as well (repeatable), `--no-std` does not use the standard package, `--std-version V` reads a file with the series V (`0.2` to read a file of 0.3 with the series 0.2), `--dialect spice|spectre` instead of guessing from the file.
 
-`rnl check` prints one line per diagnostic, `error`, `warning` or `hint`, with the file and line, and ends with a count. It exits with 1 only when there are errors; read the warnings as well. For the example in `SKILL.md`:
+`rnl check` prints one line per diagnostic, `error`, `violation`, `warning` or `hint`, with the file and line and its kind (a number and a short name), and ends with a count. It exits with 1 only when there are errors or violations; read the warnings as well. For the example in `SKILL.md`:
 
 ```text
-hint ota5t.sp:3: ota5t: 9 objects have no position and are left to a solver; they are not drawn: #M1, #M2, %g0, a usage of $IO_PORT, ...
+hint ota5t.sp:3: RNL9404 unplaced-objects: ota5t: 9 objects have no position and are left to a solver; they are not drawn: #M1, #M2, %g0, a usage of $IO_PORT, ...
 status ota5t: 9 without a position; constraints: 2 unsolved
-0 errors, 0 warnings, 1 hints
+0 errors, 0 violations, 0 warnings, 1 hints
 ```
 
 The hint is expected for a file without positions. Without a solver, `render` draws only what has coordinates; `examples/ota5t-placed.sp` gives every object a position and is drawn completely. `rnl catalog` prints what [packages.md](packages.md) lists, from the packages the command bundles.

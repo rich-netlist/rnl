@@ -109,6 +109,6 @@ threshold boundaries, short hex values and alpha. PNG, ICO and ICNS files are no
 The site's Chromium and WebKit checks cover the homepage themes, narrow layout and favicon URLs.
 For visual review, compare 16, 24, 32, 48 and 256px icons on light and dark backgrounds.
 
-`rnl check brand/rnl-logo.sp`: **0 errors, 0 warnings, 5 hints**. The hints identify intentional
+`rnl check brand/rnl-logo.sp`: **0 errors, 0 violations, 0 warnings, 5 hints**. The hints identify intentional
 overrides of `$base`, `$signal`, `$NMOS`, `$GROUND_SYMBOL` and `$JUNCTION_SYMBOL` from the standard
 package. The source is preserved rather than changing it to silence those hints.
