@@ -282,7 +282,7 @@ fn beside() -> [Q; 2] {
 fn anchor_point(r: &PointRef) -> Option<(usize, Option<usize>)> {
     match r {
         PointRef::Origin(k) => Some((*k, None)),
-        PointRef::Pin { object, pin, .. } => Some((*object, Some(*pin))),
+        PointRef::Pin { object, pin, .. } | PointRef::SymbolPin { object, pin, .. } => Some((*object, Some(*pin))),
         PointRef::Centre(_) => None,
     }
 }
@@ -1157,7 +1157,7 @@ pub(crate) fn hang(problem: &LevelProblem, k: usize) -> Option<Hang> {
 /// between the two pins with a direction and a least gap (14.5), such as the one the stubs of the
 /// standard package hold themselves by; none without such a fact.
 fn stub_rise(problem: &LevelProblem, kept: &[usize], k: usize, host: PinKey) -> Option<Q> {
-    let is = |refs: &[PointRef], (object, pin): PinKey| matches!(refs, [PointRef::Pin { object: o, pin: p, .. }] if *o == object && *p == pin);
+    let is = |refs: &[PointRef], key: PinKey| matches!(refs, [r] if r.pin_key() == Some(key));
     kept.iter().find_map(|&f| {
         let FactKind::Distance { axis: Axis::Y, sense, min: Some(min), from, to, .. } = &problem.facts.get(f)?.kind
         else {
@@ -1274,7 +1274,7 @@ fn power_pins(mut p: Power, c: &mut Connections) -> Power {
 fn connections(problem: &LevelProblem, model: &Model) -> Connections {
     let mut nets: BTreeMap<String, BTreeSet<PinKey>> = BTreeMap::new();
     let pin_of = |r: &PointRef| match r {
-        PointRef::Pin { object, pin, .. } => Some((*object, *pin)),
+        PointRef::Pin { object, pin, .. } | PointRef::SymbolPin { object, pin, .. } => Some((*object, *pin)),
         _ => None,
     };
     let mut drawn: Vec<Drawn> = Vec::new();
@@ -2212,7 +2212,7 @@ fn netlist_way<'a>(members: impl DoubleEndedIterator<Item = &'a [usize]> + Clone
 fn elements_of(r: &PointRef, out: &mut Vec<usize>) {
     match r {
         PointRef::Origin(k) => out.push(*k),
-        PointRef::Pin { object, .. } => out.push(*object),
+        PointRef::Pin { object, .. } | PointRef::SymbolPin { object, .. } => out.push(*object),
         PointRef::Centre(members) => {
             for m in members {
                 elements_of(m, out);

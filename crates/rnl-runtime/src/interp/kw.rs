@@ -377,6 +377,7 @@ impl Interp<'_> {
         }
         let sym = self.new_obj(ObjData::Symbol(Box::default()));
         self.symbol_mut(sym).unit = Some(ctx.unit);
+        self.symbol_mut(sym).independent_pins = self.follows_0_4(self.source_unit(ctx));
         let start = member
             .binds
             .iter()
@@ -1488,12 +1489,12 @@ impl Interp<'_> {
         let ObjData::Point { x: Some(x), y: Some(y), .. } = self.o(pt).clone() else {
             return self.fail(ctx, codes::KEYWORD_PIN_NOT_A_POINT, "PIN takes one point (9.2.4)", seg.start);
         };
-        let term = get(&p, "terminal").cloned().unwrap();
-        let raw = match term {
-            Lit::Arr(v) => v,
-            other => vec![other],
+        let raw = match get(&p, "terminal").cloned() {
+            Some(Lit::Arr(v)) => v,
+            Some(other) => vec![other],
+            None => Vec::new(),
         };
-        if raw.is_empty() {
+        if raw.is_empty() && get(&p, "terminal").is_some() {
             let at = seg.call.as_ref().unwrap().start;
             return self.fail(
                 ctx,
@@ -2565,10 +2566,12 @@ pub(crate) fn add_pin(sym: &mut SymbolDef, pin: Pin) {
 }
 
 pub(crate) fn add_pin_with_case(sym: &mut SymbolDef, pin: Pin, case_sensitive: bool) {
-    for old in sym.pins.iter_mut() {
-        old.terms.retain(|t| !pin.terms.iter().any(|n| t.same(n, case_sensitive)));
+    if !sym.independent_pins {
+        for old in sym.pins.iter_mut() {
+            old.terms.retain(|t| !pin.terms.iter().any(|n| t.same(n, case_sensitive)));
+        }
+        sym.pins.retain(|q| !q.terms.is_empty());
     }
-    sym.pins.retain(|q| !q.terms.is_empty());
     sym.pins.push(pin);
 }
 

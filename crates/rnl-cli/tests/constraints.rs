@@ -45,7 +45,7 @@ fn origins(points: &[ConstraintPoint]) -> Vec<usize> {
         .iter()
         .map(|p| match p {
             ConstraintPoint::Origin { origin } => *origin,
-            ConstraintPoint::Pin { object, .. } => *object,
+            ConstraintPoint::Pin { object, .. } | ConstraintPoint::SymbolPin { object, .. } => *object,
             ConstraintPoint::Centre { .. } => panic!("a centre"),
         })
         .collect()

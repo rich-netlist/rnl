@@ -105,9 +105,23 @@ pub enum PointRef {
     /// with the object (9.2.4). `pin` indexes the pins of the object's symbol; `terminal` is the
     /// terminal's name, or its number when it has none.
     Pin { object: usize, pin: usize, terminal: String },
+    /// An independent pin that a terminal reference cannot identify (0.4, 9.2.4).
+    /// Geometry uses `object` and `pin`; writeback must use this exact reference, and must leave
+    /// an anonymous endpoint unsolved rather than connect another pin of the same terminal.
+    SymbolPin { object: usize, pin: usize, reference: Reference },
     /// The centre of a set, the middle of the extent of its points, nested sets followed down
     /// to the innermost objects (6.5, 14.1).
     Centre(Vec<PointRef>),
+}
+
+impl PointRef {
+    /// The geometric identity of a pin, independent of the path used to refer to it.
+    pub fn pin_key(&self) -> Option<(usize, usize)> {
+        match self {
+            Self::Pin { object, pin, .. } | Self::SymbolPin { object, pin, .. } => Some((*object, *pin)),
+            _ => None,
+        }
+    }
 }
 
 /// Where an object is.
@@ -545,6 +559,10 @@ pub fn point_name(p: &LevelProblem, r: &PointRef) -> String {
     match r {
         PointRef::Origin(k) => label(*k),
         PointRef::Pin { object, terminal, .. } => format!("{}:{terminal}", label(*object)),
+        PointRef::SymbolPin { object, pin, reference } => match reference {
+            Reference::Name(n) => n.clone(),
+            _ => format!("pin {} of {}", pin + 1, label(*object)),
+        },
         PointRef::Centre(points) => {
             format!("{{{}}}", points.iter().map(|q| point_name(p, q)).collect::<Vec<_>>().join(" "))
         }
@@ -1048,6 +1066,12 @@ impl Canon {
                 self.index(*object);
                 self.index(*pin);
                 self.str(terminal);
+            }
+            PointRef::SymbolPin { object, pin, reference } => {
+                self.word("symbol-pin");
+                self.index(*object);
+                self.index(*pin);
+                self.reference(reference);
             }
             PointRef::Centre(points) => {
                 self.word("centre");

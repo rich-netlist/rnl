@@ -121,7 +121,7 @@ pub fn fact_holds(
 fn drawn_value(p: &LevelProblem, drawn: &[Drawn], r: &PointRef, axis: Axis) -> Option<Q> {
     match r {
         PointRef::Origin(k) => from_f64(drawn.get(*k)?.at[ax(axis)]?),
-        PointRef::Pin { object, pin, .. } => {
+        PointRef::Pin { object, pin, .. } | PointRef::SymbolPin { object, pin, .. } => {
             let pos = p.symbols.get(p.objects.get(*object)?.symbol?)?.pins.get(*pin)?.pos;
             let local = (from_f64(pos.0)?, from_f64(pos.1)?);
             let o = drawn.get(*object)?;

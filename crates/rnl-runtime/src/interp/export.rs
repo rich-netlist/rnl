@@ -321,6 +321,16 @@ impl Interp<'_> {
                 let mut pins = Vec::new();
                 let mut seen: HashSet<(ObjId, u32)> = HashSet::new();
                 for &(ow, t, i) in terms.get(&net).into_iter().flatten() {
+                    if self.scenes[s].symbol.get(&ow).is_some_and(|sym| self.symbol(*sym).independent_pins) {
+                        for pin in self.pins_for(s, ow, t) {
+                            if let Some(p) = self.symbol_pin_ref(s, &ix, ow, pin) {
+                                if !pins.iter().any(|q: &PointRef| q.pin_key() == p.pin_key()) {
+                                    pins.push(p);
+                                }
+                            }
+                        }
+                        continue;
+                    }
                     if self.has_pin(s, t) && seen.insert((ow, i)) {
                         if let Some(p) = self.point_ref(s, &ix, t) {
                             pins.push(p);
@@ -376,14 +386,21 @@ impl Interp<'_> {
                         if kind == ObjectKind::Usage {
                             on.extend(at.iter().copied());
                         }
-                        let Some(PointRef::Pin { object, pin, terminal }) = self.point_ref(s, &ix, t) else { continue };
-                        for n in at {
-                            let Some(&i) = net_at.get(&n) else { continue };
-                            let pins = &mut nets[i].pins;
-                            if !pins.iter().any(
-                                |q| matches!(q, PointRef::Pin { object: a, pin: b, .. } if *a == object && *b == pin),
-                            ) {
-                                pins.push(PointRef::Pin { object, pin, terminal: terminal.clone() });
+                        for pin in self.pins_for(s, o, t) {
+                            // Keep the terminal chosen by older exports unchanged. Only an earlier
+                            // independent pin needs a different reference.
+                            let reference = if self.pin_for(s, o, t) == Some(pin) {
+                                self.point_ref(s, &ix, t)
+                            } else {
+                                self.symbol_pin_ref(s, &ix, o, pin)
+                            };
+                            let Some(reference) = reference else { continue };
+                            for n in &at {
+                                let Some(&i) = net_at.get(n) else { continue };
+                                let pins = &mut nets[i].pins;
+                                if !pins.iter().any(|q| q.pin_key() == reference.pin_key()) {
+                                    pins.push(reference.clone());
+                                }
                             }
                         }
                     }
@@ -405,10 +422,7 @@ impl Interp<'_> {
             objects[k].nets = at;
         }
         for n in &mut nets {
-            n.pins.sort_by_key(|q| match q {
-                PointRef::Pin { object, pin, .. } => (*object, *pin),
-                _ => (usize::MAX, usize::MAX),
-            });
+            n.pins.sort_by_key(|q| q.pin_key().unwrap_or((usize::MAX, usize::MAX)));
         }
 
         // GROUP (11.5), without those PRIORITY turns off
@@ -780,6 +794,18 @@ impl Interp<'_> {
             }
             _ => None,
         }
+    }
+
+    /// Reference exactly this pin. A bus pin can use any terminal for which it is the last
+    /// binding, but an earlier pin must never borrow the reference of a later one (5.2.4).
+    fn symbol_pin_ref(&mut self, s: SceneId, ix: &Index, owner: ObjId, pin: usize) -> Option<PointRef> {
+        let object = *ix.objects.get(&owner)?;
+        for t in self.terms_of(s, owner) {
+            if self.pin_for(s, owner, t) == Some(pin) {
+                return self.point_ref(s, ix, t);
+            }
+        }
+        Some(PointRef::SymbolPin { object, pin, reference: Reference::Anonymous })
     }
 
     /// The points of a member of DISTANCE, whose extent counts (14.5): a set's members, nested

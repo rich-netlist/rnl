@@ -606,7 +606,9 @@ fn the_brainstorm_cases_give_whole_problems() {
             let ok = |r: &PointRef| -> bool {
                 fn check(r: &PointRef, n: usize) -> bool {
                     match r {
-                        PointRef::Origin(k) | PointRef::Pin { object: k, .. } => *k < n,
+                        PointRef::Origin(k)
+                        | PointRef::Pin { object: k, .. }
+                        | PointRef::SymbolPin { object: k, .. } => *k < n,
                         PointRef::Centre(rs) => rs.iter().all(|r| check(r, n)),
                     }
                 }

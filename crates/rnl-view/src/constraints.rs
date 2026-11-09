@@ -89,6 +89,7 @@ pub enum ConstraintReference {
 pub enum ConstraintPoint {
     Origin { origin: usize },
     Pin { object: usize, pin: usize, terminal: String },
+    SymbolPin { object: usize, pin: usize, reference: ConstraintReference },
     Centre { centre: Vec<ConstraintPoint> },
 }
 
@@ -221,6 +222,9 @@ fn point(r: &PointRef) -> ConstraintPoint {
         PointRef::Origin(k) => ConstraintPoint::Origin { origin: *k },
         PointRef::Pin { object, pin, terminal } => {
             ConstraintPoint::Pin { object: *object, pin: *pin, terminal: terminal.clone() }
+        }
+        PointRef::SymbolPin { object, pin, reference: r } => {
+            ConstraintPoint::SymbolPin { object: *object, pin: *pin, reference: reference(r, true) }
         }
         PointRef::Centre(points) => ConstraintPoint::Centre { centre: points_of(points) },
     }

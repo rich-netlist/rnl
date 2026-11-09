@@ -2787,6 +2787,20 @@
    ]
   },
   {
+   "number": "RNL4110",
+   "name": "pin-number-binds-no-role",
+   "severity": "warning",
+   "message": "pin {pin} of {symbol}: terminal={binding} binds no role of {owner}; this binding is unconnected (11.3)",
+   "sections": ["11.3", "12.1"]
+  },
+  {
+   "number": "RNL4113",
+   "name": "pin-terminal-names-no-role",
+   "severity": "warning",
+   "message": "pin {pin} of {symbol}: terminal={binding} binds no role of {owner}; this binding is unconnected (11.3)",
+   "sections": ["11.3", "12.1"]
+  },
+  {
    "number": "RNL4114",
    "name": "pin-terminal-on-no-net",
    "severity": "error",
@@ -2795,6 +2809,13 @@
     "5.2.4",
     "11.8"
    ]
+  },
+  {
+   "number": "RNL4119",
+   "name": "pin-terminal-not-in-owner",
+   "severity": "warning",
+   "message": "pin {pin} of {symbol}: terminal={binding} binds no terminal of {owner}; this binding is unconnected (11.3)",
+   "sections": ["11.3"]
   },
   {
    "number": "RNL4200",

@@ -1500,7 +1500,7 @@ fn jobs(problem: &LevelProblem) -> Vec<Job> {
             }
         };
         for p in &r.pins {
-            if let PointRef::Pin { object, pin, .. } = p {
+            if let PointRef::Pin { object, pin, .. } | PointRef::SymbolPin { object, pin, .. } = p {
                 let key = (*object, Some(*pin));
                 if !jobs[j].points.iter().any(|q| q.key == key) {
                     jobs[j].points.push(Point { reference: p.clone(), key });
@@ -1544,7 +1544,9 @@ pub(crate) fn style_notes(problem: &LevelProblem) -> Vec<String> {
 /// The point of a wire written that a routed wire may end at: a pin, or a point object (13.1).
 fn wire_point(problem: &LevelProblem, r: &PointRef) -> Option<Point> {
     match r {
-        PointRef::Pin { object, pin, .. } => Some(Point { reference: r.clone(), key: (*object, Some(*pin)) }),
+        PointRef::Pin { object, pin, .. } | PointRef::SymbolPin { object, pin, .. } => {
+            Some(Point { reference: r.clone(), key: (*object, Some(*pin)) })
+        }
         PointRef::Origin(k) if problem.objects.get(*k).is_some_and(|o| o.kind == ObjectKind::Point) => {
             Some(Point { reference: r.clone(), key: (*k, None) })
         }

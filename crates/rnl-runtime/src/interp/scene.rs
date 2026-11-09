@@ -1948,32 +1948,42 @@ impl Interp<'_> {
 
     /// The index of the pin of `owner`'s symbol that draws terminal `t`.
     pub(crate) fn pin_for(&mut self, s: SceneId, owner: ObjId, t: ObjId) -> Option<usize> {
+        let pins = self.pins_for(s, owner, t);
         let sym = *self.scenes[s].symbol.get(&owner)?;
-        let ObjData::Term { index, .. } = self.o(t).clone() else { return None };
+        if self.symbol(sym).independent_pins {
+            pins.last().copied()
+        } else {
+            pins.first().copied()
+        }
+    }
+
+    /// All pins bound to a terminal, in declaration order (9.2.4). Earlier languages have only
+    /// the first matching pin after their replacement rules have been applied.
+    pub(crate) fn pins_for(&mut self, s: SceneId, owner: ObjId, t: ObjId) -> Vec<usize> {
+        let Some(&sym) = self.scenes[s].symbol.get(&owner) else { return Vec::new() };
+        let ObjData::Term { index, .. } = self.o(t).clone() else { return Vec::new() };
         let terms = self.owner_terms(s, owner);
         let cs = self.host_case(owner);
+        let independent = self.symbol(sym).independent_pins;
+        let by_number = !independent || !matches!(self.o(owner), ObjData::Usage(_));
         let pins = self.symbol(sym).pins.clone();
+        let mut bound = Vec::new();
         for (k, pin) in pins.iter().enumerate() {
-            for key in &pin.terms {
-                match key {
-                    TermKey::Num(n) if *n == index => return Some(k),
-                    TermKey::Name(name) => {
-                        for (idx, tn) in &terms {
-                            if *idx == index {
-                                if let Some(tn) = tn {
-                                    let same = if cs { tn == name } else { tn.eq_ignore_ascii_case(name) };
-                                    if same {
-                                        return Some(k);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    _ => {}
+            let matches = pin.terms.iter().any(|key| match key {
+                TermKey::Num(n) => by_number && *n == index,
+                TermKey::Name(name) => terms.iter().any(|(idx, tn)| {
+                    *idx == index
+                        && tn.as_ref().is_some_and(|tn| if cs { tn == name } else { tn.eq_ignore_ascii_case(name) })
+                }),
+            });
+            if matches {
+                bound.push(k);
+                if !independent {
+                    break;
                 }
             }
         }
-        None
+        bound
     }
 
     pub(crate) fn obj_kind(&self, o: ObjId) -> Option<&'static str> {

@@ -404,7 +404,7 @@ impl Model {
                     Some(id)
                 }
             },
-            PointRef::Pin { object, pin, .. } => {
+            PointRef::Pin { object, pin, .. } | PointRef::SymbolPin { object, pin, .. } => {
                 let o = problem.objects.get(*object)?;
                 let pos = o.symbol.and_then(|s| problem.symbols.get(s)).and_then(|s| s.pins.get(*pin)).map(|p| p.pos);
                 let (x, y) = pos.unwrap_or((0.0, 0.0));
