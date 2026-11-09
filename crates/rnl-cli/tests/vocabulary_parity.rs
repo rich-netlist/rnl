@@ -57,7 +57,6 @@ const PENDING_0_4: &[&str] = &[
     // the rest of the changes of 0.4
     "record",
     "DEVICE",
-    "SET-SYMBOL",
     "SELECT-INSTANCE",
     "SELECT-TERMINAL",
     "SELECT-USAGE",

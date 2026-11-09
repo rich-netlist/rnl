@@ -215,7 +215,7 @@ pub struct Pin {
     pub dir: Option<u16>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum TermKey {
     Num(u32),
     Name(String),

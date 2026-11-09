@@ -42,6 +42,7 @@ pub enum TargetOp {
     },
     Symbol {
         symbol: ObjId,
+        map: Option<Rc<super::terminal_maps::TerminalMap>>,
         off: usize,
     },
     Style {
@@ -1097,11 +1098,17 @@ impl Interp<'_> {
                     segments: ctx.segments.clone(),
                 });
             }
-            TargetOp::Symbol { symbol, off } => {
+            TargetOp::Symbol { symbol, map, off } => {
+                let symbol = if let Some(map) = map {
+                    let target = self.map_target(s, obj);
+                    self.mapped_symbol(*symbol, map, &target, ctx, *off)?
+                } else {
+                    *symbol
+                };
                 self.scenes[s].appear.push(Fact {
                     pos: at,
                     target: obj,
-                    data: FactData::Symbol(*symbol),
+                    data: FactData::Symbol(symbol),
                     priority: None,
                     ctx: site,
                     off: *off,

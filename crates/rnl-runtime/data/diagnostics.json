@@ -1974,6 +1974,26 @@
    ]
   },
   {
+   "number": "RNL3123",
+   "name": "param-symbol-terminals-invalid",
+   "severity": "error",
+   "message": "terminals= of SET-SYMBOL must list distinct symbol terminal names or distinct pairs [object terminal or role, symbol terminal] (6.4, 11.3)",
+   "sections": [
+    "6.4",
+    "11.3"
+   ]
+  },
+  {
+   "number": "RNL3124",
+   "name": "param-pin-terminal-number",
+   "severity": "error",
+   "message": "a digits-only terminal name is a number starting at 1; this implementation supports terminal numbers through 4294967295 (6.4)",
+   "sections": [
+    "6.4",
+    "9.2.4"
+   ]
+  },
+  {
    "number": "RNL3200",
    "name": "ref-bare-hole-outside-symbol",
    "severity": "error",

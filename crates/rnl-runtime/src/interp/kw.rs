@@ -1516,6 +1516,25 @@ impl Interp<'_> {
                 at,
             );
         }
+        let raw = if self.follows_0_4(self.source_unit(ctx)) {
+            let mut normalized = Vec::with_capacity(raw.len());
+            for value in raw {
+                if let Lit::Str(name) = &value {
+                    if !name.as_str().is_empty() && name.as_str().bytes().all(|b| b.is_ascii_digit()) {
+                        let Some(TermKey::Num(number)) = super::terminal_maps::terminal_key(&value) else {
+                            return self.fail(ctx, codes::PARAM_PIN_TERMINAL_NUMBER,
+                                "a digits-only terminal name is a number starting at 1; this implementation supports terminal numbers through 4294967295 (6.4)", seg.start);
+                        };
+                        normalized.push(Lit::Num(number as f64));
+                        continue;
+                    }
+                }
+                normalized.push(value);
+            }
+            normalized
+        } else {
+            raw
+        };
         let terms: Vec<TermKey> = raw
             .iter()
             .filter_map(|t| match t {
@@ -1969,7 +1988,7 @@ impl Interp<'_> {
         }
         let Some(s) = ctx.scene else {
             if ctx.in_symbol() {
-                return Ok((self.symbol_modifier(kw, a.obj, seg, ctx, &mapped, &op)?, false));
+                return Ok((self.symbol_modifier(kw, a.obj, seg, ctx, &op)?, false));
             }
             return self.scene_only(ctx, seg.start);
         };
@@ -2006,8 +2025,24 @@ impl Interp<'_> {
                 }
                 return Ok((a.obj, a.sel));
             }
+            let mapped_symbols = matches!(op, TargetOp::Symbol { map: Some(_), .. });
+            let mut results = Vec::new();
+            let mut failed = false;
             for (k, m) in members.into_iter().enumerate() {
-                self.apply_op(s, &op, m, pos_plus(&ctx.pos, "e", k as i64), !a.sel, ctx)?;
+                match self.apply_op(s, &op, m, pos_plus(&ctx.pos, "e", k as i64), !a.sel, ctx) {
+                    Ok(()) => results.push((m, true)),
+                    Err(Stop::Fail(diag)) if mapped_symbols => {
+                        // A map can be valid for a usage but invalid for a case-insensitive
+                        // host. Each member is its own description (5.2.1, 7.3).
+                        results.push((self.new_obj(ObjData::Failed(diag)), true));
+                        failed = true;
+                    }
+                    Err(error) => return Err(error),
+                }
+            }
+            if failed {
+                self.note_failed_at(ctx.rec, seg.start, false);
+                return Ok((self.new_obj(ObjData::Set(Box::new(SetData::plain(results, false)))), a.sel));
             }
             return Ok((a.obj, a.sel));
         }
@@ -2031,23 +2066,20 @@ impl Interp<'_> {
         }
     }
 
-    fn symbol_modifier(
-        &mut self,
-        kw: &str,
-        obj: ObjId,
-        seg: &Segment,
-        ctx: &Ctx,
-        mapped: &HashMap<String, ArgV>,
-        op: &TargetOp,
-    ) -> R<ObjId> {
+    fn symbol_modifier(&mut self, kw: &str, obj: ObjId, seg: &Segment, ctx: &Ctx, op: &TargetOp) -> R<ObjId> {
         let _ = self.params(kw, seg, ctx, &self.sig_params(kw, ctx), None, false, None)?;
         match (kw, self.o(obj).clone(), op) {
             ("PLACE", ObjData::SymLabel { symbol, index }, TargetOp::Place { x, y, .. }) => {
                 self.symbol_mut(symbol).labels[index].position = Some((x.unwrap_or(0.0), y.unwrap_or(0.0)));
                 return Ok(obj);
             }
-            ("SET-SYMBOL", ObjData::Usage(u), _) if u.in_symbol => {
-                let sym = self.anon_def(mapped["symbol"].obj);
+            ("SET-SYMBOL", ObjData::Usage(u), TargetOp::Symbol { symbol, map, off }) if u.in_symbol => {
+                let sym = if let Some(map) = map {
+                    let target = super::terminal_maps::MapTarget::roles(self.def(u.definition));
+                    self.mapped_symbol(*symbol, map, &target, ctx, *off)?
+                } else {
+                    *symbol
+                };
                 self.usage_mut(obj).sym_symbol = Some(sym);
                 return Ok(obj);
             }
@@ -2066,6 +2098,10 @@ impl Interp<'_> {
     }
 
     fn kw_set_symbol(&mut self, kw: &str, args: &[ArgV], seg: &Segment, ctx: &Ctx) -> R<(ObjId, bool)> {
+        let params = self.params(kw, seg, ctx, &self.sig_params(kw, ctx), None, false, None)?;
+        let map = get(&params, "terminals")
+            .map(|value| self.terminal_map(value, ctx, seg.call.as_ref().unwrap().start))
+            .transpose()?;
         let mapped = self.map_args(kw, args, seg, ctx, sig_positions(kw))?;
         let sym = self.anon_def(mapped["symbol"].obj);
         if !matches!(self.o(sym), ObjData::Symbol(_)) {
@@ -2081,18 +2117,48 @@ impl Interp<'_> {
             );
         }
         if mapped["target"].obj == LEVEL {
-            return Ok((self.block_symbol(sym, seg, ctx), false));
+            return Ok((self.block_symbol(sym, map.as_deref(), seg, ctx)?, false));
         }
-        self.target_each_mapped(kw, mapped, seg, ctx, 4, TargetOp::Symbol { symbol: sym, off: seg.start }, "target")
+        self.target_each_mapped(
+            kw,
+            mapped,
+            seg,
+            ctx,
+            4,
+            TargetOp::Symbol { symbol: sym, map, off: seg.start },
+            "target",
+        )
     }
 
     /// `# @SET-SYMBOL $X` in a subcircuit gives the default look of its instances: the block symbol
     /// (9.2.6). Written in the same subcircuit several times, the later one wins (8.3).
-    fn block_symbol(&mut self, sym: ObjId, seg: &Segment, ctx: &Ctx) -> ObjId {
+    fn block_symbol(
+        &mut self,
+        sym: ObjId,
+        map: Option<&super::terminal_maps::TerminalMap>,
+        seg: &Segment,
+        ctx: &Ctx,
+    ) -> R<ObjId> {
         let u = ctx.unit;
         let level = self.units[u].level.filter(|_| self.units[u].kind == super::unit::UnitKind::Level);
         match level {
             Some(lv) if ctx.frame.is_none() && self.doc.levels[lv].kind == crate::host::LevelKind::Subckt => {
+                let sym = if let Some(map) = map {
+                    let level = &self.doc.levels[lv];
+                    let target = super::terminal_maps::MapTarget {
+                        names: level
+                            .ports
+                            .iter()
+                            .enumerate()
+                            .map(|(i, name)| (i as u32 + 1, Some(name.clone())))
+                            .collect(),
+                        roles: false,
+                        case_sensitive: level.case_sensitive,
+                    };
+                    self.mapped_symbol(sym, map, &target, ctx, seg.start)?
+                } else {
+                    sym
+                };
                 let name = self.doc.level_key(lv);
                 let (rec, k) = match &ctx.member_key {
                     MemberKey::M { rec, k, .. } => (*rec as i64, *k as i64),
@@ -2105,7 +2171,7 @@ impl Interp<'_> {
                 self.warn(ctx, codes::KEYWORD_SET_SYMBOL_BLOCK_NO_EFFECT, "only `# @SET-SYMBOL` in a subcircuit is a block symbol; a file level has no instances, so this has no effect (9.2.6)", at);
             }
         }
-        LEVEL
+        Ok(LEVEL)
     }
 
     // ------------------------------------------------------------------ sets (5.2.2)

@@ -28,6 +28,7 @@ mod renames;
 pub mod scene;
 mod selfcheck;
 mod symbol_pins;
+mod terminal_maps;
 mod topology;
 pub mod unit;
 mod usage_points;
@@ -208,6 +209,8 @@ pub struct Interp<'p> {
     pub(crate) symbol_order: HashMap<SceneId, Vec<ObjId>>,
     /// Pin views for case-insensitive hosts, shared by all owners of the definition.
     pub(crate) folded_symbols: HashMap<ObjId, ObjId>,
+    /// Effective terminal bindings of an assignment; definitions stay reusable.
+    pub(crate) mapped_symbols: HashMap<(ObjId, Vec<Vec<obj::TermKey>>), ObjId>,
     /// Where each set made of other sets is made (5.2.2).
     pub(crate) made_at: HashMap<ObjId, cycles::MadeAt>,
     /// Per scene (`None`: before any), the latest made source of the edits there that make a set
@@ -340,6 +343,7 @@ impl<'p> Interp<'p> {
             scenes: Vec::new(),
             symbol_order: HashMap::new(),
             folded_symbols: HashMap::new(),
+            mapped_symbols: HashMap::new(),
             made_at: HashMap::new(),
             later_sources: HashMap::new(),
             closing: HashMap::new(),
