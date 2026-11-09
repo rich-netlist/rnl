@@ -5,9 +5,12 @@ import { append, m, setAttr, setText, tr } from "./i18n.js";
 // with a small "geo" tag that says where it comes from and its own severity, "warning" or "hint". The
 // counts of the heading are by severity alone, as `rnl check` counts, so a geometry hint is counted in
 // its severity. Each count is a switch: it shows only the rows of that severity, and again shows all.
+// A row is one line, as in an IDE: its severity, the number the toolkit gives its kind of problem (`code`, such as RNL3120),
+// the kind's short name (`name`, such as param-wrong-type) and the line; the explanation, the message, is below it, when
+// the row is open. A click on a row shows its line in the text and opens or closes the row; the twisty only opens or closes.
 // (The levels are the one list SEVERITIES: another, such as the "violation" of 0.4, is one more entry.)
 
-import { markSourceDiagnostics, revealLine } from "./text.js";
+import { fileShown, markSourceDiagnostics, revealLine } from "./text.js";
 import { current, doc } from "./state.js";
 import { $, span } from "./util.js";
 import { shell } from "./shell.js";
@@ -185,43 +188,95 @@ function renderCounts() {
 // the levels of diagnostics (7.6), as a row names them
 const SEVERITY = { error: tr("error"), warning: tr("warning"), hint: tr("hint") };
 
-function diagnosticRow(d) {
-  const li = document.createElement("li");
-  li.className = `diag ${d.severity}`;
-  append(li, span("sev", m(SEVERITY[d.severity] ?? d.severity)), span("msg", d.message));
-  if (d.file) {
-    const loc = span("loc", `${d.file}:${d.line}${d.col ? `:${d.col}` : ""}`);
-    if (d.full_path) setAttr(loc, "title", d.full_path);
-    append(li, loc);
-  }
-  if (d.origin) append(li, span("more", d.origin));
-  if (d.cause) append(li, span("more", `upstream cause: ${d.cause}`));
-  if (d.file_index !== null && d.file_index !== undefined && d.line) {
-    li.classList.add("located");
-    setAttr(li, "title", m("Show in the netlist"));
-    li.addEventListener("click", () => revealLine(d.file_index, d.line, true));
-  }
-  return li;
+/**
+ * The place of a row, as its line shows it: the line and the column, and the name of the file too when it is not the one the
+ * text pane shows, since the line is of the file that the problems follow, the one in the text pane.
+ */
+function placeOf(file, fileIndex, line, col) {
+  const at = line ? `${line}${col ? `:${col}` : ""}` : "";
+  if (fileIndex === fileShown || !file) return at;
+  // a long name is cut in the middle, so that the name of the problem keeps its room; the whole path is the tooltip
+  const name = file.length > 22 ? `${file.slice(0, 8)}…${file.slice(-12)}` : file;
+  return at ? `${name}:${at}` : name;
+}
+
+/** Say again where the rows are, as the text pane shows another file. */
+function placesAgain() {
+  for (const loc of ul.querySelectorAll(".loc")) if (loc.place) loc.textContent = placeOf(...loc.place);
+}
+window.addEventListener("viewer-file", placesAgain);
+
+const KIND_TIP = () => m("The kind of problem: its number and its short name");
+
+/** Open a row, or close it: its explanation is shown only when it is open. */
+function toggle(li, open = !li.classList.contains("open")) {
+  li.classList.toggle("open", open);
+  li.querySelector(".twisty").setAttribute("aria-expanded", String(open));
 }
 
 /**
- * A geometry hint's row: its own severity, the "geo" tag and the core's message, without the file it begins with, which the
- * place below it names; a click shows the line in the text, and its kind is the tooltip.
+ * A row of the list, in one line: a twisty, the severity, a tag if it has one (a geometry hint's), the kind's number and short
+ * name, and the place; with the explanation, `details`, below. Without a kind, the line has the message in the place of the
+ * short name, cut to the width. A click on the row, but on its explanation, which is for selecting, shows `where` in the
+ * text and opens or closes the row; one on the twisty opens or closes it only.
+ */
+function problemRow({ severity, tag, code, name, message, file, fileIndex, line, col, fullPath, details, where }) {
+  const li = document.createElement("li");
+  li.className = `diag ${tag ? "geo " : ""}${severity}`;
+  const twisty = document.createElement("button");
+  twisty.type = "button";
+  twisty.className = "twisty";
+  twisty.setAttribute("aria-expanded", "false");
+  setAttr(twisty, "aria-label", m("Show or hide the explanation"));
+  twisty.append(span("chevron", ""));
+  twisty.firstChild.setAttribute("aria-hidden", "true");
+  append(li, twisty, span("sev", m(SEVERITY[severity] ?? severity)), span("tag", tag ?? ""));
+  const number = span("code", code ?? "");
+  if (code) setAttr(number, "title", KIND_TIP());
+  const short = span("name", name || message);
+  if (!name) short.classList.add("plain"); // the message, as there is no kind to name
+  setAttr(short, "title", name ? KIND_TIP() : message);
+  const loc = span("loc", placeOf(file, fileIndex, line, col));
+  loc.place = [file, fileIndex, line, col];
+  if (fullPath || file) setAttr(loc, "title", fullPath || file);
+  append(li, number, short, loc);
+  const more = document.createElement("div");
+  more.className = "details";
+  more.append(span("msg", message), ...details.map((text) => span("more", text)));
+  li.append(more);
+  const located = where && fileIndex !== null && fileIndex !== undefined && line;
+  if (located) li.classList.add("located");
+  li.addEventListener("click", (e) => {
+    if (e.target.closest(".details")) return;
+    // a selection made in the line, such as the number to copy, is not a click
+    if (!e.target.closest(".twisty") && window.getSelection().toString()) return;
+    if (located && !e.target.closest(".twisty")) revealLine(fileIndex, line, true);
+    toggle(li);
+  });
+  return li;
+}
+
+function diagnosticRow(d) {
+  const details = [];
+  if (d.origin) details.push(d.origin);
+  if (d.cause) details.push(`upstream cause: ${d.cause}`);
+  if (d.full_path) details.push(d.full_path);
+  return problemRow({
+    severity: d.severity, code: d.code, name: d.name, message: d.message, file: d.file, fileIndex: d.file_index, line: d.line,
+    col: d.col, fullPath: d.full_path, details, where: true,
+  });
+}
+
+/**
+ * A geometry hint's row: its own severity, the "geo" tag, its kind, and its place; its explanation is the core's message
+ * without the file it begins with, which the place names.
  */
 function hintRow(h) {
-  const li = document.createElement("li");
-  li.className = `diag geo ${h.severity}`;
   const message = h.file && h.message.startsWith(`${h.file}: `) ? h.message.slice(h.file.length + 2) : h.message;
-  const msg = span("msg", "");
-  msg.append(span("tag", "geo"), message);
-  append(li, span("sev", m(SEVERITY[h.severity] ?? h.severity)), msg);
-  if (h.file) append(li, span("loc", `${h.file}:${h.line}`));
-  if (h.file_index !== null && h.file_index !== undefined && h.line) {
-    li.classList.add("located");
-    li.addEventListener("click", () => revealLine(h.file_index, h.line, true));
-  }
-  li.title = h.kind;
-  return li;
+  return problemRow({
+    severity: h.severity, tag: "geo", code: h.code, name: h.kind, message, file: h.file, fileIndex: h.file_index, line: h.line,
+    col: 0, details: [], where: true,
+  });
 }
 
 /** Colour the line numbers of lines with diagnostics, by the most serious one; the geometry hints are not among them. */

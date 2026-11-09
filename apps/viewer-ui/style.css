@@ -762,32 +762,43 @@ body[data-background="dark"] .unplaced-row .thumb { background: var(--drawing-ba
 
 .diags { list-style: none; margin: 0; padding: 2px 0; }
 
+/*
+ * A problem is one line (problems.js): a twisty, the severity, a tag (a geometry hint's "geo"), the number and the short
+ * name of its kind, and the place; its explanation is under it, when it is open. Each part has its column: where subgrid is
+ * supported, the list is a grid of its own whose columns are as wide as the widest of any row (the names of the severities
+ * of another language may be wider than the 58 px: advertencia, avertissement), and each row takes its columns from it.
+ */
 .diag {
   display: grid;
-  grid-template-columns: 58px minmax(0, 1fr);
-  column-gap: 8px;
-  padding: 3px 10px;
+  grid-template-columns: 16px 58px auto auto minmax(0, 1fr) auto;
+  column-gap: 6px;
+  padding: 2px 10px;
   cursor: default;
 }
+.diag > * { min-width: 0; }
 .diag.located { cursor: pointer; }
 .diag:hover { background: var(--hover); }
-.diag .sev { font-weight: 600; }
+.diag .twisty { grid-column: 1; align-self: center; display: flex; align-items: center; justify-content: center; height: 18px; padding: 0; background: none; border: 0; cursor: pointer; }
+.diag:not(.open) .twisty .chevron { transform: rotate(-90deg); }
+.diag .sev { grid-column: 2; font-weight: 600; }
 .diag.error .sev { color: var(--error); }
 .diag.warning .sev { color: var(--warning); }
 .diag.hint .sev { color: var(--hint); }
-.diag .loc {
-  grid-column: 2;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-}
-.diag .more { grid-column: 2; color: var(--muted); }
-/*
- * The names of the severities of another language may be wider than the 58 px of the first column
- * (advertencia, avertissement): where subgrid is supported, the list is a grid of its own, whose
- * first column is as wide as the widest name of any row, and each row takes its columns from it.
- */
+.diag .tag { grid-column: 3; align-self: center; font-size: 10px; font-weight: 600; color: var(--muted); border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; line-height: 14px; }
+.diag .tag:empty { display: none; }
+.diag .code { grid-column: 4; color: var(--muted); font-family: ui-monospace, "Cascadia Mono", Consolas, monospace, var(--ui-cjk); font-size: 0.92em; align-self: center; white-space: nowrap; }
+.diag .name { grid-column: 5; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.diag .name.plain { color: inherit; }
+.diag .loc { grid-column: 6; justify-self: end; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.diag .details { grid-column: 2 / -1; display: none; padding: 1px 0 4px; cursor: text; user-select: text; }
+.diag.open .details { display: block; }
+.diag .details .msg { display: block; overflow-wrap: anywhere; }
+.diag .details .more { display: block; color: var(--muted); overflow-wrap: anywhere; }
+/* the hint to look for a package is a line of its own, under the problem it is about */
+.diag.package-hint .sev { grid-column: 2; }
+.diag.package-hint .msg { grid-column: 3 / -1; }
 @supports (grid-template-columns: subgrid) {
-  .diags { display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: 8px; }
+  .diags { display: grid; grid-template-columns: 16px max-content max-content max-content minmax(0, 1fr) max-content; column-gap: 6px; }
   .diag { grid-column: 1 / -1; grid-template-columns: subgrid; }
   .diags > :not(.diag) { grid-column: 1 / -1; }
 }
@@ -800,7 +811,6 @@ body[data-background="dark"] .unplaced-row .thumb { background: var(--drawing-ba
 .counts .chip:hover { background: var(--hover); }
 .counts .chip.on { font-weight: 600; box-shadow: inset 0 -2px 0 currentColor; }
 .counts .chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.diag .msg .tag { font-size: 10px; font-weight: 600; color: var(--muted); border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; margin-right: 6px; vertical-align: 1px; }
 
 /* ------------------------------------------------------------------ status bar */
 

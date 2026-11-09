@@ -230,7 +230,7 @@ test.describe("on the desktop", () => {
     await viewer.open("12-diagnostics", DESKTOP);
     await begin(page);
     const located = page.locator("#diags .diag.located").first();
-    const line = await located.evaluate((el) => Number(el.querySelector(".loc").textContent.split(":")[1]));
+    const line = await located.evaluate((el) => el.querySelector(".loc").place[2]);
     await located.click();
     // the line is selected in the text box
     const selected = await area(page).evaluate((el) => el.value.slice(el.selectionStart, el.selectionEnd));

@@ -263,6 +263,8 @@
   "Include": "インクルード",
   "No errors, warnings or hints.": "エラー、警告、ヒントはありません。",
   "Show only these; click again for all": "これだけを表示。もう一度クリックですべて表示",
+  "The kind of problem: its number and its short name": "問題の種類：その番号と短い名前",
+  "Show or hide the explanation": "説明を表示／非表示",
   "{0} error": "エラー {0}",
   "{0} errors": "エラー {0}",
   "{0} warning": "警告 {0}",

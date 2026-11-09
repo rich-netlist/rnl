@@ -48,7 +48,7 @@ test("the problems are listed, the most serious first, and their lines are colou
   expect(shown).toEqual([...Array(errors).fill("error"), ...Array(warnings).fill("warning"), ...Array(hints).fill("hint")]);
   // an error's location, and its line number in the error colour
   const first = diags.find((d) => d.severity === "error" && d.line);
-  await expect(items.filter({ hasText: first.message }).first()).toContainText(`${first.file}:${first.line}:${first.col}`);
+  await expect(items.filter({ hasText: first.message }).first()).toContainText(`${first.line}:${first.col}`);
   await expect(viewer.line(first.line)).toHaveClass(/\bd-error\b/);
   // the line numbers of warnings and hints too; a line takes the colour of its most serious problem,
   // such as line 53, with a warning before an error

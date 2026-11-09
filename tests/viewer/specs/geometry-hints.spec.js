@@ -36,10 +36,12 @@ for (const platform of ["web", "desktop"]) {
       await expect(first).toHaveClass(/\bwarning\b/);
       await expect(first.locator(".tag")).toHaveText("geo");
       await expect(first.locator(".sev")).toHaveText("warning");
-      expect(await first.locator(".msg").textContent()).toBe(`geo${warning.message.replace(`${warning.file}: `, "")}`);
-      await expect(first.locator(".loc")).toHaveText(`${warning.file}:${warning.line}`);
+      // its explanation is the message without the file it began with; its line is the place in the file shown
+      await expect(first.locator(".details .msg")).toHaveText(warning.message.replace(`${warning.file}: `, ""));
+      await expect(first.locator(".loc")).toHaveText(String(warning.line));
+      await expect(first.locator(".name")).toHaveText(warning.kind);
       // and no diagnostic row has the tag
-      await expect(page.locator("#diags > li.diag:not(.geo) .tag")).toHaveCount(0);
+      await expect(page.locator("#diags > li.diag:not(.geo) .tag:not(:empty)")).toHaveCount(0);
     });
 
     test("each count is a switch: it shows only the rows of its severity, and again shows all, without folding the problems", async ({ page, viewer }) => {

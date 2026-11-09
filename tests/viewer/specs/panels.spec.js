@@ -221,10 +221,11 @@ test("the plain filename follows the circuit and the controls stay below its pat
 test("the problems' severity column is as wide as the widest name, so that a language's longer names do not run into the messages", async ({ page, viewer }) => {
   await viewer.open("12-diagnostics");
   await page.locator("#tab-netlist").click();
-  const rows = page.locator("#diags .diag");
+  const rows = page.locator("#diags .diag:not(.package-hint)");
   expect(await rows.count()).toBeGreaterThan(2);
-  const measure = () => page.evaluate(() => [...document.querySelectorAll("#diags .diag")].map((row) => {
-    const msg = row.querySelector(".msg").getBoundingClientRect();
+  const measure = () => page.evaluate(() => [...document.querySelectorAll("#diags .diag:not(.package-hint)")].map((row) => {
+    // the first column after the severity's: the tag's, which a row without a tag leaves empty, or the number's
+    const msg = row.querySelector(".code").getBoundingClientRect();
     // the name's own text, not its cell: a name wider than the column overflows the cell, and its
     // lines are not the cell's height, which a longer message stretches
     const text = document.createRange();
@@ -236,7 +237,7 @@ test("the problems' severity column is as wide as the widest name, so that a lan
   expect(new Set(before.map((r) => Math.round(r.msgLeft))).size).toBe(1);
   expect(before.every((r) => r.sevRight <= r.msgLeft)).toBe(true);
   // a name wider than the column was (Spanish "advertencia", French "avertissement"), in one row
-  await page.evaluate(() => { document.querySelector("#diags .diag .sev").textContent = "avertissement"; });
+  await page.evaluate(() => { document.querySelector("#diags .diag:not(.package-hint) .sev").textContent = "avertissement"; });
   const after = await measure();
   expect(after.every((r) => r.sevRight <= r.msgLeft), "no name runs into its message").toBe(true);
   expect(new Set(after.map((r) => Math.round(r.msgLeft))).size, "the messages stay in one column").toBe(1);

@@ -167,6 +167,7 @@ export function renderFiles(shown = 0) {
   });
   renderEditors();
   if (doc.files.length === 0) clearSource(m("This document has no host file to show."));
+  window.dispatchEvent(new Event("viewer-file"));
 }
 
 export function showFile(f) {
@@ -187,6 +188,8 @@ export function showFile(f) {
   source.scrollTop = fileViews[f].scroll;
   refreshSource();
   find.changed();
+  // the problems say where they are by the file shown (problems.js)
+  window.dispatchEvent(new Event("viewer-file"));
 }
 
 /** Whether the text pane is on screen, so that lines can be scrolled to. */

@@ -263,6 +263,8 @@
   "Include": "Incluir",
   "No errors, warnings or hints.": "Sin errores, advertencias ni sugerencias.",
   "Show only these; click again for all": "Mostrar solo estos; haz clic de nuevo para verlos todos",
+  "The kind of problem: its number and its short name": "El tipo de problema: su número y su nombre corto",
+  "Show or hide the explanation": "Mostrar u ocultar la explicación",
   "{0} error": "{0} error",
   "{0} errors": "{0} errores",
   "{0} warning": "{0} advertencia",

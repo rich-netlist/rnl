@@ -746,7 +746,8 @@ test("a URL's include is read from its server, and the levels, files and problem
   expect(errors.length).toBeGreaterThan(0);
   await expect(page.locator("#counts .n-error")).toHaveText(`${errors.length} ${errors.length === 1 ? "error" : "errors"}`);
   const [e] = errors;
-  await expect(page.locator("#diags .diag.error .loc").first()).toHaveText(`${e.file}:${e.line}${e.col ? `:${e.col}` : ""}`);
+  // the line is of the file the text pane shows, so the place is the line and the column, without the file
+  await expect(page.locator("#diags .diag.error .loc").first()).toHaveText(`${e.line}${e.col ? `:${e.col}` : ""}`);
   expect(diagnostics.diagnostics.filter((d) => d.line > 0).every((d) => d.file_index === 0)).toBe(true);
 });
 
