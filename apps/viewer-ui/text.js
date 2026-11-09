@@ -83,7 +83,7 @@ function decorateLine(f, n, el) {
   if (reason !== undefined) setAttr(el, "title", reason);
   else setAttr(el, "title", null);
   const severity = fileViews[f]?.diagnostics?.get(n);
-  for (const kind of ["error", "warning", "hint"]) el.classList.toggle(`d-${kind}`, severity === kind);
+  for (const kind of ["error", "violation", "warning", "hint"]) el.classList.toggle(`d-${kind}`, severity === kind);
 }
 
 function repaintLines() {

@@ -191,7 +191,7 @@ The iframe sends these messages to `window.parent`, also with `rnl: 1`:
 | `type` | Fields | When |
 | --- | --- | --- |
 | `ready` | `version`, `features`, `maxOpenBytes` | The page and WebAssembly core are ready for messages, once per page load. |
-| `loaded` | `name`, `levels` (names), `level` (current name), `errors`, `warnings` (counts), optional `requestId` | Each successful open. |
+| `loaded` | `name`, `levels` (names), `level` (current name), `errors`, `warnings`, `violations` (counts; a violation, a statement about the circuit that does not hold, fails nothing, so an open with violations is successful), optional `requestId` | Each successful open. |
 | `level` | `name` | The current level changes, including mouse and keyboard navigation, and after an open. |
 | `error` | `message`, optional `requestId`, `reason` | A file cannot be fetched or built, has errors, or a requested level does not exist. |
 

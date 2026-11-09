@@ -8,7 +8,7 @@ import { append, m, setAttr, setText, tr } from "./i18n.js";
 // A row is one line, as in an IDE: its severity, the number the toolkit gives its kind of problem (`code`, such as RNL3120),
 // the kind's short name (`name`, such as param-wrong-type) and the line; the explanation, the message, is below it, when
 // the row is open. A click on a row shows its line in the text and opens or closes the row; the twisty only opens or closes.
-// (The levels are the one list SEVERITIES: another, such as the "violation" of 0.4, is one more entry.)
+// (The levels are the one list SEVERITIES, which the violation of 0.4, between the error and the warning, is in.)
 
 import { fileShown, markSourceDiagnostics, revealLine } from "./text.js";
 import { current, doc } from "./state.js";
@@ -20,6 +20,7 @@ import { matchingPackage, missingPackage } from "./public-packages.js";
 /** The severities, the most serious first: the order of the list, and of the counts in the heading. */
 const SEVERITIES = [
   ["error", tr("{0} error"), tr("{0} errors")],
+  ["violation", tr("{0} violation"), tr("{0} violations")],
   ["warning", tr("{0} warning"), tr("{0} warnings")],
   ["hint", tr("{0} hint"), tr("{0} hints")],
 ];
@@ -186,7 +187,7 @@ function renderCounts() {
 }
 
 // the levels of diagnostics (7.6), as a row names them
-const SEVERITY = { error: tr("error"), warning: tr("warning"), hint: tr("hint") };
+const SEVERITY = { error: tr("error"), violation: tr("violation"), warning: tr("warning"), hint: tr("hint") };
 
 /**
  * The place of a row, as its line shows it: the line and the column, and the name of the file too when it is not the one the

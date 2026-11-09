@@ -222,7 +222,7 @@ test("text and URL opens replace the drawing without reloading; fit and level me
   expect(await frame.evaluate(() => window.pageMarker)).toBe("still here");
   expect((await messages(page, "ready")).length).toBe(1);
   const fields = Object.keys((await messages(page, "loaded"))[1]).sort();
-  expect(fields).toEqual(["errors", "level", "levels", "name", "origin", "rnl", "type", "warnings"]);
+  expect(fields).toEqual(["errors", "level", "levels", "name", "origin", "rnl", "type", "violations", "warnings"]);
 });
 
 test("double-click descent and Backspace report level changes", async ({ page }) => {

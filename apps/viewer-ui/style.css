@@ -24,6 +24,7 @@
   --error: #c62828;
   --warning: #b26a00;
   --hint: #2f6db5;
+  --violation: #8e24aa;
   --canvas: #ffffff;
   --drawing-background: #ffffff;
   /* the grid under the drawing (grid.js) */
@@ -79,6 +80,7 @@
     --error: #ef6b6b;
     --warning: #e0a43a;
     --hint: #74a7e8;
+    --violation: #d28be0;
     --select-text: rgba(255, 140, 70, 0.3);
     --select-line: rgba(255, 140, 70, 0.1);
     --out-of-scope: #1a1a1d;
@@ -636,6 +638,7 @@ body[data-background="dark"] .unplaced-row .thumb { background: var(--drawing-ba
   border-right: 3px solid transparent;
 }
 .ln.d-error .no { border-right-color: var(--error); color: var(--error); }
+.ln.d-violation .no { border-right-color: var(--violation); color: var(--violation); }
 .ln.d-warning .no { border-right-color: var(--warning); color: var(--warning); }
 .ln.d-hint .no { border-right-color: var(--hint); }
 .ln .code { padding-left: 0.8em; padding-right: 2em; }
@@ -709,6 +712,7 @@ body[data-background="dark"] .unplaced-row .thumb { background: var(--drawing-ba
   color: color-mix(in srgb, var(--netlist-text) 50%, var(--netlist-background));
 }
 .source .ln.d-error .no { color: var(--error); }
+.source .ln.d-violation .no { color: var(--violation); }
 .source .ln.d-warning .no { color: var(--warning); }
 .source .ln.d-hint .no { color: var(--hint); }
 .source mark { background: color-mix(in srgb, var(--netlist-highlight) 30%, transparent); }
@@ -749,6 +753,7 @@ body[data-background="dark"] .unplaced-row .thumb { background: var(--drawing-ba
 
 .counts { display: flex; gap: 10px; white-space: nowrap; overflow: hidden; }
 .counts .n-error { color: var(--error); }
+.counts .n-violation { color: var(--violation); }
 .counts .n-warning { color: var(--warning); }
 .counts .n-hint { color: var(--hint); }
 .counts .none { color: var(--muted); }
@@ -782,6 +787,7 @@ body[data-background="dark"] .unplaced-row .thumb { background: var(--drawing-ba
 .diag:not(.open) .twisty .chevron { transform: rotate(-90deg); }
 .diag .sev { grid-column: 2; font-weight: 600; }
 .diag.error .sev { color: var(--error); }
+.diag.violation .sev { color: var(--violation); }
 .diag.warning .sev { color: var(--warning); }
 .diag.hint .sev { color: var(--hint); }
 .diag .tag { grid-column: 3; align-self: center; font-size: 10px; font-weight: 600; color: var(--muted); border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; line-height: 14px; }

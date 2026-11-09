@@ -131,6 +131,7 @@ async function open(source, packages, isCurrent, initial, message, signal) {
       level: doc.levels[current]?.title ?? "",
       errors: errors.length,
       warnings: built.diagnostics.filter((item) => item.severity === "warning").length,
+      violations: built.diagnostics.filter((item) => item.severity === "violation").length,
     };
     updateLevel();
     return result;

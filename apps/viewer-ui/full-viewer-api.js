@@ -41,7 +41,8 @@ async function open(source, packages, isCurrent, initial, message, signal) {
     showBuilt(built, false);
     sourceOpened(source, built, true);
     return { name: built.name, levels: built.levels.map(l => l.title), level: built.levels[current]?.title ?? "",
-      errors: 0, warnings: built.diagnostics.filter(d => d.severity === "warning").length };
+      errors: 0, warnings: built.diagnostics.filter(d => d.severity === "warning").length,
+      violations: built.diagnostics.filter(d => d.severity === "violation").length };
   } finally {
     if (built) shell.discardBuild?.(built);
     progress.finish();

@@ -358,6 +358,9 @@ export function writeFixtures(rnl, dir) {
   // No standard package stylesheet: exercise the renderer's omitted-width default itself.
   fs.writeFileSync(path.join(dir, "view-hairlines.json"), execFileSync(rnl,
     ["view", "tests/viewer/inputs/default-hairlines.sp", "--no-std", "--flylines", "--hints"], { cwd: root, encoding: "utf8" }));
+  // A violation (7.6), of a file of 0.4 read without the standard package, whose draft has errors of its own
+  fs.writeFileSync(path.join(dir, "violation.json"), execFileSync(rnl,
+    ["view", "tests/viewer/inputs/violation.sp", "--no-std", "--flylines", "--hints"], { cwd: root, encoding: "utf8" }));
   for (const [name, file] of Object.entries(FILES)) {
     fs.writeFileSync(path.join(dir, `${name}.json`), view(rnl, file, root));
   }
