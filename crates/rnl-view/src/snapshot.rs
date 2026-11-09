@@ -764,7 +764,7 @@ fn definition(sv: &rnl_runtime::model::SymbolView) -> SymbolDefinition {
                 dir: p.dir,
                 label: p.label.as_ref().map(|m| PinLabel {
                     markup: m.clone(),
-                    lines: rnl_runtime::markup::parse(m)
+                    lines: rnl_runtime::markup::parse_with_name_formats(m, p.label_name_formats)
                         .iter()
                         .map(|l| l.iter().map(primitive::run).collect())
                         .collect(),
@@ -966,6 +966,45 @@ mod tests {
     use super::*;
     use crate::{BuildOptions, MemoryProvider};
     use serde_json::json;
+
+    #[test]
+    fn pin_label_name_formats_in_the_snapshot_follow_the_file_version() {
+        for version in ["0.2", "0.3", "0.4"] {
+            let source = format!(
+                "* pins\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\") }}\n\
+                 .subckt leaf p n\n* @RNL {{\n\
+                 * %s = @DEFINE-SYMBOL {{ (0,0) @PIN(terminal=1, direction=\"left\", label=\"\\subdigits{{Vout1}}\") }};\n\
+                 * # @SET-SYMBOL %s\n* }}\n.ends leaf\nX1 a b leaf\n* @RNL {{ #X1 @PLACE(0,0) }}\n"
+            );
+            let options = BuildOptions {
+                runtime: rnl_runtime::Options { std: false, ..Default::default() },
+                ..Default::default()
+            };
+            let files = MemoryProvider::new().with("t.sp", &source);
+            let value = serde_json::to_value(
+                crate::snapshot("t.sp", &files, &options, Parts { drawing: false, host: false, model: true }).unwrap(),
+            )
+            .unwrap();
+            let label = value["levels"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .flat_map(|l| l["model"]["symbols"].as_array().unwrap())
+                .find_map(|s| s["definition"]["pins"][0].get("label"))
+                .unwrap();
+            assert_eq!(label["markup"], r"\subdigits{Vout1}");
+            let runs: Vec<_> = label["lines"][0]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|r| (r["text"].as_str().unwrap(), r["style"]["level"].as_i64().unwrap()))
+                .collect();
+            assert_eq!(
+                runs,
+                if version == "0.4" { vec![("Vout", 0), ("1", -1)] } else { vec![(r"\subdigits{Vout1}", 0)] }
+            );
+        }
+    }
 
     const NETLIST: &str = r##"* snapshot
 * @RNL(type="header") { @VERSION("0.2")}

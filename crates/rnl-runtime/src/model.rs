@@ -55,6 +55,8 @@ pub struct SymbolPrim {
     pub order: usize,
     /// Original fixed text, before substituting an instance's parameters.
     pub text: Option<String>,
+    /// Read the name formats of 0.4 in a preview of this text (13.6).
+    pub text_name_formats: bool,
     pub shape: Shape,
     pub points: Vec<Pt>,
     pub params: PrimParams,
@@ -125,6 +127,8 @@ pub struct SymbolView {
 pub struct SymbolLabel {
     pub key: Option<String>,
     pub text: String,
+    /// The template's source file reads the name formats of 0.4 (13.6).
+    pub text_name_formats: bool,
     pub at: Option<Pt>,
     pub halign: Option<String>,
     pub valign: Option<String>,

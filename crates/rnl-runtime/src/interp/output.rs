@@ -567,6 +567,7 @@ impl Interp<'_> {
                 .map(|l| SymbolLabel {
                     key: l.key.clone(),
                     text: l.items.text.as_ref().map(|t| t.as_str().to_string()).unwrap_or_default(),
+                    text_name_formats: l.items.text.as_ref().and_then(|t| t.unit).is_some_and(|u| self.follows_0_4(u)),
                     at: l.position,
                     halign: l.items.halign.clone(),
                     valign: l.items.valign.clone(),
@@ -592,6 +593,12 @@ impl Interp<'_> {
             .map(|(i, p)| SymbolPrim {
                 order: sd.prim_order[i],
                 text: p.text.as_ref().and_then(|t| t.text.as_ref().map(|s| s.as_str().to_string())),
+                text_name_formats: p
+                    .text
+                    .as_ref()
+                    .and_then(|t| t.text.as_ref())
+                    .and_then(|t| t.unit)
+                    .is_some_and(|u| self.follows_0_4(u)),
                 shape: p.shape,
                 points: p.points.clone(),
                 params: p.params.clone(),

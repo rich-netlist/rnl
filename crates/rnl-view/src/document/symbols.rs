@@ -235,7 +235,7 @@ fn collect(
     };
     for (k, p) in s.prims.iter().enumerate() {
         if let Some(t) = &p.text {
-            texts.insert(format!("{path}{k}"), markup::parse(&template(t)));
+            texts.insert(format!("{path}{k}"), markup::parse_with_name_formats(&template(t), p.text_name_formats));
         }
     }
     for p in s.pins.iter().filter(|_| path.is_empty()) {
@@ -276,7 +276,7 @@ fn collect(
                 markup: label.text.clone(),
                 written: false,
                 anchor: place(anchor),
-                lines: markup::parse(&template(&label.text)),
+                lines: markup::parse_with_name_formats(&template(&label.text), label.text_name_formats),
                 halign: label.halign.clone().unwrap_or_else(|| "start".into()),
                 valign: label.valign.clone().unwrap_or_else(|| "baseline".into()),
                 rotate: label.rotate,
@@ -308,6 +308,47 @@ fn collect(
 #[cfg(test)]
 mod tests {
     use crate::{build, BuildOptions, MemoryProvider};
+
+    #[test]
+    fn name_formats_in_symbol_previews_follow_each_templates_source_version() {
+        for (main, package) in [("0.4", "0.3"), ("0.3", "0.4")] {
+            let source = format!(
+                "* preview\n* @RNL(type=\"header\") {{ @VERSION(\"{main}\"); @USE-PACKAGE(name=\"s\", path=\"s.rnl\") }}\n\
+                 .subckt leaf p n\n* @RNL {{ # @SET-SYMBOL $S }}\n.ends leaf\nX1 a b leaf\n"
+            );
+            let symbol = format!(
+                "@RNL(type=\"header\") {{ @VERSION(\"{package}\"); @PACKAGE(name=\"s\", version=\"1.0\") }}\n\
+                 @RNL {{ $S = @DEFINE-SYMBOL {{\n\
+                 (0,0) @PIN(terminal=1, direction=\"left\", label=\"\\subdigits{{R12}}\");\n\
+                 (1,2) @TEXT(\"\\subrest{{VDD}}\");\n\
+                 ? @TEXT(\"\\subrest{{${{name}}}}\", key=\"name\") => @PLACE(2,3)\n\
+                 }} }}\n"
+            );
+            let options = BuildOptions {
+                runtime: rnl_runtime::Options { std: false, ..Default::default() },
+                ..Default::default()
+            };
+            let preview = |symbol: &str| {
+                let files = MemoryProvider::new().with("t.sp", &source).with("s.rnl", symbol);
+                let d = build("t.sp", &files, &options).unwrap();
+                assert!(d.diagnostics.iter().all(|d| d.severity != "error"), "{:?}", d.diagnostics);
+                d.symbols[d.levels[1].symbol.unwrap()].svg.clone()
+            };
+            let svg = preview(&symbol);
+            if package == "0.4" {
+                let explicit = symbol
+                    .replace(r"\subdigits{R12}", "R_{12}")
+                    .replace(r"\subrest{VDD}", "V_{DD}")
+                    .replace(r"\subrest{${name}}", "n_{ame}");
+                assert_eq!(svg, preview(&explicit));
+                assert!(!svg.contains(r"\sub"));
+            } else {
+                assert!(svg.contains(r"\subdigits{R12}"), "{svg}");
+                assert!(svg.contains(r"\subrest{VDD}"), "{svg}");
+                assert!(svg.contains(r"\subrest{name}"), "{svg}");
+            }
+        }
+    }
 
     #[test]
     fn symbols_follow_actual_assignments_and_keep_their_original_definitions() {
