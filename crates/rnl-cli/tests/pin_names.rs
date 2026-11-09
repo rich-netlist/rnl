@@ -209,3 +209,24 @@ fn generated_text_waits_for_the_generated_owners_symbol() {
     );
     assert!(r.model.levels[0].items.iter().any(|item| item.kind == "usage"));
 }
+
+#[test]
+fn a_rejected_assignment_still_passes_and_names_its_input_handle() {
+    let r = read("0.4", "", &format!("{GOOD} $BAD = @DEFINE-SYMBOL {{ %position = (3,0) @PIN(terminal=1) }}; #R1 @SET-SYMBOL $GOOD; %saved = #R1 @SET-SYMBOL $BAD => @ORIENT(\"R90\"); %saved @TEXT(\"still valid\",key=\"ok\")"));
+    let errors: Vec<_> = r.diagnostics().into_iter().filter(|d| d.severity == Severity::Error).collect();
+    assert_eq!(errors.len(), 1, "{errors:?}");
+    assert_eq!(errors[0].code, codes::PIN_NAME_IS_SUBOBJECT);
+    assert_eq!(r.model.levels[0].items[0].orient, rnl_runtime::geom::Orient::R90);
+    assert!(r.model.levels[0].texts.iter().any(|text| text.markup == "still valid"));
+}
+
+#[test]
+fn a_rejected_member_does_not_change_the_set_handle_or_its_members() {
+    let r = read("0.4", "", "$D = @DEFINE(roles=[\"p\"]) {}; $S = @DEFINE-SYMBOL { %p = (3,0) @PIN(terminal=\"p\") }; $GOOD = @DEFINE-SYMBOL { (-2,0) @PIN(terminal=\"p\") }; %u = &a @AS $D => @SET-SYMBOL $GOOD => @PLACE(0,0); %targets = {%u #R1}; %out = %targets @SET-SYMBOL $S; %targets = %out; %out @ORIENT(\"R90\")");
+    let errors: Vec<_> = r.diagnostics().into_iter().filter(|d| d.severity == Severity::Error).collect();
+    assert_eq!(errors.len(), 1, "{errors:?}");
+    assert_eq!(errors[0].code, codes::PIN_NAME_IS_USAGE_NAME);
+    assert!(r.model.levels[0].items.iter().all(|item| item.orient == rnl_runtime::geom::Orient::R90));
+    assert_eq!(pins(&r, "%u"), [(-2.0, 0.0)]);
+    assert_eq!(pins(&r, "#R1"), [(3.0, 0.0)]);
+}
