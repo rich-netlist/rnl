@@ -4,13 +4,17 @@
    The smallest collection of the series (16.3): it references rnl-std-style, rnl-std-basic,
    rnl-std-semiconductors and the rule packages of the two dialects, rnl-std-spice and
    rnl-std-spectre, and has no content of its own. It draws the netlist and adds nothing. A file
-   of the language 0.4 uses the rule package of its own dialect only (16.3). */
+   of the language 0.4 uses each dialect's rules in that language's host sections (2.8, 16.3). */
 @RNL(type="header") {
   @VERSION("0.4");
   @PACKAGE(name="rnl-std-core", version="0.4");
   @USE-PACKAGE(name="rnl-std-style", version="0.4");
   @USE-PACKAGE(name="rnl-std-basic", version="0.4");
-  @USE-PACKAGE(name="rnl-std-semiconductors", version="0.4");
-  @USE-PACKAGE(name="rnl-std-spice", version="0.4");
+  @USE-PACKAGE(name="rnl-std-semiconductors", version="0.4")
+}
+@RNL(type="header", language="spice") {
+  @USE-PACKAGE(name="rnl-std-spice", version="0.4")
+}
+@RNL(type="header", language="spectre") {
   @USE-PACKAGE(name="rnl-std-spectre", version="0.4")
 }

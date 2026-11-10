@@ -100,7 +100,12 @@ pub(crate) fn problem(args: &Args, provider: &FsProvider) -> Result<ExitCode, Sa
         .with_overrides(args.solver.solver_options.as_deref().unwrap_or(""))
         .map_err(solver_options)?
         .canonical();
-    let options = Options { std: args.std, std_version: args.std_version.clone(), ..Options::solver() };
+    let options = Options {
+        std: args.std,
+        include_std: args.include_std,
+        std_version: args.std_version.clone(),
+        ..Options::solver()
+    };
     let (file, dialect) = (args.file.to_string_lossy(), args.dialect.as_deref());
     let (r, previous) = if args.solver.previous {
         rnl_view::read_previous_with(&file, dialect, &args.formats, provider, &options)?
@@ -140,6 +145,7 @@ pub(crate) fn preview(args: &Args, provider: &FsProvider) -> Result<ExitCode, Sa
         dialect: args.dialect.clone(),
         formats: args.formats.clone(),
         std: args.std,
+        include_std: args.include_std,
         level: args.level.clone(),
         solver,
     };
@@ -178,6 +184,7 @@ pub(crate) fn solve(args: &Args, provider: &FsProvider) -> Result<ExitCode, Said
         dialect: args.dialect.clone(),
         formats: args.formats.clone(),
         std: args.std,
+        include_std: args.include_std,
         level: args.level.clone(),
         solver,
     };

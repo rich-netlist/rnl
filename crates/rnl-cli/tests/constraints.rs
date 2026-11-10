@@ -265,6 +265,7 @@ fn the_report_of_a_solve_tells_of_each_fact_and_the_document_with_its_record_kee
         dialect: None,
         formats: Default::default(),
         std: true,
+        include_std: false,
         level: None,
         solver: SolverOptions::default(),
     };

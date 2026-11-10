@@ -371,7 +371,7 @@ fn same_major(a: &str, b: &str) -> bool {
     }
 }
 
-fn version_ok(want: Option<&str>, have: &str) -> bool {
+pub(super) fn version_ok(want: Option<&str>, have: &str) -> bool {
     match want {
         None => true,
         Some(w) => w == have || (same_major(w, have) && version_key(have) > version_key(w)),

@@ -209,7 +209,7 @@ impl Interp<'_> {
     /// ([`crate::Options::std_version`]). The implicit reference checks the 0.4 boundary before
     /// making its names available. Reading it reads the packages it references.
     pub(crate) fn std_package(&mut self, language: &str) -> Option<UnitId> {
-        if !self.std_enabled {
+        if !self.std_enabled || (super::unit::keeps_0_4(language) && !self.include_std) {
             return None;
         }
         if let Some(&s) = self.std_units.get(language) {
@@ -283,6 +283,21 @@ impl Interp<'_> {
             EffKey::Alone(u) => u,
         };
         let language = self.version_of(Some(unit));
+        if self.follows_0_4(unit) {
+            // The setting adds one reference at the main file's root. It does not add a
+            // separate default to each included file or cross a language-version boundary.
+            let root = match key {
+                EffKey::Level(_) => self.level_unit[0],
+                EffKey::Alone(u) if self.package_main == Some(u) => u,
+                EffKey::Alone(_) => return None,
+            };
+            if !self.include_std
+                || !self.follows_0_4(root)
+                || self.units[root].uses.iter().any(|decl| decl.in_header && decl.name == STD_NAME)
+            {
+                return None;
+            }
+        }
         self.std_package(&language)
             .filter(|&p| super::unit::package_languages_match(&self.version_of(Some(p)), &language))
     }
@@ -449,7 +464,7 @@ impl Interp<'_> {
     /// effect (16.2). None too when no standard package is used, or when the one in effect does
     /// not bring that package in, as the series 0.2 does not.
     fn other_dialect_rules(&mut self, level: LevelId, uses: &[Use]) -> Option<String> {
-        if !self.follows_0_3(self.level_unit[level]) {
+        if !self.follows_0_3(self.level_unit[level]) || self.follows_0_4(self.level_unit[level]) {
             return None;
         }
         let other = match self.level_dialect(level) {

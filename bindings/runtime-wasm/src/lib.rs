@@ -68,6 +68,9 @@ pub struct Request {
     /// Use the standard package at the root (16.3); true when not given.
     #[serde(default = "yes")]
     pub std: bool,
+    /// Add the standard package to draft 0.4 files; false when omitted.
+    #[serde(default)]
+    pub include_std: bool,
     /// The version of the standard package at the root, whatever the files' language version, such
     /// as "0.2" ([`rnl_runtime::Options::std_version`]); by the language version when not given.
     #[serde(default)]
@@ -147,6 +150,9 @@ pub struct WriteRequest {
     pub package_dirs: Vec<String>,
     #[serde(default = "yes")]
     pub std: bool,
+    /// Add the standard package to draft 0.4 files; false when omitted.
+    #[serde(default)]
+    pub include_std: bool,
     #[serde(default)]
     pub std_version: Option<String>,
     #[serde(default = "yes")]
@@ -191,6 +197,9 @@ pub struct ReplaceRequest {
     pub formats: BTreeMap<String, String>,
     #[serde(default = "yes")]
     pub std: bool,
+    /// Add the standard package to draft 0.4 files; false when omitted.
+    #[serde(default)]
+    pub include_std: bool,
     #[serde(default)]
     pub std_version: Option<String>,
 }
@@ -229,6 +238,9 @@ pub struct CatalogRequest {
     /// given.
     #[serde(default = "yes")]
     pub std: bool,
+    /// Add the standard package to draft 0.4 files; false when omitted.
+    #[serde(default)]
+    pub include_std: bool,
     /// The version of the standard package each package is read with, as in a [`Request`].
     #[serde(default)]
     pub std_version: Option<String>,
@@ -446,7 +458,12 @@ pub fn respond(request: &[u8]) -> Response {
     let options = BuildOptions {
         dialect: request.dialect,
         formats: request.formats,
-        runtime: Options { std: request.std, std_version: request.std_version.clone(), ..Options::default() },
+        runtime: Options {
+            std: request.std,
+            include_std: request.include_std,
+            std_version: request.std_version.clone(),
+            ..Options::default()
+        },
         svg: request.svg,
         primitives: request.primitives,
         flylines: request.flylines,
@@ -571,20 +588,30 @@ fn drawings(query: DrawingsQuery) -> Response {
 
 /// Write, then build what was written as the entry, among the request's files.
 fn write(request: WriteRequest) -> Response {
-    let text = match rnl_edit::write(&request.write) {
+    let files = request.files.into_iter().map(|(path, text)| (normalize(&path), text)).collect();
+    let mut files = MemoryProvider { files, package_dirs: request.package_dirs };
+    let runtime = Options {
+        std: request.std,
+        include_std: request.include_std,
+        std_version: request.std_version.clone(),
+        ..Options::default()
+    };
+    let text = match rnl_edit::write_with_options(&request.write, &files, &runtime) {
         Ok(t) => t,
         Err(e) => return Response::Error(e),
     };
     // the netlist built under the name it was written under, so that it reads the same
     let entry = rnl_edit::entry_of(&request.write);
-    let mut files: BTreeMap<String, String> =
-        request.files.into_iter().map(|(path, text)| (normalize(&path), text)).collect();
-    files.insert(normalize(&entry), text.clone());
-    let files = MemoryProvider { files, package_dirs: request.package_dirs };
+    files.insert(&normalize(&entry), &text);
     let options = BuildOptions {
         dialect: Some(request.write.dialect),
         formats: BTreeMap::new(),
-        runtime: Options { std: request.std, std_version: request.std_version.clone(), ..Options::default() },
+        runtime: Options {
+            std: request.std,
+            include_std: request.include_std,
+            std_version: request.std_version.clone(),
+            ..Options::default()
+        },
         svg: request.svg,
         primitives: request.primitives,
         flylines: request.flylines,
@@ -612,7 +639,12 @@ fn replace_records(request: ReplaceRequest) -> Response {
     let files = MemoryProvider { files, package_dirs: request.package_dirs };
     let paths: Vec<String> = request.pool.iter().map(|p| normalize(p)).collect();
     let files = rnl_runtime::source::FilePool { files: &files, paths: &paths };
-    let options = Options { std: request.std, std_version: request.std_version, ..Options::default() };
+    let options = Options {
+        std: request.std,
+        include_std: request.include_std,
+        std_version: request.std_version,
+        ..Options::default()
+    };
     let reading = rnl_edit::replace::Reading {
         entry: &request.entry,
         dialect: request.dialect.as_deref(),
@@ -638,7 +670,12 @@ fn catalog(request: CatalogRequest) -> Response {
     let options = CatalogOptions {
         packages: request.catalog.packages,
         all_versions: request.catalog.all_versions,
-        runtime: Options { std: request.std, std_version: request.std_version, ..Options::default() },
+        runtime: Options {
+            std: request.std,
+            include_std: request.include_std,
+            std_version: request.std_version,
+            ..Options::default()
+        },
     };
     Response::Catalog(Box::new(rnl_view::catalog(&files, &options)))
 }
@@ -828,6 +865,34 @@ C1 a 0 1p
         };
         assert_eq!(errors(json!({ "entry": "t.sp", "files": { "t.sp": text } })), 1);
         assert_eq!(errors(json!({ "entry": "t.sp", "files": { "t.sp": text }, "std_version": "0.2" })), 0);
+    }
+
+    #[test]
+    fn draft_standard_setting_is_explicit_and_persists_when_writing() {
+        let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\nR1 a b 1k\n* @RNL { #R1 @AS $CUSTOM }\n.end\n";
+        let package = "@RNL(type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"rnl-std\", version=\"0.4\") }\n@RNL { $CUSTOM = @DEFINE(roles=[\"i\"]) {} }";
+        let mut request = json!({ "entry": "/t.sp", "files": { "/t.sp": text, "/pkg/rnl-std.rnl": package }, "package_dirs": ["/pkg"] });
+        let errors = |v: &Value| {
+            v["document"]["diagnostics"].as_array().unwrap().iter().filter(|d| d["severity"] == "error").count()
+        };
+        assert_eq!(errors(&answer(request.clone())), 1);
+        request["include_std"] = json!(true);
+        assert_eq!(errors(&answer(request.clone())), 0);
+        request["replace_records"] = json!({ "level": "t.sp", "records": "@RNL { #R1 @AS $CUSTOM }" });
+        let replaced = answer(request);
+        let saved = replaced["replaced"]["text"].as_str().unwrap_or_else(|| panic!("{replaced}"));
+        assert!(saved.contains("@USE-PACKAGE(name=\"rnl-std\", version=\"0.4\")"));
+        let reopened = answer(
+            json!({ "entry": "/t.sp", "files": { "/t.sp": saved, "/pkg/rnl-std.rnl": package }, "package_dirs": ["/pkg"], "std": false }),
+        );
+        assert_eq!(errors(&reopened), 0);
+
+        let write = json!({ "language_version": "0.4", "dialect": "spice", "netlist": "* new\nR1 a b 1k\n.end\n", "author": "test", "file": "t.sp", "ops": [] });
+        let result = answer(
+            json!({ "write": write, "files": { "/pkg/rnl-std.rnl": package }, "package_dirs": ["/pkg"], "include_std": true }),
+        );
+        let saved = result["written"]["text"].as_str().unwrap_or_else(|| panic!("{result}"));
+        assert!(saved.contains("@USE-PACKAGE(name=\"rnl-std\", version=\"0.4\")"));
     }
 
     #[test]

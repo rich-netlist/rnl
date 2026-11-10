@@ -1,6 +1,6 @@
 //! The draft language 0.4 and the standard series 0.4 (libraries/standard/0.4), bundled beside
-//! the series 0.2 and 0.3. A file of 0.4 is read (16.1), so far by the rules of 0.3, and uses the
-//! series 0.4 implicitly (16.3). 0.4 is newer than the tool's default version, 0.3, so a
+//! the series 0.2 and 0.3. A file of 0.4 is read (16.1) and explicitly uses the series 0.4
+//! (16.3). 0.4 is newer than the tool's default version, 0.3, so a
 //! USE-PACKAGE that names no version finds a package written in 0.4 only in a file of 0.4 (16.2):
 //! the files of 0.2 and 0.3 find what they found before the series 0.4 was bundled.
 
@@ -38,8 +38,13 @@ fn netlist(version: &str, header: &str) -> String {
 }
 
 #[test]
-fn a_file_of_0_4_is_read_with_the_series_0_4() {
-    let r = read(&MemoryProvider::new().with("t.sp", &netlist("0.4", "")), &Options::default());
+fn a_file_of_0_4_uses_the_series_0_4_when_requested() {
+    let without = read(&MemoryProvider::new().with("t.sp", &netlist("0.4", "")), &Options::default());
+    assert!(root(level(&without)).is_empty());
+    let r = read(
+        &MemoryProvider::new().with("t.sp", &netlist("0.4", "@USE-PACKAGE(name=\"rnl-std\", version=\"0.4\")")),
+        &Options::default(),
+    );
     assert!(errors(&r).is_empty(), "{:?}", errors(&r));
     assert_eq!(r.model.language, "0.4");
     let at_root = root(level(&r));

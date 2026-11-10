@@ -1304,6 +1304,9 @@ impl<'p> Interp<'p> {
                 }
                 None => {
                     let u = self.name_unit(ctx);
+                    if e.prefix == '$' {
+                        self.hint_standard_name(&name, ctx, e.start);
+                    }
                     if let Some(gone) = (e.prefix == '$').then(|| self.missing_from_reference(&name, u)).flatten() {
                         return self.fail(
                             ctx,

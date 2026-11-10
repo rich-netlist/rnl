@@ -685,6 +685,73 @@ pub fn with_header(doc: &HostDocument, file: &str, text: &str, version: &str) ->
     apply(text, carrier(doc, file, text), header_edits(doc, file, None, text, version).0)
 }
 
+/// Persist a standard-package reference added by a draft tool setting (16.3). Only the main
+/// file is changed, and only where its header can be written. The caller supplies the package
+/// version from `Interpretation::included_standard` and rereads the returned text before making
+/// further edits, since the document's character positions refer to the original `text`.
+pub fn with_standard_package(doc: &HostDocument, text: &str, package_version: &str) -> String {
+    let file = &doc.main().file;
+    if doc.is_package(file) {
+        return text.to_string();
+    }
+    let statement =
+        format!("@USE-PACKAGE(name=\"rnl-std\", version={})", crate::problem::written_string(package_version));
+    let marker = carrier(doc, file, text);
+    let records = file_records(doc, file, Some(0)).1;
+    // An explicit reference of any form, including an inline drop or a language-qualified
+    // reference, prevents the setting from adding another one.
+    for (_, record) in records.iter().filter(|(_, record)| record_type(record) == "header") {
+        if parse_record(&record.text).body.is_some_and(|body| {
+            body.members.iter().any(|member| {
+                member.segments.first().and_then(|segment| segment.call.as_ref()).is_some_and(|call| {
+                    call.kw == "USE-PACKAGE"
+                        && call.params.as_ref().is_some_and(|params| {
+                            params
+                                .named
+                                .iter()
+                                .any(|param| param.name == "name" && param.value == Value::Str("rnl-std".into()))
+                        })
+                })
+            })
+        }) {
+            return text.to_string();
+        }
+    }
+    let edit = match first_header(doc, file, Some(0)) {
+        Some(header) => {
+            if field(header, "language").is_some() {
+                return text.to_string();
+            }
+            let Some(body) = parse_record(&header.text).body else { return text.to_string() };
+            let version = body
+                .members
+                .first()
+                .and_then(|m| m.segments.first())
+                .and_then(|s| s.call.as_ref())
+                .filter(|call| call.kw == "VERSION");
+            let (offset, insert) = match version {
+                Some(call) => (call.end.saturating_sub(1), format!("; {statement}")),
+                None => (body.start, format!(" {statement}{}", if body.members.is_empty() { "" } else { ";" })),
+            };
+            let at = header.loc(offset);
+            Edit::Text(at.line, at.col as usize, insert)
+        }
+        None if headers_of(doc, file, Some(0)) => return text.to_string(),
+        None => {
+            let Some((edit, _)) = new_header(doc, file, text, marker, |_| {
+                format!("@RNL(type=\"header\") {{ @VERSION(\"0.4\"); {statement}}}")
+            }) else {
+                return text.to_string();
+            };
+            edit
+        }
+    };
+    if doc.unwritable_in(0, edit.at().0).is_some() {
+        return text.to_string();
+    }
+    apply(text, marker, vec![edit])
+}
+
 /// The changes that give a file its header record and its version ([`with_header`]): none when it
 /// has them, or is left as it is; and the carrier that records written with them follow: that of
 /// a new header, else the file's ([`carrier`]). Nothing is written in a region written to be

@@ -234,6 +234,30 @@ pub fn write(request: &WriteRequest) -> Result<String, String> {
     Ok(text)
 }
 
+/// Write a new drawing with the tool's package settings. In draft 0.4, persist the exact
+/// standard-package version selected by `include_std`, so the result needs no tool setting.
+/// Existing explicit package ops take precedence. Released writers keep their output.
+pub fn write_with_options(
+    request: &WriteRequest,
+    files: &dyn rnl_runtime::source::Provider,
+    options: &rnl_runtime::Options,
+) -> Result<String, String> {
+    let text = write(request)?;
+    if !options.include_std || request.language_version.as_deref() != Some("0.4") {
+        return Ok(text);
+    }
+    let entry = entry_of(request);
+    let memory = MemoryProvider::new().with(&entry, &text);
+    let both = rnl_runtime::source::Layered { layers: vec![&memory, files] };
+    let read = rnl_view::interpret_with(&entry, Some(&request.dialect), &BTreeMap::new(), &both, options)?;
+    let Some(version) = read.included_standard else { return Ok(text) };
+    let saved = rnl_runtime::writeback::with_standard_package(&read.doc, &text, &version);
+    if saved == text {
+        return Err("cannot write the standard-package reference into the main header (16.3)".into());
+    }
+    Ok(saved)
+}
+
 /// The level an op names: `subckt:NAME`, a subcircuit of the netlist, by the dialect's case rule;
 /// `file` or `file:…`, the netlist's file level.
 fn find_level(doc: &HostDocument, file: &str, id: &str) -> Result<LevelId, String> {

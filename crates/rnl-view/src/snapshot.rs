@@ -640,6 +640,9 @@ fn revision(r: &Interpretation, options: &Options) -> String {
     if let Some(v) = &options.std_version {
         reading.push_str(&format!(" std_version={v}"));
     }
+    if options.include_std {
+        reading.push_str(" include_std=true");
+    }
     let mut bytes = Vec::new();
     let mut field = |part: &[u8]| {
         bytes.extend_from_slice(&(part.len() as u64).to_le_bytes());
@@ -1344,6 +1347,8 @@ R2 a vdd! 2k
         // a version of the standard package asked for changes it
         let v02 = Options { std_version: Some("0.2".into()), ..Options::default() };
         assert_ne!(rev(NETLIST, &BuildOptions { runtime: v02, ..BuildOptions::default() }), r);
+        let include_std = Options { include_std: true, ..Options::default() };
+        assert_ne!(rev(NETLIST, &BuildOptions { runtime: include_std, ..BuildOptions::default() }), r);
         let spectre = BuildOptions { dialect: Some("spectre".into()), ..BuildOptions::default() };
         assert_ne!(rev(NETLIST, &spectre), r);
     }

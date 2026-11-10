@@ -50,8 +50,10 @@ export interface Request {
    * its files with them too.
    */
   formats?: Record<string, string>;
-  /** Use the standard package at the root (16.3); true when not given. */
+  /** Enable implicit standard packages for 0.2/0.3; false also disables include_std. Default true. */
   std?: boolean;
+  /** Explicitly add the standard package to a 0.4 main file without its own reference. Default false. */
+  include_std?: boolean;
   /**
    * The version of the standard package at the root, whatever the files' language version, such
    * as "0.2" to read a file of 0.3 with the series 0.2; a version pinned in a header record still
@@ -249,6 +251,7 @@ export interface WriteRequest {
   files?: Record<string, string>;
   package_dirs?: string[];
   std?: boolean;
+  include_std?: boolean;
   std_version?: string;
   svg?: boolean;
   primitives?: boolean;
@@ -290,6 +293,7 @@ export interface ReplaceRecordsRequest {
   /** The format set for files, by path as in `files`. */
   formats?: Record<string, string>;
   std?: boolean;
+  include_std?: boolean;
   std_version?: string;
 }
 
@@ -327,6 +331,7 @@ export interface CatalogRequest {
   package_dirs?: string[];
   /** Read each package with the standard package of its language version (16.3); true when not given. */
   std?: boolean;
+  include_std?: boolean;
   std_version?: string;
 }
 

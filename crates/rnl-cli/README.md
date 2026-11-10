@@ -1,5 +1,7 @@
 # rnl-cli
 
+For draft 0.4, write `@USE-PACKAGE(name="rnl-std", version="0.4")` in the file header to use the standard collection. Alternatively, `--include-std` enables it for a main file that has no reference of its own; the flag defaults to off. `solve`, `write` and `replace-records` save that reference when writing the main file, so reopening does not depend on the flag. Writing an included file does not add a private standard reference to it. An explicit version or inline replacement always takes precedence. `--no-std` disables the tool setting; it does not disable explicit references. Released 0.2/0.3 implicit loading and solve upgrades are unchanged.
+
 The `rnl` command. Download a prebuilt executable from the core Release (`core-vX.Y.Z`),
 or build from source. The CLI and npm package share the workspace version; Viewer and
 language versions are independent. See the [download/checksum guide](../../skills/rnl/references/tools.md#the-rnl-command)

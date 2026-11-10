@@ -98,5 +98,18 @@ pub fn replace_records(
     };
     let done =
         rnl_runtime::writeback::replace_records(&doc, level, &text, records, reread).map_err(Failure::Refused)?;
-    Ok(Replacement { path, text: done.text, removed: done.removed, added: done.added })
+    let mut text = done.text;
+    if options.include_std && path == normalize(&doc.main().path) {
+        let read = reread(&text).map_err(Failure::Unreadable)?;
+        if let Some(version) = read.included_standard {
+            let saved = rnl_runtime::writeback::with_standard_package(&read.doc, &text, &version);
+            if saved == text {
+                return Err(Failure::Unreadable(
+                    "cannot write the standard-package reference into the main header (16.3)".into(),
+                ));
+            }
+            text = saved;
+        }
+    }
+    Ok(Replacement { path, text, removed: done.removed, added: done.added })
 }

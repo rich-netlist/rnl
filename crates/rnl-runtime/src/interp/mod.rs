@@ -38,6 +38,7 @@ pub mod phases;
 mod renames;
 pub mod scene;
 mod selfcheck;
+mod standard;
 mod symbol_pins;
 mod terminal_maps;
 mod topology;
@@ -77,8 +78,12 @@ pub(crate) type RuleMembers = ((usize, usize), Rc<Vec<unit::UnitMember>>);
 
 #[derive(Clone, Debug)]
 pub struct Options {
-    /// Use the standard package implicitly at the root (16.3).
+    /// Use the released versions' implicit standard package (16.3). False also disables
+    /// `include_std`; explicit USE-PACKAGE statements always keep their meaning.
     pub std: bool,
+    /// In draft 0.4, add the standard package to the main file's header when it has no
+    /// USE-PACKAGE of that name. A writer must persist that reference (16.3).
+    pub include_std: bool,
     /// The version of the standard package at the root, instead of the newest of the series written
     /// in the file's language version (16.3: its version is the tool's default), such as "0.2" to
     /// read a file of 0.3 with the series 0.2. A version pinned in a header record still comes
@@ -97,7 +102,14 @@ pub struct Options {
 
 impl Default for Options {
     fn default() -> Options {
-        Options { std: true, std_version: None, generated: true, problems: false, tolerance: crate::geom::TOL }
+        Options {
+            std: true,
+            include_std: false,
+            std_version: None,
+            generated: true,
+            problems: false,
+            tolerance: crate::geom::TOL,
+        }
     }
 }
 
@@ -129,6 +141,9 @@ pub struct ImportedAlias {
 pub struct Interpretation {
     pub model: Model,
     pub sink: Sink,
+    /// The standard-package version added by the draft `include_std` setting. When saving
+    /// the main file, a writer persists this reference in its unqualified header (16.3).
+    pub included_standard: Option<String>,
     /// The name of the package checked on its own, when the document is a package file (2.7).
     pub checking_package: String,
     /// File texts by name: the host files and the package files read.
@@ -244,6 +259,8 @@ pub struct Interp<'p> {
     places: places::Places,
     pending_constraints: HashMap<ObjId, constraints::Pending>,
     pub(crate) std_enabled: bool,
+    pub(crate) include_std: bool,
+    standard_hints: standard::StandardHints,
     /// [`Options::std_version`].
     pub(crate) std_version: Option<String>,
     /// Read the records with `type="generated"` (`Options::generated`).
@@ -376,6 +393,8 @@ impl<'p> Interp<'p> {
             places: places::Places::default(),
             pending_constraints: HashMap::new(),
             std_enabled: options.std,
+            include_std: options.include_std,
+            standard_hints: standard::StandardHints::default(),
             std_version: options.std_version.clone(),
             read_generated: options.generated,
             want_problems: options.problems,
@@ -888,6 +907,12 @@ impl<'p> Interp<'p> {
 
     /// Build the output.
     pub fn finish(mut self) -> Interpretation {
+        let included_standard =
+            if self.package_main.is_none() && self.include_std && self.follows_0_4(self.level_unit[0]) {
+                self.implicit_std(packages::EffKey::Level(0)).map(|unit| self.pkg_ver(unit))
+            } else {
+                None
+            };
         let model = self.build_model();
         let (problems, results) =
             if self.want_problems && self.package_main.is_none() { self.build_problems() } else { Default::default() };
@@ -919,6 +944,7 @@ impl<'p> Interp<'p> {
         Interpretation {
             model,
             sink: std::mem::take(&mut self.sink),
+            included_standard,
             checking_package: checking,
             sources,
             refs: std::mem::take(&mut self.refs),

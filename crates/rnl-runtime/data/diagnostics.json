@@ -4968,6 +4968,15 @@
    "severity": "warning",
    "message": "warning: {file}: {what}, `{name}`, line {line}, has the spelling of a word that 0.3 adds (2.8): raised to 0.3, it may mean something else (16.1)",
    "sections": []
+  },
+  {
+   "number": "RNL2104",
+   "name": "standard-package-not-used",
+   "severity": "hint",
+   "message": "${name} is defined by package {package}, which is not in use; add @USE-PACKAGE for it to the file header, or enable the tool standard-package setting such as --include-std (16.3)",
+   "sections": [
+    "16.3"
+   ]
   }
  ]
 }

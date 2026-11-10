@@ -161,7 +161,8 @@ fn a_reference_checks_the_language_even_when_the_package_is_already_cached() {
 #[test]
 fn a_tool_override_cannot_select_a_different_language_but_an_explicit_use_takes_precedence() {
     for (reader, other) in [("0.4", "0.2"), ("0.4", "0.3"), ("0.2", "0.4"), ("0.3", "0.4")] {
-        let options = Options { std_version: Some(other.into()), ..Options::default() };
+        // The override is consulted in 0.4 only when the tool explicitly adds the package.
+        let options = Options { std_version: Some(other.into()), include_std: reader == "0.4", ..Options::default() };
         let files = |reference: &str| {
             let mut files = MemoryProvider::new()
                 .with("t.sp", &file(reader, reference, ""))

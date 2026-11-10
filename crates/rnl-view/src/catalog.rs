@@ -194,7 +194,9 @@ pub(crate) fn catalog(ws: &Workspace, options: &CatalogOptions) -> Catalog {
             file: file.clone(),
             references: c.references.clone(),
             series: *bundled,
-            implicit: options.runtime.std && c.name == rnl_runtime::interp::STD_NAME,
+            implicit: options.runtime.std
+                && c.name == rnl_runtime::interp::STD_NAME
+                && (!rnl_runtime::interp::unit::keeps_0_4(&c.language) || options.runtime.include_std),
         });
         for s in &c.symbols {
             out.symbols.push(CatalogSymbol {
@@ -510,6 +512,8 @@ mod tests {
         assert_eq!(at(("rnl-std", "0.2")) + 1, at(("rnl-std", "0.3")));
         assert_eq!(at(("rnl-std", "0.3")) + 1, at(("rnl-std", "0.4")));
         assert_eq!(all.packages[at(("rnl-std", "0.2"))].language, "0.2");
+        assert!(all.packages[at(("rnl-std", "0.3"))].implicit);
+        assert!(!all.packages[at(("rnl-std", "0.4"))].implicit);
         // a name of the series 0.2 for a symbol, and one of the series 0.3 for a definition
         let ground: Vec<(&str, &str)> = all
             .symbols

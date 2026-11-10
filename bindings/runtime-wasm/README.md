@@ -82,7 +82,8 @@ A call writes the request as UTF-8 JSON, calls `rnl_build`, and reads the answer
 | `files` | The texts of the workspace by path, the entry's among them. Paths are read as the runtime reads them: `\` as `/`, and without `.` and `..`. |
 | `package_dirs` | The directories, among the paths of `files`, whose `.rnl` files are packages found by name (16.2). |
 | `dialect` | `"spice"` or `"spectre"`, instead of guessing from the entry. |
-| `std` | Whether the standard package is used at the root (16.3); true when not given. |
+| `std` | Enable implicit standard loading for 0.2/0.3; true when not given. False also disables `include_std`, but explicit references remain active. |
+| `include_std` | Explicitly add the standard package to a 0.4 main file without its own header reference (16.3). False when omitted. Also accepted by write, replace-records and catalog requests. Writing the main file persists the selected package version in its header; writing an included file does not. |
 | `std_version` | The version of the standard package at the root, whatever the files' language version, such as `"0.2"` to read a file of 0.3 with the series 0.2; a version pinned in a header record still comes first (16.3). By the language version when not given. |
 | `svg` | Whether each level's SVG is written; true when not given. |
 | `primitives` | Whether each level's primitives are given; false when not given. |

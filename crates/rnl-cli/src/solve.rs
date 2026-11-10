@@ -100,6 +100,8 @@ pub struct SolveOptions {
     pub formats: BTreeMap<String, String>,
     /// Use the standard package implicitly at the root (16.3).
     pub std: bool,
+    /// Add the standard package to a draft main file and persist it when that file is written.
+    pub include_std: bool,
     /// Only the level with this title: a subcircuit name, or the file name.
     pub level: Option<String>,
     /// The solver's options; their canonical text is the second segment of the hash (17). Its
@@ -113,6 +115,7 @@ impl Default for SolveOptions {
             dialect: None,
             formats: BTreeMap::new(),
             std: true,
+            include_std: false,
             level: None,
             solver: SolverOptions::default(),
         }
@@ -122,7 +125,7 @@ impl Default for SolveOptions {
 impl SolveOptions {
     /// The runtime's options the levels are read with: as a solver reads them (2.8).
     pub fn runtime(&self) -> Options {
-        Options { std: self.std, ..Options::solver() }
+        Options { std: self.std, include_std: self.include_std, ..Options::solver() }
     }
 }
 
@@ -469,7 +472,7 @@ fn pass(
         let both = Layered { layers: vec![memory, &files] };
         rnl_view::interpret_with(&entry, options.dialect.as_deref(), &options.formats, &both, &runtime)
     };
-    let first = read(&memory)?;
+    let mut first = read(&memory)?;
     let errors = first.diagnostics().iter().filter(|d| d.severity == Severity::Error).count();
     let mut targets: Vec<(usize, String)> = Vec::new();
     let mut not_solved = Vec::new();
@@ -497,6 +500,21 @@ fn pass(
         if let Some(t) = &options.level {
             return Err(format!("no drawing level is titled {t}"));
         }
+    }
+    if let Some(version) = first
+        .included_standard
+        .clone()
+        .filter(|_| targets.iter().any(|(level, _)| first.doc.levels[*level].file == first.doc.main().file))
+    {
+        let main = first.doc.main();
+        let path = normalize(&main.path);
+        let text = text_of(&first, &Layered { layers: vec![&memory, &files] }, &main.file, &path)?;
+        let out = rnl_runtime::writeback::with_standard_package(&first.doc, &text, &version);
+        if out == text {
+            return Err(format!("cannot write the standard-package reference into the header of {} (16.3)", main.file));
+        }
+        memory.insert(&path, &out);
+        first = read(&memory)?;
     }
     // a header that the record of a level would come before moves before any level of its file is
     // written (2.8; the draft 0.3, 16.3 and 2.2), so that every record written into the file

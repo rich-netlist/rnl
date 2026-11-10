@@ -45,6 +45,7 @@ options:
   --path DIR          search packages and bare include filenames here; repeatable
   --package-dir DIR   look for packages in DIR as well (16.2), its .rnl files; repeatable
   --no-std            do not use the standard package at the root (16.3)
+  --include-std       add the standard package to a draft 0.4 file (off by default)
   --std-version V     use rnl-std V at the root, whatever the files' language version, such as 0.2
                       to read a file of 0.3 with the series 0.2; a version pinned in a header
                       record still comes first (16.3), and V not found is an error only for the
@@ -129,6 +130,7 @@ struct Args {
     package_dirs: Vec<PathBuf>,
     search_paths: Vec<PathBuf>,
     std: bool,
+    include_std: bool,
     std_version: Option<String>,
     generated: bool,
     dialect: Option<String>,
@@ -251,6 +253,7 @@ fn parse_args() -> Result<Args, Said> {
     let mut package_dirs = Vec::new();
     let mut search_paths = Vec::new();
     let mut std = true;
+    let mut include_std = false;
     let mut std_version = None;
     let mut generated = true;
     let mut dialect = None;
@@ -305,7 +308,14 @@ fn parse_args() -> Result<Args, Said> {
                 package_dirs.push(dir.clone());
                 search_paths.push(dir);
             }
-            "--no-std" => std = false,
+            "--no-std" => {
+                std = false;
+                include_std = false;
+            }
+            "--include-std" => {
+                std = true;
+                include_std = true;
+            }
             "--std-version" => {
                 std_version = Some(it.next().ok_or_else(|| needs("--std-version needs a version, such as 0.2"))?)
             }
@@ -432,6 +442,7 @@ fn parse_args() -> Result<Args, Said> {
         package_dirs,
         search_paths,
         std,
+        include_std,
         std_version,
         generated,
         dialect,
@@ -480,7 +491,13 @@ fn main() -> ExitCode {
 
 /// The runtime's options the command line gives.
 fn options(args: &Args) -> Options {
-    Options { std: args.std, std_version: args.std_version.clone(), generated: args.generated, ..Options::default() }
+    Options {
+        std: args.std,
+        include_std: args.include_std,
+        std_version: args.std_version.clone(),
+        generated: args.generated,
+        ..Options::default()
+    }
 }
 
 fn interpret(args: &Args, provider: &FsProvider) -> Result<Interpretation, String> {
@@ -803,7 +820,7 @@ fn run(args: &Args) -> Result<ExitCode, Said> {
             }
             let request: rnl_edit::WriteRequest = serde_json::from_value(request)
                 .map_err(|e| Said::new(codes::CLI_REQUEST_INVALID, format!("the request is not valid: {e}")))?;
-            std::fs::write(&out, rnl_edit::write(&request)?).map_err(io)?;
+            std::fs::write(&out, rnl_edit::write_with_options(&request, &provider, &options(args))?).map_err(io)?;
             Ok(ExitCode::SUCCESS)
         }
         _ => Err(Said::new(codes::CLI_UNKNOWN_COMMAND, format!("unknown command {}\n{USAGE}", args.command))),
