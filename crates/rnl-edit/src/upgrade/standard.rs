@@ -189,9 +189,17 @@ fn definition_shapes(version: &str) -> DefinitionShapes {
     out
 }
 
-/// Changed package bodies are decisions about layout/routing/assertions, not
-/// ordinary renames. Report them on the actual source applications.
-pub(super) fn definition_reviews(input: &Interpretation) -> BTreeMap<(usize, String), super::manual::Reason> {
+#[derive(Clone, Default)]
+pub(super) struct Policy {
+    pub review: Option<super::manual::Reason>,
+    pub notice: Option<super::manual::Reason>,
+    pub tied: bool,
+    pub gap: bool,
+}
+
+/// Classify actual bundled bodies, including the explicit replacement of the
+/// old main-point relation. Keep the accompanying definition audit up to date.
+pub(super) fn definition_policies(input: &Interpretation) -> BTreeMap<(usize, String), Policy> {
     let (shadowed, aliases) = shadows(input);
     if aliases {
         return BTreeMap::new();
@@ -225,13 +233,57 @@ pub(super) fn definition_reviews(input: &Interpretation) -> BTreeMap<(usize, Str
                 Some((_,after,_,after_defaults)) if before!=*after || defaults!=*after_defaults=>Some(("standard-definition-body","the target standard definition changes body facts, assertions or parameter defaults; review those changes before replacing the original application (9.4, 16.3)")),
                 _=>None,
             };
-            let Some(reason) = reason else { continue };
+            let mut policy = Policy { review: reason, ..Policy::default() };
+            if let Some((_, after, _, after_defaults)) = target.get(&target_name) {
+                let old = before.join("");
+                let new = after.join("");
+                // Exact syntactic tests avoid trusting a name when a later package
+                // revision adds unrelated drawing facts to the same definition.
+                policy.tied = old == "{}"
+                    && ["p", "t", "at"]
+                        .iter()
+                        .any(|role| new == format!("{{{{??{role}}}@ALIGN(\"x\");{{??{role}}}@ALIGN(\"y\")}}"));
+                policy.gap = matches!(target_name.as_str(), "$GROUND_STUB" | "$SUPPLY_STUB")
+                    && defaults == "[[\"gap\", 2]]"
+                    && after_defaults == "[[\"gap\", 1]]"
+                    && old.replace("%g:p", "%g::pin").replace("%s:p", "%s::pin") == new;
+                if policy.tied || policy.gap {
+                    policy.review = None;
+                }
+                if target_name == "$IO_PORT"
+                    && old == "{}"
+                    && new == "{?p@ASSERT-NET(port=true,message=\"a port tag stands on a port of its level\")}"
+                {
+                    policy.review = None;
+                    policy.notice = Some(("standard-assertion", "IO_PORT now asserts that its net is a port of the current level; drawing facts are unchanged, and any violated assertion remains a target violation (7.6, 16.3)"));
+                }
+                if policy.review.is_some_and(|r| r.0 == "standard-definition-body") {
+                    policy.review = Some(("standard-definition-body", match target_name.as_str() {
+                        "$CURRENT_MIRROR" => "CURRENT_MIRROR adds low-priority ALIGN y, orientation relations and ROUTE-OBJECT, as well as topology/model assertions; these are new drawing facts, not just assertions (16.3)",
+                        "$BRANCH" => "BRANCH adds SERIES routing/topology and a low-priority top-to-bottom ORDER; the old definition only aligned x (16.3)",
+                        "$MIRRORED" => "MIRRORED replaces axis-only distribution and ORDER by directed distribution and admits a set-valued axis; a multi-member axis has different centre semantics, and directed steps must be at least one unit rather than the old possible half-unit step (14.4, 16.3)",
+                        "$FLOW" => "FLOW removes the old low-priority ORDER in its direction parameter; retaining the usage alone loses that ordering fact (16.3)",
+                        _ => "the standard definition has changed drawing facts or parameter defaults that are not covered by the verified body transformations; see the standard-definition audit (16.3)",
+                    }));
+                }
+            }
             for level in &input.model.levels {
                 if level.packages.iter().any(|p| p.name == package && p.version == version) {
-                    out.insert((level.level, name.clone()), reason);
+                    out.insert((level.level, name.clone()), policy.clone());
                 }
             }
         }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn every_prior_standard_definition_has_an_audit_row() {
+        let audit = include_str!("STANDARD-DEFINITIONS.md");
+        for name in super::definition_shapes("0.3").keys() {
+            assert!(audit.contains(&format!("| {} |", name.trim_start_matches('$'))), "missing audit for {name}");
+        }
+    }
 }

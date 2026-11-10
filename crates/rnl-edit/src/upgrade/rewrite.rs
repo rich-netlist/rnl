@@ -15,6 +15,7 @@ pub(super) struct Context {
     pub packages: BTreeSet<String>,
     pub references: References,
     pub sets: super::sets::Sets,
+    pub approximate: bool,
 }
 
 fn pending(member: &Member) -> Option<(&'static str, &'static str)> {
@@ -179,11 +180,29 @@ pub(super) fn file(
                 Err(e) => error = Some(e),
             }
             reasons.extend(context.references.usage_reviews(path, record, member));
+            match context.references.usage_changes(path, source, record, member, report) {
+                Ok((found, preserved)) => {
+                    edits.extend(found);
+                    if preserved {
+                        reasons.retain(|(rule, _)| *rule != "usage-main-point");
+                    }
+                }
+                Err(e) => error = Some(e),
+            }
             reasons.extend(context.references.unresolved_pins(path, source, record, member));
             reasons.extend(pending(member));
             if member.segments.iter().flat_map(|s| &s.args).any(|a| matches!(&a.obj, ObjExpr::Ref(r) if context.references.removed_standard_name(path, record, r) && !matches!(context.sets.reference(source, record, r), Ok(Some(_)))))
                 && !reasons.iter().any(|(rule, _)| *rule == "standard-definition-removed") {
                 reasons.push(("standard-name-removed", "the referenced standard name has no direct target in series 0.4; retain its original policy or choose an explicit replacement (16.3)"));
+            }
+            if context.approximate {
+                match context.references.approximate(path, source, record, member, report) {
+                    Ok(outcome) => {
+                        reasons.retain(|(rule, _)| !outcome.resolved.contains(rule));
+                        edits.extend(outcome.edits);
+                    }
+                    Err(e) => error = Some(e),
+                }
             }
             for (rule, reason) in reasons {
                 let at = member.text_start();
@@ -214,6 +233,17 @@ pub(super) fn file(
                 }
                 for arg in &segment.args {
                     if let ObjExpr::Ref(reference) = &arg.obj {
+                        if context.approximate {
+                            match context.references.approximate_role(path, source, record, reference) {
+                                Ok(Some(edit)) => {
+                                    report.approximations.push(super::Approximation { rule: edit.change.rule.clone(), line: edit.change.line, before: edit.change.before.clone(), after: edit.change.after.clone(), risk: "Role reference follows an opted-in differential-pair replacement; that definition introduces additional facts and assertions.".into() });
+                                    edits.push(edit);
+                                    continue;
+                                }
+                                Ok(None) => {}
+                                Err(e) => error = Some(e),
+                            }
+                        }
                         match context.references.host_terminal(path, source, record, reference) {
                             Ok(Some(edit)) => {
                                 edits.push(edit);
@@ -326,7 +356,7 @@ pub(super) fn file(
         edits.push(record_edit(source, record, at..at, format!("{eol}{prefix}{seed}"), "explicit-fill-policy")?);
     }
     let mut text = apply(source, &mut edits)?;
-    report.changes.extend(edits.into_iter().map(|e| e.change));
+    report.changes.extend(edits.into_iter().filter(|e| !e.change.rule.starts_with("approximate-")).map(|e| e.change));
     if header.is_none() {
         let old = text.clone();
         text = add_header(doc, path, &text, |_| {

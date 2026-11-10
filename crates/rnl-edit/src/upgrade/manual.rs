@@ -41,7 +41,7 @@ pub(super) fn definition_references(member: &Member) -> Option<Reason> {
 }
 fn nested_items(set: &SetExpr) -> bool {
     let items = set.members.iter().flat_map(|m| &m.segments).flat_map(|s| &s.args).collect::<Vec<_>>();
-    items.len() > 1 && items.iter().any(|a| matches!(a.obj, ObjExpr::Set(_)))
+    items.len() > 1 && items.iter().any(|a| matches!(a.obj, ObjExpr::Set(_)) && !super::directions::singleton(&a.obj))
 }
 pub(super) fn collection_constraints(member: &Member) -> Option<Reason> {
     for s in &member.segments {
@@ -57,7 +57,7 @@ pub(super) fn collection_constraints(member: &Member) -> Option<Reason> {
         if matches!(call.kw.as_str(), "ALIGN" | "ORDER" | "DISTRIBUTE") && sets.iter().any(|s| nested_items(s)) {
             return Some(("constraint-items","held sets used as centres become combinations of members; preserve the original centre explicitly (5.2, 14.1)"));
         }
-        if call.kw == "DISTANCE" && !sets.is_empty() {
+        if call.kw == "DISTANCE" && !sets.is_empty() && !super::directions::equivalent_set_distance(s) {
             return Some(("distance-sets","distance between set extents becomes pairwise point distances; the old range is not a single point (14.5)"));
         }
         if call.kw == "ORIENT-RELATION" && sets.len() == 2 {

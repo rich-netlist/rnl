@@ -12,7 +12,7 @@ fn a_named_set_position_is_reported_at_its_use() {
 }
 #[test]
 fn a_named_set_distance_keeps_the_old_extent_constraint() {
-    let r = convert("%s={#R1 #R2}; %s (5, 0) @DISTANCE(\"left-to-right\", min=2)");
+    let r = convert("%s={#R1 #R2}; %s (5, 0) @DISTANCE(\"left-to-right\", min=2, max=4)");
     assert!(r.report.files[0].unconverted.iter().any(|u| u.rule == "distance-sets"));
 }
 #[test]

@@ -48,7 +48,12 @@ pub(crate) fn run(args: &Args, provider: &FsProvider) -> Result<ExitCode, Said> 
     let result = upgrade(
         &path_str(&args.file),
         provider,
-        &UpgradeOptions { dialect: args.dialect.clone(), formats: args.formats.clone(), std: args.std },
+        &UpgradeOptions {
+            dialect: args.dialect.clone(),
+            formats: args.formats.clone(),
+            std: args.std,
+            approximate: args.upgrade_approximate,
+        },
     )?;
     let mut files: Vec<_> =
         result.files.iter().map(|(path, text)| SolvedFile { path: path.clone(), text: text.clone() }).collect();
@@ -121,10 +126,12 @@ pub(crate) fn run(args: &Args, provider: &FsProvider) -> Result<ExitCode, Said> 
     let needs_solve = result.report.files.iter().filter(|f| f.needs_solve).count();
     let changes: usize = result.report.files.iter().map(|f| f.changes.len()).sum();
     let unconverted: usize = result.report.files.iter().map(|f| f.unconverted.len()).sum();
+    let approximations: usize = result.report.files.iter().map(|f| f.approximations.len()).sum();
+    let notices: usize = result.report.files.iter().map(|f| f.notices.len()).sum();
     let errors =
         result.report.diagnostics.iter().filter(|d| matches!(d.severity.as_str(), "error" | "violation")).count();
     println!(
-        "{} files written, {changes} changes, {unconverted} unconverted, {errors} target errors, {} differences, {needs_solve} files need solving",
+        "{} files written, {changes} changes, {approximations} approximations, {notices} notices, {unconverted} unconverted, {errors} target errors, {} differences, {needs_solve} files need solving",
         written,
         result.report.differences.len()
     );

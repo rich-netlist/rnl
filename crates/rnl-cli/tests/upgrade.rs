@@ -177,3 +177,21 @@ fn removing_solver_records_is_reported_as_needing_a_new_solve() {
     assert_eq!(report["files"][0]["needs_solve"], true);
     assert!(!std::fs::read_to_string(dir.join("out/top.sp")).unwrap().contains("generated"));
 }
+
+#[test]
+fn approximate_is_explicit_and_has_its_own_report_and_summary_count() {
+    let dir = scratch("approximate");
+    let source="* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\n* @RNL { {(0,0) (2,0) (4,0)} @DISTRIBUTE(\"x\") }\n.end\n";
+    std::fs::write(dir.join("top.sp"), source).unwrap();
+    for (flags, report_path, count) in [
+        (vec!["top.sp", "--no-std", "--report", "exact.json"], "exact.json", 0),
+        (vec!["top.sp", "--no-std", "--approximate", "--report", "approx.json"], "approx.json", 1),
+    ] {
+        let result = run(&dir, &flags);
+        assert_ne!(result.status.code(), Some(2), "{result:?}");
+        let report: serde_json::Value = serde_json::from_slice(&std::fs::read(dir.join(report_path)).unwrap()).unwrap();
+        assert_eq!(report["files"][0]["approximations"].as_array().unwrap().len(), count);
+        assert!(String::from_utf8(result.stdout).unwrap().contains(&format!("{count} approximations")));
+    }
+    assert_eq!(std::fs::read_to_string(dir.join("top.sp")).unwrap(), source);
+}

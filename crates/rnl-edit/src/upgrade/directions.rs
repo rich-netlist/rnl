@@ -1,7 +1,42 @@
 //! Direction changes with an algebraic justification (14.3–14.5).
 use super::edit::{record_edit, Edit};
 use rnl_runtime::host::Record;
-use rnl_runtime::syntax::{Call, Member, ObjExpr, Value};
+use rnl_runtime::syntax::{Call, Member, ObjExpr, Segment, Value};
+
+/// min(B) - max(A) >= d iff every pair has distance >= d (14.5).
+/// A maximum or exact bound does not have this property, even with one singleton.
+pub(super) fn equivalent_set_distance(segment: &Segment) -> bool {
+    let Some(call) = segment.call.as_ref().filter(|c| c.kw == "DISTANCE") else { return false };
+    let Some(p) = &call.params else { return false };
+    let Some(Value::Str(direction)) = p.positional.first().or_else(|| p.get("direction")) else { return false };
+    if opposite(direction).is_none() {
+        return false;
+    }
+    if p.get("max").is_none() && p.get("exact").is_none() {
+        return number(p.get("min")).is_some_and(|n| n >= 0.0);
+    }
+    // Both slots must denote one point, and the old range must already impose
+    // the nonnegative ordering that 0.4 adds to a maximum-only constraint.
+    !segment.piped
+        && segment.args.len() == 2
+        && segment.args.iter().all(|a| singleton(&a.obj))
+        && (number(p.get("exact")).is_some_and(|n| n >= 0.0) || number(p.get("min")).is_some_and(|n| n >= 0.0))
+}
+
+pub(super) fn singleton(object: &ObjExpr) -> bool {
+    match object {
+        ObjExpr::Point(_) => true,
+        ObjExpr::Ref(r) => {
+            r.prefix == '#' && r.name.is_some() && r.sub.is_none() && r.places.is_none() && r.path.is_empty()
+        }
+        ObjExpr::Set(s) => {
+            s.members.len() == 1 && s.members[0].segments.len() == 1 && {
+                let s = &s.members[0].segments[0];
+                s.call.is_none() && s.args.len() == 1 && singleton(&s.args[0].obj)
+            }
+        }
+    }
+}
 
 fn number(value: Option<&Value>) -> Option<f64> {
     match value {
@@ -82,7 +117,7 @@ pub(super) fn replacement(member: &Member, index: usize) -> Option<String> {
     }
     Some(render(call, &direction, axis_key, interval))
 }
-fn render(call: &Call, direction: &str, axis_key: &str, interval: Option<Vec<(String, f64)>>) -> String {
+pub(super) fn render(call: &Call, direction: &str, axis_key: &str, interval: Option<Vec<(String, f64)>>) -> String {
     let params = call.params.as_ref().unwrap();
     let mut values = vec![rnl_runtime::problem::written_string(direction)];
     values.extend(params.positional.iter().skip(1).map(super::rewrite::value));

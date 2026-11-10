@@ -35,7 +35,7 @@ fn held_constraint_sets_keep_their_centre_explanation() {
 }
 #[test]
 fn set_distance_reports_its_extent_semantics() {
-    check("{(0, 0) (1, 0)} {(4, 0) (5, 0)} @DISTANCE(\"left-to-right\", min=1)", "distance-sets");
+    check("{(0, 0) (1, 0)} {(4, 0) (5, 0)} @DISTANCE(\"left-to-right\", min=1, max=3)", "distance-sets");
 }
 #[test]
 fn displaced_symbol_pins_are_reported_before_the_definition() {
@@ -90,8 +90,8 @@ fn an_unchanged_local_semantic_usage_needs_no_generic_review_note() {
     assert!(r.report.files[0].unconverted.is_empty(), "{:?}", r.report);
 }
 #[test]
-fn a_local_drawn_usage_reports_the_point_relation_it_would_lose() {
-    check("$D = @DEFINE(roles=[[\"p\",\"point\"]]) {}; $S = @DEFINE-SYMBOL { (0, 0) @CIRCLE(radius=1) }; %u=$D @ATTACH (2, 3) => @SET-SYMBOL $S", "usage-main-point");
+fn a_local_drawn_usage_with_a_result_changing_pipeline_stays_manual() {
+    check("$D = @DEFINE(roles=[[\"p\",\"point\"]]) {}; $S = @DEFINE-SYMBOL { (0, 0) @CIRCLE(radius=1) }; %u=$D @ATTACH (2, 3) => @SET-SYMBOL $S => @TEXT(\"label\")", "usage-main-point");
 }
 #[test]
 fn removed_and_changed_standard_bodies_have_distinct_reasons() {

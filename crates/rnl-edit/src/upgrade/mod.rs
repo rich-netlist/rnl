@@ -3,6 +3,7 @@
 //! Reading, rewriting and verification are separate phases. A failed input read returns before
 //! any output is prepared. Target diagnostics and semantic differences remain in the report.
 
+mod approximate;
 mod collections;
 mod compare;
 mod directions;
@@ -14,10 +15,12 @@ mod manual;
 mod mechanical;
 mod references;
 mod rewrite;
+mod scoped_directions;
 mod selections;
 mod sets;
 mod standard;
 mod terminals;
+mod usages;
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -34,11 +37,13 @@ pub struct UpgradeOptions {
     pub dialect: Option<String>,
     pub formats: BTreeMap<String, String>,
     pub std: bool,
+    /// Opt in to documented migration choices that need not preserve semantics.
+    pub approximate: bool,
 }
 
 impl Default for UpgradeOptions {
     fn default() -> Self {
-        Self { dialect: None, formats: BTreeMap::new(), std: true }
+        Self { dialect: None, formats: BTreeMap::new(), std: true, approximate: false }
     }
 }
 
@@ -59,12 +64,24 @@ pub struct Unconverted {
 }
 
 #[derive(Clone, Debug, Serialize)]
+pub struct Approximation {
+    pub rule: String,
+    pub line: u32,
+    pub before: String,
+    pub after: String,
+    pub risk: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
 pub struct FileReport {
     pub path: String,
     pub from: String,
     pub to: String,
     pub changes: Vec<Change>,
     pub unconverted: Vec<Unconverted>,
+    /// Informational changes that do not themselves require manual conversion.
+    pub notices: Vec<Unconverted>,
+    pub approximations: Vec<Approximation>,
     /// Solver records were discarded; solving the upgraded document again is required.
     pub needs_solve: bool,
 }
@@ -94,6 +111,8 @@ pub struct Report {
     pub schema_version: u32,
     pub files: Vec<FileReport>,
     pub diagnostics: Vec<Diagnostic>,
+    /// Target assertion violations, also retained in diagnostics and exit status.
+    pub assertion_violations: Vec<Diagnostic>,
     pub differences: Vec<Difference>,
 }
 
@@ -238,9 +257,16 @@ pub fn upgrade(entry: &str, files: &dyn Provider, options: &UpgradeOptions) -> R
         packages,
         references: references::References::new(&before),
         sets: sets::Sets::new(&before, &entry),
+        approximate: options.approximate,
     };
     let mut output = BTreeMap::new();
-    let mut report = Report { schema_version: 1, files: Vec::new(), diagnostics: Vec::new(), differences: Vec::new() };
+    let mut report = Report {
+        schema_version: 1,
+        files: Vec::new(),
+        diagnostics: Vec::new(),
+        assertion_violations: Vec::new(),
+        differences: Vec::new(),
+    };
     let mut read = Vec::new();
     for (path, records) in source_records {
         let source = files.read(&path).ok_or_else(|| format!("cannot reread {path}"))?;
@@ -265,6 +291,8 @@ pub fn upgrade(entry: &str, files: &dyn Provider, options: &UpgradeOptions) -> R
             to: "0.4".into(),
             changes: Vec::new(),
             unconverted: Vec::new(),
+            notices: Vec::new(),
+            approximations: Vec::new(),
             needs_solve: false,
         };
         let doc = package_docs.get(&path).unwrap_or(&before.doc);
@@ -278,6 +306,7 @@ pub fn upgrade(entry: &str, files: &dyn Provider, options: &UpgradeOptions) -> R
     let after =
         rnl_view::interpret_with(&entry, options.dialect.as_deref(), &options.formats, &provider, &target_options)?;
     report.diagnostics = diagnostics(&after);
+    report.assertion_violations = report.diagnostics.iter().filter(|d| d.severity == "violation").cloned().collect();
     report.differences = compare::compare(&before, &after);
     Ok(Upgrade { entry, files: output, read, report })
 }

@@ -26,6 +26,8 @@ pub(super) struct References {
     definitions: BTreeMap<(usize, String), super::standard::Changes>,
     terminals: super::terminals::Terminals,
     pub local_symbols: super::local_symbols::LocalSymbols,
+    usage_changes: super::usages::Usages,
+    approximate: super::approximate::Approximate,
     usage_reviews: BTreeMap<(usize, String, u32, u32), Vec<super::manual::Reason>>,
 }
 
@@ -115,19 +117,23 @@ impl References {
             host_terminals: super::host_terminals::HostTerminals::new(input),
             ..Self::default()
         };
-        let reviews = super::standard::definition_reviews(input);
+        let policies = super::standard::definition_policies(input);
+        result.usage_changes = super::usages::Usages::new(input, &policies);
+        result.approximate = super::approximate::Approximate::new(input, &policies);
         for problem in &input.problems {
             for usage in &problem.usages {
                 let Some(loc) = &usage.source else { continue };
                 let reasons =
                     result.usage_reviews.entry((problem.level, normalize(&loc.file), loc.line, loc.col)).or_default();
-                if let Some(reason) = reviews.get(&(problem.level, usage.definition.clone())) {
-                    reasons.push(*reason);
+                let policy = policies.get(&(problem.level, usage.definition.clone()));
+                if let Some(reason) = policy.and_then(|p| p.review) {
+                    reasons.push(reason);
                 }
                 if usage
                     .object
                     .and_then(|i| problem.objects.get(i))
                     .is_some_and(|o| matches!(o.position, rnl_runtime::problem::Position::At(_)))
+                    && !policy.is_some_and(|p| p.tied)
                 {
                     reasons.push(("usage-main-point", "this usage followed its main role's point; 0.4 gives it an independent point, so preserve that relation explicitly (12.1)"));
                 }
@@ -243,6 +249,41 @@ impl References {
             return None;
         }
         self.readings.get(&key)
+    }
+    pub(super) fn usage_changes(
+        &self,
+        path: &str,
+        source: &str,
+        record: &Record,
+        member: &rnl_runtime::syntax::Member,
+        report: &mut super::FileReport,
+    ) -> Result<(Vec<Edit>, bool), String> {
+        let Some(readings) = self.readings_at(path, record, member.start) else { return Ok((Vec::new(), false)) };
+        self.usage_changes
+            .edits(source, record, member, readings, report, |r| self.host_terminal(path, source, record, r))
+    }
+    pub(super) fn approximate(
+        &self,
+        path: &str,
+        source: &str,
+        record: &Record,
+        member: &rnl_runtime::syntax::Member,
+        report: &mut super::FileReport,
+    ) -> Result<super::approximate::Outcome, String> {
+        // Definition-local choices use only their own syntax/witnesses, never
+        // the scene objects that happen to have the same spelling.
+        let readings = self.readings_at(path, record, member.start).map(Vec::as_slice).unwrap_or_default();
+        self.approximate.edits(source, record, member, readings, report)
+    }
+    pub(super) fn approximate_role(
+        &self,
+        path: &str,
+        source: &str,
+        record: &Record,
+        r: &Ref,
+    ) -> Result<Option<Edit>, String> {
+        let Some(readings) = self.readings_at(path, record, r.start) else { return Ok(None) };
+        self.approximate.role_reference(source, record, r, readings)
     }
     pub(super) fn collection_reviews(
         &self,

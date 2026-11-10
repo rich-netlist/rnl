@@ -140,7 +140,7 @@ impl Collections {
             if call.kw == "PLACE" && sets {
                 reasons.push(("set-placement","placing a set now places every member; preserve the old collective placement with explicit points or usages (11.1)"));
             }
-            if call.kw == "DISTANCE" && sets {
+            if call.kw == "DISTANCE" && sets && !super::directions::equivalent_set_distance(segment) {
                 reasons.push(("distance-sets","distance between set extents becomes pairwise point distances; the old range is not a single point (14.5)"));
             }
             if call.kw == "ORIENT-RELATION"
