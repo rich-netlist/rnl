@@ -25,8 +25,8 @@ fn a_local_definition_with_a_standard_name_does_not_get_a_standard_pin() {
         &UpgradeOptions { std: false, ..UpgradeOptions::default() },
     )
     .unwrap();
-    assert!(result.files["t.sp"].contains("@WIRE {%g:p (1, 0)}"));
-    assert!(!result.report.files[0].changes.iter().any(|c| c.rule == "usage-named-pin"));
+    assert!(result.files["t.sp"].contains("@WIRE {%g::rnl_upgrade_local_1 (1, 0)}"));
+    assert!(!result.files["t.sp"].contains("%g::pin"));
 }
 
 #[test]

@@ -1,5 +1,5 @@
 //! Resolve standard usage terminals to named pins through the source interpretation.
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use rnl_runtime::host::Record;
 use rnl_runtime::interp::unit::scan_package_decl;
@@ -15,10 +15,14 @@ type Pins = Vec<(String, String)>;
 
 #[derive(Default)]
 pub(super) struct References {
+    scopes: BTreeMap<(String, u32, u32), Vec<std::ops::Range<usize>>>,
     readings: BTreeMap<(String, u32, u32), Vec<usize>>,
     pins: BTreeMap<(usize, String, String), String>,
+    usages: BTreeSet<(usize, String)>,
     roles: BTreeMap<(usize, String, String), String>,
     definitions: BTreeMap<(usize, String), super::standard::Changes>,
+    terminals: super::terminals::Terminals,
+    pub local_symbols: super::local_symbols::LocalSymbols,
     usage_reviews: BTreeMap<(usize, String, u32, u32), Vec<super::manual::Reason>>,
 }
 
@@ -100,7 +104,12 @@ fn target_pins() -> BTreeMap<SymbolKey, Pins> {
 
 impl References {
     pub(super) fn new(input: &Interpretation) -> Self {
-        let mut result = Self { definitions: super::standard::role_changes(input), ..Self::default() };
+        let mut result = Self {
+            definitions: super::standard::role_changes(input),
+            terminals: super::terminals::Terminals::new(input),
+            local_symbols: super::local_symbols::LocalSymbols::new(input),
+            ..Self::default()
+        };
         let reviews = super::standard::definition_reviews(input);
         for problem in &input.problems {
             for usage in &problem.usages {
@@ -129,6 +138,32 @@ impl References {
                     drawing = parent;
                 }
                 let ast = parse_record_features(&record.text, true, false);
+                fn scopes(member: &rnl_runtime::syntax::Member, out: &mut Vec<std::ops::Range<usize>>) {
+                    for segment in &member.segments {
+                        for arg in &segment.args {
+                            if let ObjExpr::Set(body) = &arg.obj {
+                                if segment
+                                    .call
+                                    .as_ref()
+                                    .is_some_and(|c| matches!(c.kw.as_str(), "DEFINE" | "DEFINE-SYMBOL"))
+                                {
+                                    out.push(body.start..body.end);
+                                } else {
+                                    for member in &body.members {
+                                        scopes(member, out);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                if let Some(body) = &ast.body {
+                    let ranges =
+                        result.scopes.entry((normalize(&level.path), record.lines.0, record.lines.1)).or_default();
+                    for member in &body.members {
+                        scopes(member, ranges);
+                    }
+                }
                 let scope = ast.header.as_ref().and_then(|p| p.get("scope"));
                 let readings =
                     result.readings.entry((normalize(&level.path), record.lines.0, record.lines.1)).or_default();
@@ -152,6 +187,7 @@ impl References {
                 if object.kind != "usage" {
                     continue;
                 }
+                result.usages.insert((level.level, object.id.clone()));
                 if let Some(changes) =
                     object.definition.as_ref().and_then(|d| result.definitions.get(&(level.level, d.clone())))
                 {
@@ -160,6 +196,15 @@ impl References {
                     }
                 }
                 let Some(symbol) = &object.symbol else { continue };
+                if let SymbolOrigin::Level(owner) = &symbol.origin {
+                    for (number, (role, _)) in object.attach.iter().enumerate() {
+                        if let Some(pin) = result.local_symbols.pins.get(&(*owner, symbol.name.clone(), role.clone())) {
+                            result.pins.insert((level.level, object.id.clone(), role.clone()), pin.clone());
+                            result.pins.insert((level.level, object.id.clone(), (number + 1).to_string()), pin.clone());
+                        }
+                    }
+                    continue;
+                }
                 let SymbolOrigin::Package(package) = &symbol.origin else { continue };
                 let Some(pins) = targets.get(&(package.clone(), symbol.name.clone())) else { continue };
                 // Resolve provenance, not just a familiar definition or symbol name. A custom
@@ -186,6 +231,14 @@ impl References {
         result
     }
 
+    fn readings_at(&self, path: &str, record: &Record, at: usize) -> Option<&Vec<usize>> {
+        let key = (normalize(path), record.lines.0, record.lines.1);
+        if self.scopes.get(&key).is_some_and(|scopes| scopes.iter().any(|s| s.contains(&at))) {
+            return None;
+        }
+        self.readings.get(&key)
+    }
+
     pub(super) fn usage_reviews(
         &self,
         path: &str,
@@ -197,7 +250,7 @@ impl References {
         }
         let start = record.loc(member.text_start());
         let end = record.loc(member.end);
-        let Some(readings) = self.readings.get(&(normalize(path), record.lines.0, record.lines.1)) else {
+        let Some(readings) = self.readings_at(path, record, member.start) else {
             return Vec::new();
         };
         let mut reasons = Vec::new();
@@ -219,6 +272,49 @@ impl References {
         reasons
     }
 
+    pub(super) fn terminal_map(
+        &self,
+        path: &str,
+        source: &str,
+        record: &Record,
+        member: &rnl_runtime::syntax::Member,
+        index: usize,
+    ) -> Result<Option<Edit>, String> {
+        let readings =
+            self.readings_at(path, record, member.segments[index].start).map(Vec::as_slice).unwrap_or_default();
+        self.terminals.edit(source, record, member, index, readings)
+    }
+
+    pub(super) fn unresolved_pins(
+        &self,
+        path: &str,
+        source: &str,
+        record: &Record,
+        member: &rnl_runtime::syntax::Member,
+    ) -> Vec<super::manual::Reason> {
+        let refs = member.segments.iter().flat_map(|s| &s.args).filter_map(|a| match &a.obj {
+            ObjExpr::Ref(r) => Some(r),
+            _ => None,
+        });
+        let readings = self.readings_at(path, record, member.start).map(Vec::as_slice).unwrap_or_default();
+        if refs.into_iter().any(|r| {
+            if r.prefix != '%' || r.path.last().is_none_or(|p| p.sep != Sep::Term) {
+                return false;
+            }
+            let Some(name) = &r.name else { return false };
+            let mut object = format!("%{}", rnl_runtime::problem::written_name(name));
+            for part in &r.path[..r.path.len() - 1] {
+                object.push_str(&format!("::{}", rnl_runtime::problem::written_name(&part.name)));
+            }
+            readings.iter().any(|level| self.usages.contains(&(*level, object.clone())))
+                && !matches!(self.usage_pin(path, source, record, r), Ok(Some(_)))
+        }) {
+            vec![("usage-pin", "the usage terminal has no uniquely established target pin name; preserve its electrical binding and name the corresponding symbol pin before replacing the reference (9.2.4, 12.1)")]
+        } else {
+            Vec::new()
+        }
+    }
+
     pub(super) fn role_arguments(
         &self,
         path: &str,
@@ -235,7 +331,7 @@ impl References {
         }) else {
             return Ok(Vec::new());
         };
-        let Some(readings) = self.readings.get(&(normalize(path), record.lines.0, record.lines.1)) else {
+        let Some(readings) = self.readings_at(path, record, segment.start) else {
             return Ok(Vec::new());
         };
         let mut out = Vec::new();
@@ -281,7 +377,7 @@ impl References {
             return Ok(None);
         }
         let object = format!("%{}", rnl_runtime::problem::written_name(name));
-        let Some(readings) = self.readings.get(&(normalize(path), record.lines.0, record.lines.1)) else {
+        let Some(readings) = self.readings_at(path, record, reference.start) else {
             return Ok(None);
         };
         let mut replacements =
@@ -325,7 +421,7 @@ impl References {
             object.push_str("::");
             object.push_str(&rnl_runtime::problem::written_name(&part.name));
         }
-        let Some(readings) = self.readings.get(&(normalize(path), record.lines.0, record.lines.1)) else {
+        let Some(readings) = self.readings_at(path, record, reference.start) else {
             return Ok(None);
         };
         let mut resolved = None;

@@ -163,7 +163,15 @@ pub(super) fn file(
         });
         visit(&body.members, &mut |member| {
             let mut reasons = super::manual::reasons(member);
+            if context.references.local_symbols.preserves_points(path, record, member) {
+                reasons.retain(|(rule, _)| *rule != "symbol-text-result");
+            }
+            match context.references.local_symbols.edits(path, source, record, member) {
+                Ok(found) => edits.extend(found),
+                Err(e) => error = Some(e),
+            }
             reasons.extend(context.references.usage_reviews(path, record, member));
+            reasons.extend(context.references.unresolved_pins(path, source, record, member));
             reasons.extend(pending(member));
             for (rule, reason) in reasons {
                 let at = member.text_start();
@@ -220,6 +228,7 @@ pub(super) fn file(
                 let Some(call) = &segment.call else { continue };
                 let drawing = super::selections::drawing_selection(member, index);
                 let mut found = vec![
+                    context.references.terminal_map(path, source, record, member, index),
                     mechanical::route(source, record, call),
                     super::directions::edit(source, record, member, index),
                     super::selections::drawing_pins(source, record, member, index),

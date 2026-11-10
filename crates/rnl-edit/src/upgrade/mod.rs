@@ -6,6 +6,7 @@
 mod compare;
 mod directions;
 mod edit;
+mod local_symbols;
 mod manual;
 mod mechanical;
 mod references;
@@ -13,6 +14,7 @@ mod rewrite;
 mod selections;
 mod sets;
 mod standard;
+mod terminals;
 
 use std::collections::{BTreeMap, BTreeSet};
 

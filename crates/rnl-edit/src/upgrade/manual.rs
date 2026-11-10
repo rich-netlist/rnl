@@ -64,6 +64,7 @@ fn terminal_keys(value: &Value, out: &mut Vec<String>) {
                 terminal_keys(v, out)
             }
         }
+        Value::Num { value, .. } => out.push(value.to_string()),
         _ => out.push(super::rewrite::value(value)),
     }
 }

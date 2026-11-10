@@ -45,8 +45,8 @@ fn inherited_pin_overrides_need_fragment_review() {
     );
 }
 #[test]
-fn fixed_text_used_as_a_point_keeps_its_old_reference() {
-    check("$S = @DEFINE-SYMBOL { %t = (0, 0) @TEXT(\"fixed\"); @LINE {%t (1, 0)} }", "symbol-text-result");
+fn fixed_text_with_multiple_result_names_needs_contextual_rewriting() {
+    check("$S = @DEFINE-SYMBOL { %t = (0, 0) @TEXT(\"fixed\") => %other; @LINE {%t (1, 0)} }", "symbol-text-result");
 }
 #[test]
 fn repeated_local_symbol_names_need_renaming() {
