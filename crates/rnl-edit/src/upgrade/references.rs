@@ -16,9 +16,12 @@ type Pins = Vec<(String, String)>;
 #[derive(Default)]
 pub(super) struct References {
     scopes: BTreeMap<(String, u32, u32), Vec<std::ops::Range<usize>>>,
+    collections: super::collections::Collections,
     readings: BTreeMap<(String, u32, u32), Vec<usize>>,
     pins: BTreeMap<(usize, String, String), String>,
     usages: BTreeSet<(usize, String)>,
+    legacy: super::legacy::Legacy,
+    host_terminals: super::host_terminals::HostTerminals,
     roles: BTreeMap<(usize, String, String), String>,
     definitions: BTreeMap<(usize, String), super::standard::Changes>,
     terminals: super::terminals::Terminals,
@@ -108,6 +111,8 @@ impl References {
             definitions: super::standard::role_changes(input),
             terminals: super::terminals::Terminals::new(input),
             local_symbols: super::local_symbols::LocalSymbols::new(input),
+            legacy: super::legacy::Legacy::new(input),
+            host_terminals: super::host_terminals::HostTerminals::new(input),
             ..Self::default()
         };
         let reviews = super::standard::definition_reviews(input);
@@ -182,6 +187,7 @@ impl References {
                 }
             }
         }
+        result.collections = super::collections::Collections::new(input, &result.readings);
         for level in &input.model.levels {
             for object in &level.objects {
                 if object.kind != "usage" {
@@ -237,6 +243,15 @@ impl References {
             return None;
         }
         self.readings.get(&key)
+    }
+    pub(super) fn collection_reviews(
+        &self,
+        path: &str,
+        record: &Record,
+        member: &rnl_runtime::syntax::Member,
+    ) -> Vec<super::manual::Reason> {
+        let Some(readings) = self.readings_at(path, record, member.start) else { return Vec::new() };
+        self.collections.reasons(readings, member)
     }
 
     pub(super) fn usage_reviews(
@@ -313,6 +328,98 @@ impl References {
         } else {
             Vec::new()
         }
+    }
+
+    pub(super) fn legacy_reference(
+        &self,
+        path: &str,
+        source: &str,
+        record: &Record,
+        reference: &Ref,
+    ) -> Result<Option<Edit>, String> {
+        let readings = self.readings_at(path, record, reference.start).map(Vec::as_slice).unwrap_or_default();
+        let Some((new, _)) = self.legacy.reference(readings, reference) else { return Ok(None) };
+        if reference.name.as_ref() == Some(new) {
+            return Ok(None);
+        }
+        record_edit(
+            source,
+            record,
+            reference.start..reference.end,
+            format!("${}", rnl_runtime::problem::written_name(new)),
+            "legacy-standard-name",
+        )
+        .map(Some)
+    }
+    pub(super) fn host_terminal(
+        &self,
+        path: &str,
+        source: &str,
+        record: &Record,
+        reference: &Ref,
+    ) -> Result<Option<Edit>, String> {
+        let readings = self.readings_at(path, record, reference.start).map(Vec::as_slice).unwrap_or_default();
+        let Some(replacement) = self.host_terminals.replacement(readings, reference) else { return Ok(None) };
+        record_edit(source, record, reference.start..reference.end, replacement, "host-terminal-position").map(Some)
+    }
+    pub(super) fn removed_standard_name(&self, path: &str, record: &Record, reference: &Ref) -> bool {
+        let readings = self.readings_at(path, record, reference.start).map(Vec::as_slice).unwrap_or_default();
+        self.legacy.removed(readings, reference)
+    }
+    pub(super) fn legacy_packages(&self, path: &str, records: &[Record]) -> BTreeSet<String> {
+        let mut packages = BTreeSet::new();
+        for record in records {
+            let readings = self
+                .readings
+                .get(&(normalize(path), record.lines.0, record.lines.1))
+                .map(Vec::as_slice)
+                .unwrap_or_default();
+            let Some(body) = parse_record_features(&record.text, true, false).body else { continue };
+            for member in &body.members {
+                let mut refs = Vec::new();
+                rnl_runtime::syntax::walk_refs(member, &mut refs);
+                for r in refs {
+                    if let rnl_runtime::syntax::RefOrHole::Ref(r) = r {
+                        if let Some((_, package)) = self.legacy.reference(readings, r) {
+                            packages.insert(package.clone());
+                        }
+                    }
+                }
+            }
+        }
+        packages
+    }
+    pub(super) fn legacy_package(
+        &self,
+        path: &str,
+        source: &str,
+        record: &Record,
+        segment: &Segment,
+    ) -> Result<Option<Edit>, String> {
+        if segment.args.iter().any(|a| matches!(a.obj, ObjExpr::Set(_))) {
+            return Ok(None);
+        }
+        let Some(call) = segment.call.as_ref().filter(|c| c.kw == "USE-PACKAGE") else { return Ok(None) };
+        let Some(params) = &call.params else { return Ok(None) };
+        let Some(Value::Str(name)) = params.get("name") else { return Ok(None) };
+        let readings = self.readings_at(path, record, segment.start).map(Vec::as_slice).unwrap_or_default();
+        let Some(new) = self.legacy.package(readings, name) else { return Ok(None) };
+        let mut values = params.positional.iter().map(super::rewrite::value).collect::<Vec<_>>();
+        values.push(format!("name={}", rnl_runtime::problem::written_string(new)));
+        values.push("version=\"0.4\"".into());
+        for n in &params.named {
+            if !matches!(n.name.as_str(), "name" | "version" | "path") {
+                values.push(format!("{}={}", n.name, super::rewrite::value(&n.value)));
+            }
+        }
+        record_edit(
+            source,
+            record,
+            call.start..call.end,
+            format!("@USE-PACKAGE({})", values.join(", ")),
+            "legacy-standard-package",
+        )
+        .map(Some)
     }
 
     pub(super) fn role_arguments(

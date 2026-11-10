@@ -26,6 +26,10 @@ fn absolute_definition_coordinates_need_an_origin_decision() {
     check("$D = @DEFINE(roles=[\"p\"]) { (1, 2) @TEXT(\"fixed\") }; %u = #R1 @AS $D", "definition-coordinates");
 }
 #[test]
+fn definition_local_terminal_paths_require_expansion_context() {
+    check("$D = @DEFINE(roles=[[\"p\",\"net\"]]) {}; $S = @DEFINE-SYMBOL { (0, 0) @PIN(terminal=\"p\") }; $OUT = @DEFINE(roles=[[\"p\",\"net\"]]) { %u=$D @ATTACH ?p => @SET-SYMBOL $S; ?p @WIRE {%u:p (_, _)} }; $OUT @ATTACH &a", "definition-references");
+}
+#[test]
 fn held_constraint_sets_keep_their_centre_explanation() {
     check("{(0, 0) {(2, 1) (4, -1)}} @ALIGN(\"y\")", "constraint-items");
 }
@@ -55,6 +59,10 @@ fn repeated_local_symbol_names_need_renaming() {
 #[test]
 fn numeric_device_names_are_not_silently_reinterpreted_as_ordinals() {
     check("@DEVICE(name=\"R*\", terminals=[\"2\",\"1\"])", "device-terminal-names");
+}
+#[test]
+fn numeric_pin_names_require_assignment_specific_review() {
+    check("$S = @DEFINE-SYMBOL { (0, 0) @PIN(terminal=\"01\") }; #R1 @SET-SYMBOL $S", "numeric-pin-name");
 }
 #[test]
 fn newly_meaningful_markup_is_reported() {

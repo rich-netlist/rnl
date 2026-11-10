@@ -91,12 +91,56 @@ fn an_unconverted_statement_is_retained_and_reported() {
 }
 
 #[test]
-fn requires_one_input_and_one_write_target() {
+fn requires_one_input_and_accepts_at_most_one_write_target() {
     let dir = scratch("arguments");
     std::fs::write(dir.join("top.sp"), SOURCE).unwrap();
-    for args in [vec!["top.sp"], vec!["top.sp", "--in-place", "-o", "out"], vec!["top.sp", "top.sp", "--in-place"]] {
+    for args in [vec!["top.sp", "--in-place", "-o", "out"], vec!["top.sp", "top.sp", "--in-place"]] {
         assert_eq!(run(&dir, &args).status.code(), Some(2));
     }
+    assert_eq!(std::fs::read_to_string(dir.join("top.sp")).unwrap(), SOURCE);
+}
+
+#[test]
+fn preview_keeps_inputs_unchanged_with_or_without_a_report() {
+    for report in [false, true] {
+        let dir = scratch(if report { "preview-report" } else { "preview" });
+        std::fs::write(dir.join("top.sp"), SOURCE).unwrap();
+        let mut args = vec!["top.sp", "--no-std"];
+        if report {
+            args.extend(["--report", "report.json"]);
+        }
+        let output = run(&dir, &args);
+        assert!(output.status.success(), "{output:?}");
+        assert_eq!(std::fs::read_to_string(dir.join("top.sp")).unwrap(), SOURCE);
+        assert!(String::from_utf8(output.stdout).unwrap().starts_with("0 files written,"));
+        assert_eq!(std::fs::read_dir(&dir).unwrap().count(), if report { 2 } else { 1 });
+        if report {
+            let data: serde_json::Value =
+                serde_json::from_slice(&std::fs::read(dir.join("report.json")).unwrap()).unwrap();
+            assert_eq!(data["files"][0]["to"], "0.4");
+            assert_eq!(data["files"][0]["changes"][0]["rule"], "language-version");
+        }
+    }
+}
+
+#[test]
+fn preview_reports_unconverted_statements_without_writing_netlists() {
+    let dir = scratch("preview-unconverted");
+    let source = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\n* @RNL { (0, 0) (1, 0) @DISTANCE(\"x\", min=1) }\n.end\n";
+    std::fs::write(dir.join("top.sp"), source).unwrap();
+    let output = run(&dir, &["top.sp", "--no-std", "--report", "report.json"]);
+    assert_eq!(output.status.code(), Some(1), "{output:?}");
+    assert_eq!(std::fs::read_to_string(dir.join("top.sp")).unwrap(), source);
+    let data: serde_json::Value = serde_json::from_slice(&std::fs::read(dir.join("report.json")).unwrap()).unwrap();
+    assert_eq!(data["files"][0]["unconverted"][0]["rule"], "direction");
+}
+
+#[test]
+fn preview_cannot_overwrite_an_input_with_its_report() {
+    let dir = scratch("preview-collision");
+    std::fs::write(dir.join("top.sp"), SOURCE).unwrap();
+    let output = run(&dir, &["top.sp", "--no-std", "--report", "top.sp"]);
+    assert_eq!(output.status.code(), Some(2), "{output:?}");
     assert_eq!(std::fs::read_to_string(dir.join("top.sp")).unwrap(), SOURCE);
 }
 

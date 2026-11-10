@@ -48,6 +48,9 @@ fn pending(member: &Member) -> Option<(&'static str, &'static str)> {
             {
                 return Some(("pin-selection", "wired is a pin-selection condition in 0.4 (10.1)"));
             }
+            "SELECT-TERMINAL" if !super::selections::drawing_selection(member, index) => {
+                return Some(("terminal-selection", "terminal selection now includes terminals without pins; preserve the original drawn membership for consumers that need electrical terminals (10.1, 10.2)"));
+            }
             _ => {}
         }
     }
@@ -163,6 +166,11 @@ pub(super) fn file(
         });
         visit(&body.members, &mut |member| {
             let mut reasons = super::manual::reasons(member);
+            for reason in context.references.collection_reviews(path, record, member) {
+                if !reasons.iter().any(|r| r.0 == reason.0) {
+                    reasons.push(reason);
+                }
+            }
             if context.references.local_symbols.preserves_points(path, record, member) {
                 reasons.retain(|(rule, _)| *rule != "symbol-text-result");
             }
@@ -173,6 +181,10 @@ pub(super) fn file(
             reasons.extend(context.references.usage_reviews(path, record, member));
             reasons.extend(context.references.unresolved_pins(path, source, record, member));
             reasons.extend(pending(member));
+            if member.segments.iter().flat_map(|s| &s.args).any(|a| matches!(&a.obj, ObjExpr::Ref(r) if context.references.removed_standard_name(path, record, r) && !matches!(context.sets.reference(source, record, r), Ok(Some(_)))))
+                && !reasons.iter().any(|(rule, _)| *rule == "standard-definition-removed") {
+                reasons.push(("standard-name-removed", "the referenced standard name has no direct target in series 0.4; retain its original policy or choose an explicit replacement (16.3)"));
+            }
             for (rule, reason) in reasons {
                 let at = member.text_start();
                 let location = record.loc(at);
@@ -202,6 +214,22 @@ pub(super) fn file(
                 }
                 for arg in &segment.args {
                     if let ObjExpr::Ref(reference) = &arg.obj {
+                        match context.references.host_terminal(path, source, record, reference) {
+                            Ok(Some(edit)) => {
+                                edits.push(edit);
+                                continue;
+                            }
+                            Ok(None) => {}
+                            Err(e) => error = Some(e),
+                        }
+                        match context.references.legacy_reference(path, source, record, reference) {
+                            Ok(Some(edit)) => {
+                                edits.push(edit);
+                                continue;
+                            }
+                            Ok(None) => {}
+                            Err(e) => error = Some(e),
+                        }
                         match context.sets.reference(source, record, reference) {
                             Ok(Some(edit)) => {
                                 edits.push(edit);
@@ -228,6 +256,7 @@ pub(super) fn file(
                 let Some(call) = &segment.call else { continue };
                 let drawing = super::selections::drawing_selection(member, index);
                 let mut found = vec![
+                    context.references.legacy_package(path, source, record, segment),
                     context.references.terminal_map(path, source, record, member, index),
                     mechanical::route(source, record, call),
                     super::directions::edit(source, record, member, index),
@@ -269,10 +298,13 @@ pub(super) fn file(
     }
     let mut declarations = Vec::new();
     if !has_version {
-        declarations.push("@VERSION(\"0.4\")");
+        declarations.push("@VERSION(\"0.4\")".to_string());
     }
     if context.std && !has_std {
-        declarations.push("@USE-PACKAGE(name=\"rnl-std\", version=\"0.4\")");
+        declarations.push("@USE-PACKAGE(name=\"rnl-std\", version=\"0.4\")".to_string());
+    }
+    for package in context.references.legacy_packages(path, records) {
+        declarations.push(format!("@USE-PACKAGE(name={}, version=\"0.4\")", written_string(&package)));
     }
     if let Some((record, Some(at))) = header {
         if !declarations.is_empty() {

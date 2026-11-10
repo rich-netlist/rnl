@@ -103,7 +103,14 @@ pub(super) fn role_changes(input: &Interpretation) -> BTreeMap<(usize, String), 
             if shadowed.contains(&definition) {
                 continue;
             }
-            let Some((_, after)) = target.get(&definition) else { continue };
+            let target_name = if version == "0.2" {
+                super::legacy::renamed(definition.trim_start_matches('$'))
+                    .map(|n| format!("${n}"))
+                    .unwrap_or_else(|| definition.clone())
+            } else {
+                definition.clone()
+            };
+            let Some((_, after)) = target.get(&target_name) else { continue };
             if before.len() != after.len() {
                 continue;
             }
@@ -205,7 +212,14 @@ pub(super) fn definition_reviews(input: &Interpretation) -> BTreeMap<(usize, Str
             if sources.is_empty() || sources.iter().any(|(_, s)| !bundled.files.values().any(|b| b == s)) {
                 continue;
             }
-            let reason=match target.get(&name) {
+            let target_name = if version == "0.2" {
+                super::legacy::renamed(name.trim_start_matches('$'))
+                    .map(|n| format!("${n}"))
+                    .unwrap_or_else(|| name.clone())
+            } else {
+                name.clone()
+            };
+            let reason=match target.get(&target_name) {
                 None=>Some(("standard-definition-removed","the standard definition was removed or split; its replacement needs an explicit semantic choice (16.3)")),
                 Some((_,_,after_roles,_)) if *after_roles!=roles=>Some(("standard-definition-roles","the target standard definition has a different role list; preserving the original members requires an explicit choice (9.4, 16.3)")),
                 Some((_,after,_,after_defaults)) if before!=*after || defaults!=*after_defaults=>Some(("standard-definition-body","the target standard definition changes body facts, assertions or parameter defaults; review those changes before replacing the original application (9.4, 16.3)")),

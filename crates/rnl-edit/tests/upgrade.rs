@@ -95,6 +95,18 @@ fn explicit_custom_packages_are_upgraded_with_the_group() {
 }
 
 #[test]
+fn a_path_package_is_not_replaced_just_because_its_name_is_standard() {
+    let files = MemoryProvider::new()
+        .with("/w/top.sp", "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"rnl-std-basic\", version=\"0.3\", path=\"owned.rnl\") }\n.end\n")
+        .with("/w/owned.rnl", "@RNL(type=\"header\") { @VERSION(\"0.3\"); @PACKAGE(name=\"rnl-std-basic\", version=\"0.3\") }\n@RNL { $OWN = @DEFINE(roles=[\"member\"]) {} }\n");
+    let result = upgrade("/w/top.sp", &files, &options()).unwrap();
+    assert!(result.files["/w/top.sp"].contains("version=\"0.3\", path=\"owned.rnl\""));
+    assert!(result.files["/w/owned.rnl"].contains("@VERSION(\"0.4\")"));
+    assert!(result.files["/w/owned.rnl"].contains("@PACKAGE(name=\"rnl-std-basic\", version=\"0.3\")"));
+    assert!(result.files["/w/owned.rnl"].contains("$OWN = @DEFINE"));
+}
+
+#[test]
 fn a_second_upgrade_has_no_changes() {
     let source = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\n* @RNL { (1, 2) @TEXT(\"note\") }\n.end\n";
     let first = upgrade("top.sp", &MemoryProvider::new().with("top.sp", source), &options()).unwrap();

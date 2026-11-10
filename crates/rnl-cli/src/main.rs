@@ -26,7 +26,7 @@ const USAGE: &str = concat!(
                                     #M5:d or %dp1, written as RNL refers to it
   rnl problem FILE [options]        print what a solver reads of each level, with its hash, as JSON
   rnl solve FILE -o DIR [options]   solve each drawing level and write its record of the solver back
-  rnl upgrade FILE (-o DIR | --in-place) [--report REPORT.json]  migrate RNL records to 0.4
+  rnl upgrade FILE [-o DIR | --in-place] [--report REPORT.json]  preview migration to 0.4, or save it
   rnl preview FILE [options]        print the solve as the desktop viewer previews it, as JSON; writes nothing
   rnl snapshot FILE [options]       print the editor interface's snapshot, as JSON
   rnl catalog [options]             print the symbols, definitions and sets of the packages, as JSON

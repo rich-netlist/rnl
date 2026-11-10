@@ -3,9 +3,12 @@
 //! Reading, rewriting and verification are separate phases. A failed input read returns before
 //! any output is prepared. Target diagnostics and semantic differences remain in the report.
 
+mod collections;
 mod compare;
 mod directions;
 mod edit;
+mod host_terminals;
+mod legacy;
 mod local_symbols;
 mod manual;
 mod mechanical;
@@ -171,12 +174,22 @@ pub fn upgrade(entry: &str, files: &dyn Provider, options: &UpgradeOptions) -> R
             }
         }
     }
-    let packages: BTreeSet<_> = rnl_view::bundled()
+    let bundled = rnl_view::bundled();
+    let mut packages: BTreeSet<_> = bundled
         .files
         .iter()
         .filter(|(path, _)| path.starts_with("<bundled>/0.4/"))
         .filter_map(|(_, text)| scan_package_decl(text).map(|(name, _)| name))
         .collect();
+    // A familiar name is not proof that a package belongs to the standard
+    // series. Keep owned overrides and their paths in the file group (16.2).
+    for (_, source) in &before.sources {
+        if let Some((name, _)) = scan_package_decl(source) {
+            if !bundled.files.values().any(|known| known == source) {
+                packages.remove(&name);
+            }
+        }
+    }
     let mut source_records: BTreeMap<String, Vec<Record>> = BTreeMap::new();
     let mut versions: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     for (level, lv) in before.doc.levels.iter().enumerate() {

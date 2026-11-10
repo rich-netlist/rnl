@@ -30,6 +30,15 @@ pub(super) fn definition_coordinates(member: &Member) -> Option<Reason> {
     body(member,"DEFINE").filter(|s|s.members.iter().any(|m|absolute(m))).map(|_|(
         "definition-coordinates", "absolute coordinates in a definition become usage-relative; lift the original facts with their priorities or choose an explicit origin (9.4)"))
 }
+pub(super) fn definition_references(member: &Member) -> Option<Reason> {
+    let set = body(member, "DEFINE")?;
+    let mut refs = Vec::new();
+    for statement in &set.members {
+        rnl_runtime::syntax::walk_refs(statement, &mut refs);
+    }
+    refs.iter().any(|r| matches!(r, RefOrHole::Ref(r) if r.prefix == '%' && !r.path.is_empty())).then_some((
+        "definition-references", "definition-local object paths require each usage's expansion and symbol binding; preserve the original references until their role and pin identities can be verified (9.4, 12.1)"))
+}
 fn nested_items(set: &SetExpr) -> bool {
     let items = set.members.iter().flat_map(|m| &m.segments).flat_map(|s| &s.args).collect::<Vec<_>>();
     items.len() > 1 && items.iter().any(|a| matches!(a.obj, ObjExpr::Set(_)))
@@ -94,6 +103,9 @@ pub(super) fn symbol_bindings(member: &Member) -> Option<Reason> {
             }
             pins = true;
             let Some(value) = call.params.as_ref().and_then(|p| p.get("terminal")) else { continue };
+            if matches!(value, Value::Str(name) if !name.is_empty() && name.chars().all(|c| c.is_ascii_digit())) {
+                return Some(("numeric-pin-name", "a digits-only PIN terminal name becomes a positional terminal in 0.4; resolve its old name separately for each symbol assignment before choosing a terminal map (6.4, 9.2.4, 11.3)"));
+            }
             let mut keys = Vec::new();
             terminal_keys(value, &mut keys);
             for key in keys {
@@ -162,14 +174,55 @@ pub(super) fn text_meaning(member: &Member) -> Option<Reason> {
     }
     None
 }
+
+pub(super) fn package_context(member: &Member) -> Option<Reason> {
+    for segment in &member.segments {
+        let Some(call) = &segment.call else { continue };
+        if call.kw == "USE-ALIASES" || call.kw == "ALIAS" {
+            return Some(("alias-context", "alias-expanded statements require migration in their original alias environment; verify the expanded calls and standard names before accepting the new series (16.5)"));
+        }
+        if call.kw == "USE-PACKAGE" && segment.args.iter().any(|a| matches!(a.obj, ObjExpr::Set(_))) {
+            if let Some(Value::Str(name)) = call.params.as_ref().and_then(|p| p.get("name")) {
+                if super::legacy::merged_package(name).is_some() {
+                    return Some(("legacy-package-override", "this inline override targets a package that was merged; choose which definitions or rules to suppress in its replacement package (16.2, 16.3)"));
+                }
+            }
+        }
+    }
+    None
+}
+pub(super) fn terminal_traversal(member: &Member) -> Option<Reason> {
+    for (index, segment) in member.segments.iter().enumerate() {
+        let Some(call) = &segment.call else { continue };
+        let previous = index.checked_sub(1).and_then(|i| member.segments[i].call.as_ref()).map(|c| c.kw.as_str());
+        let affected = match call.kw.as_str() {
+            "SELECT-INSTANCE" => {
+                segment.args.iter().any(|a| matches!(&a.obj,ObjExpr::Ref(r) if r.prefix=='&'))
+                    || matches!(previous, Some("SELECT-NET" | "SELECT-TERMINAL"))
+            }
+            "SELECT-NET" => {
+                segment.args.iter().any(|a| matches!(&a.obj,ObjExpr::Ref(r) if r.prefix=='#'&&r.name.is_some()))
+                    || matches!(previous, Some("SELECT-INSTANCE" | "SELECT-TERMINAL"))
+            }
+            _ => false,
+        };
+        if affected {
+            return Some(("terminal-traversal", "this selection traverses electrical terminals that previously needed pins; check membership before retaining the rule in 0.4 (10.1, 10.2)"));
+        }
+    }
+    None
+}
 pub(super) fn reasons(member: &Member) -> Vec<Reason> {
     [
         definition_coordinates(member),
+        definition_references(member),
         collection_constraints(member),
         symbol_bindings(member),
         device_terminals(member),
         selected_creation(member),
         text_meaning(member),
+        package_context(member),
+        terminal_traversal(member),
     ]
     .into_iter()
     .flatten()

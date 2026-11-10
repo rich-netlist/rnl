@@ -29,9 +29,10 @@ fn identity(path: &Path) -> Result<String, Said> {
 
 pub(crate) fn run(args: &Args, provider: &FsProvider) -> Result<ExitCode, Said> {
     let target = match (&args.out, args.solver.in_place) {
-        (Some(dir), false) => Target::Dir(dir.clone()),
-        (None, true) => Target::InPlace,
-        _ => return Err("upgrade requires exactly one of -o DIR or --in-place".into()),
+        (Some(dir), false) => Some(Target::Dir(dir.clone())),
+        (None, true) => Some(Target::InPlace),
+        (None, false) => None,
+        _ => return Err("upgrade accepts only one of -o DIR or --in-place".into()),
     };
     if !args.generated
         || args.std_version.is_some()
@@ -69,7 +70,7 @@ pub(crate) fn run(args: &Args, provider: &FsProvider) -> Result<ExitCode, Said> 
     };
     let rewritten = run.files.len();
     // Validate the complete group, including unchanged includes, before creating any output.
-    if matches!(target, Target::Dir(_)) {
+    if matches!(target, Some(Target::Dir(_))) {
         for path in &run.read {
             if !run.files.iter().any(|f| &f.path == path) {
                 run.files.push(SolvedFile {
@@ -79,7 +80,10 @@ pub(crate) fn run(args: &Args, provider: &FsProvider) -> Result<ExitCode, Said> 
             }
         }
     }
-    let destinations = solve::all_destinations(&run, &target)?;
+    let destinations = match &target {
+        Some(target) => solve::all_destinations(&run, target)?,
+        None => Vec::new(),
+    };
     run.files.truncate(rewritten);
     let report = args
         .upgrade_report
@@ -99,10 +103,15 @@ pub(crate) fn run(args: &Args, provider: &FsProvider) -> Result<ExitCode, Said> 
             Ok((path.clone(), json))
         })
         .transpose()?;
-    let written = solve::write_with_encoding(&run, &target, OutputEncoding::Preserve);
-    if let Some(error) = written.error {
-        return Err(error.into());
-    }
+    let written = if let Some(target) = &target {
+        let result = solve::write_with_encoding(&run, target, OutputEncoding::Preserve);
+        if let Some(error) = result.error {
+            return Err(error.into());
+        }
+        result.written.len() + result.copied.len()
+    } else {
+        0
+    };
     if let Some((path, json)) = report {
         if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
             std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
@@ -116,7 +125,7 @@ pub(crate) fn run(args: &Args, provider: &FsProvider) -> Result<ExitCode, Said> 
         result.report.diagnostics.iter().filter(|d| matches!(d.severity.as_str(), "error" | "violation")).count();
     println!(
         "{} files written, {changes} changes, {unconverted} unconverted, {errors} target errors, {} differences, {needs_solve} files need solving",
-        written.written.len() + written.copied.len(),
+        written,
         result.report.differences.len()
     );
     Ok(if result.report.successful() { ExitCode::SUCCESS } else { ExitCode::from(1) })

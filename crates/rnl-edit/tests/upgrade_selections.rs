@@ -38,3 +38,23 @@ fn bound_selection_is_not_changed_to_another_kind() {
     assert!(!result.files["t.sp"].contains("@SELECT-PIN"));
     assert!(result.report.files[0].unconverted.iter().any(|u| u.rule == "pin-selection"));
 }
+
+#[test]
+fn text_without_a_wired_filter_still_uses_only_drawn_terminals() {
+    for source in ["# @SELECT-TERMINAL => @TEXT(\"${net}\")", "# @SELECT-TERMINAL(net=\"a\") => @TEXT(\"${net}\")"] {
+        let r = rewritten(source);
+        assert!(r.files["t.sp"].contains("=> @SELECT-PIN(recursive=true) => @TEXT"));
+        assert!(!r.report.files[0].unconverted.iter().any(|u| u.rule == "terminal-selection"));
+    }
+}
+#[test]
+fn electrical_terminal_consumers_without_wired_need_membership_review() {
+    let r = rewritten("# @SELECT-TERMINAL => @CURRENT(\"in\")");
+    assert!(r.report.files[0].unconverted.iter().any(|u| u.rule == "terminal-selection"));
+    assert!(!r.files["t.sp"].contains("@SELECT-PIN"));
+}
+#[test]
+fn selection_traversal_reports_the_change_to_hidden_terminals() {
+    let r = rewritten("&a @SELECT-INSTANCE => @TEXT(\"part\")");
+    assert!(r.report.files[0].unconverted.iter().any(|u| u.rule == "terminal-traversal"));
+}

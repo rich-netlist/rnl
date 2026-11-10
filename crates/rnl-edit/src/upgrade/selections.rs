@@ -7,9 +7,8 @@ use rnl_runtime::syntax::{Member, Value};
 /// selection or an electrical consumer must retain terminal identity instead.
 pub(super) fn drawing_selection(member: &Member, index: usize) -> bool {
     let Some(call) = member.segments.get(index).and_then(|s| s.call.as_ref()) else { return false };
-    let Some(params) = &call.params else { return false };
     call.kw == "SELECT-TERMINAL"
-        && matches!(params.get("wired"), Some(Value::Bool(_)))
+        && call.params.as_ref().and_then(|p| p.get("wired")).is_none_or(|v| matches!(v, Value::Bool(_)))
         && member.binds.is_empty()
         && member.segments.len() == index + 2
         && member.segments[index + 1].piped
@@ -27,7 +26,8 @@ pub(super) fn drawing_pins(
         return Ok(None);
     }
     let call = member.segments[index].call.as_ref().unwrap();
-    let params = call.params.as_ref().unwrap();
+    let empty = rnl_runtime::syntax::Params::default();
+    let params = call.params.as_ref().unwrap_or(&empty);
     let recursive = params.get("recursive").cloned().unwrap_or(Value::Bool(true));
     let mut first = params.positional.iter().map(super::rewrite::value).collect::<Vec<_>>();
     for named in &params.named {
@@ -40,10 +40,10 @@ pub(super) fn drawing_pins(
     if params.get("recursive").is_none() {
         first.push("recursive=true".into());
     }
+    let wired = params.get("wired").map(|v| format!("wired={}, ", super::rewrite::value(v))).unwrap_or_default();
     let replacement = format!(
-        "@SELECT-TERMINAL({}) => @SELECT-PIN(wired={}, recursive={})",
+        "@SELECT-TERMINAL({}) => @SELECT-PIN({wired}recursive={})",
         first.join(", "),
-        super::rewrite::value(params.get("wired").unwrap()),
         super::rewrite::value(&recursive)
     );
     record_edit(source, record, call.start..call.end, replacement, "drawing-pin-selection").map(Some)
