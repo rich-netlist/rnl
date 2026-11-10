@@ -108,7 +108,7 @@ fn target_pins() -> BTreeMap<SymbolKey, Pins> {
 }
 
 impl References {
-    pub(super) fn new(input: &Interpretation) -> Self {
+    pub(super) fn new(input: &Interpretation, approximate: bool) -> Self {
         let mut result = Self {
             definitions: super::standard::role_changes(input),
             terminals: super::terminals::Terminals::new(input),
@@ -117,6 +117,9 @@ impl References {
             host_terminals: super::host_terminals::HostTerminals::new(input),
             ..Self::default()
         };
+        if approximate {
+            result.definitions.retain(|(_, name), _| name != "$MIRRORED");
+        }
         let policies = super::standard::definition_policies(input);
         result.usage_changes = super::usages::Usages::new(input, &policies);
         result.approximate = super::approximate::Approximate::new(input, &policies);
@@ -243,7 +246,7 @@ impl References {
         result
     }
 
-    fn readings_at(&self, path: &str, record: &Record, at: usize) -> Option<&Vec<usize>> {
+    pub(super) fn readings_at(&self, path: &str, record: &Record, at: usize) -> Option<&Vec<usize>> {
         let key = (normalize(path), record.lines.0, record.lines.1);
         if self.scopes.get(&key).is_some_and(|scopes| scopes.iter().any(|s| s.contains(&at))) {
             return None;
@@ -268,12 +271,13 @@ impl References {
         source: &str,
         record: &Record,
         member: &rnl_runtime::syntax::Member,
+        enabled: bool,
         report: &mut super::FileReport,
     ) -> Result<super::approximate::Outcome, String> {
         // Definition-local choices use only their own syntax/witnesses, never
         // the scene objects that happen to have the same spelling.
         let readings = self.readings_at(path, record, member.start).map(Vec::as_slice).unwrap_or_default();
-        self.approximate.edits(source, record, member, readings, report)
+        self.approximate.edits(source, record, member, readings, enabled, report)
     }
     pub(super) fn approximate_role(
         &self,

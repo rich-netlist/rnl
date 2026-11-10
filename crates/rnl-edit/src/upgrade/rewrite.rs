@@ -191,18 +191,24 @@ pub(super) fn file(
             }
             reasons.extend(context.references.unresolved_pins(path, source, record, member));
             reasons.extend(pending(member));
+            let readings =
+                context.references.readings_at(path, record, member.start).map(Vec::as_slice).unwrap_or_default();
+            match context.sets.unrouting(source, record, member, readings) {
+                Ok(Ok(found)) => edits.extend(found),
+                Ok(Err(reason)) => reasons.push(reason),
+                Err(e) => error = Some(e),
+            }
             if member.segments.iter().flat_map(|s| &s.args).any(|a| matches!(&a.obj, ObjExpr::Ref(r) if context.references.removed_standard_name(path, record, r) && !matches!(context.sets.reference(source, record, r), Ok(Some(_)))))
                 && !reasons.iter().any(|(rule, _)| *rule == "standard-definition-removed") {
                 reasons.push(("standard-name-removed", "the referenced standard name has no direct target in series 0.4; retain its original policy or choose an explicit replacement (16.3)"));
             }
-            if context.approximate {
-                match context.references.approximate(path, source, record, member, report) {
-                    Ok(outcome) => {
-                        reasons.retain(|(rule, _)| !outcome.resolved.contains(rule));
-                        edits.extend(outcome.edits);
-                    }
-                    Err(e) => error = Some(e),
+            match context.references.approximate(path, source, record, member, context.approximate, report) {
+                Ok(outcome) => {
+                    reasons.retain(|(rule, _)| !outcome.resolved.contains(rule));
+                    reasons.extend(outcome.review);
+                    edits.extend(outcome.edits);
                 }
+                Err(e) => error = Some(e),
             }
             for (rule, reason) in reasons {
                 let at = member.text_start();

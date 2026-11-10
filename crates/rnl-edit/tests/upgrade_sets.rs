@@ -2,6 +2,17 @@ use rnl_edit::upgrade::{upgrade, UpgradeOptions};
 use rnl_runtime::source::MemoryProvider;
 
 #[test]
+fn default_net_labels_stay_off_and_explicit_whole_net_routes_win() {
+    let source = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\nR1 a b 1k\nR2 a b 2k\n* @RNL { {&a &b} @REMOVE-FROM $WIRE_NET_SET; &b @ROUTE; # @SELECT-TERMINAL(wired=false) => @TEXT(\"${net}\", key=\"netname\") }\n.end\n";
+    let r = upgrade("t.sp", &MemoryProvider::new().with("t.sp", source), &UpgradeOptions::default()).unwrap();
+    let text = &r.files["t.sp"];
+    assert!(text.contains("# @SELECT-PIN(recursive=true) => @REMOVE-FROM $LABEL_TERMINAL_SET"));
+    assert!(text.contains("{&a} @UNROUTE-NET(priority=\"high\")"), "{text}");
+    assert!(text.contains("&b @ROUTE-NET"));
+    assert!(text.contains("@TEXT(\"${net}\", key=\"netname\")"));
+}
+
+#[test]
 fn removed_routing_set_retains_its_selection_and_user_edits() {
     let source="* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\nR1 a 0 1k\n* @RNL { &a @REMOVE-FROM $WIRE_NET_SET; $WIRE_NET_SET @ROUTE }\n.end\n";
     let result = upgrade("t.sp", &MemoryProvider::new().with("t.sp", source), &UpgradeOptions::default()).unwrap();

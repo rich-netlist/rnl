@@ -195,6 +195,7 @@ pub(super) struct Policy {
     pub notice: Option<super::manual::Reason>,
     pub tied: bool,
     pub gap: bool,
+    pub restore_flow: bool,
 }
 
 /// Classify actual bundled bodies, including the explicit replacement of the
@@ -237,6 +238,7 @@ pub(super) fn definition_policies(input: &Interpretation) -> BTreeMap<(usize, St
             if let Some((_, after, _, after_defaults)) = target.get(&target_name) {
                 let old = before.join("");
                 let new = after.join("");
+                policy.restore_flow = old == "{?path@ORDER(?direction,priority=\"low\")}" && new == "{}";
                 // Exact syntactic tests avoid trusting a name when a later package
                 // revision adds unrelated drawing facts to the same definition.
                 policy.tied = old == "{}"

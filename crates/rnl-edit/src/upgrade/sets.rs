@@ -2,6 +2,7 @@
 use super::edit::{record_edit, Edit};
 use rnl_runtime::host::{LevelKind, Record};
 use rnl_runtime::interp::unit::scan_package_decl;
+use rnl_runtime::problem::written_name;
 use rnl_runtime::syntax::{parse_record_features, Member, ObjExpr, Ref, Value};
 use rnl_runtime::Interpretation;
 use std::collections::BTreeMap;
@@ -11,6 +12,25 @@ pub(super) struct Sets {
     entry: String,
     names: BTreeMap<String, String>,
     seed: String,
+    routing: BTreeMap<usize, (bool, BTreeMap<String, bool>)>,
+}
+
+fn literal_nets(obj: &ObjExpr, names: &mut Vec<String>) -> bool {
+    match obj {
+        ObjExpr::Ref(r) if r.prefix == '&' && r.path.is_empty() && r.sub.is_none() && r.places.is_none() => {
+            if let Some(name) = &r.name {
+                names.push(name.clone());
+                return true;
+            }
+            false
+        }
+        ObjExpr::Set(set) => set.members.iter().all(|m| {
+            m.binds.is_empty()
+                && matches!(m.segments.as_slice(), [s] if s.call.is_none()
+                && s.args.iter().all(|arg| literal_nets(&arg.obj, names)))
+        }),
+        _ => false,
+    }
 }
 
 fn uses(member: &Member, name: &str) -> bool {
@@ -99,6 +119,36 @@ impl Sets {
             statements.push(format!("$GROUND_NET_SET @REMOVE-FROM {name}"));
             statements.push(format!("$SUPPLY_NET_SET @REMOVE-FROM {name}"));
             result.names.insert("WIRE_NET_SET".into(), name);
+            for p in &input.problems {
+                let case_sensitive = input.doc.levels[p.level].case_sensitive;
+                let nets = p
+                    .nets
+                    .iter()
+                    .map(|n| {
+                        let name = if case_sensitive { n.name.clone() } else { n.name.to_ascii_lowercase() };
+                        (name, !n.routes.is_empty())
+                    })
+                    .collect();
+                result.routing.insert(p.level, (case_sensitive, nets));
+            }
+        }
+        // 0.3 defines a candidate set but does not attach labels from it by default.
+        // Empty only the bundled 0.4 fill's set, retaining a file-owned set for old consumers.
+        if !shadowed.contains("$LABEL_TERMINAL_SET") {
+            if referenced("LABEL_TERMINAL_SET") {
+                let name = fresh("$RNL_UPGRADE_LABEL_TERMINAL_SET");
+                statements.push(format!(
+                    "{name} = # @SELECT-TERMINAL(recursive=true) => @SELECT-PIN(wired=false, recursive=true)"
+                ));
+                for set in ["$GROUND_NET_SET", "$SUPPLY_NET_SET"] {
+                    statements.push(format!(
+                        "{set} @SELECT-TERMINAL(recursive=true) => @SELECT-PIN(recursive=true) => @REMOVE-FROM {name}"
+                    ));
+                }
+                statements.push(format!("# @SELECT-USAGE(recursive=true) $NO_CONNECT => @SELECT-TERMINAL(recursive=true) => @SELECT-PIN(recursive=true) => @REMOVE-FROM {name}"));
+                result.names.insert("LABEL_TERMINAL_SET".into(), name);
+            }
+            statements.push("# @SELECT-PIN(recursive=true) => @REMOVE-FROM $LABEL_TERMINAL_SET".into());
         }
         // 0.3 adds one free port tag per untagged port net. PORT_LIST would add
         // layout facts, so retain the former selection and generation explicitly.
@@ -122,6 +172,58 @@ impl Sets {
 
     pub(super) fn seed(&self, path: &str) -> Option<&str> {
         (path == self.entry && !self.seed.is_empty()).then_some(&self.seed)
+    }
+
+    /// Block new structure routing on explicitly removed nets only when the
+    /// old interpreter found no whole-net route. An explicit WIRE is unaffected.
+    pub(super) fn unrouting(
+        &self,
+        source: &str,
+        record: &Record,
+        member: &Member,
+        readings: &[usize],
+    ) -> Result<Result<Option<Edit>, super::manual::Reason>, String> {
+        if !self.names.contains_key("WIRE_NET_SET") {
+            return Ok(Ok(None));
+        }
+        let Some(segment) = member.segments.iter().find(|s| {
+            s.call.as_ref().is_some_and(|c| c.kw == "REMOVE-FROM")
+                && matches!(s.args.last().map(|a| &a.obj), Some(ObjExpr::Ref(r))
+                    if r.prefix == '$' && r.name.as_deref() == Some("WIRE_NET_SET") && r.path.is_empty())
+        }) else {
+            return Ok(Ok(None));
+        };
+        let review = ("wire-set-exclusion", "the removed nets or their old routing intent cannot be identified consistently; specify the required UNROUTE-NET in each drawing (13.7)");
+        let mut names = Vec::new();
+        if segment.piped
+            || readings.is_empty()
+            || !segment.args[..segment.args.len() - 1].iter().all(|a| literal_nets(&a.obj, &mut names))
+        {
+            return Ok(Err(review));
+        }
+        let mut excluded = Vec::new();
+        for name in names {
+            let mut routes = readings.iter().map(|level| {
+                let (case_sensitive, nets) = self.routing.get(level)?;
+                if *case_sensitive {
+                    nets.get(&name)
+                } else {
+                    nets.get(&name.to_ascii_lowercase())
+                }
+            });
+            let Some(Some(routed)) = routes.next() else { return Ok(Err(review)) };
+            if routes.any(|other| other != Some(routed)) {
+                return Ok(Err(review));
+            }
+            if !routed {
+                excluded.push(format!("&{}", written_name(&name)));
+            }
+        }
+        if excluded.is_empty() {
+            return Ok(Ok(None));
+        }
+        let after = format!("; {{{}}} @UNROUTE-NET(priority=\"high\")", excluded.join(" "));
+        record_edit(source, record, member.end..member.end, after, "preserve-wire-set-exclusions").map(|e| Ok(Some(e)))
     }
 
     pub(super) fn reference(&self, source: &str, record: &Record, reference: &Ref) -> Result<Option<Edit>, String> {

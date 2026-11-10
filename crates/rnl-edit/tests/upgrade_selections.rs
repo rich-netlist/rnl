@@ -28,14 +28,14 @@ fn local_selection_and_wired_true_remain_explicit() {
 fn electrical_consumers_keep_the_original_selection_and_a_reason() {
     let result = rewritten("# @SELECT-TERMINAL(wired=false) => @CURRENT(\"in\")");
     assert!(result.files["t.sp"].contains("@SELECT-TERMINAL(wired=false, recursive=true)"));
-    assert!(!result.files["t.sp"].contains("@SELECT-PIN"));
+    assert!(!result.files["t.sp"].contains("@SELECT-PIN(wired=false"));
     assert!(result.report.files[0].unconverted.iter().any(|u| u.rule == "pin-selection"));
 }
 
 #[test]
 fn bound_selection_is_not_changed_to_another_kind() {
     let result = rewritten("%terminals = # @SELECT-TERMINAL(wired=false); %terminals @TEXT(\"note\")");
-    assert!(!result.files["t.sp"].contains("@SELECT-PIN"));
+    assert!(result.files["t.sp"].contains("%terminals = # @SELECT-TERMINAL(wired=false, recursive=true)"));
     assert!(result.report.files[0].unconverted.iter().any(|u| u.rule == "pin-selection"));
 }
 
@@ -51,7 +51,7 @@ fn text_without_a_wired_filter_still_uses_only_drawn_terminals() {
 fn electrical_terminal_consumers_without_wired_need_membership_review() {
     let r = rewritten("# @SELECT-TERMINAL => @CURRENT(\"in\")");
     assert!(r.report.files[0].unconverted.iter().any(|u| u.rule == "terminal-selection"));
-    assert!(!r.files["t.sp"].contains("@SELECT-PIN"));
+    assert!(r.files["t.sp"].contains("@SELECT-TERMINAL(recursive=true) => @CURRENT"));
 }
 #[test]
 fn selection_traversal_reports_the_change_to_hidden_terminals() {

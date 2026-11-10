@@ -106,3 +106,63 @@ fn spectre_model_polarity_is_read_from_the_host() {
     assert!(r.files["t.scs"].contains("$DIFFERENTIAL_PAIR_P"));
     assert!(r.files["t.scs"].contains("model input_device bsim4 type=p\nM1 (a ip tail 0) input_device w=1u l=1u"));
 }
+
+fn layout(statement: &str, approximate: bool) -> Upgrade {
+    let source = format!(
+        "* layout migration\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\") }}\n.model channel nmos\nM1 a ip tail 0 channel\nM2 b in tail 0 channel\nR1 a b 1k\n* @RNL {{ {statement} }}\n.end\n"
+    );
+    upgrade(
+        "layout.sp",
+        &MemoryProvider::new().with("layout.sp", &source),
+        &UpgradeOptions { approximate, ..UpgradeOptions::default() },
+    )
+    .unwrap()
+}
+
+#[test]
+fn differential_pair_and_mirror_agree_on_sides_and_role_references() {
+    let r = layout("%axis = (_, _); %mirror = #M1(a) #M2(b) %axis(axis) @AS $MIRRORED; %pair = #M2(in_p) #M1(in_n) @AS $DIFFERENTIAL_PAIR; %pair::in_p @TEXT(\"input\")", true);
+    let text = &r.files["layout.sp"];
+    assert!(text.contains("#M1(left) #M2(right) %axis(axis) @AS $MIRRORED"), "{text}");
+    assert!(text.contains("#M2(right) #M1(left) @AS $DIFFERENTIAL_PAIR_N"), "{text}");
+    assert!(text.contains("%pair::right @TEXT"));
+    assert!(r.report.files[0].unconverted.is_empty(), "{:?}", r.report.files[0].unconverted);
+}
+
+#[test]
+fn authored_directions_and_x_only_placement_cannot_disagree() {
+    let r = layout(
+        "#M1 @PLACE(x=0); #M2 @PLACE(x=2); {#M1 #M2} @ORDER(\"right-to-left\"); #M1 #M2 @AS $DIFFERENTIAL_PAIR",
+        true,
+    );
+    assert!(r.files["layout.sp"].contains("#M1 #M2 @AS $DIFFERENTIAL_PAIR"));
+    assert!(!r.files["layout.sp"].contains("$DIFFERENTIAL_PAIR_N"));
+    assert!(r.report.files[0].unconverted.iter().any(|u| u.rule == "pair-direction-conflict"));
+}
+
+#[test]
+fn reversed_named_inputs_without_a_witness_follow_the_written_order() {
+    let r = layout("#M2(in_n) #M1(in_p) @AS $DIFFERENTIAL_PAIR", true);
+    assert!(r.files["layout.sp"].contains("#M2(left) #M1(right)"), "{}", r.files["layout.sp"]);
+    assert!(r.report.files[0].approximations.iter().any(|a| a.risk.contains("written argument order")));
+}
+
+#[test]
+fn flow_keeps_the_usage_and_restores_its_effective_direction_and_priority() {
+    let r = layout("%path = {#M1 #R1 #M2} @AS(direction=\"right-to-left\", priority=\"high\") $FLOW", false);
+    let text = &r.files["layout.sp"];
+    assert!(text.contains("%path = {#M1 #R1 #M2} @AS"));
+    assert!(text.contains("{#M1 #R1 #M2} @ORDER(\"right-to-left\", priority=\"high\")"), "{text}");
+    assert!(r.report.files[0].unconverted.is_empty(), "{:?}", r.report.files[0].unconverted);
+}
+
+#[test]
+fn current_mirror_additions_require_opt_in() {
+    let statement = "#M1(ref) #M2(out) @AS $CURRENT_MIRROR";
+    let exact = layout(statement, false);
+    assert!(exact.report.files[0].unconverted.iter().any(|u| u.rule == "standard-definition-body"));
+    let approximate = layout(statement, true);
+    assert!(approximate.files["layout.sp"].contains(statement));
+    assert!(approximate.report.files[0].unconverted.is_empty());
+    assert!(approximate.report.files[0].approximations.iter().any(|a| a.rule == "approximate-standard-body"));
+}

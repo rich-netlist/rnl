@@ -52,9 +52,9 @@ Sections refer to RNL 0.4. Standard package changes refer to the bundled series 
 | Standard drawing-only role p | at for the matching standard definition | Mechanical | Standard series |
 | Standard role names with underscores | Their matching definition's current role names | Context | Standard series |
 | DIFFERENTIAL_PAIR | Retain and report changed constraints and the required N/P choice | Context | Standard series |
-| MIRRORED roles a/b | left/right (or vertical variant when equivalent) | Context | Standard series |
+| MIRRORED roles a/b with a singleton axis | Opt in to left/right shared with differential pairs; report direction conflicts and spacing changes | Context | Standard series |
 | CHAIN, SUPPLY_HIGH, SUPPLY_LOW | No replacement definition; retain and report | Unsupported | Standard series |
-| FLOW with a positional direction | Retain and report the changed standard definition body | Context | Standard series |
+| FLOW | Preserve the usage and restore its expanded ORDER; multi-member path groups require opt-in | Context | Standard series |
 | WIRE_NET_SET modification / route | Explicit file-owned selection and exclusions, preserving user edits and ROUTE-NET | Context | Standard series, 13.7 |
 | Automatically generated port tags | Explicit selection and generation, with exclusions for supplies, grounds and existing tags | Context | Standard series, 12.4 |
 | Ground/supply attached to a terminal | Preserve a directly written host terminal attachment through its net and explicit ALIGN x/y; report unresolved contexts | Context | 12.1, 12.3 |

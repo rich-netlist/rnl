@@ -21,15 +21,15 @@ This table compares every ordinary definition in bundled series 0.3 with series 
 | GROUND_STUB | `gap` default 2 → 1; role `t` becomes a pin; internal ground terminal reference becomes named `::pin` | Explicit `gap=2` on old applications without a value; retain authored values. Pin binding and target diagnostics remain independently checked. |
 | SUPPLY_STUB | Same default/pin changes as GROUND_STUB | Same exact default treatment. |
 | DIFFERENTIAL_PAIR | Split into N/P, input roles become left/right; adds ordering, routing, grouping, pin orientations and assertions | Only with `--approximate`, choose by both resolved input-device polarities. Unknown or mismatched polarities stay manual. Model-card and Spectre polarity use the validated host type; DEVICE `type` is a 0.4 addition, not a supported 0.3 source declaration. A source the old reader rejects is never bypassed or guessed from its model name. No equivalence claim. |
-| CURRENT_MIRROR | Formerly empty; adds ALIGN y, orientation relations, ROUTE-OBJECT and model/topology assertions | Manual: these are actual drawing facts as well as assertions. Keeping or disabling each new fact requires a design choice. |
+| CURRENT_MIRROR | Formerly empty; adds ALIGN y, orientation relations, ROUTE-OBJECT and model/topology assertions | Keep and report the new facts with `--approximate`; review in default mode. |
 | MATCHED | Empty body remains; role is narrowed to instances/usages | No body rewrite. Target role validation remains authoritative. |
 | BRANCH | Adds SERIES (routing/topology) and top-to-bottom ORDER to the old ALIGN x | Manual: new drawing/routing facts. |
 | CHAIN | Removed | Manual: decide whether to retain the original source/chain/load ordering explicitly or choose another definition. |
 | CASCADE | Four roles become one stages role; empty body | Manual role mapping, since feedback and load membership cannot be inferred from spelling. |
 | SUPPLY_HIGH | Removed | Manual: electrical meaning alone does not determine placement or a replacement symbol. |
 | SUPPLY_LOW | Removed | Same limitation. |
-| MIRRORED | Axis-only distribution plus endpoint ORDER becomes directed distribution; axis becomes a collection role | Manual: a multi-member axis no longer means its centre. Even a singleton axis changes minimum spacing: old endpoint ORDER allowed a half-unit distribution step; directed DISTRIBUTE requires a unit step. Conflict grouping also differs. |
-| FLOW | Removes the low-priority ORDER controlled by `direction` | Manual: retaining the usage loses an ordering fact; decide whether to keep that explicit order or adopt the new semantic-only usage. |
+| MIRRORED | Axis-only distribution plus endpoint ORDER becomes directed distribution; axis becomes a collection role | With `--approximate`, retain a singleton axis and resolve sides together with differential pairs using the source mirror ORDER, directed ORDER/DISTANCE and explicit x positions. Contradictory evidence needs review. Minimum spacing and conflict grouping change even for a singleton axis. |
+| FLOW | Removes the low-priority ORDER controlled by `direction` | Preserve the usage and restore its expanded ORDER with the effective direction and priority. Nested groups with more than one member require `--approximate` because the target orders combinations rather than centres. |
 
 Series 0.2 names and merged packages retain the provenance-checked renames in `legacy.rs`; the same actual-body checks apply when their bodies match these transformations. Unrecognized body changes remain manual rather than inheriting a classification just from a familiar name.
 
