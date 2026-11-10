@@ -63,7 +63,9 @@ fn new_policy_without_a_header_keeps_host_lines_and_crlf() {
     let source = "* title\r\n.subckt child a\r\nR1 a 0 1k\r\n.ends\r\n.end\r\n";
     let result = upgrade("t.sp", &MemoryProvider::new().with("t.sp", source), &UpgradeOptions::default()).unwrap();
     let text = &result.files["t.sp"];
-    assert!(text.contains("\r\n* @RNL { $RNL_UPGRADE_PORT_FILL_SET"), "{text}");
+    let policy = text.split("\r\n").find(|line| line.starts_with("* @RNL {")).unwrap();
+    assert!(policy.contains("$RNL_UPGRADE_PORT_FILL_SET"), "{text}");
+    assert!(policy.contains("@REMOVE-FROM $LABEL_TERMINAL_SET"), "{text}");
     assert!(!text.replace("\r\n", "").contains('\n'));
     let host = |s: &str| s.lines().filter(|l| !l.starts_with("* @RNL")).collect::<Vec<_>>().join("\n");
     assert_eq!(host(source), host(text));
