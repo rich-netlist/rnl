@@ -15,7 +15,7 @@
   $base = @DEFINE-STYLE(linecolor="#1d1d1f", textcolor="#1d1d1f", fillcolor="#ffffff", linewidth=0.16, cap="butt", join="miter", size=1) {};
 
   /* A dark grey style for virtual parts and other drawn usages. */
-  $virtual = @DEFINE-STYLE(linecolor="#555555", textcolor="#555555") {};
+  $virtual = @DEFINE-STYLE(linecolor="#555555", textcolor="#555555") {$base};
 
   /* The style of a bus: its lines bold. */
   $bus = @DEFINE-STYLE(linestyle="bold") {};
@@ -37,5 +37,4 @@
   # @SELECT-ANNOTATION(recursive=true) => @SET-STYLE $base;
   # @SELECT-WIRE(bus=true, recursive=true) => @SET-STYLE $bus;
   # @SELECT-USAGE(drawn=true, recursive=true) => @SET-STYLE $virtual;
-  # @SELECT-USAGE(drawn=true, recursive=true) => @SELECT-LABEL(recursive=true) => @SET-STYLE $virtual;
 }
