@@ -245,6 +245,13 @@ pub(crate) fn solve_exact_with(
             count(usize::try_from(routing.expansions).unwrap_or(usize::MAX), "cell")
         ));
     }
+    if !routing.forced.is_empty() {
+        notes.push(format!(
+            "{} ROUTE trees joined through obstacles after bounded routing: {}",
+            routing.forced.len(),
+            routing.forced.iter().map(|n| format!("&{n}")).collect::<Vec<_>>().join(", ")
+        ));
+    }
     let mut unrouted = Vec::new();
     for l in &routing.left {
         notes.push(format!(
