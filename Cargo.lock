@@ -379,6 +379,7 @@ version = "0.5.5"
 dependencies = [
  "rnl-edit",
  "rnl-runtime",
+ "rnl-solver",
  "rnl-view",
  "serde",
  "serde_json",
@@ -395,6 +396,7 @@ dependencies = [
  "rnl-render",
  "rnl-runtime",
  "rnl-view",
+ "scoped-tls-hkt",
 ]
 
 [[package]]
@@ -433,6 +435,12 @@ dependencies = [
  "unicode-properties",
  "unicode-script",
 ]
+
+[[package]]
+name = "scoped-tls-hkt"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e9603871ffe5df3ac39cb624790c296dbd47a400d202f56bf3e414045099524d"
 
 [[package]]
 name = "serde"

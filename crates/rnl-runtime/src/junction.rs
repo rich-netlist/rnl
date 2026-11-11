@@ -10,10 +10,17 @@ pub struct JunctionConfig {
     pub definition: Option<String>,
     /// The setting that failed resolution. Kept for a consumer's located warning.
     pub invalid: Option<SolverSetting>,
+    /// An explicit tool override, resolved in the same level. Operational metadata: the
+    /// file's definition above remains the input identity used by sig2.
+    pub tool_override: Option<Box<JunctionConfig>>,
 }
 impl JunctionConfig {
+    pub fn effective(&self) -> &JunctionConfig {
+        self.tool_override.as_deref().unwrap_or(self)
+    }
+
     pub fn warning(&self) -> Option<Diag> {
-        let setting = self.invalid.as_ref()?;
+        let setting = self.effective().invalid.as_ref()?;
         Some(Diag {
             severity: Severity::Warning,
             code: codes::JUNCTION_DEFINITION_INVALID,

@@ -13,6 +13,28 @@ use rnl_solver::SolverOptions;
 
 use crate::{needs, Args, Said};
 
+struct ProgressClock<'a> {
+    inner: &'a dyn rnl_solver::Clock,
+    enabled: bool,
+}
+
+impl rnl_solver::Clock for ProgressClock<'_> {
+    fn advances(&self) -> bool {
+        self.inner.advances()
+    }
+    fn elapsed(&self) -> f64 {
+        self.inner.elapsed()
+    }
+    fn profiler(&self) -> Option<rnl_solver::profile::ProfileHandle> {
+        self.inner.profiler()
+    }
+    fn progress(&self, p: rnl_solver::BudgetProgress) {
+        if self.enabled {
+            eprintln!("solver: {}: {} work units", p.stage, p.work);
+        }
+    }
+}
+
 /// The usage of the solver's commands, after the other commands' options and before the saving
 /// options.
 macro_rules! usage {
@@ -21,10 +43,14 @@ macro_rules! usage {
   --level TITLE       only the level with this title: a subcircuit name, or the file name
   --solver-options S  key=value;... over the solver's defaults, as for solve: the options the hash covers
   --previous          give each level what its type=\"generated\" record decided, as hints
+  --solver-config S   RNL named parameters; repeated options merge by key, the last value wins
 solve options (the levels are read without their type=\"generated\" records; -o or --in-place is needed):
   -o DIR              write the files solved under DIR, named as they are relative to FILE's directory,
                       with a copy of the other files they read from there, such as includes
   --in-place          write them over the files read instead
+  --solver-config S   0.4 settings, for example limit=\"time\",seconds=10 or limit=\"work\",work=100000
+                      overrides file/package settings by key; run limits are tool-only
+  --progress          report 0.4 stages and consumed work on standard error
   --level TITLE       only the level with this title
   --solver-options S  key=value;... over the solver's defaults, for tolerance, grid, objectives, beam,
                       budget and time_limit, as rnl-solver's canonical text writes them; the hash
@@ -52,8 +78,9 @@ pub(crate) use usage;
 /// The options only the solver's commands take.
 #[derive(Default)]
 pub(crate) struct SolverArgs {
+    pub progress: bool,
+    pub configs: Vec<(bool, String)>,
     /// As given; `problem` and `solve` each have their own default.
-    pub solver_options: Option<String>,
     pub in_place: bool,
     pub report: bool,
     pub profile: Option<PathBuf>,
@@ -64,9 +91,13 @@ impl SolverArgs {
     /// Take `option`, with its value from `rest` when it has one: true when it is one of these.
     pub fn take(&mut self, option: &str, rest: &mut impl Iterator<Item = String>) -> Result<bool, Said> {
         match option {
+            "--progress" => self.progress = true,
+            "--solver-config" => {
+                self.configs.push((false, rest.next().ok_or_else(|| needs("--solver-config needs a text"))?))
+            }
             "--previous" => self.previous = true,
             "--solver-options" => {
-                self.solver_options = Some(rest.next().ok_or_else(|| needs("--solver-options needs a text"))?)
+                self.configs.push((true, rest.next().ok_or_else(|| needs("--solver-options needs a text"))?))
             }
             "--in-place" => self.in_place = true,
             "--report" => self.report = true,
@@ -93,14 +124,50 @@ fn solver_options(e: String) -> Said {
     Said::new(codes::CLI_SOLVER_OPTIONS_INVALID, format!("--solver-options: {e}"))
 }
 
+fn configured(args: &Args) -> Result<SolverOptions, Said> {
+    let mut options = SolverOptions::default();
+    for (legacy, text) in &args.solver.configs {
+        let named_syntax = !text.contains(';')
+            && rnl_runtime::solver_settings::parse_overrides(text).is_ok_and(|settings| {
+                settings.len() > 1
+                    || settings.iter().any(|s| {
+                        matches!(
+                            s.key.as_str(),
+                            "limit"
+                                | "work"
+                                | "seconds"
+                                | "safety_seconds"
+                                | "candidates"
+                                | "astar_expansions"
+                                | "junction"
+                                | "layout"
+                        ) || matches!(
+                            s.value,
+                            rnl_runtime::interp::obj::Lit::Str(_)
+                                | rnl_runtime::interp::obj::Lit::Bool(_)
+                                | rnl_runtime::interp::obj::Lit::Arr(_)
+                        )
+                    })
+            });
+        options = if *legacy && !named_syntax { options.with_legacy_config(text) } else { options.with_config(text) }
+            .map_err(solver_options)?;
+        options.settings.legacy_alias |= *legacy;
+    }
+    Ok(options)
+}
+
 pub(crate) fn problem(args: &Args, provider: &FsProvider) -> Result<ExitCode, Said> {
     // the options as the solver's canonical text writes them, so that the hash is the one
     // `rnl solve` writes with the same options
-    let problem_options = SolverOptions::default()
-        .with_overrides(args.solver.solver_options.as_deref().unwrap_or(""))
-        .map_err(solver_options)?
-        .canonical();
+    let solver = configured(args)?;
     let options = Options {
+        solver_config: solver
+            .settings
+            .overrides
+            .iter()
+            .filter(|s| !rnl_solver::is_run_setting(&s.key))
+            .cloned()
+            .collect(),
         std: args.std,
         include_std: args.include_std,
         std_version: args.std_version.clone(),
@@ -118,7 +185,7 @@ pub(crate) fn problem(args: &Args, provider: &FsProvider) -> Result<ExitCode, Sa
         .enumerate()
         .filter(|(_, p)| args.level.as_ref().is_none_or(|t| *t == p.title))
         .map(|(k, p)| {
-            let mut level = rnl_cli::problem::level(p, &problem_options);
+            let mut level = rnl_cli::problem::level(p, &solver.for_problem(p).0.canonical());
             if args.solver.previous {
                 let hints = rnl_cli::problem::previous(previous.get(k).and_then(Option::as_ref));
                 level.as_object_mut().unwrap().insert("previous".into(), hints);
@@ -138,9 +205,7 @@ pub(crate) fn problem(args: &Args, provider: &FsProvider) -> Result<ExitCode, Sa
 /// `rnl preview`: as `rnl solve` solves, and nothing written: the Document of the files as solved
 /// and the report, which the desktop viewer shows (decision 0010).
 pub(crate) fn preview(args: &Args, provider: &FsProvider) -> Result<ExitCode, Said> {
-    let solver = SolverOptions::default()
-        .with_overrides(args.solver.solver_options.as_deref().unwrap_or(""))
-        .map_err(solver_options)?;
+    let solver = configured(args)?;
     let options = SolveOptions {
         dialect: args.dialect.clone(),
         formats: args.formats.clone(),
@@ -175,9 +240,7 @@ pub(crate) fn solve(args: &Args, provider: &FsProvider) -> Result<ExitCode, Said
             return Err(Said::new(codes::CLI_SOLVE_TARGET_MISSING, text));
         }
     };
-    let solver = SolverOptions::default()
-        .with_overrides(args.solver.solver_options.as_deref().unwrap_or(""))
-        .map_err(solver_options)?;
+    let solver = configured(args)?;
     // the groups of the facts of priority low are sought only for their hints (8.5, 7.6)
     let solver = SolverOptions { hints_for_low: args.solver.report, ..solver };
     let options = SolveOptions {
@@ -201,10 +264,10 @@ pub(crate) fn solve(args: &Args, provider: &FsProvider) -> Result<ExitCode, Said
         })
         .transpose()?;
     eprintln!("{}", rnl_cli::SOLVER_PREVIEW_NOTICE);
-    let result = match &profile_clock {
-        Some(clock) => rnl_cli::solve::solve_with_clock(&args.file, provider, &options, clock),
-        None => rnl_cli::solve::solve(&args.file, provider, &options),
-    };
+    let wall_clock = WallClock::new();
+    let clock: &dyn rnl_solver::Clock = profile_clock.as_ref().map_or(&wall_clock as &dyn rnl_solver::Clock, |c| c);
+    let observed = ProgressClock { inner: clock, enabled: args.solver.progress };
+    let result = rnl_cli::solve::solve_with_clock(&args.file, provider, &options, &observed);
     if let Some(clock) = &profile_clock {
         clock.finish(result.is_ok())?;
     }
@@ -221,7 +284,9 @@ pub(crate) fn solve(args: &Args, provider: &FsProvider) -> Result<ExitCode, Said
             ));
         }
     }
-    println!("solver options: {}", options.solver.canonical());
+    if run.levels.iter().all(|l| l.solved.report.budget.is_none()) {
+        println!("solver options: {}", options.solver.canonical());
+    }
     if run.levels.is_empty() && run.not_solved.is_empty() {
         println!("hint: {}: {} has no drawing level to solve", codes::CLI_SOLVE_NO_LEVEL, run.entry);
     }

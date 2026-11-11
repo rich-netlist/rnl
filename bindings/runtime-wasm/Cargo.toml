@@ -22,3 +22,6 @@ rnl-view.workspace = true
 rnl-edit.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+
+[dev-dependencies]
+rnl-solver.workspace = true

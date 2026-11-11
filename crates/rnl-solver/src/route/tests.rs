@@ -35,6 +35,46 @@ fn net(anchors: Vec<AnchorIn>) -> NetIn {
     NetIn { anchors, joined: Vec::new() }
 }
 
+#[test]
+fn nearest_frontier_preserves_global_distance_anchor_ties_and_components() {
+    for n in 2..24 {
+        for stride in 1..5 {
+            let input = net((0..n).map(|i| anchor((i * 7 % 11) as i64, (i * 3 % 5) as i64, None)).collect());
+            let groups: Vec<usize> = (0..n).map(|i| i / stride).collect();
+            let mut inside: Vec<bool> = groups.iter().map(|g| *g == groups[0]).collect();
+            let mut expected = Vec::new();
+            loop {
+                let mut candidates = Vec::new();
+                for a in (0..n).filter(|&a| !inside[a]) {
+                    for b in (0..n).filter(|&b| inside[b]) {
+                        let (p, q) = (&input.anchors[a].at, &input.anchors[b].at);
+                        candidates.push(((&p[0] - &q[0]).abs() + (&p[1] - &q[1]).abs(), a, b));
+                    }
+                }
+                let Some((_, a, b)) = candidates.into_iter().min() else { break };
+                expected.push((a, b));
+                for k in 0..n {
+                    inside[k] |= groups[k] == groups[a];
+                }
+            }
+            assert_eq!(nearest_joins(&input, &groups), expected);
+        }
+    }
+}
+
+#[test]
+fn exhausted_shared_budget_skips_the_grid_and_still_connects_every_anchor() {
+    let input = net(vec![anchor(0, 0, None), anchor(100_000_000, 100_000_000, None), anchor(-100_000_000, 0, None)]);
+    let mut layout = layout(&[], vec![input]);
+    layout.modern = true;
+    let ((out, expansions), report) =
+        crate::budget::with(&crate::StoppedClock, crate::RunLimit::Work(0), None, || route_layout(&layout, 200_000));
+    assert_eq!(report.work, 0);
+    assert_eq!(expansions, 0);
+    assert!(all_anchors_connected(&layout.nets[0], &out[0]));
+    assert!(out[0].forced);
+}
+
 fn all_anchors_connected(net: &NetIn, out: &NetOut) -> bool {
     let n = net.anchors.len();
     let mut reached = vec![false; n + out.branches.len()];

@@ -125,7 +125,19 @@ impl Default for SolveOptions {
 impl SolveOptions {
     /// The runtime's options the levels are read with: as a solver reads them (2.8).
     pub fn runtime(&self) -> Options {
-        Options { std: self.std, include_std: self.include_std, ..Options::solver() }
+        Options {
+            std: self.std,
+            include_std: self.include_std,
+            solver_config: self
+                .solver
+                .settings
+                .overrides
+                .iter()
+                .filter(|s| !rnl_solver::is_run_setting(&s.key))
+                .cloned()
+                .collect(),
+            ..Options::solver()
+        }
     }
 }
 
@@ -560,7 +572,7 @@ fn pass(
         let start = Instant::now();
         let solved = rnl_solver::solve_with_clock(p, &options.solver, clock);
         let time = start.elapsed();
-        let hash = sig2(p, &canonical);
+        let hash = sig2(p, solved.report.canonical_options.as_deref().unwrap_or(&canonical));
         let mut written = write_record(p, &solved.solution, AUTHOR, &hash);
         let mut write_errors = Vec::new();
         let host = &r.doc.levels[p.level];
@@ -1051,6 +1063,9 @@ pub fn report(level: &SolvedLevel, all: bool) -> Vec<String> {
         r.discarded.len(),
         count(p.facts.len(), "fact")
     )];
+    if let Some(canonical) = &r.canonical_options {
+        out.push(format!("  replay options: {canonical}"));
+    }
     // Discarding a fact of priority low is expected, and its hints may be left out (the draft 0.3,
     // 8.5; 7.6): they are printed with `all` alone, the hint of the fact and those of the
     // statements that only such facts lose, when the solver sought them.
@@ -1060,7 +1075,11 @@ pub fn report(level: &SolvedLevel, all: bool) -> Vec<String> {
     let discarded = |out: &mut Vec<String>, k: usize, indent: &str| {
         let Some(d) = r.discarded.iter().find(|d| d.fact == k) else { return };
         let why = if d.undecided {
-            "not decided within the time limit of the solver (8.5)".to_string()
+            if r.budget.is_some() {
+                "not decided within the shared solve budget (8.5)".to_string()
+            } else {
+                "not decided within the time limit of the solver (8.5)".to_string()
+            }
         } else if !hinted(k) && all {
             // every fact, of a level solved without the groups of the low facts sought
             "of priority low, which is expected; the solver did not seek what it conflicts with (hints_for_low, \

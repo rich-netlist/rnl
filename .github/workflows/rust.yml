@@ -139,6 +139,11 @@ jobs:
           node --test bindings/runtime-wasm/tests/manifest.test.mjs bindings/runtime-wasm/tests/edit-errors.test.mjs
       - name: Build the CLI
         run: cargo build -p rnl-cli
+      - name: Native and WebAssembly solvers replay identical records
+        run: |
+          cargo build -p rnl-runtime-wasm --example solver_parity
+          cargo build -p rnl-runtime-wasm --example solver_parity --target wasm32-unknown-unknown
+          node bindings/runtime-wasm/tests/solver-equality.mjs target/debug/examples/solver_parity target/wasm32-unknown-unknown/debug/examples/solver_parity.wasm
       - name: Native and WebAssembly builds give identical Documents and snapshots
         run: |
           node bindings/runtime-wasm/tests/overlays.mjs

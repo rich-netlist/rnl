@@ -26,6 +26,7 @@ const USAGE: &str = concat!(
                                     #M5:d or %dp1, written as RNL refers to it
   rnl problem FILE [options]        print what a solver reads of each level, with its hash, as JSON
   rnl solve FILE -o DIR [options]   solve each drawing level and write its record of the solver back
+  rnl solver-defaults              print 0.4 solver defaults as RNL named parameters
   rnl upgrade FILE [-o DIR | --in-place] [--report REPORT.json] [--approximate]  preview migration to 0.4, or save it
   rnl preview FILE [options]        print the solve as the desktop viewer previews it, as JSON; writes nothing
   rnl snapshot FILE [options]       print the editor interface's snapshot, as JSON
@@ -220,7 +221,8 @@ fn unknown_encoding(text: String) -> Said {
 }
 
 /// The commands, as `run` takes them.
-const COMMANDS: [&str; 15] = [
+const COMMANDS: [&str; 16] = [
+    "solver-defaults",
     "check",
     "dump",
     "problem",
@@ -396,7 +398,8 @@ fn parse_args() -> Result<Args, Said> {
             "--author" => &["write"],
             "--report" => &["solve", "upgrade"],
             "--in-place" => &["solve", "upgrade", "replace-records"],
-            "--solver-options" => &["problem", "solve", "preview"],
+            "--solver-options" | "--solver-config" => &["problem", "solve", "preview"],
+            "--progress" => &["solve"],
             "--previous" => &["problem"],
             "--png" | "--scale" => &["render"],
             "--primitives" | "--no-svg" | "--status" => &["view", "snapshot"],
@@ -460,8 +463,8 @@ fn parse_args() -> Result<Args, Said> {
     }
     // the catalog reads the package directories and the bundled packages, not a file
     let file = match (command.as_str(), file) {
-        ("catalog" | "formats", None) => PathBuf::new(),
-        (c @ ("catalog" | "formats"), Some(f)) => {
+        ("catalog" | "formats" | "solver-defaults", None) => PathBuf::new(),
+        (c @ ("catalog" | "formats" | "solver-defaults"), Some(f)) => {
             let text = format!("rnl {c} takes no FILE, not {}\n{USAGE}", f.display());
             return Err(Said::new(codes::CLI_COMMAND_TAKES_NO_FILE, text));
         }
@@ -643,6 +646,10 @@ fn run(args: &Args) -> Result<ExitCode, Said> {
     let provider = FsProvider::new(&args.package_dirs).with_search_paths(&args.search_paths);
     check_formats(args, &provider)?;
     match args.command.as_str() {
+        "solver-defaults" => {
+            println!("{}", rnl_solver::SolverOptions::defaults_config());
+            Ok(ExitCode::SUCCESS)
+        }
         "check" => {
             // read with the problems too, for the lines of the records that place the objects the
             // geometry hints name

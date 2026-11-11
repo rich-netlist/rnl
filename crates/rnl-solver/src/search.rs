@@ -1554,7 +1554,7 @@ struct Search<'a> {
 
 impl Search<'_> {
     fn out_of_budget(&self) -> bool {
-        self.made >= self.options.budget.candidates
+        self.made >= self.options.budget.candidates || crate::budget::stopped()
     }
 
     /// A plan with a variant's decisions in place.
@@ -1646,7 +1646,10 @@ impl Search<'_> {
     }
 
     /// The layered estimate of a plan, and its candidate.
-    fn estimate(&mut self, plan: &Plan) -> (Vec<Q>, Candidate) {
+    fn estimate(&mut self, plan: &Plan) -> Option<(Vec<Q>, Candidate)> {
+        if !crate::budget::permit(crate::budget::Step::Candidate, self.s.elements.len()) {
+            return None;
+        }
         self.made += 1;
         crate::profile::add("candidate_estimates", 1);
         crate::profile::checkpoint();
@@ -1654,7 +1657,7 @@ impl Search<'_> {
         let ori = c.orientations(self.s);
         let at = sketch(self.problem, self.s, &c, &ori, self.options);
         let e = self.s.active.estimate(&View { s: self.s, at: &at, orient: &ori });
-        (e, c)
+        Some((e, c))
     }
 
     /// The order of a node's items: a topological order of the precedences between them, the
@@ -1830,6 +1833,9 @@ impl Search<'_> {
 
     /// The variants of a node (see the module), best first.
     fn node(&mut self, node: usize, plan: &Plan, variants: &BTreeMap<usize, Vec<Variant>>) -> Vec<Variant> {
+        if !crate::budget::permit(crate::budget::Step::Candidate, self.s.elements.len()) {
+            return Vec::new();
+        }
         crate::profile::add("expanded_group_nodes", 1);
         let s = self.s;
         let beam = self.options.beam.max(1);
@@ -1846,7 +1852,7 @@ impl Search<'_> {
                         break;
                     }
                     let q = self.with(p, v);
-                    let (e, cand) = self.estimate(&q);
+                    let Some((e, cand)) = self.estimate(&q) else { continue };
                     next.push((e, cand.code(s), q));
                 }
             }
@@ -1895,7 +1901,7 @@ impl Search<'_> {
                 let mut p = Plan { order: self.place(base, order), ..base.clone() };
                 p.items.insert(node, order.clone());
                 let (p, second) = self.orient(&p, &classes);
-                let (e, cand) = self.estimate(&p);
+                let Some((e, cand)) = self.estimate(&p) else { continue };
                 let code = cand.code(s);
                 found.push((e.clone(), code.clone(), p.clone()));
                 tried.push((e, code, p));
@@ -1930,7 +1936,7 @@ impl Search<'_> {
                 }
                 let mut p = Plan { order: self.place(&bp, &o), ..bp.clone() };
                 p.items.insert(node, o);
-                let (e, cand) = self.estimate(&p);
+                let Some((e, cand)) = self.estimate(&p) else { continue };
                 found.push((e, cand.code(s), p));
             }
             // a union, whose parts no swap moves, reversed
@@ -1940,7 +1946,7 @@ impl Search<'_> {
                 if self.order_items(node, &o, &place, &before) == o {
                     let mut p = Plan { order: self.place(&bp, &o), ..bp.clone() };
                     p.items.insert(node, o);
-                    let (e, cand) = self.estimate(&p);
+                    let Some((e, cand)) = self.estimate(&p) else { continue };
                     found.push((e, cand.code(s), p));
                 }
             }
@@ -1950,7 +1956,7 @@ impl Search<'_> {
                 }
                 let mut p = bp.clone();
                 p.values[c] = v;
-                let (e, cand) = self.estimate(&p);
+                let Some((e, cand)) = self.estimate(&p) else { continue };
                 found.push((e, cand.code(s), p));
             }
             // and each fact whose side is open and each DISTRIBUTE decided here reversed
@@ -2063,7 +2069,7 @@ impl Search<'_> {
             let o = self.order_items(node, border, &place, &precedences(s, &p.flipped));
             p.order = self.place(bp, &o);
             p.items.insert(node, o);
-            let (e, cand) = self.estimate(&p);
+            let Some((e, cand)) = self.estimate(&p) else { continue };
             out.push((e, cand.code(s), p));
         }
         out

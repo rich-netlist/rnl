@@ -319,6 +319,9 @@ impl Unit {
 /// The variables of a problem and its facts as units.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Model {
+    encoding_budget: bool,
+    /// Facts whose encoding was interrupted; these are undecided, never satisfied vacuously.
+    pub unfinished: BTreeSet<usize>,
     /// The tolerance (11.7).
     pub tol: Q,
     /// The facts whose constants hold as written, without the tolerance, by index
@@ -359,7 +362,7 @@ const MAX_DEPTH: usize = 16;
 impl Model {
     /// The model of a problem, with the tolerance `tol` (11.7).
     pub(crate) fn new(problem: &LevelProblem, tol: Q) -> Model {
-        Model::with_exact(problem, tol, BTreeSet::new(), BTreeSet::new())
+        Model::build(problem, tol, BTreeSet::new(), BTreeSet::new(), true)
     }
 
     /// The model of a problem with the tolerance `tol` (11.7), but for the facts in `exact`, whose
@@ -370,8 +373,20 @@ impl Model {
         exact: BTreeSet<usize>,
         left_out: BTreeSet<usize>,
     ) -> Model {
+        Model::build(problem, tol, exact, left_out, false)
+    }
+
+    fn build(
+        problem: &LevelProblem,
+        tol: Q,
+        exact: BTreeSet<usize>,
+        left_out: BTreeSet<usize>,
+        metered: bool,
+    ) -> Model {
         let n = problem.objects.len();
         let mut m = Model {
+            encoding_budget: metered,
+            unfinished: BTreeSet::new(),
             tol,
             exact,
             left_out,
@@ -399,7 +414,11 @@ impl Model {
             }
         }
         for (i, fact) in problem.facts.iter().enumerate() {
-            let unit = if m.left_out.contains(&i) { Unit::none() } else { m.encode(problem, i, &fact.kind) };
+            if metered && !crate::budget::permit(crate::budget::Step::Resolve, n) {
+                m.unfinished.insert(i);
+                m.left_out.insert(i);
+            }
+            let unit = if m.left_out.contains(&i) { Unit::none() } else { m.encode(problem, i, &fact.kind, metered) };
             m.units.push(unit);
         }
         for w in &problem.wires {
@@ -415,6 +434,7 @@ impl Model {
                 m.object_points[k].push(*id);
             }
         }
+        m.encoding_budget = false;
         m
     }
 
@@ -605,6 +625,9 @@ impl Model {
         let mut values = Vec::new();
         for a in before {
             for b in after {
+                if self.encoding_budget && !crate::budget::permit(crate::budget::Step::Resolve, 1) {
+                    return (Vec::new(), None);
+                }
                 pairs.push(if gap == 0 { (*a, *b) } else { (*b, *a) });
                 values.push(vec![Bound::at_most(axis, LinExpr::diff(self.var(*b), self.var(*a)), max.clone())]);
             }
@@ -620,7 +643,7 @@ impl Model {
     }
 
     /// The unit of a fact (8.5).
-    fn encode(&mut self, problem: &LevelProblem, unit: usize, kind: &FactKind) -> Unit {
+    fn encode(&mut self, problem: &LevelProblem, unit: usize, kind: &FactKind, metered: bool) -> Unit {
         let tol = if self.exact.contains(&unit) { Q::zero() } else { self.tol.clone() };
         let mut fixed = Vec::new();
         let mut choices = Vec::new();
@@ -683,12 +706,21 @@ impl Model {
                 on.extend(ps.iter().map(|p| (a, *p)));
             }
             FactKind::Table { axis, rows } => {
-                for (axis, from, to) in rows.orders(*axis) {
+                let complete = rows.visit_orders(*axis, &mut |axis, from, to| {
+                    if metered && !crate::budget::permit(crate::budget::Step::Resolve, 1) {
+                        return false;
+                    }
                     let a = ax(axis);
                     let ps = self.points_of(problem, &[from.clone(), to.clone()]);
                     let (lo, hi) = if axis == Axis::X { (ps[0], ps[1]) } else { (ps[1], ps[0]) };
                     fixed.push(Bound::at_least(a, LinExpr::diff(self.var(hi), self.var(lo)), Q::one() - &tol));
                     on.extend(ps.iter().map(|point| (a, *point)));
+                    true
+                });
+                if !complete {
+                    self.unfinished.insert(unit);
+                    self.left_out.insert(unit);
+                    return Unit::none();
                 }
             }
             FactKind::Order { axis, sense, members } => {
@@ -800,6 +832,11 @@ impl Model {
                     centres[a].push(c);
                 }
             }
+        }
+        if metered && crate::budget::stopped() {
+            self.unfinished.insert(unit);
+            self.left_out.insert(unit);
+            return Unit::none();
         }
         for a in 0..2 {
             touched[a].sort_unstable();

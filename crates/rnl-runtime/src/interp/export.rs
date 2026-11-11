@@ -547,7 +547,7 @@ impl Interp<'_> {
         let object_ids: Vec<ObjId> = objs.iter().map(|(o, _)| *o).collect();
         let ids = self.problem_ids(s, &object_ids, &usages);
         let solver_config = self.solver_config_for(s);
-        let junction = self.junction_for(s, &solver_config).0;
+        let junction = self.junction_with_tools_for(s, &solver_config).0;
         let problem = LevelProblem {
             junction,
             solver_config,

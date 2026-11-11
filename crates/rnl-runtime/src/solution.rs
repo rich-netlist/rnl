@@ -783,7 +783,7 @@ pub fn write_record(p: &LevelProblem, solution: &Solution, author: &str, hash: &
     }
 
     let mut extra_junctions = Vec::new();
-    if modern && p.junction.definition.is_some() {
+    if modern && p.junction.effective().definition.is_some() {
         for (index, point) in solution.junctions.iter().enumerate() {
             match refs.junction(point) {
                 Ok((reference, root)) => {
@@ -840,7 +840,7 @@ pub fn write_record(p: &LevelProblem, solution: &Solution, author: &str, hash: &
     for (r, pieces) in &rewrites {
         statements.push(format!("{} @WIRE(mode=\"straight\") {{{}}}", refs.text(r), list(pieces)));
     }
-    let junction = if modern { p.junction.definition.as_deref() } else { Some("$JUNCTION") };
+    let junction = if modern { p.junction.effective().definition.as_deref() } else { Some("$JUNCTION") };
     let warnings = if modern { p.junction.warning().into_iter().collect() } else { Vec::new() };
     for (b, name) in solution.branches.iter().zip(&branch_names) {
         if let (true, Some(name), Some(definition)) = (b.junction, name, junction) {

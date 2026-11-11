@@ -37,7 +37,7 @@ pub(crate) fn run(args: &Args, provider: &FsProvider) -> Result<ExitCode, Said> 
     if !args.generated
         || args.std_version.is_some()
         || args.level.is_some()
-        || args.solver.solver_options.is_some()
+        || !args.solver.configs.is_empty()
         || args.solver.previous
     {
         return Err(

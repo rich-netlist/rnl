@@ -137,9 +137,11 @@ pub(crate) fn solve_exact_with(
     let phase = crate::profile::span("stage", "search");
     let candidates = search(problem, &structure, options, &mut work);
     drop(phase);
-    let placed_count = candidates.len();
     let mut all: Vec<Placing> = Vec::new();
     for (candidate_id, c) in candidates.into_iter().enumerate() {
+        if !crate::budget::permit(crate::budget::Step::Placement, problem.objects.len()) && !all.is_empty() {
+            break;
+        }
         let phase = crate::profile::span("stage", "coords");
         crate::profile::set("candidate_id", candidate_id as u64);
         let placed = place(problem, &structure, &c, options, &mut work);
@@ -158,6 +160,7 @@ pub(crate) fn solve_exact_with(
         all.push(Placing { candidate: c, placed, entry });
         drop(phase);
     }
+    let placed_count = all.len();
     // the best `beam` by the estimate are routed and scored on their wires (plan 5.8)
     let phase = crate::profile::span("stage", "score");
     let estimated: Vec<Entry> = all.iter().map(|c| c.entry.clone()).collect();
@@ -166,6 +169,9 @@ pub(crate) fn solve_exact_with(
     let mut finals: Vec<(usize, Routing, Entry)> = Vec::new();
     drop(phase);
     for &i in ranked.iter().take(beam) {
+        if !crate::budget::permit(crate::budget::Step::Route, problem.routes.len()) && !finals.is_empty() {
+            break;
+        }
         let p = &all[i];
         let phase = crate::profile::span("stage", "route");
         crate::profile::set("candidate_id", i as u64);
@@ -333,6 +339,8 @@ pub(crate) fn solve_exact_with(
         ));
     }
     let report = SolveReport {
+        budget: None,
+        canonical_options: None,
         kept: resolved.kept.clone(),
         discarded: resolved.discarded.clone(),
         failed: resolved.failed.clone(),

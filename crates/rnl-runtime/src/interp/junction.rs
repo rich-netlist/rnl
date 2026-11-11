@@ -6,6 +6,25 @@ use super::{
 use crate::{junction::JunctionConfig, problem::SolverSetting};
 
 impl Interp<'_> {
+    pub(super) fn junction_with_tools_for(
+        &mut self,
+        scene: SceneId,
+        settings: &[SolverSetting],
+    ) -> (JunctionConfig, Option<ObjId>) {
+        let (mut file, object) = self.junction_for(scene, settings);
+        if !self.follows_0_4(self.level_unit[self.scenes[scene].level]) {
+            return (file, object);
+        }
+        let setting = self.tool_solver_config.iter().rev().find(|s| s.key == "junction").cloned();
+        if let Some(setting) = setting {
+            let (tool, object) = self.junction_for(scene, &[setting]);
+            file.tool_override = Some(Box::new(tool));
+            (file, object)
+        } else {
+            (file, object)
+        }
+    }
+
     pub(super) fn junction_for(
         &mut self,
         scene: SceneId,
@@ -52,8 +71,10 @@ impl Interp<'_> {
             Some((format!("${}", crate::model::quoted(&name)), object))
         });
         match found {
-            Some((name, object)) => (JunctionConfig { definition: Some(name), invalid: None }, Some(object)),
-            None => (JunctionConfig { definition: None, invalid: Some(setting.clone()) }, None),
+            Some((name, object)) => {
+                (JunctionConfig { definition: Some(name), invalid: None, tool_override: None }, Some(object))
+            }
+            None => (JunctionConfig { definition: None, invalid: Some(setting.clone()), tool_override: None }, None),
         }
     }
 }

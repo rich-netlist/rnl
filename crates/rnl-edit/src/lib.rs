@@ -437,7 +437,7 @@ fn add_junctions(
                 rnl_runtime::diag::Extra { cause: None, origin: d.origin, in_package: d.in_package },
             );
         }
-        if let Some(definition) = &problem.junction.definition {
+        if let Some(definition) = &problem.junction.effective().definition {
             levels.entry(level).or_default().push(format!("{definition} @ATTACH {name}"));
         }
     }

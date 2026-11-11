@@ -515,7 +515,7 @@ impl Interp<'_> {
         }
         let junction_at: Vec<ObjId> = if self.follows_0_4(self.level_unit[self.scenes[s].level]) {
             let settings = self.solver_config_for(s);
-            let definition = self.junction_for(s, &settings).1;
+            let definition = self.junction_with_tools_for(s, &settings).1;
             let roles: Vec<_> = self.scenes[s]
                 .usages
                 .iter()

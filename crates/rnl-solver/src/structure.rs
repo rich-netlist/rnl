@@ -927,6 +927,10 @@ fn fitting_values(s: &Structure, work: &mut Work) -> (BTreeMap<usize, Vec<Orient
         return (out, stopped);
     }
     for class in &s.open.classes {
+        if crate::budget::stopped() {
+            stopped = true;
+            break;
+        }
         let against = |v: Orient| class.members.iter().any(|&(m, label)| s.against_current(m, v.then(label)) > 0);
         let witness = s.witness.orient[class.root];
         if !against(witness) {
@@ -940,6 +944,10 @@ fn fitting_values(s: &Structure, work: &mut Work) -> (BTreeMap<usize, Vec<Orient
         let values: Vec<Orient> = Orient::ALL
             .into_iter()
             .filter(|v| {
+                if crate::budget::stopped() {
+                    class_stopped = true;
+                    return false;
+                }
                 if against(*v) {
                     return false;
                 }
@@ -1598,6 +1606,20 @@ fn open(problem: &LevelProblem, resolved: &Resolved) -> Open {
 /// block, made once: a group written again, or the same set as a part or the union of two groups
 /// that overlap, is that block.
 fn group_tree(problem: &LevelProblem, objects: &[ObjectInfo], elements: &[usize]) -> (GroupTree, Vec<String>) {
+    let fallback = || {
+        (
+            GroupTree {
+                nodes: vec![GroupNode {
+                    kind: NodeKind::Root,
+                    members: elements.to_vec(),
+                    children: Vec::new(),
+                    own: elements.to_vec(),
+                    fixed_order: false,
+                }],
+            },
+            vec!["group search stopped at the shared budget; using one layout block".into()],
+        )
+    };
     let mut notes = Vec::new();
     let elements_of = |g: usize| -> BTreeSet<usize> {
         problem.groups[g]
@@ -1614,6 +1636,9 @@ fn group_tree(problem: &LevelProblem, objects: &[ObjectInfo], elements: &[usize]
     let mut absorbed: Vec<BTreeSet<usize>> = Vec::new();
     let laminar = |a: &BTreeSet<usize>, b: &BTreeSet<usize>| a.is_disjoint(b) || a.is_subset(b) || b.is_subset(a);
     for g in 0..problem.groups.len() {
+        if !crate::budget::permit(crate::budget::Step::Structure, elements.len().saturating_mul(g + 1)) {
+            return fallback();
+        }
         let set = elements_of(g);
         if set.len() < 2 || blocks.iter().any(|(b, _)| *b == set) || absorbed.contains(&set) {
             continue;
@@ -1889,11 +1914,18 @@ fn sources(active: &Active) -> Vec<Source> {
 /// reached at all.
 /// Depth from declared current flow; mutually reachable elements share a depth.
 fn current_depths(s: &Structure) -> Vec<Option<u32>> {
+    current_depths_checked(s).unwrap_or_else(|| vec![None; s.objects.len()])
+}
+
+fn current_depths_checked(s: &Structure) -> Option<Vec<Option<u32>>> {
     let c = &s.connections;
     let is_element = |k: usize| s.objects[k].role == Role::Element;
     // who stands above whom, by the nets
     let mut below: BTreeMap<usize, BTreeSet<usize>> = BTreeMap::new();
     for net in &c.nets {
+        if !crate::budget::permit(crate::budget::Step::Structure, net.pins.len().saturating_mul(net.pins.len())) {
+            return None;
+        }
         let marked = |out: bool| {
             let pins = net.pins.iter().filter(move |p| is_element(p.0) && s.currents.get(p) == Some(&out));
             pins.map(|p| p.0)
@@ -1907,21 +1939,22 @@ fn current_depths(s: &Structure) -> Vec<Option<u32>> {
     }
     // what each reaches: two that reach each other are in a loop and share a depth, and of two
     // that do not, the one above reaches more, so that this order goes from the top down
-    let reach: BTreeMap<usize, BTreeSet<usize>> = below
-        .keys()
-        .map(|&a| {
-            let mut seen = BTreeSet::new();
-            let mut stack = vec![a];
-            while let Some(k) = stack.pop() {
-                for &b in &below[&k] {
-                    if seen.insert(b) {
-                        stack.push(b);
-                    }
+    let mut reach: BTreeMap<usize, BTreeSet<usize>> = BTreeMap::new();
+    for &a in below.keys() {
+        let mut seen = BTreeSet::new();
+        let mut stack = vec![a];
+        while let Some(k) = stack.pop() {
+            if !crate::budget::permit(crate::budget::Step::Structure, below[&k].len()) {
+                return None;
+            }
+            for &b in &below[&k] {
+                if seen.insert(b) {
+                    stack.push(b);
                 }
             }
-            (a, seen)
-        })
-        .collect();
+        }
+        reach.insert(a, seen);
+    }
     let same = |a: usize, b: usize| reach[&a].contains(&b) && reach[&b].contains(&a);
     let mut order: Vec<usize> = below.keys().copied().collect();
     order.sort_by_key(|a| std::cmp::Reverse(reach[a].len()));
@@ -1943,6 +1976,9 @@ fn current_depths(s: &Structure) -> Vec<Option<u32>> {
     loop {
         let mut found = Vec::new();
         for &k in &s.elements {
+            if !crate::budget::permit(crate::budget::Step::Structure, s.elements.len()) {
+                return None;
+            }
             if depth[k].is_some() {
                 continue;
             }
@@ -1971,7 +2007,7 @@ fn current_depths(s: &Structure) -> Vec<Option<u32>> {
             depth[k] = Some(dq);
         }
     }
-    depth
+    Some(depth)
 }
 
 fn depths(s: &Structure) -> Vec<Option<u32>> {
@@ -2078,6 +2114,9 @@ impl Joined {
 fn rows(problem: &LevelProblem, s: &Structure, work: &mut Work) -> Vec<Vec<usize>> {
     if s.elements.is_empty() {
         return Vec::new();
+    }
+    if crate::budget::stopped() {
+        return vec![s.elements.clone()];
     }
     let kind = |f: usize| &problem.facts[f].kind;
     // an ALIGN on y kept joins its elements in one row

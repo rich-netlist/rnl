@@ -7,7 +7,8 @@
 //!
 //! ```text
 //! let solved = rnl_solver::solve(problem, &options);
-//! let hash = rnl_runtime::problem::sig2(problem, &options.canonical());
+//! let canonical = solved.report.canonical_options.clone().unwrap_or_else(|| options.canonical());
+//! let hash = rnl_runtime::problem::sig2(problem, &canonical);
 //! let written = rnl_runtime::solution::write_record(problem, &solved.solution, rnl_solver::AUTHOR, &hash);
 //! ```
 //!
@@ -43,6 +44,8 @@
 //! search, the coordinates and the routing are counted in work, never timed, so they always do.
 
 mod bound;
+mod budget;
+mod config;
 mod coords;
 mod driver;
 mod holds;
@@ -63,6 +66,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use rnl_runtime::problem::FactKind;
 
+pub use budget::{BudgetProgress, BudgetReport, RunLimit, StopReason};
+pub use config::{is_run_setting, Settings};
 pub use holds::{fact_holds, holds_as_drawn, problem_fact_holds_as_drawn};
 pub use options::{Budget, Layer, Objectives, SolverOptions, DEFAULT_LAYERS, DEFAULT_TIME_LIMIT, OBJECTIVES};
 pub use resolve::Resolved;
@@ -82,6 +87,10 @@ pub struct Solved {
 /// What became of the facts, and how much work it took.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct SolveReport {
+    /// Whole-solve budget for 0.4; absent for released input versions.
+    pub budget: Option<BudgetReport>,
+    /// Canonical options for persisting the result, with a time limit normalized to admitted work.
+    pub canonical_options: Option<String>,
     /// The facts kept, by their index in [`LevelProblem::facts`], in that order (8.5).
     pub kept: Vec<usize>,
     /// The facts discarded, in the order of [`LevelProblem::facts`] (8.5), each with every minimal
@@ -247,6 +256,12 @@ pub struct Work {
 /// that advances by a step each time it is read, so that the limit is reached at the same point
 /// on every run.
 pub trait Clock {
+    /// Whether wall time can advance. A stopped clock requests the initial heuristic pass.
+    fn advances(&self) -> bool {
+        true
+    }
+    /// Optional progress. Observation can affect a time cutoff, but cannot consume work.
+    fn progress(&self, _progress: BudgetProgress) {}
     /// The seconds since some start of the clock's own, never less than at an earlier reading.
     /// Only differences count: the limit of a level runs from the reading when its resolution
     /// begins.
@@ -266,6 +281,9 @@ pub trait Clock {
 pub struct StoppedClock;
 
 impl Clock for StoppedClock {
+    fn advances(&self) -> bool {
+        false
+    }
     fn elapsed(&self) -> f64 {
         0.0
     }
@@ -290,11 +308,17 @@ pub fn solve(problem: &LevelProblem, options: &SolverOptions) -> Solved {
     solve_with_clock(problem, options, &StoppedClock)
 }
 
-/// [`solve`], with the time limit of the resolution ([`SolverOptions::time_limit`], the draft
-/// 0.3, 8.5) measured on `clock`. Only the resolution of 8.5 is timed, its checks and the search
-/// for its minimal conflict groups; the witness taken as written, the search, the coordinates and
-/// the routing are counted in work.
+/// [`solve`] measured on the caller's clock. For 0.4, the shared time or work budget covers
+/// resolution, structure, search, coordinates and routing. Use the report's canonical options
+/// when hashing the persisted result, so time-to-work replay includes the same hash.
+/// Released input versions retain their resolution-only time limit.
 pub fn solve_with_clock(problem: &LevelProblem, options: &SolverOptions, clock: &dyn Clock) -> Solved {
+    budget::without(|| solve_isolated(problem, options, clock))
+}
+
+fn solve_isolated(problem: &LevelProblem, options: &SolverOptions, clock: &dyn Clock) -> Solved {
+    let (effective, warnings) = options.for_problem(problem);
+    let options = &effective;
     profile::with(clock.profiler(), || {
         if profile::enabled() {
             profile::emit(profile::ProfileEvent::Level {
@@ -315,7 +339,22 @@ pub fn solve_with_clock(problem: &LevelProblem, options: &SolverOptions, clock: 
                 problem.objects.iter().filter(|o| o.kind == rnl_runtime::problem::ObjectKind::Instance).count() as u64,
             );
         }
-        let solved = driver::solve(problem, options, clock);
+        let mut solved = if problem.version == "0.4" {
+            let (limit, safety) = run_limits(options, clock);
+            let (mut solved, report) = budget::with(clock, limit, safety, || driver::solve(problem, options, clock));
+            let replay =
+                SolverOptions { run_limit: Some(RunLimit::Work(report.work)), time_limit: None, ..options.clone() };
+            solved.report.canonical_options = Some(replay.canonical());
+            solved.report.budget = Some(report);
+            solved.report.notes.push(format!(
+                "budget: {} work units; limit: {:?}; stopped: {:?}; replay with limit=\"work\", work={}",
+                report.work, report.limit, report.reason, report.work
+            ));
+            solved
+        } else {
+            driver::solve(problem, options, clock)
+        };
+        solved.report.warnings.extend(warnings);
         profile::emit(profile::ProfileEvent::LevelEnd);
         solved
     })
@@ -335,5 +374,28 @@ pub fn resolve(problem: &LevelProblem, options: &SolverOptions) -> Resolved {
 /// [`resolve()`], with the time limit ([`SolverOptions::time_limit`], the draft 0.3, 8.5) measured
 /// on `clock`.
 pub fn resolve_with_clock(problem: &LevelProblem, options: &SolverOptions, clock: &dyn Clock) -> Resolved {
-    resolve::resolve(problem, options, clock)
+    budget::without(|| {
+        let (options, warnings) = options.for_problem(problem);
+        let mut resolved = if problem.version == "0.4" {
+            let (limit, safety) = run_limits(&options, clock);
+            let (mut resolved, report) =
+                budget::with(clock, limit, safety, || resolve::resolve(problem, &options, clock));
+            resolved.budget = Some(report);
+            resolved
+        } else {
+            resolve::resolve(problem, &options, clock)
+        };
+        resolved.warnings.extend(warnings);
+        resolved
+    })
+}
+
+fn run_limits(options: &SolverOptions, clock: &dyn Clock) -> (RunLimit, Option<f64>) {
+    let mut limit =
+        options.run_limit.unwrap_or(if options.time_limit.is_some() { RunLimit::Time(10.0) } else { RunLimit::Seed });
+    if matches!(limit, RunLimit::Time(_)) && !clock.advances() {
+        limit = RunLimit::Seed;
+    }
+    let safety = (!matches!(limit, RunLimit::Time(_))).then_some(options.safety_seconds).flatten();
+    (limit, safety)
 }

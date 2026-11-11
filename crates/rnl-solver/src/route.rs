@@ -508,6 +508,9 @@ const SHARED: u32 = u32::MAX - 1;
 
 impl<'a> Grid<'a> {
     fn new(layout: &'a Layout) -> Result<Grid<'a>, Failure> {
+        if !crate::budget::permit(crate::budget::Step::Route, layout.nets.len()) {
+            return Err(Failure::Budget);
+        }
         let mut extent: Option<[Q; 4]> = None;
         let mut grow = |p: &[Q; 2]| {
             extent = Some(match extent.take() {
@@ -550,6 +553,9 @@ impl<'a> Grid<'a> {
         let Some(extent) = extent else { return Err(Failure::Lattice) };
         let lat = Lattice::new(&extent, CLEARANCE + MARGIN, [&extra[0], &extra[1]], [&near[0], &near[1]])?;
         let n = lat.len();
+        if !crate::budget::permit(crate::budget::Step::Route, n) {
+            return Err(Failure::Budget);
+        }
         let mut g = Grid {
             layout,
             blocked: vec![false; n],
@@ -950,7 +956,7 @@ impl<'a> Grid<'a> {
             if f > g + h(&self.lat, node) {
                 continue;
             }
-            if *budget == 0 {
+            if *budget == 0 || !crate::budget::permit(crate::budget::Step::Route, 1) {
                 crate::profile::add("astar_budget_failures", 1);
                 return Err(Failure::Budget);
             }
@@ -1506,23 +1512,8 @@ fn finish_net(net: &NetIn, out: &mut NetOut) {
         let (ra, rb) = (find(&mut parent, a), find(&mut parent, b));
         parent[ra.max(rb)] = ra.min(rb);
     }
-    let distance = |a: usize, b: usize| {
-        let (p, q) = (&net.anchors[a].at, &net.anchors[b].at);
-        (&p[0] - &q[0]).abs() + (&p[1] - &q[1]).abs()
-    };
-    loop {
-        let root = find(&mut parent, 0);
-        let groups: Vec<usize> = (0..n).map(|a| find(&mut parent, a)).collect();
-        let mut nearest: Option<(Q, usize, usize)> = None;
-        for a in (0..n).filter(|&a| groups[a] != root) {
-            for b in (0..n).filter(|&b| groups[b] == root) {
-                let d = distance(a, b);
-                if nearest.as_ref().is_none_or(|(least, _, _)| d < *least) {
-                    nearest = Some((d, a, b));
-                }
-            }
-        }
-        let Some((_, a, b)) = nearest else { break };
+    let groups: Vec<usize> = (0..n).map(|a| find(&mut parent, a)).collect();
+    for (a, b) in nearest_joins(net, &groups) {
         let (p, q) = (net.anchors[a].at.clone(), net.anchors[b].at.clone());
         // leaves `a` the way its pin does, when that is along an axis
         let vertical_first = net.anchors[a].exit.is_some_and(|(x, _)| x == 0);
@@ -1533,8 +1524,6 @@ fn finish_net(net: &NetIn, out: &mut NetOut) {
         }
         vertices.push(q);
         out.wires.push(WireOut { start: End::Anchor(a), end: End::Anchor(b), vertices });
-        let (ra, rb) = (find(&mut parent, a), find(&mut parent, b));
-        parent[ra.max(rb)] = ra.min(rb);
     }
     // an anchor where three now meet: the wires made end at a branch point on it
     let written = |a: usize| net.joined.iter().filter(|(x, y)| *x == a || *y == a).count();
@@ -1559,6 +1548,43 @@ fn finish_net(net: &NetIn, out: &mut NetOut) {
     out.forced = true;
     out.parts = 1;
     out.failure = None;
+}
+
+/// Prim's frontier over already connected components. Retaining each outside anchor's
+/// nearest inside anchor preserves the distance/a/b tie order with quadratic total scans.
+fn nearest_joins(net: &NetIn, groups: &[usize]) -> Vec<(usize, usize)> {
+    let n = groups.len();
+    if n == 0 {
+        return Vec::new();
+    }
+    let mut inside: Vec<bool> = groups.iter().map(|g| *g == groups[0]).collect();
+    let mut nearest: Vec<Option<(Q, usize)>> = vec![None; n];
+    let update = |inside: &[bool], added: &[usize], nearest: &mut [Option<(Q, usize)>]| {
+        for a in (0..n).filter(|&a| !inside[a]) {
+            for &b in added {
+                let (p, q) = (&net.anchors[a].at, &net.anchors[b].at);
+                let candidate = ((&p[0] - &q[0]).abs() + (&p[1] - &q[1]).abs(), b);
+                if nearest[a].as_ref().is_none_or(|old| candidate < *old) {
+                    nearest[a] = Some(candidate);
+                }
+            }
+        }
+    };
+    let initial: Vec<usize> = (0..n).filter(|&a| inside[a]).collect();
+    update(&inside, &initial, &mut nearest);
+    let mut edges = Vec::new();
+    loop {
+        let next =
+            (0..n).filter(|&a| !inside[a]).filter_map(|a| nearest[a].as_ref().map(|(d, b)| (d.clone(), a, *b))).min();
+        let Some((_, a, b)) = next else { break };
+        edges.push((a, b));
+        let added: Vec<usize> = (0..n).filter(|&k| groups[k] == groups[a]).collect();
+        for &k in &added {
+            inside[k] = true;
+        }
+        update(&inside, &added, &mut nearest);
+    }
+    edges
 }
 
 /// The order of the first try: the smallest nets first, by the half perimeter of their points, then
@@ -1599,6 +1625,14 @@ fn route_in_order(layout: &Layout, order: &[usize], budget: u64, expansions: &mu
     crate::profile::set("grid_states", grid.best.len() as u64);
     let mut outs: Vec<NetOut> = vec![NetOut::default(); layout.nets.len()];
     for &i in order {
+        if !crate::budget::permit(
+            crate::budget::Step::Route,
+            layout.nets[i].anchors.len().saturating_mul(layout.nets[i].anchors.len()),
+        ) {
+            let parts = parts_of(&layout.nets[i]);
+            outs[i] = NetOut { parts, failure: (parts > 1).then_some(Failure::Budget), ..NetOut::default() };
+            continue;
+        }
         let _net = crate::profile::span_lazy("route_net", || format!("net_{i}"));
         crate::profile::add("nets", 1);
         crate::profile::set("endpoints", layout.nets[i].anchors.len() as u64);

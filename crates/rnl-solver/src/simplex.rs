@@ -643,6 +643,7 @@ impl<T: Clone + Ord> Simplex<T> {
 
     fn out_of_budget(&self) -> bool {
         self.pivot_limit.is_some_and(|limit| self.pivots >= limit)
+            || !crate::budget::permit(crate::budget::Step::Pivot, self.vars.len().saturating_mul(self.rows.len()))
     }
 
     /// The tags of the bounds that keep the basic variable of row `r` out of its bounds: its own

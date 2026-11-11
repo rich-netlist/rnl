@@ -182,7 +182,7 @@ pub(crate) fn place(
             // overlaps of this placement may not be those of the next
             continue;
         }
-        if new.is_empty() || round >= REPAIR_ROUNDS {
+        if new.is_empty() || round >= REPAIR_ROUNDS || crate::budget::stopped() {
             let dropped = rels.iter().zip(&kept).filter(|(_, k)| !**k).map(|(t, _)| t.kind).collect();
             let overlaps = overlaps
                 .into_iter()

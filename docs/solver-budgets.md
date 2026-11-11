@@ -1,0 +1,121 @@
+# Solver settings and replay in 0.4
+
+The 0.4 solver defaults to a ten-second shared budget. Fact resolution, model expansion,
+structure analysis, candidate search, coordinate pivots and routing consume weighted work.
+The report gives the work actually admitted, the stopping reason and a replay command.
+Released input versions retain their existing solver behavior during development.
+
+```sh
+rnl solver-defaults
+rnl solve circuit.sp -o solved --solver-config 'limit="time",seconds=10' --progress
+rnl solve circuit.sp -o replay --solver-config 'limit="work",work=243750'
+```
+
+Use the reported count for the same drawing level, input, settings and solver build. For a
+file with several levels, replay each level with `--level` and that level's own count. Keep
+`--report` the same: requesting additional conflict explanations consumes budget too.
+Progress goes to standard error and does not enter the saved file. Profiling or progress
+observation can move a time cutoff; neither consumes deterministic work.
+
+Time is checked before admitting a positive-cost operation. The reported count is the sum
+of admitted operations. A work replay refuses the same next operation, including inside
+resolution or a coordinate search. Stopping is latched. Already proved facts remain valid;
+unfinished checks are undecided, with warnings, rather than contradictory or satisfied.
+Necessary result assembly and forced route completion are deterministic finalization.
+
+`SolveReport.canonical_options` is the options text to pass to `sig2` when saving a 0.4
+result. It normalizes the time limit to the admitted work, so replay preserves the record's
+hash as well as its placements and wires. A caller must not hash its original time settings
+in place of this returned text. The CLI uses the returned text automatically.
+
+Deterministic modes also have an emergency wall-clock ceiling, `safety_seconds=30` by default. A
+`Safety` stop explicitly reports that the requested deterministic work run was interrupted.
+It is not a successful completion of the requested work budget. The solver uses only the
+caller's clock, including in WebAssembly; it does not read environment switches or spawn
+worker threads.
+
+At a zero-second limit, the old 0.4 resolution-only deadline still allowed placement to run.
+The shared zero-second limit admits no model work: the facts remain undecided and the two
+symbols stay at their initial coincident positions. This boundary example demonstrates the
+scope of the limit; it is not the default ten-second setting.
+
+| Previous resolution-only limit | Shared solve limit |
+| --- | --- |
+| ![Two symbols placed](images/shared-budget-before.png) | ![No optional placement admitted](images/shared-budget-after.png) |
+
+`limit="seed"` finishes the initial heuristic candidates without later refinement. During
+the layout migration the row driver still consists of that initial pass; subsequent layout
+searches will use the same shared budget. This mode names that first pass, and does not
+introduce randomized ordering.
+
+## Settings
+
+`--solver-config` takes the named parameters inside SOLVER-CONFIG parentheses, including
+quoted strings and flat arrays. Repeated flags merge by key. Precedence is solver defaults,
+package headers in package order, the file header, the level's records, then explicit tool
+settings. Defaults do not mask file values. `--solver-options` remains a deprecated alias;
+its previous semicolon syntax is also accepted during the transition.
+
+| Key | Value | Default | Allowed in a file |
+| --- | --- | --- | --- |
+| `layout` | `"rows"` | `"rows"` | yes |
+| `spacing_x`, `spacing_y` | integer from -1 through 20, retained for line layout | 0 | yes |
+| `junction` | definition name as a string; empty disables dots | unset | yes |
+| `tolerance` | finite nonnegative number | 0.000001 | yes |
+| `grid` | positive number, or `false` | 1 | yes |
+| `beam` | integer from 1 through 1024 | 4 | yes |
+| `objectives` | layered objectives as a string | existing layered objectives | yes |
+| `limit` | `"time"`, `"work"`, or `"seed"` (initial heuristic candidates only) | `"time"` | no |
+| `seconds` | finite nonnegative number | 10 | no |
+| `work` | exact nonnegative integer count | required for work mode | no |
+| `safety_seconds` | finite nonnegative number | 30 | no |
+| `candidates`, `astar_expansions` | nonnegative integer caps | 256, 200000 | no |
+
+Nonzero spacing is parsed and hashed, with a warning that the current row layout keeps its
+fixed gaps. The skeleton/line-layout migration will consume it; group spacing follows the
+innermost containing group at that stage.
+
+Run settings in a file warn and are ignored. Unknown keys warn and are ignored. Invalid
+known file values warn and leave the effective default in place; invalid tool values are
+rejected before solving. The problem hash includes file settings. Junction names are
+resolved by the runtime in the target level, including tool overrides, so an override
+retains the same name and alias rules as a file setting. Tool overrides enter the options
+digest, while the input digest retains the original file settings. A saved result therefore
+remains solved when reopened without the command-line overrides. `JunctionConfig.effective()`
+selects the resolved tool value for writing; its base definition still identifies the file.
+
+## Work units and checks
+
+Weights are integers, multiplied by at least one input unit per checkpoint:
+
+| Operation | Weight | Size multiplier |
+| --- | --- | --- |
+| Resolution/model encoding | 8 | objects, model reconstruction size, or one encoded pair |
+| Simplex pivot | 16 | variables × tableau rows |
+| Candidate estimate | 32 | elements |
+| Placement | 32 | objects |
+| Routing | 1 | A* expansion, grid cells, per-tree anchor pairs, or route count at a candidate boundary |
+| Structure | 4 | group members or graph edges visited |
+
+The units are a replay protocol, not a promise that every unit takes the same time. Exact
+rational arithmetic and input shape affect cost. Changing the checkpoint sequence or
+weights requires re-calibration and work counts from the new solver build.
+
+The public `solver_parity` example supplies two synthetic circuits. Initial native debug
+calibration ran each three times; all eight runs per repetition finished below 0.012 seconds.
+With a requested million units, the two examples admitted 243750 and 997848 units; with
+4096 units, they admitted 4056 and 3032. A partly affordable operation is not admitted, so
+the count can be below the requested limit. These small examples calibrate the accounting
+and replay checks; they do not establish a runtime bound for arbitrary circuits.
+
+Tests cover time-to-work replay at internal cutoffs, kept facts with orientation lists and
+local pins, tolerance-dependent coordinates, interrupted Cartesian TABLE expansion,
+nested scopes, panic restoration, thread isolation, settings precedence and full saved-file
+identity. CI also builds the same example for native and WebAssembly and compares eight
+complete generated records byte for byte:
+
+```sh
+cargo build -p rnl-runtime-wasm --example solver_parity
+cargo build -p rnl-runtime-wasm --example solver_parity --target wasm32-unknown-unknown
+node bindings/runtime-wasm/tests/solver-equality.mjs target/debug/examples/solver_parity target/wasm32-unknown-unknown/debug/examples/solver_parity.wasm
+```

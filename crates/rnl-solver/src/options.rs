@@ -294,6 +294,11 @@ impl Budget {
 /// The options of the solver: every setting that changes its result.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SolverOptions {
+    pub settings: crate::Settings,
+    /// Whole-solve limit for 0.4. None uses ten seconds, or no limit when `time_limit` is None.
+    pub run_limit: Option<crate::RunLimit>,
+    /// Emergency wall-clock ceiling for work replay; reaching it is reported as non-reproducible.
+    pub safety_seconds: Option<f64>,
     /// Differences within it count as satisfied (11.7): the constant bounds of the facts are
     /// widened by it, never the equalities between variables (plan section 4).
     pub tolerance: f64,
@@ -335,6 +340,9 @@ pub struct SolverOptions {
 impl Default for SolverOptions {
     fn default() -> Self {
         SolverOptions {
+            settings: crate::Settings::default(),
+            run_limit: None,
+            safety_seconds: Some(30.0),
             tolerance: TOL,
             grid: Some(1.0),
             objectives: Objectives::default(),
@@ -346,7 +354,20 @@ impl Default for SolverOptions {
     }
 }
 
-const KEYS: [&str; 6] = ["tolerance", "grid", "objectives", "beam", "budget", "time_limit"];
+const KEYS: [&str; 12] = [
+    "tolerance",
+    "grid",
+    "objectives",
+    "beam",
+    "budget",
+    "time_limit",
+    "run",
+    "spacing_x",
+    "spacing_y",
+    "search",
+    "report_hints",
+    "junction_utf8",
+];
 
 impl SolverOptions {
     /// The defaults without a time limit: the resolution is exactly that of 8.5, the same on every
@@ -361,7 +382,7 @@ impl SolverOptions {
     /// only the report, is not.
     pub fn canonical(&self) -> String {
         let none = |v: Option<f64>| v.map_or_else(|| "none".to_string(), fmt_num);
-        format!(
+        let mut text = format!(
             "tolerance={};grid={};objectives={};beam={};budget={};time_limit={}",
             fmt_num(self.tolerance),
             none(self.grid),
@@ -369,7 +390,28 @@ impl SolverOptions {
             self.beam,
             self.budget.canonical(),
             none(self.time_limit)
-        )
+        );
+        if let Some(limit) = self.run_limit {
+            text.push_str(&match limit {
+                crate::RunLimit::Time(s) => format!(";run=time:{}", fmt_num(s)),
+                crate::RunLimit::Work(w) => format!(";run=work:{w}"),
+                crate::RunLimit::Unlimited => ";run=unlimited".into(),
+                crate::RunLimit::Seed => ";run=seed".into(),
+            });
+            text.push_str(&format!(";report_hints={}", self.hints_for_low));
+        }
+        if self.settings.spacing != [0, 0] {
+            text.push_str(&format!(";spacing_x={};spacing_y={}", self.settings.spacing[0], self.settings.spacing[1]));
+        }
+        if let Some(junction) = &self.settings.junction {
+            // UTF-8 hex keeps arbitrary quoted definition names independent of this format's
+            // semicolon separator, while retaining exact option round trips.
+            text.push_str(";junction_utf8=");
+            for byte in junction.as_bytes() {
+                text.push_str(&format!("{byte:02x}"));
+            }
+        }
+        text
     }
 
     /// Options from their text: the defaults, with the settings the text gives.
@@ -409,6 +451,35 @@ impl SolverOptions {
                 }
                 "time_limit" if value == "none" => options.time_limit = None,
                 "time_limit" => options.time_limit = Some(number("the time limit", value)?),
+                "run" | "search" => {
+                    options.run_limit = Some(match value.split_once(':') {
+                        Some(("time", s)) => crate::RunLimit::Time(number("seconds", s)?),
+                        Some(("work", n)) => crate::RunLimit::Work(n.parse().map_err(|_| "work must be an integer")?),
+                        None if value == "unlimited" => crate::RunLimit::Unlimited,
+                        None if value == "seed" => crate::RunLimit::Seed,
+                        _ => return Err("run must be time:SECONDS, work:COUNT, seed or unlimited".into()),
+                    });
+                }
+                "spacing_x" | "spacing_y" => {
+                    options.settings.spacing[usize::from(key == "spacing_y")] =
+                        value.parse().map_err(|_| "spacing must be an integer")?
+                }
+                "report_hints" => {
+                    options.hints_for_low = value.parse().map_err(|_| "report_hints must be true or false")?
+                }
+                "junction_utf8" => {
+                    if value.len() % 2 != 0 || !value.is_ascii() {
+                        return Err("junction_utf8 must be UTF-8 bytes in hex".into());
+                    }
+                    let bytes = (0..value.len())
+                        .step_by(2)
+                        .map(|i| {
+                            u8::from_str_radix(&value[i..i + 2], 16).map_err(|_| "junction_utf8 must be hexadecimal")
+                        })
+                        .collect::<Result<Vec<_>, _>>()?;
+                    options.settings.junction =
+                        Some(String::from_utf8(bytes).map_err(|_| "junction_utf8 must encode valid UTF-8")?);
+                }
                 _ => options.budget.read(value)?,
             }
         }
@@ -419,6 +490,23 @@ impl SolverOptions {
     /// Whether the options make sense: a tolerance not below 0, a grid above 0, objectives that
     /// [`Objectives::validate`] accepts, a beam of at least 1, a time limit not below 0.
     pub fn validate(&self) -> Result<(), String> {
+        if self.settings.spacing.iter().any(|n| !(-1..=20).contains(n)) {
+            return Err("spacing must be between -1 and 20".into());
+        }
+        for seconds in [
+            self.safety_seconds,
+            match self.run_limit {
+                Some(crate::RunLimit::Time(s)) => Some(s),
+                _ => None,
+            },
+        ]
+        .into_iter()
+        .flatten()
+        {
+            if !seconds.is_finite() || seconds < 0.0 {
+                return Err("seconds must be finite and nonnegative".into());
+            }
+        }
         if !(self.tolerance.is_finite() && self.tolerance >= 0.0) {
             return Err(format!("the tolerance must be a number not below 0, not {}", self.tolerance));
         }
@@ -499,6 +587,7 @@ mod tests {
             budget: Budget { candidates: 7, astar_expansions: 8 },
             time_limit: None,
             hints_for_low: false,
+            ..SolverOptions::default()
         };
         let text = options.canonical();
         assert_eq!(

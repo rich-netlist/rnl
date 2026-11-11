@@ -91,6 +91,9 @@ pub(crate) type RuleMembers = ((usize, usize), Rc<Vec<unit::UnitMember>>);
 
 #[derive(Clone, Debug)]
 pub struct Options {
+    /// Explicit tool settings for core-owned policies such as junction writeback. They do not
+    /// replace the file settings in the solver problem's input identity.
+    pub solver_config: Vec<crate::problem::SolverSetting>,
     /// Use the released versions' implicit standard package (16.3). False also disables
     /// `include_std`; explicit USE-PACKAGE statements always keep their meaning.
     pub std: bool,
@@ -116,6 +119,7 @@ pub struct Options {
 impl Default for Options {
     fn default() -> Options {
         Options {
+            solver_config: Vec::new(),
             std: true,
             include_std: false,
             std_version: None,
@@ -284,6 +288,7 @@ pub struct Interp<'p> {
     pub(crate) want_problems: bool,
     /// The tolerance of the checks against written coordinates (`Options::tolerance`, 11.7).
     pub(crate) tol: f64,
+    tool_solver_config: Vec<crate::problem::SolverSetting>,
     /// The standard package used implicitly for the files of each language version (16.3).
     pub(crate) std_units: HashMap<String, Option<UnitId>>,
     /// The version of the standard package that the reading asks for ([`Options::std_version`]),
@@ -422,6 +427,7 @@ impl<'p> Interp<'p> {
             read_generated: options.generated,
             want_problems: options.problems,
             tol: options.tolerance,
+            tool_solver_config: options.solver_config.clone(),
             std_units: HashMap::new(),
             missing_std: None,
             std_language_reported: HashSet::new(),

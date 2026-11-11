@@ -147,12 +147,15 @@ pub(crate) struct Deadline<'c> {
 impl<'c> Deadline<'c> {
     /// A limit of `limit` seconds from now, or none.
     pub(crate) fn new(clock: &'c dyn Clock, limit: Option<f64>) -> Deadline<'c> {
-        let at = limit.map(|l| clock.elapsed() + l);
+        let at = limit.filter(|_| !crate::budget::active()).map(|l| clock.elapsed() + l);
         Deadline { clock, at, out: Cell::new(false) }
     }
 
     /// Whether the time is out: the clock is read, until it is.
     pub(crate) fn passed(&self) -> bool {
+        if crate::budget::active() {
+            return !crate::budget::permit(crate::budget::Step::Resolve, 1);
+        }
         if self.out.get() {
             return true;
         }
@@ -167,7 +170,7 @@ impl<'c> Deadline<'c> {
 
     /// Whether the time was out when the clock was last read; the clock is not read.
     pub(crate) fn has_passed(&self) -> bool {
-        self.out.get()
+        self.out.get() || crate::budget::stopped()
     }
 }
 
@@ -191,12 +194,15 @@ impl Limits<'_> {
 
     /// Whether the time is out, reading the clock.
     fn out_of_time(&self) -> bool {
+        if crate::budget::active() {
+            return !crate::budget::permit(crate::budget::Step::Resolve, 1);
+        }
         matches!(self, Limits::Time(d) if d.passed())
     }
 
     /// Whether the time was out at the last reading, without reading the clock.
     fn was_out(&self) -> bool {
-        matches!(self, Limits::Time(d) if d.has_passed())
+        crate::budget::stopped() || matches!(self, Limits::Time(d) if d.has_passed())
     }
 }
 
@@ -1490,6 +1496,8 @@ pub(crate) struct Witness {
 /// every fact kept, the witness from which the coordinates are sought.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Resolved {
+    /// Budget of a standalone 0.4 resolution; a full solve reports its shared budget instead.
+    pub budget: Option<crate::BudgetReport>,
     /// The facts kept, by their index in [`LevelProblem::facts`], in that order (8.5).
     pub kept: Vec<usize>,
     /// The facts discarded, in that order, each with its minimal conflict groups, all of them
@@ -1617,9 +1625,12 @@ pub(crate) fn resolve(problem: &LevelProblem, options: &SolverOptions, clock: &d
         crate::profile::set("selectors", whole.units.iter().map(|u| u.choices.len() as u64).sum());
     }
     let mut failed = Vec::new();
-    let mut undecided = Vec::new();
+    let mut undecided: Vec<usize> = whole.unfinished.iter().copied().collect();
     let mut alone = Resolver::new(&whole, n, limits);
     for f in 0..problem.facts.len() {
+        if whole.unfinished.contains(&f) {
+            continue;
+        }
         match alone.alone(f) {
             Outcome::Kept => {}
             Outcome::Conflict(_) => failed.push(f),
@@ -1635,7 +1646,7 @@ pub(crate) fn resolve(problem: &LevelProblem, options: &SolverOptions, clock: &d
     let model = if failed.is_empty() {
         whole
     } else {
-        Model::with_exact(problem, tol, BTreeSet::new(), failed.iter().copied().collect())
+        Model::with_exact(problem, tol, BTreeSet::new(), failed.iter().chain(&whole.unfinished).copied().collect())
     };
     let mut kept = Vec::new();
     let mut conflicts: Vec<(usize, Vec<usize>)> = Vec::new();
@@ -1656,6 +1667,12 @@ pub(crate) fn resolve(problem: &LevelProblem, options: &SolverOptions, clock: &d
     let warnings = undecided
         .iter()
         .map(|&f| {
+            if crate::budget::active() {
+                return format!(
+                    "the fact {} was not decided within the shared solve budget and is discarded (8.5)",
+                    fact_name(problem, f)
+                );
+            }
             format!(
                 "the fact {} was not decided within the time limit of {seconds} s and is discarded (8.5)",
                 fact_name(problem, f)
@@ -1720,7 +1737,21 @@ pub(crate) fn resolve(problem: &LevelProblem, options: &SolverOptions, clock: &d
     }
     let (witness, as_written, placing) = placed.unwrap_or_else(|| (witness_of(&r, &model), false, model.clone()));
     drop(r);
-    Resolved { kept, discarded, failed, statements, work, errors, warnings, notes, witness, model, as_written, placing }
+    Resolved {
+        budget: None,
+        kept,
+        discarded,
+        failed,
+        statements,
+        work,
+        errors,
+        warnings,
+        notes,
+        witness,
+        model,
+        as_written,
+        placing,
+    }
 }
 
 /// The note on the facts of priority low discarded whose other groups were not sought
@@ -1796,6 +1827,9 @@ fn taken_as_written(
     kept: &[usize],
     work: &mut Work,
 ) -> Option<(Witness, bool, Model)> {
+    if !crate::budget::permit(crate::budget::Step::Resolve, problem.facts.len().saturating_mul(problem.objects.len())) {
+        return None;
+    }
     let n = problem.objects.len();
     let limits = Limits::Caps(CAPS);
     let exact = Model::with_exact(problem, Q::zero(), BTreeSet::new(), model.left_out.clone());
@@ -1809,6 +1843,9 @@ fn taken_as_written(
         return Some((witness, true, exact));
     }
     let exact_facts = held_as_written(problem, model, kept, work);
+    if crate::budget::stopped() {
+        return None;
+    }
     let placing = Model::with_exact(problem, model.tol.clone(), exact_facts, model.left_out.clone());
     let mut w = Resolver::new(&placing, n, limits);
     let holds = kept.iter().all(|&f| w.add(f) == Outcome::Kept);
@@ -1827,6 +1864,9 @@ fn held_as_written(problem: &LevelProblem, model: &Model, kept: &[usize], work: 
     let n = problem.objects.len();
     let mut exact = BTreeSet::new();
     for &f in kept {
+        if !crate::budget::permit(crate::budget::Step::Resolve, problem.facts.len().saturating_mul(n)) {
+            break;
+        }
         let widened = matches!(
             problem.facts[f].kind,
             FactKind::Place { .. }
