@@ -7,6 +7,11 @@
       "sha256": "3738e1ce0c5d6fca3e13ad44faac8bd54f5eeb70577a22e412f5858f21f86711"
     },
     {
+      "name": "analog-canvas-extensions",
+      "version": "0.6",
+      "sha256": "6b8af6bbc4538cc5ea845b45c4511027fd61865917839a37612c326e19905ead"
+    },
+    {
       "name": "eda-style",
       "version": "0.1",
       "sha256": "899d4251f7fb899551fe8b0d1404cb5277fca6428efb226d619f4361e45d6765"

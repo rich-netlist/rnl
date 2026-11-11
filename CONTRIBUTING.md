@@ -59,6 +59,8 @@ This reads `packages.lock.json`, looks up each exact name/version in the public 
 checks the locked SHA-256, downloads and verifies all version assets, and writes the ignored
 `.rnl-packages/NAME/VERSION/` directory beside that checkout's `Cargo.toml`. No shared Git-dir
 assumption is made; invoking the script by absolute path from another directory also works.
+A package may be locked at several versions, such as each version Analog Canvas writes; a test
+that names a package without a version reads its first entry.
 Use `python scripts/packages.py check` to verify the cache, or `python scripts/packages.py fixture`
 to generate `.rnl-packages/fixture/catalog.json` and offline assets for browser tests.
 

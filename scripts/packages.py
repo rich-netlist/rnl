@@ -46,13 +46,17 @@ def catalog(url):
 def locks():
     return json.loads((ROOT/'packages.lock.json').read_text(encoding='utf-8'))['packages']
 
-def package_dir(name):
-    entry = next(p for p in locks() if p['name'] == name)
-    return CACHE / name / entry['version']
+def locked(name, version=None):
+    """The lock entry of a package: the version asked for, or its first entry, which tests that
+    name no version read."""
+    return next(p for p in locks() if p['name'] == name and version in (None, p['version']))
 
-def require(name):
-    p = next(p for p in locks() if p['name'] == name)
-    file = package_dir(name) / f'{name}.rnl'
+def package_dir(name, version=None):
+    return CACHE / name / locked(name, version)['version']
+
+def require(name, version=None):
+    p = locked(name, version)
+    file = package_dir(name, p['version']) / f'{name}.rnl'
     if not file.is_file():
         raise FileNotFoundError(f'Public packages are missing; run `{DOWNLOAD}` from the checkout root.')
     if digest(file.read_bytes()) != p['sha256']:
@@ -113,7 +117,7 @@ def download(url, latest=False):
 def fixture(out):
     data = json.loads((CACHE/'catalog.json').read_text(encoding='utf-8'))
     for p in data['packages']:
-        require(p['name'])
+        require(p['name'], p['version'])
         prefix = f"packages/{p['name']}/{p['version']}/"
         for asset in p['assets']:
             source = CACHE/p['name']/p['version']/asset['path']
@@ -141,7 +145,7 @@ def main():
     if args.command == 'download': download(args.catalog, args.latest)
     elif args.command == 'fixture': fixture(args.out)
     else:
-        for p in locks(): require(p['name'])
+        for p in locks(): require(p['name'], p['version'])
         print('ok: locked public package hashes')
 
 if __name__ == '__main__':

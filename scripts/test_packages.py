@@ -37,6 +37,24 @@ class PackageDownloads(unittest.TestCase):
         data = json.loads((out/'catalog.json').read_text())
         self.assertEqual(data['packages'][0]['url'], 'packages/example/0.1/example.rnl')
 
+    def test_several_versions_of_a_package(self):
+        newer = b'newer bytes\n'
+        sha = hashlib.sha256(newer).hexdigest()
+        (self.root/'example-0.2.rnl').write_bytes(newer)
+        second = {'name':'example', 'version':'0.2', 'sha256':sha, 'url':'example-0.2.rnl',
+                  'assets':[{'path':'example.rnl','url':'example-0.2.rnl','sha256':sha}]}
+        self.catalog.write_text(json.dumps({'schemaVersion':1,'packages':[self.record, second]}))
+        (self.root/'packages.lock.json').write_text(json.dumps({'packages':[
+            {k:r[k] for k in ('name','version','sha256')} for r in (self.record, second)]}))
+        packages.download(str(self.catalog))
+        # a name alone is its first entry, as before; each version is there and verified
+        self.assertEqual(packages.require('example').joinpath('example.rnl').read_bytes(), self.data)
+        self.assertEqual(packages.require('example', '0.2').joinpath('example.rnl').read_bytes(), newer)
+        out = self.root/'fixture'
+        packages.fixture(out)
+        urls = [p['url'] for p in json.loads((out/'catalog.json').read_text())['packages']]
+        self.assertEqual(urls, ['packages/example/0.1/example.rnl', 'packages/example/0.2/example.rnl'])
+
     def test_corrupt_download_is_rejected_without_populating_cache(self):
         self.file.write_bytes(b'changed')
         with self.assertRaisesRegex(ValueError, 'SHA-256 mismatch'):

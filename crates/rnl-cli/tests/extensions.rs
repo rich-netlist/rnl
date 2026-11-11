@@ -280,3 +280,39 @@ fn the_circle_sources_are_in_the_catalog_with_their_terminals_box_and_labels() {
         assert!(c["symbols"].as_array().unwrap().iter().any(|s| s["symbol"] == name), "{name}");
     }
 }
+
+/// The version Analog Canvas writes, locked beside 0.1: a file of 0.3 that names it reads its
+/// parts on primitive cards and on calls of the bodies Canvas writes.
+#[test]
+fn the_version_analog_canvas_writes_reads() {
+    if !public_packages::available() {
+        return;
+    }
+    let dir = public_packages::version_dir("analog-canvas-extensions", "0.6");
+    let package = std::fs::read_to_string(dir.join("analog-canvas-extensions.rnl")).unwrap();
+    let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); \
+                @USE-PACKAGE(name=\"analog-canvas-extensions\", version=\"0.6\")}\n\
+                .subckt potentiometer n1 nw n2\nR1 n1 nw 1k\nR2 nw n2 1k\n.ends potentiometer\n\
+                .subckt crystal n1 n2\nC0 n1 n2 5p\n.ends crystal\n\
+                C1 a 0 10u\nD1 a b DMOD\nVA1 b 0 DC 0\nX1 a b 0 potentiometer\nX2 a 0 crystal\n\
+                .model DMOD D\n\
+                * @RNL {\n\
+                *   #C1 @SET-SYMBOL $CANVAS_POLARIZED_CAPACITOR => @PLACE(0, 0);\n\
+                *   #D1 @SET-SYMBOL $CANVAS_LED => @PLACE(10, 0);\n\
+                *   #VA1 @SET-SYMBOL $CANVAS_AMMETER => @PLACE(20, 0);\n\
+                *   #X1 @SET-SYMBOL $CANVAS_POTENTIOMETER => @PLACE(30, 0);\n\
+                *   #X2 @SET-SYMBOL $CANVAS_CRYSTAL => @PLACE(40, 0)\n\
+                * }\n.end\n";
+    let mut files = MemoryProvider::new().with("t.sp", text).with("pkgs/analog-canvas-extensions.rnl", &package);
+    files.package_dirs.push("pkgs".into());
+    let r = interpret_file(Path::new("t.sp"), None, &files, &Options::default()).unwrap();
+    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
+    let lv = top(&r);
+    assert_eq!(lv.packages.iter().find(|p| p.name == "analog-canvas-extensions").unwrap().version, "0.6");
+    let drawn: Vec<&str> =
+        lv.items.iter().filter(|i| i.kind == "instance").map(|i| lv.symbols[i.symbol].name.as_str()).collect();
+    assert_eq!(
+        drawn,
+        ["$CANVAS_POLARIZED_CAPACITOR", "$CANVAS_LED", "$CANVAS_AMMETER", "$CANVAS_POTENTIOMETER", "$CANVAS_CRYSTAL"]
+    );
+}
