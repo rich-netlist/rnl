@@ -570,25 +570,17 @@ fn params_by_name_mode(
     let params = spec.params_in(version);
     let names: Vec<&str> = params.iter().map(|q| q.name.as_str()).collect();
     let order = &spec.positional;
+    let modern = keeps_0_4(version);
+    let site =
+        crate::parameter_errors::Site::Header { standard: std_form, first: names.first().copied().unwrap_or("name") };
     let mut out = HashMap::new();
     if let Some(p) = p {
         if !p.positional.is_empty() {
             if order.is_empty() {
-                return Err((
-                    codes::HEADER_PARAM_NOT_POSITIONAL,
-                    format!("the parameters of @{kw} cannot be written by position; write each by name, such as {}=… (4.2 rule 9)", names[0]),
-                ));
+                return Err(crate::parameter_errors::positional(kw, site, modern));
             }
             if p.positional.len() > order.len() {
-                return Err((
-                    codes::PARAM_TOO_MANY_POSITIONAL,
-                    format!(
-                        "@{kw} takes at most {} parameters by position ({}), {} are written (4.2 rule 9)",
-                        order.len(),
-                        order.join(", "),
-                        p.positional.len()
-                    ),
-                ));
+                return Err(crate::parameter_errors::too_many(kw, order, p.positional.len()));
             }
             for (name, v) in order.iter().zip(&p.positional) {
                 out.insert(name.clone(), v.clone());
@@ -597,25 +589,10 @@ fn params_by_name_mode(
         for n in &p.named {
             let std = if std_form || n.quoted { n.name.clone() } else { word(&n.name) };
             if !names.contains(&std.as_str()) {
-                let mut msg = format!("@{kw} has no parameter {}", n.name);
-                if let Some(c) = closest(&std, names.iter().copied()) {
-                    msg.push_str(&format!(", did you mean {c}?"));
-                }
-                if !n.name.is_ascii() && !n.quoted {
-                    if std_form {
-                        msg.push_str("; a header record is read in the standard form, without aliases (16.5)");
-                    } else {
-                        msg.push_str("; is an alias package not loaded?");
-                    }
-                }
-                msg.push_str(" (16.4)");
-                return Err((codes::HEADER_PARAM_UNKNOWN, msg));
+                return Err(crate::parameter_errors::unknown(kw, n, &std, &names, site, modern));
             }
             if out.contains_key(&std) {
-                return Err((
-                    codes::PARAM_WRITTEN_TWICE,
-                    format!("parameter {std} of @{kw} is written twice (4.2 rule 9)"),
-                ));
+                return Err(crate::parameter_errors::twice(kw, &std));
             }
             out.insert(std, n.value.clone());
         }
@@ -704,7 +681,7 @@ impl Interp<'_> {
         let numbers = self.follows_0_3(self.rec_unit[rec]);
         let places = self.follows_0_4(self.rec_unit[rec]);
         self.places.enabled |= places;
-        let a = Rc::new(syntax::parse_record_features(&self.recs[rec].text, numbers, places));
+        let a = Rc::new(syntax::parse_record_language(&self.recs[rec].text, numbers, places));
         self.asts[rec] = Some(a.clone());
         a
     }

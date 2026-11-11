@@ -765,6 +765,15 @@ impl Interp<'_> {
         let at = seg.call.as_ref().unwrap().start;
         let DefinitionFields { roles, params } = self.definition_fields(&p, ctx, at)?;
         let defining = self.defining_for(ctx, seg, member);
+        let checked = body
+            .as_ref()
+            .and_then(|body| self.static_nested_definitions.get(&(ctx.unit, super::eval::ptr(&**body))))
+            .copied();
+        let body = if matches!(checked, Some((_, false))) {
+            body.map(|body| self.independent_definition_body(&body, ctx.unit))
+        } else {
+            body
+        };
         let d = DefData {
             roles,
             params,
@@ -778,7 +787,20 @@ impl Interp<'_> {
         let id = self.new_obj(ObjData::Definition(Box::new(d)));
         self.node_memo.insert(key, id);
         if body.is_some() {
-            self.check_definition(id, ctx);
+            if let Some((checked, complete)) = checked {
+                let parameters: Vec<_> = self
+                    .body_parameter_errors
+                    .iter()
+                    .filter(|((definition, _), _)| *definition == checked)
+                    .map(|((_, name), cause)| ((id, name.clone()), *cause))
+                    .collect();
+                self.body_parameter_errors.extend(parameters);
+                if !complete {
+                    self.check_definition(id, ctx);
+                }
+            } else {
+                self.check_definition(id, ctx);
+            }
         }
         self.unnamed_definition_warning(ctx, seg, member);
         Ok((id, false))
@@ -909,8 +931,23 @@ impl Interp<'_> {
     }
 
     /// Checks that do not depend on the arguments, once per definition (6.9, M5).
-    fn check_definition(&mut self, id: ObjId, ctx: &Ctx) {
+    pub(super) fn check_definition(&mut self, id: ObjId, ctx: &Ctx) {
+        self.check_definition_with_signature(id, ctx, true, true);
+    }
+
+    pub(super) fn check_definition_with_signature(
+        &mut self,
+        id: ObjId,
+        ctx: &Ctx,
+        known_roles: bool,
+        known_params: bool,
+    ) {
         let d = self.def(id).clone();
+        let reused = d
+            .body
+            .as_ref()
+            .and_then(|body| self.static_nested_definitions.get(&(d.def_unit, super::eval::ptr(&**body))))
+            .is_some_and(|(checked, _)| *checked != id);
         if self.follows_0_4(self.source_unit(ctx)) {
             self.check_definition_scene_names(&d, ctx);
         }
@@ -919,6 +956,9 @@ impl Interp<'_> {
         let locals = d.local_names();
         let mut names: Vec<String> = Vec::new();
         for m in d.body.as_ref().unwrap().members.iter() {
+            if reused && self.body_member_errors.contains_key(&super::eval::ptr(&**m)) {
+                continue;
+            }
             if let Some(err) = &m.error {
                 let diagnostic = self.err(ctx, err.code, err.message.clone(), m.error_pos);
                 if self.follows_0_4(self.source_unit(ctx)) {
@@ -969,6 +1009,11 @@ impl Interp<'_> {
             for (r, nested_names) in refs {
                 match r {
                     crate::syntax::RefOrHole::Ref(r) => {
+                        if self.follows_0_4(self.source_unit(ctx))
+                            && self.body_errors.contains_key(&super::eval::ptr(r))
+                        {
+                            continue;
+                        }
                         if r.number.is_some() {
                             // reported once here, and each expansion leaves the statement out (5.9)
                             let diag = self.err(
@@ -1033,7 +1078,7 @@ impl Interp<'_> {
                                             ),
                                             r.start,
                                         );
-                                    } else {
+                                    } else if known_roles && known_params {
                                         self.definition_error(
                                             r,
                                             ctx,
@@ -1047,6 +1092,9 @@ impl Interp<'_> {
                         }
                     }
                     crate::syntax::RefOrHole::Hole(n) => {
+                        if !known_params || (reused && self.body_parameter_errors.contains_key(&(id, n.to_string()))) {
+                            continue;
+                        }
                         let modern = self.follows_0_4(self.source_unit(ctx));
                         let role = roles.iter().any(|p| p == n);
                         if !params.iter().any(|p| p == n) && (modern || !role) {
@@ -1075,6 +1123,9 @@ impl Interp<'_> {
                 calls.extend(m.segments.iter().filter_map(|segment| segment.call.as_ref()));
             }
             for call in calls {
+                if reused && self.body_errors.contains_key(&super::eval::ptr(call)) {
+                    continue;
+                }
                 let k = self.kw(&call.kw, ctx.unit);
                 if modern {
                     if let Err(Stop::Fail(Some(diagnostic))) = self.check_segment_keyword(&k, call, ctx) {
@@ -1109,6 +1160,8 @@ impl Interp<'_> {
                 self.mark_failed_body_members(id, member, ctx);
             }
             self.check_constant_local_bindings(&d, ctx);
+            self.check_failed_local_names(&d, ctx);
+            self.check_nested_definitions(&d, ctx);
         }
     }
 

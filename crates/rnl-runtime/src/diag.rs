@@ -189,6 +189,11 @@ impl Sink {
         &self.items[id.0 as usize]
     }
 
+    /// Resolve a deferred cause using ids from this interpretation only.
+    pub(crate) fn set_cause(&mut self, id: DiagId, cause: Option<DiagId>) {
+        self.items[id.0 as usize].cause = cause;
+    }
+
     pub fn all(&self) -> &[Diag] {
         &self.items
     }

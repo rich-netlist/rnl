@@ -2447,32 +2447,16 @@ impl<'p> Interp<'p> {
         let order: Vec<String> = positional.map(|p| p.to_vec()).unwrap_or(default_order);
         if !p.positional.is_empty() {
             if order.is_empty() {
-                let ex = if kw == "DEFINE" {
-                    ", such as @DEFINE(roles=[\"a\", \"b\"], parameters=[[\"gap\", 2]])"
-                } else {
-                    ", as name=value"
-                };
-                return self.fail(
-                    ctx,
-                    codes::PARAM_POSITIONAL_NOT_ALLOWED,
-                    format!(
-                        "the parameters of @{kw} cannot be written by position; write each by name{ex} (4.2 rule 9)"
-                    ),
-                    p.start,
+                let (code, message) = crate::parameter_errors::positional(
+                    kw,
+                    crate::parameter_errors::Site::Body,
+                    super::unit::keeps_0_4(&version),
                 );
+                return self.fail(ctx, code, message, p.start);
             }
             if p.positional.len() > order.len() {
-                return self.fail(
-                    ctx,
-                    codes::PARAM_TOO_MANY_POSITIONAL,
-                    format!(
-                        "@{kw} takes at most {} parameters by position ({}), {} are written (4.2 rule 9)",
-                        order.len(),
-                        order.join(", "),
-                        p.positional.len()
-                    ),
-                    p.start,
-                );
+                let (code, message) = crate::parameter_errors::too_many(kw, &order, p.positional.len());
+                return self.fail(ctx, code, message, p.start);
             }
             for (name, v) in order.iter().zip(&p.positional) {
                 if static_check && has_parameter(v) {
@@ -2512,25 +2496,19 @@ impl<'p> Interp<'p> {
                 if open_style {
                     opts.extend(words().style_props.iter().map(|s| s.name.as_str()));
                 }
-                let close = closest(&std, opts);
-                let mut msg = format!("@{kw} has no parameter {}", n.name);
-                if let Some(c) = close {
-                    msg.push_str(&format!(", did you mean {c}?"));
-                }
-                if !n.quoted && !n.name.is_ascii() {
-                    msg.push_str(" Is an alias package not loaded?");
-                }
-                msg.push_str(" (16.4)");
-                return self.fail(ctx, codes::PARAM_UNKNOWN, msg, n.off);
+                let (code, message) = crate::parameter_errors::unknown(
+                    kw,
+                    n,
+                    &std,
+                    &opts,
+                    crate::parameter_errors::Site::Body,
+                    super::unit::keeps_0_4(&version),
+                );
+                return self.fail(ctx, code, message, n.off);
             }
             if out.iter().any(|(k, _)| *k == std) {
-                // by position and by name, or under two names: the same parameter twice (4.2 rule 9)
-                return self.fail(
-                    ctx,
-                    codes::PARAM_WRITTEN_TWICE,
-                    format!("parameter {std} of @{kw} is written twice (4.2 rule 9)"),
-                    n.off,
-                );
+                let (code, message) = crate::parameter_errors::twice(kw, &std);
+                return self.fail(ctx, code, message, n.off);
             }
             if static_check && has_parameter(&n.value) {
                 let parameter = spec

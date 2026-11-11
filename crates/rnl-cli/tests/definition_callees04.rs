@@ -221,10 +221,15 @@ fn package_signatures_are_resolved_where_the_body_is_written() {
 #[test]
 fn invalid_callee_headers_do_not_supply_a_guessed_signature() {
     let r = read("0.4", "", "$C = @DEFINE(roles=[\"p\",\"p\"]) {};", "$C @ATTACH(unknown=1)", "", false);
-    assert_eq!(errors(&r), [codes::DEFINE_ROLE_NAME_INVALID], "{:?}", r.diagnostics());
+    assert_eq!(errors(&r), [codes::DEFINE_ROLE_NAME_INVALID, codes::REF_FAILED], "{:?}", r.diagnostics());
     let missing =
         read("0.4", "", "$C = @DEFINE(roles=?outside,parameters=[\"known\"]) {};", "$C @ATTACH(unknown=1)", "", false);
-    assert_eq!(errors(&missing), [codes::REF_HOLE_OUTSIDE_DEFINITION], "{:?}", missing.diagnostics());
+    assert_eq!(
+        errors(&missing),
+        [codes::REF_HOLE_OUTSIDE_DEFINITION, codes::REF_FAILED],
+        "{:?}",
+        missing.diagnostics()
+    );
 }
 
 #[test]
@@ -281,7 +286,7 @@ fn scoped_declarations_use_their_source_files_language_version() {
                 .unwrap();
         assert_eq!(
             errors(&r),
-            if source == "0.3" { vec![codes::DEFINE_ROLE_UNKNOWN_KIND] } else { vec![] },
+            if source == "0.3" { vec![codes::REF_FAILED, codes::DEFINE_ROLE_UNKNOWN_KIND] } else { vec![] },
             "{source}/{target}: {:?}",
             r.diagnostics()
         );
@@ -309,7 +314,7 @@ fn a_dynamic_header_field_does_not_hide_the_other_fixed_signature_parts() {
         ("roles=?items,parameters=[\"known\"]", "%C @ATTACH(unknown=1)", codes::PARAM_UNKNOWN),
         ("roles=[\"p\"],parameters=?items", "%C @ATTACH", codes::USAGE_ROLE_NOT_FILLED),
         ("roles=?items,parameters=?items", "%C @ATTACH(priority=\"invalid\")", codes::PARAM_BAD_ENUM),
-        ("roles=?items,parameters=?items", "%C @ATTACH(value=1,value=2)", codes::SYNTAX_PARAM_TWICE),
+        ("roles=?items,parameters=?items", "%C @ATTACH(value=1,value=2)", codes::PARAM_WRITTEN_TWICE),
         ("roles=?items,parameters=?items", "%C (0,0)(p) (1,0) @ATTACH", codes::ROLE_LABELS_MIXED),
     ] {
         for used in [false, true] {

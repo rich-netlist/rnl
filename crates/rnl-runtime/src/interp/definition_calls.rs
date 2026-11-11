@@ -9,7 +9,7 @@ use crate::syntax::{Arg, Member, ObjExpr, Segment, SetExpr, Value};
 use super::ctx::Ctx;
 use super::eval::{ptr, Found, R};
 use super::kw::parse_definition_fields;
-use super::obj::{DefData, Lit, Role, WStr};
+use super::obj::{DefData, Lit, MemberRef, ObjData, Role, WStr};
 use super::unit::definition_header_params;
 use super::Interp;
 
@@ -39,6 +39,106 @@ fn header_holes_are_parameters(value: &Value, owner: &DefData) -> bool {
 }
 
 impl Interp<'_> {
+    /// Check literal nested declarations in their own role and name environment.
+    /// The template is never bound or applied; actual creations reuse only its diagnostics.
+    pub(super) fn check_nested_definitions(&mut self, owner: &DefData, ctx: &Ctx) {
+        fn walk(interp: &mut Interp<'_>, set: &SetExpr, owner: &DefData, ctx: &Ctx) {
+            for member in &set.members {
+                for (index, segment) in member.segments.iter().enumerate() {
+                    let keyword = segment.call.as_ref().map(|call| interp.kw(&call.kw, owner.def_unit));
+                    if keyword.as_deref() == Some("DEFINE") {
+                        let mut declaration = (**member).clone();
+                        declaration.segments = vec![segment.clone()];
+                        declaration.binds.retain(|binding| binding.after == index);
+                        for binding in &mut declaration.binds {
+                            binding.after = 0;
+                        }
+                        let Some(mut nested) = interp.static_callee_member(
+                            &declaration,
+                            owner,
+                            ctx,
+                            &[],
+                            String::new(),
+                            &mut HashSet::new(),
+                        ) else {
+                            continue;
+                        };
+                        let body = nested.data.body.as_ref().unwrap();
+                        let key = (owner.def_unit, ptr(&**body));
+                        if interp.static_nested_definitions.contains_key(&key) {
+                            continue;
+                        }
+                        let mut defining = (*owner.defining).clone();
+                        for binding in &declaration.binds {
+                            defining.insert(
+                                (binding.prefix, binding.name.clone()),
+                                (MemberRef { rec: owner.rec, m: member.clone() }, owner.def_unit),
+                            );
+                        }
+                        nested.data.defining = Rc::new(defining);
+                        let id = interp.new_obj(ObjData::Definition(Box::new(nested.data)));
+                        interp.static_nested_definitions.insert(key, (id, nested.known_roles && nested.known_params));
+                        interp.check_definition_with_signature(id, ctx, nested.known_roles, nested.known_params);
+                    } else if !matches!(keyword.as_deref(), Some("DEFINE-SYMBOL" | "DEFINE-STYLE" | "USE-PACKAGE")) {
+                        for argument in &segment.args {
+                            if let ObjExpr::Set(set) = &argument.obj {
+                                walk(interp, set, owner, ctx);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if let Some(body) = &owner.body {
+            walk(self, body, owner, ctx);
+        }
+    }
+
+    /// A declaration whose header depends on its enclosing application needs its own
+    /// body nodes. Preserve source diagnostics, but never share argument-dependent errors
+    /// with another creation from the same text. Source node IDs and locations stay intact.
+    pub(super) fn independent_definition_body(&mut self, body: &Rc<SetExpr>, unit: super::obj::UnitId) -> Rc<SetExpr> {
+        let mut cloned = (**body).clone();
+        cloned.members = body
+            .members
+            .iter()
+            .map(|original| {
+                let mut member = (**original).clone();
+                for segment in &mut member.segments {
+                    for argument in &mut segment.args {
+                        if let ObjExpr::Set(set) = &mut argument.obj {
+                            *set = self.independent_definition_body(set, unit);
+                        }
+                    }
+                }
+                let member = Rc::new(member);
+                if let Some(&cause) = self.body_member_errors.get(&ptr(&**original)) {
+                    self.body_member_errors.insert(ptr(&*member), cause);
+                }
+                for (old, new) in original.segments.iter().zip(&member.segments) {
+                    if let (Some(old), Some(new)) = (&old.call, &new.call) {
+                        if let Some(&cause) = self.body_errors.get(&ptr(old)) {
+                            self.body_errors.insert(ptr(new), cause);
+                        }
+                    }
+                    for (old, new) in old.args.iter().zip(&new.args) {
+                        if let (ObjExpr::Ref(old), ObjExpr::Ref(new)) = (&old.obj, &new.obj) {
+                            if let Some(&cause) = self.body_errors.get(&ptr(old)) {
+                                self.body_errors.insert(ptr(new), cause);
+                            }
+                        }
+                    }
+                }
+                member
+            })
+            .collect();
+        let cloned = Rc::new(cloned);
+        if let Some(&checked) = self.static_nested_definitions.get(&(unit, ptr(&**body))) {
+            self.static_nested_definitions.insert((unit, ptr(&*cloned)), checked);
+        }
+        cloned
+    }
+
     /// Inspect declarations without evaluating bodies, creating objects, or forcing selections.
     /// Ambiguous local creation results and argument-dependent headers stay deferred.
     fn static_callee(

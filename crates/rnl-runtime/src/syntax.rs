@@ -433,11 +433,20 @@ struct Parser {
     /// is a lexical error, as in 0.2.
     numbers: bool,
     member_places: bool,
+    parameter_errors: bool,
 }
 
 impl Parser {
     fn new(text: &str, numbers: bool) -> Parser {
-        Parser { t: text.chars().collect(), i: 0, notes: Vec::new(), next_id: 0, numbers, member_places: false }
+        Parser {
+            t: text.chars().collect(),
+            i: 0,
+            notes: Vec::new(),
+            next_id: 0,
+            numbers,
+            member_places: false,
+            parameter_errors: false,
+        }
     }
 
     fn id(&mut self) -> NodeId {
@@ -556,7 +565,7 @@ impl Parser {
                         "the record head must touch @RNL; remove the white space or comment (2.4)",
                     );
                 }
-                header = Some(self.params(true)?);
+                header = Some(self.params(true, "RNL")?);
             }
             self.skip_ws()?;
             if self.peek() != Some('{') {
@@ -1297,11 +1306,11 @@ impl Parser {
         }
         let kw: String = self.t[self.i..j].iter().collect();
         self.i = j;
-        let params = if self.peek() == Some('(') { Some(self.params(false)?) } else { None };
+        let params = if self.peek() == Some('(') { Some(self.params(false, &kw)?) } else { None };
         Ok(Call { kw, params, start, end: self.i })
     }
 
-    fn params(&mut self, record_head: bool) -> PResult<Params> {
+    fn params(&mut self, record_head: bool, kw: &str) -> PResult<Params> {
         let start = self.i;
         self.i += 1;
         let mut p = Params { start, ..Params::default() };
@@ -1353,6 +1362,10 @@ impl Parser {
                 }
                 Some(name) => {
                     if !record_head && p.named.iter().any(|x| x.name == name) {
+                        if self.parameter_errors {
+                            let (code, message) = crate::parameter_errors::twice(kw, &name);
+                            return self.err_at(code, message, off);
+                        }
                         return self.err_at(
                             codes::SYNTAX_PARAM_TWICE,
                             format!("parameter {name} is written twice (4.2 rule 9)"),
@@ -1630,6 +1643,14 @@ pub fn parse_record_features(text: &str, numbers: bool, member_places: bool) -> 
     parser.record()
 }
 
+/// Parse a file with its language's reference forms and parameter diagnostic kinds.
+pub(crate) fn parse_record_language(text: &str, numbers: bool, modern: bool) -> RecordAst {
+    let mut parser = Parser::new(text, numbers);
+    parser.member_places = modern;
+    parser.parameter_errors = modern;
+    parser.record()
+}
+
 /// One complete definition name, optionally quoted, without a path or selector.
 pub(crate) fn definition_name(text: &str) -> Option<(String, bool)> {
     if !text.starts_with('$') {
@@ -1654,7 +1675,7 @@ pub(crate) fn parameter_text(text: &str) -> Result<Params, ParseError> {
     let wrapped = format!("({text})");
     let mut parser = Parser::new(&wrapped, true);
     parser.member_places = true;
-    let mut params = parser.params(false).map_err(|e| ParseError { code: e.code, message: e.msg })?;
+    let mut params = parser.params(false, "").map_err(|e| ParseError { code: e.code, message: e.msg })?;
     if parser.i != parser.n() {
         return Err(ParseError {
             code: codes::SYNTAX_UNEXPECTED_CHAR,
