@@ -399,7 +399,29 @@ pub(crate) fn resolve(
             } else {
                 (codes::VIEW_AUTOINCLUDE_UNRESOLVED, format!("Auto Include could not resolve subcircuit {model} from {file}; reload Library to refresh its definitions"))
             };
-            sink.warning(code, message, loc);
+            let diagnostic = sink.warning(code, message, loc.clone());
+            if code == codes::VIEW_AUTOINCLUDE_ADDED {
+                // Versions belong to the file/section reading that needed the missing
+                // subcircuit, not to the automatically loaded library or the main file.
+                let readings: Vec<_> = doc
+                    .levels
+                    .iter()
+                    .flat_map(|data| &data.instances)
+                    .filter(|inst| loc.as_ref().is_some_and(|loc| inst.file == loc.file && inst.line == loc.line))
+                    .filter_map(|inst| doc.file_level_of(inst))
+                    .collect();
+                for level in readings {
+                    doc.note_diagnostic(
+                        diagnostic,
+                        &sink.all()[diagnostic.0 as usize],
+                        level,
+                        rnl_runtime::host::diagnostics::Detail::AutoIncluded {
+                            model: model.clone(),
+                            file: file.clone(),
+                        },
+                    );
+                }
+            }
         }
         return Some(doc);
     }

@@ -4577,8 +4577,8 @@
   {
    "number": "RNL8700",
    "name": "view-autoinclude-added",
-   "severity": "warning",
-   "message": "Subcircuit {model} was not included; found in {file} and added by Auto Include",
+   "severity": "hint",
+   "message": "subcircuit {model} was added from {file} by Auto Include (0.4); released versions retain their warning",
    "sections": []
   },
   {
