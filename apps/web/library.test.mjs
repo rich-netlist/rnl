@@ -13,7 +13,7 @@ test("the published library describes every package and separates built-ins from
     const optional = index.filter((p) => !p.builtin);
     assert.deepEqual(optional, []);
     assert.ok(index.every((p) => p.path.endsWith(".rnl")));
-    assert.ok(index.filter((p) => p.builtin).every((p) => p.path.startsWith("standard/") && (p.name.startsWith("rnl-std") || p.name === "rnl-zh")));
+    assert.ok(index.filter((p) => p.builtin).every((p) => p.path.startsWith("standard/") && (p.name.startsWith("rnl-std") || p.name === "rnl-zh" || p.name === "alias-zh")));
     for (const p of index) assert.ok(readFileSync(join(out, p.path), "utf8").includes(`name="${p.name}"`));
     const bundled = JSON.parse(readFileSync(join(out, "bundled.json"), "utf8"));
     for (const path of ["0.2/rnl-std.rnl", "0.3/rnl-std.rnl"])
@@ -26,9 +26,10 @@ test("a series whose standard is not released is published only when RNL_DRAFT_S
   const root = mkdtempSync(join(tmpdir(), "rnl-library-"));
   try {
     for (const series of ["0.3", "0.4"]) {
+      const pkg = series === "0.4" ? "rnl-std-all" : "rnl-std";
       mkdirSync(join(root, "libraries", "standard", series), { recursive: true });
-      writeFileSync(join(root, "libraries", "standard", series, "rnl-std.rnl"),
-        `@RNL(type="header") { @VERSION("${series}"); @PACKAGE(name="rnl-std", version="${series}")}\n`);
+      writeFileSync(join(root, "libraries", "standard", series, `${pkg}.rnl`),
+        `@RNL(type="header") { @VERSION("${series}"); @PACKAGE(name="${pkg}", version="${series}")}\n`);
     }
     mkdirSync(join(root, "spec", "0.3"), { recursive: true });
     writeFileSync(join(root, "spec", "0.3", "RELEASED"), "released\n");
@@ -37,7 +38,7 @@ test("a series whose standard is not released is published only when RNL_DRAFT_S
       publishLibrary(join(root, "libraries"), out, options);
       return Object.keys(JSON.parse(readFileSync(join(out, "bundled.json"), "utf8")));
     };
-    const both = ["<bundled>/0.3/rnl-std.rnl", "<bundled>/0.4/rnl-std.rnl"];
+    const both = ["<bundled>/0.3/rnl-std.rnl", "<bundled>/0.4/rnl-std-all.rnl"];
     const before = process.env.RNL_DRAFT_SERIES;
     try {
       delete process.env.RNL_DRAFT_SERIES;

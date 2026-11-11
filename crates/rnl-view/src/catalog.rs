@@ -488,17 +488,32 @@ mod tests {
         let c = default();
         let listed = packages(&c);
         assert!(listed.contains(&("rnl-std", "0.3")) && !listed.contains(&("rnl-std", "0.2")), "{listed:?}");
-        // the draft series 0.4, written in a version newer than the default, is not the newest
-        assert!(listed.iter().all(|(_, version)| *version != "0.4"), "{listed:?}");
+        // the draft series 0.4, written in a version newer than the default, is not the newest when
+        // a package also has an earlier version; only names new in 0.4 appear at 0.4
+        assert!(
+            listed.iter().all(|(name, version)| *version != "0.4" || matches!(*name, "alias-zh" | "rnl-std-all")),
+            "{listed:?}"
+        );
         // one version of each name, rnl-zh's 0.3; a name only the series 0.2 has keeps its version
         let mut names: Vec<&str> = listed.iter().map(|p| p.0).collect();
         names.dedup();
         assert_eq!(names.len(), listed.len(), "{listed:?}");
-        assert!(listed.contains(&("rnl-zh", "0.3")) && listed.contains(&("rnl-std-virtual", "0.2")), "{listed:?}");
-        assert!(listed.iter().all(|(name, _)| name.starts_with("rnl-std") || *name == "rnl-zh"), "{listed:?}");
-        // the 15 packages of the series 0.3 and rnl-zh; the four that only the series 0.2 has,
-        // rnl-std-symbols, rnl-std-virtual, rnl-std-semantics and rnl-std-layout
-        assert_eq!(listed.len(), 16 + 4);
+        assert!(
+            listed.contains(&("rnl-zh", "0.3"))
+                && listed.contains(&("rnl-std-virtual", "0.2"))
+                && listed.contains(&("rnl-std-semantics", "0.2"))
+                && listed.contains(&("rnl-std-all", "0.4"))
+                && listed.contains(&("alias-zh", "0.4")),
+            "{listed:?}"
+        );
+        assert!(
+            listed.iter().all(|(name, _)| name.starts_with("rnl-std") || *name == "rnl-zh" || *name == "alias-zh"),
+            "{listed:?}"
+        );
+        // the 15 packages of the series 0.3 and rnl-zh; the four that only <= 0.3 has
+        // (rnl-std-symbols, rnl-std-virtual, rnl-std-semantics and rnl-std-layout); and the two
+        // names that only the draft 0.4 has (alias-zh and rnl-std-all)
+        assert_eq!(listed.len(), 16 + 4 + 2);
         // by name, then by version
         let mut sorted = listed.clone();
         sorted.sort();
@@ -521,10 +536,12 @@ mod tests {
         assert_eq!(listed.len(), crate::BUNDLED.len());
         let at = |p: (&str, &str)| listed.iter().position(|q| *q == p).unwrap();
         assert_eq!(at(("rnl-std", "0.2")) + 1, at(("rnl-std", "0.3")));
-        assert_eq!(at(("rnl-std", "0.3")) + 1, at(("rnl-std", "0.4")));
+        assert_eq!(at(("rnl-std-semantics", "0.2")) + 1, at(("rnl-std-semantics", "0.4")));
         assert_eq!(all.packages[at(("rnl-std", "0.2"))].language, "0.2");
         assert!(all.packages[at(("rnl-std", "0.3"))].implicit);
-        assert!(!all.packages[at(("rnl-std", "0.4"))].implicit);
+        assert_eq!(all.packages[at(("rnl-std-all", "0.4"))].language, "0.4");
+        assert!(!all.packages[at(("rnl-std-all", "0.4"))].implicit);
+        assert_eq!(all.packages[at(("alias-zh", "0.4"))].language, "0.4");
         // a name of the series 0.2 for a symbol, and one of the series 0.3 for a definition
         let ground: Vec<(&str, &str)> = all
             .symbols

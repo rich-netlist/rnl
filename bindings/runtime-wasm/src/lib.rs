@@ -1341,7 +1341,7 @@ R1 a 0 1k
         assert_eq!(v["catalog"], wire(native));
         // the frontend's own packages with the bundled ones, by name, every version
         let package = "@RNL(type=\"header\") { @VERSION(\"0.3\"); @PACKAGE(name=\"acme\", version=\"1.0\")}";
-        let request = json!({ "catalog": { "packages": ["acme", "rnl-std"], "all_versions": true },
+        let request = json!({ "catalog": { "packages": ["acme", "rnl-std", "rnl-std-all"], "all_versions": true },
                               "files": { "/p/acme.rnl": package }, "package_dirs": ["/p"] });
         let v = answer(request);
         let listed: Vec<(&str, &str)> = v["catalog"]["packages"]
@@ -1350,11 +1350,12 @@ R1 a 0 1k
             .iter()
             .map(|p| (p["name"].as_str().unwrap(), p["version"].as_str().unwrap()))
             .collect();
-        // and rnl-std of each series bundled, a directory of its own
+        // and the collection package of each series bundled, a directory of its own
         let bundled = rnl_view::bundled();
         let series: Vec<&str> = bundled.package_dirs.iter().map(|d| d.rsplit('/').next().unwrap()).collect();
         let mut want = vec![("acme", "1.0")];
-        want.extend(series.iter().map(|v| ("rnl-std", *v)));
+        want.extend(series.iter().map(|v| (if *v == "0.4" { "rnl-std-all" } else { "rnl-std" }, *v)));
+        want.sort();
         assert_eq!(listed, want);
         // a catalog request of another shape is not valid
         let v = answer(json!({ "catalog": { "all_versions": "yes" } }));

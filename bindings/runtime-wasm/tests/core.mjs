@@ -342,14 +342,16 @@ test("a catalog request lists the packages, through the core and through the Wor
   assert.equal(c.symbols.find((s) => s.symbol === "$GROUND_SYMBOL").definition, "$GROUND");
   assert.equal(c.definitions.find((d) => d.definition === "$GROUND").symbol, "$GROUND_SYMBOL");
   // of each name the newest version, of those a file of the default version finds: rnl-std 0.3,
-  // not 0.2, nor the draft 0.4
+  // not 0.2; a name only the draft 0.4 has, such as rnl-std-all, keeps 0.4
   const versions = (catalog, name) => catalog.packages.filter((p) => p.name === name).map((p) => p.version);
   assert.deepEqual(versions(c, "rnl-std"), ["0.3"]);
-  // every version: rnl-std of each series bundled
+  assert.deepEqual(versions(c, "rnl-std-all"), ["0.4"]);
+  // every version: rnl-std of 0.2 and 0.3, and rnl-std-all of 0.4
   const all = core.catalog({ catalog: { all_versions: true } });
-  const series = [...new Set(all.packages.filter((p) => p.series).map((p) => p.version))];
+  const series = [...new Set(all.packages.filter((p) => p.series).map((p) => p.version))].sort();
   assert.deepEqual(series.slice(0, 3), ["0.2", "0.3", "0.4"]);
-  assert.deepEqual(versions(all, "rnl-std"), series);
+  assert.deepEqual(versions(all, "rnl-std"), ["0.2", "0.3"]);
+  assert.deepEqual(versions(all, "rnl-std-all"), ["0.4"]);
   // a request's own package, by name
   const acme = '@RNL(type="header") { @VERSION("0.3"); @PACKAGE(name="acme", version="1.0")}\n@RNL { $ACME = @DEFINE-SYMBOL { (0, 0) @PIN(terminal=1, direction="up") } }\n';
   const own = { catalog: { packages: ["acme"] }, files: { "/p/acme.rnl": acme }, package_dirs: ["/p"] };
@@ -420,7 +422,7 @@ const canvasRequest = { entry: "/canvas.sp", files: { "/canvas.sp": canvasNetlis
 test("the downloaded Canvas package is not built-in or searched merely because it is in files", { skip: !hasPublicPackages }, () => {
   const doc = core.build(canvasRequest);
   assert.ok(doc.diagnostics.some(d => d.severity === "error" && d.message.includes("package analog-canvas-extensions 0.1 cannot be found")));
-  assert.ok(core.catalog({ catalog: {} }).packages.every(p => p.name.startsWith("rnl-std") || p.name === "rnl-zh"));
+  assert.ok(core.catalog({ catalog: {} }).packages.every(p => p.name.startsWith("rnl-std") || p.name === "rnl-zh" || p.name === "alias-zh"));
 });
 test("the downloaded Canvas package resolves when explicitly placed in the pool", { skip: !hasPublicPackages }, () => {
   const doc = core.build({ ...canvasRequest, pool: [canvasPath] });

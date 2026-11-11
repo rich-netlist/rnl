@@ -838,20 +838,30 @@ R1 p q 1k
         assert_eq!(dirs[..3], ["0.2", "0.3", "0.4"]);
         let key = rnl_runtime::interp::catalog::version_key;
         assert!(dirs.windows(2).all(|d| key(d[0]) < key(d[1])), "{dirs:?}");
-        // from 0.3 on, each series has the packages of 16.3 of the language 0.3, and its rnl-zh
+        // 0.3 has the packages of 16.3 of the language 0.3 and rnl-zh; 0.4 has the single
+        // collection rnl-std-all, rnl-std-semantics and alias-zh
         assert_eq!(series("0.3"), 16);
-        for dir in &dirs[1..] {
-            for name in [
-                "rnl-std",
-                "rnl-std-core",
-                "rnl-std-basic",
-                "rnl-std-spice",
-                "rnl-std-spectre",
-                "rnl-std-full",
-                "rnl-zh",
-            ] {
-                assert!(names.contains(&format!("{dir}/{name}.rnl").as_str()), "{dir}/{name}");
-            }
+        assert_eq!(series("0.4"), 14);
+        for name in [
+            "rnl-std",
+            "rnl-std-core",
+            "rnl-std-basic",
+            "rnl-std-spice",
+            "rnl-std-spectre",
+            "rnl-std-full",
+            "rnl-zh",
+        ] {
+            assert!(names.contains(&format!("0.3/{name}.rnl").as_str()), "0.3/{name}");
+        }
+        for name in [
+            "rnl-std-all",
+            "rnl-std-basic",
+            "rnl-std-spice",
+            "rnl-std-spectre",
+            "rnl-std-semantics",
+            "alias-zh",
+        ] {
+            assert!(names.contains(&format!("0.4/{name}.rnl").as_str()), "0.4/{name}");
         }
         assert_eq!(names.len(), 9 + dirs[1..].iter().map(|d| series(d)).sum::<usize>());
         let p = bundled();

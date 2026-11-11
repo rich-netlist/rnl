@@ -176,7 +176,18 @@ fn catalog_prints_the_packages_the_core_has() {
     assert_eq!(c, json(&serde_json::to_string_pretty(&native).unwrap()));
 
     // the names asked for, every version of each
-    let (code, out) = rnl(&["catalog", "--package", "rnl-std", "--package", "rnl-zh", "--all-versions"]);
+    let (code, out) = rnl(&[
+        "catalog",
+        "--package",
+        "rnl-std",
+        "--package",
+        "rnl-std-all",
+        "--package",
+        "rnl-zh",
+        "--package",
+        "alias-zh",
+        "--all-versions",
+    ]);
     assert_eq!(code, 0, "{out}");
     let listed: Vec<(String, String)> = json(&out)["packages"]
         .as_array()
@@ -184,11 +195,17 @@ fn catalog_prints_the_packages_the_core_has() {
         .iter()
         .map(|p| (p["name"].as_str().unwrap().to_string(), p["version"].as_str().unwrap().to_string()))
         .collect();
-    // each series bundled, a directory of its own, has both
+    // each series bundled, a directory of its own, has its collection package and Chinese aliases
     let series: Vec<String> =
         rnl_view::bundled().package_dirs.iter().map(|d| d.rsplit('/').next().unwrap().to_string()).collect();
-    let want: Vec<(String, String)> =
-        ["rnl-std", "rnl-zh"].iter().flat_map(|n| series.iter().map(|v| (n.to_string(), v.clone()))).collect();
+    let mut want: Vec<(String, String)> = series
+        .iter()
+        .flat_map(|v| {
+            let (std, zh) = if v == "0.4" { ("rnl-std-all", "alias-zh") } else { ("rnl-std", "rnl-zh") };
+            [(std.to_string(), v.clone()), (zh.to_string(), v.clone())]
+        })
+        .collect();
+    want.sort();
     assert_eq!(listed, want);
 
     // a package of a package directory
