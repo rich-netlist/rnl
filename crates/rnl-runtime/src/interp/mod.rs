@@ -28,6 +28,7 @@ mod islands;
 mod junction;
 pub mod kw;
 mod languages;
+mod layer_kinds;
 mod modifier_handles;
 mod numbers;
 pub mod obj;

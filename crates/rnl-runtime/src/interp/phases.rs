@@ -2505,6 +2505,28 @@ impl Interp<'_> {
                 continue;
             }
             let o = f.target;
+            if f.ctx.as_ref().is_some_and(|ctx| self.follows_0_4(self.source_unit(ctx)))
+                && !matches!(
+                    self.o(o),
+                    ObjData::Inst { .. }
+                        | ObjData::Usage(_)
+                        | ObjData::Bundle { .. }
+                        | ObjData::Wire { .. }
+                        | ObjData::Prim { .. }
+                        | ObjData::Text { .. }
+                        | ObjData::KeyText { .. }
+                        | ObjData::SymLabel { .. }
+                )
+            {
+                let label = self.label(o);
+                self.diag_fact(
+                    Severity::Error,
+                    codes::LAYER_NOT_TAKEN,
+                    f,
+                    format!("LAYER does not take {label} (11.6)"),
+                );
+                continue;
+            }
             match self.o(o) {
                 ObjData::Point { .. } | ObjData::Net { .. } | ObjData::Constraint(_) => {
                     let l = self.label(o);

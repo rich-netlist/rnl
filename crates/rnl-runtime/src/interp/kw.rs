@@ -1344,7 +1344,7 @@ impl Interp<'_> {
 
     /// Names, counts and literal parameter values do not depend on an application's objects.
     fn check_definition_parameters(&mut self, member: &Member, definition: &DefData, ctx: &Ctx, scopes: &[&SetExpr]) {
-        for segment in &member.segments {
+        for (index, segment) in member.segments.iter().enumerate() {
             if let Some(call) = &segment.call {
                 let keyword = self.kw(&call.kw, ctx.unit);
                 if !self.body_errors.contains_key(&super::eval::ptr(call)) {
@@ -1387,6 +1387,13 @@ impl Interp<'_> {
                                     Ok(())
                                 });
                             if let Err(Stop::Fail(Some(diagnostic))) = checked {
+                                self.body_errors.insert(super::eval::ptr(call), diagnostic);
+                            }
+                        }
+                        if keyword == "LAYER" && !self.body_errors.contains_key(&super::eval::ptr(call)) {
+                            if let Err(Stop::Fail(Some(diagnostic))) =
+                                self.check_definition_layer(member, index, definition, ctx, scopes)
+                            {
                                 self.body_errors.insert(super::eval::ptr(call), diagnostic);
                             }
                         }
@@ -1553,6 +1560,10 @@ impl Interp<'_> {
                 &["instance", "bundle", "usage", "point", "position", "text", "label", "annotation"],
             ),
             ("ORIENT", _) => (codes::PLACE_ORIENT_NOT_TAKEN, &["instance", "bundle", "usage", "pin"]),
+            ("LAYER", _) => (
+                codes::LAYER_NOT_TAKEN,
+                &["instance", "bundle", "usage", "wire", "graphic", "text", "label", "annotation"],
+            ),
             ("ADD-TO" | "REMOVE-FROM", "target") => (codes::SET_EDIT_TARGET_NOT_SET, &["set"]),
             ("ASSERT-IN", "set") => (codes::SET_EDIT_TARGET_NOT_SET, &["set"]),
             ("ASSERT-INSTANCE", "members") => (codes::ASSERT_MEMBER_WRONG_KIND, &["instance", "bundle"]),
