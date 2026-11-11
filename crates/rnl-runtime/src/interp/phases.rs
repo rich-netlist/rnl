@@ -90,6 +90,13 @@ impl Interp<'_> {
             self.symbol_labels(s);
         }
         self.resolve_currents(s, false);
+        if !self.scenes[s].routing_requests.is_empty() || !self.scenes[s].tasks[9].is_empty() {
+            // Routing rules read one common snapshot of ordinary statements. Their
+            // results become the snapshot used by generation and later conditions.
+            self.scenes[s].condition_trees = self.resolve_routing_trees(s, true, false);
+            self.run_tasks_in_phase(s, 9, 4);
+            self.scenes[s].condition_trees = self.resolve_routing_trees(s, true, false);
+        }
         self.scenes[s].phase = 5;
         self.run_tasks(s, 5);
         self.resolve_currents(s, false);
@@ -122,10 +129,17 @@ impl Interp<'_> {
         self.run_tasks(s, 8);
         self.resolve_styles(s);
         self.resolve_layers(s);
+        if !self.scenes[s].routing_requests.is_empty() {
+            self.scenes[s].resolved_trees = self.resolve_routing_trees(s, false, true);
+        }
     }
 
     fn run_tasks(&mut self, s: SceneId, ph: usize) {
-        let mut tasks = std::mem::take(&mut self.scenes[s].tasks[ph]);
+        self.run_tasks_in_phase(s, ph, ph);
+    }
+
+    fn run_tasks_in_phase(&mut self, s: SceneId, queue: usize, ph: usize) {
+        let mut tasks = std::mem::take(&mut self.scenes[s].tasks[queue]);
         tasks.sort_by(|a, b| a.0.cmp(&b.0));
         for (_, t) in tasks {
             t(self, s, ph);

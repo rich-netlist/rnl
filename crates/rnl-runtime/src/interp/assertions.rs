@@ -367,6 +367,7 @@ impl Interp<'_> {
     /// How a member fails a condition, if it does: what it has instead.
     fn condition_fails(&mut self, s: SceneId, a: &Assertion, m: ObjId, cond: &str, v: &Lit) -> Option<String> {
         let kw = a.kw.as_str();
+        let modern = self.follows_0_4(self.source_unit(&a.site));
         let lv = self.scenes[s].level;
         match kw {
             "ASSERT-INSTANCE" | "ASSERT-TERMINAL" if matches!(cond, "name" | "model" | "type") => {
@@ -481,7 +482,11 @@ impl Interp<'_> {
                     // as SELECT-NET reads it (10.2)
                     "wired" => {
                         let ends = self.wire_ends(s);
-                        ("is wired", "is not wired", self.net_wired(s, m, &ends))
+                        (
+                            "is wired",
+                            "is not wired",
+                            if modern { self.routing_net_wired(s, m, &ends) } else { self.net_wired(s, m, &ends) },
+                        )
                     }
                     _ => return None,
                 };

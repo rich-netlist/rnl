@@ -5175,6 +5175,24 @@
     "13.2",
     "14.10"
    ]
+  },
+  {
+   "number": "RNL4701",
+   "name": "route-trees-different-styles",
+   "severity": "hint",
+   "message": "joined routing trees on {net} have different styles; the first routing statement supplies the style (13.7)",
+   "sections": [
+    "13.7"
+   ]
+  },
+  {
+   "number": "RNL9403",
+   "name": "route-overruled",
+   "severity": "hint",
+   "message": "UNROUTE removes {removed} of {total} pins from this {route} tree on {net} (13.7)",
+   "sections": [
+    "13.7"
+   ]
   }
  ]
 }

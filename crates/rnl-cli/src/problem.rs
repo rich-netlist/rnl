@@ -170,11 +170,17 @@ pub fn level(p: &LevelProblem, solver_options: &str) -> Value {
             "label": w.label, "reference": reference(&w.reference, numbers), "nets": w.nets, "bus": w.bus,
             "anchors": points(&w.anchors), "mode": w.mode, "generated": w.generated,
         })).collect::<Vec<_>>(),
-        "routes": p.routes.iter().map(|r| json!({
-            "net": r.net, "mode": r.mode,
-            "style": r.style.iter().map(|(k, v)| (k.clone(), lit(v))).collect::<serde_json::Map<_, _>>(),
-            "pins": points(&r.pins), "wires": r.wires,
-        })).collect::<Vec<_>>(),
+        "routes": p.routes.iter().map(|r| {
+            let mut entry = json!({
+                "net": r.net, "mode": r.mode,
+                "style": r.style.iter().map(|(k, v)| (k.clone(), lit(v))).collect::<serde_json::Map<_, _>>(),
+                "pins": points(&r.pins), "wires": r.wires,
+            });
+            if r.tree {
+                entry["tree"] = json!(true);
+            }
+            entry
+        }).collect::<Vec<_>>(),
         "groups": p.groups.iter().map(|g| {
             let mut group = json!({"label": g.label, "members": g.members});
             if let Some(value) = g.spacing_x { group["spacing_x"] = json!(value); }

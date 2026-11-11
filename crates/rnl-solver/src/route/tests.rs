@@ -113,6 +113,7 @@ fn modern_jobs_keep_separate_trees_of_one_net() {
     p.routes = [(0, 1), (2, 3)]
         .into_iter()
         .map(|(a, b)| RouteIntent {
+            tree: false,
             net: "shared".into(),
             mode: "manhattan".into(),
             style: vec![],
@@ -126,6 +127,12 @@ fn modern_jobs_keep_separate_trees_of_one_net() {
     assert_eq!(trees.len(), 2);
     assert_eq!(trees.iter().map(|j| (j.route, j.points.len())).collect::<Vec<_>>(), [(0, 2), (1, 2)]);
     assert_ne!(trees[0].points[0].key, trees[1].points[0].key);
+    // A resolved tree from a newer included file retains its identity in an older level.
+    p.version = "0.3".into();
+    for route in &mut p.routes {
+        route.tree = true;
+    }
+    assert_eq!(jobs(&p).len(), 2);
 }
 
 #[test]
@@ -182,6 +189,7 @@ fn modern_solve_preserves_tree_identity_and_reports_forced_connections() {
     p.routes = [(0, 1), (2, 3)]
         .into_iter()
         .map(|(a, b)| RouteIntent {
+            tree: false,
             net: "shared".into(),
             mode: "manhattan".into(),
             style: vec![],
@@ -247,6 +255,7 @@ fn a_pin_position_does_not_become_an_electrical_junction_during_fallback() {
             generated: false,
         }];
         p.routes = vec![RouteIntent {
+            tree: false,
             net: "shared".into(),
             mode: "manhattan".into(),
             style: vec![],

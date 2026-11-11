@@ -201,7 +201,7 @@ pub(crate) struct Connections {
     pub nets: Vec<Net>,
     /// The nets of each pin.
     pub nets_of: BTreeMap<PinKey, Vec<usize>>,
-    /// The nets of the ROUTEs, one per net, then the wires written.
+    /// Resolved routing trees (legacy requests grouped by net), then written wires.
     pub drawn: Vec<Drawn>,
     /// For each pin, the pins of other objects it is drawn to: those of its ROUTE's net, and its
     /// neighbours along the wires written.
@@ -1395,18 +1395,22 @@ fn connections(problem: &LevelProblem, model: &Model) -> Connections {
     };
     let mut drawn: Vec<Drawn> = Vec::new();
     let mut targets: BTreeMap<PinKey, BTreeSet<PinKey>> = BTreeMap::new();
-    // Released inputs draw a net asked for twice once. In 0.4 each route entry is an independent
-    // tree; keep its pins and points in order, none twice, without joining another tree by name.
+    // Legacy requests on the same net combine their members. Resolved 0.4 trees stay
+    // separate: matching net names do not imply shared drawing connectivity.
     let mut routed: Vec<(String, Vec<PinKey>)> = Vec::new();
+    let mut route_indexes: Vec<usize> = Vec::new();
     for (i, route) in problem.routes.iter().enumerate() {
         let pins: Vec<PinKey> = route.pins.iter().filter_map(pin_of).collect();
         nets.entry(route.net.clone()).or_default().extend(pins.iter().copied());
         let points: Vec<PointId> =
             model.route_points.get(i).map_or(Vec::new(), |ps| ps.iter().flatten().copied().collect());
-        let at = match routed.iter().position(|(net, _)| problem.version != "0.4" && *net == route.net) {
+        let at = match routed.iter().enumerate().position(|(at, (net, _))| {
+            problem.version != "0.4" && !route.tree && !problem.routes[route_indexes[at]].tree && *net == route.net
+        }) {
             Some(at) => at,
             None => {
                 routed.push((route.net.clone(), Vec::new()));
+                route_indexes.push(i);
                 drawn.push(Drawn { net: route.net.clone(), points: Vec::new(), routed: true });
                 routed.len() - 1
             }
@@ -1466,7 +1470,7 @@ fn connections(problem: &LevelProblem, model: &Model) -> Connections {
             }
         }
     }
-    // the routes are the first of `drawn`, one per net, in the order of `routed`
+    // Routing trees are first in `drawn`, in the order of `routed`.
     let mut out = Connections { drawn, route_of, written, ..Connections::default() };
     for (name, pins) in nets {
         let i = out.nets.len();
@@ -2909,6 +2913,7 @@ pub(crate) mod tests {
         let mut p = problem_of(vec![instance(), instance(), instance()], Vec::new());
         let pin = |object: usize, pin: usize| PointRef::Pin { object, pin, terminal: ["g", "d", "s"][pin].to_string() };
         let route = |pins: Vec<PointRef>| rnl_runtime::problem::RouteIntent {
+            tree: false,
             net: "n".to_string(),
             mode: "auto".to_string(),
             style: Vec::new(),
@@ -2923,6 +2928,25 @@ pub(crate) mod tests {
         // every pin of the net drawn to the others
         assert_eq!(s.connections.targets[&(0, 1)], vec![(1, 1), (2, 0)]);
         assert_eq!(s.connections.targets[&(2, 0)], vec![(0, 1), (1, 1)]);
+    }
+
+    #[test]
+    fn resolved_trees_on_one_net_keep_separate_connection_targets() {
+        let mut p = problem_of(vec![instance(), instance(), instance(), instance()], Vec::new());
+        let pin = |object| PointRef::Pin { object, pin: 1, terminal: "d".into() };
+        let route = |a, b| rnl_runtime::problem::RouteIntent {
+            tree: true,
+            net: "n".into(),
+            mode: "auto".into(),
+            style: Vec::new(),
+            pins: vec![pin(a), pin(b)],
+            wires: Vec::new(),
+        };
+        p.routes = vec![route(0, 1), route(2, 3)];
+        let structure = structure_of(&p);
+        assert_eq!(structure.connections.drawn.len(), 2);
+        assert_eq!(structure.connections.targets[&(0, 1)], vec![(1, 1)]);
+        assert_eq!(structure.connections.targets[&(2, 1)], vec![(3, 1)]);
     }
 
     #[test]

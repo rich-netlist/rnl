@@ -261,6 +261,10 @@ pub struct ConstraintUsage {
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct ConstraintRoute {
     pub net: String,
+    /// An independent resolved tree; equal net names do not imply one tree (0.4, 13.7).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
+    pub tree: Option<bool>,
     /// A hint for the solver, with the values of WIRE.
     pub mode: String,
     /// The pins to join.
@@ -396,7 +400,7 @@ pub fn constraint(p: &LevelProblem, k: usize) -> Constraint {
 }
 
 fn route(r: &RouteIntent) -> ConstraintRoute {
-    ConstraintRoute { net: r.net.clone(), mode: r.mode.clone(), pins: points_of(&r.pins) }
+    ConstraintRoute { net: r.net.clone(), tree: r.tree.then_some(true), mode: r.mode.clone(), pins: points_of(&r.pins) }
 }
 
 /// The constraints of the level of `p`, the problem a solver reads, tied to `level`, its level in

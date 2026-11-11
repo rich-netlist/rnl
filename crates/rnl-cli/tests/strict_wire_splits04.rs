@@ -22,6 +22,7 @@ fn problem(version: &str, mode: &str, body: &str, points: &str) -> LevelProblem 
     let mut p = r.problems[0].clone();
     // The shared writer consumes an already-resolved tree; selection and priority are tested by routing.
     p.routes.push(RouteIntent {
+        tree: version == "0.4",
         net: "a".into(),
         mode: "auto".into(),
         style: vec![],

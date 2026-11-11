@@ -1781,7 +1781,10 @@ pub(crate) fn written_path(problem: &LevelProblem, g: &Geometry, wire: usize) ->
 fn jobs(problem: &LevelProblem) -> Vec<Job> {
     let mut jobs: Vec<Job> = Vec::new();
     for (i, r) in problem.routes.iter().enumerate() {
-        let j = match jobs.iter().position(|j| problem.version != "0.4" && j.net == r.net) {
+        let j = match jobs
+            .iter()
+            .position(|j| problem.version != "0.4" && !r.tree && !problem.routes[j.route].tree && j.net == r.net)
+        {
             Some(j) => j,
             None => {
                 jobs.push(Job { route: i, net: r.net.clone(), points: Vec::new(), wires: Vec::new() });
@@ -1820,7 +1823,10 @@ pub(crate) fn style_notes(problem: &LevelProblem) -> Vec<String> {
         style
     };
     for (i, r) in problem.routes.iter().enumerate() {
-        let Some(first) = problem.routes.iter().position(|x| x.net == r.net) else { continue };
+        if r.tree {
+            continue; // The interpreter has already resolved this tree's style (13.7).
+        }
+        let Some(first) = problem.routes.iter().position(|x| !x.tree && x.net == r.net) else { continue };
         if first == i || noted.contains(&r.net.as_str()) || sorted(first) == sorted(i) {
             continue;
         }
@@ -1917,7 +1923,7 @@ pub(crate) fn route(
     work.astar_expansions += expansions;
     let mut routing = Routing { expansions, ..Routing::default() };
     for (j, (job, out)) in jobs.iter().zip(outs).enumerate() {
-        let drawn = if layout.modern {
+        let drawn = if layout.modern || problem.routes[job.route].tree {
             j
         } else {
             s.connections.drawn.iter().position(|d| d.routed && d.net == job.net).unwrap_or(j)

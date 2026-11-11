@@ -541,6 +541,9 @@ pub struct ProblemWire {
 #[derive(Clone, Debug, PartialEq)]
 pub struct RouteIntent {
     pub net: String,
+    /// An already resolved tree (0.4, 13.7), which must not be merged with other trees on its net.
+    /// False retains the whole-net requests of earlier language versions.
+    pub tree: bool,
     /// A hint for the solver, with the values of WIRE.
     pub mode: String,
     /// The style parameters of the ROUTE, which the wires written back take.
@@ -1167,6 +1170,9 @@ pub fn canonical_sig1(p: &LevelProblem) -> String {
     }
     c.word("routes");
     for r in &p.routes {
+        if r.tree {
+            c.word("tree");
+        }
         c.str(&r.net);
         c.str(&r.mode);
         for (k, v) in &r.style {

@@ -1,4 +1,4 @@
-//! Fixed LAYER inputs are checked without expanding an ordinary definition (6.9, 11.6).
+//! Fixed drawing and net-routing inputs are checked without expanding a definition (6.9).
 use super::{
     ctx::Ctx,
     eval::{ptr, Found, R},
@@ -18,14 +18,22 @@ fn drawable(kind: &str) -> bool {
 }
 
 impl Interp<'_> {
-    pub(super) fn check_definition_layer(
+    pub(super) fn check_definition_input_kind(
         &mut self,
+        keyword: &str,
         member: &Member,
         index: usize,
         owner: &DefData,
         ctx: &Ctx,
         scopes: &[&SetExpr],
     ) -> R<()> {
+        let (code, section, accepts): (_, _, fn(&str) -> bool) = match keyword {
+            "LAYER" => (codes::LAYER_NOT_TAKEN, "11.6", drawable),
+            "ROUTE-NET" | "UNROUTE-NET" => {
+                (codes::ROUTE_TARGET_NOT_NET, "13.7", |kind| matches!(kind, "net" | "terminal" | "pin"))
+            }
+            _ => return Ok(()),
+        };
         let segment = &member.segments[index];
         let mut known = Vec::new();
         if segment.piped && index > 0 {
@@ -38,11 +46,11 @@ impl Interp<'_> {
                 known.push(kinds);
             }
         }
-        if let Some(kinds) = known.iter().find(|kinds| !kinds.is_empty() && !kinds.iter().any(|kind| drawable(kind))) {
+        if let Some(kinds) = known.iter().find(|kinds| !kinds.is_empty() && !kinds.iter().any(|kind| accepts(kind))) {
             return self.fail(
                 ctx,
-                codes::LAYER_NOT_TAKEN,
-                format!("LAYER does not take {} (6.9, 11.6)", kinds.join("/")),
+                code,
+                format!("{keyword} does not take {} (6.9, {section})", kinds.join("/")),
                 segment.start,
             );
         }
@@ -153,7 +161,7 @@ impl Interp<'_> {
                 match output.as_str() {
                     "pass" => {}
                     "new:instance" | "new:bundle" | "new:usage" | "new:wire" | "new:annotation" | "new:text"
-                    | "new:constraint" | "def:definition" | "def:symbol" | "def:style" => {
+                    | "new:constraint" | "new:route" | "def:definition" | "def:symbol" | "def:style" => {
                         kinds = Some(vec![output[4..].to_owned()]);
                     }
                     _ => kinds = None,

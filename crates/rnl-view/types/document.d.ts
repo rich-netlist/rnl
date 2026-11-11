@@ -675,6 +675,10 @@ export type ConstraintUsage = {
 export type ConstraintRoute = {
   net: string,
   /**
+   * An independent resolved tree; equal net names do not imply one tree (0.4, 13.7).
+   */
+  tree?: boolean,
+  /**
    * A hint for the solver, with the values of WIRE.
    */
   mode: string,

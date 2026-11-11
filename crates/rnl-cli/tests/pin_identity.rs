@@ -183,6 +183,7 @@ fn an_earlier_bus_pin_written_through_its_other_terminal_reads_back_at_that_pin(
     let mut p = r.problems[0].clone();
     let early = p.nets.iter().find(|n| n.name == "a").unwrap().pins[0].clone();
     p.routes.push(rnl_runtime::problem::RouteIntent {
+        tree: false,
         net: "a".into(),
         mode: "straight".into(),
         style: vec![],

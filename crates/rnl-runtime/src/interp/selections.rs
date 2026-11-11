@@ -398,7 +398,10 @@ impl Interp<'_> {
                         return false;
                     }
                 }
-                params.get("wired").and_then(Lit::boolean).is_none_or(|want| self.wired(scene, *pin, &ends) == want)
+                params
+                    .get("wired")
+                    .and_then(Lit::boolean)
+                    .is_none_or(|want| (self.wired(scene, *pin, &ends) || self.routing_pin_wired(scene, *pin)) == want)
             })
             .collect()
     }

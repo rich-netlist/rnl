@@ -174,6 +174,10 @@ pub struct Scene {
     pub bundles: Vec<ObjId>,
     pub constraints: Vec<ObjId>,
     pub routes: Vec<ObjId>,
+    pub(super) routing_requests: Vec<super::routes::RoutingRequest>,
+    pub(super) condition_trees: Vec<super::routes::RouteTree>,
+    pub(super) routing_failed: HashSet<usize>,
+    pub(super) resolved_trees: Vec<super::routes::RouteTree>,
     pub keytexts: HashMap<(ObjId, String), ObjId>,
     pub named_subobjects: HashMap<(ObjId, String), ObjId>,
     pub pins: HashMap<(ObjId, usize), ObjId>,
@@ -313,6 +317,10 @@ impl Scene {
             bundles: Vec::new(),
             constraints: Vec::new(),
             routes: Vec::new(),
+            routing_requests: Vec::new(),
+            condition_trees: Vec::new(),
+            routing_failed: HashSet::new(),
+            resolved_trees: Vec::new(),
             keytexts: HashMap::new(),
             named_subobjects: HashMap::new(),
             pins: HashMap::new(),
@@ -1767,7 +1775,12 @@ impl Interp<'_> {
                         }
                     }
                     if let Some(w) = params.get("wired").and_then(Lit::boolean) {
-                        if self.net_wired(s, n, &ends) != w {
+                        let wired = if self.follows_0_4(writer) {
+                            self.routing_net_wired(s, n, &ends)
+                        } else {
+                            self.net_wired(s, n, &ends)
+                        };
+                        if wired != w {
                             continue;
                         }
                     }

@@ -416,6 +416,7 @@ impl Interp<'_> {
             }
             k if k.starts_with("SELECT-") => self.kw_select(kw, &args, seg, ctx),
             "WIRE" => self.kw_wire(kw, &args, seg, ctx),
+            "ROUTE-NET" | "ROUTE-OBJECT" | "UNROUTE-NET" | "UNROUTE-OBJECT" => self.kw_routing(kw, &args, seg, ctx),
             "ROUTE" => {
                 let mut spec = self.sig_params(kw, ctx);
                 spec.extend(style_specs("wire_style"));
@@ -1390,9 +1391,11 @@ impl Interp<'_> {
                                 self.body_errors.insert(super::eval::ptr(call), diagnostic);
                             }
                         }
-                        if keyword == "LAYER" && !self.body_errors.contains_key(&super::eval::ptr(call)) {
+                        if matches!(keyword.as_str(), "LAYER" | "ROUTE-NET" | "UNROUTE-NET")
+                            && !self.body_errors.contains_key(&super::eval::ptr(call))
+                        {
                             if let Err(Stop::Fail(Some(diagnostic))) =
-                                self.check_definition_layer(member, index, definition, ctx, scopes)
+                                self.check_definition_input_kind(&keyword, member, index, definition, ctx, scopes)
                             {
                                 self.body_errors.insert(super::eval::ptr(call), diagnostic);
                             }
@@ -1575,6 +1578,7 @@ impl Interp<'_> {
                 (codes::SELECT_DEFINITION_NOT_DEFINITION, &["definition"])
             }
             ("WIRE", "net") => (codes::WIRE_NET_WRONG_KIND, &["net", "pin", "terminal", "wire"]),
+            ("ROUTE-NET" | "UNROUTE-NET", "net") => (codes::ROUTE_TARGET_NOT_NET, &["net", "pin", "terminal"]),
             ("WIRE", "points") => (codes::WIRE_POINT_WRONG_KIND, &["point", "position", "pin", "terminal"]),
             ("SET-SYMBOL", "symbol") => (codes::KEYWORD_SET_SYMBOL_NOT_A_SYMBOL, &["symbol"]),
             ("SET-STYLE", "style") => (codes::STYLE_SET_STYLE_NOT_A_STYLE, &["style"]),
@@ -3206,6 +3210,118 @@ impl Interp<'_> {
         for (code, msg) in crate::markup::problems_with_name_formats(text.as_str(), name_formats) {
             self.warn(ctx, code, format!("{msg} (13.6)"), at);
         }
+    }
+
+    fn kw_routing(&mut self, kw: &str, args: &[ArgV], seg: &Segment, ctx: &Ctx) -> R<(ObjId, bool)> {
+        let net = kw.ends_with("-NET");
+        let join = !kw.starts_with("UNROUTE-");
+        let mut specs = self.sig_params(kw, ctx);
+        if join {
+            specs.extend(style_specs("wire_style"));
+        }
+        let params = self.params(kw, seg, ctx, &specs, None, false, None)?;
+        let (style, rest) = split_style(&params);
+        let spec = super::routes::RoutingSpec {
+            net,
+            join,
+            style,
+            priority: priority_of(&params, ctx),
+            mode: get(&rest, "mode").and_then(Lit::str).unwrap_or("auto").into(),
+        };
+        let mapped = self.map_args(kw, args, seg, ctx, sig_positions(kw))?;
+        let input = mapped[if net { "net" } else { "objects" }].clone();
+        if self.is_empty_node(input.obj) {
+            let empty = self.new_obj(ObjData::Set(Box::new(SetData::plain(Vec::new(), false))));
+            return Ok((empty, input.sel));
+        }
+        if let Some(cause) = self.failed_obj(input.obj) {
+            let diagnostic = self.err_cause(
+                ctx,
+                codes::KEYWORD_OBJECT_FAILED,
+                format!("the object of @{kw} failed"),
+                input.off,
+                cause,
+            );
+            return Err(Stop::Fail(Some(diagnostic)));
+        }
+        let off = seg.start;
+        if self.is_lazy(input.obj) {
+            let output = if net && join {
+                let key = ("route-gen", ptr_seg(seg), self.frame_key(ctx), 0usize);
+                match self.node_memo.get(&key) {
+                    Some(&object) => object,
+                    None => {
+                        let object = self.new_obj(ObjData::Set(Box::new(SetData {
+                            kind: SetKind::Gen { by_scene: HashMap::new() },
+                            ..SetData::plain(Vec::new(), false)
+                        })));
+                        self.node_memo.insert(key, object);
+                        object
+                    }
+                }
+            } else {
+                input.obj
+            };
+            if ctx.scene.is_none() {
+                self.rules.insert(ctx.member_key.clone());
+                return Ok((output, true));
+            }
+            let site = Rc::new(ctx.clone());
+            let source = input.obj;
+            let task: Task = Rc::new(move |it, scene, phase| {
+                let mut made = Vec::new();
+                if spec.net {
+                    for (index, member) in it.flatten_inputs(scene, source, phase, Some(&site)).into_iter().enumerate()
+                    {
+                        let member_site = site.with_dependencies(&member.dependencies);
+                        if let Ok(object) = it.record_routing(
+                            scene,
+                            member.object,
+                            spec.clone(),
+                            pos_plus(&site.pos, "g", index as i64),
+                            &member_site,
+                            off,
+                        ) {
+                            made.push(object);
+                        }
+                    }
+                } else {
+                    let _ = it.record_routing(scene, source, spec.clone(), site.pos.clone(), &site, off);
+                }
+                if spec.net && spec.join {
+                    if let ObjData::Set(set) = it.om(output) {
+                        if let SetKind::Gen { by_scene } = &mut set.kind {
+                            by_scene.insert(scene, made);
+                        }
+                    }
+                }
+            });
+            // Queue 9 is executed with the ordinary-symbol input view, before generation.
+            self.defer(ctx, 9, task)?;
+            return Ok((output, true));
+        }
+        let Some(scene) = ctx.scene else { return self.scene_only(ctx, off) };
+        if net && self.is_set(input.obj) {
+            let mut made = Vec::new();
+            for (index, member) in self.flatten_inputs(scene, input.obj, 3, Some(ctx)).into_iter().enumerate() {
+                let site = ctx.with_dependencies(&member.dependencies);
+                if let Ok(object) = self.record_routing(
+                    scene,
+                    member.object,
+                    spec.clone(),
+                    pos_plus(&ctx.pos, "e", index as i64),
+                    &site,
+                    off,
+                ) {
+                    made.push((object, true));
+                }
+            }
+            let output =
+                if join { self.new_obj(ObjData::Set(Box::new(SetData::plain(made, false)))) } else { input.obj };
+            return Ok((output, input.sel));
+        }
+        let output = self.record_routing(scene, input.obj, spec, ctx.pos.clone(), ctx, off)?;
+        Ok((output, input.sel))
     }
 
     // ------------------------------------------------------------------ placement (11.1, 11.2, 11.6)

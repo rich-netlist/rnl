@@ -195,7 +195,7 @@ fn standard_packages_check_clean() {
 /// The keywords of the draft language 0.4 that the draft series 0.4 writes and the toolkit does not
 /// read yet: those of the selective routing (13.7). Each change that reads
 /// one takes it out here, and with it the aliases rnl-zh gives it (16.5).
-const KEYWORDS_NOT_READ_YET: [&str; 4] = ["ROUTE-NET", "ROUTE-OBJECT", "UNROUTE-NET", "UNROUTE-OBJECT"];
+const KEYWORDS_NOT_READ_YET: [&str; 0] = [];
 
 /// The other statements of 0.4 that the draft series writes and the toolkit does not read yet: the
 /// pins as objects (5.1, 9.2.4), definition-body objects and rules (6.9, 9.4), drawn selections

@@ -38,6 +38,7 @@ mod pin_names;
 mod places;
 mod position_refs;
 mod reach;
+mod routes;
 mod scene_pins;
 mod selections;
 mod solver_config;

@@ -1076,7 +1076,9 @@ impl<'p> Interp<'p> {
             // Settle those edits before choosing between immediate and deferred execution.
             for (index, arg) in args.iter_mut().enumerate() {
                 if self.is_set(arg.obj) && !self.is_lazy(arg.obj) {
-                    if self.record_languages(ctx) != crate::host::language::Languages::ALL {
+                    if matches!(kw.as_str(), "ROUTE-NET" | "UNROUTE-NET") && !ctx.frame_generated() {
+                        self.routing_input(arg.obj, seg.start, index, ctx)?;
+                    } else if self.record_languages(ctx) != crate::host::language::Languages::ALL {
                         // Language reach depends on all final members, not only selection edits (2.8).
                         self.constraint_input(arg.obj, seg.start, index, ctx)?;
                     } else {
