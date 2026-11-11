@@ -62,7 +62,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           # Avoid a hosted mirror whose DNS failure prevents package installation.
-          printf '%s\n' 'https://archive.ubuntu.com/ubuntu' | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+          printf '%s\n' 'https://mirrors.edge.kernel.org/ubuntu' | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
           sudo apt-get update
           sudo apt-get install -y musl-tools
       - name: Link the Windows C runtime statically
