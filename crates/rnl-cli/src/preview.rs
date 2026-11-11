@@ -15,7 +15,7 @@ use rnl_runtime::problem::LevelProblem;
 use rnl_runtime::source::{dirname, normalize, relative_to, Layered, MemoryProvider, Provider};
 use rnl_runtime::{Interpretation, Options};
 pub use rnl_solver::Clock;
-use rnl_solver::{holds_as_drawn, Statement};
+use rnl_solver::{problem_fact_holds_as_drawn, Statement};
 use rnl_view::{BuildOptions, Document};
 use serde::Serialize;
 
@@ -190,7 +190,7 @@ fn report(
                         conflicts(d)
                     }
                 });
-                let holds = holds_as_drawn(p, &drawn, &p.facts[k].kind, tolerance);
+                let holds = problem_fact_holds_as_drawn(p, &drawn, k, tolerance);
                 FactLine { rank: k, status, holds, text: describe_fact(p, k), why, at: fact_at(k) }
             })
             .collect();

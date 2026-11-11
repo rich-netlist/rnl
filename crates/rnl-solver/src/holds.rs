@@ -168,6 +168,40 @@ pub fn holds_as_drawn(p: &LevelProblem, drawn: &[Drawn], kind: &FactKind, tolera
     check(kind, &|r, axis| drawn_value(p, drawn, r, axis), &|k| drawn.get(k)?.orient, &tol, &tol)
 }
 
+/// Whether an indexed fact holds in the drawing, including its complete orientation list.
+/// The index identifies the list even when two facts have the same first orientation code.
+pub fn problem_fact_holds_as_drawn(p: &LevelProblem, drawn: &[Drawn], fact: usize, tolerance: f64) -> Option<bool> {
+    let kind = &p.facts.get(fact)?.kind;
+    let Some((_, codes)) = p.orient_lists.iter().find(|(i, _)| *i == fact) else {
+        return holds_as_drawn(p, drawn, kind, tolerance);
+    };
+    match kind {
+        FactKind::Orient { object, .. } => Some(codes.contains(&drawn.get(*object)?.orient?)),
+        FactKind::OrientRelation { from, to, .. } => {
+            let mut unknown = false;
+            for a in from {
+                for b in to {
+                    let (Some(a), Some(b)) =
+                        (drawn.get(*a).and_then(|d| d.orient), drawn.get(*b).and_then(|d| d.orient))
+                    else {
+                        unknown = true;
+                        continue;
+                    };
+                    if !codes.iter().any(|r| b == a.then(*r)) {
+                        return Some(false);
+                    }
+                }
+            }
+            if unknown {
+                None
+            } else {
+                Some(true)
+            }
+        }
+        _ => holds_as_drawn(p, drawn, kind, tolerance),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -175,6 +209,29 @@ mod tests {
 
     fn at(x: f64, y: f64) -> Drawn {
         Drawn { at: [Some(x), Some(y)], orient: Some(Orient::R0) }
+    }
+
+    #[test]
+    fn indexed_facts_check_their_own_orientation_lists() {
+        use crate::resolve::tests::fact;
+        let mut p = problem_of(
+            vec![instance(), instance()],
+            vec![
+                fact(FactKind::Orient { object: 0, code: Orient::R0 }),
+                fact(FactKind::Orient { object: 0, code: Orient::R0 }),
+                fact(FactKind::OrientRelation { relation: Orient::R0, from: vec![0], to: vec![1] }),
+            ],
+        );
+        p.orient_lists = vec![
+            (0, vec![Orient::R0, Orient::MY]),
+            (1, vec![Orient::R0, Orient::MX]),
+            (2, vec![Orient::R0, Orient::MY]),
+        ];
+        let drawn = vec![Drawn { at: [None, None], orient: Some(Orient::MY) }, at(0.0, 0.0)];
+        assert_eq!(problem_fact_holds_as_drawn(&p, &drawn, 0, 1e-6), Some(true));
+        assert_eq!(problem_fact_holds_as_drawn(&p, &drawn, 1, 1e-6), Some(false));
+        assert_eq!(problem_fact_holds_as_drawn(&p, &drawn, 2, 1e-6), Some(true));
+        assert_eq!(problem_fact_holds_as_drawn(&p, &[], 2, 1e-6), None);
     }
 
     fn origins(ks: &[usize]) -> Vec<PointRef> {
