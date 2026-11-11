@@ -2524,6 +2524,15 @@
    ]
   },
   {
+   "number": "RNL3417",
+   "name": "define-body-scene-ref",
+   "severity": "error",
+   "message": "{reference} refers to an object of the drawing level; scene objects enter a definition body through roles (6.9)",
+   "sections": [
+    "6.9"
+   ]
+  },
+  {
    "number": "RNL3500",
    "name": "role-labels-mixed",
    "severity": "error",

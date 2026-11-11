@@ -911,6 +911,9 @@ impl Interp<'_> {
     /// Checks that do not depend on the arguments, once per definition (6.9, M5).
     fn check_definition(&mut self, id: ObjId, ctx: &Ctx) {
         let d = self.def(id).clone();
+        if self.follows_0_4(self.source_unit(ctx)) {
+            self.check_definition_scene_names(&d, ctx);
+        }
         let roles: Vec<String> = d.roles.iter().map(|r| r.name.clone()).collect();
         let params: Vec<String> = d.params.iter().map(|(n, _)| n.clone()).collect();
         let locals = d.local_names();
@@ -2519,6 +2522,11 @@ impl Interp<'_> {
             language_inputs: Vec::new(),
         };
         for m in body.members.iter() {
+            if self.follows_0_4(self.source_unit(&sctx))
+                && self.body_member_errors.contains_key(&super::eval::ptr(&**m))
+            {
+                continue;
+            }
             if let Some(err) = &m.error {
                 self.err(ctx, err.code, err.message.clone(), m.error_pos);
                 continue;
