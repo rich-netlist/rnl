@@ -587,6 +587,9 @@ pub struct TextView {
     /// names, such as `%j1`; null for a text at a point written in place, such as `(10, 0)`, or at
     /// one that the level does not name alone.
     pub attach: Option<String>,
+    /// For a text attached to a point, named or written in place, the point's position `[x, y]`:
+    /// what it hangs on even where `attach` is null.
+    pub attach_point: Option<[f64; 2]>,
     /// The key of a label, such as "name".
     pub key: Option<String>,
     /// The text as written, before `${…}` is read (13.6).
@@ -1097,6 +1100,7 @@ fn level_model(
         .map(|t| TextView {
             id: t.object_id.clone(),
             attach: t.attach.clone(),
+            attach_point: t.attach_point.map(|p| [p.0, p.1]),
             key: t.key.clone(),
             markup: Slot::of(Some(t.markup.clone())),
             written: t.written,
@@ -1657,7 +1661,8 @@ R2 a vdd! 2k
     }
 
     /// A text at a point the level names is attached to it, as one on an instance is; one at a point
-    /// written in place is attached to nothing it can name. Neither is a label to click.
+    /// written in place is attached to nothing it can name, though both say where their point is.
+    /// Neither is a label to click.
     #[test]
     fn a_text_at_a_named_point_says_which() {
         let text = "* points\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\nR1 a b 1k\n\
@@ -1678,6 +1683,11 @@ R2 a vdd! 2k
         assert_eq!(attach("%t1"), json!("%j1"));
         assert_eq!(attach("%t2"), Value::Null);
         assert_eq!(attach("%t3"), json!("#R1"));
+        // the point each text at a point hangs on, named or written in place; none for one on R1
+        let point = |id: &str| texts.iter().find(|t| t["id"] == id).unwrap()["attach_point"].clone();
+        assert_eq!(point("%t1"), json!([10.0, 0.0]));
+        assert_eq!(point("%t2"), json!([20.0, 0.0]));
+        assert_eq!(point("%t3"), Value::Null);
         // the point is one the snapshot lists, and the text is where it is drawn: its point and the offset
         let points = s["levels"][0]["model"]["points"].as_array().unwrap();
         assert!(points.iter().any(|p| p["id"] == "%j1"), "{points:?}");

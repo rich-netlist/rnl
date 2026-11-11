@@ -1420,6 +1420,7 @@ impl Interp<'_> {
                     .map(|&i| TextTarget::Item(i))
                     .or_else(|| wire_of.get(&att).map(|&i| TextTarget::Wire(i))),
             };
+            let attach_point = if matches!(self.o(att), ObjData::Point { .. }) { self.point_of(s, att) } else { None };
             let (key, attach) = match self.o(t) {
                 ObjData::KeyText { key, .. } => (Some(key.clone()), Some(self.ref_id(s, att, &ids))),
                 // a point the level names, such as `%j1`, by its name; one written in place, such as
@@ -1443,6 +1444,7 @@ impl Interp<'_> {
                 id: self.label(t),
                 object_id: self.ref_id(s, t, &ids),
                 attach,
+                attach_point,
                 target,
                 key,
                 markup: text.as_str().to_string(),

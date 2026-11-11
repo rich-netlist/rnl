@@ -607,6 +607,11 @@ export type TextView = {
    */
   attach: string | null,
   /**
+   * For a text attached to a point, named or written in place, the point's position `[x, y]`:
+   * what it hangs on even where `attach` is null.
+   */
+  attach_point: [number, number] | null,
+  /**
    * The key of a label, such as "name".
    */
   key: string | null,

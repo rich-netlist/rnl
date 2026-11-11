@@ -293,6 +293,9 @@ pub struct TextView {
     /// names, such as `%j1`, as [`PointInfo::id`]; None for a text at a point written in place,
     /// such as `(10, 0)`, or at one that the level does not name alone.
     pub attach: Option<String>,
+    /// For a text attached to a point, named or written in place, the point's position in the
+    /// scene: what it hangs on even where [`TextView::attach`] has no id to give.
+    pub attach_point: Option<Pt>,
     /// What a click on it stands for in the drawing: where the object it is attached to is drawn,
     /// its net, or for a terminal the pin it is drawn at. None for a text at a point, and for one
     /// attached to an object that is not drawn as an item, a wire or a pin of one.

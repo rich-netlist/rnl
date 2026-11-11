@@ -1289,6 +1289,7 @@ fn net_labels(it: &ItemView, sym: &SymbolView) -> Vec<TextView> {
             id: format!("net-{k}"),
             object_id: format!("net-{k}"),
             attach: None,
+            attach_point: None,
             target: None,
             key: None,
             markup: text.clone(),
