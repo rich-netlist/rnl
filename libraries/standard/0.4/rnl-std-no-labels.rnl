@@ -1,24 +1,22 @@
 /* rnl-std-no-labels 0.4, a package of the standard series 0.4 (16.3).
-   Made from the files of the series 0.3 (libraries/standard/0.3), which say what they were
-   generated from, and edited in rnl, whose files are the source.
    Turns the default labels of the standard symbols off, for a file that writes its own (16.3).
-   Optional, in no collection: a file names it with USE-PACKAGE. */
-@RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="rnl-std-no-labels", version="0.4")}
+   Optional, not in rnl-std-all: a file names it with USE-PACKAGE. */
+@RNL(type="header") {
+  @VERSION("0.4");
+  @PACKAGE(name="rnl-std-no-labels", version="0.4");
+}
 
-/* ---------------------------------------------------------------- rnl-std-no-labels: no default labels
-   Not implicit. A file whose labels are all its own, such as one an editor writes, names it with
-   USE-PACKAGE in its header. Every label the standard symbols give an instance or a usage (name,
-   value, model) becomes empty; the file's own TEXT with the same key comes later and shows it again
-   (13.3). A usage drawn with a device's symbol, such as a $FIGURE with $RESISTOR, has no value or
-   model to show, and its label would fail (13.6); empty, it reads nothing. A block's formula stays:
-   it is part of the drawing. A symbol without one of these keys gets an empty label for it, which
-   draws nothing. Only objects that are drawn are selected (drawn=true, 10.1, 16.3), so that no empty
-   text lands on a usage without a symbol, such as a differential pair. */
+/* ---------------------------------------------------------------- rules turning off default labels
+   Every default device or block label (name, value, model) on a drawn instance or usage becomes
+   empty; the file's own TEXT with the same key comes later and shows it again (13.3). Net names on
+   grounds, supplies, biases, port tags and net labels use key="netname" and stay visible, as do
+   block formulas (key="formula") and amplifier labels (key="label"). Only drawn objects are
+   selected (drawn=true, 10.1, 16.3), so no empty text lands on a usage without a symbol. */
 @RNL {
   # @SELECT-INSTANCE(drawn=true, recursive=true) => @TEXT("", key="name");
   # @SELECT-INSTANCE(drawn=true, recursive=true) => @TEXT("", key="value");
   # @SELECT-INSTANCE(drawn=true, recursive=true) => @TEXT("", key="model");
   # @SELECT-USAGE(drawn=true, recursive=true) => @TEXT("", key="name");
   # @SELECT-USAGE(drawn=true, recursive=true) => @TEXT("", key="value");
-  # @SELECT-USAGE(drawn=true, recursive=true) => @TEXT("", key="model")
+  # @SELECT-USAGE(drawn=true, recursive=true) => @TEXT("", key="model");
 }

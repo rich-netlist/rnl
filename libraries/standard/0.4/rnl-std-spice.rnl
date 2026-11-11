@@ -1,21 +1,16 @@
 /* rnl-std-spice 0.4, a package of the standard series 0.4 (16.3).
-   Made from the files of the series 0.3 (libraries/standard/0.3), which say what they were
-   generated from, and edited in rnl, whose files are the source.
-   The rule package of SPICE: the symbols of instances by element letter, then by model type (16.3). */
+   The rule package of SPICE: assigns symbols to instances by element letter, by model type, and by
+   bulk or control-negative net (16.3). */
 @RNL(type="header") {
   @VERSION("0.4");
   @PACKAGE(name="rnl-std-spice", version="0.4");
   @USE-PACKAGE(name="rnl-std-basic", version="0.4");
-  @USE-PACKAGE(name="rnl-std-semiconductors", version="0.4")
+  @USE-PACKAGE(name="rnl-std-semiconductors", version="0.4");
 }
 
-/* ---------------------------------------------------------------- rnl-std-spice: symbols for SPICE netlists
-   Every element the SPICE adapter reads natively, all but subcircuit calls (16.3): broad (element letter,
-   the first letter of the name) first, narrow (model type) later. A transistor (M, Q, J, Z) is drawn by
-   the type of its model card alone, below: its polarity is not told by its name, so one whose card is not
-   found is not drawn. As a package it references
-   rnl-std-basic and rnl-std-semiconductors, whose symbols it names. */
+/* ---------------------------------------------------------------- symbol rules for SPICE netlists */
 @RNL {
+  /* Broad rules by element letter (all native SPICE elements except subcircuit calls). */
   # @SELECT-INSTANCE(name="R*", recursive=true) => @SET-SYMBOL $RESISTOR;
   # @SELECT-INSTANCE(name="C*", recursive=true) => @SET-SYMBOL $CAPACITOR;
   # @SELECT-INSTANCE(name="L*", recursive=true) => @SET-SYMBOL $INDUCTOR;
@@ -24,8 +19,8 @@
   # @SELECT-INSTANCE(name="D*", recursive=true) => @SET-SYMBOL $DIODE;
   # @SELECT-INSTANCE(name="E*", recursive=true) => @SET-SYMBOL $VCVS_4TERM;
   # @SELECT-INSTANCE(name="G*", recursive=true) => @SET-SYMBOL $VCCS_4TERM;
-  # @SELECT-INSTANCE(name="F*", recursive=true) => @SET-SYMBOL $CCCS;
-  # @SELECT-INSTANCE(name="H*", recursive=true) => @SET-SYMBOL $CCVS;
+  # @SELECT-INSTANCE(name="F*", recursive=true) => @SET-SYMBOL $CONTROLLED_CURRENT_SOURCE;
+  # @SELECT-INSTANCE(name="H*", recursive=true) => @SET-SYMBOL $CONTROLLED_VOLTAGE_SOURCE;
   # @SELECT-INSTANCE(name="B*", recursive=true) => @SET-SYMBOL $BEHAVIORAL_SOURCE;
   # @SELECT-INSTANCE(name="S*", recursive=true) => @SET-SYMBOL $VOLTAGE_CONTROLLED_SWITCH;
   # @SELECT-INSTANCE(name="W*", recursive=true) => @SET-SYMBOL $SWITCH;
@@ -33,7 +28,7 @@
   # @SELECT-INSTANCE(name="O*", recursive=true) => @SET-SYMBOL $TRANSMISSION_LINE;
   # @SELECT-INSTANCE(name="U*", recursive=true) => @SET-SYMBOL $RC_LINE;
 
-  /* the model type of the .model card the element names */
+  /* Narrower rules by the model type of the .model card. */
   # @SELECT-INSTANCE(type="d", recursive=true) => @SET-SYMBOL $DIODE;
   # @SELECT-INSTANCE(type="r", recursive=true) => @SET-SYMBOL $RESISTOR;
   # @SELECT-INSTANCE(type="c", recursive=true) => @SET-SYMBOL $CAPACITOR;
@@ -43,12 +38,16 @@
   # @SELECT-INSTANCE(type="npn", recursive=true) => @SET-SYMBOL $NPN;
   # @SELECT-INSTANCE(type="njf", recursive=true) => @SET-SYMBOL $NJFET;
   # @SELECT-INSTANCE(type="nmf", recursive=true) => @SET-SYMBOL $NJFET;
-  /* narrow: the model type picks the P variants */
   # @SELECT-INSTANCE(type="pmos", recursive=true) => @SET-SYMBOL $PMOS_4TERM;
   # @SELECT-INSTANCE(type="pnp", recursive=true) => @SET-SYMBOL $PNP;
   # @SELECT-INSTANCE(type="lpnp", recursive=true) => @SET-SYMBOL $PNP;
   # @SELECT-INSTANCE(type="pjf", recursive=true) => @SET-SYMBOL $PJFET;
   # @SELECT-INSTANCE(type="pmf", recursive=true) => @SET-SYMBOL $PJFET;
-  /* the adapter's type for the W and U of HSPICE that are transmission lines, not a switch and an RC line */
-  # @SELECT-INSTANCE(type="tline", recursive=true) => @SET-SYMBOL $TRANSMISSION_LINE
+  # @SELECT-INSTANCE(type="tline", recursive=true) => @SET-SYMBOL $TRANSMISSION_LINE;
+
+  /* Three-terminal symbols when MOS bulk is on a ground/supply net or switch cn is on a ground net. */
+  $GROUND_NET_SET @SELECT-TERMINAL(type="nmos", terminal="b", recursive=true) => @SELECT-INSTANCE(recursive=true) => @SET-SYMBOL $NMOS;
+  $SUPPLY_NET_SET @SELECT-TERMINAL(type="pmos", terminal="b", recursive=true) => @SELECT-INSTANCE(recursive=true) => @SET-SYMBOL $PMOS;
+  $GROUND_NET_SET @SELECT-TERMINAL(name="S*", terminal="cn", recursive=true) => @SELECT-INSTANCE(recursive=true) => @SET-SYMBOL $EXTERNALLY_CONTROLLED_SWITCH;
+  $GROUND_NET_SET @SELECT-TERMINAL(type="sw", terminal="cn", recursive=true) => @SELECT-INSTANCE(recursive=true) => @SET-SYMBOL $EXTERNALLY_CONTROLLED_SWITCH;
 }

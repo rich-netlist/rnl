@@ -1,0 +1,25 @@
+/* rnl-std-all 0.4, a package of the standard series 0.4 (16.3).
+   The one package collection of the series 0.4, with no content of its own: it brings in styles,
+   basic and semiconductor symbols and definitions, automatic fill, circuit semantics, the four
+   domain packages, and the rule package of each host dialect through a header record for that
+   language (2.8, 16.3). A file of the language version 0.4 uses it through USE-PACKAGE or a tool's
+   setting, or names the packages it wants one by one. */
+@RNL(type="header") {
+  @VERSION("0.4");
+  @PACKAGE(name="rnl-std-all", version="0.4");
+  @USE-PACKAGE(name="rnl-std-style", version="0.4");
+  @USE-PACKAGE(name="rnl-std-basic", version="0.4");
+  @USE-PACKAGE(name="rnl-std-semiconductors", version="0.4");
+  @USE-PACKAGE(name="rnl-std-fill", version="0.4");
+  @USE-PACKAGE(name="rnl-std-semantics", version="0.4");
+  @USE-PACKAGE(name="rnl-std-functional", version="0.4");
+  @USE-PACKAGE(name="rnl-std-rf", version="0.4");
+  @USE-PACKAGE(name="rnl-std-logic", version="0.4");
+  @USE-PACKAGE(name="rnl-std-signal-flow", version="0.4");
+}
+@RNL(type="header", language="spice") {
+  @USE-PACKAGE(name="rnl-std-spice", version="0.4");
+}
+@RNL(type="header", language="spectre") {
+  @USE-PACKAGE(name="rnl-std-spectre", version="0.4");
+}

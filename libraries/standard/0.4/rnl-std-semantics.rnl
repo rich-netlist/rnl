@@ -1,0 +1,1163 @@
+/* rnl-std-semantics 0.4, a package of the standard series 0.4 (16.3).
+   The semantic definitions of circuit structures and of their default drawings. A default drawing is
+   the constraints of a body, all of priority low: the author's own facts come before them,
+   PRIORITY("disabled") on a usage turns them off for that usage, and a rule such as
+   # @SELECT-USAGE $DIFFERENTIAL_PAIR_N => @PRIORITY("disabled") does so for every usage of a
+   definition. Every position fact here gives its direction; for a drawing the other way round, use the
+   variant or write the roles the other way round. An orientation may allow several (an ORIENT-RELATION
+   with a list).
+   Each definition's comment begins with one sentence that says what it is, the line a listing of the
+   package shows; then what it draws: "Places" when it has position facts (ALIGN, ORDER, DISTRIBUTE,
+   DISTANCE, ORIENT-RELATION), "routes" when it joins its members' shared nets with wires
+   (ROUTE-OBJECT), "a group" when it makes one, and "Meaning only" when it draws nothing. A structure
+   routes no ground, supply or bias net: rnl-std-fill draws those with symbols, by an UNROUTE of
+   priority high, unless a file writes a ROUTE of priority high or a WIRE.
+   Definitions assert what their circuit must be (15.3, 15.4) as violations that change nothing drawn:
+   matching of types, models and geometry, shared nets on gates, bases, sources or emitters, connection
+   to ground or supply rails, usage definitions, and series, parallel, star or loop topologies, with
+   control and bulk or substrate terminals excluded by type. An assertion checks only what the netlist
+   tells: a member whose type or terminal names are not known, such as a PDK device without a DEVICE,
+   is not checked and gives no violation. */
+@RNL(type="header") {
+  @VERSION("0.4");
+  @PACKAGE(name="rnl-std-semantics", version="0.4");
+  @USE-PACKAGE(name="rnl-std-basic", version="0.4");
+}
+
+@RNL {
+  /* ==============================================================================================
+     1. Relations: matching, symmetry, series and parallel, branches, signal flow and feedback
+     ============================================================================================== */
+
+  /* Devices or sub-structures matched in their type or definition and in their layout.
+     Meaning only: places and routes nothing; asserts that instance members share one type and usage
+     members are of one definition. */
+  $MATCHED = @DEFINE(roles=[["{members}", ["instance", "usage"]]]) {
+    %all_usages = # @SELECT-USAGE;
+    %inst_set = {?members};
+    %all_usages @REMOVE-FROM %inst_set;
+    %inst_set @SELECT-INSTANCE(type="*")
+        => @ASSERT-INSTANCE(same=["type"], message="the members of a $MATCHED have one type");
+    %other_usages = {%all_usages};
+    ?members @REMOVE-FROM %other_usages;
+    %usage_set = {%all_usages};
+    %other_usages @REMOVE-FROM %usage_set;
+    %usage_set @ASSERT-USAGE(same=["definition"],
+            message="the usages of a $MATCHED are of one definition");
+  };
+
+  /* MOSFETs matched in type, model and channel length.
+     Meaning only: places and routes nothing; specializes $MATCHED for nmos or pmos instances with
+     one model and one channel length l. */
+  $MATCHED_MOS = @DEFINE(roles=[["{members}", "instance"]]) {
+    ?members @AS $MATCHED;
+    %mos_set = ?members @SELECT-INSTANCE(type="nmos");
+    ?members @SELECT-INSTANCE(type="pmos") => @ADD-TO %mos_set;
+    ?members @SELECT-INSTANCE(type="*")
+        => @ASSERT-IN(message="the members of a $MATCHED_MOS are MOSFETs") %mos_set;
+    ?members @ASSERT-INSTANCE(same=["model", "l"],
+            message="the members of a $MATCHED_MOS have one model and one length");
+  };
+
+  /* Bipolar transistors matched in type, model and unit emitter geometry.
+     Meaning only: places and routes nothing; specializes $MATCHED for npn, pnp or lpnp instances with
+     one model and unit emitter dimensions, allowing scaled emitter area or multiplicity. */
+  $MATCHED_BJT = @DEFINE(roles=[["{members}", "instance"]]) {
+    ?members @AS $MATCHED;
+    %bjt_set = ?members @SELECT-INSTANCE(type="npn");
+    ?members @SELECT-INSTANCE(type="pnp") => @ADD-TO %bjt_set;
+    ?members @SELECT-INSTANCE(type="lpnp") => @ADD-TO %bjt_set;
+    ?members @SELECT-INSTANCE(type="*")
+        => @ASSERT-IN(message="the members of a $MATCHED_BJT are bipolar transistors") %bjt_set;
+    ?members @ASSERT-INSTANCE(same=["model", "we", "le"],
+            message="the members of a $MATCHED_BJT have one model and emitter geometry");
+  };
+
+  /* Resistors matched in type and model.
+     Meaning only: places and routes nothing; specializes $MATCHED for resistor instances with one
+     model. */
+  $MATCHED_RESISTOR = @DEFINE(roles=[["{members}", "instance"]]) {
+    ?members @AS $MATCHED;
+    %resistor_set = ?members @SELECT-INSTANCE(type="r");
+    ?members @SELECT-INSTANCE(model="resistor") => @ADD-TO %resistor_set;
+    ?members @SELECT-INSTANCE(name="R*") => @ADD-TO %resistor_set;
+    ?members @SELECT-INSTANCE(type="*")
+        => @ASSERT-IN(message="the members of a $MATCHED_RESISTOR are resistors") %resistor_set;
+    ?members @ASSERT-INSTANCE(same=["model"],
+            message="the members of a $MATCHED_RESISTOR have one model");
+  };
+
+  /* Capacitors matched in type and model.
+     Meaning only: places and routes nothing; specializes $MATCHED for capacitor instances with one
+     model. */
+  $MATCHED_CAPACITOR = @DEFINE(roles=[["{members}", "instance"]]) {
+    ?members @AS $MATCHED;
+    %capacitor_set = ?members @SELECT-INSTANCE(type="c");
+    ?members @SELECT-INSTANCE(model="capacitor") => @ADD-TO %capacitor_set;
+    ?members @SELECT-INSTANCE(name="C*") => @ADD-TO %capacitor_set;
+    ?members @SELECT-INSTANCE(type="*")
+        => @ASSERT-IN(message="the members of a $MATCHED_CAPACITOR are capacitors") %capacitor_set;
+    ?members @ASSERT-INSTANCE(same=["model"],
+            message="the members of a $MATCHED_CAPACITOR have one model");
+  };
+
+  /* Two symmetric objects at one height, mirror images of each other about an axis.
+     Places; routes nothing: left on the left of axis, right on the right, and right oriented as left
+     flipped left-right (14.7). Write the roles the other way round to swap the sides. */
+  $MIRRORED = @DEFINE(
+      roles=[
+        ["left", ["instance", "usage"]],
+        ["right", ["instance", "usage"]],
+        ["axis", ["point", "instance", "usage"]]]) {
+    {?left ?right} @ALIGN("y", priority="low");
+    {?left ?axis ?right} @DISTRIBUTE("left-to-right", priority="low");
+    ?left ?right @ORIENT-RELATION("MY", priority="low");
+  };
+
+  /* Two symmetric objects in one column, mirror images of each other about a horizontal axis.
+     Places; routes nothing: top above axis, bottom below, and bottom oriented as top flipped
+     top-bottom (14.7). Write the roles the other way round to swap the sides. */
+  $MIRRORED_VERTICAL = @DEFINE(
+      roles=[
+        ["top", ["instance", "usage"]],
+        ["bottom", ["instance", "usage"]],
+        ["axis", ["point", "instance", "usage"]]]) {
+    {?top ?bottom} @ALIGN("x", priority="low");
+    {?top ?axis ?bottom} @DISTRIBUTE("top-to-bottom", priority="low");
+    ?top ?bottom @ORIENT-RELATION("MX", priority="low");
+  };
+
+  /* A DC branch: members in series in one column, from the top down.
+     Places and routes: members in series, aligned in x together with the usage's own point so the
+     branch moves with a tail or axis constraint, ordered from the top down. */
+  $BRANCH = @DEFINE(roles=[["{members}", ["instance", "usage"]]]) {
+    ?members @AS $SERIES;
+    {?members ?} @ALIGN("x", priority="low");
+    ?members @ORDER("top-to-bottom", priority="low");
+  };
+
+  /* A DC branch drawn as a row: members in series at one height, from left to right.
+     Places and routes: members in series, aligned in y together with the usage's own point, ordered
+     from left to right. */
+  $BRANCH_HORIZONTAL = @DEFINE(roles=[["{members}", ["instance", "usage"]]]) {
+    ?members @AS $SERIES;
+    {?members ?} @ALIGN("y", priority="low");
+    ?members @ORDER("left-to-right", priority="low");
+  };
+
+  /* A cascade of stages along a signal path.
+     Meaning only: places and routes nothing; states no geometric order. */
+  $CASCADE = @DEFINE(roles=[["{stages}", ["instance", "usage"]]]) {
+  };
+
+  /* Members connected end to end in series along one current path.
+     Routes; places nothing; asserts series topology among ?members with control and bulk or substrate
+     terminals excluded. */
+  $SERIES = @DEFINE(roles=[["{members}", ["instance", "usage"]]]) {
+    {?members} @ROUTE-OBJECT(priority="low");
+    ?members @ASSERT-TOPOLOGY("series", exclude=[["nmos", "g"], ["nmos", "b"], ["pmos", "g"],
+            ["pmos", "b"], ["npn", "b"], ["npn", "s"], ["pnp", "b"], ["pnp", "s"], ["lpnp", "b"],
+            ["lpnp", "s"], ["njf", "g"], ["pjf", "g"], ["nmf", "g"], ["pmf", "g"]],
+            message="the members of a $SERIES are in series");
+  };
+
+  /* Members connected in parallel across the same two nets.
+     Routes; places nothing; asserts parallel topology among ?members with control and bulk or
+     substrate terminals excluded. */
+  $PARALLEL = @DEFINE(roles=[["{members}", ["instance", "usage"]]]) {
+    {?members} @ROUTE-OBJECT(priority="low");
+    ?members @ASSERT-TOPOLOGY("parallel", exclude=[["nmos", "g"], ["nmos", "b"], ["pmos", "g"],
+            ["pmos", "b"], ["npn", "b"], ["npn", "s"], ["pnp", "b"], ["pnp", "s"], ["lpnp", "b"],
+            ["lpnp", "s"], ["njf", "g"], ["pjf", "g"], ["nmf", "g"], ["pmf", "g"]],
+            message="the members of a $PARALLEL are in parallel");
+  };
+
+  /* Members in parallel side by side at one height, standing as one place in a column.
+     Places and routes: applies $PARALLEL, aligns ?members and the usage's own point in y, and orders
+     ?members from left to right. */
+  $PARALLEL_HORIZONTAL = @DEFINE(roles=[["{members}", ["instance", "usage"]]]) {
+    ?members @AS $PARALLEL;
+    {?members ?} @ALIGN("y", priority="low");
+    ?members @ORDER("left-to-right", priority="low");
+  };
+
+  /* Members in parallel one above another at one x, standing as one place in a row.
+     Places and routes: applies $PARALLEL, aligns ?members and the usage's own point in x, and orders
+     ?members from top to bottom. */
+  $PARALLEL_VERTICAL = @DEFINE(roles=[["{members}", ["instance", "usage"]]]) {
+    ?members @AS $PARALLEL;
+    {?members ?} @ALIGN("x", priority="low");
+    ?members @ORDER("top-to-bottom", priority="low");
+  };
+
+  /* A signal path that flows one way.
+     Meaning only: places and routes nothing; records a unidirectional signal path (14.6). */
+  $FLOW = @DEFINE(roles=[["{path}", ["instance", "usage"]]]) {
+  };
+
+  /* A feedback loop: a forward path and a feedback network.
+     Meaning only: places and routes nothing. */
+  $FEEDBACK_LOOP = @DEFINE(
+      roles=[["{forward}", ["instance", "usage"]], ["{feedback}", ["instance", "usage"]]]) {
+  };
+
+  /* The load of an amplifier stage or of a signal path.
+     Meaning only: places and routes nothing. */
+  $LOAD = @DEFINE(roles=[["element", ["instance", "usage"]]]) {
+  };
+
+  /* The signal or bias source at the start of a stage or of a signal path.
+     Meaning only: places and routes nothing. */
+  $SOURCE = @DEFINE(roles=[["element", ["instance", "usage"]]]) {
+  };
+
+  /* ==============================================================================================
+     2. Differential pairs, current mirrors and translinear loops
+     ============================================================================================== */
+
+  /* A differential pair with its tail below it, as an NMOS pair is drawn.
+     Places and routes; a group: matched left and right mirrored about tail, tail below the pair, and
+     sources or emitters pointing down; asserts matched inputs, shared source/emitter net and star
+     connection at the tail node. */
+  $DIFFERENTIAL_PAIR_N = @DEFINE(
+      roles=[["left", "instance"], ["right", "instance"], ["tail", ["instance", "usage"]]]) {
+    {?left ?right} @AS $MATCHED;
+    ?left(left) ?right(right) ?tail(axis) @AS $MIRRORED;
+    {{?left ?right} ?tail} @ORDER("top-to-bottom", priority="low");
+    {?left ?right ?tail} @ROUTE-OBJECT(priority="low");
+    {?left ?right ?tail} @GROUP;
+    {?left ?right} @SELECT-TERMINAL(terminal="g")
+        => @SELECT-INSTANCE
+        => @SELECT-TERMINAL(terminal="s")
+        => @ASSERT-TERMINAL(same=["net"],
+                message="the sources of a $DIFFERENTIAL_PAIR_N share a net");
+    {?left ?right} @SELECT-TERMINAL(terminal="e")
+        => @ASSERT-TERMINAL(same=["net"],
+                message="the emitters of a $DIFFERENTIAL_PAIR_N share a net");
+    {?left ?right} @ASSERT-INSTANCE(same=["model", "w", "l", "nf", "m", "area"],
+            message="the two sides of a $DIFFERENTIAL_PAIR_N are matched");
+    {?left ?right ?tail} @ASSERT-TOPOLOGY("star", exclude=[["nmos", "g"], ["nmos", "b"], ["pmos", "g"],
+            ["pmos", "b"], ["npn", "b"], ["npn", "s"], ["pnp", "b"], ["pnp", "s"], ["lpnp", "b"],
+            ["lpnp", "s"], ["njf", "g"], ["pjf", "g"], ["nmf", "g"], ["pmf", "g"]],
+            message="the left, right and tail of a $DIFFERENTIAL_PAIR_N meet at one net");
+    {?left ?right ?tail} @SELECT-INSTANCE(type="nmos")
+        => @SELECT-PIN(terminal="s")
+        => @ORIENT("down", priority="low");
+    {?left ?right ?tail} @SELECT-INSTANCE(type="pmos")
+        => @SELECT-PIN(terminal="s")
+        => @ORIENT("down", priority="low");
+    {?left ?right ?tail} @SELECT-INSTANCE(type="njf")
+        => @SELECT-PIN(terminal="s")
+        => @ORIENT("down", priority="low");
+    {?left ?right ?tail} @SELECT-INSTANCE(type="pjf")
+        => @SELECT-PIN(terminal="s")
+        => @ORIENT("down", priority="low");
+    {?left ?right ?tail} @SELECT-INSTANCE(type="npn")
+        => @SELECT-PIN(terminal="e")
+        => @ORIENT("down", priority="low");
+    {?left ?right ?tail} @SELECT-INSTANCE(type="pnp")
+        => @SELECT-PIN(terminal="e")
+        => @ORIENT("down", priority="low");
+    {?left ?right ?tail} @SELECT-INSTANCE(type="lpnp")
+        => @SELECT-PIN(terminal="e")
+        => @ORIENT("down", priority="low");
+  };
+
+  /* A differential pair with its tail above it, as a PMOS pair is drawn.
+     Places and routes; a group: matched left and right mirrored about tail, tail above the pair, and
+     sources or emitters pointing up; asserts matched inputs, shared source/emitter net and star
+     connection at the tail node. */
+  $DIFFERENTIAL_PAIR_P = @DEFINE(
+      roles=[["left", "instance"], ["right", "instance"], ["tail", ["instance", "usage"]]]) {
+    {?left ?right} @AS $MATCHED;
+    ?left(left) ?right(right) ?tail(axis) @AS $MIRRORED;
+    {{?left ?right} ?tail} @ORDER("bottom-to-top", priority="low");
+    {?left ?right ?tail} @ROUTE-OBJECT(priority="low");
+    {?left ?right ?tail} @GROUP;
+    {?left ?right} @SELECT-TERMINAL(terminal="g")
+        => @SELECT-INSTANCE
+        => @SELECT-TERMINAL(terminal="s")
+        => @ASSERT-TERMINAL(same=["net"],
+                message="the sources of a $DIFFERENTIAL_PAIR_P share a net");
+    {?left ?right} @SELECT-TERMINAL(terminal="e")
+        => @ASSERT-TERMINAL(same=["net"],
+                message="the emitters of a $DIFFERENTIAL_PAIR_P share a net");
+    {?left ?right} @ASSERT-INSTANCE(same=["model", "w", "l", "nf", "m", "area"],
+            message="the two sides of a $DIFFERENTIAL_PAIR_P are matched");
+    {?left ?right ?tail} @ASSERT-TOPOLOGY("star", exclude=[["nmos", "g"], ["nmos", "b"], ["pmos", "g"],
+            ["pmos", "b"], ["npn", "b"], ["npn", "s"], ["pnp", "b"], ["pnp", "s"], ["lpnp", "b"],
+            ["lpnp", "s"], ["njf", "g"], ["pjf", "g"], ["nmf", "g"], ["pmf", "g"]],
+            message="the left, right and tail of a $DIFFERENTIAL_PAIR_P meet at one net");
+    {?left ?right ?tail} @SELECT-INSTANCE(type="nmos")
+        => @SELECT-PIN(terminal="s")
+        => @ORIENT("up", priority="low");
+    {?left ?right ?tail} @SELECT-INSTANCE(type="pmos")
+        => @SELECT-PIN(terminal="s")
+        => @ORIENT("up", priority="low");
+    {?left ?right ?tail} @SELECT-INSTANCE(type="njf")
+        => @SELECT-PIN(terminal="s")
+        => @ORIENT("up", priority="low");
+    {?left ?right ?tail} @SELECT-INSTANCE(type="pjf")
+        => @SELECT-PIN(terminal="s")
+        => @ORIENT("up", priority="low");
+    {?left ?right ?tail} @SELECT-INSTANCE(type="npn")
+        => @SELECT-PIN(terminal="e")
+        => @ORIENT("up", priority="low");
+    {?left ?right ?tail} @SELECT-INSTANCE(type="pnp")
+        => @SELECT-PIN(terminal="e")
+        => @ORIENT("up", priority="low");
+    {?left ?right ?tail} @SELECT-INSTANCE(type="lpnp")
+        => @SELECT-PIN(terminal="e")
+        => @ORIENT("up", priority="low");
+  };
+
+  /* A rail-to-rail input stage: an upper and a lower differential pair on the same inputs.
+     Routes; places nothing; a group: joins shared input nets between pairup and pairdown and asserts
+     that pairup is a $DIFFERENTIAL_PAIR_P and pairdown is a $DIFFERENTIAL_PAIR_N. */
+  $COMPLEMENTARY_DIFFERENTIAL_PAIR = @DEFINE(roles=[["pairup", "usage"], ["pairdown", "usage"]]) {
+    {?pairup ?pairdown} @ROUTE-OBJECT(priority="low");
+    {?pairup ?pairdown} @GROUP;
+    ?pairup @ASSERT-USAGE(
+            message="the pairup of a $COMPLEMENTARY_DIFFERENTIAL_PAIR is a $DIFFERENTIAL_PAIR_P")
+        $DIFFERENTIAL_PAIR_P;
+    ?pairdown @ASSERT-USAGE(
+            message="the pairdown of a $COMPLEMENTARY_DIFFERENTIAL_PAIR is a $DIFFERENTIAL_PAIR_N")
+        $DIFFERENTIAL_PAIR_N;
+  };
+
+  /* A pseudo-differential pair: two matched input transistors without a tail, drawn mirrored.
+     Places; routes nothing: mirrors left and right about a free axis and points sources or emitters
+     down for n-type devices and up for p-type devices. */
+  $PSEUDO_DIFFERENTIAL_PAIR = @DEFINE(roles=[["left", "instance"], ["right", "instance"]]) {
+    %axis = (_, _);
+    {?left ?right} @AS $MATCHED;
+    ?left(left) ?right(right) %axis(axis) @AS $MIRRORED;
+    {?left ?right} @ASSERT-INSTANCE(same=["model", "w", "l", "nf", "m", "area"],
+            message="the two sides of a $PSEUDO_DIFFERENTIAL_PAIR are matched");
+    {?left ?right} @SELECT-INSTANCE(type="nmos")
+        => @SELECT-PIN(terminal="s")
+        => @ORIENT("down", priority="low");
+    {?left ?right} @SELECT-INSTANCE(type="pmos")
+        => @SELECT-PIN(terminal="s")
+        => @ORIENT("up", priority="low");
+    {?left ?right} @SELECT-INSTANCE(type="njf")
+        => @SELECT-PIN(terminal="s")
+        => @ORIENT("down", priority="low");
+    {?left ?right} @SELECT-INSTANCE(type="pjf")
+        => @SELECT-PIN(terminal="s")
+        => @ORIENT("up", priority="low");
+    {?left ?right} @SELECT-INSTANCE(type="npn")
+        => @SELECT-PIN(terminal="e")
+        => @ORIENT("down", priority="low");
+    {?left ?right} @SELECT-INSTANCE(type="pnp")
+        => @SELECT-PIN(terminal="e")
+        => @ORIENT("up", priority="low");
+    {?left ?right} @SELECT-INSTANCE(type="lpnp")
+        => @SELECT-PIN(terminal="e")
+        => @ORIENT("up", priority="low");
+  };
+
+  /* A differential pair degenerated by a bridge between its two tails, an H.
+     Places and routes; a group: matched inputs and matched tails aligned in columns with bridge in
+     the middle; asserts matched inputs and tails and star connections on both sides of the bridge. */
+  $DEGENERATED_DIFFERENTIAL_PAIR_TYPE_H = @DEFINE(
+      roles=[
+        ["left", "instance"],
+        ["right", "instance"],
+        ["tailleft", ["instance", "usage"]],
+        ["tailright", ["instance", "usage"]],
+        ["bridge", ["instance", "usage"]]]) {
+    {?left ?right} @AS $MATCHED;
+    {?tailleft ?tailright} @AS $MATCHED;
+    ?left ?right @ORIENT-RELATION("MY", priority="low");
+    {?left ?tailleft} @ALIGN("x", priority="low");
+    {?right ?tailright} @ALIGN("x", priority="low");
+    {?left ?right} @ALIGN("y", priority="low");
+    {?tailleft ?tailright} @ALIGN("y", priority="low");
+    {?left ?bridge ?right} @DISTRIBUTE("left-to-right", priority="low");
+    {?left ?right ?tailleft ?tailright ?bridge} @ROUTE-OBJECT(priority="low");
+    {?left ?right ?tailleft ?tailright ?bridge} @GROUP;
+    {?left ?right} @ASSERT-INSTANCE(same=["model", "w", "l", "nf", "m", "area"],
+            message="the two inputs of a $DEGENERATED_DIFFERENTIAL_PAIR_TYPE_H are matched");
+    %all_usages = # @SELECT-USAGE;
+    %tail_inst_set = {?tailleft ?tailright};
+    %all_usages @REMOVE-FROM %tail_inst_set;
+    %tail_inst_set @SELECT-INSTANCE
+        => @ASSERT-INSTANCE(same=["model", "value", "w", "l", "nf", "m", "area"],
+                message="the two tails of a $DEGENERATED_DIFFERENTIAL_PAIR_TYPE_H are matched");
+    {?left ?tailleft ?bridge} @ASSERT-TOPOLOGY("star", exclude=[["nmos", "g"], ["nmos", "b"],
+            ["pmos", "g"], ["pmos", "b"], ["npn", "b"], ["npn", "s"], ["pnp", "b"], ["pnp", "s"],
+            ["lpnp", "b"], ["lpnp", "s"], ["njf", "g"], ["pjf", "g"], ["nmf", "g"], ["pmf", "g"]],
+            message="the left, tailleft and bridge of a $DEGENERATED_DIFFERENTIAL_PAIR_TYPE_H meet at one net");
+    {?right ?tailright ?bridge} @ASSERT-TOPOLOGY("star", exclude=[["nmos", "g"], ["nmos", "b"],
+            ["pmos", "g"], ["pmos", "b"], ["npn", "b"], ["npn", "s"], ["pnp", "b"], ["pnp", "s"],
+            ["lpnp", "b"], ["lpnp", "s"], ["njf", "g"], ["pjf", "g"], ["nmf", "g"], ["pmf", "g"]],
+            message="the right, tailright and bridge of a $DEGENERATED_DIFFERENTIAL_PAIR_TYPE_H meet at one net");
+    {?left ?right ?tailleft ?tailright} @SELECT-INSTANCE(type="nmos")
+        => @SELECT-PIN(terminal="s")
+        => @ORIENT("down", priority="low");
+    {?left ?right ?tailleft ?tailright} @SELECT-INSTANCE(type="pmos")
+        => @SELECT-PIN(terminal="s")
+        => @ORIENT("up", priority="low");
+    {?left ?right ?tailleft ?tailright} @SELECT-INSTANCE(type="njf")
+        => @SELECT-PIN(terminal="s")
+        => @ORIENT("down", priority="low");
+    {?left ?right ?tailleft ?tailright} @SELECT-INSTANCE(type="pjf")
+        => @SELECT-PIN(terminal="s")
+        => @ORIENT("up", priority="low");
+    {?left ?right ?tailleft ?tailright} @SELECT-INSTANCE(type="npn")
+        => @SELECT-PIN(terminal="e")
+        => @ORIENT("down", priority="low");
+    {?left ?right ?tailleft ?tailright} @SELECT-INSTANCE(type="pnp")
+        => @SELECT-PIN(terminal="e")
+        => @ORIENT("up", priority="low");
+    {?left ?right ?tailleft ?tailright} @SELECT-INSTANCE(type="lpnp")
+        => @SELECT-PIN(terminal="e")
+        => @ORIENT("up", priority="low");
+  };
+
+  /* A differential pair degenerated by an element under each input, a T.
+     Places and routes; a group: matched inputs mirrored above matched degeneration elements with tail
+     centered below them; asserts series degeneration branches and star connection at the tail node. */
+  $DEGENERATED_DIFFERENTIAL_PAIR_TYPE_T = @DEFINE(
+      roles=[
+        ["left", "instance"],
+        ["right", "instance"],
+        ["degleft", ["instance", "usage"]],
+        ["degright", ["instance", "usage"]],
+        ["tail", ["instance", "usage"]]]) {
+    {?left ?right} @AS $MATCHED;
+    {?degleft ?degright} @AS $MATCHED;
+    {?left ?degleft} @AS $SERIES;
+    {?right ?degright} @AS $SERIES;
+    ?left ?right @ORIENT-RELATION("MY", priority="low");
+    {?left ?right} @ALIGN("y", priority="low");
+    {?degleft ?degright} @ALIGN("y", priority="low");
+    {?left ?degleft} @ALIGN("x", priority="low");
+    {?right ?degright} @ALIGN("x", priority="low");
+    {?left ?degleft ?tail} @ORDER("top-to-bottom", priority="low");
+    {?right ?degright ?tail} @ORDER("top-to-bottom", priority="low");
+    {?left ?tail ?right} @DISTRIBUTE("left-to-right", priority="low");
+    {?left ?right ?degleft ?degright ?tail} @ROUTE-OBJECT(priority="low");
+    {?left ?right ?degleft ?degright ?tail} @GROUP;
+    {?left ?right} @ASSERT-INSTANCE(same=["model", "w", "l", "nf", "m", "area"],
+            message="the two inputs of a $DEGENERATED_DIFFERENTIAL_PAIR_TYPE_T are matched");
+    %all_usages = # @SELECT-USAGE;
+    %deg_inst_set = {?degleft ?degright};
+    %all_usages @REMOVE-FROM %deg_inst_set;
+    %deg_inst_set @SELECT-INSTANCE
+        => @ASSERT-INSTANCE(same=["model", "value", "w", "l", "nf", "m", "area"],
+                message="the two degeneration elements of a $DEGENERATED_DIFFERENTIAL_PAIR_TYPE_T are matched");
+    {?degleft ?degright ?tail} @ASSERT-TOPOLOGY("star", exclude=[["nmos", "g"], ["nmos", "b"],
+            ["pmos", "g"], ["pmos", "b"], ["npn", "b"], ["npn", "s"], ["pnp", "b"], ["pnp", "s"],
+            ["lpnp", "b"], ["lpnp", "s"], ["njf", "g"], ["pjf", "g"], ["nmf", "g"], ["pmf", "g"]],
+            message="the degleft, degright and tail of a $DEGENERATED_DIFFERENTIAL_PAIR_TYPE_T meet at one net");
+    {?left ?right ?tail} @SELECT-INSTANCE(type="nmos")
+        => @SELECT-PIN(terminal="s")
+        => @ORIENT("down", priority="low");
+    {?left ?right ?tail} @SELECT-INSTANCE(type="pmos")
+        => @SELECT-PIN(terminal="s")
+        => @ORIENT("up", priority="low");
+    {?left ?right ?tail} @SELECT-INSTANCE(type="njf")
+        => @SELECT-PIN(terminal="s")
+        => @ORIENT("down", priority="low");
+    {?left ?right ?tail} @SELECT-INSTANCE(type="pjf")
+        => @SELECT-PIN(terminal="s")
+        => @ORIENT("up", priority="low");
+    {?left ?right ?tail} @SELECT-INSTANCE(type="npn")
+        => @SELECT-PIN(terminal="e")
+        => @ORIENT("down", priority="low");
+    {?left ?right ?tail} @SELECT-INSTANCE(type="pnp")
+        => @SELECT-PIN(terminal="e")
+        => @ORIENT("up", priority="low");
+    {?left ?right ?tail} @SELECT-INSTANCE(type="lpnp")
+        => @SELECT-PIN(terminal="e")
+        => @ORIENT("up", priority="low");
+  };
+
+  /* A cross-coupled pair: two matched transistors cross-coupled in positive feedback, drawn mirrored.
+     Places and routes: mirrors left and right and routes their shared nets. Direct gate-to-drain or
+     base-to-collector identity is not asserted because an element such as a resistor, inductor or
+     cascode may sit in series with a drain or collector. */
+  $CROSS_COUPLED_PAIR = @DEFINE(roles=[["left", "instance"], ["right", "instance"]]) {
+    %axis = (_, _);
+    {?left ?right} @AS $MATCHED;
+    ?left(left) ?right(right) %axis(axis) @AS $MIRRORED;
+    {?left ?right} @ROUTE-OBJECT(priority="low");
+    {?left ?right} @ASSERT-INSTANCE(same=["model", "w", "l", "nf", "m", "area"],
+            message="the two sides of a $CROSS_COUPLED_PAIR are matched");
+  };
+
+  /* A low-side current mirror: reference and output transistors with sources or emitters pointing down.
+     Places and routes: aligns ref and out in one row with sources or emitters down, asserts shared
+     gate or base net, one model and channel length, and parallel reference transistors. */
+  $CURRENT_MIRROR_N = @DEFINE(roles=[["{ref}", "instance"], ["{out}", "instance"]]) {
+    {?ref ?out} @ALIGN("y", priority="low");
+    ?ref{1} {?out} @ORIENT-RELATION(["R0", "MY"], priority="low");
+    ?ref{1} ?ref{2:end} @ORIENT-RELATION("R0", priority="low");
+    {?ref ?out} @ROUTE-OBJECT(priority="low");
+    {?ref ?out} @SELECT-INSTANCE(type="nmos")
+        => @SELECT-PIN(terminal="s")
+        => @ORIENT("down", priority="low");
+    {?ref ?out} @SELECT-INSTANCE(type="pmos")
+        => @SELECT-PIN(terminal="s")
+        => @ORIENT("down", priority="low");
+    {?ref ?out} @SELECT-INSTANCE(type="njf")
+        => @SELECT-PIN(terminal="s")
+        => @ORIENT("down", priority="low");
+    {?ref ?out} @SELECT-INSTANCE(type="pjf")
+        => @SELECT-PIN(terminal="s")
+        => @ORIENT("down", priority="low");
+    {?ref ?out} @SELECT-INSTANCE(type="npn")
+        => @SELECT-PIN(terminal="e")
+        => @ORIENT("down", priority="low");
+    {?ref ?out} @SELECT-INSTANCE(type="pnp")
+        => @SELECT-PIN(terminal="e")
+        => @ORIENT("down", priority="low");
+    {?ref ?out} @SELECT-INSTANCE(type="lpnp")
+        => @SELECT-PIN(terminal="e")
+        => @ORIENT("down", priority="low");
+    {?ref ?out} @SELECT-TERMINAL(terminal="g")
+        => @ASSERT-TERMINAL(same=["net"], message="the gates of a $CURRENT_MIRROR_N share a net");
+    {?ref ?out} @SELECT-TERMINAL(terminal="c")
+        => @SELECT-INSTANCE
+        => @SELECT-TERMINAL(terminal="b")
+        => @ASSERT-TERMINAL(same=["net"], message="the bases of a $CURRENT_MIRROR_N share a net");
+    {?ref ?out} @ASSERT-INSTANCE(same=["model", "l"],
+            message="the transistors of a $CURRENT_MIRROR_N have one model and one length");
+    ?ref @ASSERT-TOPOLOGY("parallel", exclude=[["nmos", "g"], ["nmos", "b"], ["pmos", "g"],
+            ["pmos", "b"], ["npn", "b"], ["npn", "s"], ["pnp", "b"], ["pnp", "s"], ["lpnp", "b"],
+            ["lpnp", "s"], ["njf", "g"], ["pjf", "g"], ["nmf", "g"], ["pmf", "g"]],
+            message="the reference transistors of a $CURRENT_MIRROR_N are in parallel");
+  };
+
+  /* A high-side current mirror: reference and output transistors with sources or emitters pointing up.
+     Places and routes: aligns ref and out in one row with sources or emitters up, asserts shared gate
+     or base net, one model and channel length, and parallel reference transistors. */
+  $CURRENT_MIRROR_P = @DEFINE(roles=[["{ref}", "instance"], ["{out}", "instance"]]) {
+    {?ref ?out} @ALIGN("y", priority="low");
+    ?ref{1} {?out} @ORIENT-RELATION(["R0", "MY"], priority="low");
+    ?ref{1} ?ref{2:end} @ORIENT-RELATION("R0", priority="low");
+    {?ref ?out} @ROUTE-OBJECT(priority="low");
+    {?ref ?out} @SELECT-INSTANCE(type="nmos")
+        => @SELECT-PIN(terminal="s")
+        => @ORIENT("up", priority="low");
+    {?ref ?out} @SELECT-INSTANCE(type="pmos")
+        => @SELECT-PIN(terminal="s")
+        => @ORIENT("up", priority="low");
+    {?ref ?out} @SELECT-INSTANCE(type="njf")
+        => @SELECT-PIN(terminal="s")
+        => @ORIENT("up", priority="low");
+    {?ref ?out} @SELECT-INSTANCE(type="pjf")
+        => @SELECT-PIN(terminal="s")
+        => @ORIENT("up", priority="low");
+    {?ref ?out} @SELECT-INSTANCE(type="npn")
+        => @SELECT-PIN(terminal="e")
+        => @ORIENT("up", priority="low");
+    {?ref ?out} @SELECT-INSTANCE(type="pnp")
+        => @SELECT-PIN(terminal="e")
+        => @ORIENT("up", priority="low");
+    {?ref ?out} @SELECT-INSTANCE(type="lpnp")
+        => @SELECT-PIN(terminal="e")
+        => @ORIENT("up", priority="low");
+    {?ref ?out} @SELECT-TERMINAL(terminal="g")
+        => @ASSERT-TERMINAL(same=["net"], message="the gates of a $CURRENT_MIRROR_P share a net");
+    {?ref ?out} @SELECT-TERMINAL(terminal="c")
+        => @SELECT-INSTANCE
+        => @SELECT-TERMINAL(terminal="b")
+        => @ASSERT-TERMINAL(same=["net"], message="the bases of a $CURRENT_MIRROR_P share a net");
+    {?ref ?out} @ASSERT-INSTANCE(same=["model", "l"],
+            message="the transistors of a $CURRENT_MIRROR_P have one model and one length");
+    ?ref @ASSERT-TOPOLOGY("parallel", exclude=[["nmos", "g"], ["nmos", "b"], ["pmos", "g"],
+            ["pmos", "b"], ["npn", "b"], ["npn", "s"], ["pnp", "b"], ["pnp", "s"], ["lpnp", "b"],
+            ["lpnp", "s"], ["njf", "g"], ["pjf", "g"], ["nmf", "g"], ["pmf", "g"]],
+            message="the reference transistors of a $CURRENT_MIRROR_P are in parallel");
+  };
+
+  /* A low-side cascode current mirror: a mirror row at the bottom with a cascode row above it.
+     Places and routes; a group: applies $CURRENT_MIRROR_N to ref and out, places refcascode and
+     outcascode in a row above them with sources or emitters down, and asserts cascode matching. */
+  $CASCODE_CURRENT_MIRROR_N = @DEFINE(
+      roles=[
+        ["{ref}", "instance"],
+        ["{out}", "instance"],
+        ["{refcascode}", "instance"],
+        ["{outcascode}", "instance"]]) {
+    ?ref(ref) ?out(out) @AS $CURRENT_MIRROR_N;
+    {?refcascode ?outcascode} @ALIGN("y", priority="low");
+    {{?refcascode ?outcascode} {?ref ?out}} @ORDER("top-to-bottom", priority="low");
+    {?refcascode{1} ?ref{1}} @ALIGN("x", priority="low");
+    {?outcascode{1} ?out{1}} @ALIGN("x", priority="low");
+    ?ref{1} ?refcascode{1} @ORIENT-RELATION("R0", priority="low");
+    ?out{1} ?outcascode{1} @ORIENT-RELATION("R0", priority="low");
+    ?refcascode{1} ?refcascode{2:end} @ORIENT-RELATION("R0", priority="low");
+    ?outcascode{1} ?outcascode{2:end} @ORIENT-RELATION("R0", priority="low");
+    {?ref ?out ?refcascode ?outcascode} @ROUTE-OBJECT(priority="low");
+    {?ref ?out ?refcascode ?outcascode} @GROUP;
+    {?refcascode ?outcascode} @SELECT-INSTANCE(type="nmos")
+        => @SELECT-PIN(terminal="s")
+        => @ORIENT("down", priority="low");
+    {?refcascode ?outcascode} @SELECT-INSTANCE(type="pmos")
+        => @SELECT-PIN(terminal="s")
+        => @ORIENT("down", priority="low");
+    {?refcascode ?outcascode} @SELECT-INSTANCE(type="njf")
+        => @SELECT-PIN(terminal="s")
+        => @ORIENT("down", priority="low");
+    {?refcascode ?outcascode} @SELECT-INSTANCE(type="pjf")
+        => @SELECT-PIN(terminal="s")
+        => @ORIENT("down", priority="low");
+    {?refcascode ?outcascode} @SELECT-INSTANCE(type="npn")
+        => @SELECT-PIN(terminal="e")
+        => @ORIENT("down", priority="low");
+    {?refcascode ?outcascode} @SELECT-INSTANCE(type="pnp")
+        => @SELECT-PIN(terminal="e")
+        => @ORIENT("down", priority="low");
+    {?refcascode ?outcascode} @SELECT-INSTANCE(type="lpnp")
+        => @SELECT-PIN(terminal="e")
+        => @ORIENT("down", priority="low");
+    {?refcascode ?outcascode} @SELECT-TERMINAL(terminal="g")
+        => @ASSERT-TERMINAL(same=["net"],
+                message="the gates of the cascodes of a $CASCODE_CURRENT_MIRROR_N share a net");
+    {?refcascode ?outcascode} @SELECT-TERMINAL(terminal="c")
+        => @SELECT-INSTANCE
+        => @SELECT-TERMINAL(terminal="b")
+        => @ASSERT-TERMINAL(same=["net"],
+                message="the bases of the cascodes of a $CASCODE_CURRENT_MIRROR_N share a net");
+    {?refcascode ?outcascode} @ASSERT-INSTANCE(same=["model", "l"],
+            message="the cascodes of a $CASCODE_CURRENT_MIRROR_N have one model and one length");
+  };
+
+  /* A high-side cascode current mirror: a mirror row at the top with a cascode row below it.
+     Places and routes; a group: applies $CURRENT_MIRROR_P to ref and out, places refcascode and
+     outcascode in a row below them with sources or emitters up, and asserts cascode matching. */
+  $CASCODE_CURRENT_MIRROR_P = @DEFINE(
+      roles=[
+        ["{ref}", "instance"],
+        ["{out}", "instance"],
+        ["{refcascode}", "instance"],
+        ["{outcascode}", "instance"]]) {
+    ?ref(ref) ?out(out) @AS $CURRENT_MIRROR_P;
+    {?refcascode ?outcascode} @ALIGN("y", priority="low");
+    {{?refcascode ?outcascode} {?ref ?out}} @ORDER("bottom-to-top", priority="low");
+    {?refcascode{1} ?ref{1}} @ALIGN("x", priority="low");
+    {?outcascode{1} ?out{1}} @ALIGN("x", priority="low");
+    ?ref{1} ?refcascode{1} @ORIENT-RELATION("R0", priority="low");
+    ?out{1} ?outcascode{1} @ORIENT-RELATION("R0", priority="low");
+    ?refcascode{1} ?refcascode{2:end} @ORIENT-RELATION("R0", priority="low");
+    ?outcascode{1} ?outcascode{2:end} @ORIENT-RELATION("R0", priority="low");
+    {?ref ?out ?refcascode ?outcascode} @ROUTE-OBJECT(priority="low");
+    {?ref ?out ?refcascode ?outcascode} @GROUP;
+    {?refcascode ?outcascode} @SELECT-INSTANCE(type="nmos")
+        => @SELECT-PIN(terminal="s")
+        => @ORIENT("up", priority="low");
+    {?refcascode ?outcascode} @SELECT-INSTANCE(type="pmos")
+        => @SELECT-PIN(terminal="s")
+        => @ORIENT("up", priority="low");
+    {?refcascode ?outcascode} @SELECT-INSTANCE(type="njf")
+        => @SELECT-PIN(terminal="s")
+        => @ORIENT("up", priority="low");
+    {?refcascode ?outcascode} @SELECT-INSTANCE(type="pjf")
+        => @SELECT-PIN(terminal="s")
+        => @ORIENT("up", priority="low");
+    {?refcascode ?outcascode} @SELECT-INSTANCE(type="npn")
+        => @SELECT-PIN(terminal="e")
+        => @ORIENT("up", priority="low");
+    {?refcascode ?outcascode} @SELECT-INSTANCE(type="pnp")
+        => @SELECT-PIN(terminal="e")
+        => @ORIENT("up", priority="low");
+    {?refcascode ?outcascode} @SELECT-INSTANCE(type="lpnp")
+        => @SELECT-PIN(terminal="e")
+        => @ORIENT("up", priority="low");
+    {?refcascode ?outcascode} @SELECT-TERMINAL(terminal="g")
+        => @ASSERT-TERMINAL(same=["net"],
+                message="the gates of the cascodes of a $CASCODE_CURRENT_MIRROR_P share a net");
+    {?refcascode ?outcascode} @SELECT-TERMINAL(terminal="c")
+        => @SELECT-INSTANCE
+        => @SELECT-TERMINAL(terminal="b")
+        => @ASSERT-TERMINAL(same=["net"],
+                message="the bases of the cascodes of a $CASCODE_CURRENT_MIRROR_P share a net");
+    {?refcascode ?outcascode} @ASSERT-INSTANCE(same=["model", "l"],
+            message="the cascodes of a $CASCODE_CURRENT_MIRROR_P have one model and one length");
+  };
+
+  /* A translinear loop of two groups of transistors, drawn in columns.
+     Places and routes. */
+  $TRANS_LINEAR_LOOP = @DEFINE(roles=[["{a}", ["instance", "usage"]], ["{b}", ["instance", "usage"]]]) {
+    {?a ?b} @AS $PARALLEL;
+    {?a ?b} @ALIGN("x", priority="low");
+    {?a ?b} @ROUTE-OBJECT(priority="low");
+  };
+
+  /* A translinear loop of two groups of transistors, drawn in rows.
+     Places and routes. */
+  $TRANS_LINEAR_LOOP_HORIZONTAL = @DEFINE(
+      roles=[["{a}", ["instance", "usage"]], ["{b}", ["instance", "usage"]]]) {
+    {?a ?b} @AS $PARALLEL;
+    {?a ?b} @ALIGN("y", priority="low");
+    {?a ?b} @ROUTE-OBJECT(priority="low");
+  };
+
+  /* ==============================================================================================
+     3. Single-transistor configurations and amplifier stages
+     ============================================================================================== */
+
+  /* A diode-connected transistor with its gate tied toward its drain, or its base toward its collector.
+     Routes; places nothing: joins nets shared by the pins of ?device when gate and drain (or base and
+     collector) are directly tied. Direct net equality is not asserted because a resistor or cascode
+     device may sit in series with the drain or collector. */
+  $DIODE_CONNECTED = @DEFINE(roles=[["device", "instance"]]) {
+    ?device @ROUTE-OBJECT(priority="low");
+  };
+
+  /* A common-source stage of one FET.
+     Meaning only: places and routes nothing; asserts that ?device is a FET. */
+  $COMMON_SOURCE = @DEFINE(roles=[["device", "instance"]]) {
+    %fet_set = ?device @SELECT-INSTANCE(type="nmos");
+    ?device @SELECT-INSTANCE(type="pmos") => @ADD-TO %fet_set;
+    ?device @SELECT-INSTANCE(type="njf") => @ADD-TO %fet_set;
+    ?device @SELECT-INSTANCE(type="pjf") => @ADD-TO %fet_set;
+    ?device @SELECT-INSTANCE(type="nmf") => @ADD-TO %fet_set;
+    ?device @SELECT-INSTANCE(type="pmf") => @ADD-TO %fet_set;
+    ?device @SELECT-INSTANCE(type="*")
+        => @ASSERT-IN(message="the device of a $COMMON_SOURCE is a FET") %fet_set;
+  };
+
+  /* A common-gate stage of one FET.
+     Meaning only: places and routes nothing; asserts that ?device is a FET. */
+  $COMMON_GATE = @DEFINE(roles=[["device", "instance"]]) {
+    %fet_set = ?device @SELECT-INSTANCE(type="nmos");
+    ?device @SELECT-INSTANCE(type="pmos") => @ADD-TO %fet_set;
+    ?device @SELECT-INSTANCE(type="njf") => @ADD-TO %fet_set;
+    ?device @SELECT-INSTANCE(type="pjf") => @ADD-TO %fet_set;
+    ?device @SELECT-INSTANCE(type="nmf") => @ADD-TO %fet_set;
+    ?device @SELECT-INSTANCE(type="pmf") => @ADD-TO %fet_set;
+    ?device @SELECT-INSTANCE(type="*")
+        => @ASSERT-IN(message="the device of a $COMMON_GATE is a FET") %fet_set;
+  };
+
+  /* A source follower (a common-drain stage) of one FET.
+     Meaning only: places and routes nothing; specializes $FOLLOWER and asserts that ?device is a FET. */
+  $COMMON_DRAIN = @DEFINE(roles=[["device", "instance"]]) {
+    ?device @AS $FOLLOWER;
+    %fet_set = ?device @SELECT-INSTANCE(type="nmos");
+    ?device @SELECT-INSTANCE(type="pmos") => @ADD-TO %fet_set;
+    ?device @SELECT-INSTANCE(type="njf") => @ADD-TO %fet_set;
+    ?device @SELECT-INSTANCE(type="pjf") => @ADD-TO %fet_set;
+    ?device @SELECT-INSTANCE(type="nmf") => @ADD-TO %fet_set;
+    ?device @SELECT-INSTANCE(type="pmf") => @ADD-TO %fet_set;
+    ?device @SELECT-INSTANCE(type="*")
+        => @ASSERT-IN(message="the device of a $COMMON_DRAIN is a FET") %fet_set;
+  };
+
+  /* A common-emitter stage of one bipolar transistor.
+     Meaning only: places and routes nothing; asserts that ?device is a bipolar transistor. */
+  $COMMON_EMITTER = @DEFINE(roles=[["device", "instance"]]) {
+    %bjt_set = ?device @SELECT-INSTANCE(type="npn");
+    ?device @SELECT-INSTANCE(type="pnp") => @ADD-TO %bjt_set;
+    ?device @SELECT-INSTANCE(type="lpnp") => @ADD-TO %bjt_set;
+    ?device @SELECT-INSTANCE(type="*")
+        => @ASSERT-IN(message="the device of a $COMMON_EMITTER is a bipolar transistor") %bjt_set;
+  };
+
+  /* A common-base stage of one bipolar transistor.
+     Meaning only: places and routes nothing; asserts that ?device is a bipolar transistor. */
+  $COMMON_BASE = @DEFINE(roles=[["device", "instance"]]) {
+    %bjt_set = ?device @SELECT-INSTANCE(type="npn");
+    ?device @SELECT-INSTANCE(type="pnp") => @ADD-TO %bjt_set;
+    ?device @SELECT-INSTANCE(type="lpnp") => @ADD-TO %bjt_set;
+    ?device @SELECT-INSTANCE(type="*")
+        => @ASSERT-IN(message="the device of a $COMMON_BASE is a bipolar transistor") %bjt_set;
+  };
+
+  /* An emitter follower (a common-collector stage) of one bipolar transistor.
+     Meaning only: places and routes nothing; specializes $FOLLOWER and asserts that ?device is a
+     bipolar transistor. */
+  $COMMON_COLLECTOR = @DEFINE(roles=[["device", "instance"]]) {
+    ?device @AS $FOLLOWER;
+    %bjt_set = ?device @SELECT-INSTANCE(type="npn");
+    ?device @SELECT-INSTANCE(type="pnp") => @ADD-TO %bjt_set;
+    ?device @SELECT-INSTANCE(type="lpnp") => @ADD-TO %bjt_set;
+    ?device @SELECT-INSTANCE(type="*")
+        => @ASSERT-IN(message="the device of a $COMMON_COLLECTOR is a bipolar transistor") %bjt_set;
+  };
+
+  /* A voltage-follower stage of one transistor.
+     Meaning only: places and routes nothing. */
+  $FOLLOWER = @DEFINE(roles=[["device", "instance"]]) {
+  };
+
+  /* A cascode: a source device or sub-structure in series with a common-gate transistor.
+     Routes; places nothing: applies $COMMON_GATE to ?cascode and $SERIES to ?source and ?cascode. */
+  $CASCODE = @DEFINE(roles=[["source", ["instance", "usage"]], ["cascode", "instance"]]) {
+    ?cascode @AS $COMMON_GATE;
+    {?source ?cascode} @AS $SERIES;
+  };
+
+  /* A folded cascode: an input device folded into a common-gate transistor with its bias.
+     Routes; places nothing; a group: applies $COMMON_GATE to ?cascode and routes the folding node
+     joining ?source, ?cascode and ?bias. */
+  $FOLDED_CASCODE = @DEFINE(
+      roles=[
+        ["source", ["instance", "usage"]],
+        ["cascode", "instance"],
+        ["bias", ["instance", "usage"]]]) {
+    ?cascode @AS $COMMON_GATE;
+    {?source ?cascode ?bias} @ROUTE-OBJECT(priority="low");
+    {?source ?cascode ?bias} @GROUP;
+  };
+
+  /* A common-source amplifier: a FET input transistor and its load.
+     Routes; places nothing: applies $COMMON_SOURCE to ?input and $TRANSCONDUCTOR_Z_AMPLIFIER to
+     ?input and ?load. */
+  $COMMON_SOURCE_AMPLIFIER = @DEFINE(
+      roles=[["input", "instance"], ["load", ["instance", "usage"]]]) {
+    ?input @AS $COMMON_SOURCE;
+    ?input(transconductor) ?load(load) @AS $TRANSCONDUCTOR_Z_AMPLIFIER;
+  };
+
+  /* A common-emitter amplifier: a bipolar input transistor and its load.
+     Routes; places nothing: applies $COMMON_EMITTER to ?input and $TRANSCONDUCTOR_Z_AMPLIFIER to
+     ?input and ?load. */
+  $COMMON_EMITTER_AMPLIFIER = @DEFINE(
+      roles=[["input", "instance"], ["load", ["instance", "usage"]]]) {
+    ?input @AS $COMMON_EMITTER;
+    ?input(transconductor) ?load(load) @AS $TRANSCONDUCTOR_Z_AMPLIFIER;
+  };
+
+  /* A Miller-compensated amplifier: a gain stage and its compensation network.
+     Routes; places nothing; a group: specializes $FEEDBACK_LOOP and routes shared nets between ?stage
+     and ?compensation. */
+  $MILLER_AMPLIFIER = @DEFINE(
+      roles=[["stage", ["instance", "usage"]], ["compensation", ["instance", "usage"]]]) {
+    ?stage(forward) ?compensation(feedback) @AS $FEEDBACK_LOOP;
+    {?stage ?compensation} @ROUTE-OBJECT(priority="low");
+    {?stage ?compensation} @GROUP;
+  };
+
+  /* A push-pull output stage: a pull-up driver in series with a pull-down driver.
+     Routes; places nothing: applies $SERIES to ?pullup and ?pulldown. */
+  $PUSH_PULL_STAGE = @DEFINE(
+      roles=[["pullup", ["instance", "usage"]], ["pulldown", ["instance", "usage"]]]) {
+    {?pullup ?pulldown} @AS $SERIES;
+  };
+
+  /* An amplifier stage: a transconductor and its load.
+     Routes; places nothing: applies $LOAD to ?load and routes shared output nets between
+     ?transconductor and ?load. */
+  $TRANSCONDUCTOR_Z_AMPLIFIER = @DEFINE(
+      roles=[["transconductor", ["instance", "usage"]], ["load", ["instance", "usage"]]]) {
+    ?load @AS $LOAD;
+    {?transconductor ?load} @ROUTE-OBJECT(priority="low");
+  };
+
+  /* A degenerated amplifier stage: a transconductor, its load and its degeneration.
+     Routes; places nothing: applies $TRANSCONDUCTOR_Z_AMPLIFIER to ?transconductor and ?load and
+     routes shared nets with ?degenerator. */
+  $DEGENERATED_TRANSCONDUCTOR_Z_AMPLIFIER = @DEFINE(
+      roles=[
+        ["transconductor", ["instance", "usage"]],
+        ["load", ["instance", "usage"]],
+        ["degenerator", ["instance", "usage"]]]) {
+    ?transconductor(transconductor) ?load(load) @AS $TRANSCONDUCTOR_Z_AMPLIFIER;
+    {?transconductor ?degenerator} @ROUTE-OBJECT(priority="low");
+  };
+
+  /* ==============================================================================================
+     4. Switches, sampling and charge transfer
+     ============================================================================================== */
+
+  /* A switch that passes or blocks a signal between its two sides.
+     Meaning only: places and routes nothing. */
+  $PASS_SWITCH = @DEFINE(roles=[["device", ["instance", "usage"]]]) {
+  };
+
+  /* A precharge, equalization or reset transistor.
+     Meaning only: places and routes nothing. */
+  $RESET_SWITCH = @DEFINE(roles=[["device", "instance"]]) {
+  };
+
+  /* A low-side switch connected to a ground net.
+     Meaning only: places and routes nothing; asserts that a channel or path terminal of ?device lies
+     on a net in $GROUND_NET_SET. */
+  $GROUND_SWITCH = @DEFINE(roles=[["device", "instance"]]) {
+    %grounded_set = $GROUND_NET_SET @SELECT-TERMINAL(terminal="s") => @SELECT-INSTANCE;
+    $GROUND_NET_SET @SELECT-TERMINAL(terminal="d") => @SELECT-INSTANCE => @ADD-TO %grounded_set;
+    $GROUND_NET_SET @SELECT-TERMINAL(terminal="e") => @SELECT-INSTANCE => @ADD-TO %grounded_set;
+    $GROUND_NET_SET @SELECT-TERMINAL(terminal="c") => @SELECT-INSTANCE => @ADD-TO %grounded_set;
+    $GROUND_NET_SET @SELECT-TERMINAL(terminal="p") => @SELECT-INSTANCE => @ADD-TO %grounded_set;
+    $GROUND_NET_SET @SELECT-TERMINAL(terminal="n") => @SELECT-INSTANCE => @ADD-TO %grounded_set;
+    ?device @ASSERT-IN(message="the device of a $GROUND_SWITCH has a terminal on a ground net")
+        %grounded_set;
+  };
+
+  /* A high-side switch connected to a supply net.
+     Meaning only: places and routes nothing; asserts that a channel or path terminal of ?device lies
+     on a net in $SUPPLY_NET_SET. */
+  $POWER_SWITCH = @DEFINE(roles=[["device", "instance"]]) {
+    %supplied_set = $SUPPLY_NET_SET @SELECT-TERMINAL(terminal="s") => @SELECT-INSTANCE;
+    $SUPPLY_NET_SET @SELECT-TERMINAL(terminal="d") => @SELECT-INSTANCE => @ADD-TO %supplied_set;
+    $SUPPLY_NET_SET @SELECT-TERMINAL(terminal="e") => @SELECT-INSTANCE => @ADD-TO %supplied_set;
+    $SUPPLY_NET_SET @SELECT-TERMINAL(terminal="c") => @SELECT-INSTANCE => @ADD-TO %supplied_set;
+    $SUPPLY_NET_SET @SELECT-TERMINAL(terminal="p") => @SELECT-INSTANCE => @ADD-TO %supplied_set;
+    $SUPPLY_NET_SET @SELECT-TERMINAL(terminal="n") => @SELECT-INSTANCE => @ADD-TO %supplied_set;
+    ?device @ASSERT-IN(message="the device of a $POWER_SWITCH has a terminal on a supply net")
+        %supplied_set;
+  };
+
+  /* A CMOS transmission gate, the PMOS above the NMOS.
+     Places and routes: applies $PARALLEL to ?pmos and ?nmos, aligns them in one column with ?pmos
+     above ?nmos, and asserts complementary polarities. */
+  $TRANSMISSION_GATE = @DEFINE(
+      roles=[["pmos", ["instance", "usage"]], ["nmos", ["instance", "usage"]]]) {
+    {?pmos ?nmos} @AS $PARALLEL;
+    {?pmos ?nmos} @ALIGN("x", priority="low");
+    {?pmos ?nmos} @ORDER("top-to-bottom", priority="low");
+    ?pmos @SELECT-INSTANCE(type="*")
+        => @ASSERT-INSTANCE(type="pmos", message="the pmos of a $TRANSMISSION_GATE is a PMOS");
+    ?nmos @SELECT-INSTANCE(type="*")
+        => @ASSERT-INSTANCE(type="nmos", message="the nmos of a $TRANSMISSION_GATE is an NMOS");
+  };
+
+  /* A CMOS transmission gate drawn side by side, the PMOS on the left.
+     Places and routes: applies $PARALLEL to ?pmos and ?nmos, aligns them in one row with ?pmos on
+     the left, and asserts complementary polarities. */
+  $TRANSMISSION_GATE_HORIZONTAL = @DEFINE(
+      roles=[["pmos", ["instance", "usage"]], ["nmos", ["instance", "usage"]]]) {
+    {?pmos ?nmos} @AS $PARALLEL;
+    {?pmos ?nmos} @ALIGN("y", priority="low");
+    {?pmos ?nmos} @ORDER("left-to-right", priority="low");
+    ?pmos @SELECT-INSTANCE(type="*")
+        => @ASSERT-INSTANCE(type="pmos",
+                message="the pmos of a $TRANSMISSION_GATE_HORIZONTAL is a PMOS");
+    ?nmos @SELECT-INSTANCE(type="*")
+        => @ASSERT-INSTANCE(type="nmos",
+                message="the nmos of a $TRANSMISSION_GATE_HORIZONTAL is an NMOS");
+  };
+
+  /* A switch of several throws that share one pole.
+     Meaning only: places and routes nothing; a group: applies $PASS_SWITCH to ?throws and asserts
+     that all throws meet at one shared pole net. */
+  $MULTI_POLE_SWITCH = @DEFINE(roles=[["{throws}", ["instance", "usage"]]]) {
+    ?throws @AS $PASS_SWITCH;
+    {?throws} @GROUP;
+    ?throws @ASSERT-TOPOLOGY("star", exclude=[["nmos", "g"], ["nmos", "b"], ["pmos", "g"],
+            ["pmos", "b"], ["npn", "b"], ["npn", "s"], ["pnp", "b"], ["pnp", "s"], ["lpnp", "b"],
+            ["lpnp", "s"], ["njf", "g"], ["pjf", "g"], ["nmf", "g"], ["pmf", "g"]],
+            message="the throws of a $MULTI_POLE_SWITCH meet at one pole net");
+  };
+
+  /* A bootstrapped sampling switch.
+     Meaning only: places and routes nothing; specializes $PASS_SWITCH. */
+  $BOOTSTRAPPED_SWITCH = @DEFINE(roles=[["device", ["instance", "usage"]]]) {
+    ?device @AS $PASS_SWITCH;
+  };
+
+  /* A switched-capacitor sampler: sampling switches with sampling capacitors.
+     Routes; places nothing; a group: routes shared nets between ?switch and ?capacitor. */
+  $SC_SAMPLER = @DEFINE(
+      roles=[["{switch}", ["instance", "usage"]], ["{capacitor}", ["instance", "usage"]]]) {
+    {?switch ?capacitor} @ROUTE-OBJECT(priority="low");
+    {?switch ?capacitor} @GROUP;
+  };
+
+  /* A charge-sharing network: two capacitors or capacitor banks that share charge through a switch.
+     Routes; places nothing; a group: routes shared nets among ?a, ?switch and ?b. */
+  $CHARGE_SHARING = @DEFINE(
+      roles=[
+        ["a", ["instance", "usage"]],
+        ["switch", ["instance", "usage"]],
+        ["b", ["instance", "usage"]]]) {
+    {?a ?switch ?b} @ROUTE-OBJECT(priority="low");
+    {?a ?switch ?b} @GROUP;
+  };
+
+  /* A chopper: a bridge of four switches that reverses the polarity of a signal.
+     Routes; places nothing; a group: applies $PASS_SWITCH and $MATCHED, routes the bridge nets, and
+     asserts a four-switch loop alternating between ?straight and ?crossed. */
+  $CHOPPER = @DEFINE(
+      roles=[["{straight}", ["instance", "usage"]], ["{crossed}", ["instance", "usage"]]]) {
+    {?straight ?crossed} @AS $PASS_SWITCH;
+    ?straight @AS $MATCHED;
+    ?crossed @AS $MATCHED;
+    {?straight ?crossed} @ROUTE-OBJECT(priority="low");
+    {?straight ?crossed} @GROUP;
+    {?straight{1} ?crossed{1} ?straight{2} ?crossed{2}} @ASSERT-TOPOLOGY("loop",
+            exclude=[["nmos", "g"], ["nmos", "b"], ["pmos", "g"], ["pmos", "b"], ["npn", "b"],
+            ["npn", "s"], ["pnp", "b"], ["pnp", "s"], ["lpnp", "b"], ["lpnp", "s"], ["njf", "g"],
+            ["pjf", "g"], ["nmf", "g"], ["pmf", "g"]],
+            message="the four switches of a $CHOPPER form a bridge loop");
+  };
+
+  /* A flying capacitor switched between clock phases.
+     Meaning only: places and routes nothing. */
+  $FLYING_CAPACITOR = @DEFINE(roles=[["capacitor", ["instance", "usage"]]]) {
+  };
+
+  /* ==============================================================================================
+     5. Logic gates, latches and registers
+     ============================================================================================== */
+
+  /* A CMOS inverter, the PMOS above the NMOS.
+     Places and routes; a group: specializes $CMOS_GATE and places ?pmos above ?nmos in one column. */
+  $CMOS_INVERTER = @DEFINE(roles=[["pmos", "instance"], ["nmos", "instance"]]) {
+    ?pmos(pullup) ?nmos(pulldown) @AS $CMOS_GATE;
+    {?pmos ?nmos} @ALIGN("x", priority="low");
+    {?pmos ?nmos} @ORDER("top-to-bottom", priority="low");
+  };
+
+  /* A CMOS inverter drawn side by side, the PMOS on the left.
+     Places and routes; a group: specializes $CMOS_GATE and places ?pmos to the left of ?nmos in one
+     row. */
+  $CMOS_INVERTER_HORIZONTAL = @DEFINE(roles=[["pmos", "instance"], ["nmos", "instance"]]) {
+    ?pmos(pullup) ?nmos(pulldown) @AS $CMOS_GATE;
+    {?pmos ?nmos} @ALIGN("y", priority="low");
+    {?pmos ?nmos} @ORDER("left-to-right", priority="low");
+  };
+
+  /* A static CMOS logic gate: a pull-up network and a pull-down network meeting in series at the output.
+     Routes; places nothing; a group: treats {?pullup} and {?pulldown} as two networks in $SERIES and
+     asserts complementary polarities. */
+  $CMOS_GATE = @DEFINE(
+      roles=[["{pullup}", ["instance", "usage"]], ["{pulldown}", ["instance", "usage"]]]) {
+    {{?pullup} {?pulldown}} @AS $SERIES;
+    {?pullup ?pulldown} @GROUP;
+    ?pullup @SELECT-INSTANCE(type="*")
+        => @ASSERT-INSTANCE(type="pmos", message="the pullup of a $CMOS_GATE is a PMOS");
+    ?pulldown @SELECT-INSTANCE(type="*")
+        => @ASSERT-INSTANCE(type="nmos", message="the pulldown of a $CMOS_GATE is an NMOS");
+  };
+
+  /* A latch: a bistable core with the devices around it.
+     Meaning only: places and routes nothing; a group. */
+  $LATCH = @DEFINE(roles=[["{core}", ["instance", "usage"]], ["{others}", ["instance", "usage"]]]) {
+    {?core ?others} @GROUP;
+  };
+
+  /* A latch of two cross-coupled inverters.
+     Routes; places nothing; a group: specializes $LATCH and routes the cross-coupled loop nets. */
+  $INVERTER_LATCH = @DEFINE(roles=[["a", ["instance", "usage"]], ["b", ["instance", "usage"]]]) {
+    {?a ?b} @AS $LATCH;
+    {?a ?b} @ROUTE-OBJECT(priority="low");
+  };
+
+  /* A shift register: a chain of flip-flops or latches.
+     Meaning only: places and routes nothing. */
+  $SHIFT_REGISTER = @DEFINE(roles=[["{stages}", ["instance", "usage"]]]) {
+  };
+
+  /* ==============================================================================================
+     6. Passive networks, tanks and decoupling
+     ============================================================================================== */
+
+  /* A divider of two branches in series, upper and lower.
+     Routes; places nothing: applies $SERIES to ?upper and ?lower. */
+  $DIVIDER = @DEFINE(roles=[["upper", ["instance", "usage"]], ["lower", ["instance", "usage"]]]) {
+    {?upper ?lower} @AS $SERIES;
+  };
+
+  /* A ladder of resistors in series in one column, from the top down.
+     Places and routes; a group: draws ?resistors as a $BRANCH. */
+  $RESISTOR_LADDER = @DEFINE(roles=[["{resistors}", "instance"]]) {
+    ?resistors @AS $BRANCH;
+    {?resistors} @GROUP;
+  };
+
+  /* A ladder of resistors in series drawn as a row.
+     Places and routes; a group: draws ?resistors as a $BRANCH_HORIZONTAL. */
+  $RESISTOR_LADDER_HORIZONTAL = @DEFINE(roles=[["{resistors}", "instance"]]) {
+    ?resistors @AS $BRANCH_HORIZONTAL;
+    {?resistors} @GROUP;
+  };
+
+  /* A pi network: a shunt branch, a series branch and another shunt branch.
+     Routes; places nothing; a group: asserts loop topology among ?shunt1, ?series and ?shunt2. */
+  $PI_NETWORK = @DEFINE(
+      roles=[
+        ["shunt1", ["instance", "usage"]],
+        ["series", ["instance", "usage"]],
+        ["shunt2", ["instance", "usage"]]]) {
+    {?shunt1 ?series ?shunt2} @ROUTE-OBJECT(priority="low");
+    {?shunt1 ?series ?shunt2} @GROUP;
+    {?shunt1 ?series ?shunt2} @ASSERT-TOPOLOGY("loop", exclude=[["nmos", "g"], ["nmos", "b"],
+            ["pmos", "g"], ["pmos", "b"], ["npn", "b"], ["npn", "s"], ["pnp", "b"], ["pnp", "s"],
+            ["lpnp", "b"], ["lpnp", "s"], ["njf", "g"], ["pjf", "g"], ["nmf", "g"], ["pmf", "g"]],
+            message="the three branches of a $PI_NETWORK go round");
+  };
+
+  /* A T network: a series branch, a shunt branch and another series branch.
+     Routes; places nothing; a group: asserts star topology among ?series1, ?shunt and ?series2. */
+  $T_NETWORK = @DEFINE(
+      roles=[
+        ["series1", ["instance", "usage"]],
+        ["shunt", ["instance", "usage"]],
+        ["series2", ["instance", "usage"]]]) {
+    {?series1 ?shunt ?series2} @ROUTE-OBJECT(priority="low");
+    {?series1 ?shunt ?series2} @GROUP;
+    {?series1 ?shunt ?series2} @ASSERT-TOPOLOGY("star", exclude=[["nmos", "g"], ["nmos", "b"],
+            ["pmos", "g"], ["pmos", "b"], ["npn", "b"], ["npn", "s"], ["pnp", "b"], ["pnp", "s"],
+            ["lpnp", "b"], ["lpnp", "s"], ["njf", "g"], ["pjf", "g"], ["nmf", "g"], ["pmf", "g"]],
+            message="the three branches of a $T_NETWORK meet at one net");
+  };
+
+  /* A parallel LC resonant tank.
+     Routes; places nothing; a group: applies $PARALLEL to ?inductor and ?capacitor. */
+  $LC_TANK_PARALLEL = @DEFINE(
+      roles=[["inductor", ["instance", "usage"]], ["capacitor", ["instance", "usage"]]]) {
+    {?inductor ?capacitor} @AS $PARALLEL;
+    {?inductor ?capacitor} @GROUP;
+  };
+
+  /* A parallel RLC resonant tank.
+     Routes; places nothing; a group: applies $PARALLEL to ?resistor, ?inductor and ?capacitor. */
+  $RLC_TANK_PARALLEL = @DEFINE(
+      roles=[
+        ["resistor", ["instance", "usage"]],
+        ["inductor", ["instance", "usage"]],
+        ["capacitor", ["instance", "usage"]]]) {
+    {?resistor ?inductor ?capacitor} @AS $PARALLEL;
+    {?resistor ?inductor ?capacitor} @GROUP;
+  };
+
+  /* A series LC resonant tank.
+     Routes; places nothing; a group: applies $SERIES to ?inductor and ?capacitor. */
+  $LC_TANK_SERIES = @DEFINE(
+      roles=[["inductor", ["instance", "usage"]], ["capacitor", ["instance", "usage"]]]) {
+    {?inductor ?capacitor} @AS $SERIES;
+    {?inductor ?capacitor} @GROUP;
+  };
+
+  /* A series RLC resonant tank.
+     Routes; places nothing; a group: applies $SERIES to ?resistor, ?inductor and ?capacitor. */
+  $RLC_TANK_SERIES = @DEFINE(
+      roles=[
+        ["resistor", ["instance", "usage"]],
+        ["inductor", ["instance", "usage"]],
+        ["capacitor", ["instance", "usage"]]]) {
+    {?resistor ?inductor ?capacitor} @AS $SERIES;
+    {?resistor ?inductor ?capacitor} @GROUP;
+  };
+
+  /* An RF choke or bias resistor that feeds a DC supply or bias to a node.
+     Meaning only: places and routes nothing. */
+  $DC_FEED = @DEFINE(roles=[["device", ["instance", "usage"]]]) {
+  };
+
+  /* A decoupling or bypass capacitor on a supply or bias node.
+     Meaning only: places and routes nothing. */
+  $DECAP = @DEFINE(roles=[["device", ["instance", "usage"]]]) {
+  };
+
+  /* A series coupling capacitor that passes the AC signal and blocks DC.
+     Meaning only: places and routes nothing. */
+  $AC_COUPLE = @DEFINE(roles=[["device", ["instance", "usage"]]]) {
+  };
+
+  /* ==============================================================================================
+     7. Oscillators
+     ============================================================================================== */
+
+  /* An oscillator made of its active and resonant or delay elements.
+     Meaning only: places and routes nothing. */
+  $OSCILLATOR = @DEFINE(roles=[["{members}", ["instance", "usage"]]]) {
+  };
+}
