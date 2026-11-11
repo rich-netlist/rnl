@@ -1,80 +1,62 @@
 /* rnl-std-fill 0.4, a package of the standard series 0.4 (16.3).
-   Made from the files of the series 0.3 (libraries/standard/0.3), which say what they were
-   generated from, and edited in rnl, whose files are the source.
-   The sets of the fill and the rules that add grounds, supplies and net labels, each a stub with a
-   short wire of its own (10.5, 16.3). A file that does not want the fill drops it with an empty
-   inline package of its name. Ports are not filled in 0.4:
-   a port symbol is a definition of a package, not a word of the language, so the fill cannot tell
-   whether a file draws a port already; a file draws its ports, such as $IO_PORT @ATTACH &out, or
-   all the port nets of a level with $PORT_LIST @ATTACH (12.4). */
+   The sets and rules of the automatic fill: attaches ground, supply, bias and net-label stubs to
+   unwired pins, including the pins of virtual parts (10.5, 16.3). A file that does not want the
+   fill drops it with an empty inline package of its name; ports are drawn explicitly with $IO_PORT
+   or $PORT_LIST (12.4). */
 @RNL(type="header") {
   @VERSION("0.4");
   @PACKAGE(name="rnl-std-fill", version="0.4");
-  @USE-PACKAGE(name="rnl-std-basic", version="0.4")
+  @USE-PACKAGE(name="rnl-std-basic", version="0.4");
 }
 
-/* ---------------------------------------------------------------- rnl-std-fill: fill (10.5) */
+/* ---------------------------------------------------------------- automatic fill (10.5) */
 @RNL {
-  /* sets the user edits with ADD-TO / REMOVE-FROM (10.5) */
-  /* The ground nets, 0 by default, which a file edits with ADD-TO and REMOVE-FROM. */
-  $GROUND_NET_SET = # @SELECT-NET(name="0", recursive=true);
-  /* The supply nets, none by default, which a file edits with ADD-TO and REMOVE-FROM. */
-  $SUPPLY_NET_SET = {};
+  /* Ground, supply and bias nets are left unrouted unless a file overrides with priority="high" or WIRE. */
+  {$GROUND_NET_SET $SUPPLY_NET_SET $BIAS_NET_SET} @UNROUTE-NET(priority="high");
 
-  /* what is drawn with wires, routed by the solver: only what is declared (13.7).
-     A structure of rnl-std-structures joins the pins of its own roles with @ROUTE-OBJECT of low
-     priority; what joins two structures is a net label unless a file declares it. A file declares a
-     whole net with &x @ROUTE-NET, and the pins of some objects with {...} @ROUTE-OBJECT; a package
-     declares nets with ROUTE rules of its own. The fill has no set of nets to wire.
+  /* Pins of virtual parts that the fill places itself, plus pins marked with $NO_CONNECT, get no fill. */
+  %own_pin_set = # @SELECT-USAGE(recursive=true) $GROUND => @SELECT-PIN(recursive=true);
+  # @SELECT-USAGE(recursive=true) $SUPPLY => @SELECT-PIN(recursive=true) => @ADD-TO %own_pin_set;
+  # @SELECT-USAGE(recursive=true) $BIAS => @SELECT-PIN(recursive=true) => @ADD-TO %own_pin_set;
+  # @SELECT-USAGE(recursive=true) $NET_LABEL => @SELECT-PIN(recursive=true) => @ADD-TO %own_pin_set;
+  # @SELECT-USAGE(recursive=true) $IO_PORT => @SELECT-PIN(recursive=true) => @ADD-TO %own_pin_set;
+  # @SELECT-USAGE(recursive=true) $NO_CONNECT => @SELECT-PIN(role="t", recursive=true) => @ADD-TO %own_pin_set;
 
-     Ground and supply nets are never wired by the fill: an @UNROUTE-NET of high priority takes
-     their pins out of every ROUTE, so a structure that holds two pins of vss does not join them,
-     nor does a file's {#M1 #M2} @ROUTE-OBJECT. To wire one anyway, write a ROUTE of high priority
-     after this package, &vss @ROUTE-NET(priority="high") or {...} @ROUTE-OBJECT(priority="high"),
-     or a WIRE, which no UNROUTE touches. */
-  {$GROUND_NET_SET $SUPPLY_NET_SET} @UNROUTE-NET(priority="high");
+  /* Drawn four-terminal MOS bulk pins get net-label stubs rather than ground, supply or bias stubs. */
+  %bulk_pin_set = # @SELECT-TERMINAL(type="nmos", terminal="b", recursive=true) => @SELECT-PIN(recursive=true);
+  # @SELECT-TERMINAL(type="pmos", terminal="b", recursive=true) => @SELECT-PIN(recursive=true) => @ADD-TO %bulk_pin_set;
 
-  /* ground and supply for unwired pins: a stub with its own wire, at least gap (1) below or above
-     the pin (10.5). The solver places it and writes it back as an explicit statement; its wire
-     then makes the pin wired, so the fill does not come back (10.5). The pins are those of the
-     terminals on the net, which belong to the circuit: from a net itself SELECT-PIN would take the
-     pins of virtual parts on it too, such as a ground placed by hand (10.1). The pins of a terminal
-     with a no-connect mark are taken out: through the usages only their terminal members are
-     selected (10.1). Pins with wires, written by hand or drawn by ROUTE-NET, get no symbol
-     from the fill: a file that wants one attaches it, such as $GROUND @ATTACH &vss for a net drawn
-     whole or $GROUND_STUB @ATTACH #R1:2 on a pin. */
-  /* The pins without wires on ground nets, which the fill gives a ground stub. */
-  $GROUND_FILL_SET = $GROUND_NET_SET @SELECT-TERMINAL(recursive=true) => @SELECT-PIN(wired=false, recursive=true);
-  # @SELECT-USAGE(recursive=true) $NO_CONNECT => @SELECT-TERMINAL(recursive=true) => @SELECT-PIN(recursive=true) => @REMOVE-FROM $GROUND_FILL_SET;
+  /* The unwired pins on ground nets, which the fill gives a ground stub. */
+  $GROUND_FILL_SET = $GROUND_NET_SET @SELECT-PIN(wired=false, recursive=true);
+  %own_pin_set @REMOVE-FROM $GROUND_FILL_SET;
+  %bulk_pin_set @REMOVE-FROM $GROUND_FILL_SET;
   $GROUND_STUB @ATTACH $GROUND_FILL_SET;
 
-  /* The pins without wires on supply nets, which the fill gives a supply stub. */
-  $SUPPLY_FILL_SET = $SUPPLY_NET_SET @SELECT-TERMINAL(recursive=true) => @SELECT-PIN(wired=false, recursive=true);
-  # @SELECT-USAGE(recursive=true) $NO_CONNECT => @SELECT-TERMINAL(recursive=true) => @SELECT-PIN(recursive=true) => @REMOVE-FROM $SUPPLY_FILL_SET;
+  /* The unwired pins on supply nets, which the fill gives a supply stub. */
+  $SUPPLY_FILL_SET = $SUPPLY_NET_SET @SELECT-PIN(wired=false, recursive=true);
+  %own_pin_set @REMOVE-FROM $SUPPLY_FILL_SET;
+  %bulk_pin_set @REMOVE-FROM $SUPPLY_FILL_SET;
   $SUPPLY_STUB @ATTACH $SUPPLY_FILL_SET;
 
-  /* The ground nets other than 0, whose grounds show the name of their net. So the grounds of a ground net other than 0, such as vss, show the name of their net */
+  /* The unwired pins on bias nets, which the fill gives a bias stub. */
+  $BIAS_FILL_SET = $BIAS_NET_SET @SELECT-PIN(wired=false, recursive=true);
+  %own_pin_set @REMOVE-FROM $BIAS_FILL_SET;
+  %bulk_pin_set @REMOVE-FROM $BIAS_FILL_SET;
+  # @SELECT-USAGE(recursive=true) $BIAS_STUB => @SELECT-PIN(role="t", recursive=true) => @REMOVE-FROM $BIAS_FILL_SET;
+  $BIAS_STUB @ATTACH $BIAS_FILL_SET;
+
+  /* The ground nets other than 0, whose grounds show the name of their net with $NAMED_GROUND_SYMBOL. */
   $NAMED_GROUND_NET_SET = {$GROUND_NET_SET};
   # @SELECT-NET(name="0", recursive=true) => @REMOVE-FROM $NAMED_GROUND_NET_SET;
   $NAMED_GROUND_NET_SET @SELECT-ANCESTOR-USAGE(recursive=true) $GROUND => @SET-SYMBOL $NAMED_GROUND_SYMBOL;
 
-  /* The pins without wires that the fill gives a net label. The other pins of the terminals say the name of
-     their net, each with a $NET_LABEL_STUB: the name at the end of a short lead. A pin without a wire,
-     which a tree of ROUTEs also gives it (10.2), so the pins of the nets a file draws whole are left out,
-     on no ground or supply net, whose stubs stand there already. A pin with a stub written for it, a
-     $NET_LABEL_STUB or an $IO_PORT_STUB, is left out as well: these stubs write no wire, so they are
-     taken out by their usages, written by hand or by the solver: a terminal written for the pin, as the
-     solver writes it, through SELECT-TERMINAL, and a pin written by name through role=. A pin of a net drawn whole that an UNROUTE of higher priority takes
-     out of the tree gets its label. Through the terminals, as above, so that the pins of virtual parts get
-     no label. Every selection writes recursive=true, so that the fill reaches the levels below the one
-     where the package is used (10.1) */
-  $LABEL_TERMINAL_SET = # @SELECT-TERMINAL(recursive=true) => @SELECT-PIN(wired=false, recursive=true);
-  $GROUND_NET_SET @SELECT-TERMINAL(recursive=true) => @SELECT-PIN(recursive=true) => @REMOVE-FROM $LABEL_TERMINAL_SET;
-  $SUPPLY_NET_SET @SELECT-TERMINAL(recursive=true) => @SELECT-PIN(recursive=true) => @REMOVE-FROM $LABEL_TERMINAL_SET;
-  # @SELECT-USAGE(recursive=true) $NO_CONNECT => @SELECT-TERMINAL(recursive=true) => @SELECT-PIN(recursive=true) => @REMOVE-FROM $LABEL_TERMINAL_SET;
-  # @SELECT-USAGE(recursive=true) $NET_LABEL_STUB => @SELECT-TERMINAL(recursive=true) => @SELECT-PIN(recursive=true) => @REMOVE-FROM $LABEL_TERMINAL_SET;
-  # @SELECT-USAGE(recursive=true) $NET_LABEL_STUB => @SELECT-PIN(role="t", recursive=true) => @REMOVE-FROM $LABEL_TERMINAL_SET;
-  # @SELECT-USAGE(recursive=true) $IO_PORT_STUB => @SELECT-TERMINAL(recursive=true) => @SELECT-PIN(recursive=true) => @REMOVE-FROM $LABEL_TERMINAL_SET;
-  # @SELECT-USAGE(recursive=true) $IO_PORT_STUB => @SELECT-PIN(role="t", recursive=true) => @REMOVE-FROM $LABEL_TERMINAL_SET;
-  $NET_LABEL_STUB @ATTACH $LABEL_TERMINAL_SET
+  /* The remaining unwired pins on nets, which the fill gives a net-label stub. */
+  %rail_pin_set = {$GROUND_NET_SET $SUPPLY_NET_SET $BIAS_NET_SET} @SELECT-PIN(recursive=true);
+  %bulk_pin_set @REMOVE-FROM %rail_pin_set;
+  $LABEL_FILL_SET = # @SELECT-NET(recursive=true) => @SELECT-PIN(wired=false, recursive=true);
+  %rail_pin_set @REMOVE-FROM $LABEL_FILL_SET;
+  %own_pin_set @REMOVE-FROM $LABEL_FILL_SET;
+  # @SELECT-USAGE(recursive=true) $NET_LABEL_STUB => @SELECT-PIN(role="t", recursive=true) => @REMOVE-FROM $LABEL_FILL_SET;
+  # @SELECT-USAGE(recursive=true) $IO_PORT_STUB => @SELECT-PIN(role="t", recursive=true) => @REMOVE-FROM $LABEL_FILL_SET;
+  $NET_LABEL_STUB @ATTACH $LABEL_FILL_SET;
 }

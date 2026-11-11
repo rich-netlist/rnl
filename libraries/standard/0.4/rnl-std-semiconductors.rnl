@@ -1,19 +1,18 @@
 /* rnl-std-semiconductors 0.4, a package of the standard series 0.4 (16.3).
-   Made from the files of the series 0.3 (libraries/standard/0.3), which say what they were
-   generated from, and edited in rnl, whose files are the source.
-   The symbols of diodes and transistors, from Analog Canvas, and of the JFET, drawn by hand.
+   The symbols of diodes and MOS, bipolar and JFET transistors.
    Coordinates are y-up; one unit is one grid step, ten Analog Canvas units. The pins are named with
    the standard terminal names of SPICE, in SPICE's order (a k, d g s b, c b e, d g s), and bind the
-   terminal of that name (6.12, 11.3), so #M1::d is the pin of #M1:d. A subcircuit instance drawn
-   with one of these symbols needs these names: from its .subckt line, or from a DEVICE (6.12).
-   The model label of each symbol is empty by default: the name of a model can be long, and a drawing
-   reads without it. A file shows it where the symbol puts it with
-   # @SELECT-INSTANCE => @TEXT("${model}", key="model"). */
-@RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="rnl-std-semiconductors", version="0.4")}
+   terminal of that name (6.12, 11.3), so #M1::d is the pin of #M1:d. The model label of each symbol
+   is empty by default; a file shows it with # @SELECT-INSTANCE => @TEXT("${model}", key="model"). */
+@RNL(type="header") {
+  @VERSION("0.4");
+  @PACKAGE(name="rnl-std-semiconductors", version="0.4");
+}
 
-/* ---------------------------------------------------------------- rnl-std-semiconductors: symbols drawn from Analog Canvas */
 @RNL {
-  /* A diode. a k; from Analog Canvas diode */
+  /* ---------------------------------------------------------------- diodes */
+
+  /* A diode. Terminals: a k. */
   $DIODE = @DEFINE-SYMBOL(box=[-2, -1, 2, 1]) {
     %a = (-2, 0) @PIN(terminal="a", direction="left");
     %k = (2, 0) @PIN(terminal="k", direction="right");
@@ -21,10 +20,11 @@
     @LINE {(-0.8333, 0.675) (-0.8333, -0.675) (0.5833, 0) (-0.8333, 0.675)};
     @LINE(linewidth=0.24) {(0.6667, 0.7333) (0.6667, -0.7333)};
     @LINE {(0.6667, 0) (2, 0)};
-    ? @TEXT("${name}", key="name", halign="middle") => @PLACE(0, 1.1)
+    ? @TEXT("${name}", key="name", halign="middle") => @PLACE(0, 1.1);
+    ? @TEXT("", key="model", halign="middle", valign="top") => @PLACE(0, -1.1);
   };
 
-  /* A Zener diode. a k; from Analog Canvas zener-diode */
+  /* A Zener diode. Terminals: a k. */
   $ZENER_DIODE = @DEFINE-SYMBOL(box=[-2, -1, 2, 1]) {
     %a = (-2, 0) @PIN(terminal="a", direction="left");
     %k = (2, 0) @PIN(terminal="k", direction="right");
@@ -32,10 +32,13 @@
     @LINE {(-0.7803, 0.6404) (-0.7803, -0.6404) (0.6606, 0) (-0.7803, 0.6404)};
     @LINE(linewidth=0.24) {(-0.0639, 0.8507) (0.6667, 0.8406) (0.6667, -0.8205) (1.387, -0.8205)};
     @LINE {(0.6667, 0) (2, 0)};
-    ? @TEXT("${name}", key="name", halign="middle") => @PLACE(0, 1.2)
+    ? @TEXT("${name}", key="name", halign="middle") => @PLACE(0, 1.2);
+    ? @TEXT("", key="model", halign="middle", valign="top") => @PLACE(0, -1.2);
   };
 
-  /* An NMOS transistor of three pins, its bulk not drawn. d g s (b); from Analog Canvas nmos (textbook-3terminal) */
+  /* ---------------------------------------------------------------- MOS transistors */
+
+  /* An NMOS transistor of three pins, its bulk not drawn. Terminals: d g s. */
   $NMOS = @DEFINE-SYMBOL(box=[-3, -2, 1.4, 2]) {
     %d = (0, 2) @PIN(terminal="d", direction="up");
     %g = (-3, 0) @PIN(terminal="g", direction="left");
@@ -47,28 +50,27 @@
     @LINE {(-1.5116, -0.6977) (0, -0.6977) (0, -2)};
     @LINE(fill="linecolor", linestyle="none") {(0.0581, -0.6977) (-0.8721, -0.2907) (-0.8721, -1.1047) (0.0581, -0.6977)};
     ? @TEXT("${name}", key="name") => @PLACE(0.5, 1.05);
-    ? @TEXT("", key="model") => @PLACE(0.5, -1.75)
+    ? @TEXT("", key="model") => @PLACE(0.5, -1.75);
   };
 
-  /* An NMOS transistor with its bulk pin. d g s b; from Analog Canvas nmos */
-  $NMOS_4TERM = @DEFINE-SYMBOL(box=[-3, -2, 1, 2]) {
+  /* An NMOS transistor with its bulk pin aligned to drain and source and its bulk arrow at the channel. Terminals: d g s b. */
+  $NMOS_4TERM = @DEFINE-SYMBOL(box=[-3, -2, 0, 2]) {
     %d = (0, 2) @PIN(terminal="d", direction="up");
     %g = (-3, 0) @PIN(terminal="g", direction="left");
     %s = (0, -2) @PIN(terminal="s", direction="down");
-    %b = (1, 0) @PIN(terminal="b", direction="right");
+    %b = (0, 0) @PIN(terminal="b", direction="right");
     @LINE {(-1.4244, 0.6977) (0, 0.6977) (0, 2)};
     @LINE {(-1.4244, -0.6977) (0, -0.6977) (0, -2)};
     @LINE(fill="linecolor", linestyle="none") {(-2.1802, 0.9593) (-2.1802, -0.9593) (-1.8895, -0.9593) (-1.8895, 0.9593) (-2.1802, 0.9593)};
     @LINE(fill="linecolor", linestyle="none") {(-1.657, 1.25) (-1.657, -1.25) (-1.3663, -1.25) (-1.3663, 1.25) (-1.657, 1.25)};
     @LINE {(-2.0349, 0) (-3, 0)};
-    @LINE {(-1.5116, 0) (0, 0)};
-    @LINE {(0.6395, 0) (1, 0)};
-    @LINE(fill="linecolor", linestyle="none") {(0, 0) (0.6395, 0.3488) (0.6395, -0.3488) (0, 0)};
+    @LINE {(-0.7268, 0) (0, 0)};
+    @LINE(fill="linecolor", linestyle="none") {(-1.3663, 0) (-0.7268, 0.3488) (-0.7268, -0.3488) (-1.3663, 0)};
     ? @TEXT("${name}", key="name") => @PLACE(0.5, 1.05);
-    ? @TEXT("", key="model") => @PLACE(0.5, -1.75)
+    ? @TEXT("", key="model") => @PLACE(0.5, -1.75);
   };
 
-  /* A PMOS transistor of three pins, its bulk not drawn. d g s (b); from Analog Canvas pmos (textbook-3terminal) */
+  /* A PMOS transistor of three pins, its bulk not drawn. Terminals: d g s. */
   $PMOS = @DEFINE-SYMBOL(box=[-3, -2, 1.4, 2]) {
     %d = (0, -2) @PIN(terminal="d", direction="down");
     %g = (-3, 0) @PIN(terminal="g", direction="left");
@@ -80,27 +82,56 @@
     @LINE {(-0.436, 0.7122) (0, 0.7122) (0, 2)};
     @LINE(fill="linecolor", linestyle="none") {(-1.3663, 0.7122) (-0.436, 1.1192) (-0.436, 0.3052) (-1.3663, 0.7122)};
     ? @TEXT("${name}", key="name") => @PLACE(0.5, 1.05);
-    ? @TEXT("", key="model") => @PLACE(0.5, -1.75)
+    ? @TEXT("", key="model") => @PLACE(0.5, -1.75);
   };
 
-  /* A PMOS transistor with its bulk pin. d g s b; from Analog Canvas pmos */
-  $PMOS_4TERM = @DEFINE-SYMBOL(box=[-3, -2, 1, 2]) {
+  /* A PMOS transistor with its bulk pin aligned to drain and source. Terminals: d g s b. */
+  $PMOS_4TERM = @DEFINE-SYMBOL(box=[-3, -2, 0, 2]) {
     %d = (0, -2) @PIN(terminal="d", direction="down");
     %g = (-3, 0) @PIN(terminal="g", direction="left");
     %s = (0, 2) @PIN(terminal="s", direction="up");
-    %b = (1, 0) @PIN(terminal="b", direction="right");
+    %b = (0, 0) @PIN(terminal="b", direction="right");
     @LINE {(-1.4244, -0.6977) (0, -0.6977) (0, -2)};
     @LINE {(-1.4244, 0.6977) (0, 0.6977) (0, 2)};
     @LINE(fill="linecolor", linestyle="none") {(-2.1802, 0.9593) (-2.1802, -0.9593) (-1.8895, -0.9593) (-1.8895, 0.9593) (-2.1802, 0.9593)};
     @LINE(fill="linecolor", linestyle="none") {(-1.657, 1.25) (-1.657, -1.25) (-1.3663, -1.25) (-1.3663, 1.25) (-1.657, 1.25)};
     @LINE {(-2.0349, 0) (-3, 0)};
-    @LINE {(-1.5116, 0) (0.3605, 0)};
-    @LINE(fill="linecolor", linestyle="none") {(1, 0) (0.3605, 0.3779) (0.3605, -0.3779) (1, 0)};
+    @LINE {(-1.5116, 0) (-0.6395, 0)};
+    @LINE(fill="linecolor", linestyle="none") {(0, 0) (-0.6395, 0.3488) (-0.6395, -0.3488) (0, 0)};
     ? @TEXT("${name}", key="name") => @PLACE(0.5, 1.05);
-    ? @TEXT("", key="model") => @PLACE(0.5, -1.75)
+    ? @TEXT("", key="model") => @PLACE(0.5, -1.75);
   };
 
-  /* A depletion-mode NMOS transistor of three pins, its bulk not drawn. d g s (b); from Analog Canvas depletion-nmos (textbook-3terminal) */
+  /* A three-pin logic NMOS transistor without a source arrow. Terminals: d g s. */
+  $NMOS_LOGIC = @DEFINE-SYMBOL(box=[-3, -2, 0.8, 2]) {
+    %d = (0, 2) @PIN(terminal="d", direction="up");
+    %g = (-3, 0) @PIN(terminal="g", direction="left");
+    %s = (0, -2) @PIN(terminal="s", direction="down");
+    @LINE {(-1.4244, 0.6977) (0, 0.6977) (0, 2)};
+    @LINE {(-1.4244, -0.6977) (0, -0.6977) (0, -2)};
+    @LINE(fill="linecolor", linestyle="none") {(-2.1802, 0.9593) (-2.1802, -0.9593) (-1.8895, -0.9593) (-1.8895, 0.9593) (-2.1802, 0.9593)};
+    @LINE(fill="linecolor", linestyle="none") {(-1.657, 1.25) (-1.657, -1.25) (-1.3663, -1.25) (-1.3663, 1.25) (-1.657, 1.25)};
+    @LINE {(-2.0349, 0) (-3, 0)};
+    ? @TEXT("${name}", key="name") => @PLACE(0.5, 1.05);
+    ? @TEXT("", key="model") => @PLACE(0.5, -1.75);
+  };
+
+  /* A three-pin logic PMOS transistor without a source arrow, with an inversion bubble on its gate. Terminals: d g s. */
+  $PMOS_LOGIC = @DEFINE-SYMBOL(box=[-3, -2, 0.8, 2]) {
+    %d = (0, -2) @PIN(terminal="d", direction="down");
+    %g = (-3, 0) @PIN(terminal="g", direction="left");
+    %s = (0, 2) @PIN(terminal="s", direction="up");
+    @LINE {(-1.4244, -0.6977) (0, -0.6977) (0, -2)};
+    @LINE {(-1.4244, 0.6977) (0, 0.6977) (0, 2)};
+    @LINE(fill="linecolor", linestyle="none") {(-2.1802, 0.9593) (-2.1802, -0.9593) (-1.8895, -0.9593) (-1.8895, 0.9593) (-2.1802, 0.9593)};
+    @LINE(fill="linecolor", linestyle="none") {(-1.657, 1.25) (-1.657, -1.25) (-1.3663, -1.25) (-1.3663, 1.25) (-1.657, 1.25)};
+    (-2.48, 0) @CIRCLE(radius=0.28);
+    @LINE {(-3, 0) (-2.76, 0)};
+    ? @TEXT("${name}", key="name") => @PLACE(0.5, 1.05);
+    ? @TEXT("", key="model") => @PLACE(0.5, -1.75);
+  };
+
+  /* A depletion-mode NMOS transistor of three pins, its bulk not drawn. Terminals: d g s. */
   $DEPLETION_NMOS = @DEFINE-SYMBOL(box=[-3, -2, 1.4, 2]) {
     %d = (0, 2) @PIN(terminal="d", direction="up");
     %g = (-3, 0) @PIN(terminal="g", direction="left");
@@ -113,29 +144,28 @@
     @LINE {(-1.5116, -0.6977) (0, -0.6977) (0, -2)};
     @LINE(fill="linecolor", linestyle="none") {(0.0581, -0.6977) (-0.8721, -0.2907) (-0.8721, -1.1047) (0.0581, -0.6977)};
     ? @TEXT("${name}", key="name") => @PLACE(0.5, 1.05);
-    ? @TEXT("", key="model") => @PLACE(0.5, -1.75)
+    ? @TEXT("", key="model") => @PLACE(0.5, -1.75);
   };
 
-  /* A depletion-mode NMOS transistor with its bulk pin. d g s b; from Analog Canvas depletion-nmos */
-  $DEPLETION_NMOS_4TERM = @DEFINE-SYMBOL(box=[-3, -2, 1, 2]) {
+  /* A depletion-mode NMOS transistor with its bulk pin aligned to drain and source. Terminals: d g s b. */
+  $DEPLETION_NMOS_4TERM = @DEFINE-SYMBOL(box=[-3, -2, 0, 2]) {
     %d = (0, 2) @PIN(terminal="d", direction="up");
     %g = (-3, 0) @PIN(terminal="g", direction="left");
     %s = (0, -2) @PIN(terminal="s", direction="down");
-    %b = (1, 0) @PIN(terminal="b", direction="right");
+    %b = (0, 0) @PIN(terminal="b", direction="right");
     @LINE {(-1.4244, 0.6977) (0, 0.6977) (0, 2)};
     @LINE {(-1.4244, -0.6977) (0, -0.6977) (0, -2)};
     @LINE(fill="linecolor", linestyle="none") {(-2.1802, 0.9593) (-2.1802, -0.9593) (-1.8895, -0.9593) (-1.8895, 0.9593) (-2.1802, 0.9593)};
     @LINE(fill="linecolor", linestyle="none") {(-1.657, 1.25) (-1.657, -1.25) (-1.3663, -1.25) (-1.3663, 1.25) (-1.657, 1.25)};
     @LINE {(-2.0349, 0) (-3, 0)};
-    @LINE {(-1.5116, 0) (0, 0)};
-    @LINE {(0.6395, 0) (1, 0)};
-    @LINE(fill="linecolor", linestyle="none") {(0, 0) (0.6395, 0.3488) (0.6395, -0.3488) (0, 0)};
+    @LINE {(-0.7268, 0) (0, 0)};
+    @LINE(fill="linecolor", linestyle="none") {(-1.3663, 0) (-0.7268, 0.3488) (-0.7268, -0.3488) (-1.3663, 0)};
     @LINE {(-1.0368, 0.6977) (-1.0368, -0.6977)};
     ? @TEXT("${name}", key="name") => @PLACE(0.5, 1.05);
-    ? @TEXT("", key="model") => @PLACE(0.5, -1.75)
+    ? @TEXT("", key="model") => @PLACE(0.5, -1.75);
   };
 
-  /* A depletion-mode PMOS transistor of three pins, its bulk not drawn. d g s (b); from Analog Canvas depletion-pmos (textbook-3terminal) */
+  /* A depletion-mode PMOS transistor of three pins, its bulk not drawn. Terminals: d g s. */
   $DEPLETION_PMOS = @DEFINE-SYMBOL(box=[-3, -2, 1.4, 2]) {
     %d = (0, -2) @PIN(terminal="d", direction="down");
     %g = (-3, 0) @PIN(terminal="g", direction="left");
@@ -148,28 +178,28 @@
     @LINE {(-0.436, 0.7122) (0, 0.7122) (0, 2)};
     @LINE(fill="linecolor", linestyle="none") {(-1.3663, 0.7122) (-0.436, 1.1192) (-0.436, 0.3052) (-1.3663, 0.7122)};
     ? @TEXT("${name}", key="name") => @PLACE(0.5, 1.05);
-    ? @TEXT("", key="model") => @PLACE(0.5, -1.75)
+    ? @TEXT("", key="model") => @PLACE(0.5, -1.75);
   };
 
-  /* A depletion-mode PMOS transistor with its bulk pin. d g s b; from Analog Canvas depletion-pmos */
-  $DEPLETION_PMOS_4TERM = @DEFINE-SYMBOL(box=[-3, -2, 1, 2]) {
+  /* A depletion-mode PMOS transistor with its bulk pin aligned to drain and source. Terminals: d g s b. */
+  $DEPLETION_PMOS_4TERM = @DEFINE-SYMBOL(box=[-3, -2, 0, 2]) {
     %d = (0, -2) @PIN(terminal="d", direction="down");
     %g = (-3, 0) @PIN(terminal="g", direction="left");
     %s = (0, 2) @PIN(terminal="s", direction="up");
-    %b = (1, 0) @PIN(terminal="b", direction="right");
+    %b = (0, 0) @PIN(terminal="b", direction="right");
     @LINE {(-1.4244, -0.6977) (0, -0.6977) (0, -2)};
     @LINE {(-1.4244, 0.6977) (0, 0.6977) (0, 2)};
     @LINE(fill="linecolor", linestyle="none") {(-2.1802, 0.9593) (-2.1802, -0.9593) (-1.8895, -0.9593) (-1.8895, 0.9593) (-2.1802, 0.9593)};
     @LINE(fill="linecolor", linestyle="none") {(-1.657, 1.25) (-1.657, -1.25) (-1.3663, -1.25) (-1.3663, 1.25) (-1.657, 1.25)};
     @LINE {(-2.0349, 0) (-3, 0)};
-    @LINE {(-1.5116, 0) (0.3605, 0)};
-    @LINE(fill="linecolor", linestyle="none") {(1, 0) (0.3605, 0.3779) (0.3605, -0.3779) (1, 0)};
+    @LINE {(-1.5116, 0) (-0.6395, 0)};
+    @LINE(fill="linecolor", linestyle="none") {(0, 0) (-0.6395, 0.3488) (-0.6395, -0.3488) (0, 0)};
     @LINE {(-1.0368, 0.6977) (-1.0368, -0.6977)};
     ? @TEXT("${name}", key="name") => @PLACE(0.5, 1.05);
-    ? @TEXT("", key="model") => @PLACE(0.5, -1.75)
+    ? @TEXT("", key="model") => @PLACE(0.5, -1.75);
   };
 
-  /* An N-type DMOS transistor of three pins, its bulk not drawn. d g s (b); from Analog Canvas ndmos (standard-3terminal) */
+  /* An N-type DMOS transistor of three pins, its bulk not drawn. Terminals: d g s. */
   $NDMOS = @DEFINE-SYMBOL(box=[-3, -2, 1.4, 2]) {
     %d = (0, 2) @PIN(terminal="d", direction="up");
     %g = (-3, 0) @PIN(terminal="g", direction="left");
@@ -182,29 +212,28 @@
     @LINE {(-1.5116, -0.6977) (0, -0.6977) (0, -2)};
     @LINE(fill="linecolor", linestyle="none") {(0.0581, -0.6977) (-0.8721, -0.2907) (-0.8721, -1.1047) (0.0581, -0.6977)};
     ? @TEXT("${name}", key="name") => @PLACE(0.5, 1.05);
-    ? @TEXT("", key="model") => @PLACE(0.5, -1.75)
+    ? @TEXT("", key="model") => @PLACE(0.5, -1.75);
   };
 
-  /* An N-type DMOS transistor with its bulk pin. d g s b; from Analog Canvas ndmos */
-  $NDMOS_4TERM = @DEFINE-SYMBOL(box=[-3, -2, 1, 2]) {
+  /* An N-type DMOS transistor with its bulk pin aligned to drain and source. Terminals: d g s b. */
+  $NDMOS_4TERM = @DEFINE-SYMBOL(box=[-3, -2, 0, 2]) {
     %d = (0, 2) @PIN(terminal="d", direction="up");
     %g = (-3, 0) @PIN(terminal="g", direction="left");
     %s = (0, -2) @PIN(terminal="s", direction="down");
-    %b = (1, 0) @PIN(terminal="b", direction="right");
-    @LINE {(-1.4244, 0.6977) (0, 0.6977) (0, 2)};
+    %b = (0, 0) @PIN(terminal="b", direction="right");
+    @LINE {(-1.4244, 0.85) (0, 0.85) (0, 2)};
     @LINE {(-1.4244, -0.6977) (0, -0.6977) (0, -2)};
     @LINE(fill="linecolor", linestyle="none") {(-2.1802, 0.9593) (-2.1802, -0.9593) (-1.8895, -0.9593) (-1.8895, 0.9593) (-2.1802, 0.9593)};
     @LINE(fill="linecolor", linestyle="none") {(-1.657, 1.25) (-1.657, -1.25) (-1.3663, -1.25) (-1.3663, 1.25) (-1.657, 1.25)};
     @LINE {(-2.0349, 0) (-3, 0)};
-    @LINE {(-1.5116, 0) (0, 0)};
-    @LINE {(0.6395, 0) (1, 0)};
-    @LINE(fill="linecolor", linestyle="none") {(0, 0) (0.6395, 0.3488) (0.6395, -0.3488) (0, 0)};
-    @LINE {(-1.4244, 0.2977) (0, 0.2977) (0, 0.6977)};
+    @LINE {(-0.7268, 0) (0, 0)};
+    @LINE(fill="linecolor", linestyle="none") {(-1.3663, 0) (-0.7268, 0.3488) (-0.7268, -0.3488) (-1.3663, 0)};
+    @LINE {(-1.4244, 0.5) (0, 0.5) (0, 0.85)};
     ? @TEXT("${name}", key="name") => @PLACE(0.5, 1.05);
-    ? @TEXT("", key="model") => @PLACE(0.5, -1.75)
+    ? @TEXT("", key="model") => @PLACE(0.5, -1.75);
   };
 
-  /* A P-type DMOS transistor of three pins, its bulk not drawn. d g s (b); from Analog Canvas pdmos (standard-3terminal) */
+  /* A P-type DMOS transistor of three pins, its bulk not drawn. Terminals: d g s. */
   $PDMOS = @DEFINE-SYMBOL(box=[-3, -2, 1.4, 2]) {
     %d = (0, -2) @PIN(terminal="d", direction="down");
     %g = (-3, 0) @PIN(terminal="g", direction="left");
@@ -217,28 +246,30 @@
     @LINE {(-0.436, 0.7122) (0, 0.7122) (0, 2)};
     @LINE(fill="linecolor", linestyle="none") {(-1.3663, 0.7122) (-0.436, 1.1192) (-0.436, 0.3052) (-1.3663, 0.7122)};
     ? @TEXT("${name}", key="name") => @PLACE(0.5, 1.05);
-    ? @TEXT("", key="model") => @PLACE(0.5, -1.75)
+    ? @TEXT("", key="model") => @PLACE(0.5, -1.75);
   };
 
-  /* A P-type DMOS transistor with its bulk pin. d g s b; from Analog Canvas pdmos */
-  $PDMOS_4TERM = @DEFINE-SYMBOL(box=[-3, -2, 1, 2]) {
+  /* A P-type DMOS transistor with its bulk pin aligned to drain and source. Terminals: d g s b. */
+  $PDMOS_4TERM = @DEFINE-SYMBOL(box=[-3, -2, 0, 2]) {
     %d = (0, -2) @PIN(terminal="d", direction="down");
     %g = (-3, 0) @PIN(terminal="g", direction="left");
     %s = (0, 2) @PIN(terminal="s", direction="up");
-    %b = (1, 0) @PIN(terminal="b", direction="right");
-    @LINE {(-1.4244, -0.6977) (0, -0.6977) (0, -2)};
+    %b = (0, 0) @PIN(terminal="b", direction="right");
+    @LINE {(-1.4244, -0.85) (0, -0.85) (0, -2)};
     @LINE {(-1.4244, 0.6977) (0, 0.6977) (0, 2)};
     @LINE(fill="linecolor", linestyle="none") {(-2.1802, 0.9593) (-2.1802, -0.9593) (-1.8895, -0.9593) (-1.8895, 0.9593) (-2.1802, 0.9593)};
     @LINE(fill="linecolor", linestyle="none") {(-1.657, 1.25) (-1.657, -1.25) (-1.3663, -1.25) (-1.3663, 1.25) (-1.657, 1.25)};
     @LINE {(-2.0349, 0) (-3, 0)};
-    @LINE {(-1.5116, 0) (0.3605, 0)};
-    @LINE(fill="linecolor", linestyle="none") {(1, 0) (0.3605, 0.3779) (0.3605, -0.3779) (1, 0)};
-    @LINE {(-1.4244, -0.2977) (0, -0.2977) (0, -0.6977)};
+    @LINE {(-1.5116, 0) (-0.6395, 0)};
+    @LINE(fill="linecolor", linestyle="none") {(0, 0) (-0.6395, 0.3488) (-0.6395, -0.3488) (0, 0)};
+    @LINE {(-1.4244, -0.5) (0, -0.5) (0, -0.85)};
     ? @TEXT("${name}", key="name") => @PLACE(0.5, 1.05);
-    ? @TEXT("", key="model") => @PLACE(0.5, -1.75)
+    ? @TEXT("", key="model") => @PLACE(0.5, -1.75);
   };
 
-  /* An NPN bipolar transistor, its substrate not drawn. c b e (s); from Analog Canvas npn */
+  /* ---------------------------------------------------------------- bipolar and JFET transistors */
+
+  /* An NPN bipolar transistor, its substrate not drawn. Terminals: c b e. */
   $NPN = @DEFINE-SYMBOL(box=[-3, -2, 0.8, 2]) {
     %c = (0, 2) @PIN(terminal="c", direction="up");
     %b = (-3, 0) @PIN(terminal="b", direction="left");
@@ -250,10 +281,10 @@
     @LINE {(-0.0936, -1.2991) (0, -1.3378) (0, -2)};
     @LINE(fill="linecolor", linestyle="none") {(-0.6635, -0.6792) (-0.9953, -1.3378) (0, -1.3378) (-0.6635, -0.6792)};
     ? @TEXT("${name}", key="name") => @PLACE(0.5, 1.05);
-    ? @TEXT("", key="model") => @PLACE(0.5, -1.75)
+    ? @TEXT("", key="model") => @PLACE(0.5, -1.75);
   };
 
-  /* A PNP bipolar transistor, its substrate not drawn. c b e (s); from Analog Canvas pnp */
+  /* A PNP bipolar transistor, its substrate not drawn. Terminals: c b e. */
   $PNP = @DEFINE-SYMBOL(box=[-3, -2, 0.8, 2]) {
     %c = (0, -2) @PIN(terminal="c", direction="down");
     %b = (-3, 0) @PIN(terminal="b", direction="left");
@@ -264,38 +295,34 @@
     @LINE {(-1.6869, -0.6402) (0, -1.3378) (0, -2)};
     @LINE(fill="linecolor", linestyle="none") {(-1.0234, 1.2987) (-0.6916, 0.6402) (-1.6869, 0.6402) (-1.0234, 1.2987)};
     ? @TEXT("${name}", key="name") => @PLACE(0.5, 1.05);
-    ? @TEXT("", key="model") => @PLACE(0.5, -1.75)
-  }
-}
+    ? @TEXT("", key="model") => @PLACE(0.5, -1.75);
+  };
 
-/* rnl-std-semiconductors, drawn by hand: the JFET, which Analog Canvas does not have. Terminals
-   d g s (SPICE order); laid out like Analog Canvas's MOS and BJT, gate on the left, with the
-   MOS channel bar: the N type has its drain up, and the P type, as $PMOS and $PNP, its source up and
-   its drain down. J draws by the model type njf or pjf; Z (ngspice's MESFET) by nmf or pmf.
-   The lines start inside the bar, as Analog Canvas's MOS lines do, so that no cap sticks out. */
-@RNL {
+  /* Shared JFET channel body: bar, drain and source leads, gate lead and default labels. */
   %JFET_CHANNEL = @DEFINE-SYMBOL {
     @LINE(fill="linecolor", linestyle="none") {(-1.657, -1.25) (-1.657, 1.25) (-1.366, 1.25) (-1.366, -1.25) (-1.657, -1.25)};
     @LINE {(-1.4244, 0.6977) (0, 0.6977) (0, 2)};
     @LINE {(-1.4244, -0.6977) (0, -0.6977) (0, -2)};
     @LINE {(-3, 0) (-1.5116, 0)};
     ? @TEXT("${name}", key="name") => @PLACE(0.5, 1.05);
-    ? @TEXT("", key="model") => @PLACE(0.5, -1.75)
+    ? @TEXT("", key="model") => @PLACE(0.5, -1.75);
   };
-  /* An N-channel JFET. The arrow on the gate points at the channel */
+
+  /* An N-channel JFET, its gate arrow pointing at the channel. Terminals: d g s. */
   $NJFET = @DEFINE-SYMBOL(box=[-3, -2, 0.8, 2]) {
     %d = (0, 2) @PIN(terminal="d", direction="up");
     %g = (-3, 0) @PIN(terminal="g", direction="left");
     %s = (0, -2) @PIN(terminal="s", direction="down");
     %JFET_CHANNEL;
-    @LINE(fill="linecolor", linestyle="none") {(-1.66, 0) (-2.3, 0.35) (-2.3, -0.35) (-1.66, 0)}
+    @LINE(fill="linecolor", linestyle="none") {(-1.66, 0) (-2.3, 0.35) (-2.3, -0.35) (-1.66, 0)};
   };
-  /* A P-channel JFET. The arrow on the gate points away from the channel; the source is up and the drain down, as in $PMOS */
+
+  /* A P-channel JFET, its gate arrow pointing away from the channel. Terminals: d g s. */
   $PJFET = @DEFINE-SYMBOL(box=[-3, -2, 0.8, 2]) {
     %d = (0, -2) @PIN(terminal="d", direction="down");
     %g = (-3, 0) @PIN(terminal="g", direction="left");
     %s = (0, 2) @PIN(terminal="s", direction="up");
     %JFET_CHANNEL;
-    @LINE(fill="linecolor", linestyle="none") {(-2.4, 0) (-1.76, 0.35) (-1.76, -0.35) (-2.4, 0)}
-  }
+    @LINE(fill="linecolor", linestyle="none") {(-2.4, 0) (-1.76, 0.35) (-1.76, -0.35) (-2.4, 0)};
+  };
 }

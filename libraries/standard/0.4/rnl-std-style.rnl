@@ -32,9 +32,10 @@
   /* Style first, so every later rule and user statement overrides it. */
   # @SELECT-INSTANCE(recursive=true) => @SET-STYLE $base;
   # @SELECT-USAGE(recursive=true) => @SET-STYLE $base;
-  # @SELECT-USAGE(drawn=true, recursive=true) => @SET-STYLE $virtual;
   # @SELECT-WIRE(recursive=true) => @SET-STYLE $base;
   # @SELECT-LABEL(recursive=true) => @SET-STYLE $base;
   # @SELECT-ANNOTATION(recursive=true) => @SET-STYLE $base;
   # @SELECT-WIRE(bus=true, recursive=true) => @SET-STYLE $bus;
+  # @SELECT-USAGE(drawn=true, recursive=true) => @SET-STYLE $virtual;
+  # @SELECT-USAGE(drawn=true, recursive=true) => @SELECT-LABEL(recursive=true) => @SET-STYLE $virtual;
 }
