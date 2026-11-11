@@ -535,7 +535,7 @@ fn literal_object_kinds_are_checked_in_definition_slots() {
 fn open_solver_setting_signature_errors_are_checked_once() {
     for (bad, code) in [
         ("@SOLVER-CONFIG(1)", codes::PARAM_POSITIONAL_NOT_ALLOWED),
-        ("@SOLVER-CONFIG(custom=1,custom=2)", codes::SYNTAX_PARAM_TWICE),
+        ("@SOLVER-CONFIG(custom=1,custom=2)", codes::PARAM_WRITTEN_TWICE),
         ("@SOLVER-CONFIG(custom=[[1]])", codes::SOLVER_CONFIG_VALUE_NOT_LITERAL),
         ("@SOLVER-CONFIG(custom=[[?v]])", codes::SOLVER_CONFIG_VALUE_NOT_LITERAL),
         ("@SOLVER-CONFIG(custom=[?v,[1]])", codes::SOLVER_CONFIG_VALUE_NOT_LITERAL),

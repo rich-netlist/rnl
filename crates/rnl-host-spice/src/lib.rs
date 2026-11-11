@@ -679,10 +679,16 @@ impl Reader<'_, '_> {
             }
             if no == 1 {
                 if raw.contains("@RNL") {
-                    self.cx.sink.warning(
+                    let diagnostic = self.cx.sink.warning(
                         codes::HOST_RNL_ON_FIRST_LINE,
                         "the first line of a file is a title and is not read as RNL (2.2)",
                         Some(Loc::line(&fname, 1)),
+                    );
+                    self.cx.doc.note_diagnostic(
+                        diagnostic,
+                        self.cx.sink.get(diagnostic),
+                        level,
+                        rnl_runtime::host::diagnostics::Detail::FirstLine,
                     );
                 }
                 // Encryption pragmas are meaningful even on a file's first comment line.
@@ -711,10 +717,16 @@ impl Reader<'_, '_> {
                         self.cx.doc.unselected_sections.push((level, *start, no));
                         skip_lib = None;
                     } else if raw.contains("@RNL") {
-                        self.cx.sink.warning(
+                        let diagnostic = self.cx.sink.warning(
                             codes::HOST_RNL_IN_UNSELECTED_SECTION,
                             "RNL in a `.lib` section that is not selected is not read (2.2)",
                             Some(Loc::line(&fname, no)),
+                        );
+                        self.cx.doc.note_diagnostic(
+                            diagnostic,
+                            self.cx.sink.get(diagnostic),
+                            level,
+                            rnl_runtime::host::diagnostics::Detail::UnselectedSection,
                         );
                     }
                     continue;
@@ -723,10 +735,16 @@ impl Reader<'_, '_> {
                     in_section = true;
                     self.cx.doc.levels[level].section_lines.get_or_insert((no, 0));
                 } else if raw.contains("@RNL") {
-                    self.cx.sink.warning(
+                    let diagnostic = self.cx.sink.warning(
                         codes::HOST_RNL_OUTSIDE_SELECTED_SECTION,
                         "RNL outside the selected `.lib` section is not read (2.2)",
                         Some(Loc::line(&fname, no)),
+                    );
+                    self.cx.doc.note_diagnostic(
+                        diagnostic,
+                        self.cx.sink.get(diagnostic),
+                        level,
+                        rnl_runtime::host::diagnostics::Detail::OutsideSection,
                     );
                 }
                 continue;
@@ -881,17 +899,44 @@ impl Reader<'_, '_> {
             self.cx.doc.protected.push((fname.clone(), start, lines.len() as u32 + 1));
         }
         if !sub_stack.is_empty() {
-            self.cx.sink.error(
+            let diagnostic = self.cx.sink.error(
                 codes::HOST_SUBCKT_NO_ENDS,
                 "a subcircuit has no `.ends`",
                 Some(Loc::line(&fname, lines.len() as u32)),
             );
+            let open = sub_stack
+                .iter()
+                .skip(1)
+                .map(|(current, _)| *current)
+                .chain(std::iter::once(cur))
+                .map(|id| {
+                    let subcircuit = &self.cx.doc.levels[id];
+                    (subcircuit.name.clone(), Loc::line(&subcircuit.file, subcircuit.line))
+                })
+                .collect();
+            self.cx.doc.note_diagnostic(
+                diagnostic,
+                self.cx.sink.get(diagnostic),
+                level,
+                rnl_runtime::host::diagnostics::Detail::UnclosedSubcircuits(open),
+            );
         }
         if let Some(name) = section.filter(|_| self.cx.doc.levels[level].section_lines.is_none()) {
-            self.cx.sink.error(
+            let diagnostic = self.cx.sink.error(
                 codes::HOST_SECTION_NOT_FOUND,
                 format!("the selected library section {name} was not found; no records can be written there (2.2)"),
                 Some(Loc::line(&fname, 1)),
+            );
+            let include = self.cx.doc.levels[level].include_site.clone();
+            self.cx.doc.note_diagnostic(
+                diagnostic,
+                self.cx.sink.get(diagnostic),
+                level,
+                rnl_runtime::host::diagnostics::Detail::MissingSection {
+                    name: name.into(),
+                    file: fname.clone(),
+                    include,
+                },
             );
         }
         if self.cx.doc.levels[level].end_line == 0 {
@@ -969,11 +1014,23 @@ impl Reader<'_, '_> {
         let file_level = self.cx.doc.file_level(cur);
         let lv = &mut self.cx.doc.levels[circ];
         if !self.cx.names.entry(circ).or_default().insert(lv.name_key(&el.inst.name)) {
-            self.cx.sink.error(
+            let first = lv.inst(&el.inst.name).map(|index| {
+                let instance = &lv.instances[index];
+                Loc::line(&instance.file, instance.line)
+            });
+            let diagnostic = self.cx.sink.error(
                 codes::HOST_ELEMENT_DEFINED_TWICE,
                 format!("element {} is defined twice", el.inst.name),
                 Some(Loc::line(fname, no)),
             );
+            if let Some(first) = first {
+                self.cx.doc.note_diagnostic(
+                    diagnostic,
+                    self.cx.sink.get(diagnostic),
+                    file_level,
+                    rnl_runtime::host::diagnostics::Detail::DuplicateInstance { name: el.inst.name.clone(), first },
+                );
+            }
             return;
         }
         let mut inst = el.inst;

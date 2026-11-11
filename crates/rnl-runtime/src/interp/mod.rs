@@ -23,6 +23,7 @@ mod devices;
 pub mod eval;
 mod export;
 mod groups;
+mod host_diagnostics;
 mod islands;
 mod junction;
 pub mod kw;
@@ -488,6 +489,7 @@ impl<'p> Interp<'p> {
         }
         // Versions precede every other header declaration, including packages and aliases.
         it.read_file_versions();
+        it.check_host_diagnostics();
         for lv in 0..it.doc.levels.len() {
             let u = it.level_unit[lv];
             it.read_unit(u);

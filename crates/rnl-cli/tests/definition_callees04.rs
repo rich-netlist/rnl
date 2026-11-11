@@ -314,7 +314,7 @@ fn a_dynamic_header_field_does_not_hide_the_other_fixed_signature_parts() {
         ("roles=?items,parameters=[\"known\"]", "%C @ATTACH(unknown=1)", codes::PARAM_UNKNOWN),
         ("roles=[\"p\"],parameters=?items", "%C @ATTACH", codes::USAGE_ROLE_NOT_FILLED),
         ("roles=?items,parameters=?items", "%C @ATTACH(priority=\"invalid\")", codes::PARAM_BAD_ENUM),
-        ("roles=?items,parameters=?items", "%C @ATTACH(value=1,value=2)", codes::SYNTAX_PARAM_TWICE),
+        ("roles=?items,parameters=?items", "%C @ATTACH(value=1,value=2)", codes::PARAM_WRITTEN_TWICE),
         ("roles=?items,parameters=?items", "%C (0,0)(p) (1,0) @ATTACH", codes::ROLE_LABELS_MIXED),
     ] {
         for used in [false, true] {

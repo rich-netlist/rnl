@@ -7,6 +7,7 @@
 //! Each file is read by the adapter of its format ([`format`]), so the files of one document can
 //! be of several dialects; names compare by the rules of the file they are written in.
 
+pub mod diagnostics;
 pub mod format;
 pub mod language;
 pub mod package;
@@ -226,6 +227,8 @@ pub struct Dialect {
 pub struct HostDocument {
     /// levels[0] is the main file level.
     pub levels: Vec<Level>,
+    /// Diagnostics associated with individual file or section readings, before language versions are known.
+    pub diagnostic_readings: Vec<diagnostics::Reading>,
     /// The dialect of the main file's format.
     pub dialect: Dialect,
     /// The dialect of each file read, by its name in the document, when its format is not that of
@@ -280,6 +283,7 @@ impl HostDocument {
     pub fn new(main: Level, dialect: Dialect) -> HostDocument {
         HostDocument {
             levels: vec![main],
+            diagnostic_readings: Vec::new(),
             dialect,
             file_dialects: HashMap::new(),
             file_formats: Vec::new(),
@@ -295,6 +299,17 @@ impl HostDocument {
             spice_mode: Vec::new(),
             library_candidates: Vec::new(),
         }
+    }
+
+    /// Retain the source reading of an adapter diagnostic without changing its released presentation.
+    pub fn note_diagnostic(
+        &mut self,
+        diagnostic: crate::diag::DiagId,
+        original: &crate::diag::Diag,
+        level: LevelId,
+        detail: diagnostics::Detail,
+    ) {
+        self.diagnostic_readings.push(diagnostics::Reading { diagnostic, original: original.clone(), level, detail });
     }
 
     pub fn main(&self) -> &Level {

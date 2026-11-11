@@ -12,6 +12,7 @@ pub mod junction;
 pub mod markup;
 pub mod model;
 pub mod numbering;
+mod parameter_errors;
 pub mod previous;
 pub mod problem;
 pub mod records;
