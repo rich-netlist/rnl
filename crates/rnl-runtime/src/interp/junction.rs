@@ -26,20 +26,24 @@ impl Interp<'_> {
             let binding = self.lookup_unit('$', &name, unit, false, Some(scene))?;
             let home = self.home_scene(binding.owner);
             let target = if self.places.rules.contains(&binding.key()) { Some(scene) } else { home };
-            let value = self
-                .eval_member_at(
-                    binding.owner,
-                    binding.rec,
-                    binding.index,
-                    binding.embedded,
-                    &binding.member,
-                    target,
-                    binding.header.clone(),
-                    None,
-                    "",
-                )
-                .ok()?;
-            let object = self.bound_value(&binding.key(), target, binding.prefix, &binding.name, value);
+            let object = if self.modern_binding(&binding) {
+                self.evaluated_binding(&binding, target)?
+            } else {
+                let value = self
+                    .eval_member_at(
+                        binding.owner,
+                        binding.rec,
+                        binding.index,
+                        binding.embedded,
+                        &binding.member,
+                        target,
+                        binding.header.clone(),
+                        None,
+                        "",
+                    )
+                    .ok()?;
+                self.bound_value(&binding.key(), target, binding.prefix, &binding.name, value)
+            };
             let ObjData::Definition(definition) = self.o(object) else { return None };
             let role = definition.roles.first()?;
             if role.kinds.as_ref().is_some_and(|k| !k.iter().any(|k| k == "point")) {

@@ -103,6 +103,7 @@ impl Interp<'_> {
         } else {
             self.lookup_unit(reference.prefix, name, owner.def_unit, false, ctx.scene)?
         };
+        let binding = self.static_binding(binding, ctx.scene)?;
         let binding_name = format!("{}{}", binding.prefix, binding.name);
         let environment = DefData {
             roles: Vec::new(),

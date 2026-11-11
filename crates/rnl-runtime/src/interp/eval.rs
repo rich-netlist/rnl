@@ -543,9 +543,26 @@ impl<'p> Interp<'p> {
         unit: UnitId,
         scene: Option<SceneId>,
     ) -> Found {
-        if let Some(b) = self.units[unit].names.get(&(prefix, name.to_string())) {
-            if !Rc::ptr_eq(&b.member, &member.m) {
-                return Found::Binding(b.clone());
+        if let Some(b) = self.units[unit].names.get(&(prefix, name.to_string())).cloned() {
+            let candidates = self.binding_candidates(&b);
+            if self.modern_binding(&b) && candidates.iter().any(|candidate| Rc::ptr_eq(&candidate.member, &member.m)) {
+                for candidate in candidates {
+                    if Rc::ptr_eq(&candidate.member, &member.m) {
+                        break;
+                    }
+                    let target = if self.places.rules.contains(&candidate.key()) {
+                        scene
+                    } else {
+                        self.home_scene(candidate.owner)
+                    };
+                    match self.memo.get(&(candidate.key(), target)) {
+                        Some(Memo::Val(value)) if !self.binding_result(&candidate, target, *value).1 => continue,
+                        Some(Memo::Language | Memo::OwnLevel) => continue,
+                        _ => return Found::Binding(candidate),
+                    }
+                }
+            } else if !Rc::ptr_eq(&b.member, &member.m) {
+                return Found::Binding(b);
             }
         }
         match self.lookup_unit(prefix, name, unit, true, scene) {
@@ -668,6 +685,14 @@ impl<'p> Interp<'p> {
             Found::Binding(b) => b.clone(),
             _ => return Ok(NOTHING),
         };
+        if self.modern_binding(&b) {
+            self.first_valid_binding_value(&b, ctx)
+        } else {
+            self.binding_value_one(&b, ctx)
+        }
+    }
+
+    pub(super) fn binding_value_one(&mut self, b: &super::unit::Binding, ctx: &Ctx) -> R<ObjId> {
         let home = self.home_scene(b.owner);
         let mkey = b.key();
         let scene = if self.places.rules.contains(&mkey) { ctx.scene } else { home };
@@ -683,13 +708,22 @@ impl<'p> Interp<'p> {
             "",
         ) {
             Err(Stop::NoCircuit) if ctx.scene.is_some() && scene != ctx.scene && self.places.rules.contains(&mkey) => {
-                return self.binding_value(found, ctx);
+                return self.binding_value_one(b, ctx);
             }
             other => other?,
         };
-        let val = self.bound_value(&mkey, scene, b.prefix, &b.name, val);
+        let val = if self.modern_binding(b) {
+            self.binding_result(b, scene, val).0
+        } else {
+            self.bound_value(&mkey, scene, b.prefix, &b.name, val)
+        };
         if let Some(bound) = self.bound_memo.get(&(mkey.clone(), scene)) {
-            if let Some((_, _, dependencies)) = bound.iter().find(|(key, _, _)| key.0 == b.prefix && key.1 == b.name) {
+            let hit = if self.modern_binding(b) {
+                self.binding_slot(b, scene).and_then(|index| bound.get(index))
+            } else {
+                bound.iter().find(|(key, _, _)| key.0 == b.prefix && key.1 == b.name)
+            };
+            if let Some((_, _, dependencies)) = hit {
                 ctx.depend_on(dependencies);
             }
         }
@@ -730,6 +764,8 @@ impl<'p> Interp<'p> {
         pos: Option<Pos>,
         origin: &str,
     ) -> R<ObjId> {
+        let mkey = MemberKey::M { unit: u, rec: rec.unwrap_or(usize::MAX), k, embedded };
+        let skey = (mkey.clone(), scene);
         if header.languages != crate::host::language::Languages::ALL {
             let defines = m.segments.iter().any(|seg| {
                 seg.call.as_ref().is_some_and(|call| {
@@ -739,6 +775,7 @@ impl<'p> Interp<'p> {
             if !defines {
                 match scene {
                     Some(s) if !header.languages.overlaps(self.doc.level_languages(self.scenes[s].level)) => {
+                        self.memo.insert(skey, Memo::Language);
                         return Err(Stop::Language);
                     }
                     None => {
@@ -749,8 +786,6 @@ impl<'p> Interp<'p> {
                 }
             }
         }
-        let mkey = MemberKey::M { unit: u, rec: rec.unwrap_or(usize::MAX), k, embedded };
-        let skey = (mkey.clone(), scene);
         if let Some(v) = self.memo.get(&skey) {
             return match v {
                 Memo::Val(v) => Ok(*v),
@@ -814,6 +849,7 @@ impl<'p> Interp<'p> {
             Err(Stop::NoCircuit) => return Err(Stop::NoCircuit),
             Err(Stop::Fail(d)) => self.new_obj(ObjData::Failed(d)),
         };
+        self.remember_binding_creation(&ctx.member_key, scene, &bound, &ctx);
         self.bound_memo.insert(skey.clone(), bound);
         self.memo.insert(skey, Memo::Val(val));
         Ok(val)

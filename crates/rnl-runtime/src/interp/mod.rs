@@ -7,6 +7,7 @@
 
 mod assertions;
 pub mod attrs;
+mod bindings;
 mod body_rules;
 pub mod catalog;
 mod conflicts;
@@ -231,6 +232,7 @@ pub struct Interp<'p> {
     /// The language version each package file of the package directories is written in (16.1).
     pub(crate) pkg_languages: HashMap<String, String>,
     pub(crate) memo: HashMap<(MemberKey, Option<SceneId>), Memo>,
+    bindings: bindings::Bindings,
     pub(crate) bound_memo: HashMap<(MemberKey, Option<SceneId>), Bound>,
     pub(crate) in_progress: HashSet<(MemberKey, Option<SceneId>)>,
     pub(crate) nested_memo: HashMap<(usize, usize, Option<SceneId>), CachedMember>,
@@ -379,6 +381,7 @@ impl<'p> Interp<'p> {
             pkg_headers: HashMap::new(),
             pkg_languages: HashMap::new(),
             memo: HashMap::new(),
+            bindings: Default::default(),
             bound_memo: HashMap::new(),
             in_progress: HashSet::new(),
             nested_memo: HashMap::new(),
@@ -589,7 +592,8 @@ impl<'p> Interp<'p> {
             self.run();
             let restart = self.restart.take();
             let changed = restart.is_none() && self.settle_places();
-            if restart.is_none() && !changed {
+            let bindings_changed = restart.is_none() && !changed && self.settle_bindings();
+            if restart.is_none() && !changed && !bindings_changed {
                 return self;
             }
             let mut closing = std::mem::take(&mut self.closing);
@@ -598,10 +602,15 @@ impl<'p> Interp<'p> {
                 // A dropped edit may remove a dependency discovered by a provisional reading.
                 self.places.plans.clear();
             }
+            if bindings_changed {
+                self.places.plans.clear();
+            }
             let plans = std::mem::take(&mut self.places.plans);
+            let bindings = std::mem::take(&mut self.bindings.plans);
             self = again(self);
             self.closing = closing;
             self.places.plans = plans;
+            self.bindings.plans = bindings;
         }
     }
 
@@ -708,10 +717,14 @@ impl<'p> Interp<'p> {
 
     /// Check already evaluated bindings without forcing failed or inactive statements (6.6).
     fn check_unit_duplicates(&mut self, unit: UnitId, scene: Option<SceneId>) {
+        self.check_modern_binding_duplicates(unit, scene);
         // Keep released scene diagnostics unchanged; new package checks carry their package.
         let package = if scene.is_none() { self.units[unit].pkg().to_string() } else { String::new() };
         for b in self.units[unit].dups.clone() {
             let first = self.units[unit].names[&(b.prefix, b.name.clone())].clone();
+            if self.modern_binding(&first) {
+                continue;
+            }
             let k1 = first.key();
             let k2 = b.key();
             let v1 = match self.memo.get(&(k1.clone(), scene)) {

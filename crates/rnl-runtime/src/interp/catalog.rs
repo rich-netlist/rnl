@@ -14,7 +14,7 @@ use crate::syntax::{Arg, Member, ObjExpr, Params};
 
 use super::obj::{Lit, ObjData, ObjId, TermKey, UnitId};
 use super::unit::Binding;
-use super::{Interp, Memo, Options};
+use super::{Interp, Options};
 
 /// What a package file defines (2.7, 16.2).
 #[derive(Clone, Debug)]
@@ -185,9 +185,7 @@ impl Interp<'_> {
     /// The object a `$` name of a package is bound to, as the package's statements were read
     /// without a level; None when it was not read, or failed.
     fn package_binding(&self, b: &Binding) -> Option<ObjId> {
-        let key = b.key();
-        let Some(Memo::Val(v)) = self.memo.get(&(key.clone(), None)) else { return None };
-        let v = self.bound_value(&key, None, b.prefix, &b.name, *v);
+        let v = self.evaluated_binding(b, None)?;
         (!self.is_failed(v)).then_some(v)
     }
 

@@ -1879,8 +1879,7 @@ impl Interp<'_> {
                 let Some(binding) = self.lookup_unit('$', bare, u, false, scene) else { continue };
                 let key = binding.key();
                 let home = if self.places.rules.contains(&key) { scene } else { self.home_scene(binding.owner) };
-                let Some(super::Memo::Val(value)) = self.memo.get(&(key.clone(), home)) else { continue };
-                let value = self.bound_value(&key, home, '$', bare, *value);
+                let Some(value) = self.evaluated_binding(&binding, home) else { continue };
                 if matches!(self.objs[value.0 as usize].data, super::obj::ObjData::Definition(_)) {
                     self.checked_scoped_aliases(fu, value, &name);
                 }

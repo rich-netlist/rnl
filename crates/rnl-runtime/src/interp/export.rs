@@ -711,9 +711,7 @@ impl Interp<'_> {
                 continue;
             }
             let b = &self.units[u].names[key];
-            let mkey = b.key();
-            if let Some(super::Memo::Val(v)) = self.memo.get(&(mkey.clone(), Some(s))) {
-                let o = self.bound_value(&mkey, Some(s), '%', &b.name, *v);
+            if let Some(o) = self.evaluated_binding(b, Some(s)) {
                 if o != NOTHING && o != LEVEL && o != OWNER && !self.is_failed(o) {
                     out.push((b.name.clone(), o));
                 }

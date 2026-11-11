@@ -92,6 +92,9 @@ impl Interp<'_> {
         let Some(b) = self.units[u].names.get(&('%', name.clone())) else {
             return false;
         };
+        if self.modern_binding(b) {
+            return [Some(s), None].into_iter().any(|scene| self.evaluated_binding(b, scene) == Some(o));
+        }
         let key = b.key();
         [Some(s), None].into_iter().any(|sc| {
             let k = (key.clone(), sc);
