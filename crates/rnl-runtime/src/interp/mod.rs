@@ -17,6 +17,7 @@ pub mod ctx;
 mod currents;
 pub mod cycles;
 mod definition_calls;
+mod definition_failures;
 mod definition_scenes;
 mod devices;
 pub mod eval;
@@ -301,6 +302,8 @@ pub struct Interp<'p> {
     pub(crate) refs_checked: HashSet<UnitId>,
     pub(crate) scoped_memo: HashMap<(UnitId, ObjId), Vec<(String, String)>>,
     definition_scenes: definition_scenes::DefinitionScenes,
+    /// Fixed nested bodies already checked at their source site, before any outer application.
+    static_nested_definitions: HashMap<(UnitId, usize), (ObjId, bool)>,
     pub(crate) body_errors: HashMap<usize, DiagId>,
     pub(crate) body_member_errors: HashMap<usize, DiagId>,
     pub(crate) body_parameter_errors: HashMap<(ObjId, String), DiagId>,
@@ -424,6 +427,7 @@ impl<'p> Interp<'p> {
             refs_checked: HashSet::new(),
             scoped_memo: HashMap::new(),
             definition_scenes: Default::default(),
+            static_nested_definitions: HashMap::new(),
             body_errors: HashMap::new(),
             body_member_errors: HashMap::new(),
             body_parameter_errors: HashMap::new(),

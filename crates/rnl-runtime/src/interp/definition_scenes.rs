@@ -7,11 +7,11 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use super::ctx::Ctx;
-use super::eval::{ptr, Found};
+use super::eval::{ptr, Found, Stop};
 use super::obj::{DefData, MemberKey, MemberRef, ObjData, RecId, SceneId, UnitId};
 use super::unit::Binding;
 use super::{Interp, Memo};
-use crate::diag::codes;
+use crate::diag::{codes, DiagId};
 use crate::syntax::{Member, ObjExpr, Ref, SetExpr};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -28,10 +28,17 @@ struct Query {
     written: String,
 }
 
+#[derive(Clone)]
+pub(super) enum Plan {
+    Scene(String),
+    Failed(String),
+}
+
 #[derive(Default)]
 pub(super) struct DefinitionScenes {
-    pub plans: HashMap<Site, String>,
+    pub plans: HashMap<Site, Plan>,
     queries: Vec<Query>,
+    reported: HashMap<Site, DiagId>,
 }
 
 impl Interp<'_> {
@@ -115,18 +122,30 @@ impl Interp<'_> {
             return;
         }
         let site = Site { unit: d.def_unit, rec: d.rec, definition: d.off, reference: r.start };
-        if let Some(message) = self.definition_scenes.plans.get(&site).cloned() {
-            if !self.body_errors.contains_key(&ptr(r)) {
-                let diagnostic = self.err(ctx, codes::DEFINE_BODY_SCENE_REF, message, r.start);
-                self.body_errors.insert(ptr(r), diagnostic);
-                self.note_failed_at(ctx.rec, r.start, false);
+        if let Some(plan) = self.definition_scenes.plans.get(&site).cloned() {
+            let (code, message) = match &plan {
+                Plan::Scene(message) => (codes::DEFINE_BODY_SCENE_REF, message.clone()),
+                Plan::Failed(name) => (codes::REF_FAILED, format!("{name} failed (7.2, 6.9)")),
+            };
+            let diagnostic = self.err(ctx, code, message, r.start);
+            self.body_errors.insert(ptr(r), diagnostic);
+            self.note_failed_at(ctx.rec, r.start, false);
+            if matches!(plan, Plan::Scene(_)) {
+                return;
             }
-            return;
+            self.definition_scenes.reported.insert(site.clone(), diagnostic);
         }
         let Some(name) = &r.name else { return };
         let binding = if let Some((member, unit)) = d.defining.get(&(r.prefix, name.clone())) {
             match self.outer_lookup(r.prefix, name, member, *unit, ctx.scene) {
                 Found::Binding(binding) => Some(binding),
+                Found::NoOuter => {
+                    let (code, message) = super::eval::no_outer_message(r);
+                    let diagnostic = self.err(ctx, code, message, r.start);
+                    self.body_errors.insert(ptr(r), diagnostic);
+                    self.note_failed_at(ctx.rec, r.start, false);
+                    return;
+                }
                 _ => None,
             }
         } else {
@@ -134,6 +153,9 @@ impl Interp<'_> {
         };
         if let Some(binding) = binding {
             self.definition_scenes.queries.push(Query { site, binding, written: r.text() });
+        } else if let Err(Stop::Fail(Some(diagnostic))) = self.missing_reference::<()>(r, ctx) {
+            self.body_errors.insert(ptr(r), diagnostic);
+            self.note_failed_at(ctx.rec, r.start, false);
         }
     }
 
@@ -152,13 +174,25 @@ impl Interp<'_> {
                 .flat_map(|binding| contexts.get(&binding.key()).into_iter().flatten().copied())
                 .collect();
             // No selection or member list is evaluated to decide whether the name is allowed.
-            let forbidden = scenes.into_iter().any(|scene| {
-                let Some(value) = self.evaluated_binding(&query.binding, scene) else { return false };
-                self.forbidden_body_scene_value(query.binding.prefix, value)
-            });
+            let values: Vec<_> =
+                scenes.into_iter().filter_map(|scene| self.evaluated_binding(&query.binding, scene)).collect();
+            let forbidden = values.iter().any(|value| self.forbidden_body_scene_value(query.binding.prefix, *value));
             if forbidden && !self.definition_scenes.plans.contains_key(&query.site) {
-                self.definition_scenes.plans.insert(query.site,format!("{} refers to an object of the drawing level; scene objects enter a definition body through roles (6.9)",query.written));
+                self.definition_scenes.plans.insert(query.site,Plan::Scene(format!("{} refers to an object of the drawing level; scene objects enter a definition body through roles (6.9)",query.written)));
                 changed = true;
+            } else if !forbidden
+                && !values.is_empty()
+                && values.iter().all(|value| matches!(self.o(*value), ObjData::Failed(_)))
+            {
+                if let Some(&diagnostic) = self.definition_scenes.reported.get(&query.site) {
+                    let cause = values.iter().find_map(|value| self.failed_obj(*value).flatten());
+                    self.sink.set_cause(diagnostic, cause);
+                } else if let std::collections::hash_map::Entry::Vacant(entry) =
+                    self.definition_scenes.plans.entry(query.site)
+                {
+                    entry.insert(Plan::Failed(query.written));
+                    changed = true;
+                }
             }
         }
         changed
