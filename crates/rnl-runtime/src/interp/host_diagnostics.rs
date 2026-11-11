@@ -54,3 +54,14 @@ impl Interp<'_> {
         self.sink = sink;
     }
 }
+
+impl Interp<'_> {
+    pub(super) fn check_host_input_diagnostics(&mut self) {
+        for input in &self.doc.input_diagnostics {
+            if self.follows_0_4(self.level_unit[input.level]) {
+                let (code, severity, message) = input.issue.diagnostic();
+                self.sink.add(severity, code, message, Some(input.loc.clone()), Extra::default());
+            }
+        }
+    }
+}

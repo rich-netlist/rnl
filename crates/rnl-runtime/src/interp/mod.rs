@@ -468,6 +468,20 @@ impl<'p> Interp<'p> {
         Interp::new_run(doc, provider, options, sink, NumberRun::default())
     }
 
+    /// Prepare each host reading for the same file-version lookup.
+    fn init_host_units(&mut self) {
+        for lv in 0..self.doc.levels.len() {
+            let mut u = Unit::new(UnitKind::Level, &self.doc.levels[lv].title());
+            u.level = Some(lv);
+            let unit = self.units.len();
+            self.level_unit[lv] = unit;
+            self.units.push(u);
+            let recs = self.doc.levels[lv].records.clone();
+            let ids: Vec<RecId> = recs.into_iter().map(|r| self.add_record(r, unit)).collect();
+            self.unit_recs.push(ids);
+        }
+    }
+
     /// The same, with the records of the solver that this run reads differently (5.9).
     fn new_run(
         doc: HostDocument,
@@ -477,19 +491,11 @@ impl<'p> Interp<'p> {
         numbers: NumberRun,
     ) -> Interp<'p> {
         let mut it = Interp::blank(doc, provider, options, sink, numbers);
-        for lv in 0..it.doc.levels.len() {
-            let mut u = Unit::new(UnitKind::Level, &it.doc.levels[lv].title());
-            u.level = Some(lv);
-            let unit = it.units.len();
-            it.level_unit[lv] = unit;
-            it.units.push(u);
-            let recs = it.doc.levels[lv].records.clone();
-            let ids: Vec<RecId> = recs.into_iter().map(|r| it.add_record(r, unit)).collect();
-            it.unit_recs.push(ids);
-        }
+        it.init_host_units();
         // Versions precede every other header declaration, including packages and aliases.
         it.read_file_versions();
         it.check_host_diagnostics();
+        it.check_host_input_diagnostics();
         for lv in 0..it.doc.levels.len() {
             let u = it.level_unit[lv];
             it.read_unit(u);
@@ -1078,6 +1084,22 @@ fn read(
     }
     let again = run.clone();
     it.run_settled(|x| Interp::new_run(x.doc, provider, options, host.clone(), again.clone()))
+}
+
+/// Resolve the host reader's diagnostics with each file or section's language version.
+/// `default_version` is used for an undeclared main file; includes inherit normally.
+/// This reads version declarations without evaluating other RNL or loading packages.
+pub fn resolve_host_diagnostics(doc: HostDocument, default_version: &str, sink: Sink) -> (HostDocument, Sink) {
+    let provider = crate::source::MemoryProvider::new();
+    let options = Options { std: false, ..Options::default() };
+    let mut it = Interp::blank(doc, &provider, &options, sink, NumberRun::default());
+    it.init_host_units();
+    let main = it.level_unit[0];
+    it.units[main].version = default_version.to_string();
+    it.read_file_versions();
+    it.check_host_diagnostics();
+    it.check_host_input_diagnostics();
+    (it.doc, it.sink)
 }
 
 /// Check a package file on its own (2.7).

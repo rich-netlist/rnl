@@ -851,7 +851,16 @@ impl Reader<'_, '_> {
             if first == ".lib" {
                 let card = strip_inline_comment(stripped);
                 let toks: Vec<&str> = card.split_whitespace().collect();
-                if toks.len() == 2 {
+                if toks.len() < 2 {
+                    self.cx.doc.note_input_diagnostic(
+                        level,
+                        rnl_runtime::host::diagnostics::InputIssue::MissingOperand {
+                            directive: ".lib".into(),
+                            operand: "a section name, or a filename and section",
+                        },
+                        Loc::line(&fname, no),
+                    );
+                } else if toks.len() == 2 {
                     // a section definition met while reading the file as a whole: not selected
                     skip_lib = Some((toks[1].to_string(), no));
                 } else if toks.len() >= 3 {
@@ -876,6 +885,13 @@ impl Reader<'_, '_> {
                 continue;
             }
             if first == ".ends" {
+                if sub_stack.is_empty() {
+                    self.cx.doc.note_input_diagnostic(
+                        level,
+                        rnl_runtime::host::diagnostics::InputIssue::UnmatchedEnd(stripped.into()),
+                        Loc::line(&fname, no),
+                    );
+                }
                 self.cx.doc.levels[cur].end_line = no;
                 if let Some((c, k)) = sub_stack.pop() {
                     cur = c;
@@ -897,6 +913,12 @@ impl Reader<'_, '_> {
         }
         if let Some(start) = protect {
             self.cx.doc.protected.push((fname.clone(), start, lines.len() as u32 + 1));
+            let directive = lines[start as usize - 1].split_whitespace().next().unwrap_or("protect").to_string();
+            self.cx.doc.note_input_diagnostic(
+                level,
+                rnl_runtime::host::diagnostics::InputIssue::UnclosedProtection(directive),
+                Loc::line(&fname, start),
+            );
         }
         if !sub_stack.is_empty() {
             let diagnostic = self.cx.sink.error(
@@ -974,6 +996,15 @@ impl Reader<'_, '_> {
             if let Some(target) = body.split_whitespace().nth(1) {
                 let target = unquote(target);
                 self.cx.include(&target, None, no, fname, path, cur, circ, stack, true);
+            } else {
+                self.cx.doc.note_input_diagnostic(
+                    cur,
+                    rnl_runtime::host::diagnostics::InputIssue::MissingOperand {
+                        directive: first.into(),
+                        operand: "a filename",
+                    },
+                    Loc::line(fname, no),
+                );
             }
             return;
         }
@@ -1003,6 +1034,14 @@ impl Reader<'_, '_> {
         }
         if body.starts_with('.') {
             return;
+        }
+        if first.starts_with('k') {
+            let name = body.split_whitespace().next().unwrap_or(first).to_string();
+            self.cx.doc.note_input_diagnostic(
+                cur,
+                rnl_runtime::host::diagnostics::InputIssue::UnsupportedCoupling(name),
+                Loc::line(fname, no),
+            );
         }
         let Some(el) = parse_element(&body, fname, no, self.cx.sink) else {
             return;
