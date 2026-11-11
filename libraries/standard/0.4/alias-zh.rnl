@@ -196,7 +196,6 @@
   @ALIAS("$信号", "$signal");
   @ALIAS("$注释", "$note");
   @ALIAS("$灰色", "$grey");
-  @ALIAS("$虚拟件", "$virtual");
   @ALIAS("$电阻", "$RESISTOR");
   @ALIAS("$可变电阻", "$VARIABLE_RESISTOR");
   @ALIAS("$电容", "$CAPACITOR");

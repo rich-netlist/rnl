@@ -14,9 +14,6 @@
   /* The base style of every object: lines, texts and fills as Analog Canvas draws them. */
   $base = @DEFINE-STYLE(linecolor="#1d1d1f", textcolor="#1d1d1f", fillcolor="#ffffff", linewidth=0.16, cap="butt", join="miter", size=1) {};
 
-  /* A dark brown style for virtual parts and other drawn usages. */
-  $virtual = @DEFINE-STYLE(linecolor="#7a3e18", textcolor="#7a3e18") {$base};
-
   /* The style of a bus: its lines bold. */
   $bus = @DEFINE-STYLE(linestyle="bold") {};
 
@@ -36,5 +33,4 @@
   # @SELECT-LABEL(recursive=true) => @SET-STYLE $base;
   # @SELECT-ANNOTATION(recursive=true) => @SET-STYLE $base;
   # @SELECT-WIRE(bus=true, recursive=true) => @SET-STYLE $bus;
-  # @SELECT-USAGE(drawn=true, recursive=true) => @SET-STYLE $virtual;
 }
