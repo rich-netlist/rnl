@@ -1395,15 +1395,15 @@ fn connections(problem: &LevelProblem, model: &Model) -> Connections {
     };
     let mut drawn: Vec<Drawn> = Vec::new();
     let mut targets: BTreeMap<PinKey, BTreeSet<PinKey>> = BTreeMap::new();
-    // a net asked for twice, as by a ROUTE that flows down and one of the level's own, is drawn
-    // once, with the pins and points of each, in order, none twice
+    // Released inputs draw a net asked for twice once. In 0.4 each route entry is an independent
+    // tree; keep its pins and points in order, none twice, without joining another tree by name.
     let mut routed: Vec<(String, Vec<PinKey>)> = Vec::new();
     for (i, route) in problem.routes.iter().enumerate() {
         let pins: Vec<PinKey> = route.pins.iter().filter_map(pin_of).collect();
         nets.entry(route.net.clone()).or_default().extend(pins.iter().copied());
         let points: Vec<PointId> =
             model.route_points.get(i).map_or(Vec::new(), |ps| ps.iter().flatten().copied().collect());
-        let at = match routed.iter().position(|(net, _)| *net == route.net) {
+        let at = match routed.iter().position(|(net, _)| problem.version != "0.4" && *net == route.net) {
             Some(at) => at,
             None => {
                 routed.push((route.net.clone(), Vec::new()));
