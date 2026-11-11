@@ -15,7 +15,9 @@
    Definitions assert what their circuit must be (15.3, 15.4) as violations that change nothing drawn:
    matching of types, models and geometry, shared nets on gates, bases, sources or emitters, connection
    to ground or supply rails, usage definitions, and series, parallel, star or loop topologies, with
-   control and bulk or substrate terminals excluded by type. */
+   control and bulk or substrate terminals excluded by type. An assertion checks only what the netlist
+   tells: a member whose type or terminal names are not known, such as a PDK device without a DEVICE,
+   is not checked and gives no violation. */
 @RNL(type="header") {
   @VERSION("0.4");
   @PACKAGE(name="rnl-std-semantics", version="0.4");
@@ -34,7 +36,7 @@
     %all_usages = # @SELECT-USAGE;
     %inst_set = {?members};
     %all_usages @REMOVE-FROM %inst_set;
-    %inst_set @SELECT-INSTANCE
+    %inst_set @SELECT-INSTANCE(type="*")
         => @ASSERT-INSTANCE(same=["type"], message="the members of a $MATCHED have one type");
     %other_usages = {%all_usages};
     ?members @REMOVE-FROM %other_usages;
@@ -51,7 +53,8 @@
     ?members @AS $MATCHED;
     %mos_set = ?members @SELECT-INSTANCE(type="nmos");
     ?members @SELECT-INSTANCE(type="pmos") => @ADD-TO %mos_set;
-    ?members @ASSERT-IN(message="the members of a $MATCHED_MOS are MOSFETs") %mos_set;
+    ?members @SELECT-INSTANCE(type="*")
+        => @ASSERT-IN(message="the members of a $MATCHED_MOS are MOSFETs") %mos_set;
     ?members @ASSERT-INSTANCE(same=["model", "l"],
             message="the members of a $MATCHED_MOS have one model and one length");
   };
@@ -64,7 +67,8 @@
     %bjt_set = ?members @SELECT-INSTANCE(type="npn");
     ?members @SELECT-INSTANCE(type="pnp") => @ADD-TO %bjt_set;
     ?members @SELECT-INSTANCE(type="lpnp") => @ADD-TO %bjt_set;
-    ?members @ASSERT-IN(message="the members of a $MATCHED_BJT are bipolar transistors") %bjt_set;
+    ?members @SELECT-INSTANCE(type="*")
+        => @ASSERT-IN(message="the members of a $MATCHED_BJT are bipolar transistors") %bjt_set;
     ?members @ASSERT-INSTANCE(same=["model", "we", "le"],
             message="the members of a $MATCHED_BJT have one model and emitter geometry");
   };
@@ -77,7 +81,8 @@
     %resistor_set = ?members @SELECT-INSTANCE(type="r");
     ?members @SELECT-INSTANCE(model="resistor") => @ADD-TO %resistor_set;
     ?members @SELECT-INSTANCE(name="R*") => @ADD-TO %resistor_set;
-    ?members @ASSERT-IN(message="the members of a $MATCHED_RESISTOR are resistors") %resistor_set;
+    ?members @SELECT-INSTANCE(type="*")
+        => @ASSERT-IN(message="the members of a $MATCHED_RESISTOR are resistors") %resistor_set;
     ?members @ASSERT-INSTANCE(same=["model"],
             message="the members of a $MATCHED_RESISTOR have one model");
   };
@@ -90,7 +95,8 @@
     %capacitor_set = ?members @SELECT-INSTANCE(type="c");
     ?members @SELECT-INSTANCE(model="capacitor") => @ADD-TO %capacitor_set;
     ?members @SELECT-INSTANCE(name="C*") => @ADD-TO %capacitor_set;
-    ?members @ASSERT-IN(message="the members of a $MATCHED_CAPACITOR are capacitors") %capacitor_set;
+    ?members @SELECT-INSTANCE(type="*")
+        => @ASSERT-IN(message="the members of a $MATCHED_CAPACITOR are capacitors") %capacitor_set;
     ?members @ASSERT-INSTANCE(same=["model"],
             message="the members of a $MATCHED_CAPACITOR have one model");
   };
@@ -712,7 +718,8 @@
     ?device @SELECT-INSTANCE(type="pjf") => @ADD-TO %fet_set;
     ?device @SELECT-INSTANCE(type="nmf") => @ADD-TO %fet_set;
     ?device @SELECT-INSTANCE(type="pmf") => @ADD-TO %fet_set;
-    ?device @ASSERT-IN(message="the device of a $COMMON_SOURCE is a FET") %fet_set;
+    ?device @SELECT-INSTANCE(type="*")
+        => @ASSERT-IN(message="the device of a $COMMON_SOURCE is a FET") %fet_set;
   };
 
   /* A common-gate stage of one FET.
@@ -724,7 +731,8 @@
     ?device @SELECT-INSTANCE(type="pjf") => @ADD-TO %fet_set;
     ?device @SELECT-INSTANCE(type="nmf") => @ADD-TO %fet_set;
     ?device @SELECT-INSTANCE(type="pmf") => @ADD-TO %fet_set;
-    ?device @ASSERT-IN(message="the device of a $COMMON_GATE is a FET") %fet_set;
+    ?device @SELECT-INSTANCE(type="*")
+        => @ASSERT-IN(message="the device of a $COMMON_GATE is a FET") %fet_set;
   };
 
   /* A source follower (a common-drain stage) of one FET.
@@ -737,7 +745,8 @@
     ?device @SELECT-INSTANCE(type="pjf") => @ADD-TO %fet_set;
     ?device @SELECT-INSTANCE(type="nmf") => @ADD-TO %fet_set;
     ?device @SELECT-INSTANCE(type="pmf") => @ADD-TO %fet_set;
-    ?device @ASSERT-IN(message="the device of a $COMMON_DRAIN is a FET") %fet_set;
+    ?device @SELECT-INSTANCE(type="*")
+        => @ASSERT-IN(message="the device of a $COMMON_DRAIN is a FET") %fet_set;
   };
 
   /* A common-emitter stage of one bipolar transistor.
@@ -746,7 +755,8 @@
     %bjt_set = ?device @SELECT-INSTANCE(type="npn");
     ?device @SELECT-INSTANCE(type="pnp") => @ADD-TO %bjt_set;
     ?device @SELECT-INSTANCE(type="lpnp") => @ADD-TO %bjt_set;
-    ?device @ASSERT-IN(message="the device of a $COMMON_EMITTER is a bipolar transistor") %bjt_set;
+    ?device @SELECT-INSTANCE(type="*")
+        => @ASSERT-IN(message="the device of a $COMMON_EMITTER is a bipolar transistor") %bjt_set;
   };
 
   /* A common-base stage of one bipolar transistor.
@@ -755,7 +765,8 @@
     %bjt_set = ?device @SELECT-INSTANCE(type="npn");
     ?device @SELECT-INSTANCE(type="pnp") => @ADD-TO %bjt_set;
     ?device @SELECT-INSTANCE(type="lpnp") => @ADD-TO %bjt_set;
-    ?device @ASSERT-IN(message="the device of a $COMMON_BASE is a bipolar transistor") %bjt_set;
+    ?device @SELECT-INSTANCE(type="*")
+        => @ASSERT-IN(message="the device of a $COMMON_BASE is a bipolar transistor") %bjt_set;
   };
 
   /* An emitter follower (a common-collector stage) of one bipolar transistor.
@@ -766,7 +777,8 @@
     %bjt_set = ?device @SELECT-INSTANCE(type="npn");
     ?device @SELECT-INSTANCE(type="pnp") => @ADD-TO %bjt_set;
     ?device @SELECT-INSTANCE(type="lpnp") => @ADD-TO %bjt_set;
-    ?device @ASSERT-IN(message="the device of a $COMMON_COLLECTOR is a bipolar transistor") %bjt_set;
+    ?device @SELECT-INSTANCE(type="*")
+        => @ASSERT-IN(message="the device of a $COMMON_COLLECTOR is a bipolar transistor") %bjt_set;
   };
 
   /* A voltage-follower stage of one transistor.
@@ -900,9 +912,9 @@
     {?pmos ?nmos} @AS $PARALLEL;
     {?pmos ?nmos} @ALIGN("x", priority="low");
     {?pmos ?nmos} @ORDER("top-to-bottom", priority="low");
-    ?pmos @SELECT-INSTANCE(type="nmos")
+    ?pmos @SELECT-INSTANCE(type="*")
         => @ASSERT-INSTANCE(type="pmos", message="the pmos of a $TRANSMISSION_GATE is a PMOS");
-    ?nmos @SELECT-INSTANCE(type="pmos")
+    ?nmos @SELECT-INSTANCE(type="*")
         => @ASSERT-INSTANCE(type="nmos", message="the nmos of a $TRANSMISSION_GATE is an NMOS");
   };
 
@@ -914,10 +926,10 @@
     {?pmos ?nmos} @AS $PARALLEL;
     {?pmos ?nmos} @ALIGN("y", priority="low");
     {?pmos ?nmos} @ORDER("left-to-right", priority="low");
-    ?pmos @SELECT-INSTANCE(type="nmos")
+    ?pmos @SELECT-INSTANCE(type="*")
         => @ASSERT-INSTANCE(type="pmos",
                 message="the pmos of a $TRANSMISSION_GATE_HORIZONTAL is a PMOS");
-    ?nmos @SELECT-INSTANCE(type="pmos")
+    ?nmos @SELECT-INSTANCE(type="*")
         => @ASSERT-INSTANCE(type="nmos",
                 message="the nmos of a $TRANSMISSION_GATE_HORIZONTAL is an NMOS");
   };
@@ -1009,9 +1021,9 @@
       roles=[["{pullup}", ["instance", "usage"]], ["{pulldown}", ["instance", "usage"]]]) {
     {{?pullup} {?pulldown}} @AS $SERIES;
     {?pullup ?pulldown} @GROUP;
-    ?pullup @SELECT-INSTANCE(type="nmos")
+    ?pullup @SELECT-INSTANCE(type="*")
         => @ASSERT-INSTANCE(type="pmos", message="the pullup of a $CMOS_GATE is a PMOS");
-    ?pulldown @SELECT-INSTANCE(type="pmos")
+    ?pulldown @SELECT-INSTANCE(type="*")
         => @ASSERT-INSTANCE(type="nmos", message="the pulldown of a $CMOS_GATE is an NMOS");
   };
 
