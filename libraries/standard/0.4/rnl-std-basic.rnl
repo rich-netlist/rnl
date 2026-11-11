@@ -372,7 +372,7 @@
   /* A ground symbol with the name of its net under it, used by rnl-std-fill for ground nets other than 0 in $GROUND_NET_SET. */
   $NAMED_GROUND_SYMBOL = @DEFINE-SYMBOL(box=[-1.2, -2.7, 1.2, 0]) {
     $GROUND_SYMBOL;
-    ? @TEXT("${p}", key="netname", halign="middle", valign="top") => @PLACE(0, -2.5);
+    ? @TEXT("${p}", key="netname", halign="middle", valign="top", fix_rotate=true) => @PLACE(0, -2.5);
   };
 
   /* The symbol of $SUPPLY: a horizontal bar with the name of its net, its pin at the bottom. */
@@ -380,7 +380,7 @@
     %pin = (0, 0) @PIN(terminal="p", direction="down");
     @LINE {(0, 0) (0, 1.85)};
     @LINE(fill="linecolor", linestyle="none") {(-1, 2.088) (1, 2.088) (1, 1.764) (-1, 1.764) (-1, 2.088)};
-    ? @TEXT("${p}", key="netname", halign="middle", valign="bottom") => @PLACE(0, 2.4);
+    ? @TEXT("${p}", key="netname", halign="middle", valign="bottom", fix_rotate=true) => @PLACE(0, 2.4);
   };
 
   /* The symbol of $BIAS: a slanted bar with the name of its net, its pin at the bottom. */
@@ -388,7 +388,7 @@
     %pin = (0, 0) @PIN(terminal="p", direction="down");
     @LINE {(0, 0) (0, 1.85)};
     @LINE(fill="linecolor", linestyle="none") {(-1, 1.55) (1, 2.3) (1, 1.955) (-1, 1.205) (-1, 1.55)};
-    ? @TEXT("${p}", key="netname", halign="middle", valign="bottom") => @PLACE(0, 2.6);
+    ? @TEXT("${p}", key="netname", halign="middle", valign="bottom", fix_rotate=true) => @PLACE(0, 2.6);
   };
 
   /* The symbol of $IO_PORT: a small circle with the name of its net, its pin on the right. */
