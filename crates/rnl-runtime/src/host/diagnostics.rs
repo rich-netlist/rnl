@@ -49,3 +49,31 @@ impl Detail {
         (message, loc)
     }
 }
+
+/// A host input issue whose presence depends on the reading's RNL version.
+#[derive(Clone, Debug)]
+pub struct Input {
+    pub level: LevelId,
+    pub issue: InputIssue,
+    pub loc: Loc,
+}
+
+#[derive(Clone, Debug)]
+pub enum InputIssue {
+    MissingOperand { directive: String, operand: &'static str },
+    UnmatchedEnd(String),
+    UnclosedProtection(String),
+    UnsupportedCoupling(String),
+}
+
+impl InputIssue {
+    pub(crate) fn diagnostic(&self) -> (crate::diag::Code, crate::diag::Severity, String) {
+        use crate::diag::{codes, Severity};
+        match self {
+            Self::MissingOperand { directive, operand } => (codes::HOST_DIRECTIVE_MISSING_OPERAND, Severity::Error, format!("{directive} needs {operand}; the directive is ignored (2.2)")),
+            Self::UnmatchedEnd(directive) => (codes::HOST_UNMATCHED_DIRECTIVE, Severity::Warning, format!("{directive} has no open subcircuit to close; the unmatched directive is ignored (2.2)")),
+            Self::UnclosedProtection(directive) => (codes::HOST_UNTERMINATED_REGION, Severity::Warning, format!("the protection region opened by {directive} is not closed; it is not writable through end of file (2.2)")),
+            Self::UnsupportedCoupling(name) => (codes::HOST_ELEMENT_UNSUPPORTED, Severity::Warning, format!("SPICE coupling {name} is not represented in the drawing; its referenced inductors are still read (2.1)")),
+        }
+    }
+}

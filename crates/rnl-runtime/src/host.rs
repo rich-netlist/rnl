@@ -229,6 +229,8 @@ pub struct HostDocument {
     pub levels: Vec<Level>,
     /// Diagnostics associated with individual file or section readings, before language versions are known.
     pub diagnostic_readings: Vec<diagnostics::Reading>,
+    /// Host input problems reported only by the language versions that diagnose them.
+    pub input_diagnostics: Vec<diagnostics::Input>,
     /// The dialect of the main file's format.
     pub dialect: Dialect,
     /// The dialect of each file read, by its name in the document, when its format is not that of
@@ -284,6 +286,7 @@ impl HostDocument {
         HostDocument {
             levels: vec![main],
             diagnostic_readings: Vec::new(),
+            input_diagnostics: Vec::new(),
             dialect,
             file_dialects: HashMap::new(),
             file_formats: Vec::new(),
@@ -310,6 +313,12 @@ impl HostDocument {
         detail: diagnostics::Detail,
     ) {
         self.diagnostic_readings.push(diagnostics::Reading { diagnostic, original: original.clone(), level, detail });
+    }
+
+    /// Defer a host input issue until this file or section reading's version is known.
+    pub fn note_input_diagnostic(&mut self, level: LevelId, issue: diagnostics::InputIssue, loc: Loc) {
+        let level = self.file_level(level);
+        self.input_diagnostics.push(diagnostics::Input { level, issue, loc });
     }
 
     pub fn main(&self) -> &Level {

@@ -4778,6 +4778,15 @@
    "sections": []
   },
   {
+   "number": "RNL9012",
+   "name": "host-directive-missing-operand",
+   "severity": "error",
+   "message": "{directive} needs {operand}; the directive is ignored (2.2)",
+   "sections": [
+    "2.2"
+   ]
+  },
+  {
    "number": "RNL9100",
    "name": "record-at-not-after-space",
    "severity": "warning",

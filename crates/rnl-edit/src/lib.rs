@@ -106,7 +106,7 @@ pub fn write(request: &WriteRequest) -> Result<String, String> {
 /// host errors before writing; released output versions retain their existing behavior.
 pub fn write_diagnosed(request: &WriteRequest) -> Result<Written, Refusal> {
     let written = write_in(request, None)?;
-    add_junctions(request, written, &MemoryProvider::new(), &rnl_runtime::Options::default())
+    finish_write(request, written, &MemoryProvider::new(), &rnl_runtime::Options::default())
 }
 
 fn write_in(request: &WriteRequest, files: Option<&dyn rnl_runtime::source::Provider>) -> Result<Written, Refusal> {
@@ -193,19 +193,23 @@ fn write_in(request: &WriteRequest, files: Option<&dyn rnl_runtime::source::Prov
             layers.extend(files);
         }
         let source = rnl_runtime::source::Layered { layers };
-        let doc = rnl_view::read_host(&path, Some(dialect), &source, &mut sink);
+        // Each modern read reports the source it just checked, without stale locations
+        // from the input before the header or the requested records were inserted.
         if version == "0.4" {
-            if let Some(d) = sink.all().iter().find(|d| d.severity == Severity::Error) {
-                return Err(Refusal {
-                    code: d.code,
-                    message: d
-                        .loc
-                        .as_ref()
-                        .map(|loc| format!("{loc}: {}", d.message))
-                        .unwrap_or_else(|| d.message.clone()),
-                    diagnostics: error::diagnostics(&sink),
-                });
+            sink = Sink::new();
+        }
+        let doc = rnl_view::read_host(&path, Some(dialect), &source, &mut sink);
+        let doc = match doc {
+            Ok(doc) if version == "0.4" => {
+                let (doc, checked) =
+                    rnl_runtime::interp::resolve_host_diagnostics(doc, version, std::mem::take(&mut sink));
+                sink = checked;
+                Ok(doc)
             }
+            other => other,
+        };
+        if version == "0.4" {
+            refuse_host_errors(&sink)?;
         }
         doc.map_err(|message| Refusal {
             code: codes::VIEW_CANNOT_READ,
@@ -331,14 +335,14 @@ pub fn write_with_options_diagnosed(
     let mut written = write_in(request, Some(files))?;
     let text = &written.text;
     if !options.include_std || request.language_version.as_deref() != Some("0.4") {
-        return add_junctions(request, written, files, options);
+        return finish_write(request, written, files, options);
     }
     let entry = entry_of(request);
     let memory = MemoryProvider::new().with(&entry, text);
     let both = rnl_runtime::source::Layered { layers: vec![&memory, files] };
     let read = rnl_view::interpret_with(&entry, Some(&request.dialect), &BTreeMap::new(), &both, options)
         .map_err(|e| Refusal::new(codes::VIEW_CANNOT_READ, e))?;
-    let Some(version) = read.included_standard else { return add_junctions(request, written, files, options) };
+    let Some(version) = read.included_standard else { return finish_write(request, written, files, options) };
     let saved = rnl_runtime::writeback::with_standard_package(&read.doc, text, &version);
     if saved == *text {
         return Err(Refusal::new(
@@ -347,7 +351,47 @@ pub fn write_with_options_diagnosed(
         ));
     }
     written.text = saved;
-    add_junctions(request, written, files, options)
+    finish_write(request, written, files, options)
+}
+
+fn refuse_host_errors(sink: &Sink) -> Result<(), Refusal> {
+    if let Some(d) = sink.all().iter().find(|d| d.severity == Severity::Error) {
+        return Err(Refusal {
+            code: d.code,
+            message: d.loc.as_ref().map(|loc| format!("{loc}: {}", d.message)).unwrap_or_else(|| d.message.clone()),
+            diagnostics: error::diagnostics(sink),
+        });
+    }
+    Ok(())
+}
+
+/// Keep host warning locations in the final text, including package and junction insertions.
+fn finish_write(
+    request: &WriteRequest,
+    written: Written,
+    files: &dyn rnl_runtime::source::Provider,
+    options: &rnl_runtime::Options,
+) -> Result<Written, Refusal> {
+    let host_count = written.diagnostics.len();
+    let mut written = add_junctions(request, written, files, options)?;
+    if request.language_version.as_deref() != Some("0.4") {
+        return Ok(written);
+    }
+    let extra = written.diagnostics.split_off(host_count);
+    let path = entry_of(request);
+    let memory = MemoryProvider::new().with(&path, &written.text);
+    let source = rnl_runtime::source::Layered { layers: vec![&memory, files] };
+    let mut sink = Sink::new();
+    let doc = rnl_view::read_host(&path, Some(&request.dialect), &source, &mut sink).map_err(|message| Refusal {
+        code: codes::VIEW_CANNOT_READ,
+        message,
+        diagnostics: error::diagnostics(&sink),
+    })?;
+    let (_, sink) = rnl_runtime::interp::resolve_host_diagnostics(doc, "0.4", sink);
+    refuse_host_errors(&sink)?;
+    written.diagnostics = error::diagnostics(&sink);
+    written.diagnostics.extend(extra);
+    Ok(written)
 }
 
 /// Resolve only after package ops and include_std have been written. These usages are in a

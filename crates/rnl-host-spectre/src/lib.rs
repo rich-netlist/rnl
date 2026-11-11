@@ -693,7 +693,16 @@ impl Reader<'_, '_> {
                     ".lib" => {
                         let card = rnl_host_spice::strip_inline_comment(stripped);
                         let toks: Vec<&str> = card.split_whitespace().collect();
-                        if toks.len() == 2 {
+                        if toks.len() < 2 {
+                            self.cx.doc.note_input_diagnostic(
+                                level,
+                                rnl_runtime::host::diagnostics::InputIssue::MissingOperand {
+                                    directive: ".lib".into(),
+                                    operand: "a section name, or a filename and section",
+                                },
+                                Loc::line(&fname, no),
+                            );
+                        } else if toks.len() == 2 {
                             skip_section = Some((toks[1].to_string(), no));
                         } else if toks.len() >= 3 {
                             let target = unquote(toks[1]);
@@ -712,6 +721,13 @@ impl Reader<'_, '_> {
                         continue;
                     }
                     ".ends" => {
+                        if st.stack.is_empty() {
+                            self.cx.doc.note_input_diagnostic(
+                                level,
+                                rnl_runtime::host::diagnostics::InputIssue::UnmatchedEnd(stripped.into()),
+                                Loc::line(&fname, no),
+                            );
+                        }
                         self.cx.doc.levels[st.cur].end_line = no;
                         self.close_subckt(&mut st);
                         continue;
@@ -811,6 +827,12 @@ impl Reader<'_, '_> {
         }
         if let Some((start, _)) = protect {
             self.cx.doc.protected.push((fname.clone(), start, n as u32 + 1));
+            let directive = lines[start as usize - 1].split_whitespace().next().unwrap_or("protect").to_string();
+            self.cx.doc.note_input_diagnostic(
+                level,
+                rnl_runtime::host::diagnostics::InputIssue::UnclosedProtection(directive),
+                Loc::line(&fname, start),
+            );
         }
         spice_mode(&mut spice, st.mode, idx as u32, &fname, &mut self.cx.doc.spice_mode);
         if let Some(from) = spice {
@@ -932,7 +954,17 @@ impl Reader<'_, '_> {
                 return None;
             }
             "include" => {
-                let target = toks.get(1).map(|t| unquote(t))?;
+                let Some(target) = toks.get(1).map(|t| unquote(t)) else {
+                    self.cx.doc.note_input_diagnostic(
+                        st.cur,
+                        rnl_runtime::host::diagnostics::InputIssue::MissingOperand {
+                            directive: "include".into(),
+                            operand: "a filename",
+                        },
+                        Loc::line(fname, no),
+                    );
+                    return None;
+                };
                 let sec = toks.iter().skip(2).find_map(|t| t.strip_prefix("section=").map(String::from));
                 // the mode comes back after the include (S1 p89)
                 self.cx.include(&target, sec.as_deref(), no, fname, path, st.cur, st.circ, stack, true);
@@ -992,6 +1024,13 @@ impl Reader<'_, '_> {
                 return None;
             }
             "ends" => {
+                if st.stack.is_empty() {
+                    self.cx.doc.note_input_diagnostic(
+                        st.cur,
+                        rnl_runtime::host::diagnostics::InputIssue::UnmatchedEnd(stmt.into()),
+                        Loc::line(fname, no),
+                    );
+                }
                 self.cx.doc.levels[st.cur].end_line = no;
                 self.close_subckt(st);
                 return None;
@@ -1064,6 +1103,15 @@ impl Reader<'_, '_> {
         if first.starts_with(".inc") {
             if let Some(t) = body.split_whitespace().nth(1) {
                 self.cx.include(&unquote(t), None, no, fname, path, st.cur, st.circ, stack, true);
+            } else {
+                self.cx.doc.note_input_diagnostic(
+                    st.cur,
+                    rnl_runtime::host::diagnostics::InputIssue::MissingOperand {
+                        directive: first.into(),
+                        operand: "a filename",
+                    },
+                    Loc::line(fname, no),
+                );
             }
             return;
         }
@@ -1094,6 +1142,14 @@ impl Reader<'_, '_> {
         }
         if body.starts_with('.') {
             return;
+        }
+        if first.starts_with('k') {
+            let name = body.split_whitespace().next().unwrap_or(first).to_string();
+            self.cx.doc.note_input_diagnostic(
+                st.cur,
+                rnl_runtime::host::diagnostics::InputIssue::UnsupportedCoupling(name),
+                Loc::line(fname, no),
+            );
         }
         let Some(el) = rnl_host_spice::parse_element(&body, fname, no, self.cx.sink) else { return };
         let needs = rnl_host_spice::needs_models(el.inst.letter);
