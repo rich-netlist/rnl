@@ -17,6 +17,7 @@ pub mod ctx;
 mod currents;
 pub mod cycles;
 mod definition_calls;
+mod definition_scenes;
 mod devices;
 pub mod eval;
 mod export;
@@ -299,6 +300,7 @@ pub struct Interp<'p> {
     /// The packages whose references were checked for hiding (16.2).
     pub(crate) refs_checked: HashSet<UnitId>,
     pub(crate) scoped_memo: HashMap<(UnitId, ObjId), Vec<(String, String)>>,
+    definition_scenes: definition_scenes::DefinitionScenes,
     pub(crate) body_errors: HashMap<usize, DiagId>,
     pub(crate) body_member_errors: HashMap<usize, DiagId>,
     pub(crate) body_parameter_errors: HashMap<(ObjId, String), DiagId>,
@@ -421,6 +423,7 @@ impl<'p> Interp<'p> {
             home: HashMap::new(),
             refs_checked: HashSet::new(),
             scoped_memo: HashMap::new(),
+            definition_scenes: Default::default(),
             body_errors: HashMap::new(),
             body_member_errors: HashMap::new(),
             body_parameter_errors: HashMap::new(),
@@ -593,24 +596,26 @@ impl<'p> Interp<'p> {
             let restart = self.restart.take();
             let changed = restart.is_none() && self.settle_places();
             let bindings_changed = restart.is_none() && !changed && self.settle_bindings();
-            if restart.is_none() && !changed && !bindings_changed {
+            let body_changed = restart.is_none() && !changed && !bindings_changed && self.settle_definition_scenes();
+            if restart.is_none() && !changed && !bindings_changed && !body_changed {
                 return self;
             }
             let mut closing = std::mem::take(&mut self.closing);
             if let Some((key, msg)) = restart {
                 closing.insert(key, msg);
-                // A dropped edit may remove a dependency discovered by a provisional reading.
                 self.places.plans.clear();
             }
-            if bindings_changed {
+            if bindings_changed || body_changed {
                 self.places.plans.clear();
             }
             let plans = std::mem::take(&mut self.places.plans);
             let bindings = std::mem::take(&mut self.bindings.plans);
+            let body_plans = std::mem::take(&mut self.definition_scenes.plans);
             self = again(self);
             self.closing = closing;
             self.places.plans = plans;
             self.bindings.plans = bindings;
+            self.definition_scenes.plans = body_plans;
         }
     }
 

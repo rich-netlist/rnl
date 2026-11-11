@@ -60,7 +60,11 @@ jobs:
         run: rustup toolchain install stable --profile minimal --target ${{ matrix.target }} && rustup default stable
       - name: Install musl
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y musl-tools
+        run: |
+          # Avoid a hosted mirror whose DNS failure prevents package installation.
+          printf '%s\n' 'https://mirrors.edge.kernel.org/ubuntu' | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
       - name: Link the Windows C runtime statically
         if: runner.os == 'Windows'
         run: echo 'RUSTFLAGS=-C target-feature=+crt-static' >> "$GITHUB_ENV"

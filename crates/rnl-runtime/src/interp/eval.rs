@@ -1459,6 +1459,7 @@ impl<'p> Interp<'p> {
         } else {
             let name = e.name.clone().unwrap_or_default();
             let found = self.lookup(e.prefix, &name, ctx);
+            let external = matches!(&found, Some(Found::Binding(_)));
             match found {
                 Some(Found::NoOuter) => {
                     // in an ordinary definition's body this was reported once at the definition; each
@@ -1500,6 +1501,14 @@ impl<'p> Interp<'p> {
                 let msg = format!("{}{name} failed", e.prefix);
                 let id = self.err_cause(ctx, codes::REF_FAILED, msg, e.start, d);
                 return Err(Stop::Fail(Some(id)));
+            }
+            if external
+                && ctx.in_symbol()
+                && self.follows_0_4(self.source_unit(ctx))
+                && self.forbidden_body_scene_value(e.prefix, obj)
+            {
+                return self.fail(ctx, codes::DEFINE_BODY_SCENE_REF,
+                    format!("{} refers to an object of the drawing level; scene objects enter a definition body through roles (6.9)",e.text()), e.start);
             }
             sel = self.is_lazy(obj);
         }
