@@ -212,6 +212,8 @@ impl Objective {
 /// What the level offers the objectives (`crate::structure`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Inputs {
+    /// None preserves released versions; Some records whether CURRENT can be judged.
+    pub currents: Option<bool>,
     pub supply: bool,
     pub ground: bool,
     pub port_kinds: bool,
@@ -334,6 +336,11 @@ impl Active {
 
 /// Why an objective is inert in a level, in one sentence; none when it is in force.
 fn inert_reason(o: Objective, inputs: &Inputs) -> Option<String> {
+    if o == Objective::CurrentDirection {
+        if let Some(currents) = inputs.currents {
+            return (!currents).then(|| "current_direction has nothing to work with in this level, which has no CURRENT on a pin with a direction: it is treated as off".to_string());
+        }
+    }
     let entry = o.entry();
     let name = o.name();
     if !entry.implemented {
@@ -468,6 +475,9 @@ impl IntoQ for usize {
 /// not below its drain, a p-type with its source not above it. Two-terminal elements and other
 /// devices are left out.
 fn current_direction(view: &View) -> Q {
+    if view.s.language04 {
+        return (0..view.s.objects.len()).map(|k| view.s.against_current(k, view.orient[k])).sum::<usize>().into_q();
+    }
     let mut count = 0usize;
     for &k in &view.s.elements {
         let Some(n_type) = view.s.objects[k].device.n_type() else { continue };
@@ -824,7 +834,7 @@ mod tests {
     #[test]
     fn objectives_without_their_inputs_are_inert_and_said_so() {
         let options = SolverOptions::without_time_limit();
-        let all = Inputs { supply: true, ground: true, port_kinds: true, wires: true };
+        let all = Inputs { supply: true, ground: true, port_kinds: true, wires: true, currents: None };
         let active = Active::new(&options.objectives, &all);
         // the default layers less terminal_wire_alignment, which this version does not compute
         assert_eq!(active.layers.len(), 10);

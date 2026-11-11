@@ -129,7 +129,7 @@ use rnl_runtime::problem::{FactKind, LevelProblem, PointRef, Position};
 
 use crate::model::{ax, turned, Bound, ChoiceKind, LitKey, Model, OrientEffect, PointId, VarKind};
 use crate::options::{Caps, CAPS};
-use crate::orient::{from_index, index, OrientClasses};
+use crate::orient::{from_index, index, inverse, OrientClasses};
 use crate::rational::{from_f64, to_f64, Q};
 use crate::simplex::{Failure, LinExpr, Rel, Simplex, Var};
 use crate::{Clock, Discarded, SolverOptions, Statement, StatementHint, Work};
@@ -300,7 +300,7 @@ pub(crate) enum Outcome {
 #[derive(Clone, Debug)]
 struct Lit {
     key: LitKey,
-    /// The value the witness gives it, which a node takes when the literal is not decided.
+    /// The witness value, or the current authored alternative's preference, tried before branching.
     default: u32,
     /// The bounds of the default value, with their tags, made once for the search.
     defaults: Vec<(Bound, Tag)>,
@@ -308,6 +308,7 @@ struct Lit {
     /// that give the links the same constants are taken as one ([`Resolver::values`]).
     count: usize,
     body: LitBody,
+    preferred: Vec<u32>,
 }
 
 #[derive(Clone, Debug)]
@@ -391,7 +392,7 @@ struct Saved {
     touched: [BTreeSet<PointId>; 2],
     centres_on: [BTreeSet<usize>; 2],
     choices: usize,
-    pin_units: usize,
+    predicate_units: usize,
     nogoods: usize,
     held: BTreeMap<Held, u32>,
     kept: usize,
@@ -400,6 +401,7 @@ struct Saved {
 
 /// The resolution of 8.5 in progress: units are taken in one by one ([`Resolver::add`]).
 pub(crate) struct Resolver<'a> {
+    trying: Option<(usize, usize)>,
     model: &'a Model,
     limits: Limits<'a>,
     sx: [Simplex<Tag>; 2],
@@ -411,8 +413,8 @@ pub(crate) struct Resolver<'a> {
     centres_on: [BTreeSet<usize>; 2],
     /// The choices of the units kept, by unit and index.
     choices: Vec<(usize, usize)>,
-    /// Direction predicates of pins; ordinary orientation classes still relate whole objects.
-    pin_units: Vec<usize>,
+    /// Orientation predicates, including lists of codes and directed-pin facts.
+    predicate_units: Vec<usize>,
     nogoods: Vec<Nogood>,
     /// The units kept, in order.
     kept: Vec<usize>,
@@ -449,6 +451,7 @@ impl<'a> Resolver<'a> {
         }
         let base = [sx[0].checkpoint(), sx[1].checkpoint()];
         Resolver {
+            trying: None,
             model,
             limits,
             sx,
@@ -457,7 +460,7 @@ impl<'a> Resolver<'a> {
             touched: [BTreeSet::new(), BTreeSet::new()],
             centres_on: [BTreeSet::new(), BTreeSet::new()],
             choices: Vec::new(),
-            pin_units: Vec::new(),
+            predicate_units: Vec::new(),
             nogoods: Vec::new(),
             kept: Vec::new(),
             held: BTreeMap::new(),
@@ -494,8 +497,38 @@ impl<'a> Resolver<'a> {
         &self.classes
     }
 
-    /// Takes a unit in (8.5).
+    /// Takes a unit in (8.5), trying authored orientation alternatives in order.
     pub(crate) fn add(&mut self, u: usize) -> Outcome {
+        let count = match &self.model.units[u].orient {
+            OrientEffect::FixOneOf { codes, .. } => codes.len(),
+            OrientEffect::RelateOneOf { relations, .. } => relations.len(),
+            _ => return self.add_at_witness(u),
+        };
+        let mut reasons = BTreeSet::new();
+        let mut stopped = false;
+        for value in 0..count {
+            let learned_before = self.nogoods.len();
+            self.trying = Some((u, value));
+            let outcome = self.add_at_witness(u);
+            // These explanations were proved under one alternative, not under the full list.
+            self.nogoods.truncate(learned_before);
+            self.trying = None;
+            match outcome {
+                Outcome::Kept => return Outcome::Kept,
+                Outcome::Conflict(why) => reasons.extend(why),
+                Outcome::Undecided => stopped = true,
+            }
+        }
+        if stopped {
+            Outcome::Undecided
+        } else {
+            Outcome::Conflict(reasons.into_iter().collect())
+        }
+    }
+
+    /// Takes a fact at the current witness when possible, searching otherwise. Replaying a fact
+    /// already verified at a seeded witness does not retry earlier alternatives of its list.
+    pub(crate) fn add_at_witness(&mut self, u: usize) -> Outcome {
         crate::profile::add("fact_add_calls", 1);
         crate::profile::checkpoint();
         if self.holds(u) {
@@ -532,7 +565,9 @@ impl<'a> Resolver<'a> {
         let ori = &self.geometry.orient;
         let oriented = match &unit.orient {
             OrientEffect::None => true,
-            OrientEffect::Pins { .. } => unit.orient.pins_hold(|object| ori[object]),
+            OrientEffect::Pins { .. } | OrientEffect::FixOneOf { .. } | OrientEffect::RelateOneOf { .. } => {
+                self.predicate_holds(u, |object| ori[object])
+            }
             OrientEffect::Fix { object, code } => ori.get(*object) == Some(code),
             OrientEffect::Relate { relation, from, to } => relation_holds(ori, *relation, from, to),
         };
@@ -548,7 +583,7 @@ impl<'a> Resolver<'a> {
             touched: self.touched.clone(),
             centres_on: self.centres_on.clone(),
             choices: self.choices.len(),
-            pin_units: self.pin_units.len(),
+            predicate_units: self.predicate_units.len(),
             nogoods: self.nogoods.len(),
             held: self.held.clone(),
             kept: self.kept.len(),
@@ -564,7 +599,7 @@ impl<'a> Resolver<'a> {
         self.touched = saved.touched;
         self.centres_on = saved.centres_on;
         self.choices.truncate(saved.choices);
-        self.pin_units.truncate(saved.pin_units);
+        self.predicate_units.truncate(saved.predicate_units);
         self.nogoods.truncate(saved.nogoods);
         self.held = saved.held;
         self.kept.truncate(saved.kept);
@@ -726,8 +761,8 @@ impl<'a> Resolver<'a> {
         let n = self.geometry.orient.len();
         match &self.model.units[u].orient {
             OrientEffect::None => Ok(()),
-            OrientEffect::Pins { .. } => {
-                self.pin_units.push(u);
+            OrientEffect::Pins { .. } | OrientEffect::FixOneOf { .. } | OrientEffect::RelateOneOf { .. } => {
+                self.predicate_units.push(u);
                 Ok(())
             }
             OrientEffect::Fix { object, code } if *object < n => self.classes.fix(*object, *code, u),
@@ -859,6 +894,7 @@ impl<'a> Resolver<'a> {
                 defaults: Vec::new(),
                 count: c.values.len(),
                 body: LitBody::Choice { unit, choice },
+                preferred: Vec::new(),
             });
         }
         for axis in 0..2 {
@@ -877,6 +913,7 @@ impl<'a> Resolver<'a> {
                         defaults: Vec::new(),
                         count: members.len(),
                         body: LitBody::Centre { centre: c, axis, high },
+                        preferred: Vec::new(),
                     });
                 }
             }
@@ -887,18 +924,73 @@ impl<'a> Resolver<'a> {
                 Some(f) => (u32::from(index(f.value)), 1),
                 None => (u32::from(index(self.geometry.orient[root])), 8),
             };
+            let preferred = self.preferred_orientations(u, root);
+            let default = preferred.first().copied().unwrap_or(default);
             out.push(Lit {
                 key: LitKey::Class(root),
                 default,
                 defaults: Vec::new(),
                 count,
                 body: LitBody::Class { root, links },
+                preferred,
             });
         }
         for lit in &mut out {
             lit.defaults = self.lit_bounds(lit, lit.default);
         }
         out
+    }
+
+    /// Authored list order, expressed in the frame of a free orientation class.
+    fn preferred_orientations(&self, unit: usize, root: usize) -> Vec<u32> {
+        if self.classes.fixed(root).is_some() {
+            return Vec::new();
+        }
+        let values: Vec<Orient> = match &self.model.units[unit].orient {
+            OrientEffect::FixOneOf { object, codes } => {
+                let (r, label) = self.classes.find(*object);
+                if r != root {
+                    return Vec::new();
+                }
+                codes
+                    .iter()
+                    .enumerate()
+                    .filter(|(i, _)| self.trying.is_none_or(|(u, v)| u != unit || v == *i))
+                    .map(|(_, code)| code.then(inverse(label)))
+                    .collect()
+            }
+            OrientEffect::RelateOneOf { from, to, relations } => {
+                let (Some(&a), Some(&b)) = (from.first(), to.first()) else { return Vec::new() };
+                let (ra, ga) = self.classes.find(a);
+                let (rb, gb) = self.classes.find(b);
+                if ra == rb {
+                    return Vec::new();
+                }
+                if self.classes.fixed(rb).is_none() {
+                    if root != rb {
+                        return Vec::new();
+                    }
+                    relations
+                        .iter()
+                        .enumerate()
+                        .filter(|(i, _)| self.trying.is_none_or(|(u, v)| u != unit || v == *i))
+                        .map(|(_, r)| self.geometry.orient[a].then(*r).then(inverse(gb)))
+                        .collect()
+                } else {
+                    if root != ra {
+                        return Vec::new();
+                    }
+                    relations
+                        .iter()
+                        .enumerate()
+                        .filter(|(i, _)| self.trying.is_none_or(|(u, v)| u != unit || v == *i))
+                        .map(|(_, r)| self.geometry.orient[b].then(inverse(*r)).then(inverse(ga)))
+                        .collect()
+                }
+            }
+            _ => return Vec::new(),
+        };
+        values.into_iter().map(|v| u32::from(index(v))).collect()
     }
 
     /// The values of a literal to try, its default first. For an orientation, the values its class
@@ -913,11 +1005,19 @@ impl<'a> Resolver<'a> {
             None => (0..8).collect(),
         };
         let mut ordered: Vec<u32> = domain.iter().copied().filter(|&v| v == lit.default).collect();
-        ordered.extend(domain.iter().copied().filter(|&v| v != lit.default));
+        for &v in lit.preferred.iter().chain(&domain) {
+            if domain.contains(&v) && !ordered.contains(&v) {
+                ordered.push(v);
+            }
+        }
         // Coordinate-equivalent values can have different pin directions. Keep each value
-        // when a direction predicate reaches this class, even if it has no coordinate links.
-        if self.pin_units.iter().any(|unit| {
-            self.model.units[*unit].orient.pin_objects().iter().any(|object| self.classes.find(*object).0 == *root)
+        // when an orientation predicate reaches this class, even if it has no coordinate links.
+        if self.predicate_units.iter().any(|unit| {
+            self.model.units[*unit]
+                .orient
+                .predicate_objects()
+                .iter()
+                .any(|object| self.classes.find(*object).0 == *root)
         }) {
             return ordered;
         }
@@ -972,8 +1072,8 @@ impl<'a> Resolver<'a> {
     fn links(&self) -> BTreeMap<usize, Vec<ClassLink>> {
         let model = self.model;
         let mut out: BTreeMap<usize, Vec<ClassLink>> = BTreeMap::new();
-        for &unit in &self.pin_units {
-            for object in self.model.units[unit].orient.pin_objects() {
+        for &unit in &self.predicate_units {
+            for object in self.model.units[unit].orient.predicate_objects() {
                 out.entry(self.classes.find(object).0).or_default();
             }
         }
@@ -1065,7 +1165,7 @@ impl<'a> Resolver<'a> {
         crate::profile::add("resolve_nodes", 1);
         crate::profile::checkpoint();
         let cp = self.checkpoint();
-        let mut conflict = self.pin_conflict(lits, decided);
+        let mut conflict = self.orientation_conflict(lits, decided);
         'assert: for (i, lit) in lits.iter().enumerate() {
             if conflict.is_some() {
                 break;
@@ -1157,8 +1257,22 @@ impl<'a> Resolver<'a> {
         Node::Conflict(union)
     }
 
-    /// Rejects an orientation assignment when a directed-pin fact does not hold.
-    fn pin_conflict(&self, lits: &[Lit], decided: &[(usize, u32)]) -> Option<Vec<Tag>> {
+    fn predicate_holds(&self, unit: usize, orientation: impl Fn(usize) -> Orient) -> bool {
+        let effect = &self.model.units[unit].orient;
+        if let Some((_, value)) = self.trying.filter(|(u, _)| *u == unit) {
+            return match effect {
+                OrientEffect::FixOneOf { object, codes } => orientation(*object) == codes[value],
+                OrientEffect::RelateOneOf { from, to, relations } => {
+                    from.iter().all(|a| to.iter().all(|b| orientation(*b) == orientation(*a).then(relations[value])))
+                }
+                _ => effect.predicate_holds(orientation),
+            };
+        }
+        effect.predicate_holds(orientation)
+    }
+
+    /// Rejects an orientation assignment when an orientation predicate does not hold.
+    fn orientation_conflict(&self, lits: &[Lit], decided: &[(usize, u32)]) -> Option<Vec<Tag>> {
         let orientation = |object: usize| {
             let (root, label) = self.classes.find(object);
             let value = lits
@@ -1173,11 +1287,13 @@ impl<'a> Resolver<'a> {
                 .unwrap_or(self.geometry.orient[root]);
             value.then(label)
         };
-        for &unit in &self.pin_units {
+        for &unit in &self.predicate_units {
             let effect = &self.model.units[unit].orient;
-            if !effect.pins_hold(orientation) {
+            if !self.predicate_holds(unit, orientation) {
                 let mut tags = vec![Tag::Fact(unit)];
-                tags.extend(effect.pin_objects().iter().map(|object| Tag::Ori(*object, index(orientation(*object)))));
+                tags.extend(
+                    effect.predicate_objects().iter().map(|object| Tag::Ori(*object, index(orientation(*object)))),
+                );
                 return Some(tags);
             }
         }

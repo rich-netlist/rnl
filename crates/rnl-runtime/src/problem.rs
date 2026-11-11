@@ -726,6 +726,12 @@ pub fn fact_statement(p: &LevelProblem, k: usize) -> String {
     let num = |v: f64| fmt_num(v);
     let list = |ms: &[PointRef]| format!("{{{}}}", ms.iter().map(|m| point_name(p, m)).collect::<Vec<_>>().join(" "));
     let objects = |ks: &[usize]| list(&ks.iter().map(|k| PointRef::Origin(*k)).collect::<Vec<_>>());
+    let orientation = |first: Orient| {
+        p.orient_lists.iter().find(|(i, _)| *i == k).map_or_else(
+            || first.as_str().to_string(),
+            |(_, codes)| format!("[{}]", codes.iter().map(|code| code.as_str()).collect::<Vec<_>>().join(", ")),
+        )
+    };
     match &f.kind {
         FactKind::Place { at, axis, value } => {
             format!("the {} of {} = {}", axis.as_str(), point_name(p, at), num(*value))
@@ -742,7 +748,7 @@ pub fn fact_statement(p: &LevelProblem, k: usize) -> String {
             num(*value)
         ),
         FactKind::Orient { object, code } => {
-            format!("the orientation {} of {}", code.as_str(), point_name(p, &PointRef::Origin(*object)))
+            format!("the orientation {} of {}", orientation(*code), point_name(p, &PointRef::Origin(*object)))
         }
         FactKind::PinOrient { pin, codes } => format!(
             "ORIENT [{}] pin {} of {}",
@@ -790,7 +796,7 @@ pub fn fact_statement(p: &LevelProblem, k: usize) -> String {
             format!("DISTANCE {} {}{bounds} {} {}", axis.as_str(), sense.as_str(), list(from), list(to))
         }
         FactKind::OrientRelation { relation, from, to } => {
-            format!("ORIENT-RELATION {} {} {}", relation.as_str(), objects(from), objects(to))
+            format!("ORIENT-RELATION {} {} {}", orientation(*relation), objects(from), objects(to))
         }
     }
 }

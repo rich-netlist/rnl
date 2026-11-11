@@ -42,6 +42,7 @@
 //! no check reaches it, the same input and options give the same result on every platform; the
 //! search, the coordinates and the routing are counted in work, never timed, so they always do.
 
+mod bound;
 mod coords;
 mod driver;
 mod holds;
@@ -62,7 +63,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use rnl_runtime::problem::FactKind;
 
-pub use holds::{fact_holds, holds_as_drawn};
+pub use holds::{fact_holds, holds_as_drawn, problem_fact_holds_as_drawn};
 pub use options::{Budget, Layer, Objectives, SolverOptions, DEFAULT_LAYERS, DEFAULT_TIME_LIMIT, OBJECTIVES};
 pub use resolve::Resolved;
 pub use rnl_runtime::problem::LevelProblem;

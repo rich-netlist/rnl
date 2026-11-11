@@ -14,6 +14,31 @@ fn unlimited() -> SolveOptions {
     SolveOptions { solver: SolverOptions::without_time_limit(), ..SolveOptions::default() }
 }
 
+#[test]
+fn preview_checks_and_describes_the_full_orientation_list() {
+    let dir = scratch("orientation-list");
+    let file = dir.join("t.sp");
+    let text = r#"* orientation list
+* @RNL(type="header") { @VERSION("0.4") }
+R1 a b 1k
+* @RNL {
+* $S = @DEFINE-SYMBOL { %p = (-3,0) @PIN(terminal=1,direction="left"); (0,-1) (0,1) @LINE };
+* #R1 @SET-SYMBOL $S;
+* #R1 @ORIENT(["R0","MY"]);
+* #R1 @PLACE(0,0);
+* #R1::p @PLACE(3,0)
+* }
+.end
+"#;
+    std::fs::write(&file, text).unwrap();
+    let shown = preview(&path(&file), &FsProvider::new(&[]), &unlimited(), &WallClock::new(), &|_| true).unwrap();
+    let facts = &shown.report.levels[0].facts;
+    let orientation = facts.iter().find(|f| f.text.contains("orientation [R0, MY]")).expect("complete list in report");
+    assert_eq!(orientation.status, "kept");
+    assert_eq!(orientation.holds, Some(true));
+    assert!(facts.iter().all(|f| f.status == "kept" && f.holds == Some(true)), "{facts:?}");
+}
+
 /// A fresh directory of its own under the tests' temporary directory.
 fn scratch(name: &str) -> PathBuf {
     let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("rnl-preview").join(name);

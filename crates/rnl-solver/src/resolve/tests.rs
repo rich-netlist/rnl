@@ -19,6 +19,145 @@ fn resolve(problem: &LevelProblem, options: &SolverOptions) -> Resolved {
     super::resolve(problem, options, &StoppedClock)
 }
 
+#[test]
+fn orientation_lists_backtrack_through_coordinates_in_either_fact_order() {
+    // The local pin is (-3, 0). Only MY puts it at x = 3 while the origin stays at zero.
+    for reverse in [false, true] {
+        let mut facts = vec![orient(0, Orient::R0), place(o(0), Axis::X, 0.0), place(pin(0, 0), Axis::X, 3.0)];
+        if reverse {
+            facts.reverse();
+        }
+        let mut p = problem_of(vec![instance()], facts);
+        p.version = "0.4".into();
+        p.orient_lists = vec![(if reverse { 2 } else { 0 }, vec![Orient::R0, Orient::MY])];
+        let r = resolve(&p, &SolverOptions::without_time_limit());
+        assert_eq!(r.kept.len(), 3, "{r:?}");
+        assert_eq!(r.orientation(0), Some(Orient::MY));
+        assert_eq!(r, resolve(&p, &SolverOptions::without_time_limit()));
+        assert_eq!(brute_feasible(&r.model, &p, &[0, 1, 2]), Some(true));
+    }
+}
+
+#[test]
+fn orientation_lists_prefer_authored_order() {
+    let mut p = problem_of(
+        vec![instance(), instance()],
+        vec![
+            orient(0, Orient::MY),
+            fact(FactKind::OrientRelation { relation: Orient::R90, from: vec![0], to: vec![1] }),
+        ],
+    );
+    p.version = "0.4".into();
+    p.orient_lists = vec![(0, vec![Orient::MY, Orient::R0]), (1, vec![Orient::R90, Orient::R0])];
+    let r = resolve(&p, &SolverOptions::without_time_limit());
+    assert_eq!(r.kept, [0, 1]);
+    assert_eq!(r.orientation(0), Some(Orient::MY));
+    assert_eq!(r.orientation(1), Some(Orient::MY.then(Orient::R90)));
+}
+
+#[test]
+fn the_first_relation_can_turn_its_from_side_when_to_is_constrained_by_coordinates() {
+    let mut p = problem_of(
+        vec![instance(), instance()],
+        vec![
+            place(o(1), Axis::X, 0.0),
+            place(pin(1, 0), Axis::X, -3.0),
+            fact(FactKind::OrientRelation { relation: Orient::MY, from: vec![0], to: vec![1] }),
+        ],
+    );
+    p.version = "0.4".into();
+    p.orient_lists = vec![(2, vec![Orient::MY, Orient::R0])];
+    let r = resolve(&p, &SolverOptions::without_time_limit());
+    assert_eq!(r.kept, [0, 1, 2]);
+    assert_eq!(r.orientation(1), Some(r.orientation(0).unwrap().then(Orient::MY)));
+}
+
+#[test]
+fn replay_keeps_a_nonfirst_orientation_without_spending_search_nodes() {
+    let mut p = problem_of(
+        vec![instance()],
+        vec![orient(0, Orient::R0), place(o(0), Axis::X, 0.0), place(pin(0, 0), Axis::X, 3.0)],
+    );
+    p.version = "0.4".into();
+    p.orient_lists = vec![(0, vec![Orient::R0, Orient::MY])];
+    let r = resolve(&p, &SolverOptions::without_time_limit());
+    let mut replay = Resolver::new(&r.placing, 1, Limits::Caps(crate::options::Caps { nodes: 0, ..CAPS }));
+    replay.seed(r.witness.geometry.clone());
+    for &f in &r.kept {
+        assert_eq!(replay.add_at_witness(f), Outcome::Kept);
+    }
+    assert_eq!(replay.nodes, 0);
+    assert_eq!(replay.geometry.orient[0], Orient::MY);
+}
+
+#[test]
+fn orientation_alternatives_and_later_facts_agree_with_exhaustive_search() {
+    for i in 0..24 {
+        let codes = [Orient::ALL[i % 8], Orient::ALL[(i + 3) % 8]];
+        let relations = [Orient::ALL[(i * 3) % 8], Orient::ALL[(i * 3 + 1) % 8]];
+        let mut p = problem_of(
+            vec![instance(), instance()],
+            vec![
+                orient(0, codes[0]),
+                fact(FactKind::OrientRelation { relation: relations[0], from: vec![0], to: vec![1] }),
+                place(o(0), Axis::X, 0.0),
+                place(pin(0, 0), Axis::X, if i % 2 == 0 { 3.0 } else { -3.0 }),
+                orient(1, Orient::ALL[(i * 5 + 2) % 8]),
+            ],
+        );
+        p.version = "0.4".into();
+        p.orient_lists = vec![(0, codes.to_vec()), (1, relations.to_vec())];
+        let r = resolve(&p, &SolverOptions::without_time_limit());
+        assert!(r.failed.is_empty());
+        for f in 0..p.facts.len() {
+            let units: Vec<_> = r.kept.iter().copied().filter(|k| *k < f).chain([f]).collect();
+            assert_eq!(brute_feasible(&r.model, &p, &units), Some(r.kept.contains(&f)), "case {i}, fact {f}");
+        }
+    }
+}
+
+#[test]
+fn relation_lists_reconsider_an_earlier_choice_and_explain_all_alternatives() {
+    let mut p = problem_of(
+        vec![instance(), instance()],
+        vec![
+            fact(FactKind::OrientRelation { relation: Orient::R0, from: vec![0], to: vec![1] }),
+            orient(0, Orient::R0),
+            orient(1, Orient::MY),
+            orient(1, Orient::R90),
+        ],
+    );
+    p.version = "0.4".into();
+    p.orient_lists = vec![(0, vec![Orient::R0, Orient::MY])];
+    let r = resolve(&p, &SolverOptions::without_time_limit());
+    assert_eq!(r.kept, [0, 1, 2]);
+    assert_eq!(r.orientation(1), Some(Orient::MY));
+    let conflict = r.discarded.iter().find(|d| d.fact == 3).unwrap();
+    assert!(!conflict.undecided);
+    assert!(conflict.groups.contains(&vec![0, 1]));
+    assert!(conflict.groups.contains(&vec![2]));
+    assert_eq!(brute_feasible(&r.model, &p, &[0, 1, 3]), Some(false));
+}
+
+#[test]
+fn orientation_lists_and_pin_directions_share_the_search() {
+    let mut p = problem_of(
+        vec![instance()],
+        vec![
+            orient(0, Orient::R0),
+            fact(FactKind::PinOrient {
+                pin: DirectedPin { object: 0, pin: 0, direction: 180 },
+                codes: vec![Orient::R180],
+            }),
+        ],
+    );
+    p.version = "0.4".into();
+    p.orient_lists = vec![(0, vec![Orient::R0, Orient::MY])];
+    let r = resolve(&p, &SolverOptions::without_time_limit());
+    assert_eq!(r.kept, [0, 1]);
+    assert_eq!(r.orientation(0), Some(Orient::MY));
+}
+
 /// A clock that advances one second each time it is read: a time limit of `n` seconds is out at
 /// the `n + 1`-th reading after the resolution begins, at the same point on every run (the draft
 /// 0.3, 8.5).
@@ -1545,6 +1684,10 @@ fn brute_feasible(model: &Model, problem: &LevelProblem, units: &[usize]) -> Opt
         }
         let orientations_hold = units.iter().all(|&u| match &model.units[u].orient {
             OrientEffect::Pins { .. } => pin_directions_hold(&problem.facts[u].kind, &g),
+            OrientEffect::FixOneOf { object, codes } => codes.contains(&g[*object]),
+            OrientEffect::RelateOneOf { from, to, relations } => {
+                from.iter().all(|a| to.iter().all(|b| relations.iter().any(|r| g[*b] == g[*a].then(*r))))
+            }
             OrientEffect::None => true,
             OrientEffect::Fix { object, code } => g[*object] == *code,
             OrientEffect::Relate { relation, from, to } => relation_holds(&g, *relation, from, to),
