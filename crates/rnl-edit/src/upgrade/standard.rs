@@ -228,16 +228,40 @@ pub(super) fn definition_policies(input: &Interpretation) -> BTreeMap<(usize, St
             } else {
                 name.clone()
             };
-            let reason=match target.get(&target_name) {
-                None=>Some(("standard-definition-removed","the standard definition was removed or split; its replacement needs an explicit semantic choice (16.3)")),
-                Some((_,_,after_roles,_)) if *after_roles!=roles=>Some(("standard-definition-roles","the target standard definition has a different role list; preserving the original members requires an explicit choice (9.4, 16.3)")),
-                Some((_,after,_,after_defaults)) if before!=*after || defaults!=*after_defaults=>Some(("standard-definition-body","the target standard definition changes body facts, assertions or parameter defaults; review those changes before replacing the original application (9.4, 16.3)")),
-                _=>None,
+            let reason = match target.get(&target_name) {
+                None => Some((
+                    "standard-definition-removed",
+                    match target_name.as_str() {
+                        "$CURRENT_MIRROR" => "CURRENT_MIRROR was split into CURRENT_MIRROR_N and CURRENT_MIRROR_P, which add low-priority ALIGN y, orientation relations, ROUTE-OBJECT and model/topology assertions; choose the matching polarity or retain only the intended facts (16.3)",
+                        "$DIFFERENTIAL_PAIR" => "DIFFERENTIAL_PAIR was split into DIFFERENTIAL_PAIR_N and DIFFERENTIAL_PAIR_P with left/right roles and a single-object tail; choose the matching polarity and side order explicitly (16.3)",
+                        "$DELAY_CELL" => "the point-attached DELAY_CELL definition was removed in 0.4, where DELAY_CELL is the two-terminal logic symbol; use FIGURE with SET-SYMBOL DELAY_CELL for a drawing-only figure or place a host instance (16.3)",
+                        "$CHAIN" => "CHAIN was removed in 0.4; retain the intended ordering or series topology explicitly (16.3)",
+                        "$SUPPLY_HIGH" | "$SUPPLY_LOW" => "SUPPLY_HIGH and SUPPLY_LOW were removed in 0.4; choose an explicit supply or placement policy (16.3)",
+                        _ => "the standard definition was removed or split; its replacement needs an explicit semantic choice (16.3)",
+                    },
+                )),
+                Some((_, _, after_roles, _)) if *after_roles != roles => Some((
+                    "standard-definition-roles",
+                    match target_name.as_str() {
+                        "$INTEGRATOR" | "$DISCRETE_TIME_INTEGRATOR" | "$QUANTIZER" | "$UNIT_DELAY" => {
+                            "this signal-flow definition changed from a point-attached figure to a semantic block with in/out roles; use FIGURE with its _SYMBOL for a drawing-only figure or bind the block's input and output instances (16.3)"
+                        }
+                        "$CASCADE" => {
+                            "CASCADE replaces first/second/feedback/load with a single stages role; choose the intended stage sequence explicitly (16.3)"
+                        }
+                        _ => "the target standard definition has a different role list; preserving the original members requires an explicit choice (9.4, 16.3)",
+                    },
+                )),
+                Some((_, after, _, after_defaults)) if before != *after || defaults != *after_defaults => Some((
+                    "standard-definition-body",
+                    "the target standard definition changes body facts, assertions or parameter defaults; review those changes before replacing the original application (9.4, 16.3)",
+                )),
+                _ => None,
             };
             let mut policy = Policy { review: reason, ..Policy::default() };
             if let Some((_, after, _, after_defaults)) = target.get(&target_name) {
-                let old = before.join("");
-                let new = after.join("");
+                let old = before.join("").replace(";}", "}");
+                let new = after.join("").replace(";}", "}");
                 policy.restore_flow = old == "{?path@ORDER(?direction,priority=\"low\")}" && new == "{}";
                 // Exact syntactic tests avoid trusting a name when a later package
                 // revision adds unrelated drawing facts to the same definition.
@@ -254,16 +278,46 @@ pub(super) fn definition_policies(input: &Interpretation) -> BTreeMap<(usize, St
                 }
                 if target_name == "$IO_PORT"
                     && old == "{}"
-                    && new == "{?p@ASSERT-NET(port=true,message=\"a port tag stands on a port of its level\")}"
+                    && new == "{?p@ASSERT-NET(port=true,message=\"the net of an $IO_PORT is a port of its level\")}"
                 {
                     policy.review = None;
                     policy.notice = Some(("standard-assertion", "IO_PORT now asserts that its net is a port of the current level; drawing facts are unchanged, and any violated assertion remains a target violation (7.6, 16.3)"));
                 }
+                if target_name == "$MATCHED"
+                    && old == "{}"
+                    && after.iter().any(|t| t == "@ASSERT-INSTANCE")
+                    && after.iter().any(|t| t == "@ASSERT-USAGE")
+                    && !after.iter().any(|t| {
+                        matches!(
+                            t.as_str(),
+                            "@ALIGN"
+                                | "@ORDER"
+                                | "@DISTRIBUTE"
+                                | "@DISTANCE"
+                                | "@PLACE"
+                                | "@ORIENT"
+                                | "@ORIENT-RELATION"
+                                | "@WIRE"
+                                | "@BUNDLE"
+                                | "@ROUTE"
+                                | "@ROUTE-NET"
+                                | "@ROUTE-OBJECT"
+                                | "@UNROUTE-NET"
+                                | "@UNROUTE-OBJECT"
+                                | "@GROUP"
+                                | "@AS"
+                                | "@ATTACH"
+                                | "@TABLE"
+                        )
+                    })
+                {
+                    policy.review = None;
+                    policy.notice = Some(("standard-assertion", "MATCHED now asserts that instance members share one type and usage members share one definition; drawing facts are unchanged, and any violated assertion remains a target violation (15.3, 16.3)"));
+                }
                 if policy.review.is_some_and(|r| r.0 == "standard-definition-body") {
                     policy.review = Some(("standard-definition-body", match target_name.as_str() {
-                        "$CURRENT_MIRROR" => "CURRENT_MIRROR adds low-priority ALIGN y, orientation relations and ROUTE-OBJECT, as well as topology/model assertions; these are new drawing facts, not just assertions (16.3)",
                         "$BRANCH" => "BRANCH adds SERIES routing/topology and a low-priority top-to-bottom ORDER; the old definition only aligned x (16.3)",
-                        "$MIRRORED" => "MIRRORED replaces axis-only distribution and ORDER by directed distribution and admits a set-valued axis; a multi-member axis has different centre semantics, and directed steps must be at least one unit rather than the old possible half-unit step (14.4, 16.3)",
+                        "$MIRRORED" => "MIRRORED replaces axis-only distribution and ORDER by directed distribution and narrows axis to a single instance, usage or point; net axes and undirected sides require an explicit choice, and directed steps must be at least one unit (14.4, 16.3)",
                         "$FLOW" => "FLOW removes the old low-priority ORDER in its direction parameter; retaining the usage alone loses that ordering fact (16.3)",
                         _ => "the standard definition has changed drawing facts or parameter defaults that are not covered by the verified body transformations; see the standard-definition audit (16.3)",
                     }));

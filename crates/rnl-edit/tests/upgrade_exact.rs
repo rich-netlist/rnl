@@ -61,8 +61,28 @@ fn local_drawn_usages_gain_alignments_without_copying_points() {
 #[test]
 fn new_drawing_facts_in_mirrors_remain_manual() {
     let r = convert("{#R1}(ref) {#R2}(out) @AS $CURRENT_MIRROR", true);
-    let note = r.report.files[0].unconverted.iter().find(|u| u.rule == "standard-definition-body").unwrap();
+    let note = r.report.files[0].unconverted.iter().find(|u| u.rule == "standard-definition-removed").unwrap();
     assert!(note.reason.contains("ALIGN y"));
+    assert!(note.reason.contains("CURRENT_MIRROR_N"));
+}
+
+#[test]
+fn matched_assertions_are_informational_without_blocking_conversion() {
+    let r = convert("{#R1 #R2} @AS $MATCHED", true);
+    assert!(!pending(&r, "standard-definition-body"), "{:?}", r.report);
+    assert!(r.report.files[0].notices.iter().any(|n| n.rule == "standard-assertion"), "{:?}", r.report);
+}
+
+#[test]
+fn netname_and_transconductor_text_keys_follow_target_symbols() {
+    let source = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"rnl-std-full\", version=\"0.3\") }\n.subckt gm in out\n.ends\nX1 a b gm\nR1 a 0 1k\n* @RNL {\n*   $SUPPLY @ATTACH &a => @TEXT(\"VDD\", key=\"name\");\n*   %g = $GROUND @ATTACH &0; %g @TEXT(\"GND\", key=\"name\");\n*   #X1 @SET-SYMBOL $TRANSCONDUCTOR; #X1 @TEXT(\"Gm\", key=\"formula\");\n*   #R1 @TEXT(\"R_load\", key=\"name\")\n* }\n.end\n";
+    let r = upgrade("t.sp", &MemoryProvider::new().with("t.sp", source), &UpgradeOptions::default()).unwrap();
+    let text = &r.files["t.sp"];
+    assert!(text.contains("@TEXT(\"VDD\", key=\"netname\")"), "{text}");
+    assert!(text.contains("%g @TEXT(\"GND\", key=\"netname\")"), "{text}");
+    assert!(text.contains("#X1 @TEXT(\"Gm\", key=\"label\")"), "{text}");
+    assert!(text.contains("#R1 @TEXT(\"R_load\", key=\"name\")"), "{text}");
+    assert!(r.report.files[0].changes.iter().any(|c| c.rule == "standard-text-key"));
 }
 
 #[test]

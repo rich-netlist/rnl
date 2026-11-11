@@ -49,3 +49,31 @@ fn block_symbols_keep_the_subcircuit_port_order() {
     let r = upgrade("t.sp", &MemoryProvider::new().with("t.sp", source), &UpgradeOptions::default()).unwrap();
     assert!(r.report.files[0].changes.iter().any(|c| c.rule == "standard-terminal-map"));
 }
+
+#[test]
+fn renamed_03_symbols_and_inherited_pins_preserve_terminal_mappings() {
+    let source = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"rnl-std-full\", version=\"0.3\") }\n.subckt op5 a b vp vn y\n.ends\n.subckt sum x1 x2 y\n.ends\n.subckt dly i o\n.ends\nXop a b vdd 0 out op5\nXsum a b s sum\nXdly s y dly\nE1 p1 0 c1 0 2\nE2 p2 0 c2 0 1\nG1 i1 0 c1 0 1m\n* @RNL {\n*   #Xop @SET-SYMBOL $OPAMP_5TERM;\n*   #Xsum @SET-SYMBOL $ADDER;\n*   #Xdly @SET-SYMBOL $DELAY_CELL_SYMBOL;\n*   #E1 @SET-SYMBOL $VCVS;\n*   #E2 @SET-SYMBOL $VCVS_4TERM;\n*   #G1 @SET-SYMBOL $VCCS;\n*   (0, 0) @AS $FIGURE => @SET-SYMBOL $CURRENT_ARROW_SYMBOL\n* }\n.end\n";
+    let r = upgrade("t.sp", &MemoryProvider::new().with("t.sp", source), &UpgradeOptions::default()).unwrap();
+    let text = &r.files["t.sp"];
+    assert!(text.contains("#Xop @SET-SYMBOL(terminals=[[1, \"inp\"], [2, \"inn\"], [5, \"out\"]]) $OPAMP"), "{text}");
+    assert!(
+        text.contains("#Xsum @SET-SYMBOL(terminals=[[1, \"in1\"], [2, \"in2\"], [3, \"out\"]]) $ADDER_SYMBOL"),
+        "{text}"
+    );
+    assert!(text.contains("#Xdly @SET-SYMBOL(terminals=[[1, \"a\"], [2, \"y\"]]) $DELAY_CELL"), "{text}");
+    assert!(
+        text.contains("#E1 @SET-SYMBOL(terminals=[[1, \"p\"], [2, \"n\"]]) $CONTROLLED_VOLTAGE_SOURCE"),
+        "{text}"
+    );
+    assert!(
+        text.contains(
+            "#E2 @SET-SYMBOL(terminals=[[1, \"p\"], [2, \"n\"], [3, \"cp\"], [4, \"cn\"]]) $VCVS_4TERM"
+        ),
+        "{text}"
+    );
+    assert!(
+        text.contains("#G1 @SET-SYMBOL(terminals=[[1, \"p\"], [2, \"n\"]]) $CONTROLLED_CURRENT_SOURCE"),
+        "{text}"
+    );
+    assert!(text.contains("=> @SET-SYMBOL $ARROW_SYMBOL"), "{text}");
+}

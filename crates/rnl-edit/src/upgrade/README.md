@@ -6,7 +6,7 @@ An upgrade is successful only when all changes are supported, target interpretat
 
 ## Optional approximations
 
-`--approximate` is off by default. It opts into polarity-based differential-pair replacements, choosing an explicit axis direction from source positions, authored directed constraints or written order, and accepting the stronger combination semantics of held sets in ORDER. Each choice is reported in `approximations` with its original and proposed text and a `risk` explanation; the terminal summary counts it separately from exact edits. ALIGN/DISTRIBUTE on multi-member held sets remain manual. Approximation does not suppress target errors, assertion violations or comparison differences.
+`--approximate` is off by default. It opts into polarity-based differential-pair and current-mirror replacements (`_N` / `_P`, including unwrapping singleton `{#M5}(tail)` or dropping `{}(tail)` on differential pairs), choosing an explicit axis direction from source positions, authored directed constraints or written order, and accepting the stronger combination semantics of held sets in ORDER. Each choice is reported in `approximations` with its original and proposed text and a `risk` explanation; the terminal summary counts it separately from exact edits. ALIGN/DISTRIBUTE on multi-member held sets remain manual. Approximation does not suppress target errors, assertion violations or comparison differences.
 
 Verified directed collection minima and existing standard main-point ties no longer need review. Old explicit stub applications retain their default gap by writing it out. Additional main-point ties use ALIGN x/y, with fresh names only when needed. Assertion-only package changes are `notices`, and actual violations are also collected in `assertion_violations`. See [the definition audit](STANDARD-DEFINITIONS.md) for each standard definition and for the limits of each rule.
 
@@ -23,8 +23,8 @@ Sections refer to RNL 0.4. Standard package changes refer to the bundled series 
 | Source form | Target form / handling | Class | Basis |
 | --- | --- | --- | --- |
 | VERSION 0.2 or 0.3 | VERSION 0.4 | Mechanical | 16.1 |
-| Implicit standard series | Explicit USE-PACKAGE for series 0.4 | Mechanical | 16.3 |
-| Standard USE-PACKAGE / USE-ALIASES version | Available matching package of series 0.4; preserve inline overrides | Mechanical | 16.2, 16.3, 16.5 |
+| Implicit standard series | Explicit USE-PACKAGE for `rnl-std-all` 0.4 | Mechanical | 16.3 |
+| Standard USE-PACKAGE / USE-ALIASES version | Matching package in series 0.4 (`rnl-std`/`rnl-std-full` → `rnl-std-all`, `rnl-std-structures` → `rnl-std-semantics`, `rnl-zh` → `alias-zh`); preserve 1-to-1 inline overrides | Mechanical | 16.2, 16.3, 16.5 |
 | Included files, own package files, inline packages | Apply rules using each source's effective language | Context | 2.8, 16.1, 16.2 |
 | Reference immediately followed by a separate set | Insert whitespace so it cannot become member selection | Mechanical | 5.2.3 |
 | ROUTE | ROUTE-NET with original parameters | Mechanical | 13.7 |
@@ -48,15 +48,17 @@ Sections refer to RNL 0.4. Standard package changes refer to the bundled series 
 | Literal markup gaining meaning in 0.4 | Retain and report changed rendering intent | Context | 13.6 |
 | Spectre transformer default terminal names | Verified default host names become stable terminal positions | Context | 6.12 |
 | Numeric DEVICE/port names | Resolve host port positions; report invalid numeric/repeated DEVICE names | Context | 6.4, 6.12 |
-| Series 0.2 names and merged packages | Provenance-checked target names and explicit destination packages; report removed names | Context | Standard series |
+| Series 0.2/0.3 renamed symbols and merged packages | Provenance-checked target names (`$OPAMP_5TERM` → `$OPAMP`, `$COMPARATOR_5TERM` → `$COMPARATOR`, 2-terminal controlled sources, `$CURRENT_ARROW_SYMBOL` → `$ARROW_SYMBOL`, `$ADDER`/`$MULTIPLIER` → `$*_SYMBOL`, `$DELAY_CELL_SYMBOL` → `$DELAY_CELL`) with explicit terminal maps and destination packages; report removed names | Context | Standard series |
+| Standard net-part text key `name` | `netname` on bundled `$GROUND`, `$SUPPLY` and `$IO_PORT` usages (`label` for `$TRANSCONDUCTOR` `formula`) | Context | Standard series, 13.3 |
 | Standard drawing-only role p | at for the matching standard definition | Mechanical | Standard series |
 | Standard role names with underscores | Their matching definition's current role names | Context | Standard series |
-| DIFFERENTIAL_PAIR | Retain and report changed constraints and the required N/P choice | Context | Standard series |
-| MIRRORED roles a/b with a singleton axis | Opt in to left/right shared with differential pairs; report direction conflicts and spacing changes | Context | Standard series |
-| CHAIN, SUPPLY_HIGH, SUPPLY_LOW | No replacement definition; retain and report | Unsupported | Standard series |
+| DIFFERENTIAL_PAIR, CURRENT_MIRROR | Retain and report changed constraints and the required N/P choice; opt in to `_N`/`_P` when resolved model polarities agree (single-object `tail` on differential pairs) | Context | Standard series |
+| MIRRORED roles a/b with a non-net singleton axis | Opt in to left/right shared with differential pairs; report direction conflicts and spacing changes | Context | Standard series |
+| CHAIN, SUPPLY_HIGH, SUPPLY_LOW, DELAY_CELL (definition) | No direct replacement definition; retain and report | Unsupported | Standard series |
+| Signal-flow point definitions (`INTEGRATOR`, `QUANTIZER`, `UNIT_DELAY`) | Target definitions attach `in`/`out` nets; retain point usages for review | Unsupported | Standard series |
 | FLOW | Preserve the usage and restore its expanded ORDER; multi-member path groups require opt-in | Context | Standard series |
 | WIRE_NET_SET modification / route | Explicit file-owned selection and exclusions, preserving user edits and ROUTE-NET | Context | Standard series, 13.7 |
-| Automatically generated port tags | Explicit selection and generation, with exclusions for supplies, grounds and existing tags | Context | Standard series, 12.4 |
+| Default net-label, port-tag and 4-term MOS bulk fill | Empty `$LABEL_FILL_SET`, retain `$LABEL_TERMINAL_SET` consumers, generate port tags, and preserve 0.3 4-terminal MOS/switch symbol defaults and ground/supply bulk-pin stubs | Context | Standard series, 10.5, 12.4 |
 | Ground/supply attached to a terminal | Preserve a directly written host terminal attachment through its net and explicit ALIGN x/y; report unresolved contexts | Context | 12.1, 12.3 |
 | Generated numbered references | Discard validated solver records; authored numbered references fail source validation | Context | 5.9 |
 | New assertion violations or changed default fill | Report every target diagnostic and semantic difference | Verification | 7.6, 15.2-15.4 |

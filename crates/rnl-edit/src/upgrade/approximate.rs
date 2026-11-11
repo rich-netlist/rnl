@@ -2,7 +2,7 @@
 use super::edit::{record_edit, Edit};
 use super::{Approximation, FileReport};
 use rnl_runtime::geom::{Orient, Pt};
-use rnl_runtime::host::Record;
+use rnl_runtime::host::{LevelKind, Record};
 use rnl_runtime::problem::{
     Axis, FactKind, Filler, LevelProblem, ObjectKind, OrientSlot, PointRef, Position, Reference, Sense, Slot,
     UsageEntry,
@@ -26,7 +26,8 @@ pub(super) struct Approximate {
     pairs: BTreeMap<Location, Pair>,
     conflicts: BTreeMap<Location, bool>,
     pair_roles: BTreeMap<(usize, String), Pair>,
-    accepted_bodies: BTreeMap<Location, &'static str>,
+    mirrors: BTreeMap<Location, (&'static str, &'static str)>,
+    top_io_ports: BTreeSet<Location>,
     flows: BTreeMap<Location, Flow>,
 }
 
@@ -357,10 +358,22 @@ impl Approximate {
                     .insert((normalize(&loc.file), loc.line, loc.col), first.is_none_or(|r| matches!(r, "a" | "in_p")));
             }
         }
+        let device_polarity = |p: &LevelProblem, i: usize| -> Option<bool> {
+            let Reference::Name(name) = &p.objects.get(i)?.reference else { return None };
+            let host = &input.doc.levels[p.level];
+            let instance =
+                host.instances.iter().find(|inst| host.same_name(&inst.name, name.strip_prefix('#').unwrap_or(name)))?;
+            match instance.mtype.as_deref()? {
+                "nmos" | "njf" | "npn" | "nmf" => Some(true),
+                "pmos" | "pjf" | "pnp" | "lpnp" | "pmf" => Some(false),
+                _ => None,
+            }
+        };
         let mut sites = BTreeMap::<_, Vec<_>>::new();
         let mut pair_names = Vec::new();
         for p in &input.problems {
             let mut written_sides = BTreeMap::new();
+            let mut io_sites = BTreeMap::new();
             for f in &p.facts {
                 let Some(loc) = &f.source else { continue };
                 if !f.chain.is_empty() {
@@ -394,6 +407,21 @@ impl Approximate {
                     sites.entry(site.clone()).or_default().push(key.clone());
                 }
                 let Some(policy) = policies.get(&(p.level, u.definition.clone())) else { continue };
+                if matches!(u.definition.as_str(), "$IO_PORT" | "$IOPORT") {
+                    let eligible = input.doc.levels[p.level].kind == LevelKind::File
+                        && match u.roles.first().map(|r| r.members.as_slice()) {
+                            Some([Filler::Net(n)]) => {
+                                p.nets.iter().find(|net| net.name == *n).is_some_and(|net| net.port.is_none())
+                            }
+                            Some([Filler::Terminal { .. }]) => u.object.and_then(|o| p.objects.get(o)).is_some_and(|obj| {
+                                !obj.nets.is_empty()
+                                    && obj.nets.iter().all(|&ni| p.nets.get(ni).is_some_and(|net| net.port.is_none()))
+                            }),
+                            _ => false,
+                        };
+                    io_sites.entry(key).and_modify(|v| *v &= eligible).or_insert(eligible);
+                    continue;
+                }
                 if policy.restore_flow {
                     if let Some(flow) = flow(p, index) {
                         out.flows.insert(key, flow);
@@ -401,8 +429,27 @@ impl Approximate {
                     continue;
                 }
                 if u.definition == "$CURRENT_MIRROR" && p.version == "0.3" {
-                    if let Some(("standard-definition-body", risk)) = policy.review {
-                        out.accepted_bodies.insert(key, risk);
+                    let ref_role = u.roles.iter().find(|r| r.role == "ref");
+                    let out_role = u.roles.iter().find(|r| r.role == "out");
+                    if let (Some(ref_role), Some(out_role)) = (ref_role, out_role) {
+                        if !ref_role.members.is_empty() && !out_role.members.is_empty() {
+                            let mut polarities = ref_role.members.iter().chain(&out_role.members).map(|m| match m {
+                                Filler::Object(i) => device_polarity(p, *i),
+                                _ => None,
+                            });
+                            if let Some(Some(is_n)) = polarities.next() {
+                                if polarities.all(|pol| pol == Some(is_n)) {
+                                    let target_def = if is_n { "CURRENT_MIRROR_N" } else { "CURRENT_MIRROR_P" };
+                                    out.mirrors.insert(
+                                        key,
+                                        (
+                                            target_def,
+                                            "All ref and out devices share one resolved model polarity. The target definition adds low-priority ALIGN y, orientation relations, ROUTE-OBJECT and model/topology assertions (16.3).",
+                                        ),
+                                    );
+                                }
+                            }
+                        }
                     }
                     continue;
                 }
@@ -425,7 +472,7 @@ impl Approximate {
                     let axis = u.roles.iter().find(|r| r.role == "axis");
                     if !endpoints
                         || !axis.is_none_or(|r| match r.members.as_slice() {
-                            [] | [Filler::Net(_) | Filler::Usage(_)] => true,
+                            [] | [Filler::Usage(_)] => true,
                             [Filler::Object(i)] => matches!(
                                 p.objects[*i].kind,
                                 ObjectKind::Instance | ObjectKind::Point | ObjectKind::Usage
@@ -437,21 +484,25 @@ impl Approximate {
                     }
                     "MIRRORED"
                 } else {
-                    let polarity = |i: usize| {
-                        let Reference::Name(name) = &p.objects.get(i)?.reference else { return None };
-                        let host = &input.doc.levels[p.level];
-                        let instance = host
-                            .instances
-                            .iter()
-                            .find(|i| host.same_name(&i.name, name.strip_prefix('#').unwrap_or(name)))?;
-                        match instance.mtype.as_deref()? {
-                            "nmos" | "njf" | "npn" | "nmf" => Some("DIFFERENTIAL_PAIR_N"),
-                            "pmos" | "pjf" | "pnp" | "lpnp" | "pmf" => Some("DIFFERENTIAL_PAIR_P"),
-                            _ => None,
+                    let tail = u.roles.iter().find(|r| r.role == "tail");
+                    if !tail.is_none_or(|r| match r.members.as_slice() {
+                        [] | [Filler::Usage(_)] => true,
+                        [Filler::Object(i)] => {
+                            matches!(p.objects[*i].kind, ObjectKind::Instance | ObjectKind::Usage)
                         }
+                        _ => false,
+                    }) {
+                        continue;
+                    }
+                    let Some(is_n) = device_polarity(p, first).filter(|k| Some(*k) == device_polarity(p, second))
+                    else {
+                        continue;
                     };
-                    let Some(kind) = polarity(first).filter(|k| Some(*k) == polarity(second)) else { continue };
-                    kind
+                    if is_n {
+                        "DIFFERENTIAL_PAIR_N"
+                    } else {
+                        "DIFFERENTIAL_PAIR_P"
+                    }
                 };
                 let Ok(side) = pair_direction(p, first, second, &mirrored) else {
                     out.conflicts.insert(key, true);
@@ -475,6 +526,7 @@ impl Approximate {
                 }
                 out.pairs.insert(key, pair);
             }
+            out.top_io_ports.extend(io_sites.into_iter().filter_map(|(k, ok)| ok.then_some(k)));
         }
         // A statement read in several drawings gets one edit. Keep its role
         // references unchanged too when those readings cannot share a plan.
@@ -616,12 +668,47 @@ impl Approximate {
                     Self::at(&self.flows, record, start, end, readings).filter(|f| !f.grouped || enabled)
                 {
                     let rule = if flow.grouped { "approximate-flow-order" } else { "restore-flow-order" };
-                    let edit = record_edit(source, record, member.end..member.end, format!("; {}", flow.order), rule)?;
+                    let mut flow_edits = Vec::new();
+                    if let Some(params) =
+                        call.params.as_ref().filter(|p| p.get("direction").is_some() && p.positional.is_empty())
+                    {
+                        let kept: Vec<String> = params
+                            .named
+                            .iter()
+                            .filter(|n| n.name != "direction")
+                            .map(|n| {
+                                format!(
+                                    "{}={}",
+                                    rnl_runtime::problem::written_name(&n.name),
+                                    super::rewrite::value(&n.value)
+                                )
+                            })
+                            .collect();
+                        let replacement = if kept.is_empty() {
+                            format!("@{}", call.kw)
+                        } else {
+                            format!("@{}({})", call.kw, kept.join(", "))
+                        };
+                        flow_edits.push(record_edit(
+                            source,
+                            record,
+                            call.start..call.end,
+                            replacement,
+                            "standard-parameter-removed",
+                        )?);
+                    }
+                    flow_edits.push(record_edit(
+                        source,
+                        record,
+                        member.end..member.end,
+                        format!("; {}", flow.order),
+                        rule,
+                    )?);
                     if flow.grouped {
-                        record_approximation(source, record, member, std::slice::from_ref(&edit), rule,
+                        record_approximation(source, record, member, &flow_edits, rule,
                             "Restored FLOW's direction and priority. ORDER now compares every combination of members, where the old order compared group centres.".into(), report)?;
                     }
-                    out.edits.push(edit);
+                    out.edits.extend(flow_edits);
                     out.resolved.insert("standard-definition-body");
                 }
                 continue;
@@ -629,9 +716,67 @@ impl Approximate {
             if !enabled {
                 continue;
             }
-            if let Some(risk) = Self::at(&self.accepted_bodies, record, start, end, readings) {
-                record_approximation(source, record, member, &[], "approximate-standard-body", (*risk).into(), report)?;
-                out.resolved.insert("standard-definition-body");
+            if matches!(name, "IO_PORT" | "IOPORT")
+                && !member.segments.iter().any(|seg| seg.call.as_ref().is_some_and(|c| c.kw == "SET-SYMBOL"))
+                && !readings.is_empty()
+                && readings.iter().all(|reading| {
+                    let a = record.loc(start);
+                    let b = record.loc(end);
+                    self.top_io_ports.iter().any(|(lv, f, ln, col)| {
+                        lv == reading
+                            && *f == normalize(&a.file)
+                            && (*ln, *col) >= (a.line, a.col)
+                            && (*ln, *col) <= (b.line, b.col)
+                    })
+                })
+            {
+                let definition = if call.kw == "AS" { s.args.last() } else { s.args.first() }.unwrap();
+                let edit = record_edit(
+                    source,
+                    record,
+                    definition.start..definition.end,
+                    "$NET_LABEL".into(),
+                    "approximate-top-level-io-port",
+                )?;
+                record_approximation(
+                    source,
+                    record,
+                    member,
+                    std::slice::from_ref(&edit),
+                    "approximate-top-level-io-port",
+                    "Top-level non-port IO_PORT replaced by NET_LABEL. NET_LABEL_SYMBOL's pin faces left (opposite to IO_PORT_SYMBOL's right-facing pin), so check any explicit orientation or placement."
+                        .into(),
+                    report,
+                )?;
+                out.edits.push(edit);
+                continue;
+            }
+            if let Some((target_def, risk)) = Self::at(&self.mirrors, record, start, end, readings) {
+                let definition = if call.kw == "AS" { s.args.last() } else { s.args.first() }.unwrap();
+                let edit = record_edit(
+                    source,
+                    record,
+                    definition.start..definition.end,
+                    format!("${target_def}"),
+                    "approximate-current-mirror",
+                )?;
+                record_approximation(
+                    source,
+                    record,
+                    member,
+                    std::slice::from_ref(&edit),
+                    "approximate-current-mirror",
+                    (*risk).into(),
+                    report,
+                )?;
+                out.edits.push(edit);
+                out.resolved.extend([
+                    "standard-definition-body",
+                    "standard-definition-roles",
+                    "standard-definition-removed",
+                    "standard-name-removed",
+                ]);
+                continue;
             }
             if readings
                 .iter()
@@ -668,6 +813,45 @@ impl Approximate {
                 let positional = [pair.first_role, pair.second_role, if mirror { "axis" } else { "tail" }];
                 let Some(old) = arg.role.as_deref().or_else(|| positional.get(index).copied()) else { continue };
                 let role = pair.role(old).unwrap_or(old);
+                if matches!(old, "tail" | "axis") {
+                    if let ObjExpr::Set(set) = &arg.obj {
+                        if set.members.is_empty() {
+                            let mut del_start = arg.start;
+                            while del_start > s.start && matches!(chars[del_start - 1], ' ' | '\t') {
+                                del_start -= 1;
+                            }
+                            let range = if del_start < arg.start {
+                                del_start..arg.end
+                            } else {
+                                let mut del_end = arg.end;
+                                while del_end < s.end && matches!(chars[del_end], ' ' | '\t') {
+                                    del_end += 1;
+                                }
+                                arg.start..del_end
+                            };
+                            changes.push(record_edit(source, record, range, String::new(), rule)?);
+                            continue;
+                        } else if set.members.len() == 1
+                            && set.members[0].binds.is_empty()
+                            && set.members[0].segments.len() == 1
+                            && set.members[0].segments[0].call.is_none()
+                            && !set.members[0].segments[0].piped
+                            && set.members[0].segments[0].args.len() == 1
+                            && set.members[0].segments[0].args[0].role.is_none()
+                        {
+                            let inner = &set.members[0].segments[0].args[0];
+                            let inner_text: String = chars[inner.start..inner.end].iter().collect();
+                            changes.push(record_edit(
+                                source,
+                                record,
+                                arg.start..arg.end,
+                                format!("{inner_text}({role})"),
+                                rule,
+                            )?);
+                            continue;
+                        }
+                    }
+                }
                 let at = if arg.role.is_some() {
                     let Some(offset) = chars[arg.start..arg.end].iter().rposition(|c| *c == '(') else { continue };
                     arg.start + offset

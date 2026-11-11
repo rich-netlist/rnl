@@ -13,6 +13,7 @@ use super::{mechanical, references::References, Change, FileReport, Unconverted}
 pub(super) struct Context {
     pub std: bool,
     pub packages: BTreeSet<String>,
+    pub owned_packages: BTreeSet<String>,
     pub references: References,
     pub sets: super::sets::Sets,
     pub approximate: bool,
@@ -69,19 +70,31 @@ pub(super) fn value(v: &Value) -> String {
     }
 }
 
-fn package_call(call: &Call, names: &BTreeSet<String>, inline: bool) -> Option<String> {
+fn renamed_standard_package(kw: &str, name: &str) -> Option<&'static str> {
+    match (kw, name) {
+        ("USE-PACKAGE", "rnl-std" | "rnl-std-full") => Some("rnl-std-all"),
+        ("USE-PACKAGE", "rnl-std-structures") => Some("rnl-std-semantics"),
+        ("USE-ALIASES" | "USE-PACKAGE", "rnl-zh") => Some("alias-zh"),
+        _ => None,
+    }
+}
+
+fn package_call(call: &Call, names: &BTreeSet<String>, owned: &BTreeSet<String>, inline: bool) -> Option<String> {
     let p = call.params.as_ref()?;
     let Value::Str(name) = p.get("name")? else { return None };
-    if !names.contains(name) {
+    if owned.contains(name) {
         return None;
     }
+    let target_name =
+        renamed_standard_package(&call.kw, name).or_else(|| names.contains(name).then_some(name.as_str()))?;
     let mut parts = p.positional.iter().map(value).collect::<Vec<_>>();
     for named in &p.named {
         if named.name == "version" || (!inline && named.name == "path") {
             continue;
         }
         let key = if named.quoted { written_string(&named.name) } else { named.name.clone() };
-        parts.push(format!("{key}={}", value(&named.value)));
+        let val = if named.name == "name" { written_string(target_name) } else { value(&named.value) };
+        parts.push(format!("{key}={val}"));
     }
     parts.push("version=\"0.4\"".into());
     Some(format!("@{}({})", call.kw, parts.join(", ")))
@@ -100,8 +113,18 @@ fn visit(members: &[std::rc::Rc<Member>], f: &mut impl FnMut(&Member)) {
     }
 }
 
-fn uses_std(call: &Call) -> bool {
-    call.kw == "USE-PACKAGE" && call.params.as_ref().and_then(|p| p.get("name")) == Some(&Value::Str("rnl-std".into()))
+fn uses_std(segment: &rnl_runtime::syntax::Segment, owned: &BTreeSet<String>) -> bool {
+    let Some(call) = &segment.call else { return false };
+    if call.kw != "USE-PACKAGE" {
+        return false;
+    }
+    let Some(Value::Str(name)) = call.params.as_ref().and_then(|p| p.get("name")) else { return false };
+    if owned.contains(name) {
+        return false;
+    }
+    let inline = segment.args.iter().any(|a| matches!(a.obj, ObjExpr::Set(_)));
+    matches!(name.as_str(), "rnl-std" | "rnl-std-all" | "rnl-std-full")
+        || (!inline && matches!(name.as_str(), "rnl-std-core" | "rnl-std-symbols"))
 }
 
 pub(super) fn package_paths(records: &[Record], standard: &BTreeSet<String>) -> Vec<String> {
@@ -156,7 +179,7 @@ pub(super) fn file(
         }
         let Some(body) = ast.body else { continue };
         if record_type(record) == "header" {
-            has_std |= body.members.iter().flat_map(|m| &m.segments).filter_map(|s| s.call.as_ref()).any(uses_std);
+            has_std |= body.members.iter().flat_map(|m| &m.segments).any(|s| uses_std(s, &context.owned_packages));
         }
         let mut error = None;
         let mut local_selection_spans = Vec::new();
@@ -180,7 +203,7 @@ pub(super) fn file(
                 Err(e) => error = Some(e),
             }
             reasons.extend(context.references.usage_reviews(path, record, member));
-            match context.references.usage_changes(path, source, record, member, report) {
+            match context.references.usage_changes(path, source, record, member, context.approximate, report) {
                 Ok((found, preserved)) => {
                     edits.extend(found);
                     if preserved {
@@ -260,7 +283,9 @@ pub(super) fn file(
                         }
                         match context.references.legacy_reference(path, source, record, reference) {
                             Ok(Some(edit)) => {
-                                edits.push(edit);
+                                if !edits.iter().any(|e| e.start < edit.end && edit.start < e.end) {
+                                    edits.push(edit);
+                                }
                                 continue;
                             }
                             Ok(None) => {}
@@ -294,6 +319,7 @@ pub(super) fn file(
                 let mut found = vec![
                     context.references.legacy_package(path, source, record, segment),
                     context.references.terminal_map(path, source, record, member, index),
+                    context.references.text_key(path, source, record, member, index),
                     mechanical::route(source, record, call),
                     super::directions::edit(source, record, member, index),
                     super::selections::drawing_pins(source, record, member, index),
@@ -315,7 +341,8 @@ pub(super) fn file(
                     }
                     "USE-PACKAGE" | "USE-ALIASES" => {
                         let inline = segment.args.iter().any(|a| matches!(a.obj, ObjExpr::Set(_)));
-                        package_call(call, &context.packages, inline).map(|s| ("standard-series", s))
+                        package_call(call, &context.packages, &context.owned_packages, inline)
+                            .map(|s| ("standard-series", s))
                     }
                     _ => None,
                 };
@@ -337,7 +364,7 @@ pub(super) fn file(
         declarations.push("@VERSION(\"0.4\")".to_string());
     }
     if context.std && !has_std {
-        declarations.push("@USE-PACKAGE(name=\"rnl-std\", version=\"0.4\")".to_string());
+        declarations.push("@USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\")".to_string());
     }
     for package in context.references.legacy_packages(path, records) {
         declarations.push(format!("@USE-PACKAGE(name={}, version=\"0.4\")", written_string(&package)));

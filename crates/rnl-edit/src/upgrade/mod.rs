@@ -202,11 +202,28 @@ pub fn upgrade(entry: &str, files: &dyn Provider, options: &UpgradeOptions) -> R
         .collect();
     // A familiar name is not proof that a package belongs to the standard
     // series. Keep owned overrides and their paths in the file group (16.2).
+    let mut owned_packages = BTreeSet::new();
     for (_, source) in &before.sources {
         if let Some((name, _)) = scan_package_decl(source) {
             if !bundled.files.values().any(|known| known == source) {
                 packages.remove(&name);
+                owned_packages.insert(name);
             }
+        }
+    }
+    let mut standard_names = packages.clone();
+    for old_name in [
+        "rnl-std",
+        "rnl-std-core",
+        "rnl-std-full",
+        "rnl-std-structures",
+        "rnl-zh",
+        "rnl-std-symbols",
+        "rnl-std-virtual",
+        "rnl-std-layout",
+    ] {
+        if !owned_packages.contains(old_name) {
+            standard_names.insert(old_name.into());
         }
     }
     let mut source_records: BTreeMap<String, Vec<Record>> = BTreeMap::new();
@@ -230,7 +247,7 @@ pub fn upgrade(entry: &str, files: &dyn Provider, options: &UpgradeOptions) -> R
     let mut inspected = BTreeSet::new();
     while let Some(path) = source_records.keys().find(|p| !inspected.contains(*p)).cloned() {
         inspected.insert(path.clone());
-        for reference in rewrite::package_paths(&source_records[&path], &packages) {
+        for reference in rewrite::package_paths(&source_records[&path], &standard_names) {
             let dependency = join(&dirname(&path), &reference);
             if source_records.contains_key(&dependency) || files.read(&dependency).is_none() {
                 continue;
@@ -255,6 +272,7 @@ pub fn upgrade(entry: &str, files: &dyn Provider, options: &UpgradeOptions) -> R
     let context = rewrite::Context {
         std: options.std,
         packages,
+        owned_packages,
         references: references::References::new(&before, options.approximate),
         sets: sets::Sets::new(&before, &entry),
         approximate: options.approximate,

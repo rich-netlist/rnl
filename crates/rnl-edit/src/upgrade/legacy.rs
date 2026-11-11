@@ -1,8 +1,16 @@
-//! Standard-series spellings that changed between 0.2 and the current series.
+//! Standard-series spellings that changed between earlier series and 0.4.
+use rnl_runtime::host::LevelKind;
 use rnl_runtime::interp::unit::scan_package_decl;
 use rnl_runtime::syntax::{parse_record_features, Ref};
 use rnl_runtime::Interpretation;
 use std::collections::{BTreeMap, BTreeSet};
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum BindingKind {
+    Define,
+    Symbol,
+    Other,
+}
 
 pub(super) fn renamed(name: &str) -> Option<&'static str> {
     Some(match name {
@@ -13,34 +21,50 @@ pub(super) fn renamed(name: &str) -> Option<&'static str> {
         "ISRC" => "CURRENT_SOURCE",
         "NMOS4" => "NMOS_4TERM",
         "PMOS4" => "PMOS_4TERM",
+        "VCVS" => "VCVS_4TERM",
+        "VCCS" => "VCCS_4TERM",
         "GROUND" => "GROUND_SYMBOL",
         "SUPPLY_BAR" => "SUPPLY_SYMBOL",
         "PORT_TAG" => "IO_PORT_SYMBOL",
         "NC_CROSS" => "NO_CONNECT_SYMBOL",
         "JUNCTION_DOT" => "JUNCTION_SYMBOL",
-        "CURRENT_ARROW_SYM" => "CURRENT_ARROW_SYMBOL",
+        "CURRENT_ARROW_SYM" => "ARROW_SYMBOL",
         "ARROW_HEAD" => "ARROW_SYMBOL",
         "GND" => "GROUND",
         "IOPORT" => "IO_PORT",
         "NC" => "NO_CONNECT",
         "GND_STUB" => "GROUND_STUB",
         "GND_FILL_SET" => "GROUND_FILL_SET",
-        "LABEL_TERM_SET" => "LABEL_TERMINAL_SET",
+        "LABEL_TERM_SET" => "LABEL_FILL_SET",
         "MIRROR_PAIR" => "MIRRORED",
+        _ => return None,
+    })
+}
+
+pub(super) fn renamed_03_symbol(name: &str) -> Option<&'static str> {
+    Some(match name {
+        "VCVS" | "CCVS" => "CONTROLLED_VOLTAGE_SOURCE",
+        "VCCS" | "CCCS" => "CONTROLLED_CURRENT_SOURCE",
+        "CURRENT_ARROW_SYMBOL" => "ARROW_SYMBOL",
+        "OPAMP_5TERM" => "OPAMP",
+        "COMPARATOR_5TERM" => "COMPARATOR",
+        "ADDER" => "ADDER_SYMBOL",
+        "MULTIPLIER" => "MULTIPLIER_SYMBOL",
+        "DELAY_CELL_SYMBOL" => "DELAY_CELL",
         _ => return None,
     })
 }
 
 pub(super) fn merged_package(name: &str) -> Option<&'static str> {
     Some(match name {
-        "rnl-std-symbols" => "rnl-std-core",
+        "rnl-std-symbols" | "rnl-std-core" => "rnl-std-all",
         "rnl-std-virtual" => "rnl-std-basic",
-        "rnl-std-layout" | "rnl-std-semantics" => "rnl-std-structures",
+        "rnl-std-layout" => "rnl-std-semantics",
         _ => return None,
     })
 }
 
-fn bindings(version: &str) -> BTreeMap<String, String> {
+fn bindings(version: &str) -> BTreeMap<String, (String, BindingKind)> {
     let mut out = BTreeMap::new();
     for (path, text) in &rnl_view::bundled().files {
         if !path.starts_with(&format!("<bundled>/{version}/")) {
@@ -54,8 +78,15 @@ fn bindings(version: &str) -> BTreeMap<String, String> {
         ) {
             if let Some(body) = parse_record_features(&record.text, true, false).body {
                 for member in &body.members {
+                    let kind = if member.segments.iter().filter_map(|s| s.call.as_ref()).any(|c| c.kw == "DEFINE") {
+                        BindingKind::Define
+                    } else if member.segments.iter().filter_map(|s| s.call.as_ref()).any(|c| c.kw == "DEFINE-SYMBOL") {
+                        BindingKind::Symbol
+                    } else {
+                        BindingKind::Other
+                    };
                     for bind in member.binds.iter().filter(|b| b.prefix == '$') {
-                        out.insert(bind.name.clone(), package.clone());
+                        out.insert(bind.name.clone(), (package.clone(), kind));
                     }
                 }
             }
@@ -66,7 +97,7 @@ fn bindings(version: &str) -> BTreeMap<String, String> {
 
 #[derive(Default)]
 pub(super) struct Legacy {
-    names: BTreeMap<(usize, String), (String, String)>,
+    names: BTreeMap<(usize, String), (String, Option<String>)>,
     packages: BTreeMap<(usize, String), String>,
     removed: BTreeSet<(usize, String)>,
 }
@@ -79,18 +110,22 @@ impl Legacy {
         }
         let target = bindings("0.4");
         let bundled = rnl_view::bundled();
-        let known = |package: &str| {
+        let known = |version: &str, package: &str| {
             let sources: Vec<_> = input
                 .sources
                 .iter()
-                .filter(|(_, s)| scan_package_decl(s).is_some_and(|(n, v)| n == package && v == "0.2"))
+                .filter(|(_, s)| scan_package_decl(s).is_some_and(|(n, v)| n == package && v == version))
                 .collect();
             !sources.is_empty() && sources.iter().all(|(_, s)| bundled.files.values().any(|b| b == s))
         };
-        for (old, package) in bindings("0.2") {
+        for (old, (package, kind)) in bindings("0.2") {
             let new = renamed(&old).unwrap_or(&old);
-            let Some(destination) = target.get(new) else { continue };
-            if shadowed.contains(&format!("${old}")) || shadowed.contains(&format!("${new}")) || !known(&package) {
+            let Some((destination, target_kind)) = target.get(new) else { continue };
+            if *target_kind != kind
+                || shadowed.contains(&format!("${old}"))
+                || shadowed.contains(&format!("${new}"))
+                || !known("0.2", &package)
+            {
                 continue;
             }
             // Names that did not move need no explicit dependency.
@@ -99,31 +134,66 @@ impl Legacy {
             }
             for level in &input.model.levels {
                 if level.packages.iter().any(|p| p.name == package && p.version == "0.2") {
-                    out.names.insert((level.level, old.clone()), (new.into(), destination.clone()));
+                    out.names.insert((level.level, old.clone()), (new.into(), Some(destination.clone())));
                 }
             }
         }
-        for level in &input.model.levels {
-            for package in &level.packages {
-                if package.version == "0.2" && known(&package.name) {
-                    if let Some(new) = merged_package(&package.name) {
-                        out.packages.insert((level.level, package.name.clone()), new.into());
+        for (old, (package, kind)) in bindings("0.3") {
+            if kind != BindingKind::Symbol {
+                continue;
+            }
+            let Some(new) = renamed_03_symbol(&old) else { continue };
+            let Some((destination, BindingKind::Symbol)) = target.get(new) else { continue };
+            if shadowed.contains(&format!("${old}"))
+                || shadowed.contains(&format!("${new}"))
+                || !known("0.3", &package)
+            {
+                continue;
+            }
+            let explicit_pkg = (package != *destination).then(|| destination.clone());
+            for level in &input.model.levels {
+                if level.packages.iter().any(|p| p.name == package && p.version == "0.3") {
+                    out.names.insert((level.level, old.clone()), (new.into(), explicit_pkg.clone()));
+                }
+            }
+        }
+        for version in ["0.2", "0.3"] {
+            for level in &input.model.levels {
+                for package in &level.packages {
+                    if package.version == version && known(version, &package.name) {
+                        if let Some(new) = merged_package(&package.name) {
+                            out.packages.insert((level.level, package.name.clone()), new.into());
+                        }
+                    }
+                }
+            }
+        }
+        if input.model.levels.is_empty() {
+            for (idx, level) in input.doc.levels.iter().enumerate() {
+                if level.kind == LevelKind::Package || idx == 0 {
+                    for pkg in ["rnl-std-symbols", "rnl-std-core", "rnl-std-virtual", "rnl-std-layout"] {
+                        if known("0.2", pkg) || known("0.3", pkg) {
+                            if let Some(new) = merged_package(pkg) {
+                                out.packages.insert((idx, pkg.into()), new.into());
+                            }
+                        }
                     }
                 }
             }
         }
         for version in ["0.2", "0.3"] {
-            for (old, package) in bindings(version) {
-                let new = if version == "0.2" { renamed(&old).unwrap_or(&old) } else { &old };
-                if target.contains_key(new) || shadowed.contains(&format!("${old}")) {
+            for (old, (package, kind)) in bindings(version) {
+                let new = if version == "0.2" {
+                    renamed(&old).unwrap_or(&old)
+                } else if kind == BindingKind::Symbol {
+                    renamed_03_symbol(&old).unwrap_or(&old)
+                } else {
+                    &old
+                };
+                if target.get(new).is_some_and(|(_, tk)| *tk == kind) || shadowed.contains(&format!("${old}")) {
                     continue;
                 }
-                let sources: Vec<_> = input
-                    .sources
-                    .iter()
-                    .filter(|(_, s)| scan_package_decl(s).is_some_and(|(n, v)| n == package && v == version))
-                    .collect();
-                if sources.is_empty() || sources.iter().any(|(_, s)| !bundled.files.values().any(|b| b == s)) {
+                if !known(version, &package) {
                     continue;
                 }
                 for level in &input.model.levels {
@@ -142,7 +212,7 @@ impl Legacy {
                 .as_ref()
                 .is_some_and(|name| readings.iter().any(|level| self.removed.contains(&(*level, name.clone()))))
     }
-    pub(super) fn reference(&self, readings: &[usize], r: &Ref) -> Option<&(String, String)> {
+    pub(super) fn reference(&self, readings: &[usize], r: &Ref) -> Option<&(String, Option<String>)> {
         if r.prefix != '$' || !r.path.is_empty() || r.sub.is_some() || r.places.is_some() {
             return None;
         }

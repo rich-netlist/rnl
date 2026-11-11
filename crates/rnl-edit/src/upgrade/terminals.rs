@@ -8,7 +8,7 @@ use rnl_runtime::Interpretation;
 
 use super::edit::{record_edit, Edit};
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 struct Pin {
     x: f64,
     y: f64,
@@ -18,7 +18,7 @@ struct Pin {
 type Symbols = BTreeMap<(String, String), Vec<Pin>>;
 
 fn symbols(version: &str) -> Symbols {
-    let mut out = Symbols::new();
+    let mut raw: BTreeMap<(String, String), (Vec<Pin>, Vec<String>, bool)> = BTreeMap::new();
     for (path, text) in &rnl_view::bundled().files {
         if !path.starts_with(&format!("<bundled>/{version}/")) {
             continue;
@@ -31,7 +31,9 @@ fn symbols(version: &str) -> Symbols {
         ) {
             let Some(body) = parse_record_features(&record.text, true, true).body else { continue };
             for member in &body.members {
-                let Some(binding) = member.binds.iter().find(|b| b.prefix == '$') else { continue };
+                let Some(binding) = member.binds.iter().find(|b| b.prefix == '$' || b.prefix == '%') else {
+                    continue;
+                };
                 let Some(segment) =
                     member.segments.iter().find(|s| s.call.as_ref().is_some_and(|c| c.kw == "DEFINE-SYMBOL"))
                 else {
@@ -44,12 +46,29 @@ fn symbols(version: &str) -> Symbols {
                     continue;
                 };
                 let mut pins = Vec::new();
+                let mut parents = Vec::new();
                 let mut valid = true;
                 for statement in &body.members {
                     for segment in &statement.segments {
                         let Some(call) = &segment.call else {
-                            // Inheritance and aliases can add or replace pins.
-                            valid = false;
+                            match segment.args.as_slice() {
+                                [a] if !segment.piped => match &a.obj {
+                                    ObjExpr::Ref(r)
+                                        if (r.prefix == '$' || r.prefix == '%')
+                                            && r.path.is_empty()
+                                            && r.sub.is_none()
+                                            && r.places.is_none() =>
+                                    {
+                                        if let Some(name) = &r.name {
+                                            parents.push(format!("{}{name}", r.prefix));
+                                        } else {
+                                            valid = false;
+                                        }
+                                    }
+                                    _ => valid = false,
+                                },
+                                _ => valid = false,
+                            }
                             continue;
                         };
                         if call.kw != "PIN" {
@@ -82,16 +101,48 @@ fn symbols(version: &str) -> Symbols {
                         pins.push(Pin { x: *x, y: *y, direction, terminal: terminal.clone() });
                     }
                 }
-                if valid && !pins.is_empty() {
-                    out.insert((package.clone(), format!("${}", binding.name)), pins);
-                }
+                raw.insert((package.clone(), format!("{}{}", binding.prefix, binding.name)), (pins, parents, valid));
             }
+        }
+    }
+    fn resolve(
+        key: &(String, String),
+        raw: &BTreeMap<(String, String), (Vec<Pin>, Vec<String>, bool)>,
+        depth: usize,
+    ) -> Option<Vec<Pin>> {
+        if depth > 16 {
+            return None;
+        }
+        let (own, parents, valid) = raw.get(key)?;
+        if !*valid {
+            return None;
+        }
+        let mut all = Vec::new();
+        for parent in parents {
+            all.extend(resolve(&(key.0.clone(), parent.clone()), raw, depth + 1)?);
+        }
+        all.extend(own.iter().cloned());
+        let mut seen = BTreeSet::new();
+        for p in &all {
+            if !seen.insert(super::rewrite::value(&p.terminal)) {
+                return None;
+            }
+        }
+        Some(all)
+    }
+    let mut out = Symbols::new();
+    for key in raw.keys() {
+        if !key.1.starts_with('$') {
+            continue;
+        }
+        if let Some(pins) = resolve(key, &raw, 0).filter(|p| !p.is_empty()) {
+            out.insert(key.clone(), pins);
         }
     }
     out
 }
 
-fn mapping(before: &[Pin], after: &[Pin]) -> Option<String> {
+fn mapping(before: &[Pin], after: &[Pin], allow_direction_fallback: bool) -> Option<String> {
     if before.len() != after.len() {
         return None;
     }
@@ -103,8 +154,15 @@ fn mapping(before: &[Pin], after: &[Pin]) -> Option<String> {
         if *number < 1.0 || number.fract() != 0.0 || !ordinals.insert(number.to_string()) {
             return None;
         }
-        let found: Vec<_> =
+        let mut found: Vec<_> =
             after.iter().filter(|p| p.x == old.x && p.y == old.y && p.direction == old.direction).collect();
+        if found.is_empty()
+            && allow_direction_fallback
+            && old.direction.is_some()
+            && before.iter().filter(|p| p.direction == old.direction).count() == 1
+        {
+            found = after.iter().filter(|p| p.direction == old.direction).collect();
+        }
         let [new] = found.as_slice() else { return None };
         let Value::Str(name) = &new.terminal else { return None };
         if name.is_empty() || name.chars().all(|c| c.is_ascii_digit()) || !names.insert(name.to_lowercase()) {
@@ -130,11 +188,20 @@ impl Terminals {
         let bundled = rnl_view::bundled();
         for version in ["0.2", "0.3"] {
             for ((package, name), before) in symbols(version) {
-                if shadowed.contains(&name) {
+                let target_name = if version == "0.2" {
+                    super::legacy::renamed(name.trim_start_matches('$'))
+                        .map(|s| format!("${s}"))
+                        .unwrap_or_else(|| name.clone())
+                } else {
+                    super::legacy::renamed_03_symbol(name.trim_start_matches('$'))
+                        .map(|s| format!("${s}"))
+                        .unwrap_or_else(|| name.clone())
+                };
+                if shadowed.contains(&name) || shadowed.contains(&target_name) {
                     continue;
                 }
-                let Some(after) = target.get(&(package.clone(), name.clone())) else { continue };
-                let Some(replacement) = mapping(&before, after) else { continue };
+                let Some(after) = target.get(&(package.clone(), target_name)) else { continue };
+                let Some(replacement) = mapping(&before, after, version == "0.3") else { continue };
                 let sources: Vec<_> = input
                     .sources
                     .iter()

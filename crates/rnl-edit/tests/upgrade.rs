@@ -47,7 +47,7 @@ fn an_invalid_source_has_no_proposed_output() {
 fn standard_package_is_explicit_and_pinned_to_target_series() {
     let source = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\nR1 a 0 1k\n.end\n";
     let result = upgrade("t.sp", &MemoryProvider::new().with("t.sp", source), &UpgradeOptions::default()).unwrap();
-    assert!(result.files["t.sp"].contains("@USE-PACKAGE(name=\"rnl-std\", version=\"0.4\")"));
+    assert!(result.files["t.sp"].contains("@USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\")"));
     assert!(result.report.files[0].changes.iter().any(|c| c.rule == "explicit-header"));
     // An incomplete target core must never turn a syntactic conversion into verified success.
     if result.report.diagnostics.iter().any(|d| d.severity == "error") {
@@ -60,8 +60,22 @@ fn explicit_empty_standard_override_is_preserved() {
     let source = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"rnl-std\") {} }\n.end\n";
     let result = upgrade("t.sp", &MemoryProvider::new().with("t.sp", source), &UpgradeOptions::default()).unwrap();
     assert_eq!(result.files["t.sp"].matches("@USE-PACKAGE").count(), 1);
-    assert!(result.files["t.sp"].contains("version=\"0.4\") {}"));
+    assert!(result.files["t.sp"].contains("name=\"rnl-std-all\", version=\"0.4\") {}"));
     assert!(result.report.successful(), "{:?}", result.report);
+}
+
+#[test]
+fn explicit_03_package_names_map_to_their_04_counterparts() {
+    for (old, expected) in [
+        ("@USE-PACKAGE(name=\"rnl-std-full\", version=\"0.3\")", "name=\"rnl-std-all\", version=\"0.4\""),
+        ("@USE-PACKAGE(name=\"rnl-std-core\", version=\"0.3\")", "name=\"rnl-std-all\", version=\"0.4\""),
+        ("@USE-PACKAGE(name=\"rnl-std-structures\", version=\"0.3\")", "name=\"rnl-std-semantics\", version=\"0.4\""),
+        ("@USE-ALIASES(name=\"rnl-zh\", version=\"0.3\")", "name=\"alias-zh\", version=\"0.4\""),
+    ] {
+        let source = format!("* title\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\"); {old} }}\nR1 a 0 1k\n.end\n");
+        let result = upgrade("t.sp", &MemoryProvider::new().with("t.sp", &source), &options()).unwrap();
+        assert!(result.files["t.sp"].contains(expected), "{}", result.files["t.sp"]);
+    }
 }
 
 #[test]

@@ -97,9 +97,11 @@ fn a_local_drawn_usage_with_a_result_changing_pipeline_stays_manual() {
 fn removed_and_changed_standard_bodies_have_distinct_reasons() {
     for (statement, rule) in [
         ("%u=#R1(in_p) #R2(in_n) {}(tail) @AS $DIFFERENTIAL_PAIR", "standard-definition-removed"),
-        ("%u={#R1}(ref) {#R2}(out) @AS $CURRENT_MIRROR", "standard-definition-body"),
+        ("%u={#R1 #R2}(members) @AS $BRANCH", "standard-definition-body"),
+        ("%u=(1, 2) @AS $DELAY_CELL", "standard-definition-removed"),
+        ("%u=(1, 2) @AS $INTEGRATOR", "standard-definition-roles"),
     ] {
-        let source=format!("* title\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\") }}\nR1 a 0 1k\nR2 b 0 1k\n* @RNL {{ {statement} }}\n.end\n");
+        let source = format!("* title\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\"); @USE-PACKAGE(name=\"rnl-std-full\", version=\"0.3\") }}\nR1 a 0 1k\nR2 b 0 1k\n* @RNL {{ {statement} }}\n.end\n");
         let r = upgrade("t.sp", &MemoryProvider::new().with("t.sp", &source), &UpgradeOptions::default()).unwrap();
         assert!(r.report.files[0].unconverted.iter().any(|u| u.rule == rule), "{:?}", r.report);
     }

@@ -15,11 +15,15 @@ type Pins = Vec<(String, String)>;
 
 #[derive(Default)]
 pub(super) struct References {
+    aliases: bool,
+    shadowed: BTreeSet<String>,
     scopes: BTreeMap<(String, u32, u32), Vec<std::ops::Range<usize>>>,
     collections: super::collections::Collections,
     readings: BTreeMap<(String, u32, u32), Vec<usize>>,
     pins: BTreeMap<(usize, String, String), String>,
     usages: BTreeSet<(usize, String)>,
+    netname_key_objects: BTreeSet<(usize, String)>,
+    transconductor_objects: BTreeSet<(usize, String)>,
     legacy: super::legacy::Legacy,
     host_terminals: super::host_terminals::HostTerminals,
     roles: BTreeMap<(usize, String, String), String>,
@@ -48,12 +52,14 @@ fn target_pins() -> BTreeMap<SymbolKey, Pins> {
             let ast = parse_record_features(&record.text, true, true);
             let Some(body) = ast.body else { continue };
             for member in &body.members {
-                let Some(binding) = member.binds.iter().find(|b| b.prefix == '$') else { continue };
+                let Some(binding) = member.binds.iter().find(|b| b.prefix == '$' || b.prefix == '%') else {
+                    continue;
+                };
                 for segment in &member.segments {
                     if segment.call.as_ref().is_none_or(|c| c.kw != "DEFINE-SYMBOL") {
                         continue;
                     }
-                    let key = (package.clone(), format!("${}", binding.name));
+                    let key = (package.clone(), format!("{}{}", binding.prefix, binding.name));
                     let pins = direct.entry(key.clone()).or_insert_with(Vec::new);
                     for arg in &segment.args {
                         let ObjExpr::Set(body) = &arg.obj else { continue };
@@ -70,9 +76,12 @@ fn target_pins() -> BTreeMap<SymbolKey, Pins> {
                                 } else {
                                     for arg in &segment.args {
                                         if let ObjExpr::Ref(r) = &arg.obj {
-                                            if r.prefix == '$' && r.path.is_empty() {
+                                            if (r.prefix == '$' || r.prefix == '%') && r.path.is_empty() {
                                                 if let Some(name) = &r.name {
-                                                    inherited.entry(key.clone()).or_default().push(format!("${name}"));
+                                                    inherited
+                                                        .entry(key.clone())
+                                                        .or_default()
+                                                        .push(format!("{}{name}", r.prefix));
                                                 }
                                             }
                                         }
@@ -109,7 +118,10 @@ fn target_pins() -> BTreeMap<SymbolKey, Pins> {
 
 impl References {
     pub(super) fn new(input: &Interpretation, approximate: bool) -> Self {
+        let (shadowed, aliases) = super::standard::shadows(input);
         let mut result = Self {
+            aliases,
+            shadowed,
             definitions: super::standard::role_changes(input),
             terminals: super::terminals::Terminals::new(input),
             local_symbols: super::local_symbols::LocalSymbols::new(input),
@@ -199,10 +211,45 @@ impl References {
         result.collections = super::collections::Collections::new(input, &result.readings);
         for level in &input.model.levels {
             for object in &level.objects {
+                if let Some(symbol) = &object.symbol {
+                    if let SymbolOrigin::Package(package) = &symbol.origin {
+                        let sources: Vec<_> = input
+                            .sources
+                            .iter()
+                            .filter(|(_, text)| scan_package_decl(text).is_some_and(|(name, _)| &name == package))
+                            .collect();
+                        let known = !sources.is_empty()
+                            && sources.iter().all(|(_, text)| bundled.files.values().any(|original| original == text));
+                        if known {
+                            if matches!(
+                                symbol.name.as_str(),
+                                "$GROUND_SYMBOL"
+                                    | "$NAMED_GROUND_SYMBOL"
+                                    | "$GROUND"
+                                    | "$SUPPLY_SYMBOL"
+                                    | "$SUPPLY_BAR"
+                                    | "$IO_PORT_SYMBOL"
+                                    | "$PORT_TAG"
+                            ) {
+                                result.netname_key_objects.insert((level.level, object.id.clone()));
+                            }
+                            if symbol.name == "$TRANSCONDUCTOR" {
+                                result.transconductor_objects.insert((level.level, object.id.clone()));
+                            }
+                        }
+                    }
+                }
                 if object.kind != "usage" {
                     continue;
                 }
                 result.usages.insert((level.level, object.id.clone()));
+                if let Some(def) = &object.definition {
+                    if !result.shadowed.contains(def)
+                        && matches!(def.as_str(), "$GROUND" | "$GND" | "$SUPPLY" | "$IO_PORT" | "$IOPORT")
+                    {
+                        result.netname_key_objects.insert((level.level, object.id.clone()));
+                    }
+                }
                 if let Some(changes) =
                     object.definition.as_ref().and_then(|d| result.definitions.get(&(level.level, d.clone())))
                 {
@@ -221,7 +268,18 @@ impl References {
                     continue;
                 }
                 let SymbolOrigin::Package(package) = &symbol.origin else { continue };
-                let Some(pins) = targets.get(&(package.clone(), symbol.name.clone())) else { continue };
+                let raw_sym = symbol.name.trim_start_matches('$');
+                let target_sym = super::legacy::renamed_03_symbol(raw_sym)
+                    .or_else(|| super::legacy::renamed(raw_sym))
+                    .map(|s| format!("${s}"))
+                    .unwrap_or_else(|| symbol.name.clone());
+                let target_pkg = super::legacy::merged_package(package).unwrap_or(package);
+                let Some(pins) = targets
+                    .get(&(package.clone(), target_sym.clone()))
+                    .or_else(|| targets.get(&(target_pkg.to_string(), target_sym)))
+                else {
+                    continue;
+                };
                 // Resolve provenance, not just a familiar definition or symbol name. A custom
                 // package or a local override must never inherit a standard-package rewrite.
                 let sources: Vec<_> = input
@@ -259,11 +317,13 @@ impl References {
         source: &str,
         record: &Record,
         member: &rnl_runtime::syntax::Member,
+        approximate: bool,
         report: &mut super::FileReport,
     ) -> Result<(Vec<Edit>, bool), String> {
         let Some(readings) = self.readings_at(path, record, member.start) else { return Ok((Vec::new(), false)) };
-        self.usage_changes
-            .edits(source, record, member, readings, report, |r| self.host_terminal(path, source, record, r))
+        self.usage_changes.edits(source, record, member, readings, approximate, report, |r| {
+            self.host_terminal(path, source, record, r)
+        })
     }
     pub(super) fn approximate(
         &self,
@@ -330,6 +390,145 @@ impl References {
             }
         }
         reasons
+    }
+
+    pub(super) fn text_key(
+        &self,
+        path: &str,
+        source: &str,
+        record: &Record,
+        member: &rnl_runtime::syntax::Member,
+        index: usize,
+    ) -> Result<Option<Edit>, String> {
+        if self.aliases {
+            return Ok(None);
+        }
+        let segment = &member.segments[index];
+        let Some(call) = segment.call.as_ref().filter(|c| c.kw == "TEXT") else { return Ok(None) };
+        let Some(params) = &call.params else { return Ok(None) };
+        let Some(Value::Str(old_key)) = params.get("key") else { return Ok(None) };
+        if !matches!(old_key.as_str(), "name" | "formula") {
+            return Ok(None);
+        }
+        let Some(readings) = self.readings_at(path, record, segment.start).filter(|r| !r.is_empty()) else {
+            return Ok(None);
+        };
+        fn matches_set(o: &ObjExpr, readings: &[usize], set: &BTreeSet<(usize, String)>) -> bool {
+            match o {
+                ObjExpr::Ref(r)
+                    if (r.prefix == '#' || r.prefix == '%')
+                        && r.path.is_empty()
+                        && r.sub.is_none()
+                        && r.places.is_none()
+                        && r.number.is_none() =>
+                {
+                    let Some(name) = &r.name else { return false };
+                    let id = format!("{}{}", r.prefix, rnl_runtime::problem::written_name(name));
+                    readings.iter().all(|l| set.contains(&(*l, id.clone())))
+                }
+                ObjExpr::Set(s) => {
+                    !s.members.is_empty()
+                        && s.members.iter().all(|m| {
+                            m.binds.is_empty()
+                                && m.segments.len() == 1
+                                && m.segments[0].call.is_none()
+                                && !m.segments[0].piped
+                                && !m.segments[0].args.is_empty()
+                                && m.segments[0].args.iter().all(|a| matches_set(&a.obj, readings, set))
+                        })
+                }
+                _ => false,
+            }
+        }
+        let matched = if segment.piped && segment.args.is_empty() {
+            let mut ok = false;
+            for prev in member.segments[..index].iter().rev() {
+                let Some(pcall) = &prev.call else { continue };
+                match pcall.kw.as_str() {
+                    "SELECT-NET" | "SELECT-PIN" | "SELECT-TERMINAL" | "TEXT" | "WIRE" | "BUNDLE" => break,
+                    "ATTACH" | "AS" | "SELECT-USAGE" | "SELECT-ANCESTOR-USAGE" if old_key == "name" => {
+                        ok = prev.args.iter().any(|a| match &a.obj {
+                            ObjExpr::Ref(r) if r.prefix == '$' && r.path.is_empty() => {
+                                r.name.as_deref().is_some_and(|n| {
+                                    let d = format!("${n}");
+                                    !self.shadowed.contains(&d)
+                                        && matches!(n, "GROUND" | "GND" | "SUPPLY" | "IO_PORT" | "IOPORT")
+                                })
+                            }
+                            _ => false,
+                        });
+                        break;
+                    }
+                    "SET-SYMBOL" => {
+                        ok = prev.args.iter().any(|a| match &a.obj {
+                            ObjExpr::Ref(r) if r.prefix == '$' && r.path.is_empty() => {
+                                r.name.as_deref().is_some_and(|n| {
+                                    let s = format!("${n}");
+                                    !self.shadowed.contains(&s)
+                                        && if old_key == "name" {
+                                            matches!(
+                                                n,
+                                                "NAMED_GROUND_SYMBOL"
+                                                    | "GROUND_SYMBOL"
+                                                    | "SUPPLY_SYMBOL"
+                                                    | "IO_PORT_SYMBOL"
+                                            )
+                                        } else {
+                                            n == "TRANSCONDUCTOR"
+                                        }
+                                })
+                            }
+                            _ => false,
+                        });
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+            if !ok && !member.segments[0].args.is_empty() {
+                let target_set = if old_key == "name" { &self.netname_key_objects } else { &self.transconductor_objects };
+                let direct: Vec<_> = member.segments[0]
+                    .args
+                    .iter()
+                    .filter(|a| !matches!(&a.obj, ObjExpr::Ref(r) if r.prefix == '$'))
+                    .collect();
+                if !direct.is_empty()
+                    && !member.segments[..index].iter().any(|s| {
+                        s.call.as_ref().is_some_and(|c| {
+                            matches!(c.kw.as_str(), "SELECT-NET" | "SELECT-PIN" | "SELECT-TERMINAL" | "TEXT" | "WIRE")
+                        })
+                    })
+                {
+                    ok = direct.iter().all(|a| matches_set(&a.obj, readings, target_set));
+                }
+            }
+            ok
+        } else if !segment.piped && !segment.args.is_empty() {
+            let target_set = if old_key == "name" { &self.netname_key_objects } else { &self.transconductor_objects };
+            segment.args.iter().all(|a| matches_set(&a.obj, readings, target_set))
+        } else {
+            false
+        };
+        if !matched {
+            return Ok(None);
+        }
+        let new_key = if old_key == "name" { "netname" } else { "label" };
+        let mut parts = params.positional.iter().map(super::rewrite::value).collect::<Vec<_>>();
+        for named in &params.named {
+            let k = if named.quoted {
+                rnl_runtime::problem::written_string(&named.name)
+            } else {
+                named.name.clone()
+            };
+            let v = if named.name == "key" {
+                rnl_runtime::problem::written_string(new_key)
+            } else {
+                super::rewrite::value(&named.value)
+            };
+            parts.push(format!("{k}={v}"));
+        }
+        record_edit(source, record, call.start..call.end, format!("@TEXT({})", parts.join(", ")), "standard-text-key")
+            .map(Some)
     }
 
     pub(super) fn terminal_map(
@@ -425,7 +624,7 @@ impl References {
                 rnl_runtime::syntax::walk_refs(member, &mut refs);
                 for r in refs {
                     if let rnl_runtime::syntax::RefOrHole::Ref(r) = r {
-                        if let Some((_, package)) = self.legacy.reference(readings, r) {
+                        if let Some((_, Some(package))) = self.legacy.reference(readings, r) {
                             packages.insert(package.clone());
                         }
                     }

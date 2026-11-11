@@ -1,7 +1,7 @@
 //! Preserve explicit usage defaults and the old main-role point relation.
 use super::edit::{record_edit, Edit};
 use super::{FileReport, Unconverted};
-use rnl_runtime::host::Record;
+use rnl_runtime::host::{LevelKind, Record};
 use rnl_runtime::problem::{Filler, Position};
 use rnl_runtime::source::normalize;
 use rnl_runtime::syntax::{Member, ObjExpr};
@@ -14,6 +14,7 @@ struct Plan {
     align: bool,
     net_role: bool,
     gap: bool,
+    top_level_non_port_io: bool,
     notice: Option<super::manual::Reason>,
     fresh: String,
 }
@@ -60,11 +61,25 @@ impl Usages {
                     };
                     names.insert(key.clone(), fresh);
                 }
+                let top_level_non_port_io = input.doc.levels[problem.level].kind == LevelKind::File
+                    && policy.is_some()
+                    && matches!(usage.definition.as_str(), "$IO_PORT" | "$IOPORT")
+                    && match usage.roles.first().map(|r| r.members.as_slice()) {
+                        Some([Filler::Net(n)]) => {
+                            problem.nets.iter().find(|net| net.name == *n).is_some_and(|net| net.port.is_none())
+                        }
+                        Some([Filler::Terminal { .. }]) => usage.object.and_then(|o| problem.objects.get(o)).is_some_and(|obj| {
+                            !obj.nets.is_empty()
+                                && obj.nets.iter().all(|&ni| problem.nets.get(ni).is_some_and(|net| net.port.is_none()))
+                        }),
+                        _ => false,
+                    };
                 out.plans.entry((problem.level, key.0.clone(), key.1, key.2)).or_default().push(Plan {
                     role,
                     align,
                     net_role,
                     gap: policy.is_some_and(|p| p.gap),
+                    top_level_non_port_io,
                     notice: policy.and_then(|p| p.notice),
                     fresh: names[&key].clone(),
                 });
@@ -78,6 +93,7 @@ impl Usages {
         record: &Record,
         member: &Member,
         readings: &[usize],
+        approximate: bool,
         report: &mut FileReport,
         resolve: impl Fn(&rnl_runtime::syntax::Ref) -> Result<Option<Edit>, String>,
     ) -> Result<(Vec<Edit>, bool), String> {
@@ -115,7 +131,10 @@ impl Usages {
             return Ok((Vec::new(), false));
         }
         let mut edits = Vec::new();
-        if let Some((rule, reason)) = plan.notice {
+        let replaced_by_net_label = approximate
+            && plan.top_level_non_port_io
+            && !member.segments.iter().any(|s| s.call.as_ref().is_some_and(|c| c.kw == "SET-SYMBOL"));
+        if let Some((rule, reason)) = plan.notice.filter(|_| !replaced_by_net_label) {
             report.notices.push(Unconverted {
                 rule: rule.into(),
                 line: loc.line,

@@ -151,18 +151,92 @@ fn reversed_named_inputs_without_a_witness_follow_the_written_order() {
 fn flow_keeps_the_usage_and_restores_its_effective_direction_and_priority() {
     let r = layout("%path = {#M1 #R1 #M2} @AS(direction=\"right-to-left\", priority=\"high\") $FLOW", false);
     let text = &r.files["layout.sp"];
-    assert!(text.contains("%path = {#M1 #R1 #M2} @AS"));
+    assert!(text.contains("%path = {#M1 #R1 #M2} @AS(priority=\"high\") $FLOW"), "{text}");
+    assert!(!text.contains("direction="), "{text}");
     assert!(text.contains("{#M1 #R1 #M2} @ORDER(\"right-to-left\", priority=\"high\")"), "{text}");
     assert!(r.report.files[0].unconverted.is_empty(), "{:?}", r.report.files[0].unconverted);
+    assert!(
+        r.report
+            .diagnostics
+            .iter()
+            .all(|d| d.severity != "error" || d.file.as_deref().is_some_and(|f| f.ends_with(".rnl"))),
+        "{:?}",
+        r.report.diagnostics
+    );
 }
 
 #[test]
 fn current_mirror_additions_require_opt_in() {
     let statement = "#M1(ref) #M2(out) @AS $CURRENT_MIRROR";
     let exact = layout(statement, false);
-    assert!(exact.report.files[0].unconverted.iter().any(|u| u.rule == "standard-definition-body"));
+    assert!(exact.report.files[0].unconverted.iter().any(|u| u.rule == "standard-definition-removed"));
     let approximate = layout(statement, true);
-    assert!(approximate.files["layout.sp"].contains(statement));
+    assert!(approximate.files["layout.sp"].contains("#M1(ref) #M2(out) @AS $CURRENT_MIRROR_N"), "{}", approximate.files["layout.sp"]);
     assert!(approximate.report.files[0].unconverted.is_empty());
-    assert!(approximate.report.files[0].approximations.iter().any(|a| a.rule == "approximate-standard-body"));
+    assert!(approximate.report.files[0].approximations.iter().any(|a| a.rule == "approximate-current-mirror"));
+}
+
+#[test]
+fn current_mirror_with_unknown_or_mixed_polarity_stays_manual() {
+    let r = layout("#R1(ref) #R1(out) @AS $CURRENT_MIRROR", true);
+    assert!(r.files["layout.sp"].contains("@AS $CURRENT_MIRROR"));
+    assert!(r.report.files[0].unconverted.iter().any(|u| u.rule == "standard-definition-removed"));
+}
+
+#[test]
+fn singleton_set_tail_is_unwrapped_while_multi_member_tail_stays_manual() {
+    let source = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\n.model nch nmos\nM1 a ip tail 0 nch\nM2 b in tail 0 nch\nM5 tail vb 0 0 nch\nM6 tail vb 0 0 nch\n* @RNL { #M1(in_p) #M2(in_n) {#M5}(tail) @AS $DIFFERENTIAL_PAIR }\n.end\n";
+    let r = upgrade(
+        "t.sp",
+        &MemoryProvider::new().with("t.sp", source),
+        &UpgradeOptions { approximate: true, ..UpgradeOptions::default() },
+    )
+    .unwrap();
+    assert!(r.files["t.sp"].contains("#M1(left) #M2(right) #M5(tail) @AS $DIFFERENTIAL_PAIR_N"), "{}", r.files["t.sp"]);
+    assert!(r.report.files[0].unconverted.is_empty());
+
+    let multi = source.replace("{#M5}(tail)", "{#M5 #M6}(tail)");
+    let r_multi = upgrade(
+        "t.sp",
+        &MemoryProvider::new().with("t.sp", &multi),
+        &UpgradeOptions { approximate: true, ..UpgradeOptions::default() },
+    )
+    .unwrap();
+    assert!(r_multi.report.files[0].unconverted.iter().any(|u| u.rule == "standard-definition-removed"));
+}
+
+#[test]
+fn mirrored_net_axis_stays_manual_even_with_approximate() {
+    for statement in [
+        "#M1(a) #M2(b) #R1:1(axis) @AS $MIRRORED",
+        "#M1(a) #M2(b) {#R1 (0, 0)}(axis) @AS $MIRRORED",
+        "#M1(a) #M2(b) &a(axis) @AS(priority=\"disabled\") $MIRRORED",
+    ] {
+        let r = layout(statement, true);
+        assert!(
+            r.report.files[0].unconverted.iter().any(|u| u.rule == "standard-definition-body"),
+            "{statement}: {:?}",
+            r.report.files[0]
+        );
+    }
+}
+
+#[test]
+fn top_level_io_port_becomes_net_label_only_with_approximate() {
+    let source = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\n.subckt buf a y\nR1 a y 1k\n* @RNL { $IO_PORT @ATTACH &a; $IO_PORT @ATTACH &y }\n.ends\nX1 vin vout buf\n* @RNL { $IO_PORT @ATTACH &vout => %pout }\n.end\n";
+    let exact = upgrade("t.sp", &MemoryProvider::new().with("t.sp", source), &UpgradeOptions::default()).unwrap();
+    assert!(exact.files["t.sp"].contains("$IO_PORT @ATTACH &vout => %pout"));
+    assert_eq!(exact.report.assertion_violations.len(), 1);
+
+    let approx = upgrade(
+        "t.sp",
+        &MemoryProvider::new().with("t.sp", source),
+        &UpgradeOptions { approximate: true, ..UpgradeOptions::default() },
+    )
+    .unwrap();
+    let text = &approx.files["t.sp"];
+    assert!(text.contains("$IO_PORT @ATTACH &a; $IO_PORT @ATTACH &y"), "{text}");
+    assert!(text.contains("$NET_LABEL @ATTACH &vout => %pout"), "{text}");
+    assert!(approx.report.assertion_violations.is_empty(), "{:?}", approx.report.assertion_violations);
+    assert!(approx.report.files[0].approximations.iter().any(|a| a.rule == "approximate-top-level-io-port"));
 }

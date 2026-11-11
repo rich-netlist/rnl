@@ -6,7 +6,7 @@ fn default_net_labels_stay_off_and_explicit_whole_net_routes_win() {
     let source = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\nR1 a b 1k\nR2 a b 2k\n* @RNL { {&a &b} @REMOVE-FROM $WIRE_NET_SET; &b @ROUTE; # @SELECT-TERMINAL(wired=false) => @TEXT(\"${net}\", key=\"netname\") }\n.end\n";
     let r = upgrade("t.sp", &MemoryProvider::new().with("t.sp", source), &UpgradeOptions::default()).unwrap();
     let text = &r.files["t.sp"];
-    assert!(text.contains("# @SELECT-PIN(recursive=true) => @REMOVE-FROM $LABEL_TERMINAL_SET"));
+    assert!(text.contains("# @SELECT-PIN(recursive=true) => @REMOVE-FROM $LABEL_FILL_SET"));
     assert!(text.contains("{&a} @UNROUTE-NET(priority=\"high\")"), "{text}");
     assert!(text.contains("&b @ROUTE-NET"));
     assert!(text.contains("@TEXT(\"${net}\", key=\"netname\")"));
@@ -65,7 +65,7 @@ fn new_policy_without_a_header_keeps_host_lines_and_crlf() {
     let text = &result.files["t.sp"];
     let policy = text.split("\r\n").find(|line| line.starts_with("* @RNL {")).unwrap();
     assert!(policy.contains("$RNL_UPGRADE_PORT_FILL_SET"), "{text}");
-    assert!(policy.contains("@REMOVE-FROM $LABEL_TERMINAL_SET"), "{text}");
+    assert!(policy.contains("@REMOVE-FROM $LABEL_FILL_SET"), "{text}");
     assert!(!text.replace("\r\n", "").contains('\n'));
     let host = |s: &str| s.lines().filter(|l| !l.starts_with("* @RNL")).collect::<Vec<_>>().join("\n");
     assert_eq!(host(source), host(text));
@@ -80,4 +80,24 @@ fn included_set_edits_use_the_single_entry_policy() {
     assert!(result.files["t.sp"].contains("$RNL_UPGRADE_WIRE_NET_SET = #"));
     assert!(result.files["child.inc"].contains("&a @REMOVE-FROM $RNL_UPGRADE_WIRE_NET_SET"));
     assert!(!result.files["child.inc"].contains("$RNL_UPGRADE_WIRE_NET_SET ="));
+}
+
+#[test]
+fn four_terminal_mos_retains_default_symbol_and_bulk_ground_supply_fill() {
+    let source = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\n.model nch nmos\n.model pch pmos\nM1 d g s 0 nch\nM2 d g vdd vdd pch\n* @RNL { &vdd @ADD-TO $SUPPLY_NET_SET }\n.end\n";
+    let r = upgrade("t.sp", &MemoryProvider::new().with("t.sp", source), &UpgradeOptions::default()).unwrap();
+    let text = &r.files["t.sp"];
+    assert!(text.contains("# @SELECT-INSTANCE(type=\"nmos\", recursive=true) => @SET-SYMBOL $NMOS_4TERM"), "{text}");
+    assert!(text.contains("# @SELECT-INSTANCE(type=\"pmos\", recursive=true) => @SET-SYMBOL $PMOS_4TERM"), "{text}");
+    assert!(text.contains("%rnl_upgrade_bulk_ground @ADD-TO $GROUND_FILL_SET"), "{text}");
+    assert!(text.contains("%rnl_upgrade_bulk_supply @ADD-TO $SUPPLY_FILL_SET"), "{text}");
+}
+
+#[test]
+fn three_terminal_mos_without_four_terminal_instances_adds_no_bulk_fill_rules() {
+    let source = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\n.model nch nmos\nM1 d g 0 0 nch\n* @RNL { #M1 @SET-SYMBOL $NMOS }\n.end\n";
+    let r = upgrade("t.sp", &MemoryProvider::new().with("t.sp", source), &UpgradeOptions::default()).unwrap();
+    let text = &r.files["t.sp"];
+    assert!(!text.contains("rnl_upgrade_bulk_"), "{text}");
+    assert!(!text.contains("=> @SET-SYMBOL $NMOS_4TERM"), "{text}");
 }

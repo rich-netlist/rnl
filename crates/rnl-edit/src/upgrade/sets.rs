@@ -2,6 +2,7 @@
 use super::edit::{record_edit, Edit};
 use rnl_runtime::host::{LevelKind, Record};
 use rnl_runtime::interp::unit::scan_package_decl;
+use rnl_runtime::model::SymbolOrigin;
 use rnl_runtime::problem::written_name;
 use rnl_runtime::syntax::{parse_record_features, Member, ObjExpr, Ref, Value};
 use rnl_runtime::Interpretation;
@@ -46,7 +47,7 @@ fn overrides(member: &Member) -> bool {
         let inline = segment.args.iter().any(|a| matches!(a.obj, ObjExpr::Set(_)));
         let package = segment.call.as_ref().filter(|c| c.kw == "USE-PACKAGE")
             .and_then(|c| c.params.as_ref()).and_then(|p| p.get("name"));
-        (inline && matches!(package, Some(Value::Str(n)) if matches!(n.as_str(), "rnl-std" | "rnl-std-fill" | "rnl-std-basic")))
+        (inline && matches!(package, Some(Value::Str(n)) if matches!(n.as_str(), "rnl-std" | "rnl-std-all" | "rnl-std-core" | "rnl-std-full" | "rnl-std-fill" | "rnl-std-basic" | "rnl-std-spice" | "rnl-std-spectre")))
             || segment.args.iter().any(|a| matches!(&a.obj, ObjExpr::Set(s) if s.members.iter().any(|m| overrides(m))))
     })
 }
@@ -134,21 +135,104 @@ impl Sets {
         }
         // 0.3 defines a candidate set but does not attach labels from it by default.
         // Empty only the bundled 0.4 fill's set, retaining a file-owned set for old consumers.
-        if !shadowed.contains("$LABEL_TERMINAL_SET") {
-            if referenced("LABEL_TERMINAL_SET") {
-                let name = fresh("$RNL_UPGRADE_LABEL_TERMINAL_SET");
+        if !shadowed.contains("$LABEL_TERMINAL_SET") && referenced("LABEL_TERMINAL_SET") {
+            let name = fresh("$RNL_UPGRADE_LABEL_TERMINAL_SET");
+            statements.push(format!(
+                "{name} = # @SELECT-TERMINAL(recursive=true) => @SELECT-PIN(wired=false, recursive=true)"
+            ));
+            for set in ["$GROUND_NET_SET", "$SUPPLY_NET_SET"] {
                 statements.push(format!(
-                    "{name} = # @SELECT-TERMINAL(recursive=true) => @SELECT-PIN(wired=false, recursive=true)"
+                    "{set} @SELECT-TERMINAL(recursive=true) => @SELECT-PIN(recursive=true) => @REMOVE-FROM {name}"
                 ));
-                for set in ["$GROUND_NET_SET", "$SUPPLY_NET_SET"] {
-                    statements.push(format!(
-                        "{set} @SELECT-TERMINAL(recursive=true) => @SELECT-PIN(recursive=true) => @REMOVE-FROM {name}"
-                    ));
-                }
-                statements.push(format!("# @SELECT-USAGE(recursive=true) $NO_CONNECT => @SELECT-TERMINAL(recursive=true) => @SELECT-PIN(recursive=true) => @REMOVE-FROM {name}"));
-                result.names.insert("LABEL_TERMINAL_SET".into(), name);
             }
-            statements.push("# @SELECT-PIN(recursive=true) => @REMOVE-FROM $LABEL_TERMINAL_SET".into());
+            statements.push(format!("# @SELECT-USAGE(recursive=true) $NO_CONNECT => @SELECT-TERMINAL(recursive=true) => @SELECT-PIN(recursive=true) => @REMOVE-FROM {name}"));
+            result.names.insert("LABEL_TERMINAL_SET".into(), name);
+        }
+        if !shadowed.contains("$LABEL_FILL_SET") {
+            statements.push("# @SELECT-PIN(recursive=true) => @REMOVE-FROM $LABEL_FILL_SET".into());
+        }
+        // Preserve 0.3 four-terminal MOS and voltage-controlled switch defaults and bulk-pin
+        // ground/supply stub fill whenever an instance actually resolved to those 0.3 symbols.
+        let bundled_03 = |pkg_name: &str| {
+            let s: Vec<_> =
+                input.sources.iter().filter(|(_, t)| scan_package_decl(t).is_some_and(|(n, _)| n == pkg_name)).collect();
+            !s.is_empty()
+                && s.iter()
+                    .all(|(_, t)| bundled.files.iter().any(|(p, orig)| p.starts_with("<bundled>/0.3/") && t == orig))
+                && input.model.levels.iter().all(|l| l.packages.iter().any(|p| p.name == pkg_name && p.version == "0.3"))
+        };
+        let has_symbol = |pkg_name: &str, sym_name: &str| {
+            bundled_03(pkg_name)
+                && input.model.levels.iter().flat_map(|l| &l.objects).any(|o| {
+                    o.kind == "instance"
+                        && o.symbol.as_ref().is_some_and(|s| {
+                            s.name == sym_name && matches!(&s.origin, SymbolOrigin::Package(p) if p == pkg_name)
+                        })
+                })
+        };
+        let has_spice = bundled_03("rnl-std-spice");
+        let has_spectre = bundled_03("rnl-std-spectre");
+        let has_nmos_4term = has_symbol("rnl-std-semiconductors", "$NMOS_4TERM");
+        let has_pmos_4term = has_symbol("rnl-std-semiconductors", "$PMOS_4TERM");
+        let has_vc_switch = has_symbol("rnl-std-basic", "$VOLTAGE_CONTROLLED_SWITCH");
+        if has_spice || has_spectre {
+            if has_nmos_4term && !shadowed.contains("$NMOS_4TERM") {
+                statements.push("# @SELECT-INSTANCE(type=\"nmos\", recursive=true) => @SET-SYMBOL $NMOS_4TERM".into());
+            }
+            if has_pmos_4term && !shadowed.contains("$PMOS_4TERM") {
+                statements.push("# @SELECT-INSTANCE(type=\"pmos\", recursive=true) => @SET-SYMBOL $PMOS_4TERM".into());
+            }
+            if has_vc_switch && !shadowed.contains("$VOLTAGE_CONTROLLED_SWITCH") {
+                if has_spice {
+                    statements.push(
+                        "# @SELECT-INSTANCE(name=\"S*\", recursive=true) => @SET-SYMBOL $VOLTAGE_CONTROLLED_SWITCH"
+                            .into(),
+                    );
+                }
+                if has_spectre {
+                    statements.push(
+                        "# @SELECT-INSTANCE(model=\"relay\", recursive=true) => @SET-SYMBOL $VOLTAGE_CONTROLLED_SWITCH"
+                            .into(),
+                    );
+                }
+                statements.push(
+                    "# @SELECT-INSTANCE(type=\"sw\", recursive=true) => @SET-SYMBOL $VOLTAGE_CONTROLLED_SWITCH".into(),
+                );
+            }
+        }
+        if has_nmos_4term || has_pmos_4term {
+            if !shadowed.contains("$GROUND_FILL_SET")
+                && !shadowed.contains("$GROUND_NET_SET")
+                && !shadowed.contains("$NO_CONNECT")
+            {
+                let bg = fresh("%rnl_upgrade_bulk_ground");
+                statements.push(format!(
+                    "{bg} = $GROUND_NET_SET @SELECT-TERMINAL(type=\"nmos\", terminal=\"b\", recursive=true) => @SELECT-PIN(wired=false, recursive=true)"
+                ));
+                statements.push(format!(
+                    "$GROUND_NET_SET @SELECT-TERMINAL(type=\"pmos\", terminal=\"b\", recursive=true) => @SELECT-PIN(wired=false, recursive=true) => @ADD-TO {bg}"
+                ));
+                statements.push(format!(
+                    "# @SELECT-USAGE(recursive=true) $NO_CONNECT => @SELECT-PIN(role=\"t\", recursive=true) => @REMOVE-FROM {bg}"
+                ));
+                statements.push(format!("{bg} @ADD-TO $GROUND_FILL_SET"));
+            }
+            if !shadowed.contains("$SUPPLY_FILL_SET")
+                && !shadowed.contains("$SUPPLY_NET_SET")
+                && !shadowed.contains("$NO_CONNECT")
+            {
+                let bs = fresh("%rnl_upgrade_bulk_supply");
+                statements.push(format!(
+                    "{bs} = $SUPPLY_NET_SET @SELECT-TERMINAL(type=\"nmos\", terminal=\"b\", recursive=true) => @SELECT-PIN(wired=false, recursive=true)"
+                ));
+                statements.push(format!(
+                    "$SUPPLY_NET_SET @SELECT-TERMINAL(type=\"pmos\", terminal=\"b\", recursive=true) => @SELECT-PIN(wired=false, recursive=true) => @ADD-TO {bs}"
+                ));
+                statements.push(format!(
+                    "# @SELECT-USAGE(recursive=true) $NO_CONNECT => @SELECT-PIN(role=\"t\", recursive=true) => @REMOVE-FROM {bs}"
+                ));
+                statements.push(format!("{bs} @ADD-TO $SUPPLY_FILL_SET"));
+            }
         }
         // 0.3 adds one free port tag per untagged port net. PORT_LIST would add
         // layout facts, so retain the former selection and generation explicitly.
