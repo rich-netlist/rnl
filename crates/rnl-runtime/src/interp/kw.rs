@@ -735,7 +735,14 @@ impl Interp<'_> {
                                 self.err(
                                     ctx,
                                     codes::STYLE_BODY_NOT_STYLE,
-                                    "the set of DEFINE-STYLE only references other styles (9.3)",
+                                    if self.follows_0_4(self.source_unit(ctx)) {
+                                        format!(
+                                            "{} is not a style; the body of DEFINE-STYLE only references styles (9.3)",
+                                            self.label(obj)
+                                        )
+                                    } else {
+                                        "the set of DEFINE-STYLE only references other styles (9.3)".to_string()
+                                    },
                                     a.start,
                                 );
                             }
@@ -2733,7 +2740,12 @@ impl Interp<'_> {
         let p = self.params(kw, seg, ctx, &self.sig_params(kw, ctx), None, false, None)?;
         let pt = mapped["position"].obj;
         let Some((x, y)) = self.symbol_point(pt, self.follows_0_4(self.source_unit(ctx))) else {
-            return self.fail(ctx, codes::KEYWORD_PIN_NOT_A_POINT, "PIN takes one point (9.2.4)", seg.start);
+            let message = if self.follows_0_4(self.source_unit(ctx)) {
+                format!("PIN takes one point; {} is not a point (9.2.4)", self.label(pt))
+            } else {
+                "PIN takes one point (9.2.4)".to_string()
+            };
+            return self.fail(ctx, codes::KEYWORD_PIN_NOT_A_POINT, message, seg.start);
         };
         let raw = match get(&p, "terminal").cloned() {
             Some(Lit::Arr(v)) => v,

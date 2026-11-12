@@ -2074,12 +2074,17 @@ impl Interp<'_> {
             }
             if let Some(why) = bad {
                 let l = self.label(c);
+                let section = if relation && site.as_ref().is_some_and(|ctx| self.follows_0_4(self.source_unit(ctx))) {
+                    "14.9"
+                } else {
+                    "14.1"
+                };
                 self.diag_site(
                     Severity::Error,
                     codes::CONSTRAINT_MEMBER_NOT_LOCATABLE,
                     &site,
                     cd.off,
-                    format!("a member of {l}: {why}; this constraint fails (14.1)"),
+                    format!("a member of {l}: {why}; this constraint fails ({section})"),
                 );
                 self.constraint_mut(c).failed = true;
                 continue;
