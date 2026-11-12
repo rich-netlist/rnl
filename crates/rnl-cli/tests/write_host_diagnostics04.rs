@@ -1,34 +1,11 @@
 //! Host refusals reach the write command before any output is replaced.
 use serde_json::json;
-use std::{
-    fs,
-    path::PathBuf,
-    process::Command,
-    time::{SystemTime, UNIX_EPOCH},
-};
-
-struct Scratch(PathBuf);
-impl Scratch {
-    fn new() -> Self {
-        let path = std::env::temp_dir().join(format!(
-            "rnl-write-host-{}-{}",
-            std::process::id(),
-            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
-        ));
-        fs::create_dir(&path).unwrap();
-        Self(path)
-    }
-}
-impl Drop for Scratch {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
-}
+use std::{fs, process::Command};
 
 fn run(body: &str, version: Option<&str>, existing: bool) -> (i32, String, Option<String>) {
-    let dir = Scratch::new();
-    let input = dir.0.join("request.json");
-    let out = dir.0.join("out.sp");
+    let dir = tempfile::Builder::new().prefix("rnl-write-host-").tempdir().unwrap();
+    let input = dir.path().join("request.json");
+    let out = dir.path().join("out.sp");
     fs::write(&input, serde_json::to_vec(&json!({"language_version":version,"dialect":"spice","author":"test","netlist":format!("title\n{body}"),"ops":[]})).unwrap()).unwrap();
     if existing {
         fs::write(&out, "keep this file\n").unwrap();
