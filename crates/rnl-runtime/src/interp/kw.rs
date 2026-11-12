@@ -1399,6 +1399,12 @@ impl Interp<'_> {
 
     /// Names, counts and literal parameter values do not depend on an application's objects.
     fn check_definition_parameters(&mut self, member: &Member, definition: &DefData, ctx: &Ctx, scopes: &[&SetExpr]) {
+        let mut references = Vec::new();
+        self.definition_refs(member, ctx, &[], &mut references);
+        let invalid_parameter = references.iter().any(|(reference, _)| match reference {
+            crate::syntax::RefOrHole::Hole(name) => !definition.params.iter().any(|(param, _)| param == *name),
+            _ => false,
+        });
         for (index, segment) in member.segments.iter().enumerate() {
             if let Some(call) = &segment.call {
                 let keyword = self.kw(&call.kw, ctx.unit);
@@ -1477,6 +1483,8 @@ impl Interp<'_> {
                         }
                         if matches!(keyword.as_str(), "LAYER" | "PLACE" | "ROUTE-NET" | "UNROUTE-NET")
                             && !self.body_errors.contains_key(&super::eval::ptr(call))
+                            // A bad literal parameter already invalidates the entire member.
+                            && !(keyword == "PLACE" && invalid_parameter)
                         {
                             if let Err(Stop::Fail(Some(diagnostic))) =
                                 self.check_definition_input_kind(&keyword, member, index, definition, ctx, scopes)

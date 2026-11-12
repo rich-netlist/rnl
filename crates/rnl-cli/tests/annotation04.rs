@@ -514,3 +514,18 @@ fn annotation_mixed_pipe_and_written_set_rejects_nested_point_set() {
         assert!(errors.iter().any(|e| e.contains("RNL3007")), "{body}: {errors:?}");
     }
 }
+
+#[test]
+fn static_place_preserves_graphics_and_suppresses_duplicate_parameter_error() {
+    for graphic in ["CIRCLE(radius=1)", "ARC { (0,0) (1,1) (2,0) }"] {
+        let body = if graphic.starts_with("CIRCLE") { format!("(0,0) @{graphic}") } else { format!("@{graphic}") };
+        let r = read(&format!(r#"$D = @DEFINE(roles=["r"]) {{ {body} => @PLACE(x=?r) }}"#));
+        let errors = errors(&r);
+        assert_eq!(errors.len(), 1, "{errors:?}");
+        assert!(errors[0].contains("RNL3205"), "{errors:?}");
+    }
+    let r = read(&format!(r#"{SYM}; $D = @DEFINE(roles=["r"]) {{ ?r @ANNOTATION $S => @PLACE(x=?r) }}"#));
+    let errors = errors(&r);
+    assert_eq!(errors.len(), 1, "{errors:?}");
+    assert!(errors[0].contains("RNL3205"), "{errors:?}");
+}

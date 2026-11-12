@@ -163,7 +163,14 @@ impl Interp<'_> {
                     "pass" => {}
                     "new:instance" | "new:bundle" | "new:usage" | "new:wire" | "new:annotation" | "new:text"
                     | "new:constraint" | "new:route" | "def:definition" | "def:symbol" | "def:style" => {
-                        kinds = Some(vec![output[4..].to_owned()]);
+                        // The vocabulary uses new:annotation for both compound ANNOTATION and
+                        // legacy graphics; only the compound object forbids bare PLACE.
+                        let kind = if output == "new:annotation" && keyword != "ANNOTATION" {
+                            "graphic"
+                        } else {
+                            &output[4..]
+                        };
+                        kinds = Some(vec![kind.to_owned()]);
                     }
                     _ => kinds = None,
                 }
