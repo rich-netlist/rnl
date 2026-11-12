@@ -1864,17 +1864,12 @@ pub(crate) fn written_path(
         points.push([x, y]);
     }
     if w.default_auto && w.mode == "auto" {
-        // Only electrical endpoint pins have an exit direction. A pin's coordinate-only
-        // position is not the pin (5.2.4), and intermediate anchors are waypoints.
-        let direction = |point: &PointRef| -> Option<Direction> {
-            let (object, pin) = point.pin_key()?;
-            let symbol = problem.objects.get(object)?.symbol?;
-            let local = problem.symbols.get(symbol)?.pins.get(pin)?.dir?;
-            Direction::from_degrees(g.orient.get(object)?.direction(local)?)
-        };
-        return shared_auto_path(&points, w.anchors.first().and_then(direction), w.anchors.last().and_then(direction))
-            .map(Some)
-            .ok_or(WrittenPathError { wire });
+        let segments = auto_segments_for_wire(problem, g, w, &points).ok_or(WrittenPathError { wire })?;
+        let mut out: Vec<_> = points.first().cloned().into_iter().collect();
+        for segment in segments {
+            out.extend(segment.into_iter().skip(1));
+        }
+        return Ok(Some(out));
     }
     let mut out: Vec<[Q; 2]> = points.first().cloned().into_iter().collect();
     let two = int(2);
@@ -1910,20 +1905,59 @@ pub(crate) fn written_path(
     Ok(Some(out))
 }
 
-/// Use the shared renderer geometry without rounding written anchors. The helper takes
-/// f64 scene points; where a bend reuses an anchor coordinate, retain its exact rational.
-fn shared_auto_path(points: &[[Q; 2]], first: Option<Direction>, last: Option<Direction>) -> Option<Vec<[Q; 2]>> {
+/// Resolve a modern authored auto wire as one path per pair of original anchors. Even
+/// coincident anchors remain two explicit endpoints; callers never infer identity from coordinates.
+pub(crate) type WireSegments = Vec<Vec<[Q; 2]>>;
+
+pub(crate) fn written_auto_segments(
+    problem: &LevelProblem,
+    g: &Geometry,
+    wire: usize,
+) -> Result<Option<WireSegments>, WrittenPathError> {
+    let Some(w) = problem.wires.get(wire) else { return Ok(None) };
+    let mut points = Vec::with_capacity(w.anchors.len());
+    for r in &w.anchors {
+        let (Some(x), Some(y)) = (point_value(problem, g, r, 0, 0), point_value(problem, g, r, 1, 0)) else {
+            return Ok(None);
+        };
+        points.push([x, y]);
+    }
+    auto_segments_for_wire(problem, g, w, &points).map(Some).ok_or(WrittenPathError { wire })
+}
+
+fn auto_segments_for_wire(
+    problem: &LevelProblem,
+    g: &Geometry,
+    wire: &rnl_runtime::problem::ProblemWire,
+    points: &[[Q; 2]],
+) -> Option<WireSegments> {
+    let direction = |point: &PointRef| -> Option<Direction> {
+        let (object, pin) = point.pin_key()?;
+        let symbol = problem.objects.get(object)?.symbol?;
+        let local = problem.symbols.get(symbol)?.pins.get(pin)?.dir?;
+        Direction::from_degrees(g.orient.get(object)?.direction(local)?)
+    };
+    shared_auto_segments(points, wire.anchors.first().and_then(direction), wire.anchors.last().and_then(direction))
+}
+
+/// Shared renderer geometry with exact written anchor coordinates retained. One output segment
+/// corresponds to one input pair, including zero-length segments and repeated waypoint identities.
+fn shared_auto_segments(points: &[[Q; 2]], first: Option<Direction>, last: Option<Direction>) -> Option<WireSegments> {
     let floats: Vec<_> = points.iter().map(|p| (to_f64(&p[0]), to_f64(&p[1]))).collect();
     let segments = auto_wire(&floats, first, last)?;
-    let mut out: Vec<[Q; 2]> = points.first().cloned().into_iter().collect();
+    if segments.len() != points.len().saturating_sub(1) {
+        return None;
+    }
+    let mut result = Vec::with_capacity(segments.len());
     for (index, segment) in segments.iter().enumerate() {
+        let mut out = vec![points[index].clone()];
         for &(x, y) in segment.iter().skip(1).take(segment.len().saturating_sub(2)) {
             let convert = |v: f64, axis: usize| -> Option<Q> {
                 let mut exact = None;
                 for anchor in [&points[index], &points[index + 1]] {
                     if to_f64(&anchor[axis]) == v {
                         if exact.as_ref().is_some_and(|q| *q != anchor[axis]) {
-                            return None; // two distinct rationals collapsed to one f64
+                            return None;
                         }
                         exact = Some(anchor[axis].clone());
                     }
@@ -1933,10 +1967,19 @@ fn shared_auto_path(points: &[[Q; 2]], first: Option<Direction>, last: Option<Di
             out.push([convert(x, 0)?, convert(y, 1)?]);
         }
         out.push(points[index + 1].clone());
+        if out.windows(2).any(|v| v[0][0] != v[1][0] && v[0][1] != v[1][1]) {
+            return None;
+        }
+        result.push(out);
     }
-    // Converting the helper's f64 bends back to exact values must not introduce a diagonal.
-    if out.windows(2).any(|v| v[0][0] != v[1][0] && v[0][1] != v[1][1]) {
-        return None;
+    Some(result)
+}
+
+fn shared_auto_path(points: &[[Q; 2]], first: Option<Direction>, last: Option<Direction>) -> Option<Vec<[Q; 2]>> {
+    let segments = shared_auto_segments(points, first, last)?;
+    let mut out: Vec<_> = points.first().cloned().into_iter().collect();
+    for segment in segments {
+        out.extend(segment.into_iter().skip(1));
     }
     Some(out)
 }

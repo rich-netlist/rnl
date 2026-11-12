@@ -227,7 +227,23 @@ pub(crate) fn read(
     if crate::budget::stopped() {
         return None;
     }
-    sk.wires(problem, s, g, routing, crosses);
+    // Resolve each modern auto wire as a whole before modifying the skeleton. If any required
+    // geometry is missing or unrepresentable, reject the read rather than retaining a partial
+    // drawing or routing the affected wire through an invented straight segment.
+    let mut auto_paths = vec![None; problem.wires.len()];
+    for (index, wire) in problem.wires.iter().enumerate() {
+        if wire.default_auto
+            && wire.mode == "auto"
+            && wire.anchors.len() >= 2
+            && wire.anchors.iter().all(|r| sk.reads_reference(r))
+        {
+            if !sk.meter(wire.anchors.len()) {
+                return None;
+            }
+            auto_paths[index] = Some(crate::route::written_auto_segments(problem, g, index).ok()??);
+        }
+    }
+    sk.wires(problem, s, g, routing, crosses, &auto_paths);
     if crate::budget::stopped() {
         return None;
     }
@@ -431,7 +447,15 @@ impl Skeleton {
         self.vertices.len() - 1
     }
 
-    fn wires(&mut self, problem: &LevelProblem, s: &Structure, g: &Geometry, routing: &Routing, crosses: bool) {
+    fn wires(
+        &mut self,
+        problem: &LevelProblem,
+        s: &Structure,
+        g: &Geometry,
+        routing: &Routing,
+        crosses: bool,
+        auto_paths: &[Option<crate::route::WireSegments>],
+    ) {
         for (i, (wire, path)) in routing.wires.iter().zip(&routing.paths).enumerate() {
             let tree = routing.drawn.get(i).copied().unwrap_or(i);
             let mut vertices = Vec::new();
@@ -483,7 +507,7 @@ impl Skeleton {
             let mut vertices = Vec::new();
             let first = self.vertex(s, anchors[0].0, &anchors[0].1, tree);
             vertices.push(first);
-            for pair in anchors.windows(2) {
+            for (segment_index, pair) in anchors.windows(2).enumerate() {
                 if !self.meter(self.vertices.len()) {
                     return;
                 }
@@ -491,7 +515,16 @@ impl Skeleton {
                 let ia = *vertices.last().expect("one");
                 let ib = self.vertex(s, b.0, &b.1, tree);
                 let aligned = a.1[0] == b.1[0] || a.1[1] == b.1[1];
-                if !aligned {
+                if let Some(segments) = &auto_paths[w] {
+                    // Segment boundaries are supplied by the shared whole-wire helper, so each
+                    // written anchor is preserved even when it coincides with another anchor.
+                    for bend in
+                        segments[segment_index].iter().skip(1).take(segments[segment_index].len().saturating_sub(2))
+                    {
+                        let vertex = self.vertex(s, Key::Bend(id, vertices.len()), bend, tree);
+                        vertices.push(vertex);
+                    }
+                } else if !aligned {
                     let mode = wire.mode.as_str();
                     match mode {
                         "horizontal-vertical" | "vertical-horizontal" => {
@@ -1361,6 +1394,111 @@ mod tests {
                 assert_eq!(actual, crate::route::written_path(&p, &g, 0).unwrap().unwrap(), "{mode} {end:?}");
             }
         }
+    }
+
+    #[test]
+    fn authored_auto_keeps_distinct_coincident_waypoint_identities() {
+        use rnl_runtime::problem::ProblemWire;
+        let mut p = problem_of(vec![instance(), instance(), instance(), instance()], vec![]);
+        p.version = "0.4".into();
+        p.wires.push(ProblemWire {
+            label: "w".into(),
+            reference: Reference::Anonymous,
+            nets: vec![],
+            bus: false,
+            anchors: (0..4).map(PointRef::Origin).collect(),
+            mode: "auto".into(),
+            default_auto: true,
+            generated: false,
+        });
+        let s = structure(&p);
+        let mut g = s.witness.clone();
+        for (k, point) in [[0, 0], [2, 3], [2, 3], [8, 1]].into_iter().enumerate() {
+            g.origin[k] = point.map(int);
+        }
+        let sk = read(&p, &s, &g, &Routing::default(), &|_| true, false, false, None, false).unwrap();
+        let path = &sk.paths[0].vertices;
+        let actual: Vec<_> = path.iter().map(|&v| sk.vertices[v].at.clone()).collect();
+        assert_eq!(actual, crate::route::written_path(&p, &g, 0).unwrap().unwrap());
+        let keys: Vec<_> = path.iter().map(|&v| sk.vertices[v].key).filter(|k| matches!(k, Key::Point(_))).collect();
+        assert_eq!(keys, vec![Key::Point(0), Key::Point(1), Key::Point(2), Key::Point(3)]);
+        let one = path.iter().find(|&&v| sk.vertices[v].key == Key::Point(1)).unwrap();
+        let two = path.iter().find(|&&v| sk.vertices[v].key == Key::Point(2)).unwrap();
+        assert_ne!(one, two);
+    }
+
+    #[test]
+    fn authored_auto_respects_wire_source_marker() {
+        use rnl_runtime::problem::ProblemWire;
+        let mut p = problem_of(vec![instance(), instance()], vec![]);
+        p.version = "0.4".into();
+        p.wires.push(ProblemWire {
+            label: "w".into(),
+            reference: Reference::Anonymous,
+            nets: vec![],
+            bus: false,
+            anchors: vec![PointRef::Origin(0), PointRef::Origin(1)],
+            mode: "auto".into(),
+            default_auto: false,
+            generated: false,
+        });
+        let s = structure(&p);
+        let mut g = s.witness.clone();
+        g.origin[1] = [int(4), int(3)];
+        let sk = read(&p, &s, &g, &Routing::default(), &|_| true, false, false, None, false).unwrap();
+        let actual: Vec<_> = sk.paths[0].vertices.iter().map(|&v| sk.vertices[v].at.clone()).collect();
+        assert_eq!(actual, vec![[int(0), int(0)], [int(4), int(3)]]);
+    }
+
+    #[test]
+    fn authored_auto_preserves_pin_and_position_endpoint_identities() {
+        use rnl_runtime::problem::ProblemWire;
+        let mut p = problem_of(vec![instance(), instance()], vec![]);
+        p.version = "0.4".into();
+        p.wires.push(ProblemWire {
+            label: "w".into(),
+            reference: Reference::Anonymous,
+            nets: vec![],
+            bus: false,
+            anchors: vec![
+                PointRef::Pin { object: 0, pin: 0, terminal: "g".into() },
+                PointRef::PinPosition { object: 1, pin: 0, reference: Reference::Name("#M::g::position".into()) },
+            ],
+            mode: "auto".into(),
+            default_auto: true,
+            generated: false,
+        });
+        let s = structure(&p);
+        let mut g = s.witness.clone();
+        g.origin[1] = [int(8), int(3)];
+        let sk = read(&p, &s, &g, &Routing::default(), &|_| true, false, false, None, false).unwrap();
+        let path = &sk.paths[0].vertices;
+        let actual: Vec<_> = path.iter().map(|&v| sk.vertices[v].at.clone()).collect();
+        assert_eq!(actual, crate::route::written_path(&p, &g, 0).unwrap().unwrap());
+        assert_eq!(sk.vertices[*path.first().unwrap()].key, Key::Pin(0, 0));
+        assert_eq!(sk.vertices[*path.last().unwrap()].key, Key::PinPosition(1, 0));
+    }
+
+    #[test]
+    fn authored_auto_unrepresentable_geometry_rejects_skeleton_read() {
+        use rnl_runtime::problem::ProblemWire;
+        let mut p = problem_of(vec![instance(), instance()], vec![]);
+        p.version = "0.4".into();
+        p.wires.push(ProblemWire {
+            label: "w".into(),
+            reference: Reference::Anonymous,
+            nets: vec![],
+            bus: false,
+            anchors: vec![PointRef::Origin(0), PointRef::Origin(1)],
+            mode: "auto".into(),
+            default_auto: true,
+            generated: false,
+        });
+        let s = structure(&p);
+        let mut g = s.witness.clone();
+        g.origin[1] = [crate::rational::parse_decimal("1e-400").unwrap(), int(1)];
+        assert!(crate::route::written_path(&p, &g, 0).is_err());
+        assert!(read(&p, &s, &g, &Routing::default(), &|_| true, false, false, None, false).is_none());
     }
 
     #[test]
