@@ -65,6 +65,8 @@ const entries = [];
 for (const dir of ["tests/conformance/cases", "tests/conformance/equivalence", "tests/conformance/cases-0.3", "libraries/standard"]) {
   entries.push(...files(join(root, dir)).filter((path) => /\.(sp|scs|inc|rnl)$/.test(path)));
 }
+// The 0.4 solver-record corpus also exercises browser/native parity.
+entries.push(...files(join(root, "tests/roundtrip-0.4")).filter((path) => /\.(sp|scs)$/.test(path)));
 if (entries.length < 20) fail(`only ${entries.length} files found under ${root}`);
 // Explicit/default zero widths, double hairlines and the viewer's dark-colour boundary cases.
 entries.push(join(root, "tests/viewer/inputs/view-improvements.sp"));

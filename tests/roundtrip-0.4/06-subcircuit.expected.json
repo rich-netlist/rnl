@@ -1,0 +1,238 @@
+{
+  "failed": false,
+  "levels": [
+    {
+      "title": "06-subcircuit.sp",
+      "kind": "file",
+      "file": "06-subcircuit.sp",
+      "symbols": [],
+      "items": [],
+      "wires": [],
+      "shapes": [],
+      "texts": [],
+      "flylines": [],
+      "constraints": [],
+      "unplaced": [
+        "#X1"
+      ]
+    },
+    {
+      "title": "cell",
+      "kind": "subckt",
+      "file": "06-subcircuit.sp",
+      "symbols": [
+        {
+          "name": "$PART",
+          "box": [
+            -1.0,
+            -1.0,
+            1.0,
+            1.0
+          ],
+          "box_written": false,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                2.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": null,
+              "dir": null
+            },
+            {
+              "pos": [
+                0.0,
+                -2.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": null,
+              "dir": null
+            }
+          ],
+          "prims": [
+            {
+              "shape": "RECTANGLE",
+              "points": [
+                [
+                  0.0,
+                  0.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        }
+      ],
+      "items": [
+        {
+          "id": "#R1",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            0.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {},
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#R2",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            10.0,
+            4.0
+          ],
+          "orient": "R0",
+          "style": {},
+          "layer": "middle",
+          "texts": {}
+        }
+      ],
+      "wires": [
+        {
+          "id": "a wire",
+          "nets": [
+            "a"
+          ],
+          "points": [
+            [
+              0.0,
+              2.0
+            ],
+            [
+              0.0,
+              8.0
+            ],
+            [
+              20.0,
+              8.0
+            ],
+            [
+              20.0,
+              6.0
+            ],
+            [
+              10.0,
+              6.0
+            ]
+          ],
+          "mode": "straight",
+          "style": {},
+          "layer": "middle"
+        },
+        {
+          "id": "%return path",
+          "nets": [
+            "b"
+          ],
+          "points": [
+            [
+              0.0,
+              -2.0
+            ],
+            [
+              0.0,
+              2.0
+            ],
+            [
+              10.0,
+              2.0
+            ]
+          ],
+          "mode": "straight",
+          "style": {},
+          "layer": "middle"
+        }
+      ],
+      "shapes": [],
+      "texts": [
+        {
+          "id": "#R1::note",
+          "anchor": [
+            1.0,
+            12.0
+          ],
+          "lines": [
+            [
+              {
+                "text": "R",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              },
+              {
+                "text": "one",
+                "level": -1,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {},
+          "layer": "middle"
+        },
+        {
+          "id": "a text",
+          "anchor": [
+            40.0,
+            16.0
+          ],
+          "lines": [
+            [
+              {
+                "text": "电阻 α",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {},
+          "layer": "middle"
+        }
+      ],
+      "flylines": [],
+      "constraints": [],
+      "unplaced": []
+    }
+  ],
+  "diagnostics": [
+    {
+      "severity": "hint",
+      "code": "RNL0003",
+      "name": "host-non-ascii-comment",
+      "file": "06-subcircuit.sp",
+      "line": 10,
+      "col": 16
+    },
+    {
+      "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
+      "file": "06-subcircuit.sp",
+      "line": 1,
+      "col": 0
+    }
+  ]
+}

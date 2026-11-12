@@ -39,3 +39,6 @@ and run the same command, then review every changed record and JSON file. `RNL_B
 and `RNL_BLESS_0_3` do not update this corpus. On the shared Windows build host, first
 check that no other cargo/rustc is running and at least 8 GiB is free; set
 `$env:CARGO_BUILD_JOBS = "4"` before running cargo.
+
+The independent [0.4 corpus](../roundtrip-0.4/README.md) runs through the same harness.
+`RNL_BLESS_ROUNDTRIP` never updates its references; use `RNL_BLESS_ROUNDTRIP_0_4` for those.

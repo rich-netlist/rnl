@@ -1,5 +1,5 @@
-//! Dedicated 0.3 solver-record roundtrips. The corpus and reviewed expected files live in
-//! tests/roundtrip; RNL_BLESS_ROUNDTRIP=1 updates only this corpus.
+//! Solver-record roundtrips for 0.3 and 0.4, with independently reviewed references.
+//! RNL_BLESS_ROUNDTRIP and RNL_BLESS_ROUNDTRIP_0_4 update only their own corpus.
 
 use std::path::Path;
 
@@ -94,19 +94,19 @@ fn priorities(r: &Interpretation, level: usize) -> Vec<(String, String)> {
     v
 }
 
-fn expected(path: &Path, actual: &str) {
-    if std::env::var_os("RNL_BLESS_ROUNDTRIP").is_some() {
+fn expected(path: &Path, actual: &str, bless: bool) {
+    if bless {
         std::fs::write(path, actual).unwrap();
     } else {
         let want = std::fs::read_to_string(path)
-            .unwrap_or_else(|_| panic!("{} missing; run with RNL_BLESS_ROUNDTRIP=1", path.display()));
+            .unwrap_or_else(|_| panic!("{} missing; use the blessing variable of its corpus", path.display()));
         assert_eq!(want.replace("\r\n", "\n"), actual, "{}", path.display());
     }
 }
 
-#[test]
-fn dedicated_cases_preserve_the_written_result_on_reread_and_replacement() {
-    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/roundtrip");
+fn check_corpus(directory: &str, variable: &str, language: &str) {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../../tests/{directory}"));
+    let bless = std::env::var_os(variable).is_some();
     let mut cases: Vec<_> = std::fs::read_dir(&dir)
         .unwrap()
         .map(|e| e.unwrap().path())
@@ -121,6 +121,7 @@ fn dedicated_cases_preserve_the_written_result_on_reread_and_replacement() {
             let text = if final_newline { source.clone() } else { source.trim_end_matches('\n').to_string() }
                 .replace('\n', eol);
             let before = read(file, &text, true);
+            assert_eq!(before.model.language, language, "{file}: wrong corpus language");
             let p = before.problems.iter().find(|p| !p.wires.is_empty()).unwrap();
             let s = solution(p);
             let written = write_record(p, &s, "roundtrip", &rnl_runtime::problem::sig2(p, "roundtrip-v1"));
@@ -179,12 +180,23 @@ fn dedicated_cases_preserve_the_written_result_on_reread_and_replacement() {
                 "{file}: effective model changed"
             );
             if eol == "\n" && final_newline {
-                expected(&path.with_extension("record.rnl"), &(record + "\n"));
+                expected(&path.with_extension("record.rnl"), &(record + "\n"), bless);
                 expected(
                     &path.with_extension("expected.json"),
                     &(serde_json::to_string_pretty(&dump::conformance(&after)).unwrap() + "\n"),
+                    bless,
                 );
             }
         }
     }
+}
+
+#[test]
+fn dedicated_cases_preserve_the_written_result_on_reread_and_replacement() {
+    check_corpus("roundtrip", "RNL_BLESS_ROUNDTRIP", "0.3");
+}
+
+#[test]
+fn modern_cases_preserve_the_written_result_on_reread_and_replacement() {
+    check_corpus("roundtrip-0.4", "RNL_BLESS_ROUNDTRIP_0_4", "0.4");
 }

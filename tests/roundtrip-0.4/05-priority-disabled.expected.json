@@ -1,0 +1,114 @@
+{
+  "failed": false,
+  "levels": [
+    {
+      "title": "05-priority-disabled.sp",
+      "kind": "file",
+      "file": "05-priority-disabled.sp",
+      "symbols": [
+        {
+          "name": "$PART",
+          "box": [
+            0.0,
+            -2.0,
+            0.0,
+            2.0
+          ],
+          "box_written": false,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                2.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": null,
+              "dir": null
+            },
+            {
+              "pos": [
+                0.0,
+                -2.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": null,
+              "dir": null
+            }
+          ],
+          "prims": [],
+          "nested": []
+        }
+      ],
+      "items": [
+        {
+          "id": "#R1",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            0.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {},
+          "layer": "middle",
+          "texts": {}
+        }
+      ],
+      "wires": [
+        {
+          "id": "a wire",
+          "nets": [
+            "b"
+          ],
+          "points": [
+            [
+              0.0,
+              -2.0
+            ],
+            [
+              0.0,
+              -6.0
+            ],
+            [
+              0.0,
+              -6.0
+            ]
+          ],
+          "mode": "straight",
+          "style": {},
+          "layer": "middle"
+        }
+      ],
+      "shapes": [],
+      "texts": [],
+      "flylines": [],
+      "constraints": [
+        {
+          "label": "%low",
+          "kind": "ALIGN",
+          "status": "disabled",
+          "priority": "disabled"
+        },
+        {
+          "label": "%high",
+          "kind": "DISTANCE",
+          "status": "disabled",
+          "priority": "disabled"
+        },
+        {
+          "label": "%plain",
+          "kind": "DISTANCE",
+          "status": "disabled",
+          "priority": "disabled"
+        }
+      ],
+      "unplaced": []
+    }
+  ],
+  "diagnostics": []
+}
