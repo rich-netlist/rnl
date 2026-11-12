@@ -469,21 +469,25 @@ fn expanded_0_4_symbols_and_chinese_aliases_load_cleanly() {
                 s.bbox
             );
         }
+        let min_px = s.pins.iter().map(|p| p.at[0]).reduce(f64::min);
+        let max_px = s.pins.iter().map(|p| p.at[0]).reduce(f64::max);
+        let min_py = s.pins.iter().map(|p| p.at[1]).reduce(f64::min);
+        let max_py = s.pins.iter().map(|p| p.at[1]).reduce(f64::max);
         let left = s.pins.iter().filter(|p| p.direction == Some("left")).map(|p| p.at[0]).reduce(f64::min);
         let down = s.pins.iter().filter(|p| p.direction == Some("down")).map(|p| p.at[1]).reduce(f64::min);
         let right = s.pins.iter().filter(|p| p.direction == Some("right")).map(|p| p.at[0]).reduce(f64::max);
         let up = s.pins.iter().filter(|p| p.direction == Some("up")).map(|p| p.at[1]).reduce(f64::max);
         if let Some(v) = left {
-            assert_eq!(x1, v, "{} left box edge", s.symbol);
+            assert_eq!(x1, v.min(min_px.unwrap_or(v)), "{} left box edge", s.symbol);
         }
         if let Some(v) = down {
-            assert_eq!(y1, v, "{} down box edge", s.symbol);
+            assert_eq!(y1, v.min(min_py.unwrap_or(v)), "{} down box edge", s.symbol);
         }
         if let Some(v) = right {
-            assert_eq!(x2, v, "{} right box edge", s.symbol);
+            assert_eq!(x2, v.max(max_px.unwrap_or(v)), "{} right box edge", s.symbol);
         }
         if let Some(v) = up {
-            assert_eq!(y2, v, "{} up box edge", s.symbol);
+            assert_eq!(y2, v.max(max_py.unwrap_or(v)), "{} up box edge", s.symbol);
         }
     }
 
@@ -519,6 +523,96 @@ Xdff d clk rst q qb vdd 0 dffr7
 .end
 "#;
     let r_zh = read(&MemoryProvider::new().with("t.sp", zh), &Options::default());
+    assert!(errors(&r_zh).is_empty(), "{:?}", errors(&r_zh));
+    assert!(by_severity(&r_zh, Severity::Warning).is_empty(), "{:?}", by_severity(&r_zh, Severity::Warning));
+    assert!(by_severity(&r_zh, Severity::Violation).is_empty(), "{:?}", by_severity(&r_zh, Severity::Violation));
+}
+
+#[test]
+fn optional_45deg_package_is_isolated_from_rnl_std_all_and_stays_on_grid() {
+    let without_45 = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }\nR1 a 0 1k\n* @RNL { #R1 @SET-SYMBOL $RESISTOR_45 }\n.end\n";
+    let r_without = read(&MemoryProvider::new().with("t.sp", without_45), &Options::default());
+    assert!(!level(&r_without).packages.iter().any(|p| p.name == "rnl-std-45deg"));
+    assert!(!errors(&r_without).is_empty(), "rnl-std-all must not implicitly load rnl-std-45deg");
+
+    let all = rnl_view::catalog(
+        &MemoryProvider::default(),
+        &rnl_view::CatalogOptions { all_versions: true, ..Default::default() },
+    );
+    let syms_45: Vec<_> = all.symbols.iter().filter(|s| s.package == "rnl-std-45deg" && s.version == "0.4").collect();
+    let expected_45 = [
+        "$RESISTOR_45",
+        "$CAPACITOR_45",
+        "$INDUCTOR_45",
+        "$SWITCH_45",
+        "$VOLTAGE_SOURCE_45",
+        "$CURRENT_SOURCE_45",
+        "$DIODE_45",
+        "$ZENER_DIODE_45",
+        "$SCHOTTKY_DIODE_45",
+        "$LED_45",
+        "$NMOS_45",
+        "$NMOS_4TERM_45",
+        "$PMOS_45",
+        "$PMOS_4TERM_45",
+        "$NPN_45",
+        "$PNP_45",
+        "$ARROW_45_SYMBOL",
+    ];
+    let got_names: Vec<&str> = syms_45.iter().map(|s| s.symbol.as_str()).collect();
+    assert_eq!(got_names, expected_45);
+
+    let defs_45: Vec<&str> = all
+        .definitions
+        .iter()
+        .filter(|d| d.package == "rnl-std-45deg" && d.version == "0.4")
+        .map(|d| d.definition.as_str())
+        .collect();
+    assert_eq!(defs_45, ["$ARROW_45", "$CURRENT_ARROW_45"]);
+
+    let transform = |[x, y]: [f64; 2], code: &str| -> [f64; 2] {
+        match code {
+            "R0" => [x, y],
+            "R90" => [-y, x],
+            "R180" => [-x, -y],
+            "R270" => [y, -x],
+            "MY" => [-x, y],
+            "MX" => [x, -y],
+            "MYR90" => [-y, -x],
+            "MXR90" => [y, x],
+            _ => unreachable!(),
+        }
+    };
+    for s in &syms_45 {
+        for p in &s.pins {
+            for code in ["R0", "R90", "R180", "R270", "MY", "MX", "MYR90", "MXR90"] {
+                let [tx, ty] = transform(p.at, code);
+                assert_eq!(tx.fract(), 0.0, "{} {} pin {:?} off x grid", s.symbol, code, p);
+                assert_eq!(ty.fract(), 0.0, "{} {} pin {:?} off y grid", s.symbol, code, p);
+            }
+        }
+    }
+
+    let zh_45 = r#"* rnl-std-45deg + alias-zh 0.4
+* @RNL(type="header") {
+*   @VERSION("0.4");
+*   @USE-PACKAGE(name="rnl-std-all", version="0.4");
+*   @USE-PACKAGE(name="rnl-std-45deg", version="0.4");
+*   @USE-ALIASES(name="alias-zh", version="0.4");
+* }
+.model nch nmos
+R1 a b 1k
+M1 d g s 0 nch
+* @RNL {
+*   #R1 @使用符号 $"45度电阻" => @位于(0, 0) => @朝向("R90");
+*   #M1 @使用符号 $"45度四端子NMOS" => @位于(8, 0);
+*   %pt = (4, 4);
+*   %pt(挂点) @视作 $"45度箭头";
+*   #R1:p(挂点) @视作 $"45度电流箭头";
+* }
+.end
+"#;
+    let r_zh = read(&MemoryProvider::new().with("t.sp", zh_45), &Options::default());
     assert!(errors(&r_zh).is_empty(), "{:?}", errors(&r_zh));
     assert!(by_severity(&r_zh, Severity::Warning).is_empty(), "{:?}", by_severity(&r_zh, Severity::Warning));
     assert!(by_severity(&r_zh, Severity::Violation).is_empty(), "{:?}", by_severity(&r_zh, Severity::Violation));

@@ -841,7 +841,7 @@ R1 p q 1k
         // 0.3 has the packages of 16.3 of the language 0.3 and rnl-zh; 0.4 has the single
         // collection rnl-std-all, rnl-std-semantics and alias-zh
         assert_eq!(series("0.3"), 16);
-        assert_eq!(series("0.4"), 14);
+        assert_eq!(series("0.4"), 15);
         for name in
             ["rnl-std", "rnl-std-core", "rnl-std-basic", "rnl-std-spice", "rnl-std-spectre", "rnl-std-full", "rnl-zh"]
         {

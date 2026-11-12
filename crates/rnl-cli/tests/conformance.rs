@@ -196,7 +196,7 @@ fn standard_packages_check_clean() {
 #[test]
 fn the_formal_standard_series_checks_clean() {
     let packages = standard_packages().1;
-    assert_eq!(packages.len(), 14, "expected 14 package files, got {}", packages.len());
+    assert_eq!(packages.len(), 15, "expected 15 package files, got {}", packages.len());
     for file in packages {
         let read = interpret_file(&file, None, &FsProvider::new(&[]), &Options::default()).unwrap();
         let diagnostics: Vec<_> = read.diagnostics().iter().map(|d| read.sink.render(d)).collect();
