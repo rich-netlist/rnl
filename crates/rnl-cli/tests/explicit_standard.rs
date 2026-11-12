@@ -9,10 +9,11 @@ use rnl_runtime::{Interpretation, Options};
 fn files(text: &str) -> MemoryProvider {
     let mut files = MemoryProvider { package_dirs: vec!["/pkg".into()], ..MemoryProvider::new() }.with("/t.sp", text);
     for version in ["0.2", "0.3", "0.4"] {
+        let name = if version == "0.4" { "rnl-std-all" } else { "rnl-std" };
         files.insert(
-            &format!("/pkg/{version}/rnl-std.rnl"),
+            &format!("/pkg/{version}/{name}.rnl"),
             &format!(
-                r#"@RNL(type="header") {{ @VERSION("{version}"); @PACKAGE(name="rnl-std", version="{version}") }}
+                r#"@RNL(type="header") {{ @VERSION("{version}"); @PACKAGE(name="{name}", version="{version}") }}
 @RNL {{ $D = @DEFINE(roles=["i"]) {{}} }}
 "#
             ),
@@ -51,7 +52,7 @@ fn the_setting_adds_the_standard_package_for_the_main_draft_file() {
 #[test]
 fn an_explicit_reference_works_with_both_settings_off() {
     let result = read(
-        &files(&source("0.4", r#"@USE-PACKAGE(name="rnl-std", version="0.4")"#)),
+        &files(&source("0.4", r#"@USE-PACKAGE(name="rnl-std-all", version="0.4")"#)),
         Options { std: false, ..Options::solver() },
     );
     assert_eq!(errors(&result), 0, "{:?}", result.diagnostics());
@@ -70,7 +71,7 @@ fn the_added_reference_is_saved_once_and_reads_without_the_setting() {
             result.included_standard.as_deref().unwrap(),
         );
         assert_eq!(saved.matches("@USE-PACKAGE").count(), 1);
-        assert!(saved.contains(r#"@VERSION("0.4"); @USE-PACKAGE(name="rnl-std", version="0.4")"#));
+        assert!(saved.contains(r#"@VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4")"#));
         if newline == "\r\n" {
             assert!(!saved.replace("\r\n", "").contains('\n'));
         }
@@ -94,7 +95,7 @@ fn solve_persists_the_setting_in_the_main_header() {
 #[test]
 fn a_failed_explicit_header_reference_does_not_fall_back_to_the_setting() {
     let result = read(
-        &files(&source("0.4", r#"@USE-PACKAGE(name="rnl-std", version="999.0")"#)),
+        &files(&source("0.4", r#"@USE-PACKAGE(name="rnl-std-all", version="999.0")"#)),
         Options { include_std: true, ..Options::solver() },
     );
     assert!(errors(&result) > 0);
@@ -112,7 +113,7 @@ fn the_edit_writer_persists_its_reading_setting() {
     let text = rnl_edit::write_with_options(&request, &files(""), &Options { include_std: true, ..Options::default() })
         .unwrap();
     assert_eq!(text.matches("@USE-PACKAGE").count(), 1);
-    assert!(text.contains(r#"@USE-PACKAGE(name="rnl-std", version="0.4")"#));
+    assert!(text.contains(r#"@USE-PACKAGE(name="rnl-std-all", version="0.4")"#));
 }
 
 #[test]
@@ -142,7 +143,7 @@ fn replace_records_persists_the_setting_only_when_writing_the_main_file() {
 #[test]
 fn an_inline_drop_prevents_the_setting_from_adding_a_default() {
     let result = read(
-        &files(&source("0.4", r#"@USE-PACKAGE(name="rnl-std") {}"#)),
+        &files(&source("0.4", r#"@USE-PACKAGE(name="rnl-std-all") {}"#)),
         Options { include_std: true, ..Options::solver() },
     );
     assert!(result.diagnostics().iter().any(|d| d.code == codes::REF_NOT_FOUND));
@@ -174,8 +175,8 @@ fn missing_standard_names_give_one_dynamic_package_hint_per_file() {
     let text = source("0.4", "").replace("#R1 @AS $D", "#R1 @AS $D; #R1 @AS $E; #R1 @AS $UNKNOWN");
     let mut provider = files(&text);
     provider.insert(
-        "/pkg/0.4/rnl-std.rnl",
-        r#"@RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="rnl-std", version="0.4") }
+        "/pkg/0.4/rnl-std-all.rnl",
+        r#"@RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="rnl-std-all", version="0.4") }
 @RNL { $D = @DEFINE(roles=["i"]) {}; $E = @DEFINE(roles=["i"]) {}; @BAD-UNUSED-KEYWORD }
 "#,
     );
@@ -183,7 +184,7 @@ fn missing_standard_names_give_one_dynamic_package_hint_per_file() {
     let hints: Vec<_> =
         result.diagnostics().into_iter().filter(|d| d.code == codes::STANDARD_PACKAGE_NOT_USED).collect();
     assert_eq!(hints.len(), 1, "{:?}", result.diagnostics());
-    assert!(result.sink.render(hints[0]).contains("rnl-std"));
+    assert!(result.sink.render(hints[0]).contains("rnl-std-all"));
     assert_eq!(errors(&result), 3, "unused package errors must stay silent: {:?}", result.diagnostics());
 
     let result = read(&files(&source("0.4", "").replace("$D", "$UNKNOWN")), Options::solver());
@@ -195,7 +196,7 @@ fn missing_standard_names_give_one_dynamic_package_hint_per_file() {
 #[test]
 fn optional_package_hints_follow_the_available_collection_graph() {
     let mut provider = files(&source("0.4", "").replace("$D", "$OPTIONAL"));
-    provider.insert("/pkg/0.4/rnl-std-full.rnl", r#"@RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="rnl-std-full", version="0.4"); @USE-PACKAGE(name="optional", version="0.4") }"#);
+    provider.insert("/pkg/0.4/rnl-std-all.rnl", r#"@RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="rnl-std-all", version="0.4"); @USE-PACKAGE(name="optional", version="0.4") }"#);
     provider.insert(
         "/pkg/0.4/optional.rnl",
         r#"@RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="optional", version="0.4") }
@@ -209,7 +210,7 @@ fn optional_package_hints_follow_the_available_collection_graph() {
 #[test]
 fn hint_lookup_uses_path_fallback_and_the_smallest_compatible_version() {
     let mut provider = files(&source("0.4", "").replace("$D", "$OPTIONAL"));
-    provider.insert("/pkg/0.4/rnl-std-full.rnl", r#"@RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="rnl-std-full", version="0.4"); @USE-PACKAGE(name="optional", version="1.0", path="missing.rnl") }"#);
+    provider.insert("/pkg/0.4/rnl-std-all.rnl", r#"@RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="rnl-std-all", version="0.4"); @USE-PACKAGE(name="optional", version="1.0", path="missing.rnl") }"#);
     for (version, name) in [("1.1", "OPTIONAL"), ("1.2", "NEWER")] {
         provider.insert(
             &format!("/pkg/{version}/optional.rnl"),
@@ -247,8 +248,8 @@ fn the_setting_pins_the_newest_series_written_in_the_files_language() {
     let text = source("0.4", "");
     let mut provider = files(&text);
     provider.insert(
-        "/pkg/1.7/rnl-std.rnl",
-        r#"@RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="rnl-std", version="1.7") }
+        "/pkg/1.7/rnl-std-all.rnl",
+        r#"@RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="rnl-std-all", version="1.7") }
 @RNL { $D = @DEFINE(roles=["i"]) {} }"#,
     );
     let result = read(&provider, Options { include_std: true, ..Options::solver() });
@@ -273,7 +274,7 @@ fn command_line_setting_reaches_check_solve_and_both_edit_commands() {
     ));
     fs::create_dir_all(&folder).unwrap();
     fs::write(folder.join("t.sp"), source("0.4", "")).unwrap();
-    fs::write(folder.join("rnl-std.rnl"), "@RNL(type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"rnl-std\", version=\"0.4\") }\n@RNL { $D = @DEFINE(roles=[\"i\"]) {} }").unwrap();
+    fs::write(folder.join("rnl-std-all.rnl"), "@RNL(type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }\n@RNL { $D = @DEFINE(roles=[\"i\"]) {} }").unwrap();
     let run = |args: &[&str]| {
         Command::new(env!("CARGO_BIN_EXE_rnl"))
             .current_dir(&folder)

@@ -694,8 +694,14 @@ pub fn with_standard_package(doc: &HostDocument, text: &str, package_version: &s
     if doc.is_package(file) {
         return text.to_string();
     }
-    let statement =
-        format!("@USE-PACKAGE(name=\"rnl-std\", version={})", crate::problem::written_string(package_version));
+    let language = crate::interp::unit::scan_language_decl(text)
+        .unwrap_or_else(|| crate::interp::unit::DEFAULT_VERSION.to_string());
+    let standard = crate::interp::standard_package_name(&language);
+    let statement = format!(
+        "@USE-PACKAGE(name={}, version={})",
+        crate::problem::written_string(standard),
+        crate::problem::written_string(package_version)
+    );
     let marker = carrier(doc, file, text);
     let records = file_records(doc, file, Some(0)).1;
     // An explicit reference of any form, including an inline drop or a language-qualified
@@ -709,7 +715,7 @@ pub fn with_standard_package(doc: &HostDocument, text: &str, package_version: &s
                             params
                                 .named
                                 .iter()
-                                .any(|param| param.name == "name" && param.value == Value::Str("rnl-std".into()))
+                                .any(|param| param.name == "name" && param.value == Value::Str(standard.into()))
                         })
                 })
             })

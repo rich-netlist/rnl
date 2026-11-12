@@ -45,7 +45,7 @@ mod solver_config;
 mod specific;
 mod table;
 /// The name of the standard package that the setting of 16.3 brings in at the root.
-pub use packages::STD_NAME;
+pub use packages::{standard_package_name, STD_NAME};
 pub mod phases;
 mod renames;
 pub mod scene;
@@ -290,6 +290,7 @@ pub struct Interp<'p> {
     /// when it cannot be found, and whether a chain that would use it has said so (16.3).
     pub(crate) missing_std: Option<(String, bool)>,
     pub(crate) std_language_reported: HashSet<UnitId>,
+    pub(crate) std_alias_reported: HashSet<UnitId>,
     /// The packages in effect on each chain of levels, and the number of units they were found
     /// among (16.2).
     pub(crate) effs: HashMap<EffKey, Rc<Eff>>,
@@ -424,6 +425,7 @@ impl<'p> Interp<'p> {
             std_units: HashMap::new(),
             missing_std: None,
             std_language_reported: HashSet::new(),
+            std_alias_reported: HashSet::new(),
             effs: HashMap::new(),
             effs_units: 0,
             expansions: HashMap::new(),
@@ -865,10 +867,10 @@ impl<'p> Interp<'p> {
                     let pn = self.units[owner].pkg_name.clone();
                     if !self.std_env(EffKey::Level(lv)).0.contains(&pn) {
                         format!("in the package {pn}")
-                    } else if pn == packages::STD_NAME {
+                    } else if pn == self.standard_name(EffKey::Level(lv)) {
                         format!("in the standard package {pn}")
                     } else {
-                        format!("in {pn} of the standard package {}", packages::STD_NAME)
+                        format!("in {pn} of the standard package {}", self.standard_name(EffKey::Level(lv)))
                     }
                 } else {
                     let l = self.units[owner].level.map(|l| self.doc.levels[l].title()).unwrap_or_default();
@@ -925,7 +927,9 @@ impl<'p> Interp<'p> {
                         let written = packages::shown(&self.units[p].names[&key]);
                         let (pn, qn) = (self.units[p].pkg_name.clone(), self.units[q].pkg_name.clone());
                         let what = match by {
-                            _ if std.0.contains(&qn) => format!("the standard package {}", packages::STD_NAME),
+                            _ if std.0.contains(&qn) => {
+                                format!("the standard package {}", self.standard_name(EffKey::Level(lv)))
+                            }
                             Some(by) if Some(q) != by.pkg => {
                                 format!("the package {qn} that the earlier USE-PACKAGE of {} brings in", by.name)
                             }

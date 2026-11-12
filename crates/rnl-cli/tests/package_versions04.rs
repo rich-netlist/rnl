@@ -233,7 +233,7 @@ fn the_tool_standard_setting_uses_the_newest_unbounded_version() {
     for (name, version, definition) in [("low", "1.0", "LOW"), ("high", huge, "HIGH")] {
         files.insert(
             &format!("pkg/{name}.rnl"),
-            &package("0.4", version, "", definition).replace("name=\"p\"", "name=\"rnl-std\""),
+            &package("0.4", version, "", definition).replace("name=\"p\"", "name=\"rnl-std-all\""),
         );
     }
     let result =

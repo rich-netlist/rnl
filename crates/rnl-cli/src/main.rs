@@ -46,7 +46,7 @@ options:
   --package-dir DIR   look for packages in DIR as well (16.2), its .rnl files; repeatable
   --no-std            do not use the standard package at the root (16.3)
   --include-std       add the standard package to a draft 0.4 file (off by default)
-  --std-version V     use rnl-std V at the root, whatever the files' language version, such as 0.2
+  --std-version V     use version V of the file language's standard collection at the root
                       to read a file of 0.3 with the series 0.2; a version pinned in a header
                       record still comes first (16.3), and V not found is an error only for the
                       files that do not pin one. rnl solve does not take it

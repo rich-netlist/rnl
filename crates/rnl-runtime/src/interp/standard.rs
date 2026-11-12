@@ -9,7 +9,7 @@ use crate::source::{dirname, join, Provider};
 use crate::syntax::{parse_record_features, ObjExpr, Value};
 
 use super::ctx::Ctx;
-use super::packages::STD_NAME;
+use super::packages::standard_package_name;
 use super::unit::{
     package_version_cmp, params_by_name, scan_language_decl, scan_package_decl, valid_package_version, version_ok,
 };
@@ -42,9 +42,8 @@ fn index(files: &dyn Provider) -> BTreeMap<String, Vec<String>> {
     let mut names: BTreeMap<String, Vec<String>> = BTreeMap::new();
     let mut candidates: HashMap<String, Vec<Package>> = HashMap::new();
     let mut seen = HashSet::new();
-    // These are package-lookup entry points, not a table of definition names. The fuller
-    // collection also discovers optional packages that the default collection does not use.
-    let mut pending = vec![("rnl-std-full".to_string(), None::<String>, None::<String>), (STD_NAME.into(), None, None)];
+    // Discover names by following the formal collection, without recognizing definition names.
+    let mut pending = vec![(standard_package_name("0.4").to_string(), None::<String>, None::<String>)];
     while let Some((name, version, path)) = pending.pop() {
         if version.as_ref().is_some_and(|v| !valid_package_version(v)) {
             continue;

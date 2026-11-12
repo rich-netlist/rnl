@@ -165,13 +165,14 @@ fn a_reference_checks_the_language_even_when_the_package_is_already_cached() {
 fn a_tool_override_cannot_select_a_different_language_but_an_explicit_use_takes_precedence() {
     for (reader, other) in [("0.4", "0.2"), ("0.4", "0.3"), ("0.2", "0.4"), ("0.3", "0.4")] {
         // The override is consulted in 0.4 only when the tool explicitly adds the package.
+        let standard = if reader == "0.4" { "rnl-std-all" } else { "rnl-std" };
         let options = Options { std_version: Some(other.into()), include_std: reader == "0.4", ..Options::default() };
         let files = |reference: &str| {
             let mut files = MemoryProvider::new()
                 .with("t.sp", &file(reader, reference, ""))
-                .with("pkgs/std2.rnl", &package("0.2", "rnl-std", "0.2", "", ""))
-                .with("pkgs/std3.rnl", &package("0.3", "rnl-std", "0.3", "", ""))
-                .with("pkgs/std4.rnl", &package("0.4", "rnl-std", "0.4", "", ""));
+                .with("pkgs/std2.rnl", &package("0.2", standard, "0.2", "", ""))
+                .with("pkgs/std3.rnl", &package("0.3", standard, "0.3", "", ""))
+                .with("pkgs/std4.rnl", &package("0.4", standard, "0.4", "", ""));
             files.package_dirs.push("pkgs".into());
             files
         };
@@ -180,8 +181,8 @@ fn a_tool_override_cannot_select_a_different_language_but_an_explicit_use_takes_
         assert_eq!(errors(&r)[0].0, codes::PACKAGE_LANGUAGE_MISMATCH);
         assert!(r.model.levels[0].packages.is_empty());
         for reference in [
-            format!("@USE-PACKAGE(name=\"rnl-std\",version=\"{reader}\");"),
-            "@USE-PACKAGE(name=\"rnl-std\") {};".into(),
+            format!("@USE-PACKAGE(name=\"{standard}\",version=\"{reader}\");"),
+            format!("@USE-PACKAGE(name=\"{standard}\") {{}};"),
         ] {
             assert_eq!(errors(&read(&files(&reference), &options)), []);
         }

@@ -7,8 +7,8 @@
 //! same way, then itself; within one expansion each package is placed once, at its first place.
 //! On a chain of levels one package of a name is in effect: the USE-PACKAGE written in a file
 //! nearest to the level, else, for a package that only references bring in, the newest version
-//! within the major version of the reference expanded first. The standard package `rnl-std` is a
-//! package collection of this kind (16.3), used implicitly at the root.
+//! within the major version of the reference expanded first. The standard collection is placed
+//! first at the root when referenced by a header or added by a tool setting (16.3).
 
 use crate::host::language::Languages;
 use std::collections::{HashMap, HashSet};
@@ -19,12 +19,22 @@ use crate::host::{LevelId, LevelKind};
 
 use super::obj::{SceneId, UnitId};
 use super::unit::{
-    package_version_cmp, same_package_major, version_key, Binding, DeviceDecl, EffPackage, Place, UnitKind, UseDecl,
+    is_alias_package, package_version_cmp, same_package_major, version_key, Binding, DeviceDecl, EffPackage, Place,
+    UnitKind, UseDecl,
 };
 use super::Interp;
 
-/// The name of the standard package, used implicitly at the root (16.3).
+/// The standard collection of the released 0.2/0.3 languages (16.3).
 pub const STD_NAME: &str = "rnl-std";
+
+/// The collection name follows the file's language, independently of the package version.
+pub fn standard_package_name(language: &str) -> &'static str {
+    if super::unit::keeps_0_4(language) {
+        "rnl-std-all"
+    } else {
+        STD_NAME
+    }
+}
 
 /// The rule packages of the standard series 0.3, which give instances their symbols in each
 /// dialect: by element letter and model type in SPICE, by master and model type in Spectre (16.3).
@@ -194,9 +204,31 @@ pub(crate) fn shown(b: &Binding) -> String {
 }
 
 impl Interp<'_> {
+    fn standard_unit(&self, key: EffKey) -> UnitId {
+        match key {
+            EffKey::Level(level) => self.level_unit[level],
+            EffKey::Alone(unit) => unit,
+        }
+    }
+
+    pub(super) fn standard_name(&self, key: EffKey) -> &'static str {
+        standard_package_name(&self.version_of(Some(self.standard_unit(key))))
+    }
+
+    fn standard_request_location(&self, unit: UnitId) -> Option<Loc> {
+        let writer = self.file_unit(unit).unwrap_or(unit);
+        self.units[writer].header_record.and_then(|record| self.rec_loc(Some(record), 0)).or_else(|| {
+            let file = self.units[writer]
+                .level
+                .map(|level| self.doc.levels[level].file.clone())
+                .unwrap_or_else(|| self.units[writer].name.clone());
+            Some(Loc::line(file, 1))
+        })
+    }
+
     /// The standard package used implicitly for the files of the language version `language`
     /// (16.3): the newest version in the package directories of the standard series written in
-    /// that version, as the header record of its `rnl-std` declares, so that a file of 0.2 uses
+    /// that version, as the collection header declares, so that a file of 0.2 uses
     /// the series 0.2 and a file of 0.3 the series 0.3; or the version that the reading asks for
     /// ([`crate::Options::std_version`]). The implicit reference checks the 0.4 boundary before
     /// making its names available. Reading it reads the packages it references.
@@ -207,11 +239,12 @@ impl Interp<'_> {
         if let Some(&s) = self.std_units.get(language) {
             return s;
         }
-        self.scan_packages(STD_NAME);
+        let standard = standard_package_name(language);
+        self.scan_packages(standard);
         // of the files of one version, the one found is the first in the order of the package
         // directories (16.2): one of a frontend's own directories hides the bundled one
         let mut found: Vec<(String, String, String)> = Vec::new();
-        for c in self.pkg_files[STD_NAME].iter().filter(|c| c.0 == STD_NAME) {
+        for c in self.pkg_files[standard].iter().filter(|c| c.0 == standard) {
             if !found.iter().any(|f| f.1 == c.1) {
                 found.push(c.clone());
             }
@@ -285,13 +318,17 @@ impl Interp<'_> {
             };
             if !self.include_std
                 || !self.follows_0_4(root)
-                || self.units[root].uses.iter().any(|decl| decl.in_header && decl.name == STD_NAME)
+                || self.units[root]
+                    .uses
+                    .iter()
+                    .any(|decl| decl.in_header && decl.name == standard_package_name(&language))
             {
                 return None;
             }
         }
         self.std_package(&language)
             .filter(|&p| super::unit::package_languages_match(&self.version_of(Some(p)), &language))
+            .filter(|&p| !self.follows_0_4(unit) || !is_alias_package(&self.units[p]))
     }
 
     /// A package's version: what its PACKAGE says, or the `version=` of the USE-PACKAGE of an
@@ -324,7 +361,8 @@ impl Interp<'_> {
             return e.clone();
         }
         let uses = self.uses_on(key);
-        let e = Rc::new(self.effective(&uses));
+        let standard_first = self.follows_0_4(self.standard_unit(key)).then(|| self.standard_name(key));
+        let e = Rc::new(self.effective(&uses, standard_first));
         self.effs.insert(key, e.clone());
         e
     }
@@ -332,10 +370,11 @@ impl Interp<'_> {
     /// The uses on a chain, in the order of nearness: the standard package at the root, then
     /// level by level the USE-PACKAGEs of the header record (at the root) and of the level (16.3).
     fn uses_on(&mut self, key: EffKey) -> Vec<Use> {
+        let standard = self.standard_name(key);
         let mut uses = Vec::new();
         let std = self.implicit_std(key);
         if let Some(s) = std {
-            uses.push(Use { decl: None, unit: Some(s), at: At::Root, name: STD_NAME.into() });
+            uses.push(Use { decl: None, unit: Some(s), at: At::Root, name: standard.into() });
         }
         match key {
             EffKey::Level(level) => {
@@ -367,7 +406,7 @@ impl Interp<'_> {
                 // so that the packages at the root are in the order of the series in effect. An
                 // inline package of its name, which drops or freezes it, leaves the place as it is
                 let pinned =
-                    uses.iter().rev().find(|u| u.decl.is_some() && u.name == STD_NAME && matches!(u.at, At::Root));
+                    uses.iter().rev().find(|u| u.decl.is_some() && u.name == standard && matches!(u.at, At::Root));
                 if let (Some(_), Some(p)) = (std, pinned.and_then(|u| u.unit)) {
                     if !self.units[p].embedded && self.units[p].ok {
                         uses[0].unit = Some(p);
@@ -387,11 +426,44 @@ impl Interp<'_> {
         }
         self.tell_missing_std(key, &uses);
         self.tell_std_language(key, &uses);
+        self.tell_std_alias(key, &uses);
         uses
     }
 
+    fn tell_std_alias(&mut self, key: EffKey, uses: &[Use]) {
+        let unit = self.standard_unit(key);
+        let standard = self.standard_name(key);
+        if !self.follows_0_4(unit) || uses.iter().any(|u| u.name == standard) {
+            return;
+        }
+        let language = self.version_of(Some(unit));
+        let Some(package) = self.std_units.get(&language).copied().flatten() else { return };
+        if !self.units[package].ok
+            || !super::unit::package_languages_match(&self.version_of(Some(package)), &language)
+            || !is_alias_package(&self.units[package])
+        {
+            return;
+        }
+        // The setting adds one root reference, so all included levels share its failure.
+        let requester = match key {
+            EffKey::Level(_) => self.level_unit[0],
+            EffKey::Alone(u) if self.package_main == Some(u) => u,
+            _ => return,
+        };
+        if !self.std_alias_reported.insert(requester) {
+            return;
+        }
+        let version = self.pkg_ver(package);
+        let loc = self.standard_request_location(requester);
+        let context = self.units[requester].pkg().to_string();
+        self.diag_in(Severity::Error, codes::USE_PACKAGE_ALIAS_PACKAGE,
+            format!("the standard package {standard} {version} is an alias package; the standard-package setting loads ordinary packages with USE-PACKAGE (16.3, 16.5)"),
+            loc, &context);
+    }
+
     fn tell_std_language(&mut self, key: EffKey, uses: &[Use]) {
-        if uses.iter().any(|u| u.name == STD_NAME) {
+        let standard = self.standard_name(key);
+        if uses.iter().any(|u| u.name == standard) {
             return;
         }
         let unit = match key {
@@ -405,7 +477,7 @@ impl Interp<'_> {
         let writer = self.file_unit(unit).unwrap_or(unit);
         if !super::unit::package_languages_match(&language, &reader) && self.std_language_reported.insert(writer) {
             let loc = self.units[writer].header_record.and_then(|r| self.rec_loc(Some(r), 0));
-            self.reject_package_language(STD_NAME, &reader, &language, loc, "", "implicit reference");
+            self.reject_package_language(standard, &reader, &language, loc, "", "implicit reference");
         }
     }
 
@@ -417,19 +489,25 @@ impl Interp<'_> {
     /// for a package in effect nowhere, such as the rule package of the other dialect that the
     /// series pinned references and a file drops.
     fn tell_missing_std(&mut self, key: EffKey, uses: &[Use]) {
+        let standard = self.standard_name(key);
         let Some((v, false)) = self.missing_std.clone() else { return };
         let read = match key {
             EffKey::Level(level) => self.file_ok(level),
             EffKey::Alone(u) => self.package_main == Some(u) && self.units[u].ok,
         };
-        if !read || uses.iter().any(|u| u.name == STD_NAME) {
+        if !read || uses.iter().any(|u| u.name == standard) {
             return;
         }
         self.missing_std = Some((v.clone(), true));
-        self.sink.error(codes::STD_VERSION_NOT_FOUND,
-            format!("the standard package rnl-std {v} that the reading asks for cannot be found, in the package directories or among the bundled packages: the files that do not pin a version of it are read without a standard package (16.3)"),
-            None,
-        );
+        let message = format!("the standard package {standard} {v} that the reading asks for cannot be found, in the package directories or among the bundled packages: the files that do not pin a version of it are read without a standard package (16.3)");
+        let unit = self.standard_unit(key);
+        if self.follows_0_4(unit) {
+            let loc = self.standard_request_location(unit);
+            let package = self.units[unit].pkg().to_string();
+            self.diag_in(Severity::Error, codes::STD_VERSION_NOT_FOUND, message, loc, &package);
+        } else {
+            self.sink.error(codes::STD_VERSION_NOT_FOUND, message, None);
+        }
     }
 
     /// The dialect of the file a level's text is in (2.2, 16.3), in the dialect of the netlist:
@@ -532,22 +610,26 @@ impl Interp<'_> {
     /// reference expanded first, and references of another major version fail. What a package
     /// brings in is expanded from the packages in effect only, so a package that is replaced or
     /// dropped brings nothing in.
-    fn effective(&mut self, uses: &[Use]) -> Eff {
+    fn effective(&mut self, uses: &[Use], standard_first: Option<&str>) -> Eff {
         let mut eff = Eff::default();
         // the root keeps the first place a name gets there (16.3): (k, j), k counting the uses at
         // the root that bring in names not placed yet, j the place of the name in what one brings in
         let mut root_place: HashMap<String, (usize, usize)> = HashMap::new();
-        let mut full: Vec<Expansion> = Vec::new();
+        let full: Vec<Expansion> = uses.iter().map(|u| self.expansion(&u.name, u.unit)).collect();
+        let first =
+            standard_first.and_then(|name| uses.iter().rposition(|u| u.name == name && matches!(u.at, At::Root)));
+        // Give the standard its root position without reordering the references themselves:
+        // the nearest file/level still decides which version or inline content is used (16.3).
+        let roots = first.into_iter().chain((0..uses.len()).filter(|i| Some(*i) != first));
         let mut k = 0;
-        for u in uses {
-            let x = self.expansion(&u.name, u.unit);
-            if matches!(u.at, At::Root) && x.0.iter().any(|n| !root_place.contains_key(n)) {
+        for i in roots {
+            let x = &full[i];
+            if matches!(uses[i].at, At::Root) && x.0.iter().any(|n| !root_place.contains_key(n)) {
                 for (j, n) in x.0.iter().enumerate() {
                     root_place.entry(n.clone()).or_insert((k, j));
                 }
                 k += 1;
             }
-            full.push(x);
         }
         let mut direct: HashMap<&str, usize> = HashMap::new();
         for (i, u) in uses.iter().enumerate() {
@@ -836,14 +918,15 @@ impl Interp<'_> {
     /// The standard package in effect on a chain and every package it references, directly or
     /// not (16.2): their names, and the packages, the later first.
     pub(crate) fn std_env(&mut self, key: EffKey) -> Rc<(HashSet<String>, Vec<UnitId>)> {
+        let standard = self.standard_name(key);
         let eff = self.eff(key);
         if let Some(x) = self.std_envs.get(&key) {
             return x.clone();
         }
         let mut items = Vec::new();
-        if let Some(s) = eff.unit.get(STD_NAME).copied().flatten() {
-            self.walk_refs(s, &eff, &mut vec![STD_NAME.to_string()], &mut items);
-            items.push((STD_NAME.to_string(), Some(s)));
+        if let Some(s) = eff.unit.get(standard).copied().flatten() {
+            self.walk_refs(s, &eff, &mut vec![standard.to_string()], &mut items);
+            items.push((standard.to_string(), Some(s)));
         }
         let names = items.iter().map(|(n, _)| n.clone()).collect();
         let units = items.iter().rev().filter_map(|(_, u)| *u).filter(|&u| self.units[u].ok).collect();
