@@ -7,27 +7,32 @@ import { fileURLToPath } from 'node:url';
 export const root = dirname(dirname(fileURLToPath(import.meta.url)));
 export const packageCache = join(root, '.rnl-packages');
 export const packageLocks = JSON.parse(readFileSync(join(root, 'packages.lock.json'), 'utf8')).packages;
-export function publicPackageDir(name) {
-  const entry = packageLocks.find(p => p.name === name);
-  if (!entry) throw new Error(`No lock for ${name}`);
-  return join(packageCache, name, entry.version);
+// A package may be locked at several versions; without one, its first.
+function locked(name, version) {
+  const entry = packageLocks.find(p => p.name === name && (version === undefined || p.version === version));
+  if (!entry) throw new Error(`No lock for ${name}${version === undefined ? '' : ` ${version}`}`);
+  return entry;
 }
-export function publicPackageText(name) {
-  const p = packageLocks.find(p => p.name === name);
-  const path = join(publicPackageDir(name), `${name}.rnl`);
+export function publicPackageDir(name, version) {
+  return join(packageCache, name, locked(name, version).version);
+}
+export function publicPackageText(name, version) {
+  const p = locked(name, version);
+  const path = join(publicPackageDir(name, p.version), `${name}.rnl`);
   const bytes = readFileSync(path);
   if (createHash('sha256').update(bytes).digest('hex') !== p.sha256) throw new Error(`${path}: SHA-256 mismatch`);
   return bytes.toString('utf8');
 }
-export function publicPackagesAvailable(names = packageLocks.map(p => p.name)) {
-  const missing = names.some(name => !existsSync(join(publicPackageDir(name), `${name}.rnl`)));
+export function publicPackagesAvailable(names = [...new Set(packageLocks.map(p => p.name))]) {
+  const entries = packageLocks.filter(p => names.includes(p.name));
+  const missing = entries.some(p => !existsSync(join(publicPackageDir(p.name, p.version), `${p.name}.rnl`)));
   if (missing) {
     const message = 'Public packages are missing; run `python scripts/packages.py download` from the checkout root.';
     if (process.env.CI) throw new Error(message);
     console.warn(`SKIP public package tests: ${message}`);
     return false;
   }
-  for (const name of names) publicPackageText(name);
+  for (const p of entries) publicPackageText(p.name, p.version);
   return true;
 }
 export function preparePublicPackageFixture() {

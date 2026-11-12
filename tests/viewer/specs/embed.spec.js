@@ -4,7 +4,7 @@ import http from "node:http";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { expect, test } from "@playwright/test";
-import { publicPackagesAvailable, publicPackageText } from "../../../scripts/packages.mjs";
+import { packageLocks, publicPackagesAvailable, publicPackageText } from "../../../scripts/packages.mjs";
 import { zh } from "../zh.js";
 
 test.skip(!process.env.RNL_WEB_URL, "the site is not built: RNL_WEB=0");
@@ -495,11 +495,12 @@ test("public packages: every picker record loads through the offline catalog", a
       shell.setPool(items);
       const source = { name: 'public.sp', text: `* public\n* @RNL(type="header") { @VERSION("0.3"); @USE-PACKAGE(name="${pkg.name}", version="${pkg.version}") }\nR1 a 0 1k\n.end\n` };
       const doc = await shell.build(source);
-      results.push({ name: pkg.name, errors: doc.diagnostics.filter(d => d.severity === 'error') });
+      results.push({ name: `${pkg.name}@${pkg.version}`, errors: doc.diagnostics.filter(d => d.severity === 'error') });
     }
     return results;
   });
-  expect(results.map(p => p.name).sort()).toEqual(['analog-canvas-extensions', 'eda-style', 'eda-symbol', 'pdk-sky130']);
+  // Every locked version is a record of its own.
+  expect(results.map(p => p.name).sort()).toEqual(packageLocks.map(p => `${p.name}@${p.version}`).sort());
   for (const result of results) expect(result.errors, result.name).toEqual([]);
 });
 
