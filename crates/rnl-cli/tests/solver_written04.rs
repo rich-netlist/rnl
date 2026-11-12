@@ -31,13 +31,21 @@ impl Clock for Ticks {
 }
 
 #[test]
-fn authored_auto_wire_is_written_with_its_chosen_bend_and_reopens_solved() {
+fn authored_auto_wire_is_written_with_its_core_path_and_reopens_solved() {
     let files = MemoryProvider::new().with("main.sp", SOURCE);
     let result = solve_with_clock(Path::new("main.sp"), &files, &options("limit=\"seed\""), &StoppedClock).unwrap();
     assert_eq!(result.errors, 0, "{result:?}");
     let level = &result.levels[0];
     assert_eq!(level.solved.solution.wire_routes.len(), 1);
-    assert_eq!(level.solved.solution.wire_routes[0].points[1], WirePoint::Bend((0., 2.)));
+    assert_eq!(
+        level.solved.solution.wire_routes[0].points,
+        vec![
+            WirePoint::Anchor(level.problem.wires[0].anchors[0].clone()),
+            WirePoint::Bend((0., 3.)),
+            WirePoint::Bend((4., 3.)),
+            WirePoint::Anchor(level.problem.wires[0].anchors[1].clone()),
+        ],
+    );
     let saved = MemoryProvider::new().with("main.sp", &result.files[0].text);
     assert!(level.written.unsolved.is_empty(), "{:?}", level.written.unsolved);
     let back = rnl_cli::interpret_file(
