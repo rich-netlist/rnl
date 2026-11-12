@@ -53,6 +53,7 @@ mod driver;
 pub mod experimental;
 mod group_tree;
 mod holds;
+mod lines;
 mod model;
 mod objectives;
 mod options;
@@ -77,6 +78,7 @@ use rnl_runtime::problem::FactKind;
 pub use budget::{BudgetProgress, BudgetReport, RunLimit, StopReason};
 pub use config::{is_run_setting, Layout, Settings};
 pub use holds::{fact_holds, holds_as_drawn, problem_fact_holds_as_drawn};
+pub use lines::engine::{LayoutSkeleton, LineKind, SkeletonItem, SkeletonLine, SkeletonTable, SkeletonTree};
 pub use options::{Budget, Layer, Objectives, SolverOptions, DEFAULT_LAYERS, DEFAULT_TIME_LIMIT, OBJECTIVES};
 pub use resolve::Resolved;
 pub use rnl_runtime::problem::LevelProblem;
@@ -99,6 +101,8 @@ pub struct SolveReport {
     pub fatal_written_wire: Option<usize>,
     /// Index in LevelProblem.annotations of geometry that cannot safely be evaluated.
     pub fatal_annotation: Option<usize>,
+    /// The final line-layout tables and line identities, when that layout was requested.
+    pub skeleton: Option<LayoutSkeleton>,
     /// Whole-solve budget for 0.4; absent for released input versions.
     pub budget: Option<BudgetReport>,
     /// Canonical options for persisting the result, with a time limit normalized to admitted work.
@@ -359,14 +363,26 @@ fn solve_isolated(
         let mut solved = if problem.version == "0.4" {
             let (limit, safety) = run_limits(options, clock);
             let (mut solved, report) = budget::with(clock, limit, safety, || run(problem, options, clock));
-            let replay =
-                SolverOptions { run_limit: Some(RunLimit::Work(report.work)), time_limit: None, ..options.clone() };
+            let replay_limit =
+                if options.settings.layout == Layout::Lines && matches!(limit, RunLimit::Seed | RunLimit::Unlimited) {
+                    limit
+                } else {
+                    RunLimit::Work(report.work)
+                };
+            let replay = SolverOptions { run_limit: Some(replay_limit), time_limit: None, ..options.clone() };
             solved.report.canonical_options = Some(replay.canonical());
             solved.report.budget = Some(report);
-            solved.report.notes.push(format!(
-                "budget: {} work units; limit: {:?}; stopped: {:?}; replay with limit=\"work\", work={}",
-                report.work, report.limit, report.reason, report.work
-            ));
+            solved.report.notes.push(if matches!(replay_limit, RunLimit::Work(_)) {
+                format!(
+                    "budget: {} work units; limit: {:?}; stopped: {:?}; replay with limit=\"work\", work={}",
+                    report.work, report.limit, report.reason, report.work
+                )
+            } else {
+                format!(
+                    "budget: {} work units; limit: {:?}; stopped: {:?}; deterministic {:?} settings retained",
+                    report.work, report.limit, report.reason, replay_limit
+                )
+            });
             solved
         } else {
             run(problem, options, clock)

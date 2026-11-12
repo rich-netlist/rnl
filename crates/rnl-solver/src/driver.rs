@@ -146,13 +146,19 @@ fn solve_exact_mode(
     let mut work = resolved.work;
     let phase = crate::profile::span("stage", "structure");
     let structure = analyse(problem, &resolved, options, caps, &mut work);
-    let use_tree = problem.version == "0.4" && (skeleton.is_some() || options.settings.layout == crate::Layout::Tree);
+    let use_lines = problem.version == "0.4" && skeleton.is_none() && options.settings.layout == crate::Layout::Lines;
+    let use_tree = problem.version == "0.4" && (skeleton.is_some() || options.settings.layout != crate::Layout::Rows);
+    let mut layout_skeleton = None;
     let structure =
         if problem.version == "0.4" { crate::search_choices::for_layout(&structure, &mut work) } else { structure };
     notes.extend(structure.notes.iter().cloned());
     drop(phase);
-    let (candidate, placed, routing, entry) = if use_tree {
-        let laid = if let Some(rounds) = skeleton {
+    let (candidate, placed, routing, mut entry) = if use_tree {
+        let laid = if use_lines {
+            let (laid, description) = crate::lines::lay_out(problem, &structure, options, &mut work);
+            layout_skeleton = Some(description);
+            laid
+        } else if let Some(rounds) = skeleton {
             crate::skeleton::lay_out(problem, &structure, options, &mut work, rounds)
         } else {
             crate::tree::lay_out(problem, &structure, options, &mut work, &crate::tree::Stop::default())
@@ -372,6 +378,20 @@ fn solve_exact_mode(
         }
         (candidate, placed, routing, entry)
     };
+    // Materialize the chosen drawing for writeback, including authored auto-wire bends.
+    // This deterministic output conversion also runs after search has reached its limit.
+    let (routing, wire_routes, junctions) =
+        if problem.version == "0.4" && entry.written_path_error.is_none() && entry.annotation_error.is_none() {
+            let routing = crate::lines::written::branch_at_points(problem, &placed.geometry, routing);
+            crate::lines::written::finish(problem, &placed.geometry, routing)
+        } else {
+            (routing, Vec::new(), Vec::new())
+        };
+    entry.written_path_error = entry.written_path_error.or(routing.written_path_error);
+    entry.annotation_error = entry.annotation_error.or(routing.annotation_error);
+    if entry.written_path_error.is_some() || entry.annotation_error.is_some() {
+        entry.layers.clear();
+    }
     let score = entry.layers.clone();
     if !placed.optimised {
         notes.push(
@@ -511,6 +531,7 @@ fn solve_exact_mode(
     let report = SolveReport {
         fatal_written_wire: entry.written_path_error,
         fatal_annotation: entry.annotation_error.map(|error| error.index),
+        skeleton: layout_skeleton,
         budget: None,
         canonical_options: None,
         kept: resolved.kept.clone(),
@@ -545,9 +566,9 @@ fn solve_exact_mode(
         Solution {
             placements,
             branches: routing.branches.clone(),
-            junctions: Vec::new(),
+            junctions,
             wires: routing.wires.clone(),
-            wire_routes: Vec::new(),
+            wire_routes,
         }
     };
     let solved = Solved { solution, report };

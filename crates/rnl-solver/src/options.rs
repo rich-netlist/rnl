@@ -405,8 +405,10 @@ impl SolverOptions {
             });
             text.push_str(&format!(";report_hints={}", self.hints_for_low));
         }
-        if self.settings.layout == crate::Layout::Tree {
-            text.push_str(";layout=tree");
+        match self.settings.layout {
+            crate::Layout::Rows => {}
+            crate::Layout::Tree => text.push_str(";layout=tree"),
+            crate::Layout::Lines => text.push_str(";layout=lines"),
         }
         if self.settings.spacing != [0, 0] {
             text.push_str(&format!(";spacing_x={};spacing_y={}", self.settings.spacing[0], self.settings.spacing[1]));
@@ -472,7 +474,8 @@ impl SolverOptions {
                     options.settings.layout = match value {
                         "rows" => crate::Layout::Rows,
                         "tree" => crate::Layout::Tree,
-                        _ => return Err("layout must be rows or tree".into()),
+                        "lines" => crate::Layout::Lines,
+                        _ => return Err("layout must be rows, tree, or lines".into()),
                     }
                 }
                 "spacing_x" | "spacing_y" => {

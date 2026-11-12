@@ -25,6 +25,7 @@ pub fn encode_budget(b: BudgetReport) -> Result<Value> {
 
 pub(crate) fn encode(r: &SolveReport) -> Result<Value> {
     let mut value = json!({
+        "skeleton":r.skeleton.as_ref().map(crate::skeleton::encode),
         "budget":r.budget.map(encode_budget).transpose()?,
         "canonical_options":r.canonical_options,
         "kept":r.kept,"failed":r.failed,
@@ -109,6 +110,7 @@ pub(crate) fn decode(n: Node<'_>) -> Result<SolveReport> {
         } else {
             None
         },
+        skeleton: n.field("skeleton")?.nullable(crate::skeleton::decode)?,
         budget,
         canonical_options: n.field("canonical_options")?.nullable(|n| Ok(n.string()?.to_owned()))?,
         kept: indices(n.field("kept")?)?,

@@ -29,7 +29,7 @@ fn auto_source_semantics_survive_transport_and_invalidate_old_geometry() {
 }
 
 #[test]
-fn version_four_rejects_old_transport_and_validates_fatal_wire() {
+fn current_protocol_rejects_old_transport_and_validates_fatal_wire() {
     let text = "* protocol fixture\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\nR1 a b 1k\n* @RNL { &a @WIRE(mode=\"straight\") { (0,0) (1,0) } }\n.end\n";
     let files = MemoryProvider::new().with("test.sp", text);
     let read = rnl_view::interpret("test.sp", None, &files, &Options { std: false, ..Options::solver() }).unwrap();
@@ -37,8 +37,8 @@ fn version_four_rejects_old_transport_and_validates_fatal_wire() {
     assert!(!p.wires.is_empty());
     let input = InputDocument { levels: vec![LevelInput { problem: p.clone(), options: Default::default() }] };
     let value = encode_input(&input).unwrap();
-    assert_eq!(value["version"], 4);
-    for old in [2, 3] {
+    assert_eq!(value["version"], 5);
+    for old in [2, 3, 4] {
         let mut incompatible = value.clone();
         incompatible["version"] = serde_json::json!(old);
         assert!(decode_input(&incompatible).unwrap_err().to_string().contains("unsupported"));
@@ -65,9 +65,9 @@ fn version_four_rejects_old_transport_and_validates_fatal_wire() {
         }],
     };
     let mut value = encode_result(&document).unwrap();
-    assert_eq!(value["version"], 4);
+    assert_eq!(value["version"], 5);
     assert_eq!(decode_result(&value, std::slice::from_ref(&p)).unwrap(), document);
-    for old in [2, 3] {
+    for old in [2, 3, 4] {
         let mut incompatible = value.clone();
         incompatible["version"] = serde_json::json!(old);
         assert!(decode_result(&incompatible, std::slice::from_ref(&p))

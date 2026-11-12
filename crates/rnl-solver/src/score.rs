@@ -313,7 +313,7 @@ fn touch(a: &[Q; 2], b: &[Q; 2], c: &[Q; 2], d: &[Q; 2]) -> bool {
 /// Whether the segment from `a` to `b` runs through the inside of a box, its edge left out, over
 /// some length: the parameters along it at which it is strictly inside the box's range on each
 /// axis make an interval that is not empty.
-fn through(bx: &[Q; 4], a: &[Q; 2], b: &[Q; 2]) -> bool {
+pub(crate) fn through(bx: &[Q; 4], a: &[Q; 2], b: &[Q; 2]) -> bool {
     for i in 0..2 {
         let (lo, hi) = span(a, b, i);
         if *hi <= bx[i] || bx[i + 2] <= *lo {

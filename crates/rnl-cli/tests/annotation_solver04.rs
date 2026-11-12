@@ -116,13 +116,20 @@ R2 n b 1k
     let files = MemoryProvider::new().with("test.sp", text);
     let r = interpret_file(Path::new("test.sp"), None, &files, &Options { std: false, ..Options::solver() }).unwrap();
     let p = &r.problems[0];
-    let solved = rnl_solver::solve(p, &rnl_solver::SolverOptions::without_time_limit());
-    assert_eq!(solved.report.fatal_annotation, None, "{:?}", solved.report.errors);
-    assert!(!solved.solution.wires.is_empty());
-    assert!(
-        solved.solution.wires.iter().flat_map(|w| &w.points).any(|point| matches!(point, WirePoint::Bend(_))),
-        "route should leave the obstacle's interior"
-    );
+    for layout in ["rows", "tree", "lines"] {
+        let solved = rnl_solver::solve(
+            p,
+            &rnl_solver::SolverOptions::without_time_limit()
+                .with_config(&format!("layout=\"{layout}\",limit=\"seed\""))
+                .unwrap(),
+        );
+        assert_eq!(solved.report.fatal_annotation, None, "{:?}", solved.report.errors);
+        assert!(!solved.solution.wires.is_empty());
+        assert!(
+            solved.solution.wires.iter().flat_map(|w| &w.points).any(|point| matches!(point, WirePoint::Bend(_))),
+            "route should leave the obstacle's interior"
+        );
+    }
 }
 
 #[test]
@@ -241,18 +248,25 @@ fn unmapped_annotation_is_fatal_not_a_zero_or_invisible_box() {
     let r = interpreted("%a = (0,0) @ANNOTATION $S");
     let mut p = r.problems[0].clone();
     p.annotations[0].object = None;
-    let solved = rnl_solver::solve(&p, &rnl_solver::SolverOptions::without_time_limit());
-    assert_eq!(solved.report.fatal_annotation, Some(0));
-    assert!(
-        solved
-            .report
-            .errors
-            .iter()
-            .any(|e| e.contains(&p.annotations[0].view.object_id) && e.contains("unmapped annotation object")),
-        "{:?}",
-        solved.report.errors
-    );
-    assert!(solved.solution.placements.is_empty() && solved.solution.wires.is_empty());
+    for layout in ["rows", "tree", "lines"] {
+        let solved = rnl_solver::solve(
+            &p,
+            &rnl_solver::SolverOptions::without_time_limit()
+                .with_config(&format!("layout=\"{layout}\",limit=\"seed\""))
+                .unwrap(),
+        );
+        assert_eq!(solved.report.fatal_annotation, Some(0));
+        assert!(
+            solved
+                .report
+                .errors
+                .iter()
+                .any(|e| e.contains(&p.annotations[0].view.object_id) && e.contains("unmapped annotation object")),
+            "{:?}",
+            solved.report.errors
+        );
+        assert!(solved.solution.placements.is_empty() && solved.solution.wires.is_empty());
+    }
 }
 
 #[test]
@@ -304,18 +318,26 @@ R1 a b 1k
     let p = &r.problems[0];
     let a = p.annotations[0].object.unwrap();
     let Position::At(PointRef::Origin(anchor)) = &p.objects[a].position else { panic!("missing anchor") };
-    let solved = rnl_solver::solve(p, &rnl_solver::SolverOptions::without_time_limit());
-    assert_eq!(solved.report.fatal_annotation, None, "{:?}", solved.report.errors);
-    let placed = solved.solution.placements.iter().find(|v| v.object == *anchor).expect("free point must be placed");
-    let (x, y) = (placed.x.unwrap(), placed.y.unwrap());
-    let mut view = p.annotations[0].view.clone();
-    view.anchor = (x, y);
-    let [lx, ly, rx, ry] =
-        rnl_render::annotation_bounds(&view, rnl_render::RenderOptions::default().scale).unwrap().unwrap();
-    assert!(
-        x + rx <= 0.0 || x + lx >= 2.0 || y + ry <= 0.0 || y + ly >= 2.0,
-        "annotation still overlaps fixed component: ({x},{y}) bbox [{lx},{ly},{rx},{ry}]"
-    );
+    for layout in ["rows", "tree", "lines"] {
+        let solved = rnl_solver::solve(
+            p,
+            &rnl_solver::SolverOptions::without_time_limit()
+                .with_config(&format!("layout=\"{layout}\",limit=\"seed\""))
+                .unwrap(),
+        );
+        assert_eq!(solved.report.fatal_annotation, None, "{:?}", solved.report.errors);
+        let placed =
+            solved.solution.placements.iter().find(|v| v.object == *anchor).expect("free point must be placed");
+        let (x, y) = (placed.x.unwrap(), placed.y.unwrap());
+        let mut view = p.annotations[0].view.clone();
+        view.anchor = (x, y);
+        let [lx, ly, rx, ry] =
+            rnl_render::annotation_bounds(&view, rnl_render::RenderOptions::default().scale).unwrap().unwrap();
+        assert!(
+            x + rx <= 0.0 || x + lx >= 2.0 || y + ry <= 0.0 || y + ly >= 2.0,
+            "annotation still overlaps fixed component: ({x},{y}) bbox [{lx},{ly},{rx},{ry}]"
+        );
+    }
 }
 
 #[test]
@@ -332,20 +354,27 @@ R2 n b 1k
 * }
 .end
 "#;
-    for anchor in ["#R1", "#R1:1"] {
-        let text = text.replace("%a = #R1 @ANNOTATION", &format!("%a = {anchor} @ANNOTATION"));
-        let files = MemoryProvider::new().with("test.sp", &text);
-        let r =
-            interpret_file(Path::new("test.sp"), None, &files, &Options { std: false, ..Options::solver() }).unwrap();
-        let solved = rnl_solver::solve(&r.problems[0], &rnl_solver::SolverOptions::without_time_limit());
-        assert_eq!(solved.report.fatal_annotation, None, "{:?}", solved.report.errors);
-        assert!(solved.report.unrouted.is_empty(), "{:?}", solved.report.unrouted);
-        assert!(!solved.solution.wires.is_empty());
-        assert!(
-            !solved.report.notes.iter().any(|n| n.contains("joined through obstacles")),
-            "{:?}",
-            solved.report.notes
-        );
+    for layout in ["rows", "tree", "lines"] {
+        for anchor in ["#R1", "#R1:1"] {
+            let text = text.replace("%a = #R1 @ANNOTATION", &format!("%a = {anchor} @ANNOTATION"));
+            let files = MemoryProvider::new().with("test.sp", &text);
+            let r = interpret_file(Path::new("test.sp"), None, &files, &Options { std: false, ..Options::solver() })
+                .unwrap();
+            let solved = rnl_solver::solve(
+                &r.problems[0],
+                &rnl_solver::SolverOptions::without_time_limit()
+                    .with_config(&format!("layout=\"{layout}\",limit=\"seed\""))
+                    .unwrap(),
+            );
+            assert_eq!(solved.report.fatal_annotation, None, "{:?}", solved.report.errors);
+            assert!(solved.report.unrouted.is_empty(), "{:?}", solved.report.unrouted);
+            assert!(!solved.solution.wires.is_empty());
+            assert!(
+                !solved.report.notes.iter().any(|n| n.contains("joined through obstacles")),
+                "{:?}",
+                solved.report.notes
+            );
+        }
     }
 }
 
@@ -389,4 +418,36 @@ fn annotation_work_stops_and_replays_without_fatal() {
     assert_eq!(a.report.budget.as_ref().unwrap().reason, rnl_solver::StopReason::Work);
     assert_eq!(a.report.budget.as_ref().unwrap().work, b.report.budget.as_ref().unwrap().work);
     assert_eq!(format!("{:?}", a.solution), format!("{:?}", b.solution));
+}
+
+#[test]
+fn line_annotation_geometry_and_description_replay_at_time_cutoffs() {
+    use rnl_solver::{Clock, RunLimit, SolverOptions, StoppedClock};
+    use std::cell::Cell;
+    struct Ticks(Cell<u64>);
+    impl Clock for Ticks {
+        fn elapsed(&self) -> f64 {
+            let n = self.0.get();
+            self.0.set(n + 1);
+            n as f64
+        }
+    }
+    let r = interpreted(
+        r#"#R1 @SET-SYMBOL $S; #R1 @PLACE(0,0);
+        $T = @DEFINE-SYMBOL { ? @TEXT("${x}:${y}") }; %a = (_,_) @ANNOTATION $T"#,
+    );
+    let p = &r.problems[0];
+    for seconds in [0., 100., 2000., 20000.] {
+        let mut options = SolverOptions::without_time_limit().with_config("layout=\"lines\"").unwrap();
+        options.run_limit = Some(RunLimit::Time(seconds));
+        options.safety_seconds = None;
+        let timed = rnl_solver::solve_with_clock(p, &options, &Ticks(Cell::new(0)));
+        assert_eq!(timed.report.fatal_annotation, None, "{:?}", timed.report.errors);
+        options.run_limit = Some(RunLimit::Work(timed.report.budget.unwrap().work));
+        let replay = rnl_solver::solve_with_clock(p, &options, &StoppedClock);
+        assert_eq!(timed.solution, replay.solution, "cutoff {seconds}");
+        assert_eq!(timed.report.kept, replay.report.kept);
+        assert_eq!(timed.report.canonical_options, replay.report.canonical_options);
+        assert_eq!(timed.report.skeleton, replay.report.skeleton);
+    }
 }

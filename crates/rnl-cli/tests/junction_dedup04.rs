@@ -99,18 +99,20 @@ R3 n c 1k
 .end
 "#;
     let files = MemoryProvider::new().with("main.sp", text);
-    let options = SolveOptions {
-        std: false,
-        solver: SolverOptions::default().with_config("work=100000000").unwrap(),
-        ..Default::default()
-    };
-    let solved = solve_with_clock(Path::new("main.sp"), &files, &options, &StoppedClock).unwrap();
-    assert_eq!(solved.errors, 0, "{solved:?}");
-    let saved = &solved.files[0].text;
-    assert_eq!(saved.matches("$DOT @ATTACH").count(), 1, "{saved}");
-    let generated = saved.split("@RNL(type=\"generated\"").nth(1).expect("solver record");
-    assert!(generated.contains("%p") && generated.contains("#R3:p"), "{generated}");
-    assert!(!generated.contains("$DOT @ATTACH") && !generated.contains("%rt1 = (0, 0)"), "{generated}");
+    for layout in ["rows", "lines"] {
+        let options = SolveOptions {
+            std: false,
+            solver: SolverOptions::default().with_config(&format!("layout=\"{layout}\",limit=\"seed\"")).unwrap(),
+            ..Default::default()
+        };
+        let solved = solve_with_clock(Path::new("main.sp"), &files, &options, &StoppedClock).unwrap();
+        assert_eq!(solved.errors, 0, "{solved:?}");
+        let saved = &solved.files[0].text;
+        assert_eq!(saved.matches("$DOT @ATTACH").count(), 1, "{saved}");
+        let generated = saved.split("@RNL(type=\"generated\"").nth(1).expect("solver record");
+        assert!(generated.contains("%p") && generated.contains("#R3:p"), "{generated}");
+        assert!(!generated.contains("$DOT @ATTACH") && !generated.contains("%rt1 = (0, 0)"), "{generated}");
+    }
 }
 
 #[test]

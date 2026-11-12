@@ -1,8 +1,8 @@
 # Independent solver protocol
 
-The `rnl-solver-io` library encodes an independent solver's decisions as JSON and validates them against the original `LevelProblem` before writeback. Protocol version 4 is independent of the solver executable's version.
+The `rnl-solver-io` library encodes an independent solver's decisions as JSON and validates them against the original `LevelProblem` before writeback. Protocol version 5 is independent of the solver executable's version.
 
-The `rnl-solver` executable has its own version, currently `0.3.0`. It reads one input JSON document from stdin (or an explicit file) and writes one result document to stdout. Diagnostics go to stderr. Viewers continue using the solver library. Its opt-in [skeleton experiment](solver-skeleton.md) uses the same result protocol.
+The `rnl-solver` executable has its own version, currently `0.4.0`. It reads one input JSON document from stdin (or an explicit file) and writes one result document to stdout. Diagnostics go to stderr. Viewers continue using the solver library. Its opt-in [skeleton experiment](solver-skeleton.md) uses the same result protocol.
 
 ## Commands
 
@@ -44,7 +44,7 @@ JSON numbers are parsed from their decimal spelling without an intermediate loss
 ```json
 {
   "format": "rnl-solver-result",
-  "version": 4,
+  "version": 5,
   "solver": { "name": "example-solver", "version": "1.0.0" },
   "levels": [
     {
@@ -133,4 +133,10 @@ Version 3 adds source-version auto-wire semantics, arbitrary text angles and upr
 
 ## Version 4
 
-Version 4 adds annotations, existing-junction identity, and fatal annotation reporting. Version 3 programs could silently ignore these fields in some inputs and cannot safely process them. Input and result decoders require version 4; upgrade the independent executable and its caller together. The five result decision arrays retain their previous shapes.
+Version 4 adds annotations, existing-junction identity, and fatal annotation reporting. Version 3 programs could silently ignore these fields in some inputs and cannot safely process them. Version 4 required the independent executable and its caller to be upgraded together. The five result decision arrays retain their previous shapes.
+
+## Version 5
+
+Version 5 adds the required nullable `report.skeleton` field. For `layout="lines"` it carries the final group tables, typed lines, route identities, and whether the tree layout was used as a fallback. Table cuts contain `columns + 1` x coordinates and `rows + 1` y coordinates; item spans are half-open index pairs. Line coordinates must be finite and axes are 0 or 1. A line's optional `tree` and each tree's `route` index refer to the original input routes. These fields are descriptive and never grant permission to rewrite source objects.
+
+Version 4 programs reject version 5 requests. Upgrade the independent executable with the protocol; the linked solver remains available to native and browser callers. The input model itself is unchanged from version 4.

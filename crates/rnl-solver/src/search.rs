@@ -166,13 +166,34 @@ pub(crate) fn orientations(s: &Structure, values: &[Orient]) -> Vec<Orient> {
 
 /// Orientations suggested by a layout, including coordinated changes to a relation list.
 pub(crate) fn orientations_with(s: &Structure, values: &[Orient], ways: &[usize]) -> Vec<Orient> {
+    oriented(s, values, ways, true)
+}
+
+/// Enumerate all legal directions before the line search ranks current preferences.
+pub(crate) fn orientations_given(s: &Structure, values: &[Orient], ways: &[usize]) -> Vec<Orient> {
+    oriented(s, values, ways, false)
+}
+
+fn oriented(s: &Structure, values: &[Orient], ways: &[usize], fit: bool) -> Vec<Orient> {
     if !s.open.search_classes {
-        return orientations(s, values);
+        if fit {
+            return orientations(s, values);
+        }
+        let mut ori = s.witness.orient.clone();
+        for (class, value) in s.open.classes.iter().zip(values) {
+            for (m, label) in &class.members {
+                ori[*m] = value.then(*label);
+            }
+        }
+        if s.language04 {
+            crate::beside::face(s, &mut ori);
+        }
+        return ori;
     }
     let Some(classes) = crate::search_choices::classes(s, &s.open.ways, ways) else { return orientations(s, values) };
     let mut ori = s.witness.orient.clone();
     for (class, value) in s.open.classes.iter().zip(values) {
-        let value = fitting(s, class.root, *value);
+        let value = if fit { fitting(s, class.root, *value) } else { *value };
         for (m, _) in &class.members {
             let (_, label) = classes.find(*m);
             ori[*m] = value.then(label);

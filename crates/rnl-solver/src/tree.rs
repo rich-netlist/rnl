@@ -122,6 +122,7 @@ pub(crate) struct Tree<'a> {
     level: BTreeMap<usize, i64>,
     pairs: Vec<Pair>,
     rules: Rules,
+    line_rank: Option<crate::lines::Rank>,
 }
 
 const ROUNDS: usize = 3;
@@ -138,7 +139,7 @@ pub(crate) struct Stop {
     best_at: std::cell::Cell<Option<u64>>,
 }
 impl Stop {
-    fn reached(&self, _work: &Work) -> bool {
+    pub(crate) fn reached(&self, _work: &Work) -> bool {
         !crate::budget::permit(crate::budget::Step::Candidate, 1)
     }
 }
@@ -150,7 +151,11 @@ pub(crate) fn lay_out(
     work: &mut Work,
     stop: &Stop,
 ) -> Laid {
-    let tree = Tree::new(problem, s, options);
+    lay_out_from(Tree::new(problem, s, options), work, stop, None)
+}
+
+pub(crate) fn lay_out_from(tree: Tree<'_>, work: &mut Work, stop: &Stop, allowance: Option<u64>) -> Laid {
+    let started = crate::budget::consumed();
     let first = tree.first(work);
     let mut notes = Vec::new();
     if !tree.left_out.is_empty() {
@@ -177,13 +182,23 @@ pub(crate) fn lay_out(
         ));
     }
     let start = first.clone();
-    let (arr, best, said, path) = tree.search(first, best, rounds, true, work, stop);
+    // The shared budget always bounds initialization. A local stage allowance may stop
+    // subsequent improvements, but must not manufacture an unfinished initial baseline.
+    let remaining = allowance.map(|limit| limit.saturating_sub(crate::budget::consumed().saturating_sub(started)));
+    let search = || tree.search(first, best, rounds, true, work, stop);
+    let (arr, best, said, path) = match remaining {
+        Some(limit) => crate::budget::phase(limit, search).0,
+        None => search(),
+    };
     notes.extend(said);
     let mut others: Vec<Arrangement> = Vec::new();
     for a in std::iter::once(start).chain(path) {
         if a != arr && !others.contains(&a) {
             others.push(a);
         }
+    }
+    if let Some(rank) = &tree.line_rank {
+        notes.push(rank.note(tree.s));
     }
     let Evaluated { placed, routing, entry } = tree.given(best);
     let candidate = Candidate {
@@ -256,6 +271,7 @@ impl<'a> Tree<'a> {
             level: BTreeMap::new(),
             pairs,
             rules: Rules::default(),
+            line_rank: None,
         };
         if !crate::budget::permit(crate::budget::Step::Structure, tree.leaves.len()) {
             return tree;
@@ -2204,7 +2220,25 @@ impl<'a> Tree<'a> {
         Evaluated { placed, routing, entry }
     }
 
+    pub(crate) fn with_line_rank(mut self) -> Self {
+        self.line_rank = Some(crate::lines::Rank::new(self.s));
+        self
+    }
+
     fn entry(&self, placed: &Placed, routing: &Routing, objectives: Vec<Q>, code: &[u32]) -> Entry {
+        if let Some(rank) = &self.line_rank {
+            if routing.annotation_error.is_some()
+                || drawn(self.problem, self.s, &placed.geometry, routing).is_err()
+                || crate::annotation::bounds(self.problem, &placed.geometry).is_err()
+            {
+                return self.objective_entry(placed, routing, objectives, code);
+            }
+            return rank.entry(self.problem, self.s, self.options, placed, routing, objectives, code);
+        }
+        self.objective_entry(placed, routing, objectives, code)
+    }
+
+    fn objective_entry(&self, placed: &Placed, routing: &Routing, objectives: Vec<Q>, code: &[u32]) -> Entry {
         if let Some(index) =
             routing.annotation_error.or_else(|| crate::annotation::bounds(self.problem, &placed.geometry).err())
         {
@@ -2247,11 +2281,24 @@ impl<'a> Tree<'a> {
             code: code.to_vec(),
         }
     }
-    pub(crate) fn given(&self, ev: Evaluated) -> Evaluated {
+    pub(crate) fn given(&self, mut ev: Evaluated) -> Evaluated {
+        if self.line_rank.is_some() {
+            let objectives = match (
+                drawn(self.problem, self.s, &ev.placed.geometry, &ev.routing),
+                crate::annotation::bounds(self.problem, &ev.placed.geometry),
+                ev.routing.annotation_error,
+            ) {
+                (Ok(wires), Ok(_), None) => {
+                    crate::score::measured_layers(self.problem, self.s, &ev.placed, Some(&wires))
+                }
+                _ => Vec::new(),
+            };
+            ev.entry = self.objective_entry(&ev.placed, &ev.routing, objectives, &ev.entry.code);
+        }
         ev
     }
     fn active(&self) -> &crate::objectives::Active {
-        &self.s.active
+        self.line_rank.as_ref().map_or(&self.s.active, |r| r.active())
     }
 
     fn coordinates(
@@ -2403,6 +2450,21 @@ mod tests {
             o.with_overrides("objectives=overlaps,crowding,misleading,wire_over_symbol,area").unwrap().objectives;
         o.safety_seconds = None;
         o
+    }
+
+    #[test]
+    fn line_search_does_not_reward_singleton_wrappers_in_ties() {
+        let p = problem();
+        let options = options();
+        let (_, exact) = crate::driver::solve_exact(&p, &options);
+        let tree = Tree::new(&p, &exact.structure, &options).with_line_rank();
+        let mut arr = tree.first(&mut Work::default());
+        let original = tree.code(&arr);
+        for dir in [Dir::Row, Dir::Column, Dir::Row] {
+            let list = arr.lists[1].take().unwrap();
+            arr.lists[1] = Some(Item::List(dir, vec![list]));
+            assert_eq!(tree.code(&arr), original);
+        }
     }
 
     #[test]

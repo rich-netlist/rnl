@@ -160,9 +160,13 @@ pub(crate) fn read(
     within: Option<&BTreeSet<usize>>,
     crosses: bool,
 ) -> Option<Skeleton> {
-    if !crate::budget::permit(crate::budget::Step::Structure, problem.objects.len()) {
+    if !crate::budget::permit(
+        crate::budget::Step::Structure,
+        problem.objects.len().saturating_add(crate::annotation::estimated_work(problem)),
+    ) {
         return None;
     }
+    let annotation_boxes = crate::annotation::bounds(problem, g).ok()?;
     let model = &s.model;
     let n_objects = problem.objects.len();
     let mut value: [Vec<Q>; 2] =
@@ -247,7 +251,7 @@ pub(crate) fn read(
     if crate::budget::stopped() {
         return None;
     }
-    sk.features_of(problem, s, g);
+    sk.features_of(problem, s, g, &annotation_boxes);
     if crate::budget::stopped() {
         return None;
     }
@@ -873,13 +877,22 @@ impl Skeleton {
         }
     }
 
-    fn features_of(&mut self, problem: &LevelProblem, s: &Structure, g: &Geometry) {
+    fn features_of(&mut self, problem: &LevelProblem, s: &Structure, g: &Geometry, annotations: &[(usize, [Q; 4])]) {
         let boxed = |var: usize, b: &[Q; 4]| Feature {
             kind: Kind::Symbol(0),
             lo: [Term::of(var, b[0].clone()), Term::of(var, b[1].clone())],
             hi: [Term::of(var, b[2].clone()), Term::of(var, b[3].clone())],
         };
         let mut features = Vec::new();
+        for (k, bounds) in annotations {
+            if !self.meter(self.vars) {
+                return;
+            }
+            let Some(var) = self.origin[*k].filter(|_| self.reads(*k)) else { continue };
+            let offsets = [0, 1, 2, 3].map(|i| &bounds[i] - &self.value[i % 2][var]);
+            let owner = crate::annotation::attachment_owner(problem, *k).unwrap_or(*k);
+            features.push(Feature { kind: Kind::Text(owner), ..boxed(var, &offsets) });
+        }
         for k in s.components().filter(|&k| self.reads(k)) {
             let (Some(var), Some(b)) = (self.origin[k], s.box_offset(k, self.orient[k])) else { continue };
             features.push(Feature { kind: Kind::Symbol(k), ..boxed(var, &b) });

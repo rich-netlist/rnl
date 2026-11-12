@@ -23,6 +23,13 @@ resolution or a coordinate search. Stopping is latched. Already proved facts rem
 unfinished checks are undecided, with warnings, rather than contradictory or satisfied.
 Necessary result assembly and forced route completion are deterministic finalization.
 
+The seconds limit applies to each drawing level's solver, not the whole CLI process.
+Package loading and interpretation, re-reading between levels, record validation and
+writeback happen outside that budget. A ten-second search can therefore take longer
+end to end. Compare the level's solver time with the CLI/process time when diagnosing
+an overrun; profiling can itself slow search and move a time cutoff. Replaying the
+reported work is the way to inspect the same search trajectory.
+
 `SolveReport.canonical_options` is the options text to pass to `sig2` when saving a 0.4
 result. It normalizes the time limit to the admitted work, so replay preserves the record's
 hash as well as its placements and wires. A caller must not hash its original time settings
@@ -43,10 +50,9 @@ scope of the limit; it is not the default ten-second setting.
 | --- | --- |
 | ![Two symbols placed](images/shared-budget-before.png) | ![No optional placement admitted](images/shared-budget-after.png) |
 
-`limit="seed"` finishes the initial heuristic candidates without later refinement. During
-the layout migration the row driver still consists of that initial pass; subsequent layout
-searches will use the same shared budget. This mode names that first pass, and does not
-introduce randomized ordering.
+`limit="seed"` finishes the selected layout's initial heuristic pass without later
+refinement. Rows, group trees and line layouts use the same shared budget. This mode
+does not introduce randomized ordering.
 
 ## Settings
 
@@ -58,7 +64,7 @@ its previous semicolon syntax is also accepted during the transition.
 
 | Key | Value | Default | Allowed in a file |
 | --- | --- | --- | --- |
-| `layout` | `"rows"` | `"rows"` | yes |
+| `layout` | `"rows"`, `"tree"`, `"lines"` | `"rows"` | yes |
 | `spacing_x`, `spacing_y` | integer from -1 through 20, retained for line layout | 0 | yes |
 | `junction` | definition name as a string; empty disables dots | unset | yes |
 | `tolerance` | finite nonnegative number | 0.000001 | yes |
