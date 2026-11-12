@@ -123,8 +123,13 @@ def summaries() -> dict[str, str]:
     """What each package is for, in English, from the gallery's table: {'rnl-std-fill': …, 'rnl-std-fill 0.3': …}."""
     result = {m.group(1): re.sub(r"\s+", " ", m.group(2)).replace("’", "'") for m in SUMMARY_LINE.finditer(read(GALLERY_JS))}
     catalog = json.loads(read(ROOT / ".rnl-packages" / "catalog.json"))
+    # The lock may hold several versions of a package; the skill describes the first, which it reads.
+    first = {}
+    for p in json.loads(read(ROOT / "packages.lock.json"))["packages"]:
+        first.setdefault(p["name"], p["version"])
     for p in catalog["packages"]:
-        result[p["name"]] = re.sub(r"\s+", " ", p["summary"]["en"]).replace("’", "'")
+        if first.get(p["name"], p["version"]) == p["version"]:
+            result[p["name"]] = re.sub(r"\s+", " ", p["summary"]["en"]).replace("’", "'")
     return result
 
 
