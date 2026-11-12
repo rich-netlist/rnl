@@ -146,10 +146,10 @@ fn external_backend_writes_and_reopens_the_same_time_work_bytes() {
     use std::path::Path;
     let source = "* external\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\nR1 a b 1k\n* @RNL { $S = @DEFINE-SYMBOL { (-1,-1) (1,1) @RECTANGLE }; #R1 @SET-SYMBOL $S; #R1 @PLACE(2,4) }\n.end\n";
     let files = MemoryProvider::new().with("input.sp", source);
-    let options = SolveOptions {
+    let mut options = SolveOptions {
         std: false,
         solver: SolverOptions {
-            run_limit: Some(RunLimit::Time(0.02)),
+            run_limit: Some(RunLimit::Seed),
             safety_seconds: None,
             ..SolverOptions::without_time_limit()
         },
@@ -158,25 +158,35 @@ fn external_backend_writes_and_reopens_the_same_time_work_bytes() {
     let backend = |problem: &_, options: &_| {
         rnl_cli::external_solver::solve(Path::new(env!("CARGO_BIN_EXE_rnl-solver")), &[], 30., problem, options)
     };
-    let first = solve_using(Path::new("input.sp"), &files, &options, &|_| true, &backend).unwrap();
-    assert_eq!(first.levels.len(), 1);
-    assert!(first.levels[0].report_available);
-    assert!(!first.levels[0].solved.report.kept.is_empty());
-    let work = first.levels[0].solved.report.budget.unwrap().work;
-    let options =
-        SolveOptions { solver: SolverOptions { run_limit: Some(RunLimit::Work(work)), ..options.solver }, ..options };
-    let replay = solve_using(Path::new("input.sp"), &files, &options, &|_| true, &backend).unwrap();
-    assert_eq!(first.files.len(), 1);
-    assert_eq!(first.files[0].text.as_bytes(), replay.files[0].text.as_bytes());
-    let reread = rnl_view::interpret(
-        "input.sp",
-        None,
-        &MemoryProvider::new().with("input.sp", &first.files[0].text),
-        &Options { std: false, ..Options::default() },
-    )
-    .unwrap();
-    assert!(reread.diagnostics().iter().all(|d| d.severity != Severity::Error), "{:?}", reread.diagnostics());
-    assert!(first.files[0].text.contains("rnl-solver 0.4.0"));
+    // A completed seed proves that a nonempty fact report crosses the process
+    // boundary. A real-time cutoff may legally happen before any fact is kept.
+    let complete = solve_using(Path::new("input.sp"), &files, &options, &|_| true, &backend).unwrap();
+    assert!(complete.levels[0].report_available);
+    assert!(!complete.levels[0].problem.facts.is_empty());
+    assert_eq!(complete.levels[0].solved.report.kept.len(), complete.levels[0].problem.facts.len());
+    for seconds in [0., 0.02] {
+        options.solver.run_limit = Some(RunLimit::Time(seconds));
+        let first = solve_using(Path::new("input.sp"), &files, &options, &|_| true, &backend).unwrap();
+        assert_eq!(first.levels.len(), 1);
+        assert!(first.levels[0].report_available);
+        let work = first.levels[0].solved.report.budget.unwrap().work;
+        if seconds == 0. {
+            assert_eq!(work, 0);
+        }
+        options.solver.run_limit = Some(RunLimit::Work(work));
+        let replay = solve_using(Path::new("input.sp"), &files, &options, &|_| true, &backend).unwrap();
+        assert_eq!(first.files.len(), 1);
+        assert_eq!(first.files[0].text.as_bytes(), replay.files[0].text.as_bytes());
+        let reread = rnl_view::interpret(
+            "input.sp",
+            None,
+            &MemoryProvider::new().with("input.sp", &first.files[0].text),
+            &Options { std: false, ..Options::default() },
+        )
+        .unwrap();
+        assert!(reread.diagnostics().iter().all(|d| d.severity != Severity::Error), "{:?}", reread.diagnostics());
+        assert!(first.files[0].text.contains("rnl-solver 0.4.0"));
+    }
 }
 
 #[test]
