@@ -713,11 +713,12 @@ mod tests {
         assert_eq!(w.language_version, "0.2");
         assert_eq!(w.keywords_in("0.2").count(), 46);
         assert_eq!(w.keywords_in("0.3").count(), 46);
-        // Pin selection, routing, settings, tables and assertions added by 0.4.
+        // Annotations, pin selection, routing, settings, tables and assertions added by 0.4.
         let added: Vec<_> = w.keywords.iter().filter(|k| !k.in_version("0.3")).map(|k| k.name.as_str()).collect();
         assert_eq!(
             added,
             [
+                "ANNOTATION",
                 "SELECT-PIN",
                 "ROUTE-NET",
                 "ROUTE-OBJECT",
