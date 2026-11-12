@@ -499,6 +499,28 @@ fn following_text_is_checked_at_its_drawn_position_with_effective_tolerance() {
 }
 
 #[test]
+fn a_new_dropped_constraint_is_not_excused_by_an_existing_drop() {
+    use rnl_cli::solve::{solve_with_clock, SolveOptions};
+    let source = include_str!("junction_completion_fixtures/no-existing-dot.sp")
+        .replace(
+            "*   %p = (0,0);",
+            "*   {#R1 #R2} @ORIENT(\"R0\"); #R1 #R2 @ORIENT-RELATION(\"R180\",priority=\"low\");\n*   %p = (0,0);",
+        )
+        .replace(
+            "*   %p = (0,0);",
+            "*   %dots = # @SELECT-USAGE $DOT; %dots @ORIENT(\"R0\"); #R1 %dots @ORIENT-RELATION(\"R90\",priority=\"low\");\n*   %p = (0,0);",
+        );
+    let files = MemoryProvider::new().with("main.sp", &source);
+    let options = SolveOptions {
+        std: false,
+        solver: rnl_solver::SolverOptions::default().with_config("layout=\"lines\",limit=\"seed\"").unwrap(),
+        ..Default::default()
+    };
+    let error = solve_with_clock(Path::new("main.sp"), &files, &options, &rnl_solver::StoppedClock).unwrap_err();
+    assert!(error.contains("new or changed fact is unresolved or not satisfied"), "{error}");
+}
+
+#[test]
 fn already_fixed_usage_keeps_original_position_without_place_rewrite() {
     let record = run(r#"$DOT = @DEFINE(roles=[["p","point"]]) {}; # @SELECT-USAGE $DOT => @PLACE(2,0)"#)
         .expect("external fixed own point");

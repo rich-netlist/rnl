@@ -109,6 +109,10 @@ fn line_results_complete_configured_junctions_and_replay_the_written_file() {
         "*   %p = (0,0);",
         "*   $GEN = @DEFINE(roles=[\"r\"],parameters=[[\"dy\",2]]) {};\n*   $WRAP = @DEFINE(roles=[\"p\"]) { %items = # @SELECT-INSTANCE => @AS(dy=2) $GEN; %items @ALIGN(\"x\") };\n*   #R3 @AS $WRAP; # @SELECT-USAGE $GEN => @PLACE(8,9);\n*   %p = (0,0);",
     );
+    let original = original.replace(
+        "*   %p = (0,0);",
+        "*   {#R1 #R2} @ORIENT(\"R0\"); #R1 #R2 @ORIENT-RELATION(\"R90\",priority=\"low\");\n*   %p = (0,0);",
+    );
     for offset in [0, 2] {
         let source = if offset == 0 {
             original.to_string()
@@ -136,6 +140,7 @@ fn line_results_complete_configured_junctions_and_replay_the_written_file() {
         )
         .unwrap();
         assert!(read.model.levels[0].unplaced.is_empty(), "{:?}", read.model.levels[0].unplaced);
+        assert!(read.model.levels[0].constraints.iter().any(|c| c.status == "dropped" && c.priority == "low"));
         let level = &seed.levels[0];
         let line_map: Vec<_> = (0..=source.lines().count() as u32).map(Some).collect();
         let check_retained = |trial: &rnl_runtime::problem::LevelProblem| {

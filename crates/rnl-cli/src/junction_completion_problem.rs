@@ -367,7 +367,7 @@ pub struct TrialValidation<'a> {
     pub tolerance: f64,
 }
 
-pub fn validate_interpreted_trial(input: TrialValidation<'_>) -> Result<(), &'static str> {
+pub fn validate_interpreted_trial(input: TrialValidation<'_>) -> Result<(), String> {
     let TrialValidation {
         original_problem,
         host_file,
@@ -388,14 +388,14 @@ pub fn validate_interpreted_trial(input: TrialValidation<'_>) -> Result<(), &'st
     let drawn = current_drawn(trial_problem, after);
     for &index in added_facts {
         if rnl_solver::problem_fact_holds_as_drawn(trial_problem, &drawn, index, tolerance) != Some(true) {
-            return Err("new or changed fact is unresolved or not satisfied");
+            return Err("new or changed fact is unresolved or not satisfied".into());
         }
     }
     if after.failed.iter().any(|failed| !before.failed.contains(failed)) {
-        return Err("trial newly failed or dropped a statement");
+        return Err("trial newly failed or dropped a statement".into());
     }
     if after.diagnostics().iter().any(|d| d.severity == Severity::Error || d.severity == Severity::Violation) {
-        return Err("trial interpretation has an error or violation");
+        return Err("trial interpretation has an error or violation".into());
     }
     for (usage_id, candidate) in targets {
         let mut selected = right.objects.iter().filter(|v| &v.id == usage_id);
@@ -406,10 +406,10 @@ pub fn validate_interpreted_trial(input: TrialValidation<'_>) -> Result<(), &'st
             || original_dot.definition != dot.definition
             || original_dot.attach != dot.attach
         {
-            return Err("junction definition or role identity changed");
+            return Err("junction definition or role identity changed".into());
         }
         if selected.next().is_some() || dot.at != Some((candidate.x, candidate.y)) {
-            return Err("trial usage identity or placement incorrect");
+            return Err("trial usage identity or placement incorrect".into());
         }
     }
     for old in left.objects.iter().filter(|v| !targets.iter().any(|(id, _)| *id == v.id)) {
@@ -417,58 +417,64 @@ pub fn validate_interpreted_trial(input: TrialValidation<'_>) -> Result<(), &'st
         let new = matches.next().ok_or("old object missing")?;
         if matches.next().is_some() || old.at != new.at || old.orient != new.orient || old.pins.len() != new.pins.len()
         {
-            return Err("old object geometry changed");
+            return Err("old object geometry changed".into());
         }
         for (a, b) in old.pins.iter().zip(&new.pins) {
             if a.at != b.at || a.dir != b.dir || a.terminals != b.terminals || a.nets != b.nets {
-                return Err("old pin geometry or connection changed");
+                return Err("old pin geometry or connection changed".into());
             }
             match (&a.identity, &b.identity) {
                 (Some(a), Some(b)) if a.index == b.index && a.reference == b.reference => {}
                 (None, None) => {}
-                _ => return Err("physical pin identity changed"),
+                _ => return Err("physical pin identity changed".into()),
             }
         }
     }
     if left.points.len() != right.points.len() {
-        return Err("named point count changed");
+        return Err("named point count changed".into());
     }
     for old in &left.points {
         let mut matches = right.points.iter().filter(|point| point.id == old.id);
         let new = matches.next().ok_or("old point missing")?;
         if matches.next().is_some() || old.at != new.at || old.junction != new.junction {
-            return Err("old point geometry or junction identity changed");
+            return Err("old point geometry or junction identity changed".into());
         }
     }
     if left.wires.len() != right.wires.len() {
-        return Err("wire count changed");
+        return Err("wire count changed".into());
     }
     for (a, b) in left.wires.iter().zip(&right.wires) {
         if a.object_id != b.object_id || a.nets != b.nets || a.points != b.points || a.via != b.via || a.mode != b.mode
         {
-            return Err("wire geometry or endpoint identity changed");
+            return Err("wire geometry or endpoint identity changed".into());
         }
     }
-    // Without source-level status proofs, accepting a dropped/unchecked fact would guess 8.5.
+    // The first pass can already have dropped a lower-priority constraint. Its
+    // unchanged outcome needs no new resolution; newly introduced dropped facts
+    // are still exported and must pass the actual-drawing check above.
     for (index, constraint) in right.constraints.iter().enumerate() {
         if matches!(constraint.status.as_str(), "ok" | "disabled") {
             continue;
         }
         // Added/changed facts were independently checked against the actual drawing above.
         // A label alone is not a unique identity: different constraints can share it.
-        let unchanged_pending = constraint.status == "unsolved"
+        let unchanged_pending = matches!(constraint.status.as_str(), "unsolved" | "dropped")
             && left.constraints.get(index).is_some_and(|old| {
-                old.status == "unsolved"
+                old.status == constraint.status
                     && old.label == constraint.label
                     && old.kind == constraint.kind
                     && old.priority == constraint.priority
             });
         if !unchanged_pending {
-            return Err("constraint outcome requires general resolution");
+            return Err(format!(
+                "constraint outcome requires general resolution: index {index}, status {}, previous {:?}",
+                constraint.status,
+                left.constraints.get(index).map(|old| (&old.status, &old.label, &old.kind, &old.priority))
+            ));
         }
     }
     if right.unplaced.iter().any(|id| targets.iter().any(|(target, _)| target == id) || !left.unplaced.contains(id)) {
-        return Err("junction or new generated object remains unplaced");
+        return Err("junction or new generated object remains unplaced".into());
     }
     Ok(())
 }

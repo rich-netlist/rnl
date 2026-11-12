@@ -341,7 +341,7 @@ pub fn complete_record(ctx: &Context<'_>, written: &Written) -> Result<Completio
         }) {
             Ok(()) => return Ok(Completion { record: trial, trials: attempt + 1, elapsed: start.elapsed() }),
             Err(e) => {
-                last_error = e.to_owned();
+                last_error = e;
                 if let Some(d) = after.diagnostics().iter().find(|d| {
                     matches!(d.severity, rnl_runtime::diag::Severity::Error | rnl_runtime::diag::Severity::Violation)
                 }) {
