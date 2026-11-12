@@ -774,6 +774,15 @@ impl Interp<'_> {
                 }
             }
             ObjData::Pos { parent } => self.reference_of(s, ix, parent).then("::position"),
+            ObjData::ScenePin { owner, index } if self.follows_0_4(self.level_unit[self.scenes[s].level]) => {
+                match self.symbol_pin_ref(s, ix, owner, index) {
+                    Some(PointRef::SymbolPin { reference, .. }) => reference,
+                    Some(PointRef::Pin { terminal, .. }) => {
+                        self.reference_of(s, ix, owner).then(&format!(":{}", written_name(&terminal)))
+                    }
+                    _ => Reference::Anonymous,
+                }
+            }
             ObjData::NamedSubobject { parent, name, .. } => {
                 self.reference_of(s, ix, parent).then(&format!("::{}", written_name(&name)))
             }
