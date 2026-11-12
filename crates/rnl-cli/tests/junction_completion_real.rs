@@ -175,6 +175,7 @@ fn actual_solve_with_official_standard_dot() {
     use rnl_cli::solve::{solve, SolveOptions};
     let original = include_str!("junction_completion_fixtures/no-existing-dot.sp");
     let text = original
+        .replace("\r\n", "\n")
         .replace(
             "@SOLVER-CONFIG(junction=\"$DOT\")",
             "@USE-PACKAGE(name=\"rnl-std-basic\",version=\"0.4\"); @SOLVER-CONFIG(junction=\"$JUNCTION\")",
