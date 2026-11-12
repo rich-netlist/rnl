@@ -101,7 +101,14 @@ fn line_time_cutoffs_replay_the_complete_file_and_skeleton_report() {
 
 #[test]
 fn line_results_complete_configured_junctions_and_replay_the_written_file() {
-    let original = include_str!("junction_completion_fixtures/no-existing-dot.sp");
+    let original = include_str!("junction_completion_fixtures/no-existing-dot.sp").replace(
+        "*   %p = (0,0);",
+        "*   #R1 @TEXT(\"label\", key=\"note\", dx=0.1, dy=0.2);\n*   $EMPTY = @DEFINE(roles=[]) {}; $EMPTY @ATTACH => @SET-SYMBOL $DOT_SYMBOL;\n*   %p = (0,0);",
+    );
+    let original = original.replace(
+        "*   %p = (0,0);",
+        "*   $GEN = @DEFINE(roles=[\"r\"],parameters=[[\"dy\",2]]) {};\n*   $WRAP = @DEFINE(roles=[\"p\"]) { %items = # @SELECT-INSTANCE => @AS(dy=2) $GEN; %items @ALIGN(\"x\") };\n*   #R3 @AS $WRAP; # @SELECT-USAGE $GEN => @PLACE(8,9);\n*   %p = (0,0);",
+    );
     for offset in [0, 2] {
         let source = if offset == 0 {
             original.to_string()
@@ -118,6 +125,7 @@ fn line_results_complete_configured_junctions_and_replay_the_written_file() {
         assert_eq!(seed.errors, 0, "{seed:?}");
         assert!(seed.levels[0].solved.report.skeleton.is_some());
         let file = seed.files.iter().find(|file| file.path == "main.sp").unwrap();
+        assert!(file.text.contains("numbering=\""), "{}", file.text);
         assert!(file.text.contains(&format!("=> @PLACE({offset}, 0)")), "{}", file.text);
         let saved = MemoryProvider::new().with("main.sp", &file.text);
         let read = rnl_cli::interpret_file(
@@ -128,6 +136,44 @@ fn line_results_complete_configured_junctions_and_replay_the_written_file() {
         )
         .unwrap();
         assert!(read.model.levels[0].unplaced.is_empty(), "{:?}", read.model.levels[0].unplaced);
+        let level = &seed.levels[0];
+        let line_map: Vec<_> = (0..=source.lines().count() as u32).map(Some).collect();
+        let check_retained = |trial: &rnl_runtime::problem::LevelProblem| {
+            rnl_cli::junction_completion_problem::retained_facts_preserved(
+                &level.problem,
+                trial,
+                "main.sp",
+                &line_map,
+                &level.solved.report.kept,
+                &read,
+                1e-6,
+            )
+        };
+        assert!(!level.solved.report.kept.is_empty());
+        assert!(check_retained(&read.problems[0]).is_ok());
+        let mut changed = read.problems[0].clone();
+        let usage = changed.usages.iter_mut().find(|u| u.definition == "$GEN").unwrap();
+        usage.roles[0].members = vec![rnl_runtime::problem::Filler::Net("different".into())];
+        assert!(check_retained(&changed).is_err(), "reified roles must retain their identity");
+        let mut contradicted = level.problem.clone();
+        contradicted.facts[level.solved.report.kept[0]].kind = rnl_runtime::problem::FactKind::PointCoordinate {
+            point: 0,
+            axis: rnl_runtime::problem::Axis::X,
+            value: 12345.,
+        };
+        assert!(
+            rnl_cli::junction_completion_problem::retained_facts_preserved(
+                &contradicted,
+                &read.problems[0],
+                "main.sp",
+                &line_map,
+                &level.solved.report.kept,
+                &read,
+                1e-6,
+            )
+            .is_err(),
+            "a claimed kept fact must actually hold in the drawing"
+        );
         for seconds in [2000, 100000] {
             let timed = solve_with_clock(
                 Path::new("main.sp"),

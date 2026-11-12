@@ -460,6 +460,45 @@ R1 a 0 1k
 }
 
 #[test]
+fn following_text_is_checked_at_its_drawn_position_with_effective_tolerance() {
+    use rnl_runtime::{problem::ObjectKind, solution::Placement};
+    let text = include_str!("junction_completion_fixtures/no-existing-dot.sp")
+        .replace("*   %p = (0,0);", "*   #R1 @TEXT(\"label\", key=\"note\", dx=0.1, dy=0.2);\n*   %p = (0,0);");
+    let files = MemoryProvider::new().with("main.sp", &text);
+    let opts = Options { std: false, problems: true, generated: false, ..Default::default() };
+    let original = interpret_file(Path::new("main.sp"), None, &files, &opts).unwrap();
+    let p = &original.problems[0];
+    let object = p.objects.iter().position(|o| o.kind == ObjectKind::Text).unwrap();
+    let formats = BTreeMap::new();
+    for (delta, tolerance, accepted) in [(0., 1e-9, true), (5e-8, 1e-9, false), (5e-8, 1e-6, true)] {
+        let solution = Solution {
+            placements: vec![Placement { object, x: Some(-6. + 0.1 + delta), y: Some(0.2), orient: None }],
+            branches: vec![Branch { at: (0., 0.), junction: true }],
+            ..Default::default()
+        };
+        let written = write_record(p, &solution, "test", "test");
+        assert!(!written.junctions.is_empty());
+        let ctx = Context {
+            entry: "main.sp",
+            dialect: None,
+            formats: &formats,
+            files: &files,
+            runtime: &opts,
+            original: &original,
+            problem: p,
+            original_text: &text,
+            host_path: "main.sp",
+            kept: &[],
+            solution: &solution,
+            tolerance,
+            on_interpret: None,
+        };
+        let result = complete_record(&ctx, &written);
+        assert_eq!(result.is_ok(), accepted, "delta={delta}, tolerance={tolerance}: {:?}", result.err());
+    }
+}
+
+#[test]
 fn already_fixed_usage_keeps_original_position_without_place_rewrite() {
     let record = run(r#"$DOT = @DEFINE(roles=[["p","point"]]) {}; # @SELECT-USAGE $DOT => @PLACE(2,0)"#)
         .expect("external fixed own point");

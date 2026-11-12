@@ -29,6 +29,9 @@ pub struct Context<'a> {
 }
 
 fn read(ctx: &Context<'_>, record: &str) -> Result<Interpretation, String> {
+    // Numbered references take effect only after the normal writer adds their check.
+    // Each bounded trial needs its own check: adding PLACE changes usage tokens.
+    let record = rnl_view::finish_record(&ctx.original.doc, ctx.files, ctx.runtime, ctx.problem, record);
     if let Some(observe) = ctx.on_interpret {
         observe();
     }
@@ -36,7 +39,7 @@ fn read(ctx: &Context<'_>, record: &str) -> Result<Interpretation, String> {
         &ctx.original.doc,
         ctx.problem.level,
         ctx.original_text,
-        record,
+        &record,
         &ctx.problem.version,
     );
     let mut overlay = MemoryProvider::new();
@@ -206,28 +209,24 @@ pub fn complete_record(ctx: &Context<'_>, written: &Written) -> Result<Completio
     let before = read(ctx, record)?;
     let line_map = line_mapping(ctx, &before, record)?;
     let problem = before.problems.iter().find(|p| p.level == ctx.problem.level).ok_or("trial problem missing")?;
+    // The writer omits coordinates already supplied by following text or a symbol.
+    // Compare their interpreted positions, using the same generated-reference mapping
+    // as previous results, rather than requiring redundant fixed slots in the record.
+    let drawn = rnl_runtime::previous::drawn(ctx.problem, &before);
     for placement in &ctx.solution.placements {
-        let old = ctx.problem.objects.get(placement.object).ok_or("first-pass placement index invalid")?;
-        let mut matches = problem.objects.iter().filter(|o| o.reference == old.reference && o.kind == old.kind);
-        let new = matches.next().ok_or("first-pass placed object missing")?;
-        if matches.next().is_some() {
-            return Err("first-pass placed object ambiguous".into());
-        }
-        if placement.x.is_some() || placement.y.is_some() {
-            let Position::Own { x, y } = &new.position else {
-                return Err("placed object has no own coordinates".into());
-            };
-            for (wanted, slot) in [(placement.x, x), (placement.y, y)] {
-                if let Some(wanted) = wanted {
-                    if !matches!(slot, Slot::Fixed { value, .. } if *value == wanted) {
-                        return Err("first-pass placement did not survive interpretation".into());
-                    }
+        let new = drawn.get(placement.object).ok_or("first-pass placement index invalid")?;
+        for (axis, (wanted, actual)) in [placement.x, placement.y].into_iter().zip(new.at).enumerate() {
+            if let Some(wanted) = wanted {
+                if !actual.is_some_and(|actual| (actual - wanted).abs() <= ctx.tolerance) {
+                    return Err(format!(
+                        "first-pass placement did not survive interpretation: object {}, axis {axis}, expected {wanted}, drawn {actual:?}",
+                        placement.object
+                    ));
                 }
             }
         }
         if let Some(orient) = placement.orient {
-            if !matches!(new.orient.as_ref(), Some(rnl_runtime::problem::OrientSlot::Fixed { code, .. }) if *code == orient)
-            {
+            if new.orient != Some(orient) {
                 return Err("first-pass orientation did not survive interpretation".into());
             }
         }
@@ -320,9 +319,14 @@ pub fn complete_record(ctx: &Context<'_>, written: &Written) -> Result<Completio
         let after = read(ctx, &trial)?;
         let after_problem =
             after.problems.iter().find(|p| p.level == ctx.problem.level).ok_or("trial problem missing")?;
-        let added =
-            added_fact_indices(ctx.problem, after_problem, &ctx.original.doc.levels[ctx.problem.level].file, &line_map)
-                .map_err(str::to_owned)?;
+        let added = added_fact_indices(
+            ctx.problem,
+            after_problem,
+            &ctx.original.doc.levels[ctx.problem.level].file,
+            &line_map,
+            &after,
+        )
+        .map_err(str::to_owned)?;
         match validate_interpreted_trial(TrialValidation {
             original_problem: ctx.problem,
             host_file: &ctx.original.doc.levels[ctx.problem.level].file,
@@ -336,7 +340,14 @@ pub fn complete_record(ctx: &Context<'_>, written: &Written) -> Result<Completio
             tolerance: ctx.tolerance,
         }) {
             Ok(()) => return Ok(Completion { record: trial, trials: attempt + 1, elapsed: start.elapsed() }),
-            Err(e) => last_error = e.to_owned(),
+            Err(e) => {
+                last_error = e.to_owned();
+                if let Some(d) = after.diagnostics().iter().find(|d| {
+                    matches!(d.severity, rnl_runtime::diag::Severity::Error | rnl_runtime::diag::Severity::Violation)
+                }) {
+                    last_error.push_str(&format!(": {}: {}", d.code, d.message));
+                }
+            }
         }
         let mut advanced = false;
         for i in (0..indexes.len()).rev() {
