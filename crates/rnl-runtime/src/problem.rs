@@ -557,6 +557,12 @@ pub struct RouteIntent {
 /// A set given GROUP: treat it as one block (11.5). Groups that PRIORITY turns off are left out.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ProblemGroup {
+    /// Identity of the grouped set within this problem. Repeated GROUPs on the same set share it.
+    pub identity: usize,
+    /// The first valid declaration on this set, counting declarations disabled by PRIORITY.
+    pub first: bool,
+    /// The GROUP is outside a definition expansion. This is provenance, not a property of its name.
+    pub direct: bool,
     /// Optional whole grid-unit additions to the solver's default spacing (11.5).
     pub spacing_x: Option<f64>,
     pub spacing_y: Option<f64>,
@@ -1195,6 +1201,12 @@ pub fn canonical_sig1(p: &LevelProblem) -> String {
     }
     c.word("groups");
     for g in &p.groups {
+        if p.version == "0.4" {
+            c.word("group-origin");
+            c.index(g.identity);
+            c.word(if g.first { "first" } else { "repeated" });
+            c.word(if g.direct { "direct" } else { "expanded" });
+        }
         c.str(&g.label);
         c.indexes(&g.members);
         // Preserve the canonical text for groups written before spacing was available.

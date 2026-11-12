@@ -21,15 +21,15 @@
 //! candidates within the layer's tolerance of its least value kept, the canonical code breaking
 //! what is left tied. An objective that is off has no layer, so it neither ranks nor breaks ties.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use num_traits::{One, Zero};
 use rnl_runtime::geom::Orient;
 use rnl_runtime::problem::LevelProblem;
 
 use crate::coords::solid;
-use crate::objectives::{Active, Routed, View};
-use crate::rational::Q;
+use crate::objectives::{Active, Drawing, Routed, View};
+use crate::rational::{int, Q};
 use crate::resolve::Geometry;
 use crate::route::{written_path, Routing};
 use crate::search::RelKind;
@@ -141,6 +141,39 @@ pub(crate) fn misleading(
         let Some(p) = s.pin_at(origins, &g.orient, k, pin) else { continue };
         count += segments.iter().filter(|(i, a, b)| nets[*i].is_disjoint(&names) && on_segment(&p, a, b)).count();
     }
+    if !s.language04 {
+        count += wire_over_symbol(problem, s, origins, g, routed);
+    }
+    count
+}
+
+/// Segments through symbol interiors, excluding leads ending at an internal pin.
+pub(crate) fn wire_over_symbol(
+    problem: &LevelProblem,
+    s: &Structure,
+    origins: &[[Q; 2]],
+    g: &Geometry,
+    routed: &Routed,
+) -> usize {
+    let drawn = &s.connections.drawn;
+    let first_written = drawn.len().saturating_sub(problem.wires.len());
+    // the nets of an entry of `drawn`: a ROUTE's, or a wire written's
+    let nets_of = |d: usize| -> BTreeSet<&str> {
+        match d.checked_sub(first_written).and_then(|w| problem.wires.get(w)) {
+            Some(w) => w.nets.iter().map(String::as_str).collect(),
+            None => drawn.get(d).map(|e| e.net.as_str()).into_iter().collect(),
+        }
+    };
+    let nets: Vec<BTreeSet<&str>> = routed.paths.iter().map(|(d, _)| nets_of(*d)).collect();
+    let segments: Vec<(usize, &[Q; 2], &[Q; 2])> = routed
+        .paths
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| !nets[*i].is_empty())
+        .flat_map(|(i, (_, path))| path.windows(2).map(move |w| (i, &w[0], &w[1])))
+        .filter(|(_, a, b)| a != b)
+        .collect();
+    let mut count = 0;
     for k in (0..s.objects.len()).filter(|&k| solid(s, k)) {
         let Some(b) = s.box_at(origins, &g.orient, k) else { continue };
         let inner: Vec<[Q; 2]> = s
@@ -154,6 +187,34 @@ pub(crate) fn misleading(
             segments.iter().filter(|(_, p, q)| through(&b, p, q) && !inner.iter().any(|x| x == *p || x == *q)).count();
     }
     count
+}
+
+/// Score the placed drawing, preserving the released scoring path for old inputs.
+pub(crate) fn measured_layers(
+    problem: &LevelProblem,
+    s: &Structure,
+    placed: &crate::coords::Placed,
+    routed: Option<&Routed>,
+) -> Vec<Q> {
+    if !s.language04 {
+        return layers(s, &placed.origins, &placed.geometry, routed);
+    }
+    let written;
+    let wires = match routed {
+        Some(w) => w,
+        None => {
+            written = drawn(problem, s, &placed.geometry, &Routing::default());
+            &written
+        }
+    };
+    let drawing = Drawing {
+        overlaps: placed.overlaps.len(),
+        crowding: crowding(s, &placed.origins, &placed.geometry.orient, &placed.dropped),
+        misleading: misleading(problem, s, &placed.origins, &placed.geometry, wires),
+        wire_over_symbol: wire_over_symbol(problem, s, &placed.origins, &placed.geometry, wires),
+    };
+    let view = View { s, at: &placed.origins, orient: &placed.geometry.orient };
+    s.active.score_drawing(&view, routed, &drawing)
 }
 
 /// What crowds a placed candidate, in the order of candidates after the symbols that overlap and
@@ -274,6 +335,10 @@ fn through(bx: &[Q; 4], a: &[Q; 2], b: &[Q; 2]) -> bool {
 /// crowding, then the fewest places where the wires mislead, then the fewest joins left undone,
 /// then the layers within their tolerances, then the code.
 pub(crate) fn order(active: &Active, entries: &[Entry]) -> Vec<usize> {
+    if active.configured_only {
+        let refs: Vec<_> = entries.iter().map(|e| (e.layers.as_slice(), e.code.as_slice())).collect();
+        return active.rank(&refs);
+    }
     let key = |e: &Entry| (e.overlaps, e.crowding, e.misleading, e.joins_left);
     let mut keys: Vec<(usize, usize, usize, usize)> = entries.iter().map(key).collect();
     keys.sort_unstable();
@@ -286,6 +351,82 @@ pub(crate) fn order(active: &Active, entries: &[Entry]) -> Vec<usize> {
         out.extend(active.rank(&refs).into_iter().map(|j| members[j]));
     }
     out
+}
+
+/// How much trouble each object is in on these wires, as a rank: 0 for none, more for more. An
+/// object's trouble is what the wires of its nets have of the objectives in force that look at
+/// wires, compared in the order of those objectives, so that it follows the order the options set:
+/// the wires through symbols, the crossings, the turns and the length, each summed over its nets.
+pub(crate) fn trouble(s: &Structure, origins: &[[Q; 2]], ori: &[Orient], wires: &Routed) -> Vec<u64> {
+    use crate::objectives::Objective;
+    let order: Vec<Objective> = s
+        .active
+        .in_order()
+        .into_iter()
+        .filter(|o| {
+            matches!(o, Objective::WireOverSymbol | Objective::Crossings | Objective::Turns | Objective::WireLength)
+        })
+        .collect();
+    let drawn = &s.connections.drawn;
+    let name = |d: usize| drawn.get(d).map_or("", |e| e.net.as_str());
+    // what each net comes to
+    let mut by_net: BTreeMap<&str, Vec<Q>> = BTreeMap::new();
+    let segments: Vec<(&str, &[Q; 2], &[Q; 2])> = wires
+        .paths
+        .iter()
+        .flat_map(|(d, path)| path.windows(2).map(move |w| (name(*d), &w[0], &w[1])))
+        .filter(|(_, a, b)| a != b)
+        .collect();
+    let bodies: Vec<[Q; 4]> =
+        (0..s.objects.len()).filter(|&k| solid(s, k)).filter_map(|k| s.box_at(origins, ori, k)).collect();
+    for (d, path) in &wires.paths {
+        let own: Vec<(&[Q; 2], &[Q; 2])> = path.windows(2).map(|w| (&w[0], &w[1])).filter(|(a, b)| a != b).collect();
+        let values: Vec<Q> = order
+            .iter()
+            .map(|o| match o {
+                Objective::WireOverSymbol => {
+                    int(own.iter().filter(|(a, b)| bodies.iter().any(|x| through(x, a, b))).count() as i64)
+                }
+                Objective::Crossings => {
+                    let cross = |(a, b): &(&[Q; 2], &[Q; 2])| {
+                        segments.iter().filter(|(net, p, q)| *net != name(*d) && crosses(a, b, p, q)).count()
+                    };
+                    int(own.iter().map(cross).sum::<usize>() as i64)
+                }
+                Objective::Turns => int(crate::objectives::bends(path) as i64),
+                _ => own.iter().map(|(a, b)| (&a[0] - &b[0]).abs() + (&a[1] - &b[1]).abs()).sum(),
+            })
+            .collect();
+        let entry = by_net.entry(name(*d)).or_insert_with(|| vec![Q::zero(); order.len()]);
+        for (e, v) in entry.iter_mut().zip(values) {
+            *e += v;
+        }
+    }
+    // what each object's nets come to
+    let mut of_object: Vec<Vec<Q>> = vec![vec![Q::zero(); order.len()]; s.objects.len()];
+    for (&(k, _), nets) in &s.connections.nets_of {
+        for &i in nets {
+            let Some(values) = s.connections.nets.get(i).and_then(|n| by_net.get(n.name.as_str())) else { continue };
+            for (e, v) in of_object[k].iter_mut().zip(values) {
+                *e += v;
+            }
+        }
+    }
+    let mut sorted = of_object.clone();
+    sorted.sort();
+    sorted.dedup();
+    of_object.iter().map(|v| sorted.binary_search(v).unwrap_or(0) as u64).collect()
+}
+
+/// Whether two segments cross, meeting inside both.
+fn crosses(a: &[Q; 2], b: &[Q; 2], c: &[Q; 2], d: &[Q; 2]) -> bool {
+    let inside = |p: &Q, lo: &Q, hi: &Q| lo < p && p < hi;
+    let (x1, x2) = span(a, b, 0);
+    let (y1, y2) = span(a, b, 1);
+    let (u1, u2) = span(c, d, 0);
+    let (v1, v2) = span(c, d, 1);
+    (y1 == y2 && u1 == u2 && inside(u1, x1, x2) && inside(y1, v1, v2))
+        || (x1 == x2 && v1 == v2 && inside(v1, y1, y2) && inside(x1, u1, u2))
 }
 
 #[cfg(test)]

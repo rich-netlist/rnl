@@ -8,7 +8,7 @@ use rnl_solver::{RunLimit, SolverOptions};
 use std::{cell::RefCell, collections::BTreeMap};
 
 fn record(case: u32, work: u32) -> (String, u64) {
-    let n = if case == 0 { 2 } else { 4 };
+    let n = if case % 2 == 0 { 2 } else { 4 };
     let mut text = "* solver parity\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n".to_string();
     for k in 1..=n {
         text.push_str(&format!("R{k} shared n{k} 1k\n"));
@@ -18,8 +18,11 @@ fn record(case: u32, work: u32) -> (String, u64) {
         text.push_str(&format!("#R{k} "));
     }
     text.push_str("} @SET-SYMBOL $S;\n");
-    for k in 1..=n {
+    for k in 1..=if case < 2 { n } else { 0 } {
         text.push_str(&format!("* #R{k} @PLACE({}, {}) => @ORIENT(\"R0\");\n", k * 7, (k % 2) * 4));
+    }
+    if case >= 2 {
+        text.push_str("* {#R1 #R2} @GROUP;\n");
     }
     text.push_str("* }\n.end\n");
     let files = MemoryProvider::new().with("parity.sp", &text);
@@ -48,7 +51,26 @@ fn record(case: u32, work: u32) -> (String, u64) {
         pins,
         wires: Vec::new(),
     });
-    let options = SolverOptions { run_limit: Some(RunLimit::Work(u64::from(work))), ..SolverOptions::default() };
+    if case == 3 {
+        p.facts.push(rnl_runtime::problem::ProblemFact {
+            kind: rnl_runtime::problem::FactKind::PinOrient {
+                pin: rnl_runtime::problem::DirectedPin { object: 0, pin: 0, direction: 180 },
+                codes: vec![rnl_runtime::geom::Orient::R0],
+            },
+            priority: rnl_runtime::interp::obj::Priority::Normal,
+            label: "pin direction".into(),
+            reference: None,
+            source: None,
+            chain: vec![],
+        });
+    }
+    let mut options = SolverOptions { run_limit: Some(RunLimit::Work(u64::from(work))), ..SolverOptions::default() };
+    if case >= 2 {
+        options.settings.layout = rnl_solver::Layout::Tree;
+        options = options
+            .with_overrides("objectives=overlaps,crowding,misleading,wire_over_symbol,crossings,turns,wire_length,area")
+            .unwrap();
+    }
     let solved = rnl_solver::solve(&p, &options);
     let hash = sig2(&p, solved.report.canonical_options.as_ref().unwrap());
     (
@@ -74,7 +96,7 @@ pub extern "C" fn parity_ptr() -> *const u8 {
 
 fn main() {
     #[cfg(not(target_arch = "wasm32"))]
-    for case in 0..2 {
+    for case in 0..4 {
         for work in [0, 64, 4096, 1_000_000] {
             let start = std::time::Instant::now();
             let (record, used) = record(case, work);

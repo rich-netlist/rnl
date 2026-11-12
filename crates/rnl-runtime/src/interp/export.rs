@@ -485,13 +485,24 @@ impl Interp<'_> {
 
         // GROUP (11.5), without those PRIORITY turns off
         let mut groups = Vec::new();
+        let mut group_ids = std::collections::BTreeMap::new();
         for g in self.scenes[s].groups.clone() {
             let set = g.set;
-            if self.failed_group(&g) || self.group_disabled(s, &g) {
+            if self.failed_group(&g) {
+                continue;
+            }
+            let next = group_ids.len();
+            let set_value = self.scene_value(set);
+            let first = !group_ids.contains_key(&set_value);
+            let identity = *group_ids.entry(set_value).or_insert(next);
+            if self.group_disabled(s, &g) {
                 continue;
             }
             let members = self.group_members(s, &g);
             groups.push(ProblemGroup {
+                identity,
+                first,
+                direct: g.chain.is_empty(),
                 spacing_x: g.spacing_x,
                 spacing_y: g.spacing_y,
                 label: self.label(set),

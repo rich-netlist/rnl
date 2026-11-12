@@ -12,7 +12,7 @@ pub enum RunLimit {
     Time(f64),
     Work(u64),
     Unlimited,
-    /// Only the initial heuristic candidates, without subsequent layout refinement.
+    /// The initial layout pass, including its layout-specific greedy refinement.
     Seed,
 }
 
@@ -154,6 +154,10 @@ pub(crate) fn active() -> bool {
 /// Public entry points cannot borrow a caller's budget through an observer callback.
 pub(crate) fn without<T>(f: impl FnOnce() -> T) -> T {
     ACTIVE.set(None, f)
+}
+
+pub(crate) fn continues_rows() -> bool {
+    active() && ACTIVE.with(|c| c.unwrap().limit != RunLimit::Seed)
 }
 
 pub(crate) fn stopped() -> bool {

@@ -46,6 +46,9 @@
 //! lexicographic LP (`crate::coords`). The search makes no more than `Budget::candidates`
 //! candidates; past that it keeps what it has.
 
+mod refinement;
+pub(crate) use refinement::{neighbours, BATCH};
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use num_traits::{One, Zero};
@@ -85,6 +88,7 @@ pub(crate) enum Side {
 /// A port or a supply or ground symbol that no fact places, put beside the pin it connects to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Attach {
+    pub aside: i64,
     pub host: PinKey,
     pub side: Side,
     /// For a port that the router joins to a pin that leaves up or down: the pin on its net, in
@@ -97,6 +101,7 @@ pub(crate) struct Attach {
 /// A candidate: the discrete decisions of a layout (see the module).
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Candidate {
+    pub ways: Vec<usize>,
     /// The orientation of each free class, by its index in `Open::classes`: the orientation of its
     /// root.
     pub values: Vec<Orient>,
@@ -117,7 +122,7 @@ impl Candidate {
     /// The orientation of every object: the free classes as the candidate says, the others as the
     /// witness of the resolution has them.
     pub(crate) fn orientations(&self, s: &Structure) -> Vec<Orient> {
-        orientations(s, &self.values)
+        orientations_with(s, &self.values, &self.ways)
     }
 
     /// The canonical code: the orientation of each object with one, in the order of the objects,
@@ -139,12 +144,13 @@ impl Candidate {
         }
         code.push(u32::from(self.even));
         code.push(u32::from(self.columns));
+        code.extend(self.ways.iter().map(|w| *w as u32));
         code
     }
 }
 
 /// The orientation of every object given the values of the free classes.
-fn orientations(s: &Structure, values: &[Orient]) -> Vec<Orient> {
+pub(crate) fn orientations(s: &Structure, values: &[Orient]) -> Vec<Orient> {
     let mut ori = s.witness.orient.clone();
     for (class, value) in s.open.classes.iter().zip(values) {
         let value = fitting(s, class.root, *value);
@@ -152,6 +158,33 @@ fn orientations(s: &Structure, values: &[Orient]) -> Vec<Orient> {
             ori[*m] = value.then(*label);
         }
     }
+    if s.language04 {
+        crate::beside::face(s, &mut ori);
+    }
+    ori
+}
+
+/// Orientations suggested by a layout, including coordinated changes to a relation list.
+pub(crate) fn orientations_with(s: &Structure, values: &[Orient], ways: &[usize]) -> Vec<Orient> {
+    if !s.open.search_classes {
+        return orientations(s, values);
+    }
+    let Some(classes) = crate::search_choices::classes(s, &s.open.ways, ways) else { return orientations(s, values) };
+    let mut ori = s.witness.orient.clone();
+    for (class, value) in s.open.classes.iter().zip(values) {
+        let value = fitting(s, class.root, *value);
+        for (m, _) in &class.members {
+            let (_, label) = classes.find(*m);
+            ori[*m] = value.then(label);
+        }
+    }
+    for (m, value) in ori.iter_mut().enumerate() {
+        let (root, label) = classes.find(m);
+        if let Some(fixed) = classes.fixed(root) {
+            *value = fixed.value.then(label);
+        }
+    }
+    crate::beside::face(s, &mut ori);
     ori
 }
 
@@ -201,6 +234,8 @@ pub(crate) type Term = (PointId, Q);
 pub(crate) enum Relation {
     /// An orientation class takes a value: the orientation of its root (11.2).
     Orient { root: usize, value: Orient },
+    /// An authored alternative, as a preference below all kept facts.
+    Way { fact: usize, value: usize },
     /// `lo ≤ Σ aᵢ pᵢ ≤ hi` on an axis.
     Linear { axis: usize, terms: Vec<Term>, lo: Option<Q>, hi: Option<Q> },
     /// Every point of `low` plus its offset is at most some `t`, and every point of `high` plus
@@ -231,6 +266,7 @@ impl Relation {
         };
         match self {
             Relation::Orient { root, value } => orient = OrientEffect::Fix { object: *root, code: *value },
+            Relation::Way { fact, value } => orient = crate::search_choices::effect(&model.units[*fact].orient, *value),
             Relation::Linear { axis, terms, lo, hi } => {
                 touched[*axis].extend(terms.iter().map(|(p, _)| *p));
                 fixed.push(Bound { axis: *axis, expr: expr(model, terms), lo: lo.clone(), hi: hi.clone() });
@@ -313,6 +349,47 @@ pub(crate) fn with_relations<R>(
     let base = model.units.len();
     let units: Vec<Unit> = relations.iter().enumerate().map(|(i, r)| r.rel.unit(&mut model, base + i)).collect();
     model.units.extend(units);
+    let ways: Vec<usize> =
+        relations.iter().enumerate().filter_map(|(i, r)| matches!(r.rel, Relation::Way { .. }).then_some(i)).collect();
+    let mut way_undecided = false;
+    if !ways.is_empty() {
+        // Alternatives are one trial: if any conflicts, restore the whole batch. Kept
+        // predicates are replayed unchanged, including when the budget has expired.
+        let mut trial = Resolver::new(&model, s.objects.len(), Limits::Caps(s.caps));
+        trial.seed(s.witness.clone());
+        for &f in &s.kept {
+            let kept = trial.add_at_witness(f);
+            debug_assert_eq!(kept, Outcome::Kept);
+        }
+        let fit = ways.iter().all(|i| {
+            let outcome = trial.add(base + i);
+            way_undecided |= outcome == Outcome::Undecided;
+            outcome == Outcome::Kept
+        });
+        work.resolve_nodes += trial.nodes;
+        work.pivots += trial.pivots();
+        drop(trial);
+        if !fit {
+            for i in ways {
+                model.units[base + i].orient = OrientEffect::None;
+            }
+            // The roots still express the candidate's turns, but member labels revert to
+            // the original search view when its selected alternatives were rejected.
+            for class in &s.open.classes {
+                let root_value = relations.iter().find_map(|r| match r.rel {
+                    Relation::Orient { root, value } if root == class.root => Some(value),
+                    _ => None,
+                });
+                let Some(value) = root_value else { continue };
+                for (i, r) in relations.iter().enumerate() {
+                    let Relation::Orient { root, .. } = r.rel else { continue };
+                    if let Some((_, label)) = class.members.iter().find(|(m, _)| *m == root) {
+                        model.units[base + i].orient = OrientEffect::Fix { object: root, code: value.then(*label) };
+                    }
+                }
+            }
+        }
+    }
     let mut r = Resolver::new(&model, s.objects.len(), Limits::Caps(s.caps));
     r.seed(s.witness.clone());
     for &f in &s.kept {
@@ -322,7 +399,7 @@ pub(crate) fn with_relations<R>(
     let outcomes: Vec<Outcome> = (0..relations.len()).map(|i| r.add(base + i)).collect();
     let taken = Taken {
         kept: outcomes.iter().map(|o| *o == Outcome::Kept).collect(),
-        undecided: outcomes.contains(&Outcome::Undecided),
+        undecided: way_undecided || outcomes.contains(&Outcome::Undecided),
     };
     let out = f(&mut r, &model, &taken);
     work.resolve_nodes += r.nodes;
@@ -336,7 +413,7 @@ fn origin(s: &Structure, k: usize) -> Option<PointId> {
 }
 
 /// A box with nothing in it, at the origin.
-fn empty_box() -> [Q; 4] {
+pub(crate) fn empty_box() -> [Q; 4] {
     [Q::zero(), Q::zero(), Q::zero(), Q::zero()]
 }
 
@@ -364,7 +441,7 @@ pub(crate) fn up(c: Q, grid: &Option<Q>) -> Q {
     }
 }
 
-fn grid_of(options: &SolverOptions) -> Option<Q> {
+pub(crate) fn grid_of(options: &SolverOptions) -> Option<Q> {
     options.grid.and_then(from_f64).filter(|g| g.is_positive())
 }
 
@@ -385,6 +462,17 @@ pub(crate) fn attachments(s: &Structure, rows: &[Vec<usize>], ori: &[Orient]) ->
             continue;
         }
         match info.role {
+            Role::Port if info.hung_from.is_some() => {
+                let host = info.hung_from.expect("guarded");
+                let side = match s.exit(host.0, host.1, ori[host.0]) {
+                    Some((1, 0)) => Side::Right,
+                    Some((-1, 0)) => Side::Left,
+                    Some((0, -1)) => Side::Below,
+                    Some((0, 1)) => Side::Above,
+                    _ => Side::Left,
+                };
+                out.insert(k, Attach { host, side, facing: None, aside: 0 });
+            }
             Role::Port => {
                 let pins = s.attach_pins(k);
                 let sideways = pins.iter().find_map(|&p| match s.exit(p.0, p.1, ori[p.0]) {
@@ -407,19 +495,41 @@ pub(crate) fn attachments(s: &Structure, rows: &[Vec<usize>], ori: &[Orient]) ->
                     } else {
                         None
                     };
-                    out.insert(k, Attach { host, side, facing });
+                    out.insert(k, Attach { host, side, facing, aside: 0 });
                 }
             }
             Role::Supply | Role::Ground => {
                 if let Some(&host) = s.attach_pins(k).first() {
                     let side = if info.role == Role::Supply { Side::Above } else { Side::Below };
-                    out.insert(k, Attach { host, side, facing: None });
+                    out.insert(k, Attach { host, side, facing: None, aside: 0 });
                 }
             }
             _ => {}
         }
     }
+    let hung: Vec<(usize, Attach)> =
+        out.iter().filter(|(k, _)| s.objects[**k].hung_from.is_some()).map(|(k, a)| (*k, *a)).collect();
+    if !hung.is_empty() {
+        let free: Vec<usize> = out.keys().copied().filter(|&k| s.objects[k].hung_from.is_none()).collect();
+        for k in free {
+            let a = out[&k];
+            let same: Vec<(usize, Attach)> = hung.iter().filter(|(_, b)| b.host == a.host).copied().collect();
+            if !same.is_empty() {
+                let n = crate::beside::aside(s, k, &a, &same, ori);
+                out.insert(k, Attach { aside: n, ..a });
+            }
+        }
+    }
     out
+}
+
+pub(crate) fn leaves(s: &Structure, host: PinKey, ori: &[Orient]) -> Side {
+    match s.exit(host.0, host.1, ori[host.0]) {
+        Some((0, 1)) => Side::Above,
+        Some((0, -1)) => Side::Below,
+        Some((1, 0)) => Side::Right,
+        _ => Side::Left,
+    }
 }
 
 /// The pin on a port's net that faces its host's pin across the gap between two rows (see
@@ -445,7 +555,7 @@ fn facing_pin(
 /// lead (13.7): its wire is then an L to the pin's lead, or a T on the wire the pin leads to
 /// (quality review SE-13). A port on a net that wires written draw, or that nothing draws, stays
 /// at the pin's height: the wires written are drawn by their mode (13.1), not by the router.
-fn attach_offset(s: &Structure, k: usize, a: &Attach, ori: &[Orient]) -> Option<[Q; 2]> {
+pub(crate) fn attach_offset(s: &Structure, k: usize, a: &Attach, ori: &[Orient]) -> Option<[Q; 2]> {
     let (h, hp) = a.host;
     let hpin = s.pin_offset(h, hp, ori[h])?;
     let ppin = s.pin_offset(k, 0, ori[k])?;
@@ -453,7 +563,10 @@ fn attach_offset(s: &Structure, k: usize, a: &Attach, ori: &[Orient]) -> Option<
     Some(match a.side {
         Side::Left | Side::Right => {
             // clear of the host's texts too
-            let hb = dressed_box(s, h, ori[h]).unwrap_or_else(empty_box);
+            let mut hb = dressed_box(s, h, ori[h]).unwrap_or_else(empty_box);
+            for b in s.labels_on_pin(h, hp, ori[h]).into_iter().chain(crate::beside::held(s, a.host, ori)) {
+                union(&mut hb, &b);
+            }
             let pb = s.box_offset(k, ori[k]).unwrap_or_else(empty_box);
             let x = if a.side == Side::Left { &hb[0] - &gap - &pb[2] } else { &hb[2] + &gap - &pb[0] };
             let rise = match s.exit(h, hp, ori[h]) {
@@ -465,10 +578,15 @@ fn attach_offset(s: &Structure, k: usize, a: &Attach, ori: &[Orient]) -> Option<
         Side::Below => [&hpin[0] - &ppin[0], &hpin[1] - &gap - &ppin[1]],
         Side::Above => [&hpin[0] - &ppin[0], &hpin[1] + &gap - &ppin[1]],
     })
+    .map(|mut at| {
+        let across = usize::from(matches!(a.side, Side::Left | Side::Right));
+        at[across] += int(a.aside);
+        at
+    })
 }
 
 /// The box of a symbol with the texts it places.
-fn dressed_box(s: &Structure, k: usize, o: Orient) -> Option<[Q; 4]> {
+pub(crate) fn dressed_box(s: &Structure, k: usize, o: Orient) -> Option<[Q; 4]> {
     let mut b = s.box_offset(k, o)?;
     if let Some(l) = s.label_offset(k, o) {
         union(&mut b, &l);
@@ -487,6 +605,11 @@ fn parts(s: &Structure, k: usize, ori: &[Orient], attach: &BTreeMap<usize, Attac
         None => vec![empty_box()],
     };
     out.extend(s.offset_labels.get(&k).into_iter().flatten().cloned());
+    if s.language04 {
+        for pin in 0..s.pins(k).len() {
+            out.extend(s.labels_on_pin(k, pin, ori[k]));
+        }
+    }
     for &j in s.hanging.get(&k).map_or(&[][..], |v| v) {
         let Some(stub) = &s.objects[j].stub else { continue };
         let (Some(hp), Some(sp), Some(sb)) =
@@ -517,7 +640,7 @@ fn parts(s: &Structure, k: usize, ori: &[Orient], attach: &BTreeMap<usize, Attac
 
 /// The box of an element with what hangs from it, the texts of each symbol included: its stubs
 /// where their facts put them, and what is attached to it; the union of its [`parts`].
-fn effective_box(s: &Structure, k: usize, ori: &[Orient], attach: &BTreeMap<usize, Attach>) -> [Q; 4] {
+pub(crate) fn effective_box(s: &Structure, k: usize, ori: &[Orient], attach: &BTreeMap<usize, Attach>) -> [Q; 4] {
     let parts = parts(s, k, ori, attach);
     let mut b = parts[0].clone();
     for p in &parts[1..] {
@@ -1197,13 +1320,42 @@ fn columns(s: &Structure, rows: &[Vec<usize>], ori: &[Orient]) -> Vec<Tagged> {
 
 /// The orientations of a candidate's free classes as relations, one each.
 pub(crate) fn orientation_relations(s: &Structure, c: &Candidate) -> Vec<Tagged> {
+    if s.open.search_classes {
+        let mut out: Vec<Tagged> = s
+            .open
+            .ways
+            .iter()
+            .enumerate()
+            .map(|(i, w)| Tagged {
+                kind: RelKind::Orientation,
+                rel: Relation::Way { fact: w.fact, value: c.ways.get(i).copied().unwrap_or(w.taken) },
+            })
+            .collect();
+        let ori = c.orientations(s);
+        for class in &s.open.classes {
+            for m in
+                std::iter::once(class.root).chain(class.members.iter().map(|(m, _)| *m).filter(|m| *m != class.root))
+            {
+                out.push(Tagged { kind: RelKind::Orientation, rel: Relation::Orient { root: m, value: ori[m] } });
+            }
+        }
+        return out;
+    }
+    let ori = c.orientations(s);
     s.open
         .classes
         .iter()
         .zip(&c.values)
         .map(|(class, value)| Tagged {
             kind: RelKind::Orientation,
-            rel: Relation::Orient { root: class.root, value: fitting(s, class.root, *value) },
+            rel: Relation::Orient {
+                root: class.root,
+                value: if s.language04 && class.members.len() == 1 {
+                    ori[class.members[0].0].then(inverse(class.members[0].1))
+                } else {
+                    fitting(s, class.root, *value)
+                },
+            },
         })
         .collect()
 }
@@ -1273,7 +1425,7 @@ pub(crate) fn sketch(
 /// two signals across, and hang its grounds below their pins, as far as the sources in force ask:
 /// the ground direction alone hangs an end on the ground down ([`grounded_end_down`]). All eight
 /// when none satisfies them.
-fn domain(s: &Structure, class: &FreeClass) -> Vec<Orient> {
+pub(crate) fn domain(s: &Structure, class: &FreeClass) -> Vec<Orient> {
     if let Some(values) = s.fitting.get(&class.root) {
         return values.clone();
     }
@@ -1308,7 +1460,9 @@ fn domain(s: &Structure, class: &FreeClass) -> Vec<Orient> {
                 },
                 _ => true,
             };
-            let ground = if info.role == Role::Ground && s.has(Source::GroundsDown) {
+            let ground = if s.language04 {
+                !s.has(Source::GroundsDown) || crate::tree_hang::hangs_upright(s, m, o)
+            } else if info.role == Role::Ground && s.has(Source::GroundsDown) {
                 match (s.pin_offset(m, 0, o), s.box_offset(m, o)) {
                     (Some(p), Some(b)) => p[1].clone() * int(2) > &b[1] + &b[3],
                     _ => true,
@@ -1329,7 +1483,7 @@ fn domain(s: &Structure, class: &FreeClass) -> Vec<Orient> {
 
 /// Whether a stub of an element, hung where its facts put it from a pin of the element turned by
 /// `o`, lies on the element's body.
-fn stub_on_body(s: &Structure, m: usize, o: Orient) -> bool {
+pub(crate) fn stub_on_body(s: &Structure, m: usize, o: Orient) -> bool {
     let Some(body) = s.box_offset(m, o) else { return false };
     s.hanging.get(&m).is_some_and(|stubs| {
         stubs.iter().any(|&j| {
@@ -1377,12 +1531,13 @@ fn two_terminal_ok(s: &Structure, m: usize, o: Orient) -> bool {
 /// the ground: the ground direction asks it with or without the current direction, so that a
 /// load to the ground stands up even where it would lie across with one turn less (quality review
 /// SE-7, its first half). Other objects, and pins without a direction, are not judged.
-fn grounded_end_down(s: &Structure, m: usize, o: Orient) -> bool {
+pub(crate) fn grounded_end_down(s: &Structure, m: usize, o: Orient) -> bool {
     let info = &s.objects[m];
-    if info.role != Role::Element || info.device.n_type().is_some() || s.pins(m).len() != 2 {
+    if info.role != Role::Element || (!s.language04 && info.device.n_type().is_some()) || s.pins(m).len() != 2 {
         return true;
     }
     (0..2).filter(|&j| s.power.ground_pins.contains(&(m, j))).all(|j| s.exit(m, j, o).is_none_or(|e| e == (0, -1)))
+        && (0..2).filter(|&j| s.power.supply_up.contains(&(m, j))).all(|j| s.exit(m, j, o).is_none_or(|e| e == (0, 1)))
 }
 
 /// The order in which equally good orientations are preferred: unturned, then mirrored, then
@@ -1488,8 +1643,14 @@ fn pin_places(s: &Structure, class: &FreeClass, value: Orient) -> Vec<PinPlace> 
 /// upright and mirrored, the one with the fewest pins of neighbours on the side of the texts first
 /// ([`texts_inwards`]), so that the texts go on the outer side (quality review SE-8). Between
 /// values that move the pins, such as the gate of a transistor, the texts decide nothing.
-fn ranked_values(s: &Structure, at: &[[Q; 2]], ori: &[Orient], rows: &[Vec<usize>], class: &FreeClass) -> Vec<Orient> {
-    let domain = domain(s, class);
+pub(crate) fn ranked_values(
+    s: &Structure,
+    at: &[[Q; 2]],
+    ori: &[Orient],
+    rows: &[Vec<usize>],
+    class: &FreeClass,
+) -> Vec<Orient> {
+    let domain = if s.language04 { refinement::varied_values(s, class) } else { domain(s, class) };
     let places: Vec<_> = domain.iter().map(|&v| pin_places(s, class, v)).collect();
     // each value by the most preferred of the values that put the pins where it does
     let first: Vec<u8> = places
@@ -1514,9 +1675,13 @@ enum Item {
     Element(usize),
 }
 
+type RowArrangement = (Vec<Vec<usize>>, Vec<(Vec<usize>, Vec<usize>)>);
+
 /// The decisions taken so far for the whole level.
 #[derive(Clone, Debug, PartialEq)]
 struct Plan {
+    ways: Vec<usize>,
+    moved: Option<RowArrangement>,
     /// Every element, in an order left to right that the rows follow.
     order: Vec<usize>,
     /// The value of each free class.
@@ -1601,7 +1766,7 @@ impl Search<'_> {
     fn candidate(&self, plan: &Plan, origin: &'static str) -> Candidate {
         let s = self.s;
         let rank: BTreeMap<usize, usize> = plan.order.iter().enumerate().map(|(i, &k)| (k, i)).collect();
-        let rows: Vec<Vec<usize>> = s
+        let mut rows: Vec<Vec<usize>> = s
             .rows
             .iter()
             .map(|row| {
@@ -1618,8 +1783,12 @@ impl Search<'_> {
                 apart.push((s.tree.nodes[w[0]].members.clone(), s.tree.nodes[w[1]].members.clone()));
             }
         }
+        if let Some((moved_rows, moved_apart)) = &plan.moved {
+            rows = moved_rows.clone();
+            apart = moved_apart.clone();
+        }
         let mut values = plan.values.clone();
-        let ori = orientations(s, &values);
+        let ori = orientations_with(s, &values, &plan.ways);
         for (k, a) in attachments(s, &rows, &ori) {
             if s.objects[k].role != Role::Port {
                 continue;
@@ -1642,7 +1811,7 @@ impl Search<'_> {
             }
         }
         let columns = origin != "P0" && s.has(Source::Columns);
-        Candidate { values, rows, apart, even: false, columns, origin }
+        Candidate { values, ways: plan.ways.clone(), rows, apart, even: false, columns, origin }
     }
 
     /// The layered estimate of a plan, and its candidate.
@@ -1822,7 +1991,7 @@ impl Search<'_> {
                 if ca == cb || !classes.contains(&cb) {
                     continue;
                 }
-                let ori = orientations(s, &p.values);
+                let ori = orientations_with(s, &p.values, &p.ways);
                 let label_b =
                     s.open.classes[cb].members.iter().find(|(m, _)| *m == pair.b).map_or(Orient::R0, |(_, l)| *l);
                 p.values[cb] = ori[pair.a].then(Orient::MY).then(inverse(label_b));
@@ -2203,7 +2372,14 @@ fn p0_plan(s: &Structure) -> Plan {
         done.insert(k);
         order.push(k);
     }
-    Plan { order, values: vec![Orient::R0; s.open.classes.len()], items: BTreeMap::new(), flipped: BTreeSet::new() }
+    Plan {
+        order,
+        values: vec![Orient::R0; s.open.classes.len()],
+        items: BTreeMap::new(),
+        flipped: BTreeSet::new(),
+        ways: s.open.ways.iter().map(|w| w.taken).collect(),
+        moved: None,
+    }
 }
 
 /// The candidates of a level (see the module): the root's variants best first, then P0, and with
@@ -2261,6 +2437,59 @@ pub(crate) fn search(
 mod tests {
     use super::*;
     use crate::resolve::tests::{instance, problem_of};
+
+    #[test]
+    fn row_boxes_include_pin_text_at_the_main_geometry_anchor() {
+        let mut p = problem_of(vec![instance()], Vec::new());
+        p.version = "0.4".into();
+        let options = SolverOptions::without_time_limit();
+        let resolved = crate::resolve(&p, &options);
+        let mut s = crate::structure::analyse(&p, &resolved, &options, crate::options::CAPS, &mut Work::default());
+        s.pin_texts.insert((0, 0), vec![[int(0), int(0), int(10), int(2)]]);
+        assert_eq!(effective_box(&s, 0, &[Orient::R0], &BTreeMap::new())[2], int(7));
+        assert_eq!(effective_box(&s, 0, &[Orient::MY], &BTreeMap::new())[2], int(13));
+        s.language04 = false;
+        assert!(effective_box(&s, 0, &[Orient::R0], &BTreeMap::new())[2] < int(7));
+    }
+
+    #[test]
+    fn modern_row_orientation_choices_leave_free_ports_and_keep_touched_ports_horizontal() {
+        let mut p = problem_of(vec![instance()], Vec::new());
+        p.version = "0.4".into();
+        let options = SolverOptions::without_time_limit();
+        let resolved = crate::resolve(&p, &options);
+        let mut s = crate::structure::analyse(&p, &resolved, &options, crate::options::CAPS, &mut Work::default());
+        s.objects[0].role = Role::Port;
+        let class = &s.open.classes[0];
+        let ranked = |s: &Structure| ranked_values(s, &s.origins(&p, &s.witness), &s.witness.orient, &[vec![0]], class);
+        assert!(ranked(&s).is_empty());
+        s.objects[0].fact_touched = true;
+        let values = ranked(&s);
+        assert_eq!(values.len(), 2);
+        assert_eq!(values.iter().filter_map(|&o| s.exit(0, 0, o)).collect::<BTreeSet<_>>(), [(-1, 0), (1, 0)].into());
+        s.language04 = false;
+        assert!(ranked(&s).len() > 2, "the legacy orientation domain is unchanged");
+    }
+
+    #[test]
+    fn modern_rows_keep_a_free_supply_upright_above_its_host() {
+        let mut p = problem_of(vec![instance(), instance()], Vec::new());
+        p.version = "0.4".into();
+        let options = SolverOptions::without_time_limit();
+        let resolved = crate::resolve(&p, &options);
+        let mut s = crate::structure::analyse(&p, &resolved, &options, crate::options::CAPS, &mut Work::default());
+        s.objects[0].role = Role::Supply;
+        s.objects[1].role = Role::Element;
+        s.connections.targets.insert((0, 0), vec![(1, 0)]);
+        s.power.supply_up.insert((1, 0));
+        s.sources = vec![Source::GroundsDown];
+        let class = s.open.classes.iter().find(|c| c.members.iter().any(|m| m.0 == 0)).unwrap();
+        let values = domain(&s, class);
+        assert!(!values.is_empty());
+        assert!(values.iter().all(|&o| crate::tree_hang::hangs_upright(&s, 0, o)));
+        s.language04 = false;
+        assert!(domain(&s, class).iter().any(|&o| !crate::tree_hang::hangs_upright(&s, 0, o)));
+    }
 
     #[test]
     fn a_relation_between_two_points_is_one_bound_and_between_sets_a_separator() {

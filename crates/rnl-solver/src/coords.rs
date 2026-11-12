@@ -84,6 +84,89 @@ const REPAIR_ROUNDS: usize = 6;
 /// that the last LP made neighbours on x (quality review SE-4).
 const ROW_ROUNDS: usize = 2;
 
+/// Two points that the tree layout asks the LP to bring onto one line (`crate::tree`): on `axis`,
+/// `|(x_a + ca) − (x_b + cb)|` weighted, `x` the origins of the objects and `ca`, `cb` the offsets of
+/// pins or of the middles of boxes about them, as the orientations are decided.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Tie {
+    pub axis: usize,
+    pub a: usize,
+    pub ca: Q,
+    pub b: usize,
+    pub cb: Q,
+    pub weight: i64,
+    /// The two pins, `a`'s and `b`'s, by their index in their symbols, when the tie is between
+    /// pins.
+    pub pins: Option<(usize, usize)>,
+}
+
+/// What the tree layout asks of the LP before its own layers: the ties of each layer, the first
+/// first, each layer's optimum kept before the next (`crate::tree`).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(crate) struct Pull {
+    pub layers: Vec<Vec<Tie>>,
+}
+
+/// Places an arrangement of the tree layout (`crate::tree`): the orientations `orient` taken in
+/// first, then its relations `rels`, then the separations of the symbols that still overlap, each
+/// dropped when it does not fit; the LP takes the layers of `pull` before its own.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn place_tree(
+    problem: &LevelProblem,
+    s: &Structure,
+    orient: &[Tagged],
+    rels: &[Tagged],
+    pull: &Pull,
+    options: &SolverOptions,
+    work: &mut Work,
+) -> Placed {
+    let grid = options.grid.and_then(from_f64).filter(|g| *g > Q::zero());
+    let mut separations: Vec<Tagged> = Vec::new();
+    let mut separated: BTreeSet<(usize, usize)> = BTreeSet::new();
+    let mut round = 0;
+    loop {
+        let mut all = orient.to_vec();
+        all.extend(rels.iter().cloned());
+        all.extend(separations.iter().cloned());
+        let (geometry, kept, undecided, optimised) = with_relations(s, &all, work, |r, model, t| {
+            let (g, optimised) = optimise(r, model, s, options, Some(pull));
+            (g, t.kept.clone(), t.undecided, optimised)
+        });
+        let origins = s.origins(problem, &geometry);
+        let overlaps = overlapping(s, &origins, &geometry.orient);
+        let clashes = port_clashes(s, &origins, &geometry.orient);
+        let new: Vec<(usize, usize)> =
+            overlaps.iter().chain(&clashes).copied().filter(|p| !separated.contains(p)).collect();
+        if new.is_empty() || round >= REPAIR_ROUNDS || crate::budget::stopped() {
+            let dropped = all.iter().zip(&kept).filter(|(_, k)| !**k).map(|(t, _)| t.kind).collect();
+            let overlaps = overlaps
+                .into_iter()
+                .map(|(a, b)| {
+                    let cause = if undecided || !optimised || crate::budget::stopped() {
+                        Cause::Budget
+                    } else if !separated.contains(&(a, b)) {
+                        Cause::Rounds
+                    } else {
+                        apart_cause(s, &origins, &geometry.orient, a, b, &grid, work)
+                    };
+                    Overlap { a, b, cause }
+                })
+                .collect();
+            return Placed { geometry, origins, dropped, overlaps, optimised, undecided };
+        }
+        for (a, b) in new {
+            separated.insert((a, b));
+            let t = if clashes.contains(&(a, b)) {
+                dressed_separation(s, &origins, &geometry.orient, a, b, &grid)
+            } else {
+                separation(s, &origins, &geometry.orient, a, b, &grid)
+            };
+            separations.extend(t);
+        }
+        round += 1;
+    }
+}
+
 /// Why two symbols still overlap.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Cause {
@@ -151,7 +234,7 @@ pub(crate) fn place(
             Some(pairs) => relations_by_pairs(s, c, &actual, options, pairs),
         });
         let (geometry, kept, undecided, optimised) = with_relations(s, &rels, work, |r, model, t| {
-            let (g, optimised) = optimise(r, model, s, options);
+            let (g, optimised) = optimise(r, model, s, options, None);
             (g, t.kept.clone(), t.undecided, optimised)
         });
         let origins = s.origins(problem, &geometry);
@@ -176,7 +259,9 @@ pub(crate) fn place(
             }
         }
         let overlaps = overlapping(s, &origins, &geometry.orient);
-        let new: Vec<(usize, usize)> = overlaps.iter().copied().filter(|p| !separated.contains(p)).collect();
+        let clashes = if s.language04 { port_clashes(s, &origins, &geometry.orient) } else { Vec::new() };
+        let new: Vec<(usize, usize)> =
+            overlaps.iter().chain(&clashes).copied().filter(|p| !separated.contains(p)).collect();
         if rows_again && round < REPAIR_ROUNDS {
             // placed again with the rows apart pair by pair before any overlap is repaired: the
             // overlaps of this placement may not be those of the next
@@ -187,7 +272,7 @@ pub(crate) fn place(
             let overlaps = overlaps
                 .into_iter()
                 .map(|(a, b)| {
-                    let cause = if undecided || !optimised {
+                    let cause = if undecided || !optimised || crate::budget::stopped() {
                         Cause::Budget
                     } else if !separated.contains(&(a, b)) {
                         Cause::Rounds
@@ -201,7 +286,12 @@ pub(crate) fn place(
         }
         for (a, b) in new {
             separated.insert((a, b));
-            if let Some(t) = separation(s, &origins, &geometry.orient, a, b, &grid) {
+            let relation = if clashes.contains(&(a, b)) {
+                dressed_separation(s, &origins, &geometry.orient, a, b, &grid)
+            } else {
+                separation(s, &origins, &geometry.orient, a, b, &grid)
+            };
+            if let Some(t) = relation {
                 separations.push(t);
             }
         }
@@ -262,6 +352,32 @@ pub(crate) fn overlapping(s: &Structure, origins: &[[Q; 2]], ori: &[Orient]) -> 
     out
 }
 
+/// The pairs of a port and another symbol whose boxes do not overlap but whose boxes with their
+/// texts do, the earlier first: a port is placed beside its pin, wherever the texts of the symbols
+/// around it are.
+pub(crate) fn port_clashes(s: &Structure, origins: &[[Q; 2]], ori: &[Orient]) -> Vec<(usize, usize)> {
+    let placed = |k: usize| -> Option<[Q; 4]> {
+        let b = crate::search::dressed_box(s, k, ori[k])?;
+        Some([&origins[k][0] + &b[0], &origins[k][1] + &b[1], &origins[k][0] + &b[2], &origins[k][1] + &b[3]])
+    };
+    let boxes: Vec<(usize, [Q; 4])> =
+        (0..s.objects.len()).filter(|&k| solid(s, k)).filter_map(|k| Some((k, placed(k)?))).collect();
+    let bodies = overlapping(s, origins, ori);
+    let mut out = Vec::new();
+    for i in 0..boxes.len() {
+        for j in i + 1..boxes.len() {
+            let ((p, a), (q, b)) = (&boxes[i], &boxes[j]);
+            let port = s.objects[*p].role == Role::Port || s.objects[*q].role == Role::Port;
+            let x = a[0].clone().max(b[0].clone()) < a[2].clone().min(b[2].clone());
+            let y = a[1].clone().max(b[1].clone()) < a[3].clone().min(b[3].clone());
+            if port && x && y && !bodies.contains(&(*p, *q)) {
+                out.push((*p, *q));
+            }
+        }
+    }
+    out
+}
+
 /// One side two symbols may be put apart on: the axis, the form, its least value touching, and its
 /// value now.
 type SideBound = (usize, Vec<(PointId, Q)>, Q, Q);
@@ -280,6 +396,31 @@ pub(crate) fn separation(
     let (pa, pb) = (s.model.origin_point.get(a).copied().flatten()?, s.model.origin_point.get(b).copied().flatten()?);
     let ba = s.box_offset(a, ori[a])?;
     let bb = s.box_offset(b, ori[b])?;
+    Some(apart((a, pa, ba), (b, pb, bb), origins, grid))
+}
+
+/// The relation that puts two symbols apart with their texts.
+fn dressed_separation(
+    s: &Structure,
+    origins: &[[Q; 2]],
+    ori: &[Orient],
+    a: usize,
+    b: usize,
+    grid: &Option<Q>,
+) -> Option<Tagged> {
+    let (pa, pb) = (s.model.origin_point.get(a).copied().flatten()?, s.model.origin_point.get(b).copied().flatten()?);
+    let (ba, bb) = (crate::search::dressed_box(s, a, ori[a])?, crate::search::dressed_box(s, b, ori[b])?);
+    Some(apart((a, pa, ba), (b, pb, bb), origins, grid))
+}
+
+/// The relation that puts two boxes apart, each about the origin of its symbol: the symbol, its
+/// origin's point and the box.
+fn apart(
+    (a, pa, ba): (usize, PointId, [Q; 4]),
+    (b, pb, bb): (usize, PointId, [Q; 4]),
+    origins: &[[Q; 2]],
+    grid: &Option<Q>,
+) -> Tagged {
     let one = Q::one;
     let b_minus_a = || vec![(pb, one()), (pa, -one())];
     let a_minus_b = || vec![(pa, one()), (pb, -one())];
@@ -301,7 +442,7 @@ pub(crate) fn separation(
             alternatives.push(vec![(*axis, terms.clone(), up(c + &gap, grid))]);
         }
     }
-    Some(Tagged { kind: RelKind::Separation, rel: Relation::OneOf(alternatives) })
+    Tagged { kind: RelKind::Separation, rel: Relation::OneOf(alternatives) }
 }
 
 /// `v` on the nearest point of the grid, halves up.
@@ -421,6 +562,7 @@ fn stub_nets(model: &Model, s: &Structure, ori: &[Orient], axis: usize) -> Vec<B
 }
 
 /// The four layers of the LP on one axis (see the module).
+#[allow(clippy::too_many_arguments)]
 fn layers(
     sx: &mut Simplex<Tag>,
     model: &Model,
@@ -429,8 +571,29 @@ fn layers(
     own: &[(usize, Var)],
     targets: &[Target],
     axis: usize,
+    pull: Option<&Pull>,
 ) -> Result<(), ()> {
     let fail = |_| ();
+    let origin_var =
+        |k: usize| -> Option<Var> { Some(model.points.get(&model.origin_point.get(k).copied().flatten()?)?.var) };
+    for ties in pull.map_or(&[][..], |p| p.layers.as_slice()) {
+        let mut objective = LinExpr::default();
+        for t in ties.iter().filter(|t| t.axis == axis) {
+            let (Some(va), Some(vb)) = (origin_var(t.a), origin_var(t.b)) else { continue };
+            if va == vb {
+                continue;
+            }
+            // d ≥ e and d ≥ −e, e = x_a − x_b + ca − cb
+            let c = &t.ca - &t.cb;
+            let d = sx.new_var();
+            let below = LinExpr::from_terms([(d, Q::one()), (va, -Q::one()), (vb, Q::one())], Q::zero());
+            let above = LinExpr::from_terms([(d, Q::one()), (va, Q::one()), (vb, -Q::one())], Q::zero());
+            sx.assert(&below, Rel::Ge, &c, Tag::Def).map_err(fail)?;
+            sx.assert(&above, Rel::Ge, &-c.clone(), Tag::Def).map_err(fail)?;
+            objective.add_term(d, &int(t.weight));
+        }
+        minimise_and_keep(sx, &objective)?;
+    }
     let phase = crate::profile::span("lex_layer", "1_wire_length");
     // 1. the wire length: a pin of a net routed by the end of its lead
     let mut objective = LinExpr::default();
@@ -595,7 +758,13 @@ fn round_to_grid(sx: &mut Simplex<Tag>, order: &[Visit], grid: &Q, kept: &BTreeS
 
 /// The coordinates of what a resolution holds (see the module); the resolution's own witness when
 /// the LP cannot finish, with false.
-fn optimise(r: &mut Resolver, model: &Model, s: &Structure, options: &SolverOptions) -> (Geometry, bool) {
+fn optimise(
+    r: &mut Resolver,
+    model: &Model,
+    s: &Structure,
+    options: &SolverOptions,
+    pull: Option<&Pull>,
+) -> (Geometry, bool) {
     let fallback = r.geometry().clone();
     let ori = fallback.orient.clone();
     let grid = options.grid.and_then(from_f64).filter(|g| *g > Q::zero());
@@ -655,7 +824,7 @@ fn optimise(r: &mut Resolver, model: &Model, s: &Structure, options: &SolverOpti
                 return (fallback, false);
             }
             let cp = sx.checkpoint();
-            let solved = layers(sx, model, s, &ori, &own, &targets, axis).is_ok();
+            let solved = layers(sx, model, s, &ori, &own, &targets, axis, pull).is_ok();
             sx.backtrack(cp);
             if !solved && sx.check().is_err() {
                 return (fallback, false);
@@ -691,6 +860,80 @@ fn optimise(r: &mut Resolver, model: &Model, s: &Structure, options: &SolverOpti
 mod tests {
     use super::*;
     use crate::rational::{frac, int};
+
+    #[test]
+    fn modern_rows_repair_port_text_clashes_without_moving_fixed_coordinates() {
+        use crate::resolve::tests::{fact, instance, problem_of};
+        use rnl_runtime::problem::{Axis, FactKind, PointRef};
+        let mut p = problem_of(
+            vec![instance(), instance()],
+            vec![
+                fact(FactKind::Orient { object: 0, code: Orient::R0 }),
+                fact(FactKind::Orient { object: 1, code: Orient::R0 }),
+                fact(FactKind::Place { at: PointRef::Origin(0), axis: Axis::X, value: 0. }),
+                fact(FactKind::Place { at: PointRef::Origin(0), axis: Axis::Y, value: 0. }),
+                fact(FactKind::Place { at: PointRef::Origin(1), axis: Axis::X, value: 8. }),
+            ],
+        );
+        p.version = "0.4".into();
+        let options = SolverOptions::without_time_limit();
+        let resolved = crate::resolve(&p, &options);
+        let mut s = crate::structure::analyse(&p, &resolved, &options, crate::options::CAPS, &mut Work::default());
+        s.objects[0].role = Role::Port;
+        s.labels.insert(0, vec![[int(-10), int(-5), int(10), int(5)]]);
+        let c = crate::search::Candidate {
+            values: vec![],
+            ways: vec![],
+            rows: vec![vec![1]],
+            apart: vec![],
+            even: false,
+            columns: false,
+            origin: "P0",
+        };
+        s.language04 = false;
+        let legacy = place(&p, &s, &c, &options, &mut Work::default());
+        assert_eq!(port_clashes(&s, &legacy.origins, &legacy.geometry.orient), vec![(0, 1)]);
+        s.language04 = true;
+        let placed = place(&p, &s, &c, &options, &mut Work::default());
+        assert!(port_clashes(&s, &placed.origins, &placed.geometry.orient).is_empty());
+        assert_eq!(placed.origins[0], [int(0), int(0)]);
+        assert_eq!(placed.origins[1][0], int(8));
+    }
+
+    #[test]
+    fn tree_pin_ties_precede_compactness_but_cannot_break_kept_facts() {
+        use crate::resolve::tests::{fact, instance, problem_of};
+        use rnl_runtime::problem::{Axis, FactKind, PointRef};
+        let mut p = problem_of(
+            vec![instance(), instance()],
+            vec![
+                fact(FactKind::Place { at: PointRef::Origin(0), axis: Axis::X, value: 0. }),
+                fact(FactKind::Place { at: PointRef::Origin(0), axis: Axis::Y, value: 0. }),
+                fact(FactKind::Place { at: PointRef::Origin(1), axis: Axis::X, value: 20. }),
+            ],
+        );
+        p.version = "0.4".into();
+        let options = SolverOptions::without_time_limit();
+        let pull = Pull {
+            layers: vec![vec![Tie { axis: 1, a: 0, ca: int(2), b: 1, cb: int(-2), weight: 4, pins: Some((1, 2)) }]],
+        };
+        for fixed in [None, Some(9.)] {
+            if let Some(value) = fixed {
+                p.facts.push(fact(FactKind::Place { at: PointRef::Origin(1), axis: Axis::Y, value }));
+            }
+            let resolved = crate::resolve::resolve(&p, &options, &crate::StoppedClock);
+            let mut work = Work::default();
+            let s = crate::structure::analyse(&p, &resolved, &options, crate::options::CAPS, &mut work);
+            let placed = place_tree(&p, &s, &[], &[], &pull, &options, &mut work);
+            assert_eq!(placed.origins[1][1], int(if fixed.is_some() { 9 } else { 4 }));
+            for &f in &resolved.kept {
+                assert!(s.model.units[f]
+                    .fixed
+                    .iter()
+                    .all(|bound| bound.holds(|v| placed.geometry.var_value(&s.model, v, bound.axis))));
+            }
+        }
+    }
 
     #[test]
     fn halves_go_up_to_the_grid() {

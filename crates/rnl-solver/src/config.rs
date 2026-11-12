@@ -7,8 +7,17 @@ use rnl_runtime::problem::{LevelProblem, SolverSetting};
 use crate::{RunLimit, SolverOptions};
 use std::collections::BTreeMap;
 
+/// The layout engine used for a 0.4 level.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Layout {
+    #[default]
+    Rows,
+    Tree,
+}
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Settings {
+    pub layout: Layout,
     /// The definition literal, normalized after the runtime resolves it for writing.
     pub junction: Option<String>,
     pub legacy_alias: bool,
@@ -67,8 +76,13 @@ fn apply(o: &mut SolverOptions, s: &SolverSetting) -> Result<(), String> {
         "junction" => {
             o.settings.junction = Some(string(s)?.to_string());
         }
-        "layout" if string(s)? == "rows" => {}
-        "layout" => return Err("this solver currently supports layout=\"rows\"".into()),
+        "layout" => {
+            o.settings.layout = match string(s)? {
+                "rows" => Layout::Rows,
+                "tree" => Layout::Tree,
+                _ => return Err("layout must be \"rows\" or \"tree\"".into()),
+            }
+        }
         "spacing_x" | "spacing_y" => {
             let n = number(s)?;
             if n.fract() != 0.0 || !(-1.0..=20.0).contains(&n) {
@@ -154,6 +168,7 @@ impl SolverOptions {
             let (key, value) = (key.trim(), value.trim());
             match key {
                 "budget" => settings.extend(value.split(',').map(|p| p.replace(':', "="))),
+                "layout" => settings.push(format!("layout=\"{value}\"")),
                 "objectives" => settings
                     .push(format!("objectives={}", Lit::Str(rnl_runtime::interp::obj::WStr::new(value, None)).show())),
                 "grid" | "time_limit" if value == "none" => settings.push(format!("{key}=false")),
@@ -218,7 +233,8 @@ impl SolverOptions {
         }
         if out.settings.spacing != [0, 0] {
             warnings.push(
-                "spacing_x and spacing_y are retained for line layout; the row layout keeps its fixed gaps".into(),
+                "spacing_x and spacing_y are retained for line layout; row and tree layouts keep their fixed gaps"
+                    .into(),
             );
         }
         out.settings.overrides.clear();

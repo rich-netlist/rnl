@@ -65,6 +65,9 @@ use crate::{SolverOptions, Work};
 /// A pin, by object and by the index of the pin in its symbol (9.2.4).
 pub(crate) type PinKey = (usize, usize);
 
+/// Two pin owners and the orientation pairs allowed by a pin-direction relation.
+pub(crate) type PinOrientations = (usize, usize, Vec<(Orient, Orient)>);
+
 /// What an object is to the search.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Role {
@@ -159,6 +162,7 @@ pub(crate) struct Stub {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct ObjectInfo {
+    pub hung_from: Option<PinKey>,
     pub role: Role,
     pub device: Device,
     pub symbol: Option<usize>,
@@ -197,6 +201,7 @@ pub(crate) struct Drawn {
 /// The connection graph.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct Connections {
+    pub circuit: BTreeMap<PinKey, Vec<PinKey>>,
     /// The nets, by name.
     pub nets: Vec<Net>,
     /// The nets of each pin.
@@ -224,6 +229,7 @@ impl Connections {
 /// Supply and ground.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct Power {
+    pub supply_up: BTreeSet<PinKey>,
     /// The supply symbols, by object.
     pub supply: Vec<usize>,
     pub ground: Vec<usize>,
@@ -385,6 +391,9 @@ fn left_free(
     match o.role {
         Role::Text => anchors.get(&k).is_none_or(|a| !a.point),
         Role::Port | Role::Supply | Role::Ground => {
+            if problem.version == "0.4" {
+                return false;
+            }
             let unnamed = matches!(
                 problem.objects[k].reference,
                 Reference::Number { .. } | Reference::GeneratedNumber { .. } | Reference::Anonymous
@@ -406,7 +415,17 @@ fn attach_pins(objects: &[ObjectInfo], connections: &Connections, k: usize) -> V
             pins.extend(connections.nets[i].pins.iter().copied().filter(|p| p.0 != k));
         }
     }
-    pins.retain(|p| objects[p.0].role == Role::Element);
+    let element = |p: &PinKey| objects[p.0].role == Role::Element;
+    if !pins.iter().any(element) && matches!(objects[k].role, Role::Supply | Role::Ground | Role::Port) {
+        let mut netlist: Vec<PinKey> = connections.circuit.get(&(k, 0)).cloned().unwrap_or_default();
+        netlist.retain(element);
+        netlist.sort_by_key(|&p| (objects.iter().any(|o| o.stub.as_ref().is_some_and(|st| st.host == p)), p));
+        netlist.dedup();
+        if !netlist.is_empty() {
+            return netlist;
+        }
+    }
+    pins.retain(element);
     pins.sort_unstable();
     pins.dedup();
     pins
@@ -504,6 +523,8 @@ pub(crate) struct FreeClass {
 /// What the facts kept leave to decide.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct Open {
+    pub search_classes: bool,
+    pub ways: Vec<crate::search_choices::Way>,
     pub classes: Vec<FreeClass>,
     /// The ORDERs given only an axis, by fact: which way they run.
     pub orders: Vec<usize>,
@@ -564,6 +585,9 @@ pub(crate) enum Source {
 /// The structure of a level.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Structure {
+    pub pin_pairs: Vec<PinOrientations>,
+    pub pinned: BTreeMap<usize, (PinKey, usize)>,
+    pub pin_texts: BTreeMap<PinKey, Vec<[Q; 4]>>,
     pub language04: bool,
     pub currents: BTreeMap<PinKey, bool>,
     pub fitting: BTreeMap<usize, Vec<Orient>>,
@@ -645,6 +669,26 @@ impl Structure {
     /// the ROUTEs and the wires written, [`Connections`]).
     pub(crate) fn attach_pins(&self, k: usize) -> Vec<PinKey> {
         attach_pins(&self.objects, &self.connections, k)
+    }
+
+    /// A symbol reached by its netlist connections but by no drawn connection.
+    pub(crate) fn beside_by_netlist(&self, k: usize) -> bool {
+        let element = |p: &PinKey| self.objects[p.0].role == Role::Element;
+        !self.objects[k].fact_touched
+            && self.connections.targets.get(&(k, 0)).is_none_or(|t| t.is_empty())
+            && self.connections.circuit.get(&(k, 0)).is_some_and(|pins| pins.iter().any(element))
+            && !self.attach_pins(k).is_empty()
+    }
+
+    /// Text boxes anchored on this pin, relative to the symbol's origin.
+    pub(crate) fn labels_on_pin(&self, k: usize, pin: usize, orient: Orient) -> Vec<[Q; 4]> {
+        let Some(at) = self.pin_offset(k, pin, orient) else { return Vec::new() };
+        self.pin_texts
+            .get(&(k, pin))
+            .into_iter()
+            .flatten()
+            .map(|b| [&b[0] + &at[0], &b[1] + &at[1], &b[2] + &at[0], &b[3] + &at[1]])
+            .collect()
     }
 
     /// The pins of an object's symbol.
@@ -767,8 +811,43 @@ pub(crate) fn analyse(
     let witness = resolved.witness.geometry.clone();
     let kept = resolved.kept.clone();
     let mut objects = object_infos(problem, &model, &kept);
-    let power = power(problem, &kept, &mut objects);
+    let mut power = power(problem, &kept, &mut objects);
+    if problem.version == "0.4" {
+        for (k, object) in objects.iter_mut().enumerate() {
+            if object.role == Role::Port && object.own {
+                object.hung_from = crate::tree_hang::host(problem, k);
+            }
+        }
+    }
     let mut connections = connections(problem, &model);
+    if problem.version == "0.4" {
+        let untied: Vec<_> = (0..objects.len())
+            .filter(|&k| {
+                let o = &objects[k];
+                matches!(o.role, Role::Supply | Role::Ground)
+                    && o.own
+                    && !o.fact_touched
+                    && o.stub.is_none()
+                    && o.symbol.is_some()
+            })
+            .map(|k| (k, attach_pins(&objects, &connections, k)))
+            .collect();
+        for (k, pins) in untied {
+            match objects[k].role {
+                _ if pins.is_empty() => {
+                    objects[k].role = Role::Element;
+                    power.supply.retain(|&j| j != k);
+                    power.ground.retain(|&j| j != k);
+                }
+                Role::Supply => {
+                    power.supply_pins.extend(pins.iter().copied());
+                    power.supply_up.extend(pins);
+                }
+                Role::Ground => power.ground_pins.extend(pins),
+                _ => {}
+            }
+        }
+    }
     let power = power_pins(power, &mut connections);
     let elements: Vec<usize> = (0..objects.len()).filter(|&k| objects[k].role == Role::Element).collect();
     let ports = ports(problem, &objects, &symbols, &connections);
@@ -785,9 +864,14 @@ pub(crate) fn analyse(
         .collect();
     let pairs = pairs(problem, &objects);
     let open = open(problem, resolved);
-    let (tree, tree_notes) = group_tree(problem, &objects, &elements);
+    let (tree, tree_notes, selected_groups) = if language04 {
+        crate::group_tree::analyse(problem, &elements)
+    } else {
+        let (tree, notes) = group_tree(problem, &objects, &elements);
+        (tree, notes, (0..problem.groups.len()).collect())
+    };
     notes.extend(tree_notes);
-    let scopes = scopes(problem, &objects);
+    let scopes = scopes(problem, &objects, &selected_groups);
     let has_current_direction = currents.keys().any(|&(k, pin)| {
         objects.get(k).is_some_and(|o| {
             !o.left_free
@@ -863,7 +947,50 @@ pub(crate) fn analyse(
             objects[k].left_free = left_free(problem, &objects, &symbols, &connections, &anchors, k);
         }
     }
+    let mut pin_pairs = Vec::new();
+    let mut pinned = BTreeMap::new();
+    let mut pin_texts: BTreeMap<PinKey, Vec<[Q; 4]>> = BTreeMap::new();
+    if language04 {
+        for &f in &kept {
+            let effect = &model.units[f].orient;
+            if let crate::model::OrientEffect::Pins { from, to: Some(to), .. } = effect {
+                let mut pairs = Vec::new();
+                for a in Orient::ALL {
+                    for b in Orient::ALL {
+                        if from.object == to.object && a != b {
+                            continue;
+                        }
+                        if effect.predicate_holds(|k| if k == from.object { a } else { b }) {
+                            pairs.push((a, b));
+                        }
+                    }
+                }
+                pin_pairs.push((from.object, to.object, pairs));
+            }
+        }
+        for (k, o) in objects.iter().enumerate().filter(|(_, o)| o.role != Role::Element && o.symbol.is_some()) {
+            let _ = o;
+            if let Some(host) = crate::beside::on_pin(problem, &kept, k) {
+                pinned.insert(k, host);
+            }
+        }
+        // Main's text anchors already describe the renderer's position. Use those offsets,
+        // with its orientation-aware text boxes, rather than a separate layout of text.
+        for (&k, a) in &anchors {
+            let [(object, Some(pin))] = a.from.as_slice() else { continue };
+            if objects[k].left_free || objects[k].fact_axes.iter().any(|f| *f) {
+                continue;
+            }
+            let Some(t) = problem.objects[k].text.as_ref() else { continue };
+            if let Some(b) = text_box(t, &(a.offset[0].clone(), a.offset[1].clone()), Orient::R0) {
+                pin_texts.entry((*object, *pin)).or_default().push(b);
+            }
+        }
+    }
     let mut s = Structure {
+        pin_pairs,
+        pinned,
+        pin_texts,
         language04,
         currents,
         fitting: BTreeMap::new(),
@@ -920,7 +1047,7 @@ pub(crate) fn analyse(
 /// For each free class that the witness has against the current: the values the facts kept allow it,
 /// as a value they do not is dropped when a candidate is placed and the class falls back on the
 /// witness. The others cost nothing: the candidates find out for themselves.
-fn fitting_values(s: &Structure, work: &mut Work) -> (BTreeMap<usize, Vec<Orient>>, bool) {
+pub(crate) fn fitting_values(s: &Structure, work: &mut Work) -> (BTreeMap<usize, Vec<Orient>>, bool) {
     let mut out = BTreeMap::new();
     let mut stopped = false;
     if !s.has(Source::SourcesDown) {
@@ -1210,6 +1337,7 @@ fn object_infos(problem: &LevelProblem, model: &Model, kept: &[usize]) -> Vec<Ob
                 oriented: o.orient.is_some(),
                 own,
                 stub: None,
+                hung_from: None,
                 fact_touched: touched[k][0] || touched[k][1],
                 fact_axes: touched[k],
                 left_free: false,
@@ -1478,8 +1606,17 @@ fn connections(problem: &LevelProblem, model: &Model) -> Connections {
             }
         }
     }
+    let mut circuit: BTreeMap<PinKey, Vec<PinKey>> = BTreeMap::new();
+    if problem.version == "0.4" {
+        for net in &problem.nets {
+            let pins: Vec<PinKey> = net.pins.iter().filter_map(pin_of).collect();
+            for p in &pins {
+                circuit.entry(*p).or_default().extend(pins.iter().filter(|q| q.0 != p.0).copied());
+            }
+        }
+    }
     // Routing trees are first in `drawn`, in the order of `routed`.
-    let mut out = Connections { drawn, route_of, written, ..Connections::default() };
+    let mut out = Connections { drawn, route_of, written, circuit, ..Connections::default() };
     for (name, pins) in nets {
         let i = out.nets.len();
         for p in &pins {
@@ -1755,14 +1892,15 @@ fn group_tree(problem: &LevelProblem, objects: &[ObjectInfo], elements: &[usize]
 /// stubs that hang from its members. The components in no group are no scope: they are not a
 /// group, and no alignment or spacing is judged among them (algorithm synthesis 9.3, decided
 /// 2026-10-17; quality review SE-3).
-fn scopes(problem: &LevelProblem, objects: &[ObjectInfo]) -> Vec<Vec<usize>> {
+fn scopes(problem: &LevelProblem, objects: &[ObjectInfo], selected: &[usize]) -> Vec<Vec<usize>> {
     let component = |k: usize| {
         let o = &objects[k];
         matches!(o.role, Role::Element | Role::Supply | Role::Ground | Role::Port) && o.symbol.is_some()
     };
     let owner = |k: usize| objects[k].stub.as_ref().map_or(k, |s| s.host.0);
     let mut out = Vec::new();
-    for g in &problem.groups {
+    for &index in selected {
+        let g = &problem.groups[index];
         let members: BTreeSet<usize> = g.members.iter().copied().collect();
         let scope: Vec<usize> = (0..objects.len()).filter(|&k| component(k) && members.contains(&owner(k))).collect();
         if !scope.is_empty() {
@@ -2110,6 +2248,65 @@ impl Joined {
     }
 }
 
+/// Fixed vertical directions augment the initial current-depth rows. Axis-only choices
+/// remain open to search; all point-reference forms refer to their owning elements here.
+fn above_by_facts(problem: &LevelProblem, s: &Structure) -> Vec<(usize, usize)> {
+    fn elements(s: &Structure, refs: &[PointRef]) -> Vec<usize> {
+        let mut pending: Vec<_> = refs.iter().collect();
+        let mut out = Vec::new();
+        while let Some(r) = pending.pop() {
+            if !crate::budget::permit(crate::budget::Step::Structure, 1) {
+                return Vec::new();
+            }
+            match r {
+                PointRef::Origin(k)
+                | PointRef::Pin { object: k, .. }
+                | PointRef::SymbolPin { object: k, .. }
+                | PointRef::PinPosition { object: k, .. } => {
+                    if s.objects.get(*k).is_some_and(|o| o.role == Role::Element) {
+                        out.push(*k);
+                    }
+                }
+                PointRef::Centre(members) => pending.extend(members),
+            }
+        }
+        out
+    }
+    let mut out = Vec::new();
+    let mut pair = |a: &[PointRef], b: &[PointRef], sense: Sense| {
+        if sense == Sense::Either {
+            return;
+        }
+        let (first, second) = (elements(s, a), elements(s, b));
+        for a in first {
+            for &b in &second {
+                if !crate::budget::permit(crate::budget::Step::Structure, 1) {
+                    return;
+                }
+                out.push(if sense == Sense::Decreasing { (a, b) } else { (b, a) });
+            }
+        }
+    };
+    for &f in &s.kept {
+        if !crate::budget::permit(crate::budget::Step::Structure, 1) {
+            break;
+        }
+        match &problem.facts[f].kind {
+            FactKind::Order { axis: Axis::Y, sense, members }
+            | FactKind::Distribute { axis: Axis::Y, sense, members } => {
+                for w in members.windows(2) {
+                    pair(&w[..1], &w[1..], *sense);
+                }
+            }
+            FactKind::Distance { axis: Axis::Y, sense, min: Some(min), from, to, .. } if *min >= 0. => {
+                pair(from, to, *sense);
+            }
+            _ => {}
+        }
+    }
+    out
+}
+
 /// The rows the elements start in (see the module).
 fn rows(problem: &LevelProblem, s: &Structure, work: &mut Work) -> Vec<Vec<usize>> {
     if s.elements.is_empty() {
@@ -2166,10 +2363,31 @@ fn rows(problem: &LevelProblem, s: &Structure, work: &mut Work) -> Vec<Vec<usize
     match &s.depth {
         Some(depth) => {
             let last = s.elements.iter().filter_map(|&k| depth[k]).max().map_or(0, |d| d + 1);
+            let mut level = BTreeMap::new();
             for &k in &s.elements {
                 if joined.find(k) == k {
-                    key.insert(k, -int(i64::from(depth[k].unwrap_or(last))));
+                    level.insert(k, depth[k].unwrap_or(last));
                 }
+            }
+            if s.language04 {
+                let above: BTreeSet<_> = above_by_facts(problem, s)
+                    .into_iter()
+                    .map(|(a, b)| (joined.find(a), joined.find(b)))
+                    .filter(|(a, b)| a != b)
+                    .collect();
+                for _ in 0..level.len() {
+                    for &(a, b) in &above {
+                        if !crate::budget::permit(crate::budget::Step::Structure, 1) {
+                            return vec![s.elements.clone()];
+                        }
+                        if level[&b] < level[&a].saturating_add(1) {
+                            level.insert(b, level[&a].saturating_add(1));
+                        }
+                    }
+                }
+            }
+            for (k, l) in level {
+                key.insert(k, -int(i64::from(l)));
             }
         }
         None => {
@@ -2477,6 +2695,43 @@ fn elements_of(r: &PointRef, out: &mut Vec<usize>) {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+
+    #[test]
+    fn fixed_vertical_facts_refine_modern_current_depth_rows() {
+        use crate::resolve::tests::{fact, instance, problem_of};
+        let mut p = problem_of(
+            vec![instance(); 3],
+            vec![
+                fact(FactKind::Order {
+                    axis: Axis::Y,
+                    sense: Sense::Decreasing,
+                    members: vec![
+                        PointRef::Origin(0),
+                        PointRef::Centre(vec![PointRef::SymbolPin {
+                            object: 1,
+                            pin: 0,
+                            reference: Reference::Anonymous,
+                        }]),
+                    ],
+                }),
+                fact(FactKind::Distance {
+                    axis: Axis::Y,
+                    sense: Sense::Decreasing,
+                    min: Some(2.),
+                    max: None,
+                    from: vec![PointRef::Pin { object: 1, pin: 0, terminal: "1".into() }],
+                    to: vec![PointRef::PinPosition { object: 2, pin: 0, reference: Reference::Anonymous }],
+                }),
+            ],
+        );
+        p.version = "0.4".into();
+        let mut s = structure_of(&p);
+        assert_eq!(s.kept.len(), 2);
+        s.depth = Some(vec![Some(0); 3]);
+        assert_eq!(rows(&p, &s, &mut Work::default()), vec![vec![0], vec![1], vec![2]]);
+        s.language04 = false;
+        assert_eq!(rows(&p, &s, &mut Work::default()), vec![vec![0, 1, 2]]);
+    }
     use crate::resolve::tests::{fact, instance, point, problem_of};
     use rnl_runtime::problem::ProblemGroup;
 
@@ -2569,6 +2824,9 @@ pub(crate) mod tests {
     fn groups_nest_and_overlapping_groups_split_in_three() {
         let mut p = problem_of((0..6).map(|_| instance()).collect(), Vec::new());
         let group = |label: &str, members: Vec<usize>| ProblemGroup {
+            identity: 0,
+            first: true,
+            direct: true,
             label: label.to_string(),
             members,
             spacing_x: None,
@@ -2608,6 +2866,9 @@ pub(crate) mod tests {
     fn a_group_that_overlaps_two_others_is_not_nested_and_said_so() {
         let mut p = problem_of((0..5).map(|_| instance()).collect(), Vec::new());
         let group = |label: &str, members: Vec<usize>| ProblemGroup {
+            identity: 0,
+            first: true,
+            direct: true,
             label: label.to_string(),
             members,
             spacing_x: None,
@@ -2626,6 +2887,9 @@ pub(crate) mod tests {
             .iter()
             .enumerate()
             .map(|(i, m)| ProblemGroup {
+                identity: i,
+                first: true,
+                direct: true,
                 label: format!("%g{i}"),
                 members: m.clone(),
                 spacing_x: None,

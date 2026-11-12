@@ -32,7 +32,7 @@ use rnl_runtime::geom::{fmt_num, TOL};
 pub const DEFAULT_TIME_LIMIT: f64 = 5.0;
 
 /// The objectives the solver knows, by the names of the prototype (plan 5.4).
-pub const OBJECTIVES: [&str; 14] = [
+pub const OBJECTIVES: [&str; 18] = [
     "current_direction",
     "ground_direction",
     "signal_flow",
@@ -47,6 +47,10 @@ pub const OBJECTIVES: [&str; 14] = [
     "terminal_wire_alignment",
     "labels",
     "bend_alignment",
+    "overlaps",
+    "crowding",
+    "misleading",
+    "wire_over_symbol",
 ];
 
 /// The default layers, one objective each with weight 1, in this order: the prototype's order,
@@ -354,7 +358,7 @@ impl Default for SolverOptions {
     }
 }
 
-const KEYS: [&str; 12] = [
+const KEYS: [&str; 13] = [
     "tolerance",
     "grid",
     "objectives",
@@ -362,6 +366,7 @@ const KEYS: [&str; 12] = [
     "budget",
     "time_limit",
     "run",
+    "layout",
     "spacing_x",
     "spacing_y",
     "search",
@@ -399,6 +404,9 @@ impl SolverOptions {
                 crate::RunLimit::Seed => ";run=seed".into(),
             });
             text.push_str(&format!(";report_hints={}", self.hints_for_low));
+        }
+        if self.settings.layout == crate::Layout::Tree {
+            text.push_str(";layout=tree");
         }
         if self.settings.spacing != [0, 0] {
             text.push_str(&format!(";spacing_x={};spacing_y={}", self.settings.spacing[0], self.settings.spacing[1]));
@@ -459,6 +467,13 @@ impl SolverOptions {
                         None if value == "seed" => crate::RunLimit::Seed,
                         _ => return Err("run must be time:SECONDS, work:COUNT, seed or unlimited".into()),
                     });
+                }
+                "layout" => {
+                    options.settings.layout = match value {
+                        "rows" => crate::Layout::Rows,
+                        "tree" => crate::Layout::Tree,
+                        _ => return Err("layout must be rows or tree".into()),
+                    }
                 }
                 "spacing_x" | "spacing_y" => {
                     options.settings.spacing[usize::from(key == "spacing_y")] =

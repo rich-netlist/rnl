@@ -161,7 +161,7 @@ fn result_envelope_rejects_stale_missing_extra_and_duplicate_levels() {
     for mutation in 0..7 {
         let mut value = original.clone();
         match mutation {
-            0 => value["version"] = json!(2),
+            0 => value["version"] = json!(rnl_solver_io::VERSION + 1),
             1 => value["levels"][0]["input"] = json!("different-input"),
             2 => {
                 value["levels"].as_array_mut().unwrap().clear();

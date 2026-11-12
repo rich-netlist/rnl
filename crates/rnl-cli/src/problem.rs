@@ -183,6 +183,11 @@ pub fn level(p: &LevelProblem, solver_options: &str) -> Value {
         }).collect::<Vec<_>>(),
         "groups": p.groups.iter().map(|g| {
             let mut group = json!({"label": g.label, "members": g.members});
+            if p.version == "0.4" {
+                group["identity"] = json!(g.identity);
+                group["first"] = json!(g.first);
+                group["direct"] = json!(g.direct);
+            }
             if let Some(value) = g.spacing_x { group["spacing_x"] = json!(value); }
             if let Some(value) = g.spacing_y { group["spacing_y"] = json!(value); }
             group

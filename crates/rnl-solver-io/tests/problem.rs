@@ -47,6 +47,31 @@ fn roundtrip(p: &LevelProblem) -> LevelProblem {
 }
 
 #[test]
+fn group_declaration_identity_and_provenance_survive_the_protocol() {
+    let problem = read(
+        "0.4",
+        r#"
+        $Disabled = @DEFINE(roles=["{members}"]) { ?members @GROUP };
+        %pair={#R1 #R2}; %disabled=%pair @AS $Disabled => @PRIORITY("disabled"); %pair @GROUP;
+        $D = @DEFINE(roles=["a","b"]) { {?a ?b} @GROUP };
+        %u=#R1 #R2 @AS $D
+    "#,
+    );
+    assert!(problem.groups.iter().any(|g| !g.first));
+    assert!(problem.groups.iter().any(|g| !g.direct));
+    roundtrip(&problem);
+    let mut value = encode_problem(&problem).unwrap();
+    value["groups"][0].as_object_mut().unwrap().remove("identity");
+    assert!(decode_problem(&value).is_err());
+    let mut request = rnl_solver_io::encode_input(&rnl_solver_io::InputDocument {
+        levels: vec![rnl_solver_io::LevelInput { problem, options: Default::default() }],
+    })
+    .unwrap();
+    request["version"] = serde_json::json!(1);
+    assert!(rnl_solver_io::decode_input(&request).unwrap_err().to_string().contains("version"));
+}
+
+#[test]
 fn complete_runtime_inputs_round_trip_and_solve_identically() {
     for version in ["0.2", "0.3", "0.4"] {
         let p = read(
@@ -142,7 +167,7 @@ fn request_preserves_explicit_tools_safety_and_reporting_before_file_merging() {
         match case {
             0 => bad["levels"][0]["input"] = serde_json::json!("wrong"),
             1 => bad["levels"][0]["request"] = serde_json::json!(1),
-            2 => bad["version"] = serde_json::json!(2),
+            2 => bad["version"] = serde_json::json!(rnl_solver_io::VERSION + 1),
             _ => {
                 bad["levels"][0]["options"]["overrides"] =
                     serde_json::json!([{"key":"work","value":{"kind":"number","value":-1},"source":null,"package":""}])

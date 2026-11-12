@@ -59,6 +59,10 @@ pub(crate) enum Objective {
     TerminalWireAlignment,
     Labels,
     BendAlignment,
+    Overlaps,
+    Crowding,
+    Misleading,
+    WireOverSymbol,
 }
 
 /// Where an objective is measured by default (algorithm synthesis 3.5).
@@ -103,7 +107,7 @@ pub(crate) struct Entry {
 }
 
 /// The table, in the order of [`OBJECTIVES`].
-pub(crate) const TABLE: [Entry; 14] = [
+pub(crate) const TABLE: [Entry; 18] = [
     // MOS and BJT whose source (emitter) is not on the side of the ground; rows by current depth
     Entry {
         objective: Objective::CurrentDirection,
@@ -189,6 +193,22 @@ pub(crate) const TABLE: [Entry; 14] = [
         structural: true,
         implemented: false,
     },
+    Entry { objective: Objective::Overlaps, scope: Scope::Level, needs: &[], structural: false, implemented: true },
+    Entry { objective: Objective::Crowding, scope: Scope::Level, needs: &[], structural: false, implemented: true },
+    Entry {
+        objective: Objective::Misleading,
+        scope: Scope::Level,
+        needs: &[Need::Wires],
+        structural: false,
+        implemented: true,
+    },
+    Entry {
+        objective: Objective::WireOverSymbol,
+        scope: Scope::Level,
+        needs: &[Need::Wires],
+        structural: false,
+        implemented: true,
+    },
 ];
 
 impl Objective {
@@ -244,6 +264,7 @@ pub(crate) struct ActiveLayer {
 /// inert there, and a sentence for each of those.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct Active {
+    pub configured_only: bool,
     pub layers: Vec<ActiveLayer>,
     pub inert: Vec<String>,
 }
@@ -268,7 +289,7 @@ impl Active {
                 layers.push(ActiveLayer { items, tolerance });
             }
         }
-        Active { layers, inert }
+        Active { layers, inert, configured_only: inputs.currents.is_some() }
     }
 
     /// Whether an objective is in force.
@@ -289,10 +310,18 @@ impl Active {
 
     /// The value of each layer on a placed candidate ([`score`]).
     pub(crate) fn score(&self, view: &View, routed: Option<&Routed>) -> Vec<Q> {
-        self.layers
-            .iter()
-            .map(|l| l.items.iter().map(|(o, w)| score(*o, view, routed) * int(i64::from(*w))).sum())
-            .collect()
+        self.score_drawing(view, routed, &Drawing::default())
+    }
+
+    pub(crate) fn score_drawing(&self, view: &View, routed: Option<&Routed>, drawing: &Drawing) -> Vec<Q> {
+        let value = |o: Objective| match o {
+            Objective::Overlaps => drawing.overlaps.into_q(),
+            Objective::Crowding => drawing.crowding.into_q(),
+            Objective::Misleading => drawing.misleading.into_q(),
+            Objective::WireOverSymbol => drawing.wire_over_symbol.into_q(),
+            _ => score(o, view, routed),
+        };
+        self.layers.iter().map(|l| l.items.iter().map(|(o, w)| value(*o) * int(i64::from(*w))).sum()).collect()
     }
 
     /// The order of some candidates, best first, from the value of each layer and the canonical
@@ -392,6 +421,15 @@ impl View<'_> {
     }
 }
 
+/// Whole-drawing measurements that a partial sketch does not yet have.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub(crate) struct Drawing {
+    pub overlaps: usize,
+    pub crowding: usize,
+    pub misleading: usize,
+    pub wire_over_symbol: usize,
+}
+
 /// The wires of a routed candidate (stage S4): each a polyline, by the index of the drawn net
 /// of `crate::structure::Connections::drawn` it belongs to.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -457,7 +495,13 @@ pub(crate) fn score(o: Objective, view: &View, routed: Option<&Routed>) -> Q {
             Some(e) => aspect(&(&e[2] - &e[0]), &(&e[3] - &e[1])),
             None => Q::zero(),
         },
-        Objective::TerminalWireAlignment | Objective::Labels | Objective::BendAlignment => Q::zero(),
+        Objective::TerminalWireAlignment
+        | Objective::Labels
+        | Objective::BendAlignment
+        | Objective::Overlaps
+        | Objective::Crowding
+        | Objective::Misleading
+        | Objective::WireOverSymbol => Q::zero(),
     }
 }
 

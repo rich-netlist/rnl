@@ -176,10 +176,13 @@ pub(crate) fn route(n: Node<'_>) -> Result<RouteIntent> {
     })
 }
 pub(crate) fn group_value(g: &ProblemGroup) -> Value {
-    json!({"spacing_x":g.spacing_x,"spacing_y":g.spacing_y,"label":g.label,"members":g.members})
+    json!({"identity":g.identity,"first":g.first,"direct":g.direct,"spacing_x":g.spacing_x,"spacing_y":g.spacing_y,"label":g.label,"members":g.members})
 }
 pub(crate) fn group(n: Node<'_>) -> Result<ProblemGroup> {
     Ok(ProblemGroup {
+        identity: n.field("identity")?.index()?,
+        first: n.field("first")?.boolean()?,
+        direct: n.field("direct")?.boolean()?,
         spacing_x: n.field("spacing_x")?.nullable(|n| n.number())?,
         spacing_y: n.field("spacing_y")?.nullable(|n| n.number())?,
         label: n.field("label")?.string()?.into(),

@@ -19,6 +19,34 @@ fn read(version: &str, body: &str) -> Interpretation {
 fn clean(r: &Interpretation) {
     assert!(!r.diagnostics().iter().any(|d| d.severity == Severity::Error), "{:?}", r.diagnostics());
 }
+
+#[test]
+fn solver_groups_export_provenance_and_set_identity_independently_of_labels() {
+    let r = read(
+        "0.4",
+        r#"$D = @DEFINE(roles=["a","b"]) { %inner = {?a ?b} @GROUP }; %u = #R1 #R2 @AS $D; {#R2 #R3} @GROUP; %u::inner @GROUP"#,
+    );
+    clean(&r);
+    let p = &r.problems[0];
+    assert_eq!(p.groups.len(), 3);
+    let expanded: Vec<_> = p.groups.iter().filter(|g| !g.direct).collect();
+    assert_eq!(expanded.len(), 1);
+    let repeated: Vec<_> = p.groups.iter().filter(|g| g.identity == expanded[0].identity).collect();
+    assert_eq!(repeated.len(), 2);
+    assert!(repeated.iter().any(|g| g.direct));
+    assert_eq!(p.groups.iter().filter(|g| g.direct).count(), 2);
+    let shown = rnl_cli::problem::level(p, "");
+    assert_eq!(shown["groups"][0]["direct"], p.groups[0].direct);
+    assert_eq!(shown["groups"][0]["identity"], p.groups[0].identity);
+    let mut changed = p.clone();
+    changed.groups[0].direct = !changed.groups[0].direct;
+    assert_ne!(rnl_runtime::problem::input_digest(p), rnl_runtime::problem::input_digest(&changed));
+    let mut old = p.clone();
+    old.version = "0.3".into();
+    changed.version = "0.3".into();
+    changed.groups[0].identity += 100;
+    assert_eq!(rnl_runtime::problem::input_digest(&old), rnl_runtime::problem::input_digest(&changed));
+}
 fn problem(r: &Interpretation, name: &str) -> Vec<String> {
     let p = r.problems.iter().find(|p| p.groups.iter().any(|g| g.label == name)).unwrap();
     p.groups.iter().find(|g| g.label == name).unwrap().members.iter().map(|i| p.objects[*i].label.clone()).collect()
@@ -154,4 +182,20 @@ fn a_failed_expansion_cannot_group_a_shared_set() {
     members(&r, "%g", &["#R2", "#R3"]);
     assert_eq!(r.problems[0].groups.len(), 1);
     assert_eq!(r.model.levels[0].groups.len(), 1);
+}
+
+#[test]
+fn a_disabled_first_group_is_not_replaced_by_a_later_declaration() {
+    let r = read(
+        "0.4",
+        r#"$D = @DEFINE(roles=["{members}"]) { ?members @GROUP }; %g = {#R1 #R2}; %d = %g @AS $D => @PRIORITY("disabled"); %g @GROUP"#,
+    );
+    clean(&r);
+    let p = &r.problems[0];
+    assert_eq!(p.groups.len(), 1);
+    assert!(p.groups[0].direct);
+    assert!(!p.groups[0].first);
+    let mut changed = p.clone();
+    changed.groups[0].first = true;
+    assert_ne!(rnl_runtime::problem::input_digest(p), rnl_runtime::problem::input_digest(&changed));
 }

@@ -41,7 +41,7 @@
 //! stop at the caps of the implementation (`crate::options::CAPS`), a relation then dropped or an
 //! LP left where the resolution put the candidate. Each falls back to the best found so far, at worst P0, and the report says so.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use rnl_runtime::geom::Orient;
 use rnl_runtime::problem::{LevelProblem, Position};
@@ -52,7 +52,7 @@ use crate::options::{Caps, CAPS};
 use crate::rational::{to_f64, Q};
 use crate::resolve::Resolved;
 use crate::route::{route, style_notes, Failure, Routing};
-use crate::score::{crowding, drawn, layers, misleading, order, Entry};
+use crate::score::{crowding, drawn, measured_layers, misleading, order, Entry};
 use crate::search::{search, Candidate, RelKind};
 use crate::structure::{analyse, Role, Structure};
 use crate::{Clock, SolveReport, Solved, SolverOptions, StoppedClock, Unrouted};
@@ -132,77 +132,163 @@ pub(crate) fn solve_exact_with(
     let mut work = resolved.work;
     let phase = crate::profile::span("stage", "structure");
     let structure = analyse(problem, &resolved, options, caps, &mut work);
+    let use_tree = problem.version == "0.4" && options.settings.layout == crate::Layout::Tree;
+    let structure =
+        if problem.version == "0.4" { crate::search_choices::for_layout(&structure, &mut work) } else { structure };
     notes.extend(structure.notes.iter().cloned());
     drop(phase);
-    let phase = crate::profile::span("stage", "search");
-    let candidates = search(problem, &structure, options, &mut work);
-    drop(phase);
-    let mut all: Vec<Placing> = Vec::new();
-    for (candidate_id, c) in candidates.into_iter().enumerate() {
-        if !crate::budget::permit(crate::budget::Step::Placement, problem.objects.len()) && !all.is_empty() {
-            break;
+    let (candidate, placed, routing, entry) = if use_tree {
+        let laid = crate::tree::lay_out(problem, &structure, options, &mut work, &crate::tree::Stop::default());
+        notes.extend(laid.notes);
+        (laid.candidate, laid.placed, laid.routing, laid.entry)
+    } else {
+        let phase = crate::profile::span("stage", "search");
+        let candidates = search(problem, &structure, options, &mut work);
+        drop(phase);
+        let mut all: Vec<Placing> = Vec::new();
+        for (candidate_id, c) in candidates.into_iter().enumerate() {
+            if !crate::budget::permit(crate::budget::Step::Placement, problem.objects.len()) && !all.is_empty() {
+                break;
+            }
+            let phase = crate::profile::span("stage", "coords");
+            crate::profile::set("candidate_id", candidate_id as u64);
+            let placed = place(problem, &structure, &c, options, &mut work);
+            drop(phase);
+            if crate::budget::stopped() && !all.is_empty() {
+                break;
+            }
+            let phase = crate::profile::span("stage", "score");
+            let estimate = measured_layers(problem, &structure, &placed, None);
+            let written = drawn(problem, &structure, &placed.geometry, &Routing::default());
+            let entry = Entry {
+                overlaps: placed.overlaps.len(),
+                crowding: crowding(&structure, &placed.origins, &placed.geometry.orient, &placed.dropped),
+                misleading: misleading(problem, &structure, &placed.origins, &placed.geometry, &written),
+                joins_left: 0,
+                layers: estimate,
+                code: c.code(&structure),
+            };
+            all.push(Placing { candidate: c, placed, entry });
+            drop(phase);
         }
-        let phase = crate::profile::span("stage", "coords");
-        crate::profile::set("candidate_id", candidate_id as u64);
-        let placed = place(problem, &structure, &c, options, &mut work);
-        drop(phase);
+        let placed_count = all.len();
+        // the best `beam` by the estimate are routed and scored on their wires (plan 5.8)
         let phase = crate::profile::span("stage", "score");
-        let estimate = layers(&structure, &placed.origins, &placed.geometry, None);
-        let written = drawn(problem, &structure, &placed.geometry, &Routing::default());
-        let entry = Entry {
-            overlaps: placed.overlaps.len(),
-            crowding: crowding(&structure, &placed.origins, &placed.geometry.orient, &placed.dropped),
-            misleading: misleading(problem, &structure, &placed.origins, &placed.geometry, &written),
-            joins_left: 0,
-            layers: estimate,
-            code: c.code(&structure),
-        };
-        all.push(Placing { candidate: c, placed, entry });
+        let estimated: Vec<Entry> = all.iter().map(|c| c.entry.clone()).collect();
+        let ranked = order(&structure.active, &estimated);
+        let beam = options.beam.max(1);
+        let mut finals: Vec<(usize, Routing, Entry)> = Vec::new();
         drop(phase);
-    }
-    let placed_count = all.len();
-    // the best `beam` by the estimate are routed and scored on their wires (plan 5.8)
-    let phase = crate::profile::span("stage", "score");
-    let estimated: Vec<Entry> = all.iter().map(|c| c.entry.clone()).collect();
-    let ranked = order(&structure.active, &estimated);
-    let beam = options.beam.max(1);
-    let mut finals: Vec<(usize, Routing, Entry)> = Vec::new();
-    drop(phase);
-    for &i in ranked.iter().take(beam) {
-        if !crate::budget::permit(crate::budget::Step::Route, problem.routes.len()) && !finals.is_empty() {
-            break;
+        for &i in ranked.iter().take(beam) {
+            if !crate::budget::permit(crate::budget::Step::Route, problem.routes.len()) && !finals.is_empty() {
+                break;
+            }
+            let p = &all[i];
+            let phase = crate::profile::span("stage", "route");
+            crate::profile::set("candidate_id", i as u64);
+            let routing = route(problem, &structure, &p.placed.geometry, &p.placed.origins, options, &mut work);
+            crate::profile::add("wires", routing.wires.len() as u64);
+            drop(phase);
+            if crate::budget::stopped() && !finals.is_empty() {
+                break;
+            }
+            let phase = crate::profile::span("stage", "score");
+            let wires = drawn(problem, &structure, &p.placed.geometry, &routing);
+            let score = measured_layers(problem, &structure, &p.placed, Some(&wires));
+            let entry = Entry {
+                misleading: misleading(problem, &structure, &p.placed.origins, &p.placed.geometry, &wires),
+                joins_left: routing.joins_left(),
+                layers: score,
+                ..p.entry.clone()
+            };
+            finals.push((i, routing, entry));
+            drop(phase);
         }
-        let p = &all[i];
-        let phase = crate::profile::span("stage", "route");
-        crate::profile::set("candidate_id", i as u64);
-        let routing = route(problem, &structure, &p.placed.geometry, &p.placed.origins, options, &mut work);
-        crate::profile::add("wires", routing.wires.len() as u64);
-        drop(phase);
         let phase = crate::profile::span("stage", "score");
-        let wires = drawn(problem, &structure, &p.placed.geometry, &routing);
-        let score = layers(&structure, &p.placed.origins, &p.placed.geometry, Some(&wires));
-        let entry = Entry {
-            misleading: misleading(problem, &structure, &p.placed.origins, &p.placed.geometry, &wires),
-            joins_left: routing.joins_left(),
-            layers: score,
-            ..p.entry.clone()
-        };
-        finals.push((i, routing, entry));
+        let entries: Vec<Entry> = finals.iter().map(|(_, _, e)| e.clone()).collect();
+        let best = order(&structure.active, &entries)[0];
+        let mut seen: BTreeSet<_> = all.iter().map(|p| p.entry.code.clone()).collect();
+        let (taken, mut routing, mut entry) = finals.swap_remove(best);
+        let Placing { mut candidate, mut placed, .. } = all.swap_remove(taken);
         drop(phase);
-    }
-    let phase = crate::profile::span("stage", "score");
-    let entries: Vec<Entry> = finals.iter().map(|(_, _, e)| e.clone()).collect();
-    let best = order(&structure.active, &entries)[0];
-    let (taken, routing, entry) = finals.swap_remove(best);
-    let Placing { candidate, placed, .. } = all.swap_remove(taken);
+        notes.push(format!(
+            "{} placed and {} routed; the one taken comes from {}",
+            count(placed_count, "candidate"),
+            entries.len(),
+            if candidate.origin == "P0" { "P0, the order of the netlist" } else { "the beam search" }
+        ));
+        if problem.version == "0.4" && crate::budget::continues_rows() {
+            let mut start = candidate.clone();
+            let troubled = |routing: &Routing, placed: &Placed| {
+                let wires = drawn(problem, &structure, &placed.geometry, routing);
+                crate::score::trouble(&structure, &placed.origins, &placed.geometry.orient, &wires)
+            };
+            let mut rank = troubled(&routing, &placed);
+            let mut radius = 0;
+            let mut refined = 0;
+            'search: loop {
+                radius += 1;
+                let mut skip = 0;
+                let mut none = true;
+                loop {
+                    if !crate::budget::permit(crate::budget::Step::Candidate, structure.elements.len()) {
+                        break 'search;
+                    }
+                    let (batch, more, any) = crate::search::neighbours(
+                        problem,
+                        &structure,
+                        options,
+                        &mut work,
+                        &start,
+                        radius,
+                        skip,
+                        Some(&rank),
+                    );
+                    none &= !any;
+                    for c in batch {
+                        if !seen.insert(c.code(&structure)) {
+                            continue;
+                        }
+                        if !crate::budget::permit(crate::budget::Step::Placement, structure.objects.len()) {
+                            break 'search;
+                        }
+                        let p = place(problem, &structure, &c, options, &mut work);
+                        let r = route(problem, &structure, &p.geometry, &p.origins, options, &mut work);
+                        if crate::budget::stopped() {
+                            break 'search;
+                        }
+                        let wires = drawn(problem, &structure, &p.geometry, &r);
+                        let next = Entry {
+                            layers: measured_layers(problem, &structure, &p, Some(&wires)),
+                            code: c.code(&structure),
+                            overlaps: p.overlaps.len(),
+                            crowding: crowding(&structure, &p.origins, &p.geometry.orient, &p.dropped),
+                            misleading: misleading(problem, &structure, &p.origins, &p.geometry, &wires),
+                            joins_left: r.joins_left(),
+                        };
+                        refined += 1;
+                        if order(&structure.active, &[entry.clone(), next.clone()])[0] == 1 {
+                            (candidate, placed, routing, entry) = (c, p, r, next);
+                            start = candidate.clone();
+                            rank = troubled(&routing, &placed);
+                            radius = 0;
+                            continue 'search;
+                        }
+                    }
+                    if !more {
+                        break;
+                    }
+                    skip += crate::search::BATCH;
+                }
+                if none {
+                    break;
+                }
+            }
+            notes.push(format!("row search: {refined} additional candidates placed and routed"));
+        }
+        (candidate, placed, routing, entry)
+    };
     let score = entry.layers;
-    drop(phase);
-    notes.push(format!(
-        "{} placed and {} routed; the one taken comes from {}",
-        count(placed_count, "candidate"),
-        entries.len(),
-        if candidate.origin == "P0" { "P0, the order of the netlist" } else { "the beam search" }
-    ));
     if !placed.optimised {
         notes.push(
             "the coordinate LP reached its cap on pivots: the objects are where the resolution of the candidate put \

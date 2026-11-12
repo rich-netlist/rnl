@@ -1907,7 +1907,7 @@ fn every_netlist() -> Vec<PathBuf> {
 fn relation_points(r: &Relation) -> Vec<(usize, Vec<PointId>)> {
     let points = |terms: &[(PointId, Q)]| terms.iter().map(|(p, _)| *p).collect::<Vec<PointId>>();
     match r {
-        Relation::Orient { .. } => Vec::new(),
+        Relation::Orient { .. } | Relation::Way { .. } => Vec::new(),
         Relation::Linear { axis, terms, .. } => vec![(*axis, points(terms))],
         Relation::Apart { axis, low, high, .. } => vec![(*axis, points(&[low.clone(), high.clone()].concat()))],
         Relation::OneOf(alternatives) => {

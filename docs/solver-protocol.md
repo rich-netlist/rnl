@@ -1,8 +1,8 @@
 # Independent solver protocol
 
-The `rnl-solver-io` library encodes an independent solver's decisions as JSON and validates them against the original `LevelProblem` before writeback. Protocol version 1 is independent of the solver executable's version.
+The `rnl-solver-io` library encodes an independent solver's decisions as JSON and validates them against the original `LevelProblem` before writeback. Protocol version 2 is independent of the solver executable's version.
 
-The `rnl-solver` executable has its own version, starting at `0.1.0`. It reads one input JSON document from stdin (or an explicit file) and writes one result document to stdout. Diagnostics go to stderr. Viewers continue using the solver library.
+The `rnl-solver` executable has its own version, currently `0.2.0`. It reads one input JSON document from stdin (or an explicit file) and writes one result document to stdout. Diagnostics go to stderr. Viewers continue using the solver library.
 
 ## Commands
 
@@ -20,7 +20,7 @@ The host invokes the external program for each level as it reads after earlier i
 
 ## Input envelope
 
-An input has `format: "rnl-solver-input"`, `version: 1`, and a `levels` array. Each entry contains:
+An input has `format: "rnl-solver-input"`, `version: 2`, and a `levels` array. Each entry contains:
 
 - `request`: its zero-based array ordinal.
 - `input`: the original problem's input digest.
@@ -38,7 +38,7 @@ JSON numbers are parsed from their decimal spelling without an intermediate loss
 ```json
 {
   "format": "rnl-solver-result",
-  "version": 1,
+  "version": 2,
   "solver": { "name": "example-solver", "version": "1.0.0" },
   "levels": [
     {
@@ -112,3 +112,7 @@ The independent executable prints the original budget observation to stderr. For
 ## Verification
 
 Tests compare complete native solutions, reports and written records after JSON byte round trips for all three currently supported language versions. Additional cases exercise nonempty branch and rewrite arrays, every reference variant, conflict reports, values above `2^53`, reordered identical requests, stale inputs, invalid indices, inconsistent settings, nonfinite coordinates and forged writable references.
+
+## Version 2
+
+Version 2 requires group `identity`, `first` and `direct` fields. These preserve repeated declarations, disabled first declarations and definition provenance when choosing a grouping tree. Version 1 programs cannot reproduce these decisions and reject version 2 requests; upgrade the independent executable together with the protocol. Result decision shapes are unchanged, but the response uses the request protocol version.
