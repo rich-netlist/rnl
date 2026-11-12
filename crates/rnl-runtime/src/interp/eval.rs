@@ -852,6 +852,7 @@ impl<'p> Interp<'p> {
         self.remember_binding_creation(&ctx.member_key, scene, &bound, &ctx);
         self.bound_memo.insert(skey.clone(), bound);
         self.memo.insert(skey, Memo::Val(val));
+        self.finish_specific_definitions();
         Ok(val)
     }
 

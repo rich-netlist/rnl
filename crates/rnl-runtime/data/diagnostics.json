@@ -2,6 +2,28 @@
  "about": "The kinds of diagnostics of the toolkit: each with its number, RNL and four digits, and its short name, which are kept from one version to the next and never given to another kind; the severity and the message it is given with, as the code writes it; and the sections of the standard it is about. The thousands give the domain: 0 to 6 the domains of the standard, 7 the geometry hints, 8 the tools, 9 the kinds of the implementation of the domains 0 to 6 (9D00, D the domain). A kind of the versions 0.2 and 0.3 alone has no number.",
  "kinds": [
   {
+   "number": "RNL3418",
+   "name": "define-inclusion-cycle",
+   "severity": "error",
+   "message": "this inclusion closes a cycle: {chain}; the inclusion fails and the rest of the body takes effect (9.1)",
+   "sections": [
+    "9.1",
+    "9.2.7",
+    "9.3"
+   ]
+  },
+  {
+   "number": "RNL3419",
+   "name": "define-style-expansion-limit",
+   "severity": "error",
+   "message": "style expansion exceeds this implementation's limit of {limit} active style bodies (9.1, 9.3)",
+   "sections": [
+    "3.7",
+    "9.1",
+    "9.3"
+   ]
+  },
+  {
    "number": "RNL0000",
    "name": "host-carrier-no-space",
    "severity": "warning",

@@ -15,7 +15,7 @@ use super::obj::*;
 use super::scene::{FailedApplication, GroupFact, TargetOp, Task};
 use super::Interp;
 
-const MAX_SYMBOL_LEVELS: usize = 64;
+pub(super) const MAX_SYMBOL_LEVELS: usize = 64;
 
 pub(super) struct DefinitionFields {
     pub(super) roles: Vec<Role>,
@@ -310,6 +310,7 @@ impl Interp<'_> {
                         mapped["style"].off,
                     );
                 }
+                let sty = self.specific_content(sty, ctx, mapped["style"].off)?;
                 self.target_each_mapped(
                     kw,
                     mapped,
@@ -513,6 +514,9 @@ impl Interp<'_> {
 
     pub(crate) fn frame_key(&self, ctx: &Ctx) -> usize {
         match &ctx.frame {
+            Some(f) if self.follows_0_4(self.source_unit(ctx)) && f.borrow().symbol.is_some() => {
+                f.borrow().symbol.unwrap().0 as usize + 1
+            }
             Some(f) => f.borrow().usage.map(|u| u.0 as usize + 1).unwrap_or(0),
             None => 0,
         }
@@ -571,7 +575,10 @@ impl Interp<'_> {
         let body = self.body_arg(kw, args, seg, ctx)?;
         // A graph check after evaluation cannot protect the call stack while uncached,
         // forward references are still expanding their definitions.
-        if body.is_some() && self.symbol_expansions.len() >= MAX_SYMBOL_LEVELS {
+        if !self.follows_0_4(self.source_unit(ctx))
+            && body.is_some()
+            && self.symbol_expansions.len() >= MAX_SYMBOL_LEVELS
+        {
             let id = self.err(
                 ctx,
                 codes::DEFINE_SYMBOL_EXPANSION_LIMIT, format!("symbol expansion exceeds this implementation's limit of {MAX_SYMBOL_LEVELS} active symbol bodies (9.2.7)"),
@@ -614,6 +621,11 @@ impl Interp<'_> {
                 );
             }
         }
+        if self.follows_0_4(self.source_unit(ctx)) {
+            self.defer_specific(sym, body, ctx, self.defining_for(ctx, seg, member), seg.start);
+            self.unnamed_definition_warning(ctx, seg, member);
+            return Ok((sym, false));
+        }
         if let Some(body) = body {
             let defining = self.defining_for(ctx, seg, member);
             self.symbol_expansions.push(None);
@@ -646,7 +658,7 @@ impl Interp<'_> {
 
     /// Reject unsupported graphs before any renderer or solver can consume them. The limit
     /// includes the outer symbol and is shared by graphics, fixed text and inferred extents.
-    fn check_symbol_graph(&mut self, root: ObjId, ctx: &Ctx, off: usize) -> R<()> {
+    pub(super) fn check_symbol_graph(&mut self, root: ObjId, ctx: &Ctx, off: usize) -> R<()> {
         let mut pending = vec![(root, false)];
         let mut active = HashSet::new();
         let mut depths: HashMap<ObjId, usize> = HashMap::new();
@@ -705,6 +717,13 @@ impl Interp<'_> {
         }
         let own = self.params(kw, seg, ctx, &[], Some(&[]), true, None)?;
         let body = self.body_arg(kw, args, seg, ctx)?;
+        if self.follows_0_4(self.source_unit(ctx)) {
+            let sty = self.new_obj(ObjData::Style(own.into_iter().collect()));
+            self.node_memo.insert(key, sty);
+            self.defer_specific(sty, body, ctx, self.defining_for(ctx, seg, member), seg.start);
+            self.unnamed_definition_warning(ctx, seg, member);
+            return Ok((sty, false));
+        }
         let mut props = StyleMap::new();
         let mut bctx = ctx.clone();
         bctx.defining = Some(self.defining_for(ctx, seg, member)); // the body cannot see this name (6.9)
@@ -2619,7 +2638,7 @@ impl Interp<'_> {
 
     // ------------------------------------------------------------------ symbol bodies (9.2)
 
-    fn eval_symbol_body(
+    pub(super) fn eval_symbol_body(
         &mut self,
         sym: ObjId,
         body: &Rc<SetExpr>,
@@ -2670,8 +2689,13 @@ impl Interp<'_> {
                         Err(o) => return Err(o),
                     };
                     match self.o(obj) {
-                        ObjData::Symbol(other) => {
-                            let other = (**other).clone();
+                        ObjData::Symbol(_) => {
+                            let obj = match self.specific_content(obj, &sctx, a.start) {
+                                Ok(obj) => obj,
+                                Err(Stop::Fail(_)) => continue,
+                                Err(other) => return Err(other),
+                            };
+                            let other = self.symbol(obj).clone();
                             if self.symbol(sym).independent_pins && !self.include_pin_names(sym, &other, &sctx, a.start)
                             {
                                 continue;
@@ -3661,6 +3685,7 @@ impl Interp<'_> {
                 mapped["symbol"].off,
             );
         }
+        let sym = self.specific_content(sym, ctx, mapped["symbol"].off)?;
         let name = seg.args.iter().find_map(|arg| {
             if arg.start != mapped["symbol"].off {
                 return None;
