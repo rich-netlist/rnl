@@ -360,9 +360,7 @@ impl Store {
         for &r in &queue {
             waiting[r] = true;
         }
-        for p in &mut self.pred {
-            *p = None;
-        }
+        self.pred.fill(None);
         let mut fifo: VecDeque<usize> = queue.into_iter().collect();
         while let Some(r) = fifo.pop_front() {
             if !crate::budget::permit(crate::budget::Step::Structure, self.members[r].len()) {
