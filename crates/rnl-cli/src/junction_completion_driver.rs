@@ -1,7 +1,7 @@
 //! Isolated interpretation of candidate generated records. This module never calls a solver.
 use crate::junction_completion::{self, Axis, Point, Suggestion};
 use crate::junction_completion_problem::{
-    added_fact_indices, suggestions, validate_interpreted_trial, TrialValidation,
+    added_fact_indices, rebased_reference, suggestions, validate_interpreted_trial, TrialValidation,
 };
 use rnl_runtime::{
     problem::{LevelProblem, PointRef, Position, Reference, Slot},
@@ -29,9 +29,17 @@ pub struct Context<'a> {
 }
 
 fn read(ctx: &Context<'_>, record: &str) -> Result<Interpretation, String> {
-    // Numbered references take effect only after the normal writer adds their check.
-    // Each bounded trial needs its own check: adding PLACE changes usage tokens.
-    let record = rnl_view::finish_record(&ctx.original.doc, ctx.files, ctx.runtime, ctx.problem, record);
+    // Numeric references are inactive until their record has a valid check. Prepare each
+    // complete candidate, including its appended PLACE statements, in the same package
+    // environment as the normal reading. Keep the caller's raw record and byte spans intact.
+    let numbered = rnl_view::finish_record_with_formats(
+        &ctx.original.doc,
+        ctx.files,
+        ctx.formats,
+        ctx.runtime,
+        ctx.problem,
+        record,
+    );
     if let Some(observe) = ctx.on_interpret {
         observe();
     }
@@ -39,20 +47,29 @@ fn read(ctx: &Context<'_>, record: &str) -> Result<Interpretation, String> {
         &ctx.original.doc,
         ctx.problem.level,
         ctx.original_text,
-        &record,
+        &numbered,
         &ctx.problem.version,
     );
     let mut overlay = MemoryProvider::new();
     overlay.insert(ctx.host_path, &text);
     let layered = Layered { layers: vec![&overlay, ctx.files] };
     let opts = Options { generated: true, problems: true, ..ctx.runtime.clone() };
-    rnl_view::interpret_with(ctx.entry, ctx.dialect, ctx.formats, &layered, &opts)
+    let read = rnl_view::interpret_with(ctx.entry, ctx.dialect, ctx.formats, &layered, &opts)?;
+    let file = &read.doc.levels.get(ctx.problem.level).ok_or("trial level missing")?.file;
+    let numbering =
+        read.numbering.iter().find(|level| level.level == ctx.problem.level).ok_or("trial numbering unavailable")?;
+    if !numbering.records.iter().any(|record| record.file == *file)
+        || numbering.records.iter().any(|record| record.file == *file && !record.holds())
+    {
+        return Err("trial generated record has missing or stale numbering".into());
+    }
+    Ok(read)
 }
 
 fn line_mapping(ctx: &Context<'_>, new_read: &Interpretation, record: &str) -> Result<Vec<Option<u32>>, String> {
     let old_level = ctx.original.doc.levels.get(ctx.problem.level).ok_or("old level missing")?;
     let new_level = new_read.doc.levels.get(ctx.problem.level).ok_or("new level missing")?;
-    let ranges = |level: &rnl_runtime::host::Level| -> Vec<(u32, u32)> {
+    let generated_ranges = |level: &rnl_runtime::host::Level| -> Vec<(u32, u32)> {
         level
             .records
             .iter()
@@ -60,8 +77,34 @@ fn line_mapping(ctx: &Context<'_>, new_read: &Interpretation, record: &str) -> R
             .map(|r| r.lines)
             .collect()
     };
-    let old_ranges = ranges(old_level);
-    let new_ranges = ranges(new_level);
+    let headers = |doc: &rnl_runtime::host::HostDocument| -> Vec<rnl_runtime::host::Record> {
+        doc.levels
+            .iter()
+            .flat_map(|level| &level.records)
+            .filter(|r| r.file == old_level.file && rnl_runtime::writeback::record_type(r) == "header")
+            .cloned()
+            .collect()
+    };
+    let old_headers = headers(&ctx.original.doc);
+    let new_headers = headers(&new_read.doc);
+    let mut old_ranges = generated_ranges(old_level);
+    let mut new_ranges = generated_ranges(new_level);
+    if !old_headers.iter().map(|r| &r.text).eq(new_headers.iter().map(|r| &r.text)) {
+        // A changed header may alter columns on a shared physical line. Do not guess
+        // positions of an adjacent record; unchanged headers retain ordinary line mapping.
+        let shared = |doc: &rnl_runtime::host::HostDocument, headers: &[rnl_runtime::host::Record]| {
+            doc.levels.iter().flat_map(|level| &level.records).any(|r| {
+                r.file == old_level.file
+                    && rnl_runtime::writeback::record_type(r) != "header"
+                    && headers.iter().any(|h| r.lines.0 <= h.lines.1 && h.lines.0 <= r.lines.1)
+            })
+        };
+        if shared(&ctx.original.doc, &old_headers) || shared(&new_read.doc, &new_headers) {
+            return Err("changed header shares a physical line with another record".into());
+        }
+        old_ranges.extend(old_headers.iter().map(|r| r.lines));
+        new_ranges.extend(new_headers.iter().map(|r| r.lines));
+    }
     let new_text = rnl_runtime::writeback::replace_generated_with_header(
         &ctx.original.doc,
         ctx.problem.level,
@@ -155,16 +198,18 @@ fn fixed_point_inner(read: &Interpretation, p: &LevelProblem, point: &PointRef, 
         }
     }
 }
-fn original_point_in_trial(point: &PointRef, original: &LevelProblem, trial: &LevelProblem) -> Option<PointRef> {
+fn original_point_in_trial(
+    point: &PointRef,
+    original: &LevelProblem,
+    trial: &LevelProblem,
+    ids: &[Option<String>],
+) -> Option<PointRef> {
     let owner = |index: usize| -> Option<usize> {
         let old = original.objects.get(index)?;
-        if original.objects.iter().filter(|o| o.kind == old.kind && o.reference == old.reference).count() != 1 {
-            return None;
-        }
-        let mut found =
-            trial.objects.iter().enumerate().filter(|(_, o)| o.kind == old.kind && o.reference == old.reference);
+        let id = ids.get(index)?.as_ref()?;
+        let mut found = trial.ids.objects.iter().enumerate().filter(|(_, candidate)| *candidate == id);
         let (index, _) = found.next()?;
-        if found.next().is_some() {
+        if found.next().is_some() || trial.objects.get(index)?.kind != old.kind {
             return None;
         }
         Some(index)
@@ -184,10 +229,28 @@ fn original_point_in_trial(point: &PointRef, original: &LevelProblem, trial: &Le
             Some(PointRef::Pin { object: pin_owner(*object, *pin)?, pin: *pin, terminal: terminal.clone() })
         }
         PointRef::SymbolPin { object, pin, reference } => {
-            Some(PointRef::SymbolPin { object: pin_owner(*object, *pin)?, pin: *pin, reference: reference.clone() })
+            let mapped = pin_owner(*object, *pin)?;
+            Some(PointRef::SymbolPin {
+                object: mapped,
+                pin: *pin,
+                reference: rebased_reference(
+                    reference,
+                    &original.objects[*object].reference,
+                    &trial.objects[mapped].reference,
+                )?,
+            })
         }
         PointRef::PinPosition { object, pin, reference } => {
-            Some(PointRef::PinPosition { object: pin_owner(*object, *pin)?, pin: *pin, reference: reference.clone() })
+            let mapped = pin_owner(*object, *pin)?;
+            Some(PointRef::PinPosition {
+                object: mapped,
+                pin: *pin,
+                reference: rebased_reference(
+                    reference,
+                    &original.objects[*object].reference,
+                    &trial.objects[mapped].reference,
+                )?,
+            })
         }
         PointRef::Centre(_) => None,
     }
@@ -245,6 +308,7 @@ pub fn complete_record(ctx: &Context<'_>, written: &Written) -> Result<Completio
         candidates: Vec<Point>,
     }
     let mut plans = Vec::new();
+    let original_ids = rnl_runtime::previous::document_ids(ctx.problem, &before);
     for junction in &written.junctions {
         let prefix = record.get(..junction.span.start).ok_or("invalid junction span")?;
         let line = generated[0].lines.0 + prefix.bytes().filter(|byte| *byte == b'\n').count() as u32;
@@ -261,7 +325,7 @@ pub fn complete_record(ctx: &Context<'_>, written: &Written) -> Result<Completio
         let own = u.object.ok_or("junction has no own point")?;
         let usage_id = problem.ids.objects.get(own).ok_or("junction object id missing")?.clone();
         let role = if let Some(original) = &junction.original {
-            let mapped = original_point_in_trial(original, ctx.problem, problem)
+            let mapped = original_point_in_trial(original, ctx.problem, problem, &original_ids.objects)
                 .ok_or("original junction identity is ambiguous")?;
             fixed_point(&before, problem, &mapped).ok_or("original junction identity has no fixed location")?
         } else {
