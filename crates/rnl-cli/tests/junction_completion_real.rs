@@ -10,6 +10,16 @@ use rnl_runtime::{
 };
 use std::{collections::BTreeMap, path::Path};
 
+// A backend may attach to an existing named point or emit a new branch point.
+// Completion must preserve the requested coordinates and fixed axes in either case.
+fn completion_suffix<'a>(record: &'a str, definition: &str) -> &'a str {
+    let prefix = format!("{definition} @ATTACH ");
+    let mut statements = record.lines().filter_map(|line| line.split_once(&prefix).map(|(_, rest)| rest));
+    let statement = statements.next().expect("one configured junction usage");
+    assert!(statements.next().is_none(), "unexpected duplicate junction usage: {record}");
+    statement.split_once(" => ").map_or("", |(_, suffix)| suffix.trim().trim_end_matches(';'))
+}
+
 fn run(body: &str) -> Result<String, String> {
     let text = format!("* junction\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\"); @SOLVER-CONFIG(junction=\"$DOT\") }}\nR1 a 0 1k\n* @RNL {{ {body} }}\n.end\n");
     let files = MemoryProvider::new().with("main.sp", &text);
@@ -141,7 +151,7 @@ fn actual_solve_routes_and_locates_new_dot() {
     let options = SolveOptions { std: false, ..Default::default() };
     let result = solve(Path::new("main.sp"), &files, &options).expect("solve and junction completion");
     let file = result.files.iter().find(|file| file.path == "main.sp").expect("written main");
-    assert!(file.text.contains("$DOT @ATTACH %rt1 => @PLACE(0, 0)"), "{}", file.text);
+    assert_eq!(completion_suffix(&file.text, "$DOT"), "@PLACE(0, 0)", "{}", file.text);
     let saved = MemoryProvider::new().with("main.sp", &file.text);
     let read = interpret_file(
         Path::new("main.sp"),
@@ -167,7 +177,7 @@ fn actual_solve_preserves_custom_dot_offset() {
     let options = SolveOptions { std: false, ..Default::default() };
     let result = solve(Path::new("main.sp"), &files, &options).expect("solve and custom junction completion");
     let file = result.files.iter().find(|file| file.path == "main.sp").expect("written main");
-    assert!(file.text.contains("$DOT @ATTACH %rt1 => @PLACE(2, 0)"), "{}", file.text);
+    assert_eq!(completion_suffix(&file.text, "$DOT"), "@PLACE(2, 0)", "{}", file.text);
 }
 
 #[test]
@@ -191,7 +201,7 @@ fn actual_solve_with_official_standard_dot() {
     let result = solve(Path::new("main.sp"), &files, &SolveOptions { std: false, ..Default::default() })
         .expect("official junction solve");
     let file = result.files.iter().find(|file| file.path == "main.sp").expect("written main");
-    assert!(file.text.contains("$JUNCTION @ATTACH %rt1 => @PLACE(0, 0)"), "{}", file.text);
+    assert_eq!(completion_suffix(&file.text, "$JUNCTION"), "@PLACE(0, 0)", "{}", file.text);
 }
 
 #[test]
@@ -482,10 +492,7 @@ fn self_relative_place_in_definition_fails_after_application() {
 fn actual_solve_preserves_external_fixed_axes() {
     use rnl_cli::solve::{solve, SolveOptions};
     let original = include_str!("junction_completion_fixtures/no-existing-dot.sp");
-    for (selector, expected, forbidden) in [
-        ("@PLACE(2,0)", "$DOT @ATTACH %rt1", "$DOT @ATTACH %rt1 => @PLACE"),
-        ("@PLACE(x=2)", "$DOT @ATTACH %rt1 => @PLACE(y=0)", "$DOT @ATTACH %rt1 => @PLACE(2"),
-    ] {
+    for (selector, expected) in [("@PLACE(2,0)", ""), ("@PLACE(x=2)", "@PLACE(y=0)")] {
         let text =
             original.replace("{ {? ?p} @ALIGN(\"x\"); {? ?p} @ALIGN(\"y\") }", "{ {? ?p} @ALIGN(\"y\") }").replace(
                 "*   # @SELECT-USAGE $DOT => @SET-SYMBOL $DOT_SYMBOL;",
@@ -500,7 +507,6 @@ fn actual_solve_preserves_external_fixed_axes() {
         options.solver.run_limit = Some(rnl_solver::RunLimit::Work(5000));
         let result = solve(Path::new("main.sp"), &files, &options).expect("actual solver fixed axis");
         let record = &result.levels[0].record;
-        assert!(record.contains(expected), "{record}");
-        assert!(!record.contains(forbidden), "{record}");
+        assert_eq!(completion_suffix(record, "$DOT"), expected, "{record}");
     }
 }

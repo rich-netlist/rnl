@@ -98,3 +98,53 @@ fn line_time_cutoffs_replay_the_complete_file_and_skeleton_report() {
         assert_eq!(timed.levels[0].solved.report.skeleton, replay.levels[0].solved.report.skeleton);
     }
 }
+
+#[test]
+fn line_results_complete_configured_junctions_and_replay_the_written_file() {
+    let original = include_str!("junction_completion_fixtures/no-existing-dot.sp");
+    for offset in [0, 2] {
+        let source = if offset == 0 {
+            original.to_string()
+        } else {
+            original.replace(
+                "{ {? ?p} @ALIGN(\"x\"); {? ?p} @ALIGN(\"y\") }",
+                "{ ?p ? @DISTANCE(\"left-to-right\", exact=2); {? ?p} @ALIGN(\"y\") }",
+            )
+        };
+        let files = MemoryProvider::new().with("main.sp", &source);
+        let seed =
+            solve_with_clock(Path::new("main.sp"), &files, &options("layout=\"lines\",limit=\"seed\""), &StoppedClock)
+                .unwrap();
+        assert_eq!(seed.errors, 0, "{seed:?}");
+        assert!(seed.levels[0].solved.report.skeleton.is_some());
+        let file = seed.files.iter().find(|file| file.path == "main.sp").unwrap();
+        assert!(file.text.contains(&format!("=> @PLACE({offset}, 0)")), "{}", file.text);
+        let saved = MemoryProvider::new().with("main.sp", &file.text);
+        let read = rnl_cli::interpret_file(
+            Path::new("main.sp"),
+            None,
+            &saved,
+            &rnl_runtime::Options { std: false, generated: true, problems: true, ..Default::default() },
+        )
+        .unwrap();
+        assert!(read.model.levels[0].unplaced.is_empty(), "{:?}", read.model.levels[0].unplaced);
+        for seconds in [2000, 100000] {
+            let timed = solve_with_clock(
+                Path::new("main.sp"),
+                &files,
+                &options(&format!("layout=\"lines\",limit=\"time\",seconds={seconds}")),
+                &Ticks(Cell::new(0)),
+            )
+            .unwrap();
+            let work = timed.levels[0].solved.report.budget.unwrap().work;
+            let replay = solve_with_clock(
+                Path::new("main.sp"),
+                &files,
+                &options(&format!("layout=\"lines\",limit=\"work\",work={work}")),
+                &StoppedClock,
+            )
+            .unwrap();
+            assert_eq!(timed.files[0].text, replay.files[0].text, "offset {offset}, cutoff {seconds}");
+        }
+    }
+}
