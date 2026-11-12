@@ -101,7 +101,7 @@ fn check_counts_violations_and_fails_on_them() {
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert_eq!(out.status.code(), Some(1), "{stdout}");
     assert!(stdout.contains("violation ") && stdout.contains("RNL6003 violation-current-one-way"), "{stdout}");
-    assert!(stdout.ends_with("0 errors, 1 violations, 0 warnings, 2 hints\n"), "{stdout}");
+    assert!(stdout.ends_with("0 errors, 1 violation, 0 warnings, 2 hints\n"), "{stdout}");
 }
 
 #[test]

@@ -237,13 +237,27 @@ pub(crate) fn solve_exact_with(
         let mut nets: Vec<usize> = routing.wires.iter().map(|w| w.route).collect();
         nets.sort_unstable();
         nets.dedup();
-        notes.push(format!(
-            "{} and {} routed for the ROUTEs of {}, {} expanded",
-            count(routing.wires.len(), "wire"),
-            count(routing.branches.len(), "branch point"),
-            count(nets.len(), "net"),
-            count(usize::try_from(routing.expansions).unwrap_or(usize::MAX), "cell")
-        ));
+        if problem.version == "0.4" || problem.routes.iter().any(|route| route.tree) {
+            let mut names: Vec<_> = nets.iter().map(|&index| &problem.routes[index].net).collect();
+            names.sort_unstable();
+            names.dedup();
+            notes.push(format!(
+                "{} and {} routed for {} on {}, {} expanded",
+                count(routing.wires.len(), "wire"),
+                count(routing.branches.len(), "branch point"),
+                count(nets.len(), "routing tree"),
+                count(names.len(), "net"),
+                count(usize::try_from(routing.expansions).unwrap_or(usize::MAX), "cell")
+            ));
+        } else {
+            notes.push(format!(
+                "{} and {} routed for the ROUTEs of {}, {} expanded",
+                count(routing.wires.len(), "wire"),
+                count(routing.branches.len(), "branch point"),
+                count(nets.len(), "net"),
+                count(usize::try_from(routing.expansions).unwrap_or(usize::MAX), "cell")
+            ));
+        }
     }
     if !routing.forced.is_empty() {
         notes.push(format!(

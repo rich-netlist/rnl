@@ -116,6 +116,18 @@ fn graphic_point_count_is_valid(shape: Shape, count: usize) -> bool {
     }
 }
 
+fn graphic_point_count_message(kw: &str, shape: Shape, count: usize) -> String {
+    let expected = match shape {
+        Shape::Line => "at least 2 points",
+        Shape::Rectangle | Shape::Circle | Shape::Ellipse => "2 points",
+        Shape::Arc => "3 points",
+        Shape::Bezier => "4 points plus 3 for each additional segment",
+        Shape::Text => "1 point",
+    };
+    let actual = if count == 1 { "1 point is".to_string() } else { format!("{count} points are") };
+    format!("@{kw} needs {expected}, but {actual} written (9.2.5)")
+}
+
 /// Only literal, unbound points whose membership cannot be changed by another statement.
 fn definition_point_count(segment: &Segment) -> Option<usize> {
     fn point(arg: &crate::syntax::Arg) -> bool {
@@ -1487,6 +1499,16 @@ impl Interp<'_> {
         self.check_definition_callee(kw, segment, definition, ctx, scopes)
     }
 
+    pub(super) fn usage_role_count_message(&self, label: &str, roles: usize, objects: usize, ctx: &Ctx) -> String {
+        if self.follows_0_4(self.source_unit(ctx)) {
+            let role = if roles == 1 { "role" } else { "roles" };
+            let object = if objects == 1 { "object is" } else { "objects are" };
+            format!("the ordinary definition {label} has {roles} {role}, {objects} {object} written (9.4)")
+        } else {
+            format!("the ordinary definition {label} has {roles} roles, {objects} objects are written (9.4)")
+        }
+    }
+
     /// Infer only kinds fixed by the written object or a declared role and standard path.
     /// Custom sub-objects, collection indexing and aliases scoped to usages remain unknown.
     pub(super) fn definition_object_kinds(
@@ -1719,11 +1741,11 @@ impl Interp<'_> {
                         arg.start,
                     );
                 }
-                if !filled.insert(role) {
+                if !filled.insert(role.clone()) {
                     return self.fail(
                         ctx,
                         codes::KEYWORD_POSITION_LABELLED_TWICE,
-                        "a role is labelled only once (4.2 rule 6)",
+                        format!("role {role} is labelled more than once (4.2 rule 6)"),
                         arg.start,
                     );
                 }
@@ -1782,14 +1804,52 @@ impl Interp<'_> {
                 self.check_definition_slot_kind(kw, argument, slot, definition, ctx)?;
             }
         }
-        if segment.call.as_ref().unwrap().params.as_ref().is_none_or(|p| p.named.is_empty() && p.positional.is_empty())
-        {
-            if let Some(shape) = Shape::parse(kw).filter(|shape| *shape != Shape::Text) {
-                if definition_point_count(segment).is_some_and(|count| !graphic_point_count_is_valid(shape, count)) {
+        if let Some(shape) = Shape::parse(kw).filter(|shape| *shape != Shape::Text) {
+            // Style arguments never change the point count. Size placeholders can be
+            // absent in an application, so only their presence is deferred (9.2.5, 9.4).
+            let mut sizes = [None; 3]; // width, height, radius: absent, unknown, or fixed
+            if let Some(params) = &segment.call.as_ref().unwrap().params {
+                let mut record_size = |name: &str, value: &Value| {
+                    if let Some(index) = ["width", "height", "radius"].iter().position(|wanted| *wanted == name) {
+                        sizes[index] = Some(!matches!(value, Value::Hole(_)));
+                    }
+                };
+                if let Some(signature) = words().keyword(kw) {
+                    let version = self.version_of(Some(self.source_unit(ctx)));
+                    for (name, value) in signature.positional_in(&version).iter().zip(&params.positional) {
+                        record_size(name, value);
+                    }
+                }
+                for parameter in &params.named {
+                    let name =
+                        if parameter.quoted { parameter.name.clone() } else { self.word(&parameter.name, ctx.unit) };
+                    record_size(&name, &parameter.value);
+                }
+            }
+            let sized = match shape {
+                Shape::Rectangle | Shape::Ellipse => {
+                    if (sizes[0] == Some(true) && sizes[1].is_none()) || (sizes[1] == Some(true) && sizes[0].is_none())
+                    {
+                        return self.fail(
+                            ctx,
+                            codes::PARAM_GRAPHIC_WIDTH_HEIGHT,
+                            format!("write both width and height of @{kw} (9.2.5)"),
+                            segment.call.as_ref().unwrap().start,
+                        );
+                    }
+                    sizes[0].is_some() || sizes[1].is_some()
+                }
+                Shape::Circle => sizes[2].is_some(),
+                _ => false,
+            };
+            if !sized {
+                if let Some(count) =
+                    definition_point_count(segment).filter(|count| !graphic_point_count_is_valid(shape, *count))
+                {
                     return self.fail(
                         ctx,
                         codes::KEYWORD_GRAPHIC_POINT_COUNT,
-                        format!("@{kw} has the wrong number of points (9.2.5)"),
+                        graphic_point_count_message(kw, shape, count),
                         segment.start,
                     );
                 }
@@ -2027,11 +2087,7 @@ impl Interp<'_> {
                 return self.fail(
                     ctx,
                     codes::USAGE_TOO_MANY_OBJECTS,
-                    format!(
-                        "the ordinary definition {dlabel} has {} roles, {} objects are written (9.4)",
-                        d.roles.len(),
-                        objs.len()
-                    ),
+                    self.usage_role_count_message(&dlabel, d.roles.len(), objs.len(), ctx),
                     seg.start,
                 );
             }
@@ -2725,7 +2781,7 @@ impl Interp<'_> {
             _ => None,
         });
         if let Some(l) = label {
-            self.check_markup(l, ctx, seg);
+            self.check_markup(l, ctx, seg, "label");
         }
         let label_name_formats = label.is_some_and(|l| self.follows_0_4(l.unit.unwrap_or(self.source_unit(ctx))));
         let label = label.map(|l| l.as_str().to_string());
@@ -2917,7 +2973,11 @@ impl Interp<'_> {
             return self.fail(
                 ctx,
                 codes::KEYWORD_GRAPHIC_POINT_COUNT,
-                format!("@{kw} has the wrong number of points (9.2.5)"),
+                if self.follows_0_4(self.source_unit(ctx)) {
+                    graphic_point_count_message(kw, shape, n)
+                } else {
+                    format!("@{kw} has the wrong number of points (9.2.5)")
+                },
                 seg.start,
             );
         }
@@ -3049,7 +3109,7 @@ impl Interp<'_> {
         };
         let call_start = seg.call.as_ref().unwrap().start;
         if let Some(t) = &items.text {
-            self.check_markup(t, ctx, seg);
+            self.check_markup(t, ctx, seg, "text");
         }
         // the file the key is written in: its aliases decide what `::` finds first (13.3, 16.5)
         let key_unit = match &key {
@@ -3204,12 +3264,40 @@ impl Interp<'_> {
         }
     }
 
-    pub(crate) fn check_markup(&mut self, text: &WStr, ctx: &Ctx, seg: &Segment) {
-        let at = seg.call.as_ref().map(|c| c.start).unwrap_or(seg.start);
+    pub(crate) fn check_markup(&mut self, text: &WStr, ctx: &Ctx, seg: &Segment, parameter: &str) {
         let name_formats = self.follows_0_4(text.unit.unwrap_or(self.source_unit(ctx)));
-        for (code, msg) in crate::markup::problems_with_name_formats(text.as_str(), name_formats) {
+        let problems = crate::markup::problems_with_name_formats(text.as_str(), name_formats);
+        if problems.is_empty() {
+            return;
+        }
+        let fallback = seg.call.as_ref().map(|call| call.start).unwrap_or(seg.start);
+        let at = if self.follows_0_4(self.source_unit(ctx)) {
+            self.markup_value_offset(ctx, seg, parameter).unwrap_or(fallback)
+        } else {
+            fallback
+        };
+        for (code, msg) in problems {
             self.warn(ctx, code, format!("{msg} (13.6)"), at);
         }
+    }
+
+    fn markup_value_offset(&self, ctx: &Ctx, seg: &Segment, parameter: &str) -> Option<usize> {
+        let call = seg.call.as_ref()?;
+        let params = call.params.as_ref()?;
+        let record = &self.recs[ctx.rec?].text;
+        if let Some(field) = params.named.iter().find(|field| {
+            let name = if field.quoted { field.name.clone() } else { self.word(&field.name, ctx.unit) };
+            name == parameter
+        }) {
+            let offset = crate::syntax::named_value_offset(record, field)?;
+            return Some(offset + usize::from(matches!(field.value, Value::Str(_))));
+        }
+        let keyword = self.kw(&call.kw, ctx.unit);
+        let version = self.version_of(Some(self.source_unit(ctx)));
+        let index = words().keyword(&keyword)?.positional_in(&version).iter().position(|name| name == parameter)?;
+        let value = params.positional.get(index)?;
+        let offset = crate::syntax::positional_value_offset(record, params, index)?;
+        Some(offset + usize::from(matches!(value, Value::Str(_))))
     }
 
     fn kw_routing(&mut self, kw: &str, args: &[ArgV], seg: &Segment, ctx: &Ctx) -> R<(ObjId, bool)> {
@@ -3759,7 +3847,11 @@ impl Interp<'_> {
             self.warn(
                 ctx,
                 codes::SELECT_ROLE_WITHOUT_USAGE_SCOPE,
-                "role= means something only when the scope is a usage (K3.12)",
+                if self.follows_0_4(self.source_unit(ctx)) {
+                    format!("role= applies only to a usage scope; {} is not a usage (10.1)", self.label(scope))
+                } else {
+                    "role= means something only when the scope is a usage (K3.12)".to_string()
+                },
                 call.start,
             );
         }

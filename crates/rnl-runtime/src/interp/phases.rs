@@ -1121,11 +1121,15 @@ impl Interp<'_> {
             let loc = Loc::line(lv.file.clone(), lv.line.max(1));
             let shown: Vec<&String> = un.iter().take(12).collect();
             let more = if un.len() > 12 { ", …" } else { "" };
+            let description = if un.len() == 1 && self.follows_0_4(self.level_unit[self.scenes[s].level]) {
+                "1 object has no position and is left to a solver; it is not drawn".to_owned()
+            } else {
+                format!("{} objects have no position and are left to a solver; they are not drawn", un.len())
+            };
             self.sink.hint(
                 codes::UNPLACED_OBJECTS,
                 format!(
-                    "{title}: {} objects have no position and are left to a solver; they are not drawn: {}{more}",
-                    un.len(),
+                    "{title}: {description}: {}{more}",
                     shown.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ")
                 ),
                 Some(loc),

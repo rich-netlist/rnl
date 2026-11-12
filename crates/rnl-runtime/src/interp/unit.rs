@@ -2191,7 +2191,9 @@ impl Interp<'_> {
             }
         }
         if let (Some(pk), None) = (decl.pkg, &body) {
-            if is_alias_package(&self.units[pk]) && self.units[pk].header_kws.iter().any(|k| k == "ALIAS") {
+            if is_alias_package(&self.units[pk])
+                && (self.follows_0_4(self.use_writer(&decl)) || self.units[pk].header_kws.iter().any(|k| k == "ALIAS"))
+            {
                 self.diag_in(
                     Severity::Error,
                     codes::USE_PACKAGE_ALIAS_PACKAGE, format!("package {name} is an alias package; load it with @USE-ALIASES(name=\"{name}\") in the header record. This {what} fails (16.5)"),
@@ -2275,8 +2277,14 @@ impl Interp<'_> {
         let mut cand: Option<(String, String, String)> = None;
         if let Some(path) = &decl.path {
             let target = join(&base.unwrap_or_else(|| self.file_dir(decl.unit)), path);
+            let mut reason = format!("path={path:?} for {kind} {} cannot be read", decl.name);
             if let Some(text) = self.provider.read(&target) {
                 if let Some((n, v)) = scan_package_decl(&text) {
+                    let requested = decl.version.as_ref().map(|v| format!(" {v}")).unwrap_or_default();
+                    reason = format!(
+                        "path={path:?} declares {kind} {n} {v}, but this reference requests {}{requested}",
+                        decl.name
+                    );
                     if n == decl.name && version_ok(decl.version.as_deref(), &v, modern) {
                         if let Some(want) = &decl.version {
                             if *want != v {
@@ -2299,7 +2307,12 @@ impl Interp<'_> {
             if cand.is_none() {
                 self.diag_in(
                     Severity::Warning,
-                    codes::PACKAGE_PATH_NOT_FOUND, format!("the file named by path= does not exist or its @PACKAGE does not match; looking the package up by name ({sec})"),
+                    codes::PACKAGE_PATH_NOT_FOUND,
+                    if modern {
+                        format!("{reason}; looking up {kind} {} by name ({sec})", decl.name)
+                    } else {
+                        format!("the file named by path= does not exist or its @PACKAGE does not match; looking the package up by name ({sec})")
+                    },
                     Some(loc.clone()),
                     &pkg,
                 );

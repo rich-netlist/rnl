@@ -124,7 +124,7 @@ pub(crate) struct Params<'d> {
 pub(crate) type Note = (&'static str, Code, String, Option<Loc>);
 
 impl<'d> Params<'d> {
-    pub(crate) fn new(doc: &'d HostDocument, bind: Option<&'d Bind>) -> (Params<'d>, Vec<Note>) {
+    pub(crate) fn new(doc: &'d HostDocument, bind: Option<&'d Bind>, language: &str) -> (Params<'d>, Vec<Note>) {
         let mut notes = Vec::new();
         // the values the files set outside subcircuits are seen everywhere
         let globals = doc
@@ -136,7 +136,11 @@ impl<'d> Params<'d> {
         let bound = bind.and_then(|b| {
             let Some(lv) = doc.subckt_for(&b.subckt, doc.dialect.case_sensitive) else {
                 let message = format!("no subcircuit {} to bind parameters to", b.subckt);
-                notes.push(("warning", codes::VIEW_BIND_NO_SUBCKT, message, None));
+                // The binding is a tool setting, not a source statement. Anchor the missing
+                // target to the main document without inventing a declaration location.
+                let loc = rnl_runtime::interp::unit::keeps_0_4(language)
+                    .then(|| Loc::line(&doc.main().file, doc.main().line.max(1)));
+                notes.push(("warning", codes::VIEW_BIND_NO_SUBCKT, message, loc));
                 return None;
             };
             let level = &doc.levels[lv];

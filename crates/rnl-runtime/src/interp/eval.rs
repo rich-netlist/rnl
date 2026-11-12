@@ -2156,7 +2156,11 @@ impl<'p> Interp<'p> {
                     return self.fail(
                         ctx,
                         codes::KEYWORD_POSITION_LABELLED_TWICE,
-                        "a role is labelled only once (4.2 rule 6)",
+                        if self.follows_0_4(self.source_unit(ctx)) {
+                            format!("role {role} is labelled more than once (4.2 rule 6)")
+                        } else {
+                            "a role is labelled only once (4.2 rule 6)".to_string()
+                        },
                         a.off,
                     );
                 }

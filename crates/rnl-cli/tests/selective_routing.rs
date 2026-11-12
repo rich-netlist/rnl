@@ -416,6 +416,11 @@ fn independent_trees_solve_and_write_back_without_cross_tree_wires() {
     let solved = rnl_solver::solve(p, &rnl_solver::SolverOptions::without_time_limit());
     assert!(solved.report.errors.is_empty(), "{:?}", solved.report.errors);
     assert!(solved.report.unrouted.is_empty(), "{:?}", solved.report.unrouted);
+    assert!(
+        solved.report.notes.iter().any(|note| note.contains("2 routing trees on 1 net")),
+        "{:?}",
+        solved.report.notes
+    );
     let ids: std::collections::BTreeSet<_> = solved.solution.wires.iter().map(|wire| wire.route).collect();
     assert_eq!(ids, [0, 1].into_iter().collect());
     for wire in &solved.solution.wires {
@@ -544,4 +549,24 @@ fn a_fixed_route_error_omits_the_whole_statement_and_preserves_siblings() {
     );
     assert_eq!(r.model.levels[0].shapes.len(), 2);
     assert!(r.model.levels[0].texts.is_empty());
+}
+
+#[test]
+fn a_virtual_only_wire_marks_its_pins_but_not_the_host_net_wired() {
+    for (routing, nets, pins) in [("", 0, 2), ("{#R1 #R2} @ROUTE-OBJECT;", 1, 4)] {
+        let r = valid(&format!(
+            r#"
+            $V = @DEFINE(roles=[["n","net"]]) {{}};
+            $VS = @DEFINE-SYMBOL {{ %p=(0,0) @PIN(terminal="n") }};
+            %u = $V @ATTACH &a; %v = $V @ATTACH &a;
+            {{%u %v}} @SET-SYMBOL $VS;
+            &a @WIRE {{%u::p %v::p}}; {routing}
+            $Net = @DEFINE(roles=["x"]) {{}}; $Pin = @DEFINE(roles=["x"]) {{}};
+            # @SELECT-NET(wired=true) => @AS $Net;
+            # @SELECT-PIN(wired=true) => @AS $Pin
+        "#
+        ));
+        assert_eq!(usages(&r, "$Net"), nets);
+        assert_eq!(usages(&r, "$Pin"), pins);
+    }
 }

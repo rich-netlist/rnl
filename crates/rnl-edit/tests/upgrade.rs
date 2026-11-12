@@ -86,7 +86,7 @@ fn explicit_custom_packages_are_upgraded_with_the_group() {
     let files = MemoryProvider::new()
         .with("/w/top.sp", "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"custom\", path=\"custom.rnl\") }\n.end\n")
         .with("/w/custom.rnl", "@RNL(type=\"header\") { @VERSION(\"0.3\"); @PACKAGE(name=\"custom\", version=\"1.0\"); @USE-PACKAGE(name=\"nested\", path=\"nested.rnl\") }\n")
-        .with("/w/nested.rnl", "@RNL(type=\"header\") { @VERSION(\"0.2\"); @PACKAGE(name=\"nested\", version=\"1.0\") }\n");
+        .with("/w/nested.rnl", "@RNL(type=\"header\") { @VERSION(\"0.2\"); @PACKAGE(name=\"nested\", version=\"1.0\") }\n@RNL {}\n");
     let result = upgrade("/w/top.sp", &files, &options()).unwrap();
     assert_eq!(result.files.len(), 3);
     assert!(result.files["/w/custom.rnl"].contains("@VERSION(\"0.4\")"));

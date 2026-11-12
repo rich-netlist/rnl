@@ -57,6 +57,21 @@ fn stripping_generated_records_keeps_the_rest() {
 }
 
 #[test]
+fn generated_records_are_replaced_even_when_their_body_is_not_understood() {
+    let path = Path::new("opaque.sp");
+    let source="* opaque results\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\nR1 a b 1k\n* user comment\n* @RNL(type=\"generated\", author=\"unknown-tool\") {\n* @FUTURE-UNKNOWN(value=\"opaque\"); #R1 @PLACE(999,999)\n* }\n.end\n";
+    let provider = MemoryProvider::new().with("opaque.sp", source);
+    let mut sink = Sink::new();
+    let doc = read_host(path, None, &provider, &mut sink).unwrap();
+    let record = "@RNL(type=\"generated\", author=\"test\") { #R1 @PLACE(1,2) }";
+    let output = replace_generated(&doc, 0, source, record);
+    assert!(!output.contains("FUTURE-UNKNOWN") && !output.contains("unknown-tool") && !output.contains("999"));
+    assert_eq!(output.matches("type=\"generated\"").count(), 1);
+    assert!(output.contains(record) && output.contains("* user comment"));
+    assert_eq!(host_lines(&output), host_lines(source));
+}
+
+#[test]
 fn a_solver_record_written_back_reads_back() {
     let fs = FsProvider::new(&[]);
     let f = cases().into_iter().find(|p| p.ends_with("01-rc-lowpass.sp")).unwrap();

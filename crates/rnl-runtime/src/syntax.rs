@@ -631,7 +631,7 @@ impl Parser {
                     free_words: words,
                     written: HashMap::new(),
                 };
-                match check_member(&m) {
+                match check_member(&m, self.parameter_errors) {
                     Ok(()) => Some(m),
                     Err(e) => {
                         self.recover();
@@ -1574,7 +1574,7 @@ fn failed_member(id: NodeId, start: Off, end: Off, e: SyntaxErr, words: Vec<(Str
     }
 }
 
-fn check_member(m: &Member) -> PResult<()> {
+fn check_member(m: &Member, modern: bool) -> PResult<()> {
     let err = |code, msg: &str, pos| Err(SyntaxErr { code, msg: msg.into(), pos, expected: false });
     for (k, seg) in m.segments.iter().enumerate() {
         if k > 0 && seg.call.is_none() {
@@ -1614,15 +1614,75 @@ fn check_member(m: &Member) -> PResult<()> {
                 );
             }
         }
-        let mut roles: Vec<&String> = seg.args.iter().filter_map(|a| a.role.as_ref()).collect();
-        let n = roles.len();
-        roles.sort();
-        roles.dedup();
-        if roles.len() != n {
-            return err(codes::KEYWORD_POSITION_LABELLED_TWICE, "a role is labelled only once (4.2 rule 6)", seg.start);
+        if modern {
+            let mut seen = Vec::new();
+            for argument in &seg.args {
+                if let Some(role) = &argument.role {
+                    if seen.contains(&role) {
+                        return err(
+                            codes::KEYWORD_POSITION_LABELLED_TWICE,
+                            &format!("role {role} is labelled more than once (4.2 rule 6)"),
+                            argument.start,
+                        );
+                    }
+                    seen.push(role);
+                }
+            }
+        } else {
+            let mut roles: Vec<&String> = seg.args.iter().filter_map(|a| a.role.as_ref()).collect();
+            let n = roles.len();
+            roles.sort();
+            roles.dedup();
+            if roles.len() != n {
+                return err(
+                    codes::KEYWORD_POSITION_LABELLED_TWICE,
+                    "a role is labelled only once (4.2 rule 6)",
+                    seg.start,
+                );
+            }
         }
     }
     Ok(())
+}
+
+/// Locate a named parameter's value in the original record, using the same string and
+/// comment rules as the parser. Offsets count characters, including non-ASCII text.
+pub(crate) fn named_value_offset(text: &str, field: &Named) -> Option<Off> {
+    let mut parser = Parser::new(text, true);
+    parser.member_places = true;
+    parser.i = field.off;
+    if field.quoted {
+        parser.string().ok()?;
+    } else {
+        parser.name_word();
+    }
+    parser.skip_ws().ok()?;
+    if parser.peek() != Some('=') {
+        return None;
+    }
+    parser.i += 1;
+    parser.skip_ws().ok()?;
+    Some(parser.i)
+}
+
+/// Locate a positional value without splitting commas inside strings or arrays.
+pub(crate) fn positional_value_offset(text: &str, params: &Params, index: usize) -> Option<Off> {
+    if index >= params.positional.len() {
+        return None;
+    }
+    let mut parser = Parser::new(text, true);
+    parser.member_places = true;
+    parser.i = params.start + 1;
+    for _ in 0..index {
+        parser.value().ok()?;
+        parser.skip_ws().ok()?;
+        if parser.peek() != Some(',') {
+            return None;
+        }
+        parser.i += 1;
+    }
+    parser.skip_ws().ok()?;
+    Some(parser.i)
 }
 
 /// Parse one record; `text` starts with `@RNL` and ends with the matching `}`.
