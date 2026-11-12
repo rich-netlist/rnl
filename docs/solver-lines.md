@@ -12,7 +12,7 @@ The engine first builds group tables, then settles groups from the inside out, r
 
 An intermediate line arrangement may establish the required order before it satisfies an equality spanning several groups. Strict compaction retains such fixed bounds as mandatory constraints and solves them before accepting the candidate. Disjunctive facts still require a satisfied branch, which compaction retains. A failed or interrupted repair is rejected; completed coordinates are checked against every selected retained fact before ranking.
 
-Time and work limits cover the same sequence of positive-cost checkpoints. For these two modes the initial tree stage has a fixed local allowance of `40,000,000 × n² + 2,500,000,000 × n` work units, where `n = max(1, objects)`, with saturating 64-bit arithmetic. The allowance depends on the input, not the requested seconds or work. Local exhaustion ends the tree stage; global exhaustion ends optional search. This replaces a wall-clock percentage so that the total work reported by a time run reproduces that run. The allowance and weights belong to the solver's replay policy and must be versioned when changed.
+Time and work limits cover the same sequence of positive-cost checkpoints. For these two modes the initial tree stage has a fixed local allowance of `40,000,000 × n² + 2,500,000,000 × n` work units, where `n = max(1, drawing objects)`, with saturating 64-bit arithmetic. A drawing object has a symbol or text, or is an annotation. Bare points and symbol-free semantic usages still contribute to constraint-processing costs, but do not enlarge the tree's refinement allowance. This prevents additional semantic objects from taking work away from line search through a larger initialization allowance. The allowance depends on the input, not the requested seconds or work. Local exhaustion ends the tree stage; global exhaustion ends optional search. This replaces a wall-clock percentage so that the total work reported by a time run reproduces that run. The allowance and weights belong to the solver's replay policy and must be versioned when changed. The drawing-object sizing policy is part of standalone solver 0.4.1; work counts require the same solver version/build for replay.
 
 The first tree candidate is initialized under the shared budget before the local allowance limits subsequent improvements. Initialization is deducted from that allowance; when it already used the allowance, refinement is skipped. This prevents a small stage allowance from turning an otherwise feasible initial route into forced wires. The global time or work limit still interrupts initialization.
 
@@ -42,7 +42,7 @@ Every orientation trial pays its size-dependent listing cost before allocating g
 
 ## Cost calibration
 
-Standalone solver 0.4.0 uses the following fixed line-search coefficients. They supplement the shared model, pivot, structure and routing checkpoints; work units are a replay protocol, not elapsed nanoseconds.
+Standalone solver 0.4.0 introduced the following fixed line-search coefficients, retained in 0.4.1. They supplement the shared model, pivot, structure and routing checkpoints; work units are a replay protocol, not elapsed nanoseconds.
 
 | Operation | Fitted cost coefficient (ns) |
 | --- | ---: |

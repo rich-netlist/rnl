@@ -72,7 +72,15 @@ pub(crate) fn lay_out(
 // A versioned input-size policy, independent of the requested seconds or total work.
 // Optimized-build measurements and the replay contract are documented in solver-lines.md.
 fn tree_allowance(problem: &rnl_runtime::problem::LevelProblem) -> u64 {
-    tree_allowance_for_size(problem.objects.len() as u64)
+    // Semantic usage points still cost work in resolution and placement, but
+    // they add no drawing box for the tree to arrange. Counting them here can
+    // consume the line-search budget merely because more semantics were exported.
+    let drawing_objects = problem
+        .objects
+        .iter()
+        .filter(|o| o.symbol.is_some() || o.text.is_some() || o.kind == rnl_runtime::problem::ObjectKind::Annotation)
+        .count();
+    tree_allowance_for_size(drawing_objects as u64)
 }
 
 fn tree_allowance_for_size(objects: u64) -> u64 {
@@ -82,6 +90,29 @@ fn tree_allowance_for_size(objects: u64) -> u64 {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn semantic_points_do_not_enlarge_the_tree_refinement_allowance() {
+        use crate::resolve::tests::{instance, problem_of};
+        use rnl_runtime::problem::ObjectKind;
+
+        let mut p = problem_of(vec![instance(); 8], vec![]);
+        let allowance = super::tree_allowance(&p);
+        assert_eq!(allowance, super::tree_allowance_for_size(8));
+        let mut point = instance();
+        point.kind = ObjectKind::Usage;
+        point.symbol = None;
+        point.orient = None;
+        p.objects.extend(std::iter::repeat_n(point.clone(), 64));
+        point.kind = ObjectKind::Point;
+        p.objects.push(point);
+        assert_eq!(super::tree_allowance(&p), allowance);
+
+        // Attaching a drawing to a usage and adding an annotation each count.
+        p.objects[8].symbol = Some(0);
+        p.objects[9].kind = ObjectKind::Annotation;
+        assert_eq!(super::tree_allowance(&p), super::tree_allowance_for_size(10));
+    }
+
     #[test]
     fn tree_phase_work_policy_is_fixed_and_saturates_without_wrapping() {
         for (objects, expected) in [
