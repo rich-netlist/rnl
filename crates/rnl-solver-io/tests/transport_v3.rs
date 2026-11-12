@@ -40,9 +40,11 @@ fn version_three_rejects_old_transport_and_validates_fatal_wire() {
     assert_eq!(value["version"], 3);
     value["version"] = serde_json::json!(2);
     assert!(decode_input(&value).is_err());
-    let mut report = rnl_solver::SolveReport::default();
-    report.fatal_written_wire = Some(0);
-    report.errors.push("unevaluable wire".into());
+    let report = rnl_solver::SolveReport {
+        fatal_written_wire: Some(0),
+        errors: vec!["unevaluable wire".into()],
+        ..Default::default()
+    };
     let document = ResultDocument {
         solver: SolverIdentity { name: "test".into(), version: "1".into() },
         levels: vec![LevelResult {
@@ -56,9 +58,9 @@ fn version_three_rejects_old_transport_and_validates_fatal_wire() {
     };
     let mut value = encode_result(&document).unwrap();
     assert_eq!(value["version"], 3);
-    assert_eq!(decode_result(&value, &[p.clone()]).unwrap(), document);
+    assert_eq!(decode_result(&value, std::slice::from_ref(&p)).unwrap(), document);
     value["levels"][0]["report"]["fatal_written_wire"] = serde_json::json!(p.wires.len());
-    assert!(decode_result(&value, &[p.clone()]).is_err());
+    assert!(decode_result(&value, std::slice::from_ref(&p)).is_err());
     value["version"] = serde_json::json!(2);
     assert!(decode_result(&value, &[p]).is_err());
 }

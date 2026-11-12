@@ -135,6 +135,20 @@ pub(crate) fn decode(n: Node<'_>) -> Result<SolveReport> {
     })
 }
 
+fn budget(n: Node<'_>) -> Result<BudgetReport> {
+    Ok(BudgetReport {
+        limit: limit(n.field("limit")?)?,
+        work: n.field("work")?.uint()?,
+        reason: match n.field("reason")?.string()? {
+            "complete" => StopReason::Complete,
+            "time" => StopReason::Time,
+            "work" => StopReason::Work,
+            "safety" => StopReason::Safety,
+            _ => return Err(n.field("reason")?.error("unknown stop reason")),
+        },
+    })
+}
+
 #[cfg(test)]
 mod fatal_tests {
     use super::*;
@@ -153,18 +167,4 @@ mod fatal_tests {
         value["fatal_written_wire"] = json!("7");
         assert!(decode(Node::root(&value)).is_err());
     }
-}
-
-fn budget(n: Node<'_>) -> Result<BudgetReport> {
-    Ok(BudgetReport {
-        limit: limit(n.field("limit")?)?,
-        work: n.field("work")?.uint()?,
-        reason: match n.field("reason")?.string()? {
-            "complete" => StopReason::Complete,
-            "time" => StopReason::Time,
-            "work" => StopReason::Work,
-            "safety" => StopReason::Safety,
-            _ => return Err(n.field("reason")?.error("unknown stop reason")),
-        },
-    })
 }
