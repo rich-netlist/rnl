@@ -310,6 +310,52 @@ pub struct PrimParams {
     pub arrow: Option<String>,
 }
 
+/// The source of a compound ANNOTATION (13.5). A definition is inspected as a template;
+/// it is never applied merely to draw an annotation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AnnotationSource {
+    Symbol(ObjId),
+    Definition(ObjId),
+    Usage(ObjId),
+}
+
+/// An independently movable anchor, or the position of an object that the annotation follows.
+/// `Independent` is a fresh point seeded from the written literal, not that literal's handle.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AnnotationAnchor {
+    Independent(ObjId),
+    Follow(ObjId),
+}
+
+/// One annotation and its eligible, ordered local graphics. The contents are filled only after
+/// symbols have been assigned when its source is a usage. Pins, box and child usages are absent.
+#[derive(Clone, Debug)]
+pub struct AnnotationData {
+    pub anchor: AnnotationAnchor,
+    pub source: AnnotationSource,
+    pub params: Vec<(String, Option<Lit>)>,
+    pub rotate: f64,
+    pub mirror: bool,
+    pub style: StyleMap,
+    pub prims: Vec<SymPrim>,
+    pub labels: Vec<SymLabel>,
+    /// Shared written order of eligible graphics and labels.
+    pub drawing_order: Vec<AnnotationPart>,
+    pub order: Pos,
+    pub generated: bool,
+    pub resolved: bool,
+    pub failed: bool,
+    pub site: Option<Rc<Ctx>>,
+    pub off: usize,
+}
+
+/// An eligible symbol member in its original drawing order.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AnnotationPart {
+    Prim(usize),
+    Label(usize),
+}
+
 /// A label written in a symbol body on the bare `?` (13.3).
 #[derive(Clone, Debug)]
 pub struct SymLabel {
@@ -340,6 +386,8 @@ pub struct SymbolDef {
     pub prim_order: Vec<usize>,
     pub usage_order: Vec<usize>,
     pub labels: Vec<SymLabel>,
+    /// Order for ANNOTATION; the existing symbol rendering order remains unchanged.
+    pub annotation_order: Vec<AnnotationPart>,
     /// Usages drawn in the symbol (9.2.7).
     pub usages: Vec<ObjId>,
     pub bbox: Option<[f64; 4]>,
@@ -350,7 +398,15 @@ pub struct SymbolDef {
 impl SymbolDef {
     pub fn push_prim(&mut self, prim: SymPrim) {
         self.prim_order.push(self.prims.len() + self.usages.len());
+        self.annotation_order.push(AnnotationPart::Prim(self.prims.len()));
         self.prims.push(prim);
+    }
+
+    pub fn push_label(&mut self, label: SymLabel) -> usize {
+        let index = self.labels.len();
+        self.annotation_order.push(AnnotationPart::Label(index));
+        self.labels.push(label);
+        index
     }
 
     pub fn push_usage(&mut self, usage: ObjId) {
@@ -714,6 +770,8 @@ pub enum ObjData {
         style: StyleMap,
         site: Option<Rc<Ctx>>,
     },
+    /// One non-electrical compound annotation, independent of its graphics count.
+    Annotation(Box<AnnotationData>),
     Prim {
         shape: Shape,
         points: Vec<ObjId>,

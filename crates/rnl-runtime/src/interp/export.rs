@@ -87,6 +87,14 @@ impl Interp<'_> {
                 objs.push((a, ObjectKind::Usage));
             }
         }
+        let annotations: Vec<ObjId> = self.scenes[s]
+            .prims
+            .iter()
+            .copied()
+            .filter(|&o| {
+                matches!(self.o(o), ObjData::Annotation(_)) && !self.is_obj_failed(o) && !self.drawing_ignored(s, o)
+            })
+            .collect();
         let mut points = self.scenes[s].points.clone();
         points.retain(|p| !self.is_failed(*p));
         points.sort();
@@ -121,6 +129,16 @@ impl Interp<'_> {
         for (name, o) in &names {
             ix.refs.entry(*o).or_insert_with(|| Reference::Name(format!("%{}", written_name(name))));
         }
+        // An independent anchor is addressable through a named annotation, not an invented name.
+        for (name, object) in &names {
+            if let ObjData::Annotation(data) = self.o(*object) {
+                if let AnnotationAnchor::Independent(point) = data.anchor {
+                    ix.refs
+                        .entry(point)
+                        .or_insert_with(|| Reference::Name(format!("%{}::position", written_name(name))));
+                }
+            }
+        }
         let mut numbers: Vec<(ObjId, usize)> = self.problem_numbers(s).into_iter().collect();
         numbers.sort();
         let by_number: HashMap<usize, ObjId> = numbers.iter().map(|&(o, n)| (n, o)).collect();
@@ -147,6 +165,29 @@ impl Interp<'_> {
             for (name, o) in &u.locals {
                 ix.refs.entry(*o).or_insert_with(|| r.then(&format!("::{}", written_name(name))));
             }
+        }
+
+        // Resolve annotation anchors after the real point/owner indices exist. A failure stays
+        // explicit in AnnotationInfo and does not manufacture an independently placeable point.
+        let mut annotation_anchors = HashMap::new();
+        let mut annotation_templates = Vec::new();
+        for id in annotations {
+            let ObjData::Annotation(data) = self.o(id).clone() else { continue };
+            let anchor = match data.anchor {
+                AnnotationAnchor::Independent(o) | AnnotationAnchor::Follow(o) => o,
+            };
+            let point = self.point_ref(s, &ix, anchor);
+            let Some(view) = self.annotation_template_view(s, id) else { continue };
+            let object = if let Some(point) = point {
+                let index = objs.len();
+                ix.objects.insert(id, index);
+                objs.push((id, ObjectKind::Annotation));
+                annotation_anchors.insert(id, point);
+                Some(index)
+            } else {
+                None
+            };
+            annotation_templates.push(AnnotationInfo { object, view });
         }
 
         // symbols, in the order the objects first use them
@@ -214,7 +255,7 @@ impl Interp<'_> {
             };
             let own = Position::Own { x: slot(Axis::X), y: slot(Axis::Y) };
             let orient = match kind {
-                ObjectKind::Point | ObjectKind::Text => None,
+                ObjectKind::Point | ObjectKind::Text | ObjectKind::Annotation => None,
                 ObjectKind::Usage if object_symbol[k].is_none() => None,
                 _ => Some(match first_orient.get(&k) {
                     Some(&(code, fact)) => OrientSlot::Fixed { code, fact },
@@ -230,6 +271,10 @@ impl Interp<'_> {
                 _ => ix.refs.get(o).cloned().unwrap_or(Reference::Anonymous),
             };
             match kind {
+                ObjectKind::Annotation => {
+                    // Only successfully mapped annotations were inserted into objs above.
+                    position = Position::At(annotation_anchors[o].clone());
+                }
                 ObjectKind::Usage => {
                     usage = ix.usages.get(o).copied();
                     if self.at_point(*o) {
@@ -478,7 +523,7 @@ impl Interp<'_> {
                         _ => Vec::new(),
                     };
                 }
-                ObjectKind::Point => {}
+                ObjectKind::Point | ObjectKind::Annotation => {}
             }
             let mut at: Vec<usize> = on.iter().filter_map(|n| net_at.get(n).copied()).collect();
             at.sort_unstable();
@@ -564,9 +609,52 @@ impl Interp<'_> {
         let object_ids: Vec<ObjId> = objs.iter().map(|(o, _)| *o).collect();
         let ids = self.problem_ids(s, &object_ids, &usages);
         let solver_config = self.solver_config_for(s);
-        let junction = self.junction_with_tools_for(s, &solver_config).0;
+        let (junction, definition) = self.junction_with_tools_for(s, &solver_config);
+        let mut existing_junctions = Vec::new();
+        if self.follows_0_4(self.level_unit[lv]) {
+            let replaced_records = self.solver_records(s);
+            for &a in &usages {
+                let mut root = a;
+                let mut chain = Vec::new();
+                while let Some(parent) = self.usage(root).parent {
+                    chain.push(parent);
+                    root = parent;
+                }
+                chain.reverse();
+                if self
+                    .usage(root)
+                    .site
+                    .as_ref()
+                    .and_then(|ctx| ctx.rec)
+                    .is_some_and(|rec| replaced_records.contains(&rec))
+                {
+                    continue;
+                }
+                let u = self.usage(a);
+                if Some(u.definition) != definition
+                    || self.eff_priority(s, u.priority, &chain, Some(a)) == Priority::Disabled
+                    || self.drawing_ignored(s, a)
+                {
+                    continue;
+                }
+                let role = u.roles.first().map(|(_, r)| *r);
+                if let Some(role) = role {
+                    for obj in self.flatten(s, role, 7, None) {
+                        if let Some(point) = self.point_ref(s, &ix, obj) {
+                            if let Some(key) = junction_point_identity(&point) {
+                                if !existing_junctions.iter().any(|p| junction_point_identity(p) == Some(key)) {
+                                    existing_junctions.push(point);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
         let problem = LevelProblem {
+            annotations: annotation_templates,
             junction,
+            existing_junctions,
             solver_config,
             level: lv,
             title: level.title(),
@@ -875,6 +963,12 @@ impl Interp<'_> {
                 } else {
                     self.point_ref(s, ix, value)
                 }
+            }
+            ObjData::Annotation(data) => {
+                let anchor = match data.anchor {
+                    AnnotationAnchor::Independent(o) | AnnotationAnchor::Follow(o) => o,
+                };
+                self.point_ref(s, ix, anchor)
             }
             ObjData::ScenePin { owner, index } => self.symbol_pin_ref(s, ix, owner, index),
             ObjData::Inst { bundle: Some(b), .. } => Some(PointRef::Origin(*ix.objects.get(&b)?)),

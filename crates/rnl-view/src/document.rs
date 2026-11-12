@@ -1094,6 +1094,31 @@ impl<'a> Index<'a> {
                 name: None,
             });
         }
+        // A compound annotation is one selectable object. Hidden text produces no primitive,
+        // so it contributes neither geometry nor a hit region.
+        let annotation_prims = rnl_render::primitives(lv, &render);
+        for annotation in &lv.annotations {
+            let mut bounds = None::<[f64; 4]>;
+            for primitive in annotation_prims.iter().filter(|p| p.owner == annotation.object_id) {
+                let b = primitive.bbox;
+                bounds = Some(match bounds {
+                    None => b,
+                    Some(a) => [a[0].min(b[0]), a[1].min(b[1]), a[2].max(b[2]), a[3].max(b[3])],
+                });
+            }
+            if let Some([x0, y0, x1, y1]) = bounds {
+                let object = self.usage_of_kind(lv.level, &annotation.object_id, "annotation");
+                hits.push(Hit {
+                    pin: None,
+                    kind: "box",
+                    points: vec![px((x0, y1)), px((x1, y0))],
+                    origin: Some(px(annotation.anchor)),
+                    objects: vec![object],
+                    id: Some(annotation.object_id.clone()),
+                    name: None,
+                });
+            }
+        }
         // a flyline stands for its nets, as a wire does
         for (k, f) in lv.flylines.iter().enumerate().filter(|_| render.flylines) {
             hits.push(Hit {

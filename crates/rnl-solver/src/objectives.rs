@@ -830,7 +830,7 @@ fn proper_crossing(a: &[Q; 2], b: &[Q; 2], c: &[Q; 2], d: &[Q; 2]) -> bool {
 /// The envelope of the components' boxes: x1, y1, x2, y2; none without a component.
 fn envelope(view: &View) -> Option<[Q; 4]> {
     let mut out: Option<[Q; 4]> = None;
-    for k in view.s.components() {
+    for k in view.s.components().chain(view.s.annotation_views.keys().copied()) {
         let Some(b) = view.bbox(k) else { continue };
         out = Some(match out {
             None => b,

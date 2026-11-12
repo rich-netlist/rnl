@@ -40,6 +40,7 @@ use crate::structure::Structure;
 pub(crate) struct Entry {
     /// None means scoreable; Some identifies an unevaluable written wire.
     pub written_path_error: Option<usize>,
+    pub annotation_error: Option<crate::annotation::AnnotationError>,
     /// The pairs of symbols that overlap.
     pub overlaps: usize,
     /// What crowds the drawing ([`crowding`]): the gaps between neighbours left out, and the texts
@@ -211,8 +212,10 @@ pub(crate) fn measured_layers(
             &written
         }
     };
+    let annotation_overlaps = crate::annotation::overlaps(problem, s, &placed.geometry, &placed.origins)
+        .expect("candidate annotation bounds validated");
     let drawing = Drawing {
-        overlaps: placed.overlaps.len(),
+        overlaps: placed.overlaps.len() + annotation_overlaps,
         crowding: crowding(s, &placed.origins, &placed.geometry.orient, &placed.dropped),
         misleading: misleading(problem, s, &placed.origins, &placed.geometry, wires),
         wire_over_symbol: wire_over_symbol(problem, s, &placed.origins, &placed.geometry, wires),
@@ -339,8 +342,11 @@ fn through(bx: &[Q; 4], a: &[Q; 2], b: &[Q; 2]) -> bool {
 /// crowding, then the fewest places where the wires mislead, then the fewest joins left undone,
 /// then the layers within their tolerances, then the code.
 pub(crate) fn order(active: &Active, entries: &[Entry]) -> Vec<usize> {
-    let valid: Vec<usize> =
-        entries.iter().enumerate().filter_map(|(i, e)| e.written_path_error.is_none().then_some(i)).collect();
+    let valid: Vec<usize> = entries
+        .iter()
+        .enumerate()
+        .filter_map(|(i, e)| (e.written_path_error.is_none() && e.annotation_error.is_none()).then_some(i))
+        .collect();
     if valid.len() != entries.len() {
         let mut result = if valid.is_empty() {
             Vec::new()
@@ -348,7 +354,10 @@ pub(crate) fn order(active: &Active, entries: &[Entry]) -> Vec<usize> {
             let subset: Vec<Entry> = valid.iter().map(|&i| entries[i].clone()).collect();
             order(active, &subset).into_iter().map(|i| valid[i]).collect()
         };
-        result.extend((0..entries.len()).filter(|&i| entries[i].written_path_error.is_some()));
+        result.extend(
+            (0..entries.len())
+                .filter(|&i| entries[i].written_path_error.is_some() || entries[i].annotation_error.is_some()),
+        );
         return result;
     }
     if active.configured_only {
@@ -455,6 +464,7 @@ mod tests {
     fn entry(overlaps: usize, joins_left: usize, layers: &[i64], code: u32) -> Entry {
         Entry {
             written_path_error: None,
+            annotation_error: None,
             overlaps,
             crowding: 0,
             misleading: 0,

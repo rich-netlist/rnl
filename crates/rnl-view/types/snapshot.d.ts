@@ -331,6 +331,10 @@ export type LevelModel = {
    */
   shapes: Array<ShapeView>,
   /**
+   * Compound annotations retain their identity and local graphics.
+   */
+  annotations?: Array<AnnotationView>,
+  /**
    * The sets marked with GROUP (11.5), in the order of writing; only for a level that has some.
    */
   groups?: Array<GroupView>,
@@ -667,3 +671,7 @@ export type ShapeView = {
    */
   layer: string,
 };
+
+export type AnnotationView = { id: string, source_kind: string, source: string, anchor_kind: string, anchor_object: string | null, anchor: [number, number], rotate: number, mirror: boolean, style: Record<string, string | number | boolean>, layer: string, graphics: Array<AnnotationGraphic> };
+
+export type AnnotationGraphic = { shape: string, points: Array<[number, number]>, params: Record<string, string | number>, style: Record<string, string | number | boolean>, lines: Array<Array<Run>>, text: string | null, text_refs: Array<string>, halign: string | null, valign: string | null, rotate: number | null, fix_rotate: boolean, upright: boolean | null };

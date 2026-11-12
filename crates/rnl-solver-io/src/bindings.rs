@@ -81,6 +81,9 @@ impl Bindings {
                 out.point(p, r);
             }
         }
+        for point in &p.existing_junctions {
+            out.point(p, point);
+        }
         for current in &p.currents {
             out.point(p, &current.pin);
         }

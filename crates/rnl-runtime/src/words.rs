@@ -206,6 +206,8 @@ pub struct KeywordSig {
     /// AS: "last"; ATTACH: "first" (4.2 rule 7).
     pub definition_at: Option<String>,
     pub params: ParamsSpec,
+    /// Takes named parameters declared by the source definition (13.5) or usage (9.4).
+    pub definition_params: bool,
     /// The parameters that may be written by position, in order (4.2 rule 9).
     pub positional: Vec<String>,
     /// Groups of parameters of which each needs at least one written (4.2), such as DISTANCE's
@@ -646,6 +648,10 @@ fn keyword(name: &str, spec: &Value) -> Result<KeywordSig, String> {
         where_: list("where"),
         positions,
         definition_at: str_of(spec.get("definition_at")),
+        definition_params: spec
+            .get("definition_params")
+            .and_then(Value::as_bool)
+            .unwrap_or(matches!(params, ParamsSpec::Definition)),
         params,
         positional: list("positional"),
         // one group written as a list of names, or several as a list of lists

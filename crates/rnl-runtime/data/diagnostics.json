@@ -4904,7 +4904,9 @@
    "name": "auto-wire-geometry-limit",
    "severity": "error",
    "message": "the default auto wire path exceeds this implementation's finite geometry limits (13.1)",
-   "sections": ["13.1"]
+   "sections": [
+    "13.1"
+   ]
   },
   {
    "number": "RNL9500",
@@ -5221,6 +5223,51 @@
    "message": "UNROUTE removes {removed} of {total} pins from this {route} tree on {net} (13.7)",
    "sections": [
     "13.7"
+   ]
+  },
+  {
+   "number": "RNL4416",
+   "name": "annotation-source-wrong-kind",
+   "severity": "error",
+   "message": "ANNOTATION source must be a symbol, general definition, or usage (13.5)",
+   "sections": [
+    "13.5"
+   ]
+  },
+  {
+   "number": "RNL4417",
+   "name": "annotation-graphic-nonliteral",
+   "severity": "hint",
+   "message": "a graphic depending on another object is omitted from the annotation (13.5)",
+   "sections": [
+    "13.5"
+   ]
+  },
+  {
+   "number": "RNL4418",
+   "name": "annotation-source-empty",
+   "severity": "warning",
+   "message": "the annotation source has no graphic to draw (13.5)",
+   "sections": [
+    "13.5"
+   ]
+  },
+  {
+   "number": "RNL4419",
+   "name": "annotation-anchor-wrong-kind",
+   "severity": "error",
+   "message": "ANNOTATION requires a locatable anchor (13.5)",
+   "sections": [
+    "13.5"
+   ]
+  },
+  {
+   "number": "RNL4420",
+   "name": "annotation-parameter-shadowed",
+   "severity": "hint",
+   "message": "the ANNOTATION parameter takes precedence over the source parameter (13.5)",
+   "sections": [
+    "13.5"
    ]
   }
  ]

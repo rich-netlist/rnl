@@ -591,6 +591,7 @@ pub(crate) enum Source {
 /// The structure of a level.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Structure {
+    pub annotation_views: BTreeMap<usize, (usize, rnl_runtime::model::AnnotationView)>,
     pub pin_pairs: Vec<PinOrientations>,
     pub pinned: BTreeMap<usize, (PinKey, usize)>,
     pub pin_texts: BTreeMap<PinKey, Vec<[Q; 4]>>,
@@ -810,6 +811,12 @@ impl Structure {
 
     /// Where an object's box is.
     pub(crate) fn box_at(&self, at: &[[Q; 2]], orient: &[Orient], k: usize) -> Option<[Q; 4]> {
+        if let Some((index, view)) = self.annotation_views.get(&k) {
+            let origin = at.get(k)?;
+            // The candidate's mandatory annotation validation reports Err rather than accepting
+            // the absent box. Empty geometry is the only successful None.
+            return crate::annotation::bounds_at(view, &origin[0], &origin[1], *index).ok().flatten();
+        }
         let b = self.box_offset(k, orient[k])?;
         Some([&at[k][0] + &b[0], &at[k][1] + &b[1], &at[k][0] + &b[2], &at[k][1] + &b[3]])
     }
@@ -1041,6 +1048,12 @@ pub(crate) fn analyse(
         }
     }
     let mut s = Structure {
+        annotation_views: problem
+            .annotations
+            .iter()
+            .enumerate()
+            .filter_map(|(i, a)| a.object.map(|k| (k, (i, a.view.clone()))))
+            .collect(),
         pin_pairs,
         pinned,
         pin_texts,
@@ -1413,6 +1426,7 @@ fn object_infos(problem: &LevelProblem, model: &Model, kept: &[usize]) -> Vec<Ob
             let own = matches!(o.position, Position::Own { .. });
             let role = match (o.kind, hang(problem, k)) {
                 (ObjectKind::Point, _) => Role::Point,
+                (ObjectKind::Annotation, _) => Role::Other,
                 (ObjectKind::Text, _) => Role::Text,
                 (ObjectKind::Usage, Some(Hang::Below)) => Role::Ground,
                 (ObjectKind::Usage, Some(Hang::Above)) => Role::Supply,

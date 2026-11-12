@@ -1,6 +1,6 @@
 # Independent solver protocol
 
-The `rnl-solver-io` library encodes an independent solver's decisions as JSON and validates them against the original `LevelProblem` before writeback. Protocol version 3 is independent of the solver executable's version.
+The `rnl-solver-io` library encodes an independent solver's decisions as JSON and validates them against the original `LevelProblem` before writeback. Protocol version 4 is independent of the solver executable's version.
 
 The `rnl-solver` executable has its own version, currently `0.3.0`. It reads one input JSON document from stdin (or an explicit file) and writes one result document to stdout. Diagnostics go to stderr. Viewers continue using the solver library. Its opt-in [skeleton experiment](solver-skeleton.md) uses the same result protocol.
 
@@ -20,7 +20,7 @@ The host invokes the external program for each level as it reads after earlier i
 
 ## Input envelope
 
-An input has `format: "rnl-solver-input"`, `version: 3`, and a `levels` array. Each entry contains:
+An input has `format: "rnl-solver-input"`, `version: 4`, and a `levels` array. Each entry contains:
 
 - `request`: its zero-based array ordinal.
 - `input`: the original problem's input digest.
@@ -31,6 +31,10 @@ Preserving explicit overrides is necessary: an explicit zero can override a nonz
 
 Every authored wire carries a required `default_auto` boolean. It is true only for auto mode from a 0.4 WIRE or effective rewrite, independently of the containing level's version; true with another mode is rejected. Text carries optional `upright`, defaulting to true, in addition to its angle and `fix_rotate`. Hidden text retains its content and style for evaluation but contributes no drawing or collision space.
 
+Every problem also carries required `annotations` and `existing_junctions` arrays, including when empty. An annotation retains its source and anchor identity, local graphics, style, arbitrary rotation and mirror, and dynamic coordinate text. Its nullable `object` indexes the corresponding non-electrical annotation object; null identifies a valid annotation whose anchor could not be mapped, not an empty obstacle. The annotation object follows its actual anchor through `position` and has no independent orientation or electrical pins. Solvers must evaluate its visible bounds at candidate positions and account for them in placement and routing.
+
+Existing junctions identify points already carrying an effective use of the configured junction definition. Definition and point identity determine reuse; matching names or coordinates alone do not. Solvers reuse those anchors and avoid adding duplicate junction usages.
+
 Every route carries a required `tree` boolean. A resolved tree retains its own members even when another route names the same net, including when newer content appears in an older drawing level. A missing flag is an error rather than an implicit whole-net request.
 
 JSON numbers are parsed from their decimal spelling without an intermediate lossy conversion. Work counters remain integers; finite floating-point values, including negative zero, round-trip exactly. Protocol decoding has explicit nesting limits and does not change the ordinary CLI or Viewer JSON number parser.
@@ -40,7 +44,7 @@ JSON numbers are parsed from their decimal spelling without an intermediate loss
 ```json
 {
   "format": "rnl-solver-result",
-  "version": 3,
+  "version": 4,
   "solver": { "name": "example-solver", "version": "1.0.0" },
   "levels": [
     {
@@ -104,11 +108,12 @@ The runtime writes against the original problem. Result messages do not select o
 - Kept, failed and discarded fact indices, conflict groups, and complete/undecided flags.
 - Statement hints, including source positions, usage chains and optional point identities.
 - Unrouted trees and inert objectives.
+- Optional `fatal_annotation`: an index in the problem's `annotations` array whose anchor or graphics could not be evaluated.
 - Optional `fatal_written_wire`: an authored wire index whose default geometry could not be evaluated.
 - All four work counters, the shared budget limit, admitted work and stop reason.
 - Canonical replay settings, errors, warnings and notes.
 
-A `fatal_written_wire` result must carry an error. Its index is checked against the original problem. The embedded solver returns an empty solution for this failure. The host preserves that level's existing generated records and skips writeback; ordinary reported constraint errors can still accompany usable decisions.
+A `fatal_written_wire` or `fatal_annotation` result must carry an error. Its index is checked against the original problem. The embedded solver returns an empty solution for this failure. The host preserves that level's existing generated records and skips writeback; ordinary reported constraint errors can still accompany usable decisions.
 
 Integer work counters remain JSON integers and must be read without converting through floating-point values. Index checks and classification consistency are validated; conflict minimality and the solver's proof claims are the solver's responsibility. Time, work, seed and unlimited limits remain distinct, as do complete, time, work and safety stop reasons.
 
@@ -124,4 +129,8 @@ Version 2 requires group `identity`, `first` and `direct` fields. These preserve
 
 ## Version 3
 
-Version 3 adds source-version auto-wire semantics, arbitrary text angles and upright glyph layout, and fatal written-wire reporting. Version 2 executables cannot reproduce these decisions safely. Input and result decoders require version 3; upgrade the independent executable and its caller together. Result decision arrays retain their previous shapes.
+Version 3 adds source-version auto-wire semantics, arbitrary text angles and upright glyph layout, and fatal written-wire reporting. Version 2 executables cannot reproduce these decisions safely. Version 3 required the independent executable and its caller to be upgraded together. Result decision arrays retain their previous shapes.
+
+## Version 4
+
+Version 4 adds annotations, existing-junction identity, and fatal annotation reporting. Version 3 programs could silently ignore these fields in some inputs and cannot safely process them. Input and result decoders require version 4; upgrade the independent executable and its caller together. The five result decision arrays retain their previous shapes.

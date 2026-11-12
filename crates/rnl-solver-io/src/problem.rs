@@ -12,6 +12,8 @@ use serde_json::{json, Value};
 pub fn encode_problem(p: &LevelProblem) -> Result<Value> {
     crate::validate::problem(p)?;
     let value = json!({
+        "existing_junctions":p.existing_junctions.iter().map(point_value).collect::<Vec<_>>(),
+        "annotations":p.annotations.iter().map(crate::annotation::value).collect::<Vec<_>>(),
         "junction":data::junction_value(&p.junction),"solver_config":p.solver_config.iter().map(data::setting_value).collect::<Vec<_>>(),
         "level":p.level,"title":p.title,"kind":p.kind,"name":p.name,"version":p.version,"authored_numbers":p.authored_numbers,
         "file":p.file,"line":p.line,"end_line":p.end_line,"packages":p.packages,"names":p.names,
@@ -43,7 +45,9 @@ pub fn decode_problem(value: &Value) -> Result<LevelProblem> {
     };
     let ids = n.field("ids")?;
     let p = LevelProblem {
+        annotations: n.field("annotations")?.list(crate::annotation::decode)?,
         junction: data::junction(n.field("junction")?, 0)?,
+        existing_junctions: n.field("existing_junctions")?.list(|n| point(n, 0))?,
         solver_config: n.field("solver_config")?.list(data::setting)?,
         level: n.field("level")?.index()?,
         title: n.field("title")?.string()?.into(),

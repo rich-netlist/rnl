@@ -194,6 +194,10 @@ fn style_specs(group: &str) -> Vec<ParamSpec> {
         .collect()
 }
 
+fn annotation_style_specs(version: &str) -> Vec<ParamSpec> {
+    ["line_style", "text_style"].iter().flat_map(|group| style_specs(group)).filter(|p| p.in_version(version)).collect()
+}
+
 fn split_style(p: &[(String, Lit)]) -> (StyleMap, Vec<(String, Lit)>) {
     let mut style = StyleMap::new();
     let mut rest = Vec::new();
@@ -267,6 +271,7 @@ impl Interp<'_> {
             "PIN" => self.kw_pin(kw, &args, seg, ctx),
             "LINE" | "RECTANGLE" | "CIRCLE" | "ELLIPSE" | "ARC" | "BEZIER" => self.kw_prim(kw, &args, seg, ctx),
             "TEXT" => self.kw_text(kw, &args, seg, ctx),
+            "ANNOTATION" => self.kw_annotation(kw, &args, seg, ctx, member),
             "PLACE" => {
                 let p = self.params(kw, seg, ctx, &self.sig_params(kw, ctx), None, false, None)?;
                 if get(&p, "x").is_none() && get(&p, "y").is_none() {
@@ -453,7 +458,9 @@ impl Interp<'_> {
             "BUNDLE" => {
                 let mapped = self.map_args(kw, &args, seg, ctx, sig_positions(kw))?;
                 let obj = mapped["members"].obj;
-                let Some(s) = ctx.scene else { return self.scene_only(ctx, seg.start) };
+                let Some(s) = ctx.scene else {
+                    return self.scene_only(ctx, seg.start);
+                };
                 let members = if self.is_set(obj) { self.flatten(s, obj, 3, Some(ctx)) } else { vec![obj] };
                 if members.is_empty() {
                     return self.fail(
@@ -749,7 +756,9 @@ impl Interp<'_> {
                         break;
                     }
                     for a in &sg.args {
-                        let Ok((obj, _)) = self.eval_obj(&a.obj, &bctx) else { continue };
+                        let Ok((obj, _)) = self.eval_obj(&a.obj, &bctx) else {
+                            continue;
+                        };
                         match self.o(obj) {
                             ObjData::Style(p) => {
                                 let p = p.clone();
@@ -869,7 +878,9 @@ impl Interp<'_> {
     /// User-defined names and collection cardinalities still require an application.
     fn check_definition_role_path(&mut self, role: &Role, reference: &crate::syntax::Ref, ctx: &Ctx) {
         use crate::syntax::Sep;
-        let Some(mut kinds) = role.kinds.clone() else { return };
+        let Some(mut kinds) = role.kinds.clone() else {
+            return;
+        };
         if role.is_set || reference.places.is_some() || kinds.is_empty() {
             return;
         }
@@ -1418,7 +1429,33 @@ impl Interp<'_> {
                             }
                         } else if !signature.open_params && !matches!(signature.params, ParamsSpec::Definition) {
                             let mut spec = self.sig_params(&keyword, ctx);
-                            if let Some(style) = &signature.style {
+                            if keyword == "ANNOTATION" {
+                                spec.extend(annotation_style_specs(&self.version_of(Some(self.source_unit(ctx)))));
+                                // Check the source signature when it can be read without
+                                // executing a definition; otherwise defer unknown names.
+                                let known = segment
+                                    .args
+                                    .last()
+                                    .and_then(|a| self.annotation_static_params(&a.obj, definition, ctx, scopes));
+                                if let Some(names) = known {
+                                    for name in names {
+                                        if !spec.iter().any(|p| p.name == name) {
+                                            spec.push(ParamSpec::new(name, ParamType::Any));
+                                        }
+                                    }
+                                } else if let Some(params) = call.params.as_ref() {
+                                    for named in &params.named {
+                                        let name = if named.quoted {
+                                            named.name.clone()
+                                        } else {
+                                            self.word(&named.name, ctx.unit)
+                                        };
+                                        if !spec.iter().any(|p| p.name == name) {
+                                            spec.push(ParamSpec::new(name, ParamType::Any));
+                                        }
+                                    }
+                                }
+                            } else if let Some(style) = &signature.style {
                                 spec.extend(
                                     style_specs(style)
                                         .into_iter()
@@ -1438,7 +1475,7 @@ impl Interp<'_> {
                                 self.body_errors.insert(super::eval::ptr(call), diagnostic);
                             }
                         }
-                        if matches!(keyword.as_str(), "LAYER" | "ROUTE-NET" | "UNROUTE-NET")
+                        if matches!(keyword.as_str(), "LAYER" | "PLACE" | "ROUTE-NET" | "UNROUTE-NET")
                             && !self.body_errors.contains_key(&super::eval::ptr(call))
                         {
                             if let Err(Stop::Fail(Some(diagnostic))) =
@@ -1615,10 +1652,9 @@ impl Interp<'_> {
         ctx: &Ctx,
     ) -> R<()> {
         let (code, allowed): (_, &[&str]) = match (kw, slot.name.as_str()) {
-            ("PLACE", _) => (
-                codes::PLACE_NOT_TAKEN,
-                &["instance", "bundle", "usage", "point", "position", "text", "label", "annotation"],
-            ),
+            ("PLACE", _) => {
+                (codes::PLACE_NOT_TAKEN, &["instance", "bundle", "usage", "point", "position", "text", "label"])
+            }
             ("ORIENT", _) => (codes::PLACE_ORIENT_NOT_TAKEN, &["instance", "bundle", "usage", "pin"]),
             ("LAYER", _) => (
                 codes::LAYER_NOT_TAKEN,
@@ -1677,7 +1713,9 @@ impl Interp<'_> {
                 return Ok(());
             }
             _ => {
-                let Some(kinds) = self.definition_object_kinds(&argument.obj, definition, ctx) else { return Ok(()) };
+                let Some(kinds) = self.definition_object_kinds(&argument.obj, definition, ctx) else {
+                    return Ok(());
+                };
                 kinds
             }
         };
@@ -1929,7 +1967,9 @@ impl Interp<'_> {
         member: &Rc<Member>,
     ) -> R<(ObjId, bool)> {
         let result = self.kw_usage(kw, args.clone(), seg, ctx, first);
-        let (Err(Stop::Fail(diag)), Some(s)) = (&result, ctx.scene) else { return result };
+        let (Err(Stop::Fail(diag)), Some(s)) = (&result, ctx.scene) else {
+            return result;
+        };
         if ctx.frame.is_some() || ctx.selected {
             return result;
         }
@@ -3113,7 +3153,9 @@ impl Interp<'_> {
                 off: seg.start,
             }));
         }
-        let Some(s) = ctx.scene else { return self.scene_only(ctx, seg.start) };
+        let Some(s) = ctx.scene else {
+            return self.scene_only(ctx, seg.start);
+        };
         let prim = self.new_obj(ObjData::Prim {
             shape,
             points: pts,
@@ -3125,6 +3167,405 @@ impl Interp<'_> {
         self.scene_add_prim(s, prim, ctx.pos.clone(), ctx);
         self.note_birth(s, prim, ctx, seg.call.as_ref().unwrap().start, each);
         Ok(prim)
+    }
+
+    /// Create one compound non-electrical annotation. Source materialization is deferred until
+    /// after the relevant symbol queue; a definition is never applied by this handler.
+    fn kw_annotation(
+        &mut self,
+        kw: &str,
+        args: &[ArgV],
+        seg: &Segment,
+        ctx: &Ctx,
+        member: &Rc<Member>,
+    ) -> R<(ObjId, bool)> {
+        let mut spec = self.sig_params(kw, ctx);
+        // §13.5 accepts both graphic and text style properties, even though the
+        // published signature does not name a style group for this keyword.
+        spec.extend(annotation_style_specs(&self.version_of(Some(self.source_unit(ctx)))));
+        let mapped = self.map_args(kw, args, seg, ctx, sig_positions(kw))?;
+        let at = self.scene_value(mapped["at"].obj);
+        // A named pin or a role may resolve only after the symbol queue. The final location
+        // check is deferred with the rest of annotation materialization.
+        if !self.position_kind(at) && !self.late_input(at) {
+            return self.fail(
+                ctx,
+                codes::ANNOTATION_ANCHOR_WRONG_KIND,
+                format!(
+                    "the anchor of @ANNOTATION must be a point or locatable object; {} is {} (13.5)",
+                    self.label(at),
+                    self.kind_of(at)
+                ),
+                mapped["at"].off,
+            );
+        }
+        let source = self.scene_value(self.anon_def(mapped["source"].obj));
+        let source = match self.o(source) {
+            ObjData::Symbol(_) => AnnotationSource::Symbol(source),
+            ObjData::Definition(_) => AnnotationSource::Definition(source),
+            ObjData::Usage(_) => AnnotationSource::Usage(source),
+            _ => {
+                return self.fail(
+                    ctx,
+                    codes::ANNOTATION_SOURCE_WRONG_KIND,
+                    format!(
+                        "the source of @ANNOTATION must be a symbol, general definition, or usage; {} is {} (13.5)",
+                        self.label(source),
+                        self.kind_of(source)
+                    ),
+                    mapped["source"].off,
+                )
+            }
+        };
+        // ANNOTATION's own names win over source-definition names (13.5). Source
+        // parameters are named only and are never supplied when the source is a usage.
+        let own_names: Vec<String> = spec.iter().map(|p| p.name.clone()).collect();
+        let definition = match source {
+            AnnotationSource::Definition(id) => Some(id),
+            _ => None,
+        };
+        let scoped = definition.map(|id| self.scoped_for(ctx.unit, id)).unwrap_or_default();
+        let def = definition.map(|id| self.def(id).clone());
+        if let Some(def) = &def {
+            for (name, _) in &def.params {
+                if own_names.contains(name) {
+                    self.hint_at(
+                        ctx,
+                        codes::ANNOTATION_PARAMETER_SHADOWED,
+                        format!("the ANNOTATION parameter {name} takes precedence over the source parameter (13.5)"),
+                        seg.start,
+                    );
+                } else {
+                    spec.push(ParamSpec::new(name.clone(), ParamType::Any));
+                }
+            }
+        }
+        let resolve = |it: &mut Self, name: &str, quoted: bool, _off: usize| -> R<String> {
+            if quoted {
+                return Ok(name.to_string());
+            }
+            let standard = it.word(name, ctx.unit);
+            if own_names.contains(&standard) {
+                return Ok(standard);
+            }
+            if let Some((_, original)) = scoped.iter().find(|(alias, _)| alias == name) {
+                return Ok(original.clone());
+            }
+            Ok(name.to_string())
+        };
+        let params = self.params_mode(kw, seg, ctx, &spec, Some(&[]), false, Some(&resolve), false)?;
+        let source_params = def
+            .as_ref()
+            .map(|def| {
+                def.params
+                    .iter()
+                    .map(|(name, default)| {
+                        let value = if own_names.contains(name) { None } else { get(&params, name) };
+                        (name.clone(), value.map(|v| written_in(v, self.source_unit(ctx))).or_else(|| default.clone()))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        let Some(scene) = ctx.scene else {
+            return self.scene_only(ctx, seg.start);
+        };
+        // A point written directly as the anchor was already created and registered by
+        // expression evaluation. Reuse it: cloning would leave an unrelated solver point.
+        // An unbound bare point piped straight into ANNOTATION is the same written form.
+        // A point bound by the preceding segment is an object and is followed instead.
+        let direct_point =
+            seg.args.iter().any(|arg| arg.start == mapped["at"].off && matches!(arg.obj, ObjExpr::Point(_)));
+        let piped_point = member
+            .segments
+            .iter()
+            .position(|candidate| candidate.id == seg.id)
+            .filter(|&index| index > 0 && seg.piped)
+            .is_some_and(|index| {
+                let prior = &member.segments[index - 1];
+                prior.call.is_none()
+                    && prior.args.len() == 1
+                    && matches!(prior.args[0].obj, ObjExpr::Point(_))
+                    && !member.binds.iter().any(|binding| binding.after == index - 1)
+            });
+        let anchor = if (direct_point || piped_point) && matches!(self.o(at), ObjData::Point { .. }) {
+            AnnotationAnchor::Independent(at)
+        } else {
+            AnnotationAnchor::Follow(at)
+        };
+        let (style, rest) = split_style(&params);
+        let annotation = self.new_obj(ObjData::Annotation(Box::new(AnnotationData {
+            anchor,
+            source,
+            params: source_params,
+            rotate: get(&rest, "rotate").and_then(Lit::num).unwrap_or(0.0),
+            mirror: get(&rest, "mirror").and_then(Lit::boolean).unwrap_or(false),
+            style,
+            prims: Vec::new(),
+            labels: Vec::new(),
+            drawing_order: Vec::new(),
+            order: ctx.pos.clone(),
+            generated: ctx.frame_generated(),
+            resolved: false,
+            failed: false,
+            site: Some(Rc::new(ctx.clone())),
+            off: seg.start,
+        })));
+        self.scene_add_prim(scene, annotation, ctx.pos.clone(), ctx);
+        self.note_birth(scene, annotation, ctx, seg.call.as_ref().unwrap().start, None);
+        Ok((annotation, false))
+    }
+
+    /// Materialize annotation templates after symbol assignment without applying definitions.
+    pub(crate) fn materialize_annotations(&mut self, scene: SceneId) {
+        use super::annotation_template::{direct_members, nested_set, resolved_points, InputKind};
+        for id in self.scenes[scene].prims.clone() {
+            let ObjData::Annotation(data) = self.o(id).clone() else { continue };
+            if data.resolved {
+                continue;
+            }
+            let Some(site) = data.site.as_ref() else { continue };
+            if let AnnotationAnchor::Follow(anchor) = data.anchor {
+                let anchor = self.scene_value(anchor);
+                if self.is_failed(anchor) {
+                    self.set_failed(id);
+                    continue;
+                }
+                if !self.position_kind(anchor) {
+                    self.err(
+                        site,
+                        codes::ANNOTATION_ANCHOR_WRONG_KIND,
+                        format!(
+                            "the anchor of @ANNOTATION must be a point or locatable object; {} is {} (13.5)",
+                            self.label(anchor),
+                            self.kind_of(anchor)
+                        ),
+                        data.off,
+                    );
+                    self.set_failed(id);
+                    continue;
+                }
+            }
+            let mut prims = Vec::new();
+            let mut labels = Vec::new();
+            let mut drawing_order = Vec::new();
+            let definition = match data.source {
+                AnnotationSource::Symbol(symbol) => {
+                    let symbol = self.symbol(symbol);
+                    prims.extend(symbol.prims.clone());
+                    labels.extend(symbol.labels.clone());
+                    drawing_order.extend(symbol.annotation_order.iter().copied());
+                    None
+                }
+                AnnotationSource::Definition(definition) => Some((definition, None)),
+                AnnotationSource::Usage(usage) => {
+                    if let Some(&symbol) = self.scenes[scene].symbol.get(&usage) {
+                        let symbol = self.symbol(symbol);
+                        prims.extend(symbol.prims.clone());
+                        labels.extend(symbol.labels.clone());
+                        drawing_order.extend(symbol.annotation_order.iter().copied());
+                    }
+                    Some((self.usage(usage).definition, self.usage(usage).frame.clone()))
+                }
+            };
+            if let Some((definition, frame)) = definition {
+                let def = self.def(definition).clone();
+                let mut ctx = (**site).clone();
+                ctx.unit = def.def_unit;
+                ctx.rec = def.rec;
+                ctx.header = def.header.clone();
+                ctx.def_unit = Some(def.def_unit);
+                ctx.defining = Some(def.defining.clone());
+                ctx.frame = frame.or_else(|| {
+                    let mut parameter_frame = Frame::new(FrameKind::Definition);
+                    parameter_frame.definition = Some(definition);
+                    parameter_frame.params = data.params.clone();
+                    Some(Rc::new(RefCell::new(parameter_frame)))
+                });
+                if let Some(body) = def.body.as_ref() {
+                    let members = direct_members(body, |word| Some(self.kw(word, def.def_unit)));
+                    for entry in members {
+                        let seg = &entry.member.segments[entry.segment];
+                        if entry.input == InputKind::OtherObject {
+                            self.hint_at(
+                                &ctx,
+                                codes::ANNOTATION_GRAPHIC_NONLITERAL,
+                                "a graphic referring to another object is omitted from this annotation (13.5)",
+                                seg.start,
+                            );
+                            continue;
+                        }
+                        let kw = &entry.keyword;
+                        let mut spec = self.sig_params(kw, &ctx);
+                        let group = if kw == "TEXT" { "text_style" } else { "line_style" };
+                        spec.extend(
+                            style_specs(group)
+                                .into_iter()
+                                .filter(|p| p.in_version(&self.version_of(Some(self.source_unit(&ctx))))),
+                        );
+                        let Ok(params) = self.params(kw, seg, &ctx, &spec, None, false, None) else { continue };
+                        let (style, rest) = split_style(&params);
+                        let input = &entry.member.segments[entry.input_segment];
+                        let args: Vec<_> = if entry.input_segment == entry.segment {
+                            seg.args.iter().collect()
+                        } else {
+                            input.args.iter().chain(&seg.args).collect()
+                        };
+                        // A set alongside another input is a nested member in a set-valued
+                        // slot; the ordinary graphic checker rejects it as a non-point.
+                        if kw != "TEXT"
+                            && (args.iter().any(|a| nested_set(&a.obj))
+                                || (args.len() > 1 && args.iter().any(|a| matches!(a.obj, ObjExpr::Set(_)))))
+                        {
+                            self.err(
+                                &ctx,
+                                codes::KEYWORD_GRAPHIC_NOT_POINTS,
+                                format!("the points of @{kw} are points (9.2.5)"),
+                                seg.start,
+                            );
+                            continue;
+                        }
+                        let mut points = Vec::new();
+                        let mut complete = true;
+                        for arg in args {
+                            if kw == "TEXT"
+                                && matches!(&arg.obj, ObjExpr::Ref(r) if r.prefix == '?' && r.name.is_none() && r.path.is_empty())
+                            {
+                                continue;
+                            }
+                            let mut coordinate =
+                                |c: &crate::syntax::Coord, off| self.coord(c, &ctx, off).ok().flatten();
+                            match resolved_points(&arg.obj, &mut coordinate) {
+                                Some(p) => points.extend(p),
+                                None => {
+                                    complete = false;
+                                    break;
+                                }
+                            }
+                        }
+                        if !complete {
+                            self.hint_at(
+                                &ctx,
+                                codes::ANNOTATION_GRAPHIC_NONLITERAL,
+                                "a graphic with a free or nonliteral point is omitted from this annotation (13.5)",
+                                seg.start,
+                            );
+                            continue;
+                        }
+                        if kw == "TEXT" {
+                            let items = TextItems {
+                                modern_text: self.follows_0_4(self.source_unit(&ctx)),
+                                text: get(&rest, "text").and_then(|v| match v {
+                                    Lit::Str(t) => Some(t.clone()),
+                                    _ => None,
+                                }),
+                                halign: get(&rest, "halign").and_then(Lit::str).map(String::from),
+                                valign: get(&rest, "valign").and_then(Lit::str).map(String::from),
+                                rotate: get(&rest, "rotate").and_then(Lit::num),
+                                fix_rotate: get(&rest, "fix_rotate").and_then(Lit::boolean),
+                                upright: get(&rest, "upright").and_then(Lit::boolean),
+                                dx: get(&rest, "dx").and_then(Lit::num),
+                                dy: get(&rest, "dy").and_then(Lit::num),
+                            };
+                            let mut position = points.first().copied().unwrap_or((0.0, 0.0));
+                            position.0 += items.dx.unwrap_or(0.0);
+                            position.1 += items.dy.unwrap_or(0.0);
+                            if let Some(place) = entry.member.segments.get(entry.segment + 1) {
+                                if place.piped
+                                    && place
+                                        .call
+                                        .as_ref()
+                                        .is_some_and(|call| self.kw(&call.kw, def.def_unit) == "PLACE")
+                                {
+                                    if let Ok(values) = self.params(
+                                        "PLACE",
+                                        place,
+                                        &ctx,
+                                        &self.sig_params("PLACE", &ctx),
+                                        None,
+                                        false,
+                                        None,
+                                    ) {
+                                        if let Some(x) = get(&values, "x").and_then(Lit::num) {
+                                            position.0 = x;
+                                        }
+                                        if let Some(y) = get(&values, "y").and_then(Lit::num) {
+                                            position.1 = y;
+                                        }
+                                    }
+                                }
+                            }
+                            if points.is_empty() {
+                                drawing_order.push(AnnotationPart::Label(labels.len()));
+                                labels.push(SymLabel {
+                                    key: None,
+                                    items,
+                                    position: Some(position),
+                                    style,
+                                    unit: def.def_unit,
+                                    site: Some(Rc::new(ctx.clone())),
+                                    off: seg.start,
+                                });
+                            } else {
+                                points[0] = position;
+                                drawing_order.push(AnnotationPart::Prim(prims.len()));
+                                prims.push(SymPrim {
+                                    shape: Shape::Text,
+                                    points,
+                                    params: PrimParams::default(),
+                                    style,
+                                    text: Some(items),
+                                });
+                            }
+                        } else {
+                            let shape = Shape::parse(kw).unwrap();
+                            let parameters = PrimParams {
+                                width: get(&rest, "width").and_then(Lit::num),
+                                height: get(&rest, "height").and_then(Lit::num),
+                                radius: get(&rest, "radius").and_then(Lit::num),
+                                fill: get(&rest, "fill").and_then(Lit::str).map(String::from),
+                                arrow: get(&rest, "arrow").and_then(Lit::str).map(String::from),
+                            };
+                            let centered = match shape {
+                                Shape::Rectangle | Shape::Ellipse => {
+                                    parameters.width.is_some() && parameters.height.is_some()
+                                }
+                                Shape::Circle => parameters.radius.is_some(),
+                                _ => false,
+                            };
+                            if centered {
+                                for point in points {
+                                    drawing_order.push(AnnotationPart::Prim(prims.len()));
+                                    prims.push(SymPrim {
+                                        shape,
+                                        points: vec![point],
+                                        params: parameters.clone(),
+                                        style: style.clone(),
+                                        text: None,
+                                    });
+                                }
+                            } else if graphic_point_count_is_valid(shape, points.len()) {
+                                drawing_order.push(AnnotationPart::Prim(prims.len()));
+                                prims.push(SymPrim { shape, points, params: parameters, style, text: None });
+                            }
+                        }
+                    }
+                }
+            }
+            if prims.is_empty() && labels.is_empty() {
+                self.warn(
+                    site,
+                    codes::ANNOTATION_SOURCE_EMPTY,
+                    "the annotation source has no drawable graphics (13.5)",
+                    data.off,
+                );
+            }
+            if let ObjData::Annotation(target) = self.om(id) {
+                target.prims = prims;
+                target.labels = labels;
+                target.drawing_order = drawing_order;
+                target.resolved = true;
+            }
+        }
     }
 
     // ------------------------------------------------------------------ TEXT (13.3)
@@ -3194,8 +3635,7 @@ impl Interp<'_> {
                     off: call_start,
                 };
                 let sm = self.symbol_mut(symbol);
-                sm.labels.push(lab);
-                let index = sm.labels.len() - 1;
+                let index = sm.push_label(lab);
                 return Ok((self.new_obj(ObjData::SymLabel { symbol, index }), false));
             }
             if let Some((x, y)) = self.symbol_point(att.obj, self.follows_0_4(self.source_unit(ctx))) {
@@ -3267,7 +3707,9 @@ impl Interp<'_> {
             self.defer(ctx, 5, task)?;
             return Ok((NOTHING, true));
         }
-        let Some(s) = ctx.scene else { return self.scene_only(ctx, seg.start) };
+        let Some(s) = ctx.scene else {
+            return self.scene_only(ctx, seg.start);
+        };
         if self.is_set(att.obj) {
             let members = self.flatten_inputs(s, att.obj, 3, Some(ctx));
             let mut outs = Vec::new();
@@ -3439,7 +3881,9 @@ impl Interp<'_> {
             self.defer(ctx, 9, task)?;
             return Ok((output, true));
         }
-        let Some(scene) = ctx.scene else { return self.scene_only(ctx, off) };
+        let Some(scene) = ctx.scene else {
+            return self.scene_only(ctx, off);
+        };
         if net && self.is_set(input.obj) {
             let mut made = Vec::new();
             for (index, member) in self.flatten_inputs(scene, input.obj, 3, Some(ctx)).into_iter().enumerate() {
@@ -3705,7 +4149,9 @@ impl Interp<'_> {
             if arg.start != mapped["symbol"].off {
                 return None;
             }
-            let crate::syntax::ObjExpr::Ref(reference) = &arg.obj else { return None };
+            let crate::syntax::ObjExpr::Ref(reference) = &arg.obj else {
+                return None;
+            };
             (reference.prefix == '$' && reference.path.is_empty() && reference.places.is_none())
                 .then(|| reference.name.as_ref().map(|name| format!("${name}")))
                 .flatten()
@@ -4071,7 +4517,9 @@ impl Interp<'_> {
 
     fn kw_table(&mut self, args: &[ArgV], seg: &Segment, ctx: &Ctx) -> R<(ObjId, bool)> {
         let p = self.params("TABLE", seg, ctx, &self.sig_params("TABLE", ctx), None, false, None)?;
-        let Some(s) = ctx.scene else { return Err(self.final_set_needs_scene()) };
+        let Some(s) = ctx.scene else {
+            return Err(self.final_set_needs_scene());
+        };
         let mapped = self.map_args("TABLE", args, seg, ctx, sig_positions("TABLE"))?;
         let rows = mapped["rows"].obj;
         if let Some(cause) = self.failed_obj(rows) {
@@ -4293,7 +4741,9 @@ impl Interp<'_> {
     /// In a file of 0.4 ORDER, DISTRIBUTE and DISTANCE take a direction, which writes the sense: the
     /// axis alone, `"x"` or `"y"`, or DISTRIBUTE's `axis=` of 0.3, is an error (14.1, 14.3).
     fn axis_without_direction(&mut self, kw: &str, seg: &Segment, ctx: &Ctx) -> R<()> {
-        let Some(p) = seg.call.as_ref().and_then(|c| c.params.as_ref()) else { return Ok(()) };
+        let Some(p) = seg.call.as_ref().and_then(|c| c.params.as_ref()) else {
+            return Ok(());
+        };
         let mut bad = None;
         if let Some(Value::Str(s)) = p.positional.first() {
             if s == "x" || s == "y" {
@@ -4308,7 +4758,9 @@ impl Interp<'_> {
                 _ => {}
             }
         }
-        let Some((written, at)) = bad else { return Ok(()) };
+        let Some((written, at)) = bad else {
+            return Ok(());
+        };
         self.fail(
             ctx,
             codes::PARAM_AXIS_WITHOUT_DIRECTION,
@@ -4318,7 +4770,9 @@ impl Interp<'_> {
     }
 
     fn old_direction(&mut self, kw: &str, seg: &Segment, ctx: &Ctx) -> R<()> {
-        let Some(p) = seg.call.as_ref().and_then(|c| c.params.as_ref()) else { return Ok(()) };
+        let Some(p) = seg.call.as_ref().and_then(|c| c.params.as_ref()) else {
+            return Ok(());
+        };
         let mut bad = None;
         let mut written: Vec<&Value> = p.positional.iter().take(1).collect();
         for n in &p.named {
@@ -4418,6 +4872,12 @@ pub(crate) fn merge_symbol(sym: &mut SymbolDef, other: &SymbolDef) {
     let offset = sym.prims.len() + sym.usages.len();
     sym.prim_order.extend(other.prim_order.iter().map(|n| offset + n));
     sym.usage_order.extend(other.usage_order.iter().map(|n| offset + n));
+    let prim_base = sym.prims.len();
+    let label_base = sym.labels.len();
+    sym.annotation_order.extend(other.annotation_order.iter().map(|part| match part {
+        AnnotationPart::Prim(index) => AnnotationPart::Prim(prim_base + index),
+        AnnotationPart::Label(index) => AnnotationPart::Label(label_base + index),
+    }));
     sym.prims.extend(other.prims.iter().cloned());
     sym.labels.extend(other.labels.iter().cloned());
     sym.usages.extend(other.usages.iter().cloned());

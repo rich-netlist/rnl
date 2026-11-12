@@ -256,6 +256,10 @@ impl Interp<'_> {
     pub(super) fn coordinate_object(&self, object: ObjId) -> ObjId {
         match self.o(object) {
             ObjData::Pos { parent } if !self.is_set(*parent) => self.coordinate_object(*parent),
+            ObjData::Annotation(data) => match data.anchor {
+                AnnotationAnchor::Independent(point) => self.coordinate_object(point),
+                AnnotationAnchor::Follow(object) => self.coordinate_object(object),
+            },
             _ => object,
         }
     }

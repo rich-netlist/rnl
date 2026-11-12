@@ -45,7 +45,7 @@ fn pt(p: &(f64, f64)) -> Value {
 }
 
 pub fn level(lv: &LevelView) -> Value {
-    json!({
+    let mut out = json!({
         "title": lv.title,
         "kind": lv.kind,
         "file": lv.file,
@@ -84,7 +84,29 @@ pub fn level(lv: &LevelView) -> Value {
         "flylines": lv.flylines.iter().map(|f| json!([pt(&f.a), pt(&f.b)])).collect::<Vec<_>>(),
         "constraints": lv.constraints.iter().map(|c| json!({"label": c.label, "kind": c.kind, "status": c.status, "priority": c.priority})).collect::<Vec<_>>(),
         "unplaced": lv.unplaced,
-    })
+    });
+    if !lv.annotations.is_empty() {
+        out["annotations"] = json!(lv.annotations.iter().map(|a| json!({
+            "id": a.object_id, "source_kind": a.source_kind, "source": a.source,
+            "anchor_kind": a.anchor_kind, "anchor_object": a.anchor_object, "anchor": pt(&a.anchor),
+            "rotate": a.rotate, "mirror": a.mirror, "style": style(&a.style), "layer": a.layer.as_str(), "order": a.order,
+            "graphics": a.graphics.iter().map(|g| {
+                let p = &g.primitive;
+                json!({
+                    "shape": p.shape.as_str(), "order": p.order, "points": p.points.iter().map(pt).collect::<Vec<_>>(),
+                    "width": p.params.width, "height": p.params.height, "radius": p.params.radius,
+                    "fill": p.params.fill, "arrow": p.params.arrow, "style": style(&p.style),
+                    "text": p.text, "lines": lines(&g.lines), "text_name_formats": p.text_name_formats,
+                    "modern_text": p.modern_text, "halign": p.halign, "valign": p.valign,
+                    "rotate": p.rotate, "fix_rotate": p.fix_rotate, "upright": p.upright,
+                    "text_refs": g.text_refs.iter().map(|r| match r {
+                        AnnotationTextRef::X => "x", AnnotationTextRef::Y => "y", AnnotationTextRef::Empty => "empty",
+                    }).collect::<Vec<_>>(),
+                })
+            }).collect::<Vec<_>>(),
+        })).collect::<Vec<_>>());
+    }
+    out
 }
 
 pub fn interpretation(r: &Interpretation) -> Value {

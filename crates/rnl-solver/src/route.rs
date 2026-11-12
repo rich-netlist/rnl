@@ -164,6 +164,7 @@ pub(crate) struct Left {
 pub(crate) struct Routing {
     /// A written wire whose geometry is not evaluable; no routing was attempted.
     pub written_path_error: Option<usize>,
+    pub annotation_error: Option<crate::annotation::AnnotationError>,
     /// The wires, in the order of the ROUTEs, each net's in the order they were made.
     pub wires: Vec<RoutedWire>,
     pub branches: Vec<Branch>,
@@ -198,6 +199,7 @@ pub(crate) struct AnchorIn {
     pub owner: Option<usize>,
     /// Electrical pin identity, independent of the symbol whose boundary this point may leave.
     pub connects_pin: bool,
+    pub existing_junction: bool,
 }
 
 /// A net to route.
@@ -1354,6 +1356,9 @@ impl<'a> Grid<'a> {
             {
                 continue;
             }
+            if self.layout.modern && net.anchors[a].existing_junction {
+                continue;
+            }
             let b = branches.len();
             branches.push(n);
             for m in made.iter_mut() {
@@ -2161,8 +2166,17 @@ pub(crate) fn route(
     options: &SolverOptions,
     work: &mut Work,
 ) -> Routing {
+    let annotation_boxes = match crate::annotation::bounds(problem, g) {
+        Ok(boxes) => boxes,
+        Err(error) => return Routing { annotation_error: Some(error), ..Routing::default() },
+    };
     let jobs = jobs(problem);
     let mut layout = Layout { modern: problem.version == "0.4", ..Layout::default() };
+    layout.boxes.extend(
+        annotation_boxes
+            .into_iter()
+            .map(|(object, bounds)| (crate::annotation::attachment_owner(problem, object).unwrap_or(object), bounds)),
+    );
     for k in s.components() {
         if let Some(b) = s.box_at(origins, &g.orient, k) {
             layout.boxes.push((k, b));
@@ -2200,7 +2214,19 @@ pub(crate) fn route(
                 PointKey::PinPosition(k, _) => (None, Some(k)),
                 PointKey::Object(_) => (None, None),
             };
-            net.anchors.push(AnchorIn { at, exit, owner, connects_pin: matches!(p.key, PointKey::Pin(..)) });
+            let existing_junction = layout.modern
+                && problem.existing_junctions.iter().any(|existing| {
+                    rnl_runtime::problem::junction_point_identity(existing)
+                        == rnl_runtime::problem::junction_point_identity(&p.reference)
+                        && rnl_runtime::problem::junction_point_identity(existing).is_some()
+                });
+            net.anchors.push(AnchorIn {
+                at,
+                exit,
+                owner,
+                connects_pin: matches!(p.key, PointKey::Pin(..)),
+                existing_junction,
+            });
             pts.push(p);
             Some(pts.len() - 1)
         };

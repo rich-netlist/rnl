@@ -122,6 +122,7 @@ impl Interp<'_> {
         self.check_scene_pin_roles(s);
         self.materialize_constraints(s);
         self.run_tasks(s, 7);
+        self.materialize_annotations(s);
         self.check_scene_pin_roles(s);
         self.resolve_currents(s, true);
         self.resolve_geometry(s);
@@ -606,7 +607,7 @@ impl Interp<'_> {
                 });
             }
         }
-        sym.labels.push(SymLabel {
+        sym.push_label(SymLabel {
             key: Some("name".into()),
             items: TextItems {
                 text: Some(WStr::new("${name}", None)),
@@ -1144,6 +1145,7 @@ impl Interp<'_> {
                 *failed = true
             }
             ObjData::Constraint(c) => c.failed = true,
+            ObjData::Annotation(a) => a.failed = true,
             _ => {}
         }
     }
@@ -1155,6 +1157,7 @@ impl Interp<'_> {
         match self.o(o) {
             ObjData::Wire { failed, .. } | ObjData::Text { failed, .. } | ObjData::KeyText { failed, .. } => *failed,
             ObjData::Constraint(c) => c.failed,
+            ObjData::Annotation(a) => a.failed,
             _ => false,
         }
     }
@@ -1512,6 +1515,10 @@ impl Interp<'_> {
                 Some((base.0 + delta.0, base.1 + delta.1))
             }
             ObjData::Point { .. } => self.xy(s, o),
+            ObjData::Annotation(data) => match data.anchor {
+                AnnotationAnchor::Independent(point) => self.point_of(s, point),
+                AnnotationAnchor::Follow(object) => self.point_of(s, object),
+            },
             ObjData::Pos { parent } => {
                 if self.is_set(parent) {
                     self.set_center(s, parent)
@@ -2606,6 +2613,7 @@ impl Interp<'_> {
                         | ObjData::Bundle { .. }
                         | ObjData::Wire { .. }
                         | ObjData::Prim { .. }
+                        | ObjData::Annotation(_)
                         | ObjData::Text { .. }
                         | ObjData::KeyText { .. }
                         | ObjData::SymLabel { .. }

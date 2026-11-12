@@ -8,7 +8,7 @@ use super::obj::{ObjData, ObjId, SceneId, Shape};
 use super::Interp;
 
 impl Interp<'_> {
-    fn position_kind(&self, object: ObjId) -> bool {
+    pub(crate) fn position_kind(&self, object: ObjId) -> bool {
         match self.o(self.scene_value(object)) {
             ObjData::Inst { .. }
             | ObjData::Bundle { .. }
@@ -19,7 +19,8 @@ impl Interp<'_> {
             | ObjData::Point { .. }
             | ObjData::Text { .. }
             | ObjData::KeyText { .. }
-            | ObjData::SymLabel { .. } => true,
+            | ObjData::SymLabel { .. }
+            | ObjData::Annotation(_) => true,
             ObjData::Pos { parent } => self.position_kind(*parent),
             ObjData::Prim {
                 shape: Shape::Rectangle | Shape::Circle | Shape::Ellipse | Shape::Text, points, ..

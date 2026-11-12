@@ -32,17 +32,30 @@ pub(crate) fn lay_out(
     rounds: u8,
 ) -> crate::tree::Laid {
     let mut laid = crate::tree::lay_out(problem, s, options, work, &crate::tree::Stop::default());
-    if laid.entry.written_path_error.is_some() {
+    if laid.entry.written_path_error.is_some() || laid.entry.annotation_error.is_some() {
         laid.notes.push("skeleton: written wire geometry is unevaluable; compaction skipped".into());
         return laid;
     }
     let before = laid.entry.clone();
     let score = |placed: &Placed, routing: &Routing| {
+        if let Err(error) = crate::annotation::bounds(problem, &placed.geometry) {
+            return crate::score::Entry {
+                written_path_error: None,
+                annotation_error: Some(error),
+                overlaps: 0,
+                crowding: 0,
+                misleading: 0,
+                joins_left: 0,
+                layers: Vec::new(),
+                code: before.code.clone(),
+            };
+        }
         let wires = match crate::score::drawn(problem, s, &placed.geometry, routing) {
             Ok(wires) => wires,
             Err(wire) => {
                 return crate::score::Entry {
                     written_path_error: Some(wire),
+                    annotation_error: None,
                     overlaps: 0,
                     crowding: 0,
                     misleading: 0,
@@ -54,7 +67,10 @@ pub(crate) fn lay_out(
         };
         crate::score::Entry {
             written_path_error: None,
-            overlaps: placed.overlaps.len(),
+            annotation_error: None,
+            overlaps: placed.overlaps.len()
+                + crate::annotation::overlaps(problem, s, &placed.geometry, &placed.origins)
+                    .expect("validated annotation bounds"),
             crowding: crate::score::crowding(s, &placed.origins, &placed.geometry.orient, &placed.dropped),
             misleading: crate::score::misleading(problem, s, &placed.origins, &placed.geometry, &wires),
             joins_left: routing.left.iter().map(|n| n.parts.saturating_sub(1)).sum(),
@@ -63,7 +79,10 @@ pub(crate) fn lay_out(
         }
     };
     for round in 0..=rounds {
-        if !crate::budget::permit(crate::budget::Step::Structure, problem.objects.len()) {
+        if !crate::budget::permit(
+            crate::budget::Step::Structure,
+            problem.objects.len().saturating_add(crate::annotation::estimated_work(problem)),
+        ) {
             laid.notes.push(format!("skeleton, round {round}: shared budget exhausted; drawing retained"));
             break;
         }
@@ -83,7 +102,7 @@ pub(crate) fn lay_out(
         }
         laid.notes.extend(notes.into_iter().map(|n| format!("skeleton, round {round}: {n}")));
         let made = score(&placed, &routing);
-        if made.written_path_error.is_some() {
+        if made.written_path_error.is_some() || made.annotation_error.is_some() {
             laid.notes
                 .push(format!("skeleton, round {round}: unevaluable written wire geometry; previous drawing retained"));
             break;

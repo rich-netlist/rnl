@@ -567,6 +567,24 @@ fn usage_statement(u: &UsageEntry, name: &str, follows_0_3: bool) -> String {
     format!("%{} = ${} @ATTACH{params} {}", written_name(name), written_name(&u.definition[1..]), roles.join(" "))
 }
 
+// A dot already present needs no writable reference, but malformed indices must
+// still be reported as unsolved rather than silently accepted by a malformed input.
+fn junction_point_exists(p: &LevelProblem, point: &PointRef) -> bool {
+    match point {
+        PointRef::Origin(object) => p.objects.get(*object).is_some(),
+        PointRef::Pin { object, pin, .. }
+        | PointRef::SymbolPin { object, pin, .. }
+        | PointRef::PinPosition { object, pin, .. } => p
+            .objects
+            .get(*object)
+            .and_then(|o| o.symbol)
+            .and_then(|symbol| p.symbols.get(symbol))
+            .and_then(|symbol| symbol.pins.get(*pin))
+            .is_some(),
+        PointRef::Centre(_) => false,
+    }
+}
+
 /// The solver's record for a level (14.8, 17): the usages made by rules that the result reaches,
 /// written out; the branch points of routed wires; the positions and orientations; the wires
 /// routed for ROUTE; the routes of the wires written in RNL; the junctions. `p` is the problem the
@@ -783,13 +801,32 @@ pub fn write_record(p: &LevelProblem, solution: &Solution, author: &str, hash: &
     }
 
     let mut extra_junctions = Vec::new();
+    let mut accepted_junctions: Vec<&PointRef> = Vec::new();
     if modern && p.junction.effective().definition.is_some() {
         for (index, point) in solution.junctions.iter().enumerate() {
+            // Existing dots need no writable reference: nothing is emitted for them.
+            if junction_point_exists(p, point)
+                && p.existing_junctions.iter().any(|existing| {
+                    crate::problem::junction_point_identity(existing)
+                        .is_some_and(|id| Some(id) == crate::problem::junction_point_identity(point))
+                })
+            {
+                continue;
+            }
+            // An unreachable repeated request is still unsolved, so validate before
+            // suppressing requests already emitted by this record.
             match refs.junction(point) {
                 Ok((reference, root)) => {
+                    if accepted_junctions.iter().any(|existing| {
+                        crate::problem::junction_point_identity(existing)
+                            .is_some_and(|id| Some(id) == crate::problem::junction_point_identity(point))
+                    }) {
+                        continue;
+                    }
                     if let Some(root) = root {
                         needed[root] = true;
                     }
+                    accepted_junctions.push(point);
                     extra_junctions.push(reference);
                 }
                 Err(why) => lost(Decision::Junction { index }, &crate::problem::point_name(p, point), why),

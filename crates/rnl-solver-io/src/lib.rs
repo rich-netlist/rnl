@@ -2,6 +2,7 @@
 //! JSON carries model indices and typed geometry; the runtime remains responsible for
 //! writing the result back against the original problem.
 
+mod annotation;
 mod bindings;
 mod data;
 mod fact;
@@ -23,4 +24,4 @@ pub use result::{decode_result, encode_result, LevelResult, ResultDocument, Solv
 pub use solution::{decode_solution, encode_solution};
 
 /// Protocol version, independent of a solver executable's own version.
-pub const VERSION: u64 = 3;
+pub const VERSION: u64 = 4;

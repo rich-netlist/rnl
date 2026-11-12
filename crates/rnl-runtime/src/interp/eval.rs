@@ -178,7 +178,7 @@ impl<'p> Interp<'p> {
             ObjData::Pos { .. } => "position",
             ObjData::Wire { .. } => "wire",
             ObjData::Route { .. } => "route",
-            ObjData::Prim { .. } => "annotation",
+            ObjData::Prim { .. } | ObjData::Annotation(_) => "annotation",
             ObjData::Text { .. } | ObjData::KeyText { .. } | ObjData::SymLabel { .. } => "text",
             ObjData::Usage(_) => "usage",
             ObjData::Bundle { .. } => "bundle",
@@ -252,6 +252,7 @@ impl<'p> Interp<'p> {
                 }
             }
             ObjData::Prim { shape, .. } => shape.as_str().to_string(),
+            ObjData::Annotation(_) => named("an annotation"),
             ObjData::Text { attach, .. } => {
                 let _ = attach;
                 "a text".into()
@@ -950,6 +951,7 @@ impl<'p> Interp<'p> {
                             | ObjData::Set(_)
                             | ObjData::Text { .. }
                             | ObjData::Prim { .. }
+                            | ObjData::Annotation(_)
                             | ObjData::Point { .. }
                             | ObjData::SymbolPin { .. }
                             | ObjData::Symbol(_)
@@ -1257,7 +1259,7 @@ impl<'p> Interp<'p> {
         Ok(p)
     }
 
-    fn coord(&mut self, v: &Coord, ctx: &Ctx, off: usize) -> R<Option<f64>> {
+    pub(super) fn coord(&mut self, v: &Coord, ctx: &Ctx, off: usize) -> R<Option<f64>> {
         match v {
             Coord::Free => Ok(None),
             Coord::Num(x) => Ok(Some(*x)),

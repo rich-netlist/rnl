@@ -123,6 +123,7 @@ pub(crate) fn place_tree(
     let grid = options.grid.and_then(from_f64).filter(|g| *g > Q::zero());
     let mut separations: Vec<Tagged> = Vec::new();
     let mut separated: BTreeSet<(usize, usize)> = BTreeSet::new();
+    let mut annotation_seen: BTreeMap<AnnotationPair, AnnotationBoxes> = BTreeMap::new();
     let mut round = 0;
     loop {
         let mut all = orient.to_vec();
@@ -137,7 +138,9 @@ pub(crate) fn place_tree(
         let clashes = port_clashes(s, &origins, &geometry.orient);
         let new: Vec<(usize, usize)> =
             overlaps.iter().chain(&clashes).copied().filter(|p| !separated.contains(p)).collect();
-        if new.is_empty() || round >= REPAIR_ROUNDS || crate::budget::stopped() {
+        let annotation_new = annotation_separations(problem, s, &geometry, &origins, &grid, &annotation_seen);
+
+        if (new.is_empty() && annotation_new.is_empty()) || round >= REPAIR_ROUNDS || crate::budget::stopped() {
             let dropped = all.iter().zip(&kept).filter(|(_, k)| !**k).map(|(t, _)| t.kind).collect();
             let overlaps = overlaps
                 .into_iter()
@@ -153,6 +156,10 @@ pub(crate) fn place_tree(
                 })
                 .collect();
             return Placed { geometry, origins, dropped, overlaps, optimised, undecided };
+        }
+        for (key, boxes, relation) in annotation_new {
+            annotation_seen.insert(key, boxes);
+            separations.push(relation);
         }
         for (a, b) in new {
             separated.insert((a, b));
@@ -222,6 +229,7 @@ pub(crate) fn place(
     let actual: Vec<Orient> = with_relations(s, &orient, work, |r, _, _| r.geometry().orient.clone());
     let mut separations: Vec<Tagged> = Vec::new();
     let mut separated: BTreeSet<(usize, usize)> = BTreeSet::new();
+    let mut annotation_seen: BTreeMap<AnnotationPair, AnnotationBoxes> = BTreeMap::new();
     let mut round = 0;
     // the rows apart as wholes in the first LP, then pair by pair (quality review SE-4)
     let mut pairs: Option<Vec<RowPair>> = None;
@@ -262,12 +270,14 @@ pub(crate) fn place(
         let clashes = if s.language04 { port_clashes(s, &origins, &geometry.orient) } else { Vec::new() };
         let new: Vec<(usize, usize)> =
             overlaps.iter().chain(&clashes).copied().filter(|p| !separated.contains(p)).collect();
+        let annotation_new = annotation_separations(problem, s, &geometry, &origins, &grid, &annotation_seen);
+
         if rows_again && round < REPAIR_ROUNDS {
             // placed again with the rows apart pair by pair before any overlap is repaired: the
             // overlaps of this placement may not be those of the next
             continue;
         }
-        if new.is_empty() || round >= REPAIR_ROUNDS || crate::budget::stopped() {
+        if (new.is_empty() && annotation_new.is_empty()) || round >= REPAIR_ROUNDS || crate::budget::stopped() {
             let dropped = rels.iter().zip(&kept).filter(|(_, k)| !**k).map(|(t, _)| t.kind).collect();
             let overlaps = overlaps
                 .into_iter()
@@ -284,6 +294,10 @@ pub(crate) fn place(
                 .collect();
             return Placed { geometry, origins, dropped, overlaps, optimised, undecided };
         }
+        for (key, boxes, relation) in annotation_new {
+            annotation_seen.insert(key, boxes);
+            separations.push(relation);
+        }
         for (a, b) in new {
             separated.insert((a, b));
             let relation = if clashes.contains(&(a, b)) {
@@ -297,6 +311,44 @@ pub(crate) fn place(
         }
         round += 1;
     }
+}
+
+type AnnotationPair = (usize, usize);
+type AnnotationBoxes = ([Q; 4], [Q; 4]);
+type AnnotationSeparation = (AnnotationPair, AnnotationBoxes, Tagged);
+
+/// Recompute annotation offsets at each candidate position, including coordinate-dependent text.
+/// An unrepresentable bbox is reported by the candidate's mandatory annotation validation.
+fn annotation_separations(
+    problem: &LevelProblem,
+    s: &Structure,
+    geometry: &Geometry,
+    origins: &[[Q; 2]],
+    grid: &Option<Q>,
+    seen: &BTreeMap<AnnotationPair, AnnotationBoxes>,
+) -> Vec<AnnotationSeparation> {
+    let Ok(collisions) = crate::annotation::collisions(problem, s, geometry, origins) else { return Vec::new() };
+    let mut out = Vec::new();
+    for (a, b, world_a, world_b) in collisions {
+        let (Some(pa), Some(pb)) =
+            (s.model.origin_point.get(a).copied().flatten(), s.model.origin_point.get(b).copied().flatten())
+        else {
+            continue;
+        };
+        if pa == pb {
+            continue;
+        }
+        let relative = |world: [Q; 4], origin: &[Q; 2]| {
+            [&world[0] - &origin[0], &world[1] - &origin[1], &world[2] - &origin[0], &world[3] - &origin[1]]
+        };
+        let boxes = (relative(world_a, &origins[a]), relative(world_b, &origins[b]));
+        if seen.get(&(a, b)) == Some(&boxes) {
+            continue;
+        }
+        let relation = apart((a, pa, boxes.0.clone()), (b, pb, boxes.1.clone()), origins, grid);
+        out.push(((a, b), boxes, relation));
+    }
+    out
 }
 
 /// Why two symbols that were given a relation to put them apart still overlap: whether the facts

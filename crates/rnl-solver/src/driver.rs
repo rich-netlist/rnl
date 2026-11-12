@@ -165,7 +165,11 @@ fn solve_exact_mode(
         drop(phase);
         let mut all: Vec<Placing> = Vec::new();
         for (candidate_id, c) in candidates.into_iter().enumerate() {
-            if !crate::budget::permit(crate::budget::Step::Placement, problem.objects.len()) && !all.is_empty() {
+            if !crate::budget::permit(
+                crate::budget::Step::Placement,
+                problem.objects.len().saturating_add(crate::annotation::estimated_work(problem)),
+            ) && !all.is_empty()
+            {
                 break;
             }
             let phase = crate::profile::span("stage", "coords");
@@ -177,18 +181,33 @@ fn solve_exact_mode(
             }
             let phase = crate::profile::span("stage", "score");
             let written = drawn(problem, &structure, &placed.geometry, &Routing::default());
-            let entry = match written {
-                Ok(written) => Entry {
+            let annotation = crate::annotation::bounds(problem, &placed.geometry);
+            let entry = match (written, annotation) {
+                (Ok(written), Ok(_)) => Entry {
+                    annotation_error: None,
                     written_path_error: None,
-                    overlaps: placed.overlaps.len(),
+                    overlaps: placed.overlaps.len()
+                        + crate::annotation::overlaps(problem, &structure, &placed.geometry, &placed.origins)
+                            .expect("validated annotation bounds"),
                     crowding: crowding(&structure, &placed.origins, &placed.geometry.orient, &placed.dropped),
                     misleading: misleading(problem, &structure, &placed.origins, &placed.geometry, &written),
                     joins_left: 0,
                     layers: measured_layers(problem, &structure, &placed, None),
                     code: c.code(&structure),
                 },
-                Err(wire) => Entry {
+                (Err(wire), _) => Entry {
+                    annotation_error: None,
                     written_path_error: Some(wire),
+                    overlaps: 0,
+                    crowding: 0,
+                    misleading: 0,
+                    joins_left: 0,
+                    layers: Vec::new(),
+                    code: c.code(&structure),
+                },
+                (Ok(_), Err(error)) => Entry {
+                    annotation_error: Some(error),
+                    written_path_error: None,
                     overlaps: 0,
                     crowding: 0,
                     misleading: 0,
@@ -208,8 +227,16 @@ fn solve_exact_mode(
         let beam = options.beam.max(1);
         let mut finals: Vec<(usize, Routing, Entry)> = Vec::new();
         drop(phase);
-        for &i in ranked.iter().filter(|&&i| all[i].entry.written_path_error.is_none()).take(beam) {
-            if !crate::budget::permit(crate::budget::Step::Route, problem.routes.len()) && !finals.is_empty() {
+        for &i in ranked
+            .iter()
+            .filter(|&&i| all[i].entry.written_path_error.is_none() && all[i].entry.annotation_error.is_none())
+            .take(beam)
+        {
+            if !crate::budget::permit(
+                crate::budget::Step::Route,
+                problem.routes.len().saturating_add(crate::annotation::estimated_work(problem)),
+            ) && !finals.is_empty()
+            {
                 break;
             }
             let p = &all[i];
@@ -239,7 +266,11 @@ fn solve_exact_mode(
             let i = ranked[0];
             finals.push((
                 i,
-                Routing { written_path_error: all[i].entry.written_path_error, ..Routing::default() },
+                Routing {
+                    written_path_error: all[i].entry.written_path_error,
+                    annotation_error: all[i].entry.annotation_error,
+                    ..Routing::default()
+                },
                 all[i].entry.clone(),
             ));
         }
@@ -255,7 +286,11 @@ fn solve_exact_mode(
             entries.len(),
             if candidate.origin == "P0" { "P0, the order of the netlist" } else { "the beam search" }
         ));
-        if entry.written_path_error.is_none() && problem.version == "0.4" && crate::budget::continues_rows() {
+        if entry.written_path_error.is_none()
+            && entry.annotation_error.is_none()
+            && problem.version == "0.4"
+            && crate::budget::continues_rows()
+        {
             let mut start = candidate.clone();
             let troubled = |routing: &Routing, placed: &Placed| {
                 let wires =
@@ -288,7 +323,10 @@ fn solve_exact_mode(
                         if !seen.insert(c.code(&structure)) {
                             continue;
                         }
-                        if !crate::budget::permit(crate::budget::Step::Placement, structure.objects.len()) {
+                        if !crate::budget::permit(
+                            crate::budget::Step::Placement,
+                            structure.objects.len().saturating_add(crate::annotation::estimated_work(problem)),
+                        ) {
                             break 'search;
                         }
                         let p = place(problem, &structure, &c, options, &mut work);
@@ -297,11 +335,17 @@ fn solve_exact_mode(
                             break 'search;
                         }
                         let Ok(wires) = drawn(problem, &structure, &p.geometry, &r) else { continue };
+                        if crate::annotation::bounds(problem, &p.geometry).is_err() {
+                            continue;
+                        }
                         let next = Entry {
                             written_path_error: None,
+                            annotation_error: None,
                             layers: measured_layers(problem, &structure, &p, Some(&wires)),
                             code: c.code(&structure),
-                            overlaps: p.overlaps.len(),
+                            overlaps: p.overlaps.len()
+                                + crate::annotation::overlaps(problem, &structure, &p.geometry, &p.origins)
+                                    .expect("validated annotation bounds"),
                             crowding: crowding(&structure, &p.origins, &p.geometry.orient, &p.dropped),
                             misleading: misleading(problem, &structure, &p.origins, &p.geometry, &wires),
                             joins_left: r.joins_left(),
@@ -466,6 +510,7 @@ fn solve_exact_mode(
     }
     let report = SolveReport {
         fatal_written_wire: entry.written_path_error,
+        fatal_annotation: entry.annotation_error.map(|error| error.index),
         budget: None,
         canonical_options: None,
         kept: resolved.kept.clone(),
@@ -481,12 +526,20 @@ fn solve_exact_mode(
                 errors
                     .push(format!("written wire [{wire}] has unevaluable auto geometry; solve cannot be written back"));
             }
+            if let Some(error) = entry.annotation_error {
+                let name = &problem.annotations[error.index].view.object_id;
+                errors.push(format!(
+                    "annotation {name:?} [{}]: {}; solve cannot be written back",
+                    error.index,
+                    error.reason.message()
+                ));
+            }
             errors
         },
         warnings: resolved.warnings.clone(),
         notes,
     };
-    let solution = if report.fatal_written_wire.is_some() {
+    let solution = if report.fatal_written_wire.is_some() || report.fatal_annotation.is_some() {
         Solution::default()
     } else {
         Solution {

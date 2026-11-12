@@ -108,6 +108,7 @@ pub(crate) fn object(n: Node<'_>) -> Result<ProblemObject> {
         "bundle" => ObjectKind::Bundle,
         "usage" => ObjectKind::Usage,
         "point" => ObjectKind::Point,
+        "annotation" => ObjectKind::Annotation,
         "text" => ObjectKind::Text,
         _ => return Err(n.error("unknown object kind")),
     };

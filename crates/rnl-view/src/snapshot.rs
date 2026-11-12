@@ -270,6 +270,10 @@ pub struct LevelModel {
     pub texts: Vec<TextView>,
     /// The graphics of the scene (13.4) that have their points, in the order written.
     pub shapes: Vec<ShapeView>,
+    /// Compound annotations retain their identity and local graphics.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(test, ts(as = "Option<Vec<AnnotationView>>", optional))]
+    pub annotations: Vec<AnnotationView>,
     /// The sets marked with GROUP (11.5), in the order of writing; only for a level that has some.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[cfg_attr(test, ts(as = "Option<Vec<GroupView>>", optional))]
@@ -465,6 +469,42 @@ pub struct PointView {
     pub at: Slot<[f64; 2]>,
     /// A junction dot is drawn at it.
     pub junction: bool,
+}
+
+#[derive(Serialize, Debug)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct AnnotationView {
+    pub id: String,
+    pub source_kind: String,
+    pub source: String,
+    pub anchor_kind: String,
+    pub anchor_object: Option<String>,
+    pub anchor: [f64; 2],
+    pub rotate: f64,
+    pub mirror: bool,
+    #[cfg_attr(test, ts(type = "Record<string, string | number | boolean>"))]
+    pub style: Map<String, Value>,
+    pub layer: String,
+    pub graphics: Vec<AnnotationGraphic>,
+}
+
+#[derive(Serialize, Debug)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct AnnotationGraphic {
+    pub shape: String,
+    pub points: Vec<[f64; 2]>,
+    #[cfg_attr(test, ts(type = "Record<string, string | number>"))]
+    pub params: Map<String, Value>,
+    #[cfg_attr(test, ts(type = "Record<string, string | number | boolean>"))]
+    pub style: Map<String, Value>,
+    pub lines: Vec<Vec<Run>>,
+    pub text: Option<String>,
+    pub text_refs: Vec<String>,
+    pub halign: Option<String>,
+    pub valign: Option<String>,
+    pub rotate: Option<f64>,
+    pub fix_rotate: bool,
+    pub upright: Option<bool>,
 }
 
 /// A graphic of the scene (13.4), as an `add-shape` op writes one.
@@ -1043,6 +1083,51 @@ fn level_model(
             layer: s.layer.as_str().to_string(),
         })
         .collect();
+    let annotations = lv
+        .annotations
+        .iter()
+        .map(|a| AnnotationView {
+            id: a.object_id.clone(),
+            source_kind: a.source_kind.to_string(),
+            source: a.source.clone(),
+            anchor_kind: a.anchor_kind.to_string(),
+            anchor_object: a.anchor_object.clone(),
+            anchor: xy(a.anchor),
+            rotate: a.rotate,
+            mirror: a.mirror,
+            style: style(&a.own_style),
+            layer: a.layer.as_str().to_string(),
+            graphics: a
+                .graphics
+                .iter()
+                .map(|g| AnnotationGraphic {
+                    shape: g.primitive.shape.as_str().to_lowercase(),
+                    points: g.primitive.points.iter().map(|p| xy(*p)).collect(),
+                    params: params(&g.primitive.params),
+                    style: style(&g.primitive.style),
+                    lines: g.lines.iter().map(|l| l.iter().map(primitive::run).collect()).collect(),
+                    text: g.primitive.text.clone(),
+                    text_refs: g
+                        .text_refs
+                        .iter()
+                        .map(|r| {
+                            match r {
+                                rnl_runtime::model::AnnotationTextRef::X => "x",
+                                rnl_runtime::model::AnnotationTextRef::Y => "y",
+                                rnl_runtime::model::AnnotationTextRef::Empty => "empty",
+                            }
+                            .to_string()
+                        })
+                        .collect(),
+                    halign: g.primitive.halign.clone(),
+                    valign: g.primitive.valign.clone(),
+                    rotate: g.primitive.rotate,
+                    fix_rotate: g.primitive.fix_rotate,
+                    upright: g.primitive.upright,
+                })
+                .collect(),
+        })
+        .collect();
     let symbol = Slot::of(lv.block_symbol.as_ref().and_then(|b| symbol_id(&b.info)));
     LevelModel {
         symbols: symbols.into_iter().map(|(_, r)| r).collect(),
@@ -1052,6 +1137,7 @@ fn level_model(
         wires,
         texts,
         shapes,
+        annotations,
         groups,
     }
 }

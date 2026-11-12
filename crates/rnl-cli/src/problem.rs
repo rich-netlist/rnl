@@ -221,6 +221,22 @@ pub fn level(p: &LevelProblem, solver_options: &str) -> Value {
             entry
         }).collect::<Vec<_>>(),
     });
+    if !p.annotations.is_empty() {
+        v["annotations"] = json!(p
+            .annotations
+            .iter()
+            .map(|a| json!({
+                "object": a.object, "id": a.view.object_id,
+                "source_kind": a.view.source_kind, "source": a.view.source,
+                "anchor_kind": a.view.anchor_kind, "anchor_object": a.view.anchor_object,
+                "rotate": a.view.rotate, "mirror": a.view.mirror,
+                "graphics": a.view.graphics.len(),
+            }))
+            .collect::<Vec<_>>());
+    }
+    if !p.existing_junctions.is_empty() {
+        v["existing_junctions"] = points(&p.existing_junctions);
+    }
     if !p.currents.is_empty() {
         v["currents"] = json!(p
             .currents

@@ -173,6 +173,8 @@ pub enum ObjectKind {
     /// A usage with a symbol, or any usage in 0.4, by its own point (12.1, 14.1).
     Usage,
     Point,
+    /// A non-electrical compound annotation with one referenced anchor.
+    Annotation,
     /// A text: a label attached to an object, or an annotation attached to a point (13.3).
     Text,
 }
@@ -184,6 +186,7 @@ impl ObjectKind {
             ObjectKind::Bundle => "bundle",
             ObjectKind::Usage => "usage",
             ObjectKind::Point => "point",
+            ObjectKind::Annotation => "annotation",
             ObjectKind::Text => "text",
         }
     }
@@ -633,6 +636,8 @@ pub struct TerminalCurrent {
 pub struct LevelProblem {
     /// The junction definition resolved in this level for solver/editor writeback (13.2).
     pub junction: crate::junction::JunctionConfig,
+    /// Existing effective junction targets, identified by point identity rather than coordinates.
+    pub existing_junctions: Vec<PointRef>,
     /// Effective settings, by key, after package, file-header and level overrides (14.10).
     pub solver_config: Vec<SolverSetting>,
     /// The host level: its index in the host document's levels.
@@ -671,6 +676,8 @@ pub struct LevelProblem {
     /// Final effective CURRENT declarations in a 0.4 level, mapped to their terminals' pins.
     /// Empty in released language versions, preserving their JSON and input digests.
     pub currents: Vec<TerminalCurrent>,
+    /// Compound annotations, keyed by an Annotation object index.
+    pub annotations: Vec<AnnotationInfo>,
     pub groups: Vec<ProblemGroup>,
     /// Every usage made in the level, in the order they were made, so a usage comes after the one
     /// whose expansion made it.
@@ -686,6 +693,24 @@ pub struct LevelProblem {
     /// The ids the model gives the objects and the usages, in this reading. Like every place, they
     /// are left out of the input digest ([`sig2`]).
     pub ids: ProblemIds,
+}
+
+/// Stable physical point identity; pin positions remain distinct from electrical pins.
+pub fn junction_point_identity(p: &PointRef) -> Option<(u8, usize, usize)> {
+    match p {
+        PointRef::Origin(object) => Some((0, *object, 0)),
+        PointRef::PinPosition { object, pin, .. } => Some((2, *object, *pin)),
+        _ => p.pin_key().map(|(object, pin)| (1, object, pin)),
+    }
+}
+
+/// Materialized non-electrical annotation for layout; the indexed object has Position::At
+/// referencing its only position. `view.anchor` is normalized to (0,0).
+#[derive(Clone, Debug, PartialEq)]
+pub struct AnnotationInfo {
+    /// None means the runtime could not map the anchor; the solver must fail explicitly.
+    pub object: Option<usize>,
+    pub view: crate::model::AnnotationView,
 }
 
 /// The ids of the objects and the usages of a problem in the model ([`crate::model::ObjectInfo::id`]),
@@ -940,6 +965,84 @@ pub fn canonical(p: &LevelProblem) -> String {
         for current in &p.currents {
             c.point(&current.pin);
             c.str(&current.direction);
+        }
+    }
+    if !p.annotations.is_empty() {
+        c.word("annotations");
+        for a in &p.annotations {
+            let v = &a.view;
+            c.opt_index(a.object);
+            c.num(v.rotate);
+            c.bool(v.mirror);
+            c.str(v.layer.as_str());
+            for style in [&v.style, &v.own_style] {
+                c.word("[");
+                for (key, value) in style {
+                    c.str(key);
+                    c.word(&written_lit(value));
+                }
+                c.word("]");
+            }
+            c.word("[");
+            for g in &v.graphics {
+                let q = &g.primitive;
+                c.index(q.order);
+                c.str(q.shape.as_str());
+                c.opt_str(q.text.as_deref());
+                c.bool(q.text_name_formats);
+                c.bool(q.modern_text);
+                c.word("[");
+                for (x, y) in &q.points {
+                    c.num(*x);
+                    c.num(*y);
+                }
+                c.word("]");
+                c.opt_num(q.params.width);
+                c.opt_num(q.params.height);
+                c.opt_num(q.params.radius);
+                c.opt_str(q.params.fill.as_deref());
+                c.opt_str(q.params.arrow.as_deref());
+                c.word("[");
+                for (key, value) in &q.style {
+                    c.str(key);
+                    c.word(&written_lit(value));
+                }
+                c.word("]");
+                c.opt_str(q.halign.as_deref());
+                c.opt_str(q.valign.as_deref());
+                c.opt_num(q.rotate);
+                c.bool(q.fix_rotate);
+                match q.upright {
+                    Some(b) => c.bool(b),
+                    None => c.word("-"),
+                }
+                c.word("[");
+                for line in &g.lines {
+                    c.runs(line);
+                }
+                c.word("]");
+                c.word("[");
+                for r in &g.text_refs {
+                    c.word(match r {
+                        crate::model::AnnotationTextRef::X => "x",
+                        crate::model::AnnotationTextRef::Y => "y",
+                        crate::model::AnnotationTextRef::Empty => "empty",
+                    });
+                }
+                c.word("]");
+            }
+            c.word("]");
+        }
+    }
+    if !p.existing_junctions.is_empty() {
+        let mut keys: Vec<_> = p.existing_junctions.iter().filter_map(junction_point_identity).collect();
+        keys.sort_unstable();
+        keys.dedup();
+        c.word("existing-junctions");
+        for (kind, object, pin) in keys {
+            c.index(kind as usize);
+            c.index(object);
+            c.index(pin);
         }
     }
     c.0
@@ -1469,7 +1572,9 @@ mod tests {
     #[test]
     fn the_input_segment_is_compared_alone() {
         let p = LevelProblem {
+            annotations: Vec::new(),
             junction: Default::default(),
+            existing_junctions: Vec::new(),
             solver_config: Vec::new(),
             level: 0,
             title: "t.sp".into(),
@@ -1522,7 +1627,9 @@ mod tests {
             port,
         };
         let p = LevelProblem {
+            annotations: Vec::new(),
             junction: Default::default(),
+            existing_junctions: Vec::new(),
             solver_config: Vec::new(),
             level: 0,
             title: "t.sp".into(),

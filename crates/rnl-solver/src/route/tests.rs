@@ -8,7 +8,7 @@ fn p(x: i64, y: i64) -> [Q; 2] {
 }
 
 fn anchor(x: i64, y: i64, exit: Option<(i64, i64)>) -> AnchorIn {
-    AnchorIn { at: p(x, y), exit, owner: None, connects_pin: true }
+    AnchorIn { at: p(x, y), exit, owner: None, connects_pin: true, existing_junction: false }
 }
 
 const EAST: Option<(i64, i64)> = Some((1, 0));
@@ -609,8 +609,10 @@ fn a_net_whose_budget_runs_out_is_left_in_parts() {
 #[test]
 fn coordinates_off_the_integers_are_nodes_of_the_lattice() {
     let half = |v: i64| crate::rational::frac(v, 2);
-    let a = AnchorIn { at: [half(1), half(-3)], exit: EAST, owner: None, connects_pin: false };
-    let b = AnchorIn { at: [half(13), half(5)], exit: WEST, owner: None, connects_pin: false };
+    let a =
+        AnchorIn { at: [half(1), half(-3)], exit: EAST, owner: None, connects_pin: false, existing_junction: false };
+    let b =
+        AnchorIn { at: [half(13), half(5)], exit: WEST, owner: None, connects_pin: false, existing_junction: false };
     let l = layout(&[], vec![net(vec![a, b])]);
     let out = &check(&l, 100_000)[0];
     let w = &out.wires[0];
@@ -666,7 +668,7 @@ fn symbols(boxes: &[(usize, [i64; 4])], nets: Vec<NetIn>, written: Vec<Vec<[Q; 2
 }
 
 fn pin(x: i64, y: i64, exit: Option<(i64, i64)>, owner: usize) -> AnchorIn {
-    AnchorIn { at: p(x, y), exit, owner: Some(owner), connects_pin: true }
+    AnchorIn { at: p(x, y), exit, owner: Some(owner), connects_pin: true, existing_junction: false }
 }
 
 /// Whether a segment runs along the edge of a box: on the line of one of its edges, over some of
@@ -993,4 +995,41 @@ fn auto_written_path_reports_unrepresentable_exact_geometry() {
     // Missing source objects are a distinct, non-error outcome.
     problem.wires[0].anchors.push(PointRef::Origin(5));
     assert_eq!(written_path(&problem, &geometry, 0), Ok(None));
+}
+
+#[test]
+fn an_existing_dot_reuses_the_point_anchor_without_a_branch_or_zero_wire() {
+    let mut net = net(vec![anchor(0, 0, None), anchor(-4, 0, None), anchor(4, 0, None), anchor(0, 4, None)]);
+    net.anchors[0].connects_pin = false;
+    net.anchors[0].existing_junction = true;
+    net.joined = vec![(0, 1), (0, 2)];
+    let mut l = layout(&[], vec![net]);
+    l.modern = true;
+    let grid = Grid::new(&l).unwrap();
+    let nodes: Vec<Option<usize>> = l.nets[0].anchors.iter().map(|a| grid.lat.at(&a.at)).collect();
+    let mut made = vec![Made { start: End::Anchor(3), end: End::Anchor(0), nodes: vec![] }];
+    let mut branches = Vec::new();
+    grid.junctions_at_anchors(&l.nets[0], &nodes, &mut made, &mut branches);
+    assert!(branches.is_empty());
+    assert_eq!(made.len(), 1);
+    assert_eq!((made[0].start, made[0].end), (End::Anchor(3), End::Anchor(0)));
+
+    // The same topology without an existing dot retains the generated junction.
+    l.nets[0].anchors[0].existing_junction = false;
+    let grid = Grid::new(&l).unwrap();
+    let mut made = vec![Made { start: End::Anchor(3), end: End::Anchor(0), nodes: vec![] }];
+    let mut branches = Vec::new();
+    grid.junctions_at_anchors(&l.nets[0], &nodes, &mut made, &mut branches);
+    assert_eq!(branches, vec![nodes[0].unwrap()]);
+    assert_eq!(made.len(), 2);
+    assert_eq!((made[1].start, made[1].end), (End::Branch(0), End::Anchor(0)));
+
+    // The new flag must not change released-version routing.
+    l.modern = false;
+    l.nets[0].anchors[0].existing_junction = true;
+    let grid = Grid::new(&l).unwrap();
+    let mut made = vec![Made { start: End::Anchor(3), end: End::Anchor(0), nodes: vec![] }];
+    let mut branches = Vec::new();
+    grid.junctions_at_anchors(&l.nets[0], &nodes, &mut made, &mut branches);
+    assert_eq!(branches, vec![nodes[0].unwrap()]);
 }

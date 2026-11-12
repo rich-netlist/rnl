@@ -27,7 +27,7 @@ fn published_0_4() -> Value {
 /// What the draft 0.4 has that the runtime does not yet: keywords by name, and the parts of the list
 /// that change with them. A change that brings one takes it off this list, so that the comparison
 /// covers it from then on; the list is empty when 0.4 is released.
-const PENDING_0_4: &[&str] = &["ANNOTATION"];
+const PENDING_0_4: &[&str] = &[];
 
 // Every field is accounted for. These are the only prose-only exemptions: descriptions,
 // human-readable form/sentence templates (with ellipses), and explanations of keys/array items.
@@ -297,9 +297,8 @@ fn compare(p: &Value, version: &str, pending: &[&str]) {
         assert_eq!(at_least_one(k.get("at_least_one")), json!(a.at_least_one_in(version)), "{name} at_least_one");
         assert_eq!(k["open_params"].as_bool().unwrap_or(false), a.open_params, "{name} open params");
         assert_eq!(k["override"], json!(a.override_), "{name} override");
-        let dynamic = matches!(a.params, ParamsSpec::Definition);
-        assert_eq!(k["definition_params"].as_bool().unwrap_or(false), dynamic, "{name} definition params");
-        let params = if dynamic { w.usage_params() } else { a.params_in(version) };
+        assert_eq!(k["definition_params"].as_bool().unwrap_or(false), a.definition_params, "{name} definition params");
+        let params = if matches!(a.params, ParamsSpec::Definition) { w.usage_params() } else { a.params_in(version) };
         assert_eq!(params.len(), k["params"].as_array().unwrap().len(), "{name} params");
         for e in k["params"].as_array().unwrap() {
             parameter(params.iter().find(|v| e["name"] == v.name).unwrap(), e);
@@ -349,7 +348,9 @@ fn compare(p: &Value, version: &str, pending: &[&str]) {
             all_words.insert(slot["name"].as_str().unwrap().to_string());
             if slot["takes"] != "definition" {
                 for kind in slot["kinds"].as_array().into_iter().flatten().filter_map(Value::as_str) {
-                    if !kinds.iter().any(|k| k == kind) && kind != "style" {
+                    // Definition kinds can also share an ordinary slot with an object
+                    // (ANNOTATION source). They are not pseudo object kinds.
+                    if !kinds.iter().any(|k| k == kind) && !matches!(kind, "style" | "symbol" | "general") {
                         pseudo.insert(kind.to_string());
                     }
                 }

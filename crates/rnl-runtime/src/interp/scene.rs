@@ -863,6 +863,7 @@ impl Interp<'_> {
     pub(crate) fn scene_add_prim(&mut self, s: SceneId, prim: ObjId, at: Pos, ctx: &Ctx) {
         let style = match self.o(prim) {
             ObjData::Prim { style, .. } => style.clone(),
+            ObjData::Annotation(data) => data.style.clone(),
             _ => StyleMap::new(),
         };
         let sc = &mut self.scenes[s];
@@ -1160,6 +1161,17 @@ impl Interp<'_> {
         let obj = if self.scenes[s].phase >= 7 { self.scene_value(obj) } else { obj };
         match op {
             TargetOp::Place { x, y, priority, off } => {
+                // An ANNOTATION is locatable but PLACE takes its position subobject, not
+                // the annotation itself (13.5). Check before coordinate normalization so
+                // a following annotation cannot accidentally move its owner.
+                if self.follows_0_4(self.source_unit(ctx)) && matches!(self.o(obj), ObjData::Annotation(_)) {
+                    return self.fail(
+                        ctx,
+                        codes::PLACE_NOT_TAKEN,
+                        format!("PLACE does not take {}; use its ::position (11.1, 13.5)", self.label(obj)),
+                        *off,
+                    );
+                }
                 let obj = if self.follows_0_4(self.source_unit(ctx)) { self.coordinate_object(obj) } else { obj };
                 let base = self.coordinate_base(ctx);
                 if base.is_some_and(|b| self.coordinate_object(obj) == b) {
@@ -2334,7 +2346,7 @@ impl Interp<'_> {
             ObjData::Inst { .. } | ObjData::Bundle { .. } => Some("instance"),
             ObjData::Usage(_) => Some("usage"),
             ObjData::Wire { .. } => Some("wire"),
-            ObjData::Prim { .. } => Some("annotation"),
+            ObjData::Prim { .. } | ObjData::Annotation(_) => Some("annotation"),
             ObjData::Text { attach, .. } | ObjData::KeyText { attach, .. } => {
                 if matches!(self.o(*attach), ObjData::Point { .. } | ObjData::Pos { .. }) {
                     Some("annotation")

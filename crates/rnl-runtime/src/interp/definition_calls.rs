@@ -329,6 +329,37 @@ impl Interp<'_> {
         })
     }
 
+    /// Read a known ANNOTATION source's parameter names without applying its definition.
+    pub(super) fn annotation_static_params(
+        &mut self,
+        object: &ObjExpr,
+        owner: &DefData,
+        ctx: &Ctx,
+        scopes: &[&SetExpr],
+    ) -> Option<Vec<String>> {
+        let source = self.static_callee(object, owner, ctx, scopes, &mut HashSet::new())?;
+        if !source.known_params {
+            return None;
+        }
+        let mut names: Vec<String> = source.data.params.iter().map(|(name, _)| name.clone()).collect();
+        let taken: Vec<String> = source
+            .data
+            .roles
+            .iter()
+            .map(|r| r.name.clone())
+            .chain(names.iter().cloned())
+            .chain(source.data.local_names())
+            .collect();
+        if let Some(table) = self.file_unit(ctx.unit).and_then(|u| self.units[u].scoped.get(&source.label)) {
+            for (alias, (original, _)) in table {
+                if !taken.contains(alias) && names.contains(original) {
+                    names.push(alias.clone());
+                }
+            }
+        }
+        Some(names)
+    }
+
     pub(super) fn check_definition_callee(
         &mut self,
         kw: &str,

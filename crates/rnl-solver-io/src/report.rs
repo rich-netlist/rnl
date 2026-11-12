@@ -35,6 +35,9 @@ pub(crate) fn encode(r: &SolveReport) -> Result<Value> {
         "work":{"resolve_nodes":r.work.resolve_nodes,"pivots":r.work.pivots,"candidates":r.work.candidates,"astar_expansions":r.work.astar_expansions},
         "errors":r.errors,"warnings":r.warnings,"notes":r.notes,
     });
+    if let Some(index) = r.fatal_annotation {
+        value["fatal_annotation"] = json!(index);
+    }
     if let Some(wire) = r.fatal_written_wire {
         value["fatal_written_wire"] = json!(wire);
     }
@@ -96,6 +99,11 @@ pub(crate) fn decode(n: Node<'_>) -> Result<SolveReport> {
     }
     let work = n.field("work")?;
     Ok(SolveReport {
+        fatal_annotation: if n.value.get("fatal_annotation").is_some() {
+            Some(n.field("fatal_annotation")?.index()?)
+        } else {
+            None
+        },
         fatal_written_wire: if n.value.get("fatal_written_wire").is_some() {
             Some(n.field("fatal_written_wire")?.index()?)
         } else {

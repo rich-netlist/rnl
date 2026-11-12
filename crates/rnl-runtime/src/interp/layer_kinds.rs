@@ -29,6 +29,7 @@ impl Interp<'_> {
     ) -> R<()> {
         let (code, section, accepts): (_, _, fn(&str) -> bool) = match keyword {
             "LAYER" => (codes::LAYER_NOT_TAKEN, "11.6", drawable),
+            "PLACE" => (codes::PLACE_NOT_TAKEN, "11.1, 13.5", |kind| kind != "annotation"),
             "ROUTE-NET" | "UNROUTE-NET" => {
                 (codes::ROUTE_TARGET_NOT_NET, "13.7", |kind| matches!(kind, "net" | "terminal" | "pin"))
             }

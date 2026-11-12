@@ -41,6 +41,79 @@ pub fn modern_text(
     upright: bool,
     scale: f64,
 ) -> (TextPrim, [f64; 4]) {
+    let (a, b, c, d) = owner.matrix();
+    modern_text_affine(
+        anchor,
+        lines,
+        halign,
+        valign,
+        rotate,
+        style,
+        [f64::from(a), f64::from(b), f64::from(c), f64::from(d)],
+        fix_rotate,
+        upright,
+        scale,
+    )
+}
+
+/// Lay out a modern text under any orthogonal owner transform, including an annotation's
+/// arbitrary rotation and mirror. The matrix is [xx, xy, yx, yy], in scene coordinates;
+/// its translation is already reflected in `anchor`. This shares the glyph layout and
+/// upright/fixed-direction policy with ordinary symbol texts.
+#[allow(clippy::too_many_arguments)]
+pub fn modern_text_affine(
+    anchor: Pt,
+    lines: Vec<Line>,
+    halign: &str,
+    valign: &str,
+    rotate: f64,
+    style: &Style,
+    owner: [f64; 4],
+    fix_rotate: bool,
+    upright: bool,
+    scale: f64,
+) -> (TextPrim, [f64; 4]) {
+    modern_text_affine_inner(anchor, lines, halign, valign, rotate, style, owner, None, fix_rotate, upright, scale)
+}
+
+// Keep the low part of the sum for strict 90/270 comparisons, without an epsilon.
+fn annotation_upright_flip(owner_angle: f64, text_angle: f64, mirror: bool) -> bool {
+    fn two_sum(a: f64, b: f64) -> (f64, f64) {
+        let sum = a + b;
+        let bv = sum - a;
+        (sum, (a - (sum - bv)) + (b - bv))
+    }
+    let owner = owner_angle.rem_euclid(360.0);
+    let text = text_angle.rem_euclid(360.0);
+    let (first, e1) = two_sum(owner, if mirror { -text } else { text });
+    let (sum, e2) = two_sum(first, if mirror { 180.0 } else { 0.0 });
+    let (high, e3) = if sum < 0.0 {
+        two_sum(sum, 360.0)
+    } else if sum >= 360.0 {
+        two_sum(sum, -360.0)
+    } else {
+        (sum, 0.0)
+    };
+    let low = e1 + e2 + e3;
+    let after_90 = high > 90.0 || (high == 90.0 && low > 0.0);
+    let through_270 = high < 270.0 || (high == 270.0 && low <= 0.0);
+    after_90 && through_270
+}
+
+#[allow(clippy::too_many_arguments)]
+fn modern_text_affine_inner(
+    anchor: Pt,
+    lines: Vec<Line>,
+    halign: &str,
+    valign: &str,
+    rotate: f64,
+    style: &Style,
+    owner: [f64; 4],
+    annotation_owner: Option<(f64, bool)>,
+    fix_rotate: bool,
+    upright: bool,
+    scale: f64,
+) -> (TextPrim, [f64; 4]) {
     let e = Eff::from(style);
     let mut t = TextPrim {
         anchor,
@@ -70,26 +143,37 @@ pub fn modern_text(
         let rad = angle.to_radians();
         (libm::sin(rad), libm::cos(rad))
     };
-    let (box_u, box_v) = (owner.apply((cs, sn)), owner.apply((-sn, cs)));
+    let [a, b, c, d] = owner;
+    let apply = |(x, y): Pt| (a * x + b * y, c * x + d * y);
+    let (box_u, box_v) = (apply((cs, sn)), apply((-sn, cs)));
     let (mut u, mut v) = if fix_rotate { ((cs, sn), (-sn, cs)) } else { (box_u, box_v) };
     if upright {
         // Remove glyph reflection while leaving the box-side transform independent.
         if u.0 * v.1 - u.1 * v.0 < 0.0 {
             v = (-v.0, -v.1);
         }
-        // Determine the half-plane from the written angle and the exact owner
-        // matrix, rather than tolerances on sin/cos near 90 and 270 degrees.
-        let (a, b, c, d) = owner.matrix();
-        let base = match (a, c) {
-            (1, 0) => 0.0,
-            (0, 1) => 90.0,
-            (-1, 0) => 180.0,
-            (0, -1) => 270.0,
-            _ => unreachable!("an orientation has an orthogonal unit x axis"),
+        // The annotation carries its written angle: reconstructing it from atan2 can
+        // move an exact boundary. Legacy orientation callers keep their existing path.
+        let flip = if let Some((owner_angle, mirror)) = annotation_owner.filter(|_| !fix_rotate) {
+            annotation_upright_flip(owner_angle, rotate, mirror)
+        } else {
+            let base = if a == 1.0 && c == 0.0 {
+                0.0
+            } else if a == 0.0 && c == 1.0 {
+                90.0
+            } else if a == -1.0 && c == 0.0 {
+                180.0
+            } else if a == 0.0 && c == -1.0 {
+                270.0
+            } else {
+                libm::atan2(c, a).to_degrees().rem_euclid(360.0)
+            };
+            let rotation = rotate.rem_euclid(360.0);
+            let angle =
+                if fix_rotate { rotation } else { (base + (a * d - b * c).signum() * rotation).rem_euclid(360.0) };
+            angle > 90.0 && angle <= 270.0
         };
-        let rotation = rotate.rem_euclid(360.0);
-        let angle = if fix_rotate { rotation } else { (base + f64::from(a * d - b * c) * rotation).rem_euclid(360.0) };
-        if angle > 90.0 && angle <= 270.0 {
+        if flip {
             u = (-u.0, -u.1);
             v = (-v.0, -v.1);
         }
@@ -390,6 +474,250 @@ fn sub(order: &[f64], k: f64) -> Vec<f64> {
     v
 }
 
+fn annotation_angle(point: Pt, center: Pt) -> f64 {
+    let (x, y) = (point.0 - center.0, point.1 - center.1);
+    if x.is_finite() && y.is_finite() {
+        libm::atan2(y, x)
+    } else {
+        libm::atan2(point.1 / 2.0 - center.1 / 2.0, point.0 / 2.0 - center.0 / 2.0)
+    }
+}
+
+/// Stable circle through annotation arc points, calculated from scaled differences.
+/// None means collinear; Err means the circle cannot be represented finitely.
+fn annotation_circle3(a: Pt, b: Pt, c: Pt) -> Result<Option<(Pt, f64, bool)>, AnnotationBoundsError> {
+    let raw = [b.0 - a.0, b.1 - a.1, c.0 - a.0, c.1 - a.1];
+    let half = raw.iter().any(|x| !x.is_finite());
+    let d = if half {
+        [b.0 / 2.0 - a.0 / 2.0, b.1 / 2.0 - a.1 / 2.0, c.0 / 2.0 - a.0 / 2.0, c.1 / 2.0 - a.1 / 2.0]
+    } else {
+        raw
+    };
+    let scale = d.iter().map(|x| x.abs()).fold(0.0_f64, f64::max);
+    if scale == 0.0 {
+        return Ok(None);
+    }
+    let (bx, by, cx, cy) = (d[0] / scale, d[1] / scale, d[2] / scale, d[3] / scale);
+    let cross = bx * cy - by * cx;
+    if cross == 0.0 {
+        return Ok(None);
+    }
+    let (bb, cc) = (bx * bx + by * by, cx * cx + cy * cy);
+    let ux = (bb * cy - cc * by) / (2.0 * cross);
+    let uy = (cc * bx - bb * cx) / (2.0 * cross);
+    let (ox, oy) = (ux * scale, uy * scale);
+    let radius = libm::hypot(ux, uy) * scale;
+    let center = if half { ((a.0 / 2.0 + ox) * 2.0, (a.1 / 2.0 + oy) * 2.0) } else { (a.0 + ox, a.1 + oy) };
+    let radius = if half { radius * 2.0 } else { radius };
+    if !center.0.is_finite() || !center.1.is_finite() || !radius.is_finite() {
+        return Err(AnnotationBoundsError::NonFinite);
+    }
+    Ok(Some((center, radius, cross > 0.0)))
+}
+
+/// Transform a local graphic as one rigid, optionally mirrored annotation.
+fn annotation_primitive(primitive: &mut Primitive, matrix: [f64; 4], anchor: Pt, mirrored: bool) {
+    let point = |p: Pt| (anchor.0 + matrix[0] * p.0 + matrix[1] * p.1, anchor.1 + matrix[2] * p.0 + matrix[3] * p.1);
+    let old = primitive.bbox;
+    let corners = [point((old[0], old[1])), point((old[0], old[3])), point((old[2], old[1])), point((old[2], old[3]))];
+    primitive.bbox = [
+        corners.iter().map(|p| p.0).fold(f64::INFINITY, f64::min),
+        corners.iter().map(|p| p.1).fold(f64::INFINITY, f64::min),
+        corners.iter().map(|p| p.0).fold(f64::NEG_INFINITY, f64::max),
+        corners.iter().map(|p| p.1).fold(f64::NEG_INFINITY, f64::max),
+    ];
+    match &mut primitive.kind {
+        Kind::Path { segs, .. } => {
+            for seg in segs {
+                match seg {
+                    PathSeg::Move(p) | PathSeg::Line(p) => *p = point(*p),
+                    PathSeg::Arc { ccw, to, .. } => {
+                        *to = point(*to);
+                        if mirrored {
+                            *ccw = !*ccw;
+                        }
+                    }
+                    PathSeg::Cubic(a, b, c) => {
+                        *a = point(*a);
+                        *b = point(*b);
+                        *c = point(*c);
+                    }
+                    PathSeg::Close => (),
+                }
+            }
+        }
+        Kind::Rect { min, max, strokes, fill } => {
+            let (a, b) = (*min, *max);
+            let segs = vec![
+                PathSeg::Move(point(a)),
+                PathSeg::Line(point((b.0, a.1))),
+                PathSeg::Line(point(b)),
+                PathSeg::Line(point((a.0, b.1))),
+                PathSeg::Close,
+            ];
+            primitive.kind = Kind::Path { segs, strokes: strokes.clone(), fill: fill.clone() };
+        }
+        Kind::Circle { c, r, .. } => {
+            *c = point(*c);
+            primitive.bbox = [c.0 - *r, c.1 - *r, c.0 + *r, c.1 + *r];
+        }
+        Kind::Ellipse { c, rx, ry, strokes, fill } => {
+            let (x, y) = *c;
+            let (rx, ry) = (*rx, *ry);
+            let k = 0.5522847498307936;
+            let segs = vec![
+                PathSeg::Move(point((x + rx, y))),
+                PathSeg::Cubic(point((x + rx, y + k * ry)), point((x + k * rx, y + ry)), point((x, y + ry))),
+                PathSeg::Cubic(point((x - k * rx, y + ry)), point((x - rx, y + k * ry)), point((x - rx, y))),
+                PathSeg::Cubic(point((x - rx, y - k * ry)), point((x - k * rx, y - ry)), point((x, y - ry))),
+                PathSeg::Cubic(point((x + k * rx, y - ry)), point((x + rx, y - k * ry)), point((x + rx, y))),
+                PathSeg::Close,
+            ];
+            primitive.kind = Kind::Path { segs, strokes: strokes.clone(), fill: fill.clone() };
+        }
+        Kind::Flyline { a, b, .. } => {
+            *a = point(*a);
+            *b = point(*b);
+        }
+        Kind::Text(_) => (),
+    }
+}
+
+/// Failure to form a finite annotation ink box.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AnnotationBoundsError {
+    NonFinite,
+    InvalidGeometry,
+}
+
+/// Compute the same visible annotation ink as drawing, relative to its anchor.
+/// `scale` is pixels per scene unit and must be positive and finite.
+pub fn annotation_bounds(
+    annotation: &rnl_runtime::model::AnnotationView,
+    scale: f64,
+) -> Result<Option<[f64; 4]>, AnnotationBoundsError> {
+    if !scale.is_finite()
+        || scale <= 0.0
+        || !annotation.rotate.is_finite()
+        || !annotation.anchor.0.is_finite()
+        || !annotation.anchor.1.is_finite()
+    {
+        return Err(AnnotationBoundsError::NonFinite);
+    }
+    for graphic in &annotation.graphics {
+        let p = &graphic.primitive;
+        if p.shape == Shape::Text
+            && merged(&annotation.style, &p.style).get("textvisible").and_then(Lit::boolean) == Some(false)
+        {
+            continue;
+        }
+        if p.points.iter().any(|p| !p.0.is_finite() || !p.1.is_finite()) {
+            return Err(AnnotationBoundsError::NonFinite);
+        }
+        let n = p.points.len();
+        let valid = match p.shape {
+            Shape::Text => n == 1,
+            Shape::Line => n >= 2,
+            Shape::Rectangle | Shape::Circle | Shape::Ellipse => n == 1 || n == 2,
+            Shape::Arc => n == 3,
+            Shape::Bezier => n >= 4 && (n - 1) % 3 == 0,
+        };
+        if !valid {
+            return Err(AnnotationBoundsError::InvalidGeometry);
+        }
+    }
+    let mut relative = annotation.clone();
+    for graphic in &mut relative.graphics {
+        if graphic.primitive.shape == Shape::Text
+            && merged(&relative.style, &graphic.primitive.style).get("textvisible").and_then(Lit::boolean)
+                == Some(false)
+        {
+            continue;
+        }
+        if let Some(text) = &graphic.primitive.text {
+            if markup::attr_refs(text).len() != graphic.text_refs.len() {
+                return Err(AnnotationBoundsError::InvalidGeometry);
+            }
+            let mut index = 0;
+            let expanded = markup::expand_math(text, |_| {
+                use rnl_runtime::model::AnnotationTextRef;
+                let result = match graphic.text_refs[index] {
+                    AnnotationTextRef::X => rnl_runtime::geom::fmt_num(annotation.anchor.0),
+                    AnnotationTextRef::Y => rnl_runtime::geom::fmt_num(annotation.anchor.1),
+                    AnnotationTextRef::Empty => String::new(),
+                };
+                index += 1;
+                result
+            });
+            graphic.lines = markup::parse_with_name_formats(&expanded, graphic.primitive.text_name_formats);
+        } else if !graphic.text_refs.is_empty() {
+            return Err(AnnotationBoundsError::InvalidGeometry);
+        }
+    }
+    relative.anchor = (0.0, 0.0);
+    let mut out = Out { prims: Vec::new(), scale };
+    out.annotation(&relative);
+    let mut bounds = None::<[f64; 4]>;
+    for primitive in out.prims {
+        let finite = |p: Pt| p.0.is_finite() && p.1.is_finite();
+        let valid = match &primitive.kind {
+            Kind::Path { segs, .. } => segs.iter().all(|s| match s {
+                PathSeg::Move(p) | PathSeg::Line(p) => finite(*p),
+                PathSeg::Arc { r, to, .. } => r.is_finite() && finite(*to),
+                PathSeg::Cubic(a, b, c) => finite(*a) && finite(*b) && finite(*c),
+                PathSeg::Close => true,
+            }),
+            Kind::Rect { min, max, .. } => finite(*min) && finite(*max),
+            Kind::Circle { c, r, .. } => finite(*c) && r.is_finite(),
+            Kind::Ellipse { c, rx, ry, .. } => finite(*c) && rx.is_finite() && ry.is_finite(),
+            Kind::Text(t) => {
+                finite(t.anchor)
+                    && t.size.is_finite()
+                    && t.transform.is_none_or(|m| m.iter().all(|x| x.is_finite()))
+                    && t.runs.iter().all(|r| finite(r.at) && r.size.is_finite() && r.width.is_finite())
+                    && t.bars.iter().all(|b| finite(b.a) && finite(b.b) && b.stroke.width.is_finite())
+            }
+            Kind::Flyline { a, b, .. } => finite(*a) && finite(*b),
+        };
+        if !valid {
+            return Err(AnnotationBoundsError::NonFinite);
+        }
+        let strokes: &[Stroke] = match &primitive.kind {
+            Kind::Path { strokes, .. }
+            | Kind::Rect { strokes, .. }
+            | Kind::Circle { strokes, .. }
+            | Kind::Ellipse { strokes, .. }
+            | Kind::Flyline { strokes, .. } => strokes,
+            Kind::Text(_) => &[],
+        };
+        if strokes.iter().any(|s| !s.width.is_finite() || s.width < 0.0) {
+            return Err(AnnotationBoundsError::NonFinite);
+        }
+        let radius = strokes
+            .iter()
+            .map(|s| {
+                let width = if s.pixels { s.width / scale } else { s.width };
+                // SVG's default miter limit is four times the half-width.
+                width * if s.join == "miter" { 2.0 } else { 0.5 }
+            })
+            .fold(0.0_f64, f64::max);
+        let b = [
+            primitive.bbox[0] - radius,
+            primitive.bbox[1] - radius,
+            primitive.bbox[2] + radius,
+            primitive.bbox[3] + radius,
+        ];
+        if b.iter().any(|v| !v.is_finite()) {
+            return Err(AnnotationBoundsError::NonFinite);
+        }
+        bounds = Some(match bounds {
+            None => b,
+            Some(a) => [a[0].min(b[0]), a[1].min(b[1]), a[2].max(b[2]), a[3].max(b[3])],
+        });
+    }
+    Ok(bounds)
+}
+
 struct Out {
     prims: Vec<Primitive>,
     /// Pixels per scene unit, at which the strokes are resolved.
@@ -409,6 +737,130 @@ impl Out {
             b = [0.0; 4];
         }
         self.prims.push(Primitive { owner: owner.to_string(), layer, order, kind, bbox: b });
+    }
+
+    fn annotation(&mut self, annotation: &rnl_runtime::model::AnnotationView) {
+        let theta = annotation.rotate.rem_euclid(360.0).to_radians();
+        let (sin, cos) = (libm::sin(theta), libm::cos(theta));
+        let flip = if annotation.mirror { -1.0 } else { 1.0 };
+        let matrix = [cos * flip, -sin, sin * flip, cos];
+        let transform = |p: Pt| {
+            (
+                annotation.anchor.0 + matrix[0] * p.0 + matrix[1] * p.1,
+                annotation.anchor.1 + matrix[2] * p.0 + matrix[3] * p.1,
+            )
+        };
+        for graphic in &annotation.graphics {
+            let p = &graphic.primitive;
+            let style = merged(&annotation.style, &p.style);
+            let order = sub(&annotation.order, p.order as f64);
+            if p.shape == Shape::Text {
+                if style.get("textvisible").and_then(|v| v.boolean()) == Some(false)
+                    || p.points.is_empty()
+                    || graphic.lines.iter().all(|line| line.is_empty())
+                {
+                    continue;
+                }
+                let (text, bbox) = modern_text_affine_inner(
+                    transform(p.points[0]),
+                    graphic.lines.clone(),
+                    p.halign.as_deref().unwrap_or("start"),
+                    p.valign.as_deref().unwrap_or("baseline"),
+                    p.rotate.unwrap_or(0.0),
+                    &style,
+                    matrix,
+                    Some((annotation.rotate, annotation.mirror)),
+                    p.fix_rotate,
+                    p.upright.unwrap_or(true),
+                    self.scale,
+                );
+                self.prims.push(Primitive {
+                    owner: annotation.object_id.clone(),
+                    layer: annotation.layer,
+                    order,
+                    kind: Kind::Text(text),
+                    bbox,
+                });
+            } else if !p.points.is_empty() {
+                let first = self.prims.len();
+                if p.shape == Shape::Arc && p.points.len() == 3 {
+                    let (a, b, c) = (p.points[0], p.points[1], p.points[2]);
+                    let eff = Eff::from(&style);
+                    let fill = match p.params.fill.as_deref() {
+                        Some("linecolor") => Some(eff.linecolor.clone()),
+                        Some("fillcolor") => Some(eff.fillcolor.clone()),
+                        _ => None,
+                    };
+                    let segs = match annotation_circle3(a, b, c) {
+                        Ok(Some((center, r, ccw))) => {
+                            let angle = |q: Pt| annotation_angle(q, center);
+                            let sweep = (angle(c) - angle(a)).rem_euclid(std::f64::consts::TAU);
+                            let span = if ccw { sweep } else { std::f64::consts::TAU - sweep };
+                            vec![PathSeg::Move(a), PathSeg::Arc { r, large: span > std::f64::consts::PI, ccw, to: c }]
+                        }
+                        Ok(None) => vec![PathSeg::Move(a), PathSeg::Line(c)],
+                        Err(_) => vec![PathSeg::Move(a), PathSeg::Arc { r: f64::NAN, large: false, ccw: false, to: c }],
+                    };
+                    self.path(
+                        &annotation.object_id,
+                        segs,
+                        eff.strokes(self.scale),
+                        fill,
+                        annotation.layer,
+                        order.clone(),
+                        &p.points,
+                    );
+                    self.arrows(&annotation.object_id, &p.points, &p.params, &eff, annotation.layer, order, p.shape);
+                } else {
+                    self.shape(&annotation.object_id, p.shape, &p.points, &p.params, &style, annotation.layer, order);
+                }
+                for prim in &mut self.prims[first..] {
+                    annotation_primitive(prim, matrix, annotation.anchor, annotation.mirror);
+                }
+                if p.shape == Shape::Arc && p.points.len() == 3 && first < self.prims.len() {
+                    let (a, b, c) = (p.points[0], p.points[1], p.points[2]);
+                    let points = [transform(a), transform(b), transform(c)];
+                    self.prims[first].bbox = [
+                        points.iter().map(|p| p.0).fold(f64::INFINITY, f64::min),
+                        points.iter().map(|p| p.1).fold(f64::INFINITY, f64::min),
+                        points.iter().map(|p| p.0).fold(f64::NEG_INFINITY, f64::max),
+                        points.iter().map(|p| p.1).fold(f64::NEG_INFINITY, f64::max),
+                    ];
+                    if let Ok(Some((center, radius, local_ccw))) = annotation_circle3(a, b, c) {
+                        let center = transform(center);
+                        let (a, c) = (transform(a), transform(c));
+                        let ccw = local_ccw != annotation.mirror;
+                        let start = annotation_angle(a, center);
+                        let end = annotation_angle(c, center);
+                        let tau = std::f64::consts::TAU;
+                        let span = if ccw { (end - start).rem_euclid(tau) } else { (start - end).rem_euclid(tau) };
+                        let bbox = &mut self.prims[first].bbox;
+                        if !radius.is_finite() || !center.0.is_finite() || !center.1.is_finite() || !span.is_finite() {
+                            *bbox = [f64::NAN; 4];
+                        } else {
+                            for (angle, dx, dy) in [
+                                (0.0, 1.0, 0.0),
+                                (std::f64::consts::FRAC_PI_2, 0.0, 1.0),
+                                (std::f64::consts::PI, -1.0, 0.0),
+                                (3.0 * std::f64::consts::FRAC_PI_2, 0.0, -1.0),
+                            ] {
+                                let delta =
+                                    if ccw { (angle - start).rem_euclid(tau) } else { (start - angle).rem_euclid(tau) };
+                                if delta <= span + 1e-12 {
+                                    let q = (center.0 + radius * dx, center.1 + radius * dy);
+                                    bbox[0] = bbox[0].min(q.0);
+                                    bbox[1] = bbox[1].min(q.1);
+                                    bbox[2] = bbox[2].max(q.0);
+                                    bbox[3] = bbox[3].max(q.1);
+                                }
+                            }
+                        }
+                    } else if annotation_circle3(a, b, c).is_err() {
+                        self.prims[first].bbox = [f64::NAN; 4];
+                    }
+                }
+            }
+        }
     }
 
     /// A graphic (9.2.5) at scene points.
@@ -901,6 +1353,9 @@ pub fn primitives(lv: &LevelView, o: &RenderOptions) -> Vec<Primitive> {
         let kind = Kind::Flyline { a: f.a, b: f.b, strokes: vec![line::flyline()] };
         out.push(&flyline_id(k), Layer::Middle, vec![2.0, 0.0], kind, &[f.a, f.b]);
     }
+    for annotation in &lv.annotations {
+        out.annotation(annotation);
+    }
     for s in &lv.shapes {
         out.shape("", s.shape, &s.points, &s.params, &s.style, s.layer, s.order.clone());
     }
@@ -1183,6 +1638,399 @@ mod tests {
                 assert!(fill.is_some());
                 for (actual, expected) in arrow.bbox.into_iter().zip(bounds) {
                     assert!((actual - expected).abs() < 1e-12, "{points:?}: {:?}", arrow.bbox);
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod annotation_affine_tests {
+    use super::*;
+
+    #[test]
+    fn orthogonal_wrapper_and_general_owner_share_one_text_layout() {
+        for orientation in
+            [Orient::R0, Orient::R90, Orient::R180, Orient::R270, Orient::MX, Orient::MY, Orient::MXR90, Orient::MYR90]
+        {
+            let (a, b, c, d) = orientation.matrix();
+            for fixed in [false, true] {
+                for upright in [false, true] {
+                    for rotate in [0.0, 30.0, 90.0, 270.0] {
+                        let lines = markup::parse("\u{03b1}_{x}");
+                        let direct = modern_text(
+                            (4.0, 5.0),
+                            lines.clone(),
+                            "start",
+                            "baseline",
+                            rotate,
+                            &Style::new(),
+                            orientation,
+                            fixed,
+                            upright,
+                            14.0,
+                        );
+                        let affine = modern_text_affine(
+                            (4.0, 5.0),
+                            lines,
+                            "start",
+                            "baseline",
+                            rotate,
+                            &Style::new(),
+                            [f64::from(a), f64::from(b), f64::from(c), f64::from(d)],
+                            fixed,
+                            upright,
+                            14.0,
+                        );
+                        assert_eq!(direct, affine, "{orientation:?} {fixed} {upright} {rotate}");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn arbitrary_mirrored_owner_keeps_a_finite_text_bounds() {
+        let theta = 30.0_f64.to_radians();
+        let c = libm::cos(theta);
+        let s = libm::sin(theta);
+        // Mirror x first, then rotate by thirty degrees.
+        let (t, b) = modern_text_affine(
+            (4.0, 5.0),
+            markup::parse("hello"),
+            "start",
+            "baseline",
+            15.0,
+            &Style::new(),
+            [-c, -s, -s, c],
+            false,
+            false,
+            14.0,
+        );
+        assert!(t.transform.is_some());
+        assert!(b.into_iter().all(f64::is_finite));
+        assert!(b[0] < b[2] && b[1] < b[3]);
+    }
+}
+
+#[cfg(test)]
+mod annotation_angle_periodicity {
+    use super::*;
+    #[test]
+    fn enormous_angle_matches_its_normalized_rotation() {
+        let angle = 1.0e20_f64;
+        let args = |a| {
+            modern_text_affine(
+                (1.0, 2.0),
+                markup::parse("abc"),
+                "start",
+                "baseline",
+                a,
+                &Style::new(),
+                [1.0, 0.0, 0.0, 1.0],
+                false,
+                true,
+                14.0,
+            )
+        };
+        assert_eq!(args(angle), args(angle.rem_euclid(360.0)));
+    }
+}
+
+#[cfg(test)]
+mod annotation_bounds_regressions {
+    use super::*;
+    use rnl_runtime::model::{AnnotationGraphic, AnnotationView, SymbolPrim};
+    fn arc() -> AnnotationView {
+        AnnotationView {
+            object_id: "%a".into(),
+            source_kind: "symbol",
+            source: "$S".into(),
+            anchor_kind: "independent",
+            anchor_object: None,
+            anchor: (0.0, 0.0),
+            rotate: 90.0,
+            mirror: true,
+            style: Style::new(),
+            own_style: Style::new(),
+            layer: Layer::Middle,
+            order: vec![],
+            graphics: vec![AnnotationGraphic {
+                primitive: SymbolPrim {
+                    order: 0,
+                    text: None,
+                    text_name_formats: true,
+                    modern_text: true,
+                    shape: Shape::Arc,
+                    points: vec![(1.0, 0.0), (-1.0, 0.0), (0.0, -1.0)],
+                    params: PrimParams::default(),
+                    style: Style::new(),
+                    halign: None,
+                    valign: None,
+                    rotate: None,
+                    fix_rotate: false,
+                    upright: None,
+                },
+                lines: vec![],
+                text_refs: vec![],
+            }],
+        }
+    }
+    #[test]
+    fn mirrored_rotated_three_quarter_arc_contains_cardinal_extrema() {
+        let b = annotation_bounds(&arc(), 14.0).unwrap().unwrap();
+        assert!(b[0] <= -1.0 && b[1] <= -1.0 && b[2] >= 1.0 && b[3] >= 1.0, "{b:?}");
+    }
+    #[test]
+    fn coordinate_text_is_remeasured_at_the_candidate_anchor() {
+        use rnl_runtime::model::AnnotationTextRef;
+        let mut a = arc();
+        let g = &mut a.graphics[0];
+        g.primitive.shape = Shape::Text;
+        g.primitive.points = vec![(0.0, 0.0)];
+        g.primitive.text = Some("x=${x}".into());
+        g.text_refs = vec![AnnotationTextRef::X];
+        a.anchor = (1.0, 0.0);
+        let first = annotation_bounds(&a, 14.0).unwrap().unwrap();
+        a.anchor = (100000.0, 0.0);
+        let second = annotation_bounds(&a, 14.0).unwrap().unwrap();
+        assert!(second[2] - second[0] > first[2] - first[0], "{first:?} {second:?}");
+    }
+    #[test]
+    fn hidden_text_has_no_ink_or_bounds() {
+        let mut a = arc();
+        let p = &mut a.graphics[0].primitive;
+        p.shape = Shape::Text;
+        p.points = vec![(f64::NAN, 0.0)];
+        p.text = Some("hidden".into());
+        p.style.insert("textvisible".into(), Lit::Bool(false));
+        assert_eq!(annotation_bounds(&a, 14.0), Ok(None));
+    }
+    #[test]
+    fn finite_extreme_circle_remains_finite_when_rotated() {
+        let mut a = arc();
+        a.rotate = 45.0;
+        a.mirror = false;
+        let p = &mut a.graphics[0].primitive;
+        p.shape = Shape::Circle;
+        p.points = vec![(0.0, 0.0)];
+        p.params.radius = Some(f64::MAX);
+        let b = annotation_bounds(&a, 14.0).unwrap().unwrap();
+        assert_eq!(b, [-f64::MAX, -f64::MAX, f64::MAX, f64::MAX]);
+    }
+    #[test]
+    fn finite_extreme_semicircle_does_not_overflow_center_calculation() {
+        let mut a = arc();
+        a.rotate = 0.0;
+        a.mirror = false;
+        a.graphics[0].primitive.points = vec![(f64::MAX, 0.0), (0.0, f64::MAX), (-f64::MAX, 0.0)];
+        let b = annotation_bounds(&a, 14.0).unwrap().unwrap();
+        assert_eq!(b[0], -f64::MAX);
+        assert_eq!(b[2], f64::MAX);
+        assert_eq!(b[3], f64::MAX);
+        a.rotate = 45.0;
+        let rotated = annotation_bounds(&a, 14.0).unwrap().unwrap();
+        assert!(rotated.iter().all(|x| x.is_finite()));
+    }
+    #[test]
+    fn finite_extreme_straight_line_is_not_lost_to_cost_overflow() {
+        let mut a = arc();
+        a.rotate = 0.0;
+        a.mirror = false;
+        let p = &mut a.graphics[0].primitive;
+        p.shape = Shape::Line;
+        p.points = vec![(-f64::MAX, 0.0), (f64::MAX, 0.0)];
+        let b = annotation_bounds(&a, 14.0).unwrap().unwrap();
+        assert_eq!(b[0], -f64::MAX);
+        assert_eq!(b[2], f64::MAX);
+    }
+    #[test]
+    fn nonfinite_geometry_is_an_error_and_empty_is_none() {
+        let mut a = arc();
+        a.graphics.clear();
+        assert_eq!(annotation_bounds(&a, 14.0), Ok(None));
+        a.anchor.0 = f64::INFINITY;
+        assert_eq!(annotation_bounds(&a, 14.0), Err(AnnotationBoundsError::NonFinite));
+    }
+}
+
+#[cfg(test)]
+mod annotation_upright_boundary_regressions {
+    use super::*;
+
+    fn glyph_flipped(owner_angle: f64, mirror: bool, text_angle: f64) -> bool {
+        let angle = owner_angle.rem_euclid(360.0).to_radians();
+        let (s, c) = (libm::sin(angle), libm::cos(angle));
+        let flip = if mirror { -1.0 } else { 1.0 };
+        let matrix = [c * flip, -s, s * flip, c];
+        let text_rad = text_angle.rem_euclid(360.0).to_radians();
+        let (ts, tc) = (libm::sin(text_rad), libm::cos(text_rad));
+        let raw = (matrix[0] * tc + matrix[1] * ts, matrix[2] * tc + matrix[3] * ts);
+        let (text, _) = modern_text_affine_inner(
+            (0.0, 0.0),
+            markup::parse("A"),
+            "start",
+            "baseline",
+            text_angle,
+            &Style::new(),
+            matrix,
+            Some((owner_angle, mirror)),
+            false,
+            true,
+            14.0,
+        );
+        let m = text.transform.unwrap();
+        m[0] * raw.0 + m[2] * raw.1 < 0.0
+    }
+
+    #[test]
+    fn annotation_render_path_passes_written_owner_metadata() {
+        use rnl_runtime::model::{AnnotationGraphic, AnnotationView, SymbolPrim};
+        let a = AnnotationView {
+            object_id: "%a".into(),
+            source_kind: "symbol",
+            source: "$S".into(),
+            anchor_kind: "independent",
+            anchor_object: None,
+            anchor: (0.0, 0.0),
+            rotate: 271.3,
+            mirror: true,
+            style: Style::new(),
+            own_style: Style::new(),
+            layer: Layer::Middle,
+            order: vec![],
+            graphics: vec![AnnotationGraphic {
+                primitive: SymbolPrim {
+                    order: 0,
+                    text: Some("A".into()),
+                    text_name_formats: true,
+                    modern_text: true,
+                    shape: Shape::Text,
+                    points: vec![(0.0, 0.0)],
+                    params: PrimParams::default(),
+                    style: Style::new(),
+                    halign: None,
+                    valign: None,
+                    rotate: Some(361.3),
+                    fix_rotate: false,
+                    upright: Some(true),
+                },
+                lines: markup::parse("A"),
+                text_refs: vec![],
+            }],
+        };
+        let mut out = Out { prims: vec![], scale: 14.0 };
+        out.annotation(&a);
+        let Kind::Text(text) = &out.prims[0].kind else { panic!("expected text") };
+        assert!(text.transform.unwrap()[2] > 0.0, "{:?}", text.transform);
+        assert!(annotation_bounds(&a, 14.0).unwrap().is_some());
+    }
+
+    #[test]
+    fn mirrored_decimal_exact_boundary_uses_written_angles() {
+        assert!(!glyph_flipped(271.3, true, 361.3));
+        // These normalized f64 values sum just above 270, despite a raw-sum roundoff to 270.
+        assert!(!glyph_flipped(-181.1, true, -271.1));
+    }
+
+    #[test]
+    fn decimal_and_negative_angles_keep_their_low_order_side() {
+        assert!(glyph_flipped(0.1, false, 89.9));
+        assert!(glyph_flipped(7.3, false, 82.7));
+        assert!(!glyph_flipped(-30.1, false, 120.1));
+        assert!(!glyph_flipped(13.7, true, 283.7));
+        assert!(glyph_flipped(30.1, true, 120.1));
+    }
+
+    #[test]
+    fn strict_boundary_and_adjacent_floats_are_distinct() {
+        let next_up = |x: f64| f64::from_bits(x.to_bits() + 1);
+        let next_down = |x: f64| f64::from_bits(x.to_bits() - 1);
+        for (owner, text, mirror, expected) in [
+            (12.5, 77.5, false, false),
+            (12.5, next_up(77.5), false, true),
+            (12.5, next_down(77.5), false, false),
+            (12.5, 257.5, false, true),
+            (12.5, next_up(257.5), false, false),
+            (12.5, next_down(257.5), false, true),
+            (12.5, 102.5, true, false),
+            (12.5, next_down(102.5), true, true),
+            (12.5, next_up(102.5), true, false),
+            (12.5, 282.5, true, true),
+            (12.5, next_down(282.5), true, false),
+            (12.5, next_up(282.5), true, true),
+            (0.0, 270.0, true, true),
+            (0.0, next_up(270.0), true, true),
+            (0.0, next_down(270.0), true, false),
+            (300.0, 150.0, false, false),
+            (300.0, next_up(150.0), false, true),
+            (300.0, next_down(150.0), false, false),
+        ] {
+            assert_eq!(glyph_flipped(owner, mirror, text), expected, "owner={owner} text={text:?} mirror={mirror}");
+        }
+    }
+
+    #[test]
+    fn large_owner_is_normalized_before_small_text_angle() {
+        assert!(glyph_flipped(1e20, false, 180.0));
+        assert!(!glyph_flipped(1e20, true, 180.0));
+        assert!(glyph_flipped(1e20, true, 1.0));
+        for mirror in [false, true] {
+            for text in [1.0, 180.0, 270.0] {
+                assert_eq!(glyph_flipped(1e20, mirror, text), glyph_flipped(1e20_f64.rem_euclid(360.0), mirror, text));
+            }
+        }
+    }
+
+    #[test]
+    fn all_eight_orientations_keep_existing_text_behavior() {
+        for orientation in
+            [Orient::R0, Orient::R90, Orient::R180, Orient::R270, Orient::MX, Orient::MY, Orient::MXR90, Orient::MYR90]
+        {
+            let (a, b, c, d) = orientation.matrix();
+            let matrix = [f64::from(a), f64::from(b), f64::from(c), f64::from(d)];
+            let metadata = [
+                (0.0, false, [1., 0., 0., 1.]),
+                (90.0, false, [0., -1., 1., 0.]),
+                (180.0, false, [-1., 0., 0., -1.]),
+                (270.0, false, [0., 1., -1., 0.]),
+                (0.0, true, [-1., 0., 0., 1.]),
+                (90.0, true, [0., -1., -1., 0.]),
+                (180.0, true, [1., 0., 0., -1.]),
+                (270.0, true, [0., 1., 1., 0.]),
+            ]
+            .into_iter()
+            .find(|(_, _, m)| *m == matrix)
+            .unwrap();
+            for text_angle in [0.0, 45.0, 90.0, 180.0, 270.0, 361.3] {
+                for fixed in [false, true] {
+                    let input = markup::parse("A");
+                    let prior = modern_text(
+                        (0., 0.),
+                        input.clone(),
+                        "start",
+                        "baseline",
+                        text_angle,
+                        &Style::new(),
+                        orientation,
+                        fixed,
+                        true,
+                        14.,
+                    );
+                    let actual = modern_text_affine_inner(
+                        (0., 0.),
+                        input,
+                        "start",
+                        "baseline",
+                        text_angle,
+                        &Style::new(),
+                        matrix,
+                        Some((metadata.0, metadata.1)),
+                        fixed,
+                        true,
+                        14.,
+                    );
+                    assert_eq!(actual, prior, "{orientation:?} {text_angle} {fixed}");
                 }
             }
         }

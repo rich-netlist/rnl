@@ -1647,6 +1647,14 @@ impl<'a> Tree<'a> {
             }
             if bindings {
                 if let Some((a, said)) = self.bind(&current, &eval, &released) {
+                    if crate::annotation::estimated_work(self.problem) > 0
+                        && !crate::budget::permit(
+                            crate::budget::Step::Placement,
+                            crate::annotation::estimated_work(self.problem),
+                        )
+                    {
+                        break 'search;
+                    }
                     tried += 1;
                     let (next, _) = self.evaluate_rounds(&a, rounds, work);
                     if crate::budget::stopped() {
@@ -1694,6 +1702,14 @@ impl<'a> Tree<'a> {
                 if !seen.insert(self.code(arr)) || self.broken(arr) > broken {
                     continue;
                 }
+                if crate::annotation::estimated_work(self.problem) > 0
+                    && !crate::budget::permit(
+                        crate::budget::Step::Placement,
+                        crate::annotation::estimated_work(self.problem),
+                    )
+                {
+                    break 'search;
+                }
                 tried += 1;
                 stop.placed.set(stop.placed.get() + 1);
                 stop.routed.set(stop.routed.get() + 1);
@@ -1721,6 +1737,14 @@ impl<'a> Tree<'a> {
             if bindings && releases < RELEASES {
                 let mut unbound = current.clone();
                 if let Some(b) = unbound.bound.pop() {
+                    if crate::annotation::estimated_work(self.problem) > 0
+                        && !crate::budget::permit(
+                            crate::budget::Step::Placement,
+                            crate::annotation::estimated_work(self.problem),
+                        )
+                    {
+                        break 'search;
+                    }
                     let (next, _) = self.evaluate_rounds(&unbound, rounds, work);
                     if crate::budget::stopped() {
                         break 'search;
@@ -2124,7 +2148,10 @@ impl<'a> Tree<'a> {
         let mut best = self.place_route_score(arr, &orient, &rels, &pull, &code, work);
         let mut taken = 0;
         for _ in 0..rounds {
-            if !crate::budget::permit(crate::budget::Step::Placement, s.objects.len()) {
+            if !crate::budget::permit(
+                crate::budget::Step::Placement,
+                s.objects.len().saturating_add(crate::annotation::estimated_work(problem)),
+            ) {
                 break;
             }
             let mut new: Vec<Tie> = Vec::new();
@@ -2169,20 +2196,35 @@ impl<'a> Tree<'a> {
         let routing = route(problem, s, &placed.geometry, &placed.origins, self.options, work);
         drop(phase);
         let _phase = crate::profile::span("tree", "score");
-        let objectives = match drawn(problem, s, &placed.geometry, &routing) {
-            Ok(wires) => measured_layers(problem, s, &placed, Some(&wires)),
-            Err(_) => Vec::new(),
+        let objectives = match (drawn(problem, s, &placed.geometry, &routing), routing.annotation_error) {
+            (Ok(wires), None) => measured_layers(problem, s, &placed, Some(&wires)),
+            _ => Vec::new(),
         };
         let entry = self.entry(&placed, &routing, objectives, code);
         Evaluated { placed, routing, entry }
     }
 
     fn entry(&self, placed: &Placed, routing: &Routing, objectives: Vec<Q>, code: &[u32]) -> Entry {
+        if let Some(index) =
+            routing.annotation_error.or_else(|| crate::annotation::bounds(self.problem, &placed.geometry).err())
+        {
+            return Entry {
+                written_path_error: None,
+                annotation_error: Some(index),
+                overlaps: 0,
+                crowding: 0,
+                misleading: 0,
+                joins_left: 0,
+                layers: Vec::new(),
+                code: code.to_vec(),
+            };
+        }
         let wires = match drawn(self.problem, self.s, &placed.geometry, routing) {
             Ok(wires) => wires,
             Err(wire) => {
                 return Entry {
                     written_path_error: Some(wire),
+                    annotation_error: None,
                     overlaps: 0,
                     crowding: 0,
                     misleading: 0,
@@ -2194,7 +2236,10 @@ impl<'a> Tree<'a> {
         };
         Entry {
             written_path_error: None,
-            overlaps: placed.overlaps.len(),
+            annotation_error: None,
+            overlaps: placed.overlaps.len()
+                + crate::annotation::overlaps(self.problem, self.s, &placed.geometry, &placed.origins)
+                    .expect("validated annotation bounds"),
             crowding: crate::score::crowding(self.s, &placed.origins, &placed.geometry.orient, &placed.dropped),
             misleading: crate::score::misleading(self.problem, self.s, &placed.origins, &placed.geometry, &wires),
             joins_left: routing.joins_left(),

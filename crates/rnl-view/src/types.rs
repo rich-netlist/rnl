@@ -13,6 +13,7 @@ use crate::{FormatInfo, InspectedLabel, InspectedPin, InspectedSymbol, SourceInc
 use crate::{GroupView, LevelHint, MemberOf, NetLabel, RoleOf, RuleAt, UsageOf};
 use std::path::Path;
 
+use crate::snapshot::{AnnotationGraphic, AnnotationView};
 use ts_rs::{Config, TS};
 
 use crate::{
@@ -98,6 +99,8 @@ fn snapshot_all() -> Vec<(String, String)> {
         one::<Vertex>(&cfg),
         one::<TextView>(&cfg),
         one::<ShapeView>(&cfg),
+        one::<AnnotationView>(&cfg),
+        one::<AnnotationGraphic>(&cfg),
     ]
 }
 

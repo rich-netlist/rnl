@@ -43,6 +43,7 @@
 //! no check reaches it, the same input and options give the same result on every platform; the
 //! search, the coordinates and the routing are counted in work, never timed, so they always do.
 
+mod annotation;
 mod beside;
 mod bound;
 mod budget;
@@ -96,6 +97,8 @@ pub struct Solved {
 pub struct SolveReport {
     /// An authored wire could not be represented reliably. This level must not be written.
     pub fatal_written_wire: Option<usize>,
+    /// Index in LevelProblem.annotations of geometry that cannot safely be evaluated.
+    pub fatal_annotation: Option<usize>,
     /// Whole-solve budget for 0.4; absent for released input versions.
     pub budget: Option<BudgetReport>,
     /// Canonical options for persisting the result, with a time limit normalized to admitted work.

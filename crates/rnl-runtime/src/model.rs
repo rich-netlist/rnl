@@ -49,7 +49,7 @@ impl Layer {
 }
 
 /// A graphic of a symbol in local coordinates.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct SymbolPrim {
     /// Position among this symbol's primitives and nested usages (9.2.1).
     pub order: usize,
@@ -331,6 +331,39 @@ pub struct ConstraintView {
     pub priority: String,
 }
 
+/// A single selectable compound annotation with local graphics and an arbitrary transform.
+#[derive(Clone, Debug, PartialEq)]
+pub struct AnnotationView {
+    pub object_id: String,
+    pub source_kind: &'static str,
+    pub source: String,
+    pub anchor_kind: &'static str,
+    pub anchor_object: Option<String>,
+    pub anchor: Pt,
+    pub rotate: f64,
+    pub mirror: bool,
+    pub style: Style,
+    pub own_style: Style,
+    pub layer: Layer,
+    pub order: Vec<f64>,
+    pub graphics: Vec<AnnotationGraphic>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct AnnotationGraphic {
+    pub primitive: SymbolPrim,
+    pub lines: Vec<Line>,
+    /// Each markup reference, resolved in its writing unit, in occurrence order.
+    pub text_refs: Vec<AnnotationTextRef>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AnnotationTextRef {
+    X,
+    Y,
+    Empty,
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct LevelView {
     /// The language version of the file that owns this drawing level.
@@ -348,6 +381,7 @@ pub struct LevelView {
     pub items: Vec<ItemView>,
     pub wires: Vec<WireView>,
     pub shapes: Vec<ShapeView>,
+    pub annotations: Vec<AnnotationView>,
     pub texts: Vec<TextView>,
     /// Lines a viewer may draw for connections not drawn as wires, not wires themselves (13.3,
     /// 13.7), to check what is not wired: over the gaps of a wire some of whose points have no

@@ -1,5 +1,5 @@
 {
- "$schema": "rnl-words-0.4.schema.json",
+ "$schema": "rnl-words.schema.json",
  "language": "RNL",
  "version": "0.4",
  "description": "Standard word list of RNL 0.4 (section 5.3 and Annex A of rnl-0.4.md); draft.",
@@ -1069,6 +1069,7 @@
      "since": "0.4"
     }
    ],
+   "definition_params": true,
    "output": "new",
    "output_kind": "annotation",
    "form": "{at} @ANNOTATION {source}",

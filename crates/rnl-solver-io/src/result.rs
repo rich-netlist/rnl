@@ -61,6 +61,12 @@ fn report_indices(r: &SolveReport, p: &LevelProblem, at: &Node<'_>) -> Result<()
             Err(at.error(format!("{what} index {i} is out of range")))
         }
     };
+    if let Some(index) = r.fatal_annotation {
+        valid(index, p.annotations.len(), "fatal annotation")?;
+        if r.errors.is_empty() {
+            return Err(at.error("fatal annotation requires a diagnostic"));
+        }
+    }
     if let Some(wire) = r.fatal_written_wire {
         valid(wire, p.wires.len(), "fatal written wire")?;
         if r.errors.is_empty() {

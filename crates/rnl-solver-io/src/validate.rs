@@ -192,6 +192,38 @@ pub(crate) fn problem(p: &LevelProblem) -> Result<()> {
             }
         }
     }
+    let mut annotation_objects = std::collections::BTreeSet::new();
+    for (i, annotation) in p.annotations.iter().enumerate() {
+        let at = format!("$.annotations[{i}]");
+        if annotation.view.anchor != (0.0, 0.0) {
+            return Err(error(&at, "annotation template anchor must be zero"));
+        }
+        if (annotation.view.anchor_kind == "independent") != annotation.view.anchor_object.is_none() {
+            return Err(error(&at, "annotation anchor metadata is inconsistent"));
+        }
+        let Some(object_index) = annotation.object else { continue };
+        let object = p.objects.get(object_index).ok_or_else(|| error(&at, "annotation object index out of range"))?;
+        if object.kind != ObjectKind::Annotation
+            || !matches!(object.position, Position::At(_))
+            || object.symbol.is_some()
+            || object.orient.is_some()
+            || object.usage.is_some()
+            || object.text.is_some()
+            || !object.nets.is_empty()
+        {
+            return Err(error(&at, "annotation object must have a single anchor and no electrical or placement state"));
+        }
+        if !annotation_objects.insert(object_index) {
+            return Err(error(&at, "duplicate annotation object"));
+        }
+    }
+    if p.objects
+        .iter()
+        .enumerate()
+        .any(|(i, object)| object.kind == ObjectKind::Annotation && !annotation_objects.contains(&i))
+    {
+        return Err(error("$.annotations", "annotation object has no materialized geometry"));
+    }
     for (i, w) in p.wires.iter().enumerate() {
         let at = format!("$.wires[{i}]");
         reference(&w.reference, p, &at)?;
@@ -201,6 +233,22 @@ pub(crate) fn problem(p: &LevelProblem) -> Result<()> {
         let at = format!("$.routes[{i}]");
         points(&r.pins, p, &at)?;
         indices(&r.wires, p.wires.len(), &at)?;
+    }
+    let mut junctions = std::collections::BTreeSet::new();
+    if !p.existing_junctions.is_empty() && p.junction.effective().definition.is_none() {
+        return Err(error("$.existing_junctions", "junction metadata requires an effective definition"));
+    }
+    if p.version != "0.4" && !p.existing_junctions.is_empty() {
+        return Err(error("$.existing_junctions", "junction metadata requires 0.4"));
+    }
+    for (i, r) in p.existing_junctions.iter().enumerate() {
+        let at = format!("$.existing_junctions[{i}]");
+        point(r, p, &at, 0)?;
+        let key = rnl_runtime::problem::junction_point_identity(r)
+            .ok_or_else(|| error(&at, "expected a single point identity"))?;
+        if !junctions.insert(key) {
+            return Err(error(&at, "duplicate junction identity"));
+        }
     }
     for (i, c) in p.currents.iter().enumerate() {
         let at = format!("$.currents[{i}]");

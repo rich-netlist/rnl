@@ -69,6 +69,7 @@ impl Interp<'_> {
     fn site_id(&self, o: ObjId) -> Option<String> {
         let (site, off) = match self.o(o) {
             ObjData::Usage(u) => (&u.site, u.off),
+            ObjData::Annotation(a) => (&a.site, a.off),
             ObjData::Wire { site, off, .. }
             | ObjData::Text { site, off, .. }
             | ObjData::KeyText { site, off, .. }
@@ -1010,6 +1011,129 @@ impl Interp<'_> {
         }
     }
 
+    fn annotation_text_refs(&self, text: Option<&WStr>) -> Vec<AnnotationTextRef> {
+        let Some(text) = text else {
+            return Vec::new();
+        };
+        markup::attr_refs(text.as_str())
+            .iter()
+            .map(|path| {
+                if path.contains("::") {
+                    return AnnotationTextRef::Empty;
+                }
+                let name = path.trim().trim_start_matches('#');
+                let canonical =
+                    if crate::words::words().attributes.contains(&name.to_string()) || path.trim().starts_with('#') {
+                        name.to_owned()
+                    } else {
+                        text.unit.map(|u| self.word(name, u)).unwrap_or_else(|| name.to_owned())
+                    };
+                match canonical.as_str() {
+                    "x" => AnnotationTextRef::X,
+                    "y" => AnnotationTextRef::Y,
+                    _ => AnnotationTextRef::Empty,
+                }
+            })
+            .collect()
+    }
+
+    /// A materialized annotation, including an unplaced one, for solver geometry.
+    pub(crate) fn annotation_template_view(&mut self, s: SceneId, id: ObjId) -> Option<AnnotationView> {
+        if self.is_obj_failed(id) || self.drawing_ignored(s, id) {
+            return None;
+        }
+        let ObjData::Annotation(data) = self.o(id).clone() else {
+            return None;
+        };
+        let source_kind = match data.source {
+            AnnotationSource::Symbol(_) => "symbol",
+            AnnotationSource::Definition(_) => "definition",
+            AnnotationSource::Usage(_) => "usage",
+        };
+        let mut graphics = Vec::new();
+        let mut prim_order = vec![usize::MAX; data.prims.len()];
+        let mut label_order = vec![usize::MAX; data.labels.len()];
+        for (order, part) in data.drawing_order.iter().enumerate() {
+            match *part {
+                AnnotationPart::Prim(index) => prim_order[index] = order,
+                AnnotationPart::Label(index) => label_order[index] = order,
+            }
+        }
+        for (index, p) in data.prims.iter().enumerate() {
+            let order = prim_order[index];
+            let t = p.text.as_ref();
+            let lines = t.and_then(|t| t.text.as_ref()).map(|text| self.text_lines(s, text, id)).unwrap_or_default();
+            graphics.push(AnnotationGraphic {
+                primitive: SymbolPrim {
+                    order,
+                    text: t.and_then(|t| t.text.as_ref().map(|s| s.as_str().to_string())),
+                    text_name_formats: t
+                        .and_then(|t| t.text.as_ref())
+                        .and_then(|t| t.unit)
+                        .is_some_and(|u| self.follows_0_4(u)),
+                    modern_text: t.is_some_and(|t| t.modern_text),
+                    shape: p.shape,
+                    points: p.points.clone(),
+                    params: p.params.clone(),
+                    style: p.style.clone(),
+                    halign: t.and_then(|t| t.halign.clone()),
+                    valign: t.and_then(|t| t.valign.clone()),
+                    rotate: t.and_then(|t| t.rotate),
+                    fix_rotate: t.and_then(|t| t.fix_rotate).unwrap_or(false),
+                    upright: t.and_then(|t| t.upright),
+                },
+                lines,
+                text_refs: self.annotation_text_refs(t.and_then(|t| t.text.as_ref())),
+            });
+        }
+        for (index, label) in data.labels.iter().enumerate() {
+            let t = &label.items;
+            let lines = t.text.as_ref().map(|text| self.text_lines(s, text, id)).unwrap_or_default();
+            graphics.push(AnnotationGraphic {
+                primitive: SymbolPrim {
+                    order: label_order[index],
+                    text: t.text.as_ref().map(|s| s.as_str().to_string()),
+                    text_name_formats: t.text.as_ref().and_then(|t| t.unit).is_some_and(|u| self.follows_0_4(u)),
+                    modern_text: t.modern_text,
+                    shape: Shape::Text,
+                    points: vec![label.position.unwrap_or((0.0, 0.0))],
+                    params: PrimParams::default(),
+                    style: label.style.clone(),
+                    halign: t.halign.clone(),
+                    valign: t.valign.clone(),
+                    rotate: t.rotate,
+                    fix_rotate: t.fix_rotate.unwrap_or(false),
+                    upright: t.upright,
+                },
+                lines,
+                text_refs: self.annotation_text_refs(t.text.as_ref()),
+            });
+        }
+        graphics.sort_by_key(|graphic| graphic.primitive.order);
+        let source = match data.source {
+            AnnotationSource::Symbol(o) | AnnotationSource::Definition(o) | AnnotationSource::Usage(o) => self.label(o),
+        };
+        let (anchor_kind, anchor_object) = match data.anchor {
+            AnnotationAnchor::Independent(_) => ("independent", None),
+            AnnotationAnchor::Follow(object) => ("follow", Some(self.label(object))),
+        };
+        Some(AnnotationView {
+            object_id: self.label(id),
+            source_kind,
+            source,
+            anchor_kind,
+            anchor_object,
+            anchor: (0.0, 0.0),
+            rotate: data.rotate,
+            mirror: data.mirror,
+            style: self.style_of(s, id),
+            own_style: self.own_style_of(s, id),
+            layer: self.layer_of(s, id),
+            order: Vec::new(),
+            graphics,
+        })
+    }
+
     fn level_view(&mut self, s: SceneId) -> LevelView {
         let lv = self.scenes[s].level;
         let level = self.doc.levels[lv].clone();
@@ -1144,6 +1268,24 @@ impl Interp<'_> {
                 layer: self.layer_of(s, p),
                 order: self.key_of(s, p, &last_symbol),
             });
+        }
+        let mut annotations = Vec::new();
+        for id in self.scenes[s].prims.clone() {
+            let Some(anchor) = self.point_of(s, id) else {
+                continue;
+            };
+            let Some(mut annotation) = self.annotation_template_view(s, id) else {
+                continue;
+            };
+            annotation.object_id = ids[&id].clone();
+            if let ObjData::Annotation(data) = self.o(id) {
+                if let AnnotationAnchor::Follow(object) = data.anchor {
+                    annotation.anchor_object = Some(self.ref_id(s, object, &ids));
+                }
+            }
+            annotation.anchor = anchor;
+            annotation.order = self.key_of(s, id, &last_symbol);
+            annotations.push(annotation);
         }
         let mut texts = Vec::new();
         for t in self.scenes[s].texts.clone() {
@@ -1285,6 +1427,7 @@ impl Interp<'_> {
             items,
             wires,
             shapes,
+            annotations,
             texts,
             flylines,
             net_labels,

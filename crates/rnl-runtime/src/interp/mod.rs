@@ -5,6 +5,7 @@
 //! Each drawing level (the main file level and every subcircuit) gets its own scene; rules
 //! written above it are evaluated again in it (10.3).
 
+mod annotation_template;
 mod assertions;
 pub mod attrs;
 mod auto_geometry;

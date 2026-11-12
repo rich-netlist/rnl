@@ -173,3 +173,9 @@ Snapshot object pins carry the same index, names, bus flag, local position and o
 The released 0.2 and 0.3 interfaces keep their existing serialized output. Pin metadata does not change the base schematic SVG or solve geometry. Optional role inspection overlays can now show roles filled by named pins.
 
 In draft 0.4, the snapshot text model optionally includes `fix_rotate`, the effective item from TEXT. An absent value means no statement supplied it; explicit `false` is retained so an editor can override a symbol label that supplies `true`. Rendering and symbol previews apply the setting to text direction while transforming the anchor as before. `rnl-edit` accepts the same optional boolean on `add-text` with `language_version: "0.4"`.
+
+## Compound annotations in 0.4
+
+`ANNOTATION` creates a non-electrical object from the eligible graphics of a symbol, general definition or existing usage. It does not create another usage. Document hit testing identifies the compound object as `annotation`; the snapshot's optional `model.annotations` array preserves its source, anchor identity, rotation, mirror, style and local graphics. Empty arrays remain omitted. Rendered primitives retain the annotation as their owner, so viewers can select it as one object.
+
+A literal coordinate creates an independent anchor. An object reference follows that object's position. To move an independent annotation through the existing edit transaction API, target its explicit `::position` reference with `set` and `PLACE`; bare `ANNOTATION` objects do not accept `PLACE`. Following annotations keep the referenced anchor identity. The core supplies rendering and hit geometry; the consuming editor chooses how to expose those edits.

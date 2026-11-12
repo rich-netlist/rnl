@@ -145,7 +145,7 @@ impl Interp<'_> {
                 }
             }
             ObjData::Net { display, .. } if key == "name" => Ok(AVal::Text(display)),
-            ObjData::Point { .. } | ObjData::Pos { .. } if key == "x" || key == "y" => {
+            ObjData::Point { .. } | ObjData::Pos { .. } | ObjData::Annotation(_) if key == "x" || key == "y" => {
                 let p = self.point_of(s, obj);
                 Ok(AVal::Text(match p {
                     None => String::new(),
