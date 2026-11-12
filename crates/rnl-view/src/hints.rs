@@ -260,6 +260,14 @@ struct Part {
     loc: Option<Loc>,
 }
 
+/// Source spelling is not physical identity: aliases can name one pin, while two
+/// pins bound to one terminal remain distinct. Keep old references for legacy objects.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+enum VertexKey {
+    Named(String),
+    Pin { owner: String, pin: usize },
+}
+
 struct PinAt {
     part: usize,
     pos: Pt,
@@ -267,8 +275,9 @@ struct PinAt {
     nets: Vec<String>,
     /// As a message names it: `#M3:s`, `%a_port:p`.
     name: String,
-    /// What a wire names it by: `#M3:3`, `%a_port:p`.
-    keys: Vec<String>,
+    /// Its connectivity identities, separate from the source expression shown in hints.
+    keys: Vec<VertexKey>,
+    reference: String,
 }
 
 struct WireAt {
@@ -279,7 +288,7 @@ struct WireAt {
     /// as a flyline from there.
     open: [bool; 2],
     /// Every vertex the wire names.
-    keys: BTreeSet<String>,
+    keys: BTreeSet<VertexKey>,
     name: String,
     loc: Option<Loc>,
     /// For a wire drawn straight through its points, where a point is repeated, a segment of no
@@ -663,6 +672,8 @@ impl<'a> Drawing<'a> {
                 }
             }
         }
+        // A terminal denotes its last bound pin, while named pins keep their own identity.
+        let mut terminal_pins: HashMap<String, VertexKey> = HashMap::new();
         for it in &lv.items {
             let sym = &lv.symbols[it.symbol];
             let info = (!it.object_id.is_empty()).then(|| by_id.get(it.object_id.as_str()).copied()).flatten();
@@ -707,6 +718,26 @@ impl<'a> Drawing<'a> {
                     }
                 }
                 let pin_name = shown.first().cloned().unwrap_or_else(|| format!("{name}:{}", j + 1));
+                let identity = info.and_then(|o| o.pins.get(j)).and_then(|p| p.identity.as_ref());
+                let reference = match identity {
+                    Some(pin) => pin.reference.clone().unwrap_or_else(|| pin_name.clone()),
+                    None => keys.first().cloned().unwrap_or_else(|| pin_name.clone()),
+                };
+                let keys = match identity {
+                    Some(pin) => {
+                        let key = VertexKey::Pin { owner: id.clone(), pin: pin.index };
+                        for terminal in &terminals {
+                            let name = if info.is_some_and(|o| o.kind == "usage") {
+                                format!("{id}:{terminal}")
+                            } else {
+                                terminal.clone()
+                            };
+                            terminal_pins.insert(name, key.clone());
+                        }
+                        vec![key]
+                    }
+                    None => keys.into_iter().map(VertexKey::Named).collect(),
+                };
                 pins.push(d.pins.len());
                 if class != Class::Mark {
                     d.pin_at.entry(key(pos)).or_default().push(d.pins.len());
@@ -718,6 +749,7 @@ impl<'a> Drawing<'a> {
                     nets: it.pin_nets.get(j).cloned().unwrap_or_default(),
                     name: pin_name,
                     keys,
+                    reference,
                 });
             }
             if class == Class::Mark {
@@ -726,7 +758,7 @@ impl<'a> Drawing<'a> {
             d.parts.push(Part { name, class, on_port, bbox, pins, loc });
         }
         // where each vertex a wire names is: a pin by its key, a named point
-        let mut at_key: HashMap<String, Pt> = HashMap::new();
+        let mut at_key: HashMap<VertexKey, Pt> = HashMap::new();
         for p in &d.pins {
             for k in &p.keys {
                 at_key.entry(k.clone()).or_insert(p.pos);
@@ -734,15 +766,20 @@ impl<'a> Drawing<'a> {
         }
         for p in &lv.points {
             if let Some(at) = p.at {
-                at_key.entry(p.id.clone()).or_insert(at);
+                at_key.entry(VertexKey::Named(p.id.clone())).or_insert(at);
             }
         }
-        let vkey = |v: &Vertex| -> Option<String> {
+        let vkey = |v: &Vertex| -> Option<VertexKey> {
             match v {
-                Vertex::Terminal(t) => Some(t.clone()),
-                Vertex::Pin { reference, .. } => reference.clone(),
-                Vertex::Point(p) => Some(p.clone()),
-                Vertex::Usage { usage, role } => Some(format!("{usage}:{role}")),
+                Vertex::Terminal(t) => {
+                    Some(terminal_pins.get(t).cloned().unwrap_or_else(|| VertexKey::Named(t.clone())))
+                }
+                Vertex::Pin { owner, pin, .. } => Some(VertexKey::Pin { owner: owner.clone(), pin: *pin }),
+                Vertex::Point(p) => Some(VertexKey::Named(p.clone())),
+                Vertex::Usage { usage, role } => {
+                    let name = format!("{usage}:{role}");
+                    Some(terminal_pins.get(&name).cloned().unwrap_or(VertexKey::Named(name)))
+                }
                 Vertex::At(_) => None,
             }
         };
@@ -756,7 +793,7 @@ impl<'a> Drawing<'a> {
             if w.points.is_empty() {
                 continue;
             }
-            let keys: BTreeSet<String> = w.via.iter().filter_map(vkey).collect();
+            let keys: BTreeSet<VertexKey> = w.via.iter().filter_map(vkey).collect();
             // a point written twice in a row is one point; a segment of no length is said only in the
             // middle of a wire, not where an end repeats the place of the pin or point it names
             let last = w.points.len().saturating_sub(1);
@@ -1247,9 +1284,9 @@ impl<'a> Drawing<'a> {
     fn named_joins(&self) -> Vec<usize> {
         let nw = self.wires.len();
         let mut up: Vec<usize> = (0..nw + self.pins.len()).collect();
-        let mut first: HashMap<&str, usize> = HashMap::new();
-        let names = self.wires.iter().enumerate().flat_map(|(w, wire)| wire.keys.iter().map(move |k| (w, k.as_str())));
-        let pins = self.pins.iter().enumerate().flat_map(|(p, pin)| pin.keys.iter().map(move |k| (nw + p, k.as_str())));
+        let mut first: HashMap<&VertexKey, usize> = HashMap::new();
+        let names = self.wires.iter().enumerate().flat_map(|(w, wire)| wire.keys.iter().map(move |k| (w, k)));
+        let pins = self.pins.iter().enumerate().flat_map(|(p, pin)| pin.keys.iter().map(move |k| (nw + p, k)));
         for (node, k) in names.chain(pins) {
             match first.get(k) {
                 Some(&other) => union(&mut up, node, other),
@@ -1287,7 +1324,7 @@ impl<'a> Drawing<'a> {
                                 self.wire_named(w),
                                 p.name,
                                 pt(q),
-                                p.keys.first().map_or(p.name.as_str(), |k| k.as_str())
+                                p.reference
                             ),
                         );
                     }
@@ -1575,7 +1612,7 @@ impl<'a> Drawing<'a> {
                         "{} is joined to &{} by its name alone: no wire, port or label at it, so it looks unconnected; wire it, or give it a label at {}",
                         p.name,
                         rnl_runtime::model::quoted(n),
-                        p.keys.first().map_or(p.name.as_str(), |k| k.as_str())
+                        p.reference
                     ),
                 );
             }
