@@ -49,6 +49,43 @@ fn actual_native_results_and_written_records_round_trip_for_each_language_versio
 }
 
 #[test]
+fn line_reports_round_trip_and_reject_invalid_dimensions_axes_and_routes() {
+    use rnl_solver_io::{LevelResult, ResultDocument, SolverIdentity};
+    let p = problem("0.4");
+    let options = rnl_solver::SolverOptions::default().with_config("layout=\"lines\",limit=\"seed\"").unwrap();
+    let solved = rnl_solver::solve(&p, &options);
+    let skeleton = solved.report.skeleton.as_ref().unwrap();
+    assert!(!skeleton.tables.is_empty() && !skeleton.lines.is_empty());
+    let result = ResultDocument {
+        solver: SolverIdentity { name: "fixture".into(), version: "1".into() },
+        levels: vec![LevelResult {
+            request: 0,
+            level: p.level,
+            input: rnl_runtime::problem::input_digest(&p),
+            options: solved.report.canonical_options.clone().unwrap(),
+            solution: solved.solution,
+            report: Some(solved.report),
+        }],
+    };
+    let encoded = rnl_solver_io::encode_result(&result).unwrap();
+    let bytes = serde_json::to_vec(&encoded).unwrap();
+    let decoded =
+        rnl_solver_io::decode_result(&rnl_solver_io::parse_json(&bytes).unwrap(), std::slice::from_ref(&p)).unwrap();
+    assert_eq!(decoded, result);
+    for bad in 0..5 {
+        let mut value = encoded.clone();
+        match bad {
+            0 => value["levels"][0]["report"]["skeleton"]["lines"][0]["axis"] = json!(2),
+            1 => value["levels"][0]["report"]["skeleton"]["tables"][0]["xs"] = json!([]),
+            2 => value["levels"][0]["report"]["skeleton"]["lines"][0]["tree"] = json!(p.routes.len()),
+            3 => value["levels"][0]["report"]["skeleton"]["lines"][0]["at"] = json!(null),
+            _ => value["version"] = json!(2),
+        }
+        assert!(rnl_solver_io::decode_result(&value, std::slice::from_ref(&p)).is_err(), "bad case {bad}");
+    }
+}
+
+#[test]
 fn pin_coordinates_and_electrical_pins_are_not_collapsed_by_the_protocol() {
     let p = problem("0.4");
     let PointRef::Pin { object, pin, terminal } = &p.wires[0].anchors[0] else {

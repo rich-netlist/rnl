@@ -13,6 +13,7 @@ pub enum Layout {
     #[default]
     Rows,
     Tree,
+    Lines,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -80,7 +81,8 @@ fn apply(o: &mut SolverOptions, s: &SolverSetting) -> Result<(), String> {
             o.settings.layout = match string(s)? {
                 "rows" => Layout::Rows,
                 "tree" => Layout::Tree,
-                _ => return Err("layout must be \"rows\" or \"tree\"".into()),
+                "lines" => Layout::Lines,
+                _ => return Err("layout must be \"rows\", \"tree\", or \"lines\"".into()),
             }
         }
         "spacing_x" | "spacing_y" => {

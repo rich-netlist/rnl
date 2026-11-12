@@ -1,0 +1,31 @@
+# Line layout
+
+RNL 0.4 files can request `@SOLVER-CONFIG(layout="lines")`, or callers can select it through the solver options. The default remains rows. The linked library, `rnl solve`, and the independent solver use the same engine.
+
+| Group-tree layout | Line layout |
+| --- | --- |
+| ![Before](images/line-layout-before.png) | ![After](images/line-layout-after.png) |
+
+This synthetic example has four two-pin symbols in two groups, with three routed nets. Both runs use the seed pass and the same drawing objectives. The line layout moves the branch farther from a pin, increasing clearance and the drawing's width. This illustrates a routing tradeoff, not a time benchmark.
+
+The engine first builds group tables, then settles groups from the inside out, routes on ordered lines, and compacts the drawing while retaining the resolved facts. It compares the completed result with the tree layout under the line-layout order, which includes pin clearance as well as crossings and bends. A preferred result can therefore have a larger area. Failed compaction or exhausted search falls back to a completed candidate. Group spacing uses the main runtime's nesting and explicit-zero rules. Final port cleanup checks the original indexed facts, including complete orientation lists.
+
+Time and work limits cover the same sequence of positive-cost checkpoints. For these two modes the initial tree stage has a fixed local allowance of `40,000,000 × n² + 2,500,000,000 × n` work units, where `n = max(1, objects)`, with saturating 64-bit arithmetic. The allowance depends on the input, not the requested seconds or work. Local exhaustion ends the tree stage; global exhaustion ends optional search. This replaces a wall-clock percentage so that the total work reported by a time run reproduces that run. The allowance and weights belong to the solver's replay policy and must be versioned when changed.
+
+The first tree candidate is initialized under the shared budget before the local allowance limits subsequent improvements. Initialization is deducted from that allowance; when it already used the allowance, refinement is skipped. This prevents a small stage allowance from turning an otherwise feasible initial route into forced wires. The global time or work limit still interrupts initialization.
+
+The allowance was calibrated using optimized Windows x64 CLI build `8656cb0` on an Intel Core i7-12700KF. Synthetic groups of 4, 8 and 16 single-pin symbols, split into two groups on a shared net, were each run twice with a one-second tree limit and profiling. Four symbols completed in 0.281–0.289 seconds with 392,467,687 work units; eight admitted 5,341,947,456–5,457,608,803 units in about one second; sixteen admitted 15,327,889,401–15,759,410,142 units. All six unprofiled work replays reproduced the saved files byte for byte. These measurements and larger local acceptance inputs informed the size policy; work units are not nanoseconds, and the policy does not promise a fixed duration on every machine or circuit. The shared global limit remains authoritative.
+
+Seed and unlimited modes retain their own stage behavior and canonical settings. Time and work results persist the admitted work count as their canonical limit. A safety timeout remains explicitly non-reproducible.
+
+Orientation enumeration checks the shared budget before measuring each choice. Combination counts and route-window areas use fixed-width arithmetic on native and WebAssembly builds. In line-search tie breaking, a single-item list has the same canonical identity as its item: adding empty layers of row or column wrapping cannot count as an improvement or keep the seed search running indefinitely.
+
+Routing-window preparation also consumes the shared budget while filling obstacle and clearance masks. An interrupted window is discarded before routing uses it, preserving the last completed candidate.
+
+Crossing measurements consume the same budget during rerouting and final route scoring. A cutoff during those scans rejects the unfinished route rather than treating its partial crossing count as a completed score.
+
+Auto wires with effective 0.4 source semantics call the runtime's shared default path (13.1), including whole waypoint chains and generated content. Unobstructed, unmerged two-anchor auto routes use that same path: bends first, then length, with the runtime's tie order. Existing wires and obstacles prevent that substitution. Compaction and port cleanup recheck the default at the final coordinates before reporting its score and skeleton. This new core rule can change pictures and scores compared with the experimental solver.
+
+Writeback materializes the chosen path and junctions even after search stops; this is deterministic output conversion, not further layout search. Unevaluable written geometry is fatal and cannot replace an existing record. Independent routing trees remain independent despite matching net names or coordinates. A shared real anchor combines directions only at that identity, and a pin-position reference never acquires an electrical pin lead.
+
+`SolveReport.skeleton` describes the final group tables and line identities. The independent solver sends it in protocol version 4. After port cleanup changes geometry, the description is refreshed from the final coordinates. Visible interface details use the main runtime's symbol, column-text, baseline, and position models.

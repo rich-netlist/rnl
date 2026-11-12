@@ -18,7 +18,7 @@ fn record(case: u32, work: u32) -> (String, u64) {
         text.push_str(&format!("#R{k} "));
     }
     text.push_str("} @SET-SYMBOL $S;\n");
-    for k in 1..=if !(2..6).contains(&case) { n } else { 0 } {
+    for k in 1..=if matches!(case, 0 | 1 | 6 | 7) { n } else { 0 } {
         text.push_str(&format!("* #R{k} @PLACE({}, {}) => @ORIENT(\"R0\");\n", k * 7, (k % 2) * 4));
     }
     if case >= 2 {
@@ -71,7 +71,13 @@ fn record(case: u32, work: u32) -> (String, u64) {
             .with_overrides("objectives=overlaps,crowding,misleading,wire_over_symbol,crossings,turns,wire_length,area")
             .unwrap();
     }
-    if case >= 6 {
+    if case >= 8 {
+        options.settings.layout = rnl_solver::Layout::Lines;
+    }
+    if case >= 10 {
+        options.run_limit = Some(RunLimit::Seed);
+    }
+    if (6..8).contains(&case) {
         let preview =
             rnl_solver::experimental::compact_drawn_with_clock(&p, &options, &rnl_solver::StoppedClock).unwrap();
         if work == 1_000_000 {
@@ -89,16 +95,42 @@ fn record(case: u32, work: u32) -> (String, u64) {
         .to_string();
         return (text, preview.budget.work);
     }
-    let solved = if case >= 4 {
+    let solved = if (4..6).contains(&case) {
         rnl_solver::experimental::solve_skeleton_with_clock(&p, &options, 0, &rnl_solver::StoppedClock).unwrap()
     } else {
         rnl_solver::solve(&p, &options)
     };
     let hash = sig2(&p, solved.report.canonical_options.as_ref().unwrap());
-    (
-        rnl_runtime::solution::write_record(&p, &solved.solution, rnl_solver::AUTHOR, &hash).record,
-        solved.report.budget.unwrap().work,
-    )
+    let written = rnl_runtime::solution::write_record(&p, &solved.solution, rnl_solver::AUTHOR, &hash).record;
+    if case >= 8 {
+        let skeleton = solved.report.skeleton.as_ref().unwrap();
+        if work == 100_000_000 {
+            if case == 8 {
+                assert!(!skeleton.fallback, "{:?}", solved.report.notes);
+                assert!(solved.report.notes.iter().any(|note| note.starts_with("lines, round 0:")));
+            } else {
+                assert!(skeleton.fallback);
+                assert_eq!(solved.report.budget.as_ref().unwrap().reason, rnl_solver::StopReason::Work);
+            }
+        }
+        if case >= 10 {
+            assert_eq!(solved.report.budget.as_ref().unwrap().reason, rnl_solver::StopReason::Complete);
+            assert!(solved.report.notes.iter().any(|note| note.starts_with("lines, round 0:")));
+        }
+        let text = serde_json::json!({
+            "record":written,
+            "work":solved.report.budget.as_ref().unwrap().work,
+            "fallback":skeleton.fallback,
+            "tables":skeleton.tables.iter().map(|t| serde_json::json!({
+                "group":t.group,"rows":t.rows,"columns":t.columns,"xs":t.xs,"ys":t.ys,
+                "items":t.items.iter().map(|i| (&i.label,i.group,i.rows,i.columns)).collect::<Vec<_>>(),
+            })).collect::<Vec<_>>(),
+            "lines":skeleton.lines.iter().map(|l| (l.axis,l.kind.name(),l.rank,l.at,&l.owner,l.tree)).collect::<Vec<_>>(),
+            "trees":skeleton.trees.iter().map(|t| (t.route,&t.net,&t.xs,&t.ys)).collect::<Vec<_>>(),
+        }).to_string();
+        return (text, solved.report.budget.unwrap().work);
+    }
+    (written, solved.report.budget.unwrap().work)
 }
 
 thread_local! { static OUTPUT: RefCell<String> = const { RefCell::new(String::new()) }; }
@@ -118,8 +150,15 @@ pub extern "C" fn parity_ptr() -> *const u8 {
 
 fn main() {
     #[cfg(not(target_arch = "wasm32"))]
-    for case in 0..8 {
-        for work in [0, 64, 4096, 1_000_000] {
+    for case in 0..12 {
+        let limits: &[u32] = if case >= 10 {
+            &[0]
+        } else if case >= 8 {
+            &[0, 64, 4096, 100_000_000]
+        } else {
+            &[0, 64, 4096, 1_000_000]
+        };
+        for &work in limits {
             let start = std::time::Instant::now();
             let (record, used) = record(case, work);
             println!("{}", serde_json::to_string(&(case, work, record, used, start.elapsed().as_secs_f64())).unwrap());

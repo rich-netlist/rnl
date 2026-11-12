@@ -41,7 +41,7 @@ pub(crate) fn effect(effect: &OrientEffect, value: usize) -> OrientEffect {
     }
 }
 
-fn take(classes: &mut OrientClasses, effect: &OrientEffect, fact: usize) -> Result<(), Vec<usize>> {
+pub(crate) fn take(classes: &mut OrientClasses, effect: &OrientEffect, fact: usize) -> Result<(), Vec<usize>> {
     match effect {
         OrientEffect::Fix { object, code } => classes.fix(*object, *code, fact),
         OrientEffect::Relate { from, to, relation } => {

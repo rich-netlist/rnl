@@ -336,7 +336,6 @@ pub(crate) struct Strict {
 }
 
 #[allow(clippy::too_many_arguments)]
-#[cfg_attr(not(test), expect(dead_code, reason = "Entry point for the subsequent line-layout integration"))]
 pub(crate) fn compact_strict(
     problem: &LevelProblem,
     s: &Structure,
@@ -602,7 +601,6 @@ pub(crate) fn compact_strict(
 }
 
 /// Apply final spacing and compose each routed vertex's displacement with compaction.
-#[cfg_attr(not(test), expect(dead_code, reason = "Entry point for the subsequent line-layout integration"))]
 pub(crate) fn spaced(
     problem: &LevelProblem,
     s: &Structure,

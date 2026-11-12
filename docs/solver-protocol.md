@@ -1,8 +1,8 @@
 # Independent solver protocol
 
-The `rnl-solver-io` library encodes an independent solver's decisions as JSON and validates them against the original `LevelProblem` before writeback. Protocol version 3 is independent of the solver executable's version.
+The `rnl-solver-io` library encodes an independent solver's decisions as JSON and validates them against the original `LevelProblem` before writeback. Protocol version 4 is independent of the solver executable's version.
 
-The `rnl-solver` executable has its own version, currently `0.3.0`. It reads one input JSON document from stdin (or an explicit file) and writes one result document to stdout. Diagnostics go to stderr. Viewers continue using the solver library. Its opt-in [skeleton experiment](solver-skeleton.md) uses the same result protocol.
+The `rnl-solver` executable has its own version, currently `0.4.0`. It reads one input JSON document from stdin (or an explicit file) and writes one result document to stdout. Diagnostics go to stderr. Viewers continue using the solver library. Its opt-in [skeleton experiment](solver-skeleton.md) uses the same result protocol.
 
 ## Commands
 
@@ -124,4 +124,10 @@ Version 2 requires group `identity`, `first` and `direct` fields. These preserve
 
 ## Version 3
 
-Version 3 adds source-version auto-wire semantics, arbitrary text angles and upright glyph layout, and fatal written-wire reporting. Version 2 executables cannot reproduce these decisions safely. Input and result decoders require version 3; upgrade the independent executable and its caller together. Result decision arrays retain their previous shapes.
+Version 3 added source-version auto-wire semantics, arbitrary text angles and upright glyph layout, and fatal written-wire reporting. Version 2 executables cannot reproduce these decisions safely. Result decision arrays retained their previous shapes.
+
+## Version 4
+
+Version 4 adds the required nullable `report.skeleton` field. For `layout="lines"` it carries the final group tables, typed lines, route identities, and whether the tree layout was used as a fallback. Table cuts contain `columns + 1` x coordinates and `rows + 1` y coordinates; item spans are half-open index pairs. Line coordinates must be finite and axes are 0 or 1. A line's optional `tree` and each tree's `route` index refer to the original input routes. These fields are descriptive and never grant permission to rewrite source objects.
+
+Version 3 programs reject version 4 requests. Upgrade the independent executable with the protocol; the linked solver remains available to native and browser callers. The input model itself is unchanged from version 3.

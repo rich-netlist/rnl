@@ -33,10 +33,25 @@ fn run(input: &InputDocument) -> Output {
 }
 
 #[test]
+fn independent_lines_returns_the_native_solution_and_skeleton() {
+    let input = input(SolverOptions::default().with_config("layout=\"lines\",limit=\"seed\"").unwrap());
+    let output = run(&input);
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    let p = &input.levels[0].problem;
+    let result =
+        rnl_solver_io::decode_result(&rnl_solver_io::parse_json(&output.stdout).unwrap(), std::slice::from_ref(p))
+            .unwrap();
+    let native = rnl_solver::solve(p, &input.levels[0].options);
+    assert!(native.report.skeleton.is_some());
+    assert_eq!(result.levels[0].solution, native.solution);
+    assert_eq!(result.levels[0].report, Some(native.report));
+}
+
+#[test]
 fn independent_version_and_help_are_not_the_workspace_version() {
     let version = Command::new(env!("CARGO_BIN_EXE_rnl-solver")).arg("--version").output().unwrap();
     assert!(version.status.success());
-    assert_eq!(String::from_utf8(version.stdout).unwrap(), "rnl-solver 0.3.0\n");
+    assert_eq!(String::from_utf8(version.stdout).unwrap(), "rnl-solver 0.4.0\n");
     let help = Command::new(env!("CARGO_BIN_EXE_rnl-solver")).arg("--help").output().unwrap();
     assert!(help.status.success());
     assert!(String::from_utf8(help.stdout).unwrap().contains("--solver-input"));
@@ -161,7 +176,7 @@ fn external_backend_writes_and_reopens_the_same_time_work_bytes() {
     )
     .unwrap();
     assert!(reread.diagnostics().iter().all(|d| d.severity != Severity::Error), "{:?}", reread.diagnostics());
-    assert!(first.files[0].text.contains("rnl-solver 0.3.0"));
+    assert!(first.files[0].text.contains("rnl-solver 0.4.0"));
 }
 
 #[test]

@@ -171,19 +171,23 @@ pub fn holds_as_drawn(p: &LevelProblem, drawn: &[Drawn], kind: &FactKind, tolera
 /// Whether an indexed fact holds in the drawing, including its complete orientation list.
 /// The index identifies the list even when two facts have the same first orientation code.
 pub fn problem_fact_holds_as_drawn(p: &LevelProblem, drawn: &[Drawn], fact: usize, tolerance: f64) -> Option<bool> {
+    let tol = self::tolerance(tolerance);
+    check_problem(p, fact, &|r, axis| drawn_value(p, drawn, r, axis), &|k| drawn.get(k)?.orient, &tol, &tol)
+}
+
+/// Check an indexed fact in exact geometry, including its complete orientation alternatives.
+pub(crate) fn check_problem(p: &LevelProblem, fact: usize, at: At, ori: Ori, tol: &Q, equal: &Q) -> Option<bool> {
     let kind = &p.facts.get(fact)?.kind;
     let Some((_, codes)) = p.orient_lists.iter().find(|(i, _)| *i == fact) else {
-        return holds_as_drawn(p, drawn, kind, tolerance);
+        return check(kind, at, ori, tol, equal);
     };
     match kind {
-        FactKind::Orient { object, .. } => Some(codes.contains(&drawn.get(*object)?.orient?)),
+        FactKind::Orient { object, .. } => Some(codes.contains(&ori(*object)?)),
         FactKind::OrientRelation { from, to, .. } => {
             let mut unknown = false;
             for a in from {
                 for b in to {
-                    let (Some(a), Some(b)) =
-                        (drawn.get(*a).and_then(|d| d.orient), drawn.get(*b).and_then(|d| d.orient))
-                    else {
+                    let (Some(a), Some(b)) = (ori(*a), ori(*b)) else {
                         unknown = true;
                         continue;
                     };
@@ -198,7 +202,7 @@ pub fn problem_fact_holds_as_drawn(p: &LevelProblem, drawn: &[Drawn], fact: usiz
                 Some(true)
             }
         }
-        _ => holds_as_drawn(p, drawn, kind, tolerance),
+        _ => check(kind, at, ori, tol, equal),
     }
 }
 

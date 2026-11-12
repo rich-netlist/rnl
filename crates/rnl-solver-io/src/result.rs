@@ -92,6 +92,23 @@ fn report_indices(r: &SolveReport, p: &LevelProblem, at: &Node<'_>) -> Result<()
     for u in &r.unrouted {
         valid(u.route, p.routes.len(), "route")?;
     }
+    if let Some(skeleton) = &r.skeleton {
+        for line in &skeleton.lines {
+            if let Some(tree) = line.tree {
+                valid(tree, p.routes.len(), "skeleton route")?;
+            }
+        }
+        let mut seen = BTreeSet::new();
+        for tree in &skeleton.trees {
+            valid(tree.route, p.routes.len(), "skeleton route")?;
+            if !seen.insert(tree.route) {
+                return Err(at.error("duplicate skeleton tree"));
+            }
+            if tree.net != p.routes[tree.route].net {
+                return Err(at.error("skeleton tree net differs from its route"));
+            }
+        }
+    }
     Ok(())
 }
 

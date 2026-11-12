@@ -29,7 +29,7 @@ fn auto_source_semantics_survive_transport_and_invalidate_old_geometry() {
 }
 
 #[test]
-fn version_three_rejects_old_transport_and_validates_fatal_wire() {
+fn current_protocol_rejects_old_transport_and_validates_fatal_wire() {
     let text = "* protocol fixture\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\nR1 a b 1k\n* @RNL { &a @WIRE(mode=\"straight\") { (0,0) (1,0) } }\n.end\n";
     let files = MemoryProvider::new().with("test.sp", text);
     let read = rnl_view::interpret("test.sp", None, &files, &Options { std: false, ..Options::solver() }).unwrap();
@@ -37,9 +37,11 @@ fn version_three_rejects_old_transport_and_validates_fatal_wire() {
     assert!(!p.wires.is_empty());
     let input = InputDocument { levels: vec![LevelInput { problem: p.clone(), options: Default::default() }] };
     let mut value = encode_input(&input).unwrap();
-    assert_eq!(value["version"], 3);
-    value["version"] = serde_json::json!(2);
-    assert!(decode_input(&value).is_err());
+    assert_eq!(value["version"], 4);
+    for old in [2, 3] {
+        value["version"] = serde_json::json!(old);
+        assert!(decode_input(&value).is_err());
+    }
     let report = rnl_solver::SolveReport {
         fatal_written_wire: Some(0),
         errors: vec!["unevaluable wire".into()],
@@ -57,7 +59,7 @@ fn version_three_rejects_old_transport_and_validates_fatal_wire() {
         }],
     };
     let mut value = encode_result(&document).unwrap();
-    assert_eq!(value["version"], 3);
+    assert_eq!(value["version"], 4);
     assert_eq!(decode_result(&value, std::slice::from_ref(&p)).unwrap(), document);
     value["levels"][0]["report"]["fatal_written_wire"] = serde_json::json!(p.wires.len());
     assert!(decode_result(&value, std::slice::from_ref(&p)).is_err());
