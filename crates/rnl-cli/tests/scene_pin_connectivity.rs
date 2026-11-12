@@ -184,6 +184,7 @@ fn solver_writeback_reaches_an_earlier_pin_by_its_quoted_name() {
         assert!(matches!(&pin, PointRef::SymbolPin { pin: 0, reference: Reference::Name(n), .. }
             if n == &format!("#R1::{name}")));
         p.routes.push(RouteIntent {
+            tree: false,
             net: "a".into(),
             mode: "straight".into(),
             style: vec![],

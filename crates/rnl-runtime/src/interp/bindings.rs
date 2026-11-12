@@ -1,5 +1,5 @@
 //! Level names retain their first valid creation, including forward references (6.6).
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use super::ctx::Ctx;
 use super::eval::{Bound, Stop, R};
@@ -17,10 +17,27 @@ pub(super) struct Bindings {
     valid: HashMap<(MemberKey, Option<SceneId>), Vec<bool>>,
     /// Only source identities survive a repeated reading, never object or diagnostic ids.
     pub(super) plans: HashMap<BindingName, BindingChoice>,
+    /// Names whose specific body finished after the first lookup. Repeated
+    /// reading uses their settled creation result, including aliases (9.1).
+    pub(super) specific_names: HashSet<BindingName>,
     queries: HashMap<BindingName, Binding>,
 }
 
 impl Interp<'_> {
+    /// A specific body that exceeds an implementation limit fails at creation,
+    /// even though publishing its handle preceded expanding its content (9.1).
+    pub(super) fn failed_specific_creation(&mut self, object: ObjId) {
+        for (key, bound) in &self.bound_memo {
+            if let Some(valid) = self.bindings.valid.get_mut(key) {
+                for (index, (_, value, _)) in bound.iter().enumerate() {
+                    if *value == object {
+                        valid[index] = false;
+                    }
+                }
+            }
+        }
+    }
+
     pub(super) fn modern_binding(&self, binding: &Binding) -> bool {
         self.follows_0_4(binding.rec.map_or(binding.owner, |rec| self.rec_unit[rec]))
     }
@@ -83,16 +100,34 @@ impl Interp<'_> {
 
     pub(super) fn first_valid_binding_value(&mut self, binding: &Binding, ctx: &Ctx) -> R<ObjId> {
         let mut first_failed = None;
-        for candidate in self.binding_candidates(binding) {
+        let scene = if self.places.rules.contains(&binding.key()) { ctx.scene } else { self.home_scene(binding.owner) };
+        let name = (binding.owner, binding.prefix, binding.name.clone(), scene);
+        let planned =
+            self.bindings.specific_names.contains(&name).then(|| self.bindings.plans.get(&name).cloned()).flatten();
+        if planned.is_some() {
+            self.bindings.queries.insert(name.clone(), binding.clone());
+        }
+        let candidates = self.binding_candidates(binding);
+        for candidate in candidates
+            .iter()
+            .filter(|candidate| planned.as_ref().is_none_or(|choice| (candidate.key(), candidate.off) == *choice))
+        {
             let candidate_context = ctx.with_dependencies(&[]);
-            let value = match self.binding_value_one(&candidate, &candidate_context) {
+            let value = match self.binding_value_one(candidate, &candidate_context) {
                 Err(Stop::Language | Stop::OwnLevel) => continue,
                 other => other?,
             };
             let scene =
                 if self.places.rules.contains(&candidate.key()) { ctx.scene } else { self.home_scene(candidate.owner) };
-            let (_, valid) = self.binding_result(&candidate, scene, value);
+            let (_, valid) = self.binding_result(candidate, scene, value);
             if valid {
+                if candidates.len() > 1 && (self.specific_pending(value) || planned.is_some()) {
+                    self.bindings.specific_names.insert(name.clone());
+                    // Seed the first actual choice, so a completed valid body does
+                    // not cause an otherwise unnecessary repeated reading.
+                    self.bindings.plans.entry(name.clone()).or_insert((candidate.key(), candidate.off));
+                    self.bindings.queries.insert(name.clone(), binding.clone());
+                }
                 ctx.depend_on(&candidate_context.reference_dependencies.borrow());
                 return Ok(value);
             }

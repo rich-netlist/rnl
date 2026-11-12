@@ -321,7 +321,7 @@ impl References {
         report: &mut super::FileReport,
     ) -> Result<(Vec<Edit>, bool), String> {
         let Some(readings) = self.readings_at(path, record, member.start) else { return Ok((Vec::new(), false)) };
-        self.usage_changes.edits(source, record, member, readings, approximate, report, |r| {
+        self.usage_changes.edits((source, record, member), readings, approximate, report, |r| {
             self.host_terminal(path, source, record, r)
         })
     }

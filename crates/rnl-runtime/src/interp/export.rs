@@ -327,7 +327,19 @@ impl Interp<'_> {
         // ROUTE (13.7): the pins of the net, and the wires already on it
         let mut routes = Vec::new();
         let route_objs = self.scenes[s].routes.clone();
-        if !route_objs.is_empty() {
+        if !self.scenes[s].routing_requests.is_empty() {
+            for tree in self.scenes[s].resolved_trees.clone() {
+                let pins = tree.pins.iter().filter_map(|pin| self.point_ref(s, &ix, *pin)).collect();
+                routes.push(RouteIntent {
+                    tree: true,
+                    net: self.net_display(tree.net),
+                    mode: tree.mode,
+                    style: tree.style.into_iter().collect(),
+                    pins,
+                    wires: tree.wires.iter().filter_map(|wire| ix.wires.get(wire).copied()).collect(),
+                });
+            }
+        } else if !route_objs.is_empty() {
             let terms = self.route_terms(s);
             for r in route_objs {
                 let ObjData::Route { net, mode, style, .. } = self.o(r).clone() else { continue };
@@ -358,6 +370,7 @@ impl Interp<'_> {
                 }
                 let on_net = self.scenes[s].wires_by_net.get(&net).cloned().unwrap_or_default();
                 routes.push(RouteIntent {
+                    tree: false,
                     net: self.net_display(net),
                     mode,
                     style: style.into_iter().collect(),
@@ -761,6 +774,15 @@ impl Interp<'_> {
                 }
             }
             ObjData::Pos { parent } => self.reference_of(s, ix, parent).then("::position"),
+            ObjData::ScenePin { owner, index } if self.follows_0_4(self.level_unit[self.scenes[s].level]) => {
+                match self.symbol_pin_ref(s, ix, owner, index) {
+                    Some(PointRef::SymbolPin { reference, .. }) => reference,
+                    Some(PointRef::Pin { terminal, .. }) => {
+                        self.reference_of(s, ix, owner).then(&format!(":{}", written_name(&terminal)))
+                    }
+                    _ => Reference::Anonymous,
+                }
+            }
             ObjData::NamedSubobject { parent, name, .. } => {
                 self.reference_of(s, ix, parent).then(&format!("::{}", written_name(&name)))
             }

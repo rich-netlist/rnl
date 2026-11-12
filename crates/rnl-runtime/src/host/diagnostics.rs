@@ -16,6 +16,7 @@ pub struct Reading {
 #[derive(Clone, Debug)]
 pub enum Detail {
     FirstLine,
+    AutoIncluded { model: String, file: String },
     UnselectedSection,
     OutsideSection,
     UnclosedSubcircuits(Vec<(String, Loc)>),
@@ -24,8 +25,17 @@ pub enum Detail {
 }
 
 impl Detail {
+    pub(crate) fn severity(&self, original: crate::diag::Severity) -> crate::diag::Severity {
+        if matches!(self, Self::AutoIncluded { .. }) {
+            crate::diag::Severity::Hint
+        } else {
+            original
+        }
+    }
+
     pub(crate) fn presentation(&self) -> (String, Option<Loc>) {
         let message = match self {
+            Self::AutoIncluded { model, file } => format!("subcircuit {model} was added from {file} by Auto Include"),
             Self::FirstLine => "the first line of a file is not read as RNL (2.2)".into(),
             Self::UnselectedSection => "RNL in a library section that is not selected is not read (2.2)".into(),
             Self::OutsideSection => "RNL outside the selected library section is not read (2.2)".into(),

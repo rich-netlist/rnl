@@ -607,6 +607,38 @@ fn io(e: std::io::Error) -> Said {
     Said::new(codes::CLI_IO_ERROR_BARE, e.to_string())
 }
 
+fn diagnostic_summary(
+    r: &rnl_runtime::Interpretation,
+    errors: usize,
+    violations: usize,
+    warnings: usize,
+    hints: usize,
+) -> String {
+    let modern =
+        r.problems.iter().find(|problem| problem.level == 0).map(|problem| problem.version == "0.4").unwrap_or_else(
+            || {
+                r.sources
+                    .iter()
+                    .find(|(file, _)| file == &r.doc.main().file)
+                    .and_then(|(_, text)| rnl_runtime::interp::unit::scan_language_decl(text))
+                    .as_deref()
+                    == Some("0.4")
+            },
+        );
+    if modern {
+        let count = |n, noun| if n == 1 { format!("1 {noun}") } else { format!("{n} {noun}s") };
+        format!(
+            "{}, {}, {}, {}",
+            count(errors, "error"),
+            count(violations, "violation"),
+            count(warnings, "warning"),
+            count(hints, "hint")
+        )
+    } else {
+        format!("{errors} errors, {violations} violations, {warnings} warnings, {hints} hints")
+    }
+}
+
 fn run(args: &Args) -> Result<ExitCode, Said> {
     let provider = FsProvider::new(&args.package_dirs).with_search_paths(&args.search_paths);
     check_formats(args, &provider)?;
@@ -635,7 +667,7 @@ fn run(args: &Args) -> Result<ExitCode, Said> {
             for line in rnl_cli::status_lines(&r) {
                 println!("{line}");
             }
-            println!("{e} errors, {v} violations, {w} warnings, {h} hints");
+            println!("{}", diagnostic_summary(&r, e, v, w, h));
             // a violation fails the check as an error does: an assertion is written to be checked (7.6)
             Ok(if e > 0 || v > 0 { ExitCode::from(1) } else { ExitCode::SUCCESS })
         }
@@ -938,4 +970,33 @@ fn replace_records(args: &Args, provider: &FsProvider) -> Result<ExitCode, Said>
 
 fn sanitize(s: &str) -> String {
     s.chars().map(|c| if c.is_alphanumeric() || c == '-' || c == '_' || c == '.' { c } else { '_' }).collect()
+}
+
+#[cfg(test)]
+mod count_tests {
+    use super::diagnostic_summary;
+
+    #[test]
+    fn check_summary_counts_follow_the_main_language_version() {
+        for version in ["0.2", "0.3", "0.4"] {
+            for problems in [false, true] {
+                let source = format!("* counts\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\") }}\nR1 a b 1k\n");
+                let provider = rnl_runtime::source::MemoryProvider::new().with("counts.sp", &source);
+                let r = rnl_cli::interpret_file(
+                    std::path::Path::new("counts.sp"),
+                    None,
+                    &provider,
+                    &rnl_runtime::Options { std: false, problems, ..Default::default() },
+                )
+                .unwrap();
+                let expected = if version == "0.4" {
+                    "1 error, 1 violation, 1 warning, 1 hint"
+                } else {
+                    "1 errors, 1 violations, 1 warnings, 1 hints"
+                };
+                assert_eq!(diagnostic_summary(&r, 1, 1, 1, 1), expected);
+                assert_eq!(diagnostic_summary(&r, 0, 2, 2, 0), "0 errors, 2 violations, 2 warnings, 0 hints");
+            }
+        }
+    }
 }

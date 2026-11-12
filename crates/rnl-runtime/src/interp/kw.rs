@@ -15,7 +15,7 @@ use super::obj::*;
 use super::scene::{FailedApplication, GroupFact, TargetOp, Task};
 use super::Interp;
 
-const MAX_SYMBOL_LEVELS: usize = 64;
+pub(super) const MAX_SYMBOL_LEVELS: usize = 64;
 
 pub(super) struct DefinitionFields {
     pub(super) roles: Vec<Role>,
@@ -114,6 +114,18 @@ fn graphic_point_count_is_valid(shape: Shape, count: usize) -> bool {
         Shape::Bezier => count >= 4 && (count - 1) % 3 == 0,
         Shape::Text => false,
     }
+}
+
+fn graphic_point_count_message(kw: &str, shape: Shape, count: usize) -> String {
+    let expected = match shape {
+        Shape::Line => "at least 2 points",
+        Shape::Rectangle | Shape::Circle | Shape::Ellipse => "2 points",
+        Shape::Arc => "3 points",
+        Shape::Bezier => "4 points plus 3 for each additional segment",
+        Shape::Text => "1 point",
+    };
+    let actual = if count == 1 { "1 point is".to_string() } else { format!("{count} points are") };
+    format!("@{kw} needs {expected}, but {actual} written (9.2.5)")
 }
 
 /// Only literal, unbound points whose membership cannot be changed by another statement.
@@ -298,6 +310,7 @@ impl Interp<'_> {
                         mapped["style"].off,
                     );
                 }
+                let sty = self.specific_content(sty, ctx, mapped["style"].off)?;
                 self.target_each_mapped(
                     kw,
                     mapped,
@@ -416,6 +429,7 @@ impl Interp<'_> {
             }
             k if k.starts_with("SELECT-") => self.kw_select(kw, &args, seg, ctx),
             "WIRE" => self.kw_wire(kw, &args, seg, ctx),
+            "ROUTE-NET" | "ROUTE-OBJECT" | "UNROUTE-NET" | "UNROUTE-OBJECT" => self.kw_routing(kw, &args, seg, ctx),
             "ROUTE" => {
                 let mut spec = self.sig_params(kw, ctx);
                 spec.extend(style_specs("wire_style"));
@@ -500,6 +514,9 @@ impl Interp<'_> {
 
     pub(crate) fn frame_key(&self, ctx: &Ctx) -> usize {
         match &ctx.frame {
+            Some(f) if self.follows_0_4(self.source_unit(ctx)) && f.borrow().symbol.is_some() => {
+                f.borrow().symbol.unwrap().0 as usize + 1
+            }
             Some(f) => f.borrow().usage.map(|u| u.0 as usize + 1).unwrap_or(0),
             None => 0,
         }
@@ -558,7 +575,10 @@ impl Interp<'_> {
         let body = self.body_arg(kw, args, seg, ctx)?;
         // A graph check after evaluation cannot protect the call stack while uncached,
         // forward references are still expanding their definitions.
-        if body.is_some() && self.symbol_expansions.len() >= MAX_SYMBOL_LEVELS {
+        if !self.follows_0_4(self.source_unit(ctx))
+            && body.is_some()
+            && self.symbol_expansions.len() >= MAX_SYMBOL_LEVELS
+        {
             let id = self.err(
                 ctx,
                 codes::DEFINE_SYMBOL_EXPANSION_LIMIT, format!("symbol expansion exceeds this implementation's limit of {MAX_SYMBOL_LEVELS} active symbol bodies (9.2.7)"),
@@ -601,6 +621,11 @@ impl Interp<'_> {
                 );
             }
         }
+        if self.follows_0_4(self.source_unit(ctx)) {
+            self.defer_specific(sym, body, ctx, self.defining_for(ctx, seg, member), seg.start);
+            self.unnamed_definition_warning(ctx, seg, member);
+            return Ok((sym, false));
+        }
         if let Some(body) = body {
             let defining = self.defining_for(ctx, seg, member);
             self.symbol_expansions.push(None);
@@ -633,7 +658,7 @@ impl Interp<'_> {
 
     /// Reject unsupported graphs before any renderer or solver can consume them. The limit
     /// includes the outer symbol and is shared by graphics, fixed text and inferred extents.
-    fn check_symbol_graph(&mut self, root: ObjId, ctx: &Ctx, off: usize) -> R<()> {
+    pub(super) fn check_symbol_graph(&mut self, root: ObjId, ctx: &Ctx, off: usize) -> R<()> {
         let mut pending = vec![(root, false)];
         let mut active = HashSet::new();
         let mut depths: HashMap<ObjId, usize> = HashMap::new();
@@ -692,6 +717,13 @@ impl Interp<'_> {
         }
         let own = self.params(kw, seg, ctx, &[], Some(&[]), true, None)?;
         let body = self.body_arg(kw, args, seg, ctx)?;
+        if self.follows_0_4(self.source_unit(ctx)) {
+            let sty = self.new_obj(ObjData::Style(own.into_iter().collect()));
+            self.node_memo.insert(key, sty);
+            self.defer_specific(sty, body, ctx, self.defining_for(ctx, seg, member), seg.start);
+            self.unnamed_definition_warning(ctx, seg, member);
+            return Ok((sty, false));
+        }
         let mut props = StyleMap::new();
         let mut bctx = ctx.clone();
         bctx.defining = Some(self.defining_for(ctx, seg, member)); // the body cannot see this name (6.9)
@@ -722,7 +754,14 @@ impl Interp<'_> {
                                 self.err(
                                     ctx,
                                     codes::STYLE_BODY_NOT_STYLE,
-                                    "the set of DEFINE-STYLE only references other styles (9.3)",
+                                    if self.follows_0_4(self.source_unit(ctx)) {
+                                        format!(
+                                            "{} is not a style; the body of DEFINE-STYLE only references styles (9.3)",
+                                            self.label(obj)
+                                        )
+                                    } else {
+                                        "the set of DEFINE-STYLE only references other styles (9.3)".to_string()
+                                    },
                                     a.start,
                                 );
                             }
@@ -1344,7 +1383,7 @@ impl Interp<'_> {
 
     /// Names, counts and literal parameter values do not depend on an application's objects.
     fn check_definition_parameters(&mut self, member: &Member, definition: &DefData, ctx: &Ctx, scopes: &[&SetExpr]) {
-        for segment in &member.segments {
+        for (index, segment) in member.segments.iter().enumerate() {
             if let Some(call) = &segment.call {
                 let keyword = self.kw(&call.kw, ctx.unit);
                 if !self.body_errors.contains_key(&super::eval::ptr(call)) {
@@ -1387,6 +1426,15 @@ impl Interp<'_> {
                                     Ok(())
                                 });
                             if let Err(Stop::Fail(Some(diagnostic))) = checked {
+                                self.body_errors.insert(super::eval::ptr(call), diagnostic);
+                            }
+                        }
+                        if matches!(keyword.as_str(), "LAYER" | "ROUTE-NET" | "UNROUTE-NET")
+                            && !self.body_errors.contains_key(&super::eval::ptr(call))
+                        {
+                            if let Err(Stop::Fail(Some(diagnostic))) =
+                                self.check_definition_input_kind(&keyword, member, index, definition, ctx, scopes)
+                            {
                                 self.body_errors.insert(super::eval::ptr(call), diagnostic);
                             }
                         }
@@ -1477,6 +1525,16 @@ impl Interp<'_> {
         self.check_definition_callee(kw, segment, definition, ctx, scopes)
     }
 
+    pub(super) fn usage_role_count_message(&self, label: &str, roles: usize, objects: usize, ctx: &Ctx) -> String {
+        if self.follows_0_4(self.source_unit(ctx)) {
+            let role = if roles == 1 { "role" } else { "roles" };
+            let object = if objects == 1 { "object is" } else { "objects are" };
+            format!("the ordinary definition {label} has {roles} {role}, {objects} {object} written (9.4)")
+        } else {
+            format!("the ordinary definition {label} has {roles} roles, {objects} objects are written (9.4)")
+        }
+    }
+
     /// Infer only kinds fixed by the written object or a declared role and standard path.
     /// Custom sub-objects, collection indexing and aliases scoped to usages remain unknown.
     pub(super) fn definition_object_kinds(
@@ -1553,6 +1611,10 @@ impl Interp<'_> {
                 &["instance", "bundle", "usage", "point", "position", "text", "label", "annotation"],
             ),
             ("ORIENT", _) => (codes::PLACE_ORIENT_NOT_TAKEN, &["instance", "bundle", "usage", "pin"]),
+            ("LAYER", _) => (
+                codes::LAYER_NOT_TAKEN,
+                &["instance", "bundle", "usage", "wire", "graphic", "text", "label", "annotation"],
+            ),
             ("ADD-TO" | "REMOVE-FROM", "target") => (codes::SET_EDIT_TARGET_NOT_SET, &["set"]),
             ("ASSERT-IN", "set") => (codes::SET_EDIT_TARGET_NOT_SET, &["set"]),
             ("ASSERT-INSTANCE", "members") => (codes::ASSERT_MEMBER_WRONG_KIND, &["instance", "bundle"]),
@@ -1564,6 +1626,7 @@ impl Interp<'_> {
                 (codes::SELECT_DEFINITION_NOT_DEFINITION, &["definition"])
             }
             ("WIRE", "net") => (codes::WIRE_NET_WRONG_KIND, &["net", "pin", "terminal", "wire"]),
+            ("ROUTE-NET" | "UNROUTE-NET", "net") => (codes::ROUTE_TARGET_NOT_NET, &["net", "pin", "terminal"]),
             ("WIRE", "points") => (codes::WIRE_POINT_WRONG_KIND, &["point", "position", "pin", "terminal"]),
             ("SET-SYMBOL", "symbol") => (codes::KEYWORD_SET_SYMBOL_NOT_A_SYMBOL, &["symbol"]),
             ("SET-STYLE", "style") => (codes::STYLE_SET_STYLE_NOT_A_STYLE, &["style"]),
@@ -1704,11 +1767,11 @@ impl Interp<'_> {
                         arg.start,
                     );
                 }
-                if !filled.insert(role) {
+                if !filled.insert(role.clone()) {
                     return self.fail(
                         ctx,
                         codes::KEYWORD_POSITION_LABELLED_TWICE,
-                        "a role is labelled only once (4.2 rule 6)",
+                        format!("role {role} is labelled more than once (4.2 rule 6)"),
                         arg.start,
                     );
                 }
@@ -1767,14 +1830,52 @@ impl Interp<'_> {
                 self.check_definition_slot_kind(kw, argument, slot, definition, ctx)?;
             }
         }
-        if segment.call.as_ref().unwrap().params.as_ref().is_none_or(|p| p.named.is_empty() && p.positional.is_empty())
-        {
-            if let Some(shape) = Shape::parse(kw).filter(|shape| *shape != Shape::Text) {
-                if definition_point_count(segment).is_some_and(|count| !graphic_point_count_is_valid(shape, count)) {
+        if let Some(shape) = Shape::parse(kw).filter(|shape| *shape != Shape::Text) {
+            // Style arguments never change the point count. Size placeholders can be
+            // absent in an application, so only their presence is deferred (9.2.5, 9.4).
+            let mut sizes = [None; 3]; // width, height, radius: absent, unknown, or fixed
+            if let Some(params) = &segment.call.as_ref().unwrap().params {
+                let mut record_size = |name: &str, value: &Value| {
+                    if let Some(index) = ["width", "height", "radius"].iter().position(|wanted| *wanted == name) {
+                        sizes[index] = Some(!matches!(value, Value::Hole(_)));
+                    }
+                };
+                if let Some(signature) = words().keyword(kw) {
+                    let version = self.version_of(Some(self.source_unit(ctx)));
+                    for (name, value) in signature.positional_in(&version).iter().zip(&params.positional) {
+                        record_size(name, value);
+                    }
+                }
+                for parameter in &params.named {
+                    let name =
+                        if parameter.quoted { parameter.name.clone() } else { self.word(&parameter.name, ctx.unit) };
+                    record_size(&name, &parameter.value);
+                }
+            }
+            let sized = match shape {
+                Shape::Rectangle | Shape::Ellipse => {
+                    if (sizes[0] == Some(true) && sizes[1].is_none()) || (sizes[1] == Some(true) && sizes[0].is_none())
+                    {
+                        return self.fail(
+                            ctx,
+                            codes::PARAM_GRAPHIC_WIDTH_HEIGHT,
+                            format!("write both width and height of @{kw} (9.2.5)"),
+                            segment.call.as_ref().unwrap().start,
+                        );
+                    }
+                    sizes[0].is_some() || sizes[1].is_some()
+                }
+                Shape::Circle => sizes[2].is_some(),
+                _ => false,
+            };
+            if !sized {
+                if let Some(count) =
+                    definition_point_count(segment).filter(|count| !graphic_point_count_is_valid(shape, *count))
+                {
                     return self.fail(
                         ctx,
                         codes::KEYWORD_GRAPHIC_POINT_COUNT,
-                        format!("@{kw} has the wrong number of points (9.2.5)"),
+                        graphic_point_count_message(kw, shape, count),
                         segment.start,
                     );
                 }
@@ -2012,11 +2113,7 @@ impl Interp<'_> {
                 return self.fail(
                     ctx,
                     codes::USAGE_TOO_MANY_OBJECTS,
-                    format!(
-                        "the ordinary definition {dlabel} has {} roles, {} objects are written (9.4)",
-                        d.roles.len(),
-                        objs.len()
-                    ),
+                    self.usage_role_count_message(&dlabel, d.roles.len(), objs.len(), ctx),
                     seg.start,
                 );
             }
@@ -2541,7 +2638,7 @@ impl Interp<'_> {
 
     // ------------------------------------------------------------------ symbol bodies (9.2)
 
-    fn eval_symbol_body(
+    pub(super) fn eval_symbol_body(
         &mut self,
         sym: ObjId,
         body: &Rc<SetExpr>,
@@ -2592,8 +2689,13 @@ impl Interp<'_> {
                         Err(o) => return Err(o),
                     };
                     match self.o(obj) {
-                        ObjData::Symbol(other) => {
-                            let other = (**other).clone();
+                        ObjData::Symbol(_) => {
+                            let obj = match self.specific_content(obj, &sctx, a.start) {
+                                Ok(obj) => obj,
+                                Err(Stop::Fail(_)) => continue,
+                                Err(other) => return Err(other),
+                            };
+                            let other = self.symbol(obj).clone();
                             if self.symbol(sym).independent_pins && !self.include_pin_names(sym, &other, &sctx, a.start)
                             {
                                 continue;
@@ -2662,7 +2764,12 @@ impl Interp<'_> {
         let p = self.params(kw, seg, ctx, &self.sig_params(kw, ctx), None, false, None)?;
         let pt = mapped["position"].obj;
         let Some((x, y)) = self.symbol_point(pt, self.follows_0_4(self.source_unit(ctx))) else {
-            return self.fail(ctx, codes::KEYWORD_PIN_NOT_A_POINT, "PIN takes one point (9.2.4)", seg.start);
+            let message = if self.follows_0_4(self.source_unit(ctx)) {
+                format!("PIN takes one point; {} is not a point (9.2.4)", self.label(pt))
+            } else {
+                "PIN takes one point (9.2.4)".to_string()
+            };
+            return self.fail(ctx, codes::KEYWORD_PIN_NOT_A_POINT, message, seg.start);
         };
         let raw = match get(&p, "terminal").cloned() {
             Some(Lit::Arr(v)) => v,
@@ -2710,7 +2817,7 @@ impl Interp<'_> {
             _ => None,
         });
         if let Some(l) = label {
-            self.check_markup(l, ctx, seg);
+            self.check_markup(l, ctx, seg, "label");
         }
         let label_name_formats = label.is_some_and(|l| self.follows_0_4(l.unit.unwrap_or(self.source_unit(ctx))));
         let label = label.map(|l| l.as_str().to_string());
@@ -2902,7 +3009,11 @@ impl Interp<'_> {
             return self.fail(
                 ctx,
                 codes::KEYWORD_GRAPHIC_POINT_COUNT,
-                format!("@{kw} has the wrong number of points (9.2.5)"),
+                if self.follows_0_4(self.source_unit(ctx)) {
+                    graphic_point_count_message(kw, shape, n)
+                } else {
+                    format!("@{kw} has the wrong number of points (9.2.5)")
+                },
                 seg.start,
             );
         }
@@ -3034,7 +3145,7 @@ impl Interp<'_> {
         };
         let call_start = seg.call.as_ref().unwrap().start;
         if let Some(t) = &items.text {
-            self.check_markup(t, ctx, seg);
+            self.check_markup(t, ctx, seg, "text");
         }
         // the file the key is written in: its aliases decide what `::` finds first (13.3, 16.5)
         let key_unit = match &key {
@@ -3189,12 +3300,152 @@ impl Interp<'_> {
         }
     }
 
-    pub(crate) fn check_markup(&mut self, text: &WStr, ctx: &Ctx, seg: &Segment) {
-        let at = seg.call.as_ref().map(|c| c.start).unwrap_or(seg.start);
+    pub(crate) fn check_markup(&mut self, text: &WStr, ctx: &Ctx, seg: &Segment, parameter: &str) {
         let name_formats = self.follows_0_4(text.unit.unwrap_or(self.source_unit(ctx)));
-        for (code, msg) in crate::markup::problems_with_name_formats(text.as_str(), name_formats) {
+        let problems = crate::markup::problems_with_name_formats(text.as_str(), name_formats);
+        if problems.is_empty() {
+            return;
+        }
+        let fallback = seg.call.as_ref().map(|call| call.start).unwrap_or(seg.start);
+        let at = if self.follows_0_4(self.source_unit(ctx)) {
+            self.markup_value_offset(ctx, seg, parameter).unwrap_or(fallback)
+        } else {
+            fallback
+        };
+        for (code, msg) in problems {
             self.warn(ctx, code, format!("{msg} (13.6)"), at);
         }
+    }
+
+    fn markup_value_offset(&self, ctx: &Ctx, seg: &Segment, parameter: &str) -> Option<usize> {
+        let call = seg.call.as_ref()?;
+        let params = call.params.as_ref()?;
+        let record = &self.recs[ctx.rec?].text;
+        if let Some(field) = params.named.iter().find(|field| {
+            let name = if field.quoted { field.name.clone() } else { self.word(&field.name, ctx.unit) };
+            name == parameter
+        }) {
+            let offset = crate::syntax::named_value_offset(record, field)?;
+            return Some(offset + usize::from(matches!(field.value, Value::Str(_))));
+        }
+        let keyword = self.kw(&call.kw, ctx.unit);
+        let version = self.version_of(Some(self.source_unit(ctx)));
+        let index = words().keyword(&keyword)?.positional_in(&version).iter().position(|name| name == parameter)?;
+        let value = params.positional.get(index)?;
+        let offset = crate::syntax::positional_value_offset(record, params, index)?;
+        Some(offset + usize::from(matches!(value, Value::Str(_))))
+    }
+
+    fn kw_routing(&mut self, kw: &str, args: &[ArgV], seg: &Segment, ctx: &Ctx) -> R<(ObjId, bool)> {
+        let net = kw.ends_with("-NET");
+        let join = !kw.starts_with("UNROUTE-");
+        let mut specs = self.sig_params(kw, ctx);
+        if join {
+            specs.extend(style_specs("wire_style"));
+        }
+        let params = self.params(kw, seg, ctx, &specs, None, false, None)?;
+        let (style, rest) = split_style(&params);
+        let spec = super::routes::RoutingSpec {
+            net,
+            join,
+            style,
+            priority: priority_of(&params, ctx),
+            mode: get(&rest, "mode").and_then(Lit::str).unwrap_or("auto").into(),
+        };
+        let mapped = self.map_args(kw, args, seg, ctx, sig_positions(kw))?;
+        let input = mapped[if net { "net" } else { "objects" }].clone();
+        if self.is_empty_node(input.obj) {
+            let empty = self.new_obj(ObjData::Set(Box::new(SetData::plain(Vec::new(), false))));
+            return Ok((empty, input.sel));
+        }
+        if let Some(cause) = self.failed_obj(input.obj) {
+            let diagnostic = self.err_cause(
+                ctx,
+                codes::KEYWORD_OBJECT_FAILED,
+                format!("the object of @{kw} failed"),
+                input.off,
+                cause,
+            );
+            return Err(Stop::Fail(Some(diagnostic)));
+        }
+        let off = seg.start;
+        if self.is_lazy(input.obj) {
+            let output = if net && join {
+                let key = ("route-gen", ptr_seg(seg), self.frame_key(ctx), 0usize);
+                match self.node_memo.get(&key) {
+                    Some(&object) => object,
+                    None => {
+                        let object = self.new_obj(ObjData::Set(Box::new(SetData {
+                            kind: SetKind::Gen { by_scene: HashMap::new() },
+                            ..SetData::plain(Vec::new(), false)
+                        })));
+                        self.node_memo.insert(key, object);
+                        object
+                    }
+                }
+            } else {
+                input.obj
+            };
+            if ctx.scene.is_none() {
+                self.rules.insert(ctx.member_key.clone());
+                return Ok((output, true));
+            }
+            let site = Rc::new(ctx.clone());
+            let source = input.obj;
+            let task: Task = Rc::new(move |it, scene, phase| {
+                let mut made = Vec::new();
+                if spec.net {
+                    for (index, member) in it.flatten_inputs(scene, source, phase, Some(&site)).into_iter().enumerate()
+                    {
+                        let member_site = site.with_dependencies(&member.dependencies);
+                        if let Ok(object) = it.record_routing(
+                            scene,
+                            member.object,
+                            spec.clone(),
+                            pos_plus(&site.pos, "g", index as i64),
+                            &member_site,
+                            off,
+                        ) {
+                            made.push(object);
+                        }
+                    }
+                } else {
+                    let _ = it.record_routing(scene, source, spec.clone(), site.pos.clone(), &site, off);
+                }
+                if spec.net && spec.join {
+                    if let ObjData::Set(set) = it.om(output) {
+                        if let SetKind::Gen { by_scene } = &mut set.kind {
+                            by_scene.insert(scene, made);
+                        }
+                    }
+                }
+            });
+            // Queue 9 is executed with the ordinary-symbol input view, before generation.
+            self.defer(ctx, 9, task)?;
+            return Ok((output, true));
+        }
+        let Some(scene) = ctx.scene else { return self.scene_only(ctx, off) };
+        if net && self.is_set(input.obj) {
+            let mut made = Vec::new();
+            for (index, member) in self.flatten_inputs(scene, input.obj, 3, Some(ctx)).into_iter().enumerate() {
+                let site = ctx.with_dependencies(&member.dependencies);
+                if let Ok(object) = self.record_routing(
+                    scene,
+                    member.object,
+                    spec.clone(),
+                    pos_plus(&ctx.pos, "e", index as i64),
+                    &site,
+                    off,
+                ) {
+                    made.push((object, true));
+                }
+            }
+            let output =
+                if join { self.new_obj(ObjData::Set(Box::new(SetData::plain(made, false)))) } else { input.obj };
+            return Ok((output, input.sel));
+        }
+        let output = self.record_routing(scene, input.obj, spec, ctx.pos.clone(), ctx, off)?;
+        Ok((output, input.sel))
     }
 
     // ------------------------------------------------------------------ placement (11.1, 11.2, 11.6)
@@ -3434,6 +3685,7 @@ impl Interp<'_> {
                 mapped["symbol"].off,
             );
         }
+        let sym = self.specific_content(sym, ctx, mapped["symbol"].off)?;
         let name = seg.args.iter().find_map(|arg| {
             if arg.start != mapped["symbol"].off {
                 return None;
@@ -3632,7 +3884,11 @@ impl Interp<'_> {
             self.warn(
                 ctx,
                 codes::SELECT_ROLE_WITHOUT_USAGE_SCOPE,
-                "role= means something only when the scope is a usage (K3.12)",
+                if self.follows_0_4(self.source_unit(ctx)) {
+                    format!("role= applies only to a usage scope; {} is not a usage (10.1)", self.label(scope))
+                } else {
+                    "role= means something only when the scope is a usage (K3.12)".to_string()
+                },
                 call.start,
             );
         }

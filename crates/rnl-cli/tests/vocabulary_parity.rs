@@ -27,19 +27,7 @@ fn published_0_4() -> Value {
 /// What the draft 0.4 has that the runtime does not yet: keywords by name, and the parts of the list
 /// that change with them. A change that brings one takes it off this list, so that the comparison
 /// covers it from then on; the list is empty when 0.4 is released.
-const PENDING_0_4: &[&str] = &[
-    // routing (13.7)
-    "ROUTE",
-    "ROUTE-NET",
-    "ROUTE-OBJECT",
-    "UNROUTE-NET",
-    "UNROUTE-OBJECT",
-    "removed",
-    // gathered from the keywords compared, so whole only when none of them is pending
-    "pseudo_kinds",
-    "takes",
-    "all_words",
-];
+const PENDING_0_4: &[&str] = &[];
 
 // Every field is accounted for. These are the only prose-only exemptions: descriptions,
 // human-readable form/sentence templates (with ellipses), and explanations of keys/array items.
@@ -167,9 +155,16 @@ fn compare(p: &Value, version: &str, pending: &[&str]) {
     assert!(READ_VERSIONS.contains(&version));
     let w = words();
     if !pending("removed") {
-        let removed: Vec<_> =
-            w.removed.iter().map(|r| json!({"word":r.word, "what":r.what, "until":r.until, "see":r.see})).collect();
+        let removed: Vec<_> = w
+            .removed
+            .iter()
+            .filter(|r| w.removed_in(&r.word, version).any(|active| active.until == r.until && active.what == r.what))
+            .map(|r| json!({"word":r.word, "what":r.what, "until":r.until, "see":r.see}))
+            .collect();
         assert_eq!(json!(removed), p.get("removed").cloned().unwrap_or(json!([])), "removed");
+        for item in p["removed"].as_array().into_iter().flatten() {
+            keys(item, &["word", "what", "until", "see"]);
+        }
     }
     let kinds = w.kinds_in(version);
     for (category, actual) in [("kinds", &kinds), ("subobjects", &w.subobjects), ("attributes", &w.attributes)] {

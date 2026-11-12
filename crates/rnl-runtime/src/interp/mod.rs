@@ -28,6 +28,7 @@ mod islands;
 mod junction;
 pub mod kw;
 mod languages;
+mod layer_kinds;
 mod modifier_handles;
 mod numbers;
 pub mod obj;
@@ -37,9 +38,11 @@ mod pin_names;
 mod places;
 mod position_refs;
 mod reach;
+mod routes;
 mod scene_pins;
 mod selections;
 mod solver_config;
+mod specific;
 mod table;
 /// The name of the standard package that the setting of 16.3 brings in at the root.
 pub use packages::STD_NAME;
@@ -244,6 +247,7 @@ pub struct Interp<'p> {
     pub(crate) node_memo: HashMap<(&'static str, usize, usize, usize), ObjId>,
     /// Active symbol-body expansions; a limit failure invalidates only the active chain.
     pub(crate) symbol_expansions: Vec<Option<DiagId>>,
+    specific: specific::SpecificDefinitions,
     pub(crate) rules: Rules,
     body_rules: body_rules::BodyRules,
     /// The members of each unit that are rules, as `rule_members` took them last.
@@ -395,6 +399,7 @@ impl<'p> Interp<'p> {
             tm_in_progress: HashSet::new(),
             node_memo: HashMap::new(),
             symbol_expansions: Vec::new(),
+            specific: Default::default(),
             rules: Rules::default(),
             body_rules: body_rules::BodyRules::default(),
             rule_members: HashMap::new(),
@@ -591,6 +596,7 @@ impl<'p> Interp<'p> {
                 self.build_scene(lv);
             }
         }
+        self.finish_specific_definitions();
         self.check_unused_scoped_aliases();
     }
 
@@ -622,11 +628,13 @@ impl<'p> Interp<'p> {
             }
             let plans = std::mem::take(&mut self.places.plans);
             let bindings = std::mem::take(&mut self.bindings.plans);
+            let specific_names = std::mem::take(&mut self.bindings.specific_names);
             let body_plans = std::mem::take(&mut self.definition_scenes.plans);
             self = again(self);
             self.closing = closing;
             self.places.plans = plans;
             self.bindings.plans = bindings;
+            self.bindings.specific_names = specific_names;
             self.definition_scenes.plans = body_plans;
         }
     }

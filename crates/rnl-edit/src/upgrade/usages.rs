@@ -94,9 +94,7 @@ impl Usages {
     }
     pub(super) fn edits(
         &self,
-        source: &str,
-        record: &Record,
-        member: &Member,
+        (source, record, member): (&str, &Record, &Member),
         readings: &[usize],
         approximate: bool,
         report: &mut FileReport,

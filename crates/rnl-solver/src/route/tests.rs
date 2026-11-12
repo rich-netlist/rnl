@@ -8,7 +8,7 @@ fn p(x: i64, y: i64) -> [Q; 2] {
 }
 
 fn anchor(x: i64, y: i64, exit: Option<(i64, i64)>) -> AnchorIn {
-    AnchorIn { at: p(x, y), exit, owner: None }
+    AnchorIn { at: p(x, y), exit, owner: None, connects_pin: true }
 }
 
 const EAST: Option<(i64, i64)> = Some((1, 0));
@@ -27,11 +27,255 @@ fn layout(boxes: &[[i64; 4]], nets: Vec<NetIn>) -> Layout {
         pins,
         written: Vec::new(),
         nets,
+        ..Layout::default()
     }
 }
 
 fn net(anchors: Vec<AnchorIn>) -> NetIn {
     NetIn { anchors, joined: Vec::new() }
+}
+
+fn all_anchors_connected(net: &NetIn, out: &NetOut) -> bool {
+    let n = net.anchors.len();
+    let mut reached = vec![false; n + out.branches.len()];
+    if n == 0 {
+        return true;
+    }
+    reached[0] = true;
+    let index = |e| match e {
+        End::Anchor(a) => a,
+        End::Branch(b) => n + b,
+    };
+    let edges: Vec<_> =
+        net.joined.iter().copied().chain(out.wires.iter().map(|w| (index(w.start), index(w.end)))).collect();
+    loop {
+        let mut changed = false;
+        for &(a, b) in &edges {
+            if reached[a] != reached[b] {
+                reached[a] = true;
+                reached[b] = true;
+                changed = true;
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+    reached[..n].iter().all(|v| *v)
+}
+
+#[test]
+fn modern_routing_finishes_and_counts_a_budget_limited_tree() {
+    let mut l =
+        layout(&[[4, -3, 6, 3]], vec![net(vec![anchor(0, 0, EAST), anchor(10, 0, WEST), anchor(10, 8, NORTH)])]);
+    l.modern = true;
+    let (outs, work) = route_layout(&l, 3);
+    assert_eq!(work, 3);
+    assert_eq!(outs[0].parts, 1);
+    assert_eq!(outs[0].failure, None);
+    assert!(outs[0].forced);
+    assert!(all_anchors_connected(&l.nets[0], &outs[0]));
+    assert_eq!(route_layout(&l, 3), (outs, work));
+}
+
+#[test]
+fn modern_routing_connects_a_walled_in_pin_as_a_reported_last_resort() {
+    let walls = [[-5, 1, 5, 5], [-5, -5, 5, -1], [-5, -5, -1, 5], [1, -5, 5, 5]];
+    let mut l = layout(&walls, vec![net(vec![anchor(0, 0, None), anchor(20, 0, WEST), anchor(20, 10, NORTH)])]);
+    l.modern = true;
+    let (outs, _) = route_layout(&l, 100_000);
+    assert!(outs[0].forced);
+    assert!(all_anchors_connected(&l.nets[0], &outs[0]));
+    assert_eq!(outs[0].parts, 1);
+}
+
+#[test]
+fn text_boxes_are_soft_obstacles_in_modern_routing() {
+    let mut l = layout(&[], vec![net(vec![anchor(0, 0, EAST), anchor(10, 0, WEST)])]);
+    l.modern = true;
+    l.texts = vec![boxed([3, -1, 7, 1])];
+    let (outs, _) = route_layout(&l, 100_000);
+    assert!(!outs[0].forced);
+    assert!(all_anchors_connected(&l.nets[0], &outs[0]));
+    assert!(outs[0].wires.iter().flat_map(|w| w.vertices.windows(2)).all(|w| !meets_inside(&l.texts[0], &w[0], &w[1])));
+    // A text cannot prevent a connection, even when it covers the entire routing lattice.
+    l.texts = vec![boxed([-100, -100, 100, 100])];
+    let (outs, _) = route_layout(&l, 100_000);
+    assert!(!outs[0].forced);
+    assert!(all_anchors_connected(&l.nets[0], &outs[0]));
+}
+
+#[test]
+fn modern_jobs_keep_separate_trees_of_one_net() {
+    use crate::resolve::tests::{instance, problem_of};
+    use rnl_runtime::problem::RouteIntent;
+    let mut p = problem_of((0..4).map(|_| instance()).collect(), vec![]);
+    p.routes = [(0, 1), (2, 3)]
+        .into_iter()
+        .map(|(a, b)| RouteIntent {
+            tree: false,
+            net: "shared".into(),
+            mode: "manhattan".into(),
+            style: vec![],
+            wires: vec![],
+            pins: [a, b].into_iter().map(|object| PointRef::Pin { object, pin: 0, terminal: "1".into() }).collect(),
+        })
+        .collect();
+    assert_eq!(jobs(&p).len(), 1);
+    p.version = "0.4".into();
+    let trees = jobs(&p);
+    assert_eq!(trees.len(), 2);
+    assert_eq!(trees.iter().map(|j| (j.route, j.points.len())).collect::<Vec<_>>(), [(0, 2), (1, 2)]);
+    assert_ne!(trees[0].points[0].key, trees[1].points[0].key);
+    // A resolved tree from a newer included file retains its identity in an older level.
+    p.version = "0.3".into();
+    for route in &mut p.routes {
+        route.tree = true;
+    }
+    assert_eq!(jobs(&p).len(), 2);
+}
+
+#[test]
+fn a_modern_manhattan45_diagonal_has_no_zero_length_corner_segments() {
+    use crate::resolve::tests::{point, problem_of};
+    use rnl_runtime::problem::{ProblemWire, Reference};
+    let mut problem = problem_of(vec![point(), point()], vec![]);
+    problem.wires = vec![ProblemWire {
+        label: "%w".into(),
+        reference: Reference::Name("%w".into()),
+        nets: vec![],
+        bus: false,
+        anchors: vec![PointRef::Origin(0), PointRef::Origin(1)],
+        mode: "manhattan45".into(),
+        generated: false,
+    }];
+    let mut geometry = Geometry::new(2);
+    geometry.origin[1] = p(4, 4);
+    assert_eq!(written_path(&problem, &geometry, 0).unwrap().len(), 4);
+    problem.version = "0.4".into();
+    assert_eq!(written_path(&problem, &geometry, 0).unwrap(), vec![p(0, 0), p(4, 4)]);
+}
+
+#[test]
+fn ordinary_routing_does_not_count_an_unconnected_pin_at_a_position_point() {
+    for electrical in [false, true] {
+        let mut n = net(vec![anchor(0, 0, None), anchor(-5, 0, None), anchor(0, 5, None)]);
+        n.anchors[0].connects_pin = electrical;
+        n.joined = vec![(0, 1)];
+        let mut l = layout(&[], vec![n]);
+        l.modern = true;
+        let grid = Grid::new(&l).unwrap();
+        let nodes: Vec<_> = l.nets[0].anchors.iter().map(|a| grid.lat.at(&a.at)).collect();
+        let mut made = vec![Made { start: End::Anchor(0), end: End::Anchor(2), nodes: vec![] }];
+        let mut branches = vec![];
+        grid.junctions_at_anchors(&l.nets[0], &nodes, &mut made, &mut branches);
+        assert_eq!(branches.len(), usize::from(electrical));
+    }
+}
+
+#[test]
+fn modern_solve_preserves_tree_identity_and_reports_forced_connections() {
+    use crate::resolve::tests::{fact, instance, problem_of};
+    use rnl_runtime::problem::{Axis, FactKind, RouteIntent};
+    let mut p = problem_of((0..4).map(|_| instance()).collect(), vec![]);
+    p.version = "0.4".into();
+    for (object, (x, y)) in [(0.0, 0.0), (12.0, 0.0), (0.0, 12.0), (12.0, 12.0)].into_iter().enumerate() {
+        p.facts.extend([
+            fact(FactKind::Place { at: PointRef::Origin(object), axis: Axis::X, value: x }),
+            fact(FactKind::Place { at: PointRef::Origin(object), axis: Axis::Y, value: y }),
+            fact(FactKind::Orient { object, code: Orient::R0 }),
+        ]);
+    }
+    p.routes = [(0, 1), (2, 3)]
+        .into_iter()
+        .map(|(a, b)| RouteIntent {
+            tree: false,
+            net: "shared".into(),
+            mode: "manhattan".into(),
+            style: vec![],
+            wires: vec![],
+            pins: [a, b].into_iter().map(|object| PointRef::Pin { object, pin: 0, terminal: "g".into() }).collect(),
+        })
+        .collect();
+    let options = SolverOptions::without_time_limit().with_overrides("budget=candidates:0,astar_expansions:0").unwrap();
+    let solved = crate::solve(&p, &options);
+    assert_eq!(solved.solution.wires.len(), 2);
+    assert!(solved.report.unrouted.is_empty());
+    assert!(
+        solved.report.notes.iter().any(|n| n.starts_with("2 ROUTE trees joined through obstacles")),
+        "{:?}",
+        solved.report.notes
+    );
+    for wire in &solved.solution.wires {
+        let allowed = if wire.route == 0 {
+            [0, 1]
+        } else {
+            assert_eq!(wire.route, 1);
+            [2, 3]
+        };
+        for point in &wire.points {
+            if let WirePoint::Anchor(pin) = point {
+                assert!(allowed.contains(&pin.pin_key().unwrap().0));
+            }
+        }
+    }
+    assert_eq!(solved, crate::solve(&p, &options));
+}
+
+#[test]
+fn a_pin_position_does_not_become_an_electrical_junction_during_fallback() {
+    use crate::resolve::tests::{fact, instance, point, problem_of};
+    use rnl_runtime::problem::{Axis, FactKind, ProblemWire, Reference, RouteIntent};
+    for electrical in [false, true] {
+        let mut p = problem_of(vec![instance(), instance(), point()], vec![]);
+        p.version = "0.4".into();
+        p.junction.definition = Some("$DOT".into());
+        let at = [(0.0, 0.0), (0.0, 10.0), (-8.0, 0.0)];
+        for (object, (x, y)) in at.into_iter().enumerate() {
+            p.facts.extend([
+                fact(FactKind::Place { at: PointRef::Origin(object), axis: Axis::X, value: x }),
+                fact(FactKind::Place { at: PointRef::Origin(object), axis: Axis::Y, value: y }),
+            ]);
+            if object < 2 {
+                p.facts.push(fact(FactKind::Orient { object, code: Orient::R0 }));
+            }
+        }
+        let end = if electrical {
+            PointRef::Pin { object: 0, pin: 0, terminal: "g".into() }
+        } else {
+            PointRef::PinPosition { object: 0, pin: 0, reference: Reference::Name("#M:g::position".into()) }
+        };
+        p.wires = vec![ProblemWire {
+            label: "%w".into(),
+            reference: Reference::Name("%w".into()),
+            nets: vec!["shared".into()],
+            bus: false,
+            anchors: vec![PointRef::Origin(2), end.clone()],
+            mode: "straight".into(),
+            generated: false,
+        }];
+        p.routes = vec![RouteIntent {
+            tree: false,
+            net: "shared".into(),
+            mode: "manhattan".into(),
+            style: vec![],
+            wires: vec![0],
+            pins: vec![PointRef::Pin { object: 1, pin: 0, terminal: "g".into() }],
+        }];
+        let options =
+            SolverOptions::without_time_limit().with_overrides("budget=candidates:0,astar_expansions:0").unwrap();
+        let solved = crate::solve(&p, &options);
+        assert_eq!(solved.solution.branches.len(), usize::from(electrical));
+        let written = rnl_runtime::solution::write_record(&p, &solved.solution, "test", "");
+        assert_eq!(written.record.contains("$DOT"), electrical, "{}", written.record);
+        if !electrical {
+            let anchor = WirePoint::Anchor(end);
+            assert!(solved.solution.wires.iter().any(|w| w.points.contains(&anchor)));
+        }
+        p.junction.definition = None;
+        let written = rnl_runtime::solution::write_record(&p, &solved.solution, "test", "");
+        assert!(!written.record.contains("$DOT"));
+    }
 }
 
 /// What every routed net must be: wires along the axes, through no box (but the one a pin of the
@@ -293,8 +537,8 @@ fn a_net_whose_budget_runs_out_is_left_in_parts() {
 #[test]
 fn coordinates_off_the_integers_are_nodes_of_the_lattice() {
     let half = |v: i64| crate::rational::frac(v, 2);
-    let a = AnchorIn { at: [half(1), half(-3)], exit: EAST, owner: None };
-    let b = AnchorIn { at: [half(13), half(5)], exit: WEST, owner: None };
+    let a = AnchorIn { at: [half(1), half(-3)], exit: EAST, owner: None, connects_pin: false };
+    let b = AnchorIn { at: [half(13), half(5)], exit: WEST, owner: None, connects_pin: false };
     let l = layout(&[], vec![net(vec![a, b])]);
     let out = &check(&l, 100_000)[0];
     let w = &out.wires[0];
@@ -346,11 +590,11 @@ fn a_pin_inside_another_symbol_is_reported_and_inside_its_own_leaves_through_it(
 /// pin of the symbol it names.
 fn symbols(boxes: &[(usize, [i64; 4])], nets: Vec<NetIn>, written: Vec<Vec<[Q; 2]>>) -> Layout {
     let pins = nets.iter().flat_map(|n| n.anchors.iter().map(|a| a.at.clone())).collect();
-    Layout { boxes: boxes.iter().map(|(k, b)| (*k, boxed(*b))).collect(), pins, written, nets }
+    Layout { boxes: boxes.iter().map(|(k, b)| (*k, boxed(*b))).collect(), pins, written, nets, ..Layout::default() }
 }
 
 fn pin(x: i64, y: i64, exit: Option<(i64, i64)>, owner: usize) -> AnchorIn {
-    AnchorIn { at: p(x, y), exit, owner: Some(owner) }
+    AnchorIn { at: p(x, y), exit, owner: Some(owner), connects_pin: true }
 }
 
 /// Whether a segment runs along the edge of a box: on the line of one of its edges, over some of

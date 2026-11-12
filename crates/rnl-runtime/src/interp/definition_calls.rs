@@ -437,11 +437,7 @@ impl Interp<'_> {
                     return self.fail(
                         ctx,
                         codes::USAGE_TOO_MANY_OBJECTS,
-                        format!(
-                            "the ordinary definition {label} has {} roles, {} objects are written (9.4)",
-                            data.roles.len(),
-                            args.len()
-                        ),
+                        self.usage_role_count_message(label, data.roles.len(), args.len(), ctx),
                         segment.start,
                     );
                 }

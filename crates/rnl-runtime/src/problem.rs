@@ -541,6 +541,9 @@ pub struct ProblemWire {
 #[derive(Clone, Debug, PartialEq)]
 pub struct RouteIntent {
     pub net: String,
+    /// An already resolved tree (0.4, 13.7), which must not be merged with other trees on its net.
+    /// False retains the whole-net requests of earlier language versions.
+    pub tree: bool,
     /// A hint for the solver, with the values of WIRE.
     pub mode: String,
     /// The style parameters of the ROUTE, which the wires written back take.
@@ -726,6 +729,12 @@ pub fn fact_statement(p: &LevelProblem, k: usize) -> String {
     let num = |v: f64| fmt_num(v);
     let list = |ms: &[PointRef]| format!("{{{}}}", ms.iter().map(|m| point_name(p, m)).collect::<Vec<_>>().join(" "));
     let objects = |ks: &[usize]| list(&ks.iter().map(|k| PointRef::Origin(*k)).collect::<Vec<_>>());
+    let orientation = |first: Orient| {
+        p.orient_lists.iter().find(|(i, _)| *i == k).map_or_else(
+            || first.as_str().to_string(),
+            |(_, codes)| format!("[{}]", codes.iter().map(|code| code.as_str()).collect::<Vec<_>>().join(", ")),
+        )
+    };
     match &f.kind {
         FactKind::Place { at, axis, value } => {
             format!("the {} of {} = {}", axis.as_str(), point_name(p, at), num(*value))
@@ -742,7 +751,7 @@ pub fn fact_statement(p: &LevelProblem, k: usize) -> String {
             num(*value)
         ),
         FactKind::Orient { object, code } => {
-            format!("the orientation {} of {}", code.as_str(), point_name(p, &PointRef::Origin(*object)))
+            format!("the orientation {} of {}", orientation(*code), point_name(p, &PointRef::Origin(*object)))
         }
         FactKind::PinOrient { pin, codes } => format!(
             "ORIENT [{}] pin {} of {}",
@@ -790,7 +799,7 @@ pub fn fact_statement(p: &LevelProblem, k: usize) -> String {
             format!("DISTANCE {} {}{bounds} {} {}", axis.as_str(), sense.as_str(), list(from), list(to))
         }
         FactKind::OrientRelation { relation, from, to } => {
-            format!("ORIENT-RELATION {} {} {}", relation.as_str(), objects(from), objects(to))
+            format!("ORIENT-RELATION {} {} {}", orientation(*relation), objects(from), objects(to))
         }
     }
 }
@@ -1161,6 +1170,9 @@ pub fn canonical_sig1(p: &LevelProblem) -> String {
     }
     c.word("routes");
     for r in &p.routes {
+        if r.tree {
+            c.word("tree");
+        }
         c.str(&r.net);
         c.str(&r.mode);
         for (k, v) in &r.style {

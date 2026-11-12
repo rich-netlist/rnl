@@ -1082,6 +1082,7 @@ impl<'a> Drawing<'a> {
     /// The crossings, one summary line, and their count.
     fn crossings(&self, out: &mut Vec<Hint>) -> usize {
         let mut found: Vec<String> = Vec::new();
+        let mut first_loc = None;
         for (i, s) in self.segs.iter().enumerate() {
             for j in self.segs_near(seg_box(s)) {
                 let t = &self.segs[j];
@@ -1094,6 +1095,11 @@ impl<'a> Drawing<'a> {
                 let den = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
                 let u = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / den;
                 let at = (x1 + u * (x2 - x1), y1 + u * (y2 - y1));
+                if found.is_empty() && rnl_runtime::interp::unit::keeps_0_4(&self.lv.language) {
+                    // The crossing has coordinates but no statement of its own. Link its
+                    // summary to one of the first pair's wires instead of the level title.
+                    first_loc = self.wires[t.wire].loc.as_ref().or(self.wires[s.wire].loc.as_ref());
+                }
                 found.push(format!(
                     "{} with {} at {}",
                     nets(&self.wires[s.wire].nets),
@@ -1105,7 +1111,7 @@ impl<'a> Drawing<'a> {
         if !found.is_empty() {
             let n = found.len();
             let what = if n == 1 { "1 crossing of wires".to_string() } else { format!("{n} crossings of wires") };
-            self.hint(out, Kind::Crossings, Severity::Hint, None, format!("{what}: {}", list(&found)));
+            self.hint(out, Kind::Crossings, Severity::Hint, first_loc, format!("{what}: {}", list(&found)));
         }
         found.len()
     }

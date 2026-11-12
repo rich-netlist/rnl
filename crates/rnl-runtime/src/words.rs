@@ -682,12 +682,16 @@ mod tests {
         assert_eq!(w.language_version, "0.2");
         assert_eq!(w.keywords_in("0.2").count(), 46);
         assert_eq!(w.keywords_in("0.3").count(), 46);
-        // and the pin selection, table and assertions of 0.4 (10.1, 14.11, 15.3, 15.4)
+        // Pin selection, routing, settings, tables and assertions added by 0.4.
         let added: Vec<_> = w.keywords.iter().filter(|k| !k.in_version("0.3")).map(|k| k.name.as_str()).collect();
         assert_eq!(
             added,
             [
                 "SELECT-PIN",
+                "ROUTE-NET",
+                "ROUTE-OBJECT",
+                "UNROUTE-NET",
+                "UNROUTE-OBJECT",
                 "SOLVER-CONFIG",
                 "TABLE",
                 "ASSERT-INSTANCE",
@@ -698,6 +702,8 @@ mod tests {
                 "ASSERT-IN"
             ]
         );
+        assert!(w.keyword_in("ROUTE", "0.3").is_some());
+        assert!(w.keyword_in("ROUTE", "0.4").is_none());
         assert!(!w.all_words_in("0.3").contains("different") && w.all_words_in("0.4").contains("different"));
         let place = w.keyword("PLACE").unwrap();
         assert_eq!(place.positional, vec!["x", "y"]);

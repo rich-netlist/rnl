@@ -42,6 +42,7 @@ pub(super) struct Query {
     off: usize,
     constraint_arg: Option<usize>,
     selection_only: bool,
+    ordinary_only: bool,
 }
 
 #[derive(Clone, Default)]
@@ -145,7 +146,13 @@ impl Interp<'_> {
 
     /// Selection dependency is structural, separate from rule classification (`is_lazy`). In
     /// particular a plain set edited by a selection can be classified as not lazy (10.4).
-    fn place_dependencies(&self, source: ObjId, scene: Option<SceneId>, deep: bool) -> (HashSet<Site>, bool) {
+    fn place_dependencies(
+        &self,
+        source: ObjId,
+        scene: Option<SceneId>,
+        deep: bool,
+        ordinary_only: bool,
+    ) -> (HashSet<Site>, bool) {
         let mut todo = vec![(source, true)];
         let mut seen = HashSet::new();
         let mut edits = HashSet::new();
@@ -167,6 +174,9 @@ impl Interp<'_> {
             }
             for &k in set.mods_by_scene.get(&scene).into_iter().flatten() {
                 let m = &set.mods[k];
+                if ordinary_only && m.ctx.frame_generated() {
+                    continue;
+                }
                 // A directly written inner set counts as one member regardless of its edits;
                 // those edits still count when checking for a selection dependency.
                 if counted {
@@ -182,7 +192,8 @@ impl Interp<'_> {
     pub(super) fn settle_places(&mut self) -> bool {
         let mut changed = std::mem::take(&mut self.places.shape_changed);
         for read in std::mem::take(&mut self.places.reads) {
-            let (edits, selection) = self.place_dependencies(read.source, read.key.site.scene, read.deep);
+            let (edits, selection) =
+                self.place_dependencies(read.source, read.key.site.scene, read.deep, read.key.ordinary_only);
             let plan = self.places.plans.entry(read.key).or_default();
             for edit in edits.difference(&read.seen) {
                 changed |= plan.edits.insert(edit.clone());
@@ -215,9 +226,16 @@ impl Interp<'_> {
                 off,
             );
         }
-        let key = Query { site: Site::of(ctx), rec: ctx.rec, off, constraint_arg: None, selection_only: false };
+        let key = Query {
+            site: Site::of(ctx),
+            rec: ctx.rec,
+            off,
+            constraint_arg: None,
+            selection_only: false,
+            ordinary_only: false,
+        };
         let plan = self.places.plans.get(&key).cloned().unwrap_or_default();
-        let (already, selection) = self.place_dependencies(source, ctx.scene, false);
+        let (already, selection) = self.place_dependencies(source, ctx.scene, false, false);
         if !plan.selection && !selection {
             let mut edits: Vec<_> = plan.edits.difference(&already).cloned().collect();
             edits.sort_by(|a, b| (&a.pos, &a.member).cmp(&(&b.pos, &b.member)));
@@ -225,7 +243,7 @@ impl Interp<'_> {
                 self.place_edit(&edit, ctx, off)?;
             }
         }
-        let (seen, selection) = self.place_dependencies(source, ctx.scene, false);
+        let (seen, selection) = self.place_dependencies(source, ctx.scene, false, false);
         self.places.reads.push(Read { key, source, seen, deep: false });
         if plan.selection || selection {
             return self.fail(
@@ -252,19 +270,34 @@ impl Interp<'_> {
     /// its innermost members (5.2, 14.1). As for member places, later edits are replayed before
     /// making the objects that a name and a subsequent PRIORITY will refer to.
     pub(super) fn constraint_input(&mut self, source: ObjId, off: usize, arg: usize, ctx: &Ctx) -> R<bool> {
-        self.settled_input(source, off, arg, ctx, false)
+        self.settled_input(source, off, arg, ctx, false, false)
     }
 
     /// Only selection edits affect whether an ordinary use is a rule. Replaying plain
     /// edits here could make an application depend on the edit in its own body.
     pub(super) fn rule_input(&mut self, source: ObjId, off: usize, arg: usize, ctx: &Ctx) -> R<bool> {
-        self.settled_input(source, off, arg, ctx, true)
+        self.settled_input(source, off, arg, ctx, true, false)
     }
 
-    fn settled_input(&mut self, source: ObjId, off: usize, arg: usize, ctx: &Ctx, selection_only: bool) -> R<bool> {
-        let key = Query { site: Site::of(ctx), rec: ctx.rec, off, constraint_arg: Some(arg), selection_only };
+    /// Ordinary net-routing statements create one result per final ordinary member.
+    /// Later generation must not be replayed into this earlier routing snapshot (10.2).
+    pub(super) fn routing_input(&mut self, source: ObjId, off: usize, arg: usize, ctx: &Ctx) -> R<bool> {
+        self.settled_input(source, off, arg, ctx, false, true)
+    }
+
+    fn settled_input(
+        &mut self,
+        source: ObjId,
+        off: usize,
+        arg: usize,
+        ctx: &Ctx,
+        selection_only: bool,
+        ordinary_only: bool,
+    ) -> R<bool> {
+        let key =
+            Query { site: Site::of(ctx), rec: ctx.rec, off, constraint_arg: Some(arg), selection_only, ordinary_only };
         let plan = self.places.plans.get(&key).cloned().unwrap_or_default();
-        let (already, _) = self.place_dependencies(source, ctx.scene, true);
+        let (already, _) = self.place_dependencies(source, ctx.scene, true, ordinary_only);
         let mut edits: Vec<_> = plan.edits.difference(&already).cloned().collect();
         edits.sort_by(|a, b| (&a.pos, &a.member).cmp(&(&b.pos, &b.member)));
         if !selection_only || plan.selection {
@@ -272,7 +305,7 @@ impl Interp<'_> {
                 self.place_edit(&edit, ctx, off)?;
             }
         }
-        let (seen, selection) = self.place_dependencies(source, ctx.scene, true);
+        let (seen, selection) = self.place_dependencies(source, ctx.scene, true, ordinary_only);
         self.places.reads.push(Read { key, source, seen, deep: true });
         Ok(plan.selection || selection || source == LEVEL)
     }
@@ -288,7 +321,14 @@ impl Interp<'_> {
     }
 
     pub(super) fn constraint_result_key(ctx: &Ctx, off: usize) -> Query {
-        Query { site: Site::of(ctx), rec: ctx.rec, off, constraint_arg: Some(usize::MAX), selection_only: false }
+        Query {
+            site: Site::of(ctx),
+            rec: ctx.rec,
+            off,
+            constraint_arg: Some(usize::MAX),
+            selection_only: false,
+            ordinary_only: false,
+        }
     }
 
     pub(super) fn planned_constraint_set(&self, key: &Query) -> bool {

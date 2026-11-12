@@ -15,10 +15,17 @@ struct Pin {
     direction: Option<String>,
     terminal: Value,
 }
+struct RawSymbol {
+    pins: Vec<Pin>,
+    parents: Vec<String>,
+    valid: bool,
+}
+
 type Symbols = BTreeMap<(String, String), Vec<Pin>>;
+type RawSymbols = BTreeMap<(String, String), RawSymbol>;
 
 fn symbols(version: &str) -> Symbols {
-    let mut raw: BTreeMap<(String, String), (Vec<Pin>, Vec<String>, bool)> = BTreeMap::new();
+    let mut raw: RawSymbols = BTreeMap::new();
     for (path, text) in &rnl_view::bundled().files {
         if !path.starts_with(&format!("<bundled>/{version}/")) {
             continue;
@@ -101,27 +108,26 @@ fn symbols(version: &str) -> Symbols {
                         pins.push(Pin { x: *x, y: *y, direction, terminal: terminal.clone() });
                     }
                 }
-                raw.insert((package.clone(), format!("{}{}", binding.prefix, binding.name)), (pins, parents, valid));
+                raw.insert(
+                    (package.clone(), format!("{}{}", binding.prefix, binding.name)),
+                    RawSymbol { pins, parents, valid },
+                );
             }
         }
     }
-    fn resolve(
-        key: &(String, String),
-        raw: &BTreeMap<(String, String), (Vec<Pin>, Vec<String>, bool)>,
-        depth: usize,
-    ) -> Option<Vec<Pin>> {
+    fn resolve(key: &(String, String), raw: &RawSymbols, depth: usize) -> Option<Vec<Pin>> {
         if depth > 16 {
             return None;
         }
-        let (own, parents, valid) = raw.get(key)?;
-        if !*valid {
+        let symbol = raw.get(key)?;
+        if !symbol.valid {
             return None;
         }
         let mut all = Vec::new();
-        for parent in parents {
+        for parent in &symbol.parents {
             all.extend(resolve(&(key.0.clone(), parent.clone()), raw, depth + 1)?);
         }
-        all.extend(own.iter().cloned());
+        all.extend(symbol.pins.iter().cloned());
         let mut seen = BTreeSet::new();
         for p in &all {
             if !seen.insert(super::rewrite::value(&p.terminal)) {

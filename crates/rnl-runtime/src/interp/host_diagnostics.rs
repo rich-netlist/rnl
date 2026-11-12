@@ -21,6 +21,9 @@ impl Interp<'_> {
             let mut diagnostic = original.clone();
             if self.follows_0_4(self.level_unit[reading.level]) {
                 let (message, loc) = reading.detail.presentation();
+                let severity = reading.detail.severity(diagnostic.severity);
+                changed |= diagnostic.severity != severity;
+                diagnostic.severity = severity;
                 changed |=
                     diagnostic.message != message || loc.as_ref().is_some_and(|l| diagnostic.loc.as_ref() != Some(l));
                 diagnostic.message = message;

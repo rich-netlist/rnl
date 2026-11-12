@@ -61,17 +61,22 @@
 //! gives the same wires on every platform.
 
 use std::cmp::Reverse;
+// Released inputs retain the original path and costs described above. For 0.4, each route
+// entry is a separate tree, text boxes carry a soft cost, and leads along a symbol edge are
+// a last resort. Bounded retries prioritize blocked trees, then finish_net connects any
+// remaining parts and reports that an obstacle could not be avoided.
 use std::collections::{BTreeMap, BTreeSet, BinaryHeap};
 
 use num_bigint::BigInt;
 use num_integer::Integer;
 use num_traits::{One, ToPrimitive, Zero};
-use rnl_runtime::problem::{LevelProblem, ObjectKind, PointRef};
+use rnl_runtime::geom::Orient;
+use rnl_runtime::problem::{LevelProblem, ObjectKind, PointRef, Position};
 use rnl_runtime::solution::{Branch, RoutedWire, WirePoint};
 
 use crate::rational::{int, to_f64, Q};
 use crate::resolve::{point_value, Geometry};
-use crate::structure::Structure;
+use crate::structure::{text_box, Structure};
 use crate::{SolverOptions, Work};
 
 /// How far a wire keeps from the box of a symbol, in units, but where it leaves a pin.
@@ -87,6 +92,10 @@ pub(crate) const EXIT_COST: i64 = 2;
 /// The cost of a lead that runs along the edge of its own symbol, on top of the violated exit:
 /// high, so that only a pin walled in its own way takes one (see the module).
 pub(crate) const ALONG_COST: i64 = 8;
+/// A lead along its own symbol is a last resort in 0.4.
+const MODERN_ALONG_COST: i64 = 1_000_000;
+/// The cost of crossing a text box on one lattice step.
+const TEXT_COST: i64 = 3;
 /// How far from a coordinate that matters (an edge of a box, a pin, a point of a wire written) the
 /// lattice keeps every integer, the tracks wires run on near the symbols; between two such
 /// coordinates farther apart it goes straight from the last track of one to the first of the next.
@@ -161,6 +170,8 @@ pub(crate) struct Routing {
     pub drawn: Vec<usize>,
     /// The nets left in parts.
     pub left: Vec<Left>,
+    /// Trees joined through obstacles after bounded routing could not connect them.
+    pub forced: Vec<String>,
     /// The cells the searches expanded.
     pub expansions: u64,
 }
@@ -182,6 +193,8 @@ pub(crate) struct AnchorIn {
     pub exit: Option<(i64, i64)>,
     /// The object whose pin it is.
     pub owner: Option<usize>,
+    /// Electrical pin identity, independent of the symbol whose boundary this point may leave.
+    pub connects_pin: bool,
 }
 
 /// A net to route.
@@ -195,6 +208,10 @@ pub(crate) struct NetIn {
 /// What the router sees of a placed candidate: plain geometry, exact.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct Layout {
+    /// Selects 0.4 routing behavior; released inputs retain their existing paths.
+    pub modern: bool,
+    /// Text boxes are soft obstacles, charged only for 0.4 inputs.
+    pub texts: Vec<[Q; 4]>,
     /// The box of each symbol, by its object: x1, y1, x2, y2, the smaller first.
     pub boxes: Vec<(usize, [Q; 4])>,
     /// Where every pin of every symbol is.
@@ -230,6 +247,7 @@ pub(crate) struct NetOut {
     /// The parts the net is in once routed: 1 when it is one tree, 0 when it has no point.
     pub parts: usize,
     pub failure: Option<Failure>,
+    pub forced: bool,
 }
 
 // ---------------------------------------------------------------------------------- the lattice
@@ -451,6 +469,8 @@ struct Grid<'a> {
     /// none, [`SHARED`] for more than one): no wire runs through a symbol.
     hbox: Vec<u32>,
     vbox: Vec<u32>,
+    htext: Vec<bool>,
+    vtext: Vec<bool>,
     /// The symbols of the net being routed that a pin of it is inside: a wire leaves such a pin
     /// through its own symbol.
     exempt: Vec<usize>,
@@ -512,6 +532,13 @@ impl<'a> Grid<'a> {
             add(&[b[0].clone(), b[1].clone()], &mut near);
             add(&[b[2].clone(), b[3].clone()], &mut near);
         }
+        // the tracks round a text are on the integers, however its width comes out
+        let texts: Vec<[Q; 4]> =
+            layout.texts.iter().map(|b| [b[0].floor(), b[1].floor(), b[2].ceil(), b[3].ceil()]).collect();
+        for b in &texts {
+            add(&[b[0].clone(), b[1].clone()], &mut near);
+            add(&[b[2].clone(), b[3].clone()], &mut near);
+        }
         for p in layout.pins.iter().chain(layout.written.iter().flatten()) {
             grow(p);
             add(p, &mut extra);
@@ -532,6 +559,8 @@ impl<'a> Grid<'a> {
             vedge: vec![0; n],
             hbox: vec![FREE; n],
             vbox: vec![FREE; n],
+            htext: vec![false; n],
+            vtext: vec![false; n],
             exempt: Vec::new(),
             lead: vec![0; n],
             net_stamp: 0,
@@ -589,6 +618,26 @@ impl<'a> Grid<'a> {
                 }
             }
         }
+        for b in &texts {
+            let rows = g.lat.ys.partition_point(|y| *y <= b[1])..g.lat.ys.partition_point(|y| *y < b[3]);
+            let cols = g.lat.xs.partition_point(|x| *x <= b[0])..g.lat.xs.partition_point(|x| *x < b[2]);
+            for j in rows {
+                for i in 0..g.lat.nx() - 1 {
+                    if g.lat.xs[i] < b[2] && g.lat.xs[i + 1] > b[0] {
+                        let n = g.lat.node(i, j);
+                        g.htext[n] = true;
+                    }
+                }
+            }
+            for i in cols {
+                for j in 0..g.lat.ny() - 1 {
+                    if g.lat.ys[j] < b[3] && g.lat.ys[j + 1] > b[1] {
+                        let n = g.lat.node(i, j);
+                        g.vtext[n] = true;
+                    }
+                }
+            }
+        }
         for p in &layout.pins {
             if let Some(k) = g.lat.at(p) {
                 g.pin[k] = true;
@@ -639,6 +688,17 @@ impl<'a> Grid<'a> {
             _ => FREE,
         };
         k != FREE && (k == SHARED || !self.exempt.contains(&(k as usize)))
+    }
+
+    /// Whether the edge from a node in a direction runs through the box of a text.
+    fn through_text(&self, n: usize, d: usize) -> bool {
+        match (d, self.lat.step(n, d)) {
+            (0, Some(_)) => self.htext[n],
+            (1, Some(_)) => self.vtext[n],
+            (2, Some(m)) => self.htext[m],
+            (3, Some(m)) => self.vtext[m],
+            _ => false,
+        }
     }
 
     fn edge_flags(&self, n: usize, d: usize) -> u8 {
@@ -932,7 +992,7 @@ impl<'a> Grid<'a> {
                         cost += EXIT_COST * unit;
                     }
                     if self.along(v, opposite(d)) {
-                        cost += ALONG_COST * unit;
+                        cost += (if self.layout.modern { MODERN_ALONG_COST } else { ALONG_COST }) * unit;
                     }
                 } else {
                     if !self.passable(v) {
@@ -947,6 +1007,9 @@ impl<'a> Grid<'a> {
                 if edge & CROSSED != 0 {
                     cost += CROSSING_COST * unit;
                 }
+                if self.layout.modern && self.through_text(node, d) {
+                    cost += TEXT_COST * unit;
+                }
                 if din != NONE && d != din {
                     cost += BEND_COST * unit;
                 }
@@ -954,7 +1017,7 @@ impl<'a> Grid<'a> {
                     cost += EXIT_COST * unit;
                 }
                 if din == NONE && self.along(node, d) {
-                    cost += ALONG_COST * unit;
+                    cost += (if self.layout.modern { MODERN_ALONG_COST } else { ALONG_COST }) * unit;
                 }
                 let sv = v * 5 + d;
                 let (s, old, _) = self.best[sv];
@@ -1203,7 +1266,12 @@ impl<'a> Grid<'a> {
         }
         for (a, node) in nodes.iter().enumerate() {
             let Some(n) = *node else { continue };
-            if routed[a] == 0 || usize::from(self.pin[n]) + written[a] + routed[a] < 3 {
+            if routed[a] == 0
+                || usize::from(if self.layout.modern { net.anchors[a].connects_pin } else { self.pin[n] })
+                    + written[a]
+                    + routed[a]
+                    < 3
+            {
                 continue;
             }
             let b = branches.len();
@@ -1351,6 +1419,201 @@ pub(crate) fn meets_inside(b: &[Q; 4], a: &[Q; 2], c: &[Q; 2]) -> bool {
 /// Routes the nets of a layout, each with `budget` expansions, the smallest first; what each
 /// net became, in the order of `layout.nets`, and the expansions made.
 pub(crate) fn route_layout(layout: &Layout, budget: u64) -> (Vec<NetOut>, u64) {
+    if layout.modern {
+        route_layout04(layout, budget)
+    } else {
+        route_layout_legacy(layout, budget)
+    }
+}
+
+fn route_layout04(layout: &Layout, budget: u64) -> (Vec<NetOut>, u64) {
+    let mut expansions = 0;
+    let wanted = |n: &NetIn| n.anchors.len() >= 2;
+    if !layout.nets.iter().any(wanted) {
+        return (
+            layout.nets.iter().map(|n| NetOut { parts: n.anchors.len().min(1), ..NetOut::default() }).collect(),
+            0,
+        );
+    }
+    let mut order = first_order(layout);
+    let mut best = match route_in_order(layout, &order, budget, &mut expansions) {
+        Ok(outs) => outs,
+        Err(f) => {
+            let mut outs: Vec<NetOut> = layout
+                .nets
+                .iter()
+                .map(|n| {
+                    let parts = parts_of(n);
+                    NetOut { parts, failure: (parts > 1).then_some(f), ..NetOut::default() }
+                })
+                .collect();
+            for (n, out) in layout.nets.iter().zip(&mut outs) {
+                finish_net(n, out);
+            }
+            return (outs, 0);
+        }
+    };
+    // a net the wires before it walled in goes first, once more for each try: the same order and
+    // the same result for the same problem, and the routing with the fewest joins left is kept
+    let mut last = best.clone();
+    for _ in 0..RETRIES {
+        let walled = |outs: &[NetOut], i: usize| outs[i].failure == Some(Failure::NoPath);
+        if !order.iter().any(|&i| walled(&last, i)) {
+            break;
+        }
+        let (first, rest): (Vec<usize>, Vec<usize>) = order.iter().partition(|&&i| walled(&last, i));
+        let again: Vec<usize> = first.into_iter().chain(rest).collect();
+        if again == order {
+            break;
+        }
+        order = again;
+        let Ok(outs) = route_in_order(layout, &order, budget, &mut expansions) else { break };
+        if joins_left(&outs) < joins_left(&best) {
+            best = outs.clone();
+        }
+        last = outs;
+    }
+    for (n, out) in layout.nets.iter().zip(&mut best) {
+        finish_net(n, out);
+    }
+    (best, expansions)
+}
+
+/// A net that the search left in parts joined all the same: each part, the nearest first, by a wire
+/// from its nearest anchor to the nearest anchor of the rest, an L that leaves as the first pin
+/// does, through whatever is in the way. Ends as the search's are: a pin or a point where a wire
+/// routed ends and two more meet goes to a branch point with a wire of length 0 (13.1, 13.2).
+fn finish_net(net: &NetIn, out: &mut NetOut) {
+    if out.failure.is_none() {
+        return;
+    }
+    let n = net.anchors.len();
+    // which anchors are joined: by a wire written, or by the wires made, through their branch points
+    let mut parent: Vec<usize> = (0..n + out.branches.len()).collect();
+    fn find(parent: &mut [usize], mut i: usize) -> usize {
+        while parent[i] != i {
+            parent[i] = parent[parent[i]];
+            i = parent[i];
+        }
+        i
+    }
+    let index = |e: End| match e {
+        End::Anchor(a) => a,
+        End::Branch(b) => n + b,
+    };
+    let pairs = net.joined.iter().copied().chain(out.wires.iter().map(|w| (index(w.start), index(w.end))));
+    for (a, b) in pairs.collect::<Vec<_>>() {
+        let (ra, rb) = (find(&mut parent, a), find(&mut parent, b));
+        parent[ra.max(rb)] = ra.min(rb);
+    }
+    let distance = |a: usize, b: usize| {
+        let (p, q) = (&net.anchors[a].at, &net.anchors[b].at);
+        (&p[0] - &q[0]).abs() + (&p[1] - &q[1]).abs()
+    };
+    loop {
+        let root = find(&mut parent, 0);
+        let groups: Vec<usize> = (0..n).map(|a| find(&mut parent, a)).collect();
+        let mut nearest: Option<(Q, usize, usize)> = None;
+        for a in (0..n).filter(|&a| groups[a] != root) {
+            for b in (0..n).filter(|&b| groups[b] == root) {
+                let d = distance(a, b);
+                if nearest.as_ref().is_none_or(|(least, _, _)| d < *least) {
+                    nearest = Some((d, a, b));
+                }
+            }
+        }
+        let Some((_, a, b)) = nearest else { break };
+        let (p, q) = (net.anchors[a].at.clone(), net.anchors[b].at.clone());
+        // leaves `a` the way its pin does, when that is along an axis
+        let vertical_first = net.anchors[a].exit.is_some_and(|(x, _)| x == 0);
+        let corner = if vertical_first { [p[0].clone(), q[1].clone()] } else { [q[0].clone(), p[1].clone()] };
+        let mut vertices = vec![p];
+        if corner != vertices[0] && corner != q {
+            vertices.push(corner);
+        }
+        vertices.push(q);
+        out.wires.push(WireOut { start: End::Anchor(a), end: End::Anchor(b), vertices });
+        let (ra, rb) = (find(&mut parent, a), find(&mut parent, b));
+        parent[ra.max(rb)] = ra.min(rb);
+    }
+    // an anchor where three now meet: the wires made end at a branch point on it
+    let written = |a: usize| net.joined.iter().filter(|(x, y)| *x == a || *y == a).count();
+    for a in 0..n {
+        let ends = out.wires.iter().flat_map(|w| [w.start, w.end]).filter(|e| *e == End::Anchor(a)).count();
+        let pin = usize::from(net.anchors[a].connects_pin);
+        if ends == 0 || pin + written(a) + ends < 3 {
+            continue;
+        }
+        let at = net.anchors[a].at.clone();
+        let b = out.branches.len();
+        out.branches.push(at.clone());
+        for w in &mut out.wires {
+            for e in [&mut w.start, &mut w.end] {
+                if *e == End::Anchor(a) {
+                    *e = End::Branch(b);
+                }
+            }
+        }
+        out.wires.push(WireOut { start: End::Anchor(a), end: End::Branch(b), vertices: vec![at.clone(), at] });
+    }
+    out.forced = true;
+    out.parts = 1;
+    out.failure = None;
+}
+
+/// The order of the first try: the smallest nets first, by the half perimeter of their points, then
+/// their number.
+fn first_order(layout: &Layout) -> Vec<usize> {
+    let mut order: Vec<(Q, usize, usize)> = layout
+        .nets
+        .iter()
+        .enumerate()
+        .map(|(i, n)| {
+            let xs = n.anchors.iter().map(|a| &a.at[0]);
+            let ys = n.anchors.iter().map(|a| &a.at[1]);
+            let span = |v: Vec<&Q>| match (v.iter().min(), v.iter().max()) {
+                (Some(lo), Some(hi)) => *hi - *lo,
+                _ => Q::zero(),
+            };
+            (span(xs.collect()) + span(ys.collect()), n.anchors.len(), i)
+        })
+        .collect();
+    order.sort();
+    order.into_iter().map(|(_, _, i)| i).collect()
+}
+
+/// The tries a routing with a net walled in gets, each with those nets first.
+const RETRIES: usize = 4;
+
+/// The joins left undone by the routing of a layout.
+fn joins_left(outs: &[NetOut]) -> usize {
+    outs.iter().filter(|o| o.failure.is_some()).map(|o| o.parts.saturating_sub(1)).sum()
+}
+
+/// The nets of a layout routed one after the other, each around the wires of those before it.
+fn route_in_order(layout: &Layout, order: &[usize], budget: u64, expansions: &mut u64) -> Result<Vec<NetOut>, Failure> {
+    let mut grid = Grid::new(layout)?;
+    crate::profile::set("grid_width", grid.lat.nx() as u64);
+    crate::profile::set("grid_height", grid.lat.ny() as u64);
+    crate::profile::set("grid_cells", grid.lat.len() as u64);
+    crate::profile::set("grid_states", grid.best.len() as u64);
+    let mut outs: Vec<NetOut> = vec![NetOut::default(); layout.nets.len()];
+    for &i in order {
+        let _net = crate::profile::span_lazy("route_net", || format!("net_{i}"));
+        crate::profile::add("nets", 1);
+        crate::profile::set("endpoints", layout.nets[i].anchors.len() as u64);
+        outs[i] = grid.route_net(i, budget, expansions);
+        // its wires are other wires now: the leads it kept and did not take are free
+        for n in std::mem::take(&mut grid.kept_by[i]) {
+            if grid.kept[n] == i as u32 {
+                grid.kept[n] = FREE;
+            }
+        }
+    }
+    Ok(outs)
+}
+
+fn route_layout_legacy(layout: &Layout, budget: u64) -> (Vec<NetOut>, u64) {
     let mut expansions = 0;
     let wanted = |n: &NetIn| n.anchors.len() >= 2;
     if !layout.nets.iter().any(wanted) {
@@ -1407,6 +1670,24 @@ pub(crate) fn route_layout(layout: &Layout, budget: u64) -> (Vec<NetOut>, u64) {
         }
     }
     (outs, expansions)
+}
+
+/// The box of each text drawn: of the texts each symbol drawn places, and of each text with a
+/// position of its own.
+fn text_boxes(problem: &LevelProblem, s: &Structure, origins: &[[Q; 2]], ori: &[Orient]) -> Vec<[Q; 4]> {
+    let mut out = Vec::new();
+    for k in (0..s.objects.len()).filter(|&k| !s.objects[k].left_free) {
+        let Some(at) = origins.get(k) else { continue };
+        if let (Some(&o), true) = (ori.get(k), s.labels.contains_key(&k)) {
+            let placed = s.label_offset(k, o).map(|b| [&at[0] + &b[0], &at[1] + &b[1], &at[0] + &b[2], &at[1] + &b[3]]);
+            out.extend(placed);
+        }
+        let own = matches!(problem.objects[k].position, Position::Own { .. });
+        if let (true, Some(t)) = (own, problem.objects[k].text.as_ref()) {
+            out.extend(text_box(t, &(at[0].clone(), at[1].clone()), Orient::R0));
+        }
+    }
+    out
 }
 
 /// The parts the wires written join a net's anchors into.
@@ -1478,6 +1759,7 @@ pub(crate) fn written_path(problem: &LevelProblem, g: &Geometry, wire: usize) ->
                     let y = &a[1] + &dy / &two;
                     out.extend([[a[0].clone(), y.clone()], [b[0].clone(), y]]);
                 }
+                "manhattan45" if problem.version == "0.4" && dx.abs() == dy.abs() => {}
                 "manhattan45" if dx.abs() >= dy.abs() => {
                     let run = (dx.abs() - dy.abs()) / &two * dx.signum();
                     out.extend([[&a[0] + &run, a[1].clone()], [&b[0] - &run, b[1].clone()]]);
@@ -1494,12 +1776,15 @@ pub(crate) fn written_path(problem: &LevelProblem, g: &Geometry, wire: usize) ->
     Some(out)
 }
 
-/// The nets of the ROUTEs of a level, merged by name in the order of their first ROUTE, as
-/// `crate::structure::Connections::drawn` has them.
+/// One job per route tree in 0.4; released inputs merge by net name in first-ROUTE order.
+/// The order matches `crate::structure::Connections::drawn`.
 fn jobs(problem: &LevelProblem) -> Vec<Job> {
     let mut jobs: Vec<Job> = Vec::new();
     for (i, r) in problem.routes.iter().enumerate() {
-        let j = match jobs.iter().position(|j| j.net == r.net) {
+        let j = match jobs
+            .iter()
+            .position(|j| problem.version != "0.4" && !r.tree && !problem.routes[j.route].tree && j.net == r.net)
+        {
             Some(j) => j,
             None => {
                 jobs.push(Job { route: i, net: r.net.clone(), points: Vec::new(), wires: Vec::new() });
@@ -1527,6 +1812,9 @@ fn jobs(problem: &LevelProblem) -> Vec<Job> {
 /// the first of them, as [`crate::Unrouted::route`] and `RoutedWire::route` refer to it; the others'
 /// are not used, which the report says rather than leave it unsaid.
 pub(crate) fn style_notes(problem: &LevelProblem) -> Vec<String> {
+    if problem.version == "0.4" {
+        return Vec::new();
+    }
     let mut out: Vec<String> = Vec::new();
     let mut noted: Vec<&str> = Vec::new();
     let sorted = |i: usize| {
@@ -1535,7 +1823,10 @@ pub(crate) fn style_notes(problem: &LevelProblem) -> Vec<String> {
         style
     };
     for (i, r) in problem.routes.iter().enumerate() {
-        let Some(first) = problem.routes.iter().position(|x| x.net == r.net) else { continue };
+        if r.tree {
+            continue; // The interpreter has already resolved this tree's style (13.7).
+        }
+        let Some(first) = problem.routes.iter().position(|x| !x.tree && x.net == r.net) else { continue };
         if first == i || noted.contains(&r.net.as_str()) || sorted(first) == sorted(i) {
             continue;
         }
@@ -1578,7 +1869,7 @@ pub(crate) fn route(
     if jobs.is_empty() {
         return Routing::default();
     }
-    let mut layout = Layout::default();
+    let mut layout = Layout { modern: problem.version == "0.4", ..Layout::default() };
     for k in s.components() {
         if let Some(b) = s.box_at(origins, &g.orient, k) {
             layout.boxes.push((k, b));
@@ -1592,6 +1883,9 @@ pub(crate) fn route(
     }
     for w in 0..problem.wires.len() {
         layout.written.extend(written_path(problem, g, w));
+    }
+    if layout.modern {
+        layout.texts = text_boxes(problem, s, origins, &g.orient);
     }
     let mut points: Vec<Vec<Point>> = Vec::new();
     for job in &jobs {
@@ -1607,7 +1901,7 @@ pub(crate) fn route(
                 PointKey::PinPosition(k, _) => (None, Some(k)),
                 PointKey::Object(_) => (None, None),
             };
-            net.anchors.push(AnchorIn { at, exit, owner });
+            net.anchors.push(AnchorIn { at, exit, owner, connects_pin: matches!(p.key, PointKey::Pin(..)) });
             pts.push(p);
             Some(pts.len() - 1)
         };
@@ -1629,7 +1923,11 @@ pub(crate) fn route(
     work.astar_expansions += expansions;
     let mut routing = Routing { expansions, ..Routing::default() };
     for (j, (job, out)) in jobs.iter().zip(outs).enumerate() {
-        let drawn = s.connections.drawn.iter().position(|d| d.routed && d.net == job.net).unwrap_or(j);
+        let drawn = if layout.modern || problem.routes[job.route].tree {
+            j
+        } else {
+            s.connections.drawn.iter().position(|d| d.routed && d.net == job.net).unwrap_or(j)
+        };
         let offset = routing.branches.len();
         routing
             .branches
@@ -1648,6 +1946,9 @@ pub(crate) fn route(
             routing.wires.push(RoutedWire { route: job.route, points: wire_points });
             routing.paths.push(w.vertices);
             routing.drawn.push(drawn);
+        }
+        if out.forced {
+            routing.forced.push(job.net.clone());
         }
         if let Some(failure) = out.failure {
             routing.left.push(Left { route: job.route, net: job.net.clone(), parts: out.parts, failure });

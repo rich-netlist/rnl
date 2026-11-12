@@ -195,19 +195,16 @@ fn standard_packages_check_clean() {
 /// The keywords of the draft language 0.4 that the draft series 0.4 writes and the toolkit does not
 /// read yet: those of the selective routing (13.7). Each change that reads
 /// one takes it out here, and with it the aliases alias-zh gives it (16.5).
-const KEYWORDS_NOT_READ_YET: [&str; 4] = ["ROUTE-NET", "ROUTE-OBJECT", "UNROUTE-NET", "UNROUTE-OBJECT"];
+const KEYWORDS_NOT_READ_YET: [&str; 0] = [];
 
 /// The other statements of 0.4 that the draft series writes and the toolkit does not read yet: the
 /// pins as objects (5.1, 9.2.4), definition-body objects and rules (6.9, 9.4), drawn selections
-/// (10.1), solver configuration in package headers (14.10, 16.2), and the `objects` parameter
-/// alias in alias-zh.rnl accompanying ROUTE-OBJECT (13.7, 16.5).
-const NOT_READ_YET: [&str; 5] = [
+/// (10.1), and solver configuration in package headers (14.10, 16.2).
+const NOT_READ_YET: [&str; 4] = [
     "@SOLVER-CONFIG cannot be written in a header record (2.8)",
     "a statement that only draws a scene object has no level to draw in, in a package (16.2)",
     "unknown kind name pin (9.4)",
     "the body of an ordinary definition cannot reference host objects; they come in through roles (6.9)",
-    // Parameter of ROUTE-OBJECT aliased in alias-zh.rnl; remove with ROUTE-OBJECT in KEYWORDS_NOT_READ_YET.
-    "the original objects is not a standard word (16.5)",
 ];
 
 #[test]

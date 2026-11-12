@@ -233,6 +233,17 @@ pub(crate) enum ChoiceKind {
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum OrientEffect {
     None,
+    /// An object's orientation may be any code in the authored list.
+    FixOneOf {
+        object: usize,
+        codes: Vec<Orient>,
+    },
+    /// Each related pair may take any of the authored relations.
+    RelateOneOf {
+        from: Vec<usize>,
+        to: Vec<usize>,
+        relations: Vec<Orient>,
+    },
     /// Direction facts constrain pins without fixing the owner's mirror choice.
     Pins {
         from: rnl_runtime::problem::DirectedPin,
@@ -254,15 +265,21 @@ pub(crate) enum OrientEffect {
 }
 
 impl OrientEffect {
-    pub(crate) fn pin_objects(&self) -> Vec<usize> {
+    pub(crate) fn predicate_objects(&self) -> Vec<usize> {
         match self {
+            Self::FixOneOf { object, .. } => vec![*object],
+            Self::RelateOneOf { from, to, .. } => from.iter().chain(to).copied().collect(),
             Self::Pins { from, to, .. } => std::iter::once(from.object).chain(to.map(|pin| pin.object)).collect(),
             _ => Vec::new(),
         }
     }
 
-    pub(crate) fn pins_hold(&self, orientation: impl Fn(usize) -> Orient) -> bool {
+    pub(crate) fn predicate_holds(&self, orientation: impl Fn(usize) -> Orient) -> bool {
         match self {
+            Self::FixOneOf { object, codes } => codes.contains(&orientation(*object)),
+            Self::RelateOneOf { from, to, relations } => from
+                .iter()
+                .all(|a| to.iter().all(|b| relations.iter().any(|r| orientation(*b) == orientation(*a).then(*r)))),
             Self::Pins { from, to: Some(to), codes } => {
                 from.relates(orientation(from.object), *to, orientation(to.object), codes)
             }
@@ -637,7 +654,12 @@ impl Model {
                     on.extend([(a, t), (a, f)]);
                 }
             }
-            FactKind::Orient { object, code } => orient = OrientEffect::Fix { object: *object, code: *code },
+            FactKind::Orient { object, code } => {
+                orient = match problem.orient_lists.iter().find(|(i, _)| *i == unit) {
+                    Some((_, codes)) => OrientEffect::FixOneOf { object: *object, codes: codes.clone() },
+                    None => OrientEffect::Fix { object: *object, code: *code },
+                }
+            }
             FactKind::PinOrient { pin, codes } => {
                 orient = OrientEffect::Pins { from: *pin, to: None, codes: codes.clone() }
             }
@@ -645,7 +667,12 @@ impl Model {
                 orient = OrientEffect::Pins { from: *from, to: Some(*to), codes: relations.clone() }
             }
             FactKind::OrientRelation { relation, from, to } => {
-                orient = OrientEffect::Relate { relation: *relation, from: from.clone(), to: to.clone() }
+                orient = match problem.orient_lists.iter().find(|(i, _)| *i == unit) {
+                    Some((_, relations)) => {
+                        OrientEffect::RelateOneOf { relations: relations.clone(), from: from.clone(), to: to.clone() }
+                    }
+                    None => OrientEffect::Relate { relation: *relation, from: from.clone(), to: to.clone() },
+                }
             }
             FactKind::Align { axis, members } => {
                 let a = ax(*axis);

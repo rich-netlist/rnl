@@ -201,7 +201,7 @@ pub(crate) struct Connections {
     pub nets: Vec<Net>,
     /// The nets of each pin.
     pub nets_of: BTreeMap<PinKey, Vec<usize>>,
-    /// The nets of the ROUTEs, one per net, then the wires written.
+    /// Resolved routing trees (legacy requests grouped by net), then written wires.
     pub drawn: Vec<Drawn>,
     /// For each pin, the pins of other objects it is drawn to: those of its ROUTE's net, and its
     /// neighbours along the wires written.
@@ -564,6 +564,9 @@ pub(crate) enum Source {
 /// The structure of a level.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Structure {
+    pub language04: bool,
+    pub currents: BTreeMap<PinKey, bool>,
+    pub fitting: BTreeMap<usize, Vec<Orient>>,
     pub symbols: Vec<SymbolInfo>,
     pub objects: Vec<ObjectInfo>,
     /// The elements, in the order of the objects.
@@ -655,7 +658,24 @@ impl Structure {
 
     /// Whether the static current runs through a pin (see [`Device`]).
     pub(crate) fn conducts(&self, (k, pin): PinKey) -> bool {
-        self.pins(k).get(pin).is_some_and(|p| self.objects[k].device.conducts(&p.terminals))
+        if self.language04 {
+            self.currents.contains_key(&(k, pin))
+        } else {
+            self.pins(k).get(pin).is_some_and(|p| self.objects[k].device.conducts(&p.terminals))
+        }
+    }
+
+    /// How many pins of an object turned by `o` that CURRENT marks do not leave the way the current
+    /// runs: down at a pin marked `out`, up at one marked `in`. A pin without a direction is not
+    /// judged, nor is an object left free.
+    pub(crate) fn against_current(&self, k: usize, o: Orient) -> usize {
+        if self.objects[k].left_free {
+            return 0;
+        }
+        let marked = self.currents.range((k, 0)..(k + 1, 0));
+        marked
+            .filter(|((_, pin), out)| self.exit(k, *pin, o).is_some_and(|e| e != if **out { (0, -1) } else { (0, 1) }))
+            .count()
     }
 
     /// The drain (collector) of a transistor: the pin of terminal 1.
@@ -752,12 +772,30 @@ pub(crate) fn analyse(
     let power = power_pins(power, &mut connections);
     let elements: Vec<usize> = (0..objects.len()).filter(|&k| objects[k].role == Role::Element).collect();
     let ports = ports(problem, &objects, &symbols, &connections);
+    let language04 = problem.version == "0.4";
+    let currents: BTreeMap<PinKey, bool> = problem
+        .currents
+        .iter()
+        .filter_map(|t| {
+            if !language04 || !matches!(t.direction.as_str(), "in" | "out") {
+                return None;
+            }
+            Some((t.pin.pin_key()?, t.direction == "out"))
+        })
+        .collect();
     let pairs = pairs(problem, &objects);
     let open = open(problem, resolved);
     let (tree, tree_notes) = group_tree(problem, &objects, &elements);
     notes.extend(tree_notes);
     let scopes = scopes(problem, &objects);
+    let has_current_direction = currents.keys().any(|&(k, pin)| {
+        objects.get(k).is_some_and(|o| {
+            !o.left_free
+                && o.symbol.and_then(|s| symbols.get(s)).and_then(|s| s.pins.get(pin)).is_some_and(|p| p.dir.is_some())
+        })
+    });
     let inputs = Inputs {
+        currents: language04.then_some(has_current_direction),
         supply: !power.supply.is_empty(),
         ground: !power.ground.is_empty(),
         port_kinds: ports.iter().any(|p| p.kind != PortKind::Unknown),
@@ -826,6 +864,9 @@ pub(crate) fn analyse(
         }
     }
     let mut s = Structure {
+        language04,
+        currents,
+        fitting: BTreeMap::new(),
         symbols,
         objects,
         elements,
@@ -854,12 +895,65 @@ pub(crate) fn analyse(
         caps,
     };
     if s.has(Source::DepthRows) {
-        s.depth = Some(depths(&s));
+        s.depth = if language04 {
+            Some(current_depths(&s)).filter(|d| d.iter().any(Option::is_some))
+        } else {
+            Some(depths(&s))
+        };
+    }
+    if language04 {
+        let (fitting, stopped) = fitting_values(&s, work);
+        s.fitting = fitting;
+        if stopped {
+            s.notes.push(
+                "current-direction orientation checks reached their work limit; unchecked values remain available"
+                    .into(),
+            );
+        }
     }
     s.rows = rows(problem, &s, work);
     (s.precedence, s.reversible) = precedence(problem, &s);
     s.even_sets = even_sets(problem, &s);
     s
+}
+
+/// For each free class that the witness has against the current: the values the facts kept allow it,
+/// as a value they do not is dropped when a candidate is placed and the class falls back on the
+/// witness. The others cost nothing: the candidates find out for themselves.
+fn fitting_values(s: &Structure, work: &mut Work) -> (BTreeMap<usize, Vec<Orient>>, bool) {
+    let mut out = BTreeMap::new();
+    let mut stopped = false;
+    if !s.has(Source::SourcesDown) {
+        return (out, stopped);
+    }
+    for class in &s.open.classes {
+        let against = |v: Orient| class.members.iter().any(|&(m, label)| s.against_current(m, v.then(label)) > 0);
+        let witness = s.witness.orient[class.root];
+        if !against(witness) {
+            continue;
+        }
+        let fits = |v: Orient, work: &mut Work| {
+            let rel = Tagged { kind: RelKind::Orientation, rel: Relation::Orient { root: class.root, value: v } };
+            with_relations(s, &[rel], work, |_, _, t| (t.kept[0], t.undecided))
+        };
+        let mut class_stopped = false;
+        let values: Vec<Orient> = Orient::ALL
+            .into_iter()
+            .filter(|v| {
+                if against(*v) {
+                    return false;
+                }
+                let (kept, undecided) = fits(*v, work);
+                class_stopped |= undecided;
+                kept
+            })
+            .collect();
+        stopped |= class_stopped;
+        if !class_stopped && !values.is_empty() {
+            out.insert(class.root, values);
+        }
+    }
+    (out, stopped)
 }
 
 /// The boxes of some texts of an object, one for each orientation, added to those of `labels`.
@@ -1096,7 +1190,11 @@ fn object_infos(problem: &LevelProblem, model: &Model, kept: &[usize]) -> Vec<Ob
                 (ObjectKind::Instance | ObjectKind::Bundle, _) if own => Role::Element,
                 (ObjectKind::Instance | ObjectKind::Bundle, _) => Role::Other,
             };
-            let device = o.symbol.and_then(|s| problem.symbols.get(s)).map_or(Device::Other, |s| Device::of(&s.name));
+            let device = if problem.version == "0.4" {
+                Device::Other
+            } else {
+                o.symbol.and_then(|s| problem.symbols.get(s)).map_or(Device::Other, |s| Device::of(&s.name))
+            };
             ObjectInfo {
                 role,
                 device: if role == Role::Element { device } else { Device::Other },
@@ -1297,18 +1395,22 @@ fn connections(problem: &LevelProblem, model: &Model) -> Connections {
     };
     let mut drawn: Vec<Drawn> = Vec::new();
     let mut targets: BTreeMap<PinKey, BTreeSet<PinKey>> = BTreeMap::new();
-    // a net asked for twice, as by a ROUTE that flows down and one of the level's own, is drawn
-    // once, with the pins and points of each, in order, none twice
+    // Legacy requests on the same net combine their members. Resolved 0.4 trees stay
+    // separate: matching net names do not imply shared drawing connectivity.
     let mut routed: Vec<(String, Vec<PinKey>)> = Vec::new();
+    let mut route_indexes: Vec<usize> = Vec::new();
     for (i, route) in problem.routes.iter().enumerate() {
         let pins: Vec<PinKey> = route.pins.iter().filter_map(pin_of).collect();
         nets.entry(route.net.clone()).or_default().extend(pins.iter().copied());
         let points: Vec<PointId> =
             model.route_points.get(i).map_or(Vec::new(), |ps| ps.iter().flatten().copied().collect());
-        let at = match routed.iter().position(|(net, _)| *net == route.net) {
+        let at = match routed.iter().enumerate().position(|(at, (net, _))| {
+            problem.version != "0.4" && !route.tree && !problem.routes[route_indexes[at]].tree && *net == route.net
+        }) {
             Some(at) => at,
             None => {
                 routed.push((route.net.clone(), Vec::new()));
+                route_indexes.push(i);
                 drawn.push(Drawn { net: route.net.clone(), points: Vec::new(), routed: true });
                 routed.len() - 1
             }
@@ -1368,7 +1470,7 @@ fn connections(problem: &LevelProblem, model: &Model) -> Connections {
             }
         }
     }
-    // the routes are the first of `drawn`, one per net, in the order of `routed`
+    // Routing trees are first in `drawn`, in the order of `routed`.
     let mut out = Connections { drawn, route_of, written, ..Connections::default() };
     for (name, pins) in nets {
         let i = out.nets.len();
@@ -1398,7 +1500,9 @@ fn ports(problem: &LevelProblem, objects: &[ObjectInfo], symbols: &[SymbolInfo],
         let mut control = false;
         let mut conducting = false;
         let mut drain = false;
-        if let Some(n) = net.as_ref().and_then(|n| c.nets.iter().find(|x| x.name == *n)) {
+        if let Some(n) =
+            net.as_ref().filter(|_| problem.version != "0.4").and_then(|n| c.nets.iter().find(|x| x.name == *n))
+        {
             for &(o, pin) in &n.pins {
                 let oi = &objects[o];
                 if oi.role != Role::Element || oi.device == Device::Other {
@@ -1426,6 +1530,9 @@ fn ports(problem: &LevelProblem, objects: &[ObjectInfo], symbols: &[SymbolInfo],
 
 /// The mirror pairs of the semantic and layout usages.
 fn pairs(problem: &LevelProblem, objects: &[ObjectInfo]) -> Vec<Pair> {
+    if problem.version == "0.4" {
+        return crate::bound::pairs(problem, objects);
+    }
     let mut out = BTreeSet::new();
     for usage in &problem.usages {
         let roles: (&str, &str, Option<&str>) = match usage.definition.as_str() {
@@ -1780,6 +1887,93 @@ fn sources(active: &Active) -> Vec<Source> {
 
 /// The current depth of each element (see the module); none for the others and those not
 /// reached at all.
+/// Depth from declared current flow; mutually reachable elements share a depth.
+fn current_depths(s: &Structure) -> Vec<Option<u32>> {
+    let c = &s.connections;
+    let is_element = |k: usize| s.objects[k].role == Role::Element;
+    // who stands above whom, by the nets
+    let mut below: BTreeMap<usize, BTreeSet<usize>> = BTreeMap::new();
+    for net in &c.nets {
+        let marked = |out: bool| {
+            let pins = net.pins.iter().filter(move |p| is_element(p.0) && s.currents.get(p) == Some(&out));
+            pins.map(|p| p.0)
+        };
+        for a in marked(true) {
+            for b in marked(false).filter(|b| *b != a) {
+                below.entry(a).or_default().insert(b);
+                below.entry(b).or_default();
+            }
+        }
+    }
+    // what each reaches: two that reach each other are in a loop and share a depth, and of two
+    // that do not, the one above reaches more, so that this order goes from the top down
+    let reach: BTreeMap<usize, BTreeSet<usize>> = below
+        .keys()
+        .map(|&a| {
+            let mut seen = BTreeSet::new();
+            let mut stack = vec![a];
+            while let Some(k) = stack.pop() {
+                for &b in &below[&k] {
+                    if seen.insert(b) {
+                        stack.push(b);
+                    }
+                }
+            }
+            (a, seen)
+        })
+        .collect();
+    let same = |a: usize, b: usize| reach[&a].contains(&b) && reach[&b].contains(&a);
+    let mut order: Vec<usize> = below.keys().copied().collect();
+    order.sort_by_key(|a| std::cmp::Reverse(reach[a].len()));
+    let mut depth: Vec<Option<u32>> = vec![None; s.objects.len()];
+    for &a in &order {
+        let d = depth[a].unwrap_or(0);
+        depth[a] = Some(d);
+        for &b in below.keys().filter(|&&b| same(a, b)) {
+            depth[b] = Some(depth[b].map_or(d, |old| old.max(d)));
+        }
+        for &b in &below[&a] {
+            if !same(a, b) {
+                depth[b] = Some(depth[b].map_or(d + 1, |old| old.max(d + 1)));
+            }
+        }
+    }
+    // the others: the depth of what they are connected to, through the smallest net that has one,
+    // and below a pin that the current leaves by
+    loop {
+        let mut found = Vec::new();
+        for &k in &s.elements {
+            if depth[k].is_some() {
+                continue;
+            }
+            let mut best: Option<(usize, u32, usize)> = None;
+            for j in 0..s.pins(k).len() {
+                for &i in c.nets_of.get(&(k, j)).map_or(&[][..], |v| v) {
+                    for &q in &c.nets[i].pins {
+                        if let Some(dq) = depth[q.0].filter(|_| is_element(q.0) && q.0 != k) {
+                            let dq = dq + u32::from(s.currents.get(&q) == Some(&true));
+                            let key = (c.nets[i].pins.len(), dq, q.0);
+                            if best.is_none_or(|b| key < b) {
+                                best = Some(key);
+                            }
+                        }
+                    }
+                }
+            }
+            if let Some((_, dq, _)) = best {
+                found.push((k, dq));
+            }
+        }
+        if found.is_empty() {
+            break;
+        }
+        for (k, dq) in found {
+            depth[k] = Some(dq);
+        }
+    }
+    depth
+}
+
 fn depths(s: &Structure) -> Vec<Option<u32>> {
     let n = s.objects.len();
     let mut depth: Vec<Option<u32>> = vec![None; n];
@@ -2254,6 +2448,85 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn current_is_declared_and_does_not_require_supply_symbols() {
+        use rnl_runtime::problem::TerminalCurrent;
+        let mut p = problem_of(vec![instance(), instance()], vec![]);
+        p.version = "0.4".into();
+        let unmarked = structure_of(&p);
+        assert!(!unmarked.has(Source::SourcesDown));
+        assert!(!unmarked.conducts((0, 1)));
+        assert!(unmarked.objects.iter().all(|o| o.device == Device::Other));
+        let pin = |object, pin| PointRef::Pin { object, pin, terminal: String::new() };
+        p.currents = vec![
+            TerminalCurrent { pin: pin(0, 2), direction: "out".into() },
+            TerminalCurrent { pin: pin(1, 1), direction: "in".into() },
+        ];
+        let s = structure_of(&p);
+        assert!(s.has(Source::SourcesDown));
+        assert!(s.depth.is_none(), "CURRENT without a connected pair must leave rows to facts");
+        assert!(s.conducts((0, 2)));
+        assert!(!s.conducts((0, 0)));
+        assert_eq!(s.against_current(0, Orient::R0), 0);
+        assert_eq!(s.against_current(0, Orient::MX), 1);
+        assert_eq!(s.against_current(1, Orient::R90), 1);
+        p.symbols[0].name = "$CUSTOM".into();
+        let renamed = structure_of(&p);
+        assert_eq!(s.rows, renamed.rows);
+        assert_eq!(s.currents, renamed.currents);
+        assert_eq!(s.active, renamed.active);
+    }
+
+    #[test]
+    fn current_depths_collapse_cycles_and_count_the_longest_path() {
+        let mut p = problem_of((0..4).map(|_| instance()).collect(), vec![]);
+        p.version = "0.4".into();
+        let mut s = structure_of(&p);
+        // A two-object cycle followed by two objects downstream.
+        s.currents = (0..4).flat_map(|k| [((k, 1), false), ((k, 2), true)]).collect();
+        s.connections.nets = [(0, 1), (1, 0), (1, 2), (2, 3)]
+            .into_iter()
+            .map(|(a, b)| Net { name: String::new(), supply: false, ground: false, pins: vec![(a, 2), (b, 1)] })
+            .collect();
+        assert_eq!(current_depths(&s), [Some(0), Some(0), Some(1), Some(2)]);
+    }
+
+    #[test]
+    fn unfinished_current_orientation_checks_do_not_remove_values() {
+        use rnl_runtime::problem::TerminalCurrent;
+        let mut p = problem_of(vec![instance()], vec![]);
+        p.version = "0.4".into();
+        p.currents = vec![TerminalCurrent {
+            pin: PointRef::Pin { object: 0, pin: 2, terminal: String::new() },
+            direction: "in".into(),
+        }];
+        let mut s = structure_of(&p);
+        s.caps.nodes = 0;
+        let (values, stopped) = fitting_values(&s, &mut Work::default());
+        assert!(stopped);
+        assert!(values.is_empty(), "an unfinished check must not constrain a class");
+    }
+
+    #[test]
+    fn mirror_pairs_follow_facts_without_definition_names() {
+        let mut p = problem_of(
+            vec![instance(), instance(), point()],
+            vec![
+                fact(FactKind::OrientRelation { relation: Orient::R0, from: vec![0], to: vec![1] }),
+                fact(FactKind::Distribute {
+                    axis: Axis::X,
+                    sense: Sense::Increasing,
+                    members: vec![PointRef::Origin(0), PointRef::Origin(2), PointRef::Origin(1)],
+                }),
+            ],
+        );
+        p.version = "0.4".into();
+        p.orient_lists = vec![(0, vec![Orient::R0, Orient::MY])];
+        assert_eq!(structure_of(&p).pairs, [Pair { a: 0, b: 1, axis: Some(2) }]);
+        p.orient_lists.clear();
+        assert!(structure_of(&p).pairs.is_empty());
+    }
+
+    #[test]
     fn groups_nest_and_overlapping_groups_split_in_three() {
         let mut p = problem_of((0..6).map(|_| instance()).collect(), Vec::new());
         let group = |label: &str, members: Vec<usize>| ProblemGroup {
@@ -2640,6 +2913,7 @@ pub(crate) mod tests {
         let mut p = problem_of(vec![instance(), instance(), instance()], Vec::new());
         let pin = |object: usize, pin: usize| PointRef::Pin { object, pin, terminal: ["g", "d", "s"][pin].to_string() };
         let route = |pins: Vec<PointRef>| rnl_runtime::problem::RouteIntent {
+            tree: false,
             net: "n".to_string(),
             mode: "auto".to_string(),
             style: Vec::new(),
@@ -2654,6 +2928,25 @@ pub(crate) mod tests {
         // every pin of the net drawn to the others
         assert_eq!(s.connections.targets[&(0, 1)], vec![(1, 1), (2, 0)]);
         assert_eq!(s.connections.targets[&(2, 0)], vec![(0, 1), (1, 1)]);
+    }
+
+    #[test]
+    fn resolved_trees_on_one_net_keep_separate_connection_targets() {
+        let mut p = problem_of(vec![instance(), instance(), instance(), instance()], Vec::new());
+        let pin = |object| PointRef::Pin { object, pin: 1, terminal: "d".into() };
+        let route = |a, b| rnl_runtime::problem::RouteIntent {
+            tree: true,
+            net: "n".into(),
+            mode: "auto".into(),
+            style: Vec::new(),
+            pins: vec![pin(a), pin(b)],
+            wires: Vec::new(),
+        };
+        p.routes = vec![route(0, 1), route(2, 3)];
+        let structure = structure_of(&p);
+        assert_eq!(structure.connections.drawn.len(), 2);
+        assert_eq!(structure.connections.targets[&(0, 1)], vec![(1, 1)]);
+        assert_eq!(structure.connections.targets[&(2, 1)], vec![(3, 1)]);
     }
 
     #[test]

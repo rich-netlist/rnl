@@ -584,7 +584,8 @@ pub(crate) fn document(
                 .collect();
         }
     }
-    let (params, notes) = Params::new(&r.doc, options.bind.as_ref());
+    let main_language = r.model.levels.iter().find(|lv| lv.level == 0).map_or("", |lv| lv.language.as_str());
+    let (params, notes) = Params::new(&r.doc, options.bind.as_ref(), main_language);
     let drawn: HashMap<usize, usize> = r.model.levels.iter().enumerate().map(|(k, lv)| (lv.level, k)).collect();
     for (k, lv) in r.model.levels.iter().enumerate() {
         let host = &r.doc.levels[lv.level];

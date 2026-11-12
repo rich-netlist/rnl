@@ -147,11 +147,20 @@ impl Candidate {
 fn orientations(s: &Structure, values: &[Orient]) -> Vec<Orient> {
     let mut ori = s.witness.orient.clone();
     for (class, value) in s.open.classes.iter().zip(values) {
+        let value = fitting(s, class.root, *value);
         for (m, label) in &class.members {
             ori[*m] = value.then(*label);
         }
     }
     ori
+}
+
+/// Use a feasible current-directed orientation when a candidate proposes one outside that set.
+fn fitting(s: &Structure, root: usize, value: Orient) -> Orient {
+    match s.fitting.get(&root) {
+        Some(values) if !values.contains(&value) => values[0],
+        _ => value,
+    }
 }
 
 /// What a relation is for, to say which were dropped.
@@ -307,7 +316,7 @@ pub(crate) fn with_relations<R>(
     let mut r = Resolver::new(&model, s.objects.len(), Limits::Caps(s.caps));
     r.seed(s.witness.clone());
     for &f in &s.kept {
-        let kept = r.add(f);
+        let kept = r.add_at_witness(f);
         debug_assert_eq!(kept, Outcome::Kept, "the facts kept hold at the witness");
     }
     let outcomes: Vec<Outcome> = (0..relations.len()).map(|i| r.add(base + i)).collect();
@@ -1194,7 +1203,7 @@ pub(crate) fn orientation_relations(s: &Structure, c: &Candidate) -> Vec<Tagged>
         .zip(&c.values)
         .map(|(class, value)| Tagged {
             kind: RelKind::Orientation,
-            rel: Relation::Orient { root: class.root, value: *value },
+            rel: Relation::Orient { root: class.root, value: fitting(s, class.root, *value) },
         })
         .collect()
 }
@@ -1265,6 +1274,9 @@ pub(crate) fn sketch(
 /// the ground direction alone hangs an end on the ground down ([`grounded_end_down`]). All eight
 /// when none satisfies them.
 fn domain(s: &Structure, class: &FreeClass) -> Vec<Orient> {
+    if let Some(values) = s.fitting.get(&class.root) {
+        return values.clone();
+    }
     let ok = |v: Orient| {
         class.members.iter().all(|&(m, label)| {
             let o = v.then(label);
@@ -1272,14 +1284,16 @@ fn domain(s: &Structure, class: &FreeClass) -> Vec<Orient> {
             if stub_on_body(s, m, o) {
                 return false;
             }
-            if s.has(Source::SourcesDown) && !two_terminal_ok(s, m, o) {
+            if s.has(Source::SourcesDown)
+                && ((!s.language04 && !two_terminal_ok(s, m, o)) || (s.language04 && s.against_current(m, o) > 0))
+            {
                 return false;
             }
             if s.has(Source::GroundsDown) && !grounded_end_down(s, m, o) {
                 return false;
             }
             let down = match info.device.n_type() {
-                Some(n) if s.has(Source::SourcesDown) => match (s.drain(m), s.source(m)) {
+                Some(n) if !s.language04 && s.has(Source::SourcesDown) => match (s.drain(m), s.source(m)) {
                     (Some(d), Some(src)) => {
                         let (Some(d), Some(src)) = (s.pin_offset(m, d, o), s.pin_offset(m, src, o)) else {
                             return true;

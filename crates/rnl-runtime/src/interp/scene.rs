@@ -174,6 +174,10 @@ pub struct Scene {
     pub bundles: Vec<ObjId>,
     pub constraints: Vec<ObjId>,
     pub routes: Vec<ObjId>,
+    pub(super) routing_requests: Vec<super::routes::RoutingRequest>,
+    pub(super) condition_trees: Vec<super::routes::RouteTree>,
+    pub(super) routing_failed: HashSet<usize>,
+    pub(super) resolved_trees: Vec<super::routes::RouteTree>,
     pub keytexts: HashMap<(ObjId, String), ObjId>,
     pub named_subobjects: HashMap<(ObjId, String), ObjId>,
     pub pins: HashMap<(ObjId, usize), ObjId>,
@@ -313,6 +317,10 @@ impl Scene {
             bundles: Vec::new(),
             constraints: Vec::new(),
             routes: Vec::new(),
+            routing_requests: Vec::new(),
+            condition_trees: Vec::new(),
+            routing_failed: HashSet::new(),
+            resolved_trees: Vec::new(),
             keytexts: HashMap::new(),
             named_subobjects: HashMap::new(),
             pins: HashMap::new(),
@@ -889,13 +897,14 @@ impl Interp<'_> {
         key_unit: UnitId,
         off: usize,
     ) -> R<ObjId> {
+        let diagnostic_off = if self.follows_0_4(self.source_unit(ctx)) { off } else { 0 };
         if let ObjData::Failed(d) = self.o(att) {
             let d = *d;
             let id = self.err_cause(
                 ctx,
                 codes::TEXT_ATTACHED_OBJECT_FAILED,
                 "the object the TEXT is attached to failed",
-                0,
+                diagnostic_off,
                 d,
             );
             return Err(Stop::Fail(Some(id)));
@@ -909,11 +918,16 @@ impl Interp<'_> {
                         ctx,
                         codes::TEXT_POINT_TAKES_NO_KEY,
                         "a text attached to a point takes no key= (13.3)",
-                        0,
+                        diagnostic_off,
                     );
                 }
                 if items.text.is_none() {
-                    return self.fail(ctx, codes::TEXT_MISSING_TEXT, "the text= of TEXT must be written (13.3)", 0);
+                    return self.fail(
+                        ctx,
+                        codes::TEXT_MISSING_TEXT,
+                        "the text= of TEXT must be written (13.3)",
+                        diagnostic_off,
+                    );
                 }
                 self.new_obj(ObjData::Text {
                     attach: att,
@@ -974,7 +988,12 @@ impl Interp<'_> {
                     return Ok(kt);
                 }
                 if items.text.is_none() {
-                    return self.fail(ctx, codes::TEXT_MISSING_TEXT, "the text= of TEXT must be written (13.3)", 0);
+                    return self.fail(
+                        ctx,
+                        codes::TEXT_MISSING_TEXT,
+                        "the text= of TEXT must be written (13.3)",
+                        diagnostic_off,
+                    );
                 }
                 let has_offset = items.dx.is_some() || items.dy.is_some();
                 if has_offset && matches!(kind, ObjData::Wire { .. } | ObjData::Net { .. }) {
@@ -982,7 +1001,7 @@ impl Interp<'_> {
                         ctx,
                         codes::TEXT_WIRE_NET_NO_OFFSET,
                         "a text attached to a wire or a net takes no dx, dy (13.3)",
-                        0,
+                        diagnostic_off,
                     );
                 }
                 self.new_obj(ObjData::Text {
@@ -1003,7 +1022,7 @@ impl Interp<'_> {
                     ctx,
                     codes::TEXT_ATTACH_NOT_ALLOWED,
                     format!("TEXT cannot be attached to {l} (13.3)"),
-                    0,
+                    diagnostic_off,
                 );
             }
         };
@@ -1767,7 +1786,12 @@ impl Interp<'_> {
                         }
                     }
                     if let Some(w) = params.get("wired").and_then(Lit::boolean) {
-                        if self.net_wired(s, n, &ends) != w {
+                        let wired = if self.follows_0_4(writer) {
+                            self.routing_net_wired(s, n, &ends)
+                        } else {
+                            self.net_wired(s, n, &ends)
+                        };
+                        if wired != w {
                             continue;
                         }
                     }
