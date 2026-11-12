@@ -4,7 +4,7 @@
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
-use crate::geom::{Orient, Pt};
+use crate::geom::Orient;
 use crate::host::LevelKind;
 use crate::previous::{Given, Key, RecordResult};
 use crate::problem::*;
@@ -268,7 +268,9 @@ impl Interp<'_> {
                         .get(o)
                         .map(|m| {
                             m.iter()
-                                .filter(|(k, _)| matches!(k.as_str(), "size" | "font" | "bold" | "italic"))
+                                .filter(|(k, _)| {
+                                    matches!(k.as_str(), "size" | "font" | "bold" | "italic" | "textvisible")
+                                })
                                 .map(|(k, (v, _))| (k.clone(), v.clone()))
                                 .collect()
                         })
@@ -285,7 +287,9 @@ impl Interp<'_> {
                         valign: items.valign.clone().unwrap_or_else(|| "baseline".into()),
                         rotate: items.rotate.unwrap_or(0.0),
                         fix_rotate: items.fix_rotate.unwrap_or(false),
-                        baseline_mirrors: items.text.as_ref().and_then(|t| t.unit).is_some_and(|u| self.follows_0_4(u)),
+                        upright: items.upright.unwrap_or(true),
+                        baseline_mirrors: items.modern_text
+                            || items.text.as_ref().and_then(|t| t.unit).is_some_and(|u| self.follows_0_4(u)),
                         column_position: self.text_column_position(s, *o),
                         style,
                     });
@@ -311,7 +315,8 @@ impl Interp<'_> {
         let mut problem_wires = Vec::new();
         for &w in &wires {
             let ObjData::Wire { nets, bus, generated, .. } = self.o(w).clone() else { continue };
-            let Some(WireShape { points, mode, .. }) = self.wire_shape(s, w) else { continue };
+            let Some(WireShape { points, mode, site, .. }) = self.wire_shape(s, w) else { continue };
+            let default_auto = mode == "auto" && self.modern_wire_source(s, site.as_ref());
             let anchors: Vec<PointRef> = points.iter().filter_map(|q| self.point_ref(s, &ix, *q)).collect();
             problem_wires.push(ProblemWire {
                 label: self.label(w),
@@ -320,6 +325,7 @@ impl Interp<'_> {
                 bus,
                 anchors,
                 mode,
+                default_auto,
                 generated,
             });
         }
@@ -671,7 +677,8 @@ impl Interp<'_> {
             let ObjData::Wire { nets, points, mode, generated, site, .. } = self.o(w).clone() else { continue };
             if !generated && of_record(site.as_ref()) {
                 let nets = nets.iter().map(|n| self.net_display(*n)).collect();
-                if let Some(path) = self.drawn_path(s, &points, &mode) {
+                let modern = self.modern_wire_source(s, site.as_ref());
+                if let Some(path) = self.routed_wire_run(s, &points, &mode, modern, (true, true)) {
                     written.push((nets, path));
                 }
                 continue;
@@ -680,10 +687,11 @@ impl Interp<'_> {
                 rs.iter()
                     .filter(|r| r.fault.is_none() && !r.generated && of_record(Some(&r.site)))
                     .max_by(|a, b| (&a.pos, a.seq).cmp(&(&b.pos, b.seq)))
-                    .map(|r| (r.points.clone(), r.mode.clone()))
+                    .map(|r| (r.points.clone(), r.mode.clone(), r.site.clone()))
             });
-            let (Some((points, mode)), Some(k)) = (rewrite, ix.refs.get(&w).and_then(key)) else { continue };
-            if let Some(path) = self.drawn_path(s, &points, &mode) {
+            let (Some((points, mode, site)), Some(k)) = (rewrite, ix.refs.get(&w).and_then(key)) else { continue };
+            let modern = self.modern_wire_source(s, Some(&site));
+            if let Some(path) = self.routed_wire_run(s, &points, &mode, modern, (true, true)) {
                 routes.push((k, path));
             }
         }
@@ -713,15 +721,6 @@ impl Interp<'_> {
             }
         }
         Some(RecordResult { level: self.scenes[s].level, placed, routes, wires: written, ids, drawn })
-    }
-
-    /// A list of points of a wire as drawn with its mode (13.1); none when a point has no position.
-    fn drawn_path(&mut self, s: SceneId, points: &[ObjId], mode: &str) -> Option<Vec<Pt>> {
-        let mut pts = Vec::new();
-        for &q in points {
-            pts.push(self.point_of(s, q)?);
-        }
-        Some(crate::geom::route(&pts, mode))
     }
 
     /// The `%` names the level binds, those of the records written into it with scope= among them

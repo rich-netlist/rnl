@@ -1665,8 +1665,10 @@ impl<'a> Tree<'a> {
                 }
             }
             let broken = self.broken(&current);
-            let wires = drawn(self.problem, s, &eval.placed.geometry, &eval.routing);
-            let trouble = crate::score::trouble(s, &eval.placed.origins, &eval.placed.geometry.orient, &wires);
+            let trouble = match drawn(self.problem, s, &eval.placed.geometry, &eval.routing) {
+                Ok(wires) => crate::score::trouble(s, &eval.placed.origins, &eval.placed.geometry.orient, &wires),
+                Err(_) => vec![0; s.objects.len()],
+            };
             let away = if bindings { self.pointing_away(&eval) } else { BTreeSet::new() };
             let mut moves = self.neighbours(&current);
             for m in &mut moves {
@@ -2167,15 +2169,31 @@ impl<'a> Tree<'a> {
         let routing = route(problem, s, &placed.geometry, &placed.origins, self.options, work);
         drop(phase);
         let _phase = crate::profile::span("tree", "score");
-        let wires = drawn(problem, s, &placed.geometry, &routing);
-        let objectives = measured_layers(problem, s, &placed, Some(&wires));
+        let objectives = match drawn(problem, s, &placed.geometry, &routing) {
+            Ok(wires) => measured_layers(problem, s, &placed, Some(&wires)),
+            Err(_) => Vec::new(),
+        };
         let entry = self.entry(&placed, &routing, objectives, code);
         Evaluated { placed, routing, entry }
     }
 
     fn entry(&self, placed: &Placed, routing: &Routing, objectives: Vec<Q>, code: &[u32]) -> Entry {
-        let wires = drawn(self.problem, self.s, &placed.geometry, routing);
+        let wires = match drawn(self.problem, self.s, &placed.geometry, routing) {
+            Ok(wires) => wires,
+            Err(wire) => {
+                return Entry {
+                    written_path_error: Some(wire),
+                    overlaps: 0,
+                    crowding: 0,
+                    misleading: 0,
+                    joins_left: 0,
+                    layers: Vec::new(),
+                    code: code.to_vec(),
+                }
+            }
+        };
         Entry {
+            written_path_error: None,
             overlaps: placed.overlaps.len(),
             crowding: crate::score::crowding(self.s, &placed.origins, &placed.geometry.orient, &placed.dropped),
             misleading: crate::score::misleading(self.problem, self.s, &placed.origins, &placed.geometry, &wires),

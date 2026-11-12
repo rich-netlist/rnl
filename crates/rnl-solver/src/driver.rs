@@ -176,15 +176,26 @@ fn solve_exact_mode(
                 break;
             }
             let phase = crate::profile::span("stage", "score");
-            let estimate = measured_layers(problem, &structure, &placed, None);
             let written = drawn(problem, &structure, &placed.geometry, &Routing::default());
-            let entry = Entry {
-                overlaps: placed.overlaps.len(),
-                crowding: crowding(&structure, &placed.origins, &placed.geometry.orient, &placed.dropped),
-                misleading: misleading(problem, &structure, &placed.origins, &placed.geometry, &written),
-                joins_left: 0,
-                layers: estimate,
-                code: c.code(&structure),
+            let entry = match written {
+                Ok(written) => Entry {
+                    written_path_error: None,
+                    overlaps: placed.overlaps.len(),
+                    crowding: crowding(&structure, &placed.origins, &placed.geometry.orient, &placed.dropped),
+                    misleading: misleading(problem, &structure, &placed.origins, &placed.geometry, &written),
+                    joins_left: 0,
+                    layers: measured_layers(problem, &structure, &placed, None),
+                    code: c.code(&structure),
+                },
+                Err(wire) => Entry {
+                    written_path_error: Some(wire),
+                    overlaps: 0,
+                    crowding: 0,
+                    misleading: 0,
+                    joins_left: 0,
+                    layers: Vec::new(),
+                    code: c.code(&structure),
+                },
             };
             all.push(Placing { candidate: c, placed, entry });
             drop(phase);
@@ -197,7 +208,7 @@ fn solve_exact_mode(
         let beam = options.beam.max(1);
         let mut finals: Vec<(usize, Routing, Entry)> = Vec::new();
         drop(phase);
-        for &i in ranked.iter().take(beam) {
+        for &i in ranked.iter().filter(|&&i| all[i].entry.written_path_error.is_none()).take(beam) {
             if !crate::budget::permit(crate::budget::Step::Route, problem.routes.len()) && !finals.is_empty() {
                 break;
             }
@@ -211,7 +222,7 @@ fn solve_exact_mode(
                 break;
             }
             let phase = crate::profile::span("stage", "score");
-            let wires = drawn(problem, &structure, &p.placed.geometry, &routing);
+            let Ok(wires) = drawn(problem, &structure, &p.placed.geometry, &routing) else { continue };
             let score = measured_layers(problem, &structure, &p.placed, Some(&wires));
             let entry = Entry {
                 misleading: misleading(problem, &structure, &p.placed.origins, &p.placed.geometry, &wires),
@@ -223,6 +234,15 @@ fn solve_exact_mode(
             drop(phase);
         }
         let phase = crate::profile::span("stage", "score");
+        if finals.is_empty() {
+            // Keep one unscoreable candidate solely to return a fatal diagnostic, never route it.
+            let i = ranked[0];
+            finals.push((
+                i,
+                Routing { written_path_error: all[i].entry.written_path_error, ..Routing::default() },
+                all[i].entry.clone(),
+            ));
+        }
         let entries: Vec<Entry> = finals.iter().map(|(_, _, e)| e.clone()).collect();
         let best = order(&structure.active, &entries)[0];
         let mut seen: BTreeSet<_> = all.iter().map(|p| p.entry.code.clone()).collect();
@@ -235,10 +255,11 @@ fn solve_exact_mode(
             entries.len(),
             if candidate.origin == "P0" { "P0, the order of the netlist" } else { "the beam search" }
         ));
-        if problem.version == "0.4" && crate::budget::continues_rows() {
+        if entry.written_path_error.is_none() && problem.version == "0.4" && crate::budget::continues_rows() {
             let mut start = candidate.clone();
             let troubled = |routing: &Routing, placed: &Placed| {
-                let wires = drawn(problem, &structure, &placed.geometry, routing);
+                let wires =
+                    drawn(problem, &structure, &placed.geometry, routing).expect("selected candidate validated");
                 crate::score::trouble(&structure, &placed.origins, &placed.geometry.orient, &wires)
             };
             let mut rank = troubled(&routing, &placed);
@@ -275,8 +296,9 @@ fn solve_exact_mode(
                         if crate::budget::stopped() {
                             break 'search;
                         }
-                        let wires = drawn(problem, &structure, &p.geometry, &r);
+                        let Ok(wires) = drawn(problem, &structure, &p.geometry, &r) else { continue };
                         let next = Entry {
+                            written_path_error: None,
                             layers: measured_layers(problem, &structure, &p, Some(&wires)),
                             code: c.code(&structure),
                             overlaps: p.overlaps.len(),
@@ -306,7 +328,7 @@ fn solve_exact_mode(
         }
         (candidate, placed, routing, entry)
     };
-    let score = entry.layers;
+    let score = entry.layers.clone();
     if !placed.optimised {
         notes.push(
             "the coordinate LP reached its cap on pivots: the objects are where the resolution of the candidate put \
@@ -443,6 +465,7 @@ fn solve_exact_mode(
         ));
     }
     let report = SolveReport {
+        fatal_written_wire: entry.written_path_error,
         budget: None,
         canonical_options: None,
         kept: resolved.kept.clone(),
@@ -452,16 +475,27 @@ fn solve_exact_mode(
         inert_objectives: structure.active.inert.clone(),
         unrouted,
         work,
-        errors: resolved.errors.clone(),
+        errors: {
+            let mut errors = resolved.errors.clone();
+            if let Some(wire) = entry.written_path_error {
+                errors
+                    .push(format!("written wire [{wire}] has unevaluable auto geometry; solve cannot be written back"));
+            }
+            errors
+        },
         warnings: resolved.warnings.clone(),
         notes,
     };
-    let solution = Solution {
-        placements,
-        branches: routing.branches.clone(),
-        junctions: Vec::new(),
-        wires: routing.wires.clone(),
-        wire_routes: Vec::new(),
+    let solution = if report.fatal_written_wire.is_some() {
+        Solution::default()
+    } else {
+        Solution {
+            placements,
+            branches: routing.branches.clone(),
+            junctions: Vec::new(),
+            wires: routing.wires.clone(),
+            wire_routes: Vec::new(),
+        }
     };
     let solved = Solved { solution, report };
     (solved, Exact { resolved, structure, candidate, placed, routing, score })

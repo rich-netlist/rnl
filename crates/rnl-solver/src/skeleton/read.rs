@@ -1349,6 +1349,7 @@ mod tests {
                     bus: false,
                     anchors: vec![PointRef::Origin(0), PointRef::Origin(1)],
                     mode: mode.into(),
+                    default_auto: mode == "auto",
                     generated: false,
                 });
                 let s = structure(&p);
@@ -1357,7 +1358,7 @@ mod tests {
                 g.origin[1] = end.map(int);
                 let sk = read(&p, &s, &g, &Routing::default(), &|_| true, false, false, None, false).unwrap();
                 let actual: Vec<_> = sk.paths[0].vertices.iter().map(|&v| sk.vertices[v].at.clone()).collect();
-                assert_eq!(actual, crate::route::written_path(&p, &g, 0).unwrap(), "{mode} {end:?}");
+                assert_eq!(actual, crate::route::written_path(&p, &g, 0).unwrap().unwrap(), "{mode} {end:?}");
             }
         }
     }
@@ -1378,6 +1379,7 @@ mod tests {
                 PointRef::Origin(2),
             ],
             mode: "manhattan".into(),
+            default_auto: false,
             generated: false,
         });
         let s = structure(&p);
@@ -1387,7 +1389,7 @@ mod tests {
         }
         let sk = read(&p, &s, &g, &Routing::default(), &|_| true, false, false, None, false).unwrap();
         let actual: Vec<_> = sk.paths[0].vertices.iter().map(|&v| sk.vertices[v].at.clone()).collect();
-        assert_eq!(actual, crate::route::written_path(&p, &g, 0).unwrap());
+        assert_eq!(actual, crate::route::written_path(&p, &g, 0).unwrap().unwrap());
         let centre = sk.vertices.iter().find(|v| v.key == Key::Coordinate(0, 1)).unwrap();
         assert_eq!(centre.term[0].var, s.model.var(s.model.wire_points[0][1].unwrap()));
         assert!(sk.spots[centre.spot].pins.is_empty());

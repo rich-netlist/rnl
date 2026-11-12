@@ -186,7 +186,11 @@ fn style_specs(group: &str) -> Vec<ParamSpec> {
         .group(group)
         .iter()
         .filter_map(|n| words().style_prop(n))
-        .map(|s| ParamSpec::new(s.name.clone(), s.ty.clone()))
+        .map(|s| {
+            let mut p = ParamSpec::new(s.name.clone(), s.ty.clone());
+            p.since = s.since.clone();
+            p
+        })
         .collect()
 }
 
@@ -299,6 +303,7 @@ impl Interp<'_> {
             }
             "SET-SYMBOL" => self.kw_set_symbol(kw, &args, seg, ctx),
             "SET-STYLE" => {
+                self.params(kw, seg, ctx, &self.sig_params(kw, ctx), None, false, None)?;
                 let mapped = self.map_args(kw, &args, seg, ctx, sig_positions(kw))?;
                 let sty = self.anon_def(mapped["style"].obj);
                 if !matches!(self.o(sty), ObjData::Style(_)) {
@@ -1414,7 +1419,11 @@ impl Interp<'_> {
                         } else if !signature.open_params && !matches!(signature.params, ParamsSpec::Definition) {
                             let mut spec = self.sig_params(&keyword, ctx);
                             if let Some(style) = &signature.style {
-                                spec.extend(style_specs(style));
+                                spec.extend(
+                                    style_specs(style)
+                                        .into_iter()
+                                        .filter(|p| p.in_version(&self.version_of(Some(self.source_unit(ctx))))),
+                                );
                             }
                             let open_style = matches!(signature.params, ParamsSpec::Style);
                             let checked = self
@@ -3122,13 +3131,18 @@ impl Interp<'_> {
 
     fn kw_text(&mut self, kw: &str, args: &[ArgV], seg: &Segment, ctx: &Ctx) -> R<(ObjId, bool)> {
         let mut spec = self.sig_params(kw, ctx);
-        spec.extend(style_specs("text_style"));
+        spec.extend(
+            style_specs("text_style")
+                .into_iter()
+                .filter(|p| p.in_version(&self.version_of(Some(self.source_unit(ctx))))),
+        );
         let p = self.params(kw, seg, ctx, &spec, None, false, None)?;
         let mapped = self.map_args(kw, args, seg, ctx, sig_positions(kw))?;
         let att = mapped["attach"].clone();
         let (style, rest) = split_style(&p);
         let key = get(&rest, "key").cloned();
         let mut items = TextItems {
+            modern_text: self.follows_0_4(self.source_unit(ctx)),
             text: get(&rest, "text").and_then(|v| match v {
                 Lit::Str(s) => Some(match written_in(&Lit::Str(s.clone()), self.source_unit(ctx)) {
                     Lit::Str(w) => w,
@@ -3140,6 +3154,7 @@ impl Interp<'_> {
             valign: get(&rest, "valign").and_then(Lit::str).map(String::from),
             rotate: get(&rest, "rotate").and_then(Lit::num),
             fix_rotate: get(&rest, "fix_rotate").and_then(Lit::boolean),
+            upright: get(&rest, "upright").and_then(Lit::boolean),
             dx: get(&rest, "dx").and_then(Lit::num),
             dy: get(&rest, "dy").and_then(Lit::num),
         };

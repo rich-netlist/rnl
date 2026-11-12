@@ -151,8 +151,19 @@ fn write_in(request: &WriteRequest, files: Option<&dyn rnl_runtime::source::Prov
 
     for op in &ops {
         match &op.op {
-            Op::AddText { text, .. } => {
-                form::check_math_content(text, version).map_err(|e| Refusal::new(codes::EDIT_FIELD_INVALID, e))?
+            Op::AddText { text, rotate, style, .. } => {
+                form::check_math_content(text, version).map_err(|e| Refusal::new(codes::EDIT_FIELD_INVALID, e))?;
+                if version != "0.4" && rotate.is_some_and(|r| ![0.0, 90.0, 180.0, 270.0].contains(&r)) {
+                    return Err(Refusal::new(
+                        codes::EDIT_FIELD_INVALID,
+                        "arbitrary TEXT rotation requires language_version 0.4",
+                    ));
+                }
+                for (name, value) in style {
+                    if name == "textvisible" && (version != "0.4" || !matches!(value, ops::Literal::Bool(_))) {
+                        return Err(Refusal::new(codes::EDIT_FIELD_INVALID, "textvisible requires a 0.4 boolean"));
+                    }
+                }
             }
             Op::DefineSymbol { pins, .. } => {
                 for pin in pins {
@@ -170,6 +181,9 @@ fn write_in(request: &WriteRequest, files: Option<&dyn rnl_runtime::source::Prov
         for op in &ops {
             if matches!(&op.op, Op::AddText { fix_rotate: Some(_), .. }) {
                 return Err(Refusal::new(codes::EDIT_FIELD_INVALID, "fix_rotate requires language_version 0.4"));
+            }
+            if matches!(&op.op, Op::AddText { upright: Some(_), .. }) {
+                return Err(Refusal::new(codes::EDIT_FIELD_INVALID, "upright requires language_version 0.4"));
             }
             if let Op::DefineSymbol { pins, .. } = &op.op {
                 if pins.iter().any(|p| p.terminals.is_empty() || !p.names.is_empty() || p.bus && p.terminals.len() == 1)

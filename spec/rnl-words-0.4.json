@@ -309,6 +309,12 @@
    "name": "arrowsize",
    "type": "number",
    "since": "0.2"
+  },
+  {
+   "name": "textvisible",
+   "type": "bool",
+   "default": true,
+   "since": "0.4"
   }
  ],
  "style_groups": {
@@ -341,7 +347,8 @@
    "size",
    "font",
    "bold",
-   "italic"
+   "italic",
+   "textvisible"
   ]
  },
  "reserved": [],
@@ -1020,6 +1027,54 @@
    "sentence": "the control points {(0, 0) (1, 1) (2, 1) (3, 0)} make a @BEZIER"
   },
   {
+   "keyword": "ANNOTATION",
+   "since": "0.4",
+   "group": "Symbol content and graphics",
+   "summary": "Gathers the graphics of a symbol, a general definition or a usage into one annotation at a point or on an object, turned by any angle; pins and the rest are left out.",
+   "section": "13.5",
+   "where": [
+    "level"
+   ],
+   "slots": [
+    {
+     "name": "at",
+     "takes": "one",
+     "kinds": [
+      "locatable"
+     ],
+     "mode": "absorb"
+    },
+    {
+     "name": "source",
+     "takes": "one",
+     "kinds": [
+      "symbol",
+      "general",
+      "usage"
+     ],
+     "mode": "absorb"
+    }
+   ],
+   "params": [
+    {
+     "name": "rotate",
+     "type": "number",
+     "default": 0,
+     "since": "0.4"
+    },
+    {
+     "name": "mirror",
+     "type": "bool",
+     "default": false,
+     "since": "0.4"
+    }
+   ],
+   "output": "new",
+   "output_kind": "annotation",
+   "form": "{at} @ANNOTATION {source}",
+   "sentence": "at (40, 20) there is an @ANNOTATION(rotate=30) of $ARROW_SYMBOL"
+  },
+  {
    "keyword": "TEXT",
    "since": "0.2",
    "group": "Symbol content and graphics",
@@ -1095,13 +1150,7 @@
     },
     {
      "name": "rotate",
-     "type": "enum",
-     "values": [
-      0,
-      90,
-      180,
-      270
-     ],
+     "type": "number",
      "default": 0,
      "since": "0.2"
     },
@@ -1109,6 +1158,12 @@
      "name": "fix_rotate",
      "type": "bool",
      "default": false,
+     "since": "0.4"
+    },
+    {
+     "name": "upright",
+     "type": "bool",
+     "default": true,
      "since": "0.4"
     }
    ],

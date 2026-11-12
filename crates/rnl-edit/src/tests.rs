@@ -1149,6 +1149,27 @@ fn pin_editing_rejects_unwriteable_vertices_and_invalid_metadata() {
 }
 
 #[test]
+fn upright_and_fractional_rotation_write_back_explicitly() {
+    for upright in [false, true] {
+        let ops =
+            json!([{"level":"file", "op":"add-text", "at":[0,0], "markup":"arrow", "upright":upright, "rotate":30.5}]);
+        let mut req = request("spice", "* text\n.end\n", ops);
+        assert!(write(&req).is_err());
+        req.language_version = Some("0.4".into());
+        let out = write(&req).unwrap();
+        assert!(out.contains(&format!("upright={upright}")), "{out}");
+        assert!(out.contains("rotate=30.5"), "{out}");
+        let files = MemoryProvider::new().with(entry("spice"), &out);
+        let r =
+            rnl_view::interpret(entry("spice"), Some("spice"), &files, &Options { std: false, ..Options::default() })
+                .unwrap();
+        assert!(!r.diagnostics().iter().any(|d| d.severity == Severity::Error), "{out}");
+        assert_eq!(r.model.levels[0].texts[0].upright, Some(upright));
+        assert_eq!(r.model.levels[0].texts[0].rotate, 30.5);
+    }
+}
+
+#[test]
 fn fixed_rotation_round_trips_explicit_false_over_a_symbol_label() {
     let net = "* text\nR1 a b 1k\n.end\n";
     let symbol = r#"* @RNL {
@@ -1195,7 +1216,11 @@ fn fixed_rotation_round_trips_explicit_false_over_a_symbol_label() {
             .find(|primitive| primitive["kind"] == "text")
             .unwrap();
         assert_eq!(drawn["anchor"], json!([7.0, 22.0]));
-        assert_eq!(drawn["vertical"], json!(!fixed));
+        // Arbitrary-angle primitives carry a scene-space transform. Check the
+        // actual glyph axes rather than the legacy local-layout vertical flag.
+        let transform = drawn["transform"].as_array().unwrap();
+        assert_eq!(json!([transform[0], transform[2]]), if fixed { json!([1.0, 0.0]) } else { json!([0.0, 1.0]) });
+        assert_eq!(json!([transform[1], transform[3]]), if fixed { json!([0.0, 1.0]) } else { json!([-1.0, 0.0]) });
         if fixed {
             assert_eq!(drawn["halign"], "end");
             assert_eq!(drawn["valign"], "middle");

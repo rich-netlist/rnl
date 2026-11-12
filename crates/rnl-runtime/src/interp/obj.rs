@@ -169,17 +169,22 @@ impl Priority {
 /// same key replaces one by one.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct TextItems {
+    /// A 0.4 statement contributed to this keyed text.
+    pub modern_text: bool,
     pub text: Option<WStr>,
     pub halign: Option<String>,
     pub valign: Option<String>,
     pub rotate: Option<f64>,
     pub fix_rotate: Option<bool>,
+    /// Whether the characters are kept readable after the owner transform (0.4).
+    pub upright: Option<bool>,
     pub dx: Option<f64>,
     pub dy: Option<f64>,
 }
 
 impl TextItems {
     pub fn update(&mut self, o: &TextItems) {
+        self.modern_text |= o.modern_text;
         if o.text.is_some() {
             self.text = o.text.clone();
         }
@@ -194,6 +199,9 @@ impl TextItems {
         }
         if o.fix_rotate.is_some() {
             self.fix_rotate = o.fix_rotate;
+        }
+        if o.upright.is_some() {
+            self.upright = o.upright;
         }
         if o.dx.is_some() {
             self.dx = o.dx;

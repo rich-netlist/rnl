@@ -14,12 +14,18 @@ fn an_empty_level_gives_an_empty_solution_and_says_what_is_done() {
     assert_eq!(solved.solution, Solution::default());
     assert_eq!(solved.report.notes[0], METHOD_NOTE);
     assert!(solved.report.kept.is_empty() && solved.report.discarded.is_empty());
-    assert_eq!(solved, crate::solve(&p, &SolverOptions::without_time_limit()));
+    assert_eq!(
+        solved,
+        crate::solve(&p, &SolverOptions::without_time_limit())
+    );
 }
 
 #[test]
 fn options_that_make_no_sense_are_noted() {
-    let mut options = SolverOptions { beam: 0, ..SolverOptions::without_time_limit() };
+    let mut options = SolverOptions {
+        beam: 0,
+        ..SolverOptions::without_time_limit()
+    };
     options.objectives = Objectives::none();
     let solved = crate::solve(&problem_of(Vec::new(), Vec::new()), &options);
     assert!(solved.report.notes.iter().any(|n| n.contains("beam")));
@@ -30,10 +36,24 @@ fn every_object_is_placed_where_the_facts_put_it() {
     let p = problem_of(
         vec![instance(), point()],
         vec![
-            fact(FactKind::Place { at: PointRef::Origin(0), axis: Axis::X, value: 4.0 }),
-            fact(FactKind::Orient { object: 0, code: Orient::MY }),
-            fact(FactKind::Align { axis: Axis::Y, members: vec![PointRef::Origin(1), PointRef::Origin(0)] }),
-            fact(FactKind::Place { at: PointRef::Origin(1), axis: Axis::Y, value: 2.5 }),
+            fact(FactKind::Place {
+                at: PointRef::Origin(0),
+                axis: Axis::X,
+                value: 4.0,
+            }),
+            fact(FactKind::Orient {
+                object: 0,
+                code: Orient::MY,
+            }),
+            fact(FactKind::Align {
+                axis: Axis::Y,
+                members: vec![PointRef::Origin(1), PointRef::Origin(0)],
+            }),
+            fact(FactKind::Place {
+                at: PointRef::Origin(1),
+                axis: Axis::Y,
+                value: 2.5,
+            }),
         ],
     );
     let solved = crate::solve(&p, &SolverOptions::without_time_limit());
@@ -41,8 +61,18 @@ fn every_object_is_placed_where_the_facts_put_it() {
     assert_eq!(
         solved.solution.placements,
         vec![
-            Placement { object: 0, x: Some(4.0), y: Some(2.5), orient: Some(Orient::MY) },
-            Placement { object: 1, x: Some(0.0), y: Some(2.5), orient: None },
+            Placement {
+                object: 0,
+                x: Some(4.0),
+                y: Some(2.5),
+                orient: Some(Orient::MY)
+            },
+            Placement {
+                object: 1,
+                x: Some(0.0),
+                y: Some(2.5),
+                orient: None
+            },
         ]
     );
     assert!(solved.report.work.resolve_nodes > 0);
@@ -57,7 +87,13 @@ fn every_object_is_placed_where_the_facts_put_it() {
 fn a_position_the_file_fixes_is_given_and_written_where_the_record_reaches_it() {
     use rnl_runtime::problem::{ProblemObject, Reference, Slot};
     let fixed = |value: f64, fact: usize| Slot::Fixed { value, fact };
-    let m = ProblemObject { position: Position::Own { x: fixed(-10.0, 2), y: fixed(2.0, 3) }, ..instance() };
+    let m = ProblemObject {
+        position: Position::Own {
+            x: fixed(-10.0, 2),
+            y: fixed(2.0, 3),
+        },
+        ..instance()
+    };
     let anonymous = |label: &str, x: Slot, y: Slot| ProblemObject {
         label: label.to_string(),
         reference: Reference::Anonymous,
@@ -67,7 +103,10 @@ fn a_position_the_file_fixes_is_given_and_written_where_the_record_reaches_it() 
     let n = ProblemObject {
         label: "#N".to_string(),
         reference: Reference::Name("#N".to_string()),
-        position: Position::Own { x: fixed(9.0, 6), y: fixed(-10.0, 7) },
+        position: Position::Own {
+            x: fixed(9.0, 6),
+            y: fixed(-10.0, 7),
+        },
         ..instance()
     };
     let p = problem_of(
@@ -78,25 +117,72 @@ fn a_position_the_file_fixes_is_given_and_written_where_the_record_reaches_it() 
             anonymous("(7, 8)", fixed(7.0, 8), fixed(8.0, 9)),
         ],
         vec![
-            fact(FactKind::Align { axis: Axis::X, members: vec![PointRef::Origin(2), PointRef::Origin(1)] }),
-            fact(FactKind::Align { axis: Axis::X, members: vec![PointRef::Origin(3), PointRef::Origin(0)] }),
-            fact(FactKind::Place { at: PointRef::Origin(0), axis: Axis::X, value: -10.0 }),
-            fact(FactKind::Place { at: PointRef::Origin(0), axis: Axis::Y, value: 2.0 }),
-            fact(FactKind::PointCoordinate { point: 1, axis: Axis::X, value: 3.0 }),
-            fact(FactKind::PointCoordinate { point: 1, axis: Axis::Y, value: 4.0 }),
-            fact(FactKind::Place { at: PointRef::Origin(2), axis: Axis::X, value: 9.0 }),
-            fact(FactKind::Place { at: PointRef::Origin(2), axis: Axis::Y, value: -10.0 }),
-            fact(FactKind::PointCoordinate { point: 3, axis: Axis::X, value: 7.0 }),
-            fact(FactKind::PointCoordinate { point: 3, axis: Axis::Y, value: 8.0 }),
+            fact(FactKind::Align {
+                axis: Axis::X,
+                members: vec![PointRef::Origin(2), PointRef::Origin(1)],
+            }),
+            fact(FactKind::Align {
+                axis: Axis::X,
+                members: vec![PointRef::Origin(3), PointRef::Origin(0)],
+            }),
+            fact(FactKind::Place {
+                at: PointRef::Origin(0),
+                axis: Axis::X,
+                value: -10.0,
+            }),
+            fact(FactKind::Place {
+                at: PointRef::Origin(0),
+                axis: Axis::Y,
+                value: 2.0,
+            }),
+            fact(FactKind::PointCoordinate {
+                point: 1,
+                axis: Axis::X,
+                value: 3.0,
+            }),
+            fact(FactKind::PointCoordinate {
+                point: 1,
+                axis: Axis::Y,
+                value: 4.0,
+            }),
+            fact(FactKind::Place {
+                at: PointRef::Origin(2),
+                axis: Axis::X,
+                value: 9.0,
+            }),
+            fact(FactKind::Place {
+                at: PointRef::Origin(2),
+                axis: Axis::Y,
+                value: -10.0,
+            }),
+            fact(FactKind::PointCoordinate {
+                point: 3,
+                axis: Axis::X,
+                value: 7.0,
+            }),
+            fact(FactKind::PointCoordinate {
+                point: 3,
+                axis: Axis::Y,
+                value: 8.0,
+            }),
         ],
     );
     let solved = crate::solve(&p, &SolverOptions::without_time_limit());
     assert_eq!(solved.report.kept, vec![0, 1, 2, 3, 4, 5, 7, 9]);
-    let at: Vec<(usize, Option<(f64, f64)>)> =
-        solved.solution.placements.iter().map(|pl| (pl.object, pl.at())).collect();
+    let at: Vec<(usize, Option<(f64, f64)>)> = solved
+        .solution
+        .placements
+        .iter()
+        .map(|pl| (pl.object, pl.at()))
+        .collect();
     assert_eq!(
         at,
-        vec![(0, Some((-10.0, 2.0))), (1, Some((3.0, 4.0))), (2, Some((3.0, -10.0))), (3, Some((-10.0, 8.0)))]
+        vec![
+            (0, Some((-10.0, 2.0))),
+            (1, Some((3.0, 4.0))),
+            (2, Some((3.0, -10.0))),
+            (3, Some((-10.0, 8.0)))
+        ]
     );
     assert!(solved.solution.placements[0].orient.is_some());
     let written = rnl_runtime::solution::write_record(&p, &solved.solution, "t", "h");
@@ -104,8 +190,16 @@ fn a_position_the_file_fixes_is_given_and_written_where_the_record_reaches_it() 
     assert_eq!(unsolved.len(), 1, "{unsolved:?}");
     // its y is where the file fixes it, so only its x is unsolved
     assert!(unsolved[0].starts_with("the x of (7, 8): "), "{unsolved:?}");
-    assert!(written.record.contains("#M @PLACE(-10, 2) => @ORIENT("), "{}", written.record);
-    assert!(written.record.contains("#N @PLACE(3, -10) => @ORIENT("), "{}", written.record);
+    assert!(
+        written.record.contains("#M @PLACE(-10, 2) => @ORIENT("),
+        "{}",
+        written.record
+    );
+    assert!(
+        written.record.contains("#N @PLACE(3, -10) => @ORIENT("),
+        "{}",
+        written.record
+    );
 }
 
 #[test]
@@ -115,11 +209,30 @@ fn a_text_that_an_offset_places_on_one_axis_follows_its_owner_there_only() {
     let p = problem_of(
         vec![instance(), label(Some(Axis::X)), point()],
         vec![
-            fact(FactKind::Offset { text: 1, from: PointRef::Origin(0), axis: Axis::X, value: 3.0 }),
-            fact(FactKind::PointCoordinate { point: 2, axis: Axis::X, value: 10.0 }),
-            fact(FactKind::PointCoordinate { point: 2, axis: Axis::Y, value: 4.0 }),
-            fact(FactKind::Align { axis: Axis::X, members: vec![PointRef::Origin(0), PointRef::Origin(2)] }),
-            fact(FactKind::Orient { object: 0, code: Orient::R180 }),
+            fact(FactKind::Offset {
+                text: 1,
+                from: PointRef::Origin(0),
+                axis: Axis::X,
+                value: 3.0,
+            }),
+            fact(FactKind::PointCoordinate {
+                point: 2,
+                axis: Axis::X,
+                value: 10.0,
+            }),
+            fact(FactKind::PointCoordinate {
+                point: 2,
+                axis: Axis::Y,
+                value: 4.0,
+            }),
+            fact(FactKind::Align {
+                axis: Axis::X,
+                members: vec![PointRef::Origin(0), PointRef::Origin(2)],
+            }),
+            fact(FactKind::Orient {
+                object: 0,
+                code: Orient::R180,
+            }),
         ],
     );
     let (solved, e) = check_level("offset", &p);
@@ -129,15 +242,27 @@ fn a_text_that_an_offset_places_on_one_axis_follows_its_owner_there_only() {
     assert_eq!(at(&PointRef::Origin(0), 0), int(10));
     assert_eq!(at(&PointRef::Origin(1), 0), int(13));
     // R180 turns (1, 1) to (-1, -1)
-    assert_eq!(at(&PointRef::Origin(1), 1), at(&PointRef::Origin(0), 1) - int(1));
+    assert_eq!(
+        at(&PointRef::Origin(1), 1),
+        at(&PointRef::Origin(0), 1) - int(1)
+    );
     // the solution gives the text where it is; the record leaves its x to the offset and its y to
     // the symbol, which still place it there (13.3)
-    let text: Vec<&Placement> = solved.solution.placements.iter().filter(|pl| pl.object == 1).collect();
+    let text: Vec<&Placement> = solved
+        .solution
+        .placements
+        .iter()
+        .filter(|pl| pl.object == 1)
+        .collect();
     assert_eq!(text.len(), 1, "{:?}", solved.solution.placements);
     assert_eq!(text[0].x, Some(13.0));
     let written = rnl_runtime::solution::write_record(&p, &solved.solution, "t", "h");
     assert!(written.unsolved.is_empty(), "{:?}", written.unsolved);
-    assert!(written.record.contains("#M @PLACE(10, ") && !written.record.contains("#M::name"), "{}", written.record);
+    assert!(
+        written.record.contains("#M @PLACE(10, ") && !written.record.contains("#M::name"),
+        "{}",
+        written.record
+    );
 }
 
 /// A text whose offset the solver discards (8.5) is where the solver puts it, and the record writes
@@ -147,32 +272,81 @@ fn a_text_that_an_offset_places_on_one_axis_follows_its_owner_there_only() {
 fn a_text_whose_offset_is_discarded_is_written_on_that_axis() {
     use rnl_runtime::problem::{ProblemObject, Reference, Slot};
     let fixed = |value: f64, fact: usize| Slot::Fixed { value, fact };
-    let m = ProblemObject { position: Position::Own { x: fixed(0.0, 2), y: fixed(0.0, 3) }, ..instance() };
+    let m = ProblemObject {
+        position: Position::Own {
+            x: fixed(0.0, 2),
+            y: fixed(0.0, 3),
+        },
+        ..instance()
+    };
     let n = ProblemObject {
         label: "#N".to_string(),
         reference: Reference::Name("#N".to_string()),
-        position: Position::Own { x: fixed(10.0, 4), y: fixed(10.0, 5) },
+        position: Position::Own {
+            x: fixed(10.0, 4),
+            y: fixed(10.0, 5),
+        },
         ..instance()
     };
     let name = label(Some(Axis::Y));
     let note = ProblemObject {
         label: "#M::note".to_string(),
         reference: Reference::Name("#M::note".to_string()),
-        position: Position::Own { x: Slot::Free, y: Slot::Free },
+        position: Position::Own {
+            x: Slot::Free,
+            y: Slot::Free,
+        },
         ..label(None)
     };
     let p = problem_of(
         vec![m, name, n, note],
         vec![
-            fact(FactKind::Align { axis: Axis::Y, members: vec![PointRef::Origin(1), PointRef::Origin(2)] }),
-            fact(FactKind::Align { axis: Axis::Y, members: vec![PointRef::Origin(3), PointRef::Origin(2)] }),
-            fact(FactKind::Place { at: PointRef::Origin(0), axis: Axis::X, value: 0.0 }),
-            fact(FactKind::Place { at: PointRef::Origin(0), axis: Axis::Y, value: 0.0 }),
-            fact(FactKind::Place { at: PointRef::Origin(2), axis: Axis::X, value: 10.0 }),
-            fact(FactKind::Place { at: PointRef::Origin(2), axis: Axis::Y, value: 10.0 }),
-            fact(FactKind::Offset { text: 1, from: PointRef::Origin(0), axis: Axis::Y, value: 2.0 }),
-            fact(FactKind::Offset { text: 3, from: PointRef::Origin(0), axis: Axis::X, value: -1.0 }),
-            fact(FactKind::Offset { text: 3, from: PointRef::Origin(0), axis: Axis::Y, value: 2.0 }),
+            fact(FactKind::Align {
+                axis: Axis::Y,
+                members: vec![PointRef::Origin(1), PointRef::Origin(2)],
+            }),
+            fact(FactKind::Align {
+                axis: Axis::Y,
+                members: vec![PointRef::Origin(3), PointRef::Origin(2)],
+            }),
+            fact(FactKind::Place {
+                at: PointRef::Origin(0),
+                axis: Axis::X,
+                value: 0.0,
+            }),
+            fact(FactKind::Place {
+                at: PointRef::Origin(0),
+                axis: Axis::Y,
+                value: 0.0,
+            }),
+            fact(FactKind::Place {
+                at: PointRef::Origin(2),
+                axis: Axis::X,
+                value: 10.0,
+            }),
+            fact(FactKind::Place {
+                at: PointRef::Origin(2),
+                axis: Axis::Y,
+                value: 10.0,
+            }),
+            fact(FactKind::Offset {
+                text: 1,
+                from: PointRef::Origin(0),
+                axis: Axis::Y,
+                value: 2.0,
+            }),
+            fact(FactKind::Offset {
+                text: 3,
+                from: PointRef::Origin(0),
+                axis: Axis::X,
+                value: -1.0,
+            }),
+            fact(FactKind::Offset {
+                text: 3,
+                from: PointRef::Origin(0),
+                axis: Axis::Y,
+                value: 2.0,
+            }),
         ],
     );
     let (solved, _) = check_level("discarded offsets", &p);
@@ -183,7 +357,11 @@ fn a_text_whose_offset_is_discarded_is_written_on_that_axis() {
     for line in ["#M::name @PLACE(y=10)", "#M::note @PLACE(y=10)"] {
         assert!(written.record.contains(line), "{}", written.record);
     }
-    assert!(!written.record.contains("#M::note @PLACE(-1"), "{}", written.record);
+    assert!(
+        !written.record.contains("#M::note @PLACE(-1"),
+        "{}",
+        written.record
+    );
 }
 
 // ------------------------------------------------------------------------------------ the files
@@ -250,13 +428,25 @@ fn holds_exactly(p: &LevelProblem, g: &crate::resolve::Geometry, kind: &FactKind
 /// solve gave every free class: each of the four sides, touching allowed, is dropped.
 fn forced_overlap(e: &Exact, a: usize, b: usize) -> bool {
     // with the caps of the implementation, whatever caps the solve had
-    let s = &Structure { caps: CAPS, ..e.structure.clone() };
+    let s = &Structure {
+        caps: CAPS,
+        ..e.structure.clone()
+    };
     let ori = &e.placed.geometry.orient;
     let values: Vec<Orient> = s.open.classes.iter().map(|c| ori[c.root]).collect();
-    let candidate = crate::search::Candidate { values, ..e.candidate.clone() };
+    let candidate = crate::search::Candidate {
+        values,
+        ..e.candidate.clone()
+    };
     let base = orientation_relations(s, &candidate);
-    let (pa, pb) = (s.model.origin_point[a].unwrap(), s.model.origin_point[b].unwrap());
-    let (ba, bb) = (s.box_offset(a, ori[a]).unwrap(), s.box_offset(b, ori[b]).unwrap());
+    let (pa, pb) = (
+        s.model.origin_point[a].unwrap(),
+        s.model.origin_point[b].unwrap(),
+    );
+    let (ba, bb) = (
+        s.box_offset(a, ori[a]).unwrap(),
+        s.box_offset(b, ori[b]).unwrap(),
+    );
     let one = Q::one;
     let sides = [
         (0, vec![(pb, one()), (pa, -one())], &ba[2] - &bb[0]),
@@ -268,7 +458,12 @@ fn forced_overlap(e: &Exact, a: usize, b: usize) -> bool {
         let mut rels = base.clone();
         rels.push(Tagged {
             kind: crate::search::RelKind::Separation,
-            rel: Relation::Linear { axis, terms, lo: Some(c), hi: None },
+            rel: Relation::Linear {
+                axis,
+                terms,
+                lo: Some(c),
+                hi: None,
+            },
         });
         let mut work = crate::Work::default();
         with_relations(s, &rels, &mut work, |_, _, t| !t.kept[t.kept.len() - 1])
@@ -292,7 +487,12 @@ fn summary(p: &LevelProblem, solved: &Solved, e: &Exact) -> String {
         if matches!(o.kind, ObjectKind::Text) {
             continue;
         }
-        lines.push(format!("  {:>24} {:?} {:?}", o.label, pl.at(), pl.orient.map(|x| x.as_str())));
+        lines.push(format!(
+            "  {:>24} {:?} {:?}",
+            o.label,
+            pl.at(),
+            pl.orient.map(|x| x.as_str())
+        ));
     }
     for n in &solved.report.notes[1..] {
         lines.push(format!("  note: {n}"));
@@ -305,7 +505,11 @@ fn summary(p: &LevelProblem, solved: &Solved, e: &Exact) -> String {
             .points
             .iter()
             .map(|q| match q {
-                rnl_runtime::solution::WirePoint::Anchor(PointRef::Pin { object, terminal, .. }) => {
+                rnl_runtime::solution::WirePoint::Anchor(PointRef::Pin {
+                    object,
+                    terminal,
+                    ..
+                }) => {
                     format!("{}:{terminal}", p.objects[*object].label)
                 }
                 rnl_runtime::solution::WirePoint::Anchor(a) => format!("{a:?}"),
@@ -313,7 +517,11 @@ fn summary(p: &LevelProblem, solved: &Solved, e: &Exact) -> String {
                 rnl_runtime::solution::WirePoint::Bend((x, y)) => format!("({x}, {y})"),
             })
             .collect();
-        lines.push(format!("  wire &{}: {}", p.routes[w.route].net, points.join(" ")));
+        lines.push(format!(
+            "  wire &{}: {}",
+            p.routes[w.route].net,
+            points.join(" ")
+        ));
     }
     lines.join("\n")
 }
@@ -329,11 +537,22 @@ fn check_wires(p: &LevelProblem, solved: &Solved, e: &Exact, what: &str) {
     let g = &e.placed.geometry;
     let sol = &solved.solution;
     let r = &e.routing;
-    assert_eq!((&sol.wires, &sol.branches), (&r.wires, &r.branches), "{what}");
+    assert_eq!(
+        (&sol.wires, &sol.branches),
+        (&r.wires, &r.branches),
+        "{what}"
+    );
     assert_eq!(r.paths.len(), sol.wires.len(), "{what}");
-    let at = |q: &PointRef| [point_value(p, g, q, 0, 0).unwrap(), point_value(p, g, q, 1, 0).unwrap()];
-    let boxes: Vec<(usize, [Q; 4])> =
-        s.components().filter_map(|k| Some((k, s.box_at(&e.placed.origins, &g.orient, k)?))).collect();
+    let at = |q: &PointRef| {
+        [
+            point_value(p, g, q, 0, 0).unwrap(),
+            point_value(p, g, q, 1, 0).unwrap(),
+        ]
+    };
+    let boxes: Vec<(usize, [Q; 4])> = s
+        .components()
+        .filter_map(|k| Some((k, s.box_at(&e.placed.origins, &g.orient, k)?)))
+        .collect();
     let mut ends_at = vec![0usize; sol.branches.len()];
     let mut on_anchor = vec![false; sol.branches.len()];
     for (w, path) in sol.wires.iter().zip(&r.paths) {
@@ -342,8 +561,13 @@ fn check_wires(p: &LevelProblem, solved: &Solved, e: &Exact, what: &str) {
         }
         let what = format!("{what}: {w:?}");
         let net = &p.routes[w.route].net;
-        assert_eq!(p.routes.iter().position(|x| x.net == *net), Some(w.route), "{what}: the first ROUTE of its net");
-        let routes: Vec<&rnl_runtime::problem::RouteIntent> = p.routes.iter().filter(|x| x.net == *net).collect();
+        assert_eq!(
+            p.routes.iter().position(|x| x.net == *net),
+            Some(w.route),
+            "{what}: the first ROUTE of its net"
+        );
+        let routes: Vec<&rnl_runtime::problem::RouteIntent> =
+            p.routes.iter().filter(|x| x.net == *net).collect();
         let n = w.points.len();
         assert!(n >= 2 && path.len() == n, "{what}");
         for (i, q) in w.points.iter().enumerate() {
@@ -352,7 +576,10 @@ fn check_wires(p: &LevelProblem, solved: &Solved, e: &Exact, what: &str) {
                 WirePoint::Anchor(a) => {
                     assert!(end, "{what}");
                     let pin = routes.iter().any(|x| x.pins.contains(a));
-                    let written = routes.iter().flat_map(|x| &x.wires).any(|&k| p.wires[k].anchors.contains(a));
+                    let written = routes
+                        .iter()
+                        .flat_map(|x| &x.wires)
+                        .any(|&k| p.wires[k].anchors.contains(a));
                     assert!(pin || written, "{what}: {a:?} is not a point of the net");
                     assert_eq!(at(a), path[i], "{what}");
                 }
@@ -367,7 +594,13 @@ fn check_wires(p: &LevelProblem, solved: &Solved, e: &Exact, what: &str) {
                 }
                 WirePoint::Bend(xy) => {
                     assert!(!end && xy.0.is_finite() && xy.1.is_finite(), "{what}");
-                    assert_eq!(*xy, (crate::rational::to_f64(&path[i][0]), crate::rational::to_f64(&path[i][1])));
+                    assert_eq!(
+                        *xy,
+                        (
+                            crate::rational::to_f64(&path[i][0]),
+                            crate::rational::to_f64(&path[i][1])
+                        )
+                    );
                 }
             }
         }
@@ -382,7 +615,10 @@ fn check_wires(p: &LevelProblem, solved: &Solved, e: &Exact, what: &str) {
             })
         };
         for seg in path.windows(2) {
-            assert!(seg[0][0] == seg[1][0] || seg[0][1] == seg[1][1], "{what}: not along an axis");
+            assert!(
+                seg[0][0] == seg[1][0] || seg[0][1] == seg[1][1],
+                "{what}: not along an axis"
+            );
             for (k, b) in &boxes {
                 assert!(
                     !crate::route::meets_inside(b, &seg[0], &seg[1]) || inside_own(*k, b),
@@ -417,7 +653,12 @@ fn check_wires(p: &LevelProblem, solved: &Solved, e: &Exact, what: &str) {
         }
     }
     for (net, a, routed) in ends {
-        let mut wires: Vec<usize> = p.routes.iter().filter(|x| x.net == *net).flat_map(|x| x.wires.clone()).collect();
+        let mut wires: Vec<usize> = p
+            .routes
+            .iter()
+            .filter(|x| x.net == *net)
+            .flat_map(|x| x.wires.clone())
+            .collect();
         wires.sort_unstable();
         wires.dedup();
         let mut written = 0;
@@ -425,12 +666,19 @@ fn check_wires(p: &LevelProblem, solved: &Solved, e: &Exact, what: &str) {
             let anchors = &p.wires[k].anchors;
             for (i, b) in anchors.iter().enumerate() {
                 if b == a {
-                    written += if i == 0 || i == anchors.len() - 1 { 1 } else { 2 };
+                    written += if i == 0 || i == anchors.len() - 1 {
+                        1
+                    } else {
+                        2
+                    };
                 }
             }
         }
         let lead = usize::from(matches!(a, PointRef::Pin { .. }));
-        assert!(lead + routed + written < 3, "{what}: {a:?} ends {routed} wires routed and {written} written");
+        assert!(
+            lead + routed + written < 3,
+            "{what}: {a:?} ends {routed} wires routed and {written} written"
+        );
     }
     for x in sol.branches.iter().map(|b| b.at) {
         assert!(x.0.is_finite() && x.1.is_finite(), "{what}");
@@ -457,7 +705,9 @@ fn check_wires(p: &LevelProblem, solved: &Solved, e: &Exact, what: &str) {
             k
         }
         let key = |q: &PointRef| match q {
-            PointRef::Pin { object, pin, .. } | PointRef::SymbolPin { object, pin, .. } => Some((0u8, *object, *pin)),
+            PointRef::Pin { object, pin, .. } | PointRef::SymbolPin { object, pin, .. } => {
+                Some((0u8, *object, *pin))
+            }
             PointRef::Origin(k) if p.objects[*k].kind == ObjectKind::Point => Some((1, *k, 0)),
             _ => None,
         };
@@ -486,7 +736,10 @@ fn check_wires(p: &LevelProblem, solved: &Solved, e: &Exact, what: &str) {
                 WirePoint::Branch(b) => Some((2, *b, 0)),
                 WirePoint::Bend(_) => None,
             };
-            let (a, b) = (end(&w.points[0]).unwrap(), end(&w.points[w.points.len() - 1]).unwrap());
+            let (a, b) = (
+                end(&w.points[0]).unwrap(),
+                end(&w.points[w.points.len() - 1]).unwrap(),
+            );
             unite(&mut parent, a, b);
         }
         let mut roots: Vec<_> = points.iter().map(|q| find(&mut parent, *q)).collect();
@@ -528,14 +781,37 @@ fn check_capped(
     let what = format!("{file} / {}", p.title);
     // a fact discarded undecided, and only such a fact, has its warning (7.6)
     assert_eq!(solved.report.warnings, e.resolved.warnings, "{what}");
-    let undecided = solved.report.discarded.iter().filter(|d| d.undecided).count();
-    assert_eq!(solved.report.warnings.len(), undecided, "{what}: {:?}", solved.report.warnings);
+    let undecided = solved
+        .report
+        .discarded
+        .iter()
+        .filter(|d| d.undecided)
+        .count();
+    assert_eq!(
+        solved.report.warnings.len(),
+        undecided,
+        "{what}: {:?}",
+        solved.report.warnings
+    );
     // a fact that contradicts itself, and only such a fact, fails with its error (the draft 0.3,
     // 8.5; 7.6)
-    assert_eq!((&solved.report.failed, &solved.report.errors), (&e.resolved.failed, &e.resolved.errors), "{what}");
-    assert_eq!(solved.report.errors.len(), solved.report.failed.len(), "{what}: {:?}", solved.report.errors);
+    assert_eq!(
+        (&solved.report.failed, &solved.report.errors),
+        (&e.resolved.failed, &e.resolved.errors),
+        "{what}"
+    );
+    assert_eq!(
+        solved.report.errors.len(),
+        solved.report.failed.len(),
+        "{what}: {:?}",
+        solved.report.errors
+    );
     // every fact kept holds where the objects are, exactly, before they become f64
-    let tol = if e.resolved.as_written { Q::zero() } else { from_f64(options.tolerance).unwrap() };
+    let tol = if e.resolved.as_written {
+        Q::zero()
+    } else {
+        from_f64(options.tolerance).unwrap()
+    };
     for &f in &solved.report.kept {
         assert!(
             holds_exactly(p, &e.placed.geometry, &p.facts[f].kind, &tol),
@@ -548,12 +824,18 @@ fn check_capped(
     let tight = caps.pivots < CAPS.pivots;
     for o in &e.placed.overlaps {
         let (a, b) = (o.a, o.b);
-        let instance = |k: usize| matches!(p.objects[k].kind, ObjectKind::Instance | ObjectKind::Bundle);
+        let instance =
+            |k: usize| matches!(p.objects[k].kind, ObjectKind::Instance | ObjectKind::Bundle);
         if tight && o.cause == crate::coords::Cause::Budget {
             continue;
         }
         if instance(a) && instance(b) {
-            assert_eq!(o.cause, crate::coords::Cause::Facts, "{what}: {o:?}\n{}", summary(p, &solved, &e));
+            assert_eq!(
+                o.cause,
+                crate::coords::Cause::Facts,
+                "{what}: {o:?}\n{}",
+                summary(p, &solved, &e)
+            );
             assert!(
                 forced_overlap(&e, a, b),
                 "{what}: {} and {} overlap, and the facts allow them apart\n{}",
@@ -564,7 +846,11 @@ fn check_capped(
         }
     }
     // the same again, and nothing that RNL cannot write
-    assert_eq!(solved, solve_exact_with(p, &options, clock, caps).0, "{what}: not deterministic");
+    assert_eq!(
+        solved,
+        solve_exact_with(p, &options, clock, caps).0,
+        "{what}: not deterministic"
+    );
     for pl in &solved.solution.placements {
         if let Some((x, y)) = pl.at() {
             assert!(x.is_finite() && y.is_finite(), "{what}: {pl:?}");
@@ -574,22 +860,34 @@ fn check_capped(
     // the solver leaves free (13.3, 11.1), and every text that its symbol places on one axis only,
     // where it is (13.3); and every orientation given, but to what is left free
     for (k, o) in p.objects.iter().enumerate() {
-        let pl: Vec<&Placement> = solved.solution.placements.iter().filter(|pl| pl.object == k).collect();
+        let pl: Vec<&Placement> = solved
+            .solution
+            .placements
+            .iter()
+            .filter(|pl| pl.object == k)
+            .collect();
         assert!(pl.len() <= 1, "{what}: {pl:?}");
         let at = pl.first().and_then(|pl| pl.at());
         let orient = pl.first().and_then(|pl| pl.orient);
         let own = match o.position {
             Position::Own { .. } => !left_free(&e.structure, k),
-            Position::InSymbol { replaced: Some(_), .. } => true,
+            Position::InSymbol {
+                replaced: Some(_), ..
+            } => true,
             _ => false,
         };
         assert_eq!(at.is_some(), own, "{what}: {} {pl:?}", o.label);
         if let (Some((x, y)), Position::InSymbol { .. }) = (at, &o.position) {
             let origin = &e.placed.origins[k];
-            assert_eq!((from_f64(x).as_ref(), from_f64(y).as_ref()), (Some(&origin[0]), Some(&origin[1])), "{what}");
+            assert_eq!(
+                (from_f64(x).as_ref(), from_f64(y).as_ref()),
+                (Some(&origin[0]), Some(&origin[1])),
+                "{what}"
+            );
         }
-        let oriented =
-            o.orient.is_some() && !matches!(o.position, Position::InSymbol { .. }) && !left_free(&e.structure, k);
+        let oriented = o.orient.is_some()
+            && !matches!(o.position, Position::InSymbol { .. })
+            && !left_free(&e.structure, k);
         assert_eq!(orient.is_some(), oriented, "{what}: {} {pl:?}", o.label);
     }
     check_wires(p, &solved, &e, &what);
@@ -606,7 +904,12 @@ fn every_case_of_the_solver_is_placed_keeping_every_fact_kept() {
             let (solved, e) = check_level(&f.to_string_lossy(), &p);
             eprintln!("{}", summary(&p, &solved, &e));
             // every ROUTE of the cases written for the solver is routed whole
-            assert!(solved.report.unrouted.is_empty(), "{}: {:?}", p.title, solved.report.unrouted);
+            assert!(
+                solved.report.unrouted.is_empty(),
+                "{}: {:?}",
+                p.title,
+                solved.report.unrouted
+            );
             if !p.routes.is_empty() {
                 assert!(!solved.solution.wires.is_empty(), "{}", p.title);
                 routed += 1;
@@ -622,9 +925,13 @@ fn every_case_of_the_solver_is_placed_keeping_every_fact_kept() {
 /// coordinate LP, have caps of two nodes and 30 pivots.
 #[test]
 fn a_tiny_budget_still_gives_a_valid_solution() {
-    let options =
-        SolverOptions::without_time_limit().with_overrides("budget=candidates:0,astar_expansions:12").unwrap();
-    let caps = Caps { nodes: 2, pivots: 30 };
+    let options = SolverOptions::without_time_limit()
+        .with_overrides("budget=candidates:0,astar_expansions:12")
+        .unwrap();
+    let caps = Caps {
+        nodes: 2,
+        pivots: 30,
+    };
     let mut left = 0;
     for f in netlists("tests/integration/solver", "T") {
         for p in problems(&f) {
@@ -632,7 +939,11 @@ fn a_tiny_budget_still_gives_a_valid_solution() {
             left += solved.report.unrouted.len();
             for u in &solved.report.unrouted {
                 assert!(u.parts >= 2, "{}: {u:?}", p.title);
-                assert!(solved.report.notes.iter().any(|n| n.contains(&format!("&{} is left in", u.net))));
+                assert!(solved
+                    .report
+                    .notes
+                    .iter()
+                    .any(|n| n.contains(&format!("&{} is left in", u.net))));
             }
         }
     }
@@ -646,7 +957,10 @@ fn a_tiny_budget_still_gives_a_valid_solution() {
 fn a_resolution_out_of_time_still_gives_a_valid_solution() {
     let mut undecided = 0;
     for seconds in [0.0, 25.0] {
-        let options = SolverOptions { time_limit: Some(seconds), ..SolverOptions::without_time_limit() };
+        let options = SolverOptions {
+            time_limit: Some(seconds),
+            ..SolverOptions::without_time_limit()
+        };
         for f in netlists("tests/integration/solver", "T") {
             for p in problems(&f) {
                 let what = format!("{} at {seconds} s", f.to_string_lossy());
@@ -654,7 +968,14 @@ fn a_resolution_out_of_time_still_gives_a_valid_solution() {
                 undecided += solved.report.warnings.len();
                 // the solver's own work is not timed: the layout is searched and placed as usual
                 assert!(e.placed.optimised, "{what}");
-                assert!(!solved.report.notes.iter().any(|n| n.contains("a cap of work")), "{what}");
+                assert!(
+                    !solved
+                        .report
+                        .notes
+                        .iter()
+                        .any(|n| n.contains("a cap of work")),
+                    "{what}"
+                );
             }
         }
     }
@@ -689,23 +1010,41 @@ fn wires_written_do_not_touch_other_nets_or_run_through_symbols() {
     ] {
         for p in problems(&repo().join(file)) {
             let (solved, e) = check_level(file, &p);
-            let wires = crate::score::drawn(&p, &e.structure, &e.placed.geometry, &e.routing);
+            let wires =
+                crate::score::drawn(&p, &e.structure, &e.placed.geometry, &e.routing).unwrap();
             assert!(!wires.paths.is_empty(), "{file}");
-            let n = crate::score::misleading(&p, &e.structure, &e.placed.origins, &e.placed.geometry, &wires);
-            assert_eq!(n, 0, "{file}: {n} places where the wires mislead\n{}", summary(&p, &solved, &e));
+            let n = crate::score::misleading(
+                &p,
+                &e.structure,
+                &e.placed.origins,
+                &e.placed.geometry,
+                &wires,
+            );
+            assert_eq!(
+                n,
+                0,
+                "{file}: {n} places where the wires mislead\n{}",
+                summary(&p, &solved, &e)
+            );
         }
     }
 }
 
 fn object(p: &LevelProblem, label: &str) -> usize {
-    p.objects.iter().position(|o| o.label == label).unwrap_or_else(|| panic!("no object {label}"))
+    p.objects
+        .iter()
+        .position(|o| o.label == label)
+        .unwrap_or_else(|| panic!("no object {label}"))
 }
 
 /// T3, the five-transistor OTA: the picture of plan 5.11.
 #[test]
 fn t3_is_drawn_as_the_plan_pictures_it() {
     let ps = problems(&repo().join("tests/integration/solver/T3-ota5t.sp"));
-    let p = ps.iter().find(|p| p.title == "ota5t").expect("the level of the subcircuit");
+    let p = ps
+        .iter()
+        .find(|p| p.title == "ota5t")
+        .expect("the level of the subcircuit");
     let (solved, e) = check_level("T3", p);
     let what = summary(p, &solved, &e);
     let s = &e.structure;
@@ -726,44 +1065,85 @@ fn t3_is_drawn_as_the_plan_pictures_it() {
     assert_eq!(x(m5), x(ax), "{what}");
     // the current runs down: NMOS sources below their drains, PMOS sources above
     let pin = |k: usize, terminal: &str| {
-        let j = s.pins(k).iter().position(|pi| pi.terminals.iter().any(|t| t == terminal)).unwrap();
+        let j = s
+            .pins(k)
+            .iter()
+            .position(|pi| pi.terminals.iter().any(|t| t == terminal))
+            .unwrap();
         s.pin_at(at, &g.orient, k, j).unwrap()
     };
     for k in [m1, m2, m5] {
-        assert!(pin(k, "3")[1] < pin(k, "1")[1], "{what}: {}", p.objects[k].label);
+        assert!(
+            pin(k, "3")[1] < pin(k, "1")[1],
+            "{what}: {}",
+            p.objects[k].label
+        );
     }
     for k in [m3, m4] {
-        assert!(pin(k, "3")[1] > pin(k, "1")[1], "{what}: {}", p.objects[k].label);
+        assert!(
+            pin(k, "3")[1] > pin(k, "1")[1],
+            "{what}: {}",
+            p.objects[k].label
+        );
     }
     // the gates: the pair's outwards, the mirror's facing each other, towards the gate net between
     // them. The plan's picture labels M3 R0 and M4 MY; with the gate of $PMOS on its left, that
     // turns the mirror's gates outwards, away from that net. The solver turns pins towards what
     // they connect to, which gives M3 MY and M4 R0, the textbook drawing: a deviation from the
     // labels of the picture, not from its layout
-    let gate = |k: usize| s.exit(k, s.pins(k).iter().position(|pi| pi.terminals == ["2"]).unwrap(), g.orient[k]);
+    let gate = |k: usize| {
+        s.exit(
+            k,
+            s.pins(k)
+                .iter()
+                .position(|pi| pi.terminals == ["2"])
+                .unwrap(),
+            g.orient[k],
+        )
+    };
     assert_eq!(gate(m1), Some((-1, 0)), "{what}");
     assert_eq!(gate(m2), Some((1, 0)), "{what}");
     assert_eq!(gate(m3), Some((1, 0)), "{what}");
     assert_eq!(gate(m4), Some((-1, 0)), "{what}");
     // the supplies above M3 and M4, the ground below M5
-    let supplies: Vec<usize> = (0..p.objects.len()).filter(|&k| s.objects[k].role == Role::Supply).collect();
-    let grounds: Vec<usize> = (0..p.objects.len()).filter(|&k| s.objects[k].role == Role::Ground).collect();
+    let supplies: Vec<usize> = (0..p.objects.len())
+        .filter(|&k| s.objects[k].role == Role::Supply)
+        .collect();
+    let grounds: Vec<usize> = (0..p.objects.len())
+        .filter(|&k| s.objects[k].role == Role::Ground)
+        .collect();
     assert_eq!((supplies.len(), grounds.len()), (2, 1), "{what}");
     for k in supplies {
         let host = s.objects[k].stub.as_ref().unwrap().host.0;
-        assert!([m3, m4].contains(&host) && y(k) > y(host) && x(k) == x(host), "{what}");
+        assert!(
+            [m3, m4].contains(&host) && y(k) > y(host) && x(k) == x(host),
+            "{what}"
+        );
     }
     assert_eq!(s.objects[grounds[0]].stub.as_ref().unwrap().host.0, m5);
     assert!(y(grounds[0]) < y(m5) && x(grounds[0]) == x(m5), "{what}");
     assert_eq!(g.orient[grounds[0]], Orient::R0, "{what}");
     // the ports beside what they connect to: inp left of M1's gate, inn right of M2's, vbias left
     // of M5's gate
-    let port = |net: &str| s.ports.iter().find(|q| q.net.as_deref() == Some(net)).unwrap().object;
+    let port = |net: &str| {
+        s.ports
+            .iter()
+            .find(|q| q.net.as_deref() == Some(net))
+            .unwrap()
+            .object
+    };
     let tag = |net: &str| s.pin_at(at, &g.orient, port(net), 0).unwrap();
-    for (net, host, terminal, left) in [("inp", m1, "2", true), ("inn", m2, "2", false), ("vbias", m5, "2", true)] {
+    for (net, host, terminal, left) in [
+        ("inp", m1, "2", true),
+        ("inn", m2, "2", false),
+        ("vbias", m5, "2", true),
+    ] {
         let (t, h) = (tag(net), pin(host, terminal));
         assert_eq!(t[1], h[1], "{what}: {net}");
-        assert!(if left { t[0] < h[0] } else { t[0] > h[0] }, "{what}: {net}");
+        assert!(
+            if left { t[0] < h[0] } else { t[0] > h[0] },
+            "{what}: {net}"
+        );
     }
     // and out right of M4's drain, which leaves down to M2's: two below it, in the gap between the
     // two rows, above M2's drain (quality review SE-13)
@@ -771,18 +1151,41 @@ fn t3_is_drawn_as_the_plan_pictures_it() {
     assert!(t[0] > top[0], "{what}");
     assert_eq!(t[1], &top[1] - int(2), "{what}");
     assert!(bottom[1] < t[1], "{what}");
-    assert_eq!(s.ports.iter().find(|q| q.net.as_deref() == Some("inp")).unwrap().kind, PortKind::Input);
-    assert_eq!(s.ports.iter().find(|q| q.net.as_deref() == Some("out")).unwrap().kind, PortKind::Output);
+    assert_eq!(
+        s.ports
+            .iter()
+            .find(|q| q.net.as_deref() == Some("inp"))
+            .unwrap()
+            .kind,
+        PortKind::Input
+    );
+    assert_eq!(
+        s.ports
+            .iter()
+            .find(|q| q.net.as_deref() == Some("out"))
+            .unwrap()
+            .kind,
+        PortKind::Output
+    );
     // nothing overlaps, and every relation of the layout fits but the column of M5 under M1,
     // which the facts that centre M5 leave out
     assert!(e.placed.overlaps.is_empty(), "{what}");
-    assert_eq!(e.placed.dropped, vec![crate::search::RelKind::Column], "{what}");
+    assert_eq!(
+        e.placed.dropped,
+        vec![crate::search::RelKind::Column],
+        "{what}"
+    );
     // on the grid
     for k in [m1, m2, m3, m4, m5] {
         assert!(x(k).is_integer() && y(k).is_integer(), "{what}");
     }
     // the current direction is in force: none of its objectives is inert but those not computed
-    assert_eq!(solved.report.inert_objectives.len(), 1, "{:?}", solved.report.inert_objectives);
+    assert_eq!(
+        solved.report.inert_objectives.len(),
+        1,
+        "{:?}",
+        solved.report.inert_objectives
+    );
     assert!(solved.report.inert_objectives[0].starts_with("terminal_wire_alignment"));
 }
 
@@ -793,14 +1196,28 @@ fn t6_without_a_supply_reports_the_current_direction_inert() {
     assert_eq!(ps.len(), 1);
     let (solved, e) = check_level("T6", &ps[0]);
     let inert = &solved.report.inert_objectives;
-    let current = inert.iter().find(|i| i.starts_with("current_direction")).unwrap_or_else(|| panic!("{inert:?}"));
-    assert!(current.contains("no supply symbol") && !current.contains("no ground symbol"), "{current}");
+    let current = inert
+        .iter()
+        .find(|i| i.starts_with("current_direction"))
+        .unwrap_or_else(|| panic!("{inert:?}"));
+    assert!(
+        current.contains("no supply symbol") && !current.contains("no ground symbol"),
+        "{current}"
+    );
     assert!(e.structure.depth.is_none());
     // the ground direction is in force: there are grounds, below their pins
-    assert!(!inert.iter().any(|i| i.starts_with("ground_direction")), "{inert:?}");
+    assert!(
+        !inert.iter().any(|i| i.starts_with("ground_direction")),
+        "{inert:?}"
+    );
     for (k, o) in e.structure.objects.iter().enumerate() {
         if o.role == Role::Ground {
-            assert_eq!(e.placed.geometry.orient[k], Orient::R0, "{}", ps[0].objects[k].label);
+            assert_eq!(
+                e.placed.geometry.orient[k],
+                Orient::R0,
+                "{}",
+                ps[0].objects[k].label
+            );
         }
     }
     assert!(!solved.report.inert_objectives.iter().any(|i| i.is_empty()));
@@ -812,15 +1229,29 @@ fn t6_without_a_supply_reports_the_current_direction_inert() {
 #[test]
 fn options_change_the_search_and_never_the_facts() {
     let ps = problems(&repo().join("tests/integration/solver/T3-ota5t.sp"));
-    for text in
-        ["objectives=none", "grid=none", "beam=1", "budget=candidates:0", "grid=0.5;objectives=area,wire_length"]
-    {
-        let options = SolverOptions::without_time_limit().with_overrides(text).unwrap();
+    for text in [
+        "objectives=none",
+        "grid=none",
+        "beam=1",
+        "budget=candidates:0",
+        "grid=0.5;objectives=area,wire_length",
+    ] {
+        let options = SolverOptions::without_time_limit()
+            .with_overrides(text)
+            .unwrap();
         for p in &ps {
             let (solved, e) = solve_exact(p, &options);
-            let tol = if e.resolved.as_written { Q::zero() } else { from_f64(options.tolerance).unwrap() };
+            let tol = if e.resolved.as_written {
+                Q::zero()
+            } else {
+                from_f64(options.tolerance).unwrap()
+            };
             for &f in &solved.report.kept {
-                assert!(holds_exactly(p, &e.placed.geometry, &p.facts[f].kind, &tol), "{text}: {} fact {f}", p.title);
+                assert!(
+                    holds_exactly(p, &e.placed.geometry, &p.facts[f].kind, &tol),
+                    "{text}: {} fact {f}",
+                    p.title
+                );
             }
             assert_eq!(solved, crate::solve(p, &options), "{text}: {}", p.title);
             if options.grid.is_none() {
@@ -831,13 +1262,23 @@ fn options_change_the_search_and_never_the_facts() {
             for &k in &e.structure.elements {
                 for axis in 0..2 {
                     let v = &e.placed.geometry.origin[k][axis];
-                    assert!((v / &g).is_integer(), "{text}: {} {} at {v}", p.title, p.objects[k].label);
+                    assert!(
+                        (v / &g).is_integer(),
+                        "{text}: {} {} at {v}",
+                        p.title,
+                        p.objects[k].label
+                    );
                 }
             }
         }
     }
     // with no objective, the inert ones are not reported either: nothing is configured
-    let solved = crate::solve(&ps[0], &SolverOptions::without_time_limit().with_overrides("objectives=none").unwrap());
+    let solved = crate::solve(
+        &ps[0],
+        &SolverOptions::without_time_limit()
+            .with_overrides("objectives=none")
+            .unwrap(),
+    );
     assert!(solved.report.inert_objectives.is_empty());
 }
 
@@ -851,11 +1292,17 @@ fn layers_with_tolerances_rank_the_candidates_in_a_well_defined_order() {
          area~20,crossings~2,wire_length~8,aspect~0.5",
     ];
     for (i, text) in texts.into_iter().enumerate() {
-        let options = SolverOptions::without_time_limit().with_overrides(text).unwrap();
+        let options = SolverOptions::without_time_limit()
+            .with_overrides(text)
+            .unwrap();
         for f in netlists("tests/integration/solver", "T") {
             for p in problems(&f) {
                 let (solved, e) = solve_exact(&p, &options);
-                let tol = if e.resolved.as_written { Q::zero() } else { from_f64(options.tolerance).unwrap() };
+                let tol = if e.resolved.as_written {
+                    Q::zero()
+                } else {
+                    from_f64(options.tolerance).unwrap()
+                };
                 for &k in &solved.report.kept {
                     assert!(
                         holds_exactly(&p, &e.placed.geometry, &p.facts[k].kind, &tol),
@@ -882,26 +1329,52 @@ fn an_overlap_is_noted_with_its_cause() {
     let mut budget = false;
     for p in &ps {
         let (solved, e) = solve_exact_with(p, &options, &StoppedClock, caps);
-        let tol = if e.resolved.as_written { Q::zero() } else { from_f64(options.tolerance).unwrap() };
+        let tol = if e.resolved.as_written {
+            Q::zero()
+        } else {
+            from_f64(options.tolerance).unwrap()
+        };
         for &k in &solved.report.kept {
-            assert!(holds_exactly(p, &e.placed.geometry, &p.facts[k].kind, &tol), "{} fact {k}", p.title);
+            assert!(
+                holds_exactly(p, &e.placed.geometry, &p.facts[k].kind, &tol),
+                "{} fact {k}",
+                p.title
+            );
         }
         for o in &e.placed.overlaps {
             budget |= o.cause == crate::coords::Cause::Budget;
-            assert!(matches!(o.cause, crate::coords::Cause::Budget | crate::coords::Cause::Facts), "{o:?}");
+            assert!(
+                matches!(
+                    o.cause,
+                    crate::coords::Cause::Budget | crate::coords::Cause::Facts
+                ),
+                "{o:?}"
+            );
         }
-        for n in solved.report.notes.iter().filter(|n| n.contains(" overlap: ")) {
+        for n in solved
+            .report
+            .notes
+            .iter()
+            .filter(|n| n.contains(" overlap: "))
+        {
             assert!(!n.contains("the facts kept") || !e.placed.undecided, "{n}");
         }
         if e.placed.undecided {
             assert!(
-                solved.report.notes.iter().any(|n| n.contains("a cap of work ran out")),
+                solved
+                    .report
+                    .notes
+                    .iter()
+                    .any(|n| n.contains("a cap of work ran out")),
                 "{:?}",
                 solved.report.notes
             );
         }
     }
-    assert!(budget, "40 pivots leave some symbols overlapping for want of work");
+    assert!(
+        budget,
+        "40 pivots leave some symbols overlapping for want of work"
+    );
     let ps = problems(&repo().join("tests/conformance/cases/03-five-transistor-ota.sp"));
     let (solved, e) = solve_exact(&ps[0], &SolverOptions::without_time_limit());
     let [m2, cl] = ["#M2", "#CL"].map(|l| object(&ps[0], l));
@@ -909,11 +1382,16 @@ fn an_overlap_is_noted_with_its_cause() {
         e.placed
             .overlaps
             .iter()
-            .any(|o| (o.a, o.b) == (m2.min(cl), m2.max(cl)) && o.cause == crate::coords::Cause::Facts),
+            .any(|o| (o.a, o.b) == (m2.min(cl), m2.max(cl))
+                && o.cause == crate::coords::Cause::Facts),
         "{:?}",
         e.placed.overlaps
     );
-    assert!(solved.report.notes.iter().any(|n| n.contains("overlap: the facts kept, with the orientations taken")));
+    assert!(solved
+        .report
+        .notes
+        .iter()
+        .any(|n| n.contains("overlap: the facts kept, with the orientations taken")));
 }
 
 // ------------------------------------------------------------------------ netlists given as text
@@ -921,7 +1399,9 @@ fn an_overlap_is_noted_with_its_cause() {
 /// The levels of a netlist given as text, read as the CLI reads a file.
 fn problems_of(text: &str) -> Vec<LevelProblem> {
     let files = rnl_runtime::source::MemoryProvider::new().with("t.sp", text);
-    rnl_view::interpret("t.sp", None, &files, &rnl_runtime::Options::solver()).unwrap().problems
+    rnl_view::interpret("t.sp", None, &files, &rnl_runtime::Options::solver())
+        .unwrap()
+        .problems
 }
 
 /// Solves the one level of a netlist given as text, checked as the cases of the files are.
@@ -945,7 +1425,10 @@ fn a_bound_off_the_grid_puts_what_it_moves_on_the_next_grid_point() {
     let [r1, r2] = ["#R1", "#R2"].map(|l| object(&p, l));
     let at = &e.placed.geometry.origin;
     assert_eq!(at[r1], [int(0), int(0)], "{what}");
-    assert!(at[r2][0].is_integer() && at[r2][0] >= crate::rational::frac(37, 5), "{what}");
+    assert!(
+        at[r2][0].is_integer() && at[r2][0] >= crate::rational::frac(37, 5),
+        "{what}"
+    );
     assert!(at[r2][1].is_integer(), "{what}");
     // the same with points, which go on the grid after the symbols
     let (p, solved, e) = solve_text(
@@ -955,7 +1438,10 @@ fn a_bound_off_the_grid_puts_what_it_moves_on_the_next_grid_point() {
     let what = summary(&p, &solved, &e);
     let b = object(&p, "%b");
     let at = &e.placed.geometry.origin;
-    assert!(at[b][0].is_integer() && at[b][0] >= crate::rational::frac(2, 5), "{what}");
+    assert!(
+        at[b][0].is_integer() && at[b][0] >= crate::rational::frac(2, 5),
+        "{what}"
+    );
     for k in &e.structure.elements {
         assert!(at[*k][0].is_integer() && at[*k][1].is_integer(), "{what}");
     }
@@ -972,11 +1458,16 @@ fn a_text_with_an_offset_off_the_grid_leaves_its_symbol_on_the_grid() {
     let what = summary(&p, &solved, &e);
     let at = &e.placed.geometry.origin;
     for &k in &e.structure.elements {
-        assert!(at[k][0].is_integer() && at[k][1].is_integer(), "{what}: {}", p.objects[k].label);
+        assert!(
+            at[k][0].is_integer() && at[k][1].is_integer(),
+            "{what}: {}",
+            p.objects[k].label
+        );
     }
     let texts: Vec<usize> = (0..p.objects.len())
         .filter(|&k| {
-            matches!(p.objects[k].kind, ObjectKind::Text) && matches!(p.objects[k].position, Position::Own { .. })
+            matches!(p.objects[k].kind, ObjectKind::Text)
+                && matches!(p.objects[k].position, Position::Own { .. })
         })
         .collect();
     assert_eq!(texts.len(), 2, "{what}");
@@ -1001,12 +1492,22 @@ fn a_supply_and_a_ground_on_terminals_give_the_current_depth() {
     let what = summary(&p, &solved, &e);
     let s = &e.structure;
     let [m1, m2] = ["#M1", "#M2"].map(|l| object(&p, l));
-    let depth = s.depth.as_ref().unwrap_or_else(|| panic!("no current depth: {what}"));
+    let depth = s
+        .depth
+        .as_ref()
+        .unwrap_or_else(|| panic!("no current depth: {what}"));
     assert_eq!((depth[m1], depth[m2]), (Some(0), Some(1)), "{what}");
     assert_eq!(s.rows, vec![vec![m1], vec![m2]], "{what}");
     let at = &e.placed.origins;
     assert!(at[m1][1] > at[m2][1], "{what}");
-    assert!(!solved.report.inert_objectives.iter().any(|i| i.starts_with("current_direction")), "{what}");
+    assert!(
+        !solved
+            .report
+            .inert_objectives
+            .iter()
+            .any(|i| i.starts_with("current_direction")),
+        "{what}"
+    );
 }
 
 /// An ORDER on x is a row (plan 5.4), even when a neighbour of one of its members sits at another
@@ -1023,7 +1524,11 @@ fn an_order_on_x_is_one_row() {
     );
     let what = summary(&p, &solved, &e);
     let [r1, r2, r3, r4, r5] = ["#R1", "#R2", "#R3", "#R4", "#R5"].map(|l| object(&p, l));
-    assert!(e.structure.rows.contains(&vec![r1, r2, r3, r4]), "{what}: {:?}", e.structure.rows);
+    assert!(
+        e.structure.rows.contains(&vec![r1, r2, r3, r4]),
+        "{what}: {:?}",
+        e.structure.rows
+    );
     let y = |k: usize| e.placed.origins[k][1].clone();
     assert!(y(r1) == y(r2) && y(r2) == y(r3) && y(r3) == y(r4), "{what}");
     assert!(y(r5) >= y(r1) + int(5), "{what}");
@@ -1042,8 +1547,21 @@ fn an_order_given_only_an_axis_fixes_no_precedence() {
     let s = &e.structure;
     assert!(s.precedence.is_empty(), "{:?}", s.precedence);
     assert_eq!(s.reversible.len(), 1, "{:?}", s.reversible);
-    assert!(s.rows.iter().any(|row| row.contains(&r1) && row.contains(&r3)), "{:?}", s.rows);
-    assert!(e.candidate.rows.iter().any(|row| row.contains(&r1) && row.contains(&r3)), "{}", summary(&p, &solved, &e));
+    assert!(
+        s.rows
+            .iter()
+            .any(|row| row.contains(&r1) && row.contains(&r3)),
+        "{:?}",
+        s.rows
+    );
+    assert!(
+        e.candidate
+            .rows
+            .iter()
+            .any(|row| row.contains(&r1) && row.contains(&r3)),
+        "{}",
+        summary(&p, &solved, &e)
+    );
 }
 
 /// An ALIGN on x is a column: its members go in rows of their own, one above the other, not side by
@@ -1056,9 +1574,19 @@ fn an_align_on_x_is_a_column() {
     );
     let what = summary(&p, &solved, &e);
     let [r1, r2] = ["#R1", "#R2"].map(|l| object(&p, l));
-    assert!(!e.structure.rows.iter().any(|row| row.contains(&r1) && row.contains(&r2)), "{what}");
+    assert!(
+        !e.structure
+            .rows
+            .iter()
+            .any(|row| row.contains(&r1) && row.contains(&r2)),
+        "{what}"
+    );
     assert!(e.placed.overlaps.is_empty(), "{what}");
-    assert!(!e.placed.dropped.contains(&crate::search::RelKind::Gap), "{what}: {:?}", e.placed.dropped);
+    assert!(
+        !e.placed.dropped.contains(&crate::search::RelKind::Gap),
+        "{what}: {:?}",
+        e.placed.dropped
+    );
 }
 
 /// Groups whose parts or union are the same set as another group (synthesis 3.5): each set is one
@@ -1104,9 +1632,10 @@ fn groups_that_make_the_same_set_twice_are_solved() {
 #[test]
 fn overlapping_groups_keep_the_shared_part_between_the_others() {
     let chain = "R1 a b 1k\nR2 b c 1k\nR3 c d 1k\nR4 d e 1k\n";
-    for groups in
-        ["%g2 = {#R3 #R4} @GROUP; %g1 = {#R1 #R2 #R3} @GROUP", "%g1 = {#R1 #R4} @GROUP; %g2 = {#R1 #R2} @GROUP"]
-    {
+    for groups in [
+        "%g2 = {#R3 #R4} @GROUP; %g1 = {#R1 #R2 #R3} @GROUP",
+        "%g1 = {#R1 #R4} @GROUP; %g2 = {#R1 #R2} @GROUP",
+    ] {
         let text = format!(
             "* u\n* @RNL(type=\"header\") {{ @VERSION(\"0.2\")}}\n{chain}* @RNL {{ {groups}; $WIRE_NET_SET @ROUTE }}\n.end\n"
         );
@@ -1117,25 +1646,56 @@ fn overlapping_groups_keep_the_shared_part_between_the_others() {
         let mut work = crate::Work::default();
         let s = analyse(p, &resolved, &options, CAPS, &mut work);
         let nodes = &s.tree.nodes;
-        let union = nodes.iter().position(|n| n.fixed_order).unwrap_or_else(|| panic!("{groups}: {nodes:?}"));
-        let parts: Vec<Vec<usize>> = nodes[union].children.iter().map(|&c| nodes[c].members.clone()).collect();
+        let union = nodes
+            .iter()
+            .position(|n| n.fixed_order)
+            .unwrap_or_else(|| panic!("{groups}: {nodes:?}"));
+        let parts: Vec<Vec<usize>> = nodes[union]
+            .children
+            .iter()
+            .map(|&c| nodes[c].members.clone())
+            .collect();
         assert_eq!(parts.len(), 3, "{groups}: {nodes:?}");
-        let forward = vec![(parts[0].clone(), parts[1].clone()), (parts[1].clone(), parts[2].clone())];
-        let backward = vec![(parts[2].clone(), parts[1].clone()), (parts[1].clone(), parts[0].clone())];
+        let forward = vec![
+            (parts[0].clone(), parts[1].clone()),
+            (parts[1].clone(), parts[2].clone()),
+        ];
+        let backward = vec![
+            (parts[2].clone(), parts[1].clone()),
+            (parts[1].clone(), parts[0].clone()),
+        ];
         let candidates = search(p, &s, &options, &mut work);
-        assert!(candidates.iter().filter(|c| c.origin == "beam").count() >= 2, "{groups}");
+        assert!(
+            candidates.iter().filter(|c| c.origin == "beam").count() >= 2,
+            "{groups}"
+        );
         for c in candidates.iter().filter(|c| c.origin == "beam") {
-            let between: Vec<(Vec<usize>, Vec<usize>)> =
-                c.apart.iter().filter(|(a, b)| parts.contains(a) && parts.contains(b)).cloned().collect();
-            assert!(between == forward || between == backward, "{groups}: {:?}", c.apart);
+            let between: Vec<(Vec<usize>, Vec<usize>)> = c
+                .apart
+                .iter()
+                .filter(|(a, b)| parts.contains(a) && parts.contains(b))
+                .cloned()
+                .collect();
+            assert!(
+                between == forward || between == backward,
+                "{groups}: {:?}",
+                c.apart
+            );
         }
         let (solved, e) = check_level("union", p);
         let what = summary(p, &solved, &e);
-        assert!(!e.placed.dropped.contains(&RelKind::BlocksApart), "{groups}: {what}");
+        assert!(
+            !e.placed.dropped.contains(&RelKind::BlocksApart),
+            "{groups}: {what}"
+        );
         let extent = |part: &[usize]| {
             let boxes: Vec<[Q; 4]> = part
                 .iter()
-                .map(|&k| e.structure.box_at(&e.placed.origins, &e.placed.geometry.orient, k).unwrap())
+                .map(|&k| {
+                    e.structure
+                        .box_at(&e.placed.origins, &e.placed.geometry.orient, k)
+                        .unwrap()
+                })
                 .collect();
             let lo = boxes.iter().map(|b| b[0].clone()).min().unwrap();
             let hi = boxes.iter().map(|b| b[2].clone()).max().unwrap();
@@ -1144,7 +1704,8 @@ fn overlapping_groups_keep_the_shared_part_between_the_others() {
         let x: Vec<(Q, Q)> = parts.iter().map(|part| extent(part)).collect();
         let follow = |a: &(Q, Q), b: &(Q, Q)| a.1 <= b.0;
         assert!(
-            (follow(&x[0], &x[1]) && follow(&x[1], &x[2])) || (follow(&x[2], &x[1]) && follow(&x[1], &x[0])),
+            (follow(&x[0], &x[1]) && follow(&x[1], &x[2]))
+                || (follow(&x[2], &x[1]) && follow(&x[1], &x[0])),
             "{groups}: {x:?}\n{what}"
         );
     }
@@ -1204,7 +1765,8 @@ fn groups_and_facts_drawn_at_random_are_solved() {
             }
             for n in nodes.iter().filter(|n| n.fixed_order) {
                 unions += 1;
-                let parts: Vec<&Vec<usize>> = n.children.iter().map(|&c| &nodes[c].members).collect();
+                let parts: Vec<&Vec<usize>> =
+                    n.children.iter().map(|&c| &nodes[c].members).collect();
                 let between: Vec<(&Vec<usize>, &Vec<usize>)> = c
                     .apart
                     .iter()
@@ -1213,7 +1775,11 @@ fn groups_and_facts_drawn_at_random_are_solved() {
                     .collect();
                 let forward = vec![(parts[0], parts[1]), (parts[1], parts[2])];
                 let backward = vec![(parts[2], parts[1]), (parts[1], parts[0])];
-                assert!(between == forward || between == backward, "{text}: {:?}", c.apart);
+                assert!(
+                    between == forward || between == backward,
+                    "{text}: {:?}",
+                    c.apart
+                );
             }
         }
         if i % 5 == 0 {
@@ -1234,7 +1800,13 @@ fn routed_whole(body: &str, options: &str) -> (LevelProblem, Solved, Exact) {
     let ps = problems_of(&netlist(body));
     assert_eq!(ps.len(), 1, "{body}");
     let p = ps.into_iter().next().unwrap();
-    let (solved, e) = check_with(body, &p, &SolverOptions::without_time_limit().with_overrides(options).unwrap());
+    let (solved, e) = check_with(
+        body,
+        &p,
+        &SolverOptions::without_time_limit()
+            .with_overrides(options)
+            .unwrap(),
+    );
     assert!(
         solved.report.unrouted.is_empty(),
         "{body} / {options}: {:?}\n{}",
@@ -1272,13 +1844,21 @@ fn pins_of_two_nets_face_to_face_in_a_row_are_both_routed() {
 fn supply_and_ground_nets_with_stubs_are_routed() {
     let circuit = "V1 vdd 0 1\nR1 vdd out 1k\nC1 out 0 1n\nR2 out 0 1k\n";
     for (rnl, nets) in [
-        ("&vdd @ADD-TO $SUPPLY_NET_SET; # @SELECT-NET => @ROUTE", vec!["vdd", "0", "out"]),
+        (
+            "&vdd @ADD-TO $SUPPLY_NET_SET; # @SELECT-NET => @ROUTE",
+            vec!["vdd", "0", "out"],
+        ),
         ("$GND @ATTACH #C1:2; &0 @ROUTE", vec!["0"]),
     ] {
         let body = format!("{circuit}* @RNL {{ {rnl} }}\n");
         let (p, solved, _) = routed_whole(&body, "");
         for net in nets {
-            let wires = solved.solution.wires.iter().filter(|w| p.routes[w.route].net == net).count();
+            let wires = solved
+                .solution
+                .wires
+                .iter()
+                .filter(|w| p.routes[w.route].net == net)
+                .count();
             assert!(wires > 0, "{rnl}: &{net}");
         }
         // the stubs are there, and their wires are written on the nets routed
@@ -1300,10 +1880,17 @@ fn symbols_placed_far_apart_are_routed() {
 /// so; with the same style, nothing is noted. The counts of the notes are singular for one.
 #[test]
 fn routes_of_one_net_with_different_styles_are_noted() {
-    let note = "the ROUTEs of &b give different styles: its wires take the style of the first of them";
-    let (p, solved, _) =
-        routed_whole("R1 a b 1k\nR2 a b 1k\n* @RNL { &b @ROUTE(linestyle=\"dashed\"); &b @ROUTE }\n", "");
-    assert!(solved.report.notes.iter().any(|n| n == note), "{:?}", solved.report.notes);
+    let note =
+        "the ROUTEs of &b give different styles: its wires take the style of the first of them";
+    let (p, solved, _) = routed_whole(
+        "R1 a b 1k\nR2 a b 1k\n* @RNL { &b @ROUTE(linestyle=\"dashed\"); &b @ROUTE }\n",
+        "",
+    );
+    assert!(
+        solved.report.notes.iter().any(|n| n == note),
+        "{:?}",
+        solved.report.notes
+    );
     assert!(solved.solution.wires.iter().all(|w| w.route == 0));
     assert_eq!(p.routes.len(), 2);
     assert!(
@@ -1315,9 +1902,20 @@ fn routes_of_one_net_with_different_styles_are_noted() {
         "{:?}",
         solved.report.notes
     );
-    for rnl in ["&b @ROUTE(linestyle=\"dashed\"); &b @ROUTE(linestyle=\"dashed\")", "&b @ROUTE; &b @ROUTE"] {
-        let (_, solved, _) = routed_whole(&format!("R1 a b 1k\nR2 a b 1k\n* @RNL {{ {rnl} }}\n"), "");
-        assert!(!solved.report.notes.iter().any(|n| n.contains("give different styles")), "{rnl}");
+    for rnl in [
+        "&b @ROUTE(linestyle=\"dashed\"); &b @ROUTE(linestyle=\"dashed\")",
+        "&b @ROUTE; &b @ROUTE",
+    ] {
+        let (_, solved, _) =
+            routed_whole(&format!("R1 a b 1k\nR2 a b 1k\n* @RNL {{ {rnl} }}\n"), "");
+        assert!(
+            !solved
+                .report
+                .notes
+                .iter()
+                .any(|n| n.contains("give different styles")),
+            "{rnl}"
+        );
     }
     assert_eq!(
         (count(0, "net"), count(1, "net"), count(2, "branch point")),
@@ -1335,13 +1933,21 @@ fn t3_has_a_junction_where_the_port_meets_the_wire_between_the_drains() {
     let (solved, e) = check_level("T3", p);
     let what = summary(p, &solved, &e);
     for (w, path) in solved.solution.wires.iter().zip(&e.routing.paths) {
-        assert!(path.windows(2).any(|s| s[0] != s[1]), "{what}: of length 0: {w:?}");
+        assert!(
+            path.windows(2).any(|s| s[0] != s[1]),
+            "{what}: of length 0: {w:?}"
+        );
     }
     let (m2, m4) = (object(p, "#M2"), object(p, "#M4"));
     let s = &e.structure;
     let drain = |k: usize| {
-        let j = s.pins(k).iter().position(|pi| pi.terminals.iter().any(|t| t == "1")).unwrap();
-        s.pin_at(&e.placed.origins, &e.placed.geometry.orient, k, j).unwrap()
+        let j = s
+            .pins(k)
+            .iter()
+            .position(|pi| pi.terminals.iter().any(|t| t == "1"))
+            .unwrap();
+        s.pin_at(&e.placed.origins, &e.placed.geometry.orient, k, j)
+            .unwrap()
     };
     let (top, bottom) = (drain(m4), drain(m2));
     assert_eq!(top[0], bottom[0], "{what}");
@@ -1356,11 +1962,18 @@ fn t3_has_a_junction_where_the_port_meets_the_wire_between_the_drains() {
 /// left two nets in parts before leads along the edges of symbols; review of S4).
 #[test]
 fn every_case_of_the_solver_is_routed_whole_without_objectives() {
-    let options = SolverOptions::without_time_limit().with_overrides("objectives=none").unwrap();
+    let options = SolverOptions::without_time_limit()
+        .with_overrides("objectives=none")
+        .unwrap();
     for f in netlists("tests/integration/solver", "T") {
         for p in problems(&f) {
             let (solved, _) = check_with(&f.to_string_lossy(), &p, &options);
-            assert!(solved.report.unrouted.is_empty(), "{}: {:?}", p.title, solved.report.unrouted);
+            assert!(
+                solved.report.unrouted.is_empty(),
+                "{}: {:?}",
+                p.title,
+                solved.report.unrouted
+            );
         }
     }
 }
@@ -1387,14 +2000,31 @@ fn violated_exits(p: &LevelProblem, solved: &Solved, e: &Exact) -> Vec<String> {
     for (w, path) in solved.solution.wires.iter().zip(&e.routing.paths) {
         let backwards: Vec<[Q; 2]> = path.iter().rev().cloned().collect();
         for (end, path) in [(w.points.first(), path), (w.points.last(), &backwards)] {
-            let Some(WirePoint::Anchor(PointRef::Pin { object, pin, terminal })) = end else { continue };
-            let Some((x, y)) = s.exit(*object, *pin, ori[*object]) else { continue };
+            let Some(WirePoint::Anchor(PointRef::Pin {
+                object,
+                pin,
+                terminal,
+            })) = end
+            else {
+                continue;
+            };
+            let Some((x, y)) = s.exit(*object, *pin, ori[*object]) else {
+                continue;
+            };
             let Some(start) = path.first() else { continue };
-            let Some(next) = path.iter().find(|q| *q != start) else { continue };
-            let way = ((&next[0] - &start[0]).signum(), (&next[1] - &start[1]).signum());
+            let Some(next) = path.iter().find(|q| *q != start) else {
+                continue;
+            };
+            let way = (
+                (&next[0] - &start[0]).signum(),
+                (&next[1] - &start[1]).signum(),
+            );
             if way != (int(x), int(y)) {
                 let label = &p.objects[*object].label;
-                out.push(format!("{} at {label}:{terminal}, its exit ({x}, {y}): {path:?}", p.routes[w.route].net));
+                out.push(format!(
+                    "{} at {label}:{terminal}, its exit ({x}, {y}): {path:?}",
+                    p.routes[w.route].net
+                ));
             }
         }
     }
@@ -1409,7 +2039,10 @@ fn case_level(file: &str, title: &str) -> (LevelProblem, Solved, Exact) {
 /// The level with a title of a netlist in a directory of the repository, solved and checked.
 fn level_in(dir: &str, file: &str, title: &str) -> (LevelProblem, Solved, Exact) {
     let ps = problems(&repo().join(dir).join(file));
-    let p = ps.into_iter().find(|p| p.title == title).unwrap_or_else(|| panic!("{file}: no level {title}"));
+    let p = ps
+        .into_iter()
+        .find(|p| p.title == title)
+        .unwrap_or_else(|| panic!("{file}: no level {title}"));
     let (solved, e) = check_level(file, &p);
     (p, solved, e)
 }
@@ -1427,7 +2060,11 @@ fn t1_is_drawn_with_an_l_for_each_wire() {
     assert_eq!(bends.get("out"), Some(&1), "{what}");
     let at = &e.placed.origins;
     let [vin, r1, c1] = ["#VIN", "#R1", "#C1"].map(|l| object(&p, l));
-    let pin = |k: usize, j: usize| e.structure.pin_at(at, &e.placed.geometry.orient, k, j).unwrap();
+    let pin = |k: usize, j: usize| {
+        e.structure
+            .pin_at(at, &e.placed.geometry.orient, k, j)
+            .unwrap()
+    };
     // R1 lies across, above the top pins of VIN and C1
     assert_eq!(pin(r1, 0)[1], pin(r1, 1)[1], "{what}");
     for k in [vin, c1] {
@@ -1442,7 +2079,12 @@ fn t1_is_drawn_with_an_l_for_each_wire() {
 fn t2_has_an_l_from_the_source_to_the_gate() {
     for file in ["T2-common-source.sp", "T2b-common-source-dragged.sp"] {
         let (p, solved, e) = case_level(file, file);
-        assert_eq!(bends_by_net(&p, &solved, &e).get("in"), Some(&1), "{}", summary(&p, &solved, &e));
+        assert_eq!(
+            bends_by_net(&p, &solved, &e).get("in"),
+            Some(&1),
+            "{}",
+            summary(&p, &solved, &e)
+        );
     }
 }
 
@@ -1451,7 +2093,12 @@ fn t2_has_an_l_from_the_source_to_the_gate() {
 #[test]
 fn t3_has_no_jog_into_the_input_of_the_ota() {
     let (p, solved, e) = case_level("T3-ota5t.sp", "T3-ota5t.sp");
-    assert_eq!(bends_by_net(&p, &solved, &e).get("inn"), Some(&1), "{}", summary(&p, &solved, &e));
+    assert_eq!(
+        bends_by_net(&p, &solved, &e).get("inn"),
+        Some(&1),
+        "{}",
+        summary(&p, &solved, &e)
+    );
 }
 
 /// T5: &vin is an L from the source to RI; the tops of RL and C1, which both leave up to &n2, on
@@ -1465,13 +2112,27 @@ fn t5_has_an_l_for_the_input_and_one_rail_on_the_load() {
     let s = &e.structure;
     let top = |label: &str| {
         let k = object(&p, label);
-        let j = s.pins(k).iter().position(|pi| pi.terminals.iter().any(|t| t == "1")).unwrap();
-        assert_eq!(s.exit(k, j, e.placed.geometry.orient[k]), Some((0, 1)), "{what}: {label}");
-        s.pin_at(&e.placed.origins, &e.placed.geometry.orient, k, j).unwrap()
+        let j = s
+            .pins(k)
+            .iter()
+            .position(|pi| pi.terminals.iter().any(|t| t == "1"))
+            .unwrap();
+        assert_eq!(
+            s.exit(k, j, e.placed.geometry.orient[k]),
+            Some((0, 1)),
+            "{what}: {label}"
+        );
+        s.pin_at(&e.placed.origins, &e.placed.geometry.orient, k, j)
+            .unwrap()
     };
     assert_eq!(top("#RL")[1], top("#C1")[1], "{what}");
     let (p, solved, e) = case_level("T5-inverting-amp-rlc.sp", "opamp");
-    assert_eq!(bends_by_net(&p, &solved, &e).get("out"), Some(&1), "{}", summary(&p, &solved, &e));
+    assert_eq!(
+        bends_by_net(&p, &solved, &e).get("out"),
+        Some(&1),
+        "{}",
+        summary(&p, &solved, &e)
+    );
 }
 
 /// T6, the R-2R ladder: each source next to its leg of 2R in the row joins it by an L, and &n0
@@ -1485,7 +2146,10 @@ fn t6_joins_each_source_to_its_leg_by_an_l() {
     let row = &e.candidate.rows[0];
     let mut neighbours = 0;
     for i in 0..8 {
-        let (vb, leg) = (object(&p, &format!("#VB{i}")), object(&p, &format!("#R2B{i}")));
+        let (vb, leg) = (
+            object(&p, &format!("#VB{i}")),
+            object(&p, &format!("#R2B{i}")),
+        );
         let at = |k: usize| row.iter().position(|&j| j == k).unwrap();
         if at(vb).abs_diff(at(leg)) == 1 {
             neighbours += 1;
@@ -1511,7 +2175,12 @@ fn wires_routed_for_t1_to_t6_leave_each_pin_its_own_way() {
         for p in problems(&file) {
             let (solved, e) = check_level(&file.to_string_lossy(), &p);
             let bad = violated_exits(&p, &solved, &e);
-            assert!(bad.is_empty(), "{}: {bad:#?}\n{}", p.title, summary(&p, &solved, &e));
+            assert!(
+                bad.is_empty(),
+                "{}: {bad:#?}\n{}",
+                p.title,
+                summary(&p, &solved, &e)
+            );
         }
     }
 }
@@ -1525,7 +2194,10 @@ fn wires_routed_for_t1_to_t6_leave_each_pin_its_own_way() {
 #[test]
 fn a_port_on_a_net_written_stays_at_the_height_of_its_pin() {
     use crate::search::{attachments, Side};
-    for (file, title) in [("03-five-transistor-ota.sp", "03-five-transistor-ota.sp"), ("04-hierarchy.sp", "rdiv")] {
+    for (file, title) in [
+        ("03-five-transistor-ota.sp", "03-five-transistor-ota.sp"),
+        ("04-hierarchy.sp", "rdiv"),
+    ] {
         let (p, solved, e) = level_in("tests/conformance/cases", file, title);
         let what = summary(&p, &solved, &e);
         let (s, ori, at) = (&e.structure, &e.placed.geometry.orient, &e.placed.origins);
@@ -1536,9 +2208,15 @@ fn a_port_on_a_net_written_stays_at_the_height_of_its_pin() {
             }
             let label = &p.objects[k].label;
             assert!(!s.connections.routed((k, 0), a.host), "{what}: {label}");
-            let (port, host) = (s.pin_at(at, ori, k, 0).unwrap(), s.pin_at(at, ori, a.host.0, a.host.1).unwrap());
+            let (port, host) = (
+                s.pin_at(at, ori, k, 0).unwrap(),
+                s.pin_at(at, ori, a.host.0, a.host.1).unwrap(),
+            );
             assert_eq!(port[1], host[1], "{what}: {label}");
-            vertical += usize::from(matches!(s.exit(a.host.0, a.host.1, ori[a.host.0]), Some((0, _))));
+            vertical += usize::from(matches!(
+                s.exit(a.host.0, a.host.1, ori[a.host.0]),
+                Some((0, _))
+            ));
         }
         assert!(vertical > 0, "{what}");
     }
@@ -1572,10 +2250,15 @@ R1 a b 1k
         let s = &e.structure;
         let pin = |label: &str| {
             let k = object(&p, label);
-            let j = s.pins(k).iter().position(|pi| pi.terminals.iter().any(|t| t == "1")).unwrap();
+            let j = s
+                .pins(k)
+                .iter()
+                .position(|pi| pi.terminals.iter().any(|t| t == "1"))
+                .unwrap();
             (
                 s.exit(k, j, e.placed.geometry.orient[k]),
-                s.pin_at(&e.placed.origins, &e.placed.geometry.orient, k, j).unwrap(),
+                s.pin_at(&e.placed.origins, &e.placed.geometry.orient, k, j)
+                    .unwrap(),
             )
         };
         let ((up, source), (left, resistor)) = (pin("#V1"), pin("#R1"));
@@ -1585,7 +2268,11 @@ R1 a b 1k
         } else {
             assert_eq!(resistor[1], source[1], "{what}");
         }
-        assert!(e.placed.dropped.is_empty(), "{what}: {:?}", e.placed.dropped);
+        assert!(
+            e.placed.dropped.is_empty(),
+            "{what}: {:?}",
+            e.placed.dropped
+        );
     }
 }
 
@@ -1604,8 +2291,18 @@ fn extent(e: &Exact) -> [Q; 2] {
     }
     points.extend(e.routing.paths.iter().flatten().cloned());
     let span = |axis: usize| {
-        let lo = points.iter().map(|q| &q[axis]).min().cloned().unwrap_or_default();
-        let hi = points.iter().map(|q| &q[axis]).max().cloned().unwrap_or_default();
+        let lo = points
+            .iter()
+            .map(|q| &q[axis])
+            .min()
+            .cloned()
+            .unwrap_or_default();
+        let hi = points
+            .iter()
+            .map(|q| &q[axis])
+            .max()
+            .cloned()
+            .unwrap_or_default();
         hi - lo
     };
     [span(0), span(1)]
@@ -1615,7 +2312,10 @@ fn extent(e: &Exact) -> [Q; 2] {
 fn length_by_net(p: &LevelProblem, solved: &Solved, e: &Exact) -> BTreeMap<String, Q> {
     let mut out: BTreeMap<String, Q> = BTreeMap::new();
     for (w, path) in solved.solution.wires.iter().zip(&e.routing.paths) {
-        let length: Q = path.windows(2).map(|s| (&s[1][0] - &s[0][0]).abs() + (&s[1][1] - &s[0][1]).abs()).sum();
+        let length: Q = path
+            .windows(2)
+            .map(|s| (&s[1][0] - &s[0][0]).abs() + (&s[1][1] - &s[0][1]).abs())
+            .sum();
         *out.entry(p.routes[w.route].net.clone()).or_default() += length;
     }
     out
@@ -1644,7 +2344,10 @@ fn the_drawings_are_not_stretched() {
     let what = summary(&p, &solved, &e);
     assert!(length_by_net(&p, &solved, &e)["out"] <= int(3), "{what}");
     let [vin, m1] = ["#VIN", "#M1"].map(|l| object(&p, l));
-    assert!(&e.placed.origins[m1][0] - &e.placed.origins[vin][0] < int(14), "{what}");
+    assert!(
+        &e.placed.origins[m1][0] - &e.placed.origins[vin][0] < int(14),
+        "{what}"
+    );
     assert_eq!(e.placed.geometry.orient[vin], Orient::MY, "{what}");
     // T3's testbench: the lower row not evenly spaced (16 apart), CL nearer the output (&out 33
     // long), VDD beside XU1 (21 apart), narrower (50.5); the wires from the sources up to XU1
@@ -1655,11 +2358,19 @@ fn the_drawings_are_not_stretched() {
     assert!(!evenly_spaced(&e, &row), "{what}");
     assert!(length_by_net(&p, &solved, &e)["out"] <= int(24), "{what}");
     let [vdd, xu1] = ["#VDD", "#XU1"].map(|l| object(&p, l));
-    assert!(&e.placed.origins[xu1][0] - &e.placed.origins[vdd][0] <= int(12), "{what}");
+    assert!(
+        &e.placed.origins[xu1][0] - &e.placed.origins[vdd][0] <= int(12),
+        "{what}"
+    );
     assert!(extent(&e)[0] < num(50.5), "{what}");
-    let wires = crate::score::drawn(&p, &e.structure, &e.placed.geometry, &e.routing);
-    let view = crate::objectives::View { s: &e.structure, at: &e.placed.origins, orient: &e.placed.geometry.orient };
-    let crossings = crate::objectives::score(crate::objectives::Objective::Crossings, &view, Some(&wires));
+    let wires = crate::score::drawn(&p, &e.structure, &e.placed.geometry, &e.routing).unwrap();
+    let view = crate::objectives::View {
+        s: &e.structure,
+        at: &e.placed.origins,
+        orient: &e.placed.geometry.orient,
+    };
+    let crossings =
+        crate::objectives::score(crate::objectives::Objective::Crossings, &view, Some(&wires));
     assert!(crossings.is_zero(), "{what}");
     // T4: lower (44.3), the rows of the PMOS and of the input pair nearer each other; M5 and M7
     // where they were (-15), not lower: &vb runs from VB, which leaves up on the left of the row
@@ -1669,7 +2380,10 @@ fn the_drawings_are_not_stretched() {
     let (p, solved, e) = case_level("T4-miller-conflicts.sp", "T4-miller-conflicts.sp");
     let what = summary(&p, &solved, &e);
     for label in ["#M5", "#M7"] {
-        assert!(e.placed.origins[object(&p, label)][1] >= int(-15), "{what}: {label}");
+        assert!(
+            e.placed.origins[object(&p, label)][1] >= int(-15),
+            "{what}: {label}"
+        );
     }
     assert!(extent(&e)[1] < num(44.3), "{what}");
     // T5: the row not evenly spaced (13 apart), narrower (80.5)
@@ -1699,16 +2413,20 @@ fn the_drawings_are_not_stretched() {
 fn stub_leads_crossed(p: &LevelProblem, solved: &Solved, e: &Exact) -> Vec<String> {
     let (s, at, ori) = (&e.structure, &e.placed.origins, &e.placed.geometry.orient);
     let net_names = |k: usize| -> Vec<&str> {
-        s.connections
-            .nets_of
-            .get(&(k, 0))
-            .map_or(Vec::new(), |v| v.iter().map(|&n| s.connections.nets[n].name.as_str()).collect())
+        s.connections.nets_of.get(&(k, 0)).map_or(Vec::new(), |v| {
+            v.iter()
+                .map(|&n| s.connections.nets[n].name.as_str())
+                .collect()
+        })
     };
     let inside = |v: &Q, a: &Q, b: &Q| (v > a && v < b) || (v > b && v < a);
     let mut out = Vec::new();
     for (j, info) in s.objects.iter().enumerate() {
         let Some(stub) = &info.stub else { continue };
-        let (Some(top), Some(end)) = (s.pin_at(at, ori, stub.host.0, stub.host.1), s.pin_at(at, ori, j, 0)) else {
+        let (Some(top), Some(end)) = (
+            s.pin_at(at, ori, stub.host.0, stub.host.1),
+            s.pin_at(at, ori, j, 0),
+        ) else {
             continue;
         };
         // a lead runs up or down from its pin
@@ -1723,9 +2441,13 @@ fn stub_leads_crossed(p: &LevelProblem, solved: &Solved, e: &Exact) -> Vec<Strin
             }
             for seg in path.windows(2) {
                 let (a, b) = (&seg[0], &seg[1]);
-                if a[1] == b[1] && inside(&top[0], &a[0], &b[0]) && inside(&a[1], &top[1], &end[1]) {
+                if a[1] == b[1] && inside(&top[0], &a[0], &b[0]) && inside(&a[1], &top[1], &end[1])
+                {
                     let host = &p.objects[stub.host.0].label;
-                    out.push(format!("{net} over the lead of {nets:?} from {host} at ({}, {})", top[0], a[1]));
+                    out.push(format!(
+                        "{net} over the lead of {nets:?} from {host} at ({}, {})",
+                        top[0], a[1]
+                    ));
                 }
             }
         }
@@ -1741,7 +2463,9 @@ fn stub_leads_crossed(p: &LevelProblem, solved: &Solved, e: &Exact) -> Vec<Strin
 /// far from its leg (quality review SE-10).
 #[test]
 fn a_wire_between_two_rows_crosses_no_lead_of_a_stub() {
-    let files = netlists("tests/integration/solver", "T").into_iter().chain(netlists("tests/conformance/cases", ""));
+    let files = netlists("tests/integration/solver", "T")
+        .into_iter()
+        .chain(netlists("tests/conformance/cases", ""));
     for file in files {
         if file.ends_with("T6-r2r-ladder.sp") {
             continue;
@@ -1749,7 +2473,12 @@ fn a_wire_between_two_rows_crosses_no_lead_of_a_stub() {
         for p in problems(&file) {
             let (solved, e) = check_level(&file.to_string_lossy(), &p);
             let crossed = stub_leads_crossed(&p, &solved, &e);
-            assert!(crossed.is_empty(), "{}: {crossed:#?}\n{}", p.title, summary(&p, &solved, &e));
+            assert!(
+                crossed.is_empty(),
+                "{}: {crossed:#?}\n{}",
+                p.title,
+                summary(&p, &solved, &e)
+            );
         }
     }
 }
@@ -1757,7 +2486,10 @@ fn a_wire_between_two_rows_crosses_no_lead_of_a_stub() {
 /// The structure of the level with a title of a case of the solver, not solved.
 fn case_structure(file: &str, title: &str) -> (LevelProblem, Structure) {
     let ps = problems(&repo().join("tests/integration/solver").join(file));
-    let p = ps.into_iter().find(|p| p.title == title).unwrap_or_else(|| panic!("{file}: no level {title}"));
+    let p = ps
+        .into_iter()
+        .find(|p| p.title == title)
+        .unwrap_or_else(|| panic!("{file}: no level {title}"));
     let options = SolverOptions::without_time_limit();
     let resolved = crate::resolve(&p, &options);
     let s = crate::structure::analyse(&p, &resolved, &options, CAPS, &mut crate::Work::default());
@@ -1794,7 +2526,13 @@ fn only_groups_pairs_and_elements_of_one_role_are_spaced_evenly() {
     // T4: the two groups, and no set of the two halves of a mirror pair alone
     let (p, s) = case_structure("T4-miller-conflicts.sp", "T4-miller-conflicts.sp");
     let sets: Vec<Vec<String>> = s.even_sets.iter().map(|set| labels(&p, set)).collect();
-    assert_eq!(sets, vec![labels(&p, &p.groups[0].members), labels(&p, &p.groups[1].members)]);
+    assert_eq!(
+        sets,
+        vec![
+            labels(&p, &p.groups[0].members),
+            labels(&p, &p.groups[1].members)
+        ]
+    );
     assert_eq!(s.scopes.len(), 2);
 }
 
@@ -1804,6 +2542,50 @@ fn only_groups_pairs_and_elements_of_one_role_are_spaced_evenly() {
 /// renderer keeps it: its anchor turns, and a baseline stays below the glyphs, where a box turned
 /// whole lay mirrored across it (review of phase 2 of the quality review: the names and values of
 /// T6's legs and RS6, turned R270).
+#[test]
+fn modern_text_solver_contains_rendered_bounds() {
+    use rnl_runtime::problem::{Filler, TextInfo};
+    for size in [1.0, 1e12, 1e100] {
+        for angle in [0.0, 30.0, 90.0, 180.0, 270.0, -45.0] {
+            for turn in Orient::ALL {
+                for fix_rotate in [false, true] {
+                    for upright in [false, true] {
+                        let t = TextInfo {
+                            attach: Filler::Other(String::new()),
+                            key: None,
+                            lines: rnl_runtime::markup::parse("ABC"),
+                            halign: "start".into(),
+                            valign: "baseline".into(),
+                            rotate: angle,
+                            fix_rotate,
+                            upright,
+                            baseline_mirrors: true,
+                            column_position: None,
+                            style: vec![("size".into(), rnl_runtime::interp::obj::Lit::Num(size))],
+                        };
+                        let b = crate::structure::text_box(&t, &(int(0), int(0)), turn).unwrap();
+                        let (_, render) = rnl_render::modern_text(
+                            (0.0, 0.0),
+                            t.lines.clone(),
+                            &t.halign,
+                            &t.valign,
+                            angle,
+                            &t.style.iter().cloned().collect(),
+                            turn,
+                            fix_rotate,
+                            upright,
+                            14.0,
+                        );
+                        let solver = b.map(|q| crate::rational::to_f64(&q));
+                        assert!(solver[0] <= render[0] && solver[1] <= render[1]);
+                        assert!(solver[2] >= render[2] && solver[3] >= render[3]);
+                    }
+                }
+            }
+        }
+    }
+}
+
 #[test]
 fn a_text_is_as_wide_as_it_is_drawn() {
     use rnl_runtime::problem::{Filler, TextInfo};
@@ -1815,17 +2597,25 @@ fn a_text_is_as_wide_as_it_is_drawn() {
         valign: "baseline".to_string(),
         rotate,
         fix_rotate: false,
+        upright: true,
         baseline_mirrors: false,
         column_position: None,
         style: Vec::new(),
     };
-    let text_box =
-        |t: &TextInfo, at: (i64, i64), turn: Orient| crate::structure::text_box(t, &(int(at.0), int(at.1)), turn);
+    let text_box = |t: &TextInfo, at: (i64, i64), turn: Orient| {
+        crate::structure::text_box(t, &(int(at.0), int(at.1)), turn)
+    };
     let b = text_box(&text("DC 0.6 AC 1", "start", 0.0), (0, 0), Orient::R0).unwrap();
     let w = &b[2] - &b[0];
-    assert!(w > from_f64(5.19).unwrap() && w < from_f64(5.5).unwrap(), "{b:?}");
+    assert!(
+        w > from_f64(5.19).unwrap() && w < from_f64(5.5).unwrap(),
+        "{b:?}"
+    );
     // the baseline 0.8 of the size below the top, 0.4 above the bottom
-    assert_eq!((b[1].clone(), b[3].clone()), (from_f64(-0.4).unwrap(), from_f64(0.8).unwrap()));
+    assert_eq!(
+        (b[1].clone(), b[3].clone()),
+        (from_f64(-0.4).unwrap(), from_f64(0.8).unwrap())
+    );
     // ending at the anchor, and turned a quarter about it: along y, below the anchor
     let b = text_box(&text("DC 0.6 AC 1", "end", 90.0), (1, 2), Orient::R0).unwrap();
     let q = |v: f64| from_f64(v).unwrap();
@@ -1839,15 +2629,24 @@ fn a_text_is_as_wide_as_it_is_drawn() {
     assert_eq!(&b[3] - &b[1], w);
     // mirrored upside down: the anchor at (1, -2), the glyphs still above their baseline
     let b = text_box(&text("DC 0.6 AC 1", "start", 0.0), (1, 2), Orient::MX).unwrap();
-    assert_eq!([&b[0], &b[1], &b[3]], [&q(0.9), &q(-2.4), &q(-1.2)], "{b:?}");
+    assert_eq!(
+        [&b[0], &b[1], &b[3]],
+        [&q(0.9), &q(-2.4), &q(-1.2)],
+        "{b:?}"
+    );
     assert_eq!(&b[2] - &b[0], w);
     // a text hanging from its anchor by its top stands on it by its bottom, mirrored so
     let mut top = text("DC 0.6 AC 1", "start", 0.0);
     top.valign = "top".to_string();
-    let (upright, mirrored) =
-        (text_box(&top, (0, 0), Orient::R0).unwrap(), text_box(&top, (0, 0), Orient::MX).unwrap());
+    let (upright, mirrored) = (
+        text_box(&top, (0, 0), Orient::R0).unwrap(),
+        text_box(&top, (0, 0), Orient::MX).unwrap(),
+    );
     let middle = |b: &[Q; 4]| &b[1] + &b[3];
-    assert!(middle(&upright) < Q::zero() && middle(&mirrored) > Q::zero(), "{upright:?} {mirrored:?}");
+    assert!(
+        middle(&upright) < Q::zero() && middle(&mirrored) > Q::zero(),
+        "{upright:?} {mirrored:?}"
+    );
     assert!(text_box(&text("", "start", 0.0), (0, 0), Orient::R0).is_none());
 }
 
@@ -1860,18 +2659,40 @@ fn texts_that_offsets_place_are_kept_clear() {
     let (p, solved, e) = level_in("tests/conformance/cases", "06-symbols.sp", "06-symbols.sp");
     let what = summary(&p, &solved, &e);
     let (s, at, ori) = (&e.structure, &e.placed.origins, &e.placed.geometry.orient);
-    let placed = |k: usize, b: &[Q; 4]| [&at[k][0] + &b[0], &at[k][1] + &b[1], &at[k][0] + &b[2], &at[k][1] + &b[3]];
-    let texts: Vec<(usize, [Q; 4])> =
-        s.offset_labels.iter().flat_map(|(&k, boxes)| boxes.iter().map(move |b| (k, placed(k, b)))).collect();
+    let placed = |k: usize, b: &[Q; 4]| {
+        [
+            &at[k][0] + &b[0],
+            &at[k][1] + &b[1],
+            &at[k][0] + &b[2],
+            &at[k][1] + &b[3],
+        ]
+    };
+    let texts: Vec<(usize, [Q; 4])> = s
+        .offset_labels
+        .iter()
+        .flat_map(|(&k, boxes)| boxes.iter().map(move |b| (k, placed(k, b))))
+        .collect();
     assert!(texts.len() >= 10, "{what}");
     let meet = |a: &[Q; 4], b: &[Q; 4]| a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
     for (i, (k, a)) in texts.iter().enumerate() {
         for (j, b) in &texts[i + 1..] {
-            assert!(k == j || !meet(a, b), "{} {}: {what}", p.objects[*k].label, p.objects[*j].label);
+            assert!(
+                k == j || !meet(a, b),
+                "{} {}: {what}",
+                p.objects[*k].label,
+                p.objects[*j].label
+            );
         }
         for j in s.components().filter(|j| j != k) {
-            let Some(b) = s.box_at(at, ori, j) else { continue };
-            assert!(!meet(a, &b), "{} {}: {what}", p.objects[*k].label, p.objects[j].label);
+            let Some(b) = s.box_at(at, ori, j) else {
+                continue;
+            };
+            assert!(
+                !meet(a, &b),
+                "{} {}: {what}",
+                p.objects[*k].label,
+                p.objects[j].label
+            );
         }
     }
 }
@@ -1909,10 +2730,14 @@ fn relation_points(r: &Relation) -> Vec<(usize, Vec<PointId>)> {
     match r {
         Relation::Orient { .. } | Relation::Way { .. } => Vec::new(),
         Relation::Linear { axis, terms, .. } => vec![(*axis, points(terms))],
-        Relation::Apart { axis, low, high, .. } => vec![(*axis, points(&[low.clone(), high.clone()].concat()))],
-        Relation::OneOf(alternatives) => {
-            alternatives.iter().flatten().map(|(axis, terms, _)| (*axis, points(terms))).collect()
-        }
+        Relation::Apart {
+            axis, low, high, ..
+        } => vec![(*axis, points(&[low.clone(), high.clone()].concat()))],
+        Relation::OneOf(alternatives) => alternatives
+            .iter()
+            .flatten()
+            .map(|(axis, terms, _)| (*axis, points(terms)))
+            .collect(),
         Relation::Even { axis, points } => vec![(*axis, points.clone())],
     }
 }
@@ -1930,7 +2755,12 @@ fn relation_points(r: &Relation) -> Vec<(usize, Vec<PointId>)> {
 /// axis that no fact reaches, and a supply, ground or port symbol that no fact reaches and that
 /// the candidate puts beside no pin; a text attached to a wire or a net that no fact reaches would
 /// be but for its anchor.
-fn grounded(problem: &LevelProblem, s: &Structure, c: &Candidate, ori: &[Orient]) -> Vec<[bool; 2]> {
+fn grounded(
+    problem: &LevelProblem,
+    s: &Structure,
+    c: &Candidate,
+    ori: &[Orient],
+) -> Vec<[bool; 2]> {
     let n = problem.objects.len();
     // the objects, then one node for what is held: a union-find on each axis
     let mut parent: [Vec<usize>; 2] = [(0..=n).collect(), (0..=n).collect()];
@@ -1949,7 +2779,9 @@ fn grounded(problem: &LevelProblem, s: &Structure, c: &Candidate, ori: &[Orient]
     };
     let held = n;
     let object_of = |p: &PointId| match p {
-        PointId::Origin(k) | PointId::Pin(k, _) | PointId::PinPosition(k, _) | PointId::Text(k) => Some(*k),
+        PointId::Origin(k) | PointId::Pin(k, _) | PointId::PinPosition(k, _) | PointId::Text(k) => {
+            Some(*k)
+        }
         PointId::Centre(_) => None,
     };
     // the elements, in the rows of the candidate
@@ -1978,9 +2810,13 @@ fn grounded(problem: &LevelProblem, s: &Structure, c: &Candidate, ori: &[Orient]
         }
     }
     for &f in &s.kept {
-        let (Some(unit), Some(fact)) = (s.model.units.get(f), problem.facts.get(f)) else { continue };
+        let (Some(unit), Some(fact)) = (s.model.units.get(f), problem.facts.get(f)) else {
+            continue;
+        };
         let fixes = match &fact.kind {
-            FactKind::Place { axis, .. } | FactKind::PointCoordinate { axis, .. } => Some(ax(*axis)),
+            FactKind::Place { axis, .. } | FactKind::PointCoordinate { axis, .. } => {
+                Some(ax(*axis))
+            }
             _ => None,
         };
         for axis in 0..2 {
@@ -2017,7 +2853,14 @@ fn grounded(problem: &LevelProblem, s: &Structure, c: &Candidate, ori: &[Orient]
         }
     }
     let ground = [root(&mut parent[0], held), root(&mut parent[1], held)];
-    (0..n).map(|k| [root(&mut parent[0], k) == ground[0], root(&mut parent[1], k) == ground[1]]).collect()
+    (0..n)
+        .map(|k| {
+            [
+                root(&mut parent[0], k) == ground[0],
+                root(&mut parent[1], k) == ground[1],
+            ]
+        })
+        .collect()
 }
 
 /// The texts of a level: on the wire `%w` and on the net `&b`, which no fact reaches, and `%l` on
@@ -2044,11 +2887,19 @@ fn a_text_on_a_wire_or_a_net_that_no_fact_reaches_is_left_to_the_viewer() {
     let (p, solved, e) = solve_text(&netlist(TEXTS_ON_WIRES));
     let attached = |unnamed: fn(&Filler) -> bool| {
         let found = p.objects.iter().position(|o| {
-            o.reference != Reference::Name("%l".into()) && o.text.as_ref().is_some_and(|t| unnamed(&t.attach))
+            o.reference != Reference::Name("%l".into())
+                && o.text.as_ref().is_some_and(|t| unnamed(&t.attach))
         });
         found.unwrap()
     };
-    let placed = |k: usize| solved.solution.placements.iter().find(|pl| pl.object == k).and_then(|pl| pl.at());
+    let placed = |k: usize| {
+        solved
+            .solution
+            .placements
+            .iter()
+            .find(|pl| pl.object == k)
+            .and_then(|pl| pl.at())
+    };
     let on_wire = attached(|f| matches!(f, Filler::Wire(_)));
     let on_net = attached(|f| matches!(f, Filler::Net(n) if n == "b"));
     for k in [on_wire, on_net] {
@@ -2056,20 +2907,36 @@ fn a_text_on_a_wire_or_a_net_that_no_fact_reaches_is_left_to_the_viewer() {
         assert_eq!(placed(k), None, "{}", p.objects[k].label);
     }
     assert!(
-        solved.report.notes.iter().any(|n| n.starts_with("2 texts that no fact kept reaches are left free")),
+        solved
+            .report
+            .notes
+            .iter()
+            .any(|n| n.starts_with("2 texts that no fact kept reaches are left free")),
         "{:#?}",
         solved.report.notes
     );
-    let l = p.objects.iter().position(|o| o.reference == Reference::Name("%l".into())).unwrap();
+    let l = p
+        .objects
+        .iter()
+        .position(|o| o.reference == Reference::Name("%l".into()))
+        .unwrap();
     assert!(!left_free(&e.structure, l));
     assert_eq!(e.structure.objects[l].fact_axes, [false, true]);
-    assert_eq!(grounded(&p, &e.structure, &e.candidate, &e.placed.geometry.orient)[l], [true, true]);
+    assert_eq!(
+        grounded(&p, &e.structure, &e.candidate, &e.placed.geometry.orient)[l],
+        [true, true]
+    );
     let (x, y) = placed(l).expect("the aligned text is placed");
     assert_eq!(y, to_f64(&e.placed.origins[object(&p, "#R2")][1]));
     // in the middle of the wire's two points, the pins of R1 and R2, on x
     let pin_x = |r: &PointRef| {
-        let PointRef::Pin { object, pin, .. } = r else { panic!("{r:?}") };
-        let at = e.structure.pin_offset(*object, *pin, e.placed.geometry.orient[*object]).unwrap();
+        let PointRef::Pin { object, pin, .. } = r else {
+            panic!("{r:?}")
+        };
+        let at = e
+            .structure
+            .pin_offset(*object, *pin, e.placed.geometry.orient[*object])
+            .unwrap();
         &e.placed.origins[*object][0] + &at[0]
     };
     let middle = (pin_x(&p.wires[0].anchors[0]) + pin_x(&p.wires[0].anchors[1])) / int(2);
@@ -2093,28 +2960,66 @@ fn a_symbol_without_a_name_on_no_net_drawn_is_left_free() {
         "*   $GND @ATTACH &b\n",
         "* }\n",
     )));
-    let grounds: Vec<usize> = (0..p.objects.len()).filter(|&k| e.structure.objects[k].role == Role::Ground).collect();
-    let [on_c, named, on_b] = grounds.as_slice() else { panic!("{grounds:?}") };
+    let grounds: Vec<usize> = (0..p.objects.len())
+        .filter(|&k| e.structure.objects[k].role == Role::Ground)
+        .collect();
+    let [on_c, named, on_b] = grounds.as_slice() else {
+        panic!("{grounds:?}")
+    };
     let (on_c, named, on_b) = (*on_c, *named, *on_b);
-    assert!(matches!(p.objects[on_c].reference, Reference::Number { .. }), "{:?}", p.objects[on_c]);
+    assert!(
+        matches!(p.objects[on_c].reference, Reference::Number { .. }),
+        "{:?}",
+        p.objects[on_c]
+    );
     assert_eq!(p.objects[named].reference, Reference::Name("%g".into()));
     assert!(left_free(&e.structure, on_c));
-    assert!(solved.solution.placements.iter().all(|pl| pl.object != on_c), "{:?}", solved.solution.placements);
-    assert!(!e.structure.components().any(|k| k == on_c) && !crate::coords::solid(&e.structure, on_c));
+    assert!(
+        solved
+            .solution
+            .placements
+            .iter()
+            .all(|pl| pl.object != on_c),
+        "{:?}",
+        solved.solution.placements
+    );
+    assert!(
+        !e.structure.components().any(|k| k == on_c) && !crate::coords::solid(&e.structure, on_c)
+    );
     assert!(e.placed.overlaps.iter().all(|o| o.a != on_c && o.b != on_c));
     let note = "1 symbol without a name that no fact kept reaches is left free";
-    assert!(solved.report.notes.iter().any(|n| n.starts_with(note)), "{:#?}", solved.report.notes);
+    assert!(
+        solved.report.notes.iter().any(|n| n.starts_with(note)),
+        "{:#?}",
+        solved.report.notes
+    );
     // the one with a name is placed, though nothing places it either
-    let placed = |k: usize| solved.solution.placements.iter().find(|pl| pl.object == k).and_then(|pl| pl.at());
+    let placed = |k: usize| {
+        solved
+            .solution
+            .placements
+            .iter()
+            .find(|pl| pl.object == k)
+            .and_then(|pl| pl.at())
+    };
     assert!(!left_free(&e.structure, named) && placed(named).is_some());
     // the one on the net drawn goes below the first pin of an element on it, R1's
     let ori = &e.placed.geometry.orient;
     let attach = crate::search::attachments(&e.structure, &e.candidate.rows, ori);
-    assert_eq!(attach.get(&on_b).map(|a| (a.host.0, a.side)), Some((object(&p, "#R1"), crate::search::Side::Below)));
+    assert_eq!(
+        attach.get(&on_b).map(|a| (a.host.0, a.side)),
+        Some((object(&p, "#R1"), crate::search::Side::Below))
+    );
     assert!(!left_free(&e.structure, on_b) && placed(on_b).is_some());
-    assert_eq!(grounded(&p, &e.structure, &e.candidate, ori)[on_b], [true, true]);
+    assert_eq!(
+        grounded(&p, &e.structure, &e.candidate, ori)[on_b],
+        [true, true]
+    );
     let host = attach[&on_b].host;
-    let hpin = e.structure.pin_at(&e.placed.origins, ori, host.0, host.1).unwrap();
+    let hpin = e
+        .structure
+        .pin_at(&e.placed.origins, ori, host.0, host.1)
+        .unwrap();
     let gpin = e.structure.pin_at(&e.placed.origins, ori, on_b, 0).unwrap();
     assert_eq!(gpin[0], hpin[0]);
     assert!(gpin[1] < hpin[1], "{gpin:?} below {hpin:?}");
@@ -2143,7 +3048,12 @@ fn nothing_is_placed_where_only_the_witness_puts_it() {
             let (solved, e) = solve_exact(&p, &SolverOptions::without_time_limit());
             let ori = &e.placed.geometry.orient;
             let g = grounded(&p, &e.structure, &e.candidate, ori);
-            for pl in solved.solution.placements.iter().filter(|pl| pl.at().is_some()) {
+            for pl in solved
+                .solution
+                .placements
+                .iter()
+                .filter(|pl| pl.at().is_some())
+            {
                 let o = &p.objects[pl.object];
                 let free: Vec<usize> = (0..2).filter(|&a| !g[pl.object][a]).collect();
                 if free.is_empty() || o.kind == ObjectKind::Point {
@@ -2151,15 +3061,27 @@ fn nothing_is_placed_where_only_the_witness_puts_it() {
                 }
                 let what = format!("{name} / {}: {} on {free:?}", p.title, o.label);
                 let port = e.structure.objects[pl.object].role == Role::Port;
-                assert!(port && matches!(o.reference, Reference::Generated { .. }), "{what}");
+                assert!(
+                    port && matches!(o.reference, Reference::Generated { .. }),
+                    "{what}"
+                );
                 *unheld.entry(format!("{name} / {}", p.title)).or_default() += 1;
             }
             for k in (0..p.objects.len()).filter(|&k| left_free(&e.structure, k)) {
                 left.push(format!("{name} / {}: {}", p.title, p.objects[k].label));
-                assert!(solved.solution.placements.iter().all(|pl| pl.object != k), "{name} / {}", p.title);
+                assert!(
+                    solved.solution.placements.iter().all(|pl| pl.object != k),
+                    "{name} / {}",
+                    p.title
+                );
             }
             for k in crate::search::attachments(&e.structure, &e.candidate.rows, ori).keys() {
-                assert!(!left_free(&e.structure, *k), "{name} / {}: {}", p.title, p.objects[*k].label);
+                assert!(
+                    !left_free(&e.structure, *k),
+                    "{name} / {}: {}",
+                    p.title,
+                    p.objects[*k].label
+                );
             }
         }
     }
@@ -2215,11 +3137,26 @@ fn symbol_texts(p: &LevelProblem, e: &Exact) -> Vec<(usize, [Q; 4])> {
     let (at, ori) = (&e.placed.origins, &e.placed.geometry.orient);
     let mut out = Vec::new();
     for o in &p.objects {
-        let (Position::InSymbol { owner, local, replaced: None }, Some(t)) = (&o.position, &o.text) else { continue };
+        let (
+            Position::InSymbol {
+                owner,
+                local,
+                replaced: None,
+            },
+            Some(t),
+        ) = (&o.position, &o.text)
+        else {
+            continue;
+        };
         let local = (from_f64(local.0).unwrap(), from_f64(local.1).unwrap());
-        let Some(b) = crate::structure::text_box(t, &local, ori[*owner]) else { continue };
+        let Some(b) = crate::structure::text_box(t, &local, ori[*owner]) else {
+            continue;
+        };
         let a = &at[*owner];
-        out.push((*owner, [&a[0] + &b[0], &a[1] + &b[1], &a[0] + &b[2], &a[1] + &b[3]]));
+        out.push((
+            *owner,
+            [&a[0] + &b[0], &a[1] + &b[1], &a[0] + &b[2], &a[1] + &b[3]],
+        ));
     }
     out
 }
@@ -2236,17 +3173,38 @@ fn the_members_of_a_distribute_keep_its_order_and_their_texts_clear() {
               * @RNL { {#R1 #R2 #R3 #C4} @DISTRIBUTE(\"x\"); {#R1 #R2 #R3 #C4} @ALIGN(\"y\"); $WIRE_NET_SET @ROUTE }\n";
     let sweep = "R0 a 0 1k\nR1 a b 1k\nV2 b 0 SIN(0 1 1meg)\n\
                  * @RNL { {#R1 #V2 #R0} @DISTRIBUTE(\"x\"); $WIRE_NET_SET @ROUTE }\n";
-    for (body, members) in [(s2, &["#R1", "#R2", "#R3", "#C4"][..]), (sweep, &["#R1", "#V2", "#R0"][..])] {
+    for (body, members) in [
+        (s2, &["#R1", "#R2", "#R3", "#C4"][..]),
+        (sweep, &["#R1", "#V2", "#R0"][..]),
+    ] {
         let (p, solved, e) = solve_text(&netlist(body));
         let what = summary(&p, &solved, &e);
-        assert!(!e.placed.dropped.contains(&crate::search::RelKind::Gap), "{:?}\n{what}", e.placed.dropped);
+        assert!(
+            !e.placed.dropped.contains(&crate::search::RelKind::Gap),
+            "{:?}\n{what}",
+            e.placed.dropped
+        );
         // in the order of the DISTRIBUTE, one way or the other, apart
-        let xs: Vec<&Q> = members.iter().map(|m| &e.placed.origins[object(&p, m)][0]).collect();
-        let (up, down) = (xs.windows(2).all(|w| w[0] < w[1]), xs.windows(2).all(|w| w[0] > w[1]));
+        let xs: Vec<&Q> = members
+            .iter()
+            .map(|m| &e.placed.origins[object(&p, m)][0])
+            .collect();
+        let (up, down) = (
+            xs.windows(2).all(|w| w[0] < w[1]),
+            xs.windows(2).all(|w| w[0] > w[1]),
+        );
         assert!(up || down, "{xs:?}\n{what}");
         let ks: Vec<usize> = members.iter().map(|m| object(&p, m)).collect();
-        let row = e.candidate.rows.iter().find(|r| r.contains(&ks[0])).unwrap();
-        let places: Vec<usize> = ks.iter().filter_map(|k| row.iter().position(|j| j == k)).collect();
+        let row = e
+            .candidate
+            .rows
+            .iter()
+            .find(|r| r.contains(&ks[0]))
+            .unwrap();
+        let places: Vec<usize> = ks
+            .iter()
+            .filter_map(|k| row.iter().position(|j| j == k))
+            .collect();
         assert_eq!(places.len(), ks.len(), "{:?}\n{what}", e.candidate.rows);
         assert!(
             places.windows(2).all(|w| w[0] < w[1]) || places.windows(2).all(|w| w[0] > w[1]),
@@ -2258,13 +3216,24 @@ fn the_members_of_a_distribute_keep_its_order_and_their_texts_clear() {
         assert_eq!(crate::score::texts_over(s, at, ori), 0, "{what}");
         let texts = symbol_texts(&p, &e);
         assert!(texts.len() >= 2 * members.len(), "{texts:?}\n{what}");
-        let meet = |a: &[Q; 4], b: &[Q; 4]| a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+        let meet =
+            |a: &[Q; 4], b: &[Q; 4]| a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
         // a stub and its host go together
         let host = |k: usize| s.objects[k].stub.as_ref().map(|stub| stub.host.0);
         for &(k, ref t) in &texts {
-            for j in s.components().filter(|&j| j != k && host(j) != Some(k) && host(k) != Some(j)) {
-                let Some(b) = s.box_at(at, ori, j) else { continue };
-                assert!(!meet(t, &b), "{} over {}: {what}", p.objects[k].label, p.objects[j].label);
+            for j in s
+                .components()
+                .filter(|&j| j != k && host(j) != Some(k) && host(k) != Some(j))
+            {
+                let Some(b) = s.box_at(at, ori, j) else {
+                    continue;
+                };
+                assert!(
+                    !meet(t, &b),
+                    "{} over {}: {what}",
+                    p.objects[k].label,
+                    p.objects[j].label
+                );
             }
         }
     }
@@ -2275,7 +3244,9 @@ fn component_pins(e: &Exact) -> Vec<((usize, usize), [Q; 2])> {
     let (s, at, ori) = (&e.structure, &e.placed.origins, &e.placed.geometry.orient);
     let mut out = Vec::new();
     for k in s.components() {
-        out.extend((0..s.pins(k).len()).filter_map(|pin| Some(((k, pin), s.pin_at(at, ori, k, pin)?))));
+        out.extend(
+            (0..s.pins(k).len()).filter_map(|pin| Some(((k, pin), s.pin_at(at, ori, k, pin)?))),
+        );
     }
     out
 }
@@ -2288,9 +3259,13 @@ fn pins_alike(a: &Exact, b: &Exact, mirror: bool) -> bool {
         return false;
     }
     let x = |p: &[Q; 2], q: &[Q; 2]| if mirror { &p[0] + &q[0] } else { &q[0] - &p[0] };
-    let Some(((_, p0), (_, q0))) = pa.first().zip(pb.first()) else { return true };
+    let Some(((_, p0), (_, q0))) = pa.first().zip(pb.first()) else {
+        return true;
+    };
     let (dx, dy) = (x(p0, q0), &q0[1] - &p0[1]);
-    pa.iter().zip(&pb).all(|((_, p), (_, q))| x(p, q) == dx && &q[1] - &p[1] == dy)
+    pa.iter()
+        .zip(&pb)
+        .all(|((_, p), (_, q))| x(p, q) == dx && &q[1] - &p[1] == dy)
 }
 
 /// A DISTRIBUTE has no direction (14.4): its members written the other way round mean the same,
@@ -2321,7 +3296,10 @@ fn a_distribute_written_the_other_way_round_is_drawn_alike() {
         let (p, solved, e) = solve_text(&netlist(body));
         let (q, again, f) = solve_text(&netlist(&body.replacen(written, reversed, 1)));
         let (what, other) = (summary(&p, &solved, &e), summary(&q, &again, &f));
-        assert!(pins_alike(&e, &f, false) || pins_alike(&e, &f, true), "{written}:\n{what}\n{reversed}:\n{other}");
+        assert!(
+            pins_alike(&e, &f, false) || pins_alike(&e, &f, true),
+            "{written}:\n{what}\n{reversed}:\n{other}"
+        );
         assert_eq!(e.placed.dropped, f.placed.dropped, "{what}\n{other}");
     }
 }
@@ -2355,25 +3333,53 @@ fn the_stubs_of_the_series_0_3_hang_from_their_pins_by_their_drawing() {
     let what = summary(&p, &solved, &e);
     let s = &e.structure;
     let [m1, m2] = ["#M1", "#M2"].map(|l| object(&p, l));
-    assert!(solved.report.inert_objectives.iter().all(|i| i.starts_with("terminal_wire_alignment")), "{what}");
-    assert!(!s.power.ground.is_empty() && !s.power.supply.is_empty(), "{what}");
+    assert!(
+        solved
+            .report
+            .inert_objectives
+            .iter()
+            .all(|i| i.starts_with("terminal_wire_alignment")),
+        "{what}"
+    );
+    assert!(
+        !s.power.ground.is_empty() && !s.power.supply.is_empty(),
+        "{what}"
+    );
     for &k in s.power.ground.iter().chain(&s.power.supply) {
-        let stub = s.objects[k].stub.as_ref().unwrap_or_else(|| panic!("{} is no stub: {what}", p.objects[k].label));
+        let stub = s.objects[k]
+            .stub
+            .as_ref()
+            .unwrap_or_else(|| panic!("{} is no stub: {what}", p.objects[k].label));
         let up = s.power.supply.contains(&k);
-        assert_eq!(stub.rise.is_positive(), up, "{}: {what}", p.objects[k].label);
+        assert_eq!(
+            stub.rise.is_positive(),
+            up,
+            "{}: {what}",
+            p.objects[k].label
+        );
         assert!(stub.host.0 == m1 || stub.host.0 == m2, "{what}");
     }
     assert_eq!(s.elements, vec![m1, m2], "{what}");
-    let depth = s.depth.as_ref().unwrap_or_else(|| panic!("no current depth: {what}"));
+    let depth = s
+        .depth
+        .as_ref()
+        .unwrap_or_else(|| panic!("no current depth: {what}"));
     assert_eq!((depth[m1], depth[m2]), (Some(0), Some(1)), "{what}");
     let at = &e.placed.origins;
     assert!(at[m1][1] > at[m2][1], "{what}");
     // each source towards its rail: the PMOS's up, the NMOS's down
     let pin = |k: usize, terminal: &str| {
-        let i = s.pins(k).iter().position(|q| q.terminals.iter().any(|t| t == terminal)).unwrap();
+        let i = s
+            .pins(k)
+            .iter()
+            .position(|q| q.terminals.iter().any(|t| t == terminal))
+            .unwrap();
         s.pin_at(at, &e.placed.geometry.orient, k, i).unwrap()
     };
-    assert!(pin(m1, "3")[1] > pin(m1, "1")[1] && pin(m2, "3")[1] < pin(m2, "1")[1], "{what}");
+    assert!(
+        pin(m1, "3")[1] > pin(m1, "1")[1] && pin(m2, "3")[1] < pin(m2, "1")[1],
+        "{what}"
+    );
 }
 
 /// A port of the standard series 0.3 (`$IO_PORT`) is a port, which goes beside the pin it joins,
@@ -2386,7 +3392,11 @@ fn a_port_of_the_series_0_3_is_a_port_by_its_drawing() {
     );
     let what = summary(&p, &solved, &e);
     let po = object(&p, "%po");
-    assert_eq!(e.structure.objects[po].role, crate::structure::Role::Port, "{what}");
+    assert_eq!(
+        e.structure.objects[po].role,
+        crate::structure::Role::Port,
+        "{what}"
+    );
     assert!(!e.structure.elements.contains(&po), "{what}");
 }
 
@@ -2399,15 +3409,31 @@ fn the_series_0_2_and_0_3_give_the_same_structure() {
         let s = &e.structure;
         let label = |k: &usize| p.objects[*k].label.clone();
         let hosts = |ks: &[usize]| -> Vec<String> {
-            let mut v: Vec<String> =
-                ks.iter().filter_map(|k| s.objects[*k].stub.as_ref()).map(|st| label(&st.host.0)).collect();
+            let mut v: Vec<String> = ks
+                .iter()
+                .filter_map(|k| s.objects[*k].stub.as_ref())
+                .map(|st| label(&st.host.0))
+                .collect();
             v.sort();
             v
         };
-        let rows: Vec<Vec<String>> = s.rows.iter().map(|r| r.iter().map(label).collect()).collect();
-        let depth: Vec<(String, Option<u32>)> =
-            s.elements.iter().map(|k| (label(k), s.depth.as_ref().and_then(|d| d[*k]))).collect();
-        (hosts(&s.power.supply), hosts(&s.power.ground), rows, depth, solved.report.inert_objectives.clone())
+        let rows: Vec<Vec<String>> = s
+            .rows
+            .iter()
+            .map(|r| r.iter().map(label).collect())
+            .collect();
+        let depth: Vec<(String, Option<u32>)> = s
+            .elements
+            .iter()
+            .map(|k| (label(k), s.depth.as_ref().and_then(|d| d[*k])))
+            .collect();
+        (
+            hosts(&s.power.supply),
+            hosts(&s.power.ground),
+            rows,
+            depth,
+            solved.report.inert_objectives.clone(),
+        )
     };
     assert_eq!(shape("0.2"), shape("0.3"));
 }
@@ -2424,14 +3450,18 @@ fn fixed_rotation_text_boxes_move_the_anchor_without_turning_the_extent() {
             valign: "top".into(),
             rotate,
             fix_rotate: true,
+            upright: true,
             baseline_mirrors: false,
             column_position: None,
             style: Vec::new(),
         };
         for turn in Orient::ALL {
             let at = turn.apply((2.0, 3.0));
-            let want =
-                crate::structure::text_box(&text, &(from_f64(at.0).unwrap(), from_f64(at.1).unwrap()), Orient::R0);
+            let want = crate::structure::text_box(
+                &text,
+                &(from_f64(at.0).unwrap(), from_f64(at.1).unwrap()),
+                Orient::R0,
+            );
             let got = crate::structure::text_box(&text, &(int(2), int(3)), turn);
             assert_eq!(got, want, "{turn:?} rotate={rotate}");
         }
@@ -2449,6 +3479,7 @@ fn mirrored_baselines_use_the_same_box_side_in_the_solver() {
         valign: "baseline".into(),
         rotate: 0.0,
         fix_rotate: false,
+        upright: true,
         baseline_mirrors: true,
         column_position: None,
         style: Vec::new(),
@@ -2459,7 +3490,14 @@ fn mirrored_baselines_use_the_same_box_side_in_the_solver() {
     assert!(&reflected[1] + &reflected[3] < int(0));
     assert_eq!(&upright[2] - &upright[0], &reflected[2] - &reflected[0]);
     text.baseline_mirrors = false;
-    assert_eq!(crate::structure::text_box(&text, &(int(0), int(0)), Orient::MX).unwrap(), upright);
+    // Released files retain their own glyph-height collision estimate; modern text
+    // uses the complete transformed font box. Compare the legacy orientations to
+    // each other so this still verifies that legacy baselines do not flip sides.
+    let legacy_upright = crate::structure::text_box(&text, &(int(0), int(0)), Orient::R0).unwrap();
+    assert_eq!(
+        crate::structure::text_box(&text, &(int(0), int(0)), Orient::MX).unwrap(),
+        legacy_upright
+    );
 }
 
 #[test]
@@ -2473,6 +3511,7 @@ fn modern_fixed_text_boxes_follow_the_owner_side() {
         valign: "bottom".into(),
         rotate: 0.0,
         fix_rotate: true,
+        upright: true,
         baseline_mirrors: true,
         column_position: None,
         style: Vec::new(),
@@ -2491,8 +3530,11 @@ fn modern_fixed_text_boxes_follow_the_owner_side() {
         control.halign = h.into();
         control.valign = v.into();
         let at = turn.apply((2.0, 3.0));
-        let expected =
-            crate::structure::text_box(&control, &(from_f64(at.0).unwrap(), from_f64(at.1).unwrap()), Orient::R0);
+        let expected = crate::structure::text_box(
+            &control,
+            &(from_f64(at.0).unwrap(), from_f64(at.1).unwrap()),
+            Orient::R0,
+        );
         let actual = crate::structure::text_box(&text, &(int(2), int(3)), turn);
         assert_eq!(actual, expected, "{turn:?}");
     }
@@ -2509,6 +3551,7 @@ fn modern_fixed_quarter_turn_mirrors_the_box_in_scene_axes() {
         valign: "bottom".into(),
         rotate: 90.0,
         fix_rotate: true,
+        upright: true,
         baseline_mirrors: true,
         column_position: None,
         style: Vec::new(),

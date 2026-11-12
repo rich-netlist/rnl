@@ -24,7 +24,7 @@ pub fn encode_budget(b: BudgetReport) -> Result<Value> {
 }
 
 pub(crate) fn encode(r: &SolveReport) -> Result<Value> {
-    let value = json!({
+    let mut value = json!({
         "budget":r.budget.map(encode_budget).transpose()?,
         "canonical_options":r.canonical_options,
         "kept":r.kept,"failed":r.failed,
@@ -35,6 +35,9 @@ pub(crate) fn encode(r: &SolveReport) -> Result<Value> {
         "work":{"resolve_nodes":r.work.resolve_nodes,"pivots":r.work.pivots,"candidates":r.work.candidates,"astar_expansions":r.work.astar_expansions},
         "errors":r.errors,"warnings":r.warnings,"notes":r.notes,
     });
+    if let Some(wire) = r.fatal_written_wire {
+        value["fatal_written_wire"] = json!(wire);
+    }
     decode(Node::root(&value))?;
     Ok(value)
 }
@@ -93,6 +96,11 @@ pub(crate) fn decode(n: Node<'_>) -> Result<SolveReport> {
     }
     let work = n.field("work")?;
     Ok(SolveReport {
+        fatal_written_wire: if n.value.get("fatal_written_wire").is_some() {
+            Some(n.field("fatal_written_wire")?.index()?)
+        } else {
+            None
+        },
         budget,
         canonical_options: n.field("canonical_options")?.nullable(|n| Ok(n.string()?.to_owned()))?,
         kept: indices(n.field("kept")?)?,
@@ -125,6 +133,26 @@ pub(crate) fn decode(n: Node<'_>) -> Result<SolveReport> {
         warnings: strings(n.field("warnings")?)?,
         notes: strings(n.field("notes")?)?,
     })
+}
+
+#[cfg(test)]
+mod fatal_tests {
+    use super::*;
+
+    #[test]
+    fn fatal_is_explicit_and_legacy_report_has_no_new_field() {
+        let legacy = SolveReport::default();
+        let value = encode(&legacy).unwrap();
+        assert!(value.get("fatal_written_wire").is_none());
+        assert_eq!(decode(Node::root(&value)).unwrap(), legacy);
+        let mut fatal = legacy;
+        fatal.fatal_written_wire = Some(7);
+        fatal.errors.push("wire geometry failed".into());
+        let mut value = encode(&fatal).unwrap();
+        assert_eq!(decode(Node::root(&value)).unwrap(), fatal);
+        value["fatal_written_wire"] = json!("7");
+        assert!(decode(Node::root(&value)).is_err());
+    }
 }
 
 fn budget(n: Node<'_>) -> Result<BudgetReport> {

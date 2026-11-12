@@ -5,7 +5,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::geom::{route, Pt};
+use crate::geom::Pt;
 
 use super::obj::*;
 use super::Interp;
@@ -126,7 +126,7 @@ impl Interp<'_> {
             if !matches!(self.o(w), ObjData::Wire { failed: false, .. }) {
                 continue;
             }
-            let Some((runs, mode)) = self.wire_runs(s, w) else { continue };
+            let Some(runs) = self.wire_runs(s, w) else { continue };
             let handles = if by_handle {
                 self.wire_shape(s, w)
                     .map(|shape| shape.points.into_iter().map(|point| self.wire_point_handle(s, point)).collect())
@@ -136,7 +136,7 @@ impl Interp<'_> {
             };
             let mut piece = Piece { points: Vec::new(), segments: Vec::new(), pin: None, handles };
             for run in runs {
-                let drawn = if run.len() >= 2 { route(&run, &mode) } else { run };
+                let drawn = run;
                 piece.segments.extend(drawn.windows(2).map(|pair| (pair[0], pair[1])));
                 piece.points.extend(drawn);
             }

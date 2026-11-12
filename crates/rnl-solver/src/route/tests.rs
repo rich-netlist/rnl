@@ -32,7 +32,7 @@ fn layout(boxes: &[[i64; 4]], nets: Vec<NetIn>) -> Layout {
 }
 
 fn net(anchors: Vec<AnchorIn>) -> NetIn {
-    NetIn { anchors, joined: Vec::new() }
+    NetIn { anchors, joined: Vec::new(), preferred: None }
 }
 
 #[test]
@@ -217,13 +217,14 @@ fn a_modern_manhattan45_diagonal_has_no_zero_length_corner_segments() {
         bus: false,
         anchors: vec![PointRef::Origin(0), PointRef::Origin(1)],
         mode: "manhattan45".into(),
+        default_auto: false,
         generated: false,
     }];
     let mut geometry = Geometry::new(2);
     geometry.origin[1] = p(4, 4);
-    assert_eq!(written_path(&problem, &geometry, 0).unwrap().len(), 4);
+    assert_eq!(written_path(&problem, &geometry, 0).unwrap().unwrap().len(), 4);
     problem.version = "0.4".into();
-    assert_eq!(written_path(&problem, &geometry, 0).unwrap(), vec![p(0, 0), p(4, 4)]);
+    assert_eq!(written_path(&problem, &geometry, 0).unwrap().unwrap(), vec![p(0, 0), p(4, 4)]);
 }
 
 #[test]
@@ -322,6 +323,7 @@ fn a_pin_position_does_not_become_an_electrical_junction_during_fallback() {
             bus: false,
             anchors: vec![PointRef::Origin(2), end.clone()],
             mode: "straight".into(),
+            default_auto: false,
             generated: false,
         }];
         p.routes = vec![RouteIntent {
@@ -788,4 +790,207 @@ fn symbols_placed_far_apart_make_a_small_lattice() {
     for x in (-10..=TRACKS).chain(25000 - TRACKS..=25010) {
         assert!(Lattice::index(&lat.xs, &int(x)).is_some(), "{x}");
     }
+}
+
+#[test]
+fn auto_written_path_uses_source_marker_and_shared_default() {
+    use crate::resolve::tests::{point, problem_of};
+    use rnl_runtime::problem::{ProblemWire, Reference};
+    let mut problem = problem_of(vec![point(), point()], vec![]);
+    problem.version = "0.3".into(); // source marker, not target version, controls auto
+    problem.wires = vec![ProblemWire {
+        label: "%w".into(),
+        reference: Reference::Name("%w".into()),
+        nets: vec![],
+        bus: false,
+        anchors: vec![PointRef::Origin(0), PointRef::Origin(1)],
+        mode: "auto".into(),
+        default_auto: true,
+        generated: false,
+    }];
+    let mut geometry = Geometry::new(2);
+    geometry.origin[1] = p(4, 3);
+    assert_eq!(written_path(&problem, &geometry, 0).unwrap().unwrap(), vec![p(0, 0), p(4, 0), p(4, 3)]);
+    problem.version = "0.4".into();
+    problem.wires[0].default_auto = false;
+    assert_eq!(written_path(&problem, &geometry, 0).unwrap().unwrap(), vec![p(0, 0), p(4, 3)]);
+}
+
+#[test]
+fn separated_two_anchor_trees_each_keep_the_shared_default_path() {
+    let mut a = net(vec![anchor(0, 0, None), anchor(4, 3, None)]);
+    let mut b = net(vec![anchor(100, 100, None), anchor(104, 103, None)]);
+    a.preferred = shared_auto_path(&[p(0, 0), p(4, 3)], None, None);
+    b.preferred = shared_auto_path(&[p(100, 100), p(104, 103)], None, None);
+    let mut l = layout(&[], vec![a, b]);
+    l.modern = true;
+    assert!(clear_static_default(&l, 0, l.nets[0].preferred.as_ref().unwrap()));
+    assert!(clear_static_default(&l, 1, l.nets[1].preferred.as_ref().unwrap()));
+    let (outs, _) = route_layout(&l, 100_000);
+    for (index, expected) in
+        [vec![p(0, 0), p(4, 0), p(4, 3)], vec![p(100, 100), p(104, 100), p(104, 103)]].iter().enumerate()
+    {
+        assert_eq!(outs[index].wires.len(), 1, "{:?}", outs[index]);
+        let w = &outs[index].wires[0];
+        let mut points = w.vertices.clone();
+        if w.start == End::Anchor(1) {
+            points.reverse();
+        }
+        assert_eq!(&points, expected);
+    }
+}
+
+#[test]
+fn blocked_default_candidate_does_not_bypass_the_router() {
+    let mut n = net(vec![anchor(0, 0, None), anchor(4, 3, None)]);
+    let path = shared_auto_path(&[p(0, 0), p(4, 3)], None, None).unwrap();
+    n.preferred = Some(path.clone());
+    let mut l = layout(&[[1, -1, 3, 1]], vec![n]);
+    l.modern = true;
+    assert!(!clear_static_default(&l, 0, &path));
+    // A candidate rejected during assembly is not installed in the routing lattice.
+    l.nets[0].preferred = None;
+    let (out, _) = route_layout(&l, 100_000);
+    assert_ne!(out[0].wires[0].vertices, path);
+}
+
+#[test]
+fn default_wire_rotates_pin_exit_but_not_its_position_point() {
+    use crate::resolve::tests::{instance, point, problem_of};
+    use rnl_runtime::problem::{ProblemWire, Reference};
+    let mut problem = problem_of(vec![instance(), point()], vec![]);
+    problem.version = "0.4".into();
+    problem.wires = vec![ProblemWire {
+        label: "%w".into(),
+        reference: Reference::Name("%w".into()),
+        nets: vec![],
+        bus: false,
+        anchors: vec![PointRef::Pin { object: 0, pin: 0, terminal: "g".into() }, PointRef::Origin(1)],
+        mode: "auto".into(),
+        default_auto: true,
+        generated: false,
+    }];
+    let mut geometry = Geometry::new(2);
+    geometry.orient[0] = Orient::R90;
+    geometry.origin[1] = p(4, 0);
+    let pin_path = written_path(&problem, &geometry, 0).unwrap().unwrap();
+    let expected = shared_auto_path(&[p(0, -3), p(4, 0)], Some(Direction::Down), None).unwrap();
+    assert_eq!(pin_path, expected);
+    assert_eq!(pin_path[0][0], pin_path[1][0]);
+    assert!(pin_path[1][1] < pin_path[0][1]);
+    problem.wires[0].anchors[0] =
+        PointRef::PinPosition { object: 0, pin: 0, reference: Reference::Name("#M::g::position".into()) };
+    let position_path = written_path(&problem, &geometry, 0).unwrap().unwrap();
+    assert_eq!(position_path, shared_auto_path(&[p(0, -3), p(4, 0)], None, None).unwrap());
+}
+
+#[test]
+fn default_wire_keeps_intermediate_waypoint_and_legacy_modes() {
+    use crate::resolve::tests::{point, problem_of};
+    use rnl_runtime::problem::{ProblemWire, Reference};
+    let mut problem = problem_of(vec![point(), point(), point()], vec![]);
+    problem.version = "0.4".into();
+    problem.wires = vec![ProblemWire {
+        label: "%w".into(),
+        reference: Reference::Name("%w".into()),
+        nets: vec![],
+        bus: false,
+        anchors: vec![PointRef::Origin(0), PointRef::Origin(1), PointRef::Origin(2)],
+        mode: "auto".into(),
+        default_auto: true,
+        generated: false,
+    }];
+    let mut geometry = Geometry::new(3);
+    geometry.origin = vec![p(0, 0), p(4, 4), p(4, 0)];
+    assert_eq!(written_path(&problem, &geometry, 0).unwrap().unwrap(), vec![p(0, 0), p(0, 4), p(4, 4), p(4, 0)]);
+    problem.wires[0].mode = "straight".into();
+    problem.wires[0].default_auto = false;
+    assert_eq!(written_path(&problem, &geometry, 0).unwrap().unwrap(), vec![p(0, 0), p(4, 4), p(4, 0)]);
+}
+
+#[test]
+fn production_routing_uses_default_for_two_distant_auto_trees() {
+    use crate::resolve::tests::{fact, instance, problem_of};
+    use rnl_runtime::problem::{Axis, FactKind, RouteIntent};
+    let coords = [(0.0, 0.0), (4.0, 3.0), (100.0, 100.0), (104.0, 103.0)];
+    let mut facts = Vec::new();
+    for (object, &(x, y)) in coords.iter().enumerate() {
+        facts.push(fact(FactKind::Place { at: PointRef::Origin(object), axis: Axis::X, value: x }));
+        facts.push(fact(FactKind::Place { at: PointRef::Origin(object), axis: Axis::Y, value: y }));
+    }
+    let mut problem = problem_of((0..4).map(|_| instance()).collect(), facts);
+    problem.version = "0.4".into();
+    problem.symbols[0].bbox = [0.0, 0.0, 0.0, 0.0];
+    problem.symbols[0].pins.truncate(1);
+    problem.symbols[0].pins[0].pos = (0.0, 0.0);
+    problem.symbols[0].pins[0].dir = None;
+    problem.routes = [("n", 0, 1), ("m", 2, 3)]
+        .into_iter()
+        .map(|(net, a, b)| RouteIntent {
+            tree: true,
+            net: net.into(),
+            mode: "auto".into(),
+            style: vec![],
+            wires: vec![],
+            pins: [a, b].into_iter().map(|object| PointRef::Pin { object, pin: 0, terminal: "g".into() }).collect(),
+        })
+        .collect();
+    let options = SolverOptions::without_time_limit();
+    let resolved = crate::resolve(&problem, &options);
+    let mut work = Work::default();
+    let structure = crate::structure::analyse(&problem, &resolved, &options, crate::options::CAPS, &mut work);
+    let mut geometry = Geometry::new(4);
+    geometry.origin = vec![p(0, 0), p(4, 3), p(100, 100), p(104, 103)];
+    let origins = structure.origins(&problem, &geometry);
+    let result = route(&problem, &structure, &geometry, &origins, &options, &mut work);
+    assert_eq!(result.paths.len(), 2, "{result:?}");
+    for (index, expected) in
+        [vec![p(0, 0), p(4, 0), p(4, 3)], vec![p(100, 100), p(104, 100), p(104, 103)]].iter().enumerate()
+    {
+        let mut path = result.paths[index].clone();
+        if path.first() != expected.first() {
+            path.reverse();
+        }
+        assert_eq!(&path, expected, "tree {index}");
+    }
+}
+
+#[test]
+fn auto_written_path_reports_unrepresentable_exact_geometry() {
+    use crate::resolve::tests::{point, problem_of};
+    use rnl_runtime::problem::{ProblemWire, Reference};
+    let mut problem = problem_of(vec![point(), point()], vec![]);
+    problem.wires = vec![ProblemWire {
+        label: "%w".into(),
+        reference: Reference::Name("%w".into()),
+        nets: vec![],
+        bus: false,
+        anchors: vec![PointRef::Origin(0), PointRef::Origin(1)],
+        mode: "auto".into(),
+        default_auto: true,
+        generated: false,
+    }];
+    let mut geometry = Geometry::new(2);
+    geometry.origin[1] = [crate::rational::parse_decimal("1e-400").unwrap(), int(1)];
+    assert_eq!(written_path(&problem, &geometry, 0), Err(WrittenPathError { wire: 0 }));
+    problem.routes.push(rnl_runtime::problem::RouteIntent {
+        tree: true,
+        net: "other".into(),
+        mode: "auto".into(),
+        style: vec![],
+        wires: vec![],
+        pins: vec![PointRef::Origin(0), PointRef::Origin(1)],
+    });
+    let options = SolverOptions::without_time_limit();
+    let resolved = crate::resolve(&problem, &options);
+    let mut work = Work::default();
+    let structure = crate::structure::analyse(&problem, &resolved, &options, crate::options::CAPS, &mut work);
+    let origins = structure.origins(&problem, &geometry);
+    let routing = route(&problem, &structure, &geometry, &origins, &options, &mut work);
+    assert_eq!(routing.written_path_error, Some(0));
+    assert!(routing.wires.is_empty());
+    assert!(crate::score::drawn(&problem, &structure, &geometry, &routing).is_err());
+    // Missing source objects are a distinct, non-error outcome.
+    problem.wires[0].anchors.push(PointRef::Origin(5));
+    assert_eq!(written_path(&problem, &geometry, 0), Ok(None));
 }

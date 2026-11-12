@@ -6,6 +6,8 @@
 /// A point in scene or symbol coordinates: x to the right, y up (11.7).
 pub type Pt = (f64, f64);
 
+pub mod auto;
+
 /// One of the eight orientation codes, named as in Virtuoso (11.2).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
 pub enum Orient {

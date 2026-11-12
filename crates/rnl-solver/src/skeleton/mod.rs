@@ -32,10 +32,28 @@ pub(crate) fn lay_out(
     rounds: u8,
 ) -> crate::tree::Laid {
     let mut laid = crate::tree::lay_out(problem, s, options, work, &crate::tree::Stop::default());
+    if laid.entry.written_path_error.is_some() {
+        laid.notes.push("skeleton: written wire geometry is unevaluable; compaction skipped".into());
+        return laid;
+    }
     let before = laid.entry.clone();
     let score = |placed: &Placed, routing: &Routing| {
-        let wires = crate::score::drawn(problem, s, &placed.geometry, routing);
+        let wires = match crate::score::drawn(problem, s, &placed.geometry, routing) {
+            Ok(wires) => wires,
+            Err(wire) => {
+                return crate::score::Entry {
+                    written_path_error: Some(wire),
+                    overlaps: 0,
+                    crowding: 0,
+                    misleading: 0,
+                    joins_left: 0,
+                    layers: Vec::new(),
+                    code: before.code.clone(),
+                }
+            }
+        };
         crate::score::Entry {
+            written_path_error: None,
             overlaps: placed.overlaps.len(),
             crowding: crate::score::crowding(s, &placed.origins, &placed.geometry.orient, &placed.dropped),
             misleading: crate::score::misleading(problem, s, &placed.origins, &placed.geometry, &wires),
@@ -65,6 +83,11 @@ pub(crate) fn lay_out(
         }
         laid.notes.extend(notes.into_iter().map(|n| format!("skeleton, round {round}: {n}")));
         let made = score(&placed, &routing);
+        if made.written_path_error.is_some() {
+            laid.notes
+                .push(format!("skeleton, round {round}: unevaluable written wire geometry; previous drawing retained"));
+            break;
+        }
         if round > 0
             && crate::score::order(&s.active, &[without_origins(s, &laid.entry), without_origins(s, &made)])[0] == 0
         {

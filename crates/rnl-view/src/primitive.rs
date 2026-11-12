@@ -184,6 +184,11 @@ pub struct Text {
     /// Turned a quarter counter-clockwise: the lines read from bottom to top, and each run is drawn
     /// turned a quarter counter-clockwise about its `at`.
     pub vertical: bool,
+    /// Scene-space affine applied to all runs and bars.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, serde(default))]
+    #[cfg_attr(test, ts(optional))]
+    pub transform: Option<[f64; 6]>,
     /// The runs as laid out, drawn in the text's colour.
     pub runs: Vec<TextRun>,
     /// The bars of its fractions and the lines over its overlined runs.
@@ -402,6 +407,7 @@ fn text(t: &rnl_render::TextPrim) -> Text {
         halign,
         valign,
         vertical: t.vertical,
+        transform: t.transform,
         runs: t.runs.iter().map(text_run).collect(),
         bars: t.bars.iter().map(|b| Bar { points: [pt(b.a), pt(b.b)], stroke: stroke(&b.stroke) }).collect(),
     }
@@ -524,6 +530,7 @@ mod tests {
                 halign: name(t.halign),
                 valign: name(t.valign),
                 vertical: t.vertical,
+                transform: t.transform,
                 runs: t.runs.iter().map(back_run).collect(),
                 bars: t
                     .bars
@@ -629,6 +636,7 @@ mod tests {
             halign: "start".into(),
             valign: "baseline".into(),
             vertical: false,
+            transform: None,
             runs: Vec::new(),
             bars: Vec::new(),
         };
@@ -977,6 +985,7 @@ mod tests {
                 halign: HAlign::Start,
                 valign: VAlign::Baseline,
                 vertical,
+                transform: None,
                 runs,
                 bars,
             };
@@ -1045,6 +1054,7 @@ mod tests {
                 halign: "start".into(),
                 valign: valign.into(),
                 vertical: false,
+                transform: None,
                 runs: Vec::new(),
                 bars: Vec::new(),
             };

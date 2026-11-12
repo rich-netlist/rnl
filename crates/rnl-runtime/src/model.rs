@@ -57,6 +57,7 @@ pub struct SymbolPrim {
     pub text: Option<String>,
     /// Read the name formats of 0.4 in a preview of this text (13.6).
     pub text_name_formats: bool,
+    pub modern_text: bool,
     pub shape: Shape,
     pub points: Vec<Pt>,
     pub params: PrimParams,
@@ -67,6 +68,7 @@ pub struct SymbolPrim {
     pub rotate: Option<f64>,
     /// Keep the text direction in scene coordinates while its anchor follows the symbol.
     pub fix_rotate: bool,
+    pub upright: Option<bool>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -139,11 +141,13 @@ pub struct SymbolLabel {
     pub text: String,
     /// The template's source file reads the name formats of 0.4 (13.6).
     pub text_name_formats: bool,
+    pub modern_text: bool,
     pub at: Option<Pt>,
     pub halign: Option<String>,
     pub valign: Option<String>,
     pub rotate: f64,
     pub fix_rotate: Option<bool>,
+    pub upright: Option<bool>,
     pub style: Style,
 }
 
@@ -306,6 +310,7 @@ pub struct TextView {
     pub rotate: f64,
     /// The effective fix_rotate item; None when no statement supplies it.
     pub fix_rotate: Option<bool>,
+    pub upright: Option<bool>,
     /// Apply the source file's baseline reflection rule (9.2.5).
     pub baseline_mirrors: bool,
     /// Effective owner orientation; fixed-rotation and scene texts use R0.

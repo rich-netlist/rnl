@@ -1777,6 +1777,11 @@ const CAP: f64 = 0.72;
 /// to the height of a capital on the first, the way the text reads (9.2.5), so that a stack of
 /// labels, a line apart, does not touch.
 fn glyph_box(t: &rnl_runtime::model::TextView, b: [f64; 4]) -> [f64; 4] {
+    // Trimming an axis-aligned layout box as if its baseline were horizontal or vertical
+    // is not valid for an arbitrary affine (and can exclude visible glyphs).
+    if t.rotate.rem_euclid(90.0).abs() > 1e-9 || t.upright == Some(false) {
+        return b;
+    }
     let size = t.style.get("size").and_then(|v| v.num()).filter(|s| *s > 0.0).unwrap_or(1.0);
     let bold = t.style.get("bold").and_then(|v| v.boolean()).unwrap_or(false);
     let face = rnl_render::Face::of(bold);

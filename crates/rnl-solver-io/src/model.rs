@@ -75,7 +75,11 @@ fn position(n: Node<'_>) -> Result<Position> {
     })
 }
 fn text_value(t: &TextInfo) -> Value {
-    json!({"attach":filler_value(&t.attach),"key":t.key,"lines":t.lines.iter().map(|l|l.iter().map(data::run_value).collect::<Vec<_>>()).collect::<Vec<_>>(),"halign":t.halign,"valign":t.valign,"rotate":t.rotate,"fix_rotate":t.fix_rotate,"baseline_mirrors":t.baseline_mirrors,"column_position":t.column_position.map(|p|[p.0,p.1]),"style":data::pairs_value(&t.style)})
+    let mut result = json!({"attach":filler_value(&t.attach),"key":t.key,"lines":t.lines.iter().map(|l|l.iter().map(data::run_value).collect::<Vec<_>>()).collect::<Vec<_>>(),"halign":t.halign,"valign":t.valign,"rotate":t.rotate,"fix_rotate":t.fix_rotate,"baseline_mirrors":t.baseline_mirrors,"column_position":t.column_position.map(|p|[p.0,p.1]),"style":data::pairs_value(&t.style)});
+    if !t.upright {
+        result["upright"] = json!(false);
+    }
+    result
 }
 fn text(n: Node<'_>) -> Result<TextInfo> {
     Ok(TextInfo {
@@ -86,6 +90,10 @@ fn text(n: Node<'_>) -> Result<TextInfo> {
         valign: n.field("valign")?.string()?.into(),
         rotate: n.field("rotate")?.number()?,
         fix_rotate: n.field("fix_rotate")?.boolean()?,
+        upright: match n.value.get("upright") {
+            None => true,
+            Some(_) => n.field("upright")?.boolean()?,
+        },
         baseline_mirrors: n.field("baseline_mirrors")?.boolean()?,
         column_position: n.field("column_position")?.nullable(|n| n.point())?,
         style: data::pairs(n.field("style")?)?,
@@ -149,16 +157,22 @@ pub(crate) fn symbol(n: Node<'_>) -> Result<ProblemSymbol> {
     })
 }
 pub(crate) fn wire_value(w: &ProblemWire) -> Value {
-    json!({"label":w.label,"reference":reference_value(&w.reference),"nets":w.nets,"bus":w.bus,"anchors":w.anchors.iter().map(point_value).collect::<Vec<_>>(),"mode":w.mode,"generated":w.generated})
+    json!({"label":w.label,"reference":reference_value(&w.reference),"nets":w.nets,"bus":w.bus,"anchors":w.anchors.iter().map(point_value).collect::<Vec<_>>(),"mode":w.mode,"default_auto":w.default_auto,"generated":w.generated})
 }
 pub(crate) fn wire(n: Node<'_>) -> Result<ProblemWire> {
+    let mode = n.field("mode")?.string()?.to_string();
+    let default_auto = n.field("default_auto")?.boolean()?;
+    if default_auto && mode != "auto" {
+        return Err(n.field("default_auto")?.error("default_auto requires auto mode"));
+    }
     Ok(ProblemWire {
         label: n.field("label")?.string()?.into(),
         reference: reference(n.field("reference")?)?,
         nets: data::strings(n.field("nets")?)?,
         bus: n.field("bus")?.boolean()?,
         anchors: n.field("anchors")?.list(|n| point(n, 0))?,
-        mode: n.field("mode")?.string()?.into(),
+        mode,
+        default_auto,
         generated: n.field("generated")?.boolean()?,
     })
 }

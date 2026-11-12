@@ -29,7 +29,7 @@
 //! - **Other wires.** A wire may cross another, straight through the crossing, which makes no
 //!   connection (13.1); it never runs along another or touches one at a bend or an end, which
 //!   would look like a connection that is not there (Principles 2.2). The wires written, drawn by
-//!   their mode (13.1, `"auto"` straight as a viewer that does not route draws it), and those
+//!   their effective source-version mode (13.1), and those
 //!   routed for the nets before are the other wires. A wire written on the net being routed is
 //!   one too: it is part of the tree by its points, which are where the net's new wires join it
 //!   (it has no point on a segment, 13.1), and a new wire neither runs along it nor touches it in
@@ -70,11 +70,12 @@ use std::collections::{BTreeMap, BTreeSet, BinaryHeap};
 use num_bigint::BigInt;
 use num_integer::Integer;
 use num_traits::{One, ToPrimitive, Zero};
+use rnl_runtime::geom::auto::{auto_wire, Direction};
 use rnl_runtime::geom::Orient;
 use rnl_runtime::problem::{LevelProblem, ObjectKind, PointRef, Position};
 use rnl_runtime::solution::{Branch, RoutedWire, WirePoint};
 
-use crate::rational::{int, to_f64, Q};
+use crate::rational::{from_f64, int, to_f64, Q};
 use crate::resolve::{point_value, Geometry};
 use crate::structure::{text_box, Structure};
 use crate::{SolverOptions, Work};
@@ -161,6 +162,8 @@ pub(crate) struct Left {
 /// The wires routed for the ROUTEs of a placed candidate.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct Routing {
+    /// A written wire whose geometry is not evaluable; no routing was attempted.
+    pub written_path_error: Option<usize>,
     /// The wires, in the order of the ROUTEs, each net's in the order they were made.
     pub wires: Vec<RoutedWire>,
     pub branches: Vec<Branch>,
@@ -203,6 +206,8 @@ pub(crate) struct NetIn {
     pub anchors: Vec<AnchorIn>,
     /// Pairs of anchors that a wire written joins already.
     pub joined: Vec<(usize, usize)>,
+    /// Shared auto candidate, only for an unmerged two-anchor 0.4 auto tree.
+    pub preferred: Option<Vec<[Q; 2]>>,
 }
 
 /// What the router sees of a placed candidate: plain geometry, exact.
@@ -549,6 +554,14 @@ impl<'a> Grid<'a> {
         for a in layout.nets.iter().flat_map(|n| &n.anchors) {
             grow(&a.at);
             add(&a.at, &mut extra);
+        }
+        // Candidate bends must be lattice vertices before any tree is routed, so
+        // subsequent nets see the selected path in the very same occupancy grid.
+        if layout.modern {
+            for p in layout.nets.iter().filter_map(|n| n.preferred.as_ref()).flatten() {
+                grow(p);
+                add(p, &mut extra);
+            }
         }
         let Some(extent) = extent else { return Err(Failure::Lattice) };
         let lat = Lattice::new(&extent, CLEARANCE + MARGIN, [&extra[0], &extra[1]], [&near[0], &near[1]])?;
@@ -1233,6 +1246,24 @@ impl<'a> Grid<'a> {
         out.parts = if tree_parts > 0 { parts.len() - tree_parts + 1 } else { parts.len() };
         out.failure = (out.parts > 1).then(|| failure.unwrap_or(Failure::NoPath));
         self.junctions_at_anchors(net, &nodes, &mut made, &mut branches);
+        // Only replace an already successful unmerged two-anchor search. The same
+        // grid that routed earlier trees certifies the shared candidate clear before
+        // it is marked for later trees; on any uncertainty keep the A* result.
+        if self.layout.modern && out.failure.is_none() && branches.is_empty() && made.len() == 1 {
+            if let (Some(preferred), End::Anchor(start), End::Anchor(end)) =
+                (&net.preferred, made[0].start, made[0].end)
+            {
+                if (start == 0 && end == 1) || (start == 1 && end == 0) {
+                    let mut candidate = preferred.clone();
+                    if start == 1 {
+                        candidate.reverse();
+                    }
+                    if let Some(nodes) = self.clear_preferred(&candidate) {
+                        made[0].nodes = nodes;
+                    }
+                }
+            }
+        }
         // the wires made, as vertices; then other wires to the nets after
         for m in &made {
             let vertices = self.vertices(&m.nodes);
@@ -1241,6 +1272,49 @@ impl<'a> Grid<'a> {
         }
         out.branches = branches.iter().map(|&n| self.lat.point(n)).collect();
         out
+    }
+
+    /// Validate every lattice edge of a candidate against the current occupancy,
+    /// box and text checks. In particular do not erase markings for previous trees.
+    fn clear_preferred(&self, points: &[[Q; 2]]) -> Option<Vec<usize>> {
+        let nodes: Vec<usize> = points.iter().map(|p| self.lat.at(p)).collect::<Option<_>>()?;
+        for (leg, pair) in nodes.windows(2).enumerate() {
+            let (mut at, target) = (pair[0], pair[1]);
+            let (a, b) = (&points[leg], &points[leg + 1]);
+            let d = if a[0] < b[0] && a[1] == b[1] {
+                0
+            } else if a[0] == b[0] && a[1] < b[1] {
+                1
+            } else if a[0] > b[0] && a[1] == b[1] {
+                2
+            } else if a[0] == b[0] && a[1] > b[1] {
+                3
+            } else if a == b {
+                continue;
+            } else {
+                return None;
+            };
+            while at != target {
+                if !crate::budget::permit(crate::budget::Step::Route, 1) {
+                    return None;
+                }
+                let next = self.lat.step(at, d)?;
+                if self.edge_flags(at, d) != 0 || self.through_symbol(at, d) || self.through_text(at, d) {
+                    return None;
+                }
+                let endpoint = leg + 1 == nodes.len() - 1 && next == target;
+                if !self.clear(next, endpoint) || (!endpoint && self.occ[next] != 0) {
+                    return None;
+                }
+                if let Some(axis) = self.corridor(next) {
+                    if axis & axis_bit(d) == 0 {
+                        return None;
+                    }
+                }
+                at = next;
+            }
+        }
+        Some(nodes)
     }
 
     /// Where a wire made ends at a pin at which another wire ends too, made or written, the wires
@@ -1767,14 +1841,40 @@ struct Job {
     wires: Vec<usize>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct WrittenPathError {
+    pub wire: usize,
+}
+
 /// The vertices a wire written is drawn through, exactly (13.1): its points, and the bends its mode
-/// adds between them; an `"auto"` wire straight, as a viewer that does not route draws it. None when
-/// one of its points has no place.
-pub(crate) fn written_path(problem: &LevelProblem, g: &Geometry, wire: usize) -> Option<Vec<[Q; 2]>> {
-    let w = problem.wires.get(wire)?;
+/// adds between them. A 0.4 `"auto"` wire uses the shared obstacle-free default geometry;
+/// released versions keep their previous straight preview. Ok(None) means missing coordinates;
+/// Err means coordinates exist but the exact path cannot be represented.
+pub(crate) fn written_path(
+    problem: &LevelProblem,
+    g: &Geometry,
+    wire: usize,
+) -> Result<Option<Vec<[Q; 2]>>, WrittenPathError> {
+    let Some(w) = problem.wires.get(wire) else { return Ok(None) };
     let mut points = Vec::new();
     for r in &w.anchors {
-        points.push([point_value(problem, g, r, 0, 0)?, point_value(problem, g, r, 1, 0)?]);
+        let (Some(x), Some(y)) = (point_value(problem, g, r, 0, 0), point_value(problem, g, r, 1, 0)) else {
+            return Ok(None);
+        };
+        points.push([x, y]);
+    }
+    if w.default_auto && w.mode == "auto" {
+        // Only electrical endpoint pins have an exit direction. A pin's coordinate-only
+        // position is not the pin (5.2.4), and intermediate anchors are waypoints.
+        let direction = |point: &PointRef| -> Option<Direction> {
+            let (object, pin) = point.pin_key()?;
+            let symbol = problem.objects.get(object)?.symbol?;
+            let local = problem.symbols.get(symbol)?.pins.get(pin)?.dir?;
+            Direction::from_degrees(g.orient.get(object)?.direction(local)?)
+        };
+        return shared_auto_path(&points, w.anchors.first().and_then(direction), w.anchors.last().and_then(direction))
+            .map(Some)
+            .ok_or(WrittenPathError { wire });
     }
     let mut out: Vec<[Q; 2]> = points.first().cloned().into_iter().collect();
     let two = int(2);
@@ -1807,7 +1907,126 @@ pub(crate) fn written_path(problem: &LevelProblem, g: &Geometry, wire: usize) ->
         }
         out.push(b.clone());
     }
+    Ok(Some(out))
+}
+
+/// Use the shared renderer geometry without rounding written anchors. The helper takes
+/// f64 scene points; where a bend reuses an anchor coordinate, retain its exact rational.
+fn shared_auto_path(points: &[[Q; 2]], first: Option<Direction>, last: Option<Direction>) -> Option<Vec<[Q; 2]>> {
+    let floats: Vec<_> = points.iter().map(|p| (to_f64(&p[0]), to_f64(&p[1]))).collect();
+    let segments = auto_wire(&floats, first, last)?;
+    let mut out: Vec<[Q; 2]> = points.first().cloned().into_iter().collect();
+    for (index, segment) in segments.iter().enumerate() {
+        for &(x, y) in segment.iter().skip(1).take(segment.len().saturating_sub(2)) {
+            let convert = |v: f64, axis: usize| -> Option<Q> {
+                let mut exact = None;
+                for anchor in [&points[index], &points[index + 1]] {
+                    if to_f64(&anchor[axis]) == v {
+                        if exact.as_ref().is_some_and(|q| *q != anchor[axis]) {
+                            return None; // two distinct rationals collapsed to one f64
+                        }
+                        exact = Some(anchor[axis].clone());
+                    }
+                }
+                exact.or_else(|| from_f64(v))
+            };
+            out.push([convert(x, 0)?, convert(y, 1)?]);
+        }
+        out.push(points[index + 1].clone());
+    }
+    // Converting the helper's f64 bends back to exact values must not introduce a diagonal.
+    if out.windows(2).any(|v| v[0][0] != v[1][0] && v[0][1] != v[1][1]) {
+        return None;
+    }
     Some(out)
+}
+
+/// Whether an orthogonal segment touches a rectangle. For an endpoint's own box,
+/// only a positive-length passage counts; a lead may meet its box at its pin.
+fn default_touches_box(a: &[Q; 2], b: &[Q; 2], rect: &[Q; 4], positive: bool) -> bool {
+    if a == b {
+        return false;
+    }
+    let axis = usize::from(a[0] == b[0]);
+    let fixed = 1 - axis;
+    if a[fixed] < rect[fixed] || a[fixed] > rect[fixed + 2] {
+        return false;
+    }
+    let lo = a[axis].clone().min(b[axis].clone()).max(rect[axis].clone());
+    let hi = a[axis].clone().max(b[axis].clone()).min(rect[axis + 2].clone());
+    if positive {
+        lo < hi
+    } else {
+        lo <= hi
+    }
+}
+
+fn default_contains(path: &[[Q; 2]], point: &[Q; 2]) -> bool {
+    path.windows(2).any(|w| {
+        let (a, b) = (&w[0], &w[1]);
+        if a[0] == b[0] {
+            point[0] == a[0] && point[1] >= a[1].clone().min(b[1].clone()) && point[1] <= a[1].clone().max(b[1].clone())
+        } else if a[1] == b[1] {
+            point[1] == a[1] && point[0] >= a[0].clone().min(b[0].clone()) && point[0] <= a[0].clone().max(b[0].clone())
+        } else {
+            false
+        }
+    })
+}
+
+/// A conservative static precheck. Other trees are not obstacles merely because
+/// they exist; their anchors, objects, written paths and texts still are.
+fn clear_static_default(layout: &Layout, index: usize, path: &[[Q; 2]]) -> bool {
+    let Some(net) = layout.nets.get(index) else { return false };
+    if path.len() < 2 || net.anchors.len() != 2 {
+        return false;
+    }
+    let ends = [&net.anchors[0].at, &net.anchors[1].at];
+    // A coincident unconnected pin is not the same endpoint. With geometry
+    // alone, refuse the preference if more pins coincide than this anchor owns.
+    for (i, end) in ends.iter().enumerate() {
+        if layout.pins.iter().filter(|p| *p == *end).count() > usize::from(net.anchors[i].connects_pin) {
+            return false;
+        }
+    }
+    for other in layout.nets.iter().enumerate().filter(|(i, _)| *i != index).flat_map(|(_, n)| &n.anchors) {
+        if default_contains(path, &other.at) {
+            return false;
+        }
+    }
+    for point in &layout.pins {
+        if point != ends[0] && point != ends[1] && default_contains(path, point) {
+            return false;
+        }
+    }
+    for (owner, b) in &layout.boxes {
+        let own = net.anchors.iter().any(|a| a.owner == Some(*owner));
+        let margin = if own { int(0) } else { int(CLEARANCE) };
+        let bounds = [&b[0] - &margin, &b[1] - &margin, &b[2] + &margin, &b[3] + &margin];
+        if path.windows(2).any(|w| default_touches_box(&w[0], &w[1], &bounds, own)) {
+            return false;
+        }
+    }
+    for b in &layout.texts {
+        if path.windows(2).any(|w| default_touches_box(&w[0], &w[1], b, false)) {
+            return false;
+        }
+    }
+    // A bounding rectangle is intentionally conservative for oblique old wires.
+    for wire in &layout.written {
+        for pair in wire.windows(2) {
+            let bounds = [
+                pair[0][0].clone().min(pair[1][0].clone()),
+                pair[0][1].clone().min(pair[1][1].clone()),
+                pair[0][0].clone().max(pair[1][0].clone()),
+                pair[0][1].clone().max(pair[1][1].clone()),
+            ];
+            if path.windows(2).any(|w| default_touches_box(&w[0], &w[1], &bounds, false)) {
+                return false;
+            }
+        }
+    }
+    true
 }
 
 /// One job per route tree in 0.4; released inputs merge by net name in first-ROUTE order.
@@ -1900,9 +2119,6 @@ pub(crate) fn route(
     work: &mut Work,
 ) -> Routing {
     let jobs = jobs(problem);
-    if jobs.is_empty() {
-        return Routing::default();
-    }
     let mut layout = Layout { modern: problem.version == "0.4", ..Layout::default() };
     for k in s.components() {
         if let Some(b) = s.box_at(origins, &g.orient, k) {
@@ -1916,7 +2132,13 @@ pub(crate) fn route(
         }
     }
     for w in 0..problem.wires.len() {
-        layout.written.extend(written_path(problem, g, w));
+        match written_path(problem, g, w) {
+            Ok(path) => layout.written.extend(path),
+            Err(error) => return Routing { written_path_error: Some(error.wire), ..Routing::default() },
+        }
+    }
+    if jobs.is_empty() {
+        return Routing::default();
     }
     if layout.modern {
         layout.texts = text_boxes(problem, s, origins, &g.orient);
@@ -1952,6 +2174,47 @@ pub(crate) fn route(
         }
         layout.nets.push(net);
         points.push(pts);
+    }
+    // Prepare one default candidate per simple auto tree, independently of other
+    // trees. Expensive helper work is charged before entering it; routed trees,
+    // written-wire merges and other modes keep the ordinary router.
+    for i in 0..layout.nets.len() {
+        let n = &layout.nets[i];
+        if !layout.modern
+            || problem.routes[jobs[i].route].mode != "auto"
+            || n.anchors.len() != 2
+            || !n.joined.is_empty()
+            || !jobs[i].wires.is_empty()
+        {
+            continue;
+        }
+        let obstacle_work = layout
+            .boxes
+            .len()
+            .saturating_add(layout.texts.len())
+            .saturating_add(layout.pins.len())
+            .saturating_add(layout.nets.iter().map(|net| net.anchors.len()).sum::<usize>())
+            .saturating_add(layout.written.iter().map(|wire| wire.len()).sum::<usize>());
+        if !crate::budget::permit(crate::budget::Step::Route, 4096usize.saturating_add(obstacle_work)) {
+            break;
+        }
+        let dir = |a: &AnchorIn| match a.exit {
+            Some((1, 0)) => Some(Direction::Right),
+            Some((0, 1)) => Some(Direction::Up),
+            Some((-1, 0)) => Some(Direction::Left),
+            Some((0, -1)) => Some(Direction::Down),
+            _ => None,
+        };
+        let candidate = shared_auto_path(
+            &[n.anchors[0].at.clone(), n.anchors[1].at.clone()],
+            dir(&n.anchors[0]),
+            dir(&n.anchors[1]),
+        );
+        if let Some(path) = candidate {
+            if clear_static_default(&layout, i, &path) {
+                layout.nets[i].preferred = Some(path);
+            }
+        }
     }
     let (outs, expansions) = route_layout(&layout, options.budget.astar_expansions);
     work.astar_expansions += expansions;

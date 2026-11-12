@@ -139,6 +139,9 @@ pub fn level(p: &LevelProblem, solver_options: &str) -> Value {
                 if t.fix_rotate {
                     m.get_mut("text").unwrap().as_object_mut().unwrap().insert("fix_rotate".into(), json!(true));
                 }
+                if !t.upright {
+                    m.get_mut("text").unwrap().as_object_mut().unwrap().insert("upright".into(), json!(false));
+                }
                 if let Some(at) = t.column_position {
                     m.get_mut("text").unwrap().as_object_mut().unwrap().insert("column_position".into(), json!([at.0, at.1]));
                 }
@@ -166,10 +169,14 @@ pub fn level(p: &LevelProblem, solver_options: &str) -> Value {
             "name": n.name, "reference": reference(&n.reference, numbers), "pins": points(&n.pins),
             "wires": n.wires, "routes": n.routes, "port": n.port,
         })).collect::<Vec<_>>(),
-        "wires": p.wires.iter().map(|w| json!({
-            "label": w.label, "reference": reference(&w.reference, numbers), "nets": w.nets, "bus": w.bus,
-            "anchors": points(&w.anchors), "mode": w.mode, "generated": w.generated,
-        })).collect::<Vec<_>>(),
+        "wires": p.wires.iter().map(|w| {
+            let mut wire = json!({
+                "label": w.label, "reference": reference(&w.reference, numbers), "nets": w.nets, "bus": w.bus,
+                "anchors": points(&w.anchors), "mode": w.mode, "generated": w.generated,
+            });
+            if w.default_auto { wire["default_auto"] = json!(true); }
+            wire
+        }).collect::<Vec<_>>(),
         "routes": p.routes.iter().map(|r| {
             let mut entry = json!({
                 "net": r.net, "mode": r.mode,

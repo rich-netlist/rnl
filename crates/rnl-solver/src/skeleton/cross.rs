@@ -265,7 +265,11 @@ fn clear(
         if !read {
             continue;
         }
-        let Some(path) = crate::route::written_path(problem, g, w) else { continue };
+        let path = match crate::route::written_path(problem, g, w) {
+            Ok(Some(path)) => path,
+            Ok(None) => continue,
+            Err(_) => return false, // do not treat unevaluable wire as empty clearance
+        };
         if path.windows(2).any(|e| meets(&e[0], &e[1], problem.wires[w].nets.iter().any(|n| nets.contains(&n)))) {
             return false;
         }

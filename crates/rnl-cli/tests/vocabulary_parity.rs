@@ -27,7 +27,7 @@ fn published_0_4() -> Value {
 /// What the draft 0.4 has that the runtime does not yet: keywords by name, and the parts of the list
 /// that change with them. A change that brings one takes it off this list, so that the comparison
 /// covers it from then on; the list is empty when 0.4 is released.
-const PENDING_0_4: &[&str] = &[];
+const PENDING_0_4: &[&str] = &["ANNOTATION"];
 
 // Every field is accounted for. These are the only prose-only exemptions: descriptions,
 // human-readable form/sentence templates (with ellipses), and explanations of keys/array items.
@@ -214,12 +214,27 @@ fn compare(p: &Value, version: &str, pending: &[&str]) {
         };
         assert_eq!(field["since"], since);
     }
-    assert_eq!(w.style_props.len(), p["style_properties"].as_array().unwrap().len());
+    assert_eq!(
+        w.style_props.iter().filter(|s| s.in_version(version)).count(),
+        p["style_properties"].as_array().unwrap().len()
+    );
     for prop in p["style_properties"].as_array().unwrap() {
         let actual = w.style_prop(prop["name"].as_str().unwrap()).unwrap();
-        parameter(&ParamSpec::new(actual.name.clone(), actual.ty.clone()), prop);
+        let mut param = ParamSpec::new(actual.name.clone(), actual.ty.clone());
+        param.since = actual.since.clone();
+        assert!(actual.in_version(version));
+        parameter(&param, prop);
     }
-    let groups: BTreeMap<_, _> = w.groups.iter().map(|(k, v)| (k.strip_suffix("_style").unwrap(), v)).collect();
+    let groups: BTreeMap<_, _> = w
+        .groups
+        .iter()
+        .map(|(k, v)| {
+            (
+                k.strip_suffix("_style").unwrap(),
+                v.iter().filter(|name| w.style_prop(name).unwrap().in_version(version)).collect::<Vec<_>>(),
+            )
+        })
+        .collect();
     assert_eq!(json!(groups), p["style_groups"]);
     let published_names: BTreeSet<&str> = p["keywords"]
         .as_array()

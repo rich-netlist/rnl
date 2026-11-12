@@ -623,6 +623,10 @@ export type TextView = {
    */
   fix_rotate?: boolean,
   /**
+   * Effective upright, when supplied by a TEXT statement.
+   */
+  upright?: boolean,
+  /**
    * Its size, from the document or a package, when one gives it.
    */
   size: number | null,

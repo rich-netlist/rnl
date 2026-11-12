@@ -648,7 +648,7 @@ impl Interp<'_> {
         out
     }
 
-    fn style_of(&self, s: SceneId, o: ObjId) -> Style {
+    pub(crate) fn style_of(&self, s: SceneId, o: ObjId) -> Style {
         self.scenes[s]
             .style
             .get(&o)
@@ -736,11 +736,13 @@ impl Interp<'_> {
                     key: l.key.clone(),
                     text: l.items.text.as_ref().map(|t| t.as_str().to_string()).unwrap_or_default(),
                     text_name_formats: l.items.text.as_ref().and_then(|t| t.unit).is_some_and(|u| self.follows_0_4(u)),
+                    modern_text: l.items.modern_text,
                     at: l.position,
                     halign: l.items.halign.clone(),
                     valign: l.items.valign.clone(),
                     rotate: l.items.rotate.unwrap_or(0.0),
                     fix_rotate: l.items.fix_rotate,
+                    upright: l.items.upright,
                     style: l.style.clone(),
                 })
                 .collect(),
@@ -768,6 +770,7 @@ impl Interp<'_> {
                     .and_then(|t| t.text.as_ref())
                     .and_then(|t| t.unit)
                     .is_some_and(|u| self.follows_0_4(u)),
+                modern_text: p.text.as_ref().is_some_and(|t| t.modern_text),
                 shape: p.shape,
                 points: p.points.clone(),
                 params: p.params.clone(),
@@ -776,6 +779,7 @@ impl Interp<'_> {
                 valign: p.text.as_ref().and_then(|t| t.valign.clone()),
                 rotate: p.text.as_ref().and_then(|t| t.rotate),
                 fix_rotate: p.text.as_ref().and_then(|t| t.fix_rotate).unwrap_or(false),
+                upright: p.text.as_ref().and_then(|t| t.upright),
             })
             .collect();
         let pins = sd
@@ -1152,7 +1156,7 @@ impl Interp<'_> {
             let Some(text) = it.text.clone() else { continue };
             let att = self.text_attach(t);
             let drawable_att = matches!(self.o(att), ObjData::Inst { .. } | ObjData::Usage(_) | ObjData::Bundle { .. });
-            let modern_text = text.unit.is_some_and(|u| self.follows_0_4(u));
+            let modern_text = it.modern_text || text.unit.is_some_and(|u| self.follows_0_4(u));
             let orient = if from_symbol && (modern_text || !it.fix_rotate.unwrap_or(false)) {
                 self.orientation(s, att)
             } else {
@@ -1209,7 +1213,8 @@ impl Interp<'_> {
                 valign: it.valign.clone().unwrap_or_else(|| "baseline".into()),
                 rotate: it.rotate.unwrap_or(0.0),
                 fix_rotate: it.fix_rotate,
-                baseline_mirrors: text.unit.is_some_and(|u| self.follows_0_4(u)),
+                upright: it.upright,
+                baseline_mirrors: modern_text,
                 orient,
                 style: self.style_of(s, t),
                 own_style: self.own_style_of(s, t),

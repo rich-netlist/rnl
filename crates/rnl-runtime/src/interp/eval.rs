@@ -2497,11 +2497,12 @@ impl<'p> Interp<'p> {
                     }
                 }
             };
-            let known = spec.iter().any(|s| s.name == std) || (open_style && words().is_style_prop(&std));
+            let known = spec.iter().any(|s| s.name == std)
+                || (open_style && words().style_prop(&std).is_some_and(|p| p.in_version(&version)));
             if !known {
                 let mut opts: Vec<&str> = spec.iter().map(|s| s.name.as_str()).collect();
                 if open_style {
-                    opts.extend(words().style_props.iter().map(|s| s.name.as_str()));
+                    opts.extend(words().style_props.iter().filter(|s| s.in_version(&version)).map(|s| s.name.as_str()));
                 }
                 let (code, message) = crate::parameter_errors::unknown(
                     kw,

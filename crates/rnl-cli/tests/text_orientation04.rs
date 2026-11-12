@@ -98,6 +98,7 @@ fn reflected_multiline_formulas_keep_their_reading_order_and_bars() {
                 halign: "start".into(),
                 valign: "baseline".into(),
                 vertical,
+                transform: None,
                 runs: Vec::new(),
                 bars: Vec::new(),
             };

@@ -193,6 +193,7 @@ mod tests {
                 bus: false,
                 anchors,
                 mode: "straight".into(),
+                default_auto: false,
                 generated: false,
             });
         }

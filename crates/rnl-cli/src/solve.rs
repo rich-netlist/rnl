@@ -609,6 +609,24 @@ fn pass(
         let mut write_errors = Vec::new();
         let host = &r.doc.levels[p.level];
         let path = normalize(&host.path);
+        if let Some(wire) = solved.report.fatal_written_wire {
+            written.notes.push(format!("the record is not written: written wire [{wire}] has unevaluable geometry"));
+            let record = written.record.clone();
+            levels.push(SolvedLevel {
+                problem: p.clone(),
+                solved,
+                report_available,
+                written,
+                write_errors,
+                record,
+                hash,
+                path,
+                time,
+                hints_for_low: options.solver.hints_for_low,
+            });
+            // Do not replace or remove existing generated records and do not touch memory.
+            continue;
+        }
         // a file of 0.2 that the record is written into is raised to 0.3 (16.1): the file level of
         // the level, a library section read as a file (2.8)
         let want: Want = (path.clone(), host.file.clone(), r.doc.levels[r.doc.file_level(p.level)].section.clone());

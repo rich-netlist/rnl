@@ -38,6 +38,8 @@ use crate::structure::Structure;
 /// A candidate as the order of candidates sees it.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Entry {
+    /// None means scoreable; Some identifies an unevaluable written wire.
+    pub written_path_error: Option<usize>,
     /// The pairs of symbols that overlap.
     pub overlaps: usize,
     /// What crowds the drawing ([`crowding`]): the gaps between neighbours left out, and the texts
@@ -58,7 +60,7 @@ pub(crate) struct Entry {
 /// routed, each with its net, and the wires written, drawn by their mode. A wire written on a
 /// net that a ROUTE asks for counts as of that net, so that the routed wires that meet it do not
 /// count as crossing another net.
-pub(crate) fn drawn(problem: &LevelProblem, s: &Structure, g: &Geometry, routing: &Routing) -> Routed {
+pub(crate) fn drawn(problem: &LevelProblem, s: &Structure, g: &Geometry, routing: &Routing) -> Result<Routed, usize> {
     let drawn = &s.connections.drawn;
     // a net by the first entry drawn with its name
     let net = |d: usize| drawn.iter().position(|e| drawn.get(d).is_some_and(|x| x.net == e.net)).unwrap_or(d);
@@ -66,11 +68,11 @@ pub(crate) fn drawn(problem: &LevelProblem, s: &Structure, g: &Geometry, routing
         routing.drawn.iter().zip(&routing.paths).map(|(d, path)| (net(*d), path.clone())).collect();
     let first_written = drawn.len().saturating_sub(problem.wires.len());
     for w in 0..problem.wires.len() {
-        if let Some(path) = written_path(problem, g, w) {
+        if let Some(path) = written_path(problem, g, w).map_err(|error| error.wire)? {
             paths.push((net(first_written + w), path));
         }
     }
-    Routed { paths }
+    Ok(Routed { paths })
 }
 
 /// The value of each layer of the objectives in force on a placed candidate: with `routed`, the
@@ -203,7 +205,9 @@ pub(crate) fn measured_layers(
     let wires = match routed {
         Some(w) => w,
         None => {
-            written = drawn(problem, s, &placed.geometry, &Routing::default());
+            // Callers must validate written paths before measuring a candidate.
+            written =
+                drawn(problem, s, &placed.geometry, &Routing::default()).expect("candidate written paths validated");
             &written
         }
     };
@@ -335,6 +339,18 @@ fn through(bx: &[Q; 4], a: &[Q; 2], b: &[Q; 2]) -> bool {
 /// crowding, then the fewest places where the wires mislead, then the fewest joins left undone,
 /// then the layers within their tolerances, then the code.
 pub(crate) fn order(active: &Active, entries: &[Entry]) -> Vec<usize> {
+    let valid: Vec<usize> =
+        entries.iter().enumerate().filter_map(|(i, e)| e.written_path_error.is_none().then_some(i)).collect();
+    if valid.len() != entries.len() {
+        let mut result = if valid.is_empty() {
+            Vec::new()
+        } else {
+            let subset: Vec<Entry> = valid.iter().map(|&i| entries[i].clone()).collect();
+            order(active, &subset).into_iter().map(|i| valid[i]).collect()
+        };
+        result.extend((0..entries.len()).filter(|&i| entries[i].written_path_error.is_some()));
+        return result;
+    }
     if active.configured_only {
         let refs: Vec<_> = entries.iter().map(|e| (e.layers.as_slice(), e.code.as_slice())).collect();
         return active.rank(&refs);
@@ -438,6 +454,7 @@ mod tests {
 
     fn entry(overlaps: usize, joins_left: usize, layers: &[i64], code: u32) -> Entry {
         Entry {
+            written_path_error: None,
             overlaps,
             crowding: 0,
             misleading: 0,
@@ -445,6 +462,16 @@ mod tests {
             layers: layers.iter().map(|v| int(*v)).collect(),
             code: vec![code],
         }
+    }
+
+    #[test]
+    fn unevaluable_written_path_never_outranks_valid_candidate() {
+        let active = Active::new(&Objectives::none(), &Inputs::default());
+        let mut invalid = entry(0, 0, &[], 0);
+        invalid.written_path_error = Some(3);
+        let valid = entry(10, 10, &[], 1);
+        assert_eq!(order(&active, &[invalid.clone(), valid]), vec![1, 0]);
+        assert_eq!(order(&active, &[invalid]), vec![0]);
     }
 
     #[test]
@@ -573,7 +600,7 @@ mod tests {
         assert_eq!(nets, ["e", "a", "Q<1>,Q<0>", "Q<1>", "d", "b"]);
         let route_b = s.connections.drawn.iter().position(|d| d.routed && d.net == "b").unwrap();
         assert_eq!(route_b, 0);
-        let written = drawn(&p, &s, &g, &Routing::default());
+        let written = drawn(&p, &s, &g, &Routing::default()).unwrap();
         assert_eq!(written.paths.len(), p.wires.len());
         // the wire written of b is of the ROUTE's net, the others their own
         assert_eq!(written.paths[5].0, route_b);

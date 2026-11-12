@@ -337,6 +337,7 @@ fn strict_swaps_make_45_degree_crosses_or_keep_the_routed_shape_when_facts_preve
                 valign: "center".into(),
                 rotate: 0.,
                 fix_rotate: false,
+                upright: true,
                 baseline_mirrors: true,
                 column_position: None,
                 style: vec![],

@@ -1274,6 +1274,7 @@ fn net_labels(it: &ItemView, sym: &SymbolView) -> Vec<TextView> {
             valign: valign.into(),
             rotate: 0.0,
             fix_rotate: None,
+            upright: None,
             baseline_mirrors: false,
             orient: Orient::R0,
             style: style.clone(),

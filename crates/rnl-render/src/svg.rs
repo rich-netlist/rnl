@@ -197,6 +197,16 @@ impl W {
     /// whatever the estimate misses falls to both sides alike.
     fn text(&self, t: &TextPrim) -> String {
         let mut out = String::new();
+        if let Some([a, b, c, d, tx, ty]) = t.transform {
+            let _ = write!(
+                out,
+                "<g transform=\"matrix({a:.9} {:.9} {:.9} {d:.9} {:.9} {:.9})\">",
+                -c,
+                -b,
+                tx * self.s,
+                -ty * self.s
+            );
+        }
         let font = match t.font.as_str() {
             "" | "sans-serif" | "serif" => String::new(),
             family => format!(" font-family=\"{}\"", esc(family)),
@@ -238,6 +248,9 @@ impl W {
                 c.1,
                 self.stroke_attrs(&b.stroke, false)
             );
+        }
+        if t.transform.is_some() {
+            out.push_str("</g>");
         }
         out
     }
@@ -301,6 +314,7 @@ mod tests {
             halign: "start".into(),
             valign: "baseline".into(),
             vertical: false,
+            transform: None,
             runs: vec![TextRun {
                 text: "A<&\"'".into(),
                 at: (1.0, 2.0),

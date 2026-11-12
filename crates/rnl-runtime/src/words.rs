@@ -43,6 +43,8 @@ pub enum ParamType {
 pub struct ParamSpec {
     pub name: String,
     pub ty: ParamType,
+    /// A version may replace the old parameter type.
+    pub type_since: Option<(String, ParamType)>,
     pub required: bool,
     /// The last version requiring this parameter; later versions still accept it as optional.
     pub required_until: Option<String>,
@@ -65,6 +67,7 @@ impl ParamSpec {
         ParamSpec {
             name: name.into(),
             ty,
+            type_since: None,
             required: false,
             required_until: None,
             since: None,
@@ -85,6 +88,11 @@ impl ParamSpec {
     pub fn as_in(&self, version: &str) -> ParamSpec {
         let mut p = self.clone();
         p.required = self.required && in_version(&None, &self.required_until, version);
+        if let Some((since, ty)) = &self.type_since {
+            if in_version(&Some(since.clone()), &None, version) {
+                p.ty = ty.clone();
+            }
+        }
         if let ParamType::Enum(vals) = &mut p.ty {
             vals.retain(|v| match v {
                 Literal::Str(s) => self
@@ -281,6 +289,13 @@ pub struct HeaderField {
 pub struct StyleProp {
     pub name: String,
     pub ty: ParamType,
+    pub since: Option<String>,
+}
+
+impl StyleProp {
+    pub fn in_version(&self, version: &str) -> bool {
+        in_version(&self.since, &None, version)
+    }
 }
 
 #[derive(Debug)]
@@ -330,7 +345,11 @@ impl Words {
         let attributes = strings("attributes")?;
         let mut style_props = Vec::new();
         for (name, spec) in obj.get("style_props").and_then(Value::as_object).ok_or("style_props")? {
-            style_props.push(StyleProp { name: name.clone(), ty: param_type(spec) });
+            style_props.push(StyleProp {
+                name: name.clone(),
+                ty: param_type(spec),
+                since: spec.get("since").and_then(Value::as_str).map(String::from),
+            });
         }
         let mut groups = HashMap::new();
         for g in ["line_style", "area_style", "wire_style", "text_style"] {
@@ -469,7 +488,7 @@ impl Words {
                 out.insert(p.name.clone());
             }
         }
-        for s in &self.style_props {
+        for s in self.style_props.iter().filter(|s| version.is_none_or(|v| s.in_version(v))) {
             out.insert(s.name.clone());
             if let ParamType::Enum(vals) = &s.ty {
                 for v in vals {
@@ -598,6 +617,12 @@ fn keyword(name: &str, spec: &Value) -> Result<KeywordSig, String> {
                 .map(|p| ParamSpec {
                     name: str_of(p.get("name")).unwrap_or_default(),
                     ty: param_type(p),
+                    type_since: p.get("type_since").and_then(Value::as_object).and_then(|v| v.iter().next()).map(
+                        |(version, ty)| {
+                            let spec = serde_json::json!({"type": ty});
+                            (version.clone(), param_type(&spec))
+                        },
+                    ),
                     required: p.get("required").and_then(Value::as_bool).unwrap_or(false),
                     required_until: str_of(p.get("required_until")),
                     since: str_of(p.get("since")),
@@ -713,6 +738,17 @@ mod tests {
         assert!(!w.all_words().contains("PLACE"));
         // DISTANCE's group as one list of names
         assert_eq!(w.keyword("DISTANCE").unwrap().at_least_one, vec![vec!["min", "max", "exact"]]);
+    }
+
+    #[test]
+    fn style_words_follow_the_source_language_version() {
+        let w = words();
+        for version in ["0.2", "0.3"] {
+            assert!(!w.all_words_in(version).contains("textvisible"));
+            assert!(w.all_words_in(version).contains("textcolor"));
+        }
+        assert!(w.all_words_in("0.4").contains("textvisible"));
+        assert!(w.all_words().contains("textvisible"));
     }
 
     #[test]

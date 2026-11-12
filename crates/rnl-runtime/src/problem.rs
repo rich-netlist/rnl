@@ -281,6 +281,7 @@ pub struct TextInfo {
     pub rotate: f64,
     /// Keep glyph rotation in scene axes; the anchor and box side follow the owner (13.3).
     pub fix_rotate: bool,
+    pub upright: bool,
     /// Reflect the baseline text box with its transformed vertical axis (9.2.5).
     pub baseline_mirrors: bool,
     /// Local anchor in the reversed label column, used only by reversing orientations (9.2.5).
@@ -532,6 +533,9 @@ pub struct ProblemWire {
     /// The points it passes, in order: pins of terminals and point objects.
     pub anchors: Vec<PointRef>,
     pub mode: String,
+    /// The effective WIRE statement uses the 0.4 default auto route (13.1).
+    /// This belongs to the statement, which can come from a different file version.
+    pub default_auto: bool,
     /// Made by a rule (10.5), as opposed to written in a record or in the body of a usage written
     /// in one.
     pub generated: bool,
@@ -1038,6 +1042,9 @@ pub fn canonical_sig1(p: &LevelProblem) -> String {
             if t.fix_rotate {
                 c.word("fix-rotate");
             }
+            if !t.upright {
+                c.word("not-upright");
+            }
             if t.baseline_mirrors {
                 c.word("baseline-mirrors");
                 if t.fix_rotate {
@@ -1172,6 +1179,9 @@ pub fn canonical_sig1(p: &LevelProblem) -> String {
         c.bool(w.bus);
         c.points(&w.anchors);
         c.str(&w.mode);
+        if w.default_auto {
+            c.word("default-auto-0.4");
+        }
         c.bool(w.generated);
     }
     c.word("routes");

@@ -206,6 +206,7 @@ export type Op = { level?: string } & (
       rotate?: number;
       /** RNL 0.4: keep the glyph direction while the box side follows the object. */
       fix_rotate?: boolean;
+      upright?: boolean;
       size?: number;
       style?: Record<string, Literal>;
     }

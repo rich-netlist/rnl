@@ -4900,6 +4900,13 @@
    "sections": []
   },
   {
+   "number": "RNL9405",
+   "name": "auto-wire-geometry-limit",
+   "severity": "error",
+   "message": "the default auto wire path exceeds this implementation's finite geometry limits (13.1)",
+   "sections": ["13.1"]
+  },
+  {
    "number": "RNL9500",
    "name": "constraint-needs-solver",
    "severity": "hint",

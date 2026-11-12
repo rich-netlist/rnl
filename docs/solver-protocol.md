@@ -1,6 +1,6 @@
 # Independent solver protocol
 
-The `rnl-solver-io` library encodes an independent solver's decisions as JSON and validates them against the original `LevelProblem` before writeback. Protocol version 2 is independent of the solver executable's version.
+The `rnl-solver-io` library encodes an independent solver's decisions as JSON and validates them against the original `LevelProblem` before writeback. Protocol version 3 is independent of the solver executable's version.
 
 The `rnl-solver` executable has its own version, currently `0.3.0`. It reads one input JSON document from stdin (or an explicit file) and writes one result document to stdout. Diagnostics go to stderr. Viewers continue using the solver library. Its opt-in [skeleton experiment](solver-skeleton.md) uses the same result protocol.
 
@@ -20,7 +20,7 @@ The host invokes the external program for each level as it reads after earlier i
 
 ## Input envelope
 
-An input has `format: "rnl-solver-input"`, `version: 2`, and a `levels` array. Each entry contains:
+An input has `format: "rnl-solver-input"`, `version: 3`, and a `levels` array. Each entry contains:
 
 - `request`: its zero-based array ordinal.
 - `input`: the original problem's input digest.
@@ -28,6 +28,8 @@ An input has `format: "rnl-solver-input"`, `version: 2`, and a `levels` array. E
 - `options`: the caller's settings before file settings merge: `canonical`, `hints_for_low`, `safety_seconds`, `legacy_alias`, and ordered `overrides`.
 
 Preserving explicit overrides is necessary: an explicit zero can override a nonzero file setting, while an omitted zero default cannot. Duplicate override keys are rejected. The problem includes all typed facts and nested tables, electrical and coordinate-only pin identities, source locations, usages, text markup and layout, literal values and string units, groups, and junction settings. The codec checks indices, position and usage dependencies, finite coordinates and supported nesting depths.
+
+Every authored wire carries a required `default_auto` boolean. It is true only for auto mode from a 0.4 WIRE or effective rewrite, independently of the containing level's version; true with another mode is rejected. Text carries optional `upright`, defaulting to true, in addition to its angle and `fix_rotate`. Hidden text retains its content and style for evaluation but contributes no drawing or collision space.
 
 Every route carries a required `tree` boolean. A resolved tree retains its own members even when another route names the same net, including when newer content appears in an older drawing level. A missing flag is an error rather than an implicit whole-net request.
 
@@ -38,7 +40,7 @@ JSON numbers are parsed from their decimal spelling without an intermediate loss
 ```json
 {
   "format": "rnl-solver-result",
-  "version": 2,
+  "version": 3,
   "solver": { "name": "example-solver", "version": "1.0.0" },
   "levels": [
     {
@@ -102,8 +104,11 @@ The runtime writes against the original problem. Result messages do not select o
 - Kept, failed and discarded fact indices, conflict groups, and complete/undecided flags.
 - Statement hints, including source positions, usage chains and optional point identities.
 - Unrouted trees and inert objectives.
+- Optional `fatal_written_wire`: an authored wire index whose default geometry could not be evaluated.
 - All four work counters, the shared budget limit, admitted work and stop reason.
 - Canonical replay settings, errors, warnings and notes.
+
+A `fatal_written_wire` result must carry an error. Its index is checked against the original problem. The embedded solver returns an empty solution for this failure. The host preserves that level's existing generated records and skips writeback; ordinary reported constraint errors can still accompany usable decisions.
 
 Integer work counters remain JSON integers and must be read without converting through floating-point values. Index checks and classification consistency are validated; conflict minimality and the solver's proof claims are the solver's responsibility. Time, work, seed and unlimited limits remain distinct, as do complete, time, work and safety stop reasons.
 
@@ -116,3 +121,7 @@ Tests compare complete native solutions, reports and written records after JSON 
 ## Version 2
 
 Version 2 requires group `identity`, `first` and `direct` fields. These preserve repeated declarations, disabled first declarations and definition provenance when choosing a grouping tree. Version 1 programs cannot reproduce these decisions and reject version 2 requests; upgrade the independent executable together with the protocol. Result decision shapes are unchanged, but the response uses the request protocol version.
+
+## Version 3
+
+Version 3 adds source-version auto-wire semantics, arbitrary text angles and upright glyph layout, and fatal written-wire reporting. Version 2 executables cannot reproduce these decisions safely. Input and result decoders require version 3; upgrade the independent executable and its caller together. Result decision arrays retain their previous shapes.

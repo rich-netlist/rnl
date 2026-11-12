@@ -703,6 +703,7 @@ mod tests {
             halign: halign.into(),
             valign: valign.into(),
             vertical,
+            transform: None,
             runs: Vec::new(),
             bars: Vec::new(),
         };

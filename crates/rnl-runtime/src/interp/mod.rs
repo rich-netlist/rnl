@@ -7,6 +7,7 @@
 
 mod assertions;
 pub mod attrs;
+mod auto_geometry;
 mod bindings;
 mod body_rules;
 pub mod catalog;
@@ -987,6 +988,9 @@ impl<'p> Interp<'p> {
             } else {
                 None
             };
+        if !self.numbers.count {
+            self.check_auto_wire_geometry();
+        }
         let model = self.build_model();
         let (problems, results) =
             if self.want_problems && self.package_main.is_none() { self.build_problems() } else { Default::default() };

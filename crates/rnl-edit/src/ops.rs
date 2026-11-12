@@ -63,6 +63,7 @@ pub enum Op {
         valign: Option<String>,
         rotate: Option<f64>,
         fix_rotate: Option<bool>,
+        upright: Option<bool>,
         size: Option<f64>,
         style: Vec<(String, Literal)>,
     },
@@ -245,6 +246,7 @@ pub(crate) fn parse_for_language(k: usize, value: &Value, modern: bool) -> Resul
             "valign",
             "rotate",
             "fix_rotate",
+            "upright",
             "size",
             "style",
         ],
@@ -405,6 +407,7 @@ pub(crate) fn parse_for_language(k: usize, value: &Value, modern: bool) -> Resul
                 valign: r.opt_string("valign")?,
                 rotate: r.opt_num("rotate")?,
                 fix_rotate: r.opt_bool("fix_rotate")?,
+                upright: r.opt_bool("upright")?,
                 size: r.opt_num("size")?,
                 style: r.style()?,
             }

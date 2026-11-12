@@ -1220,6 +1220,10 @@ export type Text = {
    */
   vertical: boolean,
   /**
+   * Scene-space affine applied to all runs and bars.
+   */
+  transform?: [number, number, number, number, number, number],
+  /**
    * The runs as laid out, drawn in the text's colour.
    */
   runs: Array<TextRun>,

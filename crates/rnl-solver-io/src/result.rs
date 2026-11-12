@@ -61,6 +61,12 @@ fn report_indices(r: &SolveReport, p: &LevelProblem, at: &Node<'_>) -> Result<()
             Err(at.error(format!("{what} index {i} is out of range")))
         }
     };
+    if let Some(wire) = r.fatal_written_wire {
+        valid(wire, p.wires.len(), "fatal written wire")?;
+        if r.errors.is_empty() {
+            return Err(at.error("fatal written wire requires a diagnostic"));
+        }
+    }
     let fact = |i| valid(i, p.facts.len(), "fact");
     let mut classified = BTreeSet::new();
     for f in r.kept.iter().chain(&r.failed).copied().chain(r.discarded.iter().map(|d| d.fact)) {

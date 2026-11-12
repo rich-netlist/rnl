@@ -1585,9 +1585,15 @@ impl Interp<'_> {
     /// A label eligible for a symbol column, after scene edits and text expansion (9.2.5).
     fn column_label(&mut self, s: SceneId, t: ObjId) -> Option<(Pt, TextItems)> {
         let at = self.text_sym_pos(t)?;
+        if self.style_of(s, t).get("textvisible").and_then(|v| v.boolean()) == Some(false) {
+            return None;
+        }
         let items = self.text_items(t);
         let text = items.text.as_ref()?;
-        if !text.unit.is_some_and(|u| self.follows_0_4(u)) || items.dx.is_some() || items.dy.is_some() {
+        if !(items.modern_text || text.unit.is_some_and(|u| self.follows_0_4(u)))
+            || items.dx.is_some()
+            || items.dy.is_some()
+        {
             return None;
         }
         let sc = &self.scenes[s];
@@ -1620,6 +1626,7 @@ impl Interp<'_> {
                 && it.valign.as_deref().unwrap_or("baseline") == items.valign.as_deref().unwrap_or("baseline")
                 && it.rotate.unwrap_or(0.0) == items.rotate.unwrap_or(0.0)
                 && it.fix_rotate.unwrap_or(false) == items.fix_rotate.unwrap_or(false)
+                && it.upright.unwrap_or(true) == items.upright.unwrap_or(true)
             {
                 column.push((other, pos));
             }
@@ -1813,8 +1820,10 @@ impl Interp<'_> {
     /// mode, joined by its flylines ([`Interp::wire_runs`]); the vertices of the wire when all its
     /// points have a position.
     fn wire_path(&mut self, s: SceneId, w: ObjId) -> Vec<Pt> {
-        let Some((runs, mode)) = self.wire_runs(s, w) else { return Vec::new() };
-        runs.iter().flat_map(|run| if run.len() >= 2 { route(run, &mode) } else { run.clone() }).collect()
+        let Some(runs) = self.wire_runs(s, w) else {
+            return Vec::new();
+        };
+        runs.into_iter().flatten().collect()
     }
 
     pub(crate) fn text_items(&self, t: ObjId) -> TextItems {
@@ -1894,52 +1903,113 @@ impl Interp<'_> {
         true
     }
 
-    /// The vertices of a wire after its routing mode (13.1), as it is drawn: rewritten, by the
-    /// rewrite that takes effect (the draft 0.3). None while one of its points has no position.
-    pub(crate) fn wire_points(&mut self, s: SceneId, w: ObjId) -> Option<Vec<Pt>> {
-        if self.drawing_ignored(s, w) {
-            return None;
-        }
-        let WireShape { points, mode, .. } = self.wire_shape(s, w)?;
-        let mut pts = Vec::new();
-        for q in points {
-            pts.push(self.point_of(s, q)?);
-        }
-        Some(route(&pts, &mode))
+    /// The direction of an actual endpoint pin in scene coordinates. Explicit position
+    /// subobjects remain points; equal coordinates never convert them to physical pins.
+    fn auto_wire_direction(&mut self, scene: SceneId, object: ObjId) -> Option<crate::geom::auto::Direction> {
+        let value = self.scene_value(object);
+        let (owner, index) = match self.o(value).clone() {
+            ObjData::ScenePin { owner, index } => (owner, index),
+            ObjData::Term { mut owner, index, name } => {
+                let mut terminal = value;
+                if let Some(bundle) = self.bundle_field(owner) {
+                    owner = bundle;
+                    terminal = self.term_obj(scene, owner, index, name);
+                }
+                (owner, self.pin_for(scene, owner, terminal)?)
+            }
+            _ => return None,
+        };
+        let symbol = *self.scenes[scene].symbol.get(&owner)?;
+        let local = self.symbol(symbol).pins.get(index)?.dir?;
+        let degrees = self.orientation(scene, owner).direction(local)?;
+        crate::geom::auto::Direction::from_degrees(degrees)
     }
 
-    /// What a viewer that does not solve draws of a wire some of whose points have no position yet,
-    /// such as a free point `(_, _)` or the pin of an instance not placed (13.1; the draft 0.3,
-    /// section 9): the runs of consecutive points that have one, each of two or more drawn as the
-    /// wire after its mode, and a flyline from the end of each run to the start of the next, over
-    /// the points that have none. Each run is its points as written, and the mode is the wire's;
-    /// a wire whose points all have a position is one run.
-    pub(crate) fn wire_runs(&mut self, s: SceneId, w: ObjId) -> Option<(Vec<Vec<Pt>>, String)> {
-        if self.drawing_ignored(s, w) {
-            return None;
+    /// Route one complete run. `ends` identifies whether the run retains each endpoint of the
+    /// original WIRE; an internal gap is not an endpoint pin, even if its coordinate coincides.
+    pub(crate) fn routed_wire_run(
+        &mut self,
+        scene: SceneId,
+        points: &[ObjId],
+        mode: &str,
+        modern: bool,
+        ends: (bool, bool),
+    ) -> Option<Vec<Pt>> {
+        let coords: Vec<Pt> = points.iter().map(|&p| self.point_of(scene, p)).collect::<Option<_>>()?;
+        if !modern || mode != "auto" || coords.len() < 2 {
+            return Some(route(&coords, mode));
         }
-        let WireShape { points, mode, .. } = self.wire_shape(s, w)?;
-        let mut runs: Vec<Vec<Pt>> = Vec::new();
-        let mut gap = true;
-        for q in points {
-            match self.point_of(s, q) {
-                Some(xy) if gap => {
-                    runs.push(vec![xy]);
-                    gap = false;
-                }
-                Some(xy) => runs.last_mut().unwrap().push(xy),
-                None => gap = true,
+        let first = if ends.0 { points.first().and_then(|&p| self.auto_wire_direction(scene, p)) } else { None };
+        let last = if ends.1 { points.last().and_then(|&p| self.auto_wire_direction(scene, p)) } else { None };
+        let segments = crate::geom::auto::auto_wire(&coords, first, last)?;
+        let mut out = Vec::new();
+        for segment in segments {
+            if out.is_empty() {
+                out.push(segment[0]);
+            }
+            if segment.len() == 1 {
+                out.push(segment[0]);
+            } else {
+                out.extend(segment.into_iter().skip(1));
             }
         }
-        Some((runs, mode))
+        Some(out)
     }
 
-    /// A wire as a viewer that does not solve draws it ([`Interp::wire_runs`]): its runs of two
-    /// points or more after its mode, and its flylines.
-    pub(crate) fn wire_drawing(&mut self, s: SceneId, w: ObjId) -> (Vec<Vec<Pt>>, Vec<(Pt, Pt)>) {
-        let Some((runs, mode)) = self.wire_runs(s, w) else { return (Vec::new(), Vec::new()) };
-        let flylines = runs.windows(2).map(|pair| (pair[0][pair[0].len() - 1], pair[1][0])).collect();
-        let drawn = runs.iter().filter(|run| run.len() >= 2).map(|run| route(run, &mode)).collect();
+    /// The source of the effective rewrite controls the version at the WIRE statement (16.1).
+    pub(crate) fn modern_wire_source(&self, scene: SceneId, site: Option<&std::rc::Rc<super::ctx::Ctx>>) -> bool {
+        let unit = site.map_or(self.level_unit[self.scenes[scene].level], |ctx| self.source_unit(ctx));
+        self.follows_0_4(unit)
+    }
+
+    pub(crate) fn wire_points(&mut self, scene: SceneId, wire: ObjId) -> Option<Vec<Pt>> {
+        if self.drawing_ignored(scene, wire) {
+            return None;
+        }
+        let shape = self.wire_shape(scene, wire)?;
+        let modern = self.modern_wire_source(scene, shape.site.as_ref());
+        self.routed_wire_run(scene, &shape.points, &shape.mode, modern, (true, true))
+    }
+
+    /// Consecutive positioned runs after routing. The corresponding source indices distinguish
+    /// real wire endpoints from the free ends of an intermediate partially positioned run.
+    pub(crate) fn wire_runs(&mut self, scene: SceneId, wire: ObjId) -> Option<Vec<Vec<Pt>>> {
+        if self.drawing_ignored(scene, wire) {
+            return None;
+        }
+        let shape = self.wire_shape(scene, wire)?;
+        let modern = self.modern_wire_source(scene, shape.site.as_ref());
+        let mut ranges: Vec<Vec<ObjId>> = Vec::new();
+        let mut starts = Vec::new();
+        let mut ends = Vec::new();
+        let mut gap = true;
+        for (i, &point) in shape.points.iter().enumerate() {
+            if self.point_of(scene, point).is_some() {
+                if gap {
+                    ranges.push(Vec::new());
+                    starts.push(i == 0);
+                    ends.push(false);
+                    gap = false;
+                }
+                ranges.last_mut().unwrap().push(point);
+                *ends.last_mut().unwrap() = i + 1 == shape.points.len();
+            } else {
+                gap = true;
+            }
+        }
+        let mut runs = Vec::new();
+        for ((points, first), last) in ranges.into_iter().zip(starts).zip(ends) {
+            runs.push(self.routed_wire_run(scene, &points, &shape.mode, modern, (first, last))?);
+        }
+        Some(runs)
+    }
+
+    pub(crate) fn wire_drawing(&mut self, scene: SceneId, wire: ObjId) -> (Vec<Vec<Pt>>, Vec<(Pt, Pt)>) {
+        let Some(runs) = self.wire_runs(scene, wire) else {
+            return (Vec::new(), Vec::new());
+        };
+        let flylines = runs.windows(2).map(|pair| (*pair[0].last().unwrap(), pair[1][0])).collect();
+        let drawn = runs.into_iter().filter(|run| run.len() >= 2).collect();
         (drawn, flylines)
     }
 
