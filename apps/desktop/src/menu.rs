@@ -591,9 +591,9 @@ mod tests {
                 keyed("solve-save", "Save Solved &Copy As...", "Ctrl+Shift+S", "CmdOrCtrl+Shift+S"),
                 item("solve-save-utf8", "Save Solved Copy As UTF-8...", None),
                 Shown::Separator,
-                item("solve-settings", "S&ettings...", None),
-                Shown::Separator,
                 check("toggle-layout", "Show &Layout Table", None),
+                Shown::Separator,
+                item("solve-settings", "S&ettings...", None),
             ],
         )
     }
