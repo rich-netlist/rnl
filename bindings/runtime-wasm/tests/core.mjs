@@ -204,6 +204,75 @@ test("a write gives the netlist written and its Document", () => {
   assert.ok("written" in core.respond(rcWrite([placeR1])));
 });
 
+test("0.4 writes retain named, bus and unbound pins, exact wire ends and fixed text", async () => {
+  const request = {
+    write: {
+      language_version: "0.4", dialect: "spice", author: "test",
+      netlist: "* pin identities\nR1 a b 1k\nR2 a b 2k\n",
+      ops: [
+        { op: "define-symbol", level: "file", name: "$S", pins: [
+          { terminals: [1], names: ["p", "alias"], at: [-1, 0] },
+          { terminals: [1], names: ["bus"], bus: true, at: [1, 0] },
+          { terminals: [], names: ["free"], at: [0, 1] },
+        ], prims: [{ shape: "circle", points: [[0, 0]], params: { radius: 1 } }] },
+        { op: "set", level: "file", object: "#R1", symbol: "$S", at: [0, 0] },
+        { op: "set", level: "file", object: "#R2", symbol: "$S", at: [8, 0] },
+        { op: "add-wire", level: "file", nets: [], via: [
+          { owner: "#R1", pin: 2, reference: "#R1::free" },
+          { owner: "#R2", pin: 2, reference: "#R2::free" },
+        ] },
+        { op: "add-text", level: "file", attach: "#R1", markup: "R", key: "name", fix_rotate: true, at: [0, 2] },
+      ],
+    },
+    std: false,
+  };
+  const done = core.write(request);
+  assert.match(done.text, /@VERSION\("0\.4"\)/);
+  assert.deepEqual(done.document.diagnostics.filter(d => d.severity === "error"), []);
+  const entry = done.document.path;
+  const snapshot = core.snapshot({ entry, files: { [entry]: done.text }, std: false, parts: { model: true } });
+  const model = snapshot.levels[0].model;
+  const pins = model.objects.find(object => object.id === "#R1").pins;
+  assert.deepEqual(pins.map(pin => pin.names), [["p", "alias"], ["bus"], ["free"]]);
+  assert.deepEqual(pins.map(pin => pin.bus), [false, true, false]);
+  assert.deepEqual(pins[2].terminals, []);
+  assert.deepEqual(model.wires[0].nets, []);
+  assert.deepEqual(model.wires[0].via, request.write.ops[3].via);
+  assert.ok(model.texts.some(text => text.fix_rotate === true));
+  const worker = startCore();
+  try {
+    assert.deepEqual(await worker.write(request), done);
+  } finally {
+    worker.terminate();
+  }
+});
+
+test("real 0.4 write refusals keep diagnostic fields through the Worker", async () => {
+  const request = {
+    write: {
+      language_version: "0.4", dialect: "spice", author: "test",
+      netlist: "* errors\nR1 a b 1k\n", ops: [{ op: "set", level: "file", object: "#R1" }],
+    },
+    std: false,
+  };
+  const diagnostic = error => {
+    assert.equal(error.code, "RNL8619");
+    assert.equal(error.diagnosticName, "edit-set-nothing");
+    // An op-shape refusal has no RNL source location, but retains the diagnostic array.
+    assert.deepEqual(error.diagnostics, []);
+    return true;
+  };
+  assert.throws(() => core.write(request), diagnostic);
+  const worker = startCore();
+  try {
+    await assert.rejects(worker.write(request), diagnostic);
+    const legacy = { ...request, write: { ...request.write, language_version: undefined } };
+    await assert.rejects(worker.write(legacy), error => !Object.hasOwn(error, "code") && !Object.hasOwn(error, "diagnostics"));
+  } finally {
+    worker.terminate();
+  }
+});
+
 const TOP = '* top\n* @RNL(type="header") { @VERSION("0.3")}\n.include "amp.inc"\nX1 a b amp\n.end\n';
 const AMP = ".subckt amp in out\r\nR1 in out 1k\r\n* @RNL { #R1 @PLACE(0, 0) }\r\n.ends amp\r\n";
 const replace = (level, records) => ({

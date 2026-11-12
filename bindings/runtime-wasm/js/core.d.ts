@@ -121,7 +121,13 @@ export type Literal = string | number | boolean;
 export type ParameterValue = Literal | ParameterValue[];
 
 /** A vertex of a wire: a pin, a named point, a role of a usage, or coordinates. */
-export type Vertex = { terminal: string } | { point: string } | { usage: string; role: string } | { at: Point };
+export type Vertex =
+  | { terminal: string }
+  /** RNL 0.4: the owner's zero-based pin index and its exact writable reference. */
+  | { owner: string; pin: number; reference: string }
+  | { point: string }
+  | { usage: string; role: string }
+  | { at: Point };
 
 /** A run of a line of text, as the Document's `Text.lines` holds it (13.6). */
 export type Run =
@@ -198,6 +204,8 @@ export type Op = { level?: string } & (
       halign?: string;
       valign?: string;
       rotate?: number;
+      /** RNL 0.4: keep the glyph direction while the box side follows the object. */
+      fix_rotate?: boolean;
       size?: number;
       style?: Record<string, Literal>;
     }
@@ -231,11 +239,15 @@ export interface Shape {
 
 /** A pin of a symbol (9.2.4). */
 export interface SymbolPin {
-  /** One terminal, or several for a bus pin, by number or by name. */
+  /** One terminal, or several for a bus pin; empty for an unbound pin in RNL 0.4. */
   terminals: (number | string)[];
+  /** RNL 0.4: all local names of this pin, in binding order. */
+  names?: string[];
+  /** RNL 0.4: preserve a one-terminal bus. Defaults to terminals.length > 1. */
+  bus?: boolean;
   at: Point;
   direction?: "right" | "up" | "left" | "down";
-  /** The pin's name for display. */
+  /** Display text, independent of the pin's local names. */
   label?: { markup: string } | { lines: Run[][] };
 }
 
@@ -243,6 +255,8 @@ export interface SymbolPin {
 export interface WriteRequest {
   overlays?: OverlayOptions;
   write: {
+    /** Explicit output language, "0.3" or "0.4". Omitted: the released writer default. */
+    language_version?: string;
     dialect: "spice" | "spectre";
     /** The netlist, without RNL records. */
     netlist: string;

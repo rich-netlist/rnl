@@ -130,6 +130,8 @@ jobs:
         run: cargo build --target wasm32-unknown-unknown -p rnl-runtime -p rnl-render -p rnl-host-spice -p rnl-host-spectre -p rnl-view -p rnl-edit -p rnl-solver -p rnl-runtime-wasm
       - name: Build the WebAssembly binding
         run: node --version && node bindings/runtime-wasm/build.mjs
+      - name: Check public editor request types
+        run: npx --yes --package typescript@5.9.3 tsc --noEmit --strict --module NodeNext --moduleResolution NodeNext --target ES2022 bindings/runtime-wasm/tests/edit-types.mts
       - name: Test the binding's JavaScript modules, with a module that panics on request
         run: |
           node bindings/runtime-wasm/build.mjs --features test-panic --out target/wasm-test

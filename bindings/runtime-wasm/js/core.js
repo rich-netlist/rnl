@@ -44,11 +44,13 @@
  *
  * @typedef {object} WriteRequest
  * @property {import('./core.js').OverlayOptions} [overlays] Inspection SVG export options.
- * @property {{ dialect: "spice" | "spectre", netlist: string, author: string, ops: object[], file?: string }} write
+ * @property {{ language_version?: string, dialect: "spice" | "spectre", netlist: string, author: string, ops: object[], file?: string }} write
  *   The netlist, without RNL records, its dialect, the author of the records, the ops as the
  *   editor interface draft writes them, and the name the netlist is saved under when it is known,
  *   such as `top.net`: a Spectre netlist that is not a `.scs` file is read in the SPICE mode up to
- *   its `simulator lang=spectre`.
+ *   its `simulator lang=spectre`. `language_version` explicitly selects "0.3" or "0.4";
+ *   omitting it retains the released writer default. Ops follow the public `Op` declaration,
+ *   including RNL 0.4 pin identities and fixed text direction.
  * @property {Record<string, string>} [files] Further files, such as packages.
  * @property {string[]} [package_dirs]
  * @property {boolean} [std]
