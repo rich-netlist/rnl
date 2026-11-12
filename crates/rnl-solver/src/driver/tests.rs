@@ -829,8 +829,7 @@ fn options_change_the_search_and_never_the_facts() {
             // what the facts leave free is on the grid
             let g = from_f64(options.grid.unwrap()).unwrap();
             for &k in &e.structure.elements {
-                for axis in 0..2 {
-                    let v = &e.placed.geometry.origin[k][axis];
+                for v in &e.placed.geometry.origin[k] {
                     assert!((v / &g).is_integer(), "{text}: {} {} at {v}", p.title, p.objects[k].label);
                 }
             }
@@ -2038,8 +2037,8 @@ fn grounded(problem: &LevelProblem, s: &Structure, c: &Candidate, ori: &[Orient]
             FactKind::Place { axis, .. } | FactKind::PointCoordinate { axis, .. } => Some(ax(*axis)),
             _ => None,
         };
-        for axis in 0..2 {
-            let objects: Vec<usize> = unit.touched[axis].iter().filter_map(object_of).collect();
+        for (axis, touched) in unit.touched.iter().enumerate() {
+            let objects: Vec<usize> = touched.iter().filter_map(object_of).collect();
             for w in objects.windows(2) {
                 join(axis, w[0], w[1]);
             }

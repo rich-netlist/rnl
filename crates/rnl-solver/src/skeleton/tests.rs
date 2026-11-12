@@ -36,8 +36,8 @@ fn compaction_keeps_distribution_and_replays_every_interrupted_pass() {
     let resolved = crate::resolve::resolve(&p, &options, &StoppedClock);
     let s = crate::structure::analyse(&p, &resolved, &options, crate::options::CAPS, &mut Work::default());
     let mut g = s.witness.clone();
-    for k in 0..3 {
-        g.origin[k] = [int(20 * k as i64), int(0)];
+    for (k, origin) in g.origin[..3].iter_mut().enumerate() {
+        *origin = [int(20 * k as i64), int(0)];
     }
     let placed = Placed {
         origins: s.origins(&p, &g),
@@ -106,10 +106,10 @@ fn centre_positioned_pin_keeps_its_fact_and_matches_the_written_wire() {
     routing.drawn.push(0);
     let (made, wires, notes) = compact(&p, &s, &placed, &routing, &|_| true, &options, &mut Work::default());
     assert!(notes.iter().any(|n| n.contains("x pass")), "{notes:?}");
-    for axis in 0..2 {
+    for (axis, expected) in wires.paths[0][0].iter().enumerate() {
         let actual = crate::resolve::point_value(&p, &made.geometry, &pin, axis, 0).unwrap();
         assert_eq!(actual, int(8), "axis {axis}: {notes:?}");
-        assert_eq!(actual, wires.paths[0][0][axis]);
+        assert_eq!(&actual, expected);
     }
 }
 
@@ -447,8 +447,8 @@ fn spacing_shrinks_to_its_floor_and_grows_only_as_far_as_retained_facts_allow() 
         let s = crate::structure::analyse(&p, &resolved, &options, crate::options::CAPS, &mut Work::default());
         assert_eq!(s.kept.len(), p.facts.len());
         let mut g = s.witness.clone();
-        for k in 0..3 {
-            g.origin[k] = [int(8 * k as i64), int(0)];
+        for (k, origin) in g.origin[..3].iter_mut().enumerate() {
+            *origin = [int(8 * k as i64), int(0)];
         }
         let placed = Placed {
             origins: s.origins(&p, &g),

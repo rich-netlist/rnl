@@ -553,8 +553,8 @@ pub(crate) fn compact_strict(
                 read::Kind::Segment(g) => {
                     let seg = &sk.segs[g];
                     for v in [seg.a, seg.b] {
-                        for axis in 0..2 {
-                            out.conflicts.push((axis, sk.vertices[v].at[axis].clone()));
+                        for (axis, at) in sk.vertices[v].at.iter().enumerate() {
+                            out.conflicts.push((axis, at.clone()));
                         }
                     }
                 }

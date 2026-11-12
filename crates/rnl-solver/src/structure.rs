@@ -1890,7 +1890,7 @@ fn group_tree(problem: &LevelProblem, objects: &[ObjectInfo], elements: &[usize]
     // them as with the blocks, so that both stay in one piece
     let mut absorbed: Vec<BTreeSet<usize>> = Vec::new();
     let laminar = |a: &BTreeSet<usize>, b: &BTreeSet<usize>| a.is_disjoint(b) || a.is_subset(b) || b.is_subset(a);
-    for g in 0..problem.groups.len() {
+    for (g, group) in problem.groups.iter().enumerate() {
         if !crate::budget::permit(crate::budget::Step::Structure, elements.len().saturating_mul(g + 1)) {
             return fallback();
         }
@@ -1945,7 +1945,7 @@ fn group_tree(problem: &LevelProblem, objects: &[ObjectInfo], elements: &[usize]
         }
         notes.push(format!(
             "the group {} overlaps other groups in a way that does not nest: it is measured as a group but not searched as a block",
-            problem.groups[g].label
+            group.label
         ));
     }
     let all: BTreeSet<usize> = elements.iter().copied().collect();

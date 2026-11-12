@@ -1606,13 +1606,13 @@ fn finish_net(net: &NetIn, out: &mut NetOut) {
     }
     // an anchor where three now meet: the wires made end at a branch point on it
     let written = |a: usize| net.joined.iter().filter(|(x, y)| *x == a || *y == a).count();
-    for a in 0..n {
+    for (a, anchor) in net.anchors.iter().enumerate() {
         let ends = out.wires.iter().flat_map(|w| [w.start, w.end]).filter(|e| *e == End::Anchor(a)).count();
-        let pin = usize::from(net.anchors[a].connects_pin);
+        let pin = usize::from(anchor.connects_pin);
         if ends == 0 || pin + written(a) + ends < 3 {
             continue;
         }
-        let at = net.anchors[a].at.clone();
+        let at = anchor.at.clone();
         let b = out.branches.len();
         out.branches.push(at.clone());
         for w in &mut out.wires {
