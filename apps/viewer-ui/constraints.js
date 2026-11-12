@@ -13,8 +13,10 @@ import { setPane } from "./panels.js";
 import { current, doc } from "./state.js";
 import { revealLine } from "./text.js";
 import { highlightConstraint } from "./usages.js";
-import { factTextIds } from "./constraint-box.js";
+import { factObjects, factTextIds } from "./constraint-box.js";
 import { $, span, svgElement } from "./util.js";
+
+export { factObjects };
 
 /**
  * What the mark of a row says, from what became of the fact (`status`, which the solve's resolution decided) and whether
@@ -48,23 +50,6 @@ export function statusMark(status, holds = null) {
 
 /** Whether any level of a Document has its constraints: the build was asked for them. A package file has none either way. */
 export const hasConstraints = (d) => !!d && d.levels.some((l) => l.constraints);
-
-/** The objects of the constraints' list a fact acts on, by their index there. */
-export function factObjects(fact) {
-  const out = new Set();
-  const visit = (value, bare) => {
-    if (Array.isArray(value)) value.forEach((v) => visit(v, bare));
-    else if (typeof value === "number") { if (bare) out.add(value); }
-    else if (value && typeof value === "object") {
-      if (typeof value.origin === "number") out.add(value.origin);
-      else if (typeof value.object === "number") out.add(value.object);
-      else if (value.centre) visit(value.centre, false);
-    }
-  };
-  for (const key of ["members", "at", "from", "to"]) visit(fact[key], fact.kind === "ORIENT-RELATION" && key !== "at");
-  for (const key of ["object", "point", "text"]) if (typeof fact[key] === "number") out.add(fact[key]);
-  return out;
-}
 
 /** The report's level that is the solve of this constraints' list: the same host and the same input; null when none. */
 function reportOf(level, report) {

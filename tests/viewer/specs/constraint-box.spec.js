@@ -189,3 +189,69 @@ test('a box does not take the pointer: a click on the drawing under it selects w
   // the selection ended the box
   await expect(frame(page)).toHaveCount(0);
 });
+
+const NETLIST_04 = `* Directional distributes, orientation lists, pin orientations and tables in 0.4
+* @RNL(type="header") { @VERSION("0.4") }
+R1 a b 1k
+R2 b c 2k
+R3 c d 3k
+* @RNL {
+*   $S = @DEFINE-SYMBOL {
+*     %p = (-1, 0) @PIN(terminal=1, direction="left");
+*     %n = (1, 0) @PIN(terminal=2, direction="right");
+*     (-1, -1) (1, 1) @RECTANGLE
+*   };
+*   {#R1 #R2 #R3} @SET-SYMBOL $S;
+*   {#R1 #R2 #R3} @DISTRIBUTE("left-to-right");
+*   {#R1 #R2 #R3} @DISTRIBUTE("top-to-bottom");
+*   #R1 @ORIENT(["MY", "R0"]);
+*   #R1 #R2 @ORIENT-RELATION(["R0", "MY"]);
+*   #R1::p @ORIENT(["R0", "MY"]);
+*   #R1::p #R2::n @ORIENT-RELATION(["R0", "R180"]);
+*   {{#R1 #R2} {#R3}} @TABLE
+* }
+* @RNL(type="generated") {
+*   #R1 @PLACE(0, 0); #R2 @PLACE(9, 0); #R3 @PLACE(18, -6);
+*   {#R1 #R2 #R3} @ORIENT("R0")
+* }
+.end
+`;
+
+test('in RNL 0.4, directional DISTRIBUTE, orientation lists, pin orientations and TABLE show their titles, marks and lit objects', async ({ page }) => {
+  await page.goto(`${process.env.RNL_WEB_URL}/index.html`);
+  await expect(page.locator('#menubar')).toBeVisible();
+  await page.locator('#file-input').setInputFiles({ name: 'row04.sp', mimeType: 'text/plain', buffer: Buffer.from(NETLIST_04) });
+  await page.waitForFunction(() => window.viewer.doc && !document.body.classList.contains('busy'));
+  await page.keyboard.press('7');
+  await expect.poll(() => page.locator('#constraints-list li.constraint').count()).toBeGreaterThan(0);
+
+  await row(page, /DISTRIBUTE x increasing/).click();
+  expect(await texts(page)).toEqual(['DISTRIBUTE x increasing', '1', '2', '3']);
+
+  await row(page, /DISTRIBUTE y decreasing/).click();
+  expect(await texts(page)).toEqual(['DISTRIBUTE y decreasing', '1', '2', '3']);
+
+  await row(page, /the orientation \[MY, R0\] of #R1/).click();
+  expect(await texts(page)).toEqual(['ORIENT [MY, R0]']);
+
+  await row(page, /ORIENT-RELATION \[R0, MY\] \{#R1\} \{#R2\}/).click();
+  expect(await texts(page)).toEqual(['ORIENT-RELATION [R0, MY]', 'from1', 'to1']);
+
+  await row(page, /ORIENT \[R0, MY\] pin 1 of #R1/).click();
+  expect(await texts(page)).toEqual(['PIN-ORIENT [R0, MY]']);
+  // R1 stays lit while R2 and R3 are dimmed
+  expect(await page.evaluate(() => {
+    const doc = window.viewer.doc;
+    const muted = (name) => {
+      const id = doc.levels[0].hits.find((h) => h.kind === 'box' && doc.objects[h.objects[0]]?.name === name)?.id;
+      return document.querySelector(`#canvas [data-id=${JSON.stringify(id)}]`)?.classList.contains('usage-muted');
+    };
+    return [muted('R1'), muted('R2'), muted('R3')];
+  })).toEqual([false, true, true]);
+
+  await row(page, /ORIENT-RELATION \[R0, R180\] pin 1 of #R1 to pin 2 of #R2/).click();
+  expect(await texts(page)).toEqual(['PIN-ORIENT-RELATION [R0, R180]', 'from1', 'to1']);
+
+  await row(page, /TABLE y/).click();
+  expect(await texts(page)).toEqual(['TABLE y', '1.1', '1.2', '2.1']);
+});

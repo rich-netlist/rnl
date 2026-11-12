@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { boxTitle, constraintBox, factMembers, factTextIds } from '../viewer-ui/constraint-box.js';
+import { boxTitle, constraintBox, factMembers, factObjects, factTextIds } from '../viewer-ui/constraint-box.js';
 
 // a level of three resistors in a row, a ground stub under the last, a free point and a text
 const objects = [
@@ -44,6 +44,9 @@ const pin = (object, p, terminal = 'x') => ({ object, pin: p, terminal });
 test('a title says the kind and what it is given, not the objects', () => {
   assert.equal(boxTitle({ kind: 'ALIGN', axis: 'y' }), 'ALIGN y');
   assert.equal(boxTitle({ kind: 'DISTRIBUTE', axis: 'x' }), 'DISTRIBUTE x');
+  assert.equal(boxTitle({ kind: 'DISTRIBUTE', axis: 'x', sense: 'either' }), 'DISTRIBUTE x');
+  assert.equal(boxTitle({ kind: 'DISTRIBUTE', axis: 'x', sense: 'increasing' }), 'DISTRIBUTE x increasing');
+  assert.equal(boxTitle({ kind: 'DISTRIBUTE', axis: 'y', what: 'DISTRIBUTE y decreasing {#R1 #R2 #R3}' }), 'DISTRIBUTE y decreasing');
   assert.equal(boxTitle({ kind: 'ORDER', axis: 'x', sense: 'increasing' }), 'ORDER x increasing');
   assert.equal(boxTitle({ kind: 'DISTANCE', axis: 'x', sense: 'either', min: 2, max: 4 }), 'DISTANCE x ≥ 2 ≤ 4');
   assert.equal(boxTitle({ kind: 'DISTANCE', axis: 'x', sense: 'increasing', min: 8, max: 8 }), 'DISTANCE x increasing = 8');
@@ -54,7 +57,15 @@ test('a title says the kind and what it is given, not the objects', () => {
   assert.equal(boxTitle({ kind: 'POINT-y', value: 0.1 + 0.2 }), 'POINT-y = 0.3');
   assert.equal(boxTitle({ kind: 'TEXT-dx', value: 4 }), 'TEXT-dx = 4');
   assert.equal(boxTitle({ kind: 'ORIENT', code: 'R90' }), 'ORIENT R90');
+  assert.equal(boxTitle({ kind: 'ORIENT', code: 'MY', what: 'the orientation [MY, R0] of #M1' }), 'ORIENT [MY, R0]');
+  assert.equal(boxTitle({ kind: 'ORIENT', codes: ['MY', 'R0'] }), 'ORIENT [MY, R0]');
   assert.equal(boxTitle({ kind: 'ORIENT-RELATION', relation: 'MX' }), 'ORIENT-RELATION MX');
+  assert.equal(boxTitle({ kind: 'ORIENT-RELATION', relation: 'R0', what: 'ORIENT-RELATION [R0, MY] {#M1} {#M2}' }), 'ORIENT-RELATION [R0, MY]');
+  assert.equal(boxTitle({ kind: 'PIN-ORIENT', pin: { object: 0, pin: 0, direction: 180 }, codes: ['R0'] }), 'PIN-ORIENT R0');
+  assert.equal(boxTitle({ kind: 'PIN-ORIENT', pin: { object: 0, pin: 0, direction: 180 }, codes: ['R0', 'MY'] }), 'PIN-ORIENT [R0, MY]');
+  assert.equal(boxTitle({ kind: 'PIN-ORIENT-RELATION', from: { object: 0, pin: 0, direction: 180 }, to: { object: 1, pin: 0, direction: 180 }, relations: ['R180'] }), 'PIN-ORIENT-RELATION R180');
+  assert.equal(boxTitle({ kind: 'PIN-ORIENT-RELATION', from: { object: 0, pin: 0, direction: 180 }, to: { object: 1, pin: 0, direction: 180 }, relations: ['R0', 'MY'] }), 'PIN-ORIENT-RELATION [R0, MY]');
+  assert.equal(boxTitle({ kind: 'TABLE', axis: 'x' }), 'TABLE x');
 });
 
 test('the members keep the order of the fact, a distance and a relation number each of their two sets', () => {
@@ -125,4 +136,45 @@ test('texts, points and usages that have no box of their own are found by their 
 test('the texts a fact names are the labels that stay lit', () => {
   assert.deepEqual(factTextIds(level, { kind: 'TEXT-dx', text: 6, from: origin(0), value: 1 }), ['#R1::name']);
   assert.deepEqual(factTextIds(level, { kind: 'ALIGN', axis: 'x', members: [origin(0), origin(1)] }), []);
+});
+
+test('0.4 pin orientations and tables locate their pins and cells and name their objects', () => {
+  const pinOrient = { kind: 'PIN-ORIENT', pin: { object: 0, pin: 1, direction: 0 }, codes: ['R0', 'MY'] };
+  const pinBox = constraintBox(level, pinOrient);
+  assert.equal(pinBox.title, 'PIN-ORIENT [R0, MY]');
+  assert.deepEqual(pinBox.items, [{ rect: [80, 8, 80, 8], tag: null }]);
+  assert.deepEqual([...factObjects(pinOrient)], [0]);
+
+  const pinRel = {
+    kind: 'PIN-ORIENT-RELATION',
+    from: { object: 0, pin: 1, direction: 0 },
+    to: { object: 2, pin: 0, direction: 180 },
+    relations: ['R180'],
+  };
+  const relBox = constraintBox(level, pinRel);
+  assert.equal(relBox.title, 'PIN-ORIENT-RELATION R180');
+  assert.deepEqual(relBox.items, [
+    { rect: [80, 8, 80, 8], tag: 'from1' },
+    { rect: [200, 8, 200, 8], tag: 'to1' },
+  ]);
+  assert.deepEqual([...factObjects(pinRel)], [0, 2]);
+
+  const table = {
+    kind: 'TABLE',
+    axis: 'x',
+    rows: {
+      list: [
+        { list: [{ point: origin(0) }, { point: origin(1) }] },
+        { list: [{ point: { object: 2, pin: 0, reference: 'p' } }] },
+      ],
+    },
+  };
+  const tableBox = constraintBox(level, table);
+  assert.equal(tableBox.title, 'TABLE x');
+  assert.deepEqual(tableBox.items, [
+    { rect: [0, 0, 80, 16], tag: '1.1' },
+    { rect: [100, 0, 180, 16], tag: '1.2' },
+    { rect: [200, 8, 200, 8], tag: '2.1' },
+  ]);
+  assert.deepEqual([...factObjects(table)], [0, 1, 2]);
 });
