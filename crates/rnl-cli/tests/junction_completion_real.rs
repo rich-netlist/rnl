@@ -521,6 +521,51 @@ fn a_new_dropped_constraint_is_not_excused_by_an_existing_drop() {
 }
 
 #[test]
+fn existing_assertion_violation_is_preserved_but_a_new_one_is_rejected() {
+    use rnl_cli::solve::{solve_with_clock, SolveOptions};
+    let base = include_str!("junction_completion_fixtures/no-existing-dot.sp")
+        .replace("*   %p = (0,0);", "*   {#R1 #R2} @ASSERT-INSTANCE(same=[\"name\"]);\n*   %p = (0,0);");
+    for introduced in [false, true] {
+        let source = if introduced {
+            base.replace("*   %p = (0,0);", "*   $CHECK = @DEFINE(roles=[\"trigger\",\"{members}\"]) { ?members @ASSERT-INSTANCE(same=[\"name\"]) };\n*   %dots = # @SELECT-USAGE $DOT; %dots(trigger) {#R1 #R2}(members) @AS $CHECK;\n*   %p = (0,0);")
+        } else {
+            base.clone()
+        };
+        let files = MemoryProvider::new().with("main.sp", &source);
+        let opts = Options { std: false, generated: false, problems: true, ..Default::default() };
+        let original = interpret_file(Path::new("main.sp"), None, &files, &opts).unwrap();
+        assert!(
+            !original.diagnostics().iter().any(|d| d.severity == rnl_runtime::diag::Severity::Error),
+            "{:?}",
+            original.diagnostics()
+        );
+        assert_eq!(
+            original.diagnostics().iter().filter(|d| d.severity == rnl_runtime::diag::Severity::Violation).count(),
+            1
+        );
+        let options = SolveOptions {
+            std: false,
+            solver: rnl_solver::SolverOptions::default().with_config("layout=\"lines\",limit=\"seed\"").unwrap(),
+            ..Default::default()
+        };
+        let result = solve_with_clock(Path::new("main.sp"), &files, &options, &rnl_solver::StoppedClock);
+        if introduced {
+            let error = result.unwrap_err();
+            assert!(error.contains("trial interpretation has an error or violation"), "{error}");
+        } else {
+            let result = result.unwrap();
+            let saved = MemoryProvider::new().with("main.sp", &result.files[0].text);
+            let after =
+                interpret_file(Path::new("main.sp"), None, &saved, &Options { generated: true, ..opts }).unwrap();
+            assert_eq!(
+                after.diagnostics().iter().filter(|d| d.severity == rnl_runtime::diag::Severity::Violation).count(),
+                1
+            );
+        }
+    }
+}
+
+#[test]
 fn already_fixed_usage_keeps_original_position_without_place_rewrite() {
     let record = run(r#"$DOT = @DEFINE(roles=[["p","point"]]) {}; # @SELECT-USAGE $DOT => @PLACE(2,0)"#)
         .expect("external fixed own point");
