@@ -208,6 +208,8 @@ impl fmt::Display for Unsolved {
 /// A record written from a solution.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Written {
+    /// Junction ATTACH statements by zero-based statement ordinal and target expression.
+    pub junctions: Vec<JunctionWrite>,
     /// Located warnings from settings consumed while writing, separate from ordinary reading.
     pub warnings: Vec<crate::diag::Diag>,
     /// The whole record, from `@RNL` to the closing brace, lines joined by `\n` without the
@@ -222,6 +224,17 @@ pub struct Written {
     /// file adds why it does not, when it does not, such as `rnl solve` for a level in a region
     /// written to be encrypted (2.2).
     pub notes: Vec<String>,
+}
+
+/// One generated junction statement, without changing its record-local naming or numbering.
+#[derive(Clone, Debug, PartialEq)]
+pub struct JunctionWrite {
+    pub statement: usize,
+    /// UTF-8 byte range of the full ATTACH statement in the unnumbered record.
+    pub span: std::ops::Range<usize>,
+    pub target: String,
+    /// Original physical point identity for a junction on an existing point.
+    pub original: Option<PointRef>,
 }
 
 /// Why a decision is unsolved: its kind and the reason given.
@@ -827,7 +840,7 @@ pub fn write_record(p: &LevelProblem, solution: &Solution, author: &str, hash: &
                         needed[root] = true;
                     }
                     accepted_junctions.push(point);
-                    extra_junctions.push(reference);
+                    extra_junctions.push((reference, point.clone()));
                 }
                 Err(why) => lost(Decision::Junction { index }, &crate::problem::point_name(p, point), why),
             }
@@ -879,14 +892,27 @@ pub fn write_record(p: &LevelProblem, solution: &Solution, author: &str, hash: &
     }
     let junction = if modern { p.junction.effective().definition.as_deref() } else { Some("$JUNCTION") };
     let warnings = if modern { p.junction.warning().into_iter().collect() } else { Vec::new() };
+    let mut junctions = Vec::new();
     for (b, name) in solution.branches.iter().zip(&branch_names) {
         if let (true, Some(name), Some(definition)) = (b.junction, name, junction) {
+            junctions.push(JunctionWrite {
+                statement: statements.len(),
+                span: 0..0,
+                target: format!("%{name}"),
+                original: None,
+            });
             statements.push(format!("{definition} @ATTACH %{name}"));
         }
     }
 
     if let Some(definition) = junction {
-        for point in extra_junctions {
+        for (point, original) in extra_junctions {
+            junctions.push(JunctionWrite {
+                statement: statements.len(),
+                span: 0..0,
+                target: refs.text(&point),
+                original: Some(original),
+            });
             statements.push(format!("{definition} @ATTACH {}", refs.text(&point)));
         }
     }
@@ -901,7 +927,14 @@ pub fn write_record(p: &LevelProblem, solution: &Solution, author: &str, hash: &
     } else {
         format!("{head} {{\n  {}\n}}", statements.join(";\n  "))
     };
-    Written { record, unsolved, notes, warnings }
+    let mut offset = head.len() + 5; // " {\n  "
+    for (index, statement) in statements.iter().enumerate() {
+        if let Some(junction) = junctions.iter_mut().find(|junction| junction.statement == index) {
+            junction.span = offset..offset + statement.len();
+        }
+        offset += statement.len() + 4; // ";\n  "
+    }
+    Written { record, unsolved, notes, warnings, junctions }
 }
 
 /// How deep the points that points are placed from are followed.

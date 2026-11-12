@@ -140,3 +140,11 @@ Version 4 adds annotations, existing-junction identity, and fatal annotation rep
 Version 5 adds the required nullable `report.skeleton` field. For `layout="lines"` it carries the final group tables, typed lines, route identities, and whether the tree layout was used as a fallback. Table cuts contain `columns + 1` x coordinates and `rows + 1` y coordinates; item spans are half-open index pairs. Line coordinates must be finite and axes are 0 or 1. A line's optional `tree` and each tree's `route` index refer to the original input routes. These fields are descriptive and never grant permission to rewrite source objects.
 
 Version 4 programs reject version 5 requests. Upgrade the independent executable with the protocol; the linked solver remains available to native and browser callers. The input model itself is unchanged from version 4.
+
+## Positions of generated junction usages
+
+In 0.4, a configured junction definition creates usages with their own points. After the backend returns, the CLI derives coordinate candidates from the expanded definition and verifies the complete candidate record through normal interpretation. Coordinates already fixed by the definition or by applicable rules are preserved; only free axes receive generated PLACE statements. Existing geometry, identities and retained facts must survive, and all new or changed facts must hold in the resulting drawing at both the runtime and effective solver tolerance.
+
+This completion phase makes one baseline interpretation and at most 64 trial interpretations for the whole level. It does not invoke the backend again. Its trial count and elapsed time are reported separately from the backend's time/work budget. Custom configurations for which no candidate can be verified are reported as unresolved; the command does not replace files on that failure.
+
+A result that creates configured junction usages requires a retained-fact report. A third-party result with `report: null` remains usable when this completion is unnecessary; otherwise the host refuses that writeback rather than guessing which facts the producer retained. Lower-level users of `write_record` receive junction statement spans and original point identities in `Written.junctions`; they must complete the new usages before treating the record as a finished layout.

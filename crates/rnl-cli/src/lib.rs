@@ -7,6 +7,9 @@ pub mod dump;
 pub mod explain;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod external_solver;
+pub mod junction_completion;
+pub mod junction_completion_driver;
+pub mod junction_completion_problem;
 pub mod png;
 pub mod preview;
 pub mod problem;

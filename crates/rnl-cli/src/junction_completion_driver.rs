@@ -1,0 +1,355 @@
+//! Isolated interpretation of candidate generated records. This module never calls a solver.
+use crate::junction_completion::{self, Axis, Point, Suggestion};
+use crate::junction_completion_problem::{
+    added_fact_indices, suggestions, validate_interpreted_trial, TrialValidation,
+};
+use rnl_runtime::{
+    problem::{LevelProblem, PointRef, Position, Reference, Slot},
+    solution::{Solution, Written},
+    source::{Layered, MemoryProvider, Provider},
+    Interpretation, Options,
+};
+use std::collections::BTreeMap;
+
+pub struct Context<'a> {
+    pub entry: &'a str,
+    pub dialect: Option<&'a str>,
+    pub formats: &'a BTreeMap<String, String>,
+    pub files: &'a dyn Provider,
+    pub runtime: &'a Options,
+    pub original: &'a Interpretation,
+    pub problem: &'a LevelProblem,
+    pub original_text: &'a str,
+    pub host_path: &'a str,
+    pub kept: &'a [usize],
+    pub solution: &'a Solution,
+    /// Must satisfy both normal interpretation and the effective solver tolerance.
+    pub tolerance: f64,
+    pub on_interpret: Option<&'a dyn Fn()>,
+}
+
+fn read(ctx: &Context<'_>, record: &str) -> Result<Interpretation, String> {
+    if let Some(observe) = ctx.on_interpret {
+        observe();
+    }
+    let text = rnl_runtime::writeback::replace_generated_with_header(
+        &ctx.original.doc,
+        ctx.problem.level,
+        ctx.original_text,
+        record,
+        &ctx.problem.version,
+    );
+    let mut overlay = MemoryProvider::new();
+    overlay.insert(ctx.host_path, &text);
+    let layered = Layered { layers: vec![&overlay, ctx.files] };
+    let opts = Options { generated: true, problems: true, ..ctx.runtime.clone() };
+    rnl_view::interpret_with(ctx.entry, ctx.dialect, ctx.formats, &layered, &opts)
+}
+
+fn line_mapping(ctx: &Context<'_>, new_read: &Interpretation, record: &str) -> Result<Vec<Option<u32>>, String> {
+    let old_level = ctx.original.doc.levels.get(ctx.problem.level).ok_or("old level missing")?;
+    let new_level = new_read.doc.levels.get(ctx.problem.level).ok_or("new level missing")?;
+    let ranges = |level: &rnl_runtime::host::Level| -> Vec<(u32, u32)> {
+        level
+            .records
+            .iter()
+            .filter(|r| r.file == old_level.file && rnl_runtime::writeback::record_type(r) == "generated")
+            .map(|r| r.lines)
+            .collect()
+    };
+    let old_ranges = ranges(old_level);
+    let new_ranges = ranges(new_level);
+    let new_text = rnl_runtime::writeback::replace_generated_with_header(
+        &ctx.original.doc,
+        ctx.problem.level,
+        ctx.original_text,
+        record,
+        &ctx.problem.version,
+    );
+    let kept = |line: u32, ranges: &[(u32, u32)]| !ranges.iter().any(|&(start, end)| start <= line && line <= end);
+    let old: Vec<_> = ctx.original_text.lines().enumerate().filter(|(i, _)| kept(*i as u32 + 1, &old_ranges)).collect();
+    let new: Vec<_> = new_text.lines().enumerate().filter(|(i, _)| kept(*i as u32 + 1, &new_ranges)).collect();
+    if old.len() != new.len() {
+        return Err("cannot map lines outside generated record edits".into());
+    }
+    let mut map = vec![None; ctx.original_text.lines().count() + 1];
+    for ((old_index, old_line), (new_index, new_line)) in old.into_iter().zip(new) {
+        if old_line != new_line {
+            return Err("non-generated line moved or changed during writeback".into());
+        }
+        map[old_index + 1] = Some(new_index as u32 + 1);
+    }
+    Ok(map)
+}
+
+fn named_point(problem: &LevelProblem, name: &str) -> Option<Point> {
+    let mut matching = problem.objects.iter().filter(|o| o.reference == Reference::Name(name.to_owned()));
+    let o = matching.next()?;
+    if matching.next().is_some() {
+        return None;
+    }
+    let Position::Own { x: Slot::Fixed { value: x, .. }, y: Slot::Fixed { value: y, .. } } = &o.position else {
+        return None;
+    };
+    Some(Point { x: *x, y: *y })
+}
+
+fn fixed_point(read: &Interpretation, p: &LevelProblem, point: &PointRef) -> Option<Point> {
+    fixed_point_inner(read, p, point, 0)
+}
+fn fixed_point_inner(read: &Interpretation, p: &LevelProblem, point: &PointRef, depth: usize) -> Option<Point> {
+    if depth > p.objects.len() {
+        return None;
+    }
+    let level = read.model.levels.iter().find(|v| v.level == p.level)?;
+    match point {
+        PointRef::Origin(index) => {
+            let object = p.objects.get(*index)?;
+            if let Position::At(point) = &object.position {
+                if point == &PointRef::Origin(*index) {
+                    return None;
+                }
+                return fixed_point_inner(read, p, point, depth + 1);
+            }
+            if let Reference::Name(name) = &object.reference {
+                if let Some(point) = named_point(p, name) {
+                    return Some(point);
+                }
+            }
+            let id = p.ids.objects.get(*index)?;
+            let mut found = level.objects.iter().filter(|o| &o.id == id);
+            let at = found.next()?.at?;
+            if found.next().is_some() {
+                return None;
+            }
+            Some(Point { x: at.0, y: at.1 })
+        }
+        PointRef::Pin { object, pin, .. }
+        | PointRef::SymbolPin { object, pin, .. }
+        | PointRef::PinPosition { object, pin, .. } => {
+            let id = p.ids.objects.get(*object)?;
+            let mut owner = level.objects.iter().filter(|o| &o.id == id);
+            let owner = owner.next()?;
+            let mut found = owner.pins.iter().filter(|q| q.identity.as_ref().is_some_and(|id| id.index == *pin));
+            let at = found.next()?.at?;
+            if found.next().is_some() {
+                return None;
+            }
+            Some(Point { x: at.0, y: at.1 })
+        }
+        PointRef::Centre(points) => {
+            let coords: Vec<_> =
+                points.iter().map(|q| fixed_point_inner(read, p, q, depth + 1)).collect::<Option<_>>()?;
+            let first = coords.first()?;
+            let (mut xmin, mut xmax, mut ymin, mut ymax) = (first.x, first.x, first.y, first.y);
+            for q in coords {
+                xmin = xmin.min(q.x);
+                xmax = xmax.max(q.x);
+                ymin = ymin.min(q.y);
+                ymax = ymax.max(q.y);
+            }
+            Some(Point { x: (xmin + xmax) / 2., y: (ymin + ymax) / 2. })
+        }
+    }
+}
+fn original_point_in_trial(point: &PointRef, original: &LevelProblem, trial: &LevelProblem) -> Option<PointRef> {
+    let owner = |index: usize| -> Option<usize> {
+        let old = original.objects.get(index)?;
+        if original.objects.iter().filter(|o| o.kind == old.kind && o.reference == old.reference).count() != 1 {
+            return None;
+        }
+        let mut found =
+            trial.objects.iter().enumerate().filter(|(_, o)| o.kind == old.kind && o.reference == old.reference);
+        let (index, _) = found.next()?;
+        if found.next().is_some() {
+            return None;
+        }
+        Some(index)
+    };
+    let pin_owner = |object: usize, pin: usize| -> Option<usize> {
+        let mapped = owner(object)?;
+        let old_symbol = original.symbols.get(original.objects.get(object)?.symbol?)?;
+        let new_symbol = trial.symbols.get(trial.objects.get(mapped)?.symbol?)?;
+        if old_symbol.name != new_symbol.name || old_symbol.pins.get(pin)? != new_symbol.pins.get(pin)? {
+            return None;
+        }
+        Some(mapped)
+    };
+    match point {
+        PointRef::Origin(i) => Some(PointRef::Origin(owner(*i)?)),
+        PointRef::Pin { object, pin, terminal } => {
+            Some(PointRef::Pin { object: pin_owner(*object, *pin)?, pin: *pin, terminal: terminal.clone() })
+        }
+        PointRef::SymbolPin { object, pin, reference } => {
+            Some(PointRef::SymbolPin { object: pin_owner(*object, *pin)?, pin: *pin, reference: reference.clone() })
+        }
+        PointRef::PinPosition { object, pin, reference } => {
+            Some(PointRef::PinPosition { object: pin_owner(*object, *pin)?, pin: *pin, reference: reference.clone() })
+        }
+        PointRef::Centre(_) => None,
+    }
+}
+
+/// Returns a replacement record only after normal interpretation and conservative validation.
+/// Unmappable/ambiguous usages and non-positioned role targets fail closed.
+pub struct Completion {
+    pub record: String,
+    pub trials: usize,
+    pub elapsed: std::time::Duration,
+}
+pub fn complete_record(ctx: &Context<'_>, written: &Written) -> Result<Completion, String> {
+    let start = std::time::Instant::now();
+    if !written.unsolved.is_empty() {
+        return Err("first-pass decisions could not all be written".into());
+    }
+    let record = &written.record;
+    let before = read(ctx, record)?;
+    let line_map = line_mapping(ctx, &before, record)?;
+    let problem = before.problems.iter().find(|p| p.level == ctx.problem.level).ok_or("trial problem missing")?;
+    for placement in &ctx.solution.placements {
+        let old = ctx.problem.objects.get(placement.object).ok_or("first-pass placement index invalid")?;
+        let mut matches = problem.objects.iter().filter(|o| o.reference == old.reference && o.kind == old.kind);
+        let new = matches.next().ok_or("first-pass placed object missing")?;
+        if matches.next().is_some() {
+            return Err("first-pass placed object ambiguous".into());
+        }
+        if placement.x.is_some() || placement.y.is_some() {
+            let Position::Own { x, y } = &new.position else {
+                return Err("placed object has no own coordinates".into());
+            };
+            for (wanted, slot) in [(placement.x, x), (placement.y, y)] {
+                if let Some(wanted) = wanted {
+                    if !matches!(slot, Slot::Fixed { value, .. } if *value == wanted) {
+                        return Err("first-pass placement did not survive interpretation".into());
+                    }
+                }
+            }
+        }
+        if let Some(orient) = placement.orient {
+            if !matches!(new.orient.as_ref(), Some(rnl_runtime::problem::OrientSlot::Fixed { code, .. }) if *code == orient)
+            {
+                return Err("first-pass orientation did not survive interpretation".into());
+            }
+        }
+    }
+
+    let host = before.doc.levels.get(ctx.problem.level).ok_or("trial level missing")?;
+    let generated: Vec<_> =
+        host.records.iter().filter(|r| rnl_runtime::writeback::record_type(r) == "generated").collect();
+    if generated.len() != 1 {
+        return Err("generated record missing or ambiguous".into());
+    }
+    struct Plan {
+        end: usize,
+        usage_id: String,
+        fixed: [Option<f64>; 2],
+        candidates: Vec<Point>,
+    }
+    let mut plans = Vec::new();
+    for junction in &written.junctions {
+        let prefix = record.get(..junction.span.start).ok_or("invalid junction span")?;
+        let line = generated[0].lines.0 + prefix.bytes().filter(|byte| *byte == b'\n').count() as u32;
+        let file = &generated[0].file;
+        let mut found = problem
+            .usages
+            .iter()
+            .enumerate()
+            .filter(|(_, u)| u.source.as_ref().is_some_and(|s| s.file == *file && s.line == line));
+        let (usage, u) = found.next().ok_or("junction usage not interpreted")?;
+        if found.next().is_some() {
+            return Err("ambiguous junction source".into());
+        }
+        let own = u.object.ok_or("junction has no own point")?;
+        let usage_id = problem.ids.objects.get(own).ok_or("junction object id missing")?.clone();
+        let role = if let Some(original) = &junction.original {
+            let mapped = original_point_in_trial(original, ctx.problem, problem)
+                .ok_or("original junction identity is ambiguous")?;
+            fixed_point(&before, problem, &mapped).ok_or("original junction identity has no fixed location")?
+        } else {
+            named_point(problem, &junction.target).ok_or("branch point has no fixed location")?
+        };
+        let view =
+            before.model.levels.iter().find(|level| level.level == ctx.problem.level).ok_or("trial level missing")?;
+        let object = view.objects.iter().find(|object| object.id == usage_id).ok_or("junction view missing")?;
+        let mut fixed = object.at.map(|(x, y)| [Some(x), Some(y)]).unwrap_or([None, None]);
+        if let Position::Own { x, y } = &problem.objects[own].position {
+            for (axis, slot) in [x, y].into_iter().enumerate() {
+                if fixed[axis].is_none() {
+                    if let Slot::Fixed { value, .. } = slot {
+                        fixed[axis] = Some(*value);
+                    }
+                }
+            }
+        }
+        let mut facts = suggestions(problem, usage, own, |q| fixed_point(&before, problem, q));
+        if let Some(value) = fixed[0] {
+            facts.insert(0, Suggestion { axis: Axis::X, value });
+        }
+        if let Some(value) = fixed[1] {
+            facts.insert(0, Suggestion { axis: Axis::Y, value });
+        }
+        let mut candidates = Vec::new();
+        let result = junction_completion::complete(role, &facts, 64, |p| {
+            if fixed[0].is_none_or(|x| x == p.x) && fixed[1].is_none_or(|y| y == p.y) {
+                candidates.push(p);
+            }
+            Err("collect".into())
+        });
+        if !matches!(result, Err(junction_completion::CompletionError::Unresolved(_))) || candidates.is_empty() {
+            return Err("junction candidate limit or invalid coordinate".into());
+        }
+        plans.push(Plan { end: junction.span.end, usage_id, fixed, candidates });
+    }
+    // A single global bound covers the complete level, independent of junction count.
+    const MAX_TRIALS: usize = 64;
+    let mut indexes = vec![0usize; plans.len()];
+    let mut last_error = String::from("no candidates");
+    for attempt in 0..MAX_TRIALS {
+        let mut trial = record.clone();
+        let targets: Vec<_> = plans.iter().zip(&indexes).map(|(p, &i)| (p.usage_id.clone(), p.candidates[i])).collect();
+        for (plan, &index) in plans.iter().zip(&indexes).rev() {
+            let q = plan.candidates[index];
+            let place = match plan.fixed {
+                [Some(_), Some(_)] => String::new(),
+                [Some(_), None] => format!(" => @PLACE(y={})", q.y),
+                [None, Some(_)] => format!(" => @PLACE(x={})", q.x),
+                [None, None] => format!(" => @PLACE({}, {})", q.x, q.y),
+            };
+            trial.insert_str(plan.end, &place);
+        }
+        let after = read(ctx, &trial)?;
+        let after_problem =
+            after.problems.iter().find(|p| p.level == ctx.problem.level).ok_or("trial problem missing")?;
+        let added =
+            added_fact_indices(ctx.problem, after_problem, &ctx.original.doc.levels[ctx.problem.level].file, &line_map)
+                .map_err(str::to_owned)?;
+        match validate_interpreted_trial(TrialValidation {
+            original_problem: ctx.problem,
+            host_file: &ctx.original.doc.levels[ctx.problem.level].file,
+            line_map: &line_map,
+            kept: ctx.kept,
+            before: &before,
+            after: &after,
+            level: ctx.problem.level,
+            targets: &targets,
+            added_facts: &added,
+            tolerance: ctx.tolerance,
+        }) {
+            Ok(()) => return Ok(Completion { record: trial, trials: attempt + 1, elapsed: start.elapsed() }),
+            Err(e) => last_error = e.to_owned(),
+        }
+        let mut advanced = false;
+        for i in (0..indexes.len()).rev() {
+            indexes[i] += 1;
+            if indexes[i] < plans[i].candidates.len() {
+                advanced = true;
+                break;
+            }
+            indexes[i] = 0;
+        }
+        if !advanced {
+            break;
+        }
+    }
+    Err(format!("junction placement unresolved after globally bounded trials: {last_error}"))
+}

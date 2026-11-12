@@ -272,3 +272,12 @@ fn local_junction_still_requires_a_definition_and_a_complete_name() {
         assert!(r.problems[0].junction.invalid.is_some(), "{value}");
     }
 }
+#[test]
+fn junction_write_has_stable_statement_ordinal_and_target() {
+    let body = format!("{DOT} %a=(0,0)");
+    let r = read(r#"@SOLVER-CONFIG(junction="$DOT")"#, &body);
+    let w = write(&r.problems[0]);
+    assert_eq!(w.junctions.len(), 1);
+    assert_eq!(w.junctions[0].target, "%rt1");
+    assert_eq!(&w.record[w.junctions[0].span.clone()], "$DOT @ATTACH %rt1");
+}
