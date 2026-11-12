@@ -61,19 +61,11 @@ fn renamed_03_symbols_and_inherited_pins_preserve_terminal_mappings() {
         "{text}"
     );
     assert!(text.contains("#Xdly @SET-SYMBOL(terminals=[[1, \"a\"], [2, \"y\"]]) $DELAY_CELL"), "{text}");
+    assert!(text.contains("#E1 @SET-SYMBOL(terminals=[[1, \"p\"], [2, \"n\"]]) $CONTROLLED_VOLTAGE_SOURCE"), "{text}");
     assert!(
-        text.contains("#E1 @SET-SYMBOL(terminals=[[1, \"p\"], [2, \"n\"]]) $CONTROLLED_VOLTAGE_SOURCE"),
+        text.contains("#E2 @SET-SYMBOL(terminals=[[1, \"p\"], [2, \"n\"], [3, \"cp\"], [4, \"cn\"]]) $VCVS_4TERM"),
         "{text}"
     );
-    assert!(
-        text.contains(
-            "#E2 @SET-SYMBOL(terminals=[[1, \"p\"], [2, \"n\"], [3, \"cp\"], [4, \"cn\"]]) $VCVS_4TERM"
-        ),
-        "{text}"
-    );
-    assert!(
-        text.contains("#G1 @SET-SYMBOL(terminals=[[1, \"p\"], [2, \"n\"]]) $CONTROLLED_CURRENT_SOURCE"),
-        "{text}"
-    );
+    assert!(text.contains("#G1 @SET-SYMBOL(terminals=[[1, \"p\"], [2, \"n\"]]) $CONTROLLED_CURRENT_SOURCE"), "{text}");
     assert!(text.contains("=> @SET-SYMBOL $ARROW_SYMBOL"), "{text}");
 }

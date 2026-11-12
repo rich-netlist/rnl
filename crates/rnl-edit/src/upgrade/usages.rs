@@ -68,10 +68,15 @@ impl Usages {
                         Some([Filler::Net(n)]) => {
                             problem.nets.iter().find(|net| net.name == *n).is_some_and(|net| net.port.is_none())
                         }
-                        Some([Filler::Terminal { .. }]) => usage.object.and_then(|o| problem.objects.get(o)).is_some_and(|obj| {
-                            !obj.nets.is_empty()
-                                && obj.nets.iter().all(|&ni| problem.nets.get(ni).is_some_and(|net| net.port.is_none()))
-                        }),
+                        Some([Filler::Terminal { .. }]) => {
+                            usage.object.and_then(|o| problem.objects.get(o)).is_some_and(|obj| {
+                                !obj.nets.is_empty()
+                                    && obj
+                                        .nets
+                                        .iter()
+                                        .all(|&ni| problem.nets.get(ni).is_some_and(|net| net.port.is_none()))
+                            })
+                        }
                         _ => false,
                     };
                 out.plans.entry((problem.level, key.0.clone(), key.1, key.2)).or_default().push(Plan {

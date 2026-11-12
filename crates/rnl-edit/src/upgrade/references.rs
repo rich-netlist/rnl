@@ -486,7 +486,8 @@ impl References {
                 }
             }
             if !ok && !member.segments[0].args.is_empty() {
-                let target_set = if old_key == "name" { &self.netname_key_objects } else { &self.transconductor_objects };
+                let target_set =
+                    if old_key == "name" { &self.netname_key_objects } else { &self.transconductor_objects };
                 let direct: Vec<_> = member.segments[0]
                     .args
                     .iter()
@@ -515,11 +516,7 @@ impl References {
         let new_key = if old_key == "name" { "netname" } else { "label" };
         let mut parts = params.positional.iter().map(super::rewrite::value).collect::<Vec<_>>();
         for named in &params.named {
-            let k = if named.quoted {
-                rnl_runtime::problem::written_string(&named.name)
-            } else {
-                named.name.clone()
-            };
+            let k = if named.quoted { rnl_runtime::problem::written_string(&named.name) } else { named.name.clone() };
             let v = if named.name == "key" {
                 rnl_runtime::problem::written_string(new_key)
             } else {

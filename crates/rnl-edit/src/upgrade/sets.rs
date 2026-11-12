@@ -154,12 +154,19 @@ impl Sets {
         // Preserve 0.3 four-terminal MOS and voltage-controlled switch defaults and bulk-pin
         // ground/supply stub fill whenever an instance actually resolved to those 0.3 symbols.
         let bundled_03 = |pkg_name: &str| {
-            let s: Vec<_> =
-                input.sources.iter().filter(|(_, t)| scan_package_decl(t).is_some_and(|(n, _)| n == pkg_name)).collect();
+            let s: Vec<_> = input
+                .sources
+                .iter()
+                .filter(|(_, t)| scan_package_decl(t).is_some_and(|(n, _)| n == pkg_name))
+                .collect();
             !s.is_empty()
                 && s.iter()
                     .all(|(_, t)| bundled.files.iter().any(|(p, orig)| p.starts_with("<bundled>/0.3/") && t == orig))
-                && input.model.levels.iter().all(|l| l.packages.iter().any(|p| p.name == pkg_name && p.version == "0.3"))
+                && input
+                    .model
+                    .levels
+                    .iter()
+                    .all(|l| l.packages.iter().any(|p| p.name == pkg_name && p.version == "0.3"))
         };
         let has_symbol = |pkg_name: &str, sym_name: &str| {
             bundled_03(pkg_name)

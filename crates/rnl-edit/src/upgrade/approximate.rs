@@ -361,8 +361,10 @@ impl Approximate {
         let device_polarity = |p: &LevelProblem, i: usize| -> Option<bool> {
             let Reference::Name(name) = &p.objects.get(i)?.reference else { return None };
             let host = &input.doc.levels[p.level];
-            let instance =
-                host.instances.iter().find(|inst| host.same_name(&inst.name, name.strip_prefix('#').unwrap_or(name)))?;
+            let instance = host
+                .instances
+                .iter()
+                .find(|inst| host.same_name(&inst.name, name.strip_prefix('#').unwrap_or(name)))?;
             match instance.mtype.as_deref()? {
                 "nmos" | "njf" | "npn" | "nmf" => Some(true),
                 "pmos" | "pjf" | "pnp" | "lpnp" | "pmf" => Some(false),
@@ -413,10 +415,15 @@ impl Approximate {
                             Some([Filler::Net(n)]) => {
                                 p.nets.iter().find(|net| net.name == *n).is_some_and(|net| net.port.is_none())
                             }
-                            Some([Filler::Terminal { .. }]) => u.object.and_then(|o| p.objects.get(o)).is_some_and(|obj| {
-                                !obj.nets.is_empty()
-                                    && obj.nets.iter().all(|&ni| p.nets.get(ni).is_some_and(|net| net.port.is_none()))
-                            }),
+                            Some([Filler::Terminal { .. }]) => {
+                                u.object.and_then(|o| p.objects.get(o)).is_some_and(|obj| {
+                                    !obj.nets.is_empty()
+                                        && obj
+                                            .nets
+                                            .iter()
+                                            .all(|&ni| p.nets.get(ni).is_some_and(|net| net.port.is_none()))
+                                })
+                            }
                             _ => false,
                         };
                     io_sites.entry(key).and_modify(|v| *v &= eligible).or_insert(eligible);

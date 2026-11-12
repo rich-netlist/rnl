@@ -842,25 +842,14 @@ R1 p q 1k
         // collection rnl-std-all, rnl-std-semantics and alias-zh
         assert_eq!(series("0.3"), 16);
         assert_eq!(series("0.4"), 14);
-        for name in [
-            "rnl-std",
-            "rnl-std-core",
-            "rnl-std-basic",
-            "rnl-std-spice",
-            "rnl-std-spectre",
-            "rnl-std-full",
-            "rnl-zh",
-        ] {
+        for name in
+            ["rnl-std", "rnl-std-core", "rnl-std-basic", "rnl-std-spice", "rnl-std-spectre", "rnl-std-full", "rnl-zh"]
+        {
             assert!(names.contains(&format!("0.3/{name}.rnl").as_str()), "0.3/{name}");
         }
-        for name in [
-            "rnl-std-all",
-            "rnl-std-basic",
-            "rnl-std-spice",
-            "rnl-std-spectre",
-            "rnl-std-semantics",
-            "alias-zh",
-        ] {
+        for name in
+            ["rnl-std-all", "rnl-std-basic", "rnl-std-spice", "rnl-std-spectre", "rnl-std-semantics", "alias-zh"]
+        {
             assert!(names.contains(&format!("0.4/{name}.rnl").as_str()), "0.4/{name}");
         }
         assert_eq!(names.len(), 9 + dirs[1..].iter().map(|d| series(d)).sum::<usize>());

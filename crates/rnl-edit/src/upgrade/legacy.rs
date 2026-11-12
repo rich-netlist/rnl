@@ -144,9 +144,7 @@ impl Legacy {
             }
             let Some(new) = renamed_03_symbol(&old) else { continue };
             let Some((destination, BindingKind::Symbol)) = target.get(new) else { continue };
-            if shadowed.contains(&format!("${old}"))
-                || shadowed.contains(&format!("${new}"))
-                || !known("0.3", &package)
+            if shadowed.contains(&format!("${old}")) || shadowed.contains(&format!("${new}")) || !known("0.3", &package)
             {
                 continue;
             }

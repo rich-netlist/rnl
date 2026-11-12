@@ -171,7 +171,11 @@ fn current_mirror_additions_require_opt_in() {
     let exact = layout(statement, false);
     assert!(exact.report.files[0].unconverted.iter().any(|u| u.rule == "standard-definition-removed"));
     let approximate = layout(statement, true);
-    assert!(approximate.files["layout.sp"].contains("#M1(ref) #M2(out) @AS $CURRENT_MIRROR_N"), "{}", approximate.files["layout.sp"]);
+    assert!(
+        approximate.files["layout.sp"].contains("#M1(ref) #M2(out) @AS $CURRENT_MIRROR_N"),
+        "{}",
+        approximate.files["layout.sp"]
+    );
     assert!(approximate.report.files[0].unconverted.is_empty());
     assert!(approximate.report.files[0].approximations.iter().any(|a| a.rule == "approximate-current-mirror"));
 }
