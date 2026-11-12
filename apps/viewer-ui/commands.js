@@ -31,6 +31,7 @@ import { toggleOrigins } from "./origins.js";
 import { toggleFlylines } from "./flylines.js";
 import { toggleNetLabels } from "./net-labels.js";
 import { toggleLayout } from "./layout-frame.js";
+import { toggleSkeletonSymbols, toggleSkeletonWires } from "./skeleton-lines.js";
 import { netlistColors } from "./netlist-colors.js";
 import { downloadManifest, openManifest, openProject, saveProject } from "./project.js";
 import { exportImage } from "./export-image.js";
@@ -158,6 +159,8 @@ export function command(id, options = {}) {
     case "solve-save-utf8": saveSolved("utf8"); break;
     case "solve-settings": settings(); break;
     case "toggle-layout": return toggleLayout();
+    case "toggle-skeleton-symbols": return toggleSkeletonSymbols();
+    case "toggle-skeleton-wires": return toggleSkeletonWires();
     case "check-updates": checkForUpdates(); break;
     case "public-packages": bundledPackagesHelp(); break;
     case "about": about(); break;

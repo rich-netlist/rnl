@@ -592,6 +592,8 @@ mod tests {
                 item("solve-save-utf8", "Save Solved Copy As UTF-8...", None),
                 Shown::Separator,
                 check("toggle-layout", "Show &Layout Table", None),
+                check("toggle-skeleton-symbols", "Show Component and &Pin Skeleton Lines", None),
+                check("toggle-skeleton-wires", "Show &Wire Skeleton Lines", None),
                 Shown::Separator,
                 item("solve-settings", "S&ettings...", None),
             ],

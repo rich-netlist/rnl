@@ -123,6 +123,8 @@
         { "id": "solve-save-utf8", "label": "Save Solved Copy As UTF-8...", "platforms": ["desktop"] },
         "-",
         { "id": "toggle-layout", "label": "Show &Layout Table", "check": true, "page": true },
+        { "id": "toggle-skeleton-symbols", "label": "Show Component and &Pin Skeleton Lines", "check": true, "page": true },
+        { "id": "toggle-skeleton-wires", "label": "Show &Wire Skeleton Lines", "check": true, "page": true },
         "-",
         { "id": "solve-settings", "label": "S&ettings...", "platforms": ["desktop"] }
       ]

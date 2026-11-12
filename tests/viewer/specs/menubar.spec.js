@@ -441,6 +441,8 @@ test.describe("with a native menu", () => {
       ...uiLanguages(repository).map((l, i) => [`language-${l.lang}`, i === 0]),
       ["toggle-auto-include", true],
       ["toggle-layout", false],
+      ["toggle-skeleton-symbols", false],
+      ["toggle-skeleton-wires", false],
     ];
     expect(await viewer.calls("setCheck")).toEqual(expect.arrayContaining(marks));
     await page.keyboard.press("Control+B");

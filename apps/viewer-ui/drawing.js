@@ -22,6 +22,7 @@ import { markUnplaced, scopeSource } from "./text.js";
 import { renderUnplaced } from "./unplaced.js";
 import { $, clamp, svgElement } from "./util.js";
 import { paintUsages, usageAt, usagesAt } from "./usages.js";
+import { skeletonAt } from "./skeleton-lines.js";
 import { TOUCH_CLICK_MS, touchGestures } from "./touch-gestures.js";
 
 const canvas = $("canvas");
@@ -203,7 +204,7 @@ function inkExtent() {
   if (!inverse) return extent;
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const el of svg.querySelectorAll("path, circle, ellipse, line, polyline, polygon, rect, text")) {
-    if (el.classList.contains("backdrop") || el.closest(".overlay, .usage-overlays, .usage-underlays, .layout-table")) continue;
+    if (el.classList.contains("backdrop") || el.closest(".overlay, .usage-overlays, .usage-underlays, .layout-table, .skeleton-lines")) continue;
     const style = getComputedStyle(el);
     if (style.display === "none" || style.visibility === "hidden" || (style.fill === "none" && style.stroke === "none")) continue;
     let { x, y, width, height } = el.getBBox();
@@ -443,6 +444,8 @@ function pointOut(e, point) {
   if (performance.now() - gestures.touchedAt() < TOUCH_CLICK_MS) { hideTip(); return; }
   const { hits } = hitsAt(doc && doc.levels[current], view, point, { flylines: flylinesShown() });
   canvas.classList.toggle("over-object", hits.length > 0 || usageAt(point) !== null);
+  const skel = skeletonAt(view, point);
+  if (skel !== null) { showTip(skel, e.clientX, e.clientY); return; }
   const name = hoverNamesOn() ? nameOf(doc, hits[0]) : null;
   if (name === null) { hideTip(); return; }
   // with View > Show Roles on Hover, the role of the object in its first usage follows its name
