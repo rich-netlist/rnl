@@ -17,5 +17,5 @@ for (const line of run.stdout.trim().split(/\r?\n/)) {
   assert.equal(actual, expected, `example ${example}, work ${work}`);
   count++;
 }
-assert.equal(count, 16);
+assert.equal(count, 32);
 console.log(`${count} native/WASM solver records are byte-identical`);

@@ -18,7 +18,7 @@ fn record(case: u32, work: u32) -> (String, u64) {
         text.push_str(&format!("#R{k} "));
     }
     text.push_str("} @SET-SYMBOL $S;\n");
-    for k in 1..=if case < 2 { n } else { 0 } {
+    for k in 1..=if !(2..6).contains(&case) { n } else { 0 } {
         text.push_str(&format!("* #R{k} @PLACE({}, {}) => @ORIENT(\"R0\");\n", k * 7, (k % 2) * 4));
     }
     if case >= 2 {
@@ -71,7 +71,29 @@ fn record(case: u32, work: u32) -> (String, u64) {
             .with_overrides("objectives=overlaps,crowding,misleading,wire_over_symbol,crossings,turns,wire_length,area")
             .unwrap();
     }
-    let solved = rnl_solver::solve(&p, &options);
+    if case >= 6 {
+        let preview =
+            rnl_solver::experimental::compact_drawn_with_clock(&p, &options, &rnl_solver::StoppedClock).unwrap();
+        if work == 1_000_000 {
+            assert!(preview.drawing.available);
+            assert!(preview.drawing.notes.iter().any(|note| note.starts_with("x pass")));
+        }
+        let drawing = &preview.drawing;
+        let text = serde_json::json!({
+            "available":drawing.available,
+            "positions":drawing.positions.iter().map(|p| (&p.label,p.object,p.x,p.y)).collect::<Vec<_>>(),
+            "relaxed":drawing.relaxed_fact_indices,"preserved":drawing.preserved_fact_indices,
+            "errors":drawing.errors,"warnings":drawing.warnings,"notes":drawing.notes,
+            "options":preview.canonical_options,
+        })
+        .to_string();
+        return (text, preview.budget.work);
+    }
+    let solved = if case >= 4 {
+        rnl_solver::experimental::solve_skeleton_with_clock(&p, &options, 0, &rnl_solver::StoppedClock).unwrap()
+    } else {
+        rnl_solver::solve(&p, &options)
+    };
     let hash = sig2(&p, solved.report.canonical_options.as_ref().unwrap());
     (
         rnl_runtime::solution::write_record(&p, &solved.solution, rnl_solver::AUTHOR, &hash).record,
@@ -96,7 +118,7 @@ pub extern "C" fn parity_ptr() -> *const u8 {
 
 fn main() {
     #[cfg(not(target_arch = "wasm32"))]
-    for case in 0..4 {
+    for case in 0..8 {
         for work in [0, 64, 4096, 1_000_000] {
             let start = std::time::Instant::now();
             let (record, used) = record(case, work);

@@ -80,6 +80,10 @@ pub(crate) fn solve(problem: &LevelProblem, options: &SolverOptions, clock: &dyn
     solve_exact_with(problem, options, clock, CAPS).0
 }
 
+pub(crate) fn solve_skeleton(problem: &LevelProblem, options: &SolverOptions, clock: &dyn Clock, rounds: u8) -> Solved {
+    solve_exact_mode(problem, options, clock, CAPS, Some(rounds)).0
+}
+
 /// A count and its noun, singular for one: `count(1, "wire")` is "1 wire", `count(2, "wire")` "2
 /// wires".
 pub(crate) fn count(n: usize, noun: &str) -> String {
@@ -114,6 +118,16 @@ pub(crate) fn solve_exact_with(
     clock: &dyn Clock,
     caps: Caps,
 ) -> (Solved, Exact) {
+    solve_exact_mode(problem, options, clock, caps, None)
+}
+
+fn solve_exact_mode(
+    problem: &LevelProblem,
+    options: &SolverOptions,
+    clock: &dyn Clock,
+    caps: Caps,
+    skeleton: Option<u8>,
+) -> (Solved, Exact) {
     let mut notes = vec![METHOD_NOTE.to_string()];
     if let Err(e) = options.validate() {
         notes.push(format!("the options are not valid: {e}"));
@@ -132,13 +146,17 @@ pub(crate) fn solve_exact_with(
     let mut work = resolved.work;
     let phase = crate::profile::span("stage", "structure");
     let structure = analyse(problem, &resolved, options, caps, &mut work);
-    let use_tree = problem.version == "0.4" && options.settings.layout == crate::Layout::Tree;
+    let use_tree = problem.version == "0.4" && (skeleton.is_some() || options.settings.layout == crate::Layout::Tree);
     let structure =
         if problem.version == "0.4" { crate::search_choices::for_layout(&structure, &mut work) } else { structure };
     notes.extend(structure.notes.iter().cloned());
     drop(phase);
     let (candidate, placed, routing, entry) = if use_tree {
-        let laid = crate::tree::lay_out(problem, &structure, options, &mut work, &crate::tree::Stop::default());
+        let laid = if let Some(rounds) = skeleton {
+            crate::skeleton::lay_out(problem, &structure, options, &mut work, rounds)
+        } else {
+            crate::tree::lay_out(problem, &structure, options, &mut work, &crate::tree::Stop::default())
+        };
         notes.extend(laid.notes);
         (laid.candidate, laid.placed, laid.routing, laid.entry)
     } else {

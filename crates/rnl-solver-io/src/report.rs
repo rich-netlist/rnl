@@ -14,11 +14,18 @@ fn limit_value(limit: RunLimit) -> Value {
     }
 }
 
+/// Encode the shared budget shape used by results and experimental previews.
+pub fn encode_budget(b: BudgetReport) -> Result<Value> {
+    let value = json!({"limit":limit_value(b.limit),"work":b.work,"reason":match b.reason {
+            StopReason::Complete=>"complete",StopReason::Time=>"time",StopReason::Work=>"work",StopReason::Safety=>"safety",
+    }});
+    budget(Node::root(&value))?;
+    Ok(value)
+}
+
 pub(crate) fn encode(r: &SolveReport) -> Result<Value> {
     let value = json!({
-        "budget":r.budget.map(|b|json!({"limit":limit_value(b.limit),"work":b.work,"reason":match b.reason {
-            StopReason::Complete=>"complete",StopReason::Time=>"time",StopReason::Work=>"work",StopReason::Safety=>"safety",
-        }})),
+        "budget":r.budget.map(encode_budget).transpose()?,
         "canonical_options":r.canonical_options,
         "kept":r.kept,"failed":r.failed,
         "discarded":r.discarded.iter().map(|d|json!({"fact":d.fact,"groups":d.groups,"complete":d.complete,"undecided":d.undecided})).collect::<Vec<_>>(),
@@ -56,19 +63,7 @@ fn indices(n: Node<'_>) -> Result<Vec<usize>> {
 }
 
 pub(crate) fn decode(n: Node<'_>) -> Result<SolveReport> {
-    let budget = n.field("budget")?.nullable(|n| {
-        Ok(BudgetReport {
-            limit: limit(n.field("limit")?)?,
-            work: n.field("work")?.uint()?,
-            reason: match n.field("reason")?.string()? {
-                "complete" => StopReason::Complete,
-                "time" => StopReason::Time,
-                "work" => StopReason::Work,
-                "safety" => StopReason::Safety,
-                _ => return Err(n.field("reason")?.error("unknown stop reason")),
-            },
-        })
-    })?;
+    let budget = n.field("budget")?.nullable(budget)?;
     let mut statements = BTreeMap::new();
     for (i, (statement, hint)) in n
         .field("statements")?
@@ -129,5 +124,19 @@ pub(crate) fn decode(n: Node<'_>) -> Result<SolveReport> {
         errors: strings(n.field("errors")?)?,
         warnings: strings(n.field("warnings")?)?,
         notes: strings(n.field("notes")?)?,
+    })
+}
+
+fn budget(n: Node<'_>) -> Result<BudgetReport> {
+    Ok(BudgetReport {
+        limit: limit(n.field("limit")?)?,
+        work: n.field("work")?.uint()?,
+        reason: match n.field("reason")?.string()? {
+            "complete" => StopReason::Complete,
+            "time" => StopReason::Time,
+            "work" => StopReason::Work,
+            "safety" => StopReason::Safety,
+            _ => return Err(n.field("reason")?.error("unknown stop reason")),
+        },
     })
 }

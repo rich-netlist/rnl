@@ -49,6 +49,7 @@ mod budget;
 mod config;
 mod coords;
 mod driver;
+pub mod experimental;
 mod group_tree;
 mod holds;
 mod model;
@@ -63,6 +64,7 @@ mod score;
 mod search;
 mod search_choices;
 mod simplex;
+mod skeleton;
 mod structure;
 mod tree;
 mod tree_hang;
@@ -318,10 +320,15 @@ pub fn solve(problem: &LevelProblem, options: &SolverOptions) -> Solved {
 /// when hashing the persisted result, so time-to-work replay includes the same hash.
 /// Released input versions retain their resolution-only time limit.
 pub fn solve_with_clock(problem: &LevelProblem, options: &SolverOptions, clock: &dyn Clock) -> Solved {
-    budget::without(|| solve_isolated(problem, options, clock))
+    budget::without(|| solve_isolated(problem, options, clock, driver::solve))
 }
 
-fn solve_isolated(problem: &LevelProblem, options: &SolverOptions, clock: &dyn Clock) -> Solved {
+fn solve_isolated(
+    problem: &LevelProblem,
+    options: &SolverOptions,
+    clock: &dyn Clock,
+    run: impl FnOnce(&LevelProblem, &SolverOptions, &dyn Clock) -> Solved,
+) -> Solved {
     let (effective, warnings) = options.for_problem(problem);
     let options = &effective;
     profile::with(clock.profiler(), || {
@@ -346,7 +353,7 @@ fn solve_isolated(problem: &LevelProblem, options: &SolverOptions, clock: &dyn C
         }
         let mut solved = if problem.version == "0.4" {
             let (limit, safety) = run_limits(options, clock);
-            let (mut solved, report) = budget::with(clock, limit, safety, || driver::solve(problem, options, clock));
+            let (mut solved, report) = budget::with(clock, limit, safety, || run(problem, options, clock));
             let replay =
                 SolverOptions { run_limit: Some(RunLimit::Work(report.work)), time_limit: None, ..options.clone() };
             solved.report.canonical_options = Some(replay.canonical());
@@ -357,7 +364,7 @@ fn solve_isolated(problem: &LevelProblem, options: &SolverOptions, clock: &dyn C
             ));
             solved
         } else {
-            driver::solve(problem, options, clock)
+            run(problem, options, clock)
         };
         solved.report.warnings.extend(warnings);
         profile::emit(profile::ProfileEvent::LevelEnd);

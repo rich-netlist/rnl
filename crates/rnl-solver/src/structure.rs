@@ -616,6 +616,8 @@ pub(crate) struct Structure {
     /// The components of each scope of the objectives measured within groups: each group; the
     /// components in no group are no scope ([`scopes`]).
     pub scopes: Vec<Vec<usize>>,
+    /// Accepted GROUP declarations before projection onto layout elements.
+    pub selected_groups: Vec<usize>,
     /// The sets of elements that a candidate with even rows spaces evenly where three or more of
     /// one are in a row ([`even_sets`]).
     pub even_sets: Vec<Vec<usize>>,
@@ -689,6 +691,41 @@ impl Structure {
             .flatten()
             .map(|b| [&b[0] + &at[0], &b[1] + &at[1], &b[2] + &at[0], &b[3] + &at[1]])
             .collect()
+    }
+
+    /// All independently anchored pin text boxes, relative to their symbol's origin.
+    pub(crate) fn pin_labels(&self, k: usize, orient: Orient) -> Vec<[Q; 4]> {
+        self.pin_texts
+            .range((k, 0)..(k + 1, 0))
+            .flat_map(|(&(object, pin), _)| self.labels_on_pin(object, pin, orient))
+            .collect()
+    }
+
+    /// Every text rectangle associated with an object, relative to its current origin.
+    pub(crate) fn text_offsets(&self, problem: &LevelProblem, g: &Geometry, k: usize) -> Vec<[Q; 4]> {
+        let mut boxes: Vec<_> = self.label_offset(k, g.orient[k]).into_iter().collect();
+        boxes.extend(self.offset_labels.get(&k).into_iter().flatten().cloned());
+        boxes.extend(self.pin_labels(k, g.orient[k]));
+        if self.objects[k].role == Role::Text && self.objects[k].own {
+            if let Some(t) = problem.objects[k].text.as_ref() {
+                let at = &g.origin[k];
+                if let Some(b) = text_box(t, &(at[0].clone(), at[1].clone()), Orient::R0) {
+                    boxes.push([&b[0] - &at[0], &b[1] - &at[1], &b[2] - &at[0], &b[3] - &at[1]]);
+                }
+            }
+        } else if let (Position::InSymbol { owner, replaced: Some(_), .. }, Some(t)) =
+            (&problem.objects[k].position, &problem.objects[k].text)
+        {
+            let turn = g.orient[*owner];
+            if let Some(local) = problem.objects[k].symbol_local(turn) {
+                let local = (number(local.0), number(local.1));
+                if let Some(b) = text_box(t, &local, turn) {
+                    let anchor = [turned(turn, &local, 0), turned(turn, &local, 1)];
+                    boxes.push([&b[0] - &anchor[0], &b[1] - &anchor[1], &b[2] - &anchor[0], &b[3] - &anchor[1]]);
+                }
+            }
+        }
+        boxes
     }
 
     /// The pins of an object's symbol.
@@ -1007,6 +1044,7 @@ pub(crate) fn analyse(
         anchors,
         tree,
         scopes,
+        selected_groups,
         even_sets: Vec::new(),
         open,
         depth: None,

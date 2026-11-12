@@ -14,7 +14,11 @@ fn input(options: SolverOptions) -> InputDocument {
     InputDocument { levels: vec![LevelInput { problem: read.problems[0].clone(), options }] }
 }
 fn process(bytes: &[u8]) -> Output {
+    process_with(bytes, &[])
+}
+fn process_with(bytes: &[u8], args: &[&str]) -> Output {
     let mut child = Command::new(env!("CARGO_BIN_EXE_rnl-solver"))
+        .args(args)
         .arg("-")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -32,7 +36,7 @@ fn run(input: &InputDocument) -> Output {
 fn independent_version_and_help_are_not_the_workspace_version() {
     let version = Command::new(env!("CARGO_BIN_EXE_rnl-solver")).arg("--version").output().unwrap();
     assert!(version.status.success());
-    assert_eq!(String::from_utf8(version.stdout).unwrap(), "rnl-solver 0.2.0\n");
+    assert_eq!(String::from_utf8(version.stdout).unwrap(), "rnl-solver 0.3.0\n");
     let help = Command::new(env!("CARGO_BIN_EXE_rnl-solver")).arg("--help").output().unwrap();
     assert!(help.status.success());
     assert!(String::from_utf8(help.stdout).unwrap().contains("--solver-input"));
@@ -157,7 +161,7 @@ fn external_backend_writes_and_reopens_the_same_time_work_bytes() {
     )
     .unwrap();
     assert!(reread.diagnostics().iter().all(|d| d.severity != Severity::Error), "{:?}", reread.diagnostics());
-    assert!(first.files[0].text.contains("rnl-solver 0.2.0"));
+    assert!(first.files[0].text.contains("rnl-solver 0.3.0"));
 }
 
 #[test]
@@ -186,4 +190,87 @@ fn external_backend_rejects_process_failures_invalid_results_and_timeout() {
         };
         assert!(error.contains(message), "{error}");
     }
+}
+
+#[test]
+fn skeleton_command_replays_its_complete_result_and_respects_the_command_boundary() {
+    for seconds in [0., 0.002, 0.02] {
+        let mut request = input(SolverOptions {
+            run_limit: Some(RunLimit::Time(seconds)),
+            safety_seconds: None,
+            ..SolverOptions::without_time_limit()
+        });
+        let bytes =
+            |request: &InputDocument| serde_json::to_vec(&rnl_solver_io::encode_input(request).unwrap()).unwrap();
+        let timed = process_with(&bytes(&request), &["skeleton", "--rounds", "1"]);
+        assert!(timed.status.success(), "{}", String::from_utf8_lossy(&timed.stderr));
+        let result = rnl_solver_io::decode_result(
+            &rnl_solver_io::parse_json(&timed.stdout).unwrap(),
+            &[request.levels[0].problem.clone()],
+        )
+        .unwrap();
+        assert!(result.levels[0].options.ends_with(";experimental=skeleton:1"));
+        request.levels[0].options.run_limit =
+            Some(RunLimit::Work(result.levels[0].report.as_ref().unwrap().budget.unwrap().work));
+        let replay = process_with(&bytes(&request), &["skeleton", "--rounds", "1"]);
+        assert!(replay.status.success(), "{}", String::from_utf8_lossy(&replay.stderr));
+        assert_eq!(timed.stdout, replay.stdout);
+    }
+    let mut request = input(SolverOptions::without_time_limit());
+    request.levels[0].problem.version = "0.3".into();
+    let bytes = serde_json::to_vec(&rnl_solver_io::encode_input(&request).unwrap()).unwrap();
+    let rejected = process_with(&bytes, &["skeleton"]);
+    assert!(!rejected.status.success());
+    assert!(rejected.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&rejected.stderr).contains("0.4"));
+    let rejected = process_with(&[], &["skeleton", "--rounds", "4"]);
+    assert!(!rejected.status.success());
+    assert!(rejected.stdout.is_empty());
+}
+
+#[test]
+fn compact_drawn_preview_replays_and_cannot_be_used_as_a_solver_result() {
+    use rnl_runtime::interp::obj::Priority;
+    use rnl_runtime::problem::{Axis, FactKind, PointRef, ProblemFact};
+    let mut request = input(SolverOptions {
+        run_limit: Some(RunLimit::Time(0.02)),
+        safety_seconds: None,
+        ..SolverOptions::without_time_limit()
+    });
+    for (object, x) in [(0, 0.), (1, 30.)] {
+        for (axis, value) in [(Axis::X, x), (Axis::Y, 0.)] {
+            request.levels[0].problem.facts.push(ProblemFact {
+                kind: FactKind::Place { at: PointRef::Origin(object), axis, value },
+                priority: Priority::Normal,
+                label: "PLACE".into(),
+                reference: None,
+                source: None,
+                chain: vec![],
+            });
+        }
+    }
+    let encode = |r: &InputDocument| serde_json::to_vec(&rnl_solver_io::encode_input(r).unwrap()).unwrap();
+    for seconds in [0., 0.002, 0.02] {
+        request.levels[0].options.run_limit = Some(RunLimit::Time(seconds));
+        let timed = process_with(&encode(&request), &["compact-drawn"]);
+        assert!(timed.status.success(), "{}", String::from_utf8_lossy(&timed.stderr));
+        let value = rnl_solver_io::parse_json(&timed.stdout).unwrap();
+        assert_eq!(value["format"], "rnl-skeleton-preview");
+        assert!(value["levels"][0].get("solution").is_none() && value["levels"][0].get("report").is_none());
+        assert!(rnl_solver_io::decode_result(&value, &[request.levels[0].problem.clone()]).is_err());
+        let work = value["levels"][0]["budget"]["work"].as_u64().unwrap();
+        request.levels[0].options.run_limit = Some(RunLimit::Work(work));
+        let replay = process_with(&encode(&request), &["compact-drawn"]);
+        assert!(replay.status.success(), "{}", String::from_utf8_lossy(&replay.stderr));
+        assert_eq!(timed.stdout, replay.stdout);
+    }
+    let level = &request.levels[0];
+    let rejected = rnl_cli::external_solver::solve(
+        std::path::Path::new(env!("CARGO_BIN_EXE_rnl-solver")),
+        &["compact-drawn".into()],
+        30.,
+        &level.problem,
+        &level.options,
+    );
+    assert!(matches!(rejected, Err(e) if e.contains("expected rnl-solver-result")));
 }
