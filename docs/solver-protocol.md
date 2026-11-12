@@ -134,3 +134,11 @@ Version 3 adds source-version auto-wire semantics, arbitrary text angles and upr
 ## Version 4
 
 Version 4 adds annotations, existing-junction identity, and fatal annotation reporting. Version 3 programs could silently ignore these fields in some inputs and cannot safely process them. Input and result decoders require version 4; upgrade the independent executable and its caller together. The five result decision arrays retain their previous shapes.
+
+## Positions of generated junction usages
+
+In 0.4, a configured junction definition creates usages with their own points. After the backend returns, the CLI derives coordinate candidates from the expanded definition and verifies the complete candidate record through normal interpretation. Coordinates already fixed by the definition or by applicable rules are preserved; only free axes receive generated PLACE statements. Existing geometry, identities and retained facts must survive, and all new or changed facts must hold in the resulting drawing at both the runtime and effective solver tolerance.
+
+This completion phase makes one baseline interpretation and at most 64 trial interpretations for the whole level. It does not invoke the backend again. Its trial count and elapsed time are reported separately from the backend's time/work budget. Custom configurations for which no candidate can be verified are reported as unresolved; the command does not replace files on that failure.
+
+A result that creates configured junction usages requires a retained-fact report. A third-party result with `report: null` remains usable when this completion is unnecessary; otherwise the host refuses that writeback rather than guessing which facts the producer retained. Lower-level users of `write_record` receive junction statement spans and original point identities in `Written.junctions`; they must complete the new usages before treating the record as a finished layout.

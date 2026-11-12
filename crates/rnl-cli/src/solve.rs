@@ -631,6 +631,36 @@ fn pass(
             });
             continue;
         }
+        if p.version == "0.4" && !written.junctions.is_empty() {
+            if !report_available {
+                return Err(format!("junction placement unresolved in {title}: backend omitted retained-fact report"));
+            }
+            let both = Layered { layers: vec![&memory, &files] };
+            let original_text = text_of(&r, &both, &host.file, &path)?;
+            let context = crate::junction_completion_driver::Context {
+                entry: &entry,
+                dialect: options.dialect.as_deref(),
+                formats: &options.formats,
+                files: &both,
+                runtime: &runtime,
+                original: &r,
+                problem: p,
+                original_text: &original_text,
+                host_path: &path,
+                kept: &solved.report.kept,
+                solution: &solved.solution,
+                tolerance: runtime.tolerance.min(options.solver.for_problem(p).0.tolerance),
+                on_interpret: None,
+            };
+            let completion = crate::junction_completion_driver::complete_record(&context, &written)
+                .map_err(|why| format!("junction placement unresolved in {title}: {why}"))?;
+            written.notes.push(format!(
+                "junction postprocessing: {} trial readings in {:.3}s (outside solver budget)",
+                completion.trials,
+                completion.elapsed.as_secs_f64()
+            ));
+            written.record = completion.record;
+        }
         // a file of 0.2 that the record is written into is raised to 0.3 (16.1): the file level of
         // the level, a library section read as a file (2.8)
         let want: Want = (path.clone(), host.file.clone(), r.doc.levels[r.doc.file_level(p.level)].section.clone());
