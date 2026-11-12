@@ -261,6 +261,14 @@ export default {
     for (const { code: other } of (await locales("languages.json")).slice(1)) {
       for (const key of Object.keys(await locales(`${other}.json`))) keys.add(key);
     }
+    const walk = (items) => {
+      for (const it of items) {
+        if (it === "-") continue;
+        if (it.label && !it.id?.startsWith("language-")) keys.add(it.label);
+        if (it.items) walk(it.items);
+      }
+    };
+    walk((await fetch("commands.json").then((r) => r.json())).menus);
     return Object.fromEntries([...keys].map((key) => [key, pseudo(key)]));
   },
   // Most fixtures exercise same-document UI. A test can supply independent file fixtures.

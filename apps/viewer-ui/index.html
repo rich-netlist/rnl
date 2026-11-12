@@ -261,6 +261,9 @@ if (new URLSearchParams(location.search).get("embed") !== "1") document.addEvent
         <span class="pane-title">Solve</span>
         <span id="solve-counts" class="counts"></span>
       </div>
+      <div class="solve-overlays">
+        <label><input id="solve-layout-table" type="checkbox">Layout table</label>
+      </div>
       <div id="solve-views" class="solve-views" role="group" aria-label="What the Solve view shows" hidden>
         <button id="solve-view-constraints" type="button" aria-pressed="false">Constraints</button>
         <button id="solve-view-report" type="button" aria-pressed="false" hidden>Report</button>

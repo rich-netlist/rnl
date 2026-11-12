@@ -203,7 +203,7 @@ function inkExtent() {
   if (!inverse) return extent;
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const el of svg.querySelectorAll("path, circle, ellipse, line, polyline, polygon, rect, text")) {
-    if (el.classList.contains("backdrop") || el.closest(".overlay, .usage-overlays, .usage-underlays")) continue;
+    if (el.classList.contains("backdrop") || el.closest(".overlay, .usage-overlays, .usage-underlays, .layout-table")) continue;
     const style = getComputedStyle(el);
     if (style.display === "none" || style.visibility === "hidden" || (style.fill === "none" && style.stroke === "none")) continue;
     let { x, y, width, height } = el.getBBox();

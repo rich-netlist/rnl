@@ -418,7 +418,7 @@ test.describe("on the web", () => {
     await page.keyboard.press("Alt+V");
     await page.keyboard.press("g");
     await page.keyboard.press("ArrowRight");
-    await expect(list(page, "Help")).toBeVisible();
+    await expect(list(page, "Solve")).toBeVisible();
     await expect(grid).toBeHidden();
     await page.keyboard.press("ArrowLeft");
     await expect(list(page, "View")).toBeVisible();
@@ -440,6 +440,7 @@ test.describe("with a native menu", () => {
       ["toggle-hover-names", true], ["toggle-hover-roles", false], ["toggle-usages", false], ["toggle-currents", false], ["toggle-origins", false], ["toggle-flylines", false], ["toggle-net-labels", false],
       ...uiLanguages(repository).map((l, i) => [`language-${l.lang}`, i === 0]),
       ["toggle-auto-include", true],
+      ["toggle-layout", false],
     ];
     expect(await viewer.calls("setCheck")).toEqual(expect.arrayContaining(marks));
     await page.keyboard.press("Control+B");

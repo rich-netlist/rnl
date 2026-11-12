@@ -1078,6 +1078,17 @@ body.solving, body.solving canvas { cursor: progress; }
 .solve-line.discarded .st, .solve-line.undecided .st, .solve-line.warning .msg { color: var(--warning); }
 .solve-line.kept .st { color: var(--muted); }
 .solve-views { display: flex; align-items: center; gap: 4px; padding: 4px 10px; border-bottom: 1px solid var(--line); }
+.solve-overlays { display: flex; flex-wrap: wrap; gap: 6px 12px; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+.solve-overlays label { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; white-space: nowrap; color: var(--muted); cursor: pointer; }
+.solve-overlays input { accent-color: var(--accent); cursor: pointer; margin: 0; }
+/* Solve > Show Layout Table (layout-frame.js) */
+.layout-table { --layout-red: #e03131; }
+body[data-background="dark"] .layout-table { --layout-red: #ff6b6b; }
+.layout-table rect { vector-effect: non-scaling-stroke; stroke: var(--layout-red); }
+.layout-frame, .layout-group { stroke-width: 1.6; }
+.layout-cell { stroke-width: 0.8; }
+.layout-stuck { stroke-width: 1.6; stroke-dasharray: 6 4; }
+.layout-loose { stroke-width: 0.8; stroke-dasharray: 2 3; }
 .solve-views[hidden], .solve-constraints[hidden] { display: none; }
 .solve-views button { padding: 1px 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--tab); color: var(--fg); }
 .solve-views button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }

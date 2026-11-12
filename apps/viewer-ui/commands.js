@@ -30,6 +30,7 @@ import { toggleUsages, toggleCurrents } from "./usages.js";
 import { toggleOrigins } from "./origins.js";
 import { toggleFlylines } from "./flylines.js";
 import { toggleNetLabels } from "./net-labels.js";
+import { toggleLayout } from "./layout-frame.js";
 import { netlistColors } from "./netlist-colors.js";
 import { downloadManifest, openManifest, openProject, saveProject } from "./project.js";
 import { exportImage } from "./export-image.js";
@@ -156,6 +157,7 @@ export function command(id, options = {}) {
     case "solve-save": saveSolved(); break;
     case "solve-save-utf8": saveSolved("utf8"); break;
     case "solve-settings": settings(); break;
+    case "toggle-layout": return toggleLayout();
     case "check-updates": checkForUpdates(); break;
     case "public-packages": bundledPackagesHelp(); break;
     case "about": about(); break;

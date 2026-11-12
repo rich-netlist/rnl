@@ -122,7 +122,9 @@
         { "id": "solve-save", "label": "Save Solved &Copy As...", "keys": ["Ctrl+Shift+S"], "platforms": ["desktop"] },
         { "id": "solve-save-utf8", "label": "Save Solved Copy As UTF-8...", "platforms": ["desktop"] },
         "-",
-        { "id": "solve-settings", "label": "S&ettings...", "platforms": ["desktop"] }
+        { "id": "solve-settings", "label": "S&ettings...", "platforms": ["desktop"] },
+        "-",
+        { "id": "toggle-layout", "label": "Show &Layout Table", "check": true, "page": true }
       ]
     },
     {

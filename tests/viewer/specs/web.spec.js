@@ -1679,7 +1679,9 @@ test("the Solve view lists the constraints of a netlist; only a development serv
   await page.goto(`${process.env.RNL_WEB_URL}/?url=samples/cases/10-constraints-and-priority.sp`);
   await expect(page).toHaveTitle(/^10-constraints-and-priority\.sp/);
   await expect(page.locator("#tab-solve")).toBeVisible();
-  await expect(page.locator("#menubar .menu-title")).not.toContainText(["Solve"]);
+  await expect(page.locator("#menubar .menu-title")).toContainText(["Solve"]);
+  await expect(page.locator('#menubar .menu-item[data-id="solve"]')).toHaveCount(0);
+  await expect(page.locator('#menubar .menu-item[data-id="toggle-layout"]')).toHaveCount(1);
   await page.keyboard.press("7");
   await expect(page.locator("#pane-solve")).toBeVisible();
   await expect(page.locator("#constraints-list li.constraint")).toHaveCount(18, { timeout: 30000 });
@@ -1693,6 +1695,7 @@ test("the Solve view lists the constraints of a netlist; only a development serv
     await expect(page).toHaveTitle(/^10-constraints-and-priority\.sp/);
     await expect(page.locator("#tab-solve")).toBeVisible();
     await expect(page.locator("#menubar .menu-title")).toContainText(["Solve"]);
+    await expect(page.locator('#menubar .menu-item[data-id="solve"]')).toHaveCount(1);
     // the files the page read go to the service; what comes back is drawn as a preview, with the constraints listed
     const posts = [];
     page.on("request", (request) => { if (request.method() === "POST" && request.url().endsWith("rnl-solver/solve")) posts.push(request.postDataJSON()); });

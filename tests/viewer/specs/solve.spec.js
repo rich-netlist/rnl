@@ -23,9 +23,11 @@ async function solve(page, how = () => page.evaluate(() => window.viewer.command
 /** The solves the shell was asked for: [name, settings] each. */
 const solves = (viewer) => viewer.calls("solve");
 
-test("the web has no Solve menu, and its commands do nothing; the Solve view is there, for the constraints", async ({ page, viewer }) => {
+test("the web offers no solver commands, and running them does nothing; the Solve menu and Solve view remain for overlays and constraints", async ({ page, viewer }) => {
   await viewer.open(T4);
-  await expect(page.locator("#menubar .menu-title")).not.toContainText(["Solve"]);
+  await expect(page.locator("#menubar .menu-title")).toContainText(["Solve"]);
+  await expect(page.locator('#menubar .menu-item[data-id="solve"]')).toHaveCount(0);
+  await expect(page.locator('#menubar .menu-item[data-id="toggle-layout"]')).toHaveCount(1);
   await page.evaluate(() => window.viewer.command("solve"));
   await page.keyboard.press("F9");
   expect(await solves(viewer)).toEqual([]);
