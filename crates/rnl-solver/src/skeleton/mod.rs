@@ -380,16 +380,14 @@ pub(crate) fn compact_strict(
         moved: Vec::new(),
         pivot_rows: 0,
     };
-    let Some(mut sk) = read::read(problem, s, &placed.geometry, routing, &keep, true, true, within, true) else {
+    let Some(mut sk) = read::read_for_compaction(problem, s, &placed.geometry, routing, &keep, true, within, true)
+    else {
         out.failed = true;
         out.interrupted = crate::budget::stopped();
         out.notes.push("skeleton read incomplete or a retained fact does not hold; drawing unchanged".into());
         return out;
     };
     sk.levels = levels.to_vec();
-    if sk.features.is_empty() {
-        return out;
-    }
     out.notes = std::mem::take(&mut sk.notes);
     let mut bends_read = sk.bends(&BTreeSet::new());
     let mut collapsed: BTreeSet<usize> = BTreeSet::new();
@@ -411,7 +409,8 @@ pub(crate) fn compact_strict(
             break;
         }
         if t > 0 {
-            let Some(next) = read::read(problem, s, &placed.geometry, routing, &keep, true, whole, within, crosses)
+            let Some(next) =
+                read::read_for_compaction(problem, s, &placed.geometry, routing, &keep, whole, within, crosses)
             else {
                 out.failed = true;
                 out.interrupted = crate::budget::stopped();
@@ -613,7 +612,37 @@ pub(crate) fn compact_strict(
         .iter()
         .flat_map(|v| v.trees.iter().map(|&tree| (tree, v.at.clone(), [value(&v.term[0], 0), value(&v.term[1], 1)])))
         .collect();
+    // A tentative line arrangement may start with unsatisfied fixed bounds.
+    // Never expose a partially repaired drawing as a completed candidate.
+    if out.failed || out.interrupted {
+        return out;
+    }
     let (p, r) = written(problem, s, placed, routing, &sk);
+    out.failed_facts.clear();
+    let g = &p.geometry;
+    for &f in &s.kept {
+        if !keep(f) {
+            continue;
+        }
+        if !crate::budget::permit(crate::budget::Step::Structure, s.model.vars.len().saturating_add(1)) {
+            out.failed = true;
+            out.interrupted = true;
+            return out;
+        }
+        let tol = if s.model.exact.contains(&f) { Q::default() } else { s.model.tol.clone() };
+        let at = |point: &rnl_runtime::problem::PointRef, axis| {
+            crate::resolve::point_value(problem, g, point, crate::model::ax(axis), 0)
+        };
+        let ori = |k: usize| g.orient.get(k).copied();
+        if crate::holds::check_problem(problem, f, &at, &ori, &tol, &Q::default()) != Some(true) {
+            out.failed_facts.push(f);
+        }
+    }
+    if !out.failed_facts.is_empty() {
+        out.failed = true;
+        out.notes.push("compacted coordinates do not satisfy every retained fact; candidate rejected".into());
+        return out;
+    }
     out.placed = p;
     out.routing = r;
     out

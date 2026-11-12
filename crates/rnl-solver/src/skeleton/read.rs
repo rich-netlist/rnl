@@ -160,6 +160,40 @@ pub(crate) fn read(
     within: Option<&BTreeSet<usize>>,
     crosses: bool,
 ) -> Option<Skeleton> {
+    read_with_facts(problem, s, g, routing, keep, strict, whole, within, crosses, false)
+}
+
+/// A line candidate has established orders, but compaction must still solve
+/// equalities such as distribution across previously settled groups. Fixed
+/// bounds remain mandatory constraints even when the starting coordinates do
+/// not satisfy them. Disjunctive facts still need a satisfied branch to retain.
+#[allow(clippy::too_many_arguments)]
+pub(super) fn read_for_compaction(
+    problem: &LevelProblem,
+    s: &Structure,
+    g: &Geometry,
+    routing: &Routing,
+    keep: &dyn Fn(usize) -> bool,
+    whole: bool,
+    within: Option<&BTreeSet<usize>>,
+    crosses: bool,
+) -> Option<Skeleton> {
+    read_with_facts(problem, s, g, routing, keep, true, whole, within, crosses, true)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn read_with_facts(
+    problem: &LevelProblem,
+    s: &Structure,
+    g: &Geometry,
+    routing: &Routing,
+    keep: &dyn Fn(usize) -> bool,
+    strict: bool,
+    whole: bool,
+    within: Option<&BTreeSet<usize>>,
+    crosses: bool,
+    repair_fixed: bool,
+) -> Option<Skeleton> {
     if !crate::budget::permit(
         crate::budget::Step::Structure,
         problem.objects.len().saturating_add(crate::annotation::estimated_work(problem)),
@@ -225,7 +259,7 @@ pub(crate) fn read(
     if crate::budget::stopped() {
         return None;
     }
-    if !sk.facts_kept(s, g, keep) {
+    if !sk.facts_kept(s, g, keep, repair_fixed) {
         return None;
     }
     if crate::budget::stopped() {
@@ -350,7 +384,7 @@ impl Skeleton {
         }
     }
 
-    fn facts_kept(&mut self, s: &Structure, g: &Geometry, keep: &dyn Fn(usize) -> bool) -> bool {
+    fn facts_kept(&mut self, s: &Structure, g: &Geometry, keep: &dyn Fn(usize) -> bool, repair_fixed: bool) -> bool {
         let model = &s.model;
         let holds = |b: &Bound| b.holds(|v| g.var_value(model, v, b.axis));
         // A body or origin can depend on a centre without a retained bound naming it
@@ -366,7 +400,7 @@ impl Skeleton {
             }
             self.facts.push(f);
             let unit = &model.units[f];
-            if model.unfinished.contains(&f) || !unit.fixed.iter().all(holds) {
+            if model.unfinished.contains(&f) || (!repair_fixed && !unit.fixed.iter().all(holds)) {
                 return false;
             }
             let mut bounds: Vec<&Bound> = unit.fixed.iter().collect();

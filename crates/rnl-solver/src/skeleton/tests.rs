@@ -22,6 +22,97 @@ fn simplification_keeps_electrical_anchors_and_branches_at_coincident_coordinate
 }
 
 #[test]
+fn strict_compaction_repairs_distribution_and_rejects_unfinished_repairs() {
+    let mut p = problem_of(
+        vec![instance(), instance(), instance()],
+        vec![fact(FactKind::Distribute {
+            axis: Axis::X,
+            sense: rnl_runtime::problem::Sense::Increasing,
+            members: (0..3).map(PointRef::Origin).collect(),
+        })],
+    );
+    p.version = "0.4".into();
+    let options = SolverOptions::without_time_limit();
+    let resolved = crate::resolve::resolve(&p, &options, &StoppedClock);
+    let s = crate::structure::analyse(&p, &resolved, &options, crate::options::CAPS, &mut Work::default());
+    let mut geometry = s.witness.clone();
+    for (k, x) in [0, 20, 50].into_iter().enumerate() {
+        geometry.origin[k] = [int(x), int(0)];
+    }
+    let placed = Placed {
+        origins: s.origins(&p, &geometry),
+        geometry,
+        dropped: vec![],
+        overlaps: vec![],
+        optimised: true,
+        undecided: false,
+    };
+    let routing = Routing::default();
+    assert!(read::read(&p, &s, &placed.geometry, &routing, &|_| true, false, false, None, false).is_none());
+    let run = || compact_strict(&p, &s, &placed, &routing, &options, &mut Work::default(), None, &[]);
+    let full = run();
+    assert!(!full.failed && !full.interrupted, "{:?}", full.notes);
+    let equal = |made: &Placed| &made.origins[1][0] - &made.origins[0][0] == &made.origins[2][0] - &made.origins[1][0];
+    assert!(equal(&full.placed));
+    let clock = Ticks::default();
+    let (measured, _) = crate::budget::with(&clock, RunLimit::Time(f64::MAX), None, run);
+    assert_eq!(measured, full);
+    let end = clock.reads();
+    let mut rejected = 0;
+    let mut accepted = 0;
+    // Include late cuts through output validation, not only skeleton preparation.
+    for seconds in (0..160).chain(end.saturating_sub(12)..=end) {
+        let (timed, used) = crate::budget::with(&Ticks::default(), RunLimit::Time(seconds as f64), None, run);
+        let (replayed, _) = crate::budget::with(&StoppedClock, RunLimit::Work(used.work), None, run);
+        assert_eq!(timed, replayed, "cutoff {seconds}, work {}", used.work);
+        if timed.failed || timed.interrupted {
+            rejected += 1;
+            assert_eq!(timed.placed, placed, "a failed repair must not expose partial coordinates");
+        } else {
+            accepted += 1;
+            assert!(equal(&timed.placed), "cutoff {seconds}");
+        }
+    }
+    assert!(rejected > 0);
+    assert!(accepted > 0);
+}
+
+#[test]
+fn compaction_does_not_drop_an_unsatisfied_disjunctive_fact() {
+    let mut p = problem_of(
+        vec![instance(), instance()],
+        vec![fact(FactKind::Distance {
+            axis: Axis::X,
+            sense: rnl_runtime::problem::Sense::Either,
+            min: Some(10.),
+            max: None,
+            from: vec![PointRef::Origin(0)],
+            to: vec![PointRef::Origin(1)],
+        })],
+    );
+    p.version = "0.4".into();
+    let options = SolverOptions::without_time_limit();
+    let resolved = crate::resolve::resolve(&p, &options, &StoppedClock);
+    let s = crate::structure::analyse(&p, &resolved, &options, crate::options::CAPS, &mut Work::default());
+    assert_eq!(s.kept.len(), 1);
+    assert!(!s.model.units[0].choices.is_empty());
+    let mut geometry = s.witness.clone();
+    geometry.origin[0] = [int(0), int(0)];
+    geometry.origin[1] = [int(1), int(0)];
+    let placed = Placed {
+        origins: s.origins(&p, &geometry),
+        geometry,
+        dropped: vec![],
+        overlaps: vec![],
+        optimised: true,
+        undecided: false,
+    };
+    let made = compact_strict(&p, &s, &placed, &Routing::default(), &options, &mut Work::default(), None, &[]);
+    assert!(made.failed);
+    assert_eq!(made.placed, placed);
+}
+
+#[test]
 fn compaction_keeps_distribution_and_replays_every_interrupted_pass() {
     let mut p = problem_of(
         vec![instance(), instance(), instance()],
