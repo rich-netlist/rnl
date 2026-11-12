@@ -2026,7 +2026,7 @@ impl Interp<'_> {
                 if Some(self.usage(usage).definition) != dfn || ids.contains(&usage) {
                     continue;
                 }
-                let members = self.all_members(s, usage, phase, ctx, &mut HashSet::new());
+                let members = self.selected_usage_members(s, usage, phase, ctx);
                 for member in members.into_iter().collect::<HashSet<_>>() {
                     ancestors.entry(member).or_default().push(usage);
                 }

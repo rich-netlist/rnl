@@ -2,7 +2,7 @@
 
 use rnl_cli::interpret_file;
 use rnl_runtime::diag::Severity;
-use rnl_runtime::problem::{FactKind, Filler};
+use rnl_runtime::problem::{FactKind, Filler, Position, Slot};
 use rnl_runtime::source::MemoryProvider;
 use rnl_runtime::{Interpretation, Options};
 use std::path::Path;
@@ -22,6 +22,98 @@ fn read(version: &str, body: &str) -> Interpretation {
 }
 
 const SYMBOL: &str = r#"$S = @DEFINE-SYMBOL { %p = (-3,0) @PIN(terminal=1,direction="left"); (3,0) @PIN(terminal=2) }; #R1 @SET-SYMBOL $S => @PLACE(0,0)"#;
+
+#[test]
+fn ancestor_selection_sees_generated_roles_after_symbol_assignment() {
+    let r = checked(
+        r#"
+        $Bare = @DEFINE-SYMBOL { (0,0) @PIN(terminal="p") };
+        $Labeled = @DEFINE-SYMBOL { $Bare; ? @TEXT("${p}",key="name") => @PLACE(0,-2) };
+        $Marker = @DEFINE(roles=[["p","net"]]) {};
+        # @SELECT-USAGE(recursive=true) $Marker => @SET-SYMBOL $Bare;
+        $Stub = @DEFINE(roles=[["t","pin"]]) { %m = $Marker @ATTACH ?t::net };
+        #R1 @SELECT-PIN => @AS $Stub;
+        &b @SELECT-ANCESTOR-USAGE(recursive=true) $Marker => @SET-SYMBOL $Labeled
+        "#,
+    );
+    let p = &r.problems[0];
+    let symbols: Vec<_> = p.objects.iter().filter_map(|o| o.symbol).map(|i| p.symbols[i].name.as_str()).collect();
+    assert_eq!(symbols.iter().filter(|s| **s == "$Bare").count(), 1);
+    assert_eq!(symbols.iter().filter(|s| **s == "$Labeled").count(), 1);
+}
+
+#[test]
+fn ancestor_selection_matches_converted_scalar_set_and_indirect_members() {
+    for (roles, creation, scope) in [
+        (r#"[["p","pin"]]"#, "%u = #R1:1 @AS $D", "#R1::p"),
+        (r#"[["p","pin"]]"#, "%u = #R1::p @AS $D", "#R1:1 @SELECT-PIN"),
+        (r#"[["{p}","pin"]]"#, "%u = {#R1:1 #R1:2} @AS $D", "#R1::p"),
+        (r#"[["p","net"]]"#, "%u = #R1::p::net @AS $D", "&a"),
+        (
+            r#"["child"]"#,
+            "$Inner = @DEFINE(roles=[[\"p\",\"pin\"]]) {}; %i = #R1:1 @AS $Inner; %u = %i @AS $D",
+            "#R1::p",
+        ),
+    ] {
+        let r = checked(&format!(
+            r#"
+            $D = @DEFINE(roles={roles}) {{}};
+            {creation};
+            {scope} => @SELECT-ANCESTOR-USAGE $D => @PLACE(10,20)
+            "#
+        ));
+        let p = &r.problems[0];
+        let object = p.objects.iter().find(|o| o.label == "%u").unwrap();
+        assert!(
+            matches!(
+                object.position,
+                Position::Own { x: Slot::Fixed { value: 10.0, .. }, y: Slot::Fixed { value: 20.0, .. } }
+            ),
+            "{creation}: {:?}",
+            object.position
+        );
+    }
+}
+
+#[test]
+fn ancestor_selection_keeps_written_roles_before_symbol_assignment() {
+    let r = checked(
+        r#"
+        $D = @DEFINE(roles=[["p","pin"]]) {};
+        %u = #R1:1 @AS $D;
+        $Written = @DEFINE-SYMBOL { (0,0) @CIRCLE(radius=1) };
+        #R1:1 @SELECT-ANCESTOR-USAGE $D => @SET-SYMBOL $Written
+        "#,
+    );
+    let p = &r.problems[0];
+    let object = p.objects.iter().find(|o| o.label == "%u").unwrap();
+    assert_eq!(object.symbol.map(|i| p.symbols[i].name.as_str()), Some("$Written"));
+}
+
+#[test]
+fn ancestor_selection_expands_a_bus_pin_net_role_after_symbols() {
+    let r = read(
+        "0.4",
+        r#"
+        $Part = @DEFINE-SYMBOL { %bus = (0,0) @PIN(terminal=[1,2]) };
+        #R1 @SET-SYMBOL $Part;
+        $D = @DEFINE(roles=[["{p}","net"]]) {};
+        %u = {#R1::bus} @AS $D;
+        &b @SELECT-ANCESTOR-USAGE $D => @PLACE(10,20)
+        "#,
+    );
+    assert!(!r.diagnostics().iter().any(|d| d.severity == Severity::Error), "{:?}", r.diagnostics());
+    let p = &r.problems[0];
+    let object = p.objects.iter().find(|o| o.label == "%u").unwrap();
+    assert!(
+        matches!(
+            object.position,
+            Position::Own { x: Slot::Fixed { value: 10.0, .. }, y: Slot::Fixed { value: 20.0, .. } }
+        ),
+        "{:?}",
+        object.position
+    );
+}
 
 #[test]
 fn wire_net_slots_convert_terminals_and_pins() {

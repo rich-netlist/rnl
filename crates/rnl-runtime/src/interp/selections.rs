@@ -212,6 +212,47 @@ impl Interp<'_> {
         self.scene_value(object)
     }
 
+    /// Ancestors compare the same post-symbol role values as their selection scope (10.1).
+    /// This consumer walk never rewrites the handles used by earlier creation or set edits.
+    pub(super) fn selected_usage_members(
+        &mut self,
+        scene: SceneId,
+        usage: ObjId,
+        phase: usize,
+        ctx: Option<&Ctx>,
+    ) -> Vec<ObjId> {
+        let mut out = Vec::new();
+        let mut seen = HashSet::new();
+        let mut stack = vec![usage];
+        while let Some(object) = stack.pop() {
+            let object = if phase >= 5 { self.selection_value(object, phase) } else { self.written_input(object) };
+            if self.is_failed(object) || !seen.insert(object) {
+                continue;
+            }
+            if self.is_set(object) {
+                for input in self.scene_input_members_at(scene, object, phase, ctx) {
+                    if !input.dependencies.iter().any(|dependency| self.is_failed(*dependency)) {
+                        stack.push(input.object);
+                    }
+                }
+            } else {
+                if object != usage {
+                    out.push(object);
+                }
+                if let ObjData::Usage(member) = self.o(object).clone() {
+                    for (_, filler) in member.roles {
+                        for input in self.scene_input_members_at(scene, filler, phase, ctx) {
+                            if !input.dependencies.iter().any(|dependency| self.is_failed(*dependency)) {
+                                stack.push(input.object);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        out
+    }
+
     /// Scope usages contribute role members of the requested kind, never another scope step.
     #[allow(clippy::too_many_arguments)]
     pub(super) fn walk_selection_usages(
