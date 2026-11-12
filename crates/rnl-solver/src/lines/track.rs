@@ -1320,8 +1320,8 @@ fn commit(lines: &mut Lines, net: usize, paths: &[Vec<Pt>]) {
     lines.nets[net].extend(joins);
 }
 fn unroute(lines: &mut Lines, net: usize) {
-    for axis in 0..2 {
-        for occ in &mut lines.axes[axis].occ {
+    for axis in &mut lines.axes {
+        for occ in &mut axis.occ {
             occ.retain(|(m, _, _)| *m != net);
         }
     }

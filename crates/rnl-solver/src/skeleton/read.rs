@@ -396,9 +396,9 @@ impl Skeleton {
             if !self.meter(members.len()) {
                 return false;
             }
-            for axis in 0..2 {
+            for (axis, made) in self.made.iter_mut().enumerate() {
                 for b in model.centre_definition(c, axis) {
-                    self.made[axis].push(Made::Bound(b.expr, b.lo, b.hi, Why::Body));
+                    made.push(Made::Bound(b.expr, b.lo, b.hi, Why::Body));
                 }
                 if members.len() >= 3 {
                     let values: Vec<Q> = members.iter().map(|p| g.value(model, *p, axis)).collect();
@@ -407,7 +407,7 @@ impl Skeleton {
                     for (high, j) in [(false, low), (true, high)] {
                         if let Some(j) = j {
                             let b = model.centre_extreme(c, axis, high, j);
-                            self.made[axis].push(Made::Bound(b.expr, b.lo, b.hi, Why::Body));
+                            made.push(Made::Bound(b.expr, b.lo, b.hi, Why::Body));
                         }
                     }
                 }

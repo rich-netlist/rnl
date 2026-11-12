@@ -3276,9 +3276,9 @@ impl Level<'_> {
         let mut apart_bands: Vec<(usize, usize, usize, usize)> = Vec::new();
         for (u, unit) in units.iter().enumerate() {
             let Unit::Block(c) = unit else { continue };
-            for a in 0..2 {
+            for (a, axis_crossings) in blocks[c].0.crossed.iter().enumerate() {
                 for j in 1..bands.count(u, a) {
-                    let crossed = blocks[c].0.crossed[a].get(j - 1).copied().unwrap_or(0);
+                    let crossed = axis_crossings.get(j - 1).copied().unwrap_or(0);
                     apart_bands.push((crossed, a, u, j));
                 }
             }
