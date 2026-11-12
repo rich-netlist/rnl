@@ -424,8 +424,9 @@ fn interpret_in(entry: &str, reading: Formats, ws: &Workspace, options: &Options
 /// [`interpret`] reads them: [`rnl_runtime::solution::finish_record`]. `record` is what
 /// [`rnl_runtime::solution::write_record`] gives for `problem`; `doc` is the host document the
 /// problem was read from ([`Interpretation::doc`]), and `files` and `options` are what it was read
-/// with. In a level of a file of the draft 0.3, the record gets `numbering`, the check of its
-/// numbers (5.9), from the document read again with it; otherwise it stays as it is.
+/// with. In language versions that support numeric references, a record using them gets
+/// `numbering`, the check of its numbers (5.9), from the document read again with it; otherwise
+/// it stays as it is.
 pub fn finish_record(
     doc: &HostDocument,
     files: &dyn Provider,
@@ -433,7 +434,20 @@ pub fn finish_record(
     problem: &LevelProblem,
     record: &str,
 ) -> String {
-    rnl_runtime::solution::finish_record(doc, &Workspace::new(files), options, problem, record)
+    finish_record_with_formats(doc, files, &NONE_SET, options, problem, record)
+}
+
+/// Finish a solver record with the same explicit format overrides as [`interpret_with`].
+/// Package discovery and exclusions then match the interpretation that produced the problem.
+pub fn finish_record_with_formats(
+    doc: &HostDocument,
+    files: &dyn Provider,
+    formats: &BTreeMap<String, String>,
+    options: &Options,
+    problem: &LevelProblem,
+    record: &str,
+) -> String {
+    rnl_runtime::solution::finish_record(doc, &Workspace::with_formats(files, formats), options, problem, record)
 }
 
 /// What a drawing level still lacks without a solver: objects without a position, and the

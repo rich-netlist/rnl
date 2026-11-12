@@ -1,7 +1,7 @@
 //! Extract conservative proposals from normally interpreted new-usage facts.
 //! Proposals are never proof that a fact is retained; `verified_record` must reread and validate.
 use super::junction_completion::{Axis, Point, Suggestion};
-use rnl_runtime::problem::{Axis as ProblemAxis, FactKind, Filler, LevelProblem, PointRef, Sense};
+use rnl_runtime::problem::{Axis as ProblemAxis, FactKind, Filler, LevelProblem, PointRef, Reference, Sense};
 
 fn axis(a: ProblemAxis) -> Axis {
     match a {
@@ -67,37 +67,86 @@ fn mapped_index(map: &[usize], i: usize) -> Result<usize, &'static str> {
     map.get(i).copied().filter(|i| *i != usize::MAX).ok_or("referenced original object is not mapped")
 }
 
-fn remap_point(point: &mut PointRef, map: &[usize]) -> Result<(), &'static str> {
+pub(crate) fn rebased_reference(reference: &Reference, old: &Reference, new: &Reference) -> Option<Reference> {
+    if old == new {
+        return Some(reference.clone());
+    }
+    let suffix: Vec<String> = match (reference, old) {
+        (Reference::Name(a), Reference::Name(b)) => {
+            let tail = a.strip_prefix(b)?;
+            if !tail.is_empty() && !tail.starts_with(':') {
+                return None;
+            }
+            vec![tail.to_owned()]
+        }
+        (Reference::Number { number: a, path: ap }, Reference::Number { number: b, path: bp })
+            if a == b && ap.starts_with(bp) =>
+        {
+            ap[bp.len()..].to_vec()
+        }
+        (Reference::Generated { usage: a, path: ap }, Reference::Generated { usage: b, path: bp })
+            if a == b && ap.starts_with(bp) =>
+        {
+            ap[bp.len()..].to_vec()
+        }
+        (
+            Reference::GeneratedNumber { usage: a, index: ai, path: ap },
+            Reference::GeneratedNumber { usage: b, index: bi, path: bp },
+        ) if a == b && ai == bi && ap.starts_with(bp) => ap[bp.len()..].to_vec(),
+        _ => return None,
+    };
+    Some(suffix.iter().fold(new.clone(), |reference, part| reference.then(part)))
+}
+
+fn remap_point(
+    point: &mut PointRef,
+    map: &[usize],
+    original: &LevelProblem,
+    trial: &LevelProblem,
+) -> Result<(), &'static str> {
     match point {
         PointRef::Origin(i) => *i = mapped_index(map, *i)?,
-        PointRef::Pin { object, .. } | PointRef::SymbolPin { object, .. } | PointRef::PinPosition { object, .. } => {
+        PointRef::Pin { object, .. } => {
             *object = mapped_index(map, *object)?;
+        }
+        PointRef::SymbolPin { object, reference, .. } | PointRef::PinPosition { object, reference, .. } => {
+            let old = original.objects.get(*object).ok_or("invalid original pin owner")?;
+            let mapped = mapped_index(map, *object)?;
+            let new = trial.objects.get(mapped).ok_or("invalid mapped pin owner")?;
+            *reference = rebased_reference(reference, &old.reference, &new.reference)
+                .ok_or("pin reference does not belong to its mapped owner")?;
+            *object = mapped;
         }
         PointRef::Centre(points) => {
             for point in points {
-                remap_point(point, map)?;
+                remap_point(point, map, original, trial)?;
             }
         }
     }
     Ok(())
 }
-fn remap_fact(fact: &mut FactKind, map: &[usize]) -> Result<(), &'static str> {
+fn remap_fact(
+    fact: &mut FactKind,
+    map: &[usize],
+    original: &LevelProblem,
+    trial: &LevelProblem,
+) -> Result<(), &'static str> {
     match fact {
-        FactKind::Place { at, .. } => remap_point(at, map)?,
+        FactKind::Place { at, .. } => remap_point(at, map, original, trial)?,
         FactKind::PointCoordinate { point, .. } => *point = mapped_index(map, *point)?,
         FactKind::Offset { text, from, .. } => {
             *text = mapped_index(map, *text)?;
-            remap_point(from, map)?;
+            remap_point(from, map, original, trial)?;
         }
         FactKind::Orient { object, .. } => *object = mapped_index(map, *object)?,
         FactKind::Align { members, .. } | FactKind::Order { members, .. } | FactKind::Distribute { members, .. } => {
             for point in members {
-                remap_point(point, map)?;
+                remap_point(point, map, original, trial)?;
             }
         }
         FactKind::Distance { from, to, .. } => {
             for point in from.iter_mut().chain(to.iter_mut()) {
-                remap_point(point, map)?;
+                remap_point(point, map, original, trial)?;
             }
         }
         FactKind::PinOrient { pin, .. } => {
@@ -116,7 +165,7 @@ fn remap_fact(fact: &mut FactKind, map: &[usize]) -> Result<(), &'static str> {
             *rows = rows
                 .try_map(&mut |point| {
                     let mut point = point.clone();
-                    remap_point(&mut point, map).ok()?;
+                    remap_point(&mut point, map, original, trial).ok()?;
                     Some(point)
                 })
                 .ok_or("invalid TABLE point")?;
@@ -164,20 +213,91 @@ fn unique_ids(ids: &[Option<String>], current: &[String]) -> Result<Vec<usize>, 
         .collect()
 }
 
+fn same_params(old: &rnl_runtime::problem::UsageEntry, new: &rnl_runtime::problem::UsageEntry) -> bool {
+    // String unit IDs belong to one interpretation. Compare the literal values
+    // carried by the solver protocol for implicit and materialized usages alike.
+    old.params.len() == new.params.len()
+        && old.params.iter().zip(&new.params).all(|((a, x), (b, y))| {
+            a == b && rnl_runtime::problem::written_lit(x) == rnl_runtime::problem::written_lit(y)
+        })
+}
+
 fn identity_mapping(
     original: &LevelProblem,
     trial: &LevelProblem,
     read: &rnl_runtime::Interpretation,
+    host_file: &str,
+    line_map: &[Option<u32>],
 ) -> Result<IdentityMapping, &'static str> {
     // Runtime IDs are used only after the core maps original references into this
     // particular reading. Generated usages are reified under their written names.
     let ids = rnl_runtime::previous::document_ids(original, read);
-    let objects = unique_ids(&ids.objects, &trial.ids.objects)?;
-    let usages = unique_ids(&ids.usages, &trial.ids.usages)?;
-    let reified: Vec<_> = original.usages.iter().map(|u| u.rule_made).collect();
+    let mut objects = unique_ids(&ids.objects, &trial.ids.objects)?;
+    let mut usages = unique_ids(&ids.usages, &trial.ids.usages)?;
+    // A rule usage not written into the generated record can still exist in both
+    // readings. Its source, semantic parent and typed role identities must prove it.
+    // In particular, Other is display text, not an identity.
+    for _ in 0..original.usages.len().saturating_add(1) {
+        let mut changed = false;
+        for (i, old) in original.usages.iter().enumerate() {
+            if usages[i] != usize::MAX || !old.rule_made || old.source.is_none() {
+                continue;
+            }
+            let role_matches = |a: &Filler, b: &Filler| match (a, b) {
+                (Filler::Object(x), Filler::Object(y)) => objects.get(*x) == Some(y),
+                (Filler::Usage(x), Filler::Usage(y)) => usages.get(*x) == Some(y),
+                (Filler::Pin { object: x, pin: xp }, Filler::Pin { object: y, pin: yp }) => {
+                    objects.get(*x) == Some(y) && xp == yp
+                }
+                (
+                    Filler::Terminal { object: x, terminal: xt, pin: xp },
+                    Filler::Terminal { object: y, terminal: yt, pin: yp },
+                ) => objects.get(*x) == Some(y) && xt == yt && xp == yp,
+                (Filler::Net(x), Filler::Net(y)) => x == y,
+                _ => false,
+            };
+            let mut found = trial.usages.iter().enumerate().filter(|(j, new)| {
+                !usages.contains(j)
+                    && new.rule_made
+                    && equivalent_source(old.source.as_ref(), new.source.as_ref(), host_file, line_map)
+                    && old.definition == new.definition
+                    && same_params(old, new)
+                    && old.priority == new.priority
+                    && old.parent.map(|p| usages.get(p).copied()) == new.parent.map(Some)
+                    && old.roles.len() == new.roles.len()
+                    && old.roles.iter().zip(&new.roles).all(|(a, b)| {
+                        a.role == b.role
+                            && a.members.len() == b.members.len()
+                            && a.members.iter().zip(&b.members).all(|(a, b)| role_matches(a, b))
+                    })
+            });
+            let Some((j, new)) = found.next() else { continue };
+            if found.next().is_some() {
+                continue;
+            }
+            if let (Some(a), Some(b)) = (old.object, new.object) {
+                if original.objects.get(a).zip(trial.objects.get(b)).is_none_or(|(x, y)| x.kind != y.kind)
+                    || (objects[a] != usize::MAX && objects[a] != b)
+                    || objects.iter().enumerate().any(|(k, x)| k != a && *x == b)
+                {
+                    continue;
+                }
+                objects[a] = b;
+            } else if old.object.is_some() != new.object.is_some() {
+                continue;
+            }
+            usages[i] = j;
+            changed = true;
+        }
+        if !changed {
+            break;
+        }
+    }
     if usages.contains(&usize::MAX) {
         return Err("original usage identity is not mapped");
     }
+    let reified: Vec<_> =
+        original.usages.iter().zip(&usages).map(|(old, &i)| old.rule_made && !trial.usages[i].rule_made).collect();
     for (old, &index) in original.objects.iter().zip(&objects) {
         if index == usize::MAX {
             continue;
@@ -216,14 +336,8 @@ fn identity_mapping(
             old.parent.map(|i| usages.get(i).copied().ok_or("invalid parent usage")).transpose()?
         };
         let object = old.object.map(|i| mapped_index(&objects, i)).transpose()?;
-        // String unit IDs belong to one interpretation. Compare the literal
-        // values carried by the solver protocol; expanded facts are checked below.
-        let same_params = old.params.len() == new.params.len()
-            && old.params.iter().zip(&new.params).all(|((a, x), (b, y))| {
-                a == b && rnl_runtime::problem::written_lit(x) == rnl_runtime::problem::written_lit(y)
-            });
         if old.definition != new.definition
-            || !same_params
+            || !same_params(old, new)
             || parent != new.parent
             || object != new.object
             || old.roles.len() != new.roles.len()
@@ -260,12 +374,29 @@ pub fn retained_facts_preserved(
     if kept.is_empty() {
         return Ok(());
     }
-    let mapping = identity_mapping(original, trial, read)?;
-    let drawn = rnl_runtime::previous::drawn(original, read);
+    let mapping = identity_mapping(original, trial, read, host_file, line_map)?;
+    let mut drawn = rnl_runtime::previous::drawn(original, read);
+    let ids = rnl_runtime::previous::document_ids(original, read);
+    let trial_drawn = current_drawn(trial, read);
+    for (i, &mapped) in mapping.objects.iter().enumerate() {
+        // A still-implicit usage has no materialized name for previous::drawn.
+        // Use its actual trial drawing only after identity_mapping proved its
+        // source, parent and typed role identities; never match coordinates.
+        if ids.objects.get(i) == Some(&None) {
+            if let Some(at) = trial_drawn.get(mapped) {
+                let old_symbol = original.objects[i].symbol.and_then(|s| original.symbols.get(s));
+                let new_symbol = trial.objects[mapped].symbol.and_then(|s| trial.symbols.get(s));
+                if old_symbol != new_symbol {
+                    return Err("implicit object's symbol changed in trial");
+                }
+                drawn[i] = at.clone();
+            }
+        }
+    }
     for &index in kept {
         let fact = original.facts.get(index).ok_or("invalid kept fact index")?;
         let mut kind = fact.kind.clone();
-        remap_fact(&mut kind, &mapping.objects)?;
+        remap_fact(&mut kind, &mapping.objects, original, trial)?;
         let chain = mapped_chain(&fact.chain, &mapping)?;
         // Loc + kind + priority is not sufficient if it matches more than once; do not guess.
         let matches = trial
@@ -297,11 +428,11 @@ pub fn added_fact_indices(
     line_map: &[Option<u32>],
     read: &rnl_runtime::Interpretation,
 ) -> Result<Vec<usize>, &'static str> {
-    let map = identity_mapping(original, trial, read)?;
+    let map = identity_mapping(original, trial, read, host_file, line_map)?;
     let mut old_kinds = Vec::new();
     for fact in &original.facts {
         let mut kind = fact.kind.clone();
-        remap_fact(&mut kind, &map.objects)?;
+        remap_fact(&mut kind, &map.objects, original, trial)?;
         old_kinds.push((fact, kind, mapped_chain(&fact.chain, &map)?));
     }
     let mut added = Vec::new();
@@ -396,7 +527,10 @@ pub fn validate_interpreted_trial(input: TrialValidation<'_>) -> Result<(), Stri
     let drawn = current_drawn(trial_problem, after);
     for &index in added_facts {
         if rnl_solver::problem_fact_holds_as_drawn(trial_problem, &drawn, index, tolerance) != Some(true) {
-            return Err("new or changed fact is unresolved or not satisfied".into());
+            return Err(format!(
+                "new or changed fact is unresolved or not satisfied: {}",
+                rnl_runtime::problem::fact_statement(trial_problem, index)
+            ));
         }
     }
     if after.failed.iter().any(|failed| !before.failed.contains(failed)) {
@@ -479,8 +613,8 @@ pub fn validate_interpreted_trial(input: TrialValidation<'_>) -> Result<(), Stri
             return Err("wire geometry or endpoint identity changed".into());
         }
     }
-    // The first pass can already have dropped a lower-priority constraint. Its
-    // unchanged outcome needs no new resolution; newly introduced dropped facts
+    // The first pass can already have dropped or deferred a constraint. Its
+    // unchanged outcome needs no new resolution; newly introduced pending facts
     // are still exported and must pass the actual-drawing check above.
     for (index, constraint) in right.constraints.iter().enumerate() {
         if matches!(constraint.status.as_str(), "ok" | "disabled") {
@@ -488,7 +622,7 @@ pub fn validate_interpreted_trial(input: TrialValidation<'_>) -> Result<(), Stri
         }
         // Added/changed facts were independently checked against the actual drawing above.
         // A label alone is not a unique identity: different constraints can share it.
-        let unchanged_pending = matches!(constraint.status.as_str(), "unsolved" | "dropped")
+        let unchanged_pending = matches!(constraint.status.as_str(), "unsolved" | "dropped" | "needs-solver")
             && left.constraints.get(index).is_some_and(|old| {
                 old.status == constraint.status
                     && old.label == constraint.label
