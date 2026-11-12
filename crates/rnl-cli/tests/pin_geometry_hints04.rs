@@ -50,9 +50,11 @@ fn a_pin_position_or_coordinates_still_warn_and_offer_a_valid_pin_reference() {
 
 #[test]
 fn named_pin_direction_is_checked_at_its_real_position() {
-    let r = read("R1 a b 1k", &format!("{SYMBOL} &a @WIRE {{ #R1::p (3,0) }}"), "");
-    assert_eq!(hints(&r, Kind::WrongExit).len(), 1);
-    assert!(hints(&r, Kind::SilentOpen).is_empty());
+    for (mode, wrong_exits) in [("straight", 1), ("auto", 0)] {
+        let r = read("R1 a b 1k", &format!(r#"{SYMBOL} &a @WIRE(mode="{mode}") {{ #R1::p (3,0) }}"#), "");
+        assert_eq!(hints(&r, Kind::WrongExit).len(), wrong_exits, "{mode}");
+        assert!(hints(&r, Kind::SilentOpen).is_empty());
+    }
 }
 
 #[test]
