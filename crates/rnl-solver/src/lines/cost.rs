@@ -4,14 +4,16 @@ use crate::Work;
 
 const UNIT_NS: u64 = 1050;
 
-const CHOICE_NS: u64 = 24039;
-const RELAXATION_NS: u64 = 51;
-const ROUTE_NS: (u64, u64) = (24879, 6887);
-const EXPANSION_NS: u64 = 119;
-const MERGE_NS: u64 = 583090;
-const MERGE_PIVOT_ROW_NS: u64 = 139;
-const MERGE_RELAXATION_NS: u64 = 51;
-const LISTING_NS: u64 = 393;
+// Rounded coefficients from the optimized-build calibration in solver-lines.md.
+// These constants are part of the standalone solver 0.4.0 replay policy.
+const CHOICE_NS: u64 = 12_434;
+const RELAXATION_NS: u64 = 102;
+const ROUTE_NS: (u64, u64) = (0, 7_907);
+const EXPANSION_NS: u64 = 217;
+const MERGE_NS: u64 = 378_800;
+const MERGE_PIVOT_ROW_NS: u64 = 180;
+const MERGE_RELAXATION_NS: u64 = 102;
+const LISTING_NS: u64 = 2_908;
 
 /// Admit each orientation trial before constructing its geometry. Listing used
 /// to defer this charge until the next search batch, leaving interrupted lists
@@ -73,5 +75,47 @@ impl Tally {
                 / 1000;
         crate::budget::permit_weighted(crate::budget::Step::Line, total.saturating_sub(self.charged).max(1));
         self.charged = total;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{RunLimit, StopReason, StoppedClock};
+
+    #[test]
+    fn calibrated_line_work_policy_is_pinned() {
+        // One thousand operations exposes the fixed integer coefficient rather
+        // than hiding changes behind rounding of a single small operation.
+        for (step, expected) in [
+            (Step::Choice, 11_841),
+            (Step::Relaxation, 97),
+            (Step::Route, 120_487),
+            (Step::Expansion, 206),
+            (Step::Merge, 360_761),
+            (Step::MergePivotRow, 171),
+            (Step::MergeRelaxation, 97),
+        ] {
+            let (_, report) = crate::budget::with(&StoppedClock, RunLimit::Work(u64::MAX), None, || {
+                Tally::new(16).charge(&mut Work::default(), step, 1000);
+            });
+            assert_eq!(report.work, expected, "{step:?}");
+            assert_eq!(report.reason, StopReason::Complete);
+        }
+    }
+
+    #[test]
+    fn listing_is_paid_atomically_before_the_trial() {
+        let (admitted, report) = crate::budget::with(&StoppedClock, RunLimit::Work(324), None, || listing(48));
+        assert!(!admitted);
+        assert_eq!(report.work, 0);
+        let (admitted, report) = crate::budget::with(&StoppedClock, RunLimit::Work(325), None, || {
+            let first = listing(48);
+            assert!(!listing(1));
+            first
+        });
+        assert!(admitted);
+        assert_eq!(report.work, 325);
+        assert_eq!(report.reason, StopReason::Work);
     }
 }

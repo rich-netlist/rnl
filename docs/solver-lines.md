@@ -34,6 +34,29 @@ Materialized annotations remain obstacles during routing and compaction. Their b
 
 Orientation lists retain only the group's class and open-way values. Search deduplication uses two domain-separated 64-bit fingerprints of exact geometry, with a fixed-width encoding shared by native and WebAssembly. Fingerprints affect candidate membership, never ordering or hard-fact validation; a collision can skip a candidate.
 
-Each list holds at most 200,000 combinations. All live lists together hold at most 800,000, including lists still retained by a search core after cache eviction. Conservative, architecture-independent storage accounting further limits one list to 64 MiB and live lists to 256 MiB. These are limits for combination storage, not a process-wide memory guarantee. Reaching a storage limit marks the list incomplete and preserves its admitted prefix.
+Each enumerated list holds at most 200,000 combinations. All live enumerated lists together hold at most 800,000, including lists still retained by a search core after cache eviction. Conservative, architecture-independent storage accounting further limits one list to 64 MiB and live lists to 256 MiB. These are limits for combination storage, not a process-wide memory guarantee. Reaching a storage limit marks the list incomplete and preserves its admitted prefix.
 
 Every orientation trial pays its size-dependent listing cost before allocating geometry, through the same checkpoint in time and work modes. Interrupted listing therefore counts as work, and replay stops before the same trial. Output materialization runs after the search limit; profiling reports auto-default refresh, branch attachment, and materialization separately from search.
+
+## Cost calibration
+
+Standalone solver 0.4.0 uses the following fixed line-search coefficients. They supplement the shared model, pivot, structure and routing checkpoints; work units are a replay protocol, not elapsed nanoseconds.
+
+| Operation | Fitted cost coefficient (ns) |
+| --- | ---: |
+| Choice | 12,434 |
+| Relaxation | 102 |
+| Route | 7,907 × objects |
+| A* expansion | 217 |
+| Merge | 378,800 |
+| Merge pivot row | 180 |
+| Merge relaxation | 102 |
+| Listing trial | 2,908 × objects |
+
+Calibration used the optimized Windows x64 build from [this source](https://github.com/rich-netlist/rnl/commit/edff9a1cadba40f6c7693eacba38b19063ab6378), on an Intel Core i7-12700KF. The process ran at normal priority on one logical CPU. Four- and eight-symbol shared-net groups, a two-symbol link, a four-symbol fan and eight fixed symbols were each run twice in seed mode. Groups of sixteen and thirty-two symbols were each run twice with a ten-second limit. All fourteen unprofiled repeats or work replays reproduced the saved files byte for byte.
+
+The fit used 7,582 completed spans: 6,574 choices, 497 routes, 497 merges and fourteen settling spans. Child route time was removed from choices; direct choice, merge and weighing time was removed from settling. Nonnegative least squares with relative residuals and a soft-L1 loss (scale 0.2) estimated the coefficients; relaxation and merge relaxation share one coefficient. The route intercept fitted to zero. Coefficients were rounded to integer nanoseconds. Median relative residual was 5.8% overall, 12.3% for routing, 11.0% for merging and 36.2% for settling. Profiling overhead and variation between input shapes remain part of these approximate estimates.
+
+Six control runs of the preceding optimized build bracketed the measurements. Their median line time differed by -4.5% from the earlier control, within the preselected 15% drift limit; all controls were retained. The timed synthetic solves took 10.006–10.032 seconds inside the solver and at most 10.266 seconds as a process; their unprofiled work replays took 7.53–9.25 seconds as a process. These observations validate those inputs, not a universal ten-second bound.
+
+The line tally converts each coefficient to thousandths of a work unit with `floor(ns × 1000 / 1050)` and carries fractional totals between charges. Listing is admitted before each trial: for `n = max(1, objects)`, its checkpoint costs `4 × n + ceil(2769 × n / 1000)` units, including the existing structure cost. Tests pin the coefficients and the atomic admission boundary. Recalibrating this policy requires work counts from the new solver build.
