@@ -1797,6 +1797,7 @@
           {
             "id": "#X1::name",
             "attach": "#X1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -1830,6 +1831,7 @@
           {
             "id": "#X1::sub",
             "attach": "#X1",
+            "attach_point": null,
             "key": "sub",
             "markup": {
               "value": "${model}",
@@ -1863,6 +1865,7 @@
           {
             "id": "#X2::name",
             "attach": "#X2",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -1896,6 +1899,7 @@
           {
             "id": "#X2::sub",
             "attach": "#X2",
+            "attach_point": null,
             "key": "sub",
             "markup": {
               "value": "${model}",
@@ -1929,6 +1933,7 @@
           {
             "id": "#X3::name",
             "attach": "#X3",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -1962,6 +1967,7 @@
           {
             "id": "#Vdd::name",
             "attach": "#Vdd",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2002,6 +2008,7 @@
           {
             "id": "#Vdd::value",
             "attach": "#Vdd",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -2042,6 +2049,7 @@
           {
             "id": "#Vin::name",
             "attach": "#Vin",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2082,6 +2090,7 @@
           {
             "id": "#Vin::value",
             "attach": "#Vin",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -2122,6 +2131,7 @@
           {
             "id": "@rnl-std-virtual.rnl:58:9#1::name",
             "attach": "@rnl-std-virtual.rnl:58:9#1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${p}",
@@ -2155,6 +2165,7 @@
           {
             "id": "@rnl-std-virtual.rnl:58:9#2::name",
             "attach": "@rnl-std-virtual.rnl:58:9#2",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${p}",
@@ -2188,6 +2199,7 @@
           {
             "id": "@rnl-std-virtual.rnl:58:9#3::name",
             "attach": "@rnl-std-virtual.rnl:58:9#3",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${p}",
@@ -2787,6 +2799,7 @@
           {
             "id": "#R1::name",
             "attach": "#R1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2823,6 +2836,7 @@
           {
             "id": "#R1::value",
             "attach": "#R1",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -2859,6 +2873,7 @@
           {
             "id": "#R2::name",
             "attach": "#R2",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2895,6 +2910,7 @@
           {
             "id": "#R2::value",
             "attach": "#R2",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -2931,6 +2947,7 @@
           {
             "id": "@rnl-std-fill.rnl:37:3#1::name",
             "attach": "@rnl-std-fill.rnl:37:3#1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${p}",
@@ -2964,6 +2981,7 @@
           {
             "id": "@rnl-std-fill.rnl:37:3#2::name",
             "attach": "@rnl-std-fill.rnl:37:3#2",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${p}",
@@ -2997,6 +3015,7 @@
           {
             "id": "@rnl-std-fill.rnl:37:3#3::name",
             "attach": "@rnl-std-fill.rnl:37:3#3",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${p}",
@@ -3961,6 +3980,7 @@
           {
             "id": "#R1::name",
             "attach": "#R1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "R_{L}",
@@ -4007,6 +4027,7 @@
           {
             "id": "#M1::name",
             "attach": "#M1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -4047,6 +4068,7 @@
           {
             "id": "#M1::model",
             "attach": "#M1",
+            "attach_point": null,
             "key": "model",
             "markup": {
               "value": "${model}",
@@ -4087,6 +4109,7 @@
           {
             "id": "#R1::value",
             "attach": "#R1",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -4123,6 +4146,7 @@
           {
             "id": "%pin::name",
             "attach": "%pin",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${p}",
@@ -4156,6 +4180,7 @@
           {
             "id": "@rnl-std-virtual.rnl:58:9::name",
             "attach": "@rnl-std-virtual.rnl:58:9",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${p}",
@@ -4189,6 +4214,7 @@
           {
             "id": "@rnl-std-fill.rnl:37:3::name",
             "attach": "@rnl-std-fill.rnl:37:3",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${p}",

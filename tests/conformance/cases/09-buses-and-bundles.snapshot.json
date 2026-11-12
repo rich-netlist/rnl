@@ -1746,6 +1746,7 @@
           {
             "id": "@09-buses-and-bundles.sp:58:5",
             "attach": "%bus",
+            "attach_point": null,
             "key": null,
             "markup": {
               "value": "${net}",
@@ -1781,6 +1782,10 @@
           {
             "id": "@09-buses-and-bundles.sp:69:5",
             "attach": "%dpt",
+            "attach_point": [
+              -8.0,
+              1.0
+            ],
             "key": null,
             "markup": {
               "value": "D<3:0>",
@@ -1814,6 +1819,7 @@
           {
             "id": "#\"RL<0>\":1::even",
             "attach": "#\"RL<0>\":1",
+            "attach_point": null,
             "key": "even",
             "markup": {
               "value": "${net}",
@@ -1849,6 +1855,7 @@
           {
             "id": "#\"RL<2>\":1::even",
             "attach": "#\"RL<2>\":1",
+            "attach_point": null,
             "key": "even",
             "markup": {
               "value": "${net}",
@@ -1884,6 +1891,7 @@
           {
             "id": "#\"RL<1>\":1::even",
             "attach": "#\"RL<1>\":1",
+            "attach_point": null,
             "key": "even",
             "markup": {
               "value": "${net}",
@@ -1919,6 +1927,7 @@
           {
             "id": "#XR::name",
             "attach": "#XR",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -1952,6 +1961,7 @@
           {
             "id": "#\"RL<3>\"::name",
             "attach": "#\"RL<3>\"",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -1985,6 +1995,7 @@
           {
             "id": "#\"RL<3>\"::value",
             "attach": "#\"RL<3>\"",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -2018,6 +2029,7 @@
           {
             "id": "#\"RL<2>\"::name",
             "attach": "#\"RL<2>\"",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2051,6 +2063,7 @@
           {
             "id": "#\"RL<2>\"::value",
             "attach": "#\"RL<2>\"",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -2084,6 +2097,7 @@
           {
             "id": "#\"RL<1>\"::name",
             "attach": "#\"RL<1>\"",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2117,6 +2131,7 @@
           {
             "id": "#\"RL<1>\"::value",
             "attach": "#\"RL<1>\"",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -2150,6 +2165,7 @@
           {
             "id": "#\"RL<0>\"::name",
             "attach": "#\"RL<0>\"",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2183,6 +2199,7 @@
           {
             "id": "#\"RL<0>\"::value",
             "attach": "#\"RL<0>\"",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -2216,6 +2233,7 @@
           {
             "id": "#V1::name",
             "attach": "#V1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2249,6 +2267,7 @@
           {
             "id": "#V1::value",
             "attach": "#V1",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -2527,6 +2546,7 @@
           {
             "id": "@rnl-std-fill.rnl:37:3#1::name",
             "attach": "@rnl-std-fill.rnl:37:3#1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${p}",
@@ -2560,6 +2580,7 @@
           {
             "id": "@rnl-std-fill.rnl:37:3#2::name",
             "attach": "@rnl-std-fill.rnl:37:3#2",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${p}",
@@ -2593,6 +2614,7 @@
           {
             "id": "@rnl-std-fill.rnl:37:3#3::name",
             "attach": "@rnl-std-fill.rnl:37:3#3",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${p}",
@@ -3358,6 +3380,7 @@
           {
             "id": "%st::name",
             "attach": "%st",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "XI0<3:0>",
@@ -3391,6 +3414,7 @@
           {
             "id": "%st::model",
             "attach": "%st",
+            "attach_point": null,
             "key": "model",
             "markup": {
               "value": "${model}",
@@ -3424,6 +3448,10 @@
           {
             "id": "@09-buses-and-bundles.sp:41:5",
             "attach": "%dp",
+            "attach_point": [
+              -7.0,
+              1.0
+            ],
             "key": null,
             "markup": {
               "value": "D<3:0>",
@@ -3457,6 +3485,10 @@
           {
             "id": "@09-buses-and-bundles.sp:42:5",
             "attach": "%qp",
+            "attach_point": [
+              7.0,
+              1.0
+            ],
             "key": null,
             "markup": {
               "value": "Q<3:0>",
@@ -3490,6 +3522,7 @@
           {
             "id": "@rnl-std-fill.rnl:37:3::name",
             "attach": "@rnl-std-fill.rnl:37:3",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${p}",

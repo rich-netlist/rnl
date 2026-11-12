@@ -396,6 +396,10 @@
           {
             "id": "@14-numbering-first-name.sp:15:38",
             "attach": "%p",
+            "attach_point": [
+              0.0,
+              0.0
+            ],
             "key": null,
             "markup": {
               "value": "x",
@@ -429,6 +433,7 @@
           {
             "id": "#R1::name",
             "attach": "#R1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -462,6 +467,7 @@
           {
             "id": "#R1::value",
             "attach": "#R1",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -779,6 +785,10 @@
           {
             "id": "@14-numbering-first-name.sp:26:38",
             "attach": "%q",
+            "attach_point": [
+              0.0,
+              0.0
+            ],
             "key": null,
             "markup": {
               "value": "x",
@@ -812,6 +822,7 @@
           {
             "id": "#R1::name",
             "attach": "#R1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -845,6 +856,7 @@
           {
             "id": "#R1::value",
             "attach": "#R1",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
