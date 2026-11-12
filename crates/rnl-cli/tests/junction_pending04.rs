@@ -35,6 +35,7 @@ R2 b 0 1k
     // newly introduced, exactly as added_fact_indices would pass an added fact.
     let added = if added { vec![index] } else { vec![] };
     validate_interpreted_trial(TrialValidation {
+        original: &original,
         original_problem: problem,
         host_file: "main.sp",
         line_map: &lines,

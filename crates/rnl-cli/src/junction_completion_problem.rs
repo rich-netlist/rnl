@@ -213,6 +213,15 @@ fn unique_ids(ids: &[Option<String>], current: &[String]) -> Result<Vec<usize>, 
         .collect()
 }
 
+fn same_params(old: &rnl_runtime::problem::UsageEntry, new: &rnl_runtime::problem::UsageEntry) -> bool {
+    // String unit IDs belong to one interpretation. Compare the literal values
+    // carried by the solver protocol for implicit and materialized usages alike.
+    old.params.len() == new.params.len()
+        && old.params.iter().zip(&new.params).all(|((a, x), (b, y))| {
+            a == b && rnl_runtime::problem::written_lit(x) == rnl_runtime::problem::written_lit(y)
+        })
+}
+
 fn identity_mapping(
     original: &LevelProblem,
     trial: &LevelProblem,
@@ -252,7 +261,7 @@ fn identity_mapping(
                     && new.rule_made
                     && equivalent_source(old.source.as_ref(), new.source.as_ref(), host_file, line_map)
                     && old.definition == new.definition
-                    && old.params == new.params
+                    && same_params(old, new)
                     && old.priority == new.priority
                     && old.parent.map(|p| usages.get(p).copied()) == new.parent.map(Some)
                     && old.roles.len() == new.roles.len()
@@ -328,7 +337,7 @@ fn identity_mapping(
         };
         let object = old.object.map(|i| mapped_index(&objects, i)).transpose()?;
         if old.definition != new.definition
-            || old.params != new.params
+            || !same_params(old, new)
             || parent != new.parent
             || object != new.object
             || old.roles.len() != new.roles.len()
@@ -483,6 +492,7 @@ fn current_drawn(p: &LevelProblem, read: &rnl_runtime::Interpretation) -> Vec<rn
 /// deliberately stricter than the language: anything that needs general 8.5 resolution is
 /// refused. The caller must identify the trial usage from writer provenance, not coordinates.
 pub struct TrialValidation<'a> {
+    pub original: &'a rnl_runtime::Interpretation,
     pub original_problem: &'a LevelProblem,
     pub host_file: &'a str,
     pub line_map: &'a [Option<u32>],
@@ -497,6 +507,7 @@ pub struct TrialValidation<'a> {
 
 pub fn validate_interpreted_trial(input: TrialValidation<'_>) -> Result<(), String> {
     let TrialValidation {
+        original,
         original_problem,
         host_file,
         line_map,
@@ -525,7 +536,29 @@ pub fn validate_interpreted_trial(input: TrialValidation<'_>) -> Result<(), Stri
     if after.failed.iter().any(|failed| !before.failed.contains(failed)) {
         return Err("trial newly failed or dropped a statement".into());
     }
-    if after.diagnostics().iter().any(|d| d.severity == Severity::Error || d.severity == Severity::Violation) {
+    // Assertions in the input may already report a violation without failing a
+    // statement. Preserve those reports, but never excuse a newly introduced one
+    // merely because it was already visible in the first generated-record read.
+    let original_diagnostics = original.diagnostics();
+    let mut matched = vec![false; original_diagnostics.len()];
+    if after.diagnostics().iter().any(|d| {
+        d.severity == Severity::Error
+            || d.severity == Severity::Violation
+                && !original_diagnostics.iter().enumerate().any(|(i, old)| {
+                    let same = !matched[i]
+                        && old.severity == d.severity
+                        && old.code == d.code
+                        && old.message == d.message
+                        && old.origin == d.origin
+                        && old.in_package == d.in_package
+                        && old.cause == d.cause
+                        && equivalent_source(old.loc.as_ref(), d.loc.as_ref(), host_file, line_map);
+                    if same {
+                        matched[i] = true;
+                    }
+                    same
+                })
+    }) {
         return Err("trial interpretation has an error or violation".into());
     }
     for (usage_id, candidate) in targets {

@@ -15,7 +15,7 @@ const INPUT: &str = r#"* implicit kept usage
 * @RNL(type="header") { @VERSION("0.4"); @SOLVER-CONFIG(junction="$DOT") }
 R1 a b 1k
 * @RNL {
-* $MARK = @DEFINE(roles=[["x","instance"]]) {};
+* $MARK = @DEFINE(roles=[["x","instance"]],parameters=[["label","mark"]]) {};
 * $S = @DEFINE-SYMBOL { (0,0) @CIRCLE(radius=0.25) };
 * # @SELECT-INSTANCE(name="R1") => @AS $MARK;
 * # @SELECT-USAGE $MARK => @SET-SYMBOL $S;
@@ -33,6 +33,7 @@ fn kept_fact_on_fixed_unwritten_rule_usage_survives_junction_completion() {
     let p = &original.problems[0];
     let mark = p.usages.iter().find(|u| u.definition == "$MARK" && u.rule_made).expect("rule-created mark");
     let object = mark.object.expect("symbol-bearing usage");
+    assert_eq!(mark.params.len(), 1, "the implicit usage must retain its string parameter");
     assert!(
         matches!(&p.objects[object].position,Position::Own{x:Slot::Fixed{value:x,..},y:Slot::Fixed{value:y,..}} if (*x,*y)==(2.,3.))
     );

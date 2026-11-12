@@ -107,7 +107,7 @@ fn line_results_complete_configured_junctions_and_replay_the_written_file() {
     );
     let original = original.replace(
         "*   %p = (0,0);",
-        "*   $GEN = @DEFINE(roles=[\"r\"],parameters=[[\"dy\",2]]) {};\n*   $WRAP = @DEFINE(roles=[\"p\"]) { %items = # @SELECT-INSTANCE => @AS(dy=2) $GEN; %items @ALIGN(\"x\") };\n*   #R3 @AS $WRAP; # @SELECT-USAGE $GEN => @PLACE(8,9);\n*   %p = (0,0);",
+        "*   $GEN = @DEFINE(roles=[\"r\"],parameters=[[\"dy\",2],[\"direction\",\"left-to-right\"]]) {};\n*   $WRAP = @DEFINE(roles=[\"p\"]) { %items = # @SELECT-INSTANCE => @AS(dy=2) $GEN; %items @ALIGN(\"x\") };\n*   #R3 @AS $WRAP; # @SELECT-USAGE $GEN => @PLACE(8,9);\n*   %p = (0,0);",
     );
     let original = original.replace(
         "*   %p = (0,0);",
@@ -160,6 +160,10 @@ fn line_results_complete_configured_junctions_and_replay_the_written_file() {
         let usage = changed.usages.iter_mut().find(|u| u.definition == "$GEN").unwrap();
         usage.roles[0].members = vec![rnl_runtime::problem::Filler::Net("different".into())];
         assert!(check_retained(&changed).is_err(), "reified roles must retain their identity");
+        let mut changed_parameter = read.problems[0].clone();
+        let usage = changed_parameter.usages.iter_mut().find(|u| u.definition == "$GEN").unwrap();
+        usage.params[0].1 = rnl_runtime::interp::obj::Lit::Num(999.);
+        assert!(check_retained(&changed_parameter).is_err(), "reified parameter values must be preserved");
         let mut contradicted = level.problem.clone();
         contradicted.facts[level.solved.report.kept[0]].kind = rnl_runtime::problem::FactKind::PointCoordinate {
             point: 0,

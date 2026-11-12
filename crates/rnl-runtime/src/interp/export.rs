@@ -909,6 +909,15 @@ impl Interp<'_> {
         }
         match self.reference_of(s, ix, o) {
             Reference::Name(n) => Some((n, 0)),
+            Reference::Number { number, path }
+                if self.follows_0_4(self.level_unit[self.scenes[s].level])
+                    && number > 0
+                    && number <= self.level_numbers(s).authored.len() =>
+            {
+                // Authored numbers survive replacement of the solver record. Its
+                // own numbers do not, and must never become role references here.
+                Some((format!("%#{number}{}", path.concat()), 0))
+            }
             _ => match self.o(o) {
                 ObjData::Point { x: Some(x), y: Some(y), .. } => {
                     Some((format!("({}, {})", crate::geom::fmt_num(*x), crate::geom::fmt_num(*y)), 1))

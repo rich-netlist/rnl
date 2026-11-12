@@ -392,6 +392,7 @@ pub fn complete_record(ctx: &Context<'_>, written: &Written) -> Result<Completio
         )
         .map_err(str::to_owned)?;
         match validate_interpreted_trial(TrialValidation {
+            original: ctx.original,
             original_problem: ctx.problem,
             host_file: &ctx.original.doc.levels[ctx.problem.level].file,
             line_map: &line_map,
