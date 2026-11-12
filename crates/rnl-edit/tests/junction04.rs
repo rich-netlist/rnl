@@ -75,14 +75,14 @@ fn include_standard_is_persisted_before_junction_resolution() {
     let mut f = MemoryProvider::new().with(
         "/packages/std.rnl",
         r#"@RNL(type="header") {
-        @VERSION("0.4"); @PACKAGE(name="rnl-std",version="0.4"); @SOLVER-CONFIG(junction="$MARK")}
+        @VERSION("0.4"); @PACKAGE(name="rnl-std-all",version="0.4"); @SOLVER-CONFIG(junction="$MARK")}
         @RNL {$MARK = @DEFINE(roles=[["p","point"]]) {}}"#,
     );
     f.package_dirs.push("/packages".into());
     let w =
         write_with_options_diagnosed(&request("0.4", false), &f, &Options { include_std: true, ..Default::default() })
             .unwrap();
-    assert!(w.text.contains("name=\"rnl-std\", version=\"0.4\""), "{}", w.text);
+    assert!(w.text.contains("name=\"rnl-std-all\", version=\"0.4\""), "{}", w.text);
     assert!(w.text.contains("$MARK @ATTACH %j"));
     assert!(w.text.contains("$MARK @ATTACH %k"));
     assert!(w.diagnostics.is_empty());

@@ -192,38 +192,14 @@ fn standard_packages_check_clean() {
     assert!(packages.len() >= 25, "only {} package files", packages.len());
 }
 
-/// The keywords of the draft language 0.4 that the draft series 0.4 writes and the toolkit does not
-/// read yet: those of the selective routing (13.7). Each change that reads
-/// one takes it out here, and with it the aliases alias-zh gives it (16.5).
-const KEYWORDS_NOT_READ_YET: [&str; 0] = [];
-
-/// The other statements of 0.4 that the draft series writes and the toolkit does not read yet: the
-/// pins as objects (5.1, 9.2.4), definition-body objects and rules (6.9, 9.4), drawn selections
-/// (10.1), and solver configuration in package headers (14.10, 16.2).
-const NOT_READ_YET: [&str; 4] = [
-    "@SOLVER-CONFIG cannot be written in a header record (2.8)",
-    "a statement that only draws a scene object has no level to draw in, in a package (16.2)",
-    "unknown kind name pin (9.4)",
-    "the body of an ordinary definition cannot reference host objects; they come in through roles (6.9)",
-];
-
+/// The formal 0.4 series is fully understood, including its aliases and header rules.
 #[test]
-fn the_draft_standard_series_has_only_what_is_not_read_yet() {
-    // checked on its own, each package of a draft series gives no diagnostic but those of the
-    // statements of its language the toolkit does not read yet, or of a statement that fails
-    // because of one (its upstream cause)
-    let mut known: Vec<String> = NOT_READ_YET.iter().map(|n| n.to_string()).collect();
-    for k in KEYWORDS_NOT_READ_YET {
-        known.push(format!("unknown keyword @{k}"));
-        known.push(format!("the original @{k} is not a standard keyword (16.5)"));
-    }
-    let drafts = standard_packages().1;
-    assert_eq!(drafts.len(), 14, "expected 14 package files, got {}", drafts.len());
-    for f in drafts {
-        let r = interpret_file(&f, None, &FsProvider::new(&[]), &Options::default()).unwrap();
-        for d in r.diagnostics() {
-            let said = r.sink.render(d);
-            assert!(known.iter().any(|n| said.contains(n.as_str())), "{}: {said}", f.display());
-        }
+fn the_formal_standard_series_checks_clean() {
+    let packages = standard_packages().1;
+    assert_eq!(packages.len(), 14, "expected 14 package files, got {}", packages.len());
+    for file in packages {
+        let read = interpret_file(&file, None, &FsProvider::new(&[]), &Options::default()).unwrap();
+        let diagnostics: Vec<_> = read.diagnostics().iter().map(|d| read.sink.render(d)).collect();
+        assert!(diagnostics.is_empty(), "{}: {diagnostics:?}", file.display());
     }
 }

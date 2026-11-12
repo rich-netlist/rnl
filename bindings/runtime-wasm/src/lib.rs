@@ -899,8 +899,8 @@ C1 a 0 1p
     #[test]
     fn draft_standard_setting_is_explicit_and_persists_when_writing() {
         let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\nR1 a b 1k\n* @RNL { #R1 @AS $CUSTOM }\n.end\n";
-        let package = "@RNL(type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"rnl-std\", version=\"0.4\") }\n@RNL { $CUSTOM = @DEFINE(roles=[\"i\"]) {} }";
-        let mut request = json!({ "entry": "/t.sp", "files": { "/t.sp": text, "/pkg/rnl-std.rnl": package }, "package_dirs": ["/pkg"] });
+        let package = "@RNL(type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }\n@RNL { $CUSTOM = @DEFINE(roles=[\"i\"]) {} }";
+        let mut request = json!({ "entry": "/t.sp", "files": { "/t.sp": text, "/pkg/rnl-std-all.rnl": package }, "package_dirs": ["/pkg"] });
         let errors = |v: &Value| {
             v["document"]["diagnostics"].as_array().unwrap().iter().filter(|d| d["severity"] == "error").count()
         };
@@ -910,18 +910,18 @@ C1 a 0 1p
         request["replace_records"] = json!({ "level": "t.sp", "records": "@RNL { #R1 @AS $CUSTOM }" });
         let replaced = answer(request);
         let saved = replaced["replaced"]["text"].as_str().unwrap_or_else(|| panic!("{replaced}"));
-        assert!(saved.contains("@USE-PACKAGE(name=\"rnl-std\", version=\"0.4\")"));
+        assert!(saved.contains("@USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\")"));
         let reopened = answer(
-            json!({ "entry": "/t.sp", "files": { "/t.sp": saved, "/pkg/rnl-std.rnl": package }, "package_dirs": ["/pkg"], "std": false }),
+            json!({ "entry": "/t.sp", "files": { "/t.sp": saved, "/pkg/rnl-std-all.rnl": package }, "package_dirs": ["/pkg"], "std": false }),
         );
         assert_eq!(errors(&reopened), 0);
 
         let write = json!({ "language_version": "0.4", "dialect": "spice", "netlist": "* new\nR1 a b 1k\n.end\n", "author": "test", "file": "t.sp", "ops": [] });
         let result = answer(
-            json!({ "write": write, "files": { "/pkg/rnl-std.rnl": package }, "package_dirs": ["/pkg"], "include_std": true }),
+            json!({ "write": write, "files": { "/pkg/rnl-std-all.rnl": package }, "package_dirs": ["/pkg"], "include_std": true }),
         );
         let saved = result["written"]["text"].as_str().unwrap_or_else(|| panic!("{result}"));
-        assert!(saved.contains("@USE-PACKAGE(name=\"rnl-std\", version=\"0.4\")"));
+        assert!(saved.contains("@USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\")"));
     }
 
     #[test]
