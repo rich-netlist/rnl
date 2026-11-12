@@ -25,7 +25,67 @@ fn a_moved_symbol_gets_its_explicit_package_without_a_name_change() {
         "{}",
         r.files["t.sp"]
     );
-    assert!(r.files["t.sp"].contains("@SET-SYMBOL $OPAMP"));
+    assert!(
+        r.files["t.sp"]
+            .contains("@SET-SYMBOL(terminals=[[1, \"inp\"], [2, \"inn\"], [3, \"out\"]]) $OPAMP => @ORIENT(\"MX\")"),
+        "{}",
+        r.files["t.sp"]
+    );
+}
+
+#[test]
+fn series_02_opamp_composes_mx_and_preserves_input_pin_positions() {
+    let source = "* title\n\
+* @RNL(type=\"header\") { @VERSION(\"0.2\") }\n\
+.subckt op a b y\n\
+.ends\n\
+X0 inp0 inn0 out0 op\n\
+X1 inp1 inn1 out1 op\n\
+X2 inp2 inn2 out2 op\n\
+* @RNL {\n\
+*   $FIG = @DEFINE(roles=[[\"p\", \"point\"]], parameters=[[\"name\", \"U\"]]) {};\n\
+*   #X0 @SET-SYMBOL $OPAMP => @PLACE(0, 0);\n\
+*   #X1 @SET-SYMBOL $OPAMP => @PLACE(20, 0) => @ORIENT(\"R90\");\n\
+*   #X2 @SET-SYMBOL $OPAMP;\n\
+*   #X2 @PLACE(40, 0) => @ORIENT(\"R270\");\n\
+*   %fig = (0, -10) @AS $FIG => @SET-SYMBOL $OPAMP\n\
+* }\n\
+.end\n";
+    let files = MemoryProvider::new().with("t.sp", source);
+    let before =
+        rnl_view::interpret_with("t.sp", None, &Default::default(), &files, &rnl_runtime::Options::default()).unwrap();
+    let r = upgrade("t.sp", &files, &UpgradeOptions::default()).unwrap();
+    let text = &r.files["t.sp"];
+    assert!(
+        text.contains("#X0 @SET-SYMBOL(terminals=[[1, \"inp\"], [2, \"inn\"], [3, \"out\"]]) $OPAMP => @ORIENT(\"MX\") => @PLACE(0, 0)"),
+        "{text}"
+    );
+    assert!(
+        text.contains("#X1 @SET-SYMBOL(terminals=[[1, \"inp\"], [2, \"inn\"], [3, \"out\"]]) $OPAMP => @PLACE(20, 0) => @ORIENT(\"MXR90\")"),
+        "{text}"
+    );
+    assert!(text.contains("#X2 @SET-SYMBOL(terminals=[[1, \"inp\"], [2, \"inn\"], [3, \"out\"]]) $OPAMP;"), "{text}");
+    assert!(text.contains("#X2 @PLACE(40, 0) => @ORIENT(\"MYR90\")"), "{text}");
+    assert!(text.contains("%fig = (0, -10) @AS $FIG => @SET-SYMBOL $OPAMP => @ORIENT(\"MX\")"), "{text}");
+
+    let after_files = MemoryProvider::new().with("t.sp", text);
+    let after = rnl_view::interpret_with(
+        "t.sp",
+        None,
+        &Default::default(),
+        &after_files,
+        &rnl_runtime::Options { std: false, ..rnl_runtime::Options::default() },
+    )
+    .unwrap();
+    for id in ["#X0", "#X1", "#X2"] {
+        let b = before.model.levels[0].objects.iter().find(|o| o.id == id).unwrap();
+        let a = after.model.levels[0].objects.iter().find(|o| o.id == id).unwrap();
+        assert_eq!(a.pins[0].at, b.pins[0].at, "{id} inp");
+        assert_eq!(a.pins[0].nets, b.pins[0].nets, "{id} inp nets");
+        assert_eq!(a.pins[1].at, b.pins[1].at, "{id} inn");
+        assert_eq!(a.pins[1].nets, b.pins[1].nets, "{id} inn nets");
+        assert_eq!(a.pins[2].nets, b.pins[2].nets, "{id} out nets");
+    }
 }
 #[test]
 fn local_old_and_new_names_are_not_captured_by_standard_renames() {

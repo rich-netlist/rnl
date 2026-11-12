@@ -248,6 +248,7 @@
   @ALIAS("$单刀双掷开关", "$SPDT_SWITCH");
   @ALIAS("$图形", "$FIGURE");
   @ALIAS("$端口列表", "$PORT_LIST");
+  @ALIAS("$备注", "$COMMENT");
   @ALIAS("$接地桩", "$GROUND_STUB");
   @ALIAS("$电源桩", "$SUPPLY_STUB");
   @ALIAS("$偏置桩", "$BIAS_STUB");
@@ -414,6 +415,8 @@
   @ALIAS("挂点", "at", definition="$SPDT_SWITCH");
   @ALIAS("挂点", "at", definition="$FIGURE");
   @ALIAS("标签集", "tag_set", definition="$PORT_LIST");
+  @ALIAS("对象", "target", definition="$COMMENT");
+  @ALIAS("文本", "text", definition="$COMMENT");
   @ALIAS("引脚", "t", definition="$GROUND_STUB");
   @ALIAS("间距", "gap", definition="$GROUND_STUB");
   @ALIAS("地", "g", definition="$GROUND_STUB");

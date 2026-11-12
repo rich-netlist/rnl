@@ -206,8 +206,16 @@ impl Terminals {
                 if shadowed.contains(&name) || shadowed.contains(&target_name) {
                     continue;
                 }
-                let Some(after) = target.get(&(package.clone(), target_name)) else { continue };
-                let Some(replacement) = mapping(&before, after, version == "0.3") else { continue };
+                let (after, before) = if version == "0.2" && package == "rnl-std-symbols" && name == "$OPAMP" {
+                    let Some(after) = target.get(&("rnl-std-functional".into(), target_name)) else { continue };
+                    let mirrored = before.into_iter().map(|p| Pin { y: -p.y, ..p }).collect::<Vec<_>>();
+                    (after, mirrored)
+                } else {
+                    let Some(after) = target.get(&(package.clone(), target_name)) else { continue };
+                    (after, before)
+                };
+                let allow_direction_fallback = version == "0.3" || (version == "0.2" && name == "$OPAMP");
+                let Some(replacement) = mapping(&before, after, allow_direction_fallback) else { continue };
                 let sources: Vec<_> = input
                     .sources
                     .iter()

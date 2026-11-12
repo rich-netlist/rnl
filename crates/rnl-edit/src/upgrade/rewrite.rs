@@ -202,6 +202,10 @@ pub(super) fn file(
                 Ok(found) => edits.extend(found),
                 Err(e) => error = Some(e),
             }
+            match context.references.opamp02_orient(path, source, record, member) {
+                Ok(found) => edits.extend(found),
+                Err(e) => error = Some(e),
+            }
             reasons.extend(context.references.usage_reviews(path, record, member));
             match context.references.usage_changes(path, source, record, member, context.approximate, report) {
                 Ok((found, preserved)) => {

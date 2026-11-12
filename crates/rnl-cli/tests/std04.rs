@@ -200,3 +200,130 @@ Q3  a b vss qnpn
         "{violations:?}"
     );
 }
+
+#[test]
+fn transformer_pins_follow_dotted_first_order() {
+    let all = rnl_view::catalog(
+        &MemoryProvider::default(),
+        &rnl_view::CatalogOptions { all_versions: true, ..Default::default() },
+    );
+    let xfmr = all.symbols.iter().find(|s| s.version == "0.4" && s.symbol == "$TRANSFORMER").unwrap();
+    let pins: Vec<_> =
+        xfmr.pins.iter().map(|p| (serde_json::to_value(&p.terminal).unwrap(), p.at, p.direction)).collect();
+    assert_eq!(
+        pins,
+        vec![
+            (serde_json::json!("p1"), [2.0, 1.0], Some("right")),
+            (serde_json::json!("n1"), [-2.0, 1.0], Some("left")),
+            (serde_json::json!("p2"), [2.0, -1.0], Some("right")),
+            (serde_json::json!("n2"), [-2.0, -1.0], Some("left")),
+        ]
+    );
+}
+
+#[test]
+fn comment_attaches_to_any_kind_or_whole_level_without_drawing() {
+    let text = r#"* non-drawn $COMMENT definition (rnl-std-basic 0.4)
+* @RNL(type="header") {
+*   @VERSION("0.4");
+*   @USE-PACKAGE(name="rnl-std-all", version="0.4");
+* }
+R1 a b 1k
+R2 b 0 2k
+* @RNL {
+*   #R1 @PLACE(0, 4);
+*   #R2 @PLACE(0, -4);
+*   %w = &b @WIRE {#R1::n #R2::p};
+*   %pt = (4, 0);
+*   #R1 @AS(text="precision input resistor") $COMMENT;
+*   #R1:p @AS(text="kelvin sense node") $COMMENT;
+*   &b @AS(text="mid-rail divider node") $COMMENT;
+*   %w @AS(text="short matched interconnect") $COMMENT;
+*   %pt @AS(text="probe pad") $COMMENT;
+*   {#R1 #R2} @AS(text="0.1% ratio pair") $COMMENT;
+*   $COMMENT @ATTACH(text="sheet-level review comment");
+* }
+.end
+"#;
+    let r = read(&MemoryProvider::new().with("t.sp", text), &Options::default());
+    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
+    assert!(by_severity(&r, Severity::Warning).is_empty(), "{:?}", by_severity(&r, Severity::Warning));
+    assert!(by_severity(&r, Severity::Violation).is_empty(), "{:?}", by_severity(&r, Severity::Violation));
+    let lv = level(&r);
+    let comments: Vec<_> = lv.objects.iter().filter(|o| o.definition.as_deref() == Some("$COMMENT")).collect();
+    assert_eq!(comments.len(), 7, "{comments:?}");
+    assert!(comments.iter().all(|o| o.symbol.is_none() && o.symbol_view.is_none() && !o.usage_has_drawing));
+    assert!(comments.iter().any(|o| {
+        o.attach == vec![("target".into(), rnl_runtime::model::Attach::Set(vec![]))]
+            && o.params.iter().any(|(k, v)| k == "text" && v.str().is_some_and(|s| s.contains("sheet-level")))
+    }));
+
+    let zh = r#"* alias-zh $备注
+* @RNL(type="header") {
+*   @VERSION("0.4");
+*   @USE-PACKAGE(name="rnl-std-basic", version="0.4");
+*   @USE-ALIASES(name="alias-zh", version="0.4");
+* }
+R1 a 0 1k
+* @RNL {
+*   #R1(对象) @视作(文本="低温漂电阻") $"备注";
+*   $"备注" @附着(文本="整图说明");
+* }
+.end
+"#;
+    let r_zh = read(&MemoryProvider::new().with("t.sp", zh), &Options::default());
+    assert!(errors(&r_zh).is_empty(), "{:?}", errors(&r_zh));
+    assert_eq!(level(&r_zh).objects.iter().filter(|o| o.definition.as_deref() == Some("$COMMENT")).count(), 2);
+}
+
+#[test]
+fn no_connect_retains_bus_bit_terminal_and_suppresses_fill() {
+    let text = r#"* $NO_CONNECT on bus bit terminal (12.6)
+* @RNL(type="header") {
+*   @VERSION("0.4");
+*   @USE-PACKAGE(name="rnl-std-style", version="0.4");
+*   @USE-PACKAGE(name="rnl-std-basic", version="0.4");
+*   @USE-PACKAGE(name="rnl-std-fill", version="0.4");
+* }
+.subckt reg4 clk d3 d2 d1 d0 q0 q1
+.ends
+.subckt top clk q0
+XU1 clk nc_d3 bus_d2 bus_d1 bus_d0 q0 nc_q1 reg4
+* @RNL {
+*   $REG4_SYM = @DEFINE-SYMBOL(box=[-4, -3, 4, 3]) {
+*     %clk = (-4, -1) @PIN(terminal="clk", direction="left");
+*     %d = (-4, 1) @PIN(terminal=["d3", "d2", "d1", "d0"], direction="left");
+*     %q0 = (4, 1) @PIN(terminal="q0", direction="right");
+*     %q1 = (4, -1) @PIN(terminal="q1", direction="right");
+*     @RECTANGLE {(-3, -3) (3, 3)};
+*     @LINE {(-4, -1) (-3, -1)};
+*     @LINE {(-4, 1) (-3, 1)};
+*     @LINE {(3, 1) (4, 1)};
+*     @LINE {(3, -1) (4, -1)};
+*   };
+*   #XU1 @SET-SYMBOL $REG4_SYM => @PLACE(0, 0);
+*   &clk @WIRE {(-6, -1) #XU1::clk};
+*   {&bus_d2 &bus_d1 &bus_d0} @WIRE {(-8, 1) #XU1::d};
+*   &q0 @WIRE {#XU1::q0 (6, 1)};
+*   %nc_msb = #XU1:d3 @AS $NO_CONNECT;
+*   %nc_q1 = #XU1:q1 @AS $NO_CONNECT;
+* }
+.ends
+.end
+"#;
+    let r = read(&MemoryProvider::new().with("t.sp", text), &Options::solver());
+    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
+    assert!(by_severity(&r, Severity::Warning).is_empty(), "{:?}", by_severity(&r, Severity::Warning));
+    assert!(by_severity(&r, Severity::Violation).is_empty(), "{:?}", by_severity(&r, Severity::Violation));
+    let sub = r.model.levels.iter().find(|l| l.title.contains("top")).unwrap();
+    let nc_msb = sub.objects.iter().find(|o| o.id == "%nc_msb").unwrap();
+    assert_eq!(nc_msb.attach, vec![("t".into(), rnl_runtime::model::Attach::Object("#XU1:2".into()))]);
+    assert_eq!(
+        sub.constraints.iter().filter(|c| c.kind == "ALIGN" && c.status == "unsolved").count(),
+        4,
+        "{:?}",
+        sub.constraints
+    );
+    // nc_q1 suppresses automatic $NET_LABEL_STUB fill on the unwired scalar pin q1
+    assert!(!sub.objects.iter().any(|o| o.definition.as_deref() == Some("$NET_LABEL_STUB")), "{:?}", sub.objects);
+}

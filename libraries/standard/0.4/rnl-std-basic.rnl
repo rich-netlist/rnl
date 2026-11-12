@@ -5,7 +5,7 @@
    Coordinates are y-up; one unit is one grid step, ten Analog Canvas units. The pins of a device
    symbol are named with the standard terminal names of SPICE, in SPICE's order, and bind the
    terminal of that name (6.12, 11.3), so #R1::p is the pin of #R1:p. The transformer takes the
-   terminal order n1 p1 n2 p2; the closed and externally controlled switches take p n cp cn. A
+   terminal order p1 n1 p2 n2; the closed and externally controlled switches take p n cp cn. A
    one-pin virtual part names its pin pin. The header record tells a solver to mark wire junctions
    with $JUNCTION (SOLVER-CONFIG junction, 14.10). */
 @RNL(type="header") {
@@ -97,12 +97,12 @@
     ? @TEXT("${value}", key="value") => @PLACE(1.6, -1.2);
   };
 
-  /* A transformer: two coupled windings, their polarity dots on the right. Terminals: n1 p1 n2 p2. */
+  /* A transformer: two coupled windings, their polarity dots on the right. Terminals: p1 n1 p2 n2. */
   $TRANSFORMER = @DEFINE-SYMBOL(box=[-2, -2.4, 2, 2.4]) {
-    %n1 = (-2, 1) @PIN(terminal="n1", direction="left");
     %p1 = (2, 1) @PIN(terminal="p1", direction="right");
-    %n2 = (-2, -1) @PIN(terminal="n2", direction="left");
+    %n1 = (-2, 1) @PIN(terminal="n1", direction="left");
     %p2 = (2, -1) @PIN(terminal="p2", direction="right");
+    %n2 = (-2, -1) @PIN(terminal="n2", direction="left");
     @LINE {(-2, 1) (-1.2, 1)};
     @ARC(cap="round") {(-1.2, 1) (-1.1121, 0.7879) (-0.9, 0.7)};
     @ARC {(-0.9, 0.7) (-0.6879, 0.7879) (-0.6, 1)};
@@ -457,8 +457,8 @@
   $NET_LABEL = @DEFINE(roles=[["p", "net"]]) {};
   # @SELECT-USAGE(recursive=true) $NET_LABEL => @SET-SYMBOL $NET_LABEL_SYMBOL;
 
-  /* A no-connect mark on a pin left unconnected on purpose; a terminal given for t converts to its pin (5.2.4). */
-  $NO_CONNECT = @DEFINE(roles=[["t", "pin"]]) {
+  /* A no-connect mark on a terminal or pin left unconnected on purpose; a terminal is kept as itself so a mark on a bus bit records which bit is open (12.6). */
+  $NO_CONNECT = @DEFINE(roles=[["t", ["terminal", "pin"]]]) {
     {? ?t} @ALIGN("x");
     {? ?t} @ALIGN("y");
   };
@@ -507,6 +507,9 @@
     %tag_set @ALIGN("x");
     %tag_set @GROUP;
   };
+
+  /* A non-drawn comment attached to any objects, or to the level itself when target is omitted. */
+  $COMMENT = @DEFINE(roles=["{target}"], parameters=[["text", ""]]) {};
 
   /* ---------------------------------------------------------------- stubs (10.5) */
 

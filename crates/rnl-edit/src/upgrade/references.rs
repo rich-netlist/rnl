@@ -24,6 +24,9 @@ pub(super) struct References {
     usages: BTreeSet<(usize, String)>,
     netname_key_objects: BTreeSet<(usize, String)>,
     transconductor_objects: BTreeSet<(usize, String)>,
+    opamp02_levels: BTreeSet<usize>,
+    opamp02_objects: BTreeSet<(usize, String)>,
+    opamp02_oriented: BTreeSet<(usize, String)>,
     legacy: super::legacy::Legacy,
     host_terminals: super::host_terminals::HostTerminals,
     roles: BTreeMap<(usize, String, String), String>,
@@ -209,6 +212,44 @@ impl References {
             }
         }
         result.collections = super::collections::Collections::new(input, &result.readings);
+        if !result.aliases && !result.shadowed.contains("$OPAMP") {
+            let sym02_sources: Vec<_> = input
+                .sources
+                .iter()
+                .filter(|(_, text)| scan_package_decl(text).is_some_and(|(n, v)| n == "rnl-std-symbols" && v == "0.2"))
+                .collect();
+            let known_sym02 = !sym02_sources.is_empty()
+                && sym02_sources.iter().all(|(_, text)| bundled.files.values().any(|orig| orig == text));
+            if known_sym02 {
+                for level in &input.model.levels {
+                    if level.packages.iter().any(|p| p.name == "rnl-std-symbols" && p.version == "0.2") {
+                        result.opamp02_levels.insert(level.level);
+                        for object in &level.objects {
+                            if object.symbol.as_ref().is_some_and(|s| {
+                                s.name == "$OPAMP"
+                                    && matches!(&s.origin, SymbolOrigin::Package(p) if p == "rnl-std-symbols")
+                            }) {
+                                result.opamp02_objects.insert((level.level, object.id.clone()));
+                            }
+                        }
+                    }
+                }
+                for problem in &input.problems {
+                    if !result.opamp02_levels.contains(&problem.level) {
+                        continue;
+                    }
+                    for object in &problem.objects {
+                        if matches!(object.orient, Some(rnl_runtime::problem::OrientSlot::Fixed { .. })) {
+                            if let rnl_runtime::problem::Reference::Name(id) = &object.reference {
+                                if result.opamp02_objects.contains(&(problem.level, id.clone())) {
+                                    result.opamp02_oriented.insert((problem.level, id.clone()));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
         for level in &input.model.levels {
             for object in &level.objects {
                 if let Some(symbol) = &object.symbol {
@@ -539,6 +580,246 @@ impl References {
         let readings =
             self.readings_at(path, record, member.segments[index].start).map(Vec::as_slice).unwrap_or_default();
         self.terminals.edit(source, record, member, index, readings)
+    }
+
+    pub(super) fn opamp02_orient(
+        &self,
+        path: &str,
+        source: &str,
+        record: &Record,
+        member: &rnl_runtime::syntax::Member,
+    ) -> Result<Vec<Edit>, String> {
+        if self.aliases || self.opamp02_levels.is_empty() {
+            return Ok(Vec::new());
+        }
+        let Some(readings) = self.readings_at(path, record, member.start).filter(|r| !r.is_empty()) else {
+            return Ok(Vec::new());
+        };
+        if !readings.iter().all(|l| self.opamp02_levels.contains(l)) {
+            return Ok(Vec::new());
+        }
+        fn matches_set(o: &ObjExpr, readings: &[usize], set: &BTreeSet<(usize, String)>) -> bool {
+            match o {
+                ObjExpr::Ref(r)
+                    if (r.prefix == '#' || r.prefix == '%')
+                        && r.path.is_empty()
+                        && r.sub.is_none()
+                        && r.places.is_none()
+                        && r.number.is_none() =>
+                {
+                    let Some(name) = &r.name else { return false };
+                    let id = format!("{}{}", r.prefix, rnl_runtime::problem::written_name(name));
+                    readings.iter().all(|l| set.contains(&(*l, id.clone())))
+                }
+                ObjExpr::Set(s) => {
+                    !s.members.is_empty()
+                        && s.members.iter().all(|m| {
+                            m.binds.is_empty()
+                                && m.segments.len() == 1
+                                && m.segments[0].call.is_none()
+                                && !m.segments[0].piped
+                                && !m.segments[0].args.is_empty()
+                                && m.segments[0].args.iter().all(|a| matches_set(&a.obj, readings, set))
+                        })
+                }
+                _ => false,
+            }
+        }
+        fn is_bare_level(o: &ObjExpr) -> bool {
+            match o {
+                ObjExpr::Ref(r) => r.prefix == '#' && r.name.is_none() && r.number.is_none() && r.path.is_empty(),
+                ObjExpr::Set(s) => {
+                    s.members.iter().flat_map(|m| &m.segments).flat_map(|seg| &seg.args).any(|a| is_bare_level(&a.obj))
+                }
+                _ => false,
+            }
+        }
+        fn set_opamp_end(segment: &Segment) -> Option<usize> {
+            let call = segment.call.as_ref().filter(|c| c.kw == "SET-SYMBOL")?;
+            let syms: Vec<_> = segment
+                .args
+                .iter()
+                .filter_map(|a| match &a.obj {
+                    ObjExpr::Ref(r) if r.prefix == '$' && r.path.is_empty() && r.sub.is_none() => {
+                        Some((r.name.as_deref()?, r.end))
+                    }
+                    _ => None,
+                })
+                .collect();
+            match syms.as_slice() {
+                [("OPAMP", end)] => Some((*end).max(call.end)),
+                _ => None,
+            }
+        }
+        fn parse_orient_code(s: &str) -> Option<rnl_runtime::geom::Orient> {
+            match s {
+                "left" => Some(rnl_runtime::geom::Orient::R0),
+                "down" => Some(rnl_runtime::geom::Orient::R90),
+                "right" => Some(rnl_runtime::geom::Orient::R180),
+                "up" => Some(rnl_runtime::geom::Orient::R270),
+                _ => rnl_runtime::geom::Orient::parse(s),
+            }
+        }
+        fn flip_orient_value(v: &Value) -> Option<String> {
+            match v {
+                Value::Str(s) => {
+                    let c = parse_orient_code(s)?;
+                    Some(rnl_runtime::problem::written_string(rnl_runtime::geom::Orient::MX.then(c).as_str()))
+                }
+                Value::Arr(items) if !items.is_empty() => {
+                    let flipped = items.iter().map(flip_orient_value).collect::<Option<Vec<_>>>()?;
+                    Some(format!("[{}]", flipped.join(", ")))
+                }
+                _ => None,
+            }
+        }
+        fn flip_orient_call(call: &rnl_runtime::syntax::Call) -> Option<String> {
+            if call.kw != "ORIENT" {
+                return None;
+            }
+            let params = call.params.as_ref()?;
+            if params.positional.is_empty() && params.get("code").is_none() {
+                return None;
+            }
+            let mut parts = Vec::new();
+            if let Some((first, rest)) = params.positional.split_first() {
+                parts.push(flip_orient_value(first)?);
+                parts.extend(rest.iter().map(super::rewrite::value));
+            }
+            for named in &params.named {
+                let k =
+                    if named.quoted { rnl_runtime::problem::written_string(&named.name) } else { named.name.clone() };
+                let v = if named.name == "code" {
+                    flip_orient_value(&named.value)?
+                } else {
+                    super::rewrite::value(&named.value)
+                };
+                parts.push(format!("{k}={v}"));
+            }
+            Some(format!("@ORIENT({})", parts.join(", ")))
+        }
+        let mut edits = Vec::new();
+        let mut pipeline_has_orient = false;
+        for (idx, seg) in member.segments.iter().enumerate() {
+            let Some(call) = seg.call.as_ref().filter(|c| c.kw == "ORIENT") else { continue };
+            let matched = if seg.piped && seg.args.is_empty() {
+                let mut by_sym = None;
+                let mut broken = false;
+                for prev in member.segments[..idx].iter().rev() {
+                    let Some(pcall) = &prev.call else { continue };
+                    if matches!(
+                        pcall.kw.as_str(),
+                        "SELECT-NET" | "SELECT-PIN" | "SELECT-TERMINAL" | "TEXT" | "WIRE" | "BUNDLE"
+                    ) {
+                        broken = true;
+                        break;
+                    }
+                    if pcall.kw == "SET-SYMBOL" {
+                        by_sym = Some(set_opamp_end(prev).is_some());
+                        break;
+                    }
+                }
+                if broken {
+                    false
+                } else if let Some(ok) = by_sym {
+                    ok
+                } else {
+                    let direct: Vec<_> = member.segments[0]
+                        .args
+                        .iter()
+                        .filter(|a| !matches!(&a.obj, ObjExpr::Ref(r) if r.prefix == '$'))
+                        .collect();
+                    !direct.is_empty() && direct.iter().all(|a| matches_set(&a.obj, readings, &self.opamp02_objects))
+                }
+            } else if !seg.piped && !seg.args.is_empty() {
+                seg.args.iter().all(|a| matches_set(&a.obj, readings, &self.opamp02_objects))
+            } else {
+                false
+            };
+            if matched {
+                pipeline_has_orient = true;
+                if let Some(replacement) = flip_orient_call(call) {
+                    edits.push(record_edit(
+                        source,
+                        record,
+                        call.start..call.end,
+                        replacement,
+                        "legacy-symbol-orientation",
+                    )?);
+                }
+            }
+        }
+        if pipeline_has_orient {
+            return Ok(edits);
+        }
+        for (idx, seg) in member.segments.iter().enumerate() {
+            let Some(opamp_end) = set_opamp_end(seg) else {
+                continue;
+            };
+            let direct: Vec<_> =
+                seg.args.iter().filter(|a| !matches!(&a.obj, ObjExpr::Ref(r) if r.prefix == '$')).collect();
+            if !seg.piped {
+                if direct.is_empty() || direct.iter().any(|a| is_bare_level(&a.obj)) {
+                    continue;
+                }
+                if direct.iter().all(|a| matches_set(&a.obj, readings, &self.opamp02_oriented)) {
+                    continue;
+                }
+                edits.push(record_edit(
+                    source,
+                    record,
+                    opamp_end..opamp_end,
+                    " => @ORIENT(\"MX\")".into(),
+                    "legacy-symbol-orientation",
+                )?);
+            } else if direct.is_empty() {
+                let first_direct: Vec<_> = member.segments[0]
+                    .args
+                    .iter()
+                    .filter(|a| !matches!(&a.obj, ObjExpr::Ref(r) if r.prefix == '$'))
+                    .collect();
+                let from_select = member.segments[..idx].iter().any(|s| {
+                    s.call.as_ref().is_some_and(|c| {
+                        matches!(c.kw.as_str(), "SELECT-INSTANCE" | "SELECT-USAGE" | "SELECT-ANCESTOR-USAGE")
+                    })
+                });
+                if !from_select && first_direct.iter().any(|a| is_bare_level(&a.obj)) {
+                    continue;
+                }
+                if !from_select
+                    && !first_direct.is_empty()
+                    && !member.segments[..idx]
+                        .iter()
+                        .any(|s| s.call.as_ref().is_some_and(|c| matches!(c.kw.as_str(), "AS" | "ATTACH")))
+                    && first_direct.iter().all(|a| matches_set(&a.obj, readings, &self.opamp02_oriented))
+                {
+                    continue;
+                }
+                let bound_usage_oriented = member.binds.iter().any(|b| {
+                    b.prefix == '%' && {
+                        let id = format!("%{}", rnl_runtime::problem::written_name(&b.name));
+                        readings.iter().all(|l| self.opamp02_oriented.contains(&(*l, id.clone())))
+                    }
+                });
+                if bound_usage_oriented {
+                    continue;
+                }
+                let any_oriented = readings.iter().any(|l| self.opamp02_oriented.iter().any(|(lvl, _)| lvl == l));
+                let suffix = if from_select && any_oriented {
+                    " => @ORIENT(\"MX\", priority=\"low\")"
+                } else {
+                    " => @ORIENT(\"MX\")"
+                };
+                edits.push(record_edit(
+                    source,
+                    record,
+                    opamp_end..opamp_end,
+                    suffix.into(),
+                    "legacy-symbol-orientation",
+                )?);
+            }
+        }
+        Ok(edits)
     }
 
     pub(super) fn unresolved_pins(

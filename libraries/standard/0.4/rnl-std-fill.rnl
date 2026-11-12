@@ -21,6 +21,7 @@
   # @SELECT-USAGE(recursive=true) $NET_LABEL => @SELECT-PIN(recursive=true) => @ADD-TO %own_pin_set;
   # @SELECT-USAGE(recursive=true) $IO_PORT => @SELECT-PIN(recursive=true) => @ADD-TO %own_pin_set;
   # @SELECT-USAGE(recursive=true) $NO_CONNECT => @SELECT-PIN(role="t", recursive=true) => @ADD-TO %own_pin_set;
+  # @SELECT-USAGE(recursive=true) $NO_CONNECT => @SELECT-TERMINAL(role="t", recursive=true) => @SELECT-PIN(recursive=true) => @ADD-TO %own_pin_set;
 
   /* Drawn four-terminal MOS bulk pins get net-label stubs rather than ground, supply or bias stubs. */
   %bulk_pin_set = # @SELECT-TERMINAL(type="nmos", terminal="b", recursive=true) => @SELECT-PIN(recursive=true);
