@@ -36,6 +36,61 @@
     ? @TEXT("", key="model", halign="middle", valign="top") => @PLACE(0, -1.2);
   };
 
+
+  /* A light-emitting diode (LED). Terminals: a k. */
+  $LED = @DEFINE-SYMBOL(box=[-2, -1, 2, 1.8]) {
+    %a = (-2, 0) @PIN(terminal="a", direction="left");
+    %k = (2, 0) @PIN(terminal="k", direction="right");
+    @LINE {(-2, 0) (-0.8333, 0)};
+    @LINE {(-0.8333, 0.675) (-0.8333, -0.675) (0.5833, 0) (-0.8333, 0.675)};
+    @LINE(linewidth=0.24) {(0.6667, 0.7333) (0.6667, -0.7333)};
+    @LINE {(0.6667, 0) (2, 0)};
+    @LINE {(-0.5, 0.9) (-0.1, 1.3)};
+    @LINE(fill="linecolor", linestyle="none") {(0.1, 1.5) (-0.26, 1.38) (-0.02, 1.14) (0.1, 1.5)};
+    @LINE {(0.1, 0.9) (0.5, 1.3)};
+    @LINE(fill="linecolor", linestyle="none") {(0.7, 1.5) (0.34, 1.38) (0.58, 1.14) (0.7, 1.5)};
+    ? @TEXT("${name}", key="name", halign="middle") => @PLACE(0, 1.9);
+    ? @TEXT("", key="model", halign="middle", valign="top") => @PLACE(0, -1.1);
+  };
+
+  /* A Schottky barrier diode. Terminals: a k. */
+  $SCHOTTKY_DIODE = @DEFINE-SYMBOL(box=[-2, -1, 2, 1]) {
+    %a = (-2, 0) @PIN(terminal="a", direction="left");
+    %k = (2, 0) @PIN(terminal="k", direction="right");
+    @LINE {(-2, 0) (-0.8333, 0)};
+    @LINE {(-0.8333, 0.675) (-0.8333, -0.675) (0.5833, 0) (-0.8333, 0.675)};
+    @LINE(linewidth=0.24) {(1, 0.4333) (1, 0.7333) (0.6667, 0.7333) (0.6667, -0.7333) (0.3333, -0.7333) (0.3333, -0.4333)};
+    @LINE {(0.6667, 0) (2, 0)};
+    ? @TEXT("${name}", key="name", halign="middle") => @PLACE(0, 1.1);
+    ? @TEXT("", key="model", halign="middle", valign="top") => @PLACE(0, -1.1);
+  };
+
+  /* A Shockley four-layer diode. Terminals: a k. */
+  $SHOCKLEY_DIODE = @DEFINE-SYMBOL(box=[-2, -1, 2, 1]) {
+    %a = (-2, 0) @PIN(terminal="a", direction="left");
+    %k = (2, 0) @PIN(terminal="k", direction="right");
+    @LINE {(-2, 0) (-0.8333, 0)};
+    @LINE {(-0.8333, 0.675) (-0.8333, -0.675) (0.5833, 0) (-0.8333, 0.675)};
+    @LINE(linewidth=0.24) {(0.6667, 0.7333) (0.6667, -0.7333) (0, -0.7333)};
+    @LINE {(0.6667, 0) (2, 0)};
+    ? @TEXT("${name}", key="name", halign="middle") => @PLACE(0, 1.1);
+    ? @TEXT("", key="model", halign="middle", valign="top") => @PLACE(0, -1.1);
+  };
+
+  /* A programmable unijunction transistor (PUT). Terminals: a g k. */
+  $PUT = @DEFINE-SYMBOL(box=[-2, -1, 2, 2]) {
+    %a = (-2, 0) @PIN(terminal="a", direction="left");
+    %g = (-1, 2) @PIN(terminal="g", direction="up");
+    %k = (2, 0) @PIN(terminal="k", direction="right");
+    @LINE {(-2, 0) (-0.8333, 0)};
+    @LINE {(-0.8333, 0.675) (-0.8333, -0.675) (0.5833, 0) (-0.8333, 0.675)};
+    @LINE(linewidth=0.24) {(0.6667, 0.7333) (0.6667, -0.7333)};
+    @LINE {(0.6667, 0) (2, 0)};
+    @LINE {(-1, 2) (-1, 1.2) (-0.55, 0.54)};
+    ? @TEXT("${name}", key="name", halign="middle") => @PLACE(0.7, 1.45);
+    ? @TEXT("", key="model", halign="middle", valign="top") => @PLACE(0, -1.1);
+  };
+
   /* ---------------------------------------------------------------- MOS transistors */
 
   /* An NMOS transistor of three pins, its bulk not drawn. Terminals: d g s. */
@@ -324,5 +379,19 @@
     %s = (0, 2) @PIN(terminal="s", direction="up");
     %JFET_CHANNEL;
     @LINE(fill="linecolor", linestyle="none") {(-2.4, 0) (-1.76, 0.35) (-1.76, -0.35) (-2.4, 0)};
+  };
+
+  /* A unijunction transistor (UJT), b2 above and b1 below. Terminals: e b1 b2. */
+  $UJT = @DEFINE-SYMBOL(box=[-2, -2, 1.4, 2]) {
+    %e = (-2, -1) @PIN(terminal="e", direction="left");
+    %b1 = (1, -2) @PIN(terminal="b1", direction="down");
+    %b2 = (1, 2) @PIN(terminal="b2", direction="up");
+    @LINE {(-0.4, 0.8) (1, 0.8) (1, 2)};
+    @LINE {(-0.4, -0.8) (1, -0.8) (1, -2)};
+    @LINE(linewidth=0.24) {(-0.4, 1.25) (-0.4, -1.25)};
+    @LINE {(-2, -1) (-1.4, -1) (-0.496, -0.322)};
+    @LINE(fill="linecolor", linestyle="none") {(-0.496, -0.322) (-0.846, -1.022) (-1.266, -0.462) (-0.496, -0.322)};
+    ? @TEXT("${name}", key="name") => @PLACE(1.5, 1.05);
+    ? @TEXT("", key="model") => @PLACE(1.5, -1.75);
   };
 }

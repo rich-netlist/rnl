@@ -410,4 +410,497 @@
     (2.1, -1) @TEXT("\overline{Q}", halign="end", valign="middle", size=1.03, bold=true, italic=true);
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(0, 2.85);
   };
+
+  /* ---------------------------------------------------------------- *_SUPPLY variants with integer-grid vp and vn */
+
+  /* A AND gate of 2 inputs with supply pins: a, b, y, vp, vn. */
+  $AND_2INPUT_SUPPLY = @DEFINE-SYMBOL(box=[-3, -3, 2, 3]) {
+    %a = (-3, 1) @PIN(terminal="a", direction="left");
+    %b = (-3, -1) @PIN(terminal="b", direction="left");
+    %y = (2, 0) @PIN(terminal="y", direction="right");
+    %vp = (-1, 3) @PIN(terminal="vp", direction="up");
+    %vn = (-1, -3) @PIN(terminal="vn", direction="down");
+    @LINE(linewidth=0.24) {(0, 1.5) (-2, 1.5) (-2, -1.5) (0, -1.5)};
+    @ARC(linewidth=0.24) {(0, 1.5) (1.5, 0) (0, -1.5)};
+    @LINE {(-3, 1) (-2, 1)};
+    @LINE {(-3, -1) (-2, -1)};
+    @LINE {(1.5, 0) (2, 0)};
+    @LINE {(-1, 1.5) (-1, 3)};
+    @LINE {(-1, -1.5) (-1, -3)};
+    ? @TEXT("${name}", key="name", halign="middle") => @PLACE(1.1, 2);
+  };
+
+  /* A AND gate of 3 inputs with supply pins: a, b, c, y, vp, vn. */
+  $AND_3INPUT_SUPPLY = @DEFINE-SYMBOL(box=[-3, -3, 2, 3]) {
+    %a = (-3, 1) @PIN(terminal="a", direction="left");
+    %b = (-3, 0) @PIN(terminal="b", direction="left");
+    %c = (-3, -1) @PIN(terminal="c", direction="left");
+    %y = (2, 0) @PIN(terminal="y", direction="right");
+    %vp = (-1, 3) @PIN(terminal="vp", direction="up");
+    %vn = (-1, -3) @PIN(terminal="vn", direction="down");
+    @LINE(linewidth=0.24) {(0, 1.5) (-2, 1.5) (-2, -1.5) (0, -1.5)};
+    @ARC(linewidth=0.24) {(0, 1.5) (1.5, 0) (0, -1.5)};
+    @LINE {(-3, 1) (-2, 1)};
+    @LINE {(-3, 0) (-2, 0)};
+    @LINE {(-3, -1) (-2, -1)};
+    @LINE {(1.5, 0) (2, 0)};
+    @LINE {(-1, 1.5) (-1, 3)};
+    @LINE {(-1, -1.5) (-1, -3)};
+    ? @TEXT("${name}", key="name", halign="middle") => @PLACE(1.1, 2);
+  };
+
+  /* A AND gate of 4 inputs with supply pins: a, b, c, d, y, vp, vn. */
+  $AND_4INPUT_SUPPLY = @DEFINE-SYMBOL(box=[-3, -3, 2, 3]) {
+    %a = (-3, 2) @PIN(terminal="a", direction="left");
+    %b = (-3, 1) @PIN(terminal="b", direction="left");
+    %c = (-3, -1) @PIN(terminal="c", direction="left");
+    %d = (-3, -2) @PIN(terminal="d", direction="left");
+    %y = (2, 0) @PIN(terminal="y", direction="right");
+    %vp = (-1, 3) @PIN(terminal="vp", direction="up");
+    %vn = (-1, -3) @PIN(terminal="vn", direction="down");
+    @LINE(linewidth=0.24) {(0, 1.5) (-2, 1.5) (-2, -1.5) (0, -1.5)};
+    @ARC(linewidth=0.24) {(0, 1.5) (1.5, 0) (0, -1.5)};
+    @LINE {(-3, 2) (-2, 2)};
+    @LINE {(-3, 1) (-2, 1)};
+    @LINE {(-3, -1) (-2, -1)};
+    @LINE {(-3, -2) (-2, -2)};
+    @LINE(linewidth=0.24) {(-2, 2) (-2, 1.5)};
+    @LINE(linewidth=0.24) {(-2, -1.5) (-2, -2)};
+    @LINE {(1.5, 0) (2, 0)};
+    @LINE {(-1, 1.5) (-1, 3)};
+    @LINE {(-1, -1.5) (-1, -3)};
+    ? @TEXT("${name}", key="name", halign="middle") => @PLACE(1.1, 2);
+  };
+
+  /* A NAND gate of 2 inputs with supply pins: a, b, y, vp, vn. */
+  $NAND_2INPUT_SUPPLY = @DEFINE-SYMBOL(box=[-3, -3, 3, 3]) {
+    %a = (-3, 1) @PIN(terminal="a", direction="left");
+    %b = (-3, -1) @PIN(terminal="b", direction="left");
+    %y = (3, 0) @PIN(terminal="y", direction="right");
+    %vp = (-1, 3) @PIN(terminal="vp", direction="up");
+    %vn = (-1, -3) @PIN(terminal="vn", direction="down");
+    @LINE(linewidth=0.24) {(0, 1.5) (-2, 1.5) (-2, -1.5) (0, -1.5)};
+    @ARC(linewidth=0.24) {(0, 1.5) (1.5, 0) (0, -1.5)};
+    (2.05, 0) @CIRCLE(radius=0.3375, linewidth=0.24);
+    @LINE {(-3, 1) (-2, 1)};
+    @LINE {(-3, -1) (-2, -1)};
+    @LINE {(2.3875, 0) (3, 0)};
+    @LINE {(-1, 1.5) (-1, 3)};
+    @LINE {(-1, -1.5) (-1, -3)};
+    ? @TEXT("${name}", key="name", halign="middle") => @PLACE(1.1, 2);
+  };
+
+  /* A NAND gate of 3 inputs with supply pins: a, b, c, y, vp, vn. */
+  $NAND_3INPUT_SUPPLY = @DEFINE-SYMBOL(box=[-3, -3, 3, 3]) {
+    %a = (-3, 1) @PIN(terminal="a", direction="left");
+    %b = (-3, 0) @PIN(terminal="b", direction="left");
+    %c = (-3, -1) @PIN(terminal="c", direction="left");
+    %y = (3, 0) @PIN(terminal="y", direction="right");
+    %vp = (-1, 3) @PIN(terminal="vp", direction="up");
+    %vn = (-1, -3) @PIN(terminal="vn", direction="down");
+    @LINE(linewidth=0.24) {(0, 1.5) (-2, 1.5) (-2, -1.5) (0, -1.5)};
+    @ARC(linewidth=0.24) {(0, 1.5) (1.5, 0) (0, -1.5)};
+    (2.05, 0) @CIRCLE(radius=0.3375, linewidth=0.24);
+    @LINE {(-3, 1) (-2, 1)};
+    @LINE {(-3, 0) (-2, 0)};
+    @LINE {(-3, -1) (-2, -1)};
+    @LINE {(2.3875, 0) (3, 0)};
+    @LINE {(-1, 1.5) (-1, 3)};
+    @LINE {(-1, -1.5) (-1, -3)};
+    ? @TEXT("${name}", key="name", halign="middle") => @PLACE(1.1, 2);
+  };
+
+  /* A NAND gate of 4 inputs with supply pins: a, b, c, d, y, vp, vn. */
+  $NAND_4INPUT_SUPPLY = @DEFINE-SYMBOL(box=[-3, -3, 3, 3]) {
+    %a = (-3, 2) @PIN(terminal="a", direction="left");
+    %b = (-3, 1) @PIN(terminal="b", direction="left");
+    %c = (-3, -1) @PIN(terminal="c", direction="left");
+    %d = (-3, -2) @PIN(terminal="d", direction="left");
+    %y = (3, 0) @PIN(terminal="y", direction="right");
+    %vp = (-1, 3) @PIN(terminal="vp", direction="up");
+    %vn = (-1, -3) @PIN(terminal="vn", direction="down");
+    @LINE(linewidth=0.24) {(0, 1.5) (-2, 1.5) (-2, -1.5) (0, -1.5)};
+    @ARC(linewidth=0.24) {(0, 1.5) (1.5, 0) (0, -1.5)};
+    (2.05, 0) @CIRCLE(radius=0.3375, linewidth=0.24);
+    @LINE {(-3, 2) (-2, 2)};
+    @LINE {(-3, 1) (-2, 1)};
+    @LINE {(-3, -1) (-2, -1)};
+    @LINE {(-3, -2) (-2, -2)};
+    @LINE(linewidth=0.24) {(-2, 2) (-2, 1.5)};
+    @LINE(linewidth=0.24) {(-2, -1.5) (-2, -2)};
+    @LINE {(2.3875, 0) (3, 0)};
+    @LINE {(-1, 1.5) (-1, 3)};
+    @LINE {(-1, -1.5) (-1, -3)};
+    ? @TEXT("${name}", key="name", halign="middle") => @PLACE(1.1, 2);
+  };
+
+  /* A OR gate of 2 inputs with supply pins: a, b, y, vp, vn. */
+  $OR_2INPUT_SUPPLY = @DEFINE-SYMBOL(box=[-3, -3, 2, 3]) {
+    %a = (-3, 1) @PIN(terminal="a", direction="left");
+    %b = (-3, -1) @PIN(terminal="b", direction="left");
+    %y = (2, 0) @PIN(terminal="y", direction="right");
+    %vp = (-1, 3) @PIN(terminal="vp", direction="up");
+    %vn = (-1, -3) @PIN(terminal="vn", direction="down");
+    @ARC(linewidth=0.24, cap="round") {(-2, 1.78) (-1.25, 0) (-2, -1.78)};
+    @ARC(linewidth=0.24, cap="round") {(-2, 1.78) (0.03, 1.18) (1.58, 0)};
+    @ARC(linewidth=0.24, cap="round") {(-2, -1.78) (0.03, -1.18) (1.58, 0)};
+    @LINE {(-3, 1) (-1.4599, 1)};
+    @LINE {(-3, -1) (-1.4599, -1)};
+    @LINE {(1.58, 0) (2, 0)};
+    @LINE {(-1, 1.589) (-1, 3)};
+    @LINE {(-1, -1.589) (-1, -3)};
+    ? @TEXT("${name}", key="name", halign="middle") => @PLACE(1.1, 2);
+  };
+
+  /* A OR gate of 3 inputs with supply pins: a, b, c, y, vp, vn. */
+  $OR_3INPUT_SUPPLY = @DEFINE-SYMBOL(box=[-3, -3, 2, 3]) {
+    %a = (-3, 1) @PIN(terminal="a", direction="left");
+    %b = (-3, 0) @PIN(terminal="b", direction="left");
+    %c = (-3, -1) @PIN(terminal="c", direction="left");
+    %y = (2, 0) @PIN(terminal="y", direction="right");
+    %vp = (-1, 3) @PIN(terminal="vp", direction="up");
+    %vn = (-1, -3) @PIN(terminal="vn", direction="down");
+    @ARC(linewidth=0.24, cap="round") {(-2, 1.78) (-1.25, 0) (-2, -1.78)};
+    @ARC(linewidth=0.24, cap="round") {(-2, 1.78) (0.03, 1.18) (1.58, 0)};
+    @ARC(linewidth=0.24, cap="round") {(-2, -1.78) (0.03, -1.18) (1.58, 0)};
+    @LINE {(-3, 1) (-1.4599, 1)};
+    @LINE {(-3, 0) (-1.25, 0)};
+    @LINE {(-3, -1) (-1.4599, -1)};
+    @LINE {(1.58, 0) (2, 0)};
+    @LINE {(-1, 1.589) (-1, 3)};
+    @LINE {(-1, -1.589) (-1, -3)};
+    ? @TEXT("${name}", key="name", halign="middle") => @PLACE(1.1, 2);
+  };
+
+  /* A OR gate of 4 inputs with supply pins: a, b, c, d, y, vp, vn. */
+  $OR_4INPUT_SUPPLY = @DEFINE-SYMBOL(box=[-3, -3, 2, 3]) {
+    %a = (-3, 2) @PIN(terminal="a", direction="left");
+    %b = (-3, 1) @PIN(terminal="b", direction="left");
+    %c = (-3, -1) @PIN(terminal="c", direction="left");
+    %d = (-3, -2) @PIN(terminal="d", direction="left");
+    %y = (2, 0) @PIN(terminal="y", direction="right");
+    %vp = (-1, 3) @PIN(terminal="vp", direction="up");
+    %vn = (-1, -3) @PIN(terminal="vn", direction="down");
+    @ARC(linewidth=0.24, cap="round") {(-2, 1.78) (-1.25, 0) (-2, -1.78)};
+    @ARC(linewidth=0.24, cap="round") {(-2, 1.78) (0.03, 1.18) (1.58, 0)};
+    @ARC(linewidth=0.24, cap="round") {(-2, -1.78) (0.03, -1.18) (1.58, 0)};
+    @LINE {(-3, 2) (-2, 2)};
+    @LINE {(-3, 1) (-1.4599, 1)};
+    @LINE {(-3, -1) (-1.4599, -1)};
+    @LINE {(-3, -2) (-2, -2)};
+    @LINE(linewidth=0.24, cap="round") {(-2, 2) (-2, 1.78)};
+    @LINE(linewidth=0.24, cap="round") {(-2, -1.78) (-2, -2)};
+    @LINE {(1.58, 0) (2, 0)};
+    @LINE {(-1, 1.589) (-1, 3)};
+    @LINE {(-1, -1.589) (-1, -3)};
+    ? @TEXT("${name}", key="name", halign="middle") => @PLACE(1.1, 2);
+  };
+
+  /* A NOR gate of 2 inputs with supply pins: a, b, y, vp, vn. */
+  $NOR_2INPUT_SUPPLY = @DEFINE-SYMBOL(box=[-3, -3, 3, 3]) {
+    %a = (-3, 1) @PIN(terminal="a", direction="left");
+    %b = (-3, -1) @PIN(terminal="b", direction="left");
+    %y = (3, 0) @PIN(terminal="y", direction="right");
+    %vp = (-1, 3) @PIN(terminal="vp", direction="up");
+    %vn = (-1, -3) @PIN(terminal="vn", direction="down");
+    @ARC(linewidth=0.24, cap="round") {(-2, 1.78) (-1.25, 0) (-2, -1.78)};
+    @ARC(linewidth=0.24, cap="round") {(-2, 1.78) (0.03, 1.18) (1.58, 0)};
+    @ARC(linewidth=0.24, cap="round") {(-2, -1.78) (0.03, -1.18) (1.58, 0)};
+    (2, 0) @CIRCLE(radius=0.3375, linewidth=0.24);
+    @LINE {(-3, 1) (-1.4599, 1)};
+    @LINE {(-3, -1) (-1.4599, -1)};
+    @LINE {(2.3375, 0) (3, 0)};
+    @LINE {(-1, 1.589) (-1, 3)};
+    @LINE {(-1, -1.589) (-1, -3)};
+    ? @TEXT("${name}", key="name", halign="middle") => @PLACE(1.1, 2);
+  };
+
+  /* A NOR gate of 3 inputs with supply pins: a, b, c, y, vp, vn. */
+  $NOR_3INPUT_SUPPLY = @DEFINE-SYMBOL(box=[-3, -3, 3, 3]) {
+    %a = (-3, 1) @PIN(terminal="a", direction="left");
+    %b = (-3, 0) @PIN(terminal="b", direction="left");
+    %c = (-3, -1) @PIN(terminal="c", direction="left");
+    %y = (3, 0) @PIN(terminal="y", direction="right");
+    %vp = (-1, 3) @PIN(terminal="vp", direction="up");
+    %vn = (-1, -3) @PIN(terminal="vn", direction="down");
+    @ARC(linewidth=0.24, cap="round") {(-2, 1.78) (-1.25, 0) (-2, -1.78)};
+    @ARC(linewidth=0.24, cap="round") {(-2, 1.78) (0.03, 1.18) (1.58, 0)};
+    @ARC(linewidth=0.24, cap="round") {(-2, -1.78) (0.03, -1.18) (1.58, 0)};
+    (2, 0) @CIRCLE(radius=0.3375, linewidth=0.24);
+    @LINE {(-3, 1) (-1.4599, 1)};
+    @LINE {(-3, 0) (-1.25, 0)};
+    @LINE {(-3, -1) (-1.4599, -1)};
+    @LINE {(2.3375, 0) (3, 0)};
+    @LINE {(-1, 1.589) (-1, 3)};
+    @LINE {(-1, -1.589) (-1, -3)};
+    ? @TEXT("${name}", key="name", halign="middle") => @PLACE(1.1, 2);
+  };
+
+  /* A NOR gate of 4 inputs with supply pins: a, b, c, d, y, vp, vn. */
+  $NOR_4INPUT_SUPPLY = @DEFINE-SYMBOL(box=[-3, -3, 3, 3]) {
+    %a = (-3, 2) @PIN(terminal="a", direction="left");
+    %b = (-3, 1) @PIN(terminal="b", direction="left");
+    %c = (-3, -1) @PIN(terminal="c", direction="left");
+    %d = (-3, -2) @PIN(terminal="d", direction="left");
+    %y = (3, 0) @PIN(terminal="y", direction="right");
+    %vp = (-1, 3) @PIN(terminal="vp", direction="up");
+    %vn = (-1, -3) @PIN(terminal="vn", direction="down");
+    @ARC(linewidth=0.24, cap="round") {(-2, 1.78) (-1.25, 0) (-2, -1.78)};
+    @ARC(linewidth=0.24, cap="round") {(-2, 1.78) (0.03, 1.18) (1.58, 0)};
+    @ARC(linewidth=0.24, cap="round") {(-2, -1.78) (0.03, -1.18) (1.58, 0)};
+    (2, 0) @CIRCLE(radius=0.3375, linewidth=0.24);
+    @LINE {(-3, 2) (-2, 2)};
+    @LINE {(-3, 1) (-1.4599, 1)};
+    @LINE {(-3, -1) (-1.4599, -1)};
+    @LINE {(-3, -2) (-2, -2)};
+    @LINE(linewidth=0.24, cap="round") {(-2, 2) (-2, 1.78)};
+    @LINE(linewidth=0.24, cap="round") {(-2, -1.78) (-2, -2)};
+    @LINE {(2.3375, 0) (3, 0)};
+    @LINE {(-1, 1.589) (-1, 3)};
+    @LINE {(-1, -1.589) (-1, -3)};
+    ? @TEXT("${name}", key="name", halign="middle") => @PLACE(1.1, 2);
+  };
+
+  /* A XOR gate of 2 inputs with supply pins: a, b, y, vp, vn. */
+  $XOR_2INPUT_SUPPLY = @DEFINE-SYMBOL(box=[-3, -3, 3, 3]) {
+    %a = (-3, 1) @PIN(terminal="a", direction="left");
+    %b = (-3, -1) @PIN(terminal="b", direction="left");
+    %y = (3, 0) @PIN(terminal="y", direction="right");
+    %vp = (0, 3) @PIN(terminal="vp", direction="up");
+    %vn = (0, -3) @PIN(terminal="vn", direction="down");
+    @ARC(linewidth=0.24, cap="round") {(-1.35, 1.78) (-0.6, 0) (-1.35, -1.78)};
+    @ARC(linewidth=0.24, cap="round") {(-1.35, 1.78) (0.68, 1.18) (2.23, 0)};
+    @ARC(linewidth=0.24, cap="round") {(-1.35, -1.78) (0.68, -1.18) (2.23, 0)};
+    @ARC(linewidth=0.24) {(-2, 1.78) (-1.25, 0) (-2, -1.78)};
+    @LINE {(-3, 1) (-1.4599, 1)};
+    @LINE {(-3, -1) (-1.4599, -1)};
+    @LINE {(2.23, 0) (3, 0)};
+    @LINE {(0, 1.4761) (0, 3)};
+    @LINE {(0, -1.4761) (0, -3)};
+    ? @TEXT("${name}", key="name", halign="middle") => @PLACE(1.8, 2);
+  };
+
+  /* A XOR gate of 3 inputs with supply pins: a, b, c, y, vp, vn. */
+  $XOR_3INPUT_SUPPLY = @DEFINE-SYMBOL(box=[-3, -3, 3, 3]) {
+    %a = (-3, 1) @PIN(terminal="a", direction="left");
+    %b = (-3, 0) @PIN(terminal="b", direction="left");
+    %c = (-3, -1) @PIN(terminal="c", direction="left");
+    %y = (3, 0) @PIN(terminal="y", direction="right");
+    %vp = (0, 3) @PIN(terminal="vp", direction="up");
+    %vn = (0, -3) @PIN(terminal="vn", direction="down");
+    @ARC(linewidth=0.24, cap="round") {(-1.35, 1.78) (-0.6, 0) (-1.35, -1.78)};
+    @ARC(linewidth=0.24, cap="round") {(-1.35, 1.78) (0.68, 1.18) (2.23, 0)};
+    @ARC(linewidth=0.24, cap="round") {(-1.35, -1.78) (0.68, -1.18) (2.23, 0)};
+    @ARC(linewidth=0.24) {(-2, 1.78) (-1.25, 0) (-2, -1.78)};
+    @LINE {(-3, 1) (-1.4599, 1)};
+    @LINE {(-3, 0) (-1.25, 0)};
+    @LINE {(-3, -1) (-1.4599, -1)};
+    @LINE {(2.23, 0) (3, 0)};
+    @LINE {(0, 1.4761) (0, 3)};
+    @LINE {(0, -1.4761) (0, -3)};
+    ? @TEXT("${name}", key="name", halign="middle") => @PLACE(1.8, 2);
+  };
+
+  /* A XOR gate of 4 inputs with supply pins: a, b, c, d, y, vp, vn. */
+  $XOR_4INPUT_SUPPLY = @DEFINE-SYMBOL(box=[-3, -3, 3, 3]) {
+    %a = (-3, 2) @PIN(terminal="a", direction="left");
+    %b = (-3, 1) @PIN(terminal="b", direction="left");
+    %c = (-3, -1) @PIN(terminal="c", direction="left");
+    %d = (-3, -2) @PIN(terminal="d", direction="left");
+    %y = (3, 0) @PIN(terminal="y", direction="right");
+    %vp = (0, 3) @PIN(terminal="vp", direction="up");
+    %vn = (0, -3) @PIN(terminal="vn", direction="down");
+    @ARC(linewidth=0.24, cap="round") {(-1.35, 1.78) (-0.6, 0) (-1.35, -1.78)};
+    @ARC(linewidth=0.24, cap="round") {(-1.35, 1.78) (0.68, 1.18) (2.23, 0)};
+    @ARC(linewidth=0.24, cap="round") {(-1.35, -1.78) (0.68, -1.18) (2.23, 0)};
+    @ARC(linewidth=0.24) {(-2, 1.78) (-1.25, 0) (-2, -1.78)};
+    @LINE {(-3, 2) (-2, 2)};
+    @LINE {(-3, 1) (-1.4599, 1)};
+    @LINE {(-3, -1) (-1.4599, -1)};
+    @LINE {(-3, -2) (-2, -2)};
+    @LINE(linewidth=0.24, cap="round") {(-2, 2) (-2, 1.78)};
+    @LINE(linewidth=0.24, cap="round") {(-2, -1.78) (-2, -2)};
+    @LINE {(2.23, 0) (3, 0)};
+    @LINE {(0, 1.4761) (0, 3)};
+    @LINE {(0, -1.4761) (0, -3)};
+    ? @TEXT("${name}", key="name", halign="middle") => @PLACE(1.8, 2);
+  };
+
+  /* A XNOR gate of 2 inputs with supply pins: a, b, y, vp, vn. */
+  $XNOR_2INPUT_SUPPLY = @DEFINE-SYMBOL(box=[-3, -3, 4, 3]) {
+    %a = (-3, 1) @PIN(terminal="a", direction="left");
+    %b = (-3, -1) @PIN(terminal="b", direction="left");
+    %y = (4, 0) @PIN(terminal="y", direction="right");
+    %vp = (0, 3) @PIN(terminal="vp", direction="up");
+    %vn = (0, -3) @PIN(terminal="vn", direction="down");
+    @ARC(linewidth=0.24, cap="round") {(-1.35, 1.78) (-0.6, 0) (-1.35, -1.78)};
+    @ARC(linewidth=0.24, cap="round") {(-1.35, 1.78) (0.68, 1.18) (2.23, 0)};
+    @ARC(linewidth=0.24, cap="round") {(-1.35, -1.78) (0.68, -1.18) (2.23, 0)};
+    @ARC(linewidth=0.24) {(-2, 1.78) (-1.25, 0) (-2, -1.78)};
+    (2.65, 0) @CIRCLE(radius=0.3375, linewidth=0.24);
+    @LINE {(-3, 1) (-1.4599, 1)};
+    @LINE {(-3, -1) (-1.4599, -1)};
+    @LINE {(2.9875, 0) (4, 0)};
+    @LINE {(0, 1.4761) (0, 3)};
+    @LINE {(0, -1.4761) (0, -3)};
+    ? @TEXT("${name}", key="name", halign="middle") => @PLACE(1.8, 2);
+  };
+
+  /* A XNOR gate of 3 inputs with supply pins: a, b, c, y, vp, vn. */
+  $XNOR_3INPUT_SUPPLY = @DEFINE-SYMBOL(box=[-3, -3, 4, 3]) {
+    %a = (-3, 1) @PIN(terminal="a", direction="left");
+    %b = (-3, 0) @PIN(terminal="b", direction="left");
+    %c = (-3, -1) @PIN(terminal="c", direction="left");
+    %y = (4, 0) @PIN(terminal="y", direction="right");
+    %vp = (0, 3) @PIN(terminal="vp", direction="up");
+    %vn = (0, -3) @PIN(terminal="vn", direction="down");
+    @ARC(linewidth=0.24, cap="round") {(-1.35, 1.78) (-0.6, 0) (-1.35, -1.78)};
+    @ARC(linewidth=0.24, cap="round") {(-1.35, 1.78) (0.68, 1.18) (2.23, 0)};
+    @ARC(linewidth=0.24, cap="round") {(-1.35, -1.78) (0.68, -1.18) (2.23, 0)};
+    @ARC(linewidth=0.24) {(-2, 1.78) (-1.25, 0) (-2, -1.78)};
+    (2.65, 0) @CIRCLE(radius=0.3375, linewidth=0.24);
+    @LINE {(-3, 1) (-1.4599, 1)};
+    @LINE {(-3, 0) (-1.25, 0)};
+    @LINE {(-3, -1) (-1.4599, -1)};
+    @LINE {(2.9875, 0) (4, 0)};
+    @LINE {(0, 1.4761) (0, 3)};
+    @LINE {(0, -1.4761) (0, -3)};
+    ? @TEXT("${name}", key="name", halign="middle") => @PLACE(1.8, 2);
+  };
+
+  /* A XNOR gate of 4 inputs with supply pins: a, b, c, d, y, vp, vn. */
+  $XNOR_4INPUT_SUPPLY = @DEFINE-SYMBOL(box=[-3, -3, 4, 3]) {
+    %a = (-3, 2) @PIN(terminal="a", direction="left");
+    %b = (-3, 1) @PIN(terminal="b", direction="left");
+    %c = (-3, -1) @PIN(terminal="c", direction="left");
+    %d = (-3, -2) @PIN(terminal="d", direction="left");
+    %y = (4, 0) @PIN(terminal="y", direction="right");
+    %vp = (0, 3) @PIN(terminal="vp", direction="up");
+    %vn = (0, -3) @PIN(terminal="vn", direction="down");
+    @ARC(linewidth=0.24, cap="round") {(-1.35, 1.78) (-0.6, 0) (-1.35, -1.78)};
+    @ARC(linewidth=0.24, cap="round") {(-1.35, 1.78) (0.68, 1.18) (2.23, 0)};
+    @ARC(linewidth=0.24, cap="round") {(-1.35, -1.78) (0.68, -1.18) (2.23, 0)};
+    @ARC(linewidth=0.24) {(-2, 1.78) (-1.25, 0) (-2, -1.78)};
+    (2.65, 0) @CIRCLE(radius=0.3375, linewidth=0.24);
+    @LINE {(-3, 2) (-2, 2)};
+    @LINE {(-3, 1) (-1.4599, 1)};
+    @LINE {(-3, -1) (-1.4599, -1)};
+    @LINE {(-3, -2) (-2, -2)};
+    @LINE(linewidth=0.24, cap="round") {(-2, 2) (-2, 1.78)};
+    @LINE(linewidth=0.24, cap="round") {(-2, -1.78) (-2, -2)};
+    @LINE {(2.9875, 0) (4, 0)};
+    @LINE {(0, 1.4761) (0, 3)};
+    @LINE {(0, -1.4761) (0, -3)};
+    ? @TEXT("${name}", key="name", halign="middle") => @PLACE(1.8, 2);
+  };
+
+  /* A buffer with supply pins: a, y, vp, vn. */
+  $BUFFER_SUPPLY = @DEFINE-SYMBOL(box=[-3, -2, 1, 2]) {
+    %a = (-3, 0) @PIN(terminal="a", direction="left");
+    %y = (1, 0) @PIN(terminal="y", direction="right");
+    %vp = (-1, 2) @PIN(terminal="vp", direction="up");
+    %vn = (-1, -2) @PIN(terminal="vn", direction="down");
+    @LINE {(-3, 0) (-2, 0)};
+    @LINE {(-1, 0.7961) (-1, 2)};
+    @LINE {(-1, -0.8684) (-1, -2)};
+    @LINE(linewidth=0.24) {(0.375, 0) (-2, -1.4999) (-2, 1.375) (0.375, 0)};
+    @LINE {(0.375, 0) (1, 0)};
+    ? @TEXT("${name}", key="name", halign="middle") => @PLACE(0.4, 1.35);
+  };
+
+  /* An inverter with supply pins: a, y, vp, vn. */
+  $INVERTER_SUPPLY = @DEFINE-SYMBOL(box=[-3, -2, 2, 2]) {
+    %a = (-3, 0) @PIN(terminal="a", direction="left");
+    %y = (2, 0) @PIN(terminal="y", direction="right");
+    %vp = (-1, 2) @PIN(terminal="vp", direction="up");
+    %vn = (-1, -2) @PIN(terminal="vn", direction="down");
+    @LINE {(-3, 0) (-2, 0)};
+    @LINE {(-1, 0.8684) (-1, 2)};
+    @LINE {(-1, -0.796) (-1, -2)};
+    @LINE(linewidth=0.24) {(0.3751, 0) (-2, 1.5) (-2, -1.3748) (0.3751, 0)};
+    (0.7522, -0.001) @CIRCLE(radius=0.375, linewidth=0.24);
+    @LINE {(1.1272, 0) (2, 0)};
+    ? @TEXT("${name}", key="name", halign="middle") => @PLACE(0.7, 1.45);
+  };
+
+  /* A delay cell with supply pins: a, y, vp, vn. */
+  $DELAY_CELL_SUPPLY = @DEFINE-SYMBOL(box=[-4, -2, 4, 2]) {
+    %a = (-4, 0) @PIN(terminal="a", direction="left");
+    %y = (4, 0) @PIN(terminal="y", direction="right");
+    %vp = (0, 2) @PIN(terminal="vp", direction="up");
+    %vn = (0, -2) @PIN(terminal="vn", direction="down");
+    @LINE {(-4, 0) (-2.4, 0)};
+    @LINE {(0, 1.2) (0, 2)};
+    @LINE {(0, -1.2) (0, -2)};
+    @LINE(linewidth=0.24) {(-2.4, 1.2) (2.4, 1.2) (2.4, -1.2) (-2.4, -1.2) (-2.4, 1.2)};
+    @LINE {(2.4, 0) (4, 0)};
+    ? @TEXT("\Delta\textit{T}", key="formula", halign="middle", valign="middle", size=1.2, fix_rotate=true) => @PLACE(0, 0);
+    ? @TEXT("${name}", key="name", halign="middle", fix_rotate=true) => @PLACE(1.6, 1.55);
+  };
+
+  /* A D flip-flop with supply pins: d, ck, q, qb, vp, vn. */
+  $D_FLIP_FLOP_SUPPLY = @DEFINE-SYMBOL(box=[-4, -4, 4, 4]) {
+    %d = (-4, 1) @PIN(terminal="d", direction="left");
+    %ck = (-4, -1) @PIN(terminal="ck", direction="left");
+    %q = (4, 1) @PIN(terminal="q", direction="right");
+    %qb = (4, -1) @PIN(terminal="qb", direction="right");
+    %vp = (0, 4) @PIN(terminal="vp", direction="up");
+    %vn = (0, -4) @PIN(terminal="vn", direction="down");
+    @LINE {(-4, 1) (-2.5001, 1)};
+    @LINE {(-4, -1) (-2.5001, -1)};
+    @LINE {(0, 2.5) (0, 4)};
+    @LINE {(0, -2.5) (0, -4)};
+    @LINE(linewidth=0.24) {(-2.5001, 2.5) (2.5001, 2.5) (2.5001, -2.5) (-2.5001, -2.5) (-2.5001, 2.5)};
+    @LINE {(2.5001, 1) (4, 1)};
+    @LINE {(2.5001, -1) (4, -1)};
+    (-2.1, 1) @TEXT("D", halign="start", valign="middle", size=1.03, bold=true, italic=true);
+    (-2.1, -1) @TEXT("CK", halign="start", valign="middle", size=1.03, bold=true, italic=true);
+    (2.1, 1) @TEXT("Q", halign="end", valign="middle", size=1.03, bold=true, italic=true);
+    (2.1, -1) @TEXT("\overline{Q}", halign="end", valign="middle", size=1.03, bold=true, italic=true);
+    ? @TEXT("${name}", key="name", halign="middle") => @PLACE(1.5, 2.85);
+  };
+
+  /* A D flip-flop with Q only and supply pins: d, ck, q, vp, vn. */
+  $D_FLIP_FLOP_Q_ONLY_SUPPLY = @DEFINE-SYMBOL(box=[-4, -4, 4, 4]) {
+    %d = (-4, 1) @PIN(terminal="d", direction="left");
+    %ck = (-4, -1) @PIN(terminal="ck", direction="left");
+    %q = (4, 0) @PIN(terminal="q", direction="right");
+    %vp = (0, 4) @PIN(terminal="vp", direction="up");
+    %vn = (0, -4) @PIN(terminal="vn", direction="down");
+    @LINE {(-4, 1) (-2.5001, 1)};
+    @LINE {(-4, -1) (-2.5001, -1)};
+    @LINE {(0, 2.5) (0, 4)};
+    @LINE {(0, -2.5) (0, -4)};
+    @LINE(linewidth=0.24) {(-2.5001, 2.5) (2.5001, 2.5) (2.5001, -2.5) (-2.5001, -2.5) (-2.5001, 2.5)};
+    @LINE {(2.5001, 0) (4, 0)};
+    (-2.1, 1) @TEXT("D", halign="start", valign="middle", size=1.03, bold=true, italic=true);
+    (-2.1, -1) @TEXT("CK", halign="start", valign="middle", size=1.03, bold=true, italic=true);
+    (2.1, 0) @TEXT("Q", halign="end", valign="middle", size=1.03, bold=true, italic=true);
+    ? @TEXT("${name}", key="name", halign="middle") => @PLACE(1.5, 2.85);
+  };
+
+  /* A D flip-flop with reset and supply pins (vp and vn aligned at x = 1): d, ck, rst, q, qb, vp, vn. */
+  $D_FLIP_FLOP_WITH_RESET_SUPPLY = @DEFINE-SYMBOL(box=[-4, -5, 4, 4]) {
+    %d = (-4, 1) @PIN(terminal="d", direction="left");
+    %ck = (-4, -1) @PIN(terminal="ck", direction="left");
+    %rst = (-1, -5) @PIN(terminal="rst", direction="down");
+    %q = (4, 1) @PIN(terminal="q", direction="right");
+    %qb = (4, -1) @PIN(terminal="qb", direction="right");
+    %vp = (1, 4) @PIN(terminal="vp", direction="up");
+    %vn = (1, -5) @PIN(terminal="vn", direction="down");
+    @LINE {(-4, 1) (-2.5001, 1)};
+    @LINE {(-4, -1) (-2.5001, -1)};
+    @LINE {(1, 2.5) (1, 4)};
+    @LINE {(-1, -3.5) (-1, -5)};
+    @LINE {(1, -3.5) (1, -5)};
+    @LINE(linewidth=0.24) {(-2.5001, 2.5) (2.5001, 2.5) (2.5001, -3.5) (-2.5001, -3.5) (-2.5001, 2.5)};
+    @LINE {(2.5001, 1) (4, 1)};
+    @LINE {(2.5001, -1) (4, -1)};
+    (-2.1, 1) @TEXT("D", halign="start", valign="middle", size=1.03, bold=true, italic=true);
+    (-2.1, -1) @TEXT("CK", halign="start", valign="middle", size=1.03, bold=true, italic=true);
+    (-1, -3.1) @TEXT("RST", halign="middle", valign="bottom", size=1.03, bold=true, italic=true);
+    (2.1, 1) @TEXT("Q", halign="end", valign="middle", size=1.03, bold=true, italic=true);
+    (2.1, -1) @TEXT("\overline{Q}", halign="end", valign="middle", size=1.03, bold=true, italic=true);
+    ? @TEXT("${name}", key="name", halign="middle") => @PLACE(-0.8, 2.85);
+  };
 }

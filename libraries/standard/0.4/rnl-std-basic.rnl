@@ -124,6 +124,70 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(0, 2.05);
   };
 
+
+  /* A three-terminal potentiometer, the wiper in the middle. Terminals: n1 nw n2. */
+  $POTENTIOMETER = @DEFINE-SYMBOL(box=[-1, -2, 2, 2]) {
+    %n1 = (0, 2) @PIN(terminal="n1", direction="up");
+    %nw = (2, 0) @PIN(terminal="nw", direction="right");
+    %n2 = (0, -2) @PIN(terminal="n2", direction="down");
+    @LINE {(0, 2) (0, 0.8721) (0.5372, 0.6395) (-0.4605, 0.407) (0.5372, 0.1163) (-0.4988, -0.1744) (0.5372, -0.4651) (-0.4605, -0.7558) (0, -0.8721) (0, -2)};
+    @LINE {(2, 0) (1, 0)};
+    @LINE(fill="linecolor", linestyle="none") {(0.6, 0) (1.1657, 0.2828) (1.1657, -0.2828) (0.6, 0)};
+    ? @TEXT("${name}", key="name") => @PLACE(2, 0.35);
+    ? @TEXT("${value}", key="value") => @PLACE(2, -1.2);
+  };
+
+  /* A photoresistor (light-dependent resistor). Terminals: p n. */
+  $PHOTORESISTOR = @DEFINE-SYMBOL(box=[-1.8, -2, 1, 2]) {
+    %p = (0, 2) @PIN(terminal="p", direction="up");
+    %n = (0, -2) @PIN(terminal="n", direction="down");
+    @LINE {(0, 2) (0, 0.8721) (0.5372, 0.6395) (-0.4605, 0.407) (0.5372, 0.1163) (-0.4988, -0.1744) (0.5372, -0.4651) (-0.4605, -0.7558) (0, -0.8721) (0, -2)};
+    @LINE {(-1.5, 0.9) (-1.1, 0.5)};
+    @LINE(fill="linecolor", linestyle="none") {(-0.9, 0.3) (-1.02, 0.66) (-1.26, 0.42) (-0.9, 0.3)};
+    @LINE {(-1.5, 0.3) (-1.1, -0.1)};
+    @LINE(fill="linecolor", linestyle="none") {(-0.9, -0.3) (-1.02, 0.06) (-1.26, -0.18) (-0.9, -0.3)};
+    ? @TEXT("${name}", key="name") => @PLACE(1, 0.25);
+    ? @TEXT("${value}", key="value") => @PLACE(1, -1.2);
+  };
+
+  /* A polarized (electrolytic) capacitor, its positive plate on p. Terminals: p n. */
+  $POLARIZED_CAPACITOR = @DEFINE-SYMBOL(box=[-1.4, -2, 1.4, 2]) {
+    %p = (0, 2) @PIN(terminal="p", direction="up");
+    %n = (0, -2) @PIN(terminal="n", direction="down");
+    @LINE(linewidth=0.24) {(0.8051, 0.3234) (-0.8051, 0.3234)};
+    @BEZIER(linewidth=0.24) {(-0.8051, -0.65) (-0.27, -0.2145) (0.27, -0.2145) (0.8051, -0.65)};
+    @LINE {(0, 0.3234) (0, 2)};
+    @LINE {(0, -0.3234) (0, -2)};
+    @LINE {(-1.1, 0.9) (-0.5, 0.9)};
+    @LINE {(-0.8, 1.2) (-0.8, 0.6)};
+    ? @TEXT("${name}", key="name") => @PLACE(1.4, 0.25);
+    ? @TEXT("${value}", key="value") => @PLACE(1.4, -1.2);
+  };
+
+  /* A quartz crystal resonator. Terminals: n1 n2. */
+  $CRYSTAL = @DEFINE-SYMBOL(box=[-1.2, -2, 1.2, 2]) {
+    %n1 = (0, 2) @PIN(terminal="n1", direction="up");
+    %n2 = (0, -2) @PIN(terminal="n2", direction="down");
+    @LINE {(0, 2) (0, 0.7)};
+    @LINE(linewidth=0.24) {(-0.8, 0.7) (0.8, 0.7)};
+    @LINE(linewidth=0.24) {(-0.5, 0.4) (0.5, 0.4) (0.5, -0.4) (-0.5, -0.4) (-0.5, 0.4)};
+    @LINE(linewidth=0.24) {(-0.8, -0.7) (0.8, -0.7)};
+    @LINE {(0, -0.7) (0, -2)};
+    ? @TEXT("${name}", key="name") => @PLACE(1.2, 0.25);
+  };
+
+  /* A loudspeaker. Terminals: p n. */
+  $SPEAKER = @DEFINE-SYMBOL(box=[-0.8, -2, 1.6, 2]) {
+    %p = (0, 2) @PIN(terminal="p", direction="up");
+    %n = (0, -2) @PIN(terminal="n", direction="down");
+    @LINE {(-0.3, 0.6) (0.3, 0.6) (0.3, -0.6) (-0.3, -0.6) (-0.3, 0.6)};
+    @LINE {(0.3, 0.6) (1.1, 1.4) (1.1, -1.4) (0.3, -0.6)};
+    @LINE {(0, 0.6) (0, 2)};
+    @LINE {(0, -0.6) (0, -2)};
+    ? @TEXT("${name}", key="name") => @PLACE(1.6, 0.25);
+    ? @TEXT("${value}", key="value") => @PLACE(1.6, -1.2);
+  };
+
   /* ---------------------------------------------------------------- sources and RF port */
 
   /* An independent voltage source. Terminals: p n. */
@@ -251,6 +315,58 @@
     @ARC {(0, 0) (0.3, -0.3) (0.6, 0)};
     ? @TEXT("${name}", key="name") => @PLACE(1.5, 0.25);
     ? @TEXT("${value}", key="value") => @PLACE(1.5, -1.2);
+  };
+
+
+  /* A sine-wave voltage source, + on p. Terminals: p n. */
+  $SINE_VOLTAGE_SOURCE = @DEFINE-SYMBOL(box=[-1.5, -2, 1.5, 2]) {
+    %p = (0, 2) @PIN(terminal="p", direction="up");
+    %n = (0, -2) @PIN(terminal="n", direction="down");
+    (0, 0) @CIRCLE(radius=1.0756);
+    @BEZIER {(-0.6, 0) (-0.4, 0.6) (-0.2, 0.6) (0, 0) (0.2, -0.6) (0.4, -0.6) (0.6, 0)};
+    @LINE {(0, 1.0756) (0, 2)};
+    @LINE {(0, -1.0756) (0, -2)};
+    ? @TEXT("${name}", key="name") => @PLACE(1.5, 0.25);
+    ? @TEXT("${value}", key="value") => @PLACE(1.5, -1.2);
+  };
+
+  /* A pulse voltage source, + on p. Terminals: p n. */
+  $PULSE_VOLTAGE_SOURCE = @DEFINE-SYMBOL(box=[-1.5, -2, 1.5, 2]) {
+    %p = (0, 2) @PIN(terminal="p", direction="up");
+    %n = (0, -2) @PIN(terminal="n", direction="down");
+    (0, 0) @CIRCLE(radius=1.0756);
+    @LINE {(0.4, -0.7) (0.4, -0.4) (-0.4, -0.4) (-0.4, 0.4) (0.4, 0.4) (0.4, 0.7)};
+    @LINE {(0, 1.0756) (0, 2)};
+    @LINE {(0, -1.0756) (0, -2)};
+    ? @TEXT("${name}", key="name") => @PLACE(1.5, 0.25);
+    ? @TEXT("${value}", key="value") => @PLACE(1.5, -1.2);
+  };
+
+  /* A microphone, + on p. Terminals: p n. */
+  $MICROPHONE = @DEFINE-SYMBOL(box=[-2.4, -2, 2, 2]) {
+    %p = (0, 2) @PIN(terminal="p", direction="up");
+    %n = (0, -2) @PIN(terminal="n", direction="down");
+    (0.8, 0) @CIRCLE(radius=0.8);
+    @LINE(linewidth=0.24) {(0, 1) (0, -1)};
+    @LINE {(-2.0058, 1.4535) (-1.1919, 1.4535)};
+    @LINE {(-1.5988, 1.8605) (-1.5988, 1.0465)};
+    @LINE {(-2.0058, -1.3372) (-1.1919, -1.3372)};
+    @LINE {(0, 1) (0, 2)};
+    @LINE {(0, -1) (0, -2)};
+    ? @TEXT("${name}", key="name") => @PLACE(2, 0.25);
+    ? @TEXT("${value}", key="value") => @PLACE(2, -1.2);
+  };
+
+  /* An ammeter, current measured from p to n. Terminals: p n. */
+  $AMMETER = @DEFINE-SYMBOL(box=[-1.5, -2, 1.5, 2]) {
+    %p = (0, 2) @PIN(terminal="p", direction="up");
+    %n = (0, -2) @PIN(terminal="n", direction="down");
+    (0, 0) @CIRCLE(radius=1.0756);
+    @LINE {(-0.4, -0.525) (0, 0.525) (0.4, -0.525)};
+    @LINE {(-0.2667, -0.175) (0.2667, -0.175)};
+    @LINE {(0, 1.0756) (0, 2)};
+    @LINE {(0, -1.0756) (0, -2)};
+    ? @TEXT("${name}", key="name") => @PLACE(1.5, 0.25);
   };
 
   /* ---------------------------------------------------------------- switches and transmission lines */

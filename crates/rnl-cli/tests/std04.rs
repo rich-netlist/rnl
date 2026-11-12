@@ -327,3 +327,199 @@ XU1 clk nc_d3 bus_d2 bus_d1 bus_d0 q0 nc_q1 reg4
     // nc_q1 suppresses automatic $NET_LABEL_STUB fill on the unwired scalar pin q1
     assert!(!sub.objects.iter().any(|o| o.definition.as_deref() == Some("$NET_LABEL_STUB")), "{:?}", sub.objects);
 }
+
+#[test]
+fn supply_variants_cover_functional_and_logic_on_integer_grid() {
+    let all = rnl_view::catalog(
+        &MemoryProvider::default(),
+        &rnl_view::CatalogOptions { all_versions: true, ..Default::default() },
+    );
+    let syms_04: Vec<_> = all.symbols.iter().filter(|s| s.version == "0.4").collect();
+    assert!(!syms_04.iter().any(|s| s.symbol == "$OPAMP_5TERM" || s.symbol == "$COMPARATOR_5TERM"));
+
+    let expected_func = [
+        "$OPAMP_SUPPLY",
+        "$DIFFERENTIAL_OPAMP_SUPPLY",
+        "$DIFFERENTIAL_OPAMP_TWISTED_SUPPLY",
+        "$COMPARATOR_SUPPLY",
+        "$VOLTAGE_AMPLIFIER_SUPPLY",
+        "$TRANSCONDUCTOR_SUPPLY",
+        "$DIFFERENTIAL_TRANSCONDUCTOR_SUPPLY",
+        "$ADC_SUPPLY",
+        "$DAC_SUPPLY",
+    ];
+    let expected_logic = [
+        "$AND_2INPUT_SUPPLY",
+        "$AND_3INPUT_SUPPLY",
+        "$AND_4INPUT_SUPPLY",
+        "$NAND_2INPUT_SUPPLY",
+        "$NAND_3INPUT_SUPPLY",
+        "$NAND_4INPUT_SUPPLY",
+        "$OR_2INPUT_SUPPLY",
+        "$OR_3INPUT_SUPPLY",
+        "$OR_4INPUT_SUPPLY",
+        "$NOR_2INPUT_SUPPLY",
+        "$NOR_3INPUT_SUPPLY",
+        "$NOR_4INPUT_SUPPLY",
+        "$XOR_2INPUT_SUPPLY",
+        "$XOR_3INPUT_SUPPLY",
+        "$XOR_4INPUT_SUPPLY",
+        "$XNOR_2INPUT_SUPPLY",
+        "$XNOR_3INPUT_SUPPLY",
+        "$XNOR_4INPUT_SUPPLY",
+        "$BUFFER_SUPPLY",
+        "$INVERTER_SUPPLY",
+        "$DELAY_CELL_SUPPLY",
+        "$D_FLIP_FLOP_SUPPLY",
+        "$D_FLIP_FLOP_Q_ONLY_SUPPLY",
+        "$D_FLIP_FLOP_WITH_RESET_SUPPLY",
+    ];
+
+    for (pkg, names) in [("rnl-std-functional", &expected_func[..]), ("rnl-std-logic", &expected_logic[..])] {
+        for &name in names {
+            let s = syms_04
+                .iter()
+                .find(|s| s.symbol == name && s.package == pkg)
+                .unwrap_or_else(|| panic!("missing {name} in {pkg} 0.4"));
+            let [x1, y1, x2, y2] = s.bbox;
+            for p in &s.pins {
+                assert_eq!(p.at[0].fract(), 0.0, "{name} pin {:?} off x grid", p);
+                assert_eq!(p.at[1].fract(), 0.0, "{name} pin {:?} off y grid", p);
+                assert!(p.at[0] >= x1 && p.at[0] <= x2 && p.at[1] >= y1 && p.at[1] <= y2, "{name} pin outside box");
+            }
+            let n = s.pins.len();
+            assert!(n >= 4, "{name} should have at least 4 pins");
+            assert_eq!(
+                (serde_json::to_value(&s.pins[n - 2].terminal).unwrap(), s.pins[n - 2].direction),
+                (serde_json::json!("vp"), Some("up")),
+                "{name} vp"
+            );
+            assert_eq!(
+                (serde_json::to_value(&s.pins[n - 1].terminal).unwrap(), s.pins[n - 1].direction),
+                (serde_json::json!("vn"), Some("down")),
+                "{name} vn"
+            );
+        }
+    }
+
+    let dffr = syms_04.iter().find(|s| s.symbol == "$D_FLIP_FLOP_WITH_RESET_SUPPLY").unwrap();
+    let pin_at = |term: &str| {
+        dffr.pins
+            .iter()
+            .find(|p| serde_json::to_value(&p.terminal).unwrap() == serde_json::json!(term))
+            .map(|p| (p.at, p.direction))
+            .unwrap()
+    };
+    assert_eq!(pin_at("rst"), ([-1.0, -5.0], Some("down")));
+    assert_eq!(pin_at("vp"), ([1.0, 4.0], Some("up")));
+    assert_eq!(pin_at("vn"), ([1.0, -5.0], Some("down")));
+}
+
+#[test]
+fn expanded_0_4_symbols_and_chinese_aliases_load_cleanly() {
+    let all = rnl_view::catalog(
+        &MemoryProvider::default(),
+        &rnl_view::CatalogOptions { all_versions: true, ..Default::default() },
+    );
+    let syms_04: Vec<_> = all.symbols.iter().filter(|s| s.version == "0.4").collect();
+
+    let expected: &[(&str, &str, &[&str])] = &[
+        ("rnl-std-basic", "$POTENTIOMETER", &["n1", "nw", "n2"]),
+        ("rnl-std-basic", "$PHOTORESISTOR", &["p", "n"]),
+        ("rnl-std-basic", "$POLARIZED_CAPACITOR", &["p", "n"]),
+        ("rnl-std-basic", "$CRYSTAL", &["n1", "n2"]),
+        ("rnl-std-basic", "$SPEAKER", &["p", "n"]),
+        ("rnl-std-basic", "$SINE_VOLTAGE_SOURCE", &["p", "n"]),
+        ("rnl-std-basic", "$PULSE_VOLTAGE_SOURCE", &["p", "n"]),
+        ("rnl-std-basic", "$MICROPHONE", &["p", "n"]),
+        ("rnl-std-basic", "$AMMETER", &["p", "n"]),
+        ("rnl-std-semiconductors", "$LED", &["a", "k"]),
+        ("rnl-std-semiconductors", "$SCHOTTKY_DIODE", &["a", "k"]),
+        ("rnl-std-semiconductors", "$SHOCKLEY_DIODE", &["a", "k"]),
+        ("rnl-std-semiconductors", "$PUT", &["a", "g", "k"]),
+        ("rnl-std-semiconductors", "$UJT", &["e", "b1", "b2"]),
+        ("rnl-std-functional", "$CHOPPER_SYMBOL", &["inp", "inn", "outp", "outn"]),
+    ];
+
+    for &(pkg, sym, terms) in expected {
+        let s = syms_04
+            .iter()
+            .find(|s| s.package == pkg && s.symbol == sym)
+            .unwrap_or_else(|| panic!("missing {sym} in {pkg} 0.4"));
+        let got_terms: Vec<String> =
+            s.pins.iter().map(|p| serde_json::to_value(&p.terminal).unwrap().as_str().unwrap().to_string()).collect();
+        let want_terms: Vec<String> = terms.iter().map(|t| (*t).to_string()).collect();
+        assert_eq!(got_terms, want_terms, "{sym} terminals");
+        for p in &s.pins {
+            assert_eq!(p.at[0].fract(), 0.0, "{sym} pin {:?} off x grid", p);
+            assert_eq!(p.at[1].fract(), 0.0, "{sym} pin {:?} off y grid", p);
+        }
+    }
+
+    // Verify pin-side box alignment across every symbol in 0.4
+    for s in &syms_04 {
+        let [x1, y1, x2, y2] = s.bbox;
+        for p in &s.pins {
+            assert!(
+                p.at[0] >= x1 && p.at[0] <= x2 && p.at[1] >= y1 && p.at[1] <= y2,
+                "{} ({}) pin {:?} outside {:?}",
+                s.symbol,
+                s.package,
+                p,
+                s.bbox
+            );
+        }
+        let left = s.pins.iter().filter(|p| p.direction == Some("left")).map(|p| p.at[0]).reduce(f64::min);
+        let down = s.pins.iter().filter(|p| p.direction == Some("down")).map(|p| p.at[1]).reduce(f64::min);
+        let right = s.pins.iter().filter(|p| p.direction == Some("right")).map(|p| p.at[0]).reduce(f64::max);
+        let up = s.pins.iter().filter(|p| p.direction == Some("up")).map(|p| p.at[1]).reduce(f64::max);
+        if let Some(v) = left {
+            assert_eq!(x1, v, "{} left box edge", s.symbol);
+        }
+        if let Some(v) = down {
+            assert_eq!(y1, v, "{} down box edge", s.symbol);
+        }
+        if let Some(v) = right {
+            assert_eq!(x2, v, "{} right box edge", s.symbol);
+        }
+        if let Some(v) = up {
+            assert_eq!(y2, v, "{} up box edge", s.symbol);
+        }
+    }
+
+    let zh = r#"* alias-zh coverage for expanded 0.4 symbols
+* @RNL(type="header") {
+*   @VERSION("0.4");
+*   @USE-PACKAGE(name="rnl-std-all", version="0.4");
+*   @USE-ALIASES(name="alias-zh", version="0.4");
+* }
+.model dmod d
+.subckt xtal2 n1 n2
+.ends
+.subckt chop4 inp inn outp outn
+.ends
+.subckt op5 inp inn out vp vn
+.ends
+.subckt dffr7 d ck rst q qb vp vn
+.ends
+Vpulse clk 0 1.8V
+Dled a 0 dmod
+Xxtal x1 x2 xtal2
+Xchop ip in op on chop4
+Xop ip in vo vdd 0 op5
+Xdff d clk rst q qb vdd 0 dffr7
+* @RNL {
+*   #Vpulse @使用符号 $"脉冲电压源";
+*   #Dled @使用符号 $"发光二极管";
+*   #Xxtal @使用符号(端子数=["n1", "n2"]) $"晶振";
+*   #Xchop @使用符号(端子数=["inp", "inn", "outp", "outn"]) $"斩波器符号";
+*   #Xop @使用符号(端子数=["inp", "inn", "out", "vp", "vn"]) $"带电源运放";
+*   #Xdff @使用符号(端子数=["d", "ck", "rst", "q", "qb", "vp", "vn"]) $"带电源带复位D触发器";
+* }
+.end
+"#;
+    let r_zh = read(&MemoryProvider::new().with("t.sp", zh), &Options::default());
+    assert!(errors(&r_zh).is_empty(), "{:?}", errors(&r_zh));
+    assert!(by_severity(&r_zh, Severity::Warning).is_empty(), "{:?}", by_severity(&r_zh, Severity::Warning));
+    assert!(by_severity(&r_zh, Severity::Violation).is_empty(), "{:?}", by_severity(&r_zh, Severity::Violation));
+}
