@@ -1712,14 +1712,14 @@ pub(crate) fn parse_record_language(text: &str, numbers: bool, modern: bool) -> 
 }
 
 /// One complete definition name, optionally quoted, without a path or selector.
-pub(crate) fn definition_name(text: &str) -> Option<(String, bool)> {
-    if !text.starts_with('$') {
+pub(crate) fn definition_name(text: &str, prefix: char) -> Option<(String, bool)> {
+    if !text.starts_with(prefix) {
         return None;
     }
     let mut parser = Parser::new(text, true);
     let r = parser.reference().ok()?;
     if parser.i != parser.n()
-        || r.prefix != '$'
+        || r.prefix != prefix
         || !r.path.is_empty()
         || r.sub.is_some()
         || r.places.is_some()

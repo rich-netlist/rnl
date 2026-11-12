@@ -203,3 +203,72 @@ fn target_alias_resolution_changes_the_input_digest_without_hashing_source_locat
     moved.solver_config[0].source.as_mut().unwrap().line += 100;
     assert_eq!(rnl_runtime::problem::input_digest(&a.problems[0]), rnl_runtime::problem::input_digest(&moved));
 }
+
+#[test]
+fn level_local_definition_is_written_and_reads_back() {
+    for name in ["%dot", "%\"local dot\""] {
+        let quoted = name.replace('"', "\"\"");
+        let body = format!("{name} = @DEFINE(roles=[[\"p\",\"point\"]]) {{}}; @SOLVER-CONFIG(junction=\"{quoted}\"); %p=(0,0); {name} @ATTACH %p");
+        let r = read("", &body);
+        clean(&r);
+        assert_eq!(r.problems[0].junction.definition.as_deref(), Some(name));
+        assert!(r.model.levels[0].points.iter().find(|p| p.id == "%p").unwrap().junction);
+        let w = write(&r.problems[0]);
+        assert!(w.warnings.is_empty());
+        assert!(w.record.contains(&format!("{name} @ATTACH %rt1")), "{}", w.record);
+        let back = source("0.4", "", &body) + &w.record.lines().map(|l| format!("* {l}\n")).collect::<String>();
+        let again = files(&MemoryProvider::new().with("main.sp", &back));
+        clean(&again);
+        assert!(again.model.levels[0].points.iter().find(|p| p.id == "%rt1").unwrap().junction);
+    }
+}
+
+#[test]
+fn local_junction_names_do_not_escape_their_subcircuit() {
+    let text = source("0.4", "", "%dot = @DEFINE(roles=[[\"p\",\"point\"]]) {}; @SOLVER-CONFIG(junction=\"%dot\")")
+        + ".subckt child a b\nR2 a b 1k\n* @RNL { @SOLVER-CONFIG(junction=\"%dot\")}\n.ends child\n"
+        + ".subckt other a b\nR3 a b 1k\n* @RNL {%dot = @DEFINE(roles=[[\"p\",\"point\"]]) {}; @SOLVER-CONFIG(junction=\"%dot\")}\n.ends other\n";
+    let r = files(&MemoryProvider::new().with("main.sp", &text));
+    clean(&r);
+    assert_eq!(r.problems[0].junction.definition.as_deref(), Some("%dot"));
+    assert!(r.problems.iter().find(|p| p.name == "child").unwrap().junction.invalid.is_some());
+    assert_eq!(r.problems.iter().find(|p| p.name == "other").unwrap().junction.definition.as_deref(), Some("%dot"));
+}
+
+#[test]
+fn local_junction_names_are_not_accepted_in_headers_or_tool_overrides() {
+    let body = "%dot = @DEFINE(roles=[[\"p\",\"point\"]]) {}";
+    let r = read(r#"@SOLVER-CONFIG(junction="%dot")"#, body);
+    clean(&r);
+    assert!(r.problems[0].junction.invalid.is_some());
+    let input = source("0.4", "", &format!("{body}; @SOLVER-CONFIG(junction=\"%dot\")"));
+    let r = interpret_file(
+        Path::new("main.sp"),
+        None,
+        &MemoryProvider::new().with("main.sp", &input),
+        &Options {
+            std: false,
+            problems: true,
+            solver_config: rnl_runtime::solver_settings::parse_overrides("junction=\"%dot\"").unwrap(),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    clean(&r);
+    assert_eq!(r.problems[0].junction.definition.as_deref(), Some("%dot"));
+    assert!(r.problems[0].junction.effective().invalid.is_some());
+}
+
+#[test]
+fn local_junction_still_requires_a_definition_and_a_complete_name() {
+    for (value, body) in [
+        ("%p", "%p=(0,0)"),
+        ("%dot", "%dot = @DEFINE(roles=[[\"n\",\"net\"]]) {}"),
+        ("%dot::p", "%dot = @DEFINE(roles=[[\"p\",\"point\"]]) {}"),
+        ("%dot{1}", "%dot = @DEFINE(roles=[[\"p\",\"point\"]]) {}"),
+    ] {
+        let r = read("", &format!("{body}; @SOLVER-CONFIG(junction=\"{value}\")"));
+        clean(&r);
+        assert!(r.problems[0].junction.invalid.is_some(), "{value}");
+    }
+}
