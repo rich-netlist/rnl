@@ -2178,13 +2178,13 @@ pub(crate) fn route(
     // Prepare one default candidate per simple auto tree, independently of other
     // trees. Expensive helper work is charged before entering it; routed trees,
     // written-wire merges and other modes keep the ordinary router.
-    for i in 0..layout.nets.len() {
+    for (i, job) in jobs.iter().enumerate() {
         let n = &layout.nets[i];
         if !layout.modern
-            || problem.routes[jobs[i].route].mode != "auto"
+            || problem.routes[job.route].mode != "auto"
             || n.anchors.len() != 2
             || !n.joined.is_empty()
-            || !jobs[i].wires.is_empty()
+            || !job.wires.is_empty()
         {
             continue;
         }
