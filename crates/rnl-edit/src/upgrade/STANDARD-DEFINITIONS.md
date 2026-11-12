@@ -7,7 +7,7 @@ This table compares every ordinary definition in bundled series 0.3 with series 
 | GROUND | `p` accepts a net rather than net or terminal; body stays empty | For a directly written host terminal, attach its net and align the usage point with the original terminal in x and y. Net attachment has no lost main point. |
 | SUPPLY | Same role narrowing as GROUND; body stays empty | Same exact attachment/point treatment. |
 | IO_PORT | Same role narrowing, plus `ASSERT-NET(port=true)` | In default mode, exact attachment/point treatment with an assertion notice (a non-port net remains a target violation). With `--approximate`, top-level non-port `$IO_PORT` usages without symbol overrides become `$NET_LABEL` and report pin-direction risk. |
-| NO_CONNECT | Adds ALIGN x/y of `?` with `?t` | Already preserves the old main point; no additional alignment or review. |
+| NO_CONNECT | Role `t` accepts a terminal or pin; adds ALIGN x/y of `?` with `?t` | Already preserves terminal attachment and the old main point; no additional alignment or review. |
 | JUNCTION | Adds ALIGN x/y of `?` with `?p` | Already preserves the old main point. |
 | CURRENT_ARROW | Adds ALIGN x/y of `?` with `?p`; symbol renamed to `ARROW_SYMBOL` | Already preserves the old main point. |
 | ARROW | Role `p` becomes `at`; adds ALIGN x/y | Rename the role; target body preserves the old main point. |

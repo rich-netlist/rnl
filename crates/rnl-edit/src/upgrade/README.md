@@ -48,7 +48,7 @@ Sections refer to RNL 0.4. Standard package changes refer to the bundled series 
 | Literal markup gaining meaning in 0.4 | Retain and report changed rendering intent | Context | 13.6 |
 | Spectre transformer default terminal names | Verified default host names become stable terminal positions | Context | 6.12 |
 | Numeric DEVICE/port names | Resolve host port positions; report invalid numeric/repeated DEVICE names | Context | 6.4, 6.12 |
-| Series 0.2/0.3 renamed symbols and merged packages | Provenance-checked target names (`$OPAMP_5TERM` → `$OPAMP`, `$COMPARATOR_5TERM` → `$COMPARATOR`, 2-terminal controlled sources, `$CURRENT_ARROW_SYMBOL` → `$ARROW_SYMBOL`, `$ADDER`/`$MULTIPLIER` → `$*_SYMBOL`, `$DELAY_CELL_SYMBOL` → `$DELAY_CELL`) with explicit terminal maps and destination packages; report removed names | Context | Standard series |
+| Series 0.2/0.3 renamed symbols and merged packages | Provenance-checked target names (`$OPAMP_5TERM` → `$OPAMP`, `$COMPARATOR_5TERM` → `$COMPARATOR`, 2-terminal controlled sources, `$CURRENT_ARROW_SYMBOL` → `$ARROW_SYMBOL`, `$ADDER`/`$MULTIPLIER` → `$*_SYMBOL`, `$DELAY_CELL_SYMBOL` → `$DELAY_CELL`) with explicit terminal maps, destination packages, and `MX` orientation composition on series 0.2 `$OPAMP`; report removed names | Context | Standard series |
 | Standard net-part text key `name` | `netname` on bundled `$GROUND`, `$SUPPLY` and `$IO_PORT` usages (`label` for `$TRANSCONDUCTOR` `formula`) | Context | Standard series, 13.3 |
 | Standard drawing-only role p | at for the matching standard definition | Mechanical | Standard series |
 | Standard role names with underscores | Their matching definition's current role names | Context | Standard series |

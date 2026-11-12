@@ -222,6 +222,9 @@ impl Sets {
                 statements.push(format!(
                     "# @SELECT-USAGE(recursive=true) $NO_CONNECT => @SELECT-PIN(role=\"t\", recursive=true) => @REMOVE-FROM {bg}"
                 ));
+                statements.push(format!(
+                    "# @SELECT-USAGE(recursive=true) $NO_CONNECT => @SELECT-TERMINAL(role=\"t\", recursive=true) => @SELECT-PIN(recursive=true) => @REMOVE-FROM {bg}"
+                ));
                 statements.push(format!("{bg} @ADD-TO $GROUND_FILL_SET"));
             }
             if !shadowed.contains("$SUPPLY_FILL_SET")
@@ -237,6 +240,9 @@ impl Sets {
                 ));
                 statements.push(format!(
                     "# @SELECT-USAGE(recursive=true) $NO_CONNECT => @SELECT-PIN(role=\"t\", recursive=true) => @REMOVE-FROM {bs}"
+                ));
+                statements.push(format!(
+                    "# @SELECT-USAGE(recursive=true) $NO_CONNECT => @SELECT-TERMINAL(role=\"t\", recursive=true) => @SELECT-PIN(recursive=true) => @REMOVE-FROM {bs}"
                 ));
                 statements.push(format!("{bs} @ADD-TO $SUPPLY_FILL_SET"));
             }
