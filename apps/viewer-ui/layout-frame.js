@@ -37,9 +37,9 @@ export function startLayout() {
 }
 
 /** Show or hide the table: `value` true or false, or inverted when omitted. */
-export function toggleLayout(value) {
+export function toggleLayout(value, { persist = true } = {}) {
   shown = typeof value === "boolean" ? value : !shown;
-  save("layout-shown", shown);
+  if (persist) save("layout-shown", shown);
   syncControls();
   window.dispatchEvent(new Event("layout-changed"));
 }

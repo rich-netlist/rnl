@@ -10,8 +10,14 @@ import { isDark, setBackground } from "./background.js";
 import { load } from "./util.js";
 import { form, modal } from "./dialog.js";
 import { fit, notice, showView, viewCentre } from "./drawing.js";
+import { flylinesShown, setFlylines } from "./flylines.js";
 import { gridSettings, setGrid } from "./grid.js";
+import { hoverNamesOn, hoverRolesOn, setHoverNames, setHoverRoles } from "./hover.js";
+import { layoutShown, toggleLayout } from "./layout-frame.js";
+import { netLabelsShown, setNetLabels } from "./net-labels.js";
 import { COLOR_FIELDS, DEFAULT_COLORS, currentColors, showColors, showOwnColors } from "./netlist-colors.js";
+import { originsShown, setOrigins } from "./origins.js";
+import { skeletonSymbolsShown, skeletonWiresShown, toggleSkeletonSymbols, toggleSkeletonWires } from "./skeleton-lines.js";
 import { overlayChoices, showOverlays } from "./usages.js";
 
 // each manifest offered in this page, by its address or name: its settings, those the user kept, and
@@ -28,8 +34,16 @@ function items(display) {
   if (display.background) out.push({ key: "background", label: m`Background: ${display.background === "dark" ? m("dark") : m("light")}` });
   const colors = Object.keys(display.colors || {}).filter((name) => colourNames.has(name));
   if (colors.length) out.push({ key: "colors", label: m`Color scheme: ${colors.length} of its colors` });
+  if (typeof display.names === "boolean") out.push({ key: "names", label: m`Names on hover: ${shownOrHidden(display.names)}` });
+  if (typeof display.roles === "boolean") out.push({ key: "roles", label: m`Roles on hover: ${shownOrHidden(display.roles)}` });
   if (typeof display.usages === "boolean") out.push({ key: "usages", label: m`Usages: ${shownOrHidden(display.usages)}` });
   if (typeof display.currents === "boolean") out.push({ key: "currents", label: m`Current directions: ${shownOrHidden(display.currents)}` });
+  if (typeof display.origins === "boolean") out.push({ key: "origins", label: m`Registration points: ${shownOrHidden(display.origins)}` });
+  if (typeof display.flylines === "boolean") out.push({ key: "flylines", label: m`Flylines: ${shownOrHidden(display.flylines)}` });
+  if (typeof display["net-labels"] === "boolean") out.push({ key: "net-labels", label: m`Net names: ${shownOrHidden(display["net-labels"])}` });
+  if (typeof display.layout === "boolean") out.push({ key: "layout", label: m`Layout table: ${shownOrHidden(display.layout)}` });
+  if (typeof display["skeleton-parts"] === "boolean") out.push({ key: "skeleton-parts", label: m`Component and pin skeleton lines: ${shownOrHidden(display["skeleton-parts"])}` });
+  if (typeof display["skeleton-wires"] === "boolean") out.push({ key: "skeleton-wires", label: m`Wire skeleton lines: ${shownOrHidden(display["skeleton-wires"])}` });
   if (display.grid) out.push({ key: "grid", label: display.grid === "none" ? m("Grid: none") : display.grid === "dots" ? m("Grid: dots") : m("Grid: lines") });
   if (display.view) out.push({ key: "view", label: display.view.fit ? m("View: the whole level, fitted to the window") : m("View: the part of the level it shows") });
   return out;
@@ -39,10 +53,18 @@ function items(display) {
 function apply(display, keys) {
   if (keys.has("background")) setBackground(display.background, { persist: false });
   if (keys.has("colors")) showColors(Object.fromEntries(Object.entries(display.colors).filter(([name]) => colourNames.has(name))));
+  if (keys.has("names")) setHoverNames(display.names, { persist: false });
+  if (keys.has("roles")) setHoverRoles(display.roles, { persist: false });
   const overlays = {};
   if (keys.has("usages")) overlays.usages = display.usages;
   if (keys.has("currents")) overlays.currents = display.currents;
   if (Object.keys(overlays).length) showOverlays(overlays);
+  if (keys.has("origins")) setOrigins(display.origins, { persist: false });
+  if (keys.has("flylines")) setFlylines(display.flylines, { persist: false });
+  if (keys.has("net-labels")) setNetLabels(display["net-labels"], { persist: false });
+  if (keys.has("layout")) toggleLayout(display.layout, { persist: false });
+  if (keys.has("skeleton-parts")) toggleSkeletonSymbols(display["skeleton-parts"], { persist: false });
+  if (keys.has("skeleton-wires")) toggleSkeletonWires(display["skeleton-wires"], { persist: false });
   if (keys.has("grid")) setGrid(display.grid === "none" ? { shown: false } : { shown: true, style: display.grid }, { persist: false });
   if (keys.has("view")) {
     if (display.view.fit) fit();
@@ -54,7 +76,15 @@ function apply(display, keys) {
 function restoreOwn() {
   setBackground(load("background", "light"), { persist: false });
   showOwnColors();
+  setHoverNames(load("hover-names", true) !== false, { persist: false });
+  setHoverRoles(load("hover-roles", false) === true, { persist: false });
   showOverlays({ usages: load("usages-shown", false) === true, currents: load("currents-shown", false) === true });
+  setOrigins(load("origins-shown", false) === true, { persist: false });
+  setFlylines(load("flylines-shown", false) === true, { persist: false });
+  setNetLabels(load("net-labels-shown", false) === true, { persist: false });
+  toggleLayout(load("layout-shown", false) === true, { persist: false });
+  toggleSkeletonSymbols(load("skeleton-symbols-shown", false) === true, { persist: false });
+  toggleSkeletonWires(load("skeleton-wires-shown", false) === true, { persist: false });
   setGrid({ shown: load("grid-shown", false), style: load("grid-style", "dots") }, { persist: false });
 }
 
@@ -125,9 +155,17 @@ export function currentDisplay() {
   const display = { background: isDark() ? "dark" : "light" };
   const colors = Object.fromEntries(Object.entries(currentColors()).filter(([name, c]) => c !== DEFAULT_COLORS[name]));
   if (Object.keys(colors).length) display.colors = colors;
+  if (!hoverNamesOn()) display.names = false;
+  if (hoverRolesOn()) display.roles = true;
   const overlays = overlayChoices();
   display.usages = overlays.usages;
   display.currents = overlays.currents;
+  if (originsShown()) display.origins = true;
+  if (flylinesShown()) display.flylines = true;
+  if (netLabelsShown()) display["net-labels"] = true;
+  if (layoutShown()) display.layout = true;
+  if (skeletonSymbolsShown()) display["skeleton-parts"] = true;
+  if (skeletonWiresShown()) display["skeleton-wires"] = true;
   const grid = gridSettings();
   display.grid = grid.shown ? grid.style : "none";
   const view = viewCentre();

@@ -27,11 +27,15 @@ export function startOrigins() {
   setCheck("toggle-origins", shown);
 }
 
-export function toggleOrigins() {
-  shown = !shown;
-  save("origins-shown", shown);
+export function setOrigins(value, { persist = true } = {}) {
+  shown = !!value;
+  if (persist) save("origins-shown", shown);
   setCheck("toggle-origins", shown);
   window.dispatchEvent(new Event("origins-changed"));
+}
+
+export function toggleOrigins() {
+  setOrigins(!shown);
 }
 
 /** One mark: a cross with a ring, with a light halo, so that it reads over the drawing; its size is in screen pixels. */

@@ -35,11 +35,15 @@ export function startNetLabels() {
   setCheck("toggle-net-labels", shown);
 }
 
-export function toggleNetLabels() {
-  shown = !shown;
-  save("net-labels-shown", shown);
+export function setNetLabels(value, { persist = true } = {}) {
+  shown = !!value;
+  if (persist) save("net-labels-shown", shown);
   setCheck("toggle-net-labels", shown);
   window.dispatchEvent(new Event("net-labels-changed"));
+}
+
+export function toggleNetLabels() {
+  setNetLabels(!shown);
 }
 
 /** One name, centred on its place, with a halo of the paper's colour so that it reads over the lines under it. */

@@ -695,3 +695,213 @@ test("usages and currents messages switch the usage frames and the current direc
   expect(await frame.evaluate(() => window.storageCalls)).toEqual([]);
   expect(await page.evaluate(() => JSON.stringify({ ...localStorage }) === window.storedBefore)).toBe(true);
 });
+
+const displayGuideNetlist = [
+  "* Embedded display aids",
+  "* @RNL(type=\"header\") { @VERSION(\"0.3\") }",
+  "R1 in mid 1k",
+  "R2 mid out 1k",
+  "C1 in out 1p",
+  "* @RNL {",
+  "*   #R1 @PLACE(0, 0); #R2 @PLACE(8, 0); #C1 @PLACE(4, -6);",
+  "*   &mid @WIRE(mode=\"vertical-horizontal\") { #R1:1 #R2:1 }",
+  "* }",
+  ".end",
+  "",
+].join("\n");
+
+async function embedDisplayState(frame) {
+  return frame.evaluate(async () => {
+    const { hoverNamesOn, hoverRolesOn } = await import("./hover.js");
+    const { overlayChoices } = await import("./usages.js");
+    const { gridSettings } = await import("./grid.js");
+    const { originsShown } = await import("./origins.js");
+    const { flylinesShown } = await import("./flylines.js");
+    const { netLabelsShown } = await import("./net-labels.js");
+    const { layoutShown } = await import("./layout-frame.js");
+    const { skeletonSymbolsShown, skeletonWiresShown } = await import("./skeleton-lines.js");
+    const c = overlayChoices(), g = gridSettings();
+    return {
+      background: document.body.dataset.background,
+      grid: g.shown ? g.style : "off",
+      names: hoverNamesOn(),
+      roles: hoverRolesOn(),
+      usages: c.usages,
+      currents: c.currents,
+      origins: originsShown(),
+      flylines: flylinesShown(),
+      flylinesHiddenClass: document.documentElement.classList.contains("flylines-hidden"),
+      netLabels: netLabelsShown(),
+      layout: layoutShown(),
+      skeletonParts: skeletonSymbolsShown(),
+      skeletonWires: skeletonWiresShown(),
+      dom: {
+        layout: document.querySelectorAll("#canvas > svg > g.layout-table rect").length,
+        skeletonParts: document.querySelectorAll("#canvas > svg > g.skeleton-lines line.skeleton-symbol, #canvas > svg > g.skeleton-lines line.skeleton-pin").length,
+        skeletonWires: document.querySelectorAll("#canvas > svg > g.skeleton-lines line.skeleton-wire").length,
+        origins: document.querySelectorAll("#canvas > svg > g.origin-marks .origin-mark").length,
+        netLabels: document.querySelectorAll("#canvas > svg > g.net-labels text").length,
+      },
+    };
+  });
+}
+
+test("embedded viewer defaults every display aid to off except hover names, hides flylines, and advertises display features", async ({ page }) => {
+  const frame = await start(page, {}, {
+    seed: {
+      background: "dark",
+      "grid-shown": true,
+      "hover-names": false,
+      "hover-roles": true,
+      "usages-shown": true,
+      "currents-shown": true,
+      "origins-shown": true,
+      "flylines-shown": true,
+      "net-labels-shown": true,
+      "layout-shown": true,
+      "skeleton-symbols-shown": true,
+      "skeleton-wires-shown": true,
+    },
+  });
+  expect((await messages(page, "ready"))[0].features).toEqual(expect.arrayContaining([
+    "display", "background", "grid", "names", "roles", "usages", "currents",
+    "origins", "flylines", "net-labels", "layout", "skeleton-parts", "skeleton-wires",
+  ]));
+  await send(page, { type: "open", name: "guides.sp", text: displayGuideNetlist });
+  await waitMessage(page, "loaded");
+  const state = await embedDisplayState(frame);
+  expect(state).toMatchObject({
+    background: "light",
+    grid: "off",
+    names: true,
+    roles: false,
+    usages: false,
+    currents: false,
+    origins: false,
+    flylines: false,
+    flylinesHiddenClass: true,
+    netLabels: false,
+    layout: false,
+    skeletonParts: false,
+    skeletonWires: false,
+    dom: { layout: 0, skeletonParts: 0, skeletonWires: 0, origins: 0, netLabels: 0 },
+  });
+  // Unwired pins (R1.1 and C1.2) emit g.flyline in SVG, which must be hidden when flylines are off.
+  const flylineDisplay = await frame.locator("#canvas > svg g.flyline").first().evaluate((el) => getComputedStyle(el).display);
+  expect(flylineDisplay).toBe("none");
+  expect(await frame.evaluate(() => window.storageCalls)).toEqual([]);
+  expect(await page.evaluate(() => JSON.stringify({ ...localStorage }) === window.storedBefore)).toBe(true);
+});
+
+test("URL parameters enable flylines, layout, skeleton lines and other display items on startup", async ({ page }) => {
+  const frame = await start(page, {
+    background: "dark",
+    grid: "dots",
+    names: "0",
+    roles: "1",
+    origins: "1",
+    flylines: "1",
+    "net-labels": "1",
+    layout: "1",
+    "skeleton-parts": "1",
+    "skeleton-wires": "1",
+  });
+  await send(page, { type: "open", name: "guides.sp", text: displayGuideNetlist });
+  await waitMessage(page, "loaded");
+  const state = await embedDisplayState(frame);
+  expect(state).toMatchObject({
+    background: "dark",
+    grid: "dots",
+    names: false,
+    roles: true,
+    origins: true,
+    flylines: true,
+    flylinesHiddenClass: false,
+    netLabels: true,
+    layout: true,
+    skeletonParts: true,
+    skeletonWires: true,
+  });
+  expect(state.dom.layout).toBeGreaterThan(0);
+  expect(state.dom.skeletonParts).toBeGreaterThan(0);
+  expect(state.dom.skeletonWires).toBeGreaterThan(0);
+  expect(state.dom.origins).toBeGreaterThan(0);
+  expect(state.dom.netLabels).toBeGreaterThan(0);
+  const flylineDisplay = await frame.locator("#canvas > svg g.flyline").first().evaluate((el) => getComputedStyle(el).display);
+  expect(flylineDisplay).not.toBe("none");
+
+  // Non-'1' values leave display aids off, while names stays on unless '0'.
+  await frame.goto(`${base}/?embed=1&flylines=yes&layout=2&skeleton-parts=true&skeleton-wires=on&names=yes`);
+  await waitMessage(page, "ready", 2);
+  await send(page, { type: "open", name: "guides.sp", text: displayGuideNetlist });
+  await waitMessage(page, "loaded", 2);
+  expect(await embedDisplayState(frame)).toMatchObject({
+    names: true, flylines: false, flylinesHiddenClass: true,
+    layout: false, skeletonParts: false, skeletonWires: false,
+  });
+});
+
+test("display batch message and individual display messages update overlays live without reload", async ({ page }) => {
+  const frame = await start(page);
+  await send(page, { type: "open", name: "guides.sp", text: displayGuideNetlist });
+  await waitMessage(page, "loaded");
+
+  await send(page, {
+    type: "display",
+    values: {
+      background: "dark",
+      grid: "lines",
+      names: false,
+      roles: true,
+      origins: true,
+      flylines: true,
+      "net-labels": true,
+      layout: true,
+      "skeleton-parts": true,
+      "skeleton-wires": true,
+    },
+  });
+  await expect(frame.locator("#canvas > svg > g.layout-table")).toHaveCount(1);
+  await expect(frame.locator("#canvas > svg > g.skeleton-lines")).toHaveCount(1);
+  let state = await embedDisplayState(frame);
+  expect(state).toMatchObject({
+    background: "dark",
+    grid: "lines",
+    names: false,
+    roles: true,
+    origins: true,
+    flylines: true,
+    flylinesHiddenClass: false,
+    netLabels: true,
+    layout: true,
+    skeletonParts: true,
+    skeletonWires: true,
+  });
+
+  // Individual messages also work and invalid value types change nothing without emitting errors.
+  await send(page, { type: "flylines", value: false });
+  await send(page, { type: "layout", value: false });
+  await send(page, { type: "skeleton-parts", value: false });
+  await send(page, { type: "skeleton-wires", value: false });
+  await send(page, { type: "grid", value: "off" });
+  await send(page, { type: "names", value: true });
+  await send(page, { type: "layout", value: "1" });
+  await send(page, { type: "display", values: { flylines: "yes", "skeleton-parts": 1 } });
+  await send(page, { type: "display", values: null });
+  await expect(frame.locator("#canvas > svg > g.layout-table")).toHaveCount(0);
+  await expect(frame.locator("#canvas > svg > g.skeleton-lines")).toHaveCount(0);
+  state = await embedDisplayState(frame);
+  expect(state).toMatchObject({
+    background: "dark",
+    grid: "off",
+    names: true,
+    flylines: false,
+    flylinesHiddenClass: true,
+    layout: false,
+    skeletonParts: false,
+    skeletonWires: false,
+  });
+  expect(await messages(page, "error")).toEqual([]);
+  expect(await frame.evaluate(() => window.storageCalls)).toEqual([]);
+  expect(await page.evaluate(() => JSON.stringify({ ...localStorage }) === window.storedBefore)).toBe(true);
+});

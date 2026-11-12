@@ -61,8 +61,16 @@ export interface DisplaySettings {
   background?: "light" | "dark";
   /** Colours by the viewer's names (component, net, rnl, keyword, definition, local, string, parameter, free, text, background, highlight, subcircuit). */
   colors?: Record<string, string>;
+  names?: boolean;
+  roles?: boolean;
   usages?: boolean;
   currents?: boolean;
+  origins?: boolean;
+  flylines?: boolean;
+  "net-labels"?: boolean;
+  layout?: boolean;
+  "skeleton-parts"?: boolean;
+  "skeleton-wires"?: boolean;
   grid?: "none" | "dots" | "lines";
 }
 

@@ -3,12 +3,18 @@ import { setBackground } from "./background.js";
 import { startCommands } from "./commands.js";
 import { clearDrawing, fit, zoomCenter } from "./drawing.js";
 import { resetBuffers } from "./edits.js";
+import { setFlylines } from "./flylines.js";
 import { setGrid } from "./grid.js";
-import { setHoverNames } from "./hover.js";
+import { setHoverNames, setHoverRoles } from "./hover.js";
+import { toggleLayout } from "./layout-frame.js";
+import { setNetLabels } from "./net-labels.js";
 import { adoptSource, beginOpenOperation, showBuilt } from "./open.js";
+import { setOrigins } from "./origins.js";
 import { shell } from "./shell.js";
 import { prepareViewer } from "./shells/web.js";
+import { toggleSkeletonSymbols, toggleSkeletonWires } from "./skeleton-lines.js";
 import { startViewerApi } from "./viewer-api.js";
+import { EMBED_DISPLAY_FEATURES } from "./viewer-api-contract.js";
 import { viewerChannel } from "./window-session.js";
 import { current, doc, path, setDoc } from "./state.js";
 import { backTo, enterRow, enterRoot } from "./subcircuits.js";
@@ -185,19 +191,55 @@ function controls() {
   $("canvas").append(toolbar, crumbs, link);
 }
 
+const DISPLAY_SET = new Set(EMBED_DISPLAY_FEATURES);
+
+function applyDisplay(values) {
+  if (!values || typeof values !== "object" || Array.isArray(values)) return;
+  if (values.background === "light" || values.background === "dark") {
+    setBackground(values.background, { persist: false });
+  }
+  if (values.grid === "dots" || values.grid === "lines") {
+    setGrid({ shown: true, style: values.grid }, { persist: false });
+  } else if (values.grid === "off" || values.grid === "none" || values.grid === false) {
+    setGrid({ shown: false }, { persist: false });
+  }
+  if (typeof values.names === "boolean") setHoverNames(values.names, { persist: false });
+  if (typeof values.roles === "boolean") setHoverRoles(values.roles, { persist: false });
+  const overlays = {};
+  if (typeof values.usages === "boolean") overlays.usages = values.usages;
+  if (typeof values.currents === "boolean") overlays.currents = values.currents;
+  if (Object.keys(overlays).length) showOverlays(overlays);
+  if (typeof values.origins === "boolean") setOrigins(values.origins, { persist: false });
+  if (typeof values.flylines === "boolean") setFlylines(values.flylines, { persist: false });
+  if (typeof values["net-labels"] === "boolean") setNetLabels(values["net-labels"], { persist: false });
+  if (typeof values.layout === "boolean") toggleLayout(values.layout, { persist: false });
+  if (typeof values["skeleton-parts"] === "boolean") toggleSkeletonSymbols(values["skeleton-parts"], { persist: false });
+  if (typeof values["skeleton-wires"] === "boolean") toggleSkeletonWires(values["skeleton-wires"], { persist: false });
+}
+
 export async function startEmbed() {
   controls();
   clearDrawing(m("Waiting for a netlist."));
   $("canvas").tabIndex = 0;
   try {
     const [version] = await Promise.all([prepareViewer(), startCommands()]);
-    setBackground(params.get("background") === "dark" ? "dark" : "light");
     const grid = params.get("grid");
-    setGrid({ shown: grid === "dots" || grid === "lines", style: grid === "lines" ? "lines" : "dots" });
-    setHoverNames(params.get("names") !== "0");
-    // an embedded drawing starts without the usage frames and without the current directions, as the complete viewer does,
-    // unless the address says otherwise
-    showOverlays({ usages: params.get("usages") === "1", currents: params.get("currents") === "1" });
+    // Every display aid except Show Names on Hover starts off in an embedded drawing,
+    // unless the address turns it on explicitly.
+    applyDisplay({
+      background: params.get("background") === "dark" ? "dark" : "light",
+      grid: grid === "dots" || grid === "lines" ? grid : "off",
+      names: params.get("names") !== "0",
+      roles: params.get("roles") === "1",
+      usages: params.get("usages") === "1",
+      currents: params.get("currents") === "1",
+      origins: params.get("origins") === "1",
+      flylines: params.get("flylines") === "1",
+      "net-labels": params.get("net-labels") === "1",
+      layout: params.get("layout") === "1",
+      "skeleton-parts": params.get("skeleton-parts") === "1",
+      "skeleton-wires": params.get("skeleton-wires") === "1",
+    });
     window.addEventListener("viewer-level", updateLevel);
     api = startViewerApi({ version, open, onError: message => error(message.replace(/^Could not open the netlist: /, "")), begin(signal) {
       const operation = beginOpenOperation();
@@ -209,16 +251,12 @@ export async function startEmbed() {
             if (typeof message.name === "string") await level(message.name);
             break;
           case "fit": fit(); break;
-          case "background":
-            if (message.value === "light" || message.value === "dark") setBackground(message.value);
+          case "display":
+            applyDisplay(message.values);
             break;
-          case "usages":
-            if (typeof message.value === "boolean") showOverlays({ usages: message.value });
+          default:
+            if (DISPLAY_SET.has(message.type)) applyDisplay({ [message.type]: message.value });
             break;
-          case "currents":
-            if (typeof message.value === "boolean") showOverlays({ currents: message.value });
-            break;
-          default: break;
         }
     } });
     if (params.has("url")) void api.open({ url: params.get("url") }, true);

@@ -22,8 +22,12 @@ export function startFlylines() {
   apply();
 }
 
-export function toggleFlylines() {
-  shown = !shown;
-  save("flylines-shown", shown);
+export function setFlylines(value, { persist = true } = {}) {
+  shown = !!value;
+  if (persist) save("flylines-shown", shown);
   apply();
+}
+
+export function toggleFlylines() {
+  setFlylines(!shown);
 }

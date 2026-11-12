@@ -21,10 +21,10 @@ export function hoverNamesOn() {
   return on;
 }
 
-/** Show or hide names on hover, and keep the choice; the menu's check mark follows. */
-export function setHoverNames(shown) {
+/** Show or hide names on hover, and keep the choice unless `persist` is false; the menu's check mark follows. */
+export function setHoverNames(shown, { persist = true } = {}) {
   on = shown;
-  save("hover-names", on);
+  if (persist) save("hover-names", on);
   setCheck("toggle-hover-names", on);
   if (!on) hideTip();
 }
@@ -34,10 +34,10 @@ export function hoverRolesOn() {
   return roles;
 }
 
-/** Show or hide the role of an object in the box beside the pointer, and keep the choice. */
-export function setHoverRoles(shown) {
+/** Show or hide the role of an object in the box beside the pointer, and keep the choice unless `persist` is false. */
+export function setHoverRoles(shown, { persist = true } = {}) {
   roles = shown;
-  save("hover-roles", roles);
+  if (persist) save("hover-roles", roles);
   setCheck("toggle-hover-roles", roles);
 }
 

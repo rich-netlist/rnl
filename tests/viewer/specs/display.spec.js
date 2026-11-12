@@ -145,3 +145,94 @@ test("a manifest's settings hold while a file of it is shown, go with another fi
   await expect(dialog(page)).toHaveCount(0);
   expect(await state(page)).toMatchObject({ background: 'dark', currents: true, kept: { background: 'light', currents: false } });
 });
+
+test('external manifests recognize flylines, layout, skeleton lines and other display aids for the page only', async ({ page }) => {
+  const base = 'https://raw.githubusercontent.com/someone/design/0123456789abcdef0123456789abcdef01234567/';
+  const text = fs.readFileSync(path.join(import.meta.dirname, '..', 'inputs', 'usage-current.sp'));
+  const sha = (b) => createHash('sha256').update(b).digest('hex');
+  const manifest = {
+    format: 1, id: 'demo', base, entry: 'top.sp', level: '(top)',
+    display: {
+      names: false, roles: true, origins: true, flylines: true,
+      'net-labels': true, layout: true, 'skeleton-parts': true, 'skeleton-wires': true,
+    },
+    files: [{ path: 'top.sp', sha256: sha(text), size: text.length }],
+  };
+  await page.route('https://manifests.test/aids.json', (route) => route.fulfill({
+    status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' },
+    body: JSON.stringify(manifest),
+  }));
+  await page.route(`${base}**`, (route) => route.fulfill({
+    status: 200, contentType: 'text/plain', headers: { 'Access-Control-Allow-Origin': '*' }, body: text,
+  }));
+  await page.goto(`${process.env.RNL_WEB_URL}/index.html?manifest=${encodeURIComponent('https://manifests.test/aids.json')}`);
+  await expect(dialog(page)).toBeVisible();
+  await expect(dialog(page).locator('.display-setting')).toHaveText([
+    'Names on hover: hidden',
+    'Roles on hover: shown',
+    'Registration points: shown',
+    'Flylines: shown',
+    'Net names: shown',
+    'Layout table: shown',
+    'Component and pin skeleton lines: shown',
+    'Wire skeleton lines: shown',
+  ]);
+  await dialog(page).getByRole('button', { name: 'Apply Selected', exact: true }).click();
+  await ready(page);
+  const applied = await page.evaluate(async () => {
+    const { hoverNamesOn, hoverRolesOn } = await import('./hover.js');
+    const { originsShown } = await import('./origins.js');
+    const { flylinesShown } = await import('./flylines.js');
+    const { netLabelsShown } = await import('./net-labels.js');
+    const { layoutShown } = await import('./layout-frame.js');
+    const { skeletonSymbolsShown, skeletonWiresShown } = await import('./skeleton-lines.js');
+    const { currentDisplay } = await import('./display.js');
+    const { load } = await import('./util.js');
+    return {
+      names: hoverNamesOn(), roles: hoverRolesOn(), origins: originsShown(), flylines: flylinesShown(),
+      netLabels: netLabelsShown(), layout: layoutShown(),
+      skeletonParts: skeletonSymbolsShown(), skeletonWires: skeletonWiresShown(),
+      flylinesHiddenClass: document.documentElement.classList.contains('flylines-hidden'),
+      written: currentDisplay(),
+      kept: {
+        names: load('hover-names', true), roles: load('hover-roles', false),
+        flylines: load('flylines-shown', false), layout: load('layout-shown', false),
+        skeletonParts: load('skeleton-symbols-shown', false), skeletonWires: load('skeleton-wires-shown', false),
+      },
+    };
+  });
+  expect(applied).toMatchObject({
+    names: false, roles: true, origins: true, flylines: true,
+    netLabels: true, layout: true, skeletonParts: true, skeletonWires: true,
+    flylinesHiddenClass: false,
+    kept: { names: true, roles: false, flylines: false, layout: false, skeletonParts: false, skeletonWires: false },
+  });
+  expect(applied.written).toMatchObject({
+    names: false, roles: true, origins: true, flylines: true,
+    'net-labels': true, layout: true, 'skeleton-parts': true, 'skeleton-wires': true,
+  });
+  await expect(page.locator('#canvas > svg > g.layout-table')).toHaveCount(1);
+  await expect(page.locator('#canvas > svg > g.skeleton-lines')).toHaveCount(1);
+  await expect(page.locator('#canvas > svg > g.origin-marks')).toHaveCount(1);
+  await expect(page.locator('#canvas > svg > g.net-labels')).toHaveCount(1);
+
+  // Opening a local file restores the user's own defaults.
+  await page.locator('#file-input').setInputFiles({ name: 'local.sp', mimeType: 'text/plain', buffer: Buffer.from('* local\nR1 a 0 1k\n* @RNL { #R1 @PLACE(0, 0) }\n.end\n') });
+  await expect.poll(() => page.evaluate(() => window.viewer.doc?.path)).toBe('/local.sp');
+  await ready(page);
+  const restored = await page.evaluate(async () => {
+    const { hoverNamesOn, hoverRolesOn } = await import('./hover.js');
+    const { flylinesShown } = await import('./flylines.js');
+    const { layoutShown } = await import('./layout-frame.js');
+    const { skeletonSymbolsShown, skeletonWiresShown } = await import('./skeleton-lines.js');
+    return {
+      names: hoverNamesOn(), roles: hoverRolesOn(), flylines: flylinesShown(),
+      layout: layoutShown(), skeletonParts: skeletonSymbolsShown(), skeletonWires: skeletonWiresShown(),
+      flylinesHiddenClass: document.documentElement.classList.contains('flylines-hidden'),
+    };
+  });
+  expect(restored).toEqual({
+    names: true, roles: false, flylines: false, layout: false,
+    skeletonParts: false, skeletonWires: false, flylinesHiddenClass: true,
+  });
+});

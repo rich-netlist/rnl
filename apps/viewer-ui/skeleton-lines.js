@@ -49,17 +49,17 @@ export function startSkeleton() {
 }
 
 /** Show or hide component and pin skeleton lines: `value` true or false, or inverted when omitted. */
-export function toggleSkeletonSymbols(value) {
+export function toggleSkeletonSymbols(value, { persist = true } = {}) {
   symbolsShown = typeof value === "boolean" ? value : !symbolsShown;
-  save("skeleton-symbols-shown", symbolsShown);
+  if (persist) save("skeleton-symbols-shown", symbolsShown);
   syncControls();
   window.dispatchEvent(new Event("skeleton-changed"));
 }
 
 /** Show or hide wire skeleton lines: `value` true or false, or inverted when omitted. */
-export function toggleSkeletonWires(value) {
+export function toggleSkeletonWires(value, { persist = true } = {}) {
   wiresShown = typeof value === "boolean" ? value : !wiresShown;
-  save("skeleton-wires-shown", wiresShown);
+  if (persist) save("skeleton-wires-shown", wiresShown);
   syncControls();
   window.dispatchEvent(new Event("skeleton-changed"));
 }

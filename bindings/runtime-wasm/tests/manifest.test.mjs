@@ -185,20 +185,30 @@ test("a file is decoded as client.js decodeText decodes it: UTF-8 without a BOM,
 test("display settings are given as proposed, and those of another shape are left out and named", async () => {
   const display = {
     view: { center: [12.5, -4], scale: 2 }, background: "dark", colors: { component: "#2275e2", net: "red" },
-    usages: false, currents: true, grid: "dots", zoomToFit: true,
+    names: false, roles: true, usages: false, currents: true, origins: true, flylines: true,
+    "net-labels": true, layout: true, "skeleton-parts": true, "skeleton-wires": false,
+    grid: "dots", zoomToFit: true,
   };
   const checked = checkManifest(manifest({ display }));
-  assert.deepEqual(checked.display, { view: { center: [12.5, -4], scale: 2 }, background: "dark", colors: { component: "#2275e2" },
-    usages: false, currents: true, grid: "dots", zoomToFit: true });
+  assert.deepEqual(checked.display, {
+    view: { center: [12.5, -4], scale: 2 }, background: "dark", colors: { component: "#2275e2" },
+    names: false, roles: true, usages: false, currents: true, origins: true, flylines: true,
+    "net-labels": true, layout: true, "skeleton-parts": true, "skeleton-wires": false,
+    grid: "dots", zoomToFit: true,
+  });
   // a colour is kept as written; a setting this module does not know is kept, for a newer viewer,
   // and named with those of another shape
   assert.deepEqual(checked.displayIgnored, ["colors.net", "zoomToFit"]);
+  const badBooleans = checkManifest(manifest({ display: { flylines: "1", layout: 1, "skeleton-parts": null } }));
+  assert.deepEqual(badBooleans.display, {});
+  assert.deepEqual(badBooleans.displayIgnored, ["flylines", "layout", "skeleton-parts"]);
   assert.deepEqual(checkManifest(manifest({ display: { view: { fit: true }, background: "sepia" } })).display, { view: { fit: true } });
   assert.deepEqual(checkManifest(manifest()).display, {});
   // a manifest written with them reads them back
   const encode = (text) => new TextEncoder().encode(text);
-  const written = await writeManifest({ archive: true, entry: "top.scs", display: { background: "light" },
+  const written = await writeManifest({ archive: true, entry: "top.scs",
+    display: { background: "light", flylines: true, layout: true, "skeleton-parts": true, "skeleton-wires": true },
     files: Object.entries(FILES).map(([path, text]) => ({ path, bytes: encode(text) })) });
   const read = await loadManifest(written, { readFile: async (path) => encode(FILES[path]) });
-  assert.deepEqual(read.display, { background: "light" });
+  assert.deepEqual(read.display, { background: "light", flylines: true, layout: true, "skeleton-parts": true, "skeleton-wires": true });
 });

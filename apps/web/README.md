@@ -44,7 +44,7 @@ A project, a gallery design and a manifest of links have one manifest format, fo
 
 - **Download Project** (web) and **Save Project** (desktop) write the archive. The desktop's files lose the directory all of them are in, so that includes between them resolve where the project is opened.
 - **Open Project** reads the archive, checks every file against the manifest, and makes the project's pool the Library's files, with the formats and settings it gives; its entry opens at its level. The web keeps the files under `/<name>/` in the page; the desktop asks for a folder to write them in, starting where the archive is, and asks before replacing files there; its Save Project then offers to save to the archive it opened. Opening a project does not change the desktop's PATH.
-- **Display settings.** A manifest may propose display settings, `display`: the view of its `level` (`{ "fit": true }`, or `{ "center": [x, y], "scale": k }` in the drawing's units and pixels per unit), the `background` (`light` or `dark`), `colors` of the colour scheme by their names, whether `usages` and `currents` are shown, and the `grid` (`none`, `dots` or `lines`). `?manifest=`, Load Manifest and Open Project list those it has, each with a box ticked, and apply the ones kept: they hold while a file of the manifest (or of the project) is shown, go back to your own settings for another file and come back, unasked, with a file of it again; they are never written into your settings, and a setting you change meanwhile is yours. The view is set when the manifest is opened. A setting this viewer does not know is told and kept. Download Project, Save Project and Download Manifest ask whether to write the display settings shown into it. Embedded viewers do not apply them: to hide the usage frames or show the current directions of an embedded drawing, use the `usages` and `currents` parameters or messages.
+- **Display settings.** A manifest may propose display settings, `display`: the view of its `level` (`{ "fit": true }`, or `{ "center": [x, y], "scale": k }` in the drawing's units and pixels per unit), the `background` (`light` or `dark`), `colors` of the colour scheme by their names, whether `names`, `roles`, `usages`, `currents`, `origins`, `flylines`, `net-labels`, `layout`, `skeleton-parts` and `skeleton-wires` are shown, and the `grid` (`none`, `dots` or `lines`). `?manifest=`, Load Manifest and Open Project list those it has, each with a box ticked, and apply the ones kept: they hold while a file of the manifest (or of the project) is shown, go back to your own settings for another file and come back, unasked, with a file of it again; they are never written into your settings, and a setting you change meanwhile is yours. The view is set when the manifest is opened. A setting this viewer does not know is told and kept. Download Project, Save Project and Download Manifest ask whether to write the display settings shown into it. Embedded viewers do not apply them: an embedded drawing sets its display through its URL parameters or messages ([Embedding](#embedding)).
 - A project's archive holds at most 5000 files and 1 GiB, and a file may be larger than a fetched manifest allows. The web opens projects of at most 256 MB, as its WebAssembly core holds a project's texts several times over; a larger one is to be opened in the desktop viewer.
 
 ## Touch and small screens
@@ -170,9 +170,16 @@ or native settings. The ordinary web viewer and desktop viewer keep their usual 
 | `level` | Subcircuit name | Automatic, as when opening normally | Initial level. |
 | `background` | `light`, `dark` | `light` | Drawing background, as in View › Background; also colours the floating controls. |
 | `grid` | `dots`, `lines`, `off` | `off` | Canvas grid. |
-| `names` | `1`, `0` | `1` | Show names on hover. |
-| `usages` | `1`, `0` | `0` | Show the usage frames, as View › Show Usages. An embedded drawing starts without them, and so does the complete viewer (every display aid but View › Show Names on Hover is off to begin with; a choice the user kept is kept). |
-| `currents` | `1`, `0` | `0` | Show the current directions, as View › Show Current Directions. An embedded drawing starts without them, as the complete viewer does; an embedding page that was written when they were shown writes `currents=1`. |
+| `names` | `1`, `0` | `1` | Show names on hover (View › Show Names on Hover); the only display aid on by default in an embedded drawing. |
+| `roles` | `1`, `0` | `0` | Show usage roles beside names on hover, as View › Show Roles on Hover. |
+| `usages` | `1`, `0` | `0` | Show the usage frames, as View › Show Usages. |
+| `currents` | `1`, `0` | `0` | Show the current directions, as View › Show Current Directions. |
+| `origins` | `1`, `0` | `0` | Show instance and usage registration points, as View › Show Registration Points. |
+| `flylines` | `1`, `0` | `0` | Show flylines between unwired connected parts, as View › Show Flylines. |
+| `net-labels` | `1`, `0` | `0` | Show net names on the drawing, as View › Show Net Names. |
+| `layout` | `1`, `0` | `0` | Show the layout table over the drawing, as Solve › Show Layout Table. |
+| `skeleton-parts` | `1`, `0` | `0` | Show component and pin skeleton lines, as Solve › Show Component and Pin Skeleton Lines. |
+| `skeleton-wires` | `1`, `0` | `0` | Show wire skeleton lines, as Solve › Show Wire Skeleton Lines. |
 | `origin` | An exact origin, e.g. `https://example.com` | Any origin | Accept messages only from this origin and reply to it. |
 
 Send object messages to the iframe's `contentWindow`, each with `rnl: 1`:
@@ -182,15 +189,16 @@ Send object messages to the iframe's `contentWindow`, each with `rnl: 1`:
 | `open` | `text` and `name` (e.g. `amp.sp`), `url`, or `manifest`; optional `requestId`, `packages` | Replace the netlist without reloading. The filename determines its dialect. |
 | `level` | `name` | Display that level. |
 | `fit` | None | Fit the drawing to the iframe. |
+| `display` | `values`: object of display settings (`background`: `"light"` or `"dark"`; `grid`: `"dots"`, `"lines"` or `"off"`; booleans `names`, `roles`, `usages`, `currents`, `origins`, `flylines`, `net-labels`, `layout`, `skeleton-parts`, `skeleton-wires`) | Change one or more display settings at once on this page without saving a user preference. |
 | `background` | `value`: `light` or `dark` | Change this page's drawing and floating controls' background without saving a user preference. |
-| `usages` | `value`: `true` or `false` | Show or hide the usage frames of this page, without saving a user preference. |
-| `currents` | `value`: `true` or `false` | Show or hide the current directions of this page, without saving a user preference. |
+| `grid` | `value`: `dots`, `lines`, or `off` | Change or hide this page's grid without saving a user preference. |
+| `names`, `roles`, `usages`, `currents`, `origins`, `flylines`, `net-labels`, `layout`, `skeleton-parts`, `skeleton-wires` | `value`: `true` or `false` | Show or hide that single display aid on this page without saving a user preference (including legacy `usages` and `currents` messages). |
 
 The iframe sends these messages to `window.parent`, also with `rnl: 1`:
 
 | `type` | Fields | When |
 | --- | --- | --- |
-| `ready` | `version`, `features`, `maxOpenBytes` | The page and WebAssembly core are ready for messages, once per page load. |
+| `ready` | `version`, `features`, `maxOpenBytes` | The page and WebAssembly core are ready for messages, once per page load. `features` lists `"display"` and every display item name this build supports (`"background"`, `"grid"`, `"names"`, `"roles"`, `"usages"`, `"currents"`, `"origins"`, `"flylines"`, `"net-labels"`, `"layout"`, `"skeleton-parts"`, `"skeleton-wires"`), alongside `"requestId"`, `"packages"` and `"manifest"`. |
 | `loaded` | `name`, `levels` (names), `level` (current name), `errors`, `warnings`, `violations` (counts; a violation, a statement about the circuit that does not hold, fails nothing, so an open with violations is successful), optional `requestId` | Each successful open. |
 | `level` | `name` | The current level changes, including mouse and keyboard navigation, and after an open. |
 | `error` | `message`, optional `requestId`, `reason` | A file cannot be fetched or built, has errors, or a requested level does not exist. |
@@ -203,14 +211,16 @@ A URL-backed drawing offers **Open in RNL Viewer ↗**
 in a new tab with the same URL minus `embed`; opening text hides this link. `level` in the URL
 applies to the initial file. Later opens use the normal automatic choice unless sent a `level` message.
 
-This minimal example switches two netlists without fetching across origins:
+This minimal example switches two netlists without fetching across origins and toggles layout and skeleton guides when the embedded viewer advertises `"display"` in `ready.features`:
 
 ```html
 <button id="rc" disabled>RC</button>
 <button id="divider" disabled>Divider</button>
+<label><input id="guides" type="checkbox" disabled> Layout &amp; skeleton</label>
 <iframe id="rnl" title="RNL circuit" style="width:100%;height:360px;border:0"></iframe>
 <script>
   const frame = document.getElementById("rnl");
+  const guides = document.getElementById("guides");
   const viewer = new URL("https://rich-netlist.github.io/rnl/viewer/?embed=1");
   viewer.searchParams.set("origin", location.origin);
   const examples = {
@@ -221,10 +231,16 @@ This minimal example switches two netlists without fetching across origins:
     document.getElementById(name).onclick = () => frame.contentWindow.postMessage(
       { rnl: 1, type: "open", name: `${name}.sp`, text }, viewer.origin);
   }
+  guides.onchange = () => frame.contentWindow.postMessage({
+    rnl: 1,
+    type: "display",
+    values: { layout: guides.checked, "skeleton-parts": guides.checked, "skeleton-wires": guides.checked }
+  }, viewer.origin);
   window.addEventListener("message", (event) => {
     if (event.source !== frame.contentWindow || event.origin !== viewer.origin || event.data?.rnl !== 1) return;
     if (event.data.type === "ready") {
       for (const name of Object.keys(examples)) document.getElementById(name).disabled = false;
+      if (event.data.features?.includes("display")) guides.disabled = false;
       document.getElementById("rc").click();
     }
   });

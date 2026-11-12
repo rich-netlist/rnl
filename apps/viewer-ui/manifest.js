@@ -44,13 +44,18 @@ export const MANIFEST_LIMITS = Object.freeze({
 const ID = /^[A-Za-z0-9_.-]{1,64}$/;
 const SHA256 = /^[0-9a-f]{64}$/;
 const COLOUR = /^#[0-9a-f]{6}$/i;
+const BOOLEAN_DISPLAY = new Set([
+  "names", "roles", "usages", "currents", "origins", "flylines",
+  "net-labels", "layout", "skeleton-parts", "skeleton-wires",
+]);
 
 /**
  * The display settings a manifest proposes, as a viewer offers them to apply (`display`): the view
  * of its level, `{ fit: true }` or `{ center: [x, y], scale }` in the drawing's units and pixels per
  * unit; the `background`, "light" or "dark"; `colors`, by the viewer's names, each "#RRGGBB", in
- * either case, as the manifest writes it;
- * whether `usages` and `currents` are shown; the `grid`, "none", "dots" or "lines". One of these of
+ * either case, as the manifest writes it; whether `names`, `roles`, `usages`, `currents`, `origins`,
+ * `flylines`, `net-labels`, `layout`, `skeleton-parts` and `skeleton-wires` are shown; and the
+ * `grid`, "none", "dots" or "lines". One of these of
  * another shape is left out of `display`; one this module does not know is kept in it as it is, for
  * a newer viewer and so that writing the manifest again loses nothing, and no viewer applies it.
  * `ignored` names both, what this viewer will not apply, so that it can say so and a manifest
@@ -78,7 +83,7 @@ function displaySettings(display) {
         if (colors.length) out.colors = Object.fromEntries(colors);
         ok = true;
       }
-    } else if (key === "usages" || key === "currents") {
+    } else if (BOOLEAN_DISPLAY.has(key)) {
       if (typeof value === "boolean") { out[key] = value; ok = true; }
     } else if (key === "grid") {
       if (["none", "dots", "lines"].includes(value)) { out.grid = value; ok = true; }
