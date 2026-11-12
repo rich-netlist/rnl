@@ -1,0 +1,23 @@
+[package]
+name = "rnl-solver-cli"
+description = "Independent RNL solver executable"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "rnl-solver"
+path = "src/main.rs"
+
+[dependencies]
+rnl-runtime.workspace = true
+rnl-solver.workspace = true
+rnl-solver-io = { path = "../rnl-solver-io" }
+serde_json.workspace = true
+
+[dev-dependencies]
+rnl-cli = { path = "../rnl-cli" }
+rnl-view.workspace = true

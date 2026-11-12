@@ -176,6 +176,36 @@ fn modern_jobs_keep_separate_trees_of_one_net() {
 }
 
 #[test]
+fn mixed_resolved_and_legacy_requests_keep_distinct_drawn_indices() {
+    use crate::resolve::tests::{instance, problem_of};
+    use rnl_runtime::problem::RouteIntent;
+    let mut problem = problem_of((0..4).map(|_| instance()).collect(), vec![]);
+    problem.version = "0.3".into();
+    problem.routes = [(true, 0, 1), (false, 2, 3)]
+        .into_iter()
+        .map(|(tree, a, b)| RouteIntent {
+            tree,
+            net: "shared".into(),
+            mode: "manhattan".into(),
+            style: vec![],
+            wires: vec![],
+            pins: [a, b].into_iter().map(|object| PointRef::Pin { object, pin: 0, terminal: "g".into() }).collect(),
+        })
+        .collect();
+    let options = SolverOptions::without_time_limit();
+    let resolved = crate::resolve(&problem, &options);
+    let mut work = Work::default();
+    let structure = crate::structure::analyse(&problem, &resolved, &options, crate::options::CAPS, &mut work);
+    let mut geometry = Geometry::new(4);
+    geometry.origin = vec![p(0, 0), p(12, 0), p(0, 12), p(12, 12)];
+    let origins = structure.origins(&problem, &geometry);
+    let routed = route(&problem, &structure, &geometry, &origins, &options, &mut work);
+    assert_eq!(routed.wires.len(), 2);
+    assert!(routed.wires.iter().zip(&routed.drawn).all(|(wire, drawn)| wire.route == *drawn));
+    assert_eq!(routed.drawn, [0, 1]);
+}
+
+#[test]
 fn a_modern_manhattan45_diagonal_has_no_zero_length_corner_segments() {
     use crate::resolve::tests::{point, problem_of};
     use rnl_runtime::problem::{ProblemWire, Reference};

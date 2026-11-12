@@ -8,6 +8,8 @@ members = [
     "crates/rnl-view",
     "crates/rnl-edit",
     "crates/rnl-solver",
+    "crates/rnl-solver-io",
+    "crates/rnl-solver-cli",
     "crates/rnl-cli",
     "bindings/runtime-wasm",
 ]

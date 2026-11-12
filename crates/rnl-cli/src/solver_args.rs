@@ -43,6 +43,7 @@ macro_rules! usage {
   --level TITLE       only the level with this title: a subcircuit name, or the file name
   --solver-options S  key=value;... over the solver's defaults, as for solve: the options the hash covers
   --previous          give each level what its type=\"generated\" record decided, as hints
+  --solver-input      emit the lossless input protocol for the independent rnl-solver program
   --solver-config S   RNL named parameters; repeated options merge by key, the last value wins
 solve options (the levels are read without their type=\"generated\" records; -o or --in-place is needed):
   -o DIR              write the files solved under DIR, named as they are relative to FILE's directory,
@@ -51,6 +52,9 @@ solve options (the levels are read without their type=\"generated\" records; -o 
   --solver-config S   0.4 settings, for example limit=\"time\",seconds=10 or limit=\"work\",work=100000
                       overrides file/package settings by key; run limits are tool-only
   --progress          report 0.4 stages and consumed work on standard error
+  --external-solver P run executable P with the solver input/result JSON protocol
+  --external-arg ARG  append one literal argument to P (repeatable; no shell)
+  --external-timeout S  stop P after S seconds per level (120 by default)
   --level TITLE       only the level with this title
   --solver-options S  key=value;... over the solver's defaults, for tolerance, grid, objectives, beam,
                       budget and time_limit, as rnl-solver's canonical text writes them; the hash
@@ -78,6 +82,10 @@ pub(crate) use usage;
 /// The options only the solver's commands take.
 #[derive(Default)]
 pub(crate) struct SolverArgs {
+    pub external: Option<PathBuf>,
+    pub external_args: Vec<String>,
+    pub external_timeout: Option<f64>,
+    pub solver_input: bool,
     pub progress: bool,
     pub configs: Vec<(bool, String)>,
     /// As given; `problem` and `solve` each have their own default.
@@ -91,11 +99,28 @@ impl SolverArgs {
     /// Take `option`, with its value from `rest` when it has one: true when it is one of these.
     pub fn take(&mut self, option: &str, rest: &mut impl Iterator<Item = String>) -> Result<bool, Said> {
         match option {
+            "--external-solver" => {
+                self.external =
+                    Some(PathBuf::from(rest.next().ok_or_else(|| needs("--external-solver needs a path"))?));
+            }
+            "--external-arg" => {
+                self.external_args.push(rest.next().ok_or_else(|| needs("--external-arg needs an argument"))?);
+            }
+            "--external-timeout" => {
+                let value = rest.next().ok_or_else(|| needs("--external-timeout needs seconds"))?;
+                let seconds: f64 =
+                    value.parse().map_err(|_| needs("--external-timeout needs positive finite seconds"))?;
+                if !seconds.is_finite() || seconds <= 0. || std::time::Duration::try_from_secs_f64(seconds).is_err() {
+                    return Err(needs("--external-timeout needs positive finite seconds"));
+                }
+                self.external_timeout = Some(seconds);
+            }
             "--progress" => self.progress = true,
             "--solver-config" => {
                 self.configs.push((false, rest.next().ok_or_else(|| needs("--solver-config needs a text"))?))
             }
             "--previous" => self.previous = true,
+            "--solver-input" => self.solver_input = true,
             "--solver-options" => {
                 self.configs.push((true, rest.next().ok_or_else(|| needs("--solver-options needs a text"))?))
             }
@@ -111,6 +136,15 @@ impl SolverArgs {
 
     /// Refuse what `command` does not take.
     pub fn check(&self, command: &str) -> Result<(), Said> {
+        if self.external.is_none() && (!self.external_args.is_empty() || self.external_timeout.is_some()) {
+            return Err(needs("--external-arg and --external-timeout require --external-solver"));
+        }
+        if self.external.is_some() && self.profile.is_some() {
+            return Err(needs("--profile observes the embedded solver; it cannot be combined with --external-solver"));
+        }
+        if self.solver_input && self.previous {
+            return Err("--previous is available only in the readable problem format; omit --solver-input".into());
+        }
         if self.profile.is_some() && command != "solve" {
             return Err(Said::new(codes::CLI_OPTION_WRONG_COMMAND, "--profile is an option of solve"));
         }
@@ -179,6 +213,30 @@ pub(crate) fn problem(args: &Args, provider: &FsProvider) -> Result<ExitCode, Sa
     } else {
         (rnl_cli::interpret_file_with(&args.file, dialect, &args.formats, provider, &options)?, Vec::new())
     };
+    if args.solver.solver_input {
+        let diagnostics = r.diagnostics();
+        for diagnostic in &diagnostics {
+            eprintln!("{}", r.sink.render(diagnostic));
+        }
+        if diagnostics.iter().any(|d| d.severity == rnl_runtime::diag::Severity::Error) {
+            return Ok(ExitCode::from(1));
+        }
+        let levels: Vec<_> = r
+            .problems
+            .iter()
+            .filter(|p| args.level.as_ref().is_none_or(|t| *t == p.title))
+            .map(|p| rnl_solver_io::LevelInput { problem: p.clone(), options: solver.clone() })
+            .collect();
+        if levels.is_empty() {
+            if let Some(title) = &args.level {
+                return Err(Said::new(codes::SOLVE_NO_LEVEL_TITLED, format!("no drawing level is titled {title}")));
+            }
+        }
+        let input = rnl_solver_io::encode_input(&rnl_solver_io::InputDocument { levels })
+            .map_err(|e| Said::from(format!("cannot export solver input: {e}")))?;
+        println!("{}", serde_json::to_string_pretty(&input).unwrap());
+        return Ok(ExitCode::SUCCESS);
+    }
     let levels: Vec<_> = r
         .problems
         .iter()
@@ -267,7 +325,19 @@ pub(crate) fn solve(args: &Args, provider: &FsProvider) -> Result<ExitCode, Said
     let wall_clock = WallClock::new();
     let clock: &dyn rnl_solver::Clock = profile_clock.as_ref().map_or(&wall_clock as &dyn rnl_solver::Clock, |c| c);
     let observed = ProgressClock { inner: clock, enabled: args.solver.progress };
-    let result = rnl_cli::solve::solve_with_clock(&args.file, provider, &options, &observed);
+    let result = if let Some(program) = &args.solver.external {
+        rnl_cli::solve::solve_using(&args.file, provider, &options, &|_| true, &|problem, options| {
+            rnl_cli::external_solver::solve(
+                program,
+                &args.solver.external_args,
+                args.solver.external_timeout.unwrap_or(120.),
+                problem,
+                options,
+            )
+        })
+    } else {
+        rnl_cli::solve::solve_with_clock(&args.file, provider, &options, &observed)
+    };
     if let Some(clock) = &profile_clock {
         clock.finish(result.is_ok())?;
     }
@@ -284,7 +354,7 @@ pub(crate) fn solve(args: &Args, provider: &FsProvider) -> Result<ExitCode, Said
             ));
         }
     }
-    if run.levels.iter().all(|l| l.solved.report.budget.is_none()) {
+    if args.solver.external.is_none() && run.levels.iter().all(|l| l.solved.report.budget.is_none()) {
         println!("solver options: {}", options.solver.canonical());
     }
     if run.levels.is_empty() && run.not_solved.is_empty() {

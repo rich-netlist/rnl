@@ -147,6 +147,8 @@ pub struct SolvedLevel {
     /// The problem solved, as the document read before this level was written back gave it.
     pub problem: LevelProblem,
     pub solved: Solved,
+    /// False when an external solver supplied no fact or work report.
+    pub report_available: bool,
     /// The record as [`write_record`] gives it, with what it cannot hold (`unsolved`) and what it
     /// holds although a solver should not do it (`notes`); and, among the notes, why it is not
     /// written into the file when the level lies in a region written to be encrypted (2.2).
@@ -385,7 +387,37 @@ pub fn solve_watched(
     clock: &dyn Clock,
     watch: &dyn Fn(&Progress) -> bool,
 ) -> Result<SolveRun, String> {
-    let (run, wants) = pass(file, files, options, clock, &[], watch)?;
+    solve_using(file, files, options, watch, &|p, options| {
+        Ok(BackendResult {
+            solved: rnl_solver::solve_with_clock(p, options, clock),
+            author: AUTHOR.to_string(),
+            report_available: true,
+        })
+    })
+}
+
+/// Validated decisions from a caller-selected solver.
+pub struct BackendResult {
+    pub solved: Solved,
+    pub author: String,
+    /// Whether the solver supplied a report; missing reports must not be shown as zero facts.
+    pub report_available: bool,
+}
+
+type Backend<'a> = dyn Fn(&LevelProblem, &SolverOptions) -> Result<BackendResult, String> + 'a;
+
+/// Solve through a caller-selected backend, preserving the normal in-memory writeback and
+/// version-raising passes. The backend must validate its complete response against `problem`
+/// before returning. No files are written by this function, including when a later level fails.
+/// The returned author is quoted by the runtime writer, never parsed as RNL code.
+pub fn solve_using(
+    file: &Path,
+    files: &dyn Provider,
+    options: &SolveOptions,
+    watch: &dyn Fn(&Progress) -> bool,
+    backend: &Backend<'_>,
+) -> Result<SolveRun, String> {
+    let (run, wants) = pass(file, files, options, &[], watch, backend)?;
     if wants.is_empty() {
         return Ok(run);
     }
@@ -432,7 +464,7 @@ pub fn solve_watched(
     }
     // the files read are those of the first pass: the second reads the files raised from memory
     let read = run.read.clone();
-    let mut run = if texts.is_empty() { run } else { pass(file, files, options, clock, &texts, watch)?.0 };
+    let mut run = if texts.is_empty() { run } else { pass(file, files, options, &texts, watch, backend)?.0 };
     run.read = read;
     // a file level that cannot say 0.3 itself, such as a library section without a header record,
     // takes the version of the file that includes it (16.1): when that one is raised, it reads in
@@ -469,9 +501,9 @@ fn pass(
     file: &Path,
     files: &dyn Provider,
     options: &SolveOptions,
-    clock: &dyn Clock,
     raised: &[(String, String)],
     watch: &dyn Fn(&Progress) -> bool,
+    backend: &Backend<'_>,
 ) -> Result<(SolveRun, Vec<Want>), String> {
     let entry = path_str(file);
     let runtime = options.runtime();
@@ -570,10 +602,10 @@ fn pass(
             .find(|p| p.level == level && p.title == title)
             .ok_or_else(|| format!("the level {title} is not read again after the levels before it were solved"))?;
         let start = Instant::now();
-        let solved = rnl_solver::solve_with_clock(p, &options.solver, clock);
+        let BackendResult { solved, author, report_available } = backend(p, &options.solver)?;
         let time = start.elapsed();
         let hash = sig2(p, solved.report.canonical_options.as_deref().unwrap_or(&canonical));
-        let mut written = write_record(p, &solved.solution, AUTHOR, &hash);
+        let mut written = write_record(p, &solved.solution, &author, &hash);
         let mut write_errors = Vec::new();
         let host = &r.doc.levels[p.level];
         let path = normalize(&host.path);
@@ -680,6 +712,7 @@ fn pass(
         levels.push(SolvedLevel {
             problem: p.clone(),
             solved,
+            report_available,
             written,
             write_errors,
             record,
@@ -1063,6 +1096,9 @@ pub fn report(level: &SolvedLevel, all: bool) -> Vec<String> {
         r.discarded.len(),
         count(p.facts.len(), "fact")
     )];
+    if !level.report_available {
+        out[0] = format!("level {} ({} in {}): fact report not supplied", p.title, p.kind, file_name(&level.path));
+    }
     if let Some(canonical) = &r.canonical_options {
         out.push(format!("  replay options: {canonical}"));
     }
@@ -1097,7 +1133,7 @@ pub fn report(level: &SolvedLevel, all: bool) -> Vec<String> {
             }
         }
     };
-    if all {
+    if all && level.report_available {
         out.push("  facts, in the order of 8.5:".to_string());
         for k in 0..p.facts.len() {
             if r.kept.contains(&k) {
@@ -1168,13 +1204,15 @@ pub fn report(level: &SolvedLevel, all: bool) -> Vec<String> {
     section(&mut out, "inert objectives", r.inert_objectives.clone());
     section(&mut out, "notes", r.notes.iter().chain(&level.written.notes).cloned().collect());
     let w = &r.work;
-    out.push(format!(
-        "  work: {}, {}, {}, {}",
-        count(w.resolve_nodes as usize, "resolve node"),
-        count(w.pivots as usize, "pivot"),
-        count(w.candidates as usize, "candidate"),
-        count(w.astar_expansions as usize, "A* expansion")
-    ));
+    if level.report_available {
+        out.push(format!(
+            "  work: {}, {}, {}, {}",
+            count(w.resolve_nodes as usize, "resolve node"),
+            count(w.pivots as usize, "pivot"),
+            count(w.candidates as usize, "candidate"),
+            count(w.astar_expansions as usize, "A* expansion")
+        ));
+    }
     out.push(format!("  time: {:.3} s", level.time.as_secs_f64()));
     out.push(format!("  hash: {}", level.hash));
     out

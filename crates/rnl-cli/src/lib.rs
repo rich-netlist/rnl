@@ -5,6 +5,8 @@
 pub mod codec;
 pub mod dump;
 pub mod explain;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod external_solver;
 pub mod png;
 pub mod preview;
 pub mod problem;

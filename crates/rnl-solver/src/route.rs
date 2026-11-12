@@ -1957,11 +1957,9 @@ pub(crate) fn route(
     work.astar_expansions += expansions;
     let mut routing = Routing { expansions, ..Routing::default() };
     for (j, (job, out)) in jobs.iter().zip(outs).enumerate() {
-        let drawn = if layout.modern || problem.routes[job.route].tree {
-            j
-        } else {
-            s.connections.drawn.iter().position(|d| d.routed && d.net == job.net).unwrap_or(j)
-        };
+        // Jobs and the routed entries of Connections::drawn use the same grouping order.
+        // A net-name lookup would confuse a resolved tree with a legacy request on its net.
+        let drawn = j;
         let offset = routing.branches.len();
         routing
             .branches

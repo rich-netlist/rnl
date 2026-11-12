@@ -2960,9 +2960,11 @@ dependencies = [
  "rnl-render",
  "rnl-runtime",
  "rnl-solver",
+ "rnl-solver-io",
  "rnl-view",
  "serde",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]
@@ -3020,6 +3022,16 @@ dependencies = [
  "rnl-render",
  "rnl-runtime",
  "scoped-tls-hkt",
+]
+
+[[package]]
+name = "rnl-solver-io"
+version = "0.5.5"
+dependencies = [
+ "rnl-runtime",
+ "rnl-solver",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
