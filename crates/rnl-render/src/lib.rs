@@ -71,11 +71,7 @@ pub fn modern_text(
         (libm::sin(rad), libm::cos(rad))
     };
     let (box_u, box_v) = (owner.apply((cs, sn)), owner.apply((-sn, cs)));
-    let (mut u, mut v) = if fix_rotate {
-        ((cs, sn), (-sn, cs))
-    } else {
-        (box_u, box_v)
-    };
+    let (mut u, mut v) = if fix_rotate { ((cs, sn), (-sn, cs)) } else { (box_u, box_v) };
     if upright {
         // Remove glyph reflection while leaving the box-side transform independent.
         if u.0 * v.1 - u.1 * v.0 < 0.0 {
@@ -92,11 +88,7 @@ pub fn modern_text(
             _ => unreachable!("an orientation has an orthogonal unit x axis"),
         };
         let rotation = rotate.rem_euclid(360.0);
-        let angle = if fix_rotate {
-            rotation
-        } else {
-            (base + f64::from(a * d - b * c) * rotation).rem_euclid(360.0)
-        };
+        let angle = if fix_rotate { rotation } else { (base + f64::from(a * d - b * c) * rotation).rem_euclid(360.0) };
         if angle > 90.0 && angle <= 270.0 {
             u = (-u.0, -u.1);
             v = (-v.0, -v.1);
@@ -146,25 +138,14 @@ pub fn modern_text(
         _ => "middle",
     }
     .into();
-    let local = if keep_baseline && sign(y) < 0 {
-        lay_out_reflected_baseline(&mut t, scale)
-    } else {
-        lay_out(&mut t, scale)
-    };
+    let local =
+        if keep_baseline && sign(y) < 0 { lay_out_reflected_baseline(&mut t, scale) } else { lay_out(&mut t, scale) };
     let tx = anchor.0 - u.0 * anchor.0 - v.0 * anchor.1;
     let ty = anchor.1 - u.1 * anchor.0 - v.1 * anchor.1;
     let affine = [u.0, v.0, u.1, v.1, tx, ty];
     let mut b = [f64::MAX, f64::MAX, f64::MIN, f64::MIN];
-    for (x, y) in [
-        (local[0], local[1]),
-        (local[0], local[3]),
-        (local[2], local[1]),
-        (local[2], local[3]),
-    ] {
-        let p = (
-            affine[0] * x + affine[1] * y + tx,
-            affine[2] * x + affine[3] * y + ty,
-        );
+    for (x, y) in [(local[0], local[1]), (local[0], local[3]), (local[2], local[1]), (local[2], local[3])] {
+        let p = (affine[0] * x + affine[1] * y + tx, affine[2] * x + affine[3] * y + ty);
         b = [b[0].min(p.0), b[1].min(p.1), b[2].max(p.0), b[3].max(p.1)];
     }
     t.transform = Some(affine);
@@ -190,10 +171,7 @@ pub fn flyline_id(k: usize) -> String {
 
 impl Default for RenderOptions {
     fn default() -> RenderOptions {
-        RenderOptions {
-            scale: 14.0,
-            flylines: false,
-        }
+        RenderOptions { scale: 14.0, flylines: false }
     }
 }
 
@@ -358,12 +336,8 @@ struct Eff {
 
 impl Eff {
     fn from(st: &Style) -> Eff {
-        let s = |k: &str, d: &str| {
-            style_get(st, k)
-                .and_then(Lit::str)
-                .map(String::from)
-                .unwrap_or_else(|| d.to_string())
-        };
+        let s =
+            |k: &str, d: &str| style_get(st, k).and_then(Lit::str).map(String::from).unwrap_or_else(|| d.to_string());
         let n = |k: &str, d: f64| style_get(st, k).and_then(Lit::num).unwrap_or(d);
         let b = |k: &str| style_get(st, k).and_then(Lit::boolean).unwrap_or(false);
         Eff {
@@ -374,9 +348,7 @@ impl Eff {
             cap: s("cap", "round"),
             join: s("join", "round"),
             size: n("size", 1.0),
-            textcolor: style_get(st, "textcolor")
-                .and_then(Lit::str)
-                .map(String::from),
+            textcolor: style_get(st, "textcolor").and_then(Lit::str).map(String::from),
             font: s("font", "sans-serif"),
             bold: b("bold"),
             italic: b("italic"),
@@ -436,13 +408,7 @@ impl Out {
         if pts.is_empty() {
             b = [0.0; 4];
         }
-        self.prims.push(Primitive {
-            owner: owner.to_string(),
-            layer,
-            order,
-            kind,
-            bbox: b,
-        });
+        self.prims.push(Primitive { owner: owner.to_string(), layer, order, kind, bbox: b });
     }
 
     /// A graphic (9.2.5) at scene points.
@@ -480,27 +446,13 @@ impl Out {
             Shape::Rectangle => {
                 let (a, b) = if pts.len() == 1 {
                     let (w, h) = (params.width.unwrap_or(0.0), params.height.unwrap_or(0.0));
-                    (
-                        (pts[0].0 - w / 2.0, pts[0].1 - h / 2.0),
-                        (pts[0].0 + w / 2.0, pts[0].1 + h / 2.0),
-                    )
+                    ((pts[0].0 - w / 2.0, pts[0].1 - h / 2.0), (pts[0].0 + w / 2.0, pts[0].1 + h / 2.0))
                 } else {
                     (pts[0], pts[1])
                 };
                 let min = (a.0.min(b.0), a.1.min(b.1));
                 let max = (a.0.max(b.0), a.1.max(b.1));
-                self.push(
-                    owner,
-                    layer,
-                    order,
-                    Kind::Rect {
-                        min,
-                        max,
-                        strokes,
-                        fill,
-                    },
-                    &[min, max],
-                );
+                self.push(owner, layer, order, Kind::Rect { min, max, strokes, fill }, &[min, max]);
             }
             Shape::Circle => {
                 let (c, r) = if pts.len() == 1 {
@@ -512,22 +464,13 @@ impl Out {
                     owner,
                     layer,
                     order,
-                    Kind::Circle {
-                        c,
-                        r,
-                        strokes,
-                        fill,
-                    },
+                    Kind::Circle { c, r, strokes, fill },
                     &[(c.0 - r, c.1 - r), (c.0 + r, c.1 + r)],
                 );
             }
             Shape::Ellipse => {
                 let (c, rx, ry) = if pts.len() == 1 {
-                    (
-                        pts[0],
-                        params.width.unwrap_or(0.0) / 2.0,
-                        params.height.unwrap_or(0.0) / 2.0,
-                    )
+                    (pts[0], params.width.unwrap_or(0.0) / 2.0, params.height.unwrap_or(0.0) / 2.0)
                 } else {
                     (
                         ((pts[0].0 + pts[1].0) / 2.0, (pts[0].1 + pts[1].1) / 2.0),
@@ -539,13 +482,7 @@ impl Out {
                     owner,
                     layer,
                     order,
-                    Kind::Ellipse {
-                        c,
-                        rx,
-                        ry,
-                        strokes,
-                        fill,
-                    },
+                    Kind::Ellipse { c, rx, ry, strokes, fill },
                     &[(c.0 - rx, c.1 - ry), (c.0 + rx, c.1 + ry)],
                 );
             }
@@ -583,17 +520,7 @@ impl Out {
         if strokes.is_empty() && fill.is_none() {
             return;
         }
-        self.push(
-            owner,
-            layer,
-            order,
-            Kind::Path {
-                segs,
-                strokes,
-                fill,
-            },
-            pts,
-        );
+        self.push(owner, layer, order, Kind::Path { segs, strokes, fill }, pts);
     }
 
     /// Arrow heads at the ends of a line (9.2.5): filled triangles in the line colour.
@@ -619,11 +546,8 @@ impl Out {
         };
         let size = if e.arrowsize > 0.0 { e.arrowsize } else { 0.6 };
         for end in ends {
-            let (tip, mut prev) = if *end == "end" {
-                (pts[pts.len() - 1], pts[pts.len() - 2])
-            } else {
-                (pts[0], pts[1])
-            };
+            let (tip, mut prev) =
+                if *end == "end" { (pts[pts.len() - 1], pts[pts.len() - 2]) } else { (pts[0], pts[1]) };
             if shape == Shape::Bezier && prev == tip {
                 // A coincident control point gives no tangent; use the next distinct point (9.2.5).
                 let next = if *end == "end" {
@@ -653,21 +577,12 @@ impl Out {
             let w = size * 0.35;
             let p1 = (b.0 - uy * w, b.1 + ux * w);
             let p2 = (b.0 + uy * w, b.1 - ux * w);
-            let segs = vec![
-                PathSeg::Move(tip),
-                PathSeg::Line(p1),
-                PathSeg::Line(p2),
-                PathSeg::Close,
-            ];
+            let segs = vec![PathSeg::Move(tip), PathSeg::Line(p1), PathSeg::Line(p2), PathSeg::Close];
             self.push(
                 owner,
                 layer,
                 sub(&order, 0.5),
-                Kind::Path {
-                    segs,
-                    strokes: Vec::new(),
-                    fill: Some(e.linecolor.clone()),
-                },
+                Kind::Path { segs, strokes: Vec::new(), fill: Some(e.linecolor.clone()) },
                 &[tip, p1, p2],
             );
         }
@@ -722,16 +637,9 @@ impl Out {
         let size = if e.size > 0.0 { e.size } else { 1.0 };
         let color = e.textcolor.clone().unwrap_or_else(|| e.linecolor.clone());
         if baseline_mirrors {
-            let (t, bbox) = modern_text(
-                anchor, lines, halign, valign, rotate, st, code, fix_rotate, upright, self.scale,
-            );
-            self.push(
-                owner,
-                layer,
-                sub(&order, 0.9),
-                Kind::Text(t),
-                &[(bbox[0], bbox[1]), (bbox[2], bbox[3])],
-            );
+            let (t, bbox) =
+                modern_text(anchor, lines, halign, valign, rotate, st, code, fix_rotate, upright, self.scale);
+            self.push(owner, layer, sub(&order, 0.9), Kind::Text(t), &[(bbox[0], bbox[1]), (bbox[2], bbox[3])]);
             return;
         }
         let (halign, valign) = if baseline_mirrors && fix_rotate {
@@ -783,13 +691,7 @@ impl Out {
         } else {
             lay_out(&mut t, self.scale)
         };
-        self.push(
-            owner,
-            layer,
-            sub(&order, 0.9),
-            Kind::Text(t),
-            &[(x0, y0), (x1, y1)],
-        );
+        self.push(owner, layer, sub(&order, 0.9), Kind::Text(t), &[(x0, y0), (x1, y1)]);
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -811,10 +713,7 @@ impl Out {
             let gpts: Vec<Pt> = p.points.iter().map(|q| place(base, code, *q)).collect();
             let key = sub(order, p.order as f64);
             if p.shape == Shape::Text {
-                let lines = texts
-                    .get(&format!("{path}{k}"))
-                    .cloned()
-                    .unwrap_or_default();
+                let lines = texts.get(&format!("{path}{k}")).cloned().unwrap_or_default();
                 self.text(
                     owner,
                     gpts[0],
@@ -833,10 +732,7 @@ impl Out {
                 continue;
             }
             let mut params = p.params.clone();
-            if matches!(p.shape, Shape::Rectangle | Shape::Ellipse)
-                && p.points.len() == 1
-                && code.swaps_axes()
-            {
+            if matches!(p.shape, Shape::Rectangle | Shape::Ellipse) && p.points.len() == 1 && code.swaps_axes() {
                 // the centred form turns with the symbol
                 std::mem::swap(&mut params.width, &mut params.height);
             }
@@ -845,13 +741,8 @@ impl Out {
         // pin names: shown by this viewer just inside the pin, past the pin's lead when a line of
         // the symbol runs from the pin inwards, so that a block's names are inside its body (9.2.4
         // leaves it to the viewer)
-        let labels_after = sym
-            .prims
-            .iter()
-            .map(|p| p.order)
-            .chain(sym.nested.iter().map(|n| n.order))
-            .max()
-            .map_or(0, |n| n + 1);
+        let labels_after =
+            sym.prims.iter().map(|p| p.order).chain(sym.nested.iter().map(|n| n.order)).max().map_or(0, |n| n + 1);
         for (k, pin) in sym.pins.iter().enumerate() {
             let (Some(label), Some(dir)) = (&pin.label, pin.dir) else {
                 continue;
@@ -867,8 +758,7 @@ impl Out {
                 .iter()
                 .filter(|p| p.shape == Shape::Line && p.points.len() == 2)
                 .filter_map(|p| {
-                    let near =
-                        |q: Pt| (q.0 - pin.pos.0).abs() < 1e-9 && (q.1 - pin.pos.1).abs() < 1e-9;
+                    let near = |q: Pt| (q.0 - pin.pos.0).abs() < 1e-9 && (q.1 - pin.pos.1).abs() < 1e-9;
                     let other = if near(p.points[0]) {
                         p.points[1]
                     } else if near(p.points[1]) {
@@ -882,10 +772,7 @@ impl Out {
                     (along > 1e-9 && across.abs() < 1e-9).then_some(along)
                 })
                 .fold(0.0, f64::max);
-            let at = (
-                pin.pos.0 + (lead + 0.45) * inward.0,
-                pin.pos.1 + (lead + 0.45) * inward.1,
-            );
+            let at = (pin.pos.0 + (lead + 0.45) * inward.0, pin.pos.1 + (lead + 0.45) * inward.1);
             let halign = if inward == (-1.0, 0.0) {
                 "end"
             } else if inward == (1.0, 0.0) {
@@ -902,10 +789,7 @@ impl Out {
             };
             let mut st = own.clone();
             st.insert("size".into(), Lit::Num(0.55));
-            st.insert(
-                "textcolor".into(),
-                Lit::Str(rnl_runtime::interp::obj::WStr::new("#6b6b70", None)),
-            );
+            st.insert("textcolor".into(), Lit::Str(rnl_runtime::interp::obj::WStr::new("#6b6b70", None)));
             self.text(
                 owner,
                 place(base, code, at),
@@ -944,10 +828,7 @@ impl Out {
 fn rot_vec(v: Pt, deg: i64) -> Pt {
     let r = (deg as f64).to_radians();
     let (sin, cos) = (libm::sin(r), libm::cos(r));
-    (
-        (v.0 * cos - v.1 * sin).round(),
-        (v.0 * sin + v.1 * cos).round(),
-    )
+    ((v.0 * cos - v.1 * sin).round(), (v.0 * sin + v.1 * cos).round())
 }
 
 fn dist(a: Pt, b: Pt) -> f64 {
@@ -961,11 +842,7 @@ pub fn circle3(a: Pt, b: Pt, c: Pt) -> Option<(Pt, f64)> {
     if d.abs() < 1e-12 {
         return None;
     }
-    let (aa, bb, cc) = (
-        a.0 * a.0 + a.1 * a.1,
-        b.0 * b.0 + b.1 * b.1,
-        c.0 * c.0 + c.1 * c.1,
-    );
+    let (aa, bb, cc) = (a.0 * a.0 + a.1 * a.1, b.0 * b.0 + b.1 * b.1, c.0 * c.0 + c.1 * c.1);
     let ux = (aa * (b.1 - c.1) + bb * (c.1 - a.1) + cc * (a.1 - b.1)) / d;
     let uy = (aa * (c.0 - b.0) + bb * (a.0 - c.0) + cc * (b.0 - a.0)) / d;
     Some(((ux, uy), dist(a, (ux, uy))))
@@ -982,38 +859,23 @@ fn arc_segs(a: Pt, b: Pt, c: Pt) -> Vec<PathSeg> {
     let two_pi = std::f64::consts::TAU;
     let sweep_ccw = (ang(c) - ang(a)).rem_euclid(two_pi);
     let span = if ccw { sweep_ccw } else { two_pi - sweep_ccw };
-    vec![
-        PathSeg::Move(a),
-        PathSeg::Arc {
-            r,
-            large: span > std::f64::consts::PI,
-            ccw,
-            to: c,
-        },
-    ]
+    vec![PathSeg::Move(a), PathSeg::Arc { r, large: span > std::f64::consts::PI, ccw, to: c }]
 }
 
 /// The bounding box of each text of the level as it is drawn, `x0, y0, x1, y1` in scene units, in
 /// the order of `lv.texts`; None for a text that draws nothing. The primitives of texts that have
 /// the same id are not told apart by their owner; this is how a viewer finds where one text is.
 pub fn text_boxes(lv: &LevelView, o: &RenderOptions) -> Vec<Option<[f64; 4]>> {
-    let mut out = Out {
-        prims: Vec::new(),
-        scale: o.scale,
-    };
+    let mut out = Out { prims: Vec::new(), scale: o.scale };
     lv.texts
         .iter()
         .map(|t| {
             let from = out.prims.len();
             out.view_text(t);
-            out.prims[from..].iter().map(|p| p.bbox).reduce(|a, b| {
-                [
-                    a[0].min(b[0]),
-                    a[1].min(b[1]),
-                    a[2].max(b[2]),
-                    a[3].max(b[3]),
-                ]
-            })
+            out.prims[from..]
+                .iter()
+                .map(|p| p.bbox)
+                .reduce(|a, b| [a[0].min(b[0]), a[1].min(b[1]), a[2].max(b[2]), a[3].max(b[3])])
         })
         .collect()
 }
@@ -1021,15 +883,10 @@ pub fn text_boxes(lv: &LevelView, o: &RenderOptions) -> Vec<Option<[f64; 4]>> {
 /// The primitives of one level, in drawing order: by layer, then by position (11.6), with their
 /// strokes resolved at the scale of `o`.
 pub fn primitives(lv: &LevelView, o: &RenderOptions) -> Vec<Primitive> {
-    let mut out = Out {
-        prims: Vec::new(),
-        scale: o.scale,
-    };
+    let mut out = Out { prims: Vec::new(), scale: o.scale };
     for it in &lv.items {
         let sym = &lv.symbols[it.symbol];
-        out.symbol(
-            lv, &it.id, sym, it.at, it.orient, &it.style, it.layer, &it.order, &it.texts, "",
-        );
+        out.symbol(lv, &it.id, sym, it.at, it.orient, &it.style, it.layer, &it.order, &it.texts, "");
     }
     for w in &lv.wires {
         let e = Eff::from(&w.style);
@@ -1038,51 +895,21 @@ pub fn primitives(lv: &LevelView, o: &RenderOptions) -> Vec<Primitive> {
         }
         let mut segs = vec![PathSeg::Move(w.points[0])];
         segs.extend(w.points[1..].iter().map(|p| PathSeg::Line(*p)));
-        out.path(
-            &w.id,
-            segs,
-            e.strokes(o.scale),
-            None,
-            w.layer,
-            w.order.clone(),
-            &w.points,
-        );
+        out.path(&w.id, segs, e.strokes(o.scale), None, w.layer, w.order.clone(), &w.points);
     }
     for (k, f) in lv.flylines.iter().enumerate().filter(|_| o.flylines) {
-        let kind = Kind::Flyline {
-            a: f.a,
-            b: f.b,
-            strokes: vec![line::flyline()],
-        };
-        out.push(
-            &flyline_id(k),
-            Layer::Middle,
-            vec![2.0, 0.0],
-            kind,
-            &[f.a, f.b],
-        );
+        let kind = Kind::Flyline { a: f.a, b: f.b, strokes: vec![line::flyline()] };
+        out.push(&flyline_id(k), Layer::Middle, vec![2.0, 0.0], kind, &[f.a, f.b]);
     }
     for s in &lv.shapes {
-        out.shape(
-            "",
-            s.shape,
-            &s.points,
-            &s.params,
-            &s.style,
-            s.layer,
-            s.order.clone(),
-        );
+        out.shape("", s.shape, &s.points, &s.params, &s.style, s.layer, s.order.clone());
     }
     for t in &lv.texts {
         out.view_text(t);
     }
     let mut prims = out.prims;
     prims.sort_by(|a, b| {
-        a.layer.cmp(&b.layer).then_with(|| {
-            a.order
-                .partial_cmp(&b.order)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        })
+        a.layer.cmp(&b.layer).then_with(|| a.order.partial_cmp(&b.order).unwrap_or(std::cmp::Ordering::Equal))
     });
     prims
 }
@@ -1114,10 +941,7 @@ mod tests {
                         let (large, bounds) = draw(rotate);
                         let (reduced, expected) = draw(rotate.rem_euclid(360.0));
                         assert_eq!(large.transform, reduced.transform);
-                        assert_eq!(
-                            (large.halign, large.valign),
-                            (reduced.halign, reduced.valign)
-                        );
+                        assert_eq!((large.halign, large.valign), (reduced.halign, reduced.valign));
                         assert_eq!(bounds, expected);
                     }
                 }
@@ -1139,10 +963,7 @@ mod tests {
             true,
             14.0,
         );
-        assert_eq!(
-            (text.halign.as_str(), text.valign.as_str()),
-            ("end", "middle")
-        );
+        assert_eq!((text.halign.as_str(), text.valign.as_str()), ("end", "middle"));
         assert!(b[0] < -1.0 && b[2].abs() < 1e-9, "{b:?}");
         assert!((b[1] + b[3]).abs() < 1e-9, "{b:?}");
     }
@@ -1270,14 +1091,7 @@ mod tests {
             };
             let det = f64::from(a * d - b * c);
             for fix in [false, true] {
-                for target in [
-                    90.0 - 1e-8,
-                    90.0,
-                    90.0 + 1e-8,
-                    270.0 - 1e-8,
-                    270.0,
-                    270.0 + 1e-8,
-                ] {
+                for target in [90.0 - 1e-8, 90.0, 90.0 + 1e-8, 270.0 - 1e-8, 270.0, 270.0 + 1e-8] {
                     let rotate = if fix { target } else { det * (target - base) };
                     let rad = rotate.to_radians();
                     let raw = (libm::cos(rad), libm::sin(rad));
@@ -1354,46 +1168,21 @@ mod tests {
             [(0.0, 0.0), (0.0, 0.0), (0.0, 0.0), (3.0, 0.0)],
             [(0.0, 0.0), (3.0, 0.0), (3.0, 0.0), (3.0, 0.0)],
         ] {
-            let mut out = Out {
-                prims: Vec::new(),
-                scale: 14.0,
-            };
-            let params = PrimParams {
-                arrow: Some("both".into()),
-                ..PrimParams::default()
-            };
-            out.shape(
-                "curve",
-                Shape::Bezier,
-                &points,
-                &params,
-                &Style::default(),
-                Layer::Middle,
-                vec![],
-            );
+            let mut out = Out { prims: Vec::new(), scale: 14.0 };
+            let params = PrimParams { arrow: Some("both".into()), ..PrimParams::default() };
+            out.shape("curve", Shape::Bezier, &points, &params, &Style::default(), Layer::Middle, vec![]);
             assert_eq!(out.prims.len(), 3, "{points:?}");
             // Both endpoint triangles retain their full length and width and point away from the curve.
             for (arrow, tip, bounds) in [
                 (&out.prims[1], (0.0, 0.0), [0.0, -0.21, 0.6, 0.21]),
                 (&out.prims[2], (3.0, 0.0), [2.4, -0.21, 3.0, 0.21]),
             ] {
-                let Kind::Path {
-                    segs,
-                    strokes,
-                    fill,
-                } = &arrow.kind
-                else {
-                    panic!("arrow must be a path")
-                };
+                let Kind::Path { segs, strokes, fill } = &arrow.kind else { panic!("arrow must be a path") };
                 assert_eq!(segs[0], PathSeg::Move(tip));
                 assert!(strokes.is_empty());
                 assert!(fill.is_some());
                 for (actual, expected) in arrow.bbox.into_iter().zip(bounds) {
-                    assert!(
-                        (actual - expected).abs() < 1e-12,
-                        "{points:?}: {:?}",
-                        arrow.bbox
-                    );
+                    assert!((actual - expected).abs() < 1e-12, "{points:?}: {:?}", arrow.bbox);
                 }
             }
         }

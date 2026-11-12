@@ -51,8 +51,7 @@ use num_traits::{One, Zero};
 use rnl_runtime::geom::{fixed_text_alignment, Orient};
 use rnl_runtime::markup::Run;
 use rnl_runtime::problem::{
-    Axis, FactKind, Filler, LevelProblem, ObjectKind, PointRef, Position, Reference, Sense,
-    TextInfo,
+    Axis, FactKind, Filler, LevelProblem, ObjectKind, PointRef, Position, Reference, Sense, TextInfo,
 };
 
 use crate::model::{turned, Model, PointId};
@@ -223,9 +222,7 @@ pub(crate) struct Connections {
 impl Connections {
     /// Whether the router joins two pins: a ROUTE asks for the net they are both on.
     pub(crate) fn routed(&self, a: PinKey, b: PinKey) -> bool {
-        self.route_of
-            .get(&a)
-            .is_some_and(|n| self.route_of.get(&b) == Some(n))
+        self.route_of.get(&a).is_some_and(|n| self.route_of.get(&b) == Some(n))
     }
 }
 
@@ -310,86 +307,46 @@ fn first_point(points: &[PointRef]) -> Option<(usize, Option<usize>)> {
 /// segment when the wire is drawn straight between them, and those attached to a net at the first
 /// point of its first wire, else of its first ROUTE, else at its first pin of an object that the
 /// solution places. `objects` say which objects the solution leaves free.
-fn anchors(
-    problem: &LevelProblem,
-    connections: &Connections,
-    objects: &[ObjectInfo],
-) -> BTreeMap<usize, Anchor> {
+fn anchors(problem: &LevelProblem, connections: &Connections, objects: &[ObjectInfo]) -> BTreeMap<usize, Anchor> {
     let mut out = BTreeMap::new();
     let zero = || [Q::zero(), Q::zero()];
     for (k, o) in problem.objects.iter().enumerate() {
-        let (ObjectKind::Text, Position::Own { .. }, Some(t)) = (o.kind, &o.position, &o.text)
-        else {
+        let (ObjectKind::Text, Position::Own { .. }, Some(t)) = (o.kind, &o.position, &o.text) else {
             continue;
         };
         let anchor = match &t.attach {
             Filler::Object(j) => match problem.objects.get(*j).map(|a| a.kind) {
-                Some(ObjectKind::Point) => Anchor {
-                    from: vec![(*j, None)],
-                    offset: zero(),
-                    point: true,
-                },
-                Some(ObjectKind::Instance | ObjectKind::Usage | ObjectKind::Bundle) => Anchor {
-                    from: vec![(*j, None)],
-                    offset: beside(),
-                    point: true,
-                },
+                Some(ObjectKind::Point) => Anchor { from: vec![(*j, None)], offset: zero(), point: true },
+                Some(ObjectKind::Instance | ObjectKind::Usage | ObjectKind::Bundle) => {
+                    Anchor { from: vec![(*j, None)], offset: beside(), point: true }
+                }
                 _ => continue,
             },
-            Filler::Terminal {
-                object,
-                pin: Some(pin),
-                ..
+            Filler::Terminal { object, pin: Some(pin), .. } | Filler::Pin { object, pin } => {
+                Anchor { from: vec![(*object, Some(*pin))], offset: beside(), point: true }
             }
-            | Filler::Pin { object, pin } => Anchor {
-                from: vec![(*object, Some(*pin))],
-                offset: beside(),
-                point: true,
-            },
             Filler::Wire(w) => {
                 let Some(w) = problem.wires.get(*w) else {
                     continue;
                 };
-                let points: Vec<(usize, Option<usize>)> =
-                    w.anchors.iter().filter_map(anchor_point).collect();
+                let points: Vec<(usize, Option<usize>)> = w.anchors.iter().filter_map(anchor_point).collect();
                 if points.len() < 2 {
                     continue;
                 }
                 let m = points.len() / 2;
-                Anchor {
-                    from: points[m - 1..=m].to_vec(),
-                    offset: [Q::zero(), frac(3, 5)],
-                    point: false,
-                }
+                Anchor { from: points[m - 1..=m].to_vec(), offset: [Q::zero(), frac(3, 5)], point: false }
             }
             Filler::Net(name) => {
-                let wire = problem
-                    .wires
-                    .iter()
-                    .filter(|w| w.nets.contains(name))
-                    .find_map(|w| first_point(&w.anchors));
-                let route = || {
-                    problem
-                        .routes
-                        .iter()
-                        .filter(|r| r.net == *name)
-                        .find_map(|r| first_point(&r.pins))
-                };
+                let wire = problem.wires.iter().filter(|w| w.nets.contains(name)).find_map(|w| first_point(&w.anchors));
+                let route = || problem.routes.iter().filter(|r| r.net == *name).find_map(|r| first_point(&r.pins));
                 let pin = || {
                     let net = connections.nets.iter().find(|n| n.name == *name)?;
-                    net.pins
-                        .iter()
-                        .find(|p| !objects[p.0].left_free)
-                        .map(|&(object, pin)| (object, Some(pin)))
+                    net.pins.iter().find(|p| !objects[p.0].left_free).map(|&(object, pin)| (object, Some(pin)))
                 };
                 let Some(point) = wire.or_else(route).or_else(pin) else {
                     continue;
                 };
-                Anchor {
-                    from: vec![point],
-                    offset: zero(),
-                    point: false,
-                }
+                Anchor { from: vec![point], offset: zero(), point: false }
             }
             _ => continue,
         };
@@ -447,10 +404,7 @@ fn left_free(
                 problem.objects[k].reference,
                 Reference::Number { .. } | Reference::GeneratedNumber { .. } | Reference::Anonymous
             );
-            let pinless = o
-                .symbol
-                .and_then(|s| symbols.get(s))
-                .is_none_or(|s| s.pins.is_empty());
+            let pinless = o.symbol.and_then(|s| symbols.get(s)).is_none_or(|s| s.pins.is_empty());
             let nowhere = pinless || attach_pins(objects, connections, k).is_empty();
             o.symbol.is_some() && o.stub.is_none() && unnamed && nowhere
         }
@@ -461,40 +415,17 @@ fn left_free(
 /// The pins of elements that a port or a supply or ground symbol `k` goes beside
 /// ([`Structure::attach_pins`]).
 fn attach_pins(objects: &[ObjectInfo], connections: &Connections, k: usize) -> Vec<PinKey> {
-    let mut pins: Vec<PinKey> = connections
-        .targets
-        .get(&(k, 0))
-        .cloned()
-        .unwrap_or_default();
+    let mut pins: Vec<PinKey> = connections.targets.get(&(k, 0)).cloned().unwrap_or_default();
     if pins.is_empty() {
         for &i in connections.nets_of.get(&(k, 0)).map_or(&[][..], |v| v) {
-            pins.extend(
-                connections.nets[i]
-                    .pins
-                    .iter()
-                    .copied()
-                    .filter(|p| p.0 != k),
-            );
+            pins.extend(connections.nets[i].pins.iter().copied().filter(|p| p.0 != k));
         }
     }
     let element = |p: &PinKey| objects[p.0].role == Role::Element;
-    if !pins.iter().any(element)
-        && matches!(objects[k].role, Role::Supply | Role::Ground | Role::Port)
-    {
-        let mut netlist: Vec<PinKey> = connections
-            .circuit
-            .get(&(k, 0))
-            .cloned()
-            .unwrap_or_default();
+    if !pins.iter().any(element) && matches!(objects[k].role, Role::Supply | Role::Ground | Role::Port) {
+        let mut netlist: Vec<PinKey> = connections.circuit.get(&(k, 0)).cloned().unwrap_or_default();
         netlist.retain(element);
-        netlist.sort_by_key(|&p| {
-            (
-                objects
-                    .iter()
-                    .any(|o| o.stub.as_ref().is_some_and(|st| st.host == p)),
-                p,
-            )
-        });
+        netlist.sort_by_key(|&p| (objects.iter().any(|o| o.stub.as_ref().is_some_and(|st| st.host == p)), p));
         netlist.dedup();
         if !netlist.is_empty() {
             return netlist;
@@ -574,11 +505,11 @@ impl GroupTree {
     pub(crate) fn lowest_common(&self, objects: &[usize]) -> usize {
         let mut node = 0;
         loop {
-            let next = self.nodes[node].children.iter().copied().find(|&c| {
-                objects
-                    .iter()
-                    .all(|k| self.nodes[c].members.binary_search(k).is_ok())
-            });
+            let next = self.nodes[node]
+                .children
+                .iter()
+                .copied()
+                .find(|&c| objects.iter().all(|k| self.nodes[c].members.binary_search(k).is_ok()));
             match next {
                 Some(c) => node = c,
                 None => return node,
@@ -736,10 +667,7 @@ impl Structure {
     /// symbol and a place, but those that the solution leaves free.
     pub(crate) fn components(&self) -> impl Iterator<Item = usize> + '_ {
         self.objects.iter().enumerate().filter_map(|(k, o)| {
-            let component = matches!(
-                o.role,
-                Role::Element | Role::Supply | Role::Ground | Role::Port
-            );
+            let component = matches!(o.role, Role::Element | Role::Supply | Role::Ground | Role::Port);
             (component && o.symbol.is_some() && !o.left_free).then_some(k)
         })
     }
@@ -755,16 +683,8 @@ impl Structure {
     pub(crate) fn beside_by_netlist(&self, k: usize) -> bool {
         let element = |p: &PinKey| self.objects[p.0].role == Role::Element;
         !self.objects[k].fact_touched
-            && self
-                .connections
-                .targets
-                .get(&(k, 0))
-                .is_none_or(|t| t.is_empty())
-            && self
-                .connections
-                .circuit
-                .get(&(k, 0))
-                .is_some_and(|pins| pins.iter().any(element))
+            && self.connections.targets.get(&(k, 0)).is_none_or(|t| t.is_empty())
+            && self.connections.circuit.get(&(k, 0)).is_some_and(|pins| pins.iter().any(element))
             && !self.attach_pins(k).is_empty()
     }
 
@@ -777,14 +697,7 @@ impl Structure {
             .get(&(k, pin))
             .into_iter()
             .flatten()
-            .map(|b| {
-                [
-                    &b[0] + &at[0],
-                    &b[1] + &at[1],
-                    &b[2] + &at[0],
-                    &b[3] + &at[1],
-                ]
-            })
+            .map(|b| [&b[0] + &at[0], &b[1] + &at[1], &b[2] + &at[0], &b[3] + &at[1]])
             .collect()
     }
 
@@ -797,12 +710,7 @@ impl Structure {
     }
 
     /// Every text rectangle associated with an object, relative to its current origin.
-    pub(crate) fn text_offsets(
-        &self,
-        problem: &LevelProblem,
-        g: &Geometry,
-        k: usize,
-    ) -> Vec<[Q; 4]> {
+    pub(crate) fn text_offsets(&self, problem: &LevelProblem, g: &Geometry, k: usize) -> Vec<[Q; 4]> {
         let mut boxes: Vec<_> = self.label_offset(k, g.orient[k]).into_iter().collect();
         boxes.extend(self.offset_labels.get(&k).into_iter().flatten().cloned());
         boxes.extend(self.pin_labels(k, g.orient[k]));
@@ -810,34 +718,18 @@ impl Structure {
             if let Some(t) = problem.objects[k].text.as_ref() {
                 let at = &g.origin[k];
                 if let Some(b) = text_box(t, &(at[0].clone(), at[1].clone()), Orient::R0) {
-                    boxes.push([
-                        &b[0] - &at[0],
-                        &b[1] - &at[1],
-                        &b[2] - &at[0],
-                        &b[3] - &at[1],
-                    ]);
+                    boxes.push([&b[0] - &at[0], &b[1] - &at[1], &b[2] - &at[0], &b[3] - &at[1]]);
                 }
             }
-        } else if let (
-            Position::InSymbol {
-                owner,
-                replaced: Some(_),
-                ..
-            },
-            Some(t),
-        ) = (&problem.objects[k].position, &problem.objects[k].text)
+        } else if let (Position::InSymbol { owner, replaced: Some(_), .. }, Some(t)) =
+            (&problem.objects[k].position, &problem.objects[k].text)
         {
             let turn = g.orient[*owner];
             if let Some(local) = problem.objects[k].symbol_local(turn) {
                 let local = (number(local.0), number(local.1));
                 if let Some(b) = text_box(t, &local, turn) {
                     let anchor = [turned(turn, &local, 0), turned(turn, &local, 1)];
-                    boxes.push([
-                        &b[0] - &anchor[0],
-                        &b[1] - &anchor[1],
-                        &b[2] - &anchor[0],
-                        &b[3] - &anchor[1],
-                    ]);
+                    boxes.push([&b[0] - &anchor[0], &b[1] - &anchor[1], &b[2] - &anchor[0], &b[3] - &anchor[1]]);
                 }
             }
         }
@@ -846,16 +738,11 @@ impl Structure {
 
     /// The pins of an object's symbol.
     pub(crate) fn pins(&self, k: usize) -> &[PinInfo] {
-        self.objects[k]
-            .symbol
-            .and_then(|s| self.symbols.get(s))
-            .map_or(&[], |s| &s.pins)
+        self.objects[k].symbol.and_then(|s| self.symbols.get(s)).map_or(&[], |s| &s.pins)
     }
 
     fn pin_with(&self, k: usize, terminal: &str) -> Option<usize> {
-        self.pins(k)
-            .iter()
-            .position(|p| p.terminals.iter().any(|t| t == terminal))
+        self.pins(k).iter().position(|p| p.terminals.iter().any(|t| t == terminal))
     }
 
     /// Whether the static current runs through a pin (see [`Device`]).
@@ -863,9 +750,7 @@ impl Structure {
         if self.language04 {
             self.currents.contains_key(&(k, pin))
         } else {
-            self.pins(k)
-                .get(pin)
-                .is_some_and(|p| self.objects[k].device.conducts(&p.terminals))
+            self.pins(k).get(pin).is_some_and(|p| self.objects[k].device.conducts(&p.terminals))
         }
     }
 
@@ -878,10 +763,7 @@ impl Structure {
         }
         let marked = self.currents.range((k, 0)..(k + 1, 0));
         marked
-            .filter(|((_, pin), out)| {
-                self.exit(k, *pin, o)
-                    .is_some_and(|e| e != if **out { (0, -1) } else { (0, 1) })
-            })
+            .filter(|((_, pin), out)| self.exit(k, *pin, o).is_some_and(|e| e != if **out { (0, -1) } else { (0, 1) }))
             .count()
     }
 
@@ -905,10 +787,7 @@ impl Structure {
     pub(crate) fn exit(&self, k: usize, pin: usize, o: Orient) -> Option<(i64, i64)> {
         let (x, y) = self.pins(k).get(pin)?.dir?;
         let (a, b, c, d) = o.matrix();
-        Some((
-            i64::from(a) * x + i64::from(b) * y,
-            i64::from(c) * x + i64::from(d) * y,
-        ))
+        Some((i64::from(a) * x + i64::from(b) * y, i64::from(c) * x + i64::from(d) * y))
     }
 
     /// The box of an object's symbol turned by `o`, about its origin.
@@ -920,20 +799,11 @@ impl Structure {
     /// `o`: each text's anchor turned with it, the text laid out upright as the renderer keeps it
     /// (9.2.5; [`text_box`]).
     pub(crate) fn label_offset(&self, k: usize, o: Orient) -> Option<[Q; 4]> {
-        self.labels
-            .get(&k)?
-            .get(usize::from(crate::orient::index(o)))
-            .cloned()
+        self.labels.get(&k)?.get(usize::from(crate::orient::index(o))).cloned()
     }
 
     /// Where a pin is, with every object's origin at `at` and orientation `orient`.
-    pub(crate) fn pin_at(
-        &self,
-        at: &[[Q; 2]],
-        orient: &[Orient],
-        k: usize,
-        pin: usize,
-    ) -> Option<[Q; 2]> {
+    pub(crate) fn pin_at(&self, at: &[[Q; 2]], orient: &[Orient], k: usize, pin: usize) -> Option<[Q; 2]> {
         let o = self.pin_offset(k, pin, orient[k])?;
         Some([&at[k][0] + &o[0], &at[k][1] + &o[1]])
     }
@@ -941,12 +811,7 @@ impl Structure {
     /// Where an object's box is.
     pub(crate) fn box_at(&self, at: &[[Q; 2]], orient: &[Orient], k: usize) -> Option<[Q; 4]> {
         let b = self.box_offset(k, orient[k])?;
-        Some([
-            &at[k][0] + &b[0],
-            &at[k][1] + &b[1],
-            &at[k][0] + &b[2],
-            &at[k][1] + &b[3],
-        ])
+        Some([&at[k][0] + &b[0], &at[k][1] + &b[1], &at[k][0] + &b[2], &at[k][1] + &b[3]])
     }
 
     /// Where a point of the model is; none for a centre.
@@ -960,10 +825,7 @@ impl Structure {
 
     /// The free class an object is in, by the index in [`Open::classes`].
     pub(crate) fn class_of(&self, k: usize) -> Option<usize> {
-        self.open
-            .classes
-            .iter()
-            .position(|c| c.members.iter().any(|(m, _)| *m == k))
+        self.open.classes.iter().position(|c| c.members.iter().any(|(m, _)| *m == k))
     }
 
     /// The origin of every object under a placement: its own position, the point it is drawn at
@@ -971,9 +833,7 @@ impl Structure {
     pub(crate) fn origins(&self, problem: &LevelProblem, g: &Geometry) -> Vec<[Q; 2]> {
         (0..problem.objects.len())
             .map(|k| {
-                let at = |axis| {
-                    point_value(problem, g, &PointRef::Origin(k), axis, 0).unwrap_or_default()
-                };
+                let at = |axis| point_value(problem, g, &PointRef::Origin(k), axis, 0).unwrap_or_default();
                 [at(0), at(1)]
             })
             .collect()
@@ -1034,9 +894,7 @@ pub(crate) fn analyse(
         }
     }
     let power = power_pins(power, &mut connections);
-    let elements: Vec<usize> = (0..objects.len())
-        .filter(|&k| objects[k].role == Role::Element)
-        .collect();
+    let elements: Vec<usize> = (0..objects.len()).filter(|&k| objects[k].role == Role::Element).collect();
     let ports = ports(problem, &objects, &symbols, &connections);
     let language04 = problem.version == "0.4";
     let currents: BTreeMap<PinKey, bool> = problem
@@ -1062,10 +920,7 @@ pub(crate) fn analyse(
     let has_current_direction = currents.keys().any(|&(k, pin)| {
         objects.get(k).is_some_and(|o| {
             !o.left_free
-                && o.symbol
-                    .and_then(|s| symbols.get(s))
-                    .and_then(|s| s.pins.get(pin))
-                    .is_some_and(|p| p.dir.is_some())
+                && o.symbol.and_then(|s| symbols.get(s)).and_then(|s| s.pins.get(pin)).is_some_and(|p| p.dir.is_some())
         })
     });
     let inputs = Inputs {
@@ -1087,22 +942,11 @@ pub(crate) fn analyse(
     for o in &problem.objects {
         // the texts that move with their owner on both axes; one that the scene places on an axis
         // does not (13.3)
-        let (
-            Position::InSymbol {
-                owner,
-                local,
-                replaced: None,
-            },
-            Some(t),
-        ) = (&o.position, &o.text)
-        else {
+        let (Position::InSymbol { owner, local, replaced: None }, Some(t)) = (&o.position, &o.text) else {
             continue;
         };
         let local = (number(local.0), number(local.1));
-        let Some(boxes) = Orient::ALL
-            .into_iter()
-            .map(|turn| text_box(t, &local, turn))
-            .collect::<Option<Vec<_>>>()
+        let Some(boxes) = Orient::ALL.into_iter().map(|turn| text_box(t, &local, turn)).collect::<Option<Vec<_>>>()
         else {
             continue;
         };
@@ -1113,12 +957,8 @@ pub(crate) fn analyse(
     let mut offset_labels: BTreeMap<usize, Vec<[Q; 4]>> = BTreeMap::new();
     let mut offsets: BTreeMap<usize, [Option<(usize, Q)>; 2]> = BTreeMap::new();
     for &i in &kept {
-        let Some(FactKind::Offset {
-            text,
-            from: PointRef::Origin(owner),
-            axis,
-            value,
-        }) = problem.facts.get(i).map(|f| &f.kind)
+        let Some(FactKind::Offset { text, from: PointRef::Origin(owner), axis, value }) =
+            problem.facts.get(i).map(|f| &f.kind)
         else {
             continue;
         };
@@ -1126,16 +966,13 @@ pub(crate) fn analyse(
             continue;
         };
         if o.role == Role::Element {
-            offsets.entry(*text).or_default()[usize::from(*axis == Axis::Y)] =
-                Some((*owner, value));
+            offsets.entry(*text).or_default()[usize::from(*axis == Axis::Y)] = Some((*owner, value));
         }
     }
     for (text, [x, y]) in offsets {
-        let (Some((owner, dx)), Some((other, dy)), Some(t)) = (
-            x,
-            y,
-            problem.objects.get(text).and_then(|o| o.text.as_ref()),
-        ) else {
+        let (Some((owner, dx)), Some((other, dy)), Some(t)) =
+            (x, y, problem.objects.get(text).and_then(|o| o.text.as_ref()))
+        else {
             continue;
         };
         if owner != other || !matches!(problem.objects[text].position, Position::Own { .. }) {
@@ -1156,8 +993,7 @@ pub(crate) fn analyse(
     let anchors = anchors(problem, &connections, &objects);
     for k in 0..objects.len() {
         if objects[k].role == Role::Text {
-            objects[k].left_free =
-                left_free(problem, &objects, &symbols, &connections, &anchors, k);
+            objects[k].left_free = left_free(problem, &objects, &symbols, &connections, &anchors, k);
         }
     }
     let mut pin_pairs = Vec::new();
@@ -1166,10 +1002,7 @@ pub(crate) fn analyse(
     if language04 {
         for &f in &kept {
             let effect = &model.units[f].orient;
-            if let crate::model::OrientEffect::Pins {
-                from, to: Some(to), ..
-            } = effect
-            {
+            if let crate::model::OrientEffect::Pins { from, to: Some(to), .. } = effect {
                 let mut pairs = Vec::new();
                 for a in Orient::ALL {
                     for b in Orient::ALL {
@@ -1184,11 +1017,7 @@ pub(crate) fn analyse(
                 pin_pairs.push((from.object, to.object, pairs));
             }
         }
-        for (k, o) in objects
-            .iter()
-            .enumerate()
-            .filter(|(_, o)| o.role != Role::Element && o.symbol.is_some())
-        {
+        for (k, o) in objects.iter().enumerate().filter(|(_, o)| o.role != Role::Element && o.symbol.is_some()) {
             let _ = o;
             if let Some(host) = crate::beside::on_pin(problem, &kept, k) {
                 pinned.insert(k, host);
@@ -1272,10 +1101,7 @@ pub(crate) fn analyse(
 /// For each free class that the witness has against the current: the values the facts kept allow it,
 /// as a value they do not is dropped when a candidate is placed and the class falls back on the
 /// witness. The others cost nothing: the candidates find out for themselves.
-pub(crate) fn fitting_values(
-    s: &Structure,
-    work: &mut Work,
-) -> (BTreeMap<usize, Vec<Orient>>, bool) {
+pub(crate) fn fitting_values(s: &Structure, work: &mut Work) -> (BTreeMap<usize, Vec<Orient>>, bool) {
     let mut out = BTreeMap::new();
     let mut stopped = false;
     if !s.has(Source::SourcesDown) {
@@ -1286,24 +1112,13 @@ pub(crate) fn fitting_values(
             stopped = true;
             break;
         }
-        let against = |v: Orient| {
-            class
-                .members
-                .iter()
-                .any(|&(m, label)| s.against_current(m, v.then(label)) > 0)
-        };
+        let against = |v: Orient| class.members.iter().any(|&(m, label)| s.against_current(m, v.then(label)) > 0);
         let witness = s.witness.orient[class.root];
         if !against(witness) {
             continue;
         }
         let fits = |v: Orient, work: &mut Work| {
-            let rel = Tagged {
-                kind: RelKind::Orientation,
-                rel: Relation::Orient {
-                    root: class.root,
-                    value: v,
-                },
-            };
+            let rel = Tagged { kind: RelKind::Orientation, rel: Relation::Orient { root: class.root, value: v } };
             with_relations(s, &[rel], work, |_, _, t| (t.kept[0], t.undecided))
         };
         let mut class_stopped = false;
@@ -1356,16 +1171,8 @@ fn turned_box(b: &[Q; 4], o: Orient) -> Option<[Q; 4]> {
     let corners = [(b[0].clone(), b[1].clone()), (b[2].clone(), b[3].clone())];
     let xs = [turned(o, &corners[0], 0), turned(o, &corners[1], 0)];
     let ys = [turned(o, &corners[0], 1), turned(o, &corners[1], 1)];
-    let (x1, x2) = if xs[0] <= xs[1] {
-        (xs[0].clone(), xs[1].clone())
-    } else {
-        (xs[1].clone(), xs[0].clone())
-    };
-    let (y1, y2) = if ys[0] <= ys[1] {
-        (ys[0].clone(), ys[1].clone())
-    } else {
-        (ys[1].clone(), ys[0].clone())
-    };
+    let (x1, x2) = if xs[0] <= xs[1] { (xs[0].clone(), xs[1].clone()) } else { (xs[1].clone(), xs[0].clone()) };
+    let (y1, y2) = if ys[0] <= ys[1] { (ys[0].clone(), ys[1].clone()) } else { (ys[1].clone(), ys[0].clone()) };
     Some([x1, y1, x2, y2])
 }
 
@@ -1374,10 +1181,7 @@ fn turned_box(b: &[Q; 4], o: Orient) -> Option<[Q; 4]> {
 fn line_chars(runs: &[Run]) -> usize {
     runs.iter()
         .map(|r| match r {
-            Run::Text { text, .. } => text
-                .chars()
-                .filter(|c| *c != rnl_runtime::markup::LITERAL)
-                .count(),
+            Run::Text { text, .. } => text.chars().filter(|c| *c != rnl_runtime::markup::LITERAL).count(),
             Run::Frac { num, den, .. } => line_chars(num).max(line_chars(den)),
             Run::Sqrt { radicand, .. } => 1 + line_chars(radicand),
         })
@@ -1412,19 +1216,13 @@ const RUN_BELOW: (i64, i64) = (2, 5);
 /// baseline). The solver keeps the symbols' texts clear of their neighbours by it. None for a
 /// text without characters.
 pub(crate) fn text_box(t: &TextInfo, at: &(Q, Q), turn: Orient) -> Option<[Q; 4]> {
-    let alternate = t
-        .column_position
-        .filter(|_| turn.reverses_text_column())
-        .map(|(x, y)| (number(x), number(y)));
+    let alternate = t.column_position.filter(|_| turn.reverses_text_column()).map(|(x, y)| (number(x), number(y)));
     let at = alternate.as_ref().unwrap_or(at);
     let style = |name: &str| t.style.iter().find(|(n, _)| n == name).map(|(_, v)| v);
     if style("textvisible").and_then(|v| v.boolean()) == Some(false) {
         return None;
     }
-    let size = style("size")
-        .and_then(|v| v.num())
-        .filter(|s| s.is_finite() && *s > 0.0)
-        .unwrap_or(1.0);
+    let size = style("size").and_then(|v| v.num()).filter(|s| s.is_finite() && *s > 0.0).unwrap_or(1.0);
     let flag = |name: &str| style(name).and_then(|v| v.boolean()).unwrap_or(false);
     if t.lines.iter().all(|l| line_chars(l) == 0) {
         return None;
@@ -1450,11 +1248,7 @@ pub(crate) fn text_box(t: &TextInfo, at: &(Q, Q), turn: Orient) -> Option<[Q; 4]
             let x = v * 100.0;
             if x.is_finite() {
                 let rounded = from_f64(if up { x.ceil() } else { x.floor() })? / int(100);
-                Some(if up {
-                    rounded.max(exact)
-                } else {
-                    rounded.min(exact)
-                })
+                Some(if up { rounded.max(exact) } else { rounded.min(exact) })
             } else {
                 Some(exact)
             }
@@ -1552,18 +1346,9 @@ pub(crate) fn text_box(t: &TextInfo, at: &(Q, Q), turn: Orient) -> Option<[Q; 4]
         hundredths(y2, true),
     ];
     // a text that reads up has the tops of its glyphs to the left
-    let b = if vertical {
-        turned_box(&b, Orient::R90)?
-    } else {
-        b
-    };
+    let b = if vertical { turned_box(&b, Orient::R90)? } else { b };
     let at = [turned(turn, at, 0), turned(turn, at, 1)];
-    Some([
-        &b[0] + &at[0],
-        &b[1] + &at[1],
-        &b[2] + &at[0],
-        &b[3] + &at[1],
-    ])
+    Some([&b[0] + &at[0], &b[1] + &at[1], &b[2] + &at[0], &b[3] + &at[1]])
 }
 
 fn number(v: f64) -> Q {
@@ -1596,10 +1381,7 @@ fn symbol_info(s: &rnl_runtime::problem::ProblemSymbol) -> SymbolInfo {
             terminals: p.terminals.clone(),
         })
         .collect();
-    SymbolInfo {
-        bbox: [x1, y1, x2, y2],
-        pins,
-    }
+    SymbolInfo { bbox: [x1, y1, x2, y2], pins }
 }
 
 fn object_infos(problem: &LevelProblem, model: &Model, kept: &[usize]) -> Vec<ObjectInfo> {
@@ -1614,11 +1396,7 @@ fn object_infos(problem: &LevelProblem, model: &Model, kept: &[usize]) -> Vec<Ob
                     }
                     // the owner of a text on the axes its symbol gives; on the one the scene gives,
                     // the fact reaches the text alone (13.3)
-                    PointId::Text(k) => model
-                        .points
-                        .get(p)
-                        .and_then(|i| i.object_on(axis))
-                        .or(Some(*k)),
+                    PointId::Text(k) => model.points.get(p).and_then(|i| i.object_on(axis)).or(Some(*k)),
                     PointId::Centre(_) => None,
                 };
                 if let Some(t) = k.and_then(|k| touched.get_mut(k)) {
@@ -1640,9 +1418,7 @@ fn object_infos(problem: &LevelProblem, model: &Model, kept: &[usize]) -> Vec<Ob
                 (ObjectKind::Usage, Some(Hang::Above)) => Role::Supply,
                 (ObjectKind::Usage, Some(Hang::Beside)) => Role::Port,
                 (ObjectKind::Usage, None) if own && o.symbol.is_some() => Role::Element,
-                (ObjectKind::Usage, None) if own && o.symbol.is_none() && o.orient.is_none() => {
-                    Role::Point
-                }
+                (ObjectKind::Usage, None) if own && o.symbol.is_none() && o.orient.is_none() => Role::Point,
                 (ObjectKind::Usage, None) => Role::Other,
                 (ObjectKind::Instance | ObjectKind::Bundle, _) if own => Role::Element,
                 (ObjectKind::Instance | ObjectKind::Bundle, _) => Role::Other,
@@ -1650,17 +1426,11 @@ fn object_infos(problem: &LevelProblem, model: &Model, kept: &[usize]) -> Vec<Ob
             let device = if problem.version == "0.4" {
                 Device::Other
             } else {
-                o.symbol
-                    .and_then(|s| problem.symbols.get(s))
-                    .map_or(Device::Other, |s| Device::of(&s.name))
+                o.symbol.and_then(|s| problem.symbols.get(s)).map_or(Device::Other, |s| Device::of(&s.name))
             };
             ObjectInfo {
                 role,
-                device: if role == Role::Element {
-                    device
-                } else {
-                    Device::Other
-                },
+                device: if role == Role::Element { device } else { Device::Other },
                 symbol: o.symbol,
                 oriented: o.orient.is_some(),
                 own,
@@ -1694,12 +1464,11 @@ pub(crate) enum Hang {
 pub(crate) fn hang(problem: &LevelProblem, k: usize) -> Option<Hang> {
     let o = problem.objects.get(k)?;
     let usage = problem.usages.get(o.usage?)?;
-    let attached = usage.roles.iter().flat_map(|r| &r.members).any(|m| {
-        matches!(
-            m,
-            Filler::Net(_) | Filler::Terminal { pin: Some(_), .. } | Filler::Pin { .. }
-        )
-    });
+    let attached = usage
+        .roles
+        .iter()
+        .flat_map(|r| &r.members)
+        .any(|m| matches!(m, Filler::Net(_) | Filler::Terminal { pin: Some(_), .. } | Filler::Pin { .. }));
     let symbol = problem.symbols.get(o.symbol?)?;
     let [pin] = symbol.pins.as_slice() else {
         return None;
@@ -1742,14 +1511,7 @@ pub(crate) fn hang(problem: &LevelProblem, k: usize) -> Option<Hang> {
 fn stub_rise(problem: &LevelProblem, kept: &[usize], k: usize, host: PinKey) -> Option<Q> {
     let is = |refs: &[PointRef], key: PinKey| matches!(refs, [r] if r.pin_key() == Some(key));
     kept.iter().find_map(|&f| {
-        let FactKind::Distance {
-            axis: Axis::Y,
-            sense,
-            min: Some(min),
-            from,
-            to,
-            ..
-        } = &problem.facts.get(f)?.kind
+        let FactKind::Distance { axis: Axis::Y, sense, min: Some(min), from, to, .. } = &problem.facts.get(f)?.kind
         else {
             return None;
         };
@@ -1800,22 +1562,10 @@ fn power(problem: &LevelProblem, kept: &[usize], objects: &mut [ObjectInfo]) -> 
                     }
                     // drawn right on a terminal (12.1): the terminal is on the supply or the
                     // ground, and so is its net when the problem shows it ([`power_pins`])
-                    Filler::Terminal {
-                        object,
-                        pin: Some(pin),
-                        ..
-                    }
-                    | Filler::Pin { object, pin }
-                        if supply =>
-                    {
+                    Filler::Terminal { object, pin: Some(pin), .. } | Filler::Pin { object, pin } if supply => {
                         p.supply_pins.insert((*object, *pin));
                     }
-                    Filler::Terminal {
-                        object,
-                        pin: Some(pin),
-                        ..
-                    }
-                    | Filler::Pin { object, pin } => {
+                    Filler::Terminal { object, pin: Some(pin), .. } | Filler::Pin { object, pin } => {
                         p.ground_pins.insert((*object, *pin));
                     }
                     _ => {}
@@ -1824,26 +1574,16 @@ fn power(problem: &LevelProblem, kept: &[usize], objects: &mut [ObjectInfo]) -> 
         }
         // a stub: the usage this one is made in hangs it from a terminal
         let Some(parent) = usage.parent else { continue };
-        let host = problem.usages[parent]
-            .roles
-            .iter()
-            .flat_map(|r| &r.members)
-            .find_map(|m| match m {
-                Filler::Terminal {
-                    object,
-                    pin: Some(pin),
-                    ..
-                }
-                | Filler::Pin { object, pin } => Some((*object, *pin)),
-                _ => None,
-            });
+        let host = problem.usages[parent].roles.iter().flat_map(|r| &r.members).find_map(|m| match m {
+            Filler::Terminal { object, pin: Some(pin), .. } | Filler::Pin { object, pin } => Some((*object, *pin)),
+            _ => None,
+        });
         // drawn at a point of its own, not right on the terminal (12.1)
         let (Some(host), true) = (host, objects[k].own) else {
             continue;
         };
         let gap = int(crate::search::ATTACH_GAP);
-        let rise =
-            stub_rise(problem, kept, k, host).unwrap_or_else(|| if supply { gap } else { -gap });
+        let rise = stub_rise(problem, kept, k, host).unwrap_or_else(|| if supply { gap } else { -gap });
         let rises = rise.is_positive();
         if let Some(o) = objects.get_mut(k) {
             o.stub = Some(Stub { host, rise });
@@ -1888,9 +1628,7 @@ fn power_pins(mut p: Power, c: &mut Connections) -> Power {
 fn connections(problem: &LevelProblem, model: &Model) -> Connections {
     let mut nets: BTreeMap<String, BTreeSet<PinKey>> = BTreeMap::new();
     let pin_of = |r: &PointRef| match r {
-        PointRef::Pin { object, pin, .. } | PointRef::SymbolPin { object, pin, .. } => {
-            Some((*object, *pin))
-        }
+        PointRef::Pin { object, pin, .. } | PointRef::SymbolPin { object, pin, .. } => Some((*object, *pin)),
         _ => None,
     };
     let mut drawn: Vec<Drawn> = Vec::new();
@@ -1901,28 +1639,17 @@ fn connections(problem: &LevelProblem, model: &Model) -> Connections {
     let mut route_indexes: Vec<usize> = Vec::new();
     for (i, route) in problem.routes.iter().enumerate() {
         let pins: Vec<PinKey> = route.pins.iter().filter_map(pin_of).collect();
-        nets.entry(route.net.clone())
-            .or_default()
-            .extend(pins.iter().copied());
-        let points: Vec<PointId> = model
-            .route_points
-            .get(i)
-            .map_or(Vec::new(), |ps| ps.iter().flatten().copied().collect());
+        nets.entry(route.net.clone()).or_default().extend(pins.iter().copied());
+        let points: Vec<PointId> =
+            model.route_points.get(i).map_or(Vec::new(), |ps| ps.iter().flatten().copied().collect());
         let at = match routed.iter().enumerate().position(|(at, (net, _))| {
-            problem.version != "0.4"
-                && !route.tree
-                && !problem.routes[route_indexes[at]].tree
-                && *net == route.net
+            problem.version != "0.4" && !route.tree && !problem.routes[route_indexes[at]].tree && *net == route.net
         }) {
             Some(at) => at,
             None => {
                 routed.push((route.net.clone(), Vec::new()));
                 route_indexes.push(i);
-                drawn.push(Drawn {
-                    net: route.net.clone(),
-                    points: Vec::new(),
-                    routed: true,
-                });
+                drawn.push(Drawn { net: route.net.clone(), points: Vec::new(), routed: true });
                 routed.len() - 1
             }
         };
@@ -1952,9 +1679,7 @@ fn connections(problem: &LevelProblem, model: &Model) -> Connections {
     for (i, wire) in problem.wires.iter().enumerate() {
         let pins: Vec<PinKey> = wire.anchors.iter().filter_map(pin_of).collect();
         if let [net] = wire.nets.as_slice() {
-            nets.entry(net.clone())
-                .or_default()
-                .extend(pins.iter().copied());
+            nets.entry(net.clone()).or_default().extend(pins.iter().copied());
         }
         for w in wire.anchors.windows(2) {
             if let (Some(a), Some(b)) = (pin_of(&w[0]), pin_of(&w[1])) {
@@ -1965,15 +1690,9 @@ fn connections(problem: &LevelProblem, model: &Model) -> Connections {
                 }
             }
         }
-        let points: Vec<PointId> = model
-            .wire_points
-            .get(i)
-            .map_or(Vec::new(), |ps| ps.iter().flatten().copied().collect());
-        drawn.push(Drawn {
-            net: wire.nets.join(","),
-            points,
-            routed: false,
-        });
+        let points: Vec<PointId> =
+            model.wire_points.get(i).map_or(Vec::new(), |ps| ps.iter().flatten().copied().collect());
+        drawn.push(Drawn { net: wire.nets.join(","), points, routed: false });
     }
     // the symbols that usages attach to a net are on it (12.1)
     for usage in &problem.usages {
@@ -1981,11 +1700,7 @@ fn connections(problem: &LevelProblem, model: &Model) -> Connections {
         for role in &usage.roles {
             for m in &role.members {
                 if let Filler::Net(name) = m {
-                    let has_pin = problem
-                        .objects
-                        .get(k)
-                        .and_then(|o| o.symbol)
-                        .and_then(|s| problem.symbols.get(s));
+                    let has_pin = problem.objects.get(k).and_then(|o| o.symbol).and_then(|s| problem.symbols.get(s));
                     if has_pin.is_some_and(|s| !s.pins.is_empty()) {
                         nets.entry(name.clone()).or_default().insert((k, 0));
                     }
@@ -1998,47 +1713,25 @@ fn connections(problem: &LevelProblem, model: &Model) -> Connections {
         for net in &problem.nets {
             let pins: Vec<PinKey> = net.pins.iter().filter_map(pin_of).collect();
             for p in &pins {
-                circuit
-                    .entry(*p)
-                    .or_default()
-                    .extend(pins.iter().filter(|q| q.0 != p.0).copied());
+                circuit.entry(*p).or_default().extend(pins.iter().filter(|q| q.0 != p.0).copied());
             }
         }
     }
     // Routing trees are first in `drawn`, in the order of `routed`.
-    let mut out = Connections {
-        drawn,
-        route_of,
-        written,
-        circuit,
-        ..Connections::default()
-    };
+    let mut out = Connections { drawn, route_of, written, circuit, ..Connections::default() };
     for (name, pins) in nets {
         let i = out.nets.len();
         for p in &pins {
             out.nets_of.entry(*p).or_default().push(i);
         }
-        out.nets.push(Net {
-            supply: false,
-            ground: false,
-            name,
-            pins: pins.into_iter().collect(),
-        });
+        out.nets.push(Net { supply: false, ground: false, name, pins: pins.into_iter().collect() });
     }
-    out.targets = targets
-        .into_iter()
-        .map(|(k, v)| (k, v.into_iter().collect()))
-        .collect();
+    out.targets = targets.into_iter().map(|(k, v)| (k, v.into_iter().collect())).collect();
     out
 }
 
 /// The ports and their kinds.
-fn ports(
-    problem: &LevelProblem,
-    objects: &[ObjectInfo],
-    symbols: &[SymbolInfo],
-    c: &Connections,
-) -> Vec<Port> {
+fn ports(problem: &LevelProblem, objects: &[ObjectInfo], symbols: &[SymbolInfo], c: &Connections) -> Vec<Port> {
     let mut out = Vec::new();
     for (k, info) in objects.iter().enumerate() {
         if info.role != Role::Port {
@@ -2046,32 +1739,24 @@ fn ports(
         }
         let usage = problem.objects[k].usage.and_then(|u| problem.usages.get(u));
         let net = usage.and_then(|u| {
-            u.roles
-                .iter()
-                .flat_map(|r| &r.members)
-                .find_map(|m| match m {
-                    Filler::Net(n) => Some(n.clone()),
-                    _ => None,
-                })
+            u.roles.iter().flat_map(|r| &r.members).find_map(|m| match m {
+                Filler::Net(n) => Some(n.clone()),
+                _ => None,
+            })
         });
         let mut control = false;
         let mut conducting = false;
         let mut drain = false;
-        if let Some(n) = net
-            .as_ref()
-            .filter(|_| problem.version != "0.4")
-            .and_then(|n| c.nets.iter().find(|x| x.name == *n))
+        if let Some(n) =
+            net.as_ref().filter(|_| problem.version != "0.4").and_then(|n| c.nets.iter().find(|x| x.name == *n))
         {
             for &(o, pin) in &n.pins {
                 let oi = &objects[o];
                 if oi.role != Role::Element || oi.device == Device::Other {
                     continue;
                 }
-                let terminals = oi
-                    .symbol
-                    .and_then(|s| symbols.get(s))
-                    .and_then(|s| s.pins.get(pin))
-                    .map(|p| &p.terminals);
+                let terminals =
+                    oi.symbol.and_then(|s| symbols.get(s)).and_then(|s| s.pins.get(pin)).map(|p| &p.terminals);
                 let has = |t: &str| terminals.is_some_and(|ts| ts.iter().any(|x| x == t));
                 control |= has("2");
                 conducting |= has("1") || has("3");
@@ -2085,11 +1770,7 @@ fn ports(
         } else {
             PortKind::Unknown
         };
-        out.push(Port {
-            object: k,
-            net,
-            kind,
-        });
+        out.push(Port { object: k, net, kind });
     }
     out
 }
@@ -2117,27 +1798,16 @@ fn pairs(problem: &LevelProblem, objects: &[ObjectInfo]) -> Vec<Pair> {
         let (Some(a), Some(b)) = (one(roles.0), one(roles.1)) else {
             continue;
         };
-        if a == b
-            || objects.get(a).is_none_or(|o| !o.oriented)
-            || objects.get(b).is_none_or(|o| !o.oriented)
-        {
+        if a == b || objects.get(a).is_none_or(|o| !o.oriented) || objects.get(b).is_none_or(|o| !o.oriented) {
             continue;
         }
-        let axis = roles
-            .2
-            .and_then(one)
-            .filter(|&k| objects.get(k).is_some_and(|o| o.own));
+        let axis = roles.2.and_then(one).filter(|&k| objects.get(k).is_some_and(|o| o.own));
         out.insert(Pair { a, b, axis });
     }
     // a pair given twice, once with its axis and once without, counts once, with its axis
     let all: Vec<Pair> = out.into_iter().collect();
     all.iter()
-        .filter(|p| {
-            p.axis.is_some()
-                || !all
-                    .iter()
-                    .any(|q| q.a == p.a && q.b == p.b && q.axis.is_some())
-        })
+        .filter(|p| p.axis.is_some() || !all.iter().any(|q| q.a == p.a && q.b == p.b && q.axis.is_some()))
         .cloned()
         .collect()
 }
@@ -2156,10 +1826,7 @@ fn open(problem: &LevelProblem, resolved: &Resolved) -> Open {
         }
     }
     let mut out = Open {
-        classes: by_root
-            .into_iter()
-            .map(|(root, members)| FreeClass { root, members })
-            .collect(),
+        classes: by_root.into_iter().map(|(root, members)| FreeClass { root, members }).collect(),
         ..Open::default()
     };
     for &f in &resolved.kept {
@@ -2179,11 +1846,7 @@ fn open(problem: &LevelProblem, resolved: &Resolved) -> Open {
 /// The tree of groups over the elements (algorithm synthesis 3.5). Every set of elements is one
 /// block, made once: a group written again, or the same set as a part or the union of two groups
 /// that overlap, is that block.
-fn group_tree(
-    problem: &LevelProblem,
-    objects: &[ObjectInfo],
-    elements: &[usize],
-) -> (GroupTree, Vec<String>) {
+fn group_tree(problem: &LevelProblem, objects: &[ObjectInfo], elements: &[usize]) -> (GroupTree, Vec<String>) {
     let fallback = || {
         (
             GroupTree {
@@ -2212,23 +1875,16 @@ fn group_tree(
     // the two groups of each union, which are no blocks themselves: a later group must nest with
     // them as with the blocks, so that both stay in one piece
     let mut absorbed: Vec<BTreeSet<usize>> = Vec::new();
-    let laminar = |a: &BTreeSet<usize>, b: &BTreeSet<usize>| {
-        a.is_disjoint(b) || a.is_subset(b) || b.is_subset(a)
-    };
+    let laminar = |a: &BTreeSet<usize>, b: &BTreeSet<usize>| a.is_disjoint(b) || a.is_subset(b) || b.is_subset(a);
     for g in 0..problem.groups.len() {
-        if !crate::budget::permit(
-            crate::budget::Step::Structure,
-            elements.len().saturating_mul(g + 1),
-        ) {
+        if !crate::budget::permit(crate::budget::Step::Structure, elements.len().saturating_mul(g + 1)) {
             return fallback();
         }
         let set = elements_of(g);
         if set.len() < 2 || blocks.iter().any(|(b, _)| *b == set) || absorbed.contains(&set) {
             continue;
         }
-        let crossing: Vec<usize> = (0..blocks.len())
-            .filter(|&i| !laminar(&blocks[i].0, &set))
-            .collect();
+        let crossing: Vec<usize> = (0..blocks.len()).filter(|&i| !laminar(&blocks[i].0, &set)).collect();
         let nests_absorbed = absorbed.iter().all(|a| laminar(a, &set));
         if crossing.is_empty() && nests_absorbed {
             blocks.push((set, NodeKind::Group(g)));
@@ -2239,20 +1895,13 @@ fn group_tree(
             if let NodeKind::Group(h) = blocks[*i].1 {
                 let other = blocks[*i].0.clone();
                 let parts = [
-                    (
-                        other.difference(&set).copied().collect::<BTreeSet<usize>>(),
-                        0u8,
-                    ),
+                    (other.difference(&set).copied().collect::<BTreeSet<usize>>(), 0u8),
                     (other.intersection(&set).copied().collect(), 1),
                     (set.difference(&other).copied().collect(), 2),
                 ];
                 let union: BTreeSet<usize> = other.union(&set).copied().collect();
-                let rest: Vec<&BTreeSet<usize>> = blocks
-                    .iter()
-                    .enumerate()
-                    .filter(|(j, _)| j != i)
-                    .map(|(_, b)| &b.0)
-                    .collect();
+                let rest: Vec<&BTreeSet<usize>> =
+                    blocks.iter().enumerate().filter(|(j, _)| j != i).map(|(_, b)| &b.0).collect();
                 let nests = std::iter::once(&union)
                     .chain(parts.iter().map(|(p, _)| p))
                     .all(|x| rest.iter().all(|b| laminar(x, b)));
@@ -2300,10 +1949,7 @@ fn group_tree(
     for i in order {
         let (set, kind) = &blocks[i];
         // the smallest node made so far that holds it: the last, since they come largest first
-        let parent = (0..sets.len())
-            .rev()
-            .find(|&n| set.is_subset(&sets[n]) && *set != sets[n])
-            .unwrap_or(0);
+        let parent = (0..sets.len()).rev().find(|&n| set.is_subset(&sets[n]) && *set != sets[n]).unwrap_or(0);
         let n = nodes.len();
         nodes.push(GroupNode {
             kind: kind.clone(),
@@ -2326,32 +1972,17 @@ fn group_tree(
         children.sort_by_key(|&c| {
             let first = nodes[c].members[0];
             match &groups {
-                Some((h, g)) => (
-                    u8::from(g.contains(&first)) + u8::from(!h.contains(&first)),
-                    first,
-                ),
+                Some((h, g)) => (u8::from(g.contains(&first)) + u8::from(!h.contains(&first)), first),
                 None => (0, first),
             }
         });
-        let inner: BTreeSet<usize> = children
-            .iter()
-            .flat_map(|&c| nodes[c].members.iter().copied())
-            .collect();
-        nodes[n].own = nodes[n]
-            .members
-            .iter()
-            .copied()
-            .filter(|k| !inner.contains(k))
-            .collect();
+        let inner: BTreeSet<usize> = children.iter().flat_map(|&c| nodes[c].members.iter().copied()).collect();
+        nodes[n].own = nodes[n].members.iter().copied().filter(|k| !inner.contains(k)).collect();
         nodes[n].children = children;
     }
     debug_assert!(
         nodes.iter().all(|n| {
-            let mut m: Vec<usize> = n
-                .children
-                .iter()
-                .flat_map(|&c| nodes[c].members.iter().copied())
-                .collect();
+            let mut m: Vec<usize> = n.children.iter().flat_map(|&c| nodes[c].members.iter().copied()).collect();
             m.extend(n.own.iter().copied());
             m.sort_unstable();
             m == n.members
@@ -2368,19 +1999,14 @@ fn group_tree(
 fn scopes(problem: &LevelProblem, objects: &[ObjectInfo], selected: &[usize]) -> Vec<Vec<usize>> {
     let component = |k: usize| {
         let o = &objects[k];
-        matches!(
-            o.role,
-            Role::Element | Role::Supply | Role::Ground | Role::Port
-        ) && o.symbol.is_some()
+        matches!(o.role, Role::Element | Role::Supply | Role::Ground | Role::Port) && o.symbol.is_some()
     };
     let owner = |k: usize| objects[k].stub.as_ref().map_or(k, |s| s.host.0);
     let mut out = Vec::new();
     for &index in selected {
         let g = &problem.groups[index];
         let members: BTreeSet<usize> = g.members.iter().copied().collect();
-        let scope: Vec<usize> = (0..objects.len())
-            .filter(|&k| component(k) && members.contains(&owner(k)))
-            .collect();
+        let scope: Vec<usize> = (0..objects.len()).filter(|&k| component(k) && members.contains(&owner(k))).collect();
         if !scope.is_empty() {
             out.push(scope);
         }
@@ -2419,12 +2045,7 @@ fn even_sets(problem: &LevelProblem, s: &Structure) -> Vec<Vec<usize>> {
     let mut joined = Joined::new(&s.elements);
     let is_element = |k: usize| s.objects.get(k).is_some_and(|o| o.role == Role::Element);
     for &f in &s.kept {
-        let FactKind::Distribute {
-            axis: Axis::X,
-            members,
-            ..
-        } = &problem.facts[f].kind
-        else {
+        let FactKind::Distribute { axis: Axis::X, members, .. } = &problem.facts[f].kind else {
             continue;
         };
         let mut ks = Vec::new();
@@ -2437,11 +2058,8 @@ fn even_sets(problem: &LevelProblem, s: &Structure) -> Vec<Vec<usize>> {
         }
     }
     for pair in &s.pairs {
-        let ends: Vec<usize> = [Some(pair.a), Some(pair.b), pair.axis]
-            .into_iter()
-            .flatten()
-            .filter(|&k| is_element(k))
-            .collect();
+        let ends: Vec<usize> =
+            [Some(pair.a), Some(pair.b), pair.axis].into_iter().flatten().filter(|&k| is_element(k)).collect();
         for w in ends.windows(2) {
             joined.join(w[0], w[1]);
         }
@@ -2463,11 +2081,7 @@ fn even_sets(problem: &LevelProblem, s: &Structure) -> Vec<Vec<usize>> {
         let ends = net
             .pins
             .iter()
-            .filter(|(k, _)| {
-                s.objects
-                    .get(*k)
-                    .is_some_and(|o| matches!(o.role, Role::Element | Role::Port))
-            })
+            .filter(|(k, _)| s.objects.get(*k).is_some_and(|o| matches!(o.role, Role::Element | Role::Port)))
             .count();
         if ends >= 3 {
             NetRole::Node
@@ -2475,13 +2089,7 @@ fn even_sets(problem: &LevelProblem, s: &Structure) -> Vec<Vec<usize>> {
             NetRole::Link
         }
     };
-    let node_of = |k: usize| {
-        s.tree
-            .nodes
-            .iter()
-            .position(|n| n.own.contains(&k))
-            .unwrap_or(0)
-    };
+    let node_of = |k: usize| s.tree.nodes.iter().position(|n| n.own.contains(&k)).unwrap_or(0);
     let mut by_role: BTreeMap<(usize, Option<usize>, Vec<NetRole>), Vec<usize>> = BTreeMap::new();
     for &k in &s.elements {
         let mut roles: Vec<NetRole> = (0..s.pins(k).len())
@@ -2504,10 +2112,7 @@ fn even_sets(problem: &LevelProblem, s: &Structure) -> Vec<Vec<usize>> {
             continue;
         }
         roles.sort_unstable();
-        by_role
-            .entry((node_of(k), s.objects[k].symbol, roles))
-            .or_default()
-            .push(k);
+        by_role.entry((node_of(k), s.objects[k].symbol, roles)).or_default().push(k);
     }
     out.extend(by_role.into_values());
     out.into_iter()
@@ -2562,17 +2167,11 @@ fn current_depths_checked(s: &Structure) -> Option<Vec<Option<u32>>> {
     // who stands above whom, by the nets
     let mut below: BTreeMap<usize, BTreeSet<usize>> = BTreeMap::new();
     for net in &c.nets {
-        if !crate::budget::permit(
-            crate::budget::Step::Structure,
-            net.pins.len().saturating_mul(net.pins.len()),
-        ) {
+        if !crate::budget::permit(crate::budget::Step::Structure, net.pins.len().saturating_mul(net.pins.len())) {
             return None;
         }
         let marked = |out: bool| {
-            let pins = net
-                .pins
-                .iter()
-                .filter(move |p| is_element(p.0) && s.currents.get(p) == Some(&out));
+            let pins = net.pins.iter().filter(move |p| is_element(p.0) && s.currents.get(p) == Some(&out));
             pins.map(|p| p.0)
         };
         for a in marked(true) {
@@ -2660,21 +2259,13 @@ fn depths(s: &Structure) -> Vec<Option<u32>> {
     let mut depth: Vec<Option<u32>> = vec![None; n];
     let c = &s.connections;
     let is_element = |k: usize| s.objects[k].role == Role::Element;
-    let conducts = |(k, pin): PinKey| {
-        s.pins(k)
-            .get(pin)
-            .is_some_and(|p| s.objects[k].device.conducts(&p.terminals))
-    };
+    let conducts = |(k, pin): PinKey| s.pins(k).get(pin).is_some_and(|p| s.objects[k].device.conducts(&p.terminals));
     let power_net = |i: usize| c.nets[i].supply || c.nets[i].ground;
     let on_supply = |p: PinKey| s.power.supply_pins.contains(&p);
     let pins_of = |k: usize| (0..s.pins(k).len()).map(move |j| (k, j));
     // through the pins the current runs through, from the elements on a supply
-    let mut level: Vec<usize> = s
-        .elements
-        .iter()
-        .copied()
-        .filter(|&k| pins_of(k).any(|p| conducts(p) && on_supply(p)))
-        .collect();
+    let mut level: Vec<usize> =
+        s.elements.iter().copied().filter(|&k| pins_of(k).any(|p| conducts(p) && on_supply(p))).collect();
     for &k in &level {
         depth[k] = Some(0);
     }
@@ -2744,9 +2335,7 @@ struct Joined {
 
 impl Joined {
     fn new(elements: &[usize]) -> Joined {
-        Joined {
-            parent: elements.iter().map(|&k| (k, k)).collect(),
-        }
+        Joined { parent: elements.iter().map(|&k| (k, k)).collect() }
     }
 
     fn find(&self, mut k: usize) -> usize {
@@ -2800,11 +2389,7 @@ fn above_by_facts(problem: &LevelProblem, s: &Structure) -> Vec<(usize, usize)> 
                 if !crate::budget::permit(crate::budget::Step::Structure, 1) {
                     return;
                 }
-                out.push(if sense == Sense::Decreasing {
-                    (a, b)
-                } else {
-                    (b, a)
-                });
+                out.push(if sense == Sense::Decreasing { (a, b) } else { (b, a) });
             }
         }
     };
@@ -2813,28 +2398,13 @@ fn above_by_facts(problem: &LevelProblem, s: &Structure) -> Vec<(usize, usize)> 
             break;
         }
         match &problem.facts[f].kind {
-            FactKind::Order {
-                axis: Axis::Y,
-                sense,
-                members,
-            }
-            | FactKind::Distribute {
-                axis: Axis::Y,
-                sense,
-                members,
-            } => {
+            FactKind::Order { axis: Axis::Y, sense, members }
+            | FactKind::Distribute { axis: Axis::Y, sense, members } => {
                 for w in members.windows(2) {
                     pair(&w[..1], &w[1..], *sense);
                 }
             }
-            FactKind::Distance {
-                axis: Axis::Y,
-                sense,
-                min: Some(min),
-                from,
-                to,
-                ..
-            } if *min >= 0. => {
+            FactKind::Distance { axis: Axis::Y, sense, min: Some(min), from, to, .. } if *min >= 0. => {
                 pair(from, to, *sense);
             }
             _ => {}
@@ -2868,16 +2438,9 @@ fn rows(problem: &LevelProblem, s: &Structure, work: &mut Work) -> Vec<Vec<usize
         let origin = |k: usize| s.model.origin_point.get(k).copied().flatten();
         let mut pairs: Vec<(usize, usize, PointId, PointId)> = Vec::new();
         for &f in &s.kept {
-            if matches!(
-                kind(f),
-                FactKind::Order { axis: Axis::X, .. } | FactKind::Distribute { axis: Axis::X, .. }
-            ) {
+            if matches!(kind(f), FactKind::Order { axis: Axis::X, .. } | FactKind::Distribute { axis: Axis::X, .. }) {
                 let elements = touched_elements(s, f, 0);
-                pairs.extend(
-                    elements
-                        .windows(2)
-                        .filter_map(|w| Some((w[0], w[1], origin(w[0])?, origin(w[1])?))),
-                );
+                pairs.extend(elements.windows(2).filter_map(|w| Some((w[0], w[1], origin(w[0])?, origin(w[1])?))));
             }
         }
         if !pairs.is_empty() {
@@ -2905,12 +2468,7 @@ fn rows(problem: &LevelProblem, s: &Structure, work: &mut Work) -> Vec<Vec<usize
     let mut key: BTreeMap<usize, Q> = BTreeMap::new();
     match &s.depth {
         Some(depth) => {
-            let last = s
-                .elements
-                .iter()
-                .filter_map(|&k| depth[k])
-                .max()
-                .map_or(0, |d| d + 1);
+            let last = s.elements.iter().filter_map(|&k| depth[k]).max().map_or(0, |d| d + 1);
             let mut level = BTreeMap::new();
             for &k in &s.elements {
                 if joined.find(k) == k {
@@ -2947,16 +2505,14 @@ fn rows(problem: &LevelProblem, s: &Structure, work: &mut Work) -> Vec<Vec<usize
                 let joins = touched_elements(s, f, 1);
                 let placed = matches!(
                     kind(f),
-                    FactKind::Place { axis: Axis::Y, .. }
-                        | FactKind::PointCoordinate { axis: Axis::Y, .. }
+                    FactKind::Place { axis: Axis::Y, .. } | FactKind::PointCoordinate { axis: Axis::Y, .. }
                 );
                 if joins.len() >= 2 || placed {
                     related.extend(joins);
                 }
             }
             for &k in &related {
-                key.entry(joined.find(k))
-                    .or_insert_with(|| s.witness.origin[k][1].clone());
+                key.entry(joined.find(k)).or_insert_with(|| s.witness.origin[k][1].clone());
             }
             spread(s, &joined, &mut key);
         }
@@ -2966,53 +2522,30 @@ fn rows(problem: &LevelProblem, s: &Structure, work: &mut Work) -> Vec<Vec<usize
     let mut apart: BTreeSet<(usize, usize)> = BTreeSet::new();
     for &f in &s.kept {
         if matches!(kind(f), FactKind::Align { axis: Axis::X, .. }) {
-            let roots: BTreeSet<usize> = touched_elements(s, f, 0)
-                .into_iter()
-                .map(|k| joined.find(k))
-                .collect();
+            let roots: BTreeSet<usize> = touched_elements(s, f, 0).into_iter().map(|k| joined.find(k)).collect();
             for &a in &roots {
                 apart.extend(roots.iter().filter(|&&b| a < b).map(|&b| (a, b)));
             }
         }
     }
-    let mut levels: Vec<Q> = key
-        .values()
-        .cloned()
-        .collect::<BTreeSet<Q>>()
-        .into_iter()
-        .collect();
+    let mut levels: Vec<Q> = key.values().cloned().collect::<BTreeSet<Q>>().into_iter().collect();
     levels.reverse();
     let mut rows = Vec::new();
     for level in levels {
-        let mut classes: Vec<usize> = key
-            .iter()
-            .filter(|(_, q)| **q == level)
-            .map(|(r, _)| *r)
-            .collect();
-        classes.sort_by(|a, b| {
-            s.witness.origin[*b][1]
-                .cmp(&s.witness.origin[*a][1])
-                .then(a.cmp(b))
-        });
+        let mut classes: Vec<usize> = key.iter().filter(|(_, q)| **q == level).map(|(r, _)| *r).collect();
+        classes.sort_by(|a, b| s.witness.origin[*b][1].cmp(&s.witness.origin[*a][1]).then(a.cmp(b)));
         // each class in the first row of its level that holds no class of a column with it
         let mut sub: BTreeMap<usize, usize> = BTreeMap::new();
         for &r in &classes {
-            let taken: BTreeSet<usize> = sub
-                .iter()
-                .filter(|(q, _)| apart.contains(&((**q).min(r), (**q).max(r))))
-                .map(|(_, c)| *c)
-                .collect();
+            let taken: BTreeSet<usize> =
+                sub.iter().filter(|(q, _)| apart.contains(&((**q).min(r), (**q).max(r)))).map(|(_, c)| *c).collect();
             let c = (0..classes.len()).find(|c| !taken.contains(c)).unwrap_or(0);
             sub.insert(r, c);
         }
         let count = sub.values().max().map_or(0, |c| c + 1);
         for c in 0..count {
-            let row: Vec<usize> = s
-                .elements
-                .iter()
-                .copied()
-                .filter(|&k| sub.get(&joined.find(k)) == Some(&c))
-                .collect();
+            let row: Vec<usize> =
+                s.elements.iter().copied().filter(|&k| sub.get(&joined.find(k)) == Some(&c)).collect();
             if !row.is_empty() {
                 rows.push(row);
             }
@@ -3030,13 +2563,7 @@ fn neighbours(s: &Structure, k: usize) -> Vec<usize> {
             if c.nets[i].supply || c.nets[i].ground {
                 continue;
             }
-            out.extend(
-                c.nets[i]
-                    .pins
-                    .iter()
-                    .map(|q| q.0)
-                    .filter(|&j| j != k && s.objects[j].role == Role::Element),
-            );
+            out.extend(c.nets[i].pins.iter().map(|q| q.0).filter(|&j| j != k && s.objects[j].role == Role::Element));
         }
     }
     out.into_iter().collect()
@@ -3046,12 +2573,7 @@ fn neighbours(s: &Structure, k: usize) -> Vec<usize> {
 /// connected to whose class has one, round after round; then, for those connected to none, the key
 /// that most elements have, the highest of equals; 0 when no element has one.
 fn spread(s: &Structure, joined: &Joined, key: &mut BTreeMap<usize, Q>) {
-    let roots: Vec<usize> = s
-        .elements
-        .iter()
-        .copied()
-        .filter(|&k| joined.find(k) == k)
-        .collect();
+    let roots: Vec<usize> = s.elements.iter().copied().filter(|&k| joined.find(k) == k).collect();
     loop {
         let found: Vec<(usize, Q)> = roots
             .iter()
@@ -3076,10 +2598,7 @@ fn spread(s: &Structure, joined: &Joined, key: &mut BTreeMap<usize, Q>) {
             *counts.entry(q.clone()).or_default() += 1;
         }
     }
-    let common = counts
-        .iter()
-        .max_by(|a, b| a.1.cmp(b.1).then_with(|| a.0.cmp(b.0)))
-        .map(|(q, _)| q.clone());
+    let common = counts.iter().max_by(|a, b| a.1.cmp(b.1).then_with(|| a.0.cmp(b.0))).map(|(q, _)| q.clone());
     let common = common.unwrap_or_default();
     for r in roots {
         key.entry(r).or_insert_with(|| common.clone());
@@ -3123,10 +2642,7 @@ fn touched_elements(s: &Structure, f: usize, axis: usize) -> Vec<usize> {
 /// later where they run against each other (two DISTRIBUTEs at one x, each the way of the
 /// netlist); and one that orders two elements that a fact with a side orders is not open at all,
 /// its precedences fixed the way that fact has them.
-fn precedence(
-    problem: &LevelProblem,
-    s: &Structure,
-) -> (BTreeSet<(usize, usize)>, Vec<Reversible>) {
+fn precedence(problem: &LevelProblem, s: &Structure) -> (BTreeSet<(usize, usize)>, Vec<Reversible>) {
     let element = |k: usize| s.objects.get(k).is_some_and(|o| o.role == Role::Element);
     let elements = |m: &PointRef| -> Vec<usize> {
         let mut ks = Vec::new();
@@ -3147,11 +2663,7 @@ fn precedence(
     let before = |a: &[(usize, Q)], b: &[(usize, Q)]| -> Vec<(usize, usize)> {
         let mut out = Vec::new();
         for (x, vx) in a {
-            out.extend(
-                b.iter()
-                    .filter(|(y, vy)| x != y && vx < vy)
-                    .map(|(y, _)| (*x, *y)),
-            );
+            out.extend(b.iter().filter(|(y, vy)| x != y && vx < vy).map(|(y, _)| (*x, *y)));
         }
         out
     };
@@ -3159,22 +2671,11 @@ fn precedence(
     let mut open: Vec<Reversible> = Vec::new();
     for &f in &s.kept {
         let (sense, mut pairs) = match &problem.facts[f].kind {
-            FactKind::Order {
-                axis: Axis::X,
-                sense,
-                members,
-            } => {
+            FactKind::Order { axis: Axis::X, sense, members } => {
                 let at = at(members);
                 (*sense, before(&at, &at))
             }
-            FactKind::Distance {
-                axis: Axis::X,
-                sense,
-                min,
-                from,
-                to,
-                ..
-            } => {
+            FactKind::Distance { axis: Axis::X, sense, min, from, to, .. } => {
                 if !min.and_then(from_f64).is_some_and(|m| !m.is_negative()) {
                     continue;
                 }
@@ -3183,11 +2684,7 @@ fn precedence(
                 pairs.extend(before(&b, &a));
                 (*sense, pairs)
             }
-            FactKind::Distribute {
-                axis: Axis::X,
-                members,
-                ..
-            } => {
+            FactKind::Distribute { axis: Axis::X, members, .. } => {
                 // with fewer than three members it holds wherever they are (14.4)
                 if members.len() < 3 {
                     continue;
@@ -3206,13 +2703,7 @@ fn precedence(
                 for (i, (_, a)) in chain.iter().enumerate() {
                     for (_, b) in &chain[i + 1..] {
                         for &x in a {
-                            pairs.extend(b.iter().filter(|&&y| x != y).map(|&y| {
-                                if forward {
-                                    (x, y)
-                                } else {
-                                    (y, x)
-                                }
-                            }));
+                            pairs.extend(b.iter().filter(|&&y| x != y).map(|&y| if forward { (x, y) } else { (y, x) }));
                         }
                     }
                 }
@@ -3233,10 +2724,7 @@ fn precedence(
                     || matches!(problem.facts[f].kind, FactKind::Distribute { .. }) =>
             {
                 if !pairs.is_empty() {
-                    open.push(Reversible {
-                        facts: vec![f],
-                        pairs,
-                    });
+                    open.push(Reversible { facts: vec![f], pairs });
                 }
             }
             Sense::Either => {}
@@ -3244,20 +2732,14 @@ fn precedence(
         }
     }
     // the facts whose side is open that order the same two elements, one after the other, as one
-    let unordered = |r: &Reversible| -> BTreeSet<(usize, usize)> {
-        r.pairs.iter().map(|&(a, b)| (a.min(b), a.max(b))).collect()
-    };
-    let turned = |pairs: &[(usize, usize)]| -> Vec<(usize, usize)> {
-        pairs.iter().map(|&(a, b)| (b, a)).collect()
-    };
+    let unordered =
+        |r: &Reversible| -> BTreeSet<(usize, usize)> { r.pairs.iter().map(|&(a, b)| (a.min(b), a.max(b))).collect() };
+    let turned = |pairs: &[(usize, usize)]| -> Vec<(usize, usize)> { pairs.iter().map(|&(a, b)| (b, a)).collect() };
     let mut merged: Vec<Reversible> = Vec::new();
     for mut r in open {
         loop {
             let shared = unordered(&r);
-            let Some(i) = merged
-                .iter()
-                .position(|m| !unordered(m).is_disjoint(&shared))
-            else {
+            let Some(i) = merged.iter().position(|m| !unordered(m).is_disjoint(&shared)) else {
                 break;
             };
             let mut m = merged.remove(i);
@@ -3302,19 +2784,16 @@ fn netlist_way<'a>(members: impl DoubleEndedIterator<Item = &'a [usize]> + Clone
         ks.sort_unstable();
         (!ks.is_empty()).then_some(ks)
     };
-    members
-        .clone()
-        .filter_map(keyed)
-        .le(members.rev().filter_map(keyed))
+    members.clone().filter_map(keyed).le(members.rev().filter_map(keyed))
 }
 
 /// The objects a point refers to: its object, or the members of a set followed down.
 fn elements_of(r: &PointRef, out: &mut Vec<usize>) {
     match r {
         PointRef::Origin(k) => out.push(*k),
-        PointRef::Pin { object, .. }
-        | PointRef::SymbolPin { object, .. }
-        | PointRef::PinPosition { object, .. } => out.push(*object),
+        PointRef::Pin { object, .. } | PointRef::SymbolPin { object, .. } | PointRef::PinPosition { object, .. } => {
+            out.push(*object)
+        }
         PointRef::Centre(members) => {
             for m in members {
                 elements_of(m, out);
@@ -3350,16 +2829,8 @@ pub(crate) mod tests {
                     sense: Sense::Decreasing,
                     min: Some(2.),
                     max: None,
-                    from: vec![PointRef::Pin {
-                        object: 1,
-                        pin: 0,
-                        terminal: "1".into(),
-                    }],
-                    to: vec![PointRef::PinPosition {
-                        object: 2,
-                        pin: 0,
-                        reference: Reference::Anonymous,
-                    }],
+                    from: vec![PointRef::Pin { object: 1, pin: 0, terminal: "1".into() }],
+                    to: vec![PointRef::PinPosition { object: 2, pin: 0, reference: Reference::Anonymous }],
                 }),
             ],
         );
@@ -3367,10 +2838,7 @@ pub(crate) mod tests {
         let mut s = structure_of(&p);
         assert_eq!(s.kept.len(), 2);
         s.depth = Some(vec![Some(0); 3]);
-        assert_eq!(
-            rows(&p, &s, &mut Work::default()),
-            vec![vec![0], vec![1], vec![2]]
-        );
+        assert_eq!(rows(&p, &s, &mut Work::default()), vec![vec![0], vec![1], vec![2]]);
         s.language04 = false;
         assert_eq!(rows(&p, &s, &mut Work::default()), vec![vec![0, 1, 2]]);
     }
@@ -3392,27 +2860,14 @@ pub(crate) mod tests {
         assert!(!unmarked.has(Source::SourcesDown));
         assert!(!unmarked.conducts((0, 1)));
         assert!(unmarked.objects.iter().all(|o| o.device == Device::Other));
-        let pin = |object, pin| PointRef::Pin {
-            object,
-            pin,
-            terminal: String::new(),
-        };
+        let pin = |object, pin| PointRef::Pin { object, pin, terminal: String::new() };
         p.currents = vec![
-            TerminalCurrent {
-                pin: pin(0, 2),
-                direction: "out".into(),
-            },
-            TerminalCurrent {
-                pin: pin(1, 1),
-                direction: "in".into(),
-            },
+            TerminalCurrent { pin: pin(0, 2), direction: "out".into() },
+            TerminalCurrent { pin: pin(1, 1), direction: "in".into() },
         ];
         let s = structure_of(&p);
         assert!(s.has(Source::SourcesDown));
-        assert!(
-            s.depth.is_none(),
-            "CURRENT without a connected pair must leave rows to facts"
-        );
+        assert!(s.depth.is_none(), "CURRENT without a connected pair must leave rows to facts");
         assert!(s.conducts((0, 2)));
         assert!(!s.conducts((0, 0)));
         assert_eq!(s.against_current(0, Orient::R0), 0);
@@ -3431,17 +2886,10 @@ pub(crate) mod tests {
         p.version = "0.4".into();
         let mut s = structure_of(&p);
         // A two-object cycle followed by two objects downstream.
-        s.currents = (0..4)
-            .flat_map(|k| [((k, 1), false), ((k, 2), true)])
-            .collect();
+        s.currents = (0..4).flat_map(|k| [((k, 1), false), ((k, 2), true)]).collect();
         s.connections.nets = [(0, 1), (1, 0), (1, 2), (2, 3)]
             .into_iter()
-            .map(|(a, b)| Net {
-                name: String::new(),
-                supply: false,
-                ground: false,
-                pins: vec![(a, 2), (b, 1)],
-            })
+            .map(|(a, b)| Net { name: String::new(), supply: false, ground: false, pins: vec![(a, 2), (b, 1)] })
             .collect();
         assert_eq!(current_depths(&s), [Some(0), Some(0), Some(1), Some(2)]);
     }
@@ -3452,21 +2900,14 @@ pub(crate) mod tests {
         let mut p = problem_of(vec![instance()], vec![]);
         p.version = "0.4".into();
         p.currents = vec![TerminalCurrent {
-            pin: PointRef::Pin {
-                object: 0,
-                pin: 2,
-                terminal: String::new(),
-            },
+            pin: PointRef::Pin { object: 0, pin: 2, terminal: String::new() },
             direction: "in".into(),
         }];
         let mut s = structure_of(&p);
         s.caps.nodes = 0;
         let (values, stopped) = fitting_values(&s, &mut Work::default());
         assert!(stopped);
-        assert!(
-            values.is_empty(),
-            "an unfinished check must not constrain a class"
-        );
+        assert!(values.is_empty(), "an unfinished check must not constrain a class");
     }
 
     #[test]
@@ -3474,32 +2915,17 @@ pub(crate) mod tests {
         let mut p = problem_of(
             vec![instance(), instance(), point()],
             vec![
-                fact(FactKind::OrientRelation {
-                    relation: Orient::R0,
-                    from: vec![0],
-                    to: vec![1],
-                }),
+                fact(FactKind::OrientRelation { relation: Orient::R0, from: vec![0], to: vec![1] }),
                 fact(FactKind::Distribute {
                     axis: Axis::X,
                     sense: Sense::Increasing,
-                    members: vec![
-                        PointRef::Origin(0),
-                        PointRef::Origin(2),
-                        PointRef::Origin(1),
-                    ],
+                    members: vec![PointRef::Origin(0), PointRef::Origin(2), PointRef::Origin(1)],
                 }),
             ],
         );
         p.version = "0.4".into();
         p.orient_lists = vec![(0, vec![Orient::R0, Orient::MY])];
-        assert_eq!(
-            structure_of(&p).pairs,
-            [Pair {
-                a: 0,
-                b: 1,
-                axis: Some(2)
-            }]
-        );
+        assert_eq!(structure_of(&p).pairs, [Pair { a: 0, b: 1, axis: Some(2) }]);
         p.orient_lists.clear();
         assert!(structure_of(&p).pairs.is_empty());
     }
@@ -3516,48 +2942,29 @@ pub(crate) mod tests {
             spacing_x: None,
             spacing_y: None,
         };
-        p.groups = vec![
-            group("%a", vec![0, 1, 2]),
-            group("%b", vec![2, 3]),
-            group("%c", vec![0, 1]),
-            group("%d", vec![4, 5]),
-        ];
+        p.groups =
+            vec![group("%a", vec![0, 1, 2]), group("%b", vec![2, 3]), group("%c", vec![0, 1]), group("%d", vec![4, 5])];
         let s = structure_of(&p);
         let nodes = &s.tree.nodes;
         assert_eq!(nodes[0].kind, NodeKind::Root);
         assert_eq!(nodes[0].members, vec![0, 1, 2, 3, 4, 5]);
         // %a and %b overlap: their union, with %a alone, the shared #2, %b alone; %c nests in the
         // first part, %d stands apart
-        let union = nodes
-            .iter()
-            .position(|n| n.kind == NodeKind::Union(0, 1))
-            .unwrap();
+        let union = nodes.iter().position(|n| n.kind == NodeKind::Union(0, 1)).unwrap();
         assert_eq!(nodes[union].members, vec![0, 1, 2, 3]);
         assert!(nodes[union].fixed_order);
-        let parts: Vec<&Vec<usize>> = nodes[union]
-            .children
-            .iter()
-            .map(|&c| &nodes[c].members)
-            .collect();
+        let parts: Vec<&Vec<usize>> = nodes[union].children.iter().map(|&c| &nodes[c].members).collect();
         assert_eq!(parts, vec![&vec![0, 1], &vec![2], &vec![3]]);
         // %c is the same set as the first part: it is not made twice
         assert_eq!(nodes.len(), 6, "{nodes:?}");
-        let d = nodes
-            .iter()
-            .position(|n| n.kind == NodeKind::Group(3))
-            .unwrap();
+        let d = nodes.iter().position(|n| n.kind == NodeKind::Group(3)).unwrap();
         assert_eq!(nodes[0].children, vec![union, d]);
         assert!(nodes[0].own.is_empty());
         let order = s.tree.post_order();
         assert_eq!(*order.last().unwrap(), 0);
         assert!(
             order.iter().position(|&n| n == union)
-                > nodes[union]
-                    .children
-                    .iter()
-                    .map(|&c| order.iter().position(|&n| n == c))
-                    .max()
-                    .unwrap()
+                > nodes[union].children.iter().map(|&c| order.iter().position(|&n| n == c)).max().unwrap()
         );
         assert_eq!(s.tree.lowest_common(&[0, 1]), nodes[union].children[0]);
         assert_eq!(s.tree.lowest_common(&[0, 4]), 0);
@@ -3577,11 +2984,7 @@ pub(crate) mod tests {
             spacing_x: None,
             spacing_y: None,
         };
-        p.groups = vec![
-            group("%a", vec![0, 1]),
-            group("%b", vec![2, 3]),
-            group("%c", vec![1, 2]),
-        ];
+        p.groups = vec![group("%a", vec![0, 1]), group("%b", vec![2, 3]), group("%c", vec![1, 2])];
         let s = structure_of(&p);
         assert_eq!(s.tree.nodes.len(), 3);
         assert!(s.notes[0].contains("%c"), "{:?}", s.notes);
@@ -3614,16 +3017,10 @@ pub(crate) mod tests {
         let nodes = &t.nodes;
         assert!(notes.is_empty(), "{notes:?}");
         assert_eq!(nodes.len(), 5, "{nodes:?}");
-        let union = nodes
-            .iter()
-            .position(|n| n.kind == NodeKind::Union(1, 2))
-            .unwrap();
+        let union = nodes.iter().position(|n| n.kind == NodeKind::Union(1, 2)).unwrap();
         assert_eq!(nodes[0].children, vec![union]);
-        let parts: Vec<(&NodeKind, &Vec<usize>)> = nodes[union]
-            .children
-            .iter()
-            .map(|&c| (&nodes[c].kind, &nodes[c].members))
-            .collect();
+        let parts: Vec<(&NodeKind, &Vec<usize>)> =
+            nodes[union].children.iter().map(|&c| (&nodes[c].kind, &nodes[c].members)).collect();
         assert_eq!(
             parts,
             vec![
@@ -3634,44 +3031,20 @@ pub(crate) mod tests {
         );
         // the union of %g2 and %g3 is %g1, inside %g0: %g1 is the union, its parts what only %g2
         // has, what both have, what only %g3 has
-        let (t, notes) = tree_of(
-            5,
-            &[
-                vec![0, 1, 2, 3, 4],
-                vec![0, 1, 2, 3],
-                vec![2, 3],
-                vec![0, 1, 2],
-            ],
-        );
+        let (t, notes) = tree_of(5, &[vec![0, 1, 2, 3, 4], vec![0, 1, 2, 3], vec![2, 3], vec![0, 1, 2]]);
         let nodes = &t.nodes;
         assert!(notes.is_empty(), "{notes:?}");
         assert_eq!(nodes.len(), 6, "{nodes:?}");
-        let top = nodes
-            .iter()
-            .position(|n| n.kind == NodeKind::Group(0))
-            .unwrap();
-        let union = nodes
-            .iter()
-            .position(|n| n.kind == NodeKind::Union(2, 3))
-            .unwrap();
-        assert_eq!(
-            (nodes[0].children.clone(), nodes[top].children.clone()),
-            (vec![top], vec![union])
-        );
+        let top = nodes.iter().position(|n| n.kind == NodeKind::Group(0)).unwrap();
+        let union = nodes.iter().position(|n| n.kind == NodeKind::Union(2, 3)).unwrap();
+        assert_eq!((nodes[0].children.clone(), nodes[top].children.clone()), (vec![top], vec![union]));
         assert_eq!(nodes[union].members, vec![0, 1, 2, 3]);
         assert!(nodes[union].fixed_order);
-        let parts: Vec<&Vec<usize>> = nodes[union]
-            .children
-            .iter()
-            .map(|&c| &nodes[c].members)
-            .collect();
+        let parts: Vec<&Vec<usize>> = nodes[union].children.iter().map(|&c| &nodes[c].members).collect();
         assert_eq!(parts, vec![&vec![3], &vec![2], &vec![0, 1]]);
         // a group written after the union that is one of its two groups is in it already; one with
         // the two outer parts and not the shared one cannot be in one piece with them
-        let (t, notes) = tree_of(
-            4,
-            &[vec![0, 1, 2], vec![2, 3], vec![0, 1, 2], vec![0, 1, 3]],
-        );
+        let (t, notes) = tree_of(4, &[vec![0, 1, 2], vec![2, 3], vec![0, 1, 2], vec![0, 1, 3]]);
         assert_eq!(t.nodes.len(), 5, "{:?}", t.nodes);
         assert_eq!(notes.len(), 1, "{notes:?}");
         assert!(notes[0].contains("%g3"), "{notes:?}");
@@ -3682,19 +3055,14 @@ pub(crate) mod tests {
 
     impl Lcg {
         pub(crate) fn below(&mut self, n: u64) -> u64 {
-            self.0 = self
-                .0
-                .wrapping_mul(6_364_136_223_846_793_005)
-                .wrapping_add(1_442_695_040_888_963_407);
+            self.0 = self.0.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1_442_695_040_888_963_407);
             (self.0 >> 33) % n
         }
 
         /// Sets of groups over `n` elements: two to five, each element in each by a coin.
         pub(crate) fn groups(&mut self, n: usize) -> Vec<Vec<usize>> {
             let count = 2 + self.below(4) as usize;
-            (0..count)
-                .map(|_| (0..n).filter(|_| self.below(2) == 0).collect())
-                .collect()
+            (0..count).map(|_| (0..n).filter(|_| self.below(2) == 0).collect()).collect()
         }
     }
 
@@ -3711,42 +3079,23 @@ pub(crate) mod tests {
             let (t, notes) = tree_of(6, &groups);
             let nodes = &t.nodes;
             let what = format!("{groups:?}: {nodes:?}");
-            let set = |n: usize| {
-                nodes[n]
-                    .members
-                    .iter()
-                    .copied()
-                    .collect::<BTreeSet<usize>>()
-            };
+            let set = |n: usize| nodes[n].members.iter().copied().collect::<BTreeSet<usize>>();
             for a in 0..nodes.len() {
                 for b in a + 1..nodes.len() {
                     let (x, y) = (set(a), set(b));
-                    assert!(
-                        x.is_disjoint(&y) || x.is_subset(&y) || y.is_subset(&x),
-                        "{what}"
-                    );
+                    assert!(x.is_disjoint(&y) || x.is_subset(&y) || y.is_subset(&x), "{what}");
                     assert!(a == 0 || x != y, "{what}");
                 }
-                let mut m: Vec<usize> = nodes[a]
-                    .children
-                    .iter()
-                    .flat_map(|&c| nodes[c].members.clone())
-                    .collect();
+                let mut m: Vec<usize> = nodes[a].children.iter().flat_map(|&c| nodes[c].members.clone()).collect();
                 m.extend(nodes[a].own.iter().copied());
                 m.sort_unstable();
                 assert_eq!(m, nodes[a].members, "{what}");
-                assert!(nodes[a]
-                    .children
-                    .iter()
-                    .all(|&c| a == 0 || nodes[c].members.len() < nodes[a].members.len()));
+                assert!(nodes[a].children.iter().all(|&c| a == 0 || nodes[c].members.len() < nodes[a].members.len()));
                 if let NodeKind::Union(h, g) = nodes[a].kind {
                     unions += 1;
-                    let (h, g): (BTreeSet<usize>, BTreeSet<usize>) = (
-                        groups[h].iter().copied().collect(),
-                        groups[g].iter().copied().collect(),
-                    );
-                    let parts: Vec<BTreeSet<usize>> =
-                        nodes[a].children.iter().map(|&c| set(c)).collect();
+                    let (h, g): (BTreeSet<usize>, BTreeSet<usize>) =
+                        (groups[h].iter().copied().collect(), groups[g].iter().copied().collect());
+                    let parts: Vec<BTreeSet<usize>> = nodes[a].children.iter().map(|&c| set(c)).collect();
                     let expected: Vec<BTreeSet<usize>> = vec![
                         h.difference(&g).copied().collect(),
                         h.intersection(&g).copied().collect(),
@@ -3759,16 +3108,13 @@ pub(crate) mod tests {
             for (i, g) in groups.iter().enumerate() {
                 let g: BTreeSet<usize> = g.iter().copied().collect();
                 let in_union = nodes.iter().any(|n| match n.kind {
-                    NodeKind::Union(a, b) => [a, b]
-                        .iter()
-                        .any(|&j| groups[j].iter().copied().collect::<BTreeSet<usize>>() == g),
+                    NodeKind::Union(a, b) => {
+                        [a, b].iter().any(|&j| groups[j].iter().copied().collect::<BTreeSet<usize>>() == g)
+                    }
                     _ => false,
                 });
                 let noted = notes.iter().any(|n| n.contains(&format!("%g{i} ")));
-                assert!(
-                    g.len() < 2 || (0..nodes.len()).any(|n| set(n) == g) || in_union || noted,
-                    "%g{i}: {what}"
-                );
+                assert!(g.len() < 2 || (0..nodes.len()).any(|n| set(n) == g) || in_union || noted, "%g{i}: {what}");
             }
         }
         assert!(unions > 50, "{unions}");
@@ -3793,11 +3139,7 @@ pub(crate) mod tests {
                     sense: rnl_runtime::problem::Sense::Increasing,
                     members: vec![o(2), o(0)],
                 }),
-                fact(FactKind::Place {
-                    at: o(3),
-                    axis: Axis::Y,
-                    value: -20.0,
-                }),
+                fact(FactKind::Place { at: o(3), axis: Axis::Y, value: -20.0 }),
             ],
         );
         let s = structure_of(&p);
@@ -3809,25 +3151,15 @@ pub(crate) mod tests {
         // every element is its own free class
         assert_eq!(s.open.classes.len(), 4);
         // no wires, no supply: current_direction and the routing objectives are inert
-        assert!(s
-            .active
-            .inert
-            .iter()
-            .any(|i| i.starts_with("current_direction")));
-        assert!(
-            !s.has(Source::DepthRows) && s.has(Source::Barycentre) && s.has(Source::FacingPins)
-        );
+        assert!(s.active.inert.iter().any(|i| i.starts_with("current_direction")));
+        assert!(!s.has(Source::DepthRows) && s.has(Source::Barycentre) && s.has(Source::FacingPins));
     }
 
     #[test]
     fn an_order_is_a_row_where_the_facts_let_it_be_and_an_align_on_x_a_column() {
         let o = |k| PointRef::Origin(k);
         let order = |members: Vec<PointRef>| {
-            fact(FactKind::Order {
-                axis: Axis::X,
-                sense: rnl_runtime::problem::Sense::Increasing,
-                members,
-            })
+            fact(FactKind::Order { axis: Axis::X, sense: rnl_runtime::problem::Sense::Increasing, members })
         };
         let p = problem_of(
             (0..6).map(|_| instance()).collect(),
@@ -3843,10 +3175,7 @@ pub(crate) mod tests {
                 }),
                 order(vec![o(0), o(1), o(2)]),
                 // 3 and 4 in one column: rows of their own, though nothing else tells them apart
-                fact(FactKind::Align {
-                    axis: Axis::X,
-                    members: vec![o(3), o(4)],
-                }),
+                fact(FactKind::Align { axis: Axis::X, members: vec![o(3), o(4)] }),
             ],
         );
         let s = structure_of(&p);
@@ -3862,14 +3191,7 @@ pub(crate) mod tests {
     fn only_the_facts_with_a_side_give_precedences_and_those_left_open_can_be_reversed() {
         let o = |k| PointRef::Origin(k);
         let distance = |sense, min: Option<f64>, max: Option<f64>, a: usize, b: usize| {
-            fact(FactKind::Distance {
-                axis: Axis::X,
-                sense,
-                min,
-                max,
-                from: vec![o(a)],
-                to: vec![o(b)],
-            })
+            fact(FactKind::Distance { axis: Axis::X, sense, min, max, from: vec![o(a)], to: vec![o(b)] })
         };
         use rnl_runtime::problem::Sense::{Either, Increasing};
         let p = problem_of(
@@ -3879,41 +3201,21 @@ pub(crate) mod tests {
                 distance(Increasing, Some(2.0), None, 0, 1),
                 // no side: within 5 of each other, either way; and a DISTRIBUTE, an ALIGN
                 distance(Either, None, Some(5.0), 2, 3),
-                fact(FactKind::Distribute {
-                    axis: Axis::X,
-                    sense: Sense::Either,
-                    members: vec![o(2), o(3), o(4)],
-                }),
-                fact(FactKind::Align {
-                    axis: Axis::X,
-                    members: vec![o(5), o(6)],
-                }),
+                fact(FactKind::Distribute { axis: Axis::X, sense: Sense::Either, members: vec![o(2), o(3), o(4)] }),
+                fact(FactKind::Align { axis: Axis::X, members: vec![o(5), o(6)] }),
                 // a side left open: reversible
-                fact(FactKind::Order {
-                    axis: Axis::X,
-                    sense: Either,
-                    members: vec![o(6), o(7)],
-                }),
+                fact(FactKind::Order { axis: Axis::X, sense: Either, members: vec![o(6), o(7)] }),
             ],
         );
         let s = structure_of(&p);
-        assert_eq!(
-            s.precedence.iter().copied().collect::<Vec<_>>(),
-            vec![(0, 1)]
-        );
+        assert_eq!(s.precedence.iter().copied().collect::<Vec<_>>(), vec![(0, 1)]);
         assert_eq!(s.open.orders, vec![4]);
         assert_eq!(s.reversible.len(), 2, "{:?}", s.reversible);
         // the DISTRIBUTE fixes no side, but its members come in its order, one way or the other
         assert_eq!(s.reversible[0].facts, vec![2]);
-        assert!(
-            monotone(&s.reversible[0].pairs, &[2, 3, 4]),
-            "{:?}",
-            s.reversible
-        );
+        assert!(monotone(&s.reversible[0].pairs, &[2, 3, 4]), "{:?}", s.reversible);
         assert_eq!(s.reversible[1].facts, vec![4]);
-        let [(a, b)] = s.reversible[1].pairs[..] else {
-            panic!("{:?}", s.reversible)
-        };
+        let [(a, b)] = s.reversible[1].pairs[..] else { panic!("{:?}", s.reversible) };
         assert_eq!((a.min(b), a.max(b)), (6, 7));
     }
 
@@ -3923,11 +3225,7 @@ pub(crate) mod tests {
         let way = |forward: bool| -> Vec<(usize, usize)> {
             let mut out = Vec::new();
             for (i, &a) in chain.iter().enumerate() {
-                out.extend(
-                    chain[i + 1..]
-                        .iter()
-                        .map(|&b| if forward { (a, b) } else { (b, a) }),
-                );
+                out.extend(chain[i + 1..].iter().map(|&b| if forward { (a, b) } else { (b, a) }));
             }
             out.sort_unstable();
             out
@@ -3944,20 +3242,9 @@ pub(crate) mod tests {
     #[test]
     fn a_distribute_orders_its_elements_either_way() {
         let o = |k| PointRef::Origin(k);
-        let distribute = |members: Vec<PointRef>| {
-            fact(FactKind::Distribute {
-                axis: Axis::X,
-                sense: Sense::Either,
-                members,
-            })
-        };
-        let order = |sense, members: Vec<PointRef>| {
-            fact(FactKind::Order {
-                axis: Axis::X,
-                sense,
-                members,
-            })
-        };
+        let distribute =
+            |members: Vec<PointRef>| fact(FactKind::Distribute { axis: Axis::X, sense: Sense::Either, members });
+        let order = |sense, members: Vec<PointRef>| fact(FactKind::Order { axis: Axis::X, sense, members });
         use rnl_runtime::problem::Sense::{Either, Increasing};
         let mut objects: Vec<_> = (0..9).map(|_| instance()).collect();
         objects.push(point());
@@ -3974,11 +3261,7 @@ pub(crate) mod tests {
         let s = structure_of(&p);
         assert_eq!(s.reversible.len(), 2, "{:?}", s.reversible);
         assert_eq!(s.reversible[0].facts, vec![0, 1]);
-        assert!(
-            monotone(&s.reversible[0].pairs, &[0, 1, 2]),
-            "{:?}",
-            s.reversible
-        );
+        assert!(monotone(&s.reversible[0].pairs, &[0, 1, 2]), "{:?}", s.reversible);
         // the ORDER puts 5 first, so the DISTRIBUTE runs from 5 to 3
         for pair in [(5, 4), (4, 3), (5, 3)] {
             assert!(s.precedence.contains(&pair), "{:?}", s.precedence);
@@ -3986,11 +3269,7 @@ pub(crate) mod tests {
         assert_eq!(s.precedence.len(), 3, "{:?}", s.precedence);
         // the point orders nothing, and keeps its place between 6 and 7
         assert_eq!(s.reversible[1].facts, vec![4]);
-        assert!(
-            monotone(&s.reversible[1].pairs, &[6, 7]),
-            "{:?}",
-            s.reversible
-        );
+        assert!(monotone(&s.reversible[1].pairs, &[6, 7]), "{:?}", s.reversible);
     }
 
     /// A DISTRIBUTE has no direction (14.4): where the witness puts all its members at one x, it
@@ -4001,11 +3280,7 @@ pub(crate) mod tests {
     fn a_distribute_at_one_x_runs_the_way_of_the_netlist() {
         let distribute = |members: &[usize]| {
             let members = members.iter().map(|&k| PointRef::Origin(k)).collect();
-            fact(FactKind::Distribute {
-                axis: Axis::X,
-                sense: Sense::Either,
-                members,
-            })
+            fact(FactKind::Distribute { axis: Axis::X, sense: Sense::Either, members })
         };
         // the pairs of the reversible facts, and the precedences, of some DISTRIBUTEs on 0..6 and a
         // point 6, all at x 0 at the witness
@@ -4015,48 +3290,24 @@ pub(crate) mod tests {
             objects.push(point());
             let p = problem_of(objects, written.iter().map(|m| distribute(m)).collect());
             let s = structure_of(&p);
-            assert!(
-                s.witness.origin.iter().all(|o| o[0].is_zero()),
-                "{:?}",
-                s.witness.origin
-            );
-            (
-                s.reversible.into_iter().map(|r| r.pairs).collect(),
-                s.precedence,
-            )
+            assert!(s.witness.origin.iter().all(|o| o[0].is_zero()), "{:?}", s.witness.origin);
+            (s.reversible.into_iter().map(|r| r.pairs).collect(), s.precedence)
         };
         // the netlist puts the first before the last: written so, or the other way round
-        for written in [
-            [0, 1, 2],
-            [2, 1, 0],
-            [0, 2, 1],
-            [1, 2, 0],
-            [1, 0, 2],
-            [2, 0, 1],
-        ] {
+        for written in [[0, 1, 2], [2, 1, 0], [0, 2, 1], [1, 2, 0], [1, 0, 2], [2, 0, 1]] {
             let [a, b, c] = written;
             let mut way = vec![(a, b), (a, c), (b, c)];
             if a > c {
                 way = way.into_iter().map(|(x, y)| (y, x)).collect();
             }
             way.sort_unstable();
-            assert_eq!(
-                pairs(&[&written]),
-                (vec![way], BTreeSet::new()),
-                "{written:?}"
-            );
+            assert_eq!(pairs(&[&written]), (vec![way], BTreeSet::new()), "{written:?}");
         }
         // written the other way round, the same pairs
-        for (written, reversed) in [
-            (&[3, 6, 4][..], &[4, 6, 3][..]),
-            (&[0, 1, 2, 0], &[0, 2, 1, 0]),
-            (&[5, 1, 3, 2], &[2, 3, 1, 5]),
-        ] {
-            assert_eq!(
-                pairs(&[written]),
-                pairs(&[reversed]),
-                "{written:?} and {reversed:?}"
-            );
+        for (written, reversed) in
+            [(&[3, 6, 4][..], &[4, 6, 3][..]), (&[0, 1, 2, 0], &[0, 2, 1, 0]), (&[5, 1, 3, 2], &[2, 3, 1, 5])]
+        {
+            assert_eq!(pairs(&[written]), pairs(&[reversed]), "{written:?} and {reversed:?}");
         }
         // the point between orders nothing
         assert_eq!(pairs(&[&[4, 6, 3]]).0, vec![vec![(3, 4)]]);
@@ -4064,10 +3315,7 @@ pub(crate) mod tests {
         // way: 2, 1, 0 and 1, 0, 3 both hold in 2, 1, 0, 3
         assert_eq!(
             pairs(&[&[0, 1, 2], &[1, 0, 3]]),
-            (
-                vec![vec![(0, 3), (1, 0), (1, 3), (2, 0), (2, 1)]],
-                BTreeSet::new()
-            )
+            (vec![vec![(0, 3), (1, 0), (1, 3), (2, 0), (2, 1)]], BTreeSet::new())
         );
         // two members, nothing
         assert_eq!(pairs(&[&[4, 3], &[1, 5]]), (Vec::new(), BTreeSet::new()));
@@ -4076,11 +3324,7 @@ pub(crate) mod tests {
     #[test]
     fn a_net_routed_twice_is_drawn_once_with_the_pins_of_both() {
         let mut p = problem_of(vec![instance(), instance(), instance()], Vec::new());
-        let pin = |object: usize, pin: usize| PointRef::Pin {
-            object,
-            pin,
-            terminal: ["g", "d", "s"][pin].to_string(),
-        };
+        let pin = |object: usize, pin: usize| PointRef::Pin { object, pin, terminal: ["g", "d", "s"][pin].to_string() };
         let route = |pins: Vec<PointRef>| rnl_runtime::problem::RouteIntent {
             tree: false,
             net: "n".to_string(),
@@ -4089,17 +3333,11 @@ pub(crate) mod tests {
             pins,
             wires: Vec::new(),
         };
-        p.routes = vec![
-            route(vec![pin(0, 1), pin(1, 1)]),
-            route(vec![pin(1, 1), pin(2, 0)]),
-        ];
+        p.routes = vec![route(vec![pin(0, 1), pin(1, 1)]), route(vec![pin(1, 1), pin(2, 0)])];
         let s = structure_of(&p);
         let drawn = &s.connections.drawn;
         assert_eq!(drawn.len(), 1, "{drawn:?}");
-        assert_eq!(
-            drawn[0].points,
-            vec![PointId::Pin(0, 1), PointId::Pin(1, 1), PointId::Pin(2, 0)]
-        );
+        assert_eq!(drawn[0].points, vec![PointId::Pin(0, 1), PointId::Pin(1, 1), PointId::Pin(2, 0)]);
         // every pin of the net drawn to the others
         assert_eq!(s.connections.targets[&(0, 1)], vec![(1, 1), (2, 0)]);
         assert_eq!(s.connections.targets[&(2, 0)], vec![(0, 1), (1, 1)]);
@@ -4107,15 +3345,8 @@ pub(crate) mod tests {
 
     #[test]
     fn resolved_trees_on_one_net_keep_separate_connection_targets() {
-        let mut p = problem_of(
-            vec![instance(), instance(), instance(), instance()],
-            Vec::new(),
-        );
-        let pin = |object| PointRef::Pin {
-            object,
-            pin: 1,
-            terminal: "d".into(),
-        };
+        let mut p = problem_of(vec![instance(), instance(), instance(), instance()], Vec::new());
+        let pin = |object| PointRef::Pin { object, pin: 1, terminal: "d".into() };
         let route = |a, b| rnl_runtime::problem::RouteIntent {
             tree: true,
             net: "n".into(),
