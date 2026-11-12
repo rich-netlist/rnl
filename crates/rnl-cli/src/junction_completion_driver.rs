@@ -25,10 +25,22 @@ pub struct Context<'a> {
     pub solution: &'a Solution,
     /// Must satisfy both normal interpretation and the effective solver tolerance.
     pub tolerance: f64,
+    /// Observe full candidate readings, not the separate preparation of their numbering.
     pub on_interpret: Option<&'a dyn Fn()>,
 }
 
 fn read(ctx: &Context<'_>, record: &str) -> Result<Interpretation, String> {
+    // Numeric references are inactive until their record has a valid check. Prepare each
+    // complete candidate, including its appended PLACE statements, in the same package
+    // environment as the normal reading. Keep the caller's raw record and byte spans intact.
+    let numbered = rnl_view::finish_record_with_formats(
+        &ctx.original.doc,
+        ctx.files,
+        ctx.formats,
+        ctx.runtime,
+        ctx.problem,
+        record,
+    );
     if let Some(observe) = ctx.on_interpret {
         observe();
     }
@@ -36,20 +48,29 @@ fn read(ctx: &Context<'_>, record: &str) -> Result<Interpretation, String> {
         &ctx.original.doc,
         ctx.problem.level,
         ctx.original_text,
-        record,
+        &numbered,
         &ctx.problem.version,
     );
     let mut overlay = MemoryProvider::new();
     overlay.insert(ctx.host_path, &text);
     let layered = Layered { layers: vec![&overlay, ctx.files] };
     let opts = Options { generated: true, problems: true, ..ctx.runtime.clone() };
-    rnl_view::interpret_with(ctx.entry, ctx.dialect, ctx.formats, &layered, &opts)
+    let read = rnl_view::interpret_with(ctx.entry, ctx.dialect, ctx.formats, &layered, &opts)?;
+    let file = &read.doc.levels.get(ctx.problem.level).ok_or("trial level missing")?.file;
+    let numbering =
+        read.numbering.iter().find(|level| level.level == ctx.problem.level).ok_or("trial numbering unavailable")?;
+    if !numbering.records.iter().any(|record| record.file == *file)
+        || numbering.records.iter().any(|record| record.file == *file && !record.holds())
+    {
+        return Err("trial generated record has missing or stale numbering".into());
+    }
+    Ok(read)
 }
 
 fn line_mapping(ctx: &Context<'_>, new_read: &Interpretation, record: &str) -> Result<Vec<Option<u32>>, String> {
     let old_level = ctx.original.doc.levels.get(ctx.problem.level).ok_or("old level missing")?;
     let new_level = new_read.doc.levels.get(ctx.problem.level).ok_or("new level missing")?;
-    let ranges = |level: &rnl_runtime::host::Level| -> Vec<(u32, u32)> {
+    let generated_ranges = |level: &rnl_runtime::host::Level| -> Vec<(u32, u32)> {
         level
             .records
             .iter()
@@ -57,8 +78,34 @@ fn line_mapping(ctx: &Context<'_>, new_read: &Interpretation, record: &str) -> R
             .map(|r| r.lines)
             .collect()
     };
-    let old_ranges = ranges(old_level);
-    let new_ranges = ranges(new_level);
+    let headers = |doc: &rnl_runtime::host::HostDocument| -> Vec<rnl_runtime::host::Record> {
+        doc.levels
+            .iter()
+            .flat_map(|level| &level.records)
+            .filter(|r| r.file == old_level.file && rnl_runtime::writeback::record_type(r) == "header")
+            .cloned()
+            .collect()
+    };
+    let old_headers = headers(&ctx.original.doc);
+    let new_headers = headers(&new_read.doc);
+    let mut old_ranges = generated_ranges(old_level);
+    let mut new_ranges = generated_ranges(new_level);
+    if !old_headers.iter().map(|r| &r.text).eq(new_headers.iter().map(|r| &r.text)) {
+        // A changed header may alter columns on a shared physical line. Do not guess
+        // positions of an adjacent record; unchanged headers retain ordinary line mapping.
+        let shared = |doc: &rnl_runtime::host::HostDocument, headers: &[rnl_runtime::host::Record]| {
+            doc.levels.iter().flat_map(|level| &level.records).any(|r| {
+                r.file == old_level.file
+                    && rnl_runtime::writeback::record_type(r) != "header"
+                    && headers.iter().any(|h| r.lines.0 <= h.lines.1 && h.lines.0 <= r.lines.1)
+            })
+        };
+        if shared(&ctx.original.doc, &old_headers) || shared(&new_read.doc, &new_headers) {
+            return Err("changed header shares a physical line with another record".into());
+        }
+        old_ranges.extend(old_headers.iter().map(|r| r.lines));
+        new_ranges.extend(new_headers.iter().map(|r| r.lines));
+    }
     let new_text = rnl_runtime::writeback::replace_generated_with_header(
         &ctx.original.doc,
         ctx.problem.level,

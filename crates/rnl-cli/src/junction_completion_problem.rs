@@ -148,8 +148,19 @@ pub fn retained_facts_preserved(
     line_map: &[Option<u32>],
     kept: &[usize],
 ) -> Result<(), &'static str> {
+    retained_fact_indices(original, trial, host_file, line_map, kept).map(|_| ())
+}
+
+/// The result pairs original fact indices with their unique indices in this interpretation.
+fn retained_fact_indices(
+    original: &LevelProblem,
+    trial: &LevelProblem,
+    host_file: &str,
+    line_map: &[Option<u32>],
+    kept: &[usize],
+) -> Result<Vec<(usize, usize)>, &'static str> {
     if kept.is_empty() {
-        return Ok(());
+        return Ok(Vec::new());
     }
     let mut mapping = Vec::new();
     for old in &original.objects {
@@ -179,26 +190,25 @@ pub fn retained_facts_preserved(
             return Err("original usage identity mapping needs a richer adapter");
         }
     }
+    let mut indices = Vec::with_capacity(kept.len());
     for &index in kept {
         let fact = original.facts.get(index).ok_or("invalid kept fact index")?;
         let mut kind = fact.kind.clone();
         remap_fact(&mut kind, &mapping)?;
         // Loc + kind + priority is not sufficient if it matches more than once; do not guess.
-        let matches = trial
-            .facts
-            .iter()
-            .filter(|candidate| {
-                equivalent_source(fact.source.as_ref(), candidate.source.as_ref(), host_file, line_map)
-                    && candidate.priority == fact.priority
-                    && candidate.kind == kind
-                    && candidate.chain == fact.chain
-            })
-            .count();
-        if matches != 1 {
+        let mut matches = trial.facts.iter().enumerate().filter(|(_, candidate)| {
+            equivalent_source(fact.source.as_ref(), candidate.source.as_ref(), host_file, line_map)
+                && candidate.priority == fact.priority
+                && candidate.kind == kind
+                && candidate.chain == fact.chain
+        });
+        let (trial_index, _) = matches.next().ok_or("retained fact missing or ambiguous in trial")?;
+        if matches.next().is_some() {
             return Err("retained fact missing or ambiguous in trial");
         }
+        indices.push((index, trial_index));
     }
-    Ok(())
+    Ok(indices)
 }
 
 /// Every effective trial constraint not corresponding to an original fact must be checked,
@@ -327,8 +337,21 @@ pub fn validate_interpreted_trial(input: TrialValidation<'_>) -> Result<(), &'st
     let left = before.model.levels.iter().find(|v| v.level == level).ok_or("missing initial level")?;
     let right = after.model.levels.iter().find(|v| v.level == level).ok_or("missing trial level")?;
     let trial_problem = after.problems.iter().find(|v| v.level == level).ok_or("missing trial problem")?;
-    retained_facts_preserved(original_problem, trial_problem, host_file, line_map, kept)?;
+    let before_problem = before.problems.iter().find(|v| v.level == level).ok_or("missing initial problem")?;
+    let before_kept = retained_fact_indices(original_problem, before_problem, host_file, line_map, kept)?;
+    let after_kept = retained_fact_indices(original_problem, trial_problem, host_file, line_map, kept)?;
+    let before_drawn = current_drawn(before_problem, before);
     let drawn = current_drawn(trial_problem, after);
+    for ((original_index, before_index), (after_original_index, after_index)) in before_kept.iter().zip(&after_kept) {
+        if original_index != after_original_index {
+            return Err("retained fact mapping changed");
+        }
+        let prior = rnl_solver::problem_fact_holds_as_drawn(before_problem, &before_drawn, *before_index, tolerance);
+        let current = rnl_solver::problem_fact_holds_as_drawn(trial_problem, &drawn, *after_index, tolerance);
+        if prior == Some(false) || current == Some(false) || (prior == Some(true) && current != Some(true)) {
+            return Err("retained fact is false or became unresolved");
+        }
+    }
     for &index in added_facts {
         if rnl_solver::problem_fact_holds_as_drawn(trial_problem, &drawn, index, tolerance) != Some(true) {
             return Err("new or changed fact is unresolved or not satisfied");
@@ -392,23 +415,28 @@ pub fn validate_interpreted_trial(input: TrialValidation<'_>) -> Result<(), &'st
             return Err("wire geometry or endpoint identity changed");
         }
     }
-    // Without source-level status proofs, accepting a dropped/unchecked fact would guess 8.5.
-    for (index, constraint) in right.constraints.iter().enumerate() {
+    // Statuses are an additional outcome guard, never a mapping between model constraints and
+    // solver facts. Consume baseline occurrences so new bad outcomes cannot reuse one old entry.
+    let mut prior_statuses = std::collections::HashMap::new();
+    for constraint in &left.constraints {
+        if matches!(constraint.status.as_str(), "dropped" | "needs-solver" | "unsolved") {
+            *prior_statuses
+                .entry((&constraint.label, &constraint.kind, &constraint.priority, &constraint.status))
+                .or_insert(0usize) += 1;
+        }
+    }
+    for constraint in &right.constraints {
         if matches!(constraint.status.as_str(), "ok" | "disabled") {
             continue;
         }
-        // Added/changed facts were independently checked against the actual drawing above.
-        // A label alone is not a unique identity: different constraints can share it.
-        let unchanged_pending = constraint.status == "unsolved"
-            && left.constraints.get(index).is_some_and(|old| {
-                old.status == "unsolved"
-                    && old.label == constraint.label
-                    && old.kind == constraint.kind
-                    && old.priority == constraint.priority
-            });
-        if !unchanged_pending {
+        let key = (&constraint.label, &constraint.kind, &constraint.priority, &constraint.status);
+        let Some(remaining) = prior_statuses.get_mut(&key) else {
+            return Err("constraint outcome requires general resolution");
+        };
+        if *remaining == 0 {
             return Err("constraint outcome requires general resolution");
         }
+        *remaining -= 1;
     }
     if right.unplaced.iter().any(|id| targets.iter().any(|(target, _)| target == id) || !left.unplaced.contains(id)) {
         return Err("junction or new generated object remains unplaced");

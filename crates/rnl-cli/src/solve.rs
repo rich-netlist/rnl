@@ -655,7 +655,7 @@ fn pass(
             let completion = crate::junction_completion_driver::complete_record(&context, &written)
                 .map_err(|why| format!("junction placement unresolved in {title}: {why}"))?;
             written.notes.push(format!(
-                "junction postprocessing: {} trial readings in {:.3}s (outside solver budget)",
+                "junction postprocessing: {} candidate trials in {:.3}s (including numbering checks, outside solver budget)",
                 completion.trials,
                 completion.elapsed.as_secs_f64()
             ));
@@ -666,7 +666,11 @@ fn pass(
         let want: Want = (path.clone(), host.file.clone(), r.doc.levels[r.doc.file_level(p.level)].section.clone());
         let (record, texts) = {
             let both = Layered { layers: vec![&memory, &files] };
-            let record = rnl_view::finish_record(&r.doc, &both, &runtime, p, &written.record);
+            let record = if p.version == "0.4" {
+                rnl_view::finish_record_with_formats(&r.doc, &both, &options.formats, &runtime, p, &written.record)
+            } else {
+                rnl_view::finish_record(&r.doc, &both, &runtime, p, &written.record)
+            };
             let text = text_of(&r, &both, &host.file, &path)?;
             let mut texts = Vec::new();
             let mut refuse = |code, message: String| {
