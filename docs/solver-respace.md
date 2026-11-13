@@ -32,6 +32,13 @@ lists it as not solved, with one of two reasons:
 - **`no-generated`:** the level has no record of the solver, or a record that places nothing.
   Solve it first.
 - **`mismatch`:** the record is not of the netlist as it is now. Its hash's input digest differs
-  from the level's, as after an edit to the level. Solve it again.
+  from the level's, as after an edit to the level, or its numbers no longer hold, or it has no hash
+  that can be compared. Solve it again.
+- **`unsupported`:** the level is of a version before RNL 0.4.
 
-Only levels of RNL 0.4 are respaced. `--respace` cannot be combined with `--external-solver`.
+`--respace` cannot be combined with `--external-solver`.
+
+The wires are routed again by the solver's router on the record's placement, not taken from the
+record. With the lines layout, whose own router drew the record's wires, they can come out
+otherwise. Respacing does not weigh annotation clearance before taking the spacing, as the lines
+layout does.

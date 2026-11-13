@@ -3,7 +3,8 @@
 //! ([`rnl_solver::respace_with_clock`]). A level whose record cannot be used is left as it is, in
 //! [`SolveRun::not_solved`], with the reason: [`NO_RECORD`] when it has no record of the solver, or
 //! one that places nothing; [`STALE`] when its record is not of the netlist as it is now, such as
-//! after the level was edited. Solving such a level again gives it a record to respace.
+//! after the level was edited, or its numbers no longer hold; [`UNSUPPORTED`] for a level before
+//! RNL 0.4. Solving such a level again gives it a record to respace.
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -19,8 +20,11 @@ use crate::solve::{BackendResult, SolveOptions, SolveRun};
 
 /// The reason of a level with no record of the solver to respace, or one that places nothing.
 pub const NO_RECORD: &str = "no-generated";
-/// The reason of a level whose record of the solver is not of the netlist as it is now.
+/// The reason of a level whose record of the solver is not of the netlist as it is now, or cannot be
+/// compared with it.
 pub const STALE: &str = "mismatch";
+/// The reason of a level of a version before RNL 0.4.
+pub const UNSUPPORTED: &str = "unsupported";
 
 /// The records of the solver of the levels of `file`, read onto the problems, by level and title.
 fn records(
@@ -42,15 +46,19 @@ fn records(
 /// a colon, and what to do.
 fn why_not(p: &LevelProblem, record: Option<&Previous>) -> Option<String> {
     match record {
+        _ if p.version != "0.4" => Some(format!("{UNSUPPORTED}: only a level of RNL 0.4 is respaced")),
         None => Some(format!("{NO_RECORD}: the level has no record of the solver to respace; solve it first")),
-        Some(r) if r.same_input != Some(true) => Some(format!(
+        Some(r) if r.same_input.is_none() => Some(format!(
+            "{STALE}: the record of the solver has no hash this solver can compare with the netlist; solve the \
+             level again"
+        )),
+        Some(r) if r.same_input == Some(false) || r.numbering == Some(false) => Some(format!(
             "{STALE}: the record of the solver is not of the netlist as it is now, which has changed since; solve \
              the level again"
         )),
         Some(r) if r.placements.is_empty() => {
             Some(format!("{NO_RECORD}: the record of the solver places nothing; solve the level first"))
         }
-        Some(_) if p.version != "0.4" => Some(format!("{NO_RECORD}: only a level of RNL 0.4 is respaced")),
         Some(_) => None,
     }
 }

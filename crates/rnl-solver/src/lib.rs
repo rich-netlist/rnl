@@ -368,8 +368,8 @@ pub fn respace_with_clock(
     if problem.version != "0.4" {
         return Err("respacing needs an RNL 0.4 level".into());
     }
-    if previous.same_input != Some(true) {
-        return Err("the record of the solver is not of the netlist as it is now: its hash differs".into());
+    if previous.same_input != Some(true) || previous.numbering == Some(false) {
+        return Err("the record of the solver is not of the netlist as it is now".into());
     }
     if previous.placements.is_empty() {
         return Err("the record of the solver places nothing".into());
