@@ -1259,22 +1259,18 @@ pub(crate) fn text_box(t: &TextInfo, at: &(Q, Q), turn: Orient) -> Option<[Q; 4]
         let margin = from_f64(size)? * frac(TEXT_MARGIN.0, TEXT_MARGIN.1);
         let glyph = text.transform.unwrap_or([1.0, 0.0, 0.0, 1.0, 0.0, 0.0]);
         let pad = [from_f64(glyph[0].abs())? * &margin, from_f64(glyph[2].abs())? * &margin];
-        let q = |v: f64, up: bool| {
+        // the margin is added before the outward rounding, so that the sides stay on a hundredth
+        let q = |v: f64, pad: &Q, up: bool| {
             let exact = from_f64(v)?;
-            let x = v * 100.0;
-            if x.is_finite() {
-                let rounded = from_f64(if up { x.ceil() } else { x.floor() })? / int(100);
-                Some(if up { rounded.max(exact) } else { rounded.min(exact) })
-            } else {
-                Some(exact)
-            }
+            let x = if up { exact + pad } else { exact - pad } * int(100);
+            Some(if up { x.ceil() } else { x.floor() } / int(100))
         };
         let a = [turned(turn, at, 0), turned(turn, at, 1)];
         return Some([
-            q(b[0], false)? + &a[0] - &pad[0],
-            q(b[1], false)? + &a[1] - &pad[1],
-            q(b[2], true)? + &a[0] + &pad[0],
-            q(b[3], true)? + &a[1] + &pad[1],
+            q(b[0], &pad[0], false)? + &a[0],
+            q(b[1], &pad[1], false)? + &a[1],
+            q(b[2], &pad[0], true)? + &a[0],
+            q(b[3], &pad[1], true)? + &a[1],
         ]);
     }
     // 0, 90, 180 or 270 (9.2.5), read exactly

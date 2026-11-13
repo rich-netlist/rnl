@@ -1856,7 +1856,7 @@ fn modern_text_solver_contains_rendered_bounds() {
 #[test]
 fn modern_text_keeps_the_run_end_clearance_of_legacy_text() {
     use rnl_runtime::problem::{Filler, TextInfo};
-    for size in [0.5, 1.0, 2.0] {
+    for size in [0.25, 0.5, 1.0, 2.0] {
         for (turn, rotate, fixed, along) in [
             (Orient::R0, 0.0, false, 0),
             (Orient::MY, 0.0, false, 0),
@@ -1887,6 +1887,13 @@ fn modern_text_keeps_the_run_end_clearance_of_legacy_text() {
                 &modern[along + 2] - &modern[along] >= &legacy[along + 2] - &legacy[along],
                 "size={size}, turn={turn:?}, rotate={rotate}, fixed={fixed}: {legacy:?} -> {modern:?}"
             );
+            for side in &modern {
+                assert_eq!(
+                    &(side * int(100)).floor(),
+                    &(side * int(100)),
+                    "size={size}: {modern:?} is off a hundredth"
+                );
+            }
         }
     }
 }
