@@ -150,7 +150,11 @@
             "style": {}
           }
         ],
-        "shapes": []
+        "shapes": [],
+        "junction": {
+          "definition": "$JUNCTION",
+          "symbol": null
+        }
       }
     },
     {
@@ -871,7 +875,11 @@
             "style": {}
           }
         ],
-        "shapes": []
+        "shapes": [],
+        "junction": {
+          "definition": "$JUNCTION",
+          "symbol": null
+        }
       }
     }
   ],

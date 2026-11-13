@@ -856,7 +856,11 @@
             "style": {}
           }
         ],
-        "shapes": []
+        "shapes": [],
+        "junction": {
+          "definition": "$JUNCTION",
+          "symbol": null
+        }
       }
     }
   ],

@@ -1559,7 +1559,11 @@
             "style": {}
           }
         ],
-        "shapes": []
+        "shapes": [],
+        "junction": {
+          "definition": "$JUNCTION",
+          "symbol": "$JUNCTION_SYMBOL"
+        }
       }
     }
   ],

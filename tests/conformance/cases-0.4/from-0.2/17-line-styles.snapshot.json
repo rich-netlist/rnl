@@ -2325,7 +2325,11 @@
             },
             "layer": "middle"
           }
-        ]
+        ],
+        "junction": {
+          "definition": "$JUNCTION",
+          "symbol": null
+        }
       }
     }
   ],

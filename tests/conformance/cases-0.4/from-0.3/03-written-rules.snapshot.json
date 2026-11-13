@@ -477,7 +477,11 @@
             "style": {}
           }
         ],
-        "shapes": []
+        "shapes": [],
+        "junction": {
+          "definition": "$JUNCTION",
+          "symbol": null
+        }
       }
     },
     {
@@ -662,7 +666,11 @@
         "points": [],
         "wires": [],
         "texts": [],
-        "shapes": []
+        "shapes": [],
+        "junction": {
+          "definition": "$JUNCTION",
+          "symbol": null
+        }
       }
     }
   ],
