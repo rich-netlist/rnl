@@ -159,6 +159,10 @@ impl Clock for Observer<'_> {
     }
     fn progress(&self, p: BudgetProgress) {
         self.inner.progress(p.clone());
+        // nothing more is told once cancelled: the clock reads far past the limit
+        if self.state.borrow().cancelled {
+            return;
+        }
         let (level, elapsed) = {
             let mut s = self.state.borrow_mut();
             s.work = p.work;

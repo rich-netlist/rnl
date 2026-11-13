@@ -102,3 +102,38 @@ fn the_command_writes_one_event_per_line_on_the_standard_error() {
     );
     assert!(!String::from_utf8(output.stdout).unwrap().contains("\"event\""), "the standard output keeps the report");
 }
+
+#[test]
+fn the_text_lines_tell_of_the_work_only() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("main.sp"), SOURCE).unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_rnl"))
+        .current_dir(dir.path())
+        .args(["solve", "main.sp", "-o", "out", "--no-std", "--progress"])
+        .args(["--solver-config", "limit=\"work\",work=2000000000"])
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    let lines: Vec<&str> = stderr.lines().filter(|l| l.starts_with("solver: ")).collect();
+    assert!(lines.last().is_some_and(|l| l.starts_with("solver: complete: ")), "{stderr}");
+    assert!(lines.iter().all(|l| l.ends_with(" work units") && !l.starts_with("solver: : ")), "{stderr}");
+    assert!(!stderr.contains("\"event\""), "{stderr}");
+}
+
+#[test]
+fn a_failed_run_ends_with_an_error_and_done() {
+    let dir = tempfile::tempdir().unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_rnl"))
+        .current_dir(dir.path())
+        .args(["solve", "missing.sp", "-o", "out", "--no-std", "--progress=json"])
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    let events: Vec<serde_json::Value> =
+        stderr.lines().filter(|l| l.starts_with('{')).map(|l| serde_json::from_str(l).unwrap()).collect();
+    let kinds: Vec<&str> = events.iter().map(|e| e["event"].as_str().unwrap()).collect();
+    assert_eq!(kinds[kinds.len() - 2..], ["error", "done"], "{stderr}");
+    assert_eq!(events.last().unwrap()["exit"], 2);
+}

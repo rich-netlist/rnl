@@ -29,7 +29,8 @@ impl rnl_solver::Clock for ProgressClock<'_> {
         self.inner.profiler()
     }
     fn progress(&self, p: rnl_solver::BudgetProgress) {
-        if self.enabled {
+        // the text lines tell of the work only, as they always have
+        if self.enabled && matches!(p.kind, rnl_solver::ProgressKind::Work | rnl_solver::ProgressKind::Complete) {
             eprintln!("solver: {}: {} work units", p.stage, p.work);
         }
     }
@@ -290,6 +291,32 @@ pub(crate) fn preview(args: &Args, provider: &FsProvider) -> Result<ExitCode, Sa
 /// fact that contradicts itself (the draft 0.3, 8.5; 7.6); with 2 when a file cannot be read or
 /// written.
 pub(crate) fn solve(args: &Args, provider: &FsProvider) -> Result<ExitCode, Said> {
+    if !args.solver.progress_json {
+        return solve_with(args, provider).map(|(code, _, _)| code);
+    }
+    // with --progress=json, every run ends with `done`, after `error` when it fails
+    let started = std::time::Instant::now();
+    let emit = |e: rnl_cli::progress::Event| eprintln!("{}", e.line());
+    let done = |exit, written| rnl_cli::progress::Event::Done {
+        seconds: started.elapsed().as_secs_f64(),
+        exit: Some(exit),
+        written,
+    };
+    match solve_with(args, provider) {
+        Ok((code, exit, written)) => {
+            emit(done(exit, Some(written)));
+            Ok(code)
+        }
+        Err(said) => {
+            emit(rnl_cli::progress::Event::Error { message: said.to_string() });
+            emit(done(2, None));
+            Err(said)
+        }
+    }
+}
+
+/// [`solve`]: the exit code, as a number too, and how many files were written.
+fn solve_with(args: &Args, provider: &FsProvider) -> Result<(ExitCode, u8, usize), Said> {
     let target = match (&args.out, args.solver.in_place) {
         (Some(_), true) => {
             let text = "solve writes under -o DIR or --in-place, not both";
@@ -328,8 +355,7 @@ pub(crate) fn solve(args: &Args, provider: &FsProvider) -> Result<ExitCode, Said
     eprintln!("{}", rnl_cli::SOLVER_PREVIEW_NOTICE);
     let wall_clock = WallClock::new();
     let clock: &dyn rnl_solver::Clock = profile_clock.as_ref().map_or(&wall_clock as &dyn rnl_solver::Clock, |c| c);
-    let observed = ProgressClock { inner: clock, enabled: args.solver.progress };
-    let started = std::time::Instant::now();
+    let observed = ProgressClock { inner: clock, enabled: args.solver.progress && !args.solver.progress_json };
     let events = |e: &rnl_cli::progress::Event| {
         eprintln!("{}", e.line());
         true
@@ -372,9 +398,6 @@ pub(crate) fn solve(args: &Args, provider: &FsProvider) -> Result<ExitCode, Said
     };
     if let Some(clock) = &profile_clock {
         clock.finish(result.is_ok())?;
-    }
-    if let (true, Err(message)) = (args.solver.progress_json, &result) {
-        events(&rnl_cli::progress::Event::Error { message: message.clone() });
     }
     let run = result?;
     // nothing is written when a file has no place to go
@@ -425,17 +448,10 @@ pub(crate) fn solve(args: &Args, provider: &FsProvider) -> Result<ExitCode, Said
     }
     // an error of the netlist, or a fact that contradicts itself (8.5, 7.6): the levels are written
     // all the same
-    let (outcome, exit) = match writing.error {
-        Some(e) => (Err(e.into()), 2),
-        None if run.errors + rnl_cli::solve::errors(&run) > 0 => (Ok(ExitCode::from(1)), 1),
-        None => (Ok(ExitCode::SUCCESS), 0),
-    };
-    if args.solver.progress_json {
-        events(&rnl_cli::progress::Event::Done {
-            seconds: started.elapsed().as_secs_f64(),
-            exit: Some(exit),
-            written: Some(writing.written.len()),
-        });
+    let written = writing.written.len();
+    match writing.error {
+        Some(e) => Err(e.into()),
+        None if run.errors + rnl_cli::solve::errors(&run) > 0 => Ok((ExitCode::from(1), 1, written)),
+        None => Ok((ExitCode::SUCCESS, 0, written)),
     }
-    outcome
 }
