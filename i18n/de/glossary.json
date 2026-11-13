@@ -213,6 +213,12 @@
    "kind": "rnl"
   },
   {
+   "en": "layout table",
+   "term": "Layout-Tabelle",
+   "kind": "general",
+   "note": "The table of cells the solver cuts a group's place into (Solve menu)."
+  },
+  {
    "en": "level",
    "term": "Ebene",
    "kind": "rnl"
@@ -353,6 +359,12 @@
    "en": "set",
    "term": "Menge",
    "kind": "rnl"
+  },
+  {
+   "en": "skeleton line",
+   "term": "Skelettlinie",
+   "kind": "general",
+   "note": "A line of the solver's skeleton, shown in the drawing (Solve menu)."
   },
   {
    "en": "solver",

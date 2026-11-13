@@ -735,5 +735,11 @@
   "Choose": "Elegir",
   "{0} changed on disk. F5 reloads the netlist.": "{0} cambió en el disco. F5 recarga el netlist.",
   "{0} exists already. Replace it?": "{0} ya existe. ¿Reemplazarlo?",
-  "Only the first {0} entries are listed.": "Solo se muestran las primeras {0} entradas."
+  "Only the first {0} entries are listed.": "Solo se muestran las primeras {0} entradas.",
+  "Show &Layout Table": "Mostrar &tabla de disposición",
+  "Show Component and &Pin Skeleton Lines": "Mostrar líneas de esqueleto de componentes y &pines",
+  "Show &Wire Skeleton Lines": "Mostrar líneas de esqueleto de los cabl&es",
+  "Layout table": "Tabla de disposición",
+  "Component and pin lines": "Líneas de componentes y pines",
+  "Wire lines": "Líneas de cables"
 }

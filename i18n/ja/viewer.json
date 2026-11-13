@@ -735,5 +735,11 @@
   "Choose": "選択",
   "{0} changed on disk. F5 reloads the netlist.": "{0} がディスク上で変更されました。F5 でネットリストを再読み込みします。",
   "{0} exists already. Replace it?": "{0} はすでに存在します。置き換えますか?",
-  "Only the first {0} entries are listed.": "最初の {0} 件のみ表示されています。"
+  "Only the first {0} entries are listed.": "最初の {0} 件のみ表示されています。",
+  "Show &Layout Table": "レイアウト表を表示(&L)",
+  "Show Component and &Pin Skeleton Lines": "素子とピンの骨格線を表示(&P)",
+  "Show &Wire Skeleton Lines": "配線の骨格線を表示(&W)",
+  "Layout table": "レイアウト表",
+  "Component and pin lines": "素子とピンの線",
+  "Wire lines": "配線の線"
 }

@@ -207,6 +207,12 @@
    "kind": "rnl"
   },
   {
+   "en": "layout table",
+   "term": "레이아웃 표",
+   "kind": "general",
+   "note": "The table of cells the solver cuts a group's place into (Solve menu)."
+  },
+  {
    "en": "level",
    "term": "레벨",
    "kind": "rnl"
@@ -349,6 +355,12 @@
    "en": "set",
    "term": "집합",
    "kind": "rnl"
+  },
+  {
+   "en": "skeleton line",
+   "term": "골격선",
+   "kind": "general",
+   "note": "A line of the solver's skeleton, shown in the drawing (Solve menu)."
   },
   {
    "en": "solver",

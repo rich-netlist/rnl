@@ -735,5 +735,11 @@
   "Choose": "선택",
   "{0} changed on disk. F5 reloads the netlist.": "{0}이(가) 디스크에서 변경되었습니다. F5로 넷리스트를 새로 고칩니다.",
   "{0} exists already. Replace it?": "{0}이(가) 이미 있습니다. 바꾸시겠습니까?",
-  "Only the first {0} entries are listed.": "처음 {0}개 항목만 표시됩니다."
+  "Only the first {0} entries are listed.": "처음 {0}개 항목만 표시됩니다.",
+  "Show &Layout Table": "레이아웃 표 표시(&L)",
+  "Show Component and &Pin Skeleton Lines": "소자와 핀의 골격선 표시(&P)",
+  "Show &Wire Skeleton Lines": "배선 골격선 표시(&W)",
+  "Layout table": "레이아웃 표",
+  "Component and pin lines": "소자와 핀의 선",
+  "Wire lines": "배선의 선"
 }
