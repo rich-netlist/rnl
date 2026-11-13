@@ -747,5 +747,13 @@
   "Not in the tree ({0})": "트리에 없음 ({0})",
   "turned off by PRIORITY": "PRIORITY로 꺼짐",
   "same members": "같은 멤버",
-  "left out": "제외됨"
+  "left out": "제외됨",
+  "Names on hover: {0}": "마우스오버 시 이름: {0}",
+  "Roles on hover: {0}": "마우스오버 시 역할: {0}",
+  "Registration points: {0}": "등록점: {0}",
+  "Flylines: {0}": "플라이라인: {0}",
+  "Net names: {0}": "넷 이름: {0}",
+  "Layout table: {0}": "레이아웃 표: {0}",
+  "Component and pin skeleton lines: {0}": "소자와 핀의 골격선: {0}",
+  "Wire skeleton lines: {0}": "배선 골격선: {0}"
 }

@@ -747,5 +747,13 @@
   "Not in the tree ({0})": "不在树中（{0}）",
   "turned off by PRIORITY": "被 PRIORITY 停用",
   "same members": "成员相同",
-  "left out": "已排除"
+  "left out": "已排除",
+  "Names on hover: {0}": "光标悬停时的名称：{0}",
+  "Roles on hover: {0}": "光标悬停时的角色：{0}",
+  "Registration points: {0}": "注册点：{0}",
+  "Flylines: {0}": "飞线：{0}",
+  "Net names: {0}": "网络名：{0}",
+  "Layout table: {0}": "布局表：{0}",
+  "Component and pin skeleton lines: {0}": "元件和引脚的骨架线：{0}",
+  "Wire skeleton lines: {0}": "导线骨架线：{0}"
 }

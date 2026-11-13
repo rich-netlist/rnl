@@ -30,6 +30,7 @@
   "dirty": " + 未コミットの変更",
   "compare": "{w} と比較",
   "compare_title": "RNL {v} と {w} の比較",
+  "english_only": "英語のみ",
   "compared": "{label} との比較：",
   "added": "追加",
   "removed": "削除",

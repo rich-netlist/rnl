@@ -747,5 +747,13 @@
   "Not in the tree ({0})": "木に入らないもの（{0}）",
   "turned off by PRIORITY": "PRIORITY で無効",
   "same members": "同じメンバー",
-  "left out": "除外"
+  "left out": "除外",
+  "Names on hover: {0}": "ホバー時の名前：{0}",
+  "Roles on hover: {0}": "ホバー時のロール：{0}",
+  "Registration points: {0}": "登録点：{0}",
+  "Flylines: {0}": "フライライン：{0}",
+  "Net names: {0}": "ネット名：{0}",
+  "Layout table: {0}": "レイアウト表：{0}",
+  "Component and pin skeleton lines: {0}": "素子とピンの骨格線：{0}",
+  "Wire skeleton lines: {0}": "配線の骨格線：{0}"
 }

@@ -30,6 +30,7 @@
   "dirty": " + 커밋되지 않은 변경",
   "compare": "{w} 버전과 비교",
   "compare_title": "RNL {v} 및 {w} 비교",
+  "english_only": "영어만",
   "compared": "{label} 대비 변경 사항:",
   "added": "추가됨",
   "removed": "삭제됨",

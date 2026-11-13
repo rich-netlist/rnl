@@ -747,5 +747,13 @@
   "Not in the tree ({0})": "Hors de l'arbre ({0})",
   "turned off by PRIORITY": "désactivé par PRIORITY",
   "same members": "mêmes membres",
-  "left out": "écarté"
+  "left out": "écarté",
+  "Names on hover: {0}": "Noms au survol : {0}",
+  "Roles on hover: {0}": "Rôles au survol : {0}",
+  "Registration points: {0}": "Points de repère : {0}",
+  "Flylines: {0}": "Chevelu : {0}",
+  "Net names: {0}": "Noms des nets : {0}",
+  "Layout table: {0}": "Table de placement : {0}",
+  "Component and pin skeleton lines: {0}": "Lignes de squelette des composants et des broches : {0}",
+  "Wire skeleton lines: {0}": "Lignes de squelette des fils : {0}"
 }

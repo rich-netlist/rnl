@@ -30,6 +30,7 @@
   "dirty": " + cambios sin confirmar",
   "compare": "comparar con {w}",
   "compare_title": "RNL {v} comparado con {w}",
+  "english_only": "Solo en inglés",
   "compared": "Comparado con {label}:",
   "added": "añadido",
   "removed": "eliminado",
