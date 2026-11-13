@@ -50,7 +50,8 @@ pub struct MemberOf {
     /// "in-effect"; "failed", the application failed and made no usage (7.2); "overridden", a fact
     /// its statement writes lost a conflict to one of higher priority (8.5); "disabled", its
     /// priority, or that of the usage it is made in, is "disabled" (14.8), and its facts are left
-    /// out. A group is only "in-effect" or "disabled" (11.5).
+    /// out. A group is "in-effect" or "disabled" (11.5), and in a 0.4 level also "same" or
+    /// "left-out", as `Usage::state` says.
     pub state: &'static str,
     /// Why it failed or was overridden: the message of the diagnostic.
     pub reason: Option<String>,
@@ -222,7 +223,9 @@ fn level(
     let mut out = Vec::new();
     let mut groups = Vec::new();
     for o in &listed {
-        let (state, reason) = state(r, o);
+        let standing = super::usages::standing(lv, o, state(r, o));
+        let parent = standing.parent;
+        let (state, reason) = (standing.state, standing.reason);
         let (source, rule) = match &o.origin {
             UsageOrigin::Written => ("written", None),
             UsageOrigin::Solver => ("solver", None),
@@ -250,16 +253,25 @@ fn level(
         add(&found, ix, &entry, &roles, &mut out);
         if o.kind == "group" {
             let ids: BTreeSet<String> = members(&roles).into_iter().map(|(_, _, m)| m).collect();
-            groups.push((entry, ids));
+            groups.push((entry, ids, parent));
         }
     }
-    // a group within others: the smallest of them
-    for (inner, ids) in &groups {
-        let outer: Vec<&(MemberOf, BTreeSet<String>)> =
-            groups.iter().filter(|(_, o)| ids.len() < o.len() && ids.is_subset(o)).collect();
-        for (e, o) in &outer {
-            if !outer.iter().any(|(_, m)| m.len() < o.len() && m.is_subset(o)) {
+    if rnl_runtime::interp::unit::keeps_0_4(&lv.language) {
+        // a group within the group above it in the tree of groups (`Usage::group_parent`); the
+        // groups are listed in the order of `LevelView::groups`
+        for (inner, _, parent) in &groups {
+            if let Some((e, _, _)) = parent.and_then(|p| groups.get(p)) {
                 out.push((inner.usage.unwrap(), MemberOf { roles: Vec::new(), ..e.clone() }));
+            }
+        }
+    } else {
+        // a group within others: the smallest of them
+        for (inner, ids, _) in &groups {
+            let outer: Vec<_> = groups.iter().filter(|(_, o, _)| ids.len() < o.len() && ids.is_subset(o)).collect();
+            for (e, o, _) in &outer {
+                if !outer.iter().any(|(_, m, _)| m.len() < o.len() && m.is_subset(o)) {
+                    out.push((inner.usage.unwrap(), MemberOf { roles: Vec::new(), ..e.clone() }));
+                }
             }
         }
     }

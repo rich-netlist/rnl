@@ -27,7 +27,8 @@ pub struct Usage {
     pub kind: &'static str,
     /// For a group of a 0.4 level in the tree of groups: the group above it, by its Document
     /// object index, as `pin_of`; absent at the top. The tree is that of the solver's rules on the
-    /// members as written (`rnl_runtime::group_tree`).
+    /// members with a place of their own (`rnl_runtime::group_tree`); the solver's own may leave
+    /// out a group of fewer than two of the objects it lays out.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(test, ts(optional))]
     pub group_parent: Option<usize>,
@@ -55,7 +56,7 @@ pub struct Usage {
     /// priority (8.5); "disabled", its priority, or that of the usage it is made in, is
     /// "disabled" (14.8). A group is "in-effect" or "disabled" (11.5), and in a 0.4 level also
     /// "same", its members are those of another group (`same_as`), or "left-out", it crosses a
-    /// group in the tree (`crosses`). As `MemberOf::state`; an application that failed makes no
+    /// group in the tree (`crosses`) or has no member with a place of its own. As `MemberOf::state`; an application that failed makes no
     /// usage and has no row.
     pub state: &'static str,
     /// Why it was overridden, or for a group why it is "same" or "left-out".
@@ -234,7 +235,6 @@ fn inspect(
     let by_id: HashMap<_, _> = lv.objects.iter().map(|o| (o.id.as_str(), o)).collect();
     let mut memo = HashMap::new();
     let modern = rnl_runtime::interp::unit::keeps_0_4(&lv.language);
-    let rows: HashMap<&str, usize> = lv.groups.iter().enumerate().map(|(r, g)| (g.id.as_str(), r)).collect();
     let mut usages: Vec<Usage> = listed
         .iter()
         .map(|o| {
@@ -317,35 +317,12 @@ fn inspect(
                             || (b[0] == b[2] && b[1] == b[3])
                     })
                 });
-            let (mut state, mut reason) = super::member_of::state(r, o);
-            let place = (o.kind == "group" && modern).then(|| rows.get(o.id.as_str())).flatten().map(|&r| lv.groups[r].place);
+            let standing = standing(lv, o, super::member_of::state(r, o));
             let group = |r: usize| references.get(&lv.groups[r].id).and_then(|v| v.first().copied());
-            let (mut group_parent, mut same_as, mut crosses) = (None, None, None);
-            if state != "disabled" {
-                match place {
-                    Some(GroupPlace::Tree { parent }) => group_parent = parent.and_then(group),
-                    Some(GroupPlace::Same(t)) => {
-                        (state, same_as) = ("same", group(t));
-                        reason = Some(format!("its members are those of the group {}, which stands for it", lv.groups[t].id));
-                    }
-                    Some(GroupPlace::Crosses(t)) => {
-                        (state, crosses) = ("left-out", group(t));
-                        reason = Some(format!(
-                            "it shares members with the group {} without either holding the other, so it is not a block",
-                            lv.groups[t].id
-                        ));
-                    }
-                    Some(GroupPlace::Empty) => {
-                        state = "left-out";
-                        reason = Some("it has no members with a place of their own, so it is not a block".into());
-                    }
-                    Some(GroupPlace::Off) => {
-                        state = "disabled";
-                        reason = Some("the first GROUP on the same members is turned off, and this one with it".into());
-                    }
-                    None => {}
-                }
-            }
+            let (state, reason) = (standing.state, standing.reason);
+            let group_parent = standing.parent.and_then(group);
+            let same_as = standing.same_as.and_then(group);
+            let crosses = standing.crosses.and_then(group);
             Usage {
                 group_parent,
                 same_as,
@@ -383,6 +360,49 @@ fn inspect(
         tree_order(&mut usages);
     }
     usages
+}
+
+/// Where a group of a 0.4 level stands in the tree of groups (`GroupInfo::place`), over its state
+/// as a usage: the group above it, the group it is, or the group it crosses, by their index in
+/// `LevelView::groups`. A usage, a group turned off, and a group of a level before 0.4 keep their
+/// state as it is.
+pub(super) struct Standing {
+    pub state: &'static str,
+    pub reason: Option<String>,
+    pub parent: Option<usize>,
+    pub same_as: Option<usize>,
+    pub crosses: Option<usize>,
+}
+
+pub(super) fn standing(lv: &LevelView, o: &ObjectInfo, (state, reason): (&'static str, Option<String>)) -> Standing {
+    let mut out = Standing { state, reason, parent: None, same_as: None, crosses: None };
+    if o.kind != "group" || state == "disabled" || !rnl_runtime::interp::unit::keeps_0_4(&lv.language) {
+        return out;
+    }
+    let Some(row) = lv.groups.iter().position(|g| g.id == o.id) else { return out };
+    match lv.groups[row].place {
+        GroupPlace::Tree { parent } => out.parent = parent,
+        GroupPlace::Same(t) => {
+            (out.state, out.same_as) = ("same", Some(t));
+            out.reason = Some(format!("its members are those of the group {}, which stands for it", lv.groups[t].id));
+        }
+        GroupPlace::Crosses(t) => {
+            (out.state, out.crosses) = ("left-out", Some(t));
+            out.reason = Some(format!(
+                "it shares members with the group {} without either holding the other, so it is not a block",
+                lv.groups[t].id
+            ));
+        }
+        GroupPlace::Empty => {
+            out.state = "left-out";
+            out.reason = Some("it has no members with a place of their own, so it is not a block".into());
+        }
+        GroupPlace::Off => {
+            out.state = "disabled";
+            out.reason = Some("the first GROUP on the same members is turned off, and this one with it".into());
+        }
+    }
+    out
 }
 
 /// Put the groups, which follow the usages, in the order of their tree: each after the group
@@ -565,6 +585,30 @@ mod tests {
         let lv = &d.levels[0];
         assert!(lv.usages.iter().all(|u| u.group_parent.is_none() && u.same_as.is_none() && u.crosses.is_none()));
         assert!(lv.usages.iter().all(|u| u.state == "in-effect" || u.state == "disabled"));
+    }
+
+    #[test]
+    fn what_an_object_is_member_of_says_where_its_groups_stand() {
+        let file = |version: &str| {
+            format!(
+                "* g\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\") }}\nR1 a 0 1k\nR2 a 0 1k\nR3 a 0 1k\nR4 a 0 1k\n\
+                 * @RNL {{ %x={{#R3 #R4}} @GROUP; %small={{#R1 #R2}} @GROUP; %big={{#R1 #R2 #R3}} @GROUP }}\n.end\n"
+            )
+        };
+        let p = MemoryProvider::new().with("g.sp", &file("0.4"));
+        let d = crate::build("g.sp", &p, &BuildOptions::default()).unwrap();
+        let object = |name: &str| d.objects.iter().find(|o| o.name == name).unwrap();
+        let entry = |name: &str, id: &str| object(name).usages.iter().find(|e| e.id == id).cloned().unwrap();
+        // %big and %small are taken, the later first; %x, weighed last, crosses %big
+        assert_eq!(entry("R3", "%x").state, "left-out");
+        assert_eq!(entry("R1", "%big").state, "in-effect");
+        let small = d.levels[0].usages.iter().find(|u| u.id == "%small").unwrap();
+        let within: Vec<_> = d.objects[small.object].usages.iter().map(|e| e.id.as_str()).collect();
+        assert_eq!(within, ["%big"], "a group is within the group above it in the tree");
+        let p = MemoryProvider::new().with("g.sp", &file("0.3"));
+        let d = crate::build("g.sp", &p, &BuildOptions::default()).unwrap();
+        let object = |name: &str| d.objects.iter().find(|o| o.name == name).unwrap();
+        assert!(object("R3").usages.iter().all(|e| e.state == "in-effect"), "0.3 has no tree of groups");
     }
 
     #[test]

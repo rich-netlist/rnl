@@ -649,7 +649,10 @@ impl Interp<'_> {
                 place: GroupPlace::Off,
             });
         }
-        self.place_groups(s, &rows, &mut out);
+        // the tree of groups is the solver's of 0.4 (11.5); earlier versions have none
+        if self.follows_0_4(self.level_unit[self.scenes[s].level]) {
+            self.place_groups(s, &rows, &mut out);
+        }
         out
     }
 
@@ -695,10 +698,19 @@ impl Interp<'_> {
                 }
                 Fate::Same(t) => row_of(t).map_or(GroupPlace::Off, GroupPlace::Same),
                 Fate::Crosses(t) => row_of(t).map_or(GroupPlace::Off, GroupPlace::Crosses),
+                // a repeat stands where the first GROUP on its members stands: that group in the
+                // tree, or left out with it; turned off with it when the first was turned off
                 Fate::Repeat => {
                     let first = declarations.iter().position(|x| x.identity == declarations[d].identity && x.first);
-                    // the first GROUP on these members was turned off, and this one with it
-                    first.and_then(row_of).filter(|&f| f != r).map_or(GroupPlace::Off, GroupPlace::Same)
+                    match first.map(|f| (f, selection.fates[f])) {
+                        Some((f, Fate::Taken)) => {
+                            row_of(f).filter(|&f| f != r).map_or(GroupPlace::Off, GroupPlace::Same)
+                        }
+                        Some((_, Fate::Same(t))) => row_of(t).map_or(GroupPlace::Off, GroupPlace::Same),
+                        Some((_, Fate::Crosses(t))) => row_of(t).map_or(GroupPlace::Off, GroupPlace::Crosses),
+                        Some((_, Fate::Empty)) => GroupPlace::Empty,
+                        Some((_, Fate::Repeat)) | None => GroupPlace::Off,
+                    }
                 }
                 Fate::Empty => GroupPlace::Empty,
             };

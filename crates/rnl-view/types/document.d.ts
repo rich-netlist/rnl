@@ -221,7 +221,8 @@ export type Usage = {
   /**
    * For a group of a 0.4 level in the tree of groups: the group above it, by its Document
    * object index, as `pin_of`; absent at the top. The tree is that of the solver's rules on the
-   * members as written (`rnl_runtime::group_tree`).
+   * members with a place of their own (`rnl_runtime::group_tree`); the solver's own may leave
+   * out a group of fewer than two of the objects it lays out.
    */
   group_parent?: number,
   /**
@@ -255,7 +256,7 @@ export type Usage = {
    * priority (8.5); "disabled", its priority, or that of the usage it is made in, is
    * "disabled" (14.8). A group is "in-effect" or "disabled" (11.5), and in a 0.4 level also
    * "same", its members are those of another group (`same_as`), or "left-out", it crosses a
-   * group in the tree (`crosses`). As `MemberOf::state`; an application that failed makes no
+   * group in the tree (`crosses`) or has no member with a place of its own. As `MemberOf::state`; an application that failed makes no
    * usage and has no row.
    */
   state: string,
@@ -975,7 +976,8 @@ export type MemberOf = {
    * "in-effect"; "failed", the application failed and made no usage (7.2); "overridden", a fact
    * its statement writes lost a conflict to one of higher priority (8.5); "disabled", its
    * priority, or that of the usage it is made in, is "disabled" (14.8), and its facts are left
-   * out. A group is only "in-effect" or "disabled" (11.5).
+   * out. A group is "in-effect" or "disabled" (11.5), and in a 0.4 level also "same" or
+   * "left-out", as `Usage::state` says.
    */
   state: string,
   /**
