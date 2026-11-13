@@ -112,6 +112,8 @@ struct State {
     cancelled: bool,
     /// Readings since the solve was cancelled.
     after: u64,
+    /// The seconds each level's solve took on the caller's clock, in the order solved.
+    solved_in: Vec<f64>,
 }
 
 /// A clock that turns the solver's progress into [`Event`]s for `sink`. When `sink` answers
@@ -293,6 +295,11 @@ pub(crate) fn solve_progress_skipping(
             }
             Mark::LevelDone { level, solved, seconds, junction_seconds } => {
                 let budget = solved.report.budget;
+                // WebAssembly has no clock of its own to time the solve with: the caller's then
+                let seconds = match observer.state.borrow().solved_in.last() {
+                    Some(&on_the_clock) if OWN_CLOCK_MISSING => on_the_clock,
+                    _ => seconds,
+                };
                 Event::LevelDone {
                     level,
                     status: status_of(budget.map(|b| b.reason), observer.state.borrow().cancelled),
@@ -306,13 +313,31 @@ pub(crate) fn solve_progress_skipping(
         };
         observer.send(&event) && !observer.state.borrow().cancelled
     };
-    let run = solve_marked(file, files, options, &watch, skip, &|p, options| backend(p, options, &observer))?;
+    let timed = |p: &rnl_runtime::problem::LevelProblem, options: &rnl_solver::SolverOptions| {
+        let from = clock.elapsed();
+        let result = backend(p, options, &observer);
+        observer.state.borrow_mut().solved_in.push((clock.elapsed() - from).max(0.));
+        result
+    };
+    let mut run = solve_marked(file, files, options, &watch, skip, &timed)?;
     // cancelled in the last level: nothing after it to stop before
     if observer.state.borrow().cancelled {
         return Err(crate::solve::CANCELLED.to_string());
     }
+    if OWN_CLOCK_MISSING {
+        let solved_in = &observer.state.borrow().solved_in;
+        if solved_in.len() == run.levels.len() {
+            for (level, &seconds) in run.levels.iter_mut().zip(solved_in) {
+                level.time = std::time::Duration::from_secs_f64(seconds);
+            }
+        }
+    }
     Ok(run)
 }
+
+/// Whether the build has no clock of its own ([`crate::solve::Stopwatch`]), as WebAssembly: the
+/// time of a level's solve is then the one on the caller's clock.
+const OWN_CLOCK_MISSING: bool = cfg!(target_arch = "wasm32");
 
 #[cfg(test)]
 mod tests {

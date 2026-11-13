@@ -51,6 +51,62 @@ const bad = solver.solve({ ...request, solver_config: "beam=0" });
 assert.match(bad.error, /^solver_config:/);
 console.log(`solved, respaced and refused through WebAssembly, with ${events.length} progress events`);
 
+// a callback that answers false cancels; one that throws cancels too, and solve throws what it
+// threw; the instance goes on answering after any number of either
+assert.deepEqual(solver.solve(request, () => false), { cancelled: true });
+for (let k = 0; k < 40; k++) {
+  assert.throws(
+    () =>
+      solver.solve(request, () => {
+        throw new TypeError("mine");
+      }),
+    (e) => e instanceof TypeError && e.message === "mine",
+  );
+}
+assert.equal(solver.solve(request).files["/w/main.sp"], written);
+
+// the answer names the files by the paths of the request, and two paths of one file are refused
+const windows = "C:\\w\\main.sp";
+const there = solver.solve({ ...request, entry: windows, files: { [windows]: source } });
+assert.deepEqual(Object.keys(there.files), [windows], JSON.stringify(there).slice(0, 400));
+const twice = solver.solve({ ...request, files: { "/w/main.sp": source, "\\w\\main.sp": source } });
+assert.match(twice.error, /^files: .* are one file$/);
+
+// a time limit, on a clock that goes on by 50 ms at each reading: the level stops for the time,
+// soon after its second, and says how long it took on that clock
+{
+  let at = 0;
+  let readings = 0;
+  const timed = await loadSolver(readFileSync(wasm), {
+    now: () => {
+      assert.ok(++readings < 100000, "the time limit does not end the solve");
+      return (at += 50);
+    },
+  });
+  const seen = [];
+  const config = 'layout="rows",limit="time",seconds=1';
+  const answer = timed.solve({ ...request, solver_config: config }, (e) => void seen.push(e));
+  const done = seen.find((e) => e.event === "level-done");
+  assert.equal(done?.status, "time", JSON.stringify(seen).slice(0, 600));
+  assert.ok(done.seconds >= 1 && done.seconds < 20, `the level took ${done.seconds} s on the clock`);
+  assert.match(answer.report.text.join("\n"), /\n {2}time: (?!0\.000)\d+\.\d+ s/);
+  // a clock that stops being a number, or goes back, is read as the latest reading before
+  let odd = 0;
+  const broken = await loadSolver(readFileSync(wasm), {
+    now: () => {
+      odd += 1;
+      assert.ok(odd < 100000, "the time limit does not end the solve");
+      return odd % 3 === 0 ? NaN : odd % 3 === 1 ? odd * 50 : -5;
+    },
+  });
+  const after = [];
+  broken.solve({ ...request, solver_config: config }, (e) => void after.push(e));
+  const ended = after.find((e) => e.event === "level-done");
+  assert.equal(ended?.status, "time", JSON.stringify(after).slice(0, 600));
+  assert.ok(after.every((e) => !("elapsed" in e) || Number.isFinite(e.elapsed)), "every elapsed is a number");
+}
+console.log("cancelled, thrown through, renamed and timed through WebAssembly");
+
 // with the native CLI given, the same files under a limit of work: byte for byte what `rnl solve`
 // writes, and `rnl solve --respace` after it
 if (rnl) {

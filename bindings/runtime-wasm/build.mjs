@@ -104,4 +104,7 @@ if (solver) {
   copyFileSync(join(here, "..", "solver-wasm", "js", "solver.js"), join(out, "solver.js"));
   const solverBytes = readFileSync(built);
   console.log(`rnl_solver_wasm.wasm: ${size(solverBytes.length)}, ${size(gzipSync(solverBytes, { level: 9 }).length)} gzip-compressed`);
+} else {
+  // a solver's module of an earlier build would not be the one of this source
+  for (const stale of ["rnl_solver_wasm.wasm", "solver.js"]) rmSync(join(out, stale), { force: true });
 }

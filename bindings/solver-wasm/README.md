@@ -28,16 +28,34 @@ Unlike the core's module, it imports three functions from `env`:
 | --- | --- |
 | `rnl_now() -> f64` | Milliseconds, such as `performance.now()`. The solver's time limit is measured on it. |
 | `rnl_progress(ptr, len)` | One progress event as UTF-8 JSON, as [`rnl solve --progress=json`](../../docs/solver-progress.md) writes them. |
-| `rnl_cancelled() -> i32` | Not 0 to cancel. It is asked as the events come. |
+| `rnl_cancelled() -> i32` | Not 0 to cancel. It is asked after each event. |
 
-`js/solver.js` gives these imports and wraps the exports: `loadSolver(bytes)` returns an object whose `solve(request, onProgress)` gives the answer.
+The clock has to go on. A reading that is not a number, or is earlier than one before, counts as the latest reading before it; but on a clock that stands still a time limit never ends, and the default limit is one of time. With such a clock, give a limit of work or the seed in `solver_config`.
+
+After a panic or another trap, an instance is not to be used again: what the call held is not released.
+
+## The loader
+
+[`js/solver.js`](js/solver.js) gives these imports and wraps the exports. `loadSolver(bytes)` returns an object whose `solve(request, onProgress)` gives the answer.
+
+- **Progress:** `onProgress` gets each event as an object.
+- **Cancelling from the callback:** when `onProgress` returns `false`, the solve is cancelled and the answer is `{cancelled: true}`. When it throws, the solve is cancelled too and `solve` throws what it threw. Neither harms the instance.
+- **After a trap:** `solve` throws `The solver stopped: …` with the panic's message, and the loader makes a new instance for the next call.
+
+The call is synchronous and can take the solver's whole time limit. Run it in a Worker of its own. Terminating that Worker and starting another also cancels, at once.
+
+## The request and the answer
 
 The request is all the solve reads: `entry`, `files`, `package_dirs`, `dialect`, `formats`, `std`, `include_std`, `solver_config` (RNL named parameters, as `--solver-config` takes them), `level` and `respace`. A Worker that runs it needs nothing from the core's Worker.
 
-The call is synchronous and can take the solver's whole time limit. Run it in a Worker of its own; to cancel, terminate that Worker and start another.
+Other fields are ignored. That includes fields of the core's build request that this module does not read: `pool`, `auto_include`, `library_prefix`, `library_edits` and `std_version`.
 
 The answer is one of three:
 
 - `{document, report, files}`;
 - `{cancelled: true}`;
 - `{error}`.
+
+`files` holds the texts the solve wrote, each under the path its file has in the request. Two paths of the request that are one file, such as `a/b.sp` and `a\b.sp`, are an error.
+
+A level's `seconds` in the events, and its time in the report, are measured on the clock the caller gives.

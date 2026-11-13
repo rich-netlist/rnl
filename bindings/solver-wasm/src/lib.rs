@@ -14,14 +14,17 @@
 //! runs it gives:
 //!
 //! - `rnl_now() -> f64`: milliseconds from some start, such as `performance.now()`, which the
-//!   solver's time limit is measured on;
+//!   solver's time limit is measured on. It has to go on: a time limit never ends on a clock that
+//!   stands still, so a caller with such a clock gives a limit of work, or the seed;
 //! - `rnl_progress(ptr, len)`: one progress event, UTF-8 JSON at `ptr`, as `rnl solve
 //!   --progress=json` writes them (`docs/solver-progress.md`);
 //! - `rnl_cancelled() -> i32`: not 0 to cancel, asked as the events come.
 //!
 //! The call runs to its end in the Worker. To stop it sooner, a page terminates the Worker and
 //! starts another; nothing of the core's Worker depends on this one, since every request carries
-//! all it reads. A panic traps, with its message kept as the core's module keeps it.
+//! all it reads. A panic traps, with its message kept as the core's module keeps it. After a
+//! trap, or an exception thrown through the call from an import, the instance is not to be used
+//! again: what the call held is not released. `js/solver.js` makes a new one.
 
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::collections::BTreeMap;
@@ -34,13 +37,17 @@ use rnl_runtime::source::{normalize, MemoryProvider};
 use rnl_solver::{Clock, SolverOptions};
 use serde::{Deserialize, Serialize};
 
-/// What to solve: the workspace, as a build of the core's module reads it, and the settings. Every
-/// field the solve reads is here; fields it does not know are ignored.
+/// What to solve: the texts of the workspace and the settings. Every field the solve reads is
+/// here. Fields it does not know are ignored, those of a build request of the core's module that
+/// are not here among them (`pool`, `auto_include`, `library_prefix`, `library_edits`,
+/// `std_version`).
 #[derive(Deserialize, Debug)]
 pub struct SolveRequest {
     /// The path of the file to solve, as the frontend names it.
     pub entry: String,
-    /// The texts of the workspace by path, the entry's among them.
+    /// The texts of the workspace by path, the entry's among them. Two paths that are one file,
+    /// such as `a/b.sp` and `a\b.sp`, are an error. The answer names each file written by the
+    /// path it has here.
     #[serde(default)]
     pub files: BTreeMap<String, String>,
     /// The directories, among the paths of `files`, whose packages are found by name (16.2).
@@ -95,11 +102,20 @@ pub enum Answer {
 
 /// The clock of a solve: milliseconds from `now`, in seconds. It is a wall clock, and reading it
 /// is a call out of the module, so the budget reads it every so much work, not at every step.
-struct Now<'a>(&'a dyn Fn() -> f64);
+/// A reading that is not a number, or is earlier than one before, counts as the latest one
+/// before it: the solver's clock never goes back.
+struct Now<'a> {
+    now: &'a dyn Fn() -> f64,
+    latest: std::cell::Cell<Option<f64>>,
+}
 
 impl Clock for Now<'_> {
     fn elapsed(&self) -> f64 {
-        (self.0)() / 1000.
+        let read = (self.now)() / 1000.;
+        let before = self.latest.get();
+        let latest = if read.is_finite() && before.is_none_or(|b| read > b) { read } else { before.unwrap_or(0.) };
+        self.latest.set(Some(latest));
+        latest
     }
 
     fn check_every(&self) -> u64 {
@@ -126,11 +142,18 @@ pub fn solve(request: &[u8], now: &dyn Fn() -> f64, progress: &dyn Fn(&str) -> b
         level: request.level,
         solver,
     };
+    // the solve names files by their normal paths; the answer, by the paths of the request
+    let mut asked: BTreeMap<String, String> = BTreeMap::new();
+    for path in request.files.keys() {
+        if let Some(other) = asked.insert(normalize(path), path.clone()) {
+            return Answer::Error { error: format!("files: {other} and {path} are one file") };
+        }
+    }
     let files = MemoryProvider {
         files: request.files.into_iter().map(|(p, t)| (normalize(&p), t)).collect(),
         package_dirs: request.package_dirs.iter().map(|p| normalize(p)).collect(),
     };
-    let clock = Now(now);
+    let clock = Now { now, latest: std::cell::Cell::new(None) };
     let sink = |e: &rnl_cli::progress::Event| progress(&e.line());
     let shown = if request.respace {
         rnl_cli::preview::respace(&request.entry, &files, &options, &clock, &sink)
@@ -141,7 +164,12 @@ pub fn solve(request: &[u8], now: &dyn Fn() -> f64, progress: &dyn Fn(&str) -> b
         Ok(shown) => Answer::Solved {
             document: serde_json::to_value(&shown.document).expect("a Document serializes"),
             report: serde_json::to_value(&shown.report).expect("a report serializes"),
-            files: shown.copy.files.into_iter().map(|f| (f.path, f.text)).collect(),
+            files: shown
+                .copy
+                .files
+                .into_iter()
+                .map(|f| (asked.get(&normalize(&f.path)).cloned().unwrap_or(f.path), f.text))
+                .collect(),
         },
         Err(e) if e == CANCELLED => Answer::Cancelled { cancelled: true },
         Err(error) => Answer::Error { error },
