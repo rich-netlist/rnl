@@ -101,7 +101,8 @@ export async function solve({ all = false } = {}) {
   running = true;
   document.body.classList.add("solving");
   status(m`Solving ${source.name}…`, true);
-  progressBegin(source.name);
+  // the file's own name, not the address or the folders it was read from, until the solver names the first circuit
+  progressBegin(source.name.split(/[\\/]/).pop() || source.name);
   try {
     // a built-in file is held by the page, not on disk: the solver is given its text
     const given = source.text === undefined && source.path?.startsWith("<") ? { ...source, text: doc.files[0].text } : source;
