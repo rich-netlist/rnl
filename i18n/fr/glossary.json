@@ -517,6 +517,12 @@
    "kind": "rnl"
   },
   {
+   "en": "taken in",
+   "term": "pris en compte",
+   "kind": "rnl",
+   "note": "A fact tried in the order of resolution and found to hold with those before it; a fact that does not is écarté (discarded), the others are retenus (kept)."
+  },
+  {
    "en": "tap",
    "term": "dérivation",
    "kind": "rnl",

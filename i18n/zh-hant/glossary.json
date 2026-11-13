@@ -3,6 +3,12 @@
  "about": "Terms of this language's translations: the English term, its rendering here, and variants not to use. English terms are the only normative ones (decision 0016); this list is a convention for translating and talking about RNL, not part of the standard. kind: rnl (a term of RNL), circuit (of circuit design), command (a command or label of an interface), general.",
  "terms": [
   {
+   "en": "absorb",
+   "term": "吸收",
+   "kind": "rnl",
+   "note": "The three ways (5.4): 吸收, 封裝 (enclose), 提交 (commit)."
+  },
+  {
    "en": "agent",
    "term": "Agent",
    "avoid": [
@@ -92,8 +98,18 @@
    "note": "The owner's choice: a bundle is not a set in general."
   },
   {
+   "en": "carrier",
+   "term": "載體",
+   "kind": "rnl"
+  },
+  {
    "en": "comment",
    "term": "註解",
+   "kind": "rnl"
+  },
+  {
+   "en": "commit",
+   "term": "提交",
    "kind": "rnl"
   },
   {
@@ -159,6 +175,11 @@
    "kind": "rnl"
   },
   {
+   "en": "enclose",
+   "term": "封裝",
+   "kind": "rnl"
+  },
+  {
    "en": "evaluate",
    "sense": "RNL runtime",
    "term": "評估",
@@ -190,6 +211,11 @@
    "term": "檔頭記錄",
    "kind": "rnl",
    "note": "Short: 檔頭."
+  },
+  {
+   "en": "hiding",
+   "term": "遮蔽",
+   "kind": "rnl"
   },
   {
    "en": "hierarchy",

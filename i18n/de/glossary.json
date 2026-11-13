@@ -4,6 +4,12 @@
  "draft": true,
  "terms": [
   {
+   "en": "absorb",
+   "term": "absorbieren",
+   "kind": "rnl",
+   "note": "The three ways (5.4): absorbieren, einschließen (enclose), festschreiben (commit)."
+  },
+  {
    "en": "alias",
    "term": "Alias",
    "kind": "rnl"
@@ -183,6 +189,11 @@
    "kind": "rnl"
   },
   {
+   "en": "enclose",
+   "term": "einschließen",
+   "kind": "rnl"
+  },
+  {
    "en": "evaluate",
    "sense": "RNL runtime",
    "term": "auswerten",
@@ -217,6 +228,11 @@
   {
    "en": "header record",
    "term": "Kopfeintrag",
+   "kind": "rnl"
+  },
+  {
+   "en": "hiding",
+   "term": "Verdeckung",
    "kind": "rnl"
   },
   {
@@ -483,6 +499,11 @@
   {
    "en": "structure",
    "term": "Struktur",
+   "kind": "rnl"
+  },
+  {
+   "en": "stub",
+   "term": "Stub",
    "kind": "rnl"
   },
   {

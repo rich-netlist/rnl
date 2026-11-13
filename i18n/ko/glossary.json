@@ -4,6 +4,12 @@
  "draft": true,
  "terms": [
   {
+   "en": "absorb",
+   "term": "흡수",
+   "kind": "rnl",
+   "note": "The three ways (5.4): 흡수, 감싸기 (enclose), 커밋 (commit)."
+  },
+  {
    "en": "alias",
    "term": "별칭",
    "kind": "rnl"
@@ -99,6 +105,11 @@
    "kind": "rnl"
   },
   {
+   "en": "commit",
+   "term": "커밋",
+   "kind": "rnl"
+  },
+  {
    "en": "constraint",
    "term": "제약",
    "kind": "rnl",
@@ -161,6 +172,11 @@
    "kind": "rnl"
   },
   {
+   "en": "enclose",
+   "term": "감싸기",
+   "kind": "rnl"
+  },
+  {
    "en": "evaluate",
    "sense": "RNL runtime",
    "term": "평가",
@@ -192,6 +208,11 @@
    "term": "헤더 레코드",
    "kind": "rnl",
    "note": "Short: 헤더."
+  },
+  {
+   "en": "hiding",
+   "term": "가리기",
+   "kind": "rnl"
   },
   {
    "en": "hierarchy",

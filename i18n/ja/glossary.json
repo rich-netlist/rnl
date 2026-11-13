@@ -4,6 +4,12 @@
  "draft": true,
  "terms": [
   {
+   "en": "absorb",
+   "term": "吸収",
+   "kind": "rnl",
+   "note": "The three ways (5.4): 吸収, 封入 (enclose), コミット (commit)."
+  },
+  {
    "en": "alias",
    "term": "別名",
    "kind": "rnl"
@@ -107,6 +113,12 @@
    "kind": "rnl"
   },
   {
+   "en": "commit",
+   "term": "コミット",
+   "kind": "rnl",
+   "note": "The verb is コミットする."
+  },
+  {
    "en": "constraint",
    "term": "制約",
    "kind": "rnl"
@@ -168,6 +180,11 @@
   {
    "en": "empty node",
    "term": "空ノード",
+   "kind": "rnl"
+  },
+  {
+   "en": "enclose",
+   "term": "封入",
    "kind": "rnl"
   },
   {
@@ -524,6 +541,11 @@
   {
    "en": "structure",
    "term": "構造",
+   "kind": "rnl"
+  },
+  {
+   "en": "stub",
+   "term": "スタブ",
    "kind": "rnl"
   },
   {

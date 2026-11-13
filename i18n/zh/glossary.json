@@ -3,6 +3,12 @@
  "about": "Terms of this language's translations: the English term, its rendering here, and variants not to use. English terms are the only normative ones (decision 0016); this list is a convention for translating and talking about RNL, not part of the standard. kind: rnl (a term of RNL), circuit (of circuit design), command (a command or label of an interface), general.",
  "terms": [
   {
+   "en": "absorb",
+   "term": "吸收",
+   "kind": "rnl",
+   "note": "One of the three ways a record takes its statements (5.4); the others are 封装 (enclose) and 提交 (commit)."
+  },
+  {
    "en": "agent",
    "term": "Agent",
    "avoid": [
@@ -94,8 +100,19 @@
    "alias": true
   },
   {
+   "en": "carrier",
+   "term": "载体",
+   "kind": "rnl",
+   "note": "The line a record is written on, with its statements (2.2)."
+  },
+  {
    "en": "comment",
    "term": "注释",
+   "kind": "rnl"
+  },
+  {
+   "en": "commit",
+   "term": "提交",
    "kind": "rnl"
   },
   {
@@ -170,6 +187,11 @@
    "kind": "rnl"
   },
   {
+   "en": "enclose",
+   "term": "封装",
+   "kind": "rnl"
+  },
+  {
    "en": "evaluate",
    "sense": "RNL runtime",
    "term": "求值",
@@ -205,6 +227,12 @@
    "term": "头段记录",
    "kind": "rnl",
    "note": "Short: 头段."
+  },
+  {
+   "en": "hiding",
+   "term": "遮蔽",
+   "kind": "rnl",
+   "note": "A definition of a lower level, or of a later package, used in place of another of the same name."
   },
   {
    "en": "hierarchy",
