@@ -1,22 +1,25 @@
 /* rnl-std-no-labels 0.4, a package of the standard series 0.4 (16.3).
-   Turns the default labels of the standard symbols off, for a file that writes its own (16.3).
+   Hides the default labels of the standard symbols, for a file that writes its own (16.3).
    Optional, not in rnl-std-all: a file names it with USE-PACKAGE. */
 @RNL(type="header") {
   @VERSION("0.4");
   @PACKAGE(name="rnl-std-no-labels", version="0.4");
 }
 
-/* ---------------------------------------------------------------- rules turning off default labels
-   Every default device or block label (name, value, model) on a drawn instance or usage becomes
-   empty; the file's own TEXT with the same key comes later and shows it again (13.3). Net names on
-   grounds, supplies, biases, port tags and net labels use key="netname" and stay visible, as do
-   block formulas (key="formula") and amplifier labels (key="label"). Only drawn objects are
-   selected (drawn=true, 10.1, 16.3), so no empty text lands on a usage without a symbol. */
+/* ---------------------------------------------------------------- rules hiding default labels
+   Every default device or block label (name, value, model) on a drawn instance or usage gets the
+   style textvisible=false (9.3): it is not drawn and takes no room, but its content stays. A label
+   is the same text whoever writes it, and a later TEXT with the same key overrides it parameter by
+   parameter (13.3), so the style stays: to show a label again, write textvisible=true on it, such
+   as #M1 @TEXT("M1", key="name", textvisible=true). Net names on grounds, supplies, biases, port
+   tags and net labels use key="netname" and stay visible, as do block formulas (key="formula") and
+   amplifier labels (key="label"). Only drawn objects are selected (drawn=true, 10.1, 16.3). */
 @RNL {
-  # @SELECT-INSTANCE(drawn=true, recursive=true) => @TEXT("", key="name");
-  # @SELECT-INSTANCE(drawn=true, recursive=true) => @TEXT("", key="value");
-  # @SELECT-INSTANCE(drawn=true, recursive=true) => @TEXT("", key="model");
-  # @SELECT-USAGE(drawn=true, recursive=true) => @TEXT("", key="name");
-  # @SELECT-USAGE(drawn=true, recursive=true) => @TEXT("", key="value");
-  # @SELECT-USAGE(drawn=true, recursive=true) => @TEXT("", key="model");
+  %hidden = @DEFINE-STYLE(textvisible=false) {};
+  # @SELECT-INSTANCE(drawn=true, recursive=true) => @SELECT-LABEL(key="name") => @SET-STYLE %hidden;
+  # @SELECT-INSTANCE(drawn=true, recursive=true) => @SELECT-LABEL(key="value") => @SET-STYLE %hidden;
+  # @SELECT-INSTANCE(drawn=true, recursive=true) => @SELECT-LABEL(key="model") => @SET-STYLE %hidden;
+  # @SELECT-USAGE(drawn=true, recursive=true) => @SELECT-LABEL(key="name") => @SET-STYLE %hidden;
+  # @SELECT-USAGE(drawn=true, recursive=true) => @SELECT-LABEL(key="value") => @SET-STYLE %hidden;
+  # @SELECT-USAGE(drawn=true, recursive=true) => @SELECT-LABEL(key="model") => @SET-STYLE %hidden;
 }

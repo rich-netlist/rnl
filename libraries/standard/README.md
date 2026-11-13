@@ -81,6 +81,87 @@ Every symbol writes its box (`box=[x1, y1, x2, y2]`): on any side that has pins,
 
 The series 0.4 is written in the language 0.4, whose text is still a draft, and is bundled so that the files of 0.4 can be read while the toolkit takes in the rules of 0.4 one by one. Every package is version 0.4. Its fifteen files hold one collection package, [`rnl-std-all`](0.4/rnl-std-all.rnl) (replacing `rnl-std`, `rnl-std-core` and `rnl-std-full`), [`rnl-std-semantics`](0.4/rnl-std-semantics.rnl) for circuit-structure and layout definitions (replacing `rnl-std-structures`), [`alias-zh`](0.4/alias-zh.rnl) for Chinese aliases (replacing `rnl-zh`), the optional [`rnl-std-no-labels`](0.4/rnl-std-no-labels.rnl) and [`rnl-std-45deg`](0.4/rnl-std-45deg.rnl) (45-degree symbols and diagonal arrow marks), and the ten sub-packages `rnl-std-all` brings in (`rnl-std-style`, `rnl-std-basic`, `rnl-std-semiconductors`, `rnl-std-spice` or `rnl-std-spectre` for the dialect, `rnl-std-fill`, `rnl-std-semantics`, `rnl-std-functional`, `rnl-std-rf`, `rnl-std-logic` and `rnl-std-signal-flow`). It has more structures than the series 0.3, and some names of 0.3 are gone or split, such as `$CHAIN`, `$DIFFERENTIAL_PAIR` into `$DIFFERENTIAL_PAIR_N` and `$DIFFERENTIAL_PAIR_P`, and `$CURRENT_MIRROR` into `$CURRENT_MIRROR_N` and `$CURRENT_MIRROR_P`; until the toolkit reads all of 0.4, a file that uses it gets the errors of the statements of 0.4 it does not read yet. A file of 0.4 uses no package implicitly and names `rnl-std-all` or individual sub-packages in its header record (16.3). 0.4 is newer than the toolkit's default version, 0.3, so the files of 0.2 and 0.3 do not find its packages without naming the version, `version="0.4"`, and the catalog keeps the series 0.3 (or 0.2) for shared package names unless it is asked for every version (16.2). The project site does not show it until the standard 0.4 is published.
 
+### Renamed, merged, split and removed in 0.4
+
+`rnl upgrade`, which the core 0.5.x provides, rewrites files of 0.3 and 0.2 by this list. Where the table says *manual*, it reports the place and leaves the text as it was.
+
+#### Packages
+
+| Series 0.3 | Series 0.4 |
+|---|---|
+| `rnl-std` (collection) | `rnl-std-all`, the one collection; it has a header record for each host language |
+| `rnl-std-core`, `rnl-std-full` (collections) | removed: use `rnl-std-all`, or name the packages one by one |
+| `rnl-std-structures` | `rnl-std-semantics` (`$MATCHED`, `$BRANCH`, `$CASCADE`, `$MIRRORED`, `$FLOW` move with it) |
+| — | new, optional, not in `rnl-std-all`: `rnl-std-45deg` |
+
+#### Symbols
+
+| Series 0.3 | Series 0.4 | Note |
+|---|---|---|
+| `$VCVS`, `$CCVS` | `$CONTROLLED_VOLTAGE_SOURCE` | merged; drawn with its output pins only. The SPICE rules give E `$VCVS_4TERM` |
+| `$VCCS`, `$CCCS` | `$CONTROLLED_CURRENT_SOURCE` | merged; the SPICE rules give G `$VCCS_4TERM` |
+| `$OPAMP_5TERM` | `$OPAMP` | three terminals, mapped `[1, 2, 5]`; the supply pins are on `$OPAMP_SUPPLY` |
+| `$COMPARATOR_5TERM` | `$COMPARATOR` | as for `$OPAMP_5TERM`; `$COMPARATOR_SUPPLY` keeps the supply pins |
+| `$CURRENT_ARROW_SYMBOL` | `$ARROW_SYMBOL` | |
+| `$DELAY_CELL_SYMBOL` | `$DELAY_CELL` | `$DELAY_CELL` is now the two-terminal logic symbol (it was a definition attached to a point) |
+| `$ADDER`, `$MULTIPLIER` (symbols) | `$ADDER_SYMBOL`, `$MULTIPLIER_SYMBOL` | the names `$ADDER` and `$MULTIPLIER` are now general definitions of the signal-flow blocks |
+
+Also: net names on grounds, supplies, bias marks, port tags and net labels use `key="netname"` (was `key="name"`); the label of `$TRANSCONDUCTOR` uses `key="label"` (was `key="formula"`).
+
+#### General definitions
+
+| Series 0.3 | Series 0.4 | `rnl upgrade` |
+|---|---|---|
+| `$DIFFERENTIAL_PAIR` | split into `$DIFFERENTIAL_PAIR_N` and `$DIFFERENTIAL_PAIR_P`; roles `left`, `right` (were the two inputs) and an optional single `tail` | with `--approximate`, chosen by the model types of both inputs |
+| `$CURRENT_MIRROR` | split into `$CURRENT_MIRROR_N` and `$CURRENT_MIRROR_P` | with `--approximate`, chosen by the types of `ref` and `out` |
+| `$CHAIN` | removed | manual: keep the ordering explicitly, or choose another definition |
+| `$SUPPLY_HIGH`, `$SUPPLY_LOW` | removed | manual |
+| `$CASCADE` | four roles become one set role `stages` | manual role mapping |
+| `$ARROW`, `$SPDT_SWITCH`, `$FIGURE` | role `p` becomes `at` | renamed |
+| `$INTEGRATOR`, `$DISCRETE_TIME_INTEGRATOR`, `$QUANTIZER`, `$UNIT_DELAY` | a block with net roles `in` and `out` (was a figure attached to a point, role `p`) | manual: `$FIGURE` with the `*_SYMBOL` for a drawing only, or bind the block roles |
+| `$DELAY_CELL` (definition) | removed; the name is the logic symbol | manual: `$FIGURE` with `@SET-SYMBOL $DELAY_CELL`, or a host instance |
+| `$GROUND`, `$SUPPLY`, `$IO_PORT` | role `p` takes a net only (was a net or a terminal); `$IO_PORT` asserts that its net is a port | a terminal written directly: attach its net and keep the point |
+| `$NO_CONNECT` | role `t` takes a terminal or a pin | unchanged text |
+| `$GROUND_STUB`, `$SUPPLY_STUB` | `gap` default 2 → 1; role `t` is a pin | writes `gap=2` where the old default was used |
+| `$MIRRORED` | `axis` is a single instance, usage or point; directed distribution | with `--approximate` |
+| `$FLOW` | places nothing and takes no direction | restores the old ORDER where it was used |
+
+Definitions that only gained constraints or assertions keep their names, such as `$JUNCTION` and `$MATCHED`, and the upgrade reports them as notices; `$BRANCH` also gained series routing and an order from top to bottom, which the upgrade leaves to a person.
+
+#### Series 0.2 names
+
+`rnl upgrade` also takes the names of the series 0.2. Symbols:
+
+| 0.2 | 0.4 |
+|---|---|
+| `$RES` | `$RESISTOR` |
+| `$CAP` | `$CAPACITOR` |
+| `$IND` | `$INDUCTOR` |
+| `$VSRC` | `$VOLTAGE_SOURCE` |
+| `$ISRC` | `$CURRENT_SOURCE` |
+| `$NMOS4` | `$NMOS_4TERM` |
+| `$PMOS4` | `$PMOS_4TERM` |
+| `$VCVS` | `$VCVS_4TERM` |
+| `$VCCS` | `$VCCS_4TERM` |
+| `$GROUND` (symbol) | `$GROUND_SYMBOL` |
+| `$SUPPLY_BAR` | `$SUPPLY_SYMBOL` |
+| `$PORT_TAG` | `$IO_PORT_SYMBOL` |
+| `$NC_CROSS` | `$NO_CONNECT_SYMBOL` |
+| `$JUNCTION_DOT` | `$JUNCTION_SYMBOL` |
+| `$CURRENT_ARROW_SYM`, `$ARROW_HEAD` | `$ARROW_SYMBOL` |
+
+Definitions and sets:
+
+| 0.2 | 0.4 |
+|---|---|
+| `$GND` | `$GROUND` |
+| `$IOPORT` | `$IO_PORT` |
+| `$NC` | `$NO_CONNECT` |
+| `$GND_STUB` | `$GROUND_STUB` |
+| `$GND_FILL_SET` | `$GROUND_FILL_SET` |
+| `$LABEL_TERM_SET` | `$LABEL_FILL_SET` |
+| `$MIRROR_PAIR` | `$MIRRORED` |
+
 ## Symbols of 0.2
 
 | Symbol | For | Terminals (pin order) |
