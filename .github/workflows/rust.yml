@@ -189,7 +189,7 @@ jobs:
       - name: Solve through the solver's WebAssembly module
         run: |
           cargo build -p rnl-solver-wasm --target wasm32-unknown-unknown
-          node bindings/solver-wasm/tests/solve.mjs target/wasm32-unknown-unknown/debug/rnl_solver_wasm.wasm
+          node bindings/solver-wasm/tests/solve.mjs target/wasm32-unknown-unknown/debug/rnl_solver_wasm.wasm target/debug/rnl
       - name: Native and WebAssembly builds give identical Documents and snapshots
         run: |
           node bindings/runtime-wasm/tests/overlays.mjs

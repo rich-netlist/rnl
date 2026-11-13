@@ -93,12 +93,17 @@ pub enum Answer {
     },
 }
 
-/// The clock of a solve: milliseconds from `now`, in seconds.
+/// The clock of a solve: milliseconds from `now`, in seconds. It is a wall clock, and reading it
+/// is a call out of the module, so the budget reads it every so much work, not at every step.
 struct Now<'a>(&'a dyn Fn() -> f64);
 
 impl Clock for Now<'_> {
     fn elapsed(&self) -> f64 {
         (self.0)() / 1000.
+    }
+
+    fn check_every(&self) -> u64 {
+        rnl_solver::WALL_CLOCK_CHECK_EVERY
     }
 }
 
