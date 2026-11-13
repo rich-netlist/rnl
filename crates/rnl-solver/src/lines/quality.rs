@@ -413,4 +413,72 @@ mod tests {
             crate::budget::with(&StoppedClock, RunLimit::Work(0), None, || lab_key(&p, &s, &placed, &routing));
         assert_eq!(key, vec![int(i64::MAX); LAB_KEY]);
     }
+
+    /// A wire that takes the default route of `auto` (13.1) from a pin that leaves sideways to a
+    /// pin one unit beyond it turns back: out by one, half a unit over, back, and in. The order of
+    /// the lines layout and the routing objectives count it as it is drawn, three bends and a
+    /// length of three, so that a placement whose pins face each other, with a straight wire of
+    /// length one, ranks before it. Neither is taken for a drawing that could not be measured.
+    #[test]
+    fn a_default_auto_wire_that_turns_back_counts_its_bends_and_its_length() {
+        use crate::resolve::tests::{instance, problem_of};
+        use crate::{SolverOptions, Work};
+        use rnl_runtime::geom::Orient;
+        use rnl_runtime::problem::{PointRef, ProblemWire, Reference};
+        let mut p = problem_of(vec![instance(), instance()], vec![]);
+        p.version = "0.4".into();
+        p.wires.push(ProblemWire {
+            label: "w".into(),
+            reference: Reference::Anonymous,
+            nets: vec!["n".into()],
+            bus: false,
+            anchors: vec![
+                PointRef::Pin { object: 0, pin: 0, terminal: "g".into() },
+                PointRef::Pin { object: 1, pin: 1, terminal: "d".into() },
+            ],
+            mode: "auto".into(),
+            default_auto: true,
+            generated: false,
+        });
+        let options = SolverOptions::without_time_limit();
+        let resolved = crate::resolve::resolve(&p, &options, &StoppedClock);
+        let s = crate::structure::analyse(&p, &resolved, &options, crate::options::CAPS, &mut Work::default());
+        let placed_at = |first: Orient, origin: [i64; 2]| {
+            let mut geometry = s.witness.clone();
+            geometry.orient[0] = first;
+            geometry.origin = vec![origin.map(int), [int(-3), int(-3)]];
+            Placed {
+                origins: s.origins(&p, &geometry),
+                geometry,
+                dropped: vec![],
+                overlaps: vec![],
+                optimised: true,
+                undecided: false,
+            }
+        };
+        // the drain of the second faces up at (-3, -1); the gate of the first is one unit above it
+        let down = Orient::ALL.into_iter().find(|&o| s.exit(0, 0, o) == Some((0, -1))).unwrap();
+        let sideways = Orient::ALL.into_iter().find(|&o| s.exit(0, 0, o) == Some((-1, 0))).unwrap();
+        let gate = |o: Orient| s.pin_offset(0, 0, o).unwrap();
+        let origin_for = |o: Orient| {
+            let off = gate(o);
+            [int(-3) - &off[0], int(0) - &off[1]]
+        };
+        let whole = |q: &Q| crate::rational::to_f64(q) as i64;
+        let turned = placed_at(sideways, origin_for(sideways).each_ref().map(whole));
+        let facing = placed_at(down, origin_for(down).each_ref().map(whole));
+        let routing = Routing::default();
+        let back = lab_order(&p, &s, &turned, &routing, (1, 4), None);
+        let straight = lab_order(&p, &s, &facing, &routing, (1, 4), None);
+        assert!(!back.interrupted && !straight.interrupted);
+        assert_eq!((back.crossings, back.bends, back.length.clone()), (0, 3, int(3)));
+        assert_eq!((straight.crossings, straight.bends, straight.length.clone()), (0, 0, int(1)));
+        assert!(straight < back);
+        // the routing objectives are given the same paths
+        let drawn = crate::score::drawn(&p, &s, &turned.geometry, &routing).expect("a wire that can be drawn");
+        assert_eq!(drawn.paths.len(), 1);
+        assert_eq!(drawn.paths[0].1.len(), 5);
+        let drawn = crate::score::drawn(&p, &s, &facing.geometry, &routing).expect("a wire that can be drawn");
+        assert_eq!(drawn.paths[0].1.len(), 2);
+    }
 }
