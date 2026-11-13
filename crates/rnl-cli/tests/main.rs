@@ -16,6 +16,7 @@ mod auto_wire04;
 mod auto_wire_fatal;
 mod bundle_rules04;
 mod bundle_terminals;
+mod bus_taps04;
 mod cli;
 mod coincident_route04;
 mod conflicts;
