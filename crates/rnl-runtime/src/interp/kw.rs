@@ -545,6 +545,15 @@ impl Interp<'_> {
         })
     }
 
+    /// A failed object in a strict input of the statement of `ctx` (7.3): the input itself, and in a
+    /// file of 0.4 also a member written in a set, nested or named, so that `{#M1 #M2 #M9}
+    /// @ALIGN("y")` without M9 fails as a whole rather than aligning M1 and M2. A file of 0.2 or 0.3
+    /// drops such a member, as it did.
+    pub(crate) fn failed_input(&self, obj: ObjId, ctx: &Ctx) -> Option<Option<crate::diag::DiagId>> {
+        self.failed_obj(obj)
+            .or_else(|| self.follows_0_4(self.source_unit(ctx)).then(|| self.failed_written_member(obj)).flatten())
+    }
+
     pub(crate) fn frame_key(&self, ctx: &Ctx) -> usize {
         match &ctx.frame {
             Some(f) if self.follows_0_4(self.source_unit(ctx)) && f.borrow().symbol.is_some() => {
@@ -2371,7 +2380,7 @@ impl Interp<'_> {
         for r in &d.roles {
             let mut obj = match filled.iter().find(|(n, _)| *n == r.name) {
                 Some((_, a)) => {
-                    if let Some(dg) = self.failed_obj(a.obj) {
+                    if let Some(dg) = self.failed_input(a.obj, ctx) {
                         let id = self.err_cause(
                             ctx,
                             codes::USAGE_ROLE_FAILED_OBJECT,
@@ -4781,7 +4790,7 @@ impl Interp<'_> {
             return self.scene_only(ctx, seg.start);
         };
         for a in &arglist {
-            if let Some(d) = self.failed_obj(*a) {
+            if let Some(d) = self.failed_input(*a, ctx) {
                 let id = self.err_cause(
                     ctx,
                     codes::CONSTRAINT_MEMBER_FAILED,

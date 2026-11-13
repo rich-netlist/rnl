@@ -317,7 +317,7 @@ impl Interp<'_> {
     }
 
     /// A failed object among the members written in a plain set, also in a nested one.
-    fn failed_written_member(&self, set: ObjId) -> Option<Option<crate::diag::DiagId>> {
+    pub(crate) fn failed_written_member(&self, set: ObjId) -> Option<Option<crate::diag::DiagId>> {
         let ObjData::Set(sd) = self.o(set) else {
             return None;
         };
