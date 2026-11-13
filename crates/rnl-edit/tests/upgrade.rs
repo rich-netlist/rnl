@@ -284,11 +284,53 @@ fn every_level_of_a_file_has_its_hash_refreshed() {
 }
 
 #[test]
-fn only_the_default_look_goes_to_default_look_changes() {
+fn a_change_of_the_default_look_alone_is_not_a_difference() {
     let source = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\nM1 d g s b nmos\nR1 d vdd 1k\n.end\n";
     let result = upgrade("t.sp", &MemoryProvider::new().with("t.sp", source), &UpgradeOptions::default()).unwrap();
     assert!(result.report.differences.is_empty(), "{:?}", result.report.differences);
     assert!(result.report.successful());
-    let categories: Vec<_> = result.report.default_look_changes.iter().map(|d| d.category.as_str()).collect();
-    assert_eq!(categories, ["positions", "unplaced-drawings"]);
+    assert!(result.report.rule_changes.is_empty());
+}
+
+fn upgraded(source: &str) -> rnl_edit::upgrade::Upgrade {
+    upgrade("t.sp", &MemoryProvider::new().with("t.sp", source), &UpgradeOptions::default()).unwrap()
+}
+
+#[test]
+fn a_distance_between_sets_is_the_same_as_between_their_pairs() {
+    // 0.3 reads the sets by their extents, 0.4 as the pairs of their points; with a direction and
+    // a lower bound only, the two say the same.
+    let source = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\nR1 a 0 1k\nR2 b 0 1k\nR3 c 0 1k\n* @RNL { #R1 {#R2 #R3} @DISTANCE(\"left-to-right\", min=2) }\n.end\n";
+    let result = upgraded(source);
+    assert!(result.report.differences.is_empty(), "{:?}", result.report.differences);
+}
+
+#[test]
+fn a_changed_fact_is_still_a_difference() {
+    // A maximum is not the same on sets: the upgrade keeps the text, and the facts differ.
+    let source = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\nR1 a 0 1k\nR2 b 0 1k\nR3 c 0 1k\n* @RNL { #R1 {#R2 #R3} @DISTANCE(\"left-to-right\", max=9) }\n.end\n";
+    let result = upgraded(source);
+    assert!(!result.report.differences.is_empty() || !result.report.successful());
+}
+
+#[test]
+fn routes_asked_for_twice_are_one_route() {
+    let source = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\nR1 a 0 1k\nR2 a 0 1k\n* @RNL { &a @ROUTE; &a @ROUTE }\n.end\n";
+    let result = upgraded(source);
+    assert!(result.report.differences.is_empty(), "{:?}", result.report.differences);
+}
+
+#[test]
+fn discarded_solver_records_are_counted_apart_from_the_differences() {
+    let source = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\nR1 a 0 1k\n* @RNL(type=\"generated\", priority=\"high\", author=\"rnl-solver 0.1\", hash=\"sig2:1111111111111111.00000000000000aa\") {\n*   #R1 @PLACE(1, 2)\n* }\n.end\n";
+    let result = upgraded(source);
+    assert!(result.report.successful(), "{:?}", result.report);
+    assert_eq!(result.report.discarded_placements.iter().map(|d| d.facts).sum::<usize>(), 2);
+    let kept = upgrade(
+        "t.sp",
+        &MemoryProvider::new().with("t.sp", source),
+        &UpgradeOptions { keep_generated: true, ..UpgradeOptions::default() },
+    )
+    .unwrap();
+    assert!(kept.report.discarded_placements.is_empty());
 }

@@ -124,6 +124,20 @@ pub struct Report {
     /// symbol places. Connections, facts, geometry and written positions never land here. They are
     /// shown to be reviewed but do not count against success.
     pub default_look_changes: Vec<Difference>,
+    /// What a conversion rule of the upgrade changes on purpose, such as a `$IO_PORT` that becomes
+    /// a `$NET_LABEL` (no pin, so no ROUTE to it): shown to be reviewed, not counted against success.
+    pub rule_changes: Vec<Difference>,
+    /// What the solver had placed and the upgrade left out, where it discards the records of the
+    /// solver (the default): per level, how many facts only those records gave. It does not count
+    /// against success: a new solve makes them again, which `needs_solve` asks for.
+    pub discarded_placements: Vec<DiscardedPlacements>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct DiscardedPlacements {
+    pub file: String,
+    pub level: String,
+    pub facts: usize,
 }
 
 impl Report {
@@ -226,6 +240,7 @@ pub fn upgrade(entry: &str, files: &dyn Provider, options: &UpgradeOptions) -> R
         return Err(format!("cannot upgrade an unreadable source; nothing was written\n{}", errors.join("\n")));
     }
     let authored = Options { generated: false, ..runtime.clone() };
+    let mut discarded = Vec::new();
     if !options.keep_generated
         && before
             .doc
@@ -234,7 +249,11 @@ pub fn upgrade(entry: &str, files: &dyn Provider, options: &UpgradeOptions) -> R
             .flat_map(|l| &l.records)
             .any(|r| rnl_runtime::writeback::record_type(r) == "generated")
     {
-        before = rnl_view::interpret_with(&entry, options.dialect.as_deref(), &options.formats, files, &authored)?;
+        let full = std::mem::replace(
+            &mut before,
+            rnl_view::interpret_with(&entry, options.dialect.as_deref(), &options.formats, files, &authored)?,
+        );
+        discarded = compare::discarded(&full, &before);
     }
     // Package checking keeps its parsed units outside the host document. Recover their
     // carrier locations through the same scanner used by the package reader.
@@ -344,6 +363,8 @@ pub fn upgrade(entry: &str, files: &dyn Provider, options: &UpgradeOptions) -> R
         assertion_violations: Vec::new(),
         differences: Vec::new(),
         default_look_changes: Vec::new(),
+        rule_changes: Vec::new(),
+        discarded_placements: Vec::new(),
     };
     let mut read = Vec::new();
     for (path, records) in source_records {
@@ -394,6 +415,7 @@ pub fn upgrade(entry: &str, files: &dyn Provider, options: &UpgradeOptions) -> R
         rnl_view::interpret_with(&entry, options.dialect.as_deref(), &options.formats, &provider, &target_options)?;
     report.diagnostics = diagnostics(&after);
     report.assertion_violations = report.diagnostics.iter().filter(|d| d.severity == "violation").cloned().collect();
-    (report.differences, report.default_look_changes) = compare::compare(&before, &after);
+    (report.differences, report.default_look_changes, report.rule_changes) = compare::compare(&before, &after);
+    report.discarded_placements = discarded;
     Ok(Upgrade { entry, files: output, read, report })
 }

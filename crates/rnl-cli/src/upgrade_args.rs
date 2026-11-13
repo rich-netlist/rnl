@@ -132,10 +132,12 @@ pub(crate) fn run(args: &Args, provider: &FsProvider) -> Result<ExitCode, Said> 
     let errors =
         result.report.diagnostics.iter().filter(|d| matches!(d.severity.as_str(), "error" | "violation")).count();
     println!(
-        "{} files written, {changes} changes, {approximations} approximations, {notices} notices, {unconverted} unconverted, {errors} target errors, {} differences, {} default-look changes, {needs_solve} files need solving",
+        "{} files written, {changes} changes, {approximations} approximations, {notices} notices, {unconverted} unconverted, {errors} target errors, {} differences, {} default-look changes, {} rule changes, {} discarded placements, {needs_solve} files need solving",
         written,
         result.report.differences.len(),
-        result.report.default_look_changes.len()
+        result.report.default_look_changes.len(),
+        result.report.rule_changes.len(),
+        result.report.discarded_placements.iter().map(|d| d.facts).sum::<usize>()
     );
     Ok(if result.report.successful() { ExitCode::SUCCESS } else { ExitCode::from(1) })
 }

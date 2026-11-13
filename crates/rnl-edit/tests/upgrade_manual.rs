@@ -129,7 +129,7 @@ fn unplaced_symbol_pin_changes_are_compared() {
         &UpgradeOptions { std: false, ..UpgradeOptions::default() },
     )
     .unwrap();
-    assert!(r.report.differences.iter().any(|d| d.category == "unplaced-drawings"));
+    assert!(r.report.differences.iter().any(|d| d.category == "networks"));
 }
 #[test]
 fn unchanged_unplaced_geometry_does_not_make_a_false_difference() {

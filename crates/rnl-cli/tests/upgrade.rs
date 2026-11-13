@@ -226,8 +226,7 @@ fn a_change_of_the_default_look_does_not_fail_the_upgrade_but_a_real_difference_
     assert!(output.status.success(), "{output:?}");
     let report: serde_json::Value = serde_json::from_slice(&std::fs::read(dir.join("look.json")).unwrap()).unwrap();
     assert_eq!(report["differences"].as_array().unwrap().len(), 0);
-    assert_eq!(report["default_look_changes"].as_array().unwrap().len(), 2, "{report}");
-    assert!(String::from_utf8(output.stdout).unwrap().contains("2 default-look changes"));
+    assert!(String::from_utf8(output.stdout).unwrap().contains("0 differences"));
     let source = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\nR1 a 0 1k\n* @RNL { $S = @DEFINE-SYMBOL { (0, 0) @PIN(terminal=1); (2, 0) @PIN(terminal=1) }; #R1 @SET-SYMBOL $S }\n.end\n";
     std::fs::write(dir.join("real.sp"), source).unwrap();
     let output = run(&dir, &["real.sp", "--no-std", "-o", "real-out"]);

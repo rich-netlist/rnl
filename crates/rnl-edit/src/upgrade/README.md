@@ -83,3 +83,12 @@ The integration tests in `../../tests/upgrade_*.rs` cover headers and includes, 
 ## Default look
 
 The 0.4 standard package draws some things differently by default. A change that only this explains goes to `default_look_changes` in the report instead of `differences`, and does not fail the upgrade: a style property such as `bold`, the place and turning of a symbol's labels, and the offset of a label that its symbol places (a position no scene gives). The text and key of a label and the number and shapes of drawing primitives stay differences. Everything else stays a difference and exits with status 1: objects, kinds, hosts, orientations, pin positions and networks, the box of a symbol, facts, wires, written positions and any change that is not sure to come from the default look. The terminal summary counts both lists.
+
+## How the comparison pairs items
+
+The comparison pairs items by identity, not by index. An object is known by its id; one with no name (its id is where it was written, which the upgrade moves) by what it is and its place among the like ones. A fact, wire, ROUTE or group is known by what it says about those identities, so the numbers of the facts that rank a position, `#M1:2` against `pin(#M1,1)`, a pin reached as `Pin` or `SymbolPin`, an ALIGN pair against an object drawn at a point, two ROUTEs for one net and a DISTANCE between sets (with a direction and a lower bound, as pairs of their points) are the same thing written two ways. What remains falls in lists of the report:
+
+- `differences`: anything that appeared, disappeared or changed and that no list below explains. Exit status 1.
+- `default_look_changes`: style, label place and turning, the offset of a symbol-given label, the symbol drawing of the standard package, and what a rule of the package made in either reading (the default fill: junction dots, grounds and stubs, default labels). Not counted.
+- `rule_changes`: what a conversion rule of the upgrade does on purpose, today `$IO_PORT` becoming `$NET_LABEL`. Not counted; the rule is in the changes of the file.
+- `discarded_placements`: with the default (without `--keep-generated`) the records of the solver are discarded; per level, how many facts only they gave. Not counted: `needs_solve` asks for the new solve that makes them again.
