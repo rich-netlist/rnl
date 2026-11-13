@@ -14,7 +14,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use rnl_runtime::geom::fmt_num;
 use rnl_runtime::model::{SymbolOrigin, UsageOrigin};
-use rnl_runtime::problem::{FactKind, LevelProblem, ObjectKind, OrientSlot, PointRef, Position, Sense, Slot};
+use rnl_runtime::problem::{FactKind, LevelProblem, ObjectKind, OrientSlot, PointRef, Position, Reference, Sense, Slot};
 use rnl_runtime::Interpretation;
 use serde_json::{json, Value};
 
@@ -34,10 +34,43 @@ fn slot(slot: &Slot) -> String {
     }
 }
 
+/// The place in its symbol of the pin that a terminal is, by the object's written id and the
+/// terminal, as far as the level's own references say (a `Pin` names its terminal; a `SymbolPin`
+/// that is written `#M::s` names `s`).
+type Pins = BTreeMap<(String, String), usize>;
+
+fn pins(problem: &LevelProblem) -> Pins {
+    let mut out = Pins::new();
+    let mut visit = |p: &PointRef| {
+        let (object, pin, terminal) = match p {
+            PointRef::Pin { object, pin, terminal } => (*object, *pin, terminal.clone()),
+            PointRef::SymbolPin { object, pin, reference: Reference::Name(name) } => {
+                match name.rsplit_once("::") {
+                    Some((_, terminal)) => (*object, *pin, terminal.to_string()),
+                    None => return,
+                }
+            }
+            _ => return,
+        };
+        if let Some(id) = problem.ids.objects.get(object).filter(|id| !id.starts_with('@')) {
+            out.insert((id.clone(), terminal), pin);
+        }
+    };
+    for net in &problem.nets {
+        net.pins.iter().for_each(&mut visit);
+    }
+    for wire in &problem.wires {
+        wire.anchors.iter().for_each(&mut visit);
+    }
+    out
+}
+
 /// The identities of the objects of a problem, by index. An object with a name has its id; one
 /// without (the id is where it was written, which an upgrade moves) is what it is, with its place
-/// among the like ones.
+/// among the like ones. Objects that a rule made and ones that were written are counted apart, so
+/// a rule's object does not shift the number of a written one.
 fn names(problem: &LevelProblem) -> Vec<String> {
+    let pins = pins(problem);
     let mut seen: BTreeMap<String, usize> = BTreeMap::new();
     problem
         .objects
@@ -45,9 +78,9 @@ fn names(problem: &LevelProblem) -> Vec<String> {
         .enumerate()
         .map(|(index, object)| {
             if let Some(id) = problem.ids.objects.get(index).filter(|id| !id.starts_with('@')) {
-                return terminals(id);
+                return terminals(id, &pins);
             }
-            let base = format!("~{}:{}", object.kind.as_str(), object.label);
+            let base = format!("~{}:{}:{}", object.kind.as_str(), object.label, if object.generated { "made" } else { "" });
             let count = seen.entry(base.clone()).or_default();
             *count += 1;
             format!("{base}#{count}")
@@ -55,8 +88,12 @@ fn names(problem: &LevelProblem) -> Vec<String> {
         .collect()
 }
 
-/// `pin(#M1,2)`, how 0.4 writes the third pin, as `#M1:3`, how 0.3 writes the terminal.
-fn terminals(text: &str) -> String {
+/// A pin of an object as its place in the symbol: `pin(#M1,2)`, how 0.4 writes it, as `#M1.pin2`,
+/// and `#M1:d`, how 0.3 writes the terminal, as the same when the level's own references say which
+/// pin that terminal is. The terminal's number is not the pin's place (a user symbol may order
+/// them otherwise), so a terminal that is not found stays as written, and a difference of writing
+/// is then reported.
+fn terminals(text: &str, pins: &Pins) -> String {
     let mut out = String::new();
     let mut rest = text;
     while let Some(start) = rest.find("pin(") {
@@ -65,7 +102,7 @@ fn terminals(text: &str) -> String {
         let converted = after.find(')').and_then(|end| {
             let (name, index) = after[..end].rsplit_once(',')?;
             let index: usize = index.trim().parse().ok()?;
-            Some((format!("{}:{}", name.trim(), index + 1), end + 1))
+            Some((format!("{}.pin{index}", name.trim()), end + 1))
         });
         match converted {
             Some((text, used)) => {
@@ -79,7 +116,34 @@ fn terminals(text: &str) -> String {
         }
     }
     out.push_str(rest);
-    out
+    let word = |c: char| c.is_ascii_alphanumeric() || c == '_';
+    let chars: Vec<char> = out.chars().collect();
+    let mut result = String::new();
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i] == '#' {
+            let mut j = i + 1;
+            while j < chars.len() && word(chars[j]) {
+                j += 1;
+            }
+            if j + 1 < chars.len() && chars[j] == ':' && chars[j + 1] != ':' && word(chars[j + 1]) {
+                let mut k = j + 1;
+                while k < chars.len() && word(chars[k]) {
+                    k += 1;
+                }
+                let name: String = chars[i..j].iter().collect();
+                let terminal: String = chars[j + 1..k].iter().collect();
+                if let Some(pin) = pins.get(&(name.clone(), terminal)) {
+                    result.push_str(&format!("{name}.pin{pin}"));
+                    i = k;
+                    continue;
+                }
+            }
+        }
+        result.push(chars[i]);
+        i += 1;
+    }
+    result
 }
 
 fn point(names: &[String], p: &PointRef) -> String {
@@ -243,7 +307,8 @@ fn without_look(category: &str, value: &Value) -> Value {
             let standard = map.get("standard_symbol") == Some(&Value::Bool(true));
             if let Some(symbol) = map.get_mut("geometry").and_then(Value::as_object_mut) {
                 if standard {
-                    // The drawing of a symbol of the standard package is the package's default look;
+                    // The drawing of a symbol that comes from a package (any package, not only the
+                    // standard one) is that package's default look;
                     // its box and pins stay, as connections and geometry.
                     for part in ["labels", "primitives", "nested"] {
                         symbol.remove(part);
@@ -346,10 +411,12 @@ fn defaults(before: &Interpretation, after: &Interpretation) -> BTreeMap<String,
     out
 }
 
-/// The identities of the usages that a conversion rule of the upgrade turns into another usage on
-/// purpose: `$IO_PORT` becomes `$NET_LABEL`, which has no pin (and no `name` key). What changes with
-/// them (their texts, the ROUTEs and wires that went to their pin) is the rule's doing, which the
-/// report names in the changes of the file; it is not a difference that the upgrade did by mistake.
+/// The identities of the named usages whose definition the upgrade changed, per level title: a
+/// conversion rule turned them into another usage on purpose (`$IO_PORT` into `$NET_LABEL`, which
+/// has no pin and no `name` key; a legacy name into its new one). The comparison does not know the
+/// names of definitions, so it takes any definition that differs between the readings. What changes
+/// with them (their texts, the ROUTEs and wires that went to their pin) is the rule's doing, which
+/// the report names in the changes of the file; it goes to `rule_changes`, still listed.
 fn converted(before: &Interpretation, after: &Interpretation) -> BTreeMap<String, BTreeSet<String>> {
     let definitions = |read: &Interpretation, title: &str| -> BTreeMap<String, String> {
         read.model
@@ -366,7 +433,7 @@ fn converted(before: &Interpretation, after: &Interpretation) -> BTreeMap<String
         let set = new
             .into_iter()
             .filter(|(id, definition)| {
-                !id.starts_with('@') && definition == "$NET_LABEL" && old.get(id).is_some_and(|d| d == "$IO_PORT")
+                !id.starts_with('@') && old.get(id).is_some_and(|d| d != definition)
             })
             .map(|(id, _)| id)
             .collect();
@@ -398,6 +465,9 @@ fn is_fill(fill: &BTreeSet<String>, category: &str, item: &str, value: &Value) -
     match category {
         "objects" => value["rule_made"] == Value::Bool(true),
         "positions" => fill.contains(item),
+        // A network is what its author's pins say; the pins that a rule made are kept apart in it
+        // (`default_pins`) and are what `without_look` leaves out.
+        "networks" => false,
         _ => mentions(fill, item) || mentions(fill, &value.to_string()),
     }
 }
@@ -408,6 +478,22 @@ fn mentions(defaults: &BTreeSet<String>, text: &str) -> bool {
 
 fn snapshot(read: &Interpretation, added: &BTreeMap<String, BTreeSet<String>>) -> Items {
     let mut out = Items { items: BTreeMap::new(), seen: BTreeMap::new() };
+    let mut pinmaps: BTreeMap<String, Pins> = read.problems.iter().map(|p| (p.title.clone(), pins(p))).collect();
+    // An instance's pins also say their terminals, by number (`#M1:3`).
+    for level in &read.model.levels {
+        let map = pinmaps.entry(level.title.clone()).or_default();
+        for object in level.objects.iter().filter(|o| !o.id.starts_with('@')) {
+            for (index, pin) in object.pins.iter().enumerate() {
+                for terminal in &pin.terminals {
+                    if let Some((owner, number)) = terminal.rsplit_once(':') {
+                        if owner == object.id {
+                            map.insert((owner.to_string(), number.to_string()), index);
+                        }
+                    }
+                }
+            }
+        }
+    }
     for level in &read.doc.levels {
         if !level.circuit {
             continue;
@@ -427,6 +513,7 @@ fn snapshot(read: &Interpretation, added: &BTreeMap<String, BTreeSet<String>>) -
     for level in &read.model.levels {
         let file = &read.doc.levels[level.level].path;
         let title = &level.title;
+        let pins = pinmaps.get(title).cloned().unwrap_or_default();
         let mut put = |category: &str, key: &str, value: Value| out.put(file, title, category, key, value);
         // An id that is where a statement is written moves with the upgrade; such an object is
         // known by what it is.
@@ -434,7 +521,7 @@ fn snapshot(read: &Interpretation, added: &BTreeMap<String, BTreeSet<String>>) -
             if id.starts_with('@') || id.is_empty() {
                 format!("~{kind}:{extra}")
             } else {
-                terminals(id)
+                terminals(id, &pins)
             }
         };
         // Every object of the level, drawn or not, is one item: where it is drawn is a matter of
@@ -456,7 +543,7 @@ fn snapshot(read: &Interpretation, added: &BTreeMap<String, BTreeSet<String>>) -
                 &key,
                 json!({"kind":object.kind,"host":object.host,"definition":object.definition,
                     "symbol":object.symbol.as_ref().map(|s| &s.name),"standard_symbol":standard,"rule_made":!matches!(object.origin, UsageOrigin::Written | UsageOrigin::Solver),
-                    "roles":terminals(&format!("{:?}", object.attach)),
+                    "roles":terminals(&format!("{:?}", object.attach), &pins),
                     "parameters":format!("{:?}",object.params),"disabled":object.disabled,
                     "style":format!("{:?}",object.own_style),
                     "geometry":geometry}),
@@ -476,11 +563,11 @@ fn snapshot(read: &Interpretation, added: &BTreeMap<String, BTreeSet<String>>) -
                 format!(
                     "{}|{}|{}",
                     id(&text.object_id, "text", ""),
-                    terminals(text.attach.as_deref().unwrap_or("")),
+                    terminals(text.attach.as_deref().unwrap_or(""), &pins),
                     text.key.as_deref().unwrap_or("")
                 )
             } else {
-                format!("label|{}", terminals(text.object_id.split("::").next().unwrap_or("")))
+                format!("label|{}", terminals(text.object_id.split("::").next().unwrap_or(""), &pins))
             };
             put(
                 "texts",
@@ -583,7 +670,7 @@ pub(super) fn compare(
     let added = defaults(before, after);
     let rules = converted(before, after);
     let package = package_texts(before, after);
-    let mut before = snapshot(before, &BTreeMap::new()).items;
+    let mut before = snapshot(before, &added).items;
     let after = snapshot(after, &added).items;
     let mut differences = Vec::new();
     let mut look = Vec::new();
