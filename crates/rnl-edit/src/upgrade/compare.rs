@@ -14,7 +14,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use rnl_runtime::geom::fmt_num;
 use rnl_runtime::model::{SymbolOrigin, UsageOrigin};
-use rnl_runtime::problem::{FactKind, LevelProblem, ObjectKind, OrientSlot, PointRef, Position, Reference, Sense, Slot};
+use rnl_runtime::problem::{
+    FactKind, LevelProblem, ObjectKind, OrientSlot, PointRef, Position, Reference, Sense, Slot,
+};
 use rnl_runtime::Interpretation;
 use serde_json::{json, Value};
 
@@ -66,16 +68,13 @@ fn pins(read: &Interpretation, problem: &LevelProblem) -> Pins {
     let mut visit = |p: &PointRef| {
         let (object, pin, terminal) = match p {
             PointRef::Pin { object, pin, terminal } => (*object, *pin, terminal.clone()),
-            PointRef::SymbolPin { object, pin, reference: Reference::Name(name) } => {
-                match name.rsplit_once("::") {
-                    Some((_, terminal)) => (*object, *pin, terminal.to_string()),
-                    None => return,
-                }
-            }
+            PointRef::SymbolPin { object, pin, reference: Reference::Name(name) } => match name.rsplit_once("::") {
+                Some((_, terminal)) => (*object, *pin, terminal.to_string()),
+                None => return,
+            },
             _ => return,
         };
         if let Some(id) = problem.ids.objects.get(object).filter(|id| !id.starts_with('@')) {
-
             // A terminal that a reference gives by its number is the netlist's own.
             if matches!(p, PointRef::Pin { .. }) && terminal.chars().all(|c| c.is_ascii_digit()) {
                 numbers.push(((id.clone(), pin), terminal.clone()));
@@ -149,7 +148,8 @@ fn names(problem: &LevelProblem, pins: &Pins) -> Vec<String> {
             if let Some(id) = problem.ids.objects.get(index).filter(|id| !id.starts_with('@')) {
                 return terminals(id, pins);
             }
-            let base = format!("~{}:{}:{}", object.kind.as_str(), object.label, if object.generated { "made" } else { "" });
+            let base =
+                format!("~{}:{}:{}", object.kind.as_str(), object.label, if object.generated { "made" } else { "" });
             let count = seen.entry(base.clone()).or_default();
             *count += 1;
             format!("{base}#{count}")
@@ -202,10 +202,8 @@ fn terminals(text: &str, pins: &Pins) -> String {
                 }
                 let name: String = chars[i..j].iter().collect();
                 let terminal: String = chars[j + 1..k].iter().collect();
-                let number = pins
-                    .by_name
-                    .get(&(name.clone(), terminal))
-                    .and_then(|pin| pins.number.get(&(name.clone(), *pin)));
+                let number =
+                    pins.by_name.get(&(name.clone(), terminal)).and_then(|pin| pins.number.get(&(name.clone(), *pin)));
                 if let Some(number) = number {
                     result.push_str(&format!("{name}:{number}"));
                     i = k;
@@ -272,7 +270,9 @@ fn facts(names: &Names, kind: &FactKind) -> Vec<String> {
 /// The fact as it says, with identities in place of indexes and without its rank.
 fn fact(names: &Names, kind: &FactKind) -> String {
     let n = |k: &usize| names.get(*k).map_or_else(|| format!("object {k}"), |n| mark(n));
-    let pin = |d: &rnl_runtime::problem::DirectedPin| format!("{}.{}@{}", n(&d.object), names.pin(d.object, d.pin), d.direction);
+    let pin = |d: &rnl_runtime::problem::DirectedPin| {
+        format!("{}.{}@{}", n(&d.object), names.pin(d.object, d.pin), d.direction)
+    };
     match canonical(kind) {
         FactKind::Place { at, axis, value } => format!("place {} {axis:?} {}", point(names, &at), fmt_num(value)),
         FactKind::PointCoordinate { point: p, axis, value } => format!("point {} {axis:?} {}", n(&p), fmt_num(value)),
@@ -454,7 +454,12 @@ fn defaults(before: &Interpretation, after: &Interpretation) -> BTreeMap<String,
     let old: BTreeMap<_, (BTreeSet<_>, BTreeSet<_>)> = before
         .problems
         .iter()
-        .map(|p| (p.title.clone(), (names(p, &pins(before, p)).into_iter().collect(), p.ids.usages.iter().cloned().collect())))
+        .map(|p| {
+            (
+                p.title.clone(),
+                (names(p, &pins(before, p)).into_iter().collect(), p.ids.usages.iter().cloned().collect()),
+            )
+        })
         .collect();
     let mut out = BTreeMap::new();
     for problem in &after.problems {
@@ -476,9 +481,13 @@ fn defaults(before: &Interpretation, after: &Interpretation) -> BTreeMap<String,
     // between versions (0.3 draws a ground at each ground pin, 0.4 a stub).
     for read in [before, after] {
         for problem in &read.problems {
-            out.entry(problem.title.clone())
-                .or_default()
-                .extend(names(problem, &pins(read, problem)).into_iter().zip(&problem.objects).filter(|(_, o)| o.generated).map(|(n, _)| n));
+            out.entry(problem.title.clone()).or_default().extend(
+                names(problem, &pins(read, problem))
+                    .into_iter()
+                    .zip(&problem.objects)
+                    .filter(|(_, o)| o.generated)
+                    .map(|(n, _)| n),
+            );
         }
     }
     out
