@@ -304,5 +304,58 @@ class Languages(unittest.TestCase):
         self.assertEqual(self.spectools.compare("注册点", "注册点", "ch01"), ["ch01: old word '注册点' ×1"])
 
 
+class GuidePage(unittest.TestCase):
+    """From 0.4 on, the short guide has a page of its own beside the standard's; before, it is the first section."""
+
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.spec = Path(self.dir.name)
+        for v in ("0.3", "0.4"):
+            folder(self.spec, v, True, zh=False)
+            (self.spec / v / "en" / "front.md").write_text("# RNL standard\n\nFront.\n", encoding="utf-8")
+            (self.spec / v / "en" / "ch01.md").write_text("## 1 Scope\n\nText.\n", encoding="utf-8")
+            (self.spec / f"rnl-{v}-guide.md").write_text(
+                "# RNL by example\n\nIntro, see (1).\n\n## A file\n\n```text\n# not a heading\n```\n", encoding="utf-8")
+        self.work = self.spec / "work"
+        self.work.mkdir()
+
+    def tearDown(self):
+        self.dir.cleanup()
+
+    def test_the_guide_has_a_page_from_0_4_on(self):
+        self.assertFalse(build.guide_apart("0.3"))
+        self.assertTrue(build.guide_apart("0.4"))
+        self.assertTrue(build.guide_apart("0.10"))
+        self.assertTrue(build.guide_apart("1.0"))
+
+    def test_the_page_of_the_standard_has_no_guide_section_from_0_4_on_and_before_it_has(self):
+        old = build.html_input(self.spec, "0.3", "en", self.work, "../../").read_text(encoding="utf-8")
+        new = build.html_input(self.spec, "0.4", "en", self.work, "../../").read_text(encoding="utf-8")
+        self.assertIn("{#guide}", old)
+        self.assertNotIn("RNL by example", new)
+
+    def test_the_page_of_the_guide_is_the_guide_with_the_note_after_its_title(self):
+        text = build.guide_page_input(self.spec, "0.4", "en", self.work, "../../../agents.html").read_text(encoding="utf-8")
+        lines = text.split("\n")
+        self.assertEqual(lines[0], "# RNL by example")
+        self.assertIn("not the standard itself", lines[2])
+        self.assertIn("(../../../agents.html)", lines[2])
+        self.assertIn("## A file", lines)
+        self.assertEqual(text.count("# not a heading"), 1)  # a line of code is not a heading, and not shifted
+
+    def test_each_page_says_which_it_is_and_leads_to_the_other(self):
+        self.assertEqual(build.switch_html("en", "full", "./", "guide/"),
+                         '<b>Full standard</b> · <a href="guide/">Short guide (not the standard itself)</a>')
+        self.assertEqual(build.switch_html("en", "guide", "../", "./"),
+                         '<a href="../">Full standard</a> · <b>Short guide (not the standard itself)</b>')
+
+    def test_every_language_says_it_in_its_own_words(self):
+        for lang in ("zh", "zh-hant", "ja", "ko", "de", "fr", "es"):
+            catalog = json.loads((HERE.parents[1] / "i18n" / lang / "site" / "messages.json").read_text(encoding="utf-8"))
+            for key in ("page_full", "page_guide", "guide_page_note"):
+                self.assertTrue(catalog[key], (lang, key))
+            self.assertIn("{agents}", catalog["guide_page_note"], lang)
+
+
 if __name__ == "__main__":
     unittest.main()

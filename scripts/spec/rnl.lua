@@ -13,11 +13,15 @@ Pandoc filter for the RNL standard, the same for the web page (html5) and the PD
 - for Typst, the table of contents is put before chapter 1, after the front matter.
 
 Metadata read: rnl-lang ("en" or "zh"). Linked references are listed on stderr with --verbose-links.
+A page that is not the standard but cites its sections, such as the short guide, names the sections in a file,
+section-ids-file (one id a line), and the page they are on, section-base (such as "../"): the references become
+links to that page.
 ]]
 
 local is_typst = FORMAT:match("typst") ~= nil
 local lang = "en"
 local ids = {}
+local base = ""  -- the page the sections are on, when it is not this one
 local in_principles = false  -- inside the principles, whose own numbers, 1 to 4, are not those of the standard's sections
 local verbose = os.getenv("RNL_LINKS_LOG")
 local log = verbose and io.open(verbose, "a") or nil
@@ -45,6 +49,10 @@ end
 
 local function read_meta(meta)
   if meta["rnl-lang"] then lang = pandoc.utils.stringify(meta["rnl-lang"]) end
+  if meta["section-ids-file"] then
+    for id in io.lines(pandoc.utils.stringify(meta["section-ids-file"])) do ids[id] = true end
+    base = meta["section-base"] and pandoc.utils.stringify(meta["section-base"]) or ""
+  end
 end
 
 local function set_header_id(h)
@@ -80,7 +88,7 @@ end
 
 local function link(id, text)
   if log then log:write(lang, "\t", id, "\t", text, "\n") end
-  return pandoc.Link({ pandoc.Str(text) }, "#" .. anchor(id))
+  return pandoc.Link({ pandoc.Str(text) }, base .. "#" .. anchor(id))
 end
 
 -- Split one Str into text and links. prev and next are the neighbouring words; chain is true when the

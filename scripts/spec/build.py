@@ -159,6 +159,15 @@ def name(v: str, lang: str, ext: str) -> str:
     return f"rnl-{v}{LANGS[lang]['suffix']}{ext}"
 
 
+GUIDE_PAGE_FROM = (0, 4)  # from this version on, the short guide has a page of its own, not the first section of the standard's
+
+
+def guide_apart(v: str) -> bool:
+    """Whether the web page of version v leaves the short guide to a page of its own, guide/ beside the page of the
+    standard: from 0.4 on. Before, the guide is the first section of the page."""
+    return tuple(int(n) for n in v.split(".")) >= GUIDE_PAGE_FROM
+
+
 def guide_path(spec: Path, v: str, lang: str) -> Path:
     """The short guide of version v, next to the combined texts: rnl-0.3-guide.md, rnl-0.3-guide.zh.md. It is
     a section of the web page of the version and not a part of the standard, so it is in none of the other
@@ -380,6 +389,31 @@ def guide_section(spec: Path, v: str, lang: str, agents: str) -> str:
     return "\n".join(out) + "\n"
 
 
+def guide_page_input(spec: Path, v: str, lang: str, work: Path, agents: str) -> Path:
+    """The input of the page of the short guide: the guide as its file has it, with the note that it is not the
+    standard after its title, which is the title of the page."""
+    out, in_code, first = [], False, True
+    for line in read(guide_path(spec, v, lang)).strip().split("\n"):
+        if re.match(r"^[ \t]*```", line):
+            in_code = not in_code
+        out.append(line)
+        if first and not in_code and line.startswith("# "):
+            first = False
+            out += ["", LANGS[lang]["guide_page_note"].format(agents=agents)]
+    p = work / f"{v}-{lang}-guide-web.md"
+    p.write_text(FENCE.sub(fence_attrs, "\n".join(out) + "\n"), encoding="utf-8", newline="\n")
+    return p
+
+
+def switch_html(lang: str, current: str, full_href: str, guide_href: str) -> str:
+    """The line at the head of the page of the standard and of the short guide: which of the two this is, and the
+    link to the other."""
+    L = LANGS[lang]
+    full = f"<b>{html.escape(L['page_full'])}</b>" if current == "full" else f'<a href="{full_href}">{html.escape(L["page_full"])}</a>'
+    guide = f"<b>{html.escape(L['page_guide'])}</b>" if current == "guide" else f'<a href="{guide_href}">{html.escape(L["page_guide"])}</a>'
+    return f"{full} · {guide}"
+
+
 def principles_path(spec: Path, lang: str) -> Path:
     """The principles of RNL, which are not a part of the standard and not tied to a version: spec/rich-netlist.md
     and, in another language, spec/rich-netlist.<lang>.md, such as rich-netlist.zh.md. The web page of each version
@@ -426,7 +460,8 @@ def html_input(spec: Path, v: str, lang: str, work: Path, site_root: str) -> Pat
     """The input of the web page of a version: that of the other forms, with the short guide before chapter 1
     when the version has one, and the principles after the annexes when the repository has them. site_root is
     where the links of the page lead, such as the page for agents."""
-    guide, principles = guide_path(spec, v, lang).exists(), principles_path(spec, lang).exists()
+    guide = guide_path(spec, v, lang).exists() and not guide_apart(v)
+    principles = principles_path(spec, lang).exists()
     if not guide and not principles:
         return pandoc_input(spec, v, lang, work)
     texts = [STAMP.sub("", read(spec / v / lang / "front.md")).strip() + "\n"]
@@ -513,13 +548,17 @@ def page_meta(lang: str, title: str, language_path: str, site_root: str) -> dict
 
 
 def build_html(src: Path, lang: str, v: str, rev: dict, dest: Path, site_root: str,
-               links: str, out: Path, work: Path, banner: str = "") -> None:
+               links: str, out: Path, work: Path, banner: str = "", switch: str = "", downloads: str = "",
+               title: str = "", path: str = "", sections_file: Path | None = None) -> None:
     """The web page. Its downloads are the files of the same build, next to it; site_root is where the
-    links of the top bar lead: the site's pages for this language. links is the line of versions."""
+    links of the top bar lead: the site's pages for this language. links is the line of versions. switch is the
+    line that says whether this is the standard or the short guide, and leads to the other; the page of the
+    short guide has its own downloads, and a title and a path under the site's spec/ of the version, and its
+    references to sections (such as (14.8)) link to the page of the standard, one level up, for the ids in sections_file."""
     L = LANGS[lang]
-    log = work / f"links-{v}-{lang}.tsv"
+    log = work / f"links-{v}-{lang}{'-guide' if path else ''}.tsv"
     log.unlink(missing_ok=True)
-    meta = {**page_meta(lang, f"RNL {v} · {L['kicker']}", f"spec/{v}/", site_root),
+    meta = {**page_meta(lang, title or f"RNL {v} · {L['kicker']}", path or f"spec/{v}/", site_root),
             "pdf-href": name(v, lang, ".pdf"), "md-href": name(v, lang, ".md"),
             "zip-href": name(v, lang, "-chapters.zip"), "pdf-size": size(out / name(v, lang, ".pdf")),
             "md-size": size(out / name(v, lang, ".md")), "zip-size": size(out / name(v, lang, "-chapters.zip")),
@@ -529,6 +568,12 @@ def build_html(src: Path, lang: str, v: str, rev: dict, dest: Path, site_root: s
         args += ["-V", f"versions-html={links}"]
     if banner:  # HTML too
         args += ["-V", f"archived-html={banner}"]
+    if sections_file:
+        args += ["-M", f"section-ids-file={sections_file}", "-M", "section-base=../"]
+    if switch:
+        args += ["-V", f"switch-html={switch}"]
+    if downloads:
+        args += ["-V", f"downloads-html={downloads}"]
     run(["pandoc", str(src), *common_args(lang, v, rev), "-t", "html5", "--standalone",
          "--template", str(HERE / "page.html"), "--toc", "--toc-depth=2", "--section-divs", *args,
          "-o", str(dest)], f"pandoc html ({v}, {lang})", dict(os.environ, RNL_LINKS_LOG=str(log)))
@@ -746,6 +791,9 @@ def main(argv: list[str]) -> int:
                     if args.site:
                         redirect(args.site / L["site_dir"].format(v=v) / "index.html", lang, v,
                                  "../../../" + LANGS["en"]["site_dir"].format(v=v) + "/")
+                        if guide_apart(v) and guide_path(spec, v, "en").exists():
+                            redirect(args.site / L["site_dir"].format(v=v) / "guide" / "index.html", lang, v,
+                                     "../../../../" + LANGS["en"]["site_dir"].format(v=v) + "/guide/")
                     continue
                 shutil.copyfile(spec / name(v, lang, ".md"), out / name(v, lang, ".md"))
                 src = pandoc_input(spec, v, lang, work)
@@ -766,10 +814,27 @@ def main(argv: list[str]) -> int:
                     d.mkdir(parents=True, exist_ok=True)
                     for ext in (".md", "-chapters.zip") + (() if args.no_pdf else (".pdf",)):
                         shutil.copyfile(out / name(v, lang, ext), d / name(v, lang, ext))
+                    apart = guide_apart(v) and guide_path(spec, v, lang).exists()
                     build_html(html_input(spec, v, lang, work, "../../"), lang, v, rev, d / "index.html", "../../",
                                version_links(lang, v, shown, lambda x: f"../{x}/",
                                              lambda w: f"compare-{w}.html", has_text=has_text, is_archived=is_archived),
-                               out, work, banner("../../"))
+                               out, work, banner("../../"),
+                               switch=switch_html(lang, "full", "./", "guide/") if apart else "")
+                    if apart:  # the short guide has a page of its own, guide/, with its own download
+                        gd = d / "guide"
+                        gd.mkdir(parents=True, exist_ok=True)
+                        gfile = guide_path(spec, v, lang)
+                        shutil.copyfile(gfile, gd / gfile.name)
+                        dl = (f'<div class="downloads"><a class="dl" href="{gfile.name}" download><svg class="ico"><use href="#i-file"/></svg>'
+                              f'<b>{html.escape(L["md_label"])}</b><small>{size(gd / gfile.name)}</small></a></div>')
+                        ids = work / f"{v}-{lang}-sections.txt"  # the sections the guide cites, which are on the page above
+                        ids.write_text("\n".join(sorted(set(HEADING_ID.findall("\n".join(
+                            read(spec / v / lang / p) for p in ["front.md"] + parts(spec, v)))))) + "\n", encoding="utf-8", newline="\n")
+                        build_html(guide_page_input(spec, v, lang, work, "../../../agents.html"), lang, v, rev, gd / "index.html",
+                                   "../../../",
+                                   version_links(lang, v, shown, lambda x: f"../../{x}/", has_text=has_text, is_archived=is_archived),
+                                   out, work, banner("../../../"), switch=switch_html(lang, "guide", "../", "./"), downloads=dl,
+                                   title=f"RNL {v} · {L['page_guide']}", path=f"spec/{v}/guide/", sections_file=ids)
                     for w in [w for w in earlier(shown, v) if has_text(w)]:
                         revs.setdefault(w, revision(spec, w))
                         page = f"compare-{w}.html"

@@ -277,11 +277,16 @@ $table-of-contents$
 $if(versions-html)$
   <p class="versions">$versions-html$</p>
 $endif$
+$if(switch-html)$
+  <p class="versions">$switch-html$</p>
+$endif$
 $if(archived-html)$
   <p class="archived" role="note">$archived-html$</p>
 $endif$
 $if(compare-html)$
   $compare-html$
+$elseif(downloads-html)$
+  $downloads-html$
 $else$
   <div class="downloads">
     <a class="dl" href="$pdf-href$" download><svg class="ico"><use href="#i-file"/></svg><b>PDF</b><small>$pdf-size$</small></a>
