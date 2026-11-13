@@ -77,8 +77,20 @@ fn without_look(category: &str, value: &Value) -> Value {
             map.remove("style");
             for key in ["geometry", "symbol"] {
                 if let Some(symbol) = map.get_mut(key).and_then(Value::as_object_mut) {
-                    symbol.remove("labels");
-                    symbol.remove("primitives");
+                    // Of a label only its style, place and turning are look; its key and text are not.
+                    for label in symbol.get_mut("labels").and_then(Value::as_array_mut).into_iter().flatten() {
+                        if let Some(label) = label.as_object_mut() {
+                            for field in ["style", "at", "halign", "valign", "rotate", "fix_rotate", "upright"] {
+                                label.remove(field);
+                            }
+                        }
+                    }
+                    // Of a primitive only its style; how many there are and what they draw is geometry.
+                    for primitive in symbol.get_mut("primitives").and_then(Value::as_array_mut).into_iter().flatten() {
+                        if let Some(primitive) = primitive.as_object_mut() {
+                            primitive.remove("style");
+                        }
+                    }
                 }
             }
         }

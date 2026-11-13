@@ -281,6 +281,7 @@ fn every_level_of_a_file_has_its_hash_refreshed() {
         let hash = hash_of(output, i);
         assert_eq!(same_input(&hash, problem), Some(true), "{i}: {output}");
     }
+}
 
 #[test]
 fn only_the_default_look_goes_to_default_look_changes() {

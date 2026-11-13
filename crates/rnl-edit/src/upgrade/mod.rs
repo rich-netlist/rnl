@@ -120,7 +120,7 @@ pub struct Report {
     pub assertion_violations: Vec<Diagnostic>,
     pub differences: Vec<Difference>,
     /// Changes that only the default look of the 0.4 standard package explains: style properties
-    /// such as `bold`, the labels and drawing of a standard symbol, and the offset of a label that its
+    /// such as `bold`, the place and turning of the labels of a symbol, and the offset of a label that its
     /// symbol places. Connections, facts, geometry and written positions never land here. They are
     /// shown to be reviewed but do not count against success.
     pub default_look_changes: Vec<Difference>,
