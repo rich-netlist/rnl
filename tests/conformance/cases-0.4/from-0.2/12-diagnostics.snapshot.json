@@ -9,7 +9,7 @@
       "name": "12-diagnostics.sp",
       "file": 0,
       "line": 0,
-      "status": "3 without a position; constraints: 10 ok, 1 failed, 8 unsolved",
+      "status": "3 without a position; constraints: 9 ok, 1 failed, 8 unsolved",
       "host": {
         "ports": [],
         "instances": [
