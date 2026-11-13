@@ -1,0 +1,44 @@
+# Builds the core release from main every night: the four CLI archives (macOS among them, which a pull
+# request does not build), the npm package and their checks, by calling core-release.yml. It publishes
+# nothing. A night on which main is the commit that the last successful night built builds nothing; a
+# manual run always builds.
+name: Core release, nightly
+
+on:
+  schedule:
+    # 03:23 in Beijing
+    - cron: "23 19 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  changed:
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+    outputs:
+      build: ${{ steps.last.outputs.build }}
+    steps:
+      - id: last
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          build=true
+          if [ "$EVENT" = schedule ]; then
+            # the commit of the last scheduled run that succeeded; when it cannot be read, build
+            last=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/core-nightly.yml/runs?event=schedule&status=success&branch=main&per_page=1" \
+              --jq '.workflow_runs[0].head_sha // ""') || last=
+            if [ "$last" = "$GITHUB_SHA" ]; then
+              build=false
+              echo "main is still $GITHUB_SHA, which the last successful night built" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
+          echo "build=$build" | tee -a "$GITHUB_OUTPUT"
+
+  core:
+    needs: changed
+    if: needs.changed.outputs.build == 'true'
+    uses: ./.github/workflows/core-release.yml

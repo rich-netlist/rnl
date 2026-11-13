@@ -74,6 +74,12 @@ on:
         type: boolean
         default: false
 
+# A newer push to the same pull request cancels this run. A run on main or on a tag, and a manual,
+# scheduled or called run, has a group of its own, so it is never cancelled or held back.
+concurrency:
+  group: rust-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 
@@ -82,12 +88,48 @@ env:
   CARGO_BUILD_JOBS: 4
 
 jobs:
+  # The platforms of the tests: all three on main and by hand. A pull request tests on macOS only
+  # when it changes Rust (a .rs file, a Cargo manifest or lock, the crates, rustfmt.toml)
+  # or this workflow, as macOS runners are few.
+  platforms:
+    if: github.event_name != 'workflow_dispatch' || (!inputs.solver_performance && !inputs.solver_profile_work && !inputs.solver_build_only)
+    runs-on: ubuntu-24.04
+    outputs:
+      os: ${{ steps.os.outputs.os }}
+    steps:
+      # a pull request's files: those of its merge commit against the base it merges into
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: github.event_name == 'pull_request'
+        with:
+          fetch-depth: 2
+          filter: blob:none
+          sparse-checkout: .github
+      - id: os
+        env:
+          EVENT: ${{ github.event_name }}
+          SELF: .github/workflows/rust.yml
+        run: |
+          os='["ubuntu-24.04", "windows-latest", "macos-latest"]'
+          if [ "$EVENT" = pull_request ]; then
+            # when they cannot be read, every platform
+            if files=$(git diff --name-only HEAD^1 HEAD); then
+              if ! grep -qE -e '^(crates/|\.cargo/)' -e '(^|/)(Cargo\.toml|Cargo\.lock|rustfmt\.toml|rust-toolchain(\.toml)?)$' \
+                  -e '\.rs$' -e "^$SELF\$" <<<"$files"; then
+                os='["ubuntu-24.04", "windows-latest"]'
+              fi
+            else
+              echo '::warning::The files of the pull request could not be read; testing on every platform.'
+            fi
+          fi
+          echo "os=$os" | tee -a "$GITHUB_OUTPUT"
+
   test:
+    needs: platforms
     if: github.event_name != 'workflow_dispatch' || (!inputs.solver_performance && !inputs.solver_profile_work && !inputs.solver_build_only)
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-latest, macos-latest]
+        os: ${{ fromJSON(needs.platforms.outputs.os) }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

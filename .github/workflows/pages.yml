@@ -59,13 +59,9 @@ on:
       - ".github/actions/install-playwright/**"
       - "apps/web/**"
       - "apps/viewer-ui/**"
-      - "bindings/**"
-      - "crates/**"
       - "libraries/**"
       - "scripts/fonts.py"
       - "tests/conformance/**"
-      - "Cargo.toml"
-      - "Cargo.lock"
       - ".github/workflows/pages.yml"
   # The releases of the standard (spec-release.yml) and of the desktop viewer (viewer-release.yml) run
   # on a tag, but only main may deploy to github-pages; this run builds main, and its checkout has the
@@ -79,6 +75,12 @@ on:
 
 # Each job gets only what it needs: the build reads the repository and the Pages site
 # (configure-pages); only the deploy job writes to Pages, with the OIDC token deploy-pages asks for.
+# A newer push to the same pull request cancels this run. A run on main or on a tag, and a manual,
+# scheduled or called run, has a group of its own, so it is never cancelled or held back.
+concurrency:
+  group: pages-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 

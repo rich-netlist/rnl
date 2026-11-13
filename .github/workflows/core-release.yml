@@ -11,8 +11,15 @@ on:
         description: "Optional core-vX.Y.Z to validate without pushing a tag (never publishes)"
         type: string
         default: ""
+  # A change to the release notes alone builds nothing: a release checks its notes before it builds.
   pull_request:
-    paths: ["Cargo.*", "crates/**", "bindings/runtime-wasm/**", "packages/runtime/**", "scripts/release.py", "scripts/test_release.py", "release-notes/core/**", "LICENSE*", "LICENSES/**", "apps/desktop/Cargo.toml", "apps/desktop/tauri.conf.json", ".github/workflows/core-release.yml", ".github/workflows/publish-runtime.yml"]
+    paths: ["Cargo.*", "crates/**", "bindings/runtime-wasm/**", "packages/runtime/**", "scripts/release.py", "scripts/test_release.py", "LICENSE*", "LICENSES/**", "apps/desktop/Cargo.toml", "apps/desktop/tauri.conf.json", ".github/workflows/core-release.yml", ".github/workflows/publish-runtime.yml"]
+# A newer push to the same pull request cancels this run. A run on main or on a tag, and a manual,
+# scheduled or called run, has a group of its own, so it is never cancelled or held back.
+concurrency:
+  group: core-release-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 env:
@@ -42,11 +49,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - {os: windows-latest, target: x86_64-pc-windows-msvc, exe: rnl.exe}
-          - {os: ubuntu-22.04, target: x86_64-unknown-linux-musl, exe: rnl}
-          - {os: macos-15, target: aarch64-apple-darwin, exe: rnl}
-          - {os: macos-15-intel, target: x86_64-apple-darwin, exe: rnl}
+        # A pull request builds no macOS archive (macOS runners are few); a tag, a call (core-nightly.yml
+        # builds main every night) and a manual run build all four.
+        include: >-
+          ${{ fromJSON(format('[{0}{1}]',
+          '{"os": "windows-latest", "target": "x86_64-pc-windows-msvc", "exe": "rnl.exe"},
+          {"os": "ubuntu-22.04", "target": "x86_64-unknown-linux-musl", "exe": "rnl"}',
+          github.event_name != 'pull_request' && ', {"os": "macos-15", "target": "aarch64-apple-darwin", "exe": "rnl"},
+          {"os": "macos-15-intel", "target": "x86_64-apple-darwin", "exe": "rnl"}' || '')) }}
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -192,13 +202,15 @@ jobs:
           pattern: core-cli-*
           path: incoming
       - name: Verify platform checksums and combine CLI packages
+        env:
+          ARCHIVES: ${{ github.event_name == 'pull_request' && 2 || 4 }}
         run: |
           mkdir assets
           for dir in incoming/*; do
             (cd "$dir" && sha256sum --check SHA256SUMS.txt)
             find "$dir" -maxdepth 1 -type f ! -name SHA256SUMS.txt -exec cp {} assets/ \;
           done
-          test "$(find assets -type f | wc -l)" -eq 4
+          test "$(find assets -type f | wc -l)" -eq "$ARCHIVES"
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: core-npm

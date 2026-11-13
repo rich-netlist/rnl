@@ -34,6 +34,12 @@ on:
         description: "The version of the program (apps/local/Cargo.toml)"
         value: ${{ jobs.build.outputs.version }}
 
+# A newer push to the same pull request cancels this run. A run on main or on a tag, and a manual,
+# scheduled or called run, has a group of its own, so it is never cancelled or held back.
+concurrency:
+  group: local-linux-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 
@@ -116,8 +122,42 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  # Whether to test in the three containers. A pull request does only when it changes the local
+  # viewer, Cargo.lock, a toolchain file or this workflow and the release that calls it; a run on
+  # main, on a tag or by hand always does.
+  systems:
+    runs-on: ubuntu-24.04
+    outputs:
+      test: ${{ steps.files.outputs.test }}
+    steps:
+      # a pull request's files: those of its merge commit against the base it merges into
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: github.event_name == 'pull_request'
+        with:
+          fetch-depth: 2
+          filter: blob:none
+          sparse-checkout: .github
+      - id: files
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          test=true
+          if [ "$EVENT" = pull_request ]; then
+            # when they cannot be read, test
+            if files=$(git diff --name-only HEAD^1 HEAD); then
+              if ! grep -qE -e '^apps/local/' -e '^Cargo\.lock$' -e '(^|/)rust-toolchain(\.toml)?$' \
+                  -e '^\.github/workflows/local-(linux|release)\.yml$' <<<"$files"; then
+                test=false
+              fi
+            else
+              echo '::warning::The files of the pull request could not be read; testing in the containers.'
+            fi
+          fi
+          echo "test=$test" | tee -a "$GITHUB_OUTPUT"
+
   system:
-    needs: build
+    needs: [build, systems]
+    if: needs.systems.outputs.test == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     strategy:

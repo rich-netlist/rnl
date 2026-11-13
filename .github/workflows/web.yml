@@ -29,7 +29,8 @@ on:
       - "scripts/packages*"
       - "apps/web/**"
       - "apps/viewer-ui/**"
-      - "i18n/**"
+      - "i18n/languages.json"
+      - "i18n/*/viewer.json"
       - "scripts/i18n/viewer-locales.mjs"
       - "bindings/**"
       - "crates/**"
@@ -42,6 +43,12 @@ on:
       - "Cargo.lock"
       - ".github/workflows/web.yml"
   workflow_dispatch:
+
+# A newer push to the same pull request cancels this run. A run on main or on a tag, and a manual,
+# scheduled or called run, has a group of its own, so it is never cancelled or held back.
+concurrency:
+  group: web-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read

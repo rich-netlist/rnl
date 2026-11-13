@@ -27,7 +27,6 @@ on:
     paths:
       - "apps/desktop/**"
       - "apps/viewer-ui/**"
-      - "i18n/**"
       - "scripts/i18n/viewer-locales.mjs"
       - "crates/**"
       - "libraries/**"
@@ -53,6 +52,12 @@ on:
         description: "Only observe the retained macos-arm64 DMG from this Viewer release run; no rebuild"
         type: string
         default: ""
+
+# A newer push to the same pull request cancels this run. A run on main or on a tag, and a manual,
+# scheduled or called run, has a group of its own, so it is never cancelled or held back.
+concurrency:
+  group: desktop-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -227,12 +232,48 @@ jobs:
           path: ${{ runner.temp }}/current/
           retention-days: 14
 
+  # The platforms of the tests: all three on main and by hand. A pull request tests on macOS only
+  # when it changes Rust (a .rs file, a Cargo manifest or lock, the crates, rustfmt.toml, tauri.conf.json)
+  # or this workflow, as macOS runners are few.
+  platforms:
+    if: ${{ !inputs.linux_diagnostics && !inputs.macos_smoke_run_id }}
+    runs-on: ubuntu-24.04
+    outputs:
+      os: ${{ steps.os.outputs.os }}
+    steps:
+      # a pull request's files: those of its merge commit against the base it merges into
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: github.event_name == 'pull_request'
+        with:
+          fetch-depth: 2
+          filter: blob:none
+          sparse-checkout: .github
+      - id: os
+        env:
+          EVENT: ${{ github.event_name }}
+          SELF: .github/workflows/desktop.yml
+        run: |
+          os='["ubuntu-24.04", "windows-latest", "macos-latest"]'
+          if [ "$EVENT" = pull_request ]; then
+            # when they cannot be read, every platform
+            if files=$(git diff --name-only HEAD^1 HEAD); then
+              if ! grep -qE -e '^(crates/|\.cargo/)' -e '(^|/)(Cargo\.toml|Cargo\.lock|rustfmt\.toml|rust-toolchain(\.toml)?)$' \
+                  -e '\.rs$' -e '^apps/desktop/tauri\.conf\.json$' -e "^$SELF\$" <<<"$files"; then
+                os='["ubuntu-24.04", "windows-latest"]'
+              fi
+            else
+              echo '::warning::The files of the pull request could not be read; testing on every platform.'
+            fi
+          fi
+          echo "os=$os" | tee -a "$GITHUB_OUTPUT"
+
   test:
+    needs: platforms
     if: ${{ !inputs.linux_diagnostics && !inputs.macos_smoke_run_id }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-latest, macos-latest]
+        os: ${{ fromJSON(needs.platforms.outputs.os) }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -307,20 +348,21 @@ jobs:
           path: ${{ runner.temp }}/smoke-linux/
           if-no-files-found: ignore
           retention-days: 14
+      # the Mac app and its smoke test: on main and by hand, not on a pull request
       - name: Bundle the debug Mac app
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && github.event_name != 'pull_request'
         working-directory: apps/desktop
         env:
           APPLE_SIGNING_IDENTITY: "-"
         run: npm ci && npx tauri build --debug --bundles app
       - name: macOS smoke test
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && github.event_name != 'pull_request'
         timeout-minutes: 12
         env:
           SMOKE_OUTPUT_DIR: ${{ runner.temp }}/smoke-macos
         run: node apps/desktop/tests/macos-smoke.mjs --app "apps/desktop/target/debug/bundle/macos/RNL Viewer.app"
       - name: Keep the macOS native screenshots and OCR
-        if: always() && runner.os == 'macOS'
+        if: always() && runner.os == 'macOS' && github.event_name != 'pull_request'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: desktop-macos-smoke
