@@ -7,12 +7,13 @@ use rnl_runtime::problem::{LevelProblem, SolverSetting};
 use crate::{RunLimit, SolverOptions};
 use std::collections::BTreeMap;
 
-/// The layout engine used for a 0.4 level.
+/// The layout engine used for a 0.4 level: the lines layout unless another is asked for. A level
+/// of an earlier version is laid out in rows whatever is asked.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Layout {
-    #[default]
     Rows,
     Tree,
+    #[default]
     Lines,
 }
 
@@ -226,10 +227,10 @@ pub(crate) const SPACING_NOT_USED: &str =
     "spacing_x and spacing_y are retained for line layout; row and tree layouts keep their fixed gaps";
 
 impl SolverOptions {
-    /// Defaults in the syntax accepted by --solver-config. Layout stays rows until the 0.4 switch.
+    /// Defaults in the syntax accepted by --solver-config.
     pub fn defaults_config() -> String {
         let d = Self::default();
-        format!("layout=\"rows\", spacing_x=0, spacing_y=0, limit=\"time\", seconds=10, safety_seconds=30, tolerance={}, grid=1, beam={}, candidates={}, astar_expansions={}", rnl_runtime::geom::fmt_num(d.tolerance), d.beam, d.budget.candidates, d.budget.astar_expansions)
+        format!("layout=\"lines\", spacing_x=0, spacing_y=0, limit=\"time\", seconds=10, safety_seconds=30, tolerance={}, grid=1, beam={}, candidates={}, astar_expansions={}", rnl_runtime::geom::fmt_num(d.tolerance), d.beam, d.budget.candidates, d.budget.astar_expansions)
     }
     /// Parse tool settings using RNL literal syntax; reject invalid values before solving.
     pub fn with_config(&self, text: &str) -> Result<Self, String> {
@@ -381,6 +382,9 @@ impl SolverOptions {
         let mut out = self.clone();
         let mut warnings = Vec::new();
         if p.version != "0.4" {
+            // the layouts are those of 0.4: an earlier level is laid out in rows, as it always was,
+            // and the options its hash covers name no layout, as they never did
+            out.settings.layout = Layout::default();
             return (out, warnings);
         }
         if self.settings.legacy_alias {

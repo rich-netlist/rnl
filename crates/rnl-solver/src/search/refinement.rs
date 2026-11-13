@@ -372,7 +372,7 @@ mod tests {
     fn rows_refine_under_work_limit_but_seed_stops_after_initial_candidates() {
         let mut p = problem_of(vec![instance(), instance()], vec![]);
         p.version = "0.4".into();
-        let options = SolverOptions::default().with_overrides("objectives=overlaps,crowding,area").unwrap();
+        let options = SolverOptions::default().with_overrides("layout=rows;objectives=overlaps,crowding,area").unwrap();
         let seed = crate::solve(&p, &SolverOptions { run_limit: Some(crate::RunLimit::Seed), ..options.clone() });
         let refined = crate::solve(&p, &SolverOptions { run_limit: Some(crate::RunLimit::Work(2_000_000)), ..options });
         assert!(!seed.report.notes.iter().any(|n| n.starts_with("row search:")));

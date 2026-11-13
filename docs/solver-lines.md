@@ -1,6 +1,6 @@
 # Line layout
 
-RNL 0.4 files can request `@SOLVER-CONFIG(layout="lines")`, or callers can select it through the solver options. The default remains rows. The linked library, `rnl solve`, and the independent solver use the same engine.
+The line layout is the default for an RNL 0.4 level. A file can ask for another with `@SOLVER-CONFIG(layout="rows")` or `layout="tree"`, and callers can select one through the solver options. Levels of earlier versions are laid out in rows, whatever is asked. The linked library, `rnl solve`, and the independent solver use the same engine.
 
 | Group-tree layout | Line layout |
 | --- | --- |

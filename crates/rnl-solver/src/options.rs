@@ -406,9 +406,11 @@ impl SolverOptions {
             text.push_str(&format!(";report_hints={}", self.hints_for_low));
         }
         match self.settings.layout {
-            crate::Layout::Rows => {}
+            // the default is not named: the text of the defaults, and of a level before 0.4, is as
+            // it was before the lines layout became the default
+            crate::Layout::Rows => text.push_str(";layout=rows"),
             crate::Layout::Tree => text.push_str(";layout=tree"),
-            crate::Layout::Lines => text.push_str(";layout=lines"),
+            crate::Layout::Lines => {}
         }
         if self.settings.spacing != [0, 0] {
             text.push_str(&format!(";spacing_x={};spacing_y={}", self.settings.spacing[0], self.settings.spacing[1]));

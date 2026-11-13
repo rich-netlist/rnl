@@ -43,7 +43,9 @@ fn exercise(astar_expansions: u64, expect_forced: bool) {
     let keys: BTreeSet<_> = original.iter().map(|p| p.pin_key().expect("electrical pin")).collect();
     assert_eq!(keys.len(), 2, "coordinates must not merge the pin identities");
 
+    // the rows layout's router, whose join through obstacles this is about
     let mut options = SolverOptions::without_time_limit();
+    options.settings.layout = rnl_solver::Layout::Rows;
     options.budget.astar_expansions = astar_expansions;
     let solved = solve(p, &options);
     assert!(solved.report.errors.is_empty(), "{:?}", solved.report.errors);

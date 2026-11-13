@@ -61,7 +61,7 @@ fn each_setting_says_where_it_comes_from_in_the_order_of_14_10() {
     let amp = level(&c, "amp");
     assert_eq!(setting(amp, "beam"), "beam=6 (level)");
     assert_eq!(setting(amp, "layout"), "layout=\"tree\" (level)");
-    assert_eq!(setting(top, "layout"), "layout=\"rows\" (default)");
+    assert_eq!(setting(top, "layout"), "layout=\"lines\" (default)");
 }
 
 #[test]

@@ -64,7 +64,7 @@ its previous semicolon syntax is also accepted during the transition.
 
 | Key | Value | Default | Allowed in a file |
 | --- | --- | --- | --- |
-| `layout` | `"rows"`, `"tree"`, `"lines"` | `"rows"` | yes |
+| `layout` | `"rows"`, `"tree"`, `"lines"` | `"lines"` for a 0.4 level; a level of an earlier version is always laid out in rows | yes |
 | `spacing_x`, `spacing_y` | integer from -1 through 20, retained for line layout | 0 | yes |
 | `junction` | definition name as a string; empty disables dots | unset | yes |
 | `tolerance` | finite nonnegative number | 0.000001 | yes |

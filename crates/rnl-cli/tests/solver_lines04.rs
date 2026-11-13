@@ -30,8 +30,8 @@ impl Clock for Ticks {
 }
 
 #[test]
-fn lines_is_opt_in_and_its_seed_result_reopens_solved() {
-    assert_eq!(SolverOptions::default().settings.layout, rnl_solver::Layout::Rows);
+fn lines_is_the_default_and_its_seed_result_reopens_solved() {
+    assert_eq!(SolverOptions::default().settings.layout, rnl_solver::Layout::Lines);
     let files = MemoryProvider::new().with("main.sp", SOURCE);
     let result = solve_with_clock(Path::new("main.sp"), &files, &options(""), &StoppedClock).unwrap();
     assert_eq!(result.errors, 0, "{result:?}");
