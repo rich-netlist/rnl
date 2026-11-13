@@ -67,3 +67,28 @@ fn a_level_without_a_record_that_fits_is_left_as_it_is() {
     assert!(run.levels.is_empty());
     assert!(run.not_solved[0].reason.starts_with("mismatch: "), "{:?}", run.not_solved);
 }
+
+#[test]
+fn a_level_before_04_is_not_respaced() {
+    let old = SOURCE.replace("@VERSION(\"0.4\"); @SOLVER-CONFIG(layout=\"lines\")", "@VERSION(\"0.3\")");
+    let files = MemoryProvider::new().with("main.sp", &old);
+    let run = respace(Path::new("main.sp"), &files, &options("spacing_x=4"), &StoppedClock).unwrap();
+    assert!(run.levels.is_empty() && run.files.is_empty());
+    assert!(run.not_solved[0].reason.starts_with("unsupported: "), "{:?}", run.not_solved);
+}
+
+#[test]
+fn the_preview_says_respace_and_draws_the_level_spaced_again() {
+    let before = solved();
+    let files = MemoryProvider::new().with("main.sp", &before);
+    let config = "spacing_x=4,limit=\"work\",work=100000000000";
+    let shown = rnl_cli::preview::respace("main.sp", &files, &options(config), &StoppedClock, &|_| true).unwrap();
+    assert_eq!(shown.report.mode, "respace");
+    // as many files as `solve --respace` writes
+    let run = respace(Path::new("main.sp"), &files, &options(config), &StoppedClock).unwrap();
+    assert_eq!(shown.report.files.len(), run.files.len());
+    // a solve's preview says solve
+    let plain = MemoryProvider::new().with("main.sp", SOURCE);
+    let solved = rnl_cli::preview::preview("main.sp", &plain, &options("limit=\"seed\""), &StoppedClock, &|_| true);
+    assert_eq!(solved.unwrap().report.mode, "solve");
+}

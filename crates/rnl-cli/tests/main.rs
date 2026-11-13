@@ -126,6 +126,7 @@ mod recursive_scope;
 mod refs;
 mod render_png;
 mod replace_records;
+mod respace04;
 mod rewrite;
 mod role_conversions;
 mod role_diagnostic_details04;

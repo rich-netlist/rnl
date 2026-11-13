@@ -27,7 +27,7 @@ the others. The budget is shared as in a solve, and replaying with the reported 
 same file from the same record.
 
 A level whose record cannot be used is not respaced and nothing is written for it. The report
-lists it as not solved, with one of two reasons:
+lists it as not solved, with one of three reasons:
 
 - **`no-generated`:** the level has no record of the solver, or a record that places nothing.
   Solve it first.
@@ -36,7 +36,7 @@ lists it as not solved, with one of two reasons:
   that can be compared. Solve it again.
 - **`unsupported`:** the level is of a version before RNL 0.4.
 
-`--respace` cannot be combined with `--external-solver`.
+`--respace` cannot be combined with `--external-solver` or `--check`.
 
 The wires are routed again by the solver's router on the record's placement, not taken from the
 record. With the lines layout, whose own router drew the record's wires, they can come out

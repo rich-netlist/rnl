@@ -182,9 +182,8 @@ impl SolverArgs {
             }
         }
         if self.respace && self.external.is_some() {
-            return Err(needs(
-                "--respace spaces the record of the embedded solver; it cannot be combined with --external-solver",
-            ));
+            let text = "--respace spaces the record of the embedded solver, so it takes no --external-solver";
+            return Err(Said::new(codes::CLI_OPTION_WRONG_COMMAND, text));
         }
         if self.profile.is_some() && command != "solve" {
             return Err(Said::new(codes::CLI_OPTION_WRONG_COMMAND, "--profile is an option of solve"));

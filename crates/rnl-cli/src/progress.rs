@@ -30,6 +30,7 @@ pub const STAGES: &[(&str, &str)] = &[
     ("score", "Comparing the candidates"),
     ("tree", "Laying out the groups"),
     ("lines", "Laying out along the signal lines"),
+    ("respace", "Spacing the drawing again"),
     ("junctions", "Placing the junction dots"),
     ("write", "Writing the record back"),
 ];
