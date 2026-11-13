@@ -240,7 +240,9 @@ impl Interp<'_> {
                                 break 'sizes;
                             }
                             let mask = indices.iter().fold(0u64, |m, i| m | (1u64 << i));
-                            if !masks.iter().any(|m| mask & *m == *m) {
+                            // skip a set that holds a smaller conflicting set: a mask in `masks`
+                            // that is a subset of `mask`, having no bit outside it
+                            if !masks.iter().any(|m| m & !mask == 0) {
                                 let mut remaining = own.clone();
                                 for &i in &indices {
                                     let other = values(taken[i].0, &taken[i].1);
