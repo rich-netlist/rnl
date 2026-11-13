@@ -87,7 +87,9 @@ impl Interp<'_> {
         let positions = words().keyword(kw).map(|s| s.position_list()).unwrap_or(&[]);
         let mapped = self.map_args(kw, args, seg, ctx, positions)?;
         let members = mapped["members"].obj;
-        if let Some(d) = self.failed_obj(members) {
+        // a failed object among the members, written in a set too, nested or named, fails the
+        // assertion as a whole, as for those of 15.3 (7.3)
+        if let Some(d) = self.failed_input(members, ctx) {
             let id = self.err_cause(
                 ctx,
                 codes::ASSERT_MEMBER_FAILED,
@@ -157,6 +159,8 @@ impl Interp<'_> {
 
     /// The terminals an object brings into a black box (15.4), followed inward.
     fn brought(&mut self, s: SceneId, o: ObjId, out: &mut Vec<ObjId>, seen: &mut HashSet<ObjId>) {
+        // a pin written `#R5::p` is a named sub-object, resolved in the scene to the pin
+        let o = self.scene_value(o);
         if !seen.insert(o) {
             return;
         }
@@ -166,6 +170,8 @@ impl Interp<'_> {
             ObjData::Term { owner, .. } if matches!(self.o(owner), ObjData::Inst { .. } | ObjData::Bundle { .. }) => {
                 out.push(o)
             }
+            // a pin, the terminals it binds; a pin of a usage binds none (15.4)
+            ObjData::ScenePin { owner, index } => out.extend(self.selected_pin_terminals(s, owner, index)),
             ObjData::Usage(_) => {
                 for m in self.usage_members(s, o, 7, None) {
                     self.brought(s, m, out, seen);
