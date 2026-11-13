@@ -12,6 +12,7 @@ pub mod format;
 pub mod language;
 pub mod package;
 pub mod text;
+pub mod veriloga;
 
 use std::collections::{HashMap, HashSet};
 
@@ -387,6 +388,18 @@ impl HostDocument {
     /// the RNL package format, as a package file checked on its own is ([`crate::check_package`]).
     pub fn is_package(&self, file: &str) -> bool {
         self.rules(file).name == package::NAME
+    }
+
+    /// Whether the file `file`, by its name in the document, is a Verilog-A file that the netlist
+    /// brings in (2.9): its file level holds only header records, and each of its modules is a
+    /// level of [`LevelKind::Subckt`] with no circuit.
+    pub fn is_veriloga(&self, file: &str) -> bool {
+        self.rules(file).name == veriloga::NAME
+    }
+
+    /// Whether the level `level` is a module of a Verilog-A file (2.9).
+    pub fn is_module(&self, level: LevelId) -> bool {
+        self.levels[level].kind == LevelKind::Subckt && self.is_veriloga(&self.levels[level].file)
     }
 
     /// The format a file was read with, by its name in the document.

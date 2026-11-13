@@ -970,6 +970,15 @@ impl Reader<'_, '_> {
                 self.cx.include(&target, sec.as_deref(), no, fname, path, st.cur, st.circ, stack, true);
                 return None;
             }
+            "ahdl_include" => {
+                // a Verilog-A file, read once the version of this file is known (2.9)
+                if let Some(target) = toks.get(1).map(|t| unquote(t)) {
+                    let master = toks.iter().position(|t| t == "-master").and_then(|k| toks.get(k + 1));
+                    let master = master.map(|t| unquote(t));
+                    self.cx.include_hdl(&target, master.as_deref(), no, fname, path, st.cur);
+                }
+                return None;
+            }
             "library" | "endlibrary" => return None,
             "section" => return None,
             "endsection" => return Some(section.is_some()),
@@ -1114,6 +1123,15 @@ impl Reader<'_, '_> {
                 );
             }
             return;
+        }
+        if first == "ahdl_include" {
+            // in SPICE mode too (2.9); the line is still the element it has been read as
+            let toks: Vec<&str> = body.split_whitespace().collect();
+            if let Some(target) = toks.get(1) {
+                let master = toks.iter().position(|t| *t == "-master").and_then(|k| toks.get(k + 1));
+                let master = master.map(|t| unquote(t));
+                self.cx.include_hdl(&unquote(target), master.as_deref(), no, fname, path, st.cur);
+            }
         }
         if first == ".model" {
             let models = &mut self.cx.state::<Kept>().spice_models;

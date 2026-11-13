@@ -177,6 +177,15 @@
    ]
   },
   {
+   "number": "RNL0017",
+   "name": "host-veriloga-not-found",
+   "severity": "warning",
+   "message": "the Verilog-A file {file} cannot be found; its modules give no block symbol (2.9)",
+   "sections": [
+    "2.9"
+   ]
+  },
+  {
    "number": "RNL1000",
    "name": "record-braces-mismatch",
    "severity": "error",

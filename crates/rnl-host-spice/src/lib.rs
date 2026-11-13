@@ -1032,6 +1032,13 @@ impl Reader<'_, '_> {
             self.cx.doc.levels[cur].param_statements.extend(param_statement(&body));
             return;
         }
+        if first == ".hdl" {
+            // HSPICE's Verilog-A file, read once the version of this file is known (2.9)
+            if let Some(target) = body.split_whitespace().nth(1) {
+                self.cx.include_hdl(&unquote(target), None, no, fname, path, cur);
+            }
+            return;
+        }
         if body.starts_with('.') {
             return;
         }

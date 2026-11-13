@@ -47,10 +47,13 @@ impl Reading<'_> {
         self.doc.levels[level].records.extend(records);
     }
 
-    pub(crate) fn finish_record_scans(&mut self) {
+    /// Choose the boundaries of the records of each file by its language version; and say, for
+    /// each level, whether its file is of version 0.4 or later.
+    pub(crate) fn finish_record_scans(&mut self) -> Vec<bool> {
         let runs = std::mem::take(&mut self.pending_records);
         if runs.is_empty() {
-            return;
+            // no carrier, so no header record: every file is of the default version
+            return vec![keeps_0_4(DEFAULT_VERSION); self.doc.levels.len()];
         }
         // Every range refers to the original level vector. Reverse order also puts
         // consecutive runs that originally yielded no records in their source order.
@@ -96,7 +99,7 @@ impl Reading<'_> {
             })
             .collect();
         if !modern.iter().any(|&modern| modern) {
-            return;
+            return modern;
         }
         for &index in &order {
             let run = &runs[index];
@@ -137,5 +140,6 @@ impl Reading<'_> {
                 }
             }
         }
+        modern
     }
 }

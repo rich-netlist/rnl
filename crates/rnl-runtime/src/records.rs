@@ -39,6 +39,11 @@ pub fn scan_package_run(run: &[CarrierLine], file: &str, sink: &mut Sink) -> Vec
     scan_run_with(run, file, sink, modern)
 }
 
+/// Scan a run of a file that only a reading of version 0.4 reads: a Verilog-A file (2.9).
+pub(crate) fn scan_run_0_4(run: &[CarrierLine], file: &str, sink: &mut Sink) -> Vec<Record> {
+    scan_run_with(run, file, sink, true)
+}
+
 fn scan_run_with(run: &[CarrierLine], file: &str, sink: &mut Sink, modern: bool) -> Vec<Record> {
     let mut segs = Vec::new();
     let mut chars: Vec<char> = Vec::new();

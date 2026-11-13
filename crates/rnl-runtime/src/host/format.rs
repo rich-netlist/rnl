@@ -12,6 +12,7 @@ use std::any::{Any, TypeId};
 use std::collections::{HashMap, HashSet};
 
 use crate::diag::{codes, Loc, Sink};
+use crate::host::veriloga::{self, HdlInclude};
 use crate::host::{file_name, Dialect, FileFormat, HostDocument, Level, LevelId, LevelKind};
 use crate::source::{dirname, normalize, relative_to, resolve_include, Provider};
 
@@ -108,6 +109,9 @@ pub struct Reading<'a> {
     state: HashMap<TypeId, Box<dyn Any>>,
     /// Alternative record boundaries, selected after file versions and includes are known.
     pub(crate) pending_records: Vec<crate::records::PendingRun>,
+    /// The Verilog-A files the netlist brings in, read once the version of the file that brings
+    /// each in is known (2.9).
+    pending_hdl: Vec<HdlInclude>,
 }
 
 impl<'a> Reading<'a> {
@@ -144,6 +148,7 @@ impl<'a> Reading<'a> {
             cards: HashMap::new(),
             state: HashMap::new(),
             pending_records: Vec::new(),
+            pending_hdl: Vec::new(),
         };
         cx.note_format(&fname, k, default);
         let stack = [format!("{path}#")];
@@ -157,7 +162,14 @@ impl<'a> Reading<'a> {
         for k in cx.used.clone() {
             formats.list[k].finish(&mut cx);
         }
-        cx.finish_record_scans();
+        let modern = cx.finish_record_scans();
+        // the Verilog-A files that a file of version 0.4 brings in (2.9); a file of an earlier
+        // version reads none
+        for h in std::mem::take(&mut cx.pending_hdl) {
+            if modern.get(h.cur).copied().unwrap_or(false) {
+                veriloga::read(&mut cx, &h);
+            }
+        }
         cx.not_unique_subckts();
         Some(cx.doc)
     }
@@ -261,6 +273,21 @@ impl<'a> Reading<'a> {
         st.push(key);
         let read = FileRead { path: &full, level: child, circ, main: false, stack: &st, section };
         self.formats.list[k].read_file(self, &read);
+    }
+
+    /// Note the Verilog-A file that `target` names, brought in by the line `no` of the file `fname`
+    /// (path `path`) whose text is of the level `cur`: Spectre's `ahdl_include`, with the name
+    /// `master` that `-master` gives its module, or HSPICE's `.hdl` (2.9). It is read once the
+    /// version of the file that brings it in is known, and only when that is 0.4 or later.
+    pub fn include_hdl(&mut self, target: &str, master: Option<&str>, no: u32, fname: &str, path: &str, cur: LevelId) {
+        self.pending_hdl.push(HdlInclude {
+            target: target.to_string(),
+            master: master.map(String::from),
+            no,
+            fname: fname.to_string(),
+            path: path.to_string(),
+            cur,
+        });
     }
 
     /// Register a model card, `replace` when a later card of the same name in a file of the same
