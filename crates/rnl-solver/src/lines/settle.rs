@@ -2477,7 +2477,7 @@ impl Level<'_> {
                 let every: Vec<(usize, Orient)> = (0..ori.len()).map(|m| (m, ori[m])).collect();
                 // List-valued ORIENT facts may have no free class at all, while
                 // ORIENT-RELATION alternatives change a class's member labels.
-                if fits(&ori, &every) && allowed(problem, s, every.iter().copied()) {
+                if fits(&ori, &every) && allowed(problem, s, own_leaves.iter().map(|&m| (m, ori[m]))) {
                     let mut look = Look::new();
                     for &m in own_leaves {
                         look.row(&drawn(m, ori[m]));
@@ -3972,8 +3972,9 @@ pub(super) mod tests {
     fn listed_orientation_choices_keep_local_pin_orders() {
         for related in [false, true] {
             let object = usize::from(related);
+            let outside = object + 1;
             let mut p = problem_of(
-                vec![instance(); object + 1],
+                vec![instance(); outside + 1],
                 vec![
                     fact(if related {
                         FactKind::OrientRelation { relation: Orient::R0, from: vec![0], to: vec![1] }
@@ -3987,18 +3988,33 @@ pub(super) mod tests {
                     }),
                 ],
             );
+            p.facts.extend([
+                fact(FactKind::Orient { object: outside, code: Orient::R0 }),
+                fact(FactKind::Order {
+                    axis: Axis::X,
+                    sense: Sense::Increasing,
+                    members: vec![
+                        PointRef::Pin { object: outside, pin: 0, terminal: "a".into() },
+                        PointRef::Origin(outside),
+                    ],
+                }),
+            ]);
             p.version = "0.4".into();
-            p.orient_lists = vec![(0, vec![Orient::R0, Orient::MY])];
+            p.orient_lists = vec![(0, vec![Orient::R0, Orient::MY]), (2, vec![Orient::R0, Orient::MY])];
             p.symbols[0].pins[0].pos = (-2., 0.);
             let options = SolverOptions::without_time_limit();
             let resolved = crate::resolve::resolve(&p, &options, &StoppedClock);
             let s = crate::structure::analyse(&p, &resolved, &options, crate::options::CAPS, &mut Work::default());
             let s = crate::search_choices::for_layout(&s, &mut Work::default());
-            assert_eq!(s.kept.len(), 2);
+            assert_eq!(s.kept.len(), 4);
             assert_eq!(s.open.classes.is_empty(), !related);
             let tree = crate::tree::Tree::new(&p, &s, &options);
-            let arr = tree.first(&mut Work::default());
+            let mut arr = tree.first(&mut Work::default());
             let (start, _) = tree.evaluate_rounds(&arr, 0, &mut Work::default());
+            // Another group's pending alternative must not prevent this group's
+            // legal orientations from being listed. It will be checked there.
+            let pending = s.open.ways.iter().position(|w| w.fact == 2).unwrap();
+            arr.ways[pending] = 1;
             let level = Level {
                 problem: &p,
                 s: &s,
