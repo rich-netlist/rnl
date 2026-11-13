@@ -23,6 +23,12 @@
    "kind": "rnl"
   },
   {
+   "en": "annotation",
+   "term": "标注",
+   "kind": "rnl",
+   "note": "rnl-zh: @标注 is @ANNOTATION."
+  },
+  {
    "en": "apply",
    "sense": "definition",
    "term": "套用",
@@ -116,6 +122,16 @@
    "kind": "rnl"
   },
   {
+   "en": "discarded",
+   "sense": "fact status",
+   "term": "丢弃",
+   "avoid": [
+    "舍弃",
+    "留用"
+   ],
+   "kind": "rnl"
+  },
+  {
    "en": "drawing",
    "sense": "the schematic as a whole",
    "term": "原理图",
@@ -196,6 +212,12 @@
    "kind": "rnl"
   },
   {
+   "en": "inline package",
+   "term": "内嵌的包",
+   "kind": "rnl",
+   "note": "A USE-PACKAGE with a body {…}."
+  },
+  {
    "en": "instance",
    "term": "元件",
    "kind": "rnl",
@@ -203,13 +225,24 @@
    "alias": true
   },
   {
-   "en": "junction / junction dot",
+   "en": "junction",
+   "term": "交汇点",
+   "avoid": [
+    "汇聚点",
+    "交接点"
+   ],
+   "kind": "rnl",
+   "sense": "the point where wires meet"
+  },
+  {
+   "en": "junction dot",
+   "sense": "the dot drawn there; $JUNCTION; the junction key of @SOLVER-CONFIG",
    "term": "交汇圆点",
    "avoid": [
     "交接圆点"
    ],
    "kind": "rnl",
-   "note": "The point itself: 交汇点."
+   "note": "Short: 圆点."
   },
   {
    "en": "kept",
@@ -305,6 +338,12 @@
    "alias": true
   },
   {
+   "en": "package collection",
+   "term": "包集合",
+   "kind": "rnl",
+   "note": "0.4's name for what 0.3 called a package catalog; the files in a tool's package directory are 包目录."
+  },
+  {
    "en": "phase",
    "term": "阶段",
    "kind": "rnl"
@@ -381,6 +420,12 @@
    "note": "The owner's choice. For the RNL selection only; choosing in the interface stays 选择."
   },
   {
+   "en": "selective routing",
+   "term": "选择性布线",
+   "kind": "rnl",
+   "note": "ROUTE-NET, ROUTE-OBJECT, UNROUTE-NET, UNROUTE-OBJECT."
+  },
+  {
    "en": "set",
    "term": "集合",
    "kind": "rnl"
@@ -421,6 +466,12 @@
    "kind": "rnl"
   },
   {
+   "en": "taken in",
+   "term": "采纳",
+   "kind": "rnl",
+   "note": "A fact tried in the order of 8.5 and found to hold with those before it; as a result it is kept (保留)."
+  },
+  {
    "en": "terminal",
    "term": "端子",
    "kind": "rnl"
@@ -459,6 +510,15 @@
    "term": "竖",
    "kind": "rnl",
    "note": "The name of a routing mode; 竖向 as an adjective."
+  },
+  {
+   "en": "violation",
+   "term": "违例",
+   "avoid": [
+    "违规"
+   ],
+   "kind": "rnl",
+   "note": "The fourth kind of diagnostic (0.4): a statement about the circuit that does not hold. Also the Viewer's fourth severity."
   },
   {
    "en": "wire",
