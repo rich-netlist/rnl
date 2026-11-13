@@ -181,8 +181,8 @@ pub struct UsageOf {
     /// The usage's id, as its object view has it: `%dp1`, `@file:line:col`. A failed application,
     /// which made no usage, has the name it binds, or where it is written.
     pub id: String,
-    /// Its definition, such as `$DIFFERENTIAL_PAIR`; empty for a group, and when a failed
-    /// statement names none.
+    /// Its definition, such as `$DIFFERENTIAL_PAIR`, or in a 0.4 level, `%dot` for one a level defines, whose `%` a level before 0.4 leaves out;
+    /// empty for a group, and when a failed statement names none.
     pub definition: String,
     /// The roles the object fills in it: for a group, `members`; none for a group within this one,
     /// as `MemberOf::roles`.
@@ -278,6 +278,23 @@ pub struct LevelModel {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[cfg_attr(test, ts(as = "Option<Vec<GroupView>>", optional))]
     pub groups: Vec<GroupView>,
+    /// For a 0.4 level, the definition of its junction dots, which SOLVER-CONFIG `junction` selects
+    /// (14.10), readable before any solve; absent before 0.4, and when none is selected.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
+    pub junction: Option<JunctionView>,
+}
+
+/// The junction dots of a 0.4 level ([`LevelModel::junction`]).
+#[derive(Serialize, Debug)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct JunctionView {
+    /// The definition, as a usage names it: `$JUNCTION`, or `%dot` for one a level defines.
+    pub definition: String,
+    /// The symbol its dots in the level are drawn with, by its id in `symbols`, whose `definition`
+    /// gives its graphics, such as the radius of its circle; null while the level has no dot yet,
+    /// such as before a solve, as the symbol a rule gives a usage is only known for one.
+    pub symbol: Option<String>,
 }
 
 /// A symbol, by an id unique in the level's `symbols`: its name, or its name and where it is
@@ -388,7 +405,7 @@ pub struct ObjectView {
     pub kind: String,
     /// The host instances it draws: one for an instance, the members of a bundle, none for a usage.
     pub host: Vec<String>,
-    /// A usage's definition, such as `$GROUND`.
+    /// A usage's definition, such as `$GROUND`, or in a 0.4 level, `%dot` for one a level defines, whose `%` a level before 0.4 leaves out.
     pub definition: Option<String>,
     /// A usage's roles, each with the id of what it is attached to, or a point; a set role (9.4)
     /// with the list of its members, each an id or a point, nested sets followed down, empty when the
@@ -505,6 +522,11 @@ pub struct AnnotationGraphic {
     pub rotate: Option<f64>,
     pub fix_rotate: bool,
     pub upright: Option<bool>,
+    /// For a text, false when its style in effect, its own over the annotation's, hides it
+    /// (`textvisible=false`, 9.3); absent when it is shown.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
+    pub visible: Option<bool>,
 }
 
 /// A graphic of the scene (13.4), as an `add-shape` op writes one.
@@ -586,6 +608,12 @@ pub struct TextView {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(test, ts(optional))]
     pub upright: Option<bool>,
+    /// False when its style in effect hides it, `textvisible=false` (9.3), whether the document or a
+    /// package gives it, as a package's rule hiding default labels does; absent when it is shown.
+    /// A hidden text takes no room and is not drawn, but its content stays.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
+    pub visible: Option<bool>,
     /// Its size, from the document or a package, when one gives it.
     pub size: Option<f64>,
     /// The style properties the document's records give it, such as `textcolor`, `bold` and
@@ -855,6 +883,17 @@ fn symbol_refs(doc: &HostDocument, lv: &LevelView) -> Vec<(SymbolInfo, SymbolRef
                 {
                     lv.unplaced_symbols.iter().find(|v| v.name == s.name && v.origin == s.origin)
                 }
+                // in a 0.4 level, any symbol an object uses, drawn or not, such as that of a junction
+                // dot, which has no place of its own before a solve
+                _ if rnl_runtime::interp::unit::keeps_0_4(&lv.language)
+                    && lv.objects.iter().any(|o| o.symbol.as_ref() == Some(s)) =>
+                {
+                    // a view names a level's symbol without its `%`, as the reading keeps it
+                    let named = |v: &&rnl_runtime::model::SymbolView| {
+                        v.origin == s.origin && (v.name == s.name || format!("%{}", quoted(&v.name)) == s.name)
+                    };
+                    lv.unplaced_symbols.iter().chain(&lv.symbols).find(named)
+                }
                 _ => None,
             };
             let definition = view.filter(|_| package.is_none() && !s.default).map(definition);
@@ -961,6 +1000,11 @@ fn groups_of(
         .collect()
 }
 
+/// `Some(false)` when a `textvisible` in effect hides a text, else none.
+fn hidden(textvisible: Option<&Lit>) -> Option<bool> {
+    (textvisible.and_then(Lit::boolean) == Some(false)).then_some(false)
+}
+
 fn level_model(
     doc: &HostDocument,
     lv: &LevelView,
@@ -1063,6 +1107,7 @@ fn level_model(
             rotate: t.rotate,
             fix_rotate: t.fix_rotate,
             upright: t.upright,
+            visible: hidden(t.style.get("textvisible")),
             size: match t.style.get("size") {
                 Some(Lit::Num(n)) => Some(*n),
                 _ => None,
@@ -1124,11 +1169,20 @@ fn level_model(
                     rotate: g.primitive.rotate,
                     fix_rotate: g.primitive.fix_rotate,
                     upright: g.primitive.upright,
+                    visible: g
+                        .primitive
+                        .text
+                        .as_ref()
+                        .and_then(|_| hidden(g.primitive.style.get("textvisible").or(a.style.get("textvisible")))),
                 })
                 .collect(),
         })
         .collect();
     let symbol = Slot::of(lv.block_symbol.as_ref().and_then(|b| symbol_id(&b.info)));
+    let junction = lv
+        .junction
+        .as_ref()
+        .map(|j| JunctionView { definition: j.definition.clone(), symbol: j.symbol.as_ref().and_then(&symbol_id) });
     LevelModel {
         symbols: symbols.into_iter().map(|(_, r)| r).collect(),
         symbol,
@@ -1139,6 +1193,7 @@ fn level_model(
         shapes,
         annotations,
         groups,
+        junction,
     }
 }
 
@@ -1169,6 +1224,78 @@ mod tests {
                 None => assert!(text.get("fix_rotate").is_none()),
             }
         }
+    }
+
+    /// The model part of the snapshot of `source`, the file `t.sp`, read with the standard package
+    /// when `std` says so.
+    fn model_of(source: &str, std: bool) -> serde_json::Value {
+        let files = MemoryProvider::new().with("t.sp", source);
+        let options = BuildOptions { runtime: Options { std, ..Options::default() }, ..BuildOptions::default() };
+        let snap =
+            crate::snapshot("t.sp", &files, &options, Parts { drawing: false, host: false, model: true }).unwrap();
+        serde_json::to_value(snap).unwrap()["levels"][0]["model"].clone()
+    }
+
+    #[test]
+    fn a_text_its_style_hides_says_so_whoever_hides_it() {
+        // the file's own textvisible, and a package's rule that hides the default labels
+        let source = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\"); \
+                      @USE-PACKAGE(name=\"rnl-std-no-labels\", version=\"0.4\") }\nR1 a 0 1k\n\
+                      * @RNL { #R1 @PLACE(0, 0); (2, 3) @TEXT(\"hidden\", textvisible=false); (2, 5) @TEXT(\"shown\") }\n.end\n";
+        let model = model_of(source, true);
+        let text = |what: &str, value: &str| {
+            let found =
+                model["texts"].as_array().unwrap().iter().find(|t| t[what] == value || t[what]["value"] == value);
+            found.unwrap_or_else(|| panic!("{value}: {model}")).clone()
+        };
+        assert_eq!(text("markup", "hidden").get("visible"), Some(&json!(false)));
+        assert_eq!(text("markup", "shown").get("visible"), None);
+        // the package hides the label: the file's own style says nothing of it
+        let name = text("id", "#R1::name");
+        assert_eq!(name.get("visible"), Some(&json!(false)));
+        assert_eq!(name["style"], json!({}));
+        // before 0.4 there is no textvisible, and no field
+        let old = model_of(
+            "* t\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\nR1 a 0 1k\n* @RNL { (2, 3) @TEXT(\"x\") }\n.end\n",
+            false,
+        );
+        assert!(old["texts"].as_array().unwrap().iter().all(|t| t.get("visible").is_none()));
+    }
+
+    #[test]
+    fn a_level_says_its_junction_definition_and_the_symbol_with_its_circle() {
+        let local = "%dotsym = @DEFINE-SYMBOL(box=[-1, -1, 1, 1]) { (0, 0) @CIRCLE(radius=0.6, fill=\"linecolor\") }; \
+                     %dot = @DEFINE(roles=[[\"p\", \"point\"]]) { {? ?p} @ALIGN(\"x\"); {? ?p} @ALIGN(\"y\") }; \
+                     # @SELECT-USAGE %dot => @SET-SYMBOL %dotsym; @SOLVER-CONFIG(junction=\"%dot\")";
+        let file = |dots: &str| {
+            format!("* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\") }}\nR1 a 0 1k\n* @RNL {{ {local}; #R1 @PLACE(0, 0); %j = (2, 3){dots} }}\n.end\n")
+        };
+        // before a solve, no dot: the definition, but no symbol yet
+        let model = model_of(&file(""), false);
+        assert_eq!(model["junction"], json!({"definition": "%dot", "symbol": null}));
+        // with a dot, its symbol, and the symbol's circle
+        let model = model_of(&file("; %dot @ATTACH %j"), false);
+        assert_eq!(model["junction"], json!({"definition": "%dot", "symbol": "%dotsym"}));
+        let usage = model["objects"].as_array().unwrap().iter().find(|o| o["kind"] == "usage").unwrap();
+        assert_eq!(usage["definition"], "%dot", "a level's own definition keeps its %");
+        let symbol = model["symbols"].as_array().unwrap().iter().find(|s| s["id"] == "%dotsym").unwrap();
+        assert_eq!(symbol["definition"]["prims"][0]["params"]["radius"], 0.6);
+        // the standard package's, by default
+        let standard = model_of(
+            "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }\nR1 a 0 1k\n.end\n",
+            true,
+        );
+        assert_eq!(standard["junction"]["definition"], "$JUNCTION");
+    }
+
+    #[test]
+    fn before_0_4_a_level_has_no_junction_and_its_definitions_no_percent() {
+        let source = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\nR1 a 0 1k\n\
+                      * @RNL { %w = @DEFINE(roles=[\"x\"]) { ?x @ORIENT(\"R90\") }; %v = #R1 @AS %w }\n.end\n";
+        let model = model_of(source, false);
+        assert!(model.get("junction").is_none());
+        let usage = model["objects"].as_array().unwrap().iter().find(|o| o["kind"] == "usage").unwrap();
+        assert_eq!(usage["definition"], "w");
     }
 
     #[test]

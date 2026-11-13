@@ -406,7 +406,7 @@ impl Interp<'_> {
             let (definition, attach) = match self.o(o).clone() {
                 ObjData::Usage(u) => {
                     let roles = u.roles.iter().map(|(name, r)| (name.clone(), self.attached(s, *r, ids))).collect();
-                    (Some(self.label(u.definition)), roles)
+                    (Some(self.definition_name(u.definition, language_0_4)), roles)
                 }
                 _ => (None, Vec::new()),
             };
@@ -570,8 +570,37 @@ impl Interp<'_> {
         (origin, parent, disabled)
     }
 
+    /// A definition as a usage names it: `$NAME`, or in a 0.4 level `%name` for one a level
+    /// defines, whose name the reading keeps without its `%`. A level before 0.4 shows the name as
+    /// it always has, without it.
+    fn definition_name(&self, d: ObjId, language_0_4: bool) -> String {
+        let name = &self.objs[d.0 as usize].name;
+        if language_0_4 && matches!(self.o(d), ObjData::Definition(_)) && !name.is_empty() && !name.starts_with('$') {
+            format!("%{}", quoted(name))
+        } else {
+            self.label(d)
+        }
+    }
+
+    /// The junction definition of a 0.4 level and the symbol its usages there are drawn with
+    /// ([`JunctionInfo`]); None before 0.4, and when none is selected.
+    fn junction_info(&mut self, s: SceneId, objects: &[ObjectInfo]) -> Option<JunctionInfo> {
+        if !self.follows_0_4(self.level_unit[self.scenes[s].level]) {
+            return None;
+        }
+        let settings = self.solver_config_for(s);
+        let selected = self.junction_with_tools_for(s, &settings).1?;
+        let definition = self.definition_name(selected, true);
+        let symbol = objects
+            .iter()
+            .find(|o| o.kind == "usage" && o.definition.as_deref() == Some(definition.as_str()))
+            .and_then(|o| o.symbol.clone());
+        Some(JunctionInfo { definition, symbol })
+    }
+
     /// The applications of definitions in the level's records that failed ([`FailedUsage`]).
     fn failed_usages(&mut self, s: SceneId, ids: &HashMap<ObjId, String>) -> Vec<FailedUsage> {
+        let language_0_4 = self.follows_0_4(self.level_unit[self.scenes[s].level]);
         let failed = self.scenes[s].failed_usages.clone();
         failed
             .into_iter()
@@ -581,7 +610,7 @@ impl Interp<'_> {
                 let roles = f.roles.iter().map(|(r, o)| (r.clone(), self.attached(s, *o, ids))).collect();
                 Some(FailedUsage {
                     id: f.name.map(|n| format!("%{}", quoted(&n))),
-                    definition: f.definition.map(|d| self.label(d)),
+                    definition: f.definition.map(|d| self.definition_name(d, language_0_4)),
                     roles,
                     source,
                     reason: f.diag.map(|d| self.sink.get(d).message.clone()).unwrap_or_default(),
@@ -1212,6 +1241,7 @@ impl Interp<'_> {
 
         let (objs, named_points, ids) = self.level_ids(s);
         let (objects, points) = self.objects_of(s, &objs, &named_points, &ids);
+        let junction = self.junction_info(s, &objects);
         let failed_usages = self.failed_usages(s, &ids);
         let groups = self.groups(s, &ids);
         let mut terminal_names = vec![Vec::new(); level.instances.len()];
@@ -1511,6 +1541,7 @@ impl Interp<'_> {
             terminal_names,
             block_symbol: self.block_symbol_of(lv),
             packages,
+            junction,
         }
     }
 

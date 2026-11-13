@@ -185,8 +185,8 @@ export type UsageOf = {
    */
   id: string,
   /**
-   * Its definition, such as `$DIFFERENTIAL_PAIR`; empty for a group, and when a failed
-   * statement names none.
+   * Its definition, such as `$DIFFERENTIAL_PAIR`, or in a 0.4 level, `%dot` for one a level defines, whose `%` a level before 0.4 leaves out;
+   * empty for a group, and when a failed statement names none.
    */
   definition: string,
   /**
@@ -338,6 +338,11 @@ export type LevelModel = {
    * The sets marked with GROUP (11.5), in the order of writing; only for a level that has some.
    */
   groups?: Array<GroupView>,
+  /**
+   * For a 0.4 level, the definition of its junction dots, which SOLVER-CONFIG `junction` selects
+   * (14.10), readable before any solve; absent before 0.4, and when none is selected.
+   */
+  junction?: JunctionView,
 };
 
 /**
@@ -464,7 +469,7 @@ export type ObjectView = {
    */
   host: Array<string>,
   /**
-   * A usage's definition, such as `$GROUND`.
+   * A usage's definition, such as `$GROUND`, or in a 0.4 level, `%dot` for one a level defines, whose `%` a level before 0.4 leaves out.
    */
   definition: string | null,
   /**
@@ -631,6 +636,12 @@ export type TextView = {
    */
   upright?: boolean,
   /**
+   * False when its style in effect hides it, `textvisible=false` (9.3), whether the document or a
+   * package gives it, as a package's rule hiding default labels does; absent when it is shown.
+   * A hidden text takes no room and is not drawn, but its content stays.
+   */
+  visible?: boolean,
+  /**
    * Its size, from the document or a package, when one gives it.
    */
   size: number | null,
@@ -674,4 +685,22 @@ export type ShapeView = {
 
 export type AnnotationView = { id: string, source_kind: string, source: string, anchor_kind: string, anchor_object: string | null, anchor: [number, number], rotate: number, mirror: boolean, style: Record<string, string | number | boolean>, layer: string, graphics: Array<AnnotationGraphic> };
 
-export type AnnotationGraphic = { shape: string, points: Array<[number, number]>, params: Record<string, string | number>, style: Record<string, string | number | boolean>, lines: Array<Array<Run>>, text: string | null, text_refs: Array<string>, halign: string | null, valign: string | null, rotate: number | null, fix_rotate: boolean, upright: boolean | null };
+export type AnnotationGraphic = {
+  shape: string,
+  points: Array<[number, number]>,
+  params: Record<string, string | number>,
+  style: Record<string, string | number | boolean>,
+  lines: Array<Array<Run>>,
+  text: string | null,
+  text_refs: Array<string>,
+  halign: string | null,
+  valign: string | null,
+  rotate: number | null,
+  fix_rotate: boolean,
+  upright: boolean | null,
+  /**
+   * For a text, false when its style in effect, its own over the annotation's, hides it
+   * (`textvisible=false`, 9.3); absent when it is shown.
+   */
+  visible?: boolean,
+};

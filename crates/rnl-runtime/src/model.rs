@@ -424,6 +424,22 @@ pub struct LevelView {
     /// The packages in effect at the level, one of each name, in the order of their places:
     /// those at the root first (16.2, 16.3).
     pub packages: Vec<LevelPackage>,
+    /// The junction dots of a 0.4 level (14.10); None in a level before 0.4, and when no definition
+    /// is selected.
+    pub junction: Option<JunctionInfo>,
+}
+
+/// The definition of a 0.4 level's junction dots ([`LevelView::junction`]): the one that
+/// SOLVER-CONFIG `junction` selects there, the tool's over the file's (14.10), which a solve gives
+/// each dot it writes, and which the level can be read for before any solve.
+#[derive(Clone, Debug, PartialEq)]
+pub struct JunctionInfo {
+    /// As a usage names it: `$JUNCTION`, or `%dot` for one a level defines.
+    pub definition: String,
+    /// The symbol its usages in the level are drawn with, that of the first of them; None while
+    /// the level has none, such as before a solve, as which symbol a rule gives them is only known
+    /// for a usage.
+    pub symbol: Option<SymbolInfo>,
 }
 
 #[derive(Clone, Debug)]
@@ -485,7 +501,7 @@ pub struct ObjectInfo {
     /// The ids of the host instances it draws: one for an instance, the members of a bundle, none
     /// for a usage.
     pub host: Vec<String>,
-    /// A usage's definition, such as `$GROUND`.
+    /// A usage's definition, such as `$GROUND`; in a 0.4 level, `%dot` for one a level defines.
     pub definition: Option<String>,
     /// A usage's roles in order, with what each is attached to.
     pub attach: Vec<(String, Attach)>,

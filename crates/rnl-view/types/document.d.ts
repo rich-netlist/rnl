@@ -236,7 +236,7 @@ export type Usage = {
   crosses?: number,
   id: string,
   /**
-   * Its definition; empty for a group.
+   * Its definition, such as `$GROUND`, or in a 0.4 level, `%dot` for one a level defines, whose `%` a level before 0.4 leaves out; empty for a group.
    */
   definition: string,
   /**
@@ -939,8 +939,8 @@ export type MemberOf = {
    */
   id: string,
   /**
-   * Its definition, such as `$DIFFERENTIAL_PAIR`; empty for a group, and when a failed statement
-   * names none.
+   * Its definition, such as `$DIFFERENTIAL_PAIR`, or in a 0.4 level, `%dot` for one a level defines, whose `%` a level before 0.4 leaves out;
+   * empty for a group, and when a failed statement names none.
    */
   definition: string,
   /**

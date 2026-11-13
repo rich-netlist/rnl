@@ -42,7 +42,7 @@ pub struct Usage {
     #[cfg_attr(test, ts(optional))]
     pub crosses: Option<usize>,
     pub id: String,
-    /// Its definition; empty for a group.
+    /// Its definition, such as `$GROUND`, or in a 0.4 level, `%dot` for one a level defines, whose `%` a level before 0.4 leaves out; empty for a group.
     pub definition: String,
     /// Whether the usage itself is a virtual part with its own symbol.
     pub has_symbol: bool,

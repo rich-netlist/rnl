@@ -25,8 +25,8 @@ pub struct MemberOf {
     /// Its id: `%dp1`, or for one without a name of its own, where the statement that made it is,
     /// `@file:line:col`; for a group, where GROUP is.
     pub id: String,
-    /// Its definition, such as `$DIFFERENTIAL_PAIR`; empty for a group, and when a failed statement
-    /// names none.
+    /// Its definition, such as `$DIFFERENTIAL_PAIR`, or in a 0.4 level, `%dot` for one a level defines, whose `%` a level before 0.4 leaves out;
+    /// empty for a group, and when a failed statement names none.
     pub definition: String,
     /// The roles the object fills in it, in the order of the definition. For a group, `members`, a
     /// set role; none when the object is a group within this one: a reference to a set is spread
