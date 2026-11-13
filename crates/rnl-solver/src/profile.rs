@@ -79,6 +79,12 @@ pub(crate) fn span(category: &'static str, name: impl Into<String>) -> Span {
     Span(active)
 }
 
+/// A span of the solver's own stages, of which the budget's observer is told too.
+pub(crate) fn stage(name: &'static str) -> Span {
+    crate::budget::enter(name);
+    span("stage", name)
+}
+
 pub(crate) fn span_lazy(category: &'static str, name: impl FnOnce() -> String) -> Span {
     if enabled() {
         span(category, name())

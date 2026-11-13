@@ -52,6 +52,8 @@ solve options (the levels are read without their type=\"generated\" records; -o 
   --solver-config S   0.4 settings, for example limit=\"time\",seconds=10 or limit=\"work\",work=100000
                       overrides file/package settings by key; run limits are tool-only
   --progress          report 0.4 stages and consumed work on standard error
+  --progress=json     report the solve on standard error as events, one JSON object per line
+                      (docs/solver-progress.md)
   --external-solver P run executable P with the solver input/result JSON protocol
   --external-arg ARG  append one literal argument to P (repeatable; no shell)
   --external-timeout S  stop P after S seconds per level (120 by default)
@@ -87,6 +89,7 @@ pub(crate) struct SolverArgs {
     pub external_timeout: Option<f64>,
     pub solver_input: bool,
     pub progress: bool,
+    pub progress_json: bool,
     pub configs: Vec<(bool, String)>,
     /// As given; `problem` and `solve` each have their own default.
     pub in_place: bool,
@@ -116,6 +119,7 @@ impl SolverArgs {
                 self.external_timeout = Some(seconds);
             }
             "--progress" => self.progress = true,
+            "--progress=json" => self.progress_json = true,
             "--solver-config" => {
                 self.configs.push((false, rest.next().ok_or_else(|| needs("--solver-config needs a text"))?))
             }
@@ -325,7 +329,35 @@ pub(crate) fn solve(args: &Args, provider: &FsProvider) -> Result<ExitCode, Said
     let wall_clock = WallClock::new();
     let clock: &dyn rnl_solver::Clock = profile_clock.as_ref().map_or(&wall_clock as &dyn rnl_solver::Clock, |c| c);
     let observed = ProgressClock { inner: clock, enabled: args.solver.progress };
-    let result = if let Some(program) = &args.solver.external {
+    let started = std::time::Instant::now();
+    let events = |e: &rnl_cli::progress::Event| {
+        eprintln!("{}", e.line());
+        true
+    };
+    let result = if args.solver.progress_json {
+        let external = args.solver.external.as_ref();
+        rnl_cli::progress::solve_progress_using(
+            &args.file,
+            provider,
+            &options,
+            &observed,
+            &events,
+            &|problem, options, clock| match external {
+                Some(program) => rnl_cli::external_solver::solve(
+                    program,
+                    &args.solver.external_args,
+                    args.solver.external_timeout.unwrap_or(120.),
+                    problem,
+                    options,
+                ),
+                None => Ok(rnl_cli::solve::BackendResult {
+                    solved: rnl_solver::solve_with_clock(problem, options, clock),
+                    author: rnl_solver::AUTHOR.to_string(),
+                    report_available: true,
+                }),
+            },
+        )
+    } else if let Some(program) = &args.solver.external {
         rnl_cli::solve::solve_using(&args.file, provider, &options, &|_| true, &|problem, options| {
             rnl_cli::external_solver::solve(
                 program,
@@ -340,6 +372,9 @@ pub(crate) fn solve(args: &Args, provider: &FsProvider) -> Result<ExitCode, Said
     };
     if let Some(clock) = &profile_clock {
         clock.finish(result.is_ok())?;
+    }
+    if let (true, Err(message)) = (args.solver.progress_json, &result) {
+        events(&rnl_cli::progress::Event::Error { message: message.clone() });
     }
     let run = result?;
     // nothing is written when a file has no place to go
@@ -390,9 +425,17 @@ pub(crate) fn solve(args: &Args, provider: &FsProvider) -> Result<ExitCode, Said
     }
     // an error of the netlist, or a fact that contradicts itself (8.5, 7.6): the levels are written
     // all the same
-    match writing.error {
-        Some(e) => Err(e.into()),
-        None if run.errors + rnl_cli::solve::errors(&run) > 0 => Ok(ExitCode::from(1)),
-        None => Ok(ExitCode::SUCCESS),
+    let (outcome, exit) = match writing.error {
+        Some(e) => (Err(e.into()), 2),
+        None if run.errors + rnl_cli::solve::errors(&run) > 0 => (Ok(ExitCode::from(1)), 1),
+        None => (Ok(ExitCode::SUCCESS), 0),
+    };
+    if args.solver.progress_json {
+        events(&rnl_cli::progress::Event::Done {
+            seconds: started.elapsed().as_secs_f64(),
+            exit: Some(exit),
+            written: Some(writing.written.len()),
+        });
     }
+    outcome
 }

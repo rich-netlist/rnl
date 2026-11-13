@@ -165,6 +165,7 @@ distinction and the position reference when writing a wire back.
 - **The notes:** the lines of the files raised to 0.3 and of the levels not solved.
 - **Saving it:** `preview::save_copy` saves a copy of a solve, refusing any place over a file that was read. It saves one file when the solve writes one and reads no other (`preview::one_file`). Otherwise it saves a folder, as `solve -o DIR` writes it.
 - **Watching it:** `solve::solve_watched` tells a watcher of each level before it is solved, and stops at its word. `preview::StoppableClock` is past the time limit once stopped, so that the level under way stops checking its facts.
+- **Following it:** `progress::solve_progress` and `preview::preview_progress` give every step of the solve as an event: each level with its limit, the stages, the work, each better candidate, and each level's end. `rnl solve --progress=json` writes the same events, one JSON object per line, on the standard error. See [solver progress events](../../docs/solver-progress.md).
 
 ## solve
 

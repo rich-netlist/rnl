@@ -124,6 +124,24 @@ pub fn preview(
     watch: &dyn Fn(&Progress) -> bool,
 ) -> Result<Preview, String> {
     let run = solve_watched(Path::new(entry), files, options, clock, watch)?;
+    as_solved(entry, run, files, options)
+}
+
+/// [`preview`], with every step of the solve given to `sink` as a [`crate::progress::Event`], as
+/// [`crate::progress::solve_progress`] gives them; false cancels.
+pub fn preview_progress(
+    entry: &str,
+    files: &dyn Provider,
+    options: &SolveOptions,
+    clock: &dyn Clock,
+    sink: &dyn Fn(&crate::progress::Event) -> bool,
+) -> Result<Preview, String> {
+    let run = crate::progress::solve_progress(Path::new(entry), files, options, clock, sink)?;
+    as_solved(entry, run, files, options)
+}
+
+/// The run drawn as solved, as [`preview`] gives it.
+fn as_solved(entry: &str, run: SolveRun, files: &dyn Provider, options: &SolveOptions) -> Result<Preview, String> {
     let mut written = MemoryProvider::new();
     for f in &run.files {
         written.insert(&f.path, &f.text);

@@ -75,7 +75,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use rnl_runtime::problem::FactKind;
 
-pub use budget::{BudgetProgress, BudgetReport, RunLimit, StopReason};
+pub use budget::{BudgetProgress, BudgetReport, ProgressKind, RunLimit, StopReason};
 pub use config::{is_run_setting, Layout, Settings};
 pub use holds::{fact_holds, holds_as_drawn, problem_fact_holds_as_drawn};
 pub use lines::engine::{LayoutSkeleton, LineKind, SkeletonItem, SkeletonLine, SkeletonTable, SkeletonTree};
@@ -278,6 +278,12 @@ pub trait Clock {
     }
     /// Optional progress. Observation can affect a time cutoff, but cannot consume work.
     fn progress(&self, _progress: BudgetProgress) {}
+    /// Whether [`Clock::progress`] should be given the elapsed time and the share of the limit
+    /// used, which reads the clock at each observation. False by default, so that a clock that
+    /// does not watch progress is read only where the limits are checked.
+    fn observes_progress(&self) -> bool {
+        false
+    }
     /// The seconds since some start of the clock's own, never less than at an earlier reading.
     /// Only differences count: the limit of a level runs from the reading when its resolution
     /// begins.
@@ -421,6 +427,12 @@ pub fn resolve_with_clock(problem: &LevelProblem, options: &SolverOptions, clock
         resolved.warnings.extend(warnings);
         resolved
     })
+}
+
+/// The limit a level is solved with under `options`, read on `clock`: a time limit on a clock that
+/// does not advance is the initial pass instead.
+pub fn run_limit(options: &SolverOptions, clock: &dyn Clock) -> RunLimit {
+    run_limits(options, clock).0
 }
 
 fn run_limits(options: &SolverOptions, clock: &dyn Clock) -> (RunLimit, Option<f64>) {

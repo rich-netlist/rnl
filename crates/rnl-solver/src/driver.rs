@@ -139,12 +139,12 @@ fn solve_exact_mode(
         count(problem.facts.len(), "fact"),
         count(problem.routes.len(), "ROUTE")
     ));
-    let phase = crate::profile::span("stage", "resolve");
+    let phase = crate::profile::stage("resolve");
     let resolved = crate::resolve::resolve(problem, options, clock);
     drop(phase);
     notes.extend(resolved.notes.iter().cloned());
     let mut work = resolved.work;
-    let phase = crate::profile::span("stage", "structure");
+    let phase = crate::profile::stage("structure");
     let structure = analyse(problem, &resolved, options, caps, &mut work);
     let use_lines = problem.version == "0.4" && skeleton.is_none() && options.settings.layout == crate::Layout::Lines;
     let use_tree = problem.version == "0.4" && (skeleton.is_some() || options.settings.layout != crate::Layout::Rows);
@@ -155,18 +155,21 @@ fn solve_exact_mode(
     drop(phase);
     let (candidate, placed, routing, mut entry) = if use_tree {
         let laid = if use_lines {
+            crate::budget::enter("lines");
             let (laid, description) = crate::lines::lay_out(problem, &structure, options, &mut work);
             layout_skeleton = Some(description);
             laid
         } else if let Some(rounds) = skeleton {
             crate::skeleton::lay_out(problem, &structure, options, &mut work, rounds)
         } else {
+            crate::budget::enter("tree");
             crate::tree::lay_out(problem, &structure, options, &mut work, &crate::tree::Stop::default())
         };
         notes.extend(laid.notes);
+        crate::budget::best(cost(&laid.entry));
         (laid.candidate, laid.placed, laid.routing, laid.entry)
     } else {
-        let phase = crate::profile::span("stage", "search");
+        let phase = crate::profile::stage("search");
         let candidates = search(problem, &structure, options, &mut work);
         drop(phase);
         let mut all: Vec<Placing> = Vec::new();
@@ -178,14 +181,14 @@ fn solve_exact_mode(
             {
                 break;
             }
-            let phase = crate::profile::span("stage", "coords");
+            let phase = crate::profile::stage("coords");
             crate::profile::set("candidate_id", candidate_id as u64);
             let placed = place(problem, &structure, &c, options, &mut work);
             drop(phase);
             if crate::budget::stopped() && !all.is_empty() {
                 break;
             }
-            let phase = crate::profile::span("stage", "score");
+            let phase = crate::profile::stage("score");
             let written = drawn(problem, &structure, &placed.geometry, &Routing::default());
             let annotation = crate::annotation::bounds(problem, &placed.geometry);
             let entry = match (written, annotation) {
@@ -227,11 +230,12 @@ fn solve_exact_mode(
         }
         let placed_count = all.len();
         // the best `beam` by the estimate are routed and scored on their wires (plan 5.8)
-        let phase = crate::profile::span("stage", "score");
+        let phase = crate::profile::stage("score");
         let estimated: Vec<Entry> = all.iter().map(|c| c.entry.clone()).collect();
         let ranked = order(&structure.active, &estimated);
         let beam = options.beam.max(1);
         let mut finals: Vec<(usize, Routing, Entry)> = Vec::new();
+        let mut best_so_far: Option<Entry> = None;
         drop(phase);
         for &i in ranked
             .iter()
@@ -246,7 +250,7 @@ fn solve_exact_mode(
                 break;
             }
             let p = &all[i];
-            let phase = crate::profile::span("stage", "route");
+            let phase = crate::profile::stage("route");
             crate::profile::set("candidate_id", i as u64);
             let routing = route(problem, &structure, &p.placed.geometry, &p.placed.origins, options, &mut work);
             crate::profile::add("wires", routing.wires.len() as u64);
@@ -254,7 +258,7 @@ fn solve_exact_mode(
             if crate::budget::stopped() && !finals.is_empty() {
                 break;
             }
-            let phase = crate::profile::span("stage", "score");
+            let phase = crate::profile::stage("score");
             let Ok(wires) = drawn(problem, &structure, &p.placed.geometry, &routing) else { continue };
             let score = measured_layers(problem, &structure, &p.placed, Some(&wires));
             let entry = Entry {
@@ -263,10 +267,17 @@ fn solve_exact_mode(
                 layers: score,
                 ..p.entry.clone()
             };
+            if best_so_far
+                .as_ref()
+                .is_none_or(|b: &Entry| order(&structure.active, &[b.clone(), entry.clone()])[0] == 1)
+            {
+                crate::budget::best(cost(&entry));
+                best_so_far = Some(entry.clone());
+            }
             finals.push((i, routing, entry));
             drop(phase);
         }
-        let phase = crate::profile::span("stage", "score");
+        let phase = crate::profile::stage("score");
         if finals.is_empty() {
             // Keep one unscoreable candidate solely to return a fatal diagnostic, never route it.
             let i = ranked[0];
@@ -359,6 +370,7 @@ fn solve_exact_mode(
                         refined += 1;
                         if order(&structure.active, &[entry.clone(), next.clone()])[0] == 1 {
                             (candidate, placed, routing, entry) = (c, p, r, next);
+                            crate::budget::best(cost(&entry));
                             start = candidate.clone();
                             rank = troubled(&routing, &placed);
                             radius = 0;
@@ -590,6 +602,16 @@ fn solve_exact_mode(
 /// nothing else places (11.1).
 pub(crate) fn left_free(s: &Structure, k: usize) -> bool {
     s.objects.get(k).is_some_and(|o| o.left_free)
+}
+
+/// What the progress observer is shown of a candidate's rank: the counts the order compares
+/// first, then the layers of the objective. Lower is better; only comparisons mean anything.
+fn cost(e: &Entry) -> Vec<f64> {
+    [e.overlaps, e.crowding, e.misleading, e.joins_left]
+        .into_iter()
+        .map(|n| n as f64)
+        .chain(e.layers.iter().map(crate::rational::to_f64))
+        .collect()
 }
 
 #[cfg(test)]

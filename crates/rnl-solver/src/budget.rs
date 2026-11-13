@@ -33,11 +33,40 @@ pub struct BudgetReport {
     pub reason: StopReason,
 }
 
-/// Observational progress, outside persisted results.
+/// What a [`BudgetProgress`] tells of.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ProgressKind {
+    /// The solver entered a stage of its own, [`BudgetProgress::solver_stage`].
+    Stage,
+    /// More work was admitted.
+    Work,
+    /// The solver took a better candidate than any before in this level.
+    Best,
+    /// The level's budget closed.
+    Complete,
+}
+
+/// Observational progress, outside persisted results. Observing never consumes work. The clock
+/// is read for `elapsed` and `fraction` only when [`Clock::observes_progress`] says so.
+#[derive(Clone, Debug, PartialEq)]
 pub struct BudgetProgress {
+    pub kind: ProgressKind,
     pub work: u64,
+    /// The kind of step that last admitted work, such as "coordinates" or "search"; "complete"
+    /// when the budget closed.
     pub stage: &'static str,
+    /// The stage of the solver: "resolve", "structure", "search", "coords", "route", "score",
+    /// "tree" or "lines"; empty before the first.
+    pub solver_stage: &'static str,
+    /// The candidates admitted so far in this level.
+    pub tried: u64,
+    /// The seconds since the level's budget opened, by its clock.
+    pub elapsed: f64,
+    /// The share of a time or a work limit used so far, from 0 to 1.
+    pub fraction: Option<f64>,
+    /// With [`ProgressKind::Best`], the new best's cost: lower is better, compared element by
+    /// element. Its entries carry no promised meaning.
+    pub cost: Vec<f64>,
 }
 
 impl BudgetReport {
@@ -93,6 +122,9 @@ struct Control<'a> {
     used: Cell<u64>,
     stopped: Cell<Option<StopReason>>,
     last_progress: Cell<u64>,
+    tried: Cell<u64>,
+    solver_stage: Cell<&'static str>,
+    step: Cell<&'static str>,
 }
 
 scoped_tls_hkt::scoped_thread_local!(static ACTIVE: for<'a> Option<&'a Control<'a>>);
@@ -124,6 +156,30 @@ fn phase_stopped() -> bool {
 }
 
 impl Control<'_> {
+    fn observe(&self, kind: ProgressKind, cost: Vec<f64>) {
+        let (elapsed, fraction) = if self.clock.observes_progress() {
+            let elapsed = self.clock.elapsed() - self.start;
+            let fraction = match self.limit {
+                RunLimit::Time(s) if s > 0. => Some((elapsed / s).clamp(0., 1.)),
+                RunLimit::Work(n) if n > 0 => Some((self.used.get() as f64 / n as f64).clamp(0., 1.)),
+                _ => None,
+            };
+            (elapsed, fraction)
+        } else {
+            (0., None)
+        };
+        self.clock.progress(BudgetProgress {
+            kind,
+            work: self.used.get(),
+            stage: self.step.get(),
+            solver_stage: self.solver_stage.get(),
+            tried: self.tried.get(),
+            elapsed,
+            fraction,
+            cost,
+        });
+    }
+
     fn permit(&self, cost: u64) -> bool {
         if self.stopped.get().is_some() {
             return false;
@@ -167,13 +223,37 @@ pub(crate) fn with<T>(
         used: Cell::new(0),
         stopped: Cell::new(None),
         last_progress: Cell::new(0),
+        tried: Cell::new(0),
+        solver_stage: Cell::new(""),
+        step: Cell::new(""),
     };
     let result = ACTIVE.set(Some(&control), f);
-    clock.progress(BudgetProgress { work: control.used.get(), stage: "complete" });
+    control.step.set("complete");
+    control.observe(ProgressKind::Complete, Vec::new());
     (
         result,
         BudgetReport { limit, work: control.used.get(), reason: control.stopped.get().unwrap_or(StopReason::Complete) },
     )
+}
+
+/// Tell the observer that the solver entered `stage`, when it is not the stage it is in.
+pub(crate) fn enter(stage: &'static str) {
+    if active() {
+        ACTIVE.with(|c| {
+            let c = c.unwrap();
+            if c.solver_stage.get() != stage {
+                c.solver_stage.set(stage);
+                c.observe(ProgressKind::Stage, Vec::new());
+            }
+        });
+    }
+}
+
+/// Tell the observer that the solver took a better candidate, of this cost.
+pub(crate) fn best(cost: Vec<f64>) {
+    if active() {
+        ACTIVE.with(|c| c.unwrap().observe(ProgressKind::Best, cost));
+    }
 }
 
 pub(crate) fn active() -> bool {
@@ -222,9 +302,15 @@ pub(crate) fn permit_weighted(step: Step, cost: u64) -> bool {
             if admitted && phase_active() {
                 PHASE.with(|p| p.unwrap().used.set(p.unwrap().used.get() + cost));
             }
+            if admitted {
+                c.step.set(step.name());
+                if matches!(step, Step::Candidate) {
+                    c.tried.set(c.tried.get() + 1);
+                }
+            }
             if admitted && c.used.get().saturating_sub(c.last_progress.get()) >= 100_000 {
                 c.last_progress.set(c.used.get());
-                c.clock.progress(BudgetProgress { work: c.used.get(), stage: step.name() });
+                c.observe(ProgressKind::Work, Vec::new());
             }
             admitted
         });

@@ -14,6 +14,7 @@ pub mod png;
 pub mod preview;
 pub mod problem;
 pub mod profile;
+pub mod progress;
 pub mod provider;
 pub mod replace;
 pub mod solve;

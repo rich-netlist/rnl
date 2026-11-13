@@ -417,6 +417,45 @@ pub fn solve_using(
     watch: &dyn Fn(&Progress) -> bool,
     backend: &Backend<'_>,
 ) -> Result<SolveRun, String> {
+    solve_marked(
+        file,
+        files,
+        options,
+        &|mark| match mark {
+            Mark::Level(p) => watch(p),
+            _ => true,
+        },
+        backend,
+    )
+}
+
+/// What a pass tells its watcher of, in order: how many levels it solves, then for each level its
+/// start, the stages outside the solver, and its end. Only the answer to [`Mark::Level`] counts:
+/// false stops the solve there.
+pub(crate) enum Mark<'a> {
+    Run {
+        levels: usize,
+    },
+    Level(&'a Progress),
+    /// The level's problem is read: the options it is solved with, its own settings applied.
+    Problem(&'a SolverOptions),
+    Stage(&'static str),
+    LevelDone {
+        level: usize,
+        solved: &'a Solved,
+        seconds: f64,
+        junction_seconds: Option<f64>,
+    },
+}
+
+/// [`solve_using`], its watcher told of every [`Mark`].
+pub(crate) fn solve_marked(
+    file: &Path,
+    files: &dyn Provider,
+    options: &SolveOptions,
+    watch: &dyn Fn(Mark<'_>) -> bool,
+    backend: &Backend<'_>,
+) -> Result<SolveRun, String> {
     let (run, wants) = pass(file, files, options, &[], watch, backend)?;
     if wants.is_empty() {
         return Ok(run);
@@ -502,7 +541,7 @@ fn pass(
     files: &dyn Provider,
     options: &SolveOptions,
     raised: &[(String, String)],
-    watch: &dyn Fn(&Progress) -> bool,
+    watch: &dyn Fn(Mark<'_>) -> bool,
     backend: &Backend<'_>,
 ) -> Result<(SolveRun, Vec<Want>), String> {
     let entry = path_str(file);
@@ -585,9 +624,10 @@ fn pass(
     // the document read again when a header moved
     let mut current = if moved.is_empty() { Some(first) } else { None };
     let count = targets.len();
+    watch(Mark::Run { levels: count });
     for (k, (level, title)) in targets.into_iter().enumerate() {
         let progress = Progress { level: k, levels: count, title: title.clone(), again: !raised.is_empty() };
-        if !watch(&progress) {
+        if !watch(Mark::Level(&progress)) {
             return Err(CANCELLED.to_string());
         }
         // the document as written so far: the lines of this level have moved if one before it in
@@ -601,6 +641,7 @@ fn pass(
             .iter()
             .find(|p| p.level == level && p.title == title)
             .ok_or_else(|| format!("the level {title} is not read again after the levels before it were solved"))?;
+        watch(Mark::Problem(&options.solver.for_problem(p).0));
         let start = Instant::now();
         let BackendResult { solved, author, report_available } = backend(p, &options.solver)?;
         let time = start.elapsed();
@@ -617,6 +658,7 @@ fn pass(
             };
             written.notes.push(format!("the record is not written: {why}"));
             let record = written.record.clone();
+            watch(Mark::LevelDone { level: k, solved: &solved, seconds: time.as_secs_f64(), junction_seconds: None });
             levels.push(SolvedLevel {
                 problem: p.clone(),
                 solved,
@@ -631,7 +673,9 @@ fn pass(
             });
             continue;
         }
+        let mut junction_seconds = None;
         if p.version == "0.4" && !written.junctions.is_empty() {
+            watch(Mark::Stage("junctions"));
             if !report_available {
                 return Err(format!("junction placement unresolved in {title}: backend omitted retained-fact report"));
             }
@@ -659,8 +703,10 @@ fn pass(
                 completion.trials,
                 completion.elapsed.as_secs_f64()
             ));
+            junction_seconds = Some(completion.elapsed.as_secs_f64());
             written.record = completion.record;
         }
+        watch(Mark::Stage("write"));
         // a file of 0.2 that the record is written into is raised to 0.3 (16.1): the file level of
         // the level, a library section read as a file (2.8)
         let want: Want = (path.clone(), host.file.clone(), r.doc.levels[r.doc.file_level(p.level)].section.clone());
@@ -765,6 +811,7 @@ fn pass(
             }
         }
         let hints_for_low = options.solver.hints_for_low;
+        watch(Mark::LevelDone { level: k, solved: &solved, seconds: time.as_secs_f64(), junction_seconds });
         levels.push(SolvedLevel {
             problem: p.clone(),
             solved,
