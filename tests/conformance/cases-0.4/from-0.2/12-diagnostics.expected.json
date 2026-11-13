@@ -1604,12 +1604,6 @@
           "priority": "normal"
         },
         {
-          "label": "ALIGN",
-          "kind": "ALIGN",
-          "status": "ok",
-          "priority": "normal"
-        },
-        {
           "label": "ORIENT-RELATION",
           "kind": "ORIENT-RELATION",
           "status": "unsolved",
@@ -2021,9 +2015,9 @@
       "col": 5
     },
     {
-      "severity": "hint",
-      "code": "RNL5005",
-      "name": "constraint-expansion-too-few-places",
+      "severity": "error",
+      "code": "RNL5000",
+      "name": "constraint-member-failed",
       "file": "12-diagnostics.sp",
       "line": 48,
       "col": 31

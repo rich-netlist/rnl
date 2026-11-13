@@ -289,7 +289,7 @@ impl Interp<'_> {
         let mapped = self.map_args(kw, args, seg, ctx, positions)?;
         let args: Vec<_> = positions.iter().map(|p| mapped[&p.name].obj).collect();
         for &a in &args {
-            if let Some(cause) = self.failed_obj(a) {
+            if let Some(cause) = self.failed_input(a, ctx) {
                 let d = self.err_cause(
                     ctx,
                     codes::CONSTRAINT_MEMBER_FAILED,
