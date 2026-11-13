@@ -89,6 +89,11 @@ use rnl_runtime::writeback::{
 use rnl_runtime::{Interpretation, Options};
 use rnl_solver::{Clock, Discarded, Solved, SolverOptions, Statement, AUTHOR};
 
+mod check;
+pub use check::{
+    check_lines, check_settings, named_syntax, Checked, CheckedLevel, CheckedProblem, CheckedSetting, ToolSettings,
+};
+
 use crate::provider::path_str;
 
 /// What `rnl solve` takes besides the file.

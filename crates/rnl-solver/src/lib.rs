@@ -76,7 +76,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use rnl_runtime::problem::FactKind;
 
 pub use budget::{BudgetProgress, BudgetReport, ProgressKind, RunLimit, StopReason};
-pub use config::{is_run_setting, Layout, Settings};
+pub use config::{is_run_setting, Layout, SettingFrom, SettingProblem, Settings, SettingsCheck};
 pub use holds::{fact_holds, holds_as_drawn, problem_fact_holds_as_drawn};
 pub use lines::engine::{LayoutSkeleton, LineKind, SkeletonItem, SkeletonLine, SkeletonTable, SkeletonTree};
 pub use options::{Budget, Layer, Objectives, SolverOptions, DEFAULT_LAYERS, DEFAULT_TIME_LIMIT, OBJECTIVES};

@@ -52,6 +52,10 @@ solve options (the levels are read without their type=\"generated\" records; -o 
   --in-place          write them over the files read instead
   --solver-config S   0.4 settings, for example limit=\"time\",seconds=10 or limit=\"work\",work=100000
                       overrides file/package settings by key; run limits are tool-only
+  --check             only check the solver's settings, level by level, with where each comes from:
+                      the defaults, a package, the file's header, the level, the command line (14.10);
+                      nothing is solved or written, and FILE may be left out to check the command
+                      line's settings alone; with --json, as JSON; exits with 1 on an error
   --progress          report 0.4 stages and consumed work on standard error
   --progress=json     report the solve on standard error as events, one JSON object per line
                       (docs/solver-progress.md; solve and preview take it)
@@ -91,6 +95,8 @@ pub(crate) struct SolverArgs {
     pub solver_input: bool,
     pub progress: bool,
     pub progress_json: bool,
+    /// `solve --check`: check the settings only.
+    pub check: bool,
     pub configs: Vec<(bool, String)>,
     /// As given; `problem` and `solve` each have their own default.
     pub in_place: bool,
@@ -121,6 +127,7 @@ impl SolverArgs {
             }
             "--progress" => self.progress = true,
             "--progress=json" => self.progress_json = true,
+            "--check" => self.check = true,
             "--solver-config" => {
                 self.configs.push((false, rest.next().ok_or_else(|| needs("--solver-config needs a text"))?))
             }
@@ -150,6 +157,19 @@ impl SolverArgs {
         if self.solver_input && self.previous {
             return Err("--previous is available only in the readable problem format; omit --solver-input".into());
         }
+        if self.check {
+            let writes = [
+                (self.in_place, "--in-place"),
+                (self.progress || self.progress_json, "--progress"),
+                (self.external.is_some(), "--external-solver"),
+                (self.profile.is_some(), "--profile"),
+                (self.report, "--report"),
+            ];
+            if let Some((_, option)) = writes.iter().find(|(given, _)| *given) {
+                let text = format!("solve --check solves and writes nothing, so it takes no {option}");
+                return Err(Said::new(codes::CLI_OPTION_WRONG_COMMAND, text));
+            }
+        }
         if self.profile.is_some() && command != "solve" {
             return Err(Said::new(codes::CLI_OPTION_WRONG_COMMAND, "--profile is an option of solve"));
         }
@@ -166,28 +186,7 @@ fn solver_options(e: String) -> Said {
 fn configured(args: &Args) -> Result<SolverOptions, Said> {
     let mut options = SolverOptions::default();
     for (legacy, text) in &args.solver.configs {
-        let named_syntax = !text.contains(';')
-            && rnl_runtime::solver_settings::parse_overrides(text).is_ok_and(|settings| {
-                settings.len() > 1
-                    || settings.iter().any(|s| {
-                        matches!(
-                            s.key.as_str(),
-                            "limit"
-                                | "work"
-                                | "seconds"
-                                | "safety_seconds"
-                                | "candidates"
-                                | "astar_expansions"
-                                | "junction"
-                                | "layout"
-                        ) || matches!(
-                            s.value,
-                            rnl_runtime::interp::obj::Lit::Str(_)
-                                | rnl_runtime::interp::obj::Lit::Bool(_)
-                                | rnl_runtime::interp::obj::Lit::Arr(_)
-                        )
-                    })
-            });
+        let named_syntax = rnl_cli::solve::named_syntax(text);
         options = if *legacy && !named_syntax { options.with_legacy_config(text) } else { options.with_config(text) }
             .map_err(solver_options)?;
         options.settings.legacy_alias |= *legacy;
@@ -318,7 +317,46 @@ pub(crate) fn preview(args: &Args, provider: &FsProvider) -> Result<ExitCode, Sa
 /// reads it, counted as `rnl check --no-generated` counts them (7.6), or an error of the solver, a
 /// fact that contradicts itself (the draft 0.3, 8.5; 7.6); with 2 when a file cannot be read or
 /// written.
+/// `rnl solve --check`: the solver's settings of each level of FILE, or of the command line alone,
+/// with where each comes from; nothing solved or written. Exits with 1 when a level has an error.
+fn check(args: &Args, provider: &FsProvider) -> Result<ExitCode, Said> {
+    use rnl_cli::solve::ToolSettings;
+    let tool: Vec<_> = args
+        .solver
+        .configs
+        .iter()
+        .map(|(old, text)| if *old { ToolSettings::Options(text.clone()) } else { ToolSettings::Config(text.clone()) })
+        .collect();
+    let options = SolveOptions {
+        dialect: args.dialect.clone(),
+        formats: args.formats.clone(),
+        std: args.std,
+        include_std: args.include_std,
+        level: args.level.clone(),
+        ..SolveOptions::default()
+    };
+    let file = (!args.file.as_os_str().is_empty()).then_some(args.file.as_path());
+    let checked = rnl_cli::solve::check_settings(file, provider, &options, &tool).map_err(|e| {
+        if e.starts_with("no drawing level is titled") {
+            Said::new(codes::SOLVE_NO_LEVEL_TITLED, e)
+        } else {
+            Said::from(e)
+        }
+    })?;
+    if args.json {
+        println!("{}", serde_json::to_string_pretty(&checked).unwrap());
+    } else {
+        for line in rnl_cli::solve::check_lines(&checked) {
+            println!("{line}");
+        }
+    }
+    Ok(if checked.ok { ExitCode::SUCCESS } else { ExitCode::from(1) })
+}
+
 pub(crate) fn solve(args: &Args, provider: &FsProvider) -> Result<ExitCode, Said> {
+    if args.solver.check {
+        return check(args, provider);
+    }
     if !args.solver.progress_json {
         return solve_with(args, provider).map(|(code, _, _)| code);
     }

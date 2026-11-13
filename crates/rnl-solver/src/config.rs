@@ -113,32 +113,112 @@ fn apply(o: &mut SolverOptions, s: &SolverSetting) -> Result<(), String> {
     o.validate()
 }
 
-fn apply_tool(o: &mut SolverOptions, settings: &[SolverSetting]) -> Result<(), String> {
-    for s in settings {
-        if known(&s.key) {
-            apply(o, s)?;
+/// A problem with a setting, or with the settings together when `key` is None.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SettingProblem {
+    pub key: Option<String>,
+    pub message: String,
+}
+
+impl SettingProblem {
+    fn new(key: Option<&str>, message: impl Into<String>) -> SettingProblem {
+        SettingProblem { key: key.map(str::to_string), message: message.into() }
+    }
+}
+
+/// Where an effective setting comes from (14.10).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SettingFrom {
+    /// The solver's default ([`SolverOptions::defaults_config`]).
+    Default,
+    /// The level's own settings, [`LevelProblem::solver_config`], by index: from a package, the
+    /// file's header or the level, as the runtime merged them.
+    File(usize),
+    /// The tool: a command line, or a viewer.
+    Tool,
+}
+
+/// The settings a solve of a level takes, and what is wrong with them
+/// ([`SolverOptions::check_settings`]).
+#[derive(Clone, Debug, PartialEq)]
+pub struct SettingsCheck {
+    /// Each setting in effect, by key: its value, and where it comes from.
+    pub values: BTreeMap<String, (Lit, SettingFrom)>,
+    /// What a solve ignores, saying so: a bad value or a run setting in the file, an unknown key.
+    pub warnings: Vec<SettingProblem>,
+    /// What a solve refuses: the tool's bad values. A solve with them does not start.
+    pub errors: Vec<SettingProblem>,
+}
+
+/// Every problem of the tool's settings, each with its key, rather than the first: the settings
+/// without one are applied to `o` in order, and the run limit is made of limit, work and seconds
+/// together when none of them has one.
+fn tool_problems(o: &mut SolverOptions, settings: &[SolverSetting]) -> Vec<SettingProblem> {
+    let mut out = Vec::new();
+    for s in settings.iter().filter(|s| known(&s.key)) {
+        let mut next = o.clone();
+        match apply(&mut next, s) {
+            Ok(()) => *o = next,
+            Err(e) => out.push(SettingProblem::new(Some(&s.key), e)),
         }
     }
     let find = |key: &str| settings.iter().find(|s| s.key == key);
-    let seconds = find("seconds").map(number).transpose()?;
-    if seconds.is_some_and(|s| s < 0.0) {
-        return Err("seconds must not be negative".into());
+    let mut value = |key: &'static str, check: &dyn Fn(&SolverSetting) -> Result<(), String>| {
+        let problem = find(key).map(check).and_then(Result::err);
+        out.extend(problem.map(|e| SettingProblem::new(Some(key), e)));
+    };
+    value("seconds", &|s| match number(s)? {
+        n if n < 0.0 => Err("seconds must not be negative".into()),
+        _ => Ok(()),
+    });
+    value("work", &|s| count(s, u64::MAX).map(drop));
+    value("limit", &|s| match string(s)? {
+        "time" | "seed" | "work" => Ok(()),
+        _ => Err("limit must be \"time\", \"work\" or \"seed\"".into()),
+    });
+    if out.iter().any(|p| matches!(p.key.as_deref(), Some("seconds" | "work" | "limit"))) {
+        return out;
     }
-    let work = find("work").map(|s| count(s, u64::MAX)).transpose()?;
-    let mode = find("limit").map(string).transpose()?;
-    o.run_limit = match mode {
+    // each of them is now a value of its kind, or not given
+    let seconds = find("seconds").and_then(|s| number(s).ok());
+    let work = find("work").and_then(|s| count(s, u64::MAX).ok());
+    let limit = match find("limit").and_then(|s| string(s).ok()) {
         Some("time") => Some(RunLimit::Time(seconds.unwrap_or(10.0))),
         Some("seed") => Some(RunLimit::Seed),
-        Some("work") => Some(RunLimit::Work(work.ok_or("limit=\"work\" requires work=COUNT")?)),
-        Some(_) => return Err("limit must be \"time\", \"work\" or \"seed\"".into()),
-        None if seconds.is_some() && work.is_some() => {
-            return Err("give limit when both seconds and work are supplied".into())
-        }
-        None if seconds.is_some() => Some(RunLimit::Time(seconds.unwrap())),
-        None if work.is_some() => Some(RunLimit::Work(work.unwrap())),
-        None => o.run_limit,
+        Some(_) => match work {
+            Some(work) => Some(RunLimit::Work(work)),
+            None => {
+                out.push(SettingProblem::new(Some("limit"), "limit=\"work\" requires work=COUNT"));
+                return out;
+            }
+        },
+        None => match (seconds, work) {
+            (Some(_), Some(_)) => {
+                out.push(SettingProblem::new(None, "give limit when both seconds and work are supplied"));
+                return out;
+            }
+            (Some(seconds), None) => Some(RunLimit::Time(seconds)),
+            (None, Some(work)) => Some(RunLimit::Work(work)),
+            (None, None) => o.run_limit,
+        },
     };
-    o.validate()
+    o.run_limit = limit;
+    for (key, message) in o.problems() {
+        if !out.iter().any(|p| p.message == message) {
+            out.push(SettingProblem::new(Some(key), message));
+        }
+    }
+    out
+}
+
+/// The tool's settings applied to `o`, or the problems of all of them, joined.
+fn apply_tool(o: &mut SolverOptions, settings: &[SolverSetting]) -> Result<(), String> {
+    let problems = tool_problems(o, settings);
+    if problems.is_empty() {
+        Ok(())
+    } else {
+        Err(problems.into_iter().map(|p| p.message).collect::<Vec<_>>().join("; "))
+    }
 }
 
 impl SolverOptions {
@@ -196,6 +276,105 @@ impl SolverOptions {
         Ok(out)
     }
 
+    /// The settings of an old `--solver-options` text, key=value;…, as the named settings it
+    /// stands for, with the problem of each item that is wrong, by its key, rather than the first.
+    pub fn legacy_settings(text: &str) -> (Vec<SolverSetting>, Vec<SettingProblem>) {
+        let mut values = BTreeMap::new();
+        let mut problems = Vec::new();
+        for item in text.split(';').filter(|s| !s.trim().is_empty()) {
+            match Self::default().with_legacy_config(item) {
+                Ok(o) => values.extend(o.settings.overrides.into_iter().map(|s| (s.key.clone(), s))),
+                Err(message) => {
+                    let key = item.split_once('=').map(|(key, _)| key.trim());
+                    problems.push(SettingProblem::new(key, message));
+                }
+            }
+        }
+        (values.into_values().collect(), problems)
+    }
+
+    /// What a solve of `problem` would take, key by key, with where each setting comes from, and
+    /// what is wrong (14.10): the solver's defaults, then the level's settings as the runtime merged
+    /// them (packages, the file's header, the level), then the tool's, `tool`, merged by key, each
+    /// with whether it comes from an old `--solver-options` text. Without a problem, the tool's
+    /// over the defaults. As in a solve, a bad value of the file is a warning and is ignored, and a
+    /// bad value of the tool is an error; a level before 0.4 reads no SOLVER-CONFIG, and of the
+    /// tool only the old `--solver-options`.
+    pub fn check_settings(tool: &[(SolverSetting, bool)], problem: Option<&LevelProblem>) -> SettingsCheck {
+        let defaults = rnl_runtime::solver_settings::parse_overrides(&Self::defaults_config()).unwrap_or_default();
+        let mut values: BTreeMap<_, _> =
+            defaults.into_iter().map(|s| (s.key, (s.value, SettingFrom::Default))).collect();
+        let mut warnings = Vec::new();
+        if tool.iter().any(|(_, old)| *old) {
+            warnings.push(SettingProblem::new(
+                None,
+                "--solver-options is deprecated; use --solver-config with RNL named parameters",
+            ));
+        }
+        let modern = problem.is_none_or(|p| p.version == "0.4");
+        let mut read = Vec::new();
+        for (s, old) in tool {
+            if modern || *old {
+                read.push(s.clone());
+            } else {
+                let message = format!("a level before 0.4 reads no --solver-config; {} is ignored", s.key);
+                warnings.push(SettingProblem::new(Some(&s.key), message));
+            }
+        }
+        let mut o = Self::default();
+        if let Some(p) = problem.filter(|_| modern) {
+            for (k, s) in p.solver_config.iter().enumerate() {
+                if is_run_setting(&s.key) {
+                    let message = format!("{} is a tool-only run setting and is ignored in the file", s.key);
+                    warnings.push(SettingProblem::new(Some(&s.key), message));
+                    continue;
+                }
+                if read.iter().any(|t| t.key == s.key) {
+                    continue;
+                }
+                let mut next = o.clone();
+                match apply(&mut next, s) {
+                    Ok(()) => {
+                        o = next;
+                        values.insert(s.key.clone(), (s.value.clone(), SettingFrom::File(k)));
+                    }
+                    Err(e) => warnings.push(SettingProblem::new(Some(&s.key), format!("{e}; ignored"))),
+                }
+            }
+        }
+        let errors = tool_problems(&mut o, &read);
+        for s in &read {
+            if !known(&s.key) {
+                warnings.push(SettingProblem::new(Some(&s.key), format!("unknown solver setting {}; ignored", s.key)));
+            } else if !errors.iter().any(|e| e.key.as_deref() == Some(s.key.as_str())) {
+                values.insert(s.key.clone(), (s.value.clone(), SettingFrom::Tool));
+            }
+        }
+        // the run limit as the tool's limit, work and seconds make it, together
+        let run = ["limit", "work", "seconds"];
+        if errors.iter().all(|e| e.key.as_deref().is_none_or(|k| !run.contains(&k)))
+            && read.iter().any(|s| run.contains(&s.key.as_str()))
+        {
+            let limit = |mode: &str| Lit::Str(rnl_runtime::interp::obj::WStr::new(mode, None));
+            let (mode, unused) = match o.run_limit {
+                Some(RunLimit::Work(_)) => ("work", "seconds"),
+                Some(RunLimit::Seed) => ("seed", "seconds"),
+                _ => ("time", "work"),
+            };
+            values.insert("limit".into(), (limit(mode), SettingFrom::Tool));
+            if values.get(unused).is_some_and(|(_, from)| *from == SettingFrom::Default) {
+                values.remove(unused);
+            }
+        }
+        if modern && o.settings.spacing != [0, 0] {
+            warnings.push(SettingProblem::new(
+                None,
+                "spacing_x and spacing_y are retained for line layout; row and tree layouts keep their fixed gaps",
+            ));
+        }
+        SettingsCheck { values, warnings, errors }
+    }
+
     /// Materialize effective settings. Bad file values warn and keep the previous/default value.
     pub fn for_problem(&self, p: &LevelProblem) -> (Self, Vec<String>) {
         let mut out = self.clone();
@@ -248,6 +427,37 @@ impl SolverOptions {
 mod tests {
     use super::*;
     use crate::resolve::tests::problem_of;
+
+    #[test]
+    fn every_problem_of_the_tool_settings_is_found_not_only_the_first() {
+        let d = SolverOptions::default();
+        // one problem reads as before; several are joined, in the order of the keys
+        assert_eq!(d.with_config("beam=0").unwrap_err(), "the beam must be at least 1");
+        assert_eq!(
+            d.with_config("spacing_x=21, beam=0").unwrap_err(),
+            "the beam must be at least 1; spacing_x must be an integer from -1 to 20"
+        );
+        let tool: Vec<_> =
+            rnl_runtime::solver_settings::parse_overrides("beam=0, grid=0, work=-1, limit=\"time\", tolerance=0.5")
+                .unwrap()
+                .into_iter()
+                .map(|s| (s, false))
+                .collect();
+        let check = SolverOptions::check_settings(&tool, None);
+        let keys: Vec<_> = check.errors.iter().map(|e| e.key.as_deref().unwrap()).collect();
+        assert_eq!(keys, ["beam", "grid", "work"]);
+        // the good ones are in effect, from the tool; the bad ones are not
+        assert_eq!(check.values["tolerance"], (Lit::Num(0.5), SettingFrom::Tool));
+        assert_eq!(check.values["beam"].1, SettingFrom::Default);
+    }
+
+    #[test]
+    fn validate_gives_the_first_of_the_problems() {
+        let o = SolverOptions { beam: 0, tolerance: -1.0, ..Default::default() };
+        let keys: Vec<_> = o.problems().into_iter().map(|(key, _)| key).collect();
+        assert_eq!(keys, ["tolerance", "beam"]);
+        assert_eq!(o.validate().unwrap_err(), "the tolerance must be a number not below 0, not -1");
+    }
 
     #[test]
     fn explicit_tools_override_files_without_default_values_masking_them() {

@@ -152,6 +152,7 @@ mod slots;
 mod snapshot_params;
 mod solution;
 mod solve;
+mod solve_check04;
 mod solver;
 mod solver_budget04;
 mod solver_config04;

@@ -90,6 +90,21 @@ digest, while the input digest retains the original file settings. A saved resul
 remains solved when reopened without the command-line overrides. `JunctionConfig.effective()`
 selects the resolved tool value for writing; its base definition still identifies the file.
 
+A key is merged before its value is checked: a later value takes the place of an earlier
+one, and when the later one is invalid, the solver warns and takes the default, not the
+earlier value. A level's `grid="x"` over a package's `grid=2` therefore gives `grid=1`.
+
+`rnl solve FILE --check` checks the settings without solving or writing anything. For each
+level it prints every setting in effect and where it comes from (`default`,
+`package:NAME`, `header`, `level`, `command-line`), then the warnings and the errors. Without
+FILE, it checks the command line's settings alone. It reports every problem, not only the
+first, each with its key. `--json` prints
+`{"ok", "levels": [{"title", "settings": {KEY: {"value", "from"}}, "warnings": [{"key", "message"}], "errors": [...]}]}`;
+without FILE, `levels` has one entry whose `title` is `null`, and a problem that is not about
+one key has the `key` `null`. It exits with 1 when a level has an error, and with 2 when the
+command line itself is wrong. `rnl_cli::solve::check_settings` gives the same result to a
+viewer.
+
 ## Work units and checks
 
 Weights are integers, multiplied by at least one input unit per checkpoint:

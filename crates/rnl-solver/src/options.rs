@@ -506,42 +506,56 @@ impl SolverOptions {
     }
 
     /// Whether the options make sense: a tolerance not below 0, a grid above 0, objectives that
-    /// [`Objectives::validate`] accepts, a beam of at least 1, a time limit not below 0.
+    /// [`Objectives::validate`] accepts, a beam of at least 1, a time limit not below 0. The first
+    /// of [`SolverOptions::problems`].
     pub fn validate(&self) -> Result<(), String> {
-        if self.settings.spacing.iter().any(|n| !(-1..=20).contains(n)) {
-            return Err("spacing must be between -1 and 20".into());
+        match self.problems().into_iter().next() {
+            Some((_, message)) => Err(message),
+            None => Ok(()),
         }
-        for seconds in [
-            self.safety_seconds,
-            match self.run_limit {
-                Some(crate::RunLimit::Time(s)) => Some(s),
-                _ => None,
-            },
-        ]
-        .into_iter()
-        .flatten()
-        {
-            if !seconds.is_finite() || seconds < 0.0 {
-                return Err("seconds must be finite and nonnegative".into());
+    }
+
+    /// Every way the options do not make sense, each with the setting it is about, in the order
+    /// [`SolverOptions::validate`] checks them.
+    pub fn problems(&self) -> Vec<(&'static str, String)> {
+        let mut out = Vec::new();
+        for (key, n) in ["spacing_x", "spacing_y"].into_iter().zip(self.settings.spacing) {
+            if !(-1..=20).contains(&n) {
+                out.push((key, "spacing must be between -1 and 20".into()));
+            }
+        }
+        let run_seconds = match self.run_limit {
+            Some(crate::RunLimit::Time(s)) => Some(s),
+            _ => None,
+        };
+        for (key, seconds) in [("safety_seconds", self.safety_seconds), ("seconds", run_seconds)] {
+            if seconds.is_some_and(|s| !s.is_finite() || s < 0.0) {
+                out.push((key, "seconds must be finite and nonnegative".into()));
             }
         }
         if !(self.tolerance.is_finite() && self.tolerance >= 0.0) {
-            return Err(format!("the tolerance must be a number not below 0, not {}", self.tolerance));
+            out.push(("tolerance", format!("the tolerance must be a number not below 0, not {}", self.tolerance)));
         }
         if let Some(grid) = self.grid {
             if !(grid.is_finite() && grid > 0.0) {
-                return Err(format!("the grid must be a number above 0, not {grid}"));
+                out.push(("grid", format!("the grid must be a number above 0, not {grid}")));
             }
         }
         if let Some(limit) = self.time_limit {
             if !(limit.is_finite() && limit >= 0.0) {
-                return Err(format!("the time limit must be a number of seconds not below 0, or none, not {limit}"));
+                out.push((
+                    "time_limit",
+                    format!("the time limit must be a number of seconds not below 0, or none, not {limit}"),
+                ));
             }
         }
         if self.beam == 0 {
-            return Err("the beam must be at least 1".to_string());
+            out.push(("beam", "the beam must be at least 1".to_string()));
         }
-        self.objectives.validate()
+        if let Err(message) = self.objectives.validate() {
+            out.push(("objectives", message));
+        }
+        out
     }
 }
 

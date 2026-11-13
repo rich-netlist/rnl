@@ -407,7 +407,7 @@ fn parse_args() -> Result<Args, Said> {
             "--in-place" => &["solve", "upgrade", "replace-records"],
             "--solver-options" | "--solver-config" => &["problem", "solve", "preview"],
             "--progress=json" => &["solve", "preview"],
-            "--progress" | "--external-solver" | "--external-arg" | "--external-timeout" => &["solve"],
+            "--progress" | "--check" | "--external-solver" | "--external-arg" | "--external-timeout" => &["solve"],
             "--previous" | "--solver-input" => &["problem"],
             "--png" | "--scale" => &["render"],
             "--primitives" | "--no-svg" | "--status" => &["view", "snapshot"],
@@ -442,7 +442,14 @@ fn parse_args() -> Result<Args, Said> {
         return Err(needs("upgrade takes exactly one input FILE"));
     }
     let file = positional.pop().map(PathBuf::from);
-    if json && command != "explain" {
+    if solver.check && out.is_some() {
+        let text = "solve --check solves and writes nothing, so it takes no -o";
+        return Err(Said::new(codes::CLI_OPTION_WRONG_COMMAND, text));
+    }
+    if json && command == "solve" && !solver.check {
+        return Err(Said::new(codes::CLI_OPTION_WRONG_COMMAND, "--json is an option of solve only with --check"));
+    }
+    if json && !matches!(command.as_str(), "explain" | "solve") {
         return Err(Said::new(codes::CLI_OPTION_WRONG_COMMAND, "--json is an option of explain"));
     }
     if constraints && command != "view" {
@@ -472,6 +479,8 @@ fn parse_args() -> Result<Args, Said> {
     // the catalog reads the package directories and the bundled packages, not a file
     let file = match (command.as_str(), file) {
         ("catalog" | "formats" | "solver-defaults", None) => PathBuf::new(),
+        // solve --check without FILE checks the command line's settings alone
+        ("solve", None) if solver.check => PathBuf::new(),
         (c @ ("catalog" | "formats" | "solver-defaults"), Some(f)) => {
             let text = format!("rnl {c} takes no FILE, not {}\n{USAGE}", f.display());
             return Err(Said::new(codes::CLI_COMMAND_TAKES_NO_FILE, text));
