@@ -34,13 +34,35 @@ fn slot(slot: &Slot) -> String {
     }
 }
 
-/// The place in its symbol of the pin that a terminal is, by the object's written id and the
-/// terminal, as far as the level's own references say (a `Pin` names its terminal; a `SymbolPin`
-/// that is written `#M::s` names `s`).
-type Pins = BTreeMap<(String, String), usize>;
+/// What says which terminal a pin is. The terminal that the netlist numbers (`#M1:3`) is the same in
+/// both versions, where a pin's place in the symbol is not (a symbol may order its pins otherwise
+/// from one version to the next), so pins are compared by terminal.
+#[derive(Default, Clone)]
+struct Pins {
+    /// The pin of an object that a terminal written by name is, from the level's own references
+    /// (a `Pin` names its terminal; a `SymbolPin` written `#M::s` names `s`).
+    by_name: BTreeMap<(String, String), usize>,
+    /// The terminal that a pin of an object is, by the object's written id and the pin's place,
+    /// from the pins of the object in the model (`#M1:3` is the number `3`).
+    number: BTreeMap<(String, usize), String>,
+}
 
-fn pins(problem: &LevelProblem) -> Pins {
-    let mut out = Pins::new();
+fn pins(read: &Interpretation, problem: &LevelProblem) -> Pins {
+    let mut out = Pins::default();
+    for level in read.model.levels.iter().filter(|l| l.title == problem.title) {
+        for object in level.objects.iter().filter(|o| !o.id.starts_with('@')) {
+            for (index, pin) in object.pins.iter().enumerate() {
+                let terminal = pin.terminals.iter().find_map(|t| match t.rsplit_once(':') {
+                    Some((owner, number)) => (owner == object.id).then(|| number.to_string()),
+                    None => Some(t.clone()),
+                });
+                if let Some(terminal) = terminal {
+                    out.number.insert((object.id.clone(), index), terminal);
+                }
+            }
+        }
+    }
+    let mut numbers = Vec::new();
     let mut visit = |p: &PointRef| {
         let (object, pin, terminal) = match p {
             PointRef::Pin { object, pin, terminal } => (*object, *pin, terminal.clone()),
@@ -53,7 +75,12 @@ fn pins(problem: &LevelProblem) -> Pins {
             _ => return,
         };
         if let Some(id) = problem.ids.objects.get(object).filter(|id| !id.starts_with('@')) {
-            out.insert((id.clone(), terminal), pin);
+
+            // A terminal that a reference gives by its number is the netlist's own.
+            if matches!(p, PointRef::Pin { .. }) && terminal.chars().all(|c| c.is_ascii_digit()) {
+                numbers.push(((id.clone(), pin), terminal.clone()));
+            }
+            out.by_name.insert((id.clone(), terminal), pin);
         }
     };
     for net in &problem.nets {
@@ -62,15 +89,57 @@ fn pins(problem: &LevelProblem) -> Pins {
     for wire in &problem.wires {
         wire.anchors.iter().for_each(&mut visit);
     }
+    for (key, terminal) in numbers {
+        out.number.entry(key).or_insert(terminal);
+    }
     out
+}
+
+/// The identities of the objects of a problem, by index, with the terminal of each of their pins.
+struct Names {
+    names: Vec<String>,
+    terminal: BTreeMap<(usize, usize), String>,
+}
+
+impl std::ops::Deref for Names {
+    type Target = [String];
+    fn deref(&self) -> &[String] {
+        &self.names
+    }
+}
+
+impl Names {
+    /// A pin as the terminal it is; by its place in the symbol only when no terminal is known.
+    fn pin(&self, object: usize, pin: usize) -> String {
+        match self.terminal.get(&(object, pin)) {
+            Some(t) => format!("t{t}"),
+            None => format!("pin{pin}"),
+        }
+    }
+}
+
+fn identities(read: &Interpretation, problem: &LevelProblem) -> Names {
+    let pins = pins(read, problem);
+    // A pin of a point is the terminal that the level's own references name (a `Pin` its terminal,
+    // a `SymbolPin` written `#M::s` its `s`), the same in both versions where the pin's place in the
+    // symbol is not.
+    let terminal = pins
+        .by_name
+        .iter()
+        .filter_map(|((id, name), pin)| {
+            let index = problem.ids.objects.iter().position(|o| o == id)?;
+            // The roles of a usage are the package's and may be renamed with it; its pins stay by place.
+            (problem.objects[index].kind == ObjectKind::Instance).then(|| ((index, *pin), name.clone()))
+        })
+        .collect();
+    Names { names: names(problem, &pins), terminal }
 }
 
 /// The identities of the objects of a problem, by index. An object with a name has its id; one
 /// without (the id is where it was written, which an upgrade moves) is what it is, with its place
 /// among the like ones. Objects that a rule made and ones that were written are counted apart, so
 /// a rule's object does not shift the number of a written one.
-fn names(problem: &LevelProblem) -> Vec<String> {
-    let pins = pins(problem);
+fn names(problem: &LevelProblem, pins: &Pins) -> Vec<String> {
     let mut seen: BTreeMap<String, usize> = BTreeMap::new();
     problem
         .objects
@@ -78,7 +147,7 @@ fn names(problem: &LevelProblem) -> Vec<String> {
         .enumerate()
         .map(|(index, object)| {
             if let Some(id) = problem.ids.objects.get(index).filter(|id| !id.starts_with('@')) {
-                return terminals(id, &pins);
+                return terminals(id, pins);
             }
             let base = format!("~{}:{}:{}", object.kind.as_str(), object.label, if object.generated { "made" } else { "" });
             let count = seen.entry(base.clone()).or_default();
@@ -88,11 +157,10 @@ fn names(problem: &LevelProblem) -> Vec<String> {
         .collect()
 }
 
-/// A pin of an object as its place in the symbol: `pin(#M1,2)`, how 0.4 writes it, as `#M1.pin2`,
-/// and `#M1:d`, how 0.3 writes the terminal, as the same when the level's own references say which
-/// pin that terminal is. The terminal's number is not the pin's place (a user symbol may order
-/// them otherwise), so a terminal that is not found stays as written, and a difference of writing
-/// is then reported.
+/// A pin of an object as its terminal: `pin(#M1,2)`, how 0.4 writes the pin of a symbol, and `#M1:d`,
+/// the terminal by its name, are `#M1:3` when the object's pins say that terminal (the number is the
+/// netlist's, the same in both versions). What cannot be resolved stays as written, and a
+/// difference of writing is then reported rather than hidden.
 fn terminals(text: &str, pins: &Pins) -> String {
     let mut out = String::new();
     let mut rest = text;
@@ -102,7 +170,8 @@ fn terminals(text: &str, pins: &Pins) -> String {
         let converted = after.find(')').and_then(|end| {
             let (name, index) = after[..end].rsplit_once(',')?;
             let index: usize = index.trim().parse().ok()?;
-            Some((format!("{}.pin{index}", name.trim()), end + 1))
+            let terminal = pins.number.get(&(name.trim().to_string(), index))?;
+            Some((format!("{}:{terminal}", name.trim()), end + 1))
         });
         match converted {
             Some((text, used)) => {
@@ -133,8 +202,12 @@ fn terminals(text: &str, pins: &Pins) -> String {
                 }
                 let name: String = chars[i..j].iter().collect();
                 let terminal: String = chars[j + 1..k].iter().collect();
-                if let Some(pin) = pins.get(&(name.clone(), terminal)) {
-                    result.push_str(&format!("{name}.pin{pin}"));
+                let number = pins
+                    .by_name
+                    .get(&(name.clone(), terminal))
+                    .and_then(|pin| pins.number.get(&(name.clone(), *pin)));
+                if let Some(number) = number {
+                    result.push_str(&format!("{name}:{number}"));
                     i = k;
                     continue;
                 }
@@ -146,28 +219,28 @@ fn terminals(text: &str, pins: &Pins) -> String {
     result
 }
 
-fn point(names: &[String], p: &PointRef) -> String {
+fn point(names: &Names, p: &PointRef) -> String {
     let name = |k: &usize| names.get(*k).map_or_else(|| format!("object {k}"), |n| mark(n));
     match p {
         PointRef::Origin(k) => name(k),
         PointRef::Pin { object, pin, .. } | PointRef::SymbolPin { object, pin, .. } => {
-            format!("{}.pin{pin}", name(object))
+            format!("{}.{}", name(object), names.pin(*object, *pin))
         }
-        PointRef::PinPosition { object, pin, .. } => format!("{}.at{pin}", name(object)),
+        PointRef::PinPosition { object, pin, .. } => format!("{}.at{}", name(object), names.pin(*object, *pin)),
         PointRef::Centre(points) => {
             format!("centre({})", points.iter().map(|q| point(names, q)).collect::<Vec<_>>().join(","))
         }
     }
 }
 
-fn points(names: &[String], list: &[PointRef]) -> String {
+fn points(names: &Names, list: &[PointRef]) -> String {
     list.iter().map(|p| point(names, p)).collect::<Vec<_>>().join(",")
 }
 
 /// The facts that a fact says. A DISTANCE between sets with a direction and a lower bound only
 /// (nonnegative) is the same as one between every pair of their points (14.5): 0.3 reads it as
 /// the one fact over the extents, 0.4 as the pairs, so both are the pairs.
-fn facts(names: &[String], kind: &FactKind) -> Vec<String> {
+fn facts(names: &Names, kind: &FactKind) -> Vec<String> {
     if let FactKind::Distance { axis, sense, min, max: None, from, to } = kind {
         let plain = |list: &[PointRef]| !list.iter().any(|p| matches!(p, PointRef::Centre(_)));
         if *sense != Sense::Either
@@ -197,9 +270,9 @@ fn facts(names: &[String], kind: &FactKind) -> Vec<String> {
 }
 
 /// The fact as it says, with identities in place of indexes and without its rank.
-fn fact(names: &[String], kind: &FactKind) -> String {
+fn fact(names: &Names, kind: &FactKind) -> String {
     let n = |k: &usize| names.get(*k).map_or_else(|| format!("object {k}"), |n| mark(n));
-    let pin = |d: &rnl_runtime::problem::DirectedPin| format!("{}.pin{}@{}", n(&d.object), d.pin, d.direction);
+    let pin = |d: &rnl_runtime::problem::DirectedPin| format!("{}.{}@{}", n(&d.object), names.pin(d.object, d.pin), d.direction);
     match canonical(kind) {
         FactKind::Place { at, axis, value } => format!("place {} {axis:?} {}", point(names, &at), fmt_num(value)),
         FactKind::PointCoordinate { point: p, axis, value } => format!("point {} {axis:?} {}", n(&p), fmt_num(value)),
@@ -263,7 +336,7 @@ fn canonical(kind: &FactKind) -> FactKind {
     kind
 }
 
-fn position(names: &[String], position: &Position) -> Value {
+fn position(names: &Names, position: &Position) -> Value {
     let n = |k: &usize| names.get(*k).map_or_else(|| format!("object {k}"), |n| mark(n));
     match position {
         Position::InSymbol { owner, local, replaced: None } => {
@@ -381,12 +454,12 @@ fn defaults(before: &Interpretation, after: &Interpretation) -> BTreeMap<String,
     let old: BTreeMap<_, (BTreeSet<_>, BTreeSet<_>)> = before
         .problems
         .iter()
-        .map(|p| (p.title.clone(), (names(p).into_iter().collect(), p.ids.usages.iter().cloned().collect())))
+        .map(|p| (p.title.clone(), (names(p, &pins(before, p)).into_iter().collect(), p.ids.usages.iter().cloned().collect())))
         .collect();
     let mut out = BTreeMap::new();
     for problem in &after.problems {
         let (known, usages) = old.get(&problem.title).cloned().unwrap_or_default();
-        let set: BTreeSet<String> = names(problem)
+        let set: BTreeSet<String> = names(problem, &pins(after, problem))
             .into_iter()
             .zip(&problem.objects)
             .filter(|(name, object)| {
@@ -405,18 +478,28 @@ fn defaults(before: &Interpretation, after: &Interpretation) -> BTreeMap<String,
         for problem in &read.problems {
             out.entry(problem.title.clone())
                 .or_default()
-                .extend(names(problem).into_iter().zip(&problem.objects).filter(|(_, o)| o.generated).map(|(n, _)| n));
+                .extend(names(problem, &pins(read, problem)).into_iter().zip(&problem.objects).filter(|(_, o)| o.generated).map(|(n, _)| n));
         }
     }
     out
 }
 
-/// The identities of the named usages whose definition the upgrade changed, per level title: a
-/// conversion rule turned them into another usage on purpose (`$IO_PORT` into `$NET_LABEL`, which
-/// has no pin and no `name` key; a legacy name into its new one). The comparison does not know the
-/// names of definitions, so it takes any definition that differs between the readings. What changes
-/// with them (their texts, the ROUTEs and wires that went to their pin) is the rule's doing, which
-/// the report names in the changes of the file; it goes to `rule_changes`, still listed.
+/// Whether the upgrade's own tables explain a definition becoming another: a rename of the legacy
+/// tables, or a conversion of an approximate rule. Any other change of definition is not the
+/// upgrade's doing on purpose.
+fn explained(old: &str, new: &str) -> bool {
+    let (old, new) = (old.trim_start_matches('$'), new.trim_start_matches('$'));
+    [super::legacy::renamed(old), super::legacy::renamed_03_definition(old), super::legacy::renamed_03_symbol(old)]
+        .contains(&Some(new))
+        || super::approximate::CONVERSIONS.iter().any(|(from, to)| *from == old && *to == new)
+}
+
+/// The identities of the named usages whose definition the upgrade changed on purpose, per level
+/// title: a legacy rename, or a conversion of an approximate rule (`$IO_PORT` into `$NET_LABEL`,
+/// which has no pin and no `name` key). What changes with them (their texts, the ROUTEs and wires
+/// that went to their pin) is the rule's doing, which the report names in the changes of the file;
+/// it goes to `rule_changes`, still listed. A change of definition the tables do not explain is a
+/// difference.
 fn converted(before: &Interpretation, after: &Interpretation) -> BTreeMap<String, BTreeSet<String>> {
     let definitions = |read: &Interpretation, title: &str| -> BTreeMap<String, String> {
         read.model
@@ -433,7 +516,7 @@ fn converted(before: &Interpretation, after: &Interpretation) -> BTreeMap<String
         let set = new
             .into_iter()
             .filter(|(id, definition)| {
-                !id.starts_with('@') && old.get(id).is_some_and(|d| d != definition)
+                !id.starts_with('@') && old.get(id).is_some_and(|d| d != definition && explained(d, definition))
             })
             .map(|(id, _)| id)
             .collect();
@@ -478,22 +561,7 @@ fn mentions(defaults: &BTreeSet<String>, text: &str) -> bool {
 
 fn snapshot(read: &Interpretation, added: &BTreeMap<String, BTreeSet<String>>) -> Items {
     let mut out = Items { items: BTreeMap::new(), seen: BTreeMap::new() };
-    let mut pinmaps: BTreeMap<String, Pins> = read.problems.iter().map(|p| (p.title.clone(), pins(p))).collect();
-    // An instance's pins also say their terminals, by number (`#M1:3`).
-    for level in &read.model.levels {
-        let map = pinmaps.entry(level.title.clone()).or_default();
-        for object in level.objects.iter().filter(|o| !o.id.starts_with('@')) {
-            for (index, pin) in object.pins.iter().enumerate() {
-                for terminal in &pin.terminals {
-                    if let Some((owner, number)) = terminal.rsplit_once(':') {
-                        if owner == object.id {
-                            map.insert((owner.to_string(), number.to_string()), index);
-                        }
-                    }
-                }
-            }
-        }
-    }
+    let pinmaps: BTreeMap<String, Pins> = read.problems.iter().map(|p| (p.title.clone(), pins(read, p))).collect();
     for level in &read.doc.levels {
         if !level.circuit {
             continue;
@@ -586,7 +654,7 @@ fn snapshot(read: &Interpretation, added: &BTreeMap<String, BTreeSet<String>>) -
     for problem in &read.problems {
         let file = &read.doc.levels[problem.level].path;
         let title = &problem.title;
-        let names = names(problem);
+        let names = identities(read, problem);
         let none = BTreeSet::new();
         let default = added.get(title).unwrap_or(&none);
         let mut put = |category: &str, key: &str, value: Value| out.put(file, title, category, key, value);
@@ -768,4 +836,40 @@ pub(super) fn discarded(full: &Interpretation, authored: &Interpretation) -> Vec
             })
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn pins_of() -> Pins {
+        // A symbol whose first pin is the netlist's terminal 2 (named `d`), the second terminal 1.
+        let mut pins = Pins::default();
+        pins.by_name.insert(("#M1".into(), "d".into()), 0);
+        pins.number.insert(("#M1".into(), 0), "2".into());
+        pins.number.insert(("#M1".into(), 1), "1".into());
+        pins
+    }
+
+    #[test]
+    fn a_pin_is_known_by_its_terminal_not_by_its_place_in_the_symbol() {
+        let pins = pins_of();
+        assert_eq!(terminals("pin(#M1,0)", &pins), "#M1:2");
+        assert_eq!(terminals("#M1:d", &pins), "#M1:2");
+        // The wrong pin of the same symbol is another terminal, so a mix-up shows as a difference.
+        assert_ne!(terminals("pin(#M1,1)", &pins), terminals("#M1:d", &pins));
+        // A pin that no reference says stays as written.
+        assert_eq!(terminals("pin(#M2,0)", &pins), "pin(#M2,0)");
+        assert_eq!(terminals("#M2:g", &pins), "#M2:g");
+    }
+
+    #[test]
+    fn only_definitions_the_upgrade_explains_are_conversions() {
+        assert!(explained("$IO_PORT", "$NET_LABEL"));
+        assert!(explained("$CURRENT_MIRROR", "$CURRENT_MIRROR_N"));
+        assert!(explained("$FLOW", "$SIGNAL_FLOW"));
+        assert!(!explained("$GROUND", "$SUPPLY"));
+        assert!(!explained("$FLOW", "$IO_PORT"));
+        assert!(!explained("$IO_PORT", "$NET_LABEL_N"));
+    }
 }

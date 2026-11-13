@@ -12,6 +12,17 @@ use rnl_runtime::syntax::{Arg, Member, ObjExpr, Ref, Segment, Sep, Value};
 use rnl_runtime::Interpretation;
 use std::collections::{BTreeMap, BTreeSet};
 
+/// The definitions that an approximate rule turns a usage into, as (old, new) without the `$`: the
+/// one list of them, which the comparison also reads to tell a conversion on purpose from a mistake.
+pub(super) const CONVERSIONS: &[(&str, &str)] = &[
+    ("IO_PORT", "NET_LABEL"),
+    ("IOPORT", "NET_LABEL"),
+    ("CURRENT_MIRROR", "CURRENT_MIRROR_N"),
+    ("CURRENT_MIRROR", "CURRENT_MIRROR_P"),
+    ("DIFFERENTIAL_PAIR", "DIFFERENTIAL_PAIR_N"),
+    ("DIFFERENTIAL_PAIR", "DIFFERENTIAL_PAIR_P"),
+];
+
 #[derive(Clone, PartialEq)]
 pub(super) struct Choice {
     pub direction: String,

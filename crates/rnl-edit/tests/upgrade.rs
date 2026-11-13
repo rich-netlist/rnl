@@ -334,3 +334,15 @@ fn discarded_solver_records_are_counted_apart_from_the_differences() {
     .unwrap();
     assert!(kept.report.discarded_placements.is_empty());
 }
+
+#[test]
+fn a_symbol_with_its_pins_in_another_order_than_its_terminals_is_not_a_difference() {
+    let source = "* title
+* @RNL(type=\"header\") { @VERSION(\"0.3\") }
+R1 a b 1k
+* @RNL { $S = @DEFINE-SYMBOL { (0, 0) @PIN(terminal=2); (2, 0) @PIN(terminal=1) }; #R1 @SET-SYMBOL $S }
+.end
+";
+    let result = upgraded(source);
+    assert!(result.report.differences.is_empty(), "{:?}", result.report.differences);
+}
