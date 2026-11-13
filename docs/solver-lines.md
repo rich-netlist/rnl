@@ -10,6 +10,14 @@ This synthetic example has four two-pin symbols in two groups, with three routed
 
 The engine first builds group tables, then settles groups from the inside out, routes on ordered lines, and compacts the drawing while retaining the resolved facts. It compares the completed result with the tree layout under the line-layout order, which includes pin clearance as well as crossings and bends. A preferred result can therefore have a larger area. Failed compaction or exhausted search falls back to a completed candidate. Group spacing uses the main runtime's nesting and explicit-zero rules. Final port cleanup checks the original indexed facts, including complete orientation lists.
 
+Standalone solver 0.4.8 restores the text clearance at each end of a run to one tenth of the text size. The margin follows the renderer's glyph direction through rotation, reflection and fixed rotation. The full rendered text bounds remain enclosed. This prevents a change of text layout rules from silently removing the spacing used for placement and routing; it can change line choices and the resulting drawing.
+
+This [synthetic example](text-clearance.sp) uses line layout, the seed pass and a 0.1 grid. Restoring the margin moves the right-hand column and wire slightly farther from the text.
+
+| Without run-end clearance | With run-end clearance |
+| --- | --- |
+| ![Without clearance](images/text-clearance-before.png) | ![With clearance](images/text-clearance-after.png) |
+
 An intermediate line arrangement may establish the required order before it satisfies an equality spanning several groups. Strict compaction retains such fixed bounds as mandatory constraints and solves them before accepting the candidate. Disjunctive facts still require a satisfied branch, which compaction retains. A failed or interrupted repair is rejected; completed coordinates are checked against every selected retained fact before ranking.
 
 Time and work limits cover the same sequence of positive-cost checkpoints. Standalone solver 0.4.6 gives initial tree refinement a fixed operation-cost estimate of 5,000,000,000 units. A reported coordinate pivot costs `4,754 + 157 × n` units and an A* expansion costs `114`, where `n` counts every object in the level problem; arithmetic saturates at 64 bits. Semantic objects without a drawing still contribute to the coordinate problem and are included. Adding drawing metadata to an existing object does not count it twice. Initialization contributes to the estimate but is completed under the shared budget before optional refinement can stop. The estimate is checked before trying another tree arrangement. The shared time/work budget still interrupts the interior of an arrangement, and line search uses what remains.

@@ -1854,6 +1854,44 @@ fn modern_text_solver_contains_rendered_bounds() {
 }
 
 #[test]
+fn modern_text_keeps_the_run_end_clearance_of_legacy_text() {
+    use rnl_runtime::problem::{Filler, TextInfo};
+    for size in [0.5, 1.0, 2.0] {
+        for (turn, rotate, fixed, along) in [
+            (Orient::R0, 0.0, false, 0),
+            (Orient::MY, 0.0, false, 0),
+            (Orient::R90, 0.0, false, 1),
+            (Orient::R270, 90.0, false, 0),
+            (Orient::MX, 90.0, false, 1),
+            (Orient::R90, 0.0, true, 0),
+            (Orient::R90, 90.0, true, 1),
+        ] {
+            let mut text = TextInfo {
+                attach: Filler::Other(String::new()),
+                key: None,
+                lines: rnl_runtime::markup::parse("WideW"),
+                halign: "start".into(),
+                valign: "baseline".into(),
+                rotate,
+                fix_rotate: fixed,
+                upright: true,
+                baseline_mirrors: false,
+                column_position: None,
+                style: vec![("size".into(), rnl_runtime::interp::obj::Lit::Num(size))],
+            };
+            let at = (int(2), int(3));
+            let legacy = crate::structure::text_box(&text, &at, turn).unwrap();
+            text.baseline_mirrors = true;
+            let modern = crate::structure::text_box(&text, &at, turn).unwrap();
+            assert!(
+                &modern[along + 2] - &modern[along] >= &legacy[along + 2] - &legacy[along],
+                "size={size}, turn={turn:?}, rotate={rotate}, fixed={fixed}: {legacy:?} -> {modern:?}"
+            );
+        }
+    }
+}
+
+#[test]
 fn a_text_is_as_wide_as_it_is_drawn() {
     use rnl_runtime::problem::{Filler, TextInfo};
     let text = |s: &str, halign: &str, rotate: f64| TextInfo {
