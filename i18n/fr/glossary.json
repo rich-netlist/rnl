@@ -40,6 +40,11 @@
    "kind": "rnl"
   },
   {
+   "en": "bias circuit",
+   "term": "circuit de polarisation",
+   "kind": "rnl"
+  },
+  {
    "en": "black box",
    "term": "boîte noire",
    "kind": "rnl"
@@ -303,6 +308,11 @@
    "kind": "rnl"
   },
   {
+   "en": "mirrored layout",
+   "term": "disposition symétrique",
+   "kind": "rnl"
+  },
+  {
    "en": "mirrored pair",
    "sense": "the structure, a mirrored pair",
    "term": "paire en miroir",
@@ -389,6 +399,18 @@
    "kind": "rnl"
   },
   {
+   "en": "power",
+   "sense": "electrical",
+   "term": "puissance",
+   "kind": "rnl",
+   "note": "Electrical power."
+  },
+  {
+   "en": "power flow",
+   "term": "flux de puissance",
+   "kind": "rnl"
+  },
+  {
    "en": "primitive",
    "term": "primitive",
    "kind": "rnl"
@@ -460,6 +482,11 @@
    "kind": "rnl"
   },
   {
+   "en": "signal flow",
+   "term": "flux de signal",
+   "kind": "rnl"
+  },
+  {
    "en": "skeleton line",
    "term": "ligne de squelette",
    "kind": "general",
@@ -509,6 +536,12 @@
   {
    "en": "subject",
    "term": "sujet",
+   "kind": "rnl"
+  },
+  {
+   "en": "supply",
+   "sense": "supply, rail",
+   "term": "alimentation",
    "kind": "rnl"
   },
   {

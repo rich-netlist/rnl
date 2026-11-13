@@ -63,6 +63,11 @@
    "kind": "rnl"
   },
   {
+   "en": "bias circuit",
+   "term": "Bias-Schaltung",
+   "kind": "rnl"
+  },
+  {
    "en": "block symbol",
    "term": "Blocksymbol",
    "kind": "rnl"
@@ -318,6 +323,11 @@
    "kind": "rnl"
   },
   {
+   "en": "mirrored layout",
+   "term": "symmetrisches Layout",
+   "kind": "rnl"
+  },
+  {
    "en": "mirrored pair",
    "sense": "the structure, a mirrored pair",
    "term": "gespiegeltes Paar",
@@ -401,6 +411,19 @@
    "kind": "rnl"
   },
   {
+   "en": "power",
+   "sense": "electrical",
+   "term": "Leistung",
+   "kind": "rnl",
+   "note": "Electrical power."
+  },
+  {
+   "en": "power flow",
+   "term": "Leistungsfluss",
+   "kind": "rnl",
+   "note": "Path role: Leistungspfad."
+  },
+  {
    "en": "primitive",
    "term": "Grundform",
    "kind": "rnl"
@@ -465,6 +488,12 @@
    "kind": "rnl"
   },
   {
+   "en": "signal flow",
+   "term": "Signalfluss",
+   "kind": "rnl",
+   "note": "Path role: Signalpfad."
+  },
+  {
    "en": "skeleton line",
    "term": "Skelettlinie",
    "kind": "general",
@@ -519,6 +548,12 @@
    "note": "A bus subscript; in LaTeX text Tiefstellung."
   },
   {
+   "en": "supply",
+   "sense": "supply, rail",
+   "term": "Versorgung",
+   "kind": "rnl"
+  },
+  {
    "en": "symbol",
    "term": "Symbol",
    "kind": "rnl"
@@ -526,6 +561,11 @@
   {
    "en": "taken in",
    "term": "aufgenommen",
+   "kind": "rnl"
+  },
+  {
+   "en": "tap",
+   "term": "Abzweig",
    "kind": "rnl"
   },
   {

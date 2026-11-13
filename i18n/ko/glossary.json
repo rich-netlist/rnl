@@ -53,6 +53,11 @@
    "note": "Counts and solver objectives say 꺾임 (꺾임 횟수, 꺾임 위치)."
   },
   {
+   "en": "bias circuit",
+   "term": "바이어스 회로",
+   "kind": "rnl"
+  },
+  {
    "en": "block symbol",
    "term": "블록 심볼",
    "kind": "rnl"
@@ -291,6 +296,11 @@
    "kind": "rnl"
   },
   {
+   "en": "mirrored layout",
+   "term": "대칭 배치",
+   "kind": "rnl"
+  },
+  {
    "en": "mirrored pair",
    "sense": "the structure, a mirrored pair",
    "term": "대칭쌍",
@@ -378,6 +388,19 @@
    "kind": "rnl"
   },
   {
+   "en": "power",
+   "sense": "electrical",
+   "term": "전력",
+   "kind": "rnl",
+   "note": "Electrical power."
+  },
+  {
+   "en": "power flow",
+   "term": "전력 흐름",
+   "kind": "rnl",
+   "note": "Path role: 전력 경로."
+  },
+  {
    "en": "primitive",
    "term": "도형 요소",
    "kind": "rnl"
@@ -451,6 +474,12 @@
    "kind": "rnl"
   },
   {
+   "en": "signal flow",
+   "term": "신호 흐름",
+   "kind": "rnl",
+   "note": "Path role: 신호 경로."
+  },
+  {
    "en": "skeleton line",
    "term": "골격선",
    "kind": "general",
@@ -509,18 +538,28 @@
    "kind": "rnl"
   },
   {
+   "en": "supply",
+   "sense": "supply, rail",
+   "term": "전원",
+   "kind": "rnl"
+  },
+  {
    "en": "symbol",
    "term": "심볼",
    "kind": "rnl"
   },
   {
    "en": "taken in",
-   "term": "취해짐",
-   "kind": "rnl"
+   "term": "반영됨",
+   "kind": "rnl",
+   "avoid": [
+    "채택됨"
+   ],
+   "note": "The verb 반영하며; not 채택됨, which is avoided for kept."
   },
   {
    "en": "tap",
-   "term": "분기 탭",
+   "term": "탭",
    "kind": "rnl",
    "note": "branch tap"
   },

@@ -420,6 +420,13 @@
    "kind": "rnl"
   },
   {
+   "en": "power",
+   "sense": "electrical",
+   "term": "功率",
+   "kind": "rnl",
+   "note": "Electrical power."
+  },
+  {
    "en": "power flow",
    "term": "功率流",
    "kind": "rnl",
@@ -535,8 +542,20 @@
    "kind": "rnl"
   },
   {
+   "en": "stub",
+   "term": "短桩",
+   "kind": "rnl",
+   "note": "Not 短接 or 短线."
+  },
+  {
    "en": "subject",
    "term": "主语",
+   "kind": "rnl"
+  },
+  {
+   "en": "supply",
+   "sense": "supply, rail",
+   "term": "电源",
    "kind": "rnl"
   },
   {
@@ -549,6 +568,12 @@
    "term": "采纳",
    "kind": "rnl",
    "note": "A fact tried in the order of 8.5 and found to hold with those before it; as a result it is kept (保留)."
+  },
+  {
+   "en": "tap",
+   "term": "分接",
+   "kind": "rnl",
+   "note": "A branch taken off a bus; a branch of a wire is 分叉."
   },
   {
    "en": "terminal",

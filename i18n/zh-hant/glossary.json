@@ -51,9 +51,9 @@
   },
   {
    "en": "bias circuit",
-   "term": "偏置電路",
+   "term": "偏壓電路",
    "kind": "rnl",
-   "note": "$BIAS_CIRCUIT."
+   "note": "The bias of the glossary is 偏壓."
   },
   {
    "en": "block symbol",
@@ -395,6 +395,13 @@
    "kind": "rnl"
   },
   {
+   "en": "power",
+   "sense": "electrical",
+   "term": "功率",
+   "kind": "rnl",
+   "note": "Electrical power."
+  },
+  {
    "en": "power flow",
    "term": "功率流",
    "kind": "rnl",
@@ -462,9 +469,9 @@
   },
   {
    "en": "signal flow",
-   "term": "信號流",
+   "term": "訊號流",
    "kind": "rnl",
-   "note": "$SIGNAL_FLOW."
+   "note": "The signal of the glossary is 訊號."
   },
   {
    "en": "skeleton line",
@@ -503,8 +510,20 @@
    "kind": "rnl"
   },
   {
+   "en": "stub",
+   "term": "短樁",
+   "kind": "rnl",
+   "note": "Not 短接 or 短接線."
+  },
+  {
    "en": "subject",
    "term": "主詞",
+   "kind": "rnl"
+  },
+  {
+   "en": "supply",
+   "sense": "supply, rail",
+   "term": "電源",
    "kind": "rnl"
   },
   {
