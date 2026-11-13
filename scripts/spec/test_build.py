@@ -70,6 +70,31 @@ class Selection(unittest.TestCase):
         self.assertEqual(build.check_structure(self.spec, "0.5"), [])
         self.assertEqual(build.check_stamps(self.spec, "0.5"), [])
 
+    def test_a_released_version_is_archived_by_its_file_and_stays_shown(self):
+        self.assertFalse(build.archived(self.spec, "0.2"))
+        (self.spec / "0.2" / build.ARCHIVED).write_text("archived\n", encoding="utf-8")
+        self.assertTrue(build.archived(self.spec, "0.2"))
+        self.assertEqual(build.shown_versions(self.spec, self.all), (["0.2", "0.3"], ["0.2", "0.3"]))
+
+    def test_the_version_line_marks_an_archived_version_and_the_page_of_one_in_bold(self):
+        shown = ["0.2", "0.3", "0.4"]
+        line = build.version_links("en", "0.4", shown, lambda x: f"../{x}/", is_archived=lambda x: x != "0.4")
+        self.assertIn('<a href="../0.3/">0.3</a> (archived)', line)
+        self.assertIn("<b>0.4</b>", line)
+        self.assertNotIn("0.4</b> (archived)", line)
+        line = build.version_links("en", "0.3", shown, lambda x: f"../{x}/", is_archived=lambda x: x != "0.4")
+        self.assertIn("<b>0.3</b> (archived)", line)
+        both = build.version_links("zh", "0.4", shown, lambda x: f"../{x}/", has_text=lambda x: x != "0.2",
+                                   is_archived=lambda x: x != "0.4")
+        self.assertIn("0.2</a> (已归档, 仅英文)", both)
+
+    def test_the_banner_names_the_version_the_current_one_and_the_upgrade(self):
+        banner = build.archived_banner("en", "0.3", "0.4", "../../tools.html#upgrade")
+        self.assertIn("archived version (0.3)", banner)
+        self.assertIn("The current standard is 0.4", banner)
+        self.assertIn('<a href="../../tools.html#upgrade">', banner)
+        self.assertIn("已归档", build.archived_banner("zh", "0.3", "0.4", "x"))
+
     def test_the_versions_published_so_far_have_the_file(self):
         # not every folder: a draft in spec/ has none until it is released. Add a version here when it is.
         for v in ("0.2", "0.3"):

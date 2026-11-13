@@ -5,7 +5,8 @@ same events:
 
 - **CLI:** `rnl solve FILE -o DIR --progress=json` writes one JSON object per line on standard
   error. The report stays on standard output. `--progress` without `=json` keeps the older
-  text lines.
+  text lines. `rnl preview FILE --progress=json` tells the same events, for the viewers' development
+  server, and ends with `done` (no `written`: a preview writes nothing).
 - **Library:** `rnl_cli::progress::solve_progress` and `rnl_cli::preview::preview_progress`
   give each event to a callback, on the thread that solves. Returning false cancels.
 

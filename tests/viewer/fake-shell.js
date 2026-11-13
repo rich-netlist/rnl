@@ -102,9 +102,9 @@ const fake = {
     if (held) held.resolve();
     held = null;
   },
-  /** Tell the page that the solve under way begins a level. */
-  step(step) {
-    if (progress) progress(step);
+  /** Tell the page of one event of the solve under way (docs/solver-progress.md), as the desktop does. */
+  step(event) {
+    if (progress) progress(event);
   },
   /** The edits each build was given, in order: undefined for a build of the files as they are. */
   buildEdits: [],
@@ -163,7 +163,7 @@ let solveCancelled = false; // cancellation can arrive before the fixture fetch 
 let heldDrawings = []; // the requests for drawings that wait: their resolve
 let kept = null; // the drawings of the last build that left them out of its Document, by level: { names, drawings }
 let closing = null; // the page's handler of a request to close the window
-let progress = null; // the page's handler of each level a solve begins
+let progress = null; // the page's handler of the events of a solve
 let opening = null;
 
 /**

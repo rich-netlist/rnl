@@ -53,6 +53,11 @@
    "note": "3 texts say 折れ曲がり without 点."
   },
   {
+   "en": "bias circuit",
+   "term": "バイアス回路",
+   "kind": "rnl"
+  },
+  {
    "en": "black box",
    "term": "ブラックボックス",
    "kind": "rnl"
@@ -330,6 +335,11 @@
    "kind": "rnl"
   },
   {
+   "en": "mirrored layout",
+   "term": "対称配置",
+   "kind": "rnl"
+  },
+  {
    "en": "mirrored pair",
    "sense": "the structure, a mirrored pair",
    "term": "鏡像対",
@@ -419,6 +429,19 @@
    "kind": "rnl"
   },
   {
+   "en": "power",
+   "sense": "electrical",
+   "term": "電力",
+   "kind": "rnl",
+   "note": "Electrical power."
+  },
+  {
+   "en": "power flow",
+   "term": "電力フロー",
+   "kind": "rnl",
+   "note": "Path role: 電力の経路."
+  },
+  {
    "en": "primitive",
    "term": "プリミティブ",
    "kind": "rnl"
@@ -502,6 +525,12 @@
    "kind": "rnl"
   },
   {
+   "en": "signal flow",
+   "term": "信号フロー",
+   "kind": "rnl",
+   "note": "Path role: 信号経路."
+  },
+  {
    "en": "skeleton line",
    "term": "骨格線",
    "kind": "general",
@@ -559,6 +588,12 @@
    "kind": "rnl"
   },
   {
+   "en": "supply",
+   "sense": "supply, rail",
+   "term": "電源",
+   "kind": "rnl"
+  },
+  {
    "en": "symbol",
    "term": "シンボル",
    "kind": "rnl"
@@ -571,6 +606,11 @@
   {
    "en": "taken in",
    "term": "取り込まれる",
+   "kind": "rnl"
+  },
+  {
+   "en": "tap",
+   "term": "タップ",
    "kind": "rnl"
   },
   {

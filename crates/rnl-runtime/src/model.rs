@@ -552,9 +552,11 @@ pub struct GroupInfo {
     /// PRIORITY turns it off, on itself or on a usage it is made in (11.5, 14.8): the solver does
     /// not get it.
     pub disabled: bool,
-    /// Where it stands in the tree of groups, by the rules of [`crate::group_tree`] on its members
-    /// as written. The solver applies the same rules to the objects it lays out, which can join
-    /// two groups that differ only in members it does not place.
+    /// Where it stands in the tree of groups of a 0.4 level, by the rules of [`crate::group_tree`] on
+    /// its members that have a place of their own, the objects the solver's problem places;
+    /// [`GroupPlace::Off`] in a level of an earlier version, which has no tree of groups. The solver
+    /// then also leaves out a set of fewer than two of the objects it lays out, and joins two sets
+    /// that become one there, so its tree can have fewer groups.
     pub place: GroupPlace,
 }
 

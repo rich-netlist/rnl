@@ -1,7 +1,8 @@
 import { append, m, setAttr, setText, tr } from "./i18n.js";
-// The Solve menu of the desktop viewer (decision 0010): the netlist shown solved as `rnl solve`
-// solves it, without its records of the solver, by the shell on a thread of its own, with its
-// progress and a Cancel button in the status bar; the result drawn as a preview over the file,
+// The Solve menu of the desktop viewer (decision 0010): the circuit shown, or with Solve All Circuits
+// every circuit of the netlist, solved as `rnl solve` solves it, without its records of the solver,
+// by the shell on a thread of its own, with its progress as a panel over the drawing (solve-progress.js)
+// and in the status bar, with a Cancel button; the result drawn as a preview over the file,
 // which stays as it is; a report of what became of each fact in the Solve view of the side panel,
 // every line of it shown in the netlist when clicked; and a copy of the files solved saved where
 // the user says. The solver's options are Solve > Settings (solve-settings.js). A shell without
@@ -15,8 +16,9 @@ import { hasConstraints, showConstraints } from "./constraints.js";
 import { currentSource, isLoading, openSource, showBuilt } from "./open.js";
 import { setPane } from "./panels.js";
 import { shell } from "./shell.js";
+import { progressBegin, progressEnd, progressEvent } from "./solve-progress.js";
 import { solverSettings } from "./solve-settings.js";
-import { constraintsWanted, doc, setConstraintsWanted } from "./state.js";
+import { constraintsWanted, current, doc, setConstraintsWanted } from "./state.js";
 import { revealLine } from "./text.js";
 import { $, span } from "./util.js";
 
@@ -82,11 +84,12 @@ window.addEventListener("open-finished", () => {
 });
 
 /**
- * Solve the netlist shown (Solve > Solve, F9), or, while a preview is shown, solve its file
- * again; File > Reload does the same then. The file is read again first, so that the solve is
- * of the file as it is now.
+ * Solve the circuit shown (Solve > Solve, F9), or with `all` every circuit of its netlist (Solve >
+ * Solve All Circuits); while a preview is shown, solve its file again, and File > Reload does the
+ * same then. The file is read again first, so that the solve is of the file as it is now. The
+ * circuits not solved are drawn as the file has them.
  */
-export async function solve() {
+export async function solve({ all = false } = {}) {
   if (!shell || !shell.solve || running || modal() || isLoading()) return;
   const source = shown ? shown.source : currentSource();
   if (!source || !doc) {
@@ -98,10 +101,14 @@ export async function solve() {
   running = true;
   document.body.classList.add("solving");
   status(m`Solving ${source.name}…`, true);
+  // the file's own name, not the address or the folders it was read from, until the solver names the first circuit
+  progressBegin(source.name.split(/[\\/]/).pop() || source.name);
   try {
     // a built-in file is held by the page, not on disk: the solver is given its text
     const given = source.text === undefined && source.path?.startsWith("<") ? { ...source, text: doc.files[0].text } : source;
-    const solved = await shell.solve(given, solverSettings(), changes(true));
+    // the circuit shown is asked for by its title, as `rnl solve --level` takes it
+    const level = all ? null : doc.levels[current]?.title ?? null;
+    const solved = await shell.solve(given, { ...solverSettings(), level }, changes(true));
     shown = { source, report: solved.report };
     showBuilt(solved.document, true);
     // the solved layout can lie outside the view of the netlist as it was
@@ -124,6 +131,7 @@ export async function solve() {
       await inform({ title: m("Solve"), paragraphs: [m`The netlist could not be solved: ${message}`] });
     }
   } finally {
+    progressEnd();
     running = false;
     document.body.classList.remove("solving");
   }
@@ -169,12 +177,17 @@ export async function saveSolved(encoding = "preserve") {
   }
 }
 
-/** Show each level of the solve under way in the status bar, once the shell can say. */
+/**
+ * Follow the solve under way once the shell can say: each event goes to the panel (solve-progress.js), and the
+ * level it begins to the status bar.
+ */
 function hookProgress() {
   if (progressHooked || !shell.onSolveProgress) return;
   progressHooked = true;
-  shell.onSolveProgress((step) => {
+  shell.onSolveProgress((event) => {
     if (!running) return;
+    const step = progressEvent(event);
+    if (!step) return;
     const again = step.again ? m(", again after the upgrade to RNL 0.3") : "";
     status(m`Solving ${step.title} (${step.level + 1} of ${step.levels}${again})…`, true);
   });

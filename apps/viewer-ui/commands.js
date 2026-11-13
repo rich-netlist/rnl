@@ -154,6 +154,7 @@ export function command(id, options = {}) {
       m("Ctrl+F: Find in Netlist, including offscreen text. Enter / Shift+Enter: next / previous match."),
     ] }); break;
     case "solve": solve(); break;
+    case "solve-all": solve({ all: true }); break;
     case "solve-close": closePreview(); break;
     case "solve-save": saveSolved(); break;
     case "solve-save-utf8": saveSolved("utf8"); break;

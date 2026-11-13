@@ -31,6 +31,8 @@
   "compare": "與 {w} 比較",
   "compare_title": "RNL {v} 與 {w} 比較",
   "english_only": "僅英文",
+  "archived": "已封存",
+  "archived_banner": "這是已封存的版本（{v}）。目前標準是 {current}。升級 {v} 的檔案，請用<a href=\"{href}\">升級工具</a>。",
   "compared": "與 {label} 比較：",
   "added": "新增",
   "removed": "移除",

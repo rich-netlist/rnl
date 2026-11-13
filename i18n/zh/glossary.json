@@ -85,12 +85,21 @@
   },
   {
    "en": "branch",
-   "sense": "wire routing",
+   "sense": "a part that splits off a wire",
    "term": "分叉",
    "avoid": [
-    "支线"
+    "支线",
+    "支路"
    ],
-   "kind": "rnl"
+   "kind": "rnl",
+   "note": "Wires only; a branch taken off a bus is a tap (分接)."
+  },
+  {
+   "en": "branch",
+   "sense": "the $BRANCH structure, a branch of a circuit",
+   "term": "支路",
+   "kind": "rnl",
+   "note": "Only for $BRANCH and a branch of a circuit (series or parallel branch), never for the part of a wire."
   },
   {
    "en": "bundle",
@@ -420,6 +429,13 @@
    "kind": "rnl"
   },
   {
+   "en": "power",
+   "sense": "electrical",
+   "term": "功率",
+   "kind": "rnl",
+   "note": "Electrical power."
+  },
+  {
    "en": "power flow",
    "term": "功率流",
    "kind": "rnl",
@@ -535,8 +551,20 @@
    "kind": "rnl"
   },
   {
+   "en": "stub",
+   "term": "短桩",
+   "kind": "rnl",
+   "note": "Not 短接 or 短线."
+  },
+  {
    "en": "subject",
    "term": "主语",
+   "kind": "rnl"
+  },
+  {
+   "en": "supply",
+   "sense": "supply, rail",
+   "term": "电源",
    "kind": "rnl"
   },
   {
@@ -549,6 +577,12 @@
    "term": "采纳",
    "kind": "rnl",
    "note": "A fact tried in the order of 8.5 and found to hold with those before it; as a result it is kept (保留)."
+  },
+  {
+   "en": "tap",
+   "term": "分接",
+   "kind": "rnl",
+   "note": "A branch taken off a bus; a branch of a wire is 分叉."
   },
   {
    "en": "terminal",

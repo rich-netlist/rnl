@@ -83,6 +83,7 @@ LANGS = {
 # pages moved to zh/ on 2026-10-18 (site/build.py); later versions have only the addresses under zh/.
 MOVED_ZH = ("0.2",)
 RELEASED = "RELEASED"  # the file that marks a version in spec/ as published, such as spec/0.3/RELEASED
+ARCHIVED = "ARCHIVED"  # the file that marks a released version as archived, such as spec/0.3/ARCHIVED
 VERSION_DIR = re.compile(r"(0|[1-9]\d*)\.(0|[1-9]\d*)")  # a version folder of spec/, such as 0.2 (16.1)
 STAMP = re.compile(r"^<!-- translated from en/(\S+) sha256:([0-9a-f]{12}) -->\n")
 FENCE = re.compile(r"^([ \t]*)```([\w-]+)((?:[ \t]+\S+)+)[ \t]*$", re.M)
@@ -113,6 +114,19 @@ def released(spec: Path, v: str) -> bool:
     """Whether version v is published: its folder holds a file RELEASED (the tag does not say, since the
     build must work without the repository's tags). Until then the site shows nothing of it."""
     return (spec / v / RELEASED).is_file()
+
+
+def archived(spec: Path, v: str) -> bool:
+    """Whether version v is archived: its folder holds a file ARCHIVED. An archived version stays on the site, with
+    a banner that leads to the current one and to the upgrade, and is marked in the lines of versions; it is
+    frozen, so the checks leave it alone."""
+    return (spec / v / ARCHIVED).is_file()
+
+
+def archived_banner(lang: str, v: str, current: str, upgrade_href: str) -> str:
+    """The banner at the head of the page of an archived version, as HTML."""
+    L = LANGS[lang]
+    return L["archived_banner"].format(v=html.escape(v), current=html.escape(current), href=html.escape(upgrade_href, quote=True))
 
 
 def shown_versions(spec: Path, all_versions: list[str], drafts: bool = False, asked: str | None = None) -> tuple[list[str], list[str]]:
@@ -445,16 +459,20 @@ def earlier(all_versions: list[str], v: str) -> list[str]:
 
 
 def version_links(lang: str, v: str, all_versions: list[str], href, compare_href=None,
-                  comparing: str | None = None, has_text=lambda x: True) -> str:
+                  comparing: str | None = None, has_text=lambda x: True, is_archived=lambda x: False) -> str:
     """The versions, newest first, for the head of the page of v, then the pages that compare v with each
     earlier version, when compare_href is given; nothing while there is only one version. On the page that
     compares v with the version comparing, that comparison is in bold instead of v. A version of which the language
-    has no text (has_text is false) is marked as English only, and has no comparison."""
+    has no text (has_text is false) is marked as English only, and has no comparison; an archived version
+    (is_archived is true) is marked as archived."""
     if len(all_versions) < 2:
         return ""
     L = LANGS[lang]
-    items = [f"<b>{x}</b>" if x == v and not comparing else
-             f'<a href="{href(x)}">{x}</a>' + ("" if has_text(x) else f" ({html.escape(L['english_only'])})")
+    def tags(x: str) -> str:
+        marks = ([L["archived"]] if is_archived(x) else []) + ([] if has_text(x) else [L["english_only"]])
+        return f" ({html.escape(', '.join(marks))})" if marks else ""
+    items = [f"<b>{x}</b>" + (tags(x) if is_archived(x) else "") if x == v and not comparing else
+             f'<a href="{href(x)}">{x}</a>' + tags(x)
              for x in reversed(all_versions)]
     for w in [w for w in reversed(earlier(all_versions, v)) if has_text(w)] if compare_href else []:
         text = L["compare"].format(w=w)
@@ -479,7 +497,7 @@ def page_meta(lang: str, title: str, language_path: str, site_root: str) -> dict
 
 
 def build_html(src: Path, lang: str, v: str, rev: dict, dest: Path, site_root: str,
-               links: str, out: Path, work: Path) -> None:
+               links: str, out: Path, work: Path, banner: str = "") -> None:
     """The web page. Its downloads are the files of the same build, next to it; site_root is where the
     links of the top bar lead: the site's pages for this language. links is the line of versions."""
     L = LANGS[lang]
@@ -493,6 +511,8 @@ def build_html(src: Path, lang: str, v: str, rev: dict, dest: Path, site_root: s
     args = [a for k, val in meta.items() for a in ("-V" if k in ("language-menu", "locale-css", "language-css", "language-script") else "-M", f"{k}={val}")]
     if links:  # HTML, so a variable (not escaped) rather than metadata
         args += ["-V", f"versions-html={links}"]
+    if banner:  # HTML too
+        args += ["-V", f"archived-html={banner}"]
     run(["pandoc", str(src), *common_args(lang, v, rev), "-t", "html5", "--standalone",
          "--template", str(HERE / "page.html"), "--toc", "--toc-depth=2", "--section-divs", *args,
          "-o", str(dest)], f"pandoc html ({v}, {lang})", dict(os.environ, RNL_LINKS_LOG=str(log)))
@@ -666,15 +686,18 @@ def main(argv: list[str]) -> int:
         print(f"{spec}: no released version, which holds a file {RELEASED}, for the site's addresses to lead to")
         return 1
     chosen = [args.version] if args.version else all_versions
+    current = (newest or all_versions)[-1]  # the version the banner of an archived one leads to
     built = [args.version] if args.version else shown
     if args.stamp:
         for v in chosen:
             stamp(spec, v)
         return 0
 
+    # an archived version is frozen: it is not checked again, unless it is the one asked for
+    checked = [v for v in chosen if args.version or not archived(spec, v)]
     failures = []
     for what, check in CHECKS:
-        msgs = [m for v in chosen for m in check(spec, v)]
+        msgs = [m for v in checked for m in check(spec, v)]
         print(f"check {what}: {'ok' if not msgs else f'{len(msgs)} problem(s)'}")
         failures += msgs
     if failures:
@@ -712,10 +735,13 @@ def main(argv: list[str]) -> int:
                     build_pdf(src, lang, v, rev, out, work, fonts)
                 on_site = SITE_URL + L["site_dir"].format(v=v) + "/"
                 has_text = lambda x: lang in langs(spec, x)  # noqa: E731
+                is_archived = lambda x: archived(spec, x)  # noqa: E731
                 published = version_links(lang, v, shown, lambda x: SITE_URL + L["site_dir"].format(v=x) + "/",
-                                          lambda w: on_site + f"compare-{w}.html", has_text=has_text)
+                                          lambda w: on_site + f"compare-{w}.html", has_text=has_text, is_archived=is_archived)
+                banner = lambda root: (archived_banner(lang, v, current, root + "tools.html#upgrade")  # noqa: E731
+                                       if is_archived(v) else "")
                 build_html(src, lang, v, rev, out / name(v, lang, ".html"),
-                           SITE_URL + L["site_home"], published, out, work)
+                           SITE_URL + L["site_home"], published, out, work, banner(SITE_URL + L["site_home"]))
                 if args.site:
                     d = args.site / L["site_dir"].format(v=v)
                     d.mkdir(parents=True, exist_ok=True)
@@ -723,12 +749,14 @@ def main(argv: list[str]) -> int:
                         shutil.copyfile(out / name(v, lang, ext), d / name(v, lang, ext))
                     build_html(html_input(spec, v, lang, work, "../../"), lang, v, rev, d / "index.html", "../../",
                                version_links(lang, v, shown, lambda x: f"../{x}/",
-                                             lambda w: f"compare-{w}.html", has_text=has_text), out, work)
+                                             lambda w: f"compare-{w}.html", has_text=has_text, is_archived=is_archived),
+                               out, work, banner("../../"))
                     for w in [w for w in earlier(shown, v) if has_text(w)]:
                         revs.setdefault(w, revision(spec, w))
                         page = f"compare-{w}.html"
                         links = version_links(lang, v, shown, lambda x: "./" if x == v else f"../{x}/",
-                                              lambda x: f"compare-{x}.html", comparing=w, has_text=has_text)
+                                              lambda x: f"compare-{x}.html", comparing=w, has_text=has_text,
+                                              is_archived=is_archived)
                         found = build_compare(doc(w, lang), doc(v, lang), lang, v, w, revs, d / page, "../../", links, work)
                         print(f"built {v} compared with {w}, {lang}: " +
                               ", ".join(f"{len(found[k])} sections {k}" for k in ("changed", "added", "removed")))

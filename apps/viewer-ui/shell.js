@@ -78,7 +78,7 @@
  *   Help > Check for Updates (updates.js), which only the desktop offers; without it, that command
  *   does nothing.
  * @property {(source: Source, settings: SolverSettings, edits?: Edits) => Promise<Solved>} [solve] Solve a
- *   source as `rnl solve` solves it, without its records of the solver, and give it drawn as
+ *   source (or its one level, `settings.level`) as `rnl solve` solves it, without its records of the solver, and give it drawn as
  *   solved, nothing written (solve.js, decision 0010), with the solver's options set to
  *   `settings`, over the texts of `edits` where it has any, as `build` takes them: the text applied
  *   (decision 0011). Rejects with a message when it cannot, and with CANCELLED when `cancelSolve`
@@ -94,8 +94,9 @@
  * @property {(encoding?: "preserve" | "utf8") => Promise<string | null>} [saveSolved] Save a copy of the last solve shown where the
  *   user says, never over a file that was read: what was saved, in a sentence, or null when the
  *   user cancelled. Rejects with a message when it cannot.
- * @property {(handler: (step: SolveStep) => void) => void} [onSolveProgress] Call `handler` with each
- *   level as the solve under way begins it.
+ * @property {(handler: (event: SolveEvent) => void) => void} [onSolveProgress] Call `handler` with each
+ *   event of the solve under way, as it comes (the panel of solve-progress.js and the status bar follow them).
+ *   A shell that cannot tell has no events: the solve then shows its status line alone.
  * @property {(source: Source, files: SavedFile[], overwrite?: boolean, encoding?: "preserve" | "utf8") => Promise<string | { changed: string[] }>} [save]
  *   Write the text of the files where they were read from, which the user has asked for with File >
  *   Save (decision 0011): a sentence that says what was saved. Unless `overwrite`, a file that is no
@@ -163,9 +164,10 @@
  * The settings of a solve: `options` are the options that differ from the solver's defaults,
  * written as `rnl solve --solver-options` takes them, such as "beam=8;time_limit=none", empty for
  * the defaults; `hintsForLow` asks for every conflict group of the facts of priority low, which
- * that text cannot say (`rnl solve --report` does).
+ * that text cannot say (`rnl solve --report` does); `level` is the title of the one level to solve,
+ * the circuit shown (Solve > Solve), and null or absent for every level (Solve > Solve All Circuits).
  *
- * @typedef {{ options: string, hintsForLow: boolean }} SolverSettings
+ * @typedef {{ options: string, hintsForLow: boolean, level?: string | null }} SolverSettings
  */
 
 /**
@@ -187,10 +189,14 @@
  */
 
 /**
- * Where a solve is: the level it begins, counted from 0 among the `levels` it solves, its title,
- * and whether it is the second pass, after files were raised to 0.3.
+ * One step of a solve, as docs/solver-progress.md describes the events: `event` is "run" (with `levels`, how many
+ * the run solves), "level" (a level begins: `level`, counted from 0, its `title`, `again` for the second pass,
+ * after files were raised to 0.3, and its `limit`, "time" with `seconds`, "work", "seed" or "none"), "stage" and
+ * "work" (`stage`, `elapsed`, and `fraction` of the limit and `tried` candidates in "work"), "best" (a better
+ * candidate), "level-done" (`status`, `seconds`) and, from the CLI, "done" and "error". Fields are only ever
+ * added: the page reads those it knows (solve-progress.js).
  *
- * @typedef {{ level: number, levels: number, title: string, again: boolean }} SolveStep
+ * @typedef {{ event: string, level?: number, levels?: number, title?: string, again?: boolean, limit?: string, seconds?: number, stage?: string, elapsed?: number, fraction?: number, tried?: number, status?: string }} SolveEvent
  */
 
 /**

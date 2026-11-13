@@ -31,6 +31,8 @@
   "compare": "与 {w} 对比",
   "compare_title": "RNL {v} 与 {w} 对比",
   "english_only": "仅英文",
+  "archived": "已归档",
+  "archived_banner": "这是已归档的版本（{v}）。当前标准是 {current}。升级 {v} 的文件，请用<a href=\"{href}\">升级工具</a>。",
   "compared": "与 {label} 对比：",
   "added": "新增",
   "removed": "移除",

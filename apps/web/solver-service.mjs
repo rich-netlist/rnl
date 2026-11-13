@@ -3,7 +3,12 @@
 // again and pressing Solve, without building the viewer or restarting anything.
 //
 //   GET  /rnl-solver        {"service": "rnl-solver", "version": ..., "path": ..., "options": ...}
-//   POST /rnl-solver/solve  {"entry", "files", "pool", "options"}  ->  {"document", "report"}
+//   POST /rnl-solver/solve  {"entry", "files", "pool", "options", "level"}  ->  {"document", "report"}
+//     "level": only the level with this title, the circuit shown; none solves every level.
+//     With "stream": true the answer is lines of JSON (application/x-ndjson) instead: the events of the solve as
+//     `rnl preview --progress=json` tells them (docs/solver-progress.md), each as it came, then one line
+//     {"result": {"document", "report"}}, or {"error": message} when the solve failed after the first event.
+//     A request that fails before any event is answered as without "stream": a status and {"error": message}.
 //
 // A solve writes the files the page sends into a directory of its own, runs `rnl preview` on the entry
 // there, as the desktop viewer solves (decision 0010), and gives what it prints: the Document of the
@@ -46,8 +51,12 @@ export function insidePath(path) {
   return segments.map((s) => s.replace(/[<>:"|?*\\]/g, "_")).join("/");
 }
 
-/** Run `rnl` with `args` in `cwd`: its standard output; rejects with its error text on a failure, and kills it when `signal` is aborted. */
-function run(rnl, prefix, args, cwd, signal) {
+/**
+ * Run `rnl` with `args` in `cwd`: its standard output; rejects with its error text on a failure, and kills it when
+ * `signal` is aborted. `onEvent` is given each line of its standard error that is an event of the solve (a JSON
+ * object with an `event`), as it came.
+ */
+function run(rnl, prefix, args, cwd, signal, onEvent) {
   return new Promise((done, fail) => {
     const child = spawn(rnl, [...prefix, ...args], { cwd, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
     const out = [];
@@ -56,24 +65,44 @@ function run(rnl, prefix, args, cwd, signal) {
     if (signal.aborted) stop();
     signal.addEventListener("abort", stop, { once: true });
     child.stdout.on("data", (chunk) => out.push(chunk));
-    child.stderr.on("data", (chunk) => err.push(chunk));
+    let partial = "";
+    child.stderr.on("data", (chunk) => {
+      err.push(chunk);
+      if (!onEvent) return;
+      partial += chunk.toString("utf8");
+      const lines = partial.split("\n");
+      partial = lines.pop();
+      for (const line of lines) if (isEvent(line)) onEvent(line.trim());
+    });
     child.on("error", (e) => fail(new Error(`${rnl} cannot be run: ${e.message}`)));
     child.on("close", (code) => {
       signal.removeEventListener("abort", stop);
       if (signal.aborted) return fail(new Error("the solve was cancelled"));
       if (code === 0) return done(Buffer.concat(out).toString("utf8"));
-      const text = Buffer.concat(err).toString("utf8").trim().split("\n").filter((l) => !/^(the solver is a preview|note: |hint: RNL\d{4} solve-preview-notice:)/i.test(l)).join("\n");
+      const text = Buffer.concat(err).toString("utf8").trim().split("\n").filter((l) => !isEvent(l) && !/^(the solver is a preview|note: |hint: RNL\d{4} solve-preview-notice:)/i.test(l)).join("\n");
       fail(new Error(text || `rnl ${args[0]} failed with exit code ${code}`));
     });
   });
 }
 
+/** Whether a line of the standard error is an event of the solve: a JSON object with an `event`. */
+function isEvent(line) {
+  const text = line.trim();
+  if (!text.startsWith("{")) return false;
+  try {
+    return typeof JSON.parse(text)?.event === "string";
+  } catch {
+    return false;
+  }
+}
+
 /**
  * The solve of a request: what `rnl preview` prints, the Document and the report, as JSON text. `work` holds the
- * directory the files are written in; `options` are the solver's, as `--solver-options` takes them.
+ * directory the files are written in; `options` are the solver's, as `--solver-options` takes them; `level` is the
+ * title of the one level to solve. `onEvent` is given the events of the solve, as lines of JSON, as they come.
  */
-export async function solve({ rnl, prefix = [], work, request, defaults, signal }) {
-  const { entry, files, pool = [], options = "" } = request;
+export async function solve({ rnl, prefix = [], work, request, defaults, signal, onEvent }) {
+  const { entry, files, pool = [], options = "", level = null } = request;
   const entryPath = insidePath(entry);
   if (!entryPath || !files || typeof files !== "object" || typeof files[entry] !== "string") throw new Error("the request has no entry file");
   await mkdir(work, { recursive: true });
@@ -99,8 +128,10 @@ export async function solve({ rnl, prefix = [], work, request, defaults, signal 
     for (const d of packageDirs) common.push("--package-dir", d);
     for (const d of searchDirs) common.push("--path", d);
     if (solverOptions) common.push("--solver-options", solverOptions);
+    if (typeof level === "string" && level !== "") common.push("--level", level);
+    if (onEvent) common.push("--progress=json");
     const cwd = resolve(dir, dirname(entryPath));
-    return await run(rnl, prefix, ["preview", ...common], cwd, signal);
+    return await run(rnl, prefix, ["preview", ...common], cwd, signal, onEvent);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -147,11 +178,32 @@ export function createService({ rnl, prefix = [], version, options = "", work = 
       response.on("close", () => {
         if (!response.writableEnded) abort.abort();
       });
+      let streaming = false;
+      // the head of a streamed answer goes out with its first line: a request that fails before any is answered as a plain one
+      const line = (text) => {
+        if (!streaming) {
+          streaming = true;
+          response.writeHead(200, { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
+        }
+        response.write(`${text}\n`);
+      };
       try {
         const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-        reply(response, 200, await solve({ rnl, prefix, work, request: body, defaults: options, signal: abort.signal }));
+        if (body.stream === true) {
+          const result = await solve({ rnl, prefix, work, request: body, defaults: options, signal: abort.signal, onEvent: line });
+          // on one line: what rnl preview prints is indented
+          line(`{"result":${JSON.stringify(JSON.parse(result))}}`);
+          response.end();
+        } else {
+          reply(response, 200, await solve({ rnl, prefix, work, request: body, defaults: options, signal: abort.signal }));
+        }
       } catch (e) {
-        if (!response.writableEnded && !abort.signal.aborted) reply(response, 400, { error: e instanceof Error ? e.message : String(e) });
+        const message = e instanceof Error ? e.message : String(e);
+        if (response.writableEnded || abort.signal.aborted) return true;
+        if (streaming) {
+          line(JSON.stringify({ error: message }));
+          response.end();
+        } else reply(response, 400, { error: message });
       }
       return true;
     },

@@ -767,9 +767,6 @@ impl Interp<'_> {
         Some(RecordResult { level: self.scenes[s].level, placed, routes, wires: written, ids, drawn })
     }
 
-    /// The `%` names the level binds, those of the records written into it with scope= among them
-    /// (2.6, 6.7), with their objects in this scene, in the order they are declared; a name bound
-    /// twice keeps its first binding (6.6).
     /// The objects of a level's problem that have a place of their own, kind by kind, each in the
     /// order it was made: instances and bundles, usages drawn or with a point of their own, points
     /// and texts; with the usages and the annotations, which find their place later.
@@ -822,6 +819,9 @@ impl Interp<'_> {
         (objs, usages, annotations)
     }
 
+    /// The `%` names the level binds, those of the records written into it with scope= among them
+    /// (2.6, 6.7), with their objects in this scene, in the order they are declared; a name bound
+    /// twice keeps its first binding (6.6).
     pub(crate) fn level_names(&self, s: SceneId) -> Vec<(String, ObjId)> {
         let u = self.level_unit[self.scenes[s].level];
         let mut out = Vec::new();

@@ -50,7 +50,9 @@ async function solved(page, viewer) {
   await page.evaluate(() => window.viewer.command("solve"));
   await expect.poll(async () => (await viewer.calls("solve")).length).toBe(before + 1);
   await page.waitForFunction(() => document.body.classList.contains("preview") && !document.body.classList.contains("solving"));
-  return (await viewer.calls("solve")).at(-1)[1];
+  // the options, not which circuit (solve.spec.js)
+  const { level, ...options } = (await viewer.calls("solve")).at(-1)[1];
+  return options;
 }
 
 test("the web has no Solve settings, and its command does nothing", async ({ page, viewer }) => {
@@ -71,7 +73,7 @@ test.describe("on the desktop", () => {
       return table.menus.find((m) => m.label === "&Solve").items.filter((i) => i !== "-").map((i) => [i.id, i.label]);
     });
     expect(solve.map(([id]) => id)).toEqual([
-      "solve", "solve-close", "solve-save", "solve-save-utf8",
+      "solve", "solve-all", "solve-close", "solve-save", "solve-save-utf8",
       "toggle-layout", "toggle-skeleton-symbols", "toggle-skeleton-wires",
       "solve-settings",
     ]);

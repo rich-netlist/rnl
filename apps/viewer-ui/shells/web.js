@@ -54,6 +54,7 @@ async function localSolver() {
 const solver = await localSolver();
 let lastBuilt = null; // the Document of a build the page accepted last: what a solve is of, not a preview of one
 let solving = null; // the AbortController of the solve under way
+let solveProgress = null; // the page's handler of the events of the solve under way
 
 const WARMUP = { entry: "/ready.sp", files: { "/ready.sp": "* Ready\n.end\n" }, svg: false };
 function warmCore() {
@@ -1040,7 +1041,10 @@ export default {
     /**
      * Solve the netlist shown with the solver service of the server (solve.js): the files the last build read, with
      * the text applied over them, are sent to it, and it gives the Document of the netlist as solved and the report,
-     * as the desktop's Solve does. Cancelling drops the request, and the service stops the solver.
+     * as the desktop's Solve does, of the one level `settings.level` names or of every level. The service tells the
+     * events of the solve (docs/solver-progress.md) as lines of JSON as they come, each to `onSolveProgress`'s
+     * handler, then the result (apps/web/solver-service.mjs); a service that does not stream, as the local program's
+     * does not yet, gives the result alone. Cancelling drops the request, and the service stops the solver.
      */
     async solve(_source, settings, edits) {
       const request = lastBuilt && builtRequests.get(lastBuilt);
@@ -1054,10 +1058,30 @@ export default {
         const response = await fetch(new URL("rnl-solver/solve", location.href), { method: "POST", signal: own.signal,
           // (X-RNL: the local program, which serves the page to one browser, asks for it of every request that does anything)
           headers: { "Content-Type": "application/json", "X-RNL": "1" },
-          body: JSON.stringify({ entry: request.entry, files, pool: request.pool, options: settings?.options || "" }) });
-        const answer = await response.json().catch(() => ({ error: `the solver service answered ${response.status}` }));
-        if (!response.ok) throw answer.error || `the solver service answered ${response.status}`;
-        return answer;
+          body: JSON.stringify({ entry: request.entry, files, pool: request.pool, options: settings?.options || "", level: settings?.level ?? null, stream: true }) });
+        if (!/^application\/x-ndjson/.test(response.headers.get("Content-Type") || "")) {
+          const answer = await response.json().catch(() => ({ error: `the solver service answered ${response.status}` }));
+          if (!response.ok) throw answer.error || `the solver service answered ${response.status}`;
+          return answer;
+        }
+        // lines of JSON: the events as they come, then the result or the error
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let text = "";
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (value) text += decoder.decode(value, { stream: true });
+          const lines = text.split("\n");
+          text = done ? "" : lines.pop();
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            const said = JSON.parse(line);
+            if (said.error) throw said.error;
+            if (said.result) return said.result;
+            if (said.event) solveProgress?.(said);
+          }
+          if (done) throw "the solver service ended without a result";
+        }
       } catch (e) {
         if (own.signal.aborted) throw "the solve was cancelled";
         throw e instanceof TypeError ? "the solver service could not be reached; is serve.mjs still running?" : e;
@@ -1067,6 +1091,9 @@ export default {
     },
     cancelSolve() {
       solving?.abort();
+    },
+    onSolveProgress(handler) {
+      solveProgress = handler;
     },
   } : {}),
   /** The drawings of the objects the last Document lists without a position, which the core keeps. */
