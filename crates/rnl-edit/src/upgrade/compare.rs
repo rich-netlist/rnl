@@ -45,7 +45,7 @@ fn names(problem: &LevelProblem) -> Vec<String> {
         .enumerate()
         .map(|(index, object)| {
             if let Some(id) = problem.ids.objects.get(index).filter(|id| !id.starts_with('@')) {
-                return id.clone();
+                return terminals(id);
             }
             let base = format!("~{}:{}", object.kind.as_str(), object.label);
             let count = seen.entry(base.clone()).or_default();
@@ -267,6 +267,9 @@ fn without_look(category: &str, value: &Value) -> Value {
         }
         "texts" => {
             map.remove("style");
+            // Where a text is drawn follows from the facts that place it and the symbol, which are
+            // compared on their own.
+            map.remove("at");
             // A label that only its symbol gives is the package's: what it says and where it is are look.
             if map.get("written") == Some(&Value::Bool(false)) {
                 for field in
@@ -426,7 +429,7 @@ fn snapshot(read: &Interpretation, added: &BTreeMap<String, BTreeSet<String>>) -
             if id.starts_with('@') || id.is_empty() {
                 format!("~{kind}:{extra}")
             } else {
-                id.to_string()
+                terminals(id)
             }
         };
         // Every object of the level, drawn or not, is one item: where it is drawn is a matter of
@@ -468,11 +471,11 @@ fn snapshot(read: &Interpretation, added: &BTreeMap<String, BTreeSet<String>>) -
                 format!(
                     "{}|{}|{}",
                     id(&text.object_id, "text", ""),
-                    text.attach.as_deref().unwrap_or(""),
+                    terminals(text.attach.as_deref().unwrap_or("")),
                     text.key.as_deref().unwrap_or("")
                 )
             } else {
-                format!("label|{}", text.object_id.split("::").next().unwrap_or(""))
+                format!("label|{}", terminals(text.object_id.split("::").next().unwrap_or("")))
             };
             put(
                 "texts",
