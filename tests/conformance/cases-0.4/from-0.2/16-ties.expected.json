@@ -1,0 +1,282 @@
+{
+  "failed": false,
+  "levels": [
+    {
+      "title": "16-ties.sp",
+      "kind": "file",
+      "file": "16-ties.sp",
+      "symbols": [
+        {
+          "name": "$B",
+          "box": [
+            -2.0,
+            0.0,
+            2.0,
+            0.0
+          ],
+          "box_written": false,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                -2.0,
+                0.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": "a",
+              "dir": 180,
+              "label_name_formats": true
+            },
+            {
+              "pos": [
+                2.0,
+                0.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": "b",
+              "dir": 0,
+              "label_name_formats": true
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -2.0,
+                  0.0
+                ],
+                [
+                  2.0,
+                  0.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "(viewer default)",
+          "box": [
+            -3.0,
+            -1.0,
+            3.0,
+            1.0
+          ],
+          "box_written": false,
+          "default": true,
+          "pins": [
+            {
+              "pos": [
+                -3.0,
+                0.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": "p",
+              "dir": 180
+            },
+            {
+              "pos": [
+                3.0,
+                0.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": "n",
+              "dir": 0
+            }
+          ],
+          "prims": [
+            {
+              "shape": "RECTANGLE",
+              "points": [
+                [
+                  -2.0,
+                  -1.0
+                ],
+                [
+                  2.0,
+                  1.0
+                ]
+              ],
+              "style": {
+                "linestyle": "dashed"
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -3.0,
+                  0.0
+                ],
+                [
+                  -2.0,
+                  0.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  3.0,
+                  0.0
+                ],
+                [
+                  2.0,
+                  0.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        }
+      ],
+      "items": [
+        {
+          "id": "#R1",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            0.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {},
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#R2",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            8.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {},
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#R3",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            16.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {},
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#R4",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            0.0,
+            8.0
+          ],
+          "orient": "R0",
+          "style": {},
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#R5",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            8.0,
+            8.0
+          ],
+          "orient": "R0",
+          "style": {},
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#R6",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            16.0,
+            8.0
+          ],
+          "orient": "R0",
+          "style": {},
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#R7",
+          "kind": "instance",
+          "symbol": 1,
+          "at": [
+            24.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {},
+          "layer": "middle",
+          "texts": {}
+        }
+      ],
+      "wires": [],
+      "shapes": [],
+      "texts": [
+        {
+          "id": "#R7::name",
+          "anchor": [
+            24.0,
+            1.3
+          ],
+          "lines": [
+            [
+              {
+                "text": "R7",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "middle",
+          "valign": "bottom",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {},
+          "layer": "middle"
+        }
+      ],
+      "flylines": [],
+      "constraints": [],
+      "unplaced": []
+    }
+  ],
+  "diagnostics": [
+    {
+      "severity": "error",
+      "code": "RNL3221",
+      "name": "ref-not-found",
+      "file": "16-ties.sp",
+      "line": 32,
+      "col": 21
+    }
+  ]
+}

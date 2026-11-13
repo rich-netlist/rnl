@@ -42,3 +42,6 @@ RNL_BLESS=1 cargo test -p rnl-cli --test conformance
 `RNL_BLESS_0_3=1` writes those of `cases-0.3` instead, and leaves the others as they are; `RNL_BLESS=1` does not write those of `cases-0.3`. The expected files of each corpus are written only when that corpus is asked for, so that blessing a change of 0.3, whose text is still a draft, never rewrites the regression suite of 0.2.
 
 The data in this directory is licensed under CC0-1.0, like the rest of `tests/`.
+
+
+The reviewed RNL 0.4 counterparts are documented in [cases-0.4](cases-0.4/README.md); `RNL_BLESS_0_4` updates only that corpus. The older corpora remain independent during development.

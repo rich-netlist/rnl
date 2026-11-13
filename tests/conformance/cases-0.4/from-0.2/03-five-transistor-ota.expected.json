@@ -1,0 +1,3225 @@
+{
+  "failed": false,
+  "levels": [
+    {
+      "title": "03-five-transistor-ota.sp",
+      "kind": "file",
+      "file": "03-five-transistor-ota.sp",
+      "symbols": [
+        {
+          "name": "$NMOS",
+          "box": [
+            -3.0,
+            -2.0,
+            1.4,
+            2.0
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                2.0
+              ],
+              "terminals": [
+                "d"
+              ],
+              "label": null,
+              "dir": 90
+            },
+            {
+              "pos": [
+                -3.0,
+                0.0
+              ],
+              "terminals": [
+                "g"
+              ],
+              "label": null,
+              "dir": 180
+            },
+            {
+              "pos": [
+                0.0,
+                -2.0
+              ],
+              "terminals": [
+                "s"
+              ],
+              "label": null,
+              "dir": 270
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.4244,
+                  0.6977
+                ],
+                [
+                  0.0,
+                  0.6977
+                ],
+                [
+                  0.0,
+                  2.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -2.1802,
+                  0.9593
+                ],
+                [
+                  -2.1802,
+                  -0.9593
+                ],
+                [
+                  -1.8895,
+                  -0.9593
+                ],
+                [
+                  -1.8895,
+                  0.9593
+                ],
+                [
+                  -2.1802,
+                  0.9593
+                ]
+              ],
+              "style": {
+                "linestyle": "none"
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.657,
+                  1.25
+                ],
+                [
+                  -1.657,
+                  -1.25
+                ],
+                [
+                  -1.3663,
+                  -1.25
+                ],
+                [
+                  -1.3663,
+                  1.25
+                ],
+                [
+                  -1.657,
+                  1.25
+                ]
+              ],
+              "style": {
+                "linestyle": "none"
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -2.0349,
+                  0.0
+                ],
+                [
+                  -3.0,
+                  0.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.5116,
+                  -0.6977
+                ],
+                [
+                  0.0,
+                  -0.6977
+                ],
+                [
+                  0.0,
+                  -2.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0581,
+                  -0.6977
+                ],
+                [
+                  -0.8721,
+                  -0.2907
+                ],
+                [
+                  -0.8721,
+                  -1.1047
+                ],
+                [
+                  0.0581,
+                  -0.6977
+                ]
+              ],
+              "style": {
+                "linestyle": "none"
+              }
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$PMOS",
+          "box": [
+            -3.0,
+            -2.0,
+            1.4,
+            2.0
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                -2.0
+              ],
+              "terminals": [
+                "d"
+              ],
+              "label": null,
+              "dir": 270
+            },
+            {
+              "pos": [
+                -3.0,
+                0.0
+              ],
+              "terminals": [
+                "g"
+              ],
+              "label": null,
+              "dir": 180
+            },
+            {
+              "pos": [
+                0.0,
+                2.0
+              ],
+              "terminals": [
+                "s"
+              ],
+              "label": null,
+              "dir": 90
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.4244,
+                  -0.6977
+                ],
+                [
+                  0.0,
+                  -0.6977
+                ],
+                [
+                  0.0,
+                  -2.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -2.1802,
+                  0.9593
+                ],
+                [
+                  -2.1802,
+                  -0.9593
+                ],
+                [
+                  -1.8895,
+                  -0.9593
+                ],
+                [
+                  -1.8895,
+                  0.9593
+                ],
+                [
+                  -2.1802,
+                  0.9593
+                ]
+              ],
+              "style": {
+                "linestyle": "none"
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.657,
+                  1.25
+                ],
+                [
+                  -1.657,
+                  -1.25
+                ],
+                [
+                  -1.3663,
+                  -1.25
+                ],
+                [
+                  -1.3663,
+                  1.25
+                ],
+                [
+                  -1.657,
+                  1.25
+                ]
+              ],
+              "style": {
+                "linestyle": "none"
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -2.0349,
+                  0.0
+                ],
+                [
+                  -3.0,
+                  0.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -0.436,
+                  0.7122
+                ],
+                [
+                  0.0,
+                  0.7122
+                ],
+                [
+                  0.0,
+                  2.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.3663,
+                  0.7122
+                ],
+                [
+                  -0.436,
+                  1.1192
+                ],
+                [
+                  -0.436,
+                  0.3052
+                ],
+                [
+                  -1.3663,
+                  0.7122
+                ]
+              ],
+              "style": {
+                "linestyle": "none"
+              }
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$CURRENT_SOURCE",
+          "box": [
+            -1.5,
+            -2.0,
+            1.5,
+            2.0
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                2.0
+              ],
+              "terminals": [
+                "p"
+              ],
+              "label": null,
+              "dir": 90
+            },
+            {
+              "pos": [
+                0.0,
+                -2.0
+              ],
+              "terminals": [
+                "n"
+              ],
+              "label": null,
+              "dir": 270
+            }
+          ],
+          "prims": [
+            {
+              "shape": "CIRCLE",
+              "points": [
+                [
+                  0.0,
+                  0.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  0.6977
+                ],
+                [
+                  0.0,
+                  0.2326
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  -0.6977
+                ],
+                [
+                  -0.4651,
+                  0.2326
+                ],
+                [
+                  0.4651,
+                  0.2326
+                ],
+                [
+                  0.0,
+                  -0.6977
+                ]
+              ],
+              "style": {
+                "linestyle": "none"
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  1.0756
+                ],
+                [
+                  0.0,
+                  2.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  -1.0756
+                ],
+                [
+                  0.0,
+                  -2.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$CAPACITOR",
+          "box": [
+            -1.2,
+            -2.0,
+            1.2,
+            2.0
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                2.0
+              ],
+              "terminals": [
+                "p"
+              ],
+              "label": null,
+              "dir": 90
+            },
+            {
+              "pos": [
+                0.0,
+                -2.0
+              ],
+              "terminals": [
+                "n"
+              ],
+              "label": null,
+              "dir": 270
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.8051,
+                  0.3234
+                ],
+                [
+                  -0.8051,
+                  0.3234
+                ]
+              ],
+              "style": {
+                "linewidth": 0.24
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.8051,
+                  -0.3234
+                ],
+                [
+                  -0.8051,
+                  -0.3234
+                ]
+              ],
+              "style": {
+                "linewidth": 0.24
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  0.3234
+                ],
+                [
+                  0.0,
+                  2.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  -0.3234
+                ],
+                [
+                  0.0,
+                  -2.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$VOLTAGE_SOURCE",
+          "box": [
+            -2.4,
+            -2.0,
+            1.5,
+            2.0
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                2.0
+              ],
+              "terminals": [
+                "p"
+              ],
+              "label": null,
+              "dir": 90
+            },
+            {
+              "pos": [
+                0.0,
+                -2.0
+              ],
+              "terminals": [
+                "n"
+              ],
+              "label": null,
+              "dir": 270
+            }
+          ],
+          "prims": [
+            {
+              "shape": "CIRCLE",
+              "points": [
+                [
+                  0.0,
+                  0.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -2.0058,
+                  1.4535
+                ],
+                [
+                  -1.1919,
+                  1.4535
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.5988,
+                  1.8605
+                ],
+                [
+                  -1.5988,
+                  1.0465
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -2.0058,
+                  -1.3372
+                ],
+                [
+                  -1.1919,
+                  -1.3372
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  1.0756
+                ],
+                [
+                  0.0,
+                  2.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  -1.0756
+                ],
+                [
+                  0.0,
+                  -2.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$JUNCTION_SYMBOL",
+          "box": [
+            -0.4,
+            -0.4,
+            0.4,
+            0.4
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [],
+          "prims": [
+            {
+              "shape": "CIRCLE",
+              "points": [
+                [
+                  0.0,
+                  0.0
+                ]
+              ],
+              "style": {
+                "linestyle": "none"
+              }
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$NET_LABEL_SYMBOL",
+          "box": [
+            0.0,
+            0.0,
+            1.0,
+            0.0
+          ],
+          "box_written": false,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                0.0
+              ],
+              "terminals": [
+                "p"
+              ],
+              "label": null,
+              "dir": 180
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  0.0
+                ],
+                [
+                  1.0,
+                  0.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$GROUND_SYMBOL",
+          "box": [
+            -1.2,
+            -2.7,
+            1.2,
+            0.0
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                0.0
+              ],
+              "terminals": [
+                "p"
+              ],
+              "label": null,
+              "dir": 90
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  0.0
+                ],
+                [
+                  0.0,
+                  -1.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -0.6395,
+                  -1.0
+                ],
+                [
+                  0.6395,
+                  -1.0
+                ]
+              ],
+              "style": {
+                "linewidth": 0.2907
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -0.407,
+                  -1.5814
+                ],
+                [
+                  0.407,
+                  -1.5814
+                ]
+              ],
+              "style": {
+                "linewidth": 0.2907
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -0.2326,
+                  -2.1047
+                ],
+                [
+                  0.2326,
+                  -2.1047
+                ]
+              ],
+              "style": {
+                "linewidth": 0.2907
+              }
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$SUPPLY_SYMBOL",
+          "box": [
+            -1.2,
+            0.0,
+            1.2,
+            2.2
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                0.0
+              ],
+              "terminals": [
+                "p"
+              ],
+              "label": null,
+              "dir": 270
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  0.0
+                ],
+                [
+                  0.0,
+                  1.85
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.0,
+                  2.088
+                ],
+                [
+                  1.0,
+                  2.088
+                ],
+                [
+                  1.0,
+                  1.764
+                ],
+                [
+                  -1.0,
+                  1.764
+                ],
+                [
+                  -1.0,
+                  2.088
+                ]
+              ],
+              "style": {
+                "linestyle": "none"
+              }
+            }
+          ],
+          "nested": []
+        }
+      ],
+      "items": [
+        {
+          "id": "#M1",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            -6.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1f4fd8",
+            "linestyle": "bold",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#M2",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            6.0,
+            0.0
+          ],
+          "orient": "MY",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1f4fd8",
+            "linestyle": "bold",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#M3",
+          "kind": "instance",
+          "symbol": 1,
+          "at": [
+            -6.0,
+            8.0
+          ],
+          "orient": "MY",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#M4",
+          "kind": "instance",
+          "symbol": 1,
+          "at": [
+            6.0,
+            8.0
+          ],
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#M5",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            0.0,
+            -6.0
+          ],
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#M6",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            -22.0,
+            -6.0
+          ],
+          "orient": "MY",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#Ib",
+          "kind": "instance",
+          "symbol": 2,
+          "at": [
+            -22.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#CL",
+          "kind": "instance",
+          "symbol": 3,
+          "at": [
+            16.0,
+            1.0
+          ],
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#Vdd",
+          "kind": "instance",
+          "symbol": 4,
+          "at": [
+            28.0,
+            4.0
+          ],
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "a usage of $JUNCTION",
+          "kind": "usage",
+          "symbol": 5,
+          "at": [
+            -6.0,
+            4.0
+          ],
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "a usage of $JUNCTION",
+          "kind": "usage",
+          "symbol": 5,
+          "at": [
+            -2.0,
+            8.0
+          ],
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "a usage of $JUNCTION",
+          "kind": "usage",
+          "symbol": 5,
+          "at": [
+            6.0,
+            4.0
+          ],
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "a usage of $JUNCTION",
+          "kind": "usage",
+          "symbol": 5,
+          "at": [
+            16.0,
+            4.0
+          ],
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "a usage of $JUNCTION",
+          "kind": "usage",
+          "symbol": 5,
+          "at": [
+            0.0,
+            -3.0
+          ],
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "a usage of $JUNCTION",
+          "kind": "usage",
+          "symbol": 5,
+          "at": [
+            -22.0,
+            -3.0
+          ],
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "a usage of $JUNCTION",
+          "kind": "usage",
+          "symbol": 5,
+          "at": [
+            -14.0,
+            -6.0
+          ],
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "%pi",
+          "kind": "usage",
+          "symbol": 6,
+          "at": [
+            -11.0,
+            0.0
+          ],
+          "orient": "MY",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "%pn",
+          "kind": "usage",
+          "symbol": 6,
+          "at": [
+            11.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "%po",
+          "kind": "usage",
+          "symbol": 6,
+          "at": [
+            21.0,
+            4.0
+          ],
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "%gs_M5_3",
+          "kind": "usage",
+          "symbol": 7,
+          "at": [
+            0.0,
+            -10.0
+          ],
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "%gs_M6_3",
+          "kind": "usage",
+          "symbol": 7,
+          "at": [
+            -22.0,
+            -10.0
+          ],
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "%gs_CL_2",
+          "kind": "usage",
+          "symbol": 7,
+          "at": [
+            16.0,
+            -3.0
+          ],
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "%gs_Vdd_2",
+          "kind": "usage",
+          "symbol": 7,
+          "at": [
+            28.0,
+            -1.0
+          ],
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "%ss_M3_3",
+          "kind": "usage",
+          "symbol": 8,
+          "at": [
+            -6.0,
+            12.0
+          ],
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "%ss_M4_3",
+          "kind": "usage",
+          "symbol": 8,
+          "at": [
+            6.0,
+            12.0
+          ],
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "%ss_Ib_1",
+          "kind": "usage",
+          "symbol": 8,
+          "at": [
+            -22.0,
+            5.0
+          ],
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "%ss_Vdd_1",
+          "kind": "usage",
+          "symbol": 8,
+          "at": [
+            28.0,
+            9.0
+          ],
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        }
+      ],
+      "wires": [
+        {
+          "id": "a wire",
+          "nets": [
+            "x"
+          ],
+          "points": [
+            [
+              -6.0,
+              6.0
+            ],
+            [
+              -6.0,
+              4.0
+            ],
+            [
+              -6.0,
+              2.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "x"
+          ],
+          "points": [
+            [
+              -3.0,
+              8.0
+            ],
+            [
+              -2.0,
+              8.0
+            ],
+            [
+              3.0,
+              8.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "x"
+          ],
+          "points": [
+            [
+              -6.0,
+              4.0
+            ],
+            [
+              -2.0,
+              4.0
+            ],
+            [
+              -2.0,
+              8.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "out"
+          ],
+          "points": [
+            [
+              6.0,
+              6.0
+            ],
+            [
+              6.0,
+              4.0
+            ],
+            [
+              6.0,
+              2.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "tail"
+          ],
+          "points": [
+            [
+              -6.0,
+              -2.0
+            ],
+            [
+              -6.0,
+              -3.0
+            ],
+            [
+              0.0,
+              -3.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "tail"
+          ],
+          "points": [
+            [
+              6.0,
+              -2.0
+            ],
+            [
+              6.0,
+              -3.0
+            ],
+            [
+              0.0,
+              -3.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "tail"
+          ],
+          "points": [
+            [
+              0.0,
+              -3.0
+            ],
+            [
+              0.0,
+              -4.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "bias"
+          ],
+          "points": [
+            [
+              -22.0,
+              -2.0
+            ],
+            [
+              -22.0,
+              -3.0
+            ],
+            [
+              -22.0,
+              -4.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "bias"
+          ],
+          "points": [
+            [
+              -19.0,
+              -6.0
+            ],
+            [
+              -14.0,
+              -6.0
+            ],
+            [
+              -3.0,
+              -6.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "bias"
+          ],
+          "points": [
+            [
+              -14.0,
+              -6.0
+            ],
+            [
+              -14.0,
+              -3.0
+            ],
+            [
+              -22.0,
+              -3.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "inp"
+          ],
+          "points": [
+            [
+              -11.0,
+              0.0
+            ],
+            [
+              -9.0,
+              0.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "inn"
+          ],
+          "points": [
+            [
+              11.0,
+              0.0
+            ],
+            [
+              9.0,
+              0.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "out"
+          ],
+          "points": [
+            [
+              6.0,
+              4.0
+            ],
+            [
+              16.0,
+              4.0
+            ],
+            [
+              21.0,
+              4.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "out"
+          ],
+          "points": [
+            [
+              16.0,
+              4.0
+            ],
+            [
+              16.0,
+              3.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "0"
+          ],
+          "points": [
+            [
+              0.0,
+              -8.0
+            ],
+            [
+              0.0,
+              -10.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "0"
+          ],
+          "points": [
+            [
+              -22.0,
+              -8.0
+            ],
+            [
+              -22.0,
+              -10.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "0"
+          ],
+          "points": [
+            [
+              16.0,
+              -1.0
+            ],
+            [
+              16.0,
+              -3.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "0"
+          ],
+          "points": [
+            [
+              28.0,
+              2.0
+            ],
+            [
+              28.0,
+              -1.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "vdd"
+          ],
+          "points": [
+            [
+              -6.0,
+              10.0
+            ],
+            [
+              -6.0,
+              12.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "vdd"
+          ],
+          "points": [
+            [
+              6.0,
+              10.0
+            ],
+            [
+              6.0,
+              12.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "vdd"
+          ],
+          "points": [
+            [
+              -22.0,
+              2.0
+            ],
+            [
+              -22.0,
+              5.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "vdd"
+          ],
+          "points": [
+            [
+              28.0,
+              6.0
+            ],
+            [
+              28.0,
+              9.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        }
+      ],
+      "shapes": [],
+      "texts": [
+        {
+          "id": "#M1::name",
+          "anchor": [
+            -5.5,
+            1.05
+          ],
+          "lines": [
+            [
+              {
+                "text": "M1",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1f4fd8",
+            "linestyle": "bold",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#M1::model",
+          "anchor": [
+            -5.5,
+            -1.75
+          ],
+          "lines": [
+            []
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1f4fd8",
+            "linestyle": "bold",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#M2::name",
+          "anchor": [
+            5.5,
+            1.05
+          ],
+          "lines": [
+            [
+              {
+                "text": "M2",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "MY",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1f4fd8",
+            "linestyle": "bold",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#M2::model",
+          "anchor": [
+            5.5,
+            -1.75
+          ],
+          "lines": [
+            []
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "MY",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1f4fd8",
+            "linestyle": "bold",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#M3::name",
+          "anchor": [
+            -6.5,
+            9.05
+          ],
+          "lines": [
+            [
+              {
+                "text": "M3",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "MY",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#M3::model",
+          "anchor": [
+            -6.5,
+            6.25
+          ],
+          "lines": [
+            []
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "MY",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#M4::name",
+          "anchor": [
+            6.5,
+            9.05
+          ],
+          "lines": [
+            [
+              {
+                "text": "M4",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#M4::model",
+          "anchor": [
+            6.5,
+            6.25
+          ],
+          "lines": [
+            []
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#M5::name",
+          "anchor": [
+            0.5,
+            -4.95
+          ],
+          "lines": [
+            [
+              {
+                "text": "M5",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#M5::model",
+          "anchor": [
+            0.5,
+            -7.75
+          ],
+          "lines": [
+            []
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#M6::name",
+          "anchor": [
+            -22.5,
+            -4.95
+          ],
+          "lines": [
+            [
+              {
+                "text": "M6",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "MY",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#M6::model",
+          "anchor": [
+            -22.5,
+            -7.75
+          ],
+          "lines": [
+            []
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "MY",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#Ib::name",
+          "anchor": [
+            -20.5,
+            0.25
+          ],
+          "lines": [
+            [
+              {
+                "text": "Ib",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#Ib::value",
+          "anchor": [
+            -20.5,
+            -1.2
+          ],
+          "lines": [
+            [
+              {
+                "text": "20u",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#CL::name",
+          "anchor": [
+            17.2,
+            1.25
+          ],
+          "lines": [
+            [
+              {
+                "text": "CL",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#CL::value",
+          "anchor": [
+            17.2,
+            -0.19999999999999996
+          ],
+          "lines": [
+            [
+              {
+                "text": "1p",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#Vdd::name",
+          "anchor": [
+            29.5,
+            4.25
+          ],
+          "lines": [
+            [
+              {
+                "text": "Vdd",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#Vdd::value",
+          "anchor": [
+            29.5,
+            2.8
+          ],
+          "lines": [
+            [
+              {
+                "text": "1.8",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "%pi::netname",
+          "anchor": [
+            -12.3,
+            0.0
+          ],
+          "lines": [
+            [
+              {
+                "text": "inp",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "middle",
+          "rotate": 0.0,
+          "orient": "MY",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "%pn::netname",
+          "anchor": [
+            12.3,
+            0.0
+          ],
+          "lines": [
+            [
+              {
+                "text": "inn",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "middle",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "%po::netname",
+          "anchor": [
+            22.3,
+            4.0
+          ],
+          "lines": [
+            [
+              {
+                "text": "out",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "middle",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "%ss_M3_3::netname",
+          "anchor": [
+            -6.0,
+            14.4
+          ],
+          "lines": [
+            [
+              {
+                "text": "vdd",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "middle",
+          "valign": "bottom",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "%ss_M4_3::netname",
+          "anchor": [
+            6.0,
+            14.4
+          ],
+          "lines": [
+            [
+              {
+                "text": "vdd",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "middle",
+          "valign": "bottom",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "%ss_Ib_1::netname",
+          "anchor": [
+            -22.0,
+            7.4
+          ],
+          "lines": [
+            [
+              {
+                "text": "vdd",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "middle",
+          "valign": "bottom",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "%ss_Vdd_1::netname",
+          "anchor": [
+            28.0,
+            11.4
+          ],
+          "lines": [
+            [
+              {
+                "text": "vdd",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "middle",
+          "valign": "bottom",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        }
+      ],
+      "flylines": [
+        [
+          [
+            0.0,
+            -8.0
+          ],
+          [
+            16.0,
+            -3.0
+          ]
+        ],
+        [
+          [
+            16.0,
+            -1.0
+          ],
+          [
+            28.0,
+            -1.0
+          ]
+        ],
+        [
+          [
+            0.0,
+            -8.0
+          ],
+          [
+            -22.0,
+            -8.0
+          ]
+        ],
+        [
+          [
+            -6.0,
+            10.0
+          ],
+          [
+            6.0,
+            10.0
+          ]
+        ],
+        [
+          [
+            -6.0,
+            10.0
+          ],
+          [
+            -22.0,
+            5.0
+          ]
+        ],
+        [
+          [
+            6.0,
+            10.0
+          ],
+          [
+            28.0,
+            9.0
+          ]
+        ]
+      ],
+      "constraints": [
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "low"
+        },
+        {
+          "label": "DISTRIBUTE",
+          "kind": "DISTRIBUTE",
+          "status": "ok",
+          "priority": "low"
+        },
+        {
+          "label": "ORIENT-RELATION",
+          "kind": "ORIENT-RELATION",
+          "status": "unsolved",
+          "priority": "low"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "low"
+        },
+        {
+          "label": "DISTRIBUTE",
+          "kind": "DISTRIBUTE",
+          "status": "ok",
+          "priority": "low"
+        },
+        {
+          "label": "ORIENT-RELATION",
+          "kind": "ORIENT-RELATION",
+          "status": "unsolved",
+          "priority": "low"
+        },
+        {
+          "label": "DISTRIBUTE",
+          "kind": "DISTRIBUTE",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ORDER",
+          "kind": "ORDER",
+          "status": "ok",
+          "priority": "low"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ORDER",
+          "kind": "ORDER",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "dropped",
+          "priority": "low"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "dropped",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        }
+      ],
+      "unplaced": []
+    }
+  ],
+  "diagnostics": [
+    {
+      "severity": "hint",
+      "code": "RNL5102",
+      "name": "conflict-fact-discarded-with-sets",
+      "file": "03-five-transistor-ota.sp",
+      "line": 40,
+      "col": 5
+    },
+    {
+      "severity": "hint",
+      "code": "RNL5104",
+      "name": "conflict-statement-caused-discards",
+      "file": "03-five-transistor-ota.sp",
+      "line": 71,
+      "col": 5
+    },
+    {
+      "severity": "hint",
+      "code": "RNL5104",
+      "name": "conflict-statement-caused-discards",
+      "file": "03-five-transistor-ota.sp",
+      "line": 75,
+      "col": 5
+    }
+  ]
+}

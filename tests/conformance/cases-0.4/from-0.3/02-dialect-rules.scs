@@ -1,0 +1,18 @@
+// Dialect-specific rules follow each object's host language section
+*! The 0.4 collection selects rules by host-language section (2.8, 16.3). I0 and R0 are Spectre instances: I0 is a subcircuit call, while R0 receives the resistor rule by master. The included SPICE file has its own SPICE rules.
+*! I3 is in a SPICE section and receives the SPICE rule; I1 and R1 in the included file also receive SPICE rules.
+simulator lang=spectre
+// @RNL(type="header") { @USE-PACKAGE(name="rnl-std-all", version="0.4"); @VERSION("0.4")}
+// @RNL { # @SELECT-PIN(recursive=true) => @REMOVE-FROM $LABEL_FILL_SET; $PORT_FILL_NET_SET = # @SELECT-NET(port=true, recursive=true); $SUPPLY_NET_SET @REMOVE-FROM $PORT_FILL_NET_SET; $GROUND_NET_SET @REMOVE-FROM $PORT_FILL_NET_SET; # @SELECT-USAGE(recursive=true) $IO_PORT => @SELECT-NET(recursive=true) => @REMOVE-FROM $PORT_FILL_NET_SET; $IO_PORT @ATTACH $PORT_FILL_NET_SET }
+subckt cell (p n)
+ends cell
+I0 (a 0) cell
+R0 (a 0) resistor r=1k
+include "02-dialect-rules-sp.inc"
+simulator lang=spice
+.subckt mid a b
+I3 a b 1m
+* @RNL { #I3 @PLACE(0, 0) }
+.ends
+simulator lang=spectre
+// @RNL { #I0 @PLACE(0, 0); #R0 @PLACE(10, 0) }

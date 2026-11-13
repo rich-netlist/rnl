@@ -1,0 +1,1339 @@
+{
+  "schema": "rnl-snapshot/1",
+  "failed": null,
+  "language": "0.4",
+  "levels": [
+    {
+      "id": "file:10-constraints-and-priority.sp",
+      "kind": "file",
+      "name": "10-constraints-and-priority.sp",
+      "file": 0,
+      "line": 0,
+      "status": "constraints: 8 ok, 3 dropped, 2 disabled, 1 unsolved, 1 needs-solver",
+      "host": {
+        "ports": [],
+        "instances": [
+          {
+            "id": "#R1",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&a"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&b"
+              }
+            ]
+          },
+          {
+            "id": "#R2",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&b"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&c"
+              }
+            ]
+          },
+          {
+            "id": "#R3",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&c"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&d"
+              }
+            ]
+          },
+          {
+            "id": "#R4",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&d"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&0"
+              }
+            ]
+          }
+        ],
+        "nets": [
+          {
+            "id": "&a",
+            "global": false,
+            "port": false,
+            "usages": [
+              {
+                "kind": "usage",
+                "id": "@rnl-std-basic.rnl:672:9",
+                "definition": "$NET_LABEL",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&a",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 672,
+                "source": "body",
+                "made_in": "%net_label_stub_R1_p",
+                "state": "in-effect"
+              }
+            ]
+          },
+          {
+            "id": "&b",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&c",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&d",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&0",
+            "global": true,
+            "port": false,
+            "usages": [
+              {
+                "kind": "usage",
+                "id": "%ground",
+                "definition": "$GROUND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 40,
+                "source": "solver",
+                "state": "in-effect"
+              }
+            ]
+          }
+        ]
+      },
+      "model": {
+        "symbols": [
+          {
+            "id": "$RESISTOR",
+            "name": "$RESISTOR",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$GROUND_SYMBOL",
+            "name": "$GROUND_SYMBOL",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$NET_LABEL_SYMBOL",
+            "name": "$NET_LABEL_SYMBOL",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          }
+        ],
+        "symbol": {
+          "value": null,
+          "source": null
+        },
+        "objects": [
+          {
+            "id": "#R1",
+            "kind": "instance",
+            "host": [
+              "#R1"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$RESISTOR",
+              "source": null
+            },
+            "at": {
+              "value": [
+                0.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R90",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(#R1,0)",
+                "index": 0,
+                "names": [
+                  "p"
+                ],
+                "bus": false,
+                "reference": "#R1::p",
+                "local_at": [
+                  0.0,
+                  2.0
+                ],
+                "terminals": [
+                  "#R1:1"
+                ],
+                "at": [
+                  -2.0,
+                  0.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&a"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#R1,1)",
+                "index": 1,
+                "names": [
+                  "n"
+                ],
+                "bus": false,
+                "reference": "#R1::n",
+                "local_at": [
+                  0.0,
+                  -2.0
+                ],
+                "terminals": [
+                  "#R1:2"
+                ],
+                "at": [
+                  2.0,
+                  0.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&b"
+                ]
+              }
+            ],
+            "usages": [
+              {
+                "kind": "usage",
+                "id": "%r",
+                "definition": "$ROW",
+                "roles": [
+                  {
+                    "role": "m",
+                    "set": true,
+                    "member": "#R1",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 27,
+                "source": "written",
+                "state": "in-effect"
+              }
+            ]
+          },
+          {
+            "id": "#R2",
+            "kind": "instance",
+            "host": [
+              "#R2"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$RESISTOR",
+              "source": null
+            },
+            "at": {
+              "value": [
+                8.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R90",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(#R2,0)",
+                "index": 0,
+                "names": [
+                  "p"
+                ],
+                "bus": false,
+                "reference": "#R2::p",
+                "local_at": [
+                  0.0,
+                  2.0
+                ],
+                "terminals": [
+                  "#R2:1"
+                ],
+                "at": [
+                  6.0,
+                  0.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&b"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#R2,1)",
+                "index": 1,
+                "names": [
+                  "n"
+                ],
+                "bus": false,
+                "reference": "#R2::n",
+                "local_at": [
+                  0.0,
+                  -2.0
+                ],
+                "terminals": [
+                  "#R2:2"
+                ],
+                "at": [
+                  10.0,
+                  0.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&c"
+                ]
+              }
+            ],
+            "usages": [
+              {
+                "kind": "usage",
+                "id": "%r",
+                "definition": "$ROW",
+                "roles": [
+                  {
+                    "role": "m",
+                    "set": true,
+                    "member": "#R2",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 27,
+                "source": "written",
+                "state": "in-effect"
+              }
+            ]
+          },
+          {
+            "id": "#R3",
+            "kind": "instance",
+            "host": [
+              "#R3"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$RESISTOR",
+              "source": null
+            },
+            "at": {
+              "value": [
+                16.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R90",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(#R3,0)",
+                "index": 0,
+                "names": [
+                  "p"
+                ],
+                "bus": false,
+                "reference": "#R3::p",
+                "local_at": [
+                  0.0,
+                  2.0
+                ],
+                "terminals": [
+                  "#R3:1"
+                ],
+                "at": [
+                  14.0,
+                  0.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&c"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#R3,1)",
+                "index": 1,
+                "names": [
+                  "n"
+                ],
+                "bus": false,
+                "reference": "#R3::n",
+                "local_at": [
+                  0.0,
+                  -2.0
+                ],
+                "terminals": [
+                  "#R3:2"
+                ],
+                "at": [
+                  18.0,
+                  0.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&d"
+                ]
+              }
+            ],
+            "usages": [
+              {
+                "kind": "usage",
+                "id": "%p1",
+                "definition": "$PAIR_Y",
+                "roles": [
+                  {
+                    "role": "a",
+                    "set": false,
+                    "member": "#R3",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 22,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "kind": "usage",
+                "id": "%r",
+                "definition": "$ROW",
+                "roles": [
+                  {
+                    "role": "m",
+                    "set": true,
+                    "member": "#R3",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 27,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "kind": "usage",
+                "id": "%p2",
+                "definition": "$PAIR_Y",
+                "roles": [
+                  {
+                    "role": "a",
+                    "set": false,
+                    "member": "#R3",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 43,
+                "source": "written",
+                "state": "in-effect"
+              }
+            ]
+          },
+          {
+            "id": "#R4",
+            "kind": "instance",
+            "host": [
+              "#R4"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$RESISTOR",
+              "source": null
+            },
+            "at": {
+              "value": [
+                24.0,
+                -2.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(#R4,0)",
+                "index": 0,
+                "names": [
+                  "p"
+                ],
+                "bus": false,
+                "reference": "#R4::p",
+                "local_at": [
+                  0.0,
+                  2.0
+                ],
+                "terminals": [
+                  "#R4:1"
+                ],
+                "at": [
+                  24.0,
+                  0.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&d"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#R4,1)",
+                "index": 1,
+                "names": [
+                  "n"
+                ],
+                "bus": false,
+                "reference": "#R4::n",
+                "local_at": [
+                  0.0,
+                  -2.0
+                ],
+                "terminals": [
+                  "#R4:2"
+                ],
+                "at": [
+                  24.0,
+                  -4.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&0"
+                ]
+              }
+            ],
+            "usages": [
+              {
+                "kind": "usage",
+                "id": "%p1",
+                "definition": "$PAIR_Y",
+                "roles": [
+                  {
+                    "role": "b",
+                    "set": false,
+                    "member": "#R4",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 22,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "kind": "usage",
+                "id": "%p2",
+                "definition": "$PAIR_Y",
+                "roles": [
+                  {
+                    "role": "b",
+                    "set": false,
+                    "member": "#R4",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 43,
+                "source": "written",
+                "state": "in-effect"
+              }
+            ]
+          },
+          {
+            "id": "%p1",
+            "kind": "usage",
+            "host": [],
+            "definition": "$PAIR_Y",
+            "attach": {
+              "a": "#R3",
+              "b": "#R4"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "%r",
+            "kind": "usage",
+            "host": [],
+            "definition": "$ROW",
+            "attach": {
+              "m": [
+                "#R1",
+                "#R2",
+                "#R3"
+              ]
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "%ground",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GROUND",
+            "attach": {
+              "p": "&0"
+            },
+            "symbol": {
+              "value": "$GROUND_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                24.0,
+                -7.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(%ground,0)",
+                "index": 0,
+                "names": [
+                  "pin"
+                ],
+                "bus": false,
+                "reference": "%ground::pin",
+                "local_at": [
+                  0.0,
+                  0.0
+                ],
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  24.0,
+                  -7.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&0"
+                ]
+              }
+            ]
+          },
+          {
+            "pin_of": "#R1",
+            "id": "%net_label_stub_R1_p",
+            "kind": "usage",
+            "host": [],
+            "definition": "$NET_LABEL_STUB",
+            "attach": {
+              "t": "pin(#R1,0)"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": [
+                0.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "parent": "%net_label_stub_R1_p",
+            "id": "@rnl-std-basic.rnl:672:9",
+            "kind": "usage",
+            "host": [],
+            "definition": "$NET_LABEL",
+            "attach": {
+              "p": "&a"
+            },
+            "symbol": {
+              "value": "$NET_LABEL_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -2.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R180",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(@rnl-std-basic.rnl:672:9,0)",
+                "index": 0,
+                "names": [
+                  "pin"
+                ],
+                "bus": false,
+                "reference": "%net_label_stub_R1_p::l::pin",
+                "local_at": [
+                  0.0,
+                  0.0
+                ],
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  -2.0,
+                  0.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&a"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "%p2",
+            "kind": "usage",
+            "host": [],
+            "definition": "$PAIR_Y",
+            "attach": {
+              "a": "#R3",
+              "b": "#R4"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          }
+        ],
+        "points": [
+          {
+            "id": "%f",
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "junction": false
+          }
+        ],
+        "wires": [
+          {
+            "id": "@10-constraints-and-priority.sp:33:5",
+            "nets": [
+              "&b"
+            ],
+            "via": [
+              {
+                "terminal": "#R1:2"
+              },
+              {
+                "terminal": "#R2:1"
+              }
+            ],
+            "points": [
+              [
+                2.0,
+                0.0
+              ],
+              [
+                6.0,
+                0.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@10-constraints-and-priority.sp:33:42",
+            "nets": [
+              "&c"
+            ],
+            "via": [
+              {
+                "terminal": "#R2:2"
+              },
+              {
+                "terminal": "#R3:1"
+              }
+            ],
+            "points": [
+              [
+                10.0,
+                0.0
+              ],
+              [
+                14.0,
+                0.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@10-constraints-and-priority.sp:33:79",
+            "nets": [
+              "&d"
+            ],
+            "via": [
+              {
+                "terminal": "#R3:2"
+              },
+              {
+                "terminal": "#R4:1"
+              }
+            ],
+            "points": [
+              [
+                18.0,
+                0.0
+              ],
+              [
+                21.0,
+                0.0
+              ],
+              [
+                21.0,
+                1.0
+              ],
+              [
+                24.0,
+                1.0
+              ],
+              [
+                24.0,
+                0.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@10-constraints-and-priority.sp:40:229",
+            "nets": [
+              "&0"
+            ],
+            "via": [
+              {
+                "terminal": "#R4:2"
+              },
+              {
+                "usage": "%ground",
+                "role": "p"
+              }
+            ],
+            "points": [
+              [
+                24.0,
+                -4.0
+              ],
+              [
+                24.0,
+                -7.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          }
+        ],
+        "texts": [
+          {
+            "id": "%t",
+            "attach": null,
+            "key": null,
+            "markup": {
+              "value": "各约束的状态和生效的优先级见下方列表",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "各约束的状态和生效的优先级见下方列表",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              0.0,
+              6.0
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R1::name",
+            "attach": "#R1",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "R1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -0.25,
+              0.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R1::value",
+            "attach": "#R1",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "1k",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              1.2,
+              0.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R2::name",
+            "attach": "#R2",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "R2",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              7.75,
+              0.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R2::value",
+            "attach": "#R2",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "1k",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              9.2,
+              0.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R3::name",
+            "attach": "#R3",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "R3",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              15.75,
+              0.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R3::value",
+            "attach": "#R3",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "1k",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              17.2,
+              0.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R4::name",
+            "attach": "#R4",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "R4",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              24.95,
+              -1.75
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R4::value",
+            "attach": "#R4",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "1k",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              24.95,
+              -3.2
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "@rnl-std-basic.rnl:672:9::netname",
+            "attach": "@rnl-std-basic.rnl:672:9",
+            "key": "netname",
+            "markup": {
+              "value": "${p}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "a",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -3.3,
+              0.0
+            ],
+            "halign": "start",
+            "valign": "middle",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          }
+        ],
+        "shapes": []
+      }
+    }
+  ],
+  "dialect": "spice",
+  "packages": [
+    {
+      "name": "rnl-std-style",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-basic",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-semiconductors",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-fill",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-semantics",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-functional",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-rf",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-logic",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-signal-flow",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-spice",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-spectre",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-all",
+      "version": "0.4"
+    }
+  ],
+  "files": [
+    {
+      "path": "10-constraints-and-priority.sp",
+      "name": "10-constraints-and-priority.sp"
+    }
+  ]
+}

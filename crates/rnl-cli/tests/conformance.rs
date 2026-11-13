@@ -11,6 +11,9 @@
 //!   of their own as in `cases`. `RNL_BLESS_0_3=1` writes them, and `RNL_BLESS=1` does not: the
 //!   expected files of each corpus are written only when it is asked for.
 
+//! - `cases-0.4/from-0.2` and `cases-0.4/from-0.3`: reviewed modern counterparts,
+//!   with references isolated by `RNL_BLESS_0_4`; `equivalence-0.4` contains the modern dialect pairs.
+
 use std::path::{Path, PathBuf};
 
 use rnl_cli::{dump, interpret_file, FsProvider};
@@ -110,6 +113,34 @@ fn cases_of_0_3_match_their_expected_snapshots() {
     check_cases_in("cases-0.3", "RNL_BLESS_0_3", "snapshot", "snapshot of 0.3", snapshot);
 }
 
+/// The migrated examples retain their source families, including deliberate negative cases.
+const MODERN_CASES: [&str; 2] = ["cases-0.4/from-0.2", "cases-0.4/from-0.3"];
+
+#[test]
+fn cases_of_0_4_match_their_expected_models() {
+    for dir in MODERN_CASES {
+        check_cases_in(dir, "RNL_BLESS_0_4", "expected", "effective model of 0.4", run);
+    }
+}
+
+#[test]
+fn cases_of_0_4_match_their_expected_snapshots() {
+    for dir in MODERN_CASES {
+        check_cases_in(dir, "RNL_BLESS_0_4", "snapshot", "snapshot of 0.4", snapshot);
+    }
+}
+
+#[test]
+fn migrated_cases_declare_the_modern_language_except_the_unsupported_version_test() {
+    for dir in MODERN_CASES.into_iter().chain(["equivalence-0.4"]) {
+        for file in files(&corpus().join(dir), &["sp", "scs"]) {
+            let source = std::fs::read_to_string(&file).unwrap();
+            let expected = if file.file_name().unwrap() == "13-unsupported-version.sp" { "9.0" } else { "0.4" };
+            assert_eq!(scan_language_decl(&source).as_deref(), Some(expected), "{}", file.display());
+        }
+    }
+}
+
 #[test]
 fn the_corpus_of_0_2_declares_its_version() {
     // a main file without a header record is read in the tool's default version, 0.3 (16.1): each
@@ -145,9 +176,8 @@ fn without_files(v: &mut Value) {
     }
 }
 
-#[test]
-fn spice_and_spectre_give_the_same_model() {
-    let dir = corpus().join("equivalence");
+fn check_equivalence(directory: &str) {
+    let dir = corpus().join(directory);
     let pairs = files(&dir, &["sp"]);
     assert!(!pairs.is_empty());
     for sp in pairs {
@@ -159,6 +189,16 @@ fn spice_and_spectre_give_the_same_model() {
         assert_eq!(a, b, "{} and its Spectre version differ", sp.display());
         assert!(!a["levels"][0]["items"].as_array().unwrap().is_empty());
     }
+}
+
+#[test]
+fn spice_and_spectre_give_the_same_model() {
+    check_equivalence("equivalence");
+}
+
+#[test]
+fn modern_spice_and_spectre_give_the_same_model() {
+    check_equivalence("equivalence-0.4");
 }
 
 /// The package files of the standard series, every version in a directory of its own, each written

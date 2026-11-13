@@ -1,0 +1,303 @@
+{
+  "failed": false,
+  "levels": [
+    {
+      "title": "11-conflict-hints.sp",
+      "kind": "file",
+      "file": "11-conflict-hints.sp",
+      "symbols": [
+        {
+          "name": "$RESISTOR",
+          "box": [
+            -1.0,
+            -2.0,
+            1.0,
+            2.0
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                2.0
+              ],
+              "terminals": [
+                "p"
+              ],
+              "label": null,
+              "dir": 90
+            },
+            {
+              "pos": [
+                0.0,
+                -2.0
+              ],
+              "terminals": [
+                "n"
+              ],
+              "label": null,
+              "dir": 270
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  2.0
+                ],
+                [
+                  0.0,
+                  0.8721
+                ],
+                [
+                  0.5372,
+                  0.6395
+                ],
+                [
+                  -0.4605,
+                  0.407
+                ],
+                [
+                  0.5372,
+                  0.1163
+                ],
+                [
+                  -0.4988,
+                  -0.1744
+                ],
+                [
+                  0.5372,
+                  -0.4651
+                ],
+                [
+                  -0.4605,
+                  -0.7558
+                ],
+                [
+                  0.0,
+                  -0.8721
+                ],
+                [
+                  0.0,
+                  -2.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        }
+      ],
+      "items": [
+        {
+          "id": "#R1",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            10.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {},
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#R2",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            0.0,
+            -8.0
+          ],
+          "orient": "MY",
+          "style": {},
+          "layer": "middle",
+          "texts": {}
+        }
+      ],
+      "wires": [],
+      "shapes": [],
+      "texts": [
+        {
+          "id": "#R1::name",
+          "anchor": [
+            10.95,
+            0.25
+          ],
+          "lines": [
+            [
+              {
+                "text": "R1",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {},
+          "layer": "middle"
+        },
+        {
+          "id": "#R1::value",
+          "anchor": [
+            10.95,
+            -1.2
+          ],
+          "lines": [
+            [
+              {
+                "text": "1k",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {},
+          "layer": "middle"
+        },
+        {
+          "id": "#R2::name",
+          "anchor": [
+            -0.95,
+            -7.75
+          ],
+          "lines": [
+            [
+              {
+                "text": "R2",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "MY",
+          "style": {},
+          "layer": "middle"
+        },
+        {
+          "id": "#R2::value",
+          "anchor": [
+            -0.95,
+            -9.2
+          ],
+          "lines": [
+            [
+              {
+                "text": "1k",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "MY",
+          "style": {},
+          "layer": "middle"
+        }
+      ],
+      "flylines": [
+        [
+          [
+            10.0,
+            -2.0
+          ],
+          [
+            0.0,
+            -6.0
+          ]
+        ]
+      ],
+      "constraints": [
+        {
+          "label": "%row",
+          "kind": "ALIGN",
+          "status": "dropped",
+          "priority": "normal"
+        }
+      ],
+      "unplaced": []
+    }
+  ],
+  "diagnostics": [
+    {
+      "severity": "hint",
+      "code": "RNL5102",
+      "name": "conflict-fact-discarded-with-sets",
+      "file": "11-conflict-hints.sp",
+      "line": 11,
+      "col": 5
+    },
+    {
+      "severity": "hint",
+      "code": "RNL5102",
+      "name": "conflict-fact-discarded-with-sets",
+      "file": "11-conflict-hints.sp",
+      "line": 13,
+      "col": 26
+    },
+    {
+      "severity": "hint",
+      "code": "RNL5102",
+      "name": "conflict-fact-discarded-with-sets",
+      "file": "11-conflict-hints.sp",
+      "line": 10,
+      "col": 11
+    },
+    {
+      "severity": "hint",
+      "code": "RNL5104",
+      "name": "conflict-statement-caused-discards",
+      "file": "11-conflict-hints.sp",
+      "line": 11,
+      "col": 5
+    },
+    {
+      "severity": "hint",
+      "code": "RNL5104",
+      "name": "conflict-statement-caused-discards",
+      "file": "11-conflict-hints.sp",
+      "line": 12,
+      "col": 5
+    },
+    {
+      "severity": "hint",
+      "code": "RNL5104",
+      "name": "conflict-statement-caused-discards",
+      "file": "11-conflict-hints.sp",
+      "line": 13,
+      "col": 5
+    },
+    {
+      "severity": "hint",
+      "code": "RNL5104",
+      "name": "conflict-statement-caused-discards",
+      "file": "11-conflict-hints.sp",
+      "line": 14,
+      "col": 5
+    }
+  ]
+}

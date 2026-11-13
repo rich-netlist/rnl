@@ -592,7 +592,11 @@
     {? ?p} @ALIGN("x");
     {? ?p} @ALIGN("y");
   };
-  # @SELECT-USAGE(recursive=true) $CURRENT_ARROW => @SET-SYMBOL $ARROW_SYMBOL;
+  /* A compact current marker leaves room for the adjacent pin or junction. */
+  %current_arrow_symbol = @DEFINE-SYMBOL(box=[-0.425, -0.2, 0.425, 0.2]) {
+    @LINE(fill="linecolor", linestyle="none") {(0.41425, 0) (-0.41425, 0.19765) (-0.41425, -0.19765) (0.41425, 0)};
+  };
+  # @SELECT-USAGE(recursive=true) $CURRENT_ARROW => @SET-SYMBOL %current_arrow_symbol;
 
   /* An arrow head drawn on a point in a symbol or in the scene (9.2.7). */
   $ARROW = @DEFINE(roles=[["at", "point"]]) {

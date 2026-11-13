@@ -1,0 +1,1169 @@
+{
+  "schema": "rnl-snapshot/1",
+  "failed": null,
+  "language": "0.4",
+  "levels": [
+    {
+      "id": "file:01-rc-lowpass.sp",
+      "kind": "file",
+      "name": "01-rc-lowpass.sp",
+      "file": 0,
+      "line": 0,
+      "status": null,
+      "host": {
+        "ports": [],
+        "instances": [
+          {
+            "id": "#V1",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&in"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&0"
+              }
+            ]
+          },
+          {
+            "id": "#R1",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&in"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&out"
+              }
+            ]
+          },
+          {
+            "id": "#C1",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&out"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&0"
+              }
+            ]
+          }
+        ],
+        "nets": [
+          {
+            "id": "&in",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&0",
+            "global": true,
+            "port": false,
+            "usages": [
+              {
+                "kind": "usage",
+                "id": "@rnl-std-basic.rnl:638:9#1",
+                "definition": "$GROUND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 638,
+                "source": "body",
+                "made_in": "%ground_stub_V1_n",
+                "state": "in-effect"
+              },
+              {
+                "kind": "usage",
+                "id": "@rnl-std-basic.rnl:638:9#2",
+                "definition": "$GROUND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 638,
+                "source": "body",
+                "made_in": "%ground_stub_C1_n",
+                "state": "in-effect"
+              }
+            ]
+          },
+          {
+            "id": "&out",
+            "global": false,
+            "port": false
+          }
+        ]
+      },
+      "model": {
+        "symbols": [
+          {
+            "id": "$VOLTAGE_SOURCE",
+            "name": "$VOLTAGE_SOURCE",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$RESISTOR",
+            "name": "$RESISTOR",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$CAPACITOR",
+            "name": "$CAPACITOR",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$JUNCTION_SYMBOL",
+            "name": "$JUNCTION_SYMBOL",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$GROUND_SYMBOL",
+            "name": "$GROUND_SYMBOL",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          }
+        ],
+        "symbol": {
+          "value": null,
+          "source": null
+        },
+        "objects": [
+          {
+            "id": "#V1",
+            "kind": "instance",
+            "host": [
+              "#V1"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$VOLTAGE_SOURCE",
+              "source": null
+            },
+            "at": {
+              "value": [
+                0.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(#V1,0)",
+                "index": 0,
+                "names": [
+                  "p"
+                ],
+                "bus": false,
+                "reference": "#V1::p",
+                "local_at": [
+                  0.0,
+                  2.0
+                ],
+                "terminals": [
+                  "#V1:1"
+                ],
+                "at": [
+                  0.0,
+                  2.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&in"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#V1,1)",
+                "index": 1,
+                "names": [
+                  "n"
+                ],
+                "bus": false,
+                "reference": "#V1::n",
+                "local_at": [
+                  0.0,
+                  -2.0
+                ],
+                "terminals": [
+                  "#V1:2"
+                ],
+                "at": [
+                  0.0,
+                  -2.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&0"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#R1",
+            "kind": "instance",
+            "host": [
+              "#R1"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$RESISTOR",
+              "source": null
+            },
+            "at": {
+              "value": [
+                6.0,
+                6.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R90",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(#R1,0)",
+                "index": 0,
+                "names": [
+                  "p"
+                ],
+                "bus": false,
+                "reference": "#R1::p",
+                "local_at": [
+                  0.0,
+                  2.0
+                ],
+                "terminals": [
+                  "#R1:1"
+                ],
+                "at": [
+                  4.0,
+                  6.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&in"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#R1,1)",
+                "index": 1,
+                "names": [
+                  "n"
+                ],
+                "bus": false,
+                "reference": "#R1::n",
+                "local_at": [
+                  0.0,
+                  -2.0
+                ],
+                "terminals": [
+                  "#R1:2"
+                ],
+                "at": [
+                  8.0,
+                  6.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&out"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#C1",
+            "kind": "instance",
+            "host": [
+              "#C1"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$CAPACITOR",
+              "source": null
+            },
+            "at": {
+              "value": [
+                12.0,
+                3.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(#C1,0)",
+                "index": 0,
+                "names": [
+                  "p"
+                ],
+                "bus": false,
+                "reference": "#C1::p",
+                "local_at": [
+                  0.0,
+                  2.0
+                ],
+                "terminals": [
+                  "#C1:1"
+                ],
+                "at": [
+                  12.0,
+                  5.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&out"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#C1,1)",
+                "index": 1,
+                "names": [
+                  "n"
+                ],
+                "bus": false,
+                "reference": "#C1::n",
+                "local_at": [
+                  0.0,
+                  -2.0
+                ],
+                "terminals": [
+                  "#C1:2"
+                ],
+                "at": [
+                  12.0,
+                  1.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&0"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "@01-rc-lowpass.sp:14:5",
+            "kind": "usage",
+            "host": [],
+            "definition": "$JUNCTION",
+            "attach": {
+              "p": "%j"
+            },
+            "symbol": {
+              "value": "$JUNCTION_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                12.0,
+                6.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "pin_of": "#V1",
+            "id": "%ground_stub_V1_n",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GROUND_STUB",
+            "attach": {
+              "t": "pin(#V1,1)"
+            },
+            "params": {
+              "gap": 1.0
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": [
+                0.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "parent": "%ground_stub_V1_n",
+            "id": "@rnl-std-basic.rnl:638:9#1",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GROUND",
+            "attach": {
+              "p": "&0"
+            },
+            "symbol": {
+              "value": "$GROUND_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                0.0,
+                -3.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(@rnl-std-basic.rnl:638:9#1,0)",
+                "index": 0,
+                "names": [
+                  "pin"
+                ],
+                "bus": false,
+                "reference": "%ground_stub_V1_n::g::pin",
+                "local_at": [
+                  0.0,
+                  0.0
+                ],
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  0.0,
+                  -3.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&0"
+                ]
+              }
+            ]
+          },
+          {
+            "pin_of": "#C1",
+            "id": "%ground_stub_C1_n",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GROUND_STUB",
+            "attach": {
+              "t": "pin(#C1,1)"
+            },
+            "params": {
+              "gap": 1.0
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": [
+                0.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "parent": "%ground_stub_C1_n",
+            "id": "@rnl-std-basic.rnl:638:9#2",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GROUND",
+            "attach": {
+              "p": "&0"
+            },
+            "symbol": {
+              "value": "$GROUND_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                12.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(@rnl-std-basic.rnl:638:9#2,0)",
+                "index": 0,
+                "names": [
+                  "pin"
+                ],
+                "bus": false,
+                "reference": "%ground_stub_C1_n::g::pin",
+                "local_at": [
+                  0.0,
+                  0.0
+                ],
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  12.0,
+                  0.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&0"
+                ]
+              }
+            ]
+          }
+        ],
+        "points": [
+          {
+            "id": "%input_corner",
+            "at": {
+              "value": [
+                0.0,
+                6.0
+              ],
+              "source": null
+            },
+            "junction": false
+          },
+          {
+            "id": "%j",
+            "at": {
+              "value": [
+                12.0,
+                6.0
+              ],
+              "source": null
+            },
+            "junction": true
+          },
+          {
+            "id": "%o",
+            "at": {
+              "value": [
+                17.0,
+                6.0
+              ],
+              "source": null
+            },
+            "junction": false
+          }
+        ],
+        "wires": [
+          {
+            "id": "@01-rc-lowpass.sp:9:5",
+            "nets": [
+              "&in"
+            ],
+            "via": [
+              {
+                "terminal": "#V1:1"
+              },
+              {
+                "point": "%input_corner"
+              },
+              {
+                "terminal": "#R1:1"
+              }
+            ],
+            "points": [
+              [
+                0.0,
+                2.0
+              ],
+              [
+                0.0,
+                6.0
+              ],
+              [
+                4.0,
+                6.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@01-rc-lowpass.sp:11:5",
+            "nets": [
+              "&out"
+            ],
+            "via": [
+              {
+                "terminal": "#R1:2"
+              },
+              {
+                "point": "%j"
+              },
+              {
+                "terminal": "#C1:1"
+              }
+            ],
+            "points": [
+              [
+                8.0,
+                6.0
+              ],
+              [
+                12.0,
+                6.0
+              ],
+              [
+                12.0,
+                5.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@01-rc-lowpass.sp:13:5",
+            "nets": [
+              "&out"
+            ],
+            "via": [
+              {
+                "point": "%j"
+              },
+              {
+                "point": "%o"
+              }
+            ],
+            "points": [
+              [
+                12.0,
+                6.0
+              ],
+              [
+                17.0,
+                6.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@rnl-std-basic.rnl:639:5#1",
+            "nets": [
+              "&0"
+            ],
+            "via": [
+              {
+                "owner": "#V1",
+                "pin": 1,
+                "reference": "#V1::n"
+              },
+              {
+                "owner": "@rnl-std-basic.rnl:638:9#1",
+                "pin": 0,
+                "reference": "@rnl-std-basic.rnl:638:9#1::pin"
+              }
+            ],
+            "points": [
+              [
+                0.0,
+                -2.0
+              ],
+              [
+                0.0,
+                -3.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@rnl-std-basic.rnl:639:5#2",
+            "nets": [
+              "&0"
+            ],
+            "via": [
+              {
+                "owner": "#C1",
+                "pin": 1,
+                "reference": "#C1::n"
+              },
+              {
+                "owner": "@rnl-std-basic.rnl:638:9#2",
+                "pin": 0,
+                "reference": "@rnl-std-basic.rnl:638:9#2::pin"
+              }
+            ],
+            "points": [
+              [
+                12.0,
+                1.0
+              ],
+              [
+                12.0,
+                0.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          }
+        ],
+        "texts": [
+          {
+            "id": "@01-rc-lowpass.sp:14:29",
+            "attach": "@01-rc-lowpass.sp:14:5",
+            "key": null,
+            "markup": {
+              "value": "(${p::x}, ${p::y})",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "(12, 6)",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              12.4,
+              5.1
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 0.7,
+            "style": {
+              "size": 0.7
+            }
+          },
+          {
+            "id": "@01-rc-lowpass.sp:15:5",
+            "attach": "%o",
+            "key": null,
+            "markup": {
+              "value": "V_{out}",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "V",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                },
+                {
+                  "kind": "text",
+                  "text": "out",
+                  "style": {
+                    "level": -1,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              17.4,
+              6.8
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "@01-rc-lowpass.sp:16:5",
+            "attach": null,
+            "key": null,
+            "markup": {
+              "value": "RC 低通：f_{c} = 1/(2\\pi RC) ≈ 159 kHz",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "RC 低通：f",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                },
+                {
+                  "kind": "text",
+                  "text": "c",
+                  "style": {
+                    "level": -1,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                },
+                {
+                  "kind": "text",
+                  "text": " = 1/(2πRC) ≈ 159 kHz",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              6.0,
+              11.0
+            ],
+            "halign": "middle",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#V1::name",
+            "attach": "#V1",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "V1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              1.5,
+              0.25
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#V1::value",
+            "attach": "#V1",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "DC 0 AC 1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              1.5,
+              -1.2
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R1::name",
+            "attach": "#R1",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "R1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              5.75,
+              6.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R1::value",
+            "attach": "#R1",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "1k",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              7.2,
+              6.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#C1::name",
+            "attach": "#C1",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "C1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              13.2,
+              3.25
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#C1::value",
+            "attach": "#C1",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "1n",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              13.2,
+              1.8
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          }
+        ],
+        "shapes": []
+      }
+    }
+  ],
+  "dialect": "spice",
+  "packages": [
+    {
+      "name": "rnl-std-style",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-basic",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-semiconductors",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-fill",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-semantics",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-functional",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-rf",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-logic",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-signal-flow",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-spice",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-spectre",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-all",
+      "version": "0.4"
+    }
+  ],
+  "files": [
+    {
+      "path": "01-rc-lowpass.sp",
+      "name": "01-rc-lowpass.sp"
+    }
+  ]
+}

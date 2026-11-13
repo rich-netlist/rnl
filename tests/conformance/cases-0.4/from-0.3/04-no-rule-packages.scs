@@ -1,0 +1,10 @@
+// An explicitly selected collection with no dialect rule packages drops nothing
+*! The collection imports basic symbols and writes its own rules, without either dialect rule package. In a Spectre file both collection rules remain: I0 is drawn by its name as a current source and R0 by its master as a resistor.
+simulator lang=spectre
+// @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="case04-no-rules", version="0.4", path="04-no-rule-packages.rnl")}
+subckt cell (p n)
+ends cell
+I0 (a 0) cell
+R0 (a 0) resistor r=1k
+// @RNL { #I0 @PLACE(0, 0); #R0 @PLACE(10, 0) }
+

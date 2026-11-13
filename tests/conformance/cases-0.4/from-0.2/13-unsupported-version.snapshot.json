@@ -1,0 +1,145 @@
+{
+  "schema": "rnl-snapshot/1",
+  "failed": null,
+  "language": "9.0",
+  "levels": [
+    {
+      "id": "file:13-unsupported-version.sp",
+      "kind": "file",
+      "name": "13-unsupported-version.sp",
+      "file": 0,
+      "line": 0,
+      "status": "2 without a position",
+      "host": {
+        "ports": [],
+        "instances": [
+          {
+            "id": "#R1",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&a"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&b"
+              }
+            ]
+          },
+          {
+            "id": "#C1",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&b"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&0"
+              }
+            ]
+          }
+        ],
+        "nets": [
+          {
+            "id": "&a",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&b",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&0",
+            "global": true,
+            "port": false
+          }
+        ]
+      },
+      "model": {
+        "symbols": [
+          {
+            "id": "%\"(viewer default)\"",
+            "name": "%\"(viewer default)\"",
+            "package": null,
+            "level": null,
+            "default": true,
+            "definition": null
+          }
+        ],
+        "symbol": {
+          "value": null,
+          "source": null
+        },
+        "objects": [
+          {
+            "id": "#R1",
+            "kind": "instance",
+            "host": [
+              "#R1"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "%\"(viewer default)\"",
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "#C1",
+            "kind": "instance",
+            "host": [
+              "#C1"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "%\"(viewer default)\"",
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          }
+        ],
+        "points": [],
+        "wires": [],
+        "texts": [],
+        "shapes": []
+      }
+    }
+  ],
+  "dialect": "spice",
+  "packages": [],
+  "files": [
+    {
+      "path": "13-unsupported-version.sp",
+      "name": "13-unsupported-version.sp"
+    }
+  ]
+}

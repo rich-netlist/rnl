@@ -1,0 +1,40 @@
+// File and section dialects, simulator lang=, and explicit USE-PACKAGE (16.3)
+//! 2.8, 16.3: Rule packages in the collection apply to each object's host language section.
+//! Rtop is in SPICE mode; X1 is in Spectre mode and receives the Spectre resistor rule.
+//! X2 also lies in Spectre mode; its explicit Spectre package reference is retained,
+//! though it is redundant in that section. Included files and library
+//! sections retain their own language switches and package selection.
+simulator lang=spice
+* @RNL(type="header") { @USE-PACKAGE(name="rnl-std-all", version="0.4");
+*   @VERSION("0.4")
+* }
+* @RNL { # @SELECT-PIN(recursive=true) => @REMOVE-FROM $LABEL_FILL_SET; $PORT_FILL_NET_SET = # @SELECT-NET(port=true, recursive=true); $SUPPLY_NET_SET @REMOVE-FROM $PORT_FILL_NET_SET; $GROUND_NET_SET @REMOVE-FROM $PORT_FILL_NET_SET; # @SELECT-USAGE(recursive=true) $IO_PORT => @SELECT-NET(recursive=true) => @REMOVE-FROM $PORT_FILL_NET_SET; $IO_PORT @ATTACH $PORT_FILL_NET_SET }
+
+* SPICE-mode object before the switch
+Rtop a b 1k
+* @RNL {
+*   #Rtop @PLACE(0, 0)
+* }
+
+* Switch to Spectre mode: its rule applies to objects in this section
+simulator lang=spectre
+
+subckt sub_dropped (a b)
+  X1 (a b) resistor r=1k
+// @RNL {
+//   #X1 @PLACE(0, 0)
+// }
+ends sub_dropped
+
+subckt sub_kept (a b)
+  X2 (a b) resistor r=1k
+// @RNL {
+//   @USE-PACKAGE(name="rnl-std-spectre", version="0.4");
+//   #X2 @PLACE(0, 0)
+// }
+ends sub_kept
+
+include "18-dialect-switch-sp.inc"
+include "18-dialect-switch-sec.inc" section=sec_sp
+include "18-dialect-switch-sec.inc" section=sec_scs
+

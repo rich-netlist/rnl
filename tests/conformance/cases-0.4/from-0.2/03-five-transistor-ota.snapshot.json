@@ -1,0 +1,4230 @@
+{
+  "schema": "rnl-snapshot/1",
+  "failed": null,
+  "language": "0.4",
+  "levels": [
+    {
+      "id": "file:03-five-transistor-ota.sp",
+      "kind": "file",
+      "name": "03-five-transistor-ota.sp",
+      "file": 0,
+      "line": 0,
+      "status": "constraints: 24 ok, 2 unsolved, 2 dropped",
+      "host": {
+        "ports": [],
+        "instances": [
+          {
+            "id": "#M1",
+            "subckt": false,
+            "master": "nch",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "d",
+                "net": "&x"
+              },
+              {
+                "n": 2,
+                "name": "g",
+                "net": "&inp"
+              },
+              {
+                "n": 3,
+                "name": "s",
+                "net": "&tail"
+              },
+              {
+                "n": 4,
+                "name": "b",
+                "net": "&0"
+              }
+            ]
+          },
+          {
+            "id": "#M2",
+            "subckt": false,
+            "master": "nch",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "d",
+                "net": "&out"
+              },
+              {
+                "n": 2,
+                "name": "g",
+                "net": "&inn"
+              },
+              {
+                "n": 3,
+                "name": "s",
+                "net": "&tail"
+              },
+              {
+                "n": 4,
+                "name": "b",
+                "net": "&0"
+              }
+            ]
+          },
+          {
+            "id": "#M3",
+            "subckt": false,
+            "master": "pch",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "d",
+                "net": "&x"
+              },
+              {
+                "n": 2,
+                "name": "g",
+                "net": "&x"
+              },
+              {
+                "n": 3,
+                "name": "s",
+                "net": "&vdd"
+              },
+              {
+                "n": 4,
+                "name": "b",
+                "net": "&vdd"
+              }
+            ]
+          },
+          {
+            "id": "#M4",
+            "subckt": false,
+            "master": "pch",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "d",
+                "net": "&out"
+              },
+              {
+                "n": 2,
+                "name": "g",
+                "net": "&x"
+              },
+              {
+                "n": 3,
+                "name": "s",
+                "net": "&vdd"
+              },
+              {
+                "n": 4,
+                "name": "b",
+                "net": "&vdd"
+              }
+            ]
+          },
+          {
+            "id": "#M5",
+            "subckt": false,
+            "master": "nch",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "d",
+                "net": "&tail"
+              },
+              {
+                "n": 2,
+                "name": "g",
+                "net": "&bias"
+              },
+              {
+                "n": 3,
+                "name": "s",
+                "net": "&0"
+              },
+              {
+                "n": 4,
+                "name": "b",
+                "net": "&0"
+              }
+            ]
+          },
+          {
+            "id": "#M6",
+            "subckt": false,
+            "master": "nch",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "d",
+                "net": "&bias"
+              },
+              {
+                "n": 2,
+                "name": "g",
+                "net": "&bias"
+              },
+              {
+                "n": 3,
+                "name": "s",
+                "net": "&0"
+              },
+              {
+                "n": 4,
+                "name": "b",
+                "net": "&0"
+              }
+            ]
+          },
+          {
+            "id": "#Ib",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&vdd"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&bias"
+              }
+            ]
+          },
+          {
+            "id": "#CL",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&out"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&0"
+              }
+            ]
+          },
+          {
+            "id": "#Vdd",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&vdd"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&0"
+              }
+            ]
+          }
+        ],
+        "nets": [
+          {
+            "id": "&x",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&inp",
+            "global": false,
+            "port": false,
+            "usages": [
+              {
+                "kind": "usage",
+                "id": "%pi",
+                "definition": "$NET_LABEL",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&inp",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 57,
+                "source": "written",
+                "state": "in-effect"
+              }
+            ]
+          },
+          {
+            "id": "&tail",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&0",
+            "global": true,
+            "port": false,
+            "usages": [
+              {
+                "kind": "usage",
+                "id": "%gs_M5_3",
+                "definition": "$GROUND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 83,
+                "source": "solver",
+                "state": "in-effect"
+              },
+              {
+                "kind": "usage",
+                "id": "%gs_M6_3",
+                "definition": "$GROUND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 84,
+                "source": "solver",
+                "state": "in-effect"
+              },
+              {
+                "kind": "usage",
+                "id": "%gs_CL_2",
+                "definition": "$GROUND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 85,
+                "source": "solver",
+                "state": "in-effect"
+              },
+              {
+                "kind": "usage",
+                "id": "%gs_Vdd_2",
+                "definition": "$GROUND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&0",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 86,
+                "source": "solver",
+                "state": "in-effect"
+              }
+            ]
+          },
+          {
+            "id": "&out",
+            "global": false,
+            "port": false,
+            "usages": [
+              {
+                "kind": "usage",
+                "id": "%po",
+                "definition": "$NET_LABEL",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&out",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 59,
+                "source": "written",
+                "state": "in-effect"
+              }
+            ]
+          },
+          {
+            "id": "&inn",
+            "global": false,
+            "port": false,
+            "usages": [
+              {
+                "kind": "usage",
+                "id": "%pn",
+                "definition": "$NET_LABEL",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&inn",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 58,
+                "source": "written",
+                "state": "in-effect"
+              }
+            ]
+          },
+          {
+            "id": "&vdd",
+            "global": false,
+            "port": false,
+            "usages": [
+              {
+                "kind": "usage",
+                "id": "%ss_M3_3",
+                "definition": "$SUPPLY",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&vdd",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 87,
+                "source": "solver",
+                "state": "in-effect"
+              },
+              {
+                "kind": "usage",
+                "id": "%ss_M4_3",
+                "definition": "$SUPPLY",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&vdd",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 88,
+                "source": "solver",
+                "state": "in-effect"
+              },
+              {
+                "kind": "usage",
+                "id": "%ss_Ib_1",
+                "definition": "$SUPPLY",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&vdd",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 89,
+                "source": "solver",
+                "state": "in-effect"
+              },
+              {
+                "kind": "usage",
+                "id": "%ss_Vdd_1",
+                "definition": "$SUPPLY",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&vdd",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 90,
+                "source": "solver",
+                "state": "in-effect"
+              }
+            ]
+          },
+          {
+            "id": "&bias",
+            "global": false,
+            "port": false
+          }
+        ]
+      },
+      "model": {
+        "symbols": [
+          {
+            "id": "$NMOS",
+            "name": "$NMOS",
+            "package": "rnl-std-semiconductors",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$PMOS",
+            "name": "$PMOS",
+            "package": "rnl-std-semiconductors",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$CURRENT_SOURCE",
+            "name": "$CURRENT_SOURCE",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$CAPACITOR",
+            "name": "$CAPACITOR",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$VOLTAGE_SOURCE",
+            "name": "$VOLTAGE_SOURCE",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$JUNCTION_SYMBOL",
+            "name": "$JUNCTION_SYMBOL",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$NET_LABEL_SYMBOL",
+            "name": "$NET_LABEL_SYMBOL",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$GROUND_SYMBOL",
+            "name": "$GROUND_SYMBOL",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$SUPPLY_SYMBOL",
+            "name": "$SUPPLY_SYMBOL",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          }
+        ],
+        "symbol": {
+          "value": null,
+          "source": null
+        },
+        "objects": [
+          {
+            "id": "#M1",
+            "kind": "instance",
+            "host": [
+              "#M1"
+            ],
+            "definition": null,
+            "attach": null,
+            "style": {
+              "bold": true,
+              "cap": "butt",
+              "fillcolor": "#ffffff",
+              "join": "miter",
+              "linecolor": "#1f4fd8",
+              "linestyle": "bold",
+              "linewidth": 0.16,
+              "size": 1.0,
+              "textcolor": "#1d1d1f"
+            },
+            "symbol": {
+              "value": "$NMOS",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -6.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(#M1,0)",
+                "index": 0,
+                "names": [
+                  "d"
+                ],
+                "bus": false,
+                "reference": "#M1::d",
+                "local_at": [
+                  0.0,
+                  2.0
+                ],
+                "terminals": [
+                  "#M1:1"
+                ],
+                "at": [
+                  -6.0,
+                  2.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&x"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#M1,1)",
+                "index": 1,
+                "names": [
+                  "g"
+                ],
+                "bus": false,
+                "reference": "#M1::g",
+                "local_at": [
+                  -3.0,
+                  0.0
+                ],
+                "terminals": [
+                  "#M1:2"
+                ],
+                "at": [
+                  -9.0,
+                  0.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&inp"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#M1,2)",
+                "index": 2,
+                "names": [
+                  "s"
+                ],
+                "bus": false,
+                "reference": "#M1::s",
+                "local_at": [
+                  0.0,
+                  -2.0
+                ],
+                "terminals": [
+                  "#M1:3"
+                ],
+                "at": [
+                  -6.0,
+                  -2.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&tail"
+                ]
+              }
+            ],
+            "usages": [
+              {
+                "kind": "usage",
+                "id": "%dp",
+                "definition": "$DIFFPAIR",
+                "roles": [
+                  {
+                    "role": "in_p",
+                    "set": false,
+                    "member": "#M1",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 25,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "kind": "usage",
+                "id": "@03-five-transistor-ota.sp:28:5",
+                "definition": "$MATCHED",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "#M1",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 28,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "kind": "usage",
+                "id": "@03-five-transistor-ota.sp:32:3",
+                "definition": "$MIRRORED",
+                "roles": [
+                  {
+                    "role": "left",
+                    "set": false,
+                    "member": "#M1",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 32,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "kind": "usage",
+                "id": "%tc",
+                "definition": "$TAIL_CENTER",
+                "roles": [
+                  {
+                    "role": "a",
+                    "set": false,
+                    "member": "#M1",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 34,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "kind": "usage",
+                "id": "@03-five-transistor-ota.sp:35:5",
+                "definition": "$FLOW",
+                "roles": [
+                  {
+                    "role": "path",
+                    "set": true,
+                    "member": "#M1",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 35,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "kind": "group",
+                "id": "%core",
+                "definition": "",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "#M1",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 41,
+                "source": "written",
+                "state": "in-effect"
+              }
+            ]
+          },
+          {
+            "id": "#M2",
+            "kind": "instance",
+            "host": [
+              "#M2"
+            ],
+            "definition": null,
+            "attach": null,
+            "style": {
+              "bold": true,
+              "cap": "butt",
+              "fillcolor": "#ffffff",
+              "join": "miter",
+              "linecolor": "#1f4fd8",
+              "linestyle": "bold",
+              "linewidth": 0.16,
+              "size": 1.0,
+              "textcolor": "#1d1d1f"
+            },
+            "symbol": {
+              "value": "$NMOS",
+              "source": null
+            },
+            "at": {
+              "value": [
+                6.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "MY",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(#M2,0)",
+                "index": 0,
+                "names": [
+                  "d"
+                ],
+                "bus": false,
+                "reference": "#M2::d",
+                "local_at": [
+                  0.0,
+                  2.0
+                ],
+                "terminals": [
+                  "#M2:1"
+                ],
+                "at": [
+                  6.0,
+                  2.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&out"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#M2,1)",
+                "index": 1,
+                "names": [
+                  "g"
+                ],
+                "bus": false,
+                "reference": "#M2::g",
+                "local_at": [
+                  -3.0,
+                  0.0
+                ],
+                "terminals": [
+                  "#M2:2"
+                ],
+                "at": [
+                  9.0,
+                  0.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&inn"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#M2,2)",
+                "index": 2,
+                "names": [
+                  "s"
+                ],
+                "bus": false,
+                "reference": "#M2::s",
+                "local_at": [
+                  0.0,
+                  -2.0
+                ],
+                "terminals": [
+                  "#M2:3"
+                ],
+                "at": [
+                  6.0,
+                  -2.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&tail"
+                ]
+              }
+            ],
+            "usages": [
+              {
+                "kind": "usage",
+                "id": "%dp",
+                "definition": "$DIFFPAIR",
+                "roles": [
+                  {
+                    "role": "in_n",
+                    "set": false,
+                    "member": "#M2",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 25,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "kind": "usage",
+                "id": "@03-five-transistor-ota.sp:28:5",
+                "definition": "$MATCHED",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "#M2",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 28,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "kind": "usage",
+                "id": "@03-five-transistor-ota.sp:32:3",
+                "definition": "$MIRRORED",
+                "roles": [
+                  {
+                    "role": "right",
+                    "set": false,
+                    "member": "#M2",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 32,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "kind": "usage",
+                "id": "%tc",
+                "definition": "$TAIL_CENTER",
+                "roles": [
+                  {
+                    "role": "b",
+                    "set": false,
+                    "member": "#M2",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 34,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "kind": "usage",
+                "id": "@03-five-transistor-ota.sp:35:5",
+                "definition": "$FLOW",
+                "roles": [
+                  {
+                    "role": "path",
+                    "set": true,
+                    "member": "#M2",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 35,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "kind": "group",
+                "id": "%core",
+                "definition": "",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "#M2",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 41,
+                "source": "written",
+                "state": "in-effect"
+              }
+            ]
+          },
+          {
+            "id": "#M3",
+            "kind": "instance",
+            "host": [
+              "#M3"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$PMOS",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -6.0,
+                8.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "MY",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(#M3,0)",
+                "index": 0,
+                "names": [
+                  "d"
+                ],
+                "bus": false,
+                "reference": "#M3::d",
+                "local_at": [
+                  0.0,
+                  -2.0
+                ],
+                "terminals": [
+                  "#M3:1"
+                ],
+                "at": [
+                  -6.0,
+                  6.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&x"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#M3,1)",
+                "index": 1,
+                "names": [
+                  "g"
+                ],
+                "bus": false,
+                "reference": "#M3::g",
+                "local_at": [
+                  -3.0,
+                  0.0
+                ],
+                "terminals": [
+                  "#M3:2"
+                ],
+                "at": [
+                  -3.0,
+                  8.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&x"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#M3,2)",
+                "index": 2,
+                "names": [
+                  "s"
+                ],
+                "bus": false,
+                "reference": "#M3::s",
+                "local_at": [
+                  0.0,
+                  2.0
+                ],
+                "terminals": [
+                  "#M3:3"
+                ],
+                "at": [
+                  -6.0,
+                  10.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&vdd"
+                ]
+              }
+            ],
+            "usages": [
+              {
+                "kind": "usage",
+                "id": "%cm",
+                "definition": "$CURRENT_MIRROR",
+                "roles": [
+                  {
+                    "role": "ref",
+                    "set": false,
+                    "member": "#M3",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 26,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "kind": "usage",
+                "id": "@03-five-transistor-ota.sp:33:3",
+                "definition": "$MIRRORED",
+                "roles": [
+                  {
+                    "role": "left",
+                    "set": false,
+                    "member": "#M3",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 33,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "kind": "group",
+                "id": "%core",
+                "definition": "",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "#M3",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 41,
+                "source": "written",
+                "state": "in-effect"
+              }
+            ]
+          },
+          {
+            "id": "#M4",
+            "kind": "instance",
+            "host": [
+              "#M4"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$PMOS",
+              "source": null
+            },
+            "at": {
+              "value": [
+                6.0,
+                8.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(#M4,0)",
+                "index": 0,
+                "names": [
+                  "d"
+                ],
+                "bus": false,
+                "reference": "#M4::d",
+                "local_at": [
+                  0.0,
+                  -2.0
+                ],
+                "terminals": [
+                  "#M4:1"
+                ],
+                "at": [
+                  6.0,
+                  6.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&out"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#M4,1)",
+                "index": 1,
+                "names": [
+                  "g"
+                ],
+                "bus": false,
+                "reference": "#M4::g",
+                "local_at": [
+                  -3.0,
+                  0.0
+                ],
+                "terminals": [
+                  "#M4:2"
+                ],
+                "at": [
+                  3.0,
+                  8.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&x"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#M4,2)",
+                "index": 2,
+                "names": [
+                  "s"
+                ],
+                "bus": false,
+                "reference": "#M4::s",
+                "local_at": [
+                  0.0,
+                  2.0
+                ],
+                "terminals": [
+                  "#M4:3"
+                ],
+                "at": [
+                  6.0,
+                  10.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&vdd"
+                ]
+              }
+            ],
+            "usages": [
+              {
+                "kind": "usage",
+                "id": "%cm",
+                "definition": "$CURRENT_MIRROR",
+                "roles": [
+                  {
+                    "role": "out",
+                    "set": false,
+                    "member": "#M4",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 26,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "kind": "usage",
+                "id": "@03-five-transistor-ota.sp:33:3",
+                "definition": "$MIRRORED",
+                "roles": [
+                  {
+                    "role": "right",
+                    "set": false,
+                    "member": "#M4",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 33,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "kind": "group",
+                "id": "%core",
+                "definition": "",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "#M4",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 41,
+                "source": "written",
+                "state": "in-effect"
+              }
+            ]
+          },
+          {
+            "id": "#M5",
+            "kind": "instance",
+            "host": [
+              "#M5"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$NMOS",
+              "source": null
+            },
+            "at": {
+              "value": [
+                0.0,
+                -6.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(#M5,0)",
+                "index": 0,
+                "names": [
+                  "d"
+                ],
+                "bus": false,
+                "reference": "#M5::d",
+                "local_at": [
+                  0.0,
+                  2.0
+                ],
+                "terminals": [
+                  "#M5:1"
+                ],
+                "at": [
+                  0.0,
+                  -4.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&tail"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#M5,1)",
+                "index": 1,
+                "names": [
+                  "g"
+                ],
+                "bus": false,
+                "reference": "#M5::g",
+                "local_at": [
+                  -3.0,
+                  0.0
+                ],
+                "terminals": [
+                  "#M5:2"
+                ],
+                "at": [
+                  -3.0,
+                  -6.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&bias"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#M5,2)",
+                "index": 2,
+                "names": [
+                  "s"
+                ],
+                "bus": false,
+                "reference": "#M5::s",
+                "local_at": [
+                  0.0,
+                  -2.0
+                ],
+                "terminals": [
+                  "#M5:3"
+                ],
+                "at": [
+                  0.0,
+                  -8.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&0"
+                ]
+              }
+            ],
+            "usages": [
+              {
+                "kind": "usage",
+                "id": "%is",
+                "definition": "$INPUT_STAGE",
+                "roles": [
+                  {
+                    "role": "tail",
+                    "set": false,
+                    "member": "#M5",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 27,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "kind": "usage",
+                "id": "%tc",
+                "definition": "$TAIL_CENTER",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#M5",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 34,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "kind": "group",
+                "id": "%core",
+                "definition": "",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "#M5",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 41,
+                "source": "written",
+                "state": "in-effect"
+              }
+            ]
+          },
+          {
+            "id": "#M6",
+            "kind": "instance",
+            "host": [
+              "#M6"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$NMOS",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -22.0,
+                -6.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "MY",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(#M6,0)",
+                "index": 0,
+                "names": [
+                  "d"
+                ],
+                "bus": false,
+                "reference": "#M6::d",
+                "local_at": [
+                  0.0,
+                  2.0
+                ],
+                "terminals": [
+                  "#M6:1"
+                ],
+                "at": [
+                  -22.0,
+                  -4.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&bias"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#M6,1)",
+                "index": 1,
+                "names": [
+                  "g"
+                ],
+                "bus": false,
+                "reference": "#M6::g",
+                "local_at": [
+                  -3.0,
+                  0.0
+                ],
+                "terminals": [
+                  "#M6:2"
+                ],
+                "at": [
+                  -19.0,
+                  -6.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&bias"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#M6,2)",
+                "index": 2,
+                "names": [
+                  "s"
+                ],
+                "bus": false,
+                "reference": "#M6::s",
+                "local_at": [
+                  0.0,
+                  -2.0
+                ],
+                "terminals": [
+                  "#M6:3"
+                ],
+                "at": [
+                  -22.0,
+                  -8.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&0"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#Ib",
+            "kind": "instance",
+            "host": [
+              "#Ib"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$CURRENT_SOURCE",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -22.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(#Ib,0)",
+                "index": 0,
+                "names": [
+                  "p"
+                ],
+                "bus": false,
+                "reference": "#Ib::p",
+                "local_at": [
+                  0.0,
+                  2.0
+                ],
+                "terminals": [
+                  "#Ib:1"
+                ],
+                "at": [
+                  -22.0,
+                  2.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&vdd"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#Ib,1)",
+                "index": 1,
+                "names": [
+                  "n"
+                ],
+                "bus": false,
+                "reference": "#Ib::n",
+                "local_at": [
+                  0.0,
+                  -2.0
+                ],
+                "terminals": [
+                  "#Ib:2"
+                ],
+                "at": [
+                  -22.0,
+                  -2.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&bias"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#CL",
+            "kind": "instance",
+            "host": [
+              "#CL"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$CAPACITOR",
+              "source": null
+            },
+            "at": {
+              "value": [
+                16.0,
+                1.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(#CL,0)",
+                "index": 0,
+                "names": [
+                  "p"
+                ],
+                "bus": false,
+                "reference": "#CL::p",
+                "local_at": [
+                  0.0,
+                  2.0
+                ],
+                "terminals": [
+                  "#CL:1"
+                ],
+                "at": [
+                  16.0,
+                  3.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&out"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#CL,1)",
+                "index": 1,
+                "names": [
+                  "n"
+                ],
+                "bus": false,
+                "reference": "#CL::n",
+                "local_at": [
+                  0.0,
+                  -2.0
+                ],
+                "terminals": [
+                  "#CL:2"
+                ],
+                "at": [
+                  16.0,
+                  -1.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&0"
+                ]
+              }
+            ],
+            "usages": [
+              {
+                "kind": "usage",
+                "id": "@03-five-transistor-ota.sp:35:5",
+                "definition": "$FLOW",
+                "roles": [
+                  {
+                    "role": "path",
+                    "set": true,
+                    "member": "#CL",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 35,
+                "source": "written",
+                "state": "in-effect"
+              }
+            ]
+          },
+          {
+            "id": "#Vdd",
+            "kind": "instance",
+            "host": [
+              "#Vdd"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$VOLTAGE_SOURCE",
+              "source": null
+            },
+            "at": {
+              "value": [
+                28.0,
+                4.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(#Vdd,0)",
+                "index": 0,
+                "names": [
+                  "p"
+                ],
+                "bus": false,
+                "reference": "#Vdd::p",
+                "local_at": [
+                  0.0,
+                  2.0
+                ],
+                "terminals": [
+                  "#Vdd:1"
+                ],
+                "at": [
+                  28.0,
+                  6.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&vdd"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#Vdd,1)",
+                "index": 1,
+                "names": [
+                  "n"
+                ],
+                "bus": false,
+                "reference": "#Vdd::n",
+                "local_at": [
+                  0.0,
+                  -2.0
+                ],
+                "terminals": [
+                  "#Vdd:2"
+                ],
+                "at": [
+                  28.0,
+                  2.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&0"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "%dp",
+            "kind": "usage",
+            "host": [],
+            "definition": "$DIFFPAIR",
+            "attach": {
+              "in_p": "#M1",
+              "in_n": "#M2"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [],
+            "usages": [
+              {
+                "kind": "usage",
+                "id": "%is",
+                "definition": "$INPUT_STAGE",
+                "roles": [
+                  {
+                    "role": "pair",
+                    "set": false,
+                    "member": "%dp",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 27,
+                "source": "written",
+                "state": "in-effect"
+              }
+            ]
+          },
+          {
+            "id": "%cm",
+            "kind": "usage",
+            "host": [],
+            "definition": "$CURRENT_MIRROR",
+            "attach": {
+              "ref": "#M3",
+              "out": "#M4"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "%is",
+            "kind": "usage",
+            "host": [],
+            "definition": "$INPUT_STAGE",
+            "attach": {
+              "pair": "%dp",
+              "tail": "#M5"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@03-five-transistor-ota.sp:28:5",
+            "kind": "usage",
+            "host": [],
+            "definition": "$MATCHED",
+            "attach": {
+              "members": [
+                "#M1",
+                "#M2"
+              ]
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@03-five-transistor-ota.sp:32:3",
+            "kind": "usage",
+            "host": [],
+            "definition": "$MIRRORED",
+            "attach": {
+              "left": "#M1",
+              "right": "#M2",
+              "axis": "%ax"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@03-five-transistor-ota.sp:33:3",
+            "kind": "usage",
+            "host": [],
+            "definition": "$MIRRORED",
+            "attach": {
+              "left": "#M3",
+              "right": "#M4",
+              "axis": "%ax"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "%tc",
+            "kind": "usage",
+            "host": [],
+            "definition": "$TAIL_CENTER",
+            "attach": {
+              "a": "#M1",
+              "b": "#M2",
+              "t": "#M5"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": [
+                0.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@03-five-transistor-ota.sp:35:5",
+            "kind": "usage",
+            "host": [],
+            "definition": "$FLOW",
+            "attach": {
+              "path": [
+                "#M1",
+                "#M2",
+                "#CL"
+              ]
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@03-five-transistor-ota.sp:55:5",
+            "kind": "usage",
+            "host": [],
+            "definition": "$JUNCTION",
+            "attach": {
+              "p": "%jd"
+            },
+            "symbol": {
+              "value": "$JUNCTION_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -6.0,
+                4.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@03-five-transistor-ota.sp:55:45",
+            "kind": "usage",
+            "host": [],
+            "definition": "$JUNCTION",
+            "attach": {
+              "p": "%jg"
+            },
+            "symbol": {
+              "value": "$JUNCTION_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -2.0,
+                8.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@03-five-transistor-ota.sp:55:85",
+            "kind": "usage",
+            "host": [],
+            "definition": "$JUNCTION",
+            "attach": {
+              "p": "%jo"
+            },
+            "symbol": {
+              "value": "$JUNCTION_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                6.0,
+                4.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@03-five-transistor-ota.sp:55:124",
+            "kind": "usage",
+            "host": [],
+            "definition": "$JUNCTION",
+            "attach": {
+              "p": "%jc"
+            },
+            "symbol": {
+              "value": "$JUNCTION_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                16.0,
+                4.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@03-five-transistor-ota.sp:55:164",
+            "kind": "usage",
+            "host": [],
+            "definition": "$JUNCTION",
+            "attach": {
+              "p": "%jt"
+            },
+            "symbol": {
+              "value": "$JUNCTION_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                0.0,
+                -3.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@03-five-transistor-ota.sp:55:204",
+            "kind": "usage",
+            "host": [],
+            "definition": "$JUNCTION",
+            "attach": {
+              "p": "%jb"
+            },
+            "symbol": {
+              "value": "$JUNCTION_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -22.0,
+                -3.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@03-five-transistor-ota.sp:55:246",
+            "kind": "usage",
+            "host": [],
+            "definition": "$JUNCTION",
+            "attach": {
+              "p": "%j6"
+            },
+            "symbol": {
+              "value": "$JUNCTION_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -14.0,
+                -6.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "%pi",
+            "kind": "usage",
+            "host": [],
+            "definition": "$NET_LABEL",
+            "attach": {
+              "p": "&inp"
+            },
+            "symbol": {
+              "value": "$NET_LABEL_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -11.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "MY",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(%pi,0)",
+                "index": 0,
+                "names": [
+                  "pin"
+                ],
+                "bus": false,
+                "reference": "%pi::pin",
+                "local_at": [
+                  0.0,
+                  0.0
+                ],
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  -11.0,
+                  0.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&inp"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "%pn",
+            "kind": "usage",
+            "host": [],
+            "definition": "$NET_LABEL",
+            "attach": {
+              "p": "&inn"
+            },
+            "symbol": {
+              "value": "$NET_LABEL_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                11.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(%pn,0)",
+                "index": 0,
+                "names": [
+                  "pin"
+                ],
+                "bus": false,
+                "reference": "%pn::pin",
+                "local_at": [
+                  0.0,
+                  0.0
+                ],
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  11.0,
+                  0.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&inn"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "%po",
+            "kind": "usage",
+            "host": [],
+            "definition": "$NET_LABEL",
+            "attach": {
+              "p": "&out"
+            },
+            "symbol": {
+              "value": "$NET_LABEL_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                21.0,
+                4.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(%po,0)",
+                "index": 0,
+                "names": [
+                  "pin"
+                ],
+                "bus": false,
+                "reference": "%po::pin",
+                "local_at": [
+                  0.0,
+                  0.0
+                ],
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  21.0,
+                  4.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&out"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "%gs_M5_3",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GROUND",
+            "attach": {
+              "p": "&0"
+            },
+            "symbol": {
+              "value": "$GROUND_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                0.0,
+                -10.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(%gs_M5_3,0)",
+                "index": 0,
+                "names": [
+                  "pin"
+                ],
+                "bus": false,
+                "reference": "%gs_M5_3::pin",
+                "local_at": [
+                  0.0,
+                  0.0
+                ],
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  0.0,
+                  -10.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&0"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "%gs_M6_3",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GROUND",
+            "attach": {
+              "p": "&0"
+            },
+            "symbol": {
+              "value": "$GROUND_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -22.0,
+                -10.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(%gs_M6_3,0)",
+                "index": 0,
+                "names": [
+                  "pin"
+                ],
+                "bus": false,
+                "reference": "%gs_M6_3::pin",
+                "local_at": [
+                  0.0,
+                  0.0
+                ],
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  -22.0,
+                  -10.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&0"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "%gs_CL_2",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GROUND",
+            "attach": {
+              "p": "&0"
+            },
+            "symbol": {
+              "value": "$GROUND_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                16.0,
+                -3.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(%gs_CL_2,0)",
+                "index": 0,
+                "names": [
+                  "pin"
+                ],
+                "bus": false,
+                "reference": "%gs_CL_2::pin",
+                "local_at": [
+                  0.0,
+                  0.0
+                ],
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  16.0,
+                  -3.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&0"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "%gs_Vdd_2",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GROUND",
+            "attach": {
+              "p": "&0"
+            },
+            "symbol": {
+              "value": "$GROUND_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                28.0,
+                -1.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(%gs_Vdd_2,0)",
+                "index": 0,
+                "names": [
+                  "pin"
+                ],
+                "bus": false,
+                "reference": "%gs_Vdd_2::pin",
+                "local_at": [
+                  0.0,
+                  0.0
+                ],
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  28.0,
+                  -1.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&0"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "%ss_M3_3",
+            "kind": "usage",
+            "host": [],
+            "definition": "$SUPPLY",
+            "attach": {
+              "p": "&vdd"
+            },
+            "symbol": {
+              "value": "$SUPPLY_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -6.0,
+                12.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(%ss_M3_3,0)",
+                "index": 0,
+                "names": [
+                  "pin"
+                ],
+                "bus": false,
+                "reference": "%ss_M3_3::pin",
+                "local_at": [
+                  0.0,
+                  0.0
+                ],
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  -6.0,
+                  12.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&vdd"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "%ss_M4_3",
+            "kind": "usage",
+            "host": [],
+            "definition": "$SUPPLY",
+            "attach": {
+              "p": "&vdd"
+            },
+            "symbol": {
+              "value": "$SUPPLY_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                6.0,
+                12.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(%ss_M4_3,0)",
+                "index": 0,
+                "names": [
+                  "pin"
+                ],
+                "bus": false,
+                "reference": "%ss_M4_3::pin",
+                "local_at": [
+                  0.0,
+                  0.0
+                ],
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  6.0,
+                  12.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&vdd"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "%ss_Ib_1",
+            "kind": "usage",
+            "host": [],
+            "definition": "$SUPPLY",
+            "attach": {
+              "p": "&vdd"
+            },
+            "symbol": {
+              "value": "$SUPPLY_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -22.0,
+                5.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(%ss_Ib_1,0)",
+                "index": 0,
+                "names": [
+                  "pin"
+                ],
+                "bus": false,
+                "reference": "%ss_Ib_1::pin",
+                "local_at": [
+                  0.0,
+                  0.0
+                ],
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  -22.0,
+                  5.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&vdd"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "%ss_Vdd_1",
+            "kind": "usage",
+            "host": [],
+            "definition": "$SUPPLY",
+            "attach": {
+              "p": "&vdd"
+            },
+            "symbol": {
+              "value": "$SUPPLY_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                28.0,
+                9.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(%ss_Vdd_1,0)",
+                "index": 0,
+                "names": [
+                  "pin"
+                ],
+                "bus": false,
+                "reference": "%ss_Vdd_1::pin",
+                "local_at": [
+                  0.0,
+                  0.0
+                ],
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  28.0,
+                  9.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&vdd"
+                ]
+              }
+            ]
+          }
+        ],
+        "points": [
+          {
+            "id": "%ax",
+            "at": {
+              "value": [
+                0.0,
+                3.0
+              ],
+              "source": null
+            },
+            "junction": false
+          },
+          {
+            "id": "%jd",
+            "at": {
+              "value": [
+                -6.0,
+                4.0
+              ],
+              "source": null
+            },
+            "junction": true
+          },
+          {
+            "id": "%jg",
+            "at": {
+              "value": [
+                -2.0,
+                8.0
+              ],
+              "source": null
+            },
+            "junction": true
+          },
+          {
+            "id": "%jo",
+            "at": {
+              "value": [
+                6.0,
+                4.0
+              ],
+              "source": null
+            },
+            "junction": true
+          },
+          {
+            "id": "%jc",
+            "at": {
+              "value": [
+                16.0,
+                4.0
+              ],
+              "source": null
+            },
+            "junction": true
+          },
+          {
+            "id": "%jt",
+            "at": {
+              "value": [
+                0.0,
+                -3.0
+              ],
+              "source": null
+            },
+            "junction": true
+          },
+          {
+            "id": "%jb",
+            "at": {
+              "value": [
+                -22.0,
+                -3.0
+              ],
+              "source": null
+            },
+            "junction": true
+          },
+          {
+            "id": "%j6",
+            "at": {
+              "value": [
+                -14.0,
+                -6.0
+              ],
+              "source": null
+            },
+            "junction": true
+          }
+        ],
+        "wires": [
+          {
+            "id": "@03-five-transistor-ota.sp:45:5",
+            "nets": [
+              "&x"
+            ],
+            "via": [
+              {
+                "terminal": "#M3:1"
+              },
+              {
+                "point": "%jd"
+              },
+              {
+                "terminal": "#M1:1"
+              }
+            ],
+            "points": [
+              [
+                -6.0,
+                6.0
+              ],
+              [
+                -6.0,
+                4.0
+              ],
+              [
+                -6.0,
+                2.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@03-five-transistor-ota.sp:46:5",
+            "nets": [
+              "&x"
+            ],
+            "via": [
+              {
+                "terminal": "#M3:2"
+              },
+              {
+                "point": "%jg"
+              },
+              {
+                "terminal": "#M4:2"
+              }
+            ],
+            "points": [
+              [
+                -3.0,
+                8.0
+              ],
+              [
+                -2.0,
+                8.0
+              ],
+              [
+                3.0,
+                8.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@03-five-transistor-ota.sp:47:5",
+            "nets": [
+              "&x"
+            ],
+            "via": [
+              {
+                "point": "%jd"
+              },
+              {
+                "at": [
+                  -2.0,
+                  4.0
+                ]
+              },
+              {
+                "point": "%jg"
+              }
+            ],
+            "points": [
+              [
+                -6.0,
+                4.0
+              ],
+              [
+                -2.0,
+                4.0
+              ],
+              [
+                -2.0,
+                8.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@03-five-transistor-ota.sp:48:5",
+            "nets": [
+              "&out"
+            ],
+            "via": [
+              {
+                "terminal": "#M4:1"
+              },
+              {
+                "point": "%jo"
+              },
+              {
+                "terminal": "#M2:1"
+              }
+            ],
+            "points": [
+              [
+                6.0,
+                6.0
+              ],
+              [
+                6.0,
+                4.0
+              ],
+              [
+                6.0,
+                2.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@03-five-transistor-ota.sp:49:5",
+            "nets": [
+              "&tail"
+            ],
+            "via": [
+              {
+                "terminal": "#M1:3"
+              },
+              {
+                "at": [
+                  -6.0,
+                  -3.0
+                ]
+              },
+              {
+                "point": "%jt"
+              }
+            ],
+            "points": [
+              [
+                -6.0,
+                -2.0
+              ],
+              [
+                -6.0,
+                -3.0
+              ],
+              [
+                0.0,
+                -3.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@03-five-transistor-ota.sp:50:5",
+            "nets": [
+              "&tail"
+            ],
+            "via": [
+              {
+                "terminal": "#M2:3"
+              },
+              {
+                "at": [
+                  6.0,
+                  -3.0
+                ]
+              },
+              {
+                "point": "%jt"
+              }
+            ],
+            "points": [
+              [
+                6.0,
+                -2.0
+              ],
+              [
+                6.0,
+                -3.0
+              ],
+              [
+                0.0,
+                -3.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@03-five-transistor-ota.sp:51:5",
+            "nets": [
+              "&tail"
+            ],
+            "via": [
+              {
+                "point": "%jt"
+              },
+              {
+                "terminal": "#M5:1"
+              }
+            ],
+            "points": [
+              [
+                0.0,
+                -3.0
+              ],
+              [
+                0.0,
+                -4.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@03-five-transistor-ota.sp:52:5",
+            "nets": [
+              "&bias"
+            ],
+            "via": [
+              {
+                "terminal": "#Ib:2"
+              },
+              {
+                "point": "%jb"
+              },
+              {
+                "terminal": "#M6:1"
+              }
+            ],
+            "points": [
+              [
+                -22.0,
+                -2.0
+              ],
+              [
+                -22.0,
+                -3.0
+              ],
+              [
+                -22.0,
+                -4.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@03-five-transistor-ota.sp:53:5",
+            "nets": [
+              "&bias"
+            ],
+            "via": [
+              {
+                "terminal": "#M6:2"
+              },
+              {
+                "point": "%j6"
+              },
+              {
+                "terminal": "#M5:2"
+              }
+            ],
+            "points": [
+              [
+                -19.0,
+                -6.0
+              ],
+              [
+                -14.0,
+                -6.0
+              ],
+              [
+                -3.0,
+                -6.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@03-five-transistor-ota.sp:54:5",
+            "nets": [
+              "&bias"
+            ],
+            "via": [
+              {
+                "point": "%j6"
+              },
+              {
+                "at": [
+                  -14.0,
+                  -3.0
+                ]
+              },
+              {
+                "point": "%jb"
+              }
+            ],
+            "points": [
+              [
+                -14.0,
+                -6.0
+              ],
+              [
+                -14.0,
+                -3.0
+              ],
+              [
+                -22.0,
+                -3.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@03-five-transistor-ota.sp:60:5",
+            "nets": [
+              "&inp"
+            ],
+            "via": [
+              {
+                "usage": "%pi",
+                "role": "p"
+              },
+              {
+                "terminal": "#M1:2"
+              }
+            ],
+            "points": [
+              [
+                -11.0,
+                0.0
+              ],
+              [
+                -9.0,
+                0.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@03-five-transistor-ota.sp:61:5",
+            "nets": [
+              "&inn"
+            ],
+            "via": [
+              {
+                "usage": "%pn",
+                "role": "p"
+              },
+              {
+                "terminal": "#M2:2"
+              }
+            ],
+            "points": [
+              [
+                11.0,
+                0.0
+              ],
+              [
+                9.0,
+                0.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@03-five-transistor-ota.sp:62:5",
+            "nets": [
+              "&out"
+            ],
+            "via": [
+              {
+                "point": "%jo"
+              },
+              {
+                "point": "%jc"
+              },
+              {
+                "usage": "%po",
+                "role": "p"
+              }
+            ],
+            "points": [
+              [
+                6.0,
+                4.0
+              ],
+              [
+                16.0,
+                4.0
+              ],
+              [
+                21.0,
+                4.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@03-five-transistor-ota.sp:63:5",
+            "nets": [
+              "&out"
+            ],
+            "via": [
+              {
+                "point": "%jc"
+              },
+              {
+                "terminal": "#CL:1"
+              }
+            ],
+            "points": [
+              [
+                16.0,
+                4.0
+              ],
+              [
+                16.0,
+                3.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@03-five-transistor-ota.sp:83:62",
+            "nets": [
+              "&0"
+            ],
+            "via": [
+              {
+                "terminal": "#M5:3"
+              },
+              {
+                "usage": "%gs_M5_3",
+                "role": "p"
+              }
+            ],
+            "points": [
+              [
+                0.0,
+                -8.0
+              ],
+              [
+                0.0,
+                -10.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@03-five-transistor-ota.sp:84:64",
+            "nets": [
+              "&0"
+            ],
+            "via": [
+              {
+                "terminal": "#M6:3"
+              },
+              {
+                "usage": "%gs_M6_3",
+                "role": "p"
+              }
+            ],
+            "points": [
+              [
+                -22.0,
+                -8.0
+              ],
+              [
+                -22.0,
+                -10.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@03-five-transistor-ota.sp:85:62",
+            "nets": [
+              "&0"
+            ],
+            "via": [
+              {
+                "terminal": "#CL:2"
+              },
+              {
+                "usage": "%gs_CL_2",
+                "role": "p"
+              }
+            ],
+            "points": [
+              [
+                16.0,
+                -1.0
+              ],
+              [
+                16.0,
+                -3.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@03-five-transistor-ota.sp:86:64",
+            "nets": [
+              "&0"
+            ],
+            "via": [
+              {
+                "terminal": "#Vdd:2"
+              },
+              {
+                "usage": "%gs_Vdd_2",
+                "role": "p"
+              }
+            ],
+            "points": [
+              [
+                28.0,
+                2.0
+              ],
+              [
+                28.0,
+                -1.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@03-five-transistor-ota.sp:87:62",
+            "nets": [
+              "&vdd"
+            ],
+            "via": [
+              {
+                "terminal": "#M3:3"
+              },
+              {
+                "usage": "%ss_M3_3",
+                "role": "p"
+              }
+            ],
+            "points": [
+              [
+                -6.0,
+                10.0
+              ],
+              [
+                -6.0,
+                12.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@03-five-transistor-ota.sp:88:61",
+            "nets": [
+              "&vdd"
+            ],
+            "via": [
+              {
+                "terminal": "#M4:3"
+              },
+              {
+                "usage": "%ss_M4_3",
+                "role": "p"
+              }
+            ],
+            "points": [
+              [
+                6.0,
+                10.0
+              ],
+              [
+                6.0,
+                12.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@03-five-transistor-ota.sp:89:62",
+            "nets": [
+              "&vdd"
+            ],
+            "via": [
+              {
+                "terminal": "#Ib:1"
+              },
+              {
+                "usage": "%ss_Ib_1",
+                "role": "p"
+              }
+            ],
+            "points": [
+              [
+                -22.0,
+                2.0
+              ],
+              [
+                -22.0,
+                5.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@03-five-transistor-ota.sp:90:63",
+            "nets": [
+              "&vdd"
+            ],
+            "via": [
+              {
+                "terminal": "#Vdd:1"
+              },
+              {
+                "usage": "%ss_Vdd_1",
+                "role": "p"
+              }
+            ],
+            "points": [
+              [
+                28.0,
+                6.0
+              ],
+              [
+                28.0,
+                9.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          }
+        ],
+        "texts": [
+          {
+            "id": "#M1::name",
+            "attach": "#M1",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "M1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -5.5,
+              1.05
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {
+              "bold": true,
+              "cap": "butt",
+              "fillcolor": "#ffffff",
+              "join": "miter",
+              "linecolor": "#1f4fd8",
+              "linestyle": "bold",
+              "linewidth": 0.16,
+              "size": 1.0,
+              "textcolor": "#1d1d1f"
+            }
+          },
+          {
+            "id": "#M2::name",
+            "attach": "#M2",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "M2",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              5.5,
+              1.05
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {
+              "bold": true,
+              "cap": "butt",
+              "fillcolor": "#ffffff",
+              "join": "miter",
+              "linecolor": "#1f4fd8",
+              "linestyle": "bold",
+              "linewidth": 0.16,
+              "size": 1.0,
+              "textcolor": "#1d1d1f"
+            }
+          },
+          {
+            "id": "#M3::name",
+            "attach": "#M3",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "M3",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -6.5,
+              9.05
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#M4::name",
+            "attach": "#M4",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "M4",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              6.5,
+              9.05
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#M5::name",
+            "attach": "#M5",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "M5",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              0.5,
+              -4.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#M6::name",
+            "attach": "#M6",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "M6",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -22.5,
+              -4.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#Ib::name",
+            "attach": "#Ib",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "Ib",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -20.5,
+              0.25
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#Ib::value",
+            "attach": "#Ib",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "20u",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -20.5,
+              -1.2
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#CL::name",
+            "attach": "#CL",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "CL",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              17.2,
+              1.25
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#CL::value",
+            "attach": "#CL",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "1p",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              17.2,
+              -0.19999999999999996
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#Vdd::name",
+            "attach": "#Vdd",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "Vdd",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              29.5,
+              4.25
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#Vdd::value",
+            "attach": "#Vdd",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "1.8",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              29.5,
+              2.8
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "%pi::netname",
+            "attach": "%pi",
+            "key": "netname",
+            "markup": {
+              "value": "${p}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "inp",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -12.3,
+              0.0
+            ],
+            "halign": "start",
+            "valign": "middle",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "%pn::netname",
+            "attach": "%pn",
+            "key": "netname",
+            "markup": {
+              "value": "${p}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "inn",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              12.3,
+              0.0
+            ],
+            "halign": "start",
+            "valign": "middle",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "%po::netname",
+            "attach": "%po",
+            "key": "netname",
+            "markup": {
+              "value": "${p}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "out",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              22.3,
+              4.0
+            ],
+            "halign": "start",
+            "valign": "middle",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "%ss_M3_3::netname",
+            "attach": "%ss_M3_3",
+            "key": "netname",
+            "markup": {
+              "value": "${p}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "vdd",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -6.0,
+              14.4
+            ],
+            "halign": "middle",
+            "valign": "bottom",
+            "rotate": 0.0,
+            "fix_rotate": true,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "%ss_M4_3::netname",
+            "attach": "%ss_M4_3",
+            "key": "netname",
+            "markup": {
+              "value": "${p}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "vdd",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              6.0,
+              14.4
+            ],
+            "halign": "middle",
+            "valign": "bottom",
+            "rotate": 0.0,
+            "fix_rotate": true,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "%ss_Ib_1::netname",
+            "attach": "%ss_Ib_1",
+            "key": "netname",
+            "markup": {
+              "value": "${p}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "vdd",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -22.0,
+              7.4
+            ],
+            "halign": "middle",
+            "valign": "bottom",
+            "rotate": 0.0,
+            "fix_rotate": true,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "%ss_Vdd_1::netname",
+            "attach": "%ss_Vdd_1",
+            "key": "netname",
+            "markup": {
+              "value": "${p}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "vdd",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              28.0,
+              11.4
+            ],
+            "halign": "middle",
+            "valign": "bottom",
+            "rotate": 0.0,
+            "fix_rotate": true,
+            "size": 1.0,
+            "style": {}
+          }
+        ],
+        "shapes": [],
+        "groups": [
+          {
+            "id": "%core",
+            "members": [
+              "#M1",
+              "#M2",
+              "#M3",
+              "#M4",
+              "#M5"
+            ],
+            "file": 0,
+            "line": 41,
+            "source": "written",
+            "state": "in-effect"
+          }
+        ]
+      }
+    }
+  ],
+  "dialect": "spice",
+  "packages": [
+    {
+      "name": "rnl-std-style",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-basic",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-semiconductors",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-fill",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-semantics",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-functional",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-rf",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-logic",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-signal-flow",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-spice",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-spectre",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-all",
+      "version": "0.4"
+    }
+  ],
+  "files": [
+    {
+      "path": "03-five-transistor-ota.sp",
+      "name": "03-five-transistor-ota.sp"
+    }
+  ]
+}
