@@ -1021,14 +1021,23 @@ impl<'a> Drawing<'a> {
                 );
             }
         }
+        // in 0.4, wires that start from a point where a wire that carries all their nets also
+        // passes or ends are taps of that wire, and not joined to each other (13.1)
+        let taps = rnl_runtime::interp::unit::keeps_0_4(&self.lv.language);
         for (w, wire) in self.wires.iter().enumerate() {
             for q in [wire.points[0], wire.points[wire.points.len() - 1]] {
-                for v in self.wires_at(q) {
+                let at = self.wires_at(q);
+                for &v in &at {
                     let other = &self.wires[v];
+                    let carries = |u: usize| {
+                        let nets = &self.wires[u].nets;
+                        wire.nets.iter().chain(&other.nets).all(|n| nets.contains(n))
+                    };
                     // an end on a pin of the other net is said above
                     if v == w
                         || share(&wire.nets, &other.nets)
                         || self.pins_at(q).any(|(_, p)| share(&p.nets, &other.nets))
+                        || (taps && at.iter().any(|&u| u != w && u != v && carries(u)))
                     {
                         continue;
                     }
