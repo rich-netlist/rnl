@@ -9,11 +9,10 @@ on:
   pull_request:
     types: [opened, reopened, edited, synchronize]
 
-# A newer push to the same pull request cancels this run. A run on main or on a tag, and a manual,
-# scheduled or called run, has a group of its own, so it is never cancelled or held back.
-concurrency:
-  group: pr-base-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+# No concurrency group, unlike the other workflows: a push and an edit of the pull request, a moment
+# apart, start two runs on the same commit, and a group would cancel one of them (a group cancels a
+# waiting run even without cancel-in-progress), which then stays on the commit as a cancelled check.
+# The job takes seconds, so there is nothing to save.
 
 permissions: {}
 
