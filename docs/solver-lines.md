@@ -30,6 +30,8 @@ Crossing measurements consume the same budget during rerouting and final route s
 
 Auto wires with effective 0.4 source semantics call the runtime's shared default path (13.1), including whole waypoint chains and generated content. Unobstructed, unmerged two-anchor auto routes use that same path: bends first, then length, with the runtime's tie order. Existing wires and obstacles prevent that substitution. Compaction and port cleanup recheck the default at the final coordinates before reporting its score and skeleton. This new core rule can change pictures and scores compared with the experimental solver.
 
+Standalone solver 0.4.7 applies this substitution only when every endpoint of the route is present. Two pins visible inside a child group may be part of a larger routing tree; its temporary path stays available for joins in the parent group. Complete two-anchor routes still use the shared default inside a group, including when multiple references name the same physical pin.
+
 Writeback materializes the chosen path and junctions even after search stops; this is deterministic output conversion, not further layout search. Unevaluable written geometry is fatal and cannot replace an existing record. Independent routing trees remain independent despite matching net names or coordinates. A shared real anchor combines directions only at that identity, and a pin-position reference never acquires an electrical pin lead.
 
 `SolveReport.skeleton` describes the final group tables and line identities. The independent solver sends it in protocol version 5. After port cleanup changes geometry, the description is refreshed from the final coordinates. Visible interface details use the main runtime's symbol, column-text, baseline, and position models.

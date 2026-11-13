@@ -3406,7 +3406,7 @@ impl Level<'_> {
             return Evaluated::Unplaced(0, None);
         };
         for (i, route) in problem.routes.iter().enumerate() {
-            if route.mode == "auto" && route.wires.is_empty() {
+            if complete_auto_route(route, &refs[i]) {
                 layout.nets[i].preferred = crate::route::default_candidate(&layout, i);
             }
         }
@@ -3649,6 +3649,16 @@ fn ref_object(r: &PointRef) -> usize {
         | PointRef::PinPosition { object: k, .. } => *k,
         PointRef::Centre(ms) => ms.first().map_or(usize::MAX, ref_object),
     }
+}
+
+/// A group's temporary two-pin slice of a larger tree is not a complete auto wire.
+/// Leave that topology available for the parent to join; only complete trees use
+/// the core's unmerged default. Compare physical pins across reference spellings.
+pub(super) fn complete_auto_route(route: &rnl_runtime::problem::RouteIntent, refs: &[PointRef]) -> bool {
+    route.mode == "auto"
+        && route.wires.is_empty()
+        && refs.len() == 2
+        && route.pins.iter().all(|p| refs.iter().any(|q| same_point(p, q)))
 }
 
 fn same_point(a: &PointRef, b: &PointRef) -> bool {

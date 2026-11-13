@@ -52,7 +52,7 @@ pub(super) fn defaults(
         if !final_output && crate::budget::stopped() {
             break;
         }
-        if route.mode != "auto" || !route.wires.is_empty() || refs[i].len() != 2 {
+        if !super::settle::complete_auto_route(route, &refs[i]) {
             continue;
         }
         let mut wires = routing.wires.iter().enumerate().filter(|(_, w)| w.route == i);
@@ -492,6 +492,49 @@ mod tests {
             default_auto: mode == "auto",
             generated: false,
         }
+    }
+
+    #[test]
+    fn a_partial_multi_anchor_tree_keeps_its_path_until_the_tree_is_complete() {
+        let mut p = problem_of(vec![instance(); 3], vec![]);
+        p.version = "0.4".into();
+        p.symbols[0].bbox = [0.0; 4];
+        p.symbols[0].pins.truncate(1);
+        p.symbols[0].pins[0].pos = (0.0, 0.0);
+        p.symbols[0].pins[0].dir = None;
+        let pin = |object| PointRef::Pin { object, pin: 0, terminal: "g".into() };
+        p.routes = vec![RouteIntent { pins: (0..3).map(pin).collect(), ..route(vec![]) }];
+        let options = crate::SolverOptions::without_time_limit();
+        let resolved = crate::resolve(&p, &options);
+        let s = crate::structure::analyse(&p, &resolved, &options, crate::options::CAPS, &mut crate::Work::default());
+        let g = geometry(&[(0, 0), (4, 3), (100, 100)]);
+        let placed = crate::coords::Placed {
+            origins: s.origins(&p, &g),
+            geometry: g,
+            dropped: vec![],
+            overlaps: vec![],
+            optimised: true,
+            undecided: false,
+        };
+        let mut routing = Routing {
+            wires: vec![RoutedWire {
+                route: 0,
+                points: vec![WirePoint::Anchor(pin(0)), WirePoint::Bend((0.0, 3.0)), WirePoint::Anchor(pin(1))],
+            }],
+            paths: vec![vec![[int(0), int(0)], [int(0), int(3)], [int(4), int(3)]]],
+            drawn: vec![0],
+            ..Default::default()
+        };
+        let before = routing.clone();
+        let inside = BTreeSet::from([0, 1]);
+        assert!(!defaults(&p, &s, &placed, &mut routing, Some(&inside), false));
+        assert_eq!(routing, before);
+
+        // A complete two-anchor tree inside the same group still follows the core rule.
+        p.routes[0].pins.pop();
+        p.routes[0].pins.push(PointRef::SymbolPin { object: 0, pin: 0, reference: Reference::Anonymous });
+        assert!(defaults(&p, &s, &placed, &mut routing, Some(&inside), false));
+        assert_eq!(routing.paths[0], vec![[int(0), int(0)], [int(4), int(0)], [int(4), int(3)]]);
     }
 
     #[test]
