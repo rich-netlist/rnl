@@ -281,6 +281,9 @@ impl Default for WallClock {
 }
 
 impl Clock for WallClock {
+    fn check_every(&self) -> u64 {
+        rnl_solver::WALL_CLOCK_CHECK_EVERY
+    }
     fn elapsed(&self) -> f64 {
         self.0.elapsed().as_secs_f64()
     }

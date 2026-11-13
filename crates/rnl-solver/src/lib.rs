@@ -266,6 +266,11 @@ pub struct Work {
     pub astar_expansions: u64,
 }
 
+/// The work a wall clock lets the budget admit between two readings ([`Clock::check_every`]):
+/// about a millisecond of it. The budget also reads the clock at each 256th step at the latest,
+/// so that the smallest steps do not put a reading off for long.
+pub const WALL_CLOCK_CHECK_EVERY: u64 = 1_000_000;
+
 /// The clock that the time limit of the resolution is measured on (the draft 0.3, 8.5): the
 /// caller gives it, as the crate reads no clock of its own and builds for
 /// `wasm32-unknown-unknown`. `rnl solve` gives one on `std::time::Instant`; a test can give one
@@ -283,6 +288,15 @@ pub trait Clock {
     /// does not watch progress is read only where the limits are checked.
     fn observes_progress(&self) -> bool {
         false
+    }
+    /// How much work the budget may admit between two readings of this clock for the time limit
+    /// and the safety limit. 0, the default, reads it at every step, as a clock that counts its
+    /// readings needs. A wall clock gives [`WALL_CLOCK_CHECK_EVERY`]: reading the system's clock
+    /// at each of the tens of millions of steps of a solve took several percent of its time.
+    /// With more than 0 the budget still reads it at each 256th step at the latest. The work
+    /// admitted, and so what a work limit gives, does not depend on it.
+    fn check_every(&self) -> u64 {
+        0
     }
     /// The seconds since some start of the clock's own, never less than at an earlier reading.
     /// Only differences count: the limit of a level runs from the reading when its resolution

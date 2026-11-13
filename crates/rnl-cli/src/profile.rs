@@ -95,6 +95,9 @@ impl ProfileClock {
 }
 
 impl Clock for ProfileClock {
+    fn check_every(&self) -> u64 {
+        self.0.clock.check_every()
+    }
     fn elapsed(&self) -> f64 {
         self.0.clock.elapsed()
     }
@@ -104,6 +107,9 @@ impl Clock for ProfileClock {
 }
 
 impl Clock for Writer {
+    fn check_every(&self) -> u64 {
+        self.clock.check_every()
+    }
     fn elapsed(&self) -> f64 {
         self.clock.elapsed()
     }

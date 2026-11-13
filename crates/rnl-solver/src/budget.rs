@@ -125,7 +125,15 @@ struct Control<'a> {
     tried: Cell<u64>,
     solver_stage: Cell<&'static str>,
     step: Cell<&'static str>,
+    /// The work between two readings of the clock for the limits ([`Clock::check_every`]), the
+    /// work at which it is read next, and the steps admitted since it was read.
+    every: u64,
+    clock_due: Cell<u64>,
+    steps: Cell<u32>,
 }
+
+/// The steps admitted on one reading of the clock at most ([`Control::late`]).
+const CHECK_STEPS: u32 = 256;
 
 scoped_tls_hkt::scoped_thread_local!(static ACTIVE: for<'a> Option<&'a Control<'a>>);
 
@@ -158,27 +166,46 @@ impl Control<'_> {
         if self.stopped.get().is_some() {
             return false;
         }
-        let next = self.used.get().checked_add(cost);
-        let reason = if next.is_none() || matches!(self.limit, RunLimit::Work(n) if next.unwrap() > n) {
-            Some(StopReason::Work)
-        } else if matches!(self.limit, RunLimit::Time(_)) || self.safety_seconds.is_some() {
-            let elapsed = self.clock.elapsed() - self.start;
-            if matches!(self.limit, RunLimit::Time(s) if elapsed >= s) {
-                Some(StopReason::Time)
-            } else if self.safety_seconds.is_some_and(|s| elapsed >= s) {
-                Some(StopReason::Safety)
-            } else {
-                None
+        let reason = match self.used.get().checked_add(cost) {
+            None => Some(StopReason::Work),
+            Some(next) if matches!(self.limit, RunLimit::Work(n) if next > n) => Some(StopReason::Work),
+            Some(next) => {
+                let reason = self.late(next);
+                if reason.is_none() {
+                    self.used.set(next);
+                }
+                reason
             }
-        } else {
-            None
         };
         if let Some(reason) = reason {
             self.stopped.set(Some(reason));
-            false
+        }
+        reason.is_none()
+    }
+
+    /// Whether the time or the safety limit has passed, for a step that would bring the work to
+    /// `next`. The clock is read when [`Clock::check_every`] more work is done since its last
+    /// reading, and at each [`CHECK_STEPS`]th step at the latest, since some steps cost a unit and
+    /// take a third of a microsecond; in between, a step is admitted on the last reading. A stop
+    /// is still at a step, with the work so far, so that the work reported replays it exactly.
+    fn late(&self, next: u64) -> Option<StopReason> {
+        if !matches!(self.limit, RunLimit::Time(_)) && self.safety_seconds.is_none() {
+            return None;
+        }
+        let steps = self.steps.get() + 1;
+        if steps < CHECK_STEPS && next < self.clock_due.get() {
+            self.steps.set(steps);
+            return None;
+        }
+        self.steps.set(0);
+        self.clock_due.set(next.saturating_add(self.every));
+        let elapsed = self.clock.elapsed() - self.start;
+        if matches!(self.limit, RunLimit::Time(s) if elapsed >= s) {
+            Some(StopReason::Time)
+        } else if self.safety_seconds.is_some_and(|s| elapsed >= s) {
+            Some(StopReason::Safety)
         } else {
-            self.used.set(next.unwrap());
-            true
+            None
         }
     }
 }
@@ -200,6 +227,9 @@ pub(crate) fn with<T>(
         tried: Cell::new(0),
         solver_stage: Cell::new(""),
         step: Cell::new(""),
+        every: clock.check_every(),
+        clock_due: Cell::new(0),
+        steps: Cell::new(0),
     };
     let result = ACTIVE.set(Some(&control), f);
     control.step.set("complete");
@@ -337,6 +367,66 @@ mod tests {
             assert_eq!(timed, replayed);
             assert_eq!(report.work, again.work);
         }
+    }
+
+    /// A clock that asks to be read only every so much work: it is read far less often than
+    /// there are steps, the stop is still at a step, and the work it reports replays the run.
+    /// So it is where a step costs more than the work between two readings, and where the work
+    /// never comes to a reading and the clock is read at each 256th step.
+    #[test]
+    fn a_clock_read_every_so_much_work_still_replays_by_work() {
+        struct Sparse(Cell<u64>, u64);
+        impl Clock for Sparse {
+            fn check_every(&self) -> u64 {
+                self.1
+            }
+            fn elapsed(&self) -> f64 {
+                let n = self.0.get();
+                self.0.set(n + 1);
+                n as f64
+            }
+        }
+        for (every, scale) in [(100, 1), (100, 500), (u64::MAX, 1)] {
+            let run = || {
+                let mut admitted = Vec::new();
+                for i in 0..2000u64 {
+                    if !permit(Step::Route, scale * (1 + (i % 7) as usize)) {
+                        break;
+                    }
+                    admitted.push(i);
+                }
+                admitted
+            };
+            let (all, _) = with(&StoppedClock, RunLimit::Unlimited, None, run);
+            assert_eq!(all.len(), 2000);
+            let mut stopped_within = false;
+            for seconds in 0..12 {
+                let clock = Sparse(Cell::new(0), every);
+                let (timed, report) = with(&clock, RunLimit::Time(seconds as f64), None, run);
+                // a reading when the budget starts and one at the first step; then one for each
+                // `every` units of work and one for each 256 steps at most
+                let most = 3 + report.work / every + timed.len() as u64 / 256;
+                assert!(clock.0.get() <= most, "every {every}, scale {scale}: {} readings", clock.0.get());
+                let (replayed, again) = with(&StoppedClock, RunLimit::Work(report.work), None, run);
+                assert_eq!(timed, replayed, "every {every}, scale {scale}, limit {seconds}");
+                assert_eq!(report.work, again.work);
+                stopped_within |= report.reason == StopReason::Time && !timed.is_empty() && timed.len() < 2000;
+            }
+            assert!(stopped_within, "every {every}, scale {scale}: no time limit stopped the run part way");
+        }
+        // a step that costs more than the work between two readings reads the clock each time
+        let clock = Sparse(Cell::new(0), 100);
+        let (admitted, _) =
+            with(&clock, RunLimit::Time(5.), None, || (0..50).take_while(|_| permit(Step::Route, 500)).count());
+        assert_eq!(admitted, 4);
+        // under a work limit the safety limit reads the clock as rarely, and changes nothing
+        let run = || (0..2000).take_while(|_| permit(Step::Route, 3)).count();
+        let clock = Sparse(Cell::new(0), 100);
+        let (limited, report) = with(&clock, RunLimit::Work(1000), Some(1e9), run);
+        let (plain, _) = with(&StoppedClock, RunLimit::Work(1000), None, run);
+        assert_eq!(limited, plain);
+        assert_eq!(report.reason, StopReason::Work);
+        assert!(clock.0.get() <= 13, "{} readings", clock.0.get());
     }
 
     #[test]

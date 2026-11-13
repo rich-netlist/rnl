@@ -311,6 +311,9 @@ impl StoppableClock {
 const STOPPED_STEP: f64 = 1e9;
 
 impl Clock for StoppableClock {
+    fn check_every(&self) -> u64 {
+        rnl_solver::WALL_CLOCK_CHECK_EVERY
+    }
     fn elapsed(&self) -> f64 {
         if self.stop.load(Ordering::Relaxed) {
             let k = self.after.fetch_add(1, Ordering::Relaxed) + 1;

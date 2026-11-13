@@ -138,6 +138,9 @@ impl Observer<'_> {
 }
 
 impl Clock for Observer<'_> {
+    fn check_every(&self) -> u64 {
+        self.inner.check_every()
+    }
     fn advances(&self) -> bool {
         self.inner.advances()
     }
