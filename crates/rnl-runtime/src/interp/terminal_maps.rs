@@ -52,6 +52,15 @@ impl MapTarget {
     }
 }
 
+/// A terminal as a condition or reference of 0.4 writes it: a string made only of digits, quoted or
+/// not, is the terminal number (6.4); anything else is as written.
+pub(crate) fn terminal_value(value: &Lit) -> Lit {
+    match terminal_key(value) {
+        Some(TermKey::Num(n)) => Lit::Num(n as f64),
+        _ => value.clone(),
+    }
+}
+
 /// A quoted, digits-only terminal is still a position (6.4).
 pub(crate) fn terminal_key(value: &Lit) -> Option<TermKey> {
     match value {

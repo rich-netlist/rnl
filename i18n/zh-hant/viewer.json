@@ -735,5 +735,11 @@
   "Choose": "選擇",
   "{0} changed on disk. F5 reloads the netlist.": "{0} 在磁碟上已變更。按 F5 重新載入網表。",
   "{0} exists already. Replace it?": "{0} 已存在。要取代它嗎？",
-  "Only the first {0} entries are listed.": "僅列出前 {0} 項。"
+  "Only the first {0} entries are listed.": "僅列出前 {0} 項。",
+  "Show &Layout Table": "顯示佈局表(&L)",
+  "Show Component and &Pin Skeleton Lines": "顯示實例和接腳的骨架線(&P)",
+  "Show &Wire Skeleton Lines": "顯示連線骨架線(&W)",
+  "Layout table": "佈局表",
+  "Component and pin lines": "實例和接腳的線",
+  "Wire lines": "連線的線"
 }

@@ -138,6 +138,42 @@ pub(crate) struct Stop {
     routed: std::cell::Cell<u64>,
     best_at: std::cell::Cell<Option<u64>>,
 }
+
+/// A deterministic estimate for the initial tree phase, independent of the
+/// requested time/work limit and of the tableau's structural variable numbering.
+#[derive(Clone, Copy)]
+struct Refinement {
+    pivots: u64,
+    expansions: u64,
+    pivot_ns: u64,
+    limit_ns: u64,
+}
+
+impl Refinement {
+    fn for_problem(problem: &LevelProblem, work: &Work, limit_ns: u64) -> Self {
+        // The operation estimate scales with the coordinate problem, including
+        // semantic objects without a drawing, rather than just its visible boxes.
+        Self::new(problem.objects.len() as u64, work, limit_ns)
+    }
+
+    fn new(objects: u64, work: &Work, limit_ns: u64) -> Self {
+        Self {
+            pivots: work.pivots,
+            expansions: work.astar_expansions,
+            pivot_ns: 4_754u64.saturating_add(157u64.saturating_mul(objects)),
+            limit_ns,
+        }
+    }
+
+    fn reached(self, work: &Work) -> bool {
+        work.pivots
+            .saturating_sub(self.pivots)
+            .saturating_mul(self.pivot_ns)
+            .saturating_add(work.astar_expansions.saturating_sub(self.expansions).saturating_mul(114))
+            >= self.limit_ns
+    }
+}
+
 impl Stop {
     pub(crate) fn reached(&self, _work: &Work) -> bool {
         !crate::budget::permit(crate::budget::Step::Candidate, 1)
@@ -155,7 +191,7 @@ pub(crate) fn lay_out(
 }
 
 pub(crate) fn lay_out_from(tree: Tree<'_>, work: &mut Work, stop: &Stop, allowance: Option<u64>) -> Laid {
-    let started = crate::budget::consumed();
+    let refinement = allowance.map(|limit| Refinement::for_problem(tree.problem, work, limit));
     let first = tree.first(work);
     let mut notes = Vec::new();
     if !tree.left_out.is_empty() {
@@ -184,12 +220,7 @@ pub(crate) fn lay_out_from(tree: Tree<'_>, work: &mut Work, stop: &Stop, allowan
     let start = first.clone();
     // The shared budget always bounds initialization. A local stage allowance may stop
     // subsequent improvements, but must not manufacture an unfinished initial baseline.
-    let remaining = allowance.map(|limit| limit.saturating_sub(crate::budget::consumed().saturating_sub(started)));
-    let search = || tree.search(first, best, rounds, true, work, stop);
-    let (arr, best, said, path) = match remaining {
-        Some(limit) => crate::budget::phase(limit, search).0,
-        None => search(),
-    };
+    let (arr, best, said, path) = tree.search(first, best, rounds, true, work, stop, refinement);
     notes.extend(said);
     let mut others: Vec<Arrangement> = Vec::new();
     for a in std::iter::once(start).chain(path) {
@@ -1634,7 +1665,7 @@ impl<'a> Tree<'a> {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn search(
+    fn search(
         &self,
         first: Arrangement,
         evaluated: Evaluated,
@@ -1642,6 +1673,7 @@ impl<'a> Tree<'a> {
         bindings: bool,
         work: &mut Work,
         stop: &Stop,
+        refinement: Option<Refinement>,
     ) -> (Arrangement, Evaluated, Vec<String>, Vec<Arrangement>) {
         let s = self.s;
         let better = |a: &Entry, b: &Entry| crate::score::order(self.active(), &[a.clone(), b.clone()])[0] == 1;
@@ -1658,7 +1690,7 @@ impl<'a> Tree<'a> {
         let mut releases = 0;
         let mut finished = false;
         'search: loop {
-            if stop.reached(work) {
+            if refinement.is_some_and(|limit| limit.reached(work)) || stop.reached(work) {
                 break;
             }
             if bindings {
@@ -1711,7 +1743,7 @@ impl<'a> Tree<'a> {
             });
             let mut stepped = false;
             for i in order {
-                if stop.reached(work) {
+                if refinement.is_some_and(|limit| limit.reached(work)) || stop.reached(work) {
                     break 'search;
                 }
                 let (what, arr, _, _) = &moves[i];
@@ -2547,7 +2579,8 @@ mod tests {
             for seconds in [1., 10., 30., 50., 100.] {
                 let run = || {
                     let mut work = Work::default();
-                    let made = tree.search(first.clone(), complete.clone(), 3, bindings, &mut work, &Stop::default());
+                    let made =
+                        tree.search(first.clone(), complete.clone(), 3, bindings, &mut work, &Stop::default(), None);
                     (made, work)
                 };
                 let ((made, work), report) =
@@ -2648,7 +2681,7 @@ mod tests {
             let seconds = ticks.reads().saturating_sub(back) as f64;
             let run = || {
                 let mut work = Work::default();
-                let made = tree.search(first.clone(), complete.clone(), 3, true, &mut work, &Stop::default());
+                let made = tree.search(first.clone(), complete.clone(), 3, true, &mut work, &Stop::default(), None);
                 (made, work)
             };
             let ((made, work), report) =
@@ -2670,5 +2703,58 @@ mod tests {
             break;
         }
         assert!(caught, "must interrupt A* after it starts evaluating the bound challenger");
+    }
+}
+
+#[cfg(test)]
+mod refinement_tests {
+    use super::*;
+
+    #[test]
+    fn semantic_coordinate_objects_contribute_without_counting_drawing_metadata_twice() {
+        use crate::resolve::tests::{instance, problem_of};
+        use rnl_runtime::problem::ObjectKind;
+        let mut p = problem_of(vec![instance(); 8], vec![]);
+        let work = Work::default();
+        let before = Refinement::for_problem(&p, &work, 50_000);
+        let mut point = instance();
+        point.kind = ObjectKind::Usage;
+        point.symbol = None;
+        point.orient = None;
+        p.objects.extend(std::iter::repeat_n(point.clone(), 64));
+        point.kind = ObjectKind::Point;
+        p.objects.push(point);
+        let after = Refinement::for_problem(&p, &work, 50_000);
+        let advanced = Work { pivots: 4, ..Work::default() };
+        assert!(!before.reached(&advanced));
+        assert!(after.reached(&advanced));
+
+        // Attaching a drawing to an existing coordinate object adds no object.
+        p.objects[8].symbol = Some(0);
+        p.objects[9].kind = ObjectKind::Annotation;
+        let drawn = Refinement::for_problem(&p, &work, 50_000);
+        assert_eq!(drawn.pivot_ns, after.pivot_ns);
+        assert_eq!(drawn.reached(&advanced), after.reached(&advanced));
+    }
+
+    #[test]
+    fn tree_refinement_counts_pivots_and_expansions_from_its_start() {
+        let mut work = Work { pivots: 20, astar_expansions: 30, ..Work::default() };
+        let limit = Refinement::new(8, &work, 6_238);
+        assert!(!limit.reached(&work));
+        work.pivots += 1; // 4,754 + 157 * 8 = 6,010
+        work.astar_expansions += 1;
+        assert!(!limit.reached(&work));
+        work.astar_expansions += 1;
+        assert!(limit.reached(&work));
+        assert!(Refinement::new(8, &work, 0).reached(&work));
+    }
+
+    #[test]
+    fn tree_refinement_saturates_large_estimates() {
+        let work = Work::default();
+        let limit = Refinement::new(u64::MAX, &work, u64::MAX);
+        assert!(!limit.reached(&work));
+        assert!(limit.reached(&Work { pivots: 1, ..work }));
     }
 }

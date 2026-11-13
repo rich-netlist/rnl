@@ -404,6 +404,12 @@ impl Interp<'_> {
                     return false;
                 }
                 if let Some(want) = params.get("terminal") {
+                    // in 0.4 a string of digits is the terminal number (6.4)
+                    let want = &if self.follows_0_4(writer) {
+                        super::terminal_maps::terminal_value(want)
+                    } else {
+                        want.clone()
+                    };
                     let matched = if let ObjData::Usage(_) = self.o(owner) {
                         let symbol = self.scenes[scene].symbol[&owner];
                         self.symbol(symbol).pins[index].terms.iter().any(|term| match (term, want) {

@@ -458,6 +458,14 @@ impl Interp<'_> {
             "BUNDLE" => {
                 let mapped = self.map_args(kw, &args, seg, ctx, sig_positions(kw))?;
                 let obj = mapped["members"].obj;
+                if let Some(what) = self.selection_input(obj, ctx) {
+                    return self.fail(
+                        ctx,
+                        codes::KEYWORD_BUNDLE_SELECTION,
+                        format!("BUNDLE takes objects written out, not {what}: a bundle must exist before the symbols are given (8.2, 10.4, 11.8)"),
+                        mapped["members"].off,
+                    );
+                }
                 let Some(s) = ctx.scene else {
                     return self.scene_only(ctx, seg.start);
                 };
@@ -522,6 +530,19 @@ impl Interp<'_> {
             ObjData::ScenePin { owner, .. } => self.failed_obj(*owner),
             _ => None,
         }
+    }
+
+    /// In a file of 0.4, what BUNDLE and WIRE do not take (10.4, 11.8, 13.1): the result of a
+    /// selection, or a set that depends on one, said as a message says it. None for objects
+    /// written out, and in a file of 0.2 or 0.3.
+    fn selection_input(&self, obj: ObjId, ctx: &Ctx) -> Option<&'static str> {
+        if obj == LEVEL || !self.follows_0_4(self.source_unit(ctx)) || !self.is_lazy(obj) {
+            return None;
+        }
+        Some(match self.o(obj) {
+            ObjData::Set(set) if matches!(set.kind, SetKind::Select { .. }) => "the result of a selection",
+            _ => "a set that depends on one",
+        })
     }
 
     /// A failed object in a strict input of the statement of `ctx` (7.3): the input itself, and in a
@@ -4448,6 +4469,16 @@ impl Interp<'_> {
         let mapped = self.map_args(kw, args, seg, ctx, sig_positions(kw))?;
         let nets_a = mapped["net"].clone();
         let pts_a = mapped["points"].clone();
+        for input in [&nets_a, &pts_a] {
+            if let Some(what) = self.selection_input(input.obj, ctx) {
+                return self.fail(
+                    ctx,
+                    codes::WIRE_SELECTION,
+                    format!("WIRE does not take {what}: a wire made from it would have nothing to be written back as; to draw the pins of a selection as wires, use ROUTE-OBJECT (10.4, 13.1)"),
+                    input.off,
+                );
+            }
+        }
         let Some(s) = ctx.scene else {
             if self.is_lazy(nets_a.obj) || self.is_lazy(pts_a.obj) {
                 self.note_rule(ctx);

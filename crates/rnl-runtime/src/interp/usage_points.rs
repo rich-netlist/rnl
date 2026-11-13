@@ -255,7 +255,18 @@ impl Interp<'_> {
     /// An explicit ::position and its owner share one coordinate variable.
     pub(super) fn coordinate_object(&self, object: ObjId) -> ObjId {
         match self.o(object) {
-            ObjData::Pos { parent } if !self.is_set(*parent) => self.coordinate_object(*parent),
+            // the `::position` of a RECTANGLE, CIRCLE or ELLIPSE written with a centre is its centre
+            // point, which PLACE takes and moves; the graphic itself it does not take (11.1, 13.4)
+            ObjData::Pos { parent } => match self.o(*parent) {
+                ObjData::Prim { shape: Shape::Rectangle | Shape::Circle | Shape::Ellipse, points, .. }
+                    if points.len() == 1 =>
+                {
+                    self.coordinate_object(points[0])
+                }
+                ObjData::Prim { .. } => object,
+                _ if self.is_set(*parent) => object,
+                _ => self.coordinate_object(*parent),
+            },
             ObjData::Annotation(data) => match data.anchor {
                 AnnotationAnchor::Independent(point) => self.coordinate_object(point),
                 AnnotationAnchor::Follow(object) => self.coordinate_object(object),

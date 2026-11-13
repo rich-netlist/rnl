@@ -1691,6 +1691,12 @@ impl Interp<'_> {
                         continue;
                     }
                     if let Some(pv) = params.get("terminal") {
+                        // in 0.4 a string of digits is the terminal number (6.4)
+                        let pv = &if self.follows_0_4(writer) {
+                            super::terminal_maps::terminal_value(pv)
+                        } else {
+                            pv.clone()
+                        };
                         let ok = match pv {
                             Lit::Num(n) => index == *n as u32,
                             Lit::Str(w) => name.as_ref().is_some_and(|n| {
