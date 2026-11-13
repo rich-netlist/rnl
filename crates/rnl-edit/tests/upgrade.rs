@@ -224,3 +224,61 @@ fn a_matching_hash_stays_matching_and_a_stale_one_stays_stale() {
     let result = upgrade("t.sp", &MemoryProvider::new().with("t.sp", &with(stale)), &keeping()).unwrap();
     assert!(result.files["t.sp"].contains(stale));
 }
+
+fn read_with(text: &str, std: bool) -> rnl_runtime::Interpretation {
+    rnl_view::interpret_with(
+        "t.sp",
+        None,
+        &Default::default(),
+        &MemoryProvider::new().with("t.sp", text),
+        &rnl_runtime::Options { std, problems: true, generated: false, ..Default::default() },
+    )
+    .unwrap()
+}
+
+fn hash_of(output: &str, nth: usize) -> String {
+    output.split("hash=\"").nth(nth).unwrap().split('"').next().unwrap().to_string()
+}
+
+#[test]
+fn a_matching_hash_stays_matching_with_the_standard_packages_loaded() {
+    use rnl_runtime::problem::{input_digest, same_input};
+    let record = |hash: &str| {
+        format!("* @RNL(type=\"generated\", priority=\"high\", author=\"rnl-solver 0.1\", hash=\"{hash}\") {{\n*   #R1 @PLACE(1, 2)\n* }}\n")
+    };
+    let bare = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\nR1 a 0 1k\n.end\n";
+    let fresh = format!("sig2:{}.00000000000000aa", input_digest(&read_with(bare, true).problems[0]));
+    let source =
+        format!("* title\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\") }}\nR1 a 0 1k\n{}.end\n", record(&fresh));
+    let options = UpgradeOptions { std: true, keep_generated: true, ..UpgradeOptions::default() };
+    let result = upgrade("t.sp", &MemoryProvider::new().with("t.sp", &source), &options).unwrap();
+    let output = &result.files["t.sp"];
+    let hash = hash_of(output, 1);
+    assert!(hash.ends_with(".00000000000000aa"), "{hash}");
+    assert_eq!(same_input(&hash, &read_with(output, true).problems[0]), Some(true), "{output}");
+}
+
+#[test]
+fn every_level_of_a_file_has_its_hash_refreshed() {
+    use rnl_runtime::problem::{input_digest, same_input};
+    let body = |name: &str, hash: &str| {
+        format!(
+            ".subckt {name} a b\nR1 a b 1k\n* @RNL(type=\"generated\", priority=\"high\", author=\"rnl-solver 0.1\", hash=\"{hash}\") {{\n*   #R1 @PLACE(1, 2)\n* }}\n.ends\n"
+        )
+    };
+    let head = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\n";
+    let probe = format!("{head}{}{}.end\n", body("s1", "x"), body("s2", "x"));
+    let problems = read_with(&probe, false).problems;
+    let digests: Vec<_> = problems.iter().map(input_digest).collect();
+    assert!(digests.len() >= 3, "{digests:?}");
+    let fresh = |i: usize| format!("sig2:{}.00000000000000aa", digests[i]);
+    let source = format!("{head}{}{}.end\n", body("s1", &fresh(1)), body("s2", &fresh(2)));
+    let options = UpgradeOptions { std: false, keep_generated: true, ..UpgradeOptions::default() };
+    let result = upgrade("t.sp", &MemoryProvider::new().with("t.sp", &source), &options).unwrap();
+    let output = &result.files["t.sp"];
+    let read = read_with(output, false);
+    for (i, problem) in read.problems.iter().enumerate().skip(1) {
+        let hash = hash_of(output, i);
+        assert_eq!(same_input(&hash, problem), Some(true), "{i}: {output}");
+    }
+}

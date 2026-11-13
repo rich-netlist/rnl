@@ -168,6 +168,9 @@ fn effective_version(doc: &HostDocument, level: usize) -> String {
 /// match before, or that is not a `sig2` hash, stays as written, so that a stale record is still stale.
 fn refresh_hashes(before: &Interpretation, after: &Interpretation, output: &mut BTreeMap<String, String>) {
     use rnl_runtime::problem::{input_digest, same_input};
+    // Equal levels (two identical subcircuits) write the same hash, so a hash is replaced
+    // everywhere or nowhere: only if it matches every level that carries it, with one new digest.
+    let mut renames: BTreeMap<String, Option<String>> = BTreeMap::new();
     for problem in &before.problems {
         let Some(target) = after.problems.iter().find(|p| p.level == problem.level) else { continue };
         let digest = input_digest(target);
@@ -178,14 +181,23 @@ fn refresh_hashes(before: &Interpretation, after: &Interpretation, output: &mut 
             let Some(old) = rnl_runtime::writeback::field(record, "hash") else { continue };
             let Some((tag, rest)) = old.split_once(':') else { continue };
             let Some((_, options_digest)) = rest.split_once('.') else { continue };
-            if tag != "sig2" || same_input(&old, problem) != Some(true) {
-                continue;
-            }
-            let new = format!("sig2:{digest}.{options_digest}");
-            for text in output.values_mut() {
-                if text.matches(&old).count() == 1 {
-                    *text = text.replace(&old, &new);
+            let new = (tag == "sig2" && same_input(&old, problem) == Some(true))
+                .then(|| format!("sig2:{digest}.{options_digest}"));
+            match renames.get(&old) {
+                None => {
+                    renames.insert(old, new);
                 }
+                Some(seen) if *seen != new => {
+                    renames.insert(old, None);
+                }
+                Some(_) => {}
+            }
+        }
+    }
+    for (old, new) in renames {
+        if let Some(new) = new {
+            for text in output.values_mut() {
+                *text = text.replace(&old, &new);
             }
         }
     }
@@ -363,7 +375,7 @@ pub fn upgrade(entry: &str, files: &dyn Provider, options: &UpgradeOptions) -> R
     let overlay = MemoryProvider { files: output.clone(), package_dirs: Vec::new() };
     let provider = Layered { layers: vec![&overlay, files] };
     if options.keep_generated {
-        let target = Options { std: false, ..authored.clone() };
+        let target = Options { std: options.std, ..authored.clone() };
         let current =
             rnl_view::interpret_with(&entry, options.dialect.as_deref(), &options.formats, &provider, &target)?;
         let written = rnl_view::interpret_with(&entry, options.dialect.as_deref(), &options.formats, files, &target)?;
