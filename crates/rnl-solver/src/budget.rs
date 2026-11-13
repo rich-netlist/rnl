@@ -97,32 +97,6 @@ struct Control<'a> {
 
 scoped_tls_hkt::scoped_thread_local!(static ACTIVE: for<'a> Option<&'a Control<'a>>);
 
-struct Phase {
-    limit: u64,
-    used: Cell<u64>,
-    stopped: Cell<bool>,
-}
-
-scoped_tls_hkt::scoped_thread_local!(static PHASE: for<'a> Option<&'a Phase>);
-
-/// A deterministic local allowance, independent of the requested total time or work.
-/// Its exhaustion ends this stage without exhausting the level's shared budget.
-/// Nested solver entry points clear this scope; layout stages themselves do not nest.
-pub(crate) fn phase<T>(limit: u64, run: impl FnOnce() -> T) -> (T, u64, bool) {
-    assert!(!phase_active(), "layout budget phases must not nest");
-    let phase = Phase { limit, used: Cell::new(0), stopped: Cell::new(false) };
-    let result = PHASE.set(Some(&phase), run);
-    (result, phase.used.get(), phase.stopped.get())
-}
-
-fn phase_active() -> bool {
-    PHASE.is_set() && PHASE.with(|p| p.is_some())
-}
-
-fn phase_stopped() -> bool {
-    phase_active() && PHASE.with(|p| p.unwrap().stopped.get())
-}
-
 impl Control<'_> {
     fn permit(&self, cost: u64) -> bool {
         if self.stopped.get().is_some() {
@@ -182,7 +156,7 @@ pub(crate) fn active() -> bool {
 
 /// Public entry points cannot borrow a caller's budget through an observer callback.
 pub(crate) fn without<T>(f: impl FnOnce() -> T) -> T {
-    ACTIVE.set(None, || PHASE.set(None, f))
+    ACTIVE.set(None, f)
 }
 
 pub(crate) fn continues_rows() -> bool {
@@ -190,7 +164,7 @@ pub(crate) fn continues_rows() -> bool {
 }
 
 pub(crate) fn stopped() -> bool {
-    (active() && ACTIVE.with(|c| c.unwrap().stopped.get().is_some())) || phase_stopped()
+    active() && ACTIVE.with(|c| c.unwrap().stopped.get().is_some())
 }
 
 /// Never charge zero: otherwise a work count would not uniquely identify the cutoff.
@@ -202,36 +176,16 @@ pub(crate) fn permit(step: Step, size: usize) -> bool {
 /// Admit a calibrated cost without narrowing it to the platform's pointer width.
 pub(crate) fn permit_weighted(step: Step, cost: u64) -> bool {
     let cost = cost.max(1);
-    if phase_active()
-        && !PHASE.with(|p| {
-            let p = p.unwrap();
-            if p.stopped.get() || p.used.get().checked_add(cost).is_none_or(|next| next > p.limit) {
-                p.stopped.set(true);
-                false
-            } else {
-                true
-            }
-        })
-    {
-        return false;
-    }
-    let admitted = !active()
+    !active()
         || ACTIVE.with(|c| {
             let c = c.unwrap();
             let admitted = c.permit(cost);
-            if admitted && phase_active() {
-                PHASE.with(|p| p.unwrap().used.set(p.unwrap().used.get() + cost));
-            }
             if admitted && c.used.get().saturating_sub(c.last_progress.get()) >= 100_000 {
                 c.last_progress.set(c.used.get());
                 c.clock.progress(BudgetProgress { work: c.used.get(), stage: step.name() });
             }
             admitted
-        });
-    if admitted && !active() && phase_active() {
-        PHASE.with(|p| p.unwrap().used.set(p.unwrap().used.get() + cost));
-    }
-    admitted
+        })
 }
 
 /// The common work count, also used for diagnostic costs of line-search solutions.
@@ -277,66 +231,6 @@ mod tests {
             self.0.set(n + 1);
             n as f64
         }
-    }
-
-    #[test]
-    fn fixed_phase_allowances_replay_across_stage_boundaries() {
-        let run = || {
-            let mut admitted = Vec::new();
-            for (stage, allowance) in [6, 10, 15].into_iter().enumerate() {
-                if stopped() {
-                    break;
-                }
-                phase(allowance, || {
-                    for operation in 1..=10 {
-                        if !permit(Step::Route, operation) {
-                            break;
-                        }
-                        admitted.push((stage, operation));
-                    }
-                });
-            }
-            admitted
-        };
-        for seconds in 0..25 {
-            let (timed, timed_report) = with(&Ticks(Cell::new(0)), RunLimit::Time(seconds as f64), None, run);
-            let (replayed, replay_report) = with(&StoppedClock, RunLimit::Work(timed_report.work), None, run);
-            assert_eq!(timed, replayed, "cutoff {seconds}");
-            assert_eq!(timed_report.work, replay_report.work);
-        }
-        let (complete, report) = with(&StoppedClock, RunLimit::Unlimited, None, run);
-        assert_eq!(report.reason, StopReason::Complete);
-        assert_eq!(report.work, 31);
-        assert_eq!(complete.len(), 12);
-        assert_eq!(complete.last(), Some(&(2, 5)));
-    }
-
-    #[test]
-    fn local_exhaustion_resumes_the_parent_and_nested_solves_restore_the_phase() {
-        let (_, report) = with(&StoppedClock, RunLimit::Work(30), None, || {
-            let (_, used, exhausted) = phase(5, || {
-                assert!(permit(Step::Route, 2));
-                let (_, nested) = without(|| {
-                    with(&StoppedClock, RunLimit::Work(7), None, || {
-                        assert!(permit(Step::Route, 7));
-                        assert!(!permit(Step::Route, 1));
-                    })
-                });
-                assert_eq!(nested.work, 7);
-                assert!(permit(Step::Route, 3));
-                assert!(!permit(Step::Route, 1));
-                assert!(stopped());
-            });
-            assert_eq!((used, exhausted), (5, true));
-            assert!(!stopped());
-            assert!(permit(Step::Route, 10));
-            let _ = std::panic::catch_unwind(|| phase(1, || panic!("restore phase scope")));
-            assert!(!phase_active());
-            assert!(permit(Step::Route, 15));
-            assert!(!permit(Step::Route, 1));
-        });
-        assert_eq!(report.work, 30);
-        assert_eq!(report.reason, StopReason::Work);
     }
 
     #[test]
