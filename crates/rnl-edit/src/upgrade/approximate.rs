@@ -23,6 +23,18 @@ pub(super) const CONVERSIONS: &[(&str, &str)] = &[
     ("DIFFERENTIAL_PAIR", "DIFFERENTIAL_PAIR_P"),
 ];
 
+/// The definition a rule turns `old` into for the polarity of its devices (`_N` or `_P`), read from
+/// the table so that the rules and the comparison cannot name different ones.
+fn polarized(old: &str, is_n: bool) -> &'static str {
+    let suffix = if is_n { "_N" } else { "_P" };
+    CONVERSIONS.iter().find(|(from, to)| *from == old && to.ends_with(suffix)).map(|(_, to)| *to).unwrap()
+}
+
+/// The definition a rule turns a top-level `IO_PORT` into, read from the table.
+fn label() -> &'static str {
+    CONVERSIONS.iter().find(|(from, _)| *from == "IO_PORT").map(|(_, to)| *to).unwrap()
+}
+
 #[derive(Clone, PartialEq)]
 pub(super) struct Choice {
     pub direction: String,
@@ -457,7 +469,7 @@ impl Approximate {
                             });
                             if let Some(Some(is_n)) = polarities.next() {
                                 if polarities.all(|pol| pol == Some(is_n)) {
-                                    let target_def = if is_n { "CURRENT_MIRROR_N" } else { "CURRENT_MIRROR_P" };
+                                    let target_def = polarized("CURRENT_MIRROR", is_n);
                                     out.mirrors.insert(
                                         key,
                                         (
@@ -516,11 +528,7 @@ impl Approximate {
                     else {
                         continue;
                     };
-                    if is_n {
-                        "DIFFERENTIAL_PAIR_N"
-                    } else {
-                        "DIFFERENTIAL_PAIR_P"
-                    }
+                    polarized("DIFFERENTIAL_PAIR", is_n)
                 };
                 let Ok(side) = pair_direction(p, first, second, &mirrored) else {
                     out.conflicts.insert(key, true);
@@ -753,7 +761,7 @@ impl Approximate {
                     source,
                     record,
                     definition.start..definition.end,
-                    "$NET_LABEL".into(),
+                    format!("${}", label()),
                     "approximate-top-level-io-port",
                 )?;
                 record_approximation(
@@ -921,5 +929,22 @@ impl Approximate {
             out.resolved.insert("constraint-items");
         }
         Ok(out)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_table_gives_every_target_the_rules_write() {
+        for old in ["CURRENT_MIRROR", "DIFFERENTIAL_PAIR"] {
+            assert_eq!(polarized(old, true), format!("{old}_N"));
+            assert_eq!(polarized(old, false), format!("{old}_P"));
+        }
+        assert_eq!(label(), "NET_LABEL");
+        for (from, to) in CONVERSIONS {
+            assert_ne!(from, to);
+        }
     }
 }

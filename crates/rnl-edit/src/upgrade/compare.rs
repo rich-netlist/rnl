@@ -873,6 +873,18 @@ mod tests {
     }
 
     #[test]
+    fn a_point_and_a_text_spell_one_terminal_alike() {
+        let pins = pins_of();
+        let terminal = pins.number.iter().map(|((_, pin), t)| ((0, *pin), t.clone())).collect();
+        let names = Names { names: vec!["#M1".into()], terminal };
+        // The pin of a point is the terminal number, the number that a text resolves to.
+        assert_eq!(names.pin(0, 0), "t2");
+        assert!(terminals("#M1:d", &pins).ends_with(":2"));
+        // Without a known terminal the place in the symbol stands in.
+        assert_eq!(names.pin(0, 5), "pin5");
+    }
+
+    #[test]
     fn only_definitions_the_upgrade_explains_are_conversions() {
         assert!(explained("$IO_PORT", "$NET_LABEL"));
         assert!(explained("$CURRENT_MIRROR", "$CURRENT_MIRROR_N"));
