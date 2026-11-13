@@ -29,6 +29,7 @@
   @ALIAS("@圆弧", "@ARC");
   @ALIAS("@贝塞尔", "@BEZIER");
   @ALIAS("@文本", "@TEXT");
+  @ALIAS("@标注", "@ANNOTATION");
   @ALIAS("@导线", "@WIRE");
   @ALIAS("@布线网络", "@ROUTE-NET");
   @ALIAS("@布线对象", "@ROUTE-OBJECT");
@@ -98,6 +99,8 @@
   @ALIAS("纵向对齐", "valign");
   @ALIAS("旋转", "rotate");
   @ALIAS("固定旋转", "fix_rotate");
+  @ALIAS("镜像", "mirror");
+  @ALIAS("直立", "upright");
   @ALIAS("标签", "label");
   @ALIAS("半径", "radius");
   @ALIAS("宽度", "width");
@@ -180,6 +183,7 @@
   @ALIAS("字体", "font");
   @ALIAS("加粗", "bold");
   @ALIAS("斜体", "italic");
+  @ALIAS("文本可见", "textvisible");
   @ALIAS("箭头大小", "arrowsize");
   @ALIAS("实线", "solid");
   @ALIAS("虚线", "dashed");

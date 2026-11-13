@@ -140,6 +140,18 @@
       "notes": "Part of the language (16.5), not a translation of the interface: a file written with these words reads as one written with the English ones. Whether a language has an alias package is decided with the standard. no_alias lists the names that keep their English spelling on purpose."
     },
     {
+      "id": "alias-0.4",
+      "title": "Alias package of the standard series 0.4",
+      "kind": "aliases",
+      "words": "spec/rnl-words-0.4.json",
+      "packages": "libraries/standard/0.4/*.rnl",
+      "translation": "libraries/standard/0.4/alias-{lang}.rnl",
+      "optional": true,
+      "no_alias": ["$NMOS", "$PMOS", "$NPN", "$PNP", "x", "y", "dx", "dy"],
+      "owner": "language",
+      "notes": "As alias-0.3, for the series 0.4, whose package is alias-<lang>.rnl. Until the switch to 0.4 both surfaces are read."
+    },
+    {
       "id": "glossary",
       "title": "Glossary: how a language renders RNL's English terms",
       "kind": "glossary",
