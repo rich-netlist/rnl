@@ -706,9 +706,16 @@ impl Skeleton {
             let (lo, hi) = if a.at[axis] < b.at[axis] { (seg.a, seg.b) } else { (seg.b, seg.a) };
             let length = &self.vertices[hi].at[axis] - &self.vertices[lo].at[axis];
             let least_lead = if self.strict && self.lead_to_branch(i) { lead() * int(2) } else { lead() };
+            // a piece of the default route of `auto` at one of the route's bends is as long as the
+            // ends of the wire make it (13.1: a route that turns back has its middle leg halfway,
+            // half a unit where the ends are one apart), and the wire is drawn by that route again
+            // once the drawing is spaced: it keeps its length where a whole lead is asked of the
+            // others. A wire drawn straight has no such piece, and is a lead like any other.
+            let bent =
+                seg.default_auto && [seg.a, seg.b].iter().any(|&v| matches!(self.vertices[v].key, Key::Bend(..)));
             let least = if self.collapses(i).is_some() || self.z_middle(i) || (self.strict && !self.lead_or_floor(i)) {
                 Q::zero()
-            } else if self.whole && !seg.default_auto {
+            } else if self.whole && !bent {
                 least_lead
             } else {
                 min(length, least_lead)
@@ -1638,6 +1645,22 @@ mod tests {
                 assert_eq!(report.failed, None, "whole {whole}, axis {axis}");
             }
         }
+        // a default auto wire drawn straight has no such piece: half a unit long between a source
+        // that leaves down and a drain that faces it, it is still asked a whole lead
+        p.wires[0].anchors[0] = PointRef::Pin { object: 0, pin: 2, terminal: "s".into() };
+        g.origin[1] = [int(0), int(-4) - half.clone()];
+        assert_eq!(crate::route::written_path(&p, &g, 0).unwrap().unwrap().len(), 2);
+        let least = |whole: bool| {
+            let sk = read_for_compaction(&p, &s, &g, &Routing::default(), &|_| true, whole, None, false).expect("read");
+            assert!(sk.segs.iter().all(|seg| seg.default_auto));
+            let wires = sk.made[1].iter().filter_map(|m| match m {
+                Made::AtLeast(_, _, _, _, least, Why::Wire) => Some(least.clone()),
+                _ => None,
+            });
+            wires.max().expect("a least length")
+        };
+        assert_eq!(least(true), int(1));
+        assert_eq!(least(false), half);
     }
 
     #[test]
