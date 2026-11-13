@@ -38,6 +38,15 @@ rnl-view = { path = "crates/rnl-view" }
 rnl-edit = { path = "crates/rnl-edit" }
 rnl-solver = { path = "crates/rnl-solver" }
 
+# Debug builds and tests keep line tables, so that a panic's backtrace still gives files and lines,
+# but no full debug information, and the dependencies none: every test program links the whole
+# toolkit, and full debug information made each tens of times larger. The test profile inherits it.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+
 # The WebAssembly binding, small rather than fast, since a document takes milliseconds either way:
 # `cargo build --profile wasm --target wasm32-unknown-unknown -p rnl-runtime-wasm`. The CLI keeps
 # the release profile.
