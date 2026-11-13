@@ -51,6 +51,8 @@
         "compare": "compare with {w}",
         "compare_title": "RNL {v} compared with {w}",
         "english_only": "English only",
+        "archived": "archived",
+        "archived_banner": "This is an archived version ({v}). The current standard is {current}. To upgrade files of {v}, use <a href=\"{href}\">the upgrade tool</a>.",
         "compared": "Compared with {label}:",
         "added": "added",
         "removed": "removed",

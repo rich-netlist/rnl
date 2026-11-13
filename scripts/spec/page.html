@@ -130,6 +130,8 @@ html[lang="zh-CN"] main h1.title { font-weight: 900; letter-spacing: .02em; }
 .rev { margin: 0; font: 13px/1.6 var(--f-mono); color: var(--ink-3); }
 .versions { margin: 2px 0 0; font: 13px/1.6 var(--f-mono); color: var(--ink-3); }
 .versions b { color: var(--ink-2); font-weight: 600; }
+.archived { margin: 10px 0 0; padding: 8px 12px; border: 1px solid currentColor; border-left-width: 4px; border-radius: 4px; font-size: 14px; line-height: 1.55; color: var(--ink-2); }
+.archived a { color: inherit; text-decoration: underline; }
 .downloads { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
 .dl {
   display: inline-flex; align-items: center; gap: 10px; padding: 9px 14px; border-radius: 8px;
@@ -274,6 +276,9 @@ $table-of-contents$
   <p class="rev">$revision-label$</p>
 $if(versions-html)$
   <p class="versions">$versions-html$</p>
+$endif$
+$if(archived-html)$
+  <p class="archived" role="note">$archived-html$</p>
 $endif$
 $if(compare-html)$
   $compare-html$
