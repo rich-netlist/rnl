@@ -569,10 +569,7 @@
   };
   # @SELECT-USAGE(recursive=true) $IO_PORT => @SET-SYMBOL $IO_PORT_SYMBOL;
 
-  /* A net label: the name of a net on a short lead, drawn at a point of its own. The role takes a
-     net, or a pin, which it keeps, so that a label on a bus pin, such as a pin of a bundle (11.8),
-     is one label on all its nets and shows their names, joined with "," (13.6); a terminal becomes
-     its net. */
+  /* A net label: the name of a net on a short lead, drawn at a point of its own; given a bus pin, such as a pin of a bundle (11.8), it keeps the pin and is one label on all its nets, showing their names (13.6). */
   $NET_LABEL = @DEFINE(roles=[["p", ["net", "pin"]]]) {};
   # @SELECT-USAGE(recursive=true) $NET_LABEL => @SET-SYMBOL $NET_LABEL_SYMBOL;
 

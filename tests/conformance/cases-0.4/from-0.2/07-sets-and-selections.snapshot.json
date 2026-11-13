@@ -194,63 +194,7 @@
           {
             "id": "&bias",
             "global": false,
-            "port": false,
-            "usages": [
-              {
-                "kind": "usage",
-                "id": "@rnl-std-basic.rnl:672:9#1",
-                "definition": "$NET_LABEL",
-                "roles": [
-                  {
-                    "role": "p",
-                    "set": false,
-                    "member": "&bias",
-                    "terminal": null
-                  }
-                ],
-                "file": null,
-                "line": 672,
-                "source": "body",
-                "made_in": "%net_label_stub_M1_g",
-                "state": "in-effect"
-              },
-              {
-                "kind": "usage",
-                "id": "@rnl-std-basic.rnl:672:9#2",
-                "definition": "$NET_LABEL",
-                "roles": [
-                  {
-                    "role": "p",
-                    "set": false,
-                    "member": "&bias",
-                    "terminal": null
-                  }
-                ],
-                "file": null,
-                "line": 672,
-                "source": "body",
-                "made_in": "%net_label_stub_M2_g",
-                "state": "in-effect"
-              },
-              {
-                "kind": "usage",
-                "id": "@rnl-std-basic.rnl:672:9#3",
-                "definition": "$NET_LABEL",
-                "roles": [
-                  {
-                    "role": "p",
-                    "set": false,
-                    "member": "&bias",
-                    "terminal": null
-                  }
-                ],
-                "file": null,
-                "line": 672,
-                "source": "body",
-                "made_in": "%net_label_stub_M3_g",
-                "state": "in-effect"
-              }
-            ]
+            "port": false
           },
           {
             "id": "&0",
@@ -1685,13 +1629,14 @@
             "pins": []
           },
           {
+            "pin_of": "#M1",
             "parent": "%net_label_stub_M1_g",
             "id": "@rnl-std-basic.rnl:672:9#1",
             "kind": "usage",
             "host": [],
             "definition": "$NET_LABEL",
             "attach": {
-              "p": "&bias"
+              "p": "pin(#M1,1)"
             },
             "symbol": {
               "value": "$NET_LABEL_SYMBOL",
@@ -1763,13 +1708,14 @@
             "pins": []
           },
           {
+            "pin_of": "#M2",
             "parent": "%net_label_stub_M2_g",
             "id": "@rnl-std-basic.rnl:672:9#2",
             "kind": "usage",
             "host": [],
             "definition": "$NET_LABEL",
             "attach": {
-              "p": "&bias"
+              "p": "pin(#M2,1)"
             },
             "symbol": {
               "value": "$NET_LABEL_SYMBOL",
@@ -1841,13 +1787,14 @@
             "pins": []
           },
           {
+            "pin_of": "#M3",
             "parent": "%net_label_stub_M3_g",
             "id": "@rnl-std-basic.rnl:672:9#3",
             "kind": "usage",
             "host": [],
             "definition": "$NET_LABEL",
             "attach": {
-              "p": "&bias"
+              "p": "pin(#M3,1)"
             },
             "symbol": {
               "value": "$NET_LABEL_SYMBOL",

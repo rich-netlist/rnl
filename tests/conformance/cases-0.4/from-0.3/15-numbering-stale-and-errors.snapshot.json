@@ -215,13 +215,14 @@
             "pins": []
           },
           {
+            "pin_of": "#Rtop",
             "parent": "@rnl-std-fill.rnl:62:3#1",
             "id": "@rnl-std-basic.rnl:672:9#1",
             "kind": "usage",
             "host": [],
             "definition": "$NET_LABEL",
             "attach": {
-              "p": "pin(#Rtop,0)::net"
+              "p": "pin(#Rtop,0)"
             },
             "symbol": {
               "value": "$NET_LABEL_SYMBOL",
@@ -283,13 +284,14 @@
             "pins": []
           },
           {
+            "pin_of": "#Rtop",
             "parent": "@rnl-std-fill.rnl:62:3#2",
             "id": "@rnl-std-basic.rnl:672:9#2",
             "kind": "usage",
             "host": [],
             "definition": "$NET_LABEL",
             "attach": {
-              "p": "pin(#Rtop,1)::net"
+              "p": "pin(#Rtop,1)"
             },
             "symbol": {
               "value": "$NET_LABEL_SYMBOL",
@@ -662,13 +664,14 @@
             "pins": []
           },
           {
+            "pin_of": "#R1",
             "parent": "@rnl-std-fill.rnl:62:3#1",
             "id": "@rnl-std-basic.rnl:672:9#1",
             "kind": "usage",
             "host": [],
             "definition": "$NET_LABEL",
             "attach": {
-              "p": "pin(#R1,1)::net"
+              "p": "pin(#R1,1)"
             },
             "symbol": {
               "value": "$NET_LABEL_SYMBOL",
@@ -730,13 +733,14 @@
             "pins": []
           },
           {
+            "pin_of": "#R2",
             "parent": "@rnl-std-fill.rnl:62:3#2",
             "id": "@rnl-std-basic.rnl:672:9#2",
             "kind": "usage",
             "host": [],
             "definition": "$NET_LABEL",
             "attach": {
-              "p": "pin(#R2,1)::net"
+              "p": "pin(#R2,1)"
             },
             "symbol": {
               "value": "$NET_LABEL_SYMBOL",

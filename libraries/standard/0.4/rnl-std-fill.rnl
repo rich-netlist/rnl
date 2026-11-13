@@ -51,10 +51,8 @@
   # @SELECT-NET(name="0", recursive=true) => @REMOVE-FROM $NAMED_GROUND_NET_SET;
   $NAMED_GROUND_NET_SET @SELECT-ANCESTOR-USAGE(recursive=true) $GROUND => @SET-SYMBOL $NAMED_GROUND_SYMBOL;
 
-  /* The pins on ground, supply and bias nets and the bulk pins, which get no net label. */
   %rail_pin_set = {$GROUND_NET_SET $SUPPLY_NET_SET $BIAS_NET_SET} @SELECT-PIN(recursive=true);
   %bulk_pin_set @REMOVE-FROM %rail_pin_set;
-
   /* The remaining unwired pins on nets, which the fill gives a net-label stub; a bus pin gets one. */
   $LABEL_FILL_SET = # @SELECT-NET(recursive=true) => @SELECT-PIN(wired=false, recursive=true);
   %rail_pin_set @REMOVE-FROM $LABEL_FILL_SET;
