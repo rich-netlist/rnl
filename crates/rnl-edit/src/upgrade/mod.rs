@@ -276,6 +276,7 @@ pub fn upgrade(entry: &str, files: &dyn Provider, options: &UpgradeOptions) -> R
         references: references::References::new(&before, options.approximate),
         sets: sets::Sets::new(&before, &entry),
         approximate: options.approximate,
+        no_labels: source_records.values().any(|r| rewrite::uses_no_labels(r)),
     };
     let mut output = BTreeMap::new();
     let mut report = Report {

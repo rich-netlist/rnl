@@ -17,6 +17,8 @@ pub(super) struct Context {
     pub references: References,
     pub sets: super::sets::Sets,
     pub approximate: bool,
+    /// The files use rnl-std-no-labels, whose 0.4 form hides labels with `textvisible=false`.
+    pub no_labels: bool,
 }
 
 fn pending(member: &Member) -> Option<(&'static str, &'static str)> {
@@ -113,6 +115,51 @@ fn visit(members: &[std::rc::Rc<Member>], f: &mut impl FnMut(&Member)) {
     }
 }
 
+/// Whether a record uses the package rnl-std-no-labels (16.3).
+pub(super) fn uses_no_labels(records: &[Record]) -> bool {
+    let mut found = false;
+    for record in records {
+        let ast = parse_record_features(&record.text, true, false);
+        let Some(body) = ast.body else { continue };
+        visit(&body.members, &mut |member| {
+            found |= member.segments.iter().filter_map(|s| s.call.as_ref()).any(|c| {
+                c.kw == "USE-PACKAGE"
+                    && matches!(c.params.as_ref().and_then(|p| p.get("name")), Some(Value::Str(n)) if n == "rnl-std-no-labels")
+            });
+        });
+    }
+    found
+}
+
+/// rnl-std-no-labels 0.3 emptied the default labels, and a later TEXT with the same key showed one
+/// again; 0.4 hides them with the style `textvisible=false`, which a later TEXT keeps unless it
+/// writes `textvisible=true` (9.3, 13.3). A TEXT with the key name, value or model outside a symbol
+/// body gets `textvisible=true`, so that the drawing does not change.
+fn no_labels_text(
+    source: &str,
+    record: &Record,
+    member: &Member,
+    index: usize,
+    symbol_spans: &[std::ops::Range<usize>],
+) -> Result<Option<Edit>, String> {
+    let Some(call) = member.segments[index].call.as_ref().filter(|c| c.kw == "TEXT") else { return Ok(None) };
+    if symbol_spans.iter().any(|r| r.contains(&call.start)) {
+        return Ok(None);
+    }
+    let Some(params) = &call.params else { return Ok(None) };
+    if !matches!(params.get("key"), Some(Value::Str(k)) if matches!(k.as_str(), "name" | "value" | "model")) {
+        return Ok(None);
+    }
+    if params.named.iter().any(|n| n.name == "textvisible") {
+        return Ok(None);
+    }
+    let close = call.end.saturating_sub(1);
+    if record.text.chars().nth(close) != Some(')') {
+        return Ok(None);
+    }
+    record_edit(source, record, close..close, ", textvisible=true".to_string(), "no-labels-shown").map(Some)
+}
+
 fn uses_std(segment: &rnl_runtime::syntax::Segment, owned: &BTreeSet<String>) -> bool {
     let Some(call) = &segment.call else { return false };
     if call.kw != "USE-PACKAGE" {
@@ -183,9 +230,13 @@ pub(super) fn file(
         }
         let mut error = None;
         let mut local_selection_spans = Vec::new();
+        let mut symbol_spans = Vec::new();
         visit(&body.members, &mut |member| {
             if mechanical::mixed_recursion(member) {
                 local_selection_spans.push(member.text_start()..member.end);
+            }
+            if member.segments.iter().filter_map(|s| s.call.as_ref()).any(|c| c.kw == "DEFINE-SYMBOL") {
+                symbol_spans.push(member.text_start()..member.end);
             }
         });
         visit(&body.members, &mut |member| {
@@ -323,7 +374,10 @@ pub(super) fn file(
                 let mut found = vec![
                     context.references.legacy_package(path, source, record, segment),
                     context.references.terminal_map(path, source, record, member, index),
-                    context.references.text_key(path, source, record, member, index),
+                    match context.references.text_key(path, source, record, member, index) {
+                        Ok(None) if context.no_labels => no_labels_text(source, record, member, index, &symbol_spans),
+                        other => other,
+                    },
                     mechanical::route(source, record, call),
                     super::directions::edit(source, record, member, index),
                     super::selections::drawing_pins(source, record, member, index),

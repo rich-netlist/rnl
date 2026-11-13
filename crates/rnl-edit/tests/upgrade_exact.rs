@@ -106,3 +106,23 @@ fn ground_on_a_terminal_preserves_the_electrical_net_and_point() {
     assert!(r.files["t.sp"].contains("{%g #R1:1} @ALIGN(\"x\")"));
     assert!(!pending(&r, "usage-main-point"));
 }
+
+#[test]
+fn labels_shown_again_under_no_labels_keep_showing() {
+    let source = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"rnl-std\", version=\"0.3\"); @USE-PACKAGE(name=\"rnl-std-no-labels\", version=\"0.3\") }\nR1 a 0 1k\nR2 b 0 2k\n* @RNL {\n*   #R1 @TEXT(\"R_load\", key=\"name\");\n*   #R2 @TEXT(\"2k\", key=\"value\");\n*   #R2 @TEXT(\"note\", key=\"memo\");\n*   $SUPPLY @ATTACH &a => @TEXT(\"VDD\", key=\"name\");\n*   $S = @DEFINE-SYMBOL { (0, 0) @CIRCLE(radius=1); ? @TEXT(\"${name}\", key=\"name\") }\n* }\n.end\n";
+    let r = upgrade("t.sp", &MemoryProvider::new().with("t.sp", source), &UpgradeOptions::default()).unwrap();
+    let text = &r.files["t.sp"];
+    assert!(text.contains("#R1 @TEXT(\"R_load\", key=\"name\", textvisible=true)"), "{text}");
+    assert!(text.contains("#R2 @TEXT(\"2k\", key=\"value\", textvisible=true)"), "{text}");
+    assert!(text.contains("#R2 @TEXT(\"note\", key=\"memo\")"), "{text}");
+    assert!(text.contains("@TEXT(\"VDD\", key=\"netname\")"), "{text}");
+    assert!(text.contains("? @TEXT(\"${name}\", key=\"name\") }"), "{text}");
+    assert!(r.report.files[0].changes.iter().any(|c| c.rule == "no-labels-shown"));
+}
+
+#[test]
+fn labels_are_left_alone_without_no_labels() {
+    let r = convert("#R1 @TEXT(\"R_load\", key=\"name\")", true);
+    assert!(r.files["t.sp"].contains("#R1 @TEXT(\"R_load\", key=\"name\")"), "{}", r.files["t.sp"]);
+    assert!(!r.report.files[0].changes.iter().any(|c| c.rule == "no-labels-shown"));
+}
