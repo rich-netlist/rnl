@@ -2,8 +2,7 @@
 //! as `$PMOS` and `$PNP` do, its source up and its drain down, and the controlled sources of two
 //! terminals are the diamonds of Analog Canvas.
 
-#[path = "support/public_packages.rs"]
-mod public_packages;
+use crate::public_packages;
 
 use std::path::Path;
 

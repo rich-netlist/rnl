@@ -87,7 +87,7 @@ caller must handle an unrepresentable character. Desktop IPC accepts the optiona
 Focused verification commands (run serially with `CARGO_BUILD_JOBS=4`):
 
 ```sh
-cargo test -p rnl-cli --test encoding
+cargo test -p rnl-cli --test cli encoding::
 cargo test -p rnl-cli codec
 cargo test --manifest-path apps/desktop/Cargo.toml
 # From tests/viewer; its setup builds the CLI, so it must share the same build lock:

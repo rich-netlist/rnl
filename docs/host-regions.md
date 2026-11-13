@@ -93,6 +93,6 @@ and `the_editor_explains_when_a_conditional_subcircuit_has_no_safe_write_place` 
 its public write path. Existing `protected_regions` tests retain the distinction
 between readable plaintext protection and encrypted text.
 
-Focused commands: `cargo test -p rnl-cli --test host_regions` and
+Focused commands: `cargo test -p rnl-cli --test cli host_regions::` and
 `cargo test -p rnl-edit`. Repository-wide validation is recorded in the
 [supported profile](supported-profile-0.3.md#validation).

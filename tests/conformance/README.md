@@ -30,13 +30,13 @@ A snapshot file is what `rnl snapshot` prints for the case, the snapshot of the 
 ## Running
 
 ```bash
-cargo test -p rnl-cli --test conformance
+cargo test -p rnl-cli --test cli conformance::
 ```
 
 After a change that is meant to alter a result, write the expected files again and review the difference:
 
 ```bash
-RNL_BLESS=1 cargo test -p rnl-cli --test conformance
+RNL_BLESS=1 cargo test -p rnl-cli --test cli conformance::
 ```
 
 `RNL_BLESS_0_3=1` writes those of `cases-0.3` instead, and leaves the others as they are; `RNL_BLESS=1` does not write those of `cases-0.3`. The expected files of each corpus are written only when that corpus is asked for, so that blessing a change of 0.3, whose text is still a draft, never rewrites the regression suite of 0.2.

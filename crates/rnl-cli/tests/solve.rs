@@ -4,7 +4,7 @@
 //! level, into a temporary directory, and the file read again as a viewer reads it: no error,
 //! nothing unplaced, every constraint `ok` but those that 8.5 discarded, which are `dropped`, the
 //! hash the same, and the text the snapshot in `tests/integration/solver/solved`. After a change to
-//! the solver that is meant, `RNL_BLESS=1 cargo test -p rnl-cli --test solve` writes the snapshots
+//! the solver that is meant, `RNL_BLESS=1 cargo test -p rnl-cli --test cli solve::` writes the snapshots
 //! again. Every solve here has no time limit, so that it is the resolution of 8.5 exactly and the
 //! same on every run (the draft 0.3, 8.5), but where a test is about the limit: those measure it on
 //! a clock that counts its readings ([`Ticks`]), or check the default of the command.

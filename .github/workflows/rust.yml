@@ -109,8 +109,8 @@ jobs:
         run: |
           mv .rnl-packages .rnl-packages-held
           trap 'mv .rnl-packages-held .rnl-packages' EXIT
-          env -u CI cargo test -p rnl-cli --test device_symbols --test extensions --test eda_style --test pdk_sky130
-          if CI=true cargo test -p rnl-cli --test extensions; then
+          env -u CI cargo test -p rnl-cli --test cli -- device_symbols:: extensions:: eda_style:: pdk_sky130::
+          if CI=true cargo test -p rnl-cli --test cli -- extensions::; then
             echo 'Missing public packages must fail in CI'
             exit 1
           fi
