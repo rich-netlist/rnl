@@ -205,6 +205,10 @@ pub fn carrier(doc: &HostDocument, file: &str, text: &str) -> &'static str {
     if doc.is_package(file) {
         return "";
     }
+    // a Verilog-A file carries RNL in `//` comments only (2.9)
+    if doc.is_veriloga(file) {
+        return "//";
+    }
     let lines: Vec<&str> = text.lines().collect();
     for lv in &doc.levels {
         for r in lv.records.iter().filter(|r| r.file == file) {
@@ -343,9 +347,15 @@ pub fn record_line(doc: &HostDocument, level: LevelId, text: &str) -> Result<u32
     if file.section.is_some() && file.section_lines.is_none() {
         return Err((1, Lines::new(text).lines.len() as u32 + 1));
     }
-    // the first place of its own text: after its `.subckt`; line 2 of a file, as line 1 is not read
-    let first =
-        if lv.kind == LevelKind::Subckt { lv.line + 1 } else { lv.section_lines.map_or(2, |(start, _)| start + 1) };
+    // the first place of its own text: after its `.subckt`; line 2 of a file, as line 1 is not read,
+    // but line 1 of a Verilog-A file, which has no title (2.9)
+    let first = if lv.kind == LevelKind::Subckt {
+        lv.line + 1
+    } else if doc.is_veriloga(&lv.file) {
+        1
+    } else {
+        lv.section_lines.map_or(2, |(start, _)| start + 1)
+    };
     free_place(doc, level, end_of(doc, level, &Lines::new(text)), first)
 }
 

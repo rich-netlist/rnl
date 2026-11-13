@@ -188,3 +188,49 @@ fn outside_its_modules_a_verilog_a_file_holds_only_header_records() {
     assert_eq!(errors_in(&r, "m.va"), [(codes::HOST_VERILOGA_FILE_RECORD, 2)]);
     assert_eq!(symbol(&r, "I1"), "%s");
 }
+
+/// A directory of its own for a test that writes files, with the files of a Spectre netlist of 0.4
+/// that brings in `vco.va`.
+fn written(name: &str) -> std::path::PathBuf {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("veriloga04").join(name);
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let top = "// t\n// @RNL(type=\"header\") { @VERSION(\"0.4\")}\nahdl_include \"vco.va\"\nI1 (ctl out vdd 0) vco\nR1 (out 0) resistor r=1k\n";
+    std::fs::write(dir.join("t.scs"), top).unwrap();
+    std::fs::write(dir.join("vco.va"), VCO).unwrap();
+    dir
+}
+
+fn rnl(args: &[&str]) -> std::process::Output {
+    std::process::Command::new(env!("CARGO_BIN_EXE_rnl")).args(args).output().unwrap()
+}
+
+#[test]
+fn a_tool_writes_the_records_of_a_module_in_comments_of_verilog_a() {
+    let dir = written("replace");
+    let records = "@RNL(author=\"canvas\") {\n  %s = @DEFINE-SYMBOL(box=[-1, -1, 1, 1]) { @RECTANGLE {(-1, -1) (1, 1)}; \
+        (-1, 0) @PIN(terminal=\"vin\", direction=\"left\"); (1, 0) @PIN(terminal=\"out\", direction=\"right\"); \
+        (0, 1) @PIN(terminal=\"vdd\", direction=\"up\"); (0, -1) @PIN(terminal=\"vss\", direction=\"down\") };\n  # @SET-SYMBOL %s\n}\n";
+    std::fs::write(dir.join("new.rnl"), records).unwrap();
+    let path = |name: &str| dir.join(name).to_string_lossy().into_owned();
+    let out = rnl(&["replace-records", &path("t.scs"), "--level", "vco", "--records", &path("new.rnl"), "--in-place"]);
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    let va = std::fs::read_to_string(dir.join("vco.va")).unwrap().replace("\r\n", "\n");
+    // the records go before `endmodule`, each line behind `//`, and the module reads them
+    let at = va.find("// @RNL(author=\"canvas\") {\n//   %s = @DEFINE-SYMBOL").expect(&va);
+    assert!(at < va.find("endmodule").unwrap(), "{va}");
+    assert!(!va.contains("%vco"), "{va}");
+    assert_eq!(std::fs::read_to_string(dir.join("t.scs")).unwrap().lines().count(), 5);
+    let files = rnl_cli::FsProvider::new(&[]);
+    let r = interpret_file(&dir.join("t.scs"), None, &files, &Options { std: false, ..Options::default() }).unwrap();
+    assert_eq!(symbol(&r, "I1"), "%s");
+}
+
+#[test]
+fn the_solver_writes_nothing_in_a_verilog_a_file() {
+    let dir = written("solve");
+    let out = rnl(&["solve", &dir.join("t.scs").to_string_lossy(), "-o", &dir.join("out").to_string_lossy()]);
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert_eq!(std::fs::read_to_string(dir.join("out").join("vco.va")).unwrap(), VCO);
+    assert!(std::fs::read_to_string(dir.join("out").join("t.scs")).unwrap().contains("type=\"generated\""));
+}

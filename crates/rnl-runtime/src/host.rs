@@ -360,9 +360,11 @@ impl HostDocument {
 
     /// Whether the line `line` of `file`, or what is written in before that line, is read in SPICE
     /// mode, where only `*` is a comment (2.2): in a file of Spectre's dialect, in the regions of
-    /// [`HostDocument::spice_mode`]; in a file of another dialect, everywhere.
+    /// [`HostDocument::spice_mode`]; in a Verilog-A file, where `//` carries RNL (2.9), nowhere;
+    /// in a file of another dialect, everywhere.
     pub fn in_spice_mode(&self, file: &str, line: u32) -> bool {
-        self.rules(file).name != "spectre"
+        let name = &self.rules(file).name;
+        (name != "spectre" && name != veriloga::NAME)
             || self.spice_mode.iter().any(|(f, a, b)| f == file && *a < line && line <= *b)
     }
 
