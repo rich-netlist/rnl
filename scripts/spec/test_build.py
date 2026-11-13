@@ -300,8 +300,8 @@ class Languages(unittest.TestCase):
     def test_a_comparison_names_the_language_and_the_old_words_are_the_Chinese_ones(self):
         en, other = "## 1 One\n\n- a\n", "## 1 Eins\n"
         self.assertIn("list items 1 in en, 0 in de", "\n".join(self.spectools.compare(en, other, "ch01", lang="de")))
-        self.assertEqual(self.spectools.compare("", "注册点", "ch01", lang="ja"), [])
-        self.assertTrue(self.spectools.compare("", "注册点", "ch01"))
+        self.assertEqual(self.spectools.compare("注册点", "注册点", "ch01", lang="ja"), [])
+        self.assertEqual(self.spectools.compare("注册点", "注册点", "ch01"), ["ch01: old word '注册点' ×1"])
 
 
 if __name__ == "__main__":
