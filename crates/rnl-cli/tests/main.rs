@@ -118,6 +118,7 @@ mod priority;
 mod problem_currents04;
 mod profile_semantics;
 mod profile_validation;
+mod progress04;
 mod record_language;
 mod record_recovery04;
 mod recursive_scope;
