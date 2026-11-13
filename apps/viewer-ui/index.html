@@ -268,6 +268,7 @@ if (new URLSearchParams(location.search).get("embed") !== "1") document.addEvent
       </div>
       <div id="solve-views" class="solve-views" role="group" aria-label="What the Solve view shows" hidden>
         <button id="solve-view-constraints" type="button" aria-pressed="false">Constraints</button>
+        <button id="solve-view-groups" type="button" aria-pressed="false" hidden>Groups</button>
         <button id="solve-view-report" type="button" aria-pressed="false" hidden>Report</button>
         <span id="constraints-count" class="counts"></span>
       </div>
@@ -276,6 +277,10 @@ if (new URLSearchParams(location.search).get("embed") !== "1") document.addEvent
         <p class="constraints-note">The constraints of this netlist as the solver takes them in, after the structures are expanded, in the order it takes them. Click one to box the objects it acts on in the drawing, numbered in the order it lists them.</p>
         <input id="constraints-filter" type="search" placeholder="Filter the constraints" spellcheck="false" autocomplete="off" aria-label="Filter the constraints by what they say, their priority, their structure or their result">
         <div id="constraints-list" class="constraints-list"></div>
+      </div>
+      <div id="solve-groups" class="solve-report solve-groups" hidden>
+        <p class="constraints-note">The groups of this level as the solver takes them in: each stands under the smallest group that holds all its members. Click one to light it in the drawing; the check shows or hides its frame. The groups the solver does not take in follow, with the reason.</p>
+        <div id="groups-list" class="groups-list"></div>
       </div>
     </div>
   </aside>

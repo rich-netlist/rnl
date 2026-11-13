@@ -1,65 +1,48 @@
-// Scope-local group hierarchy, structural attachment queries, and layout-table geometry for
-// the Solve overlays. Groups written directly in the netlist (named with %) are taken in first,
-// followed by groups created inside definitions, later statements first in each part. Identical
-// member sets merge into the earlier group (`same`), partial overlaps are excluded (`left`), and
-// groups turned off by PRIORITY stay in `off`. Attachment queries follow language relations
-// (`pin_of`, `parent`, `solver_config` and point-mark structure) without naming any package or
-// definition.
+// The tree of a level's groups, as the core gives it (`Usage.group_parent`, `same_as`, `crosses` and the states "same",
+// "left-out" and "disabled" of a group's usage: rnl_runtime::group_tree), and structural attachment queries and
+// layout-table geometry for the Solve overlays. Attachment queries follow language relations (`pin_of`, `parent`,
+// `solver_config` and point-mark structure) without naming any package or definition.
 
 const PAD = 14; // SVG pixels from the outermost boxes to the table's frame
 
 /** The objects of a group: the objects of all its roles. */
 const membersOf = (u) => new Set((u.roles ?? []).flatMap((r) => r.objects ?? []));
-const holds = (a, b) => [...b].every((k) => a.has(k));
-const same = (a, b) => a.size === b.size && holds(a, b);
-const meets = (a, b) => [...a].some((k) => b.has(k));
 const union = (a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[2], b[2]), Math.max(a[3], b[3])];
 
 /**
- * The tree of the level's groups: `nodes` (the level first, as `group: null`, then each group taken in), each with its
- * `parent` node, `children` nodes and `own` objects (the members no child holds); `left` the groups left out, each with
- * `crosses`, the group it crosses; `off` those turned off; `same` the groups that are another one, each with `as`.
+ * The tree of the level's groups: `nodes` (the level first, as `group: null`, then each group in the tree, in the order of
+ * the Document's usages, which is the solver's), each with its `parent` node, `children` nodes and `own` objects (the
+ * members no child holds); `left` the groups left out, each with `crosses`, the group it crosses, when it crosses one;
+ * `off` those turned off; `same` the groups that are another one, each with `as`. A level that is not of 0.4 has no tree:
+ * its groups are all at the top.
  */
 export function groupTree(level) {
   const all = (level?.usages ?? []).filter((u) => u.kind === "group");
-  const written = (u) => typeof u.id === "string" && u.id.startsWith("%");
-  const live = all.filter((u) => (u.state ?? "in-effect") === "in-effect");
-  const coreLeft = all.filter((u) => u.state === "left-out");
-  const coreSame = all.filter((u) => u.state === "same");
-  const order = [...live.filter(written).reverse(), ...live.filter((u) => !written(u)).reverse()];
-  const taken = [];
-  const left = [];
-  const sameAs = [];
-  for (const u of order) {
-    const members = membersOf(u);
-    if (members.size === 0) continue;
-    const twin = taken.find((t) => same(t.members, members));
-    if (twin) { sameAs.push({ group: u, as: twin.group }); continue; }
-    const crossing = taken.find((t) => meets(t.members, members) && !holds(t.members, members) && !holds(members, t.members));
-    if (crossing) { left.push({ group: u, crosses: crossing.group }); continue; }
-    taken.push({ group: u, members });
-  }
+  const byObject = new Map(all.map((u) => [u.object, u]));
+  const stateOf = (u) => u.state ?? "in-effect";
   const root = { group: null, members: null, parent: null, children: [], own: [] };
-  const nodes = [root, ...taken.map((t) => ({ group: t.group, members: t.members, parent: null, children: [], own: [] }))];
+  const nodes = [root];
+  const nodeOfGroup = new Map();
+  for (const u of all) {
+    if (stateOf(u) !== "in-effect") continue;
+    const node = { group: u, members: membersOf(u), parent: null, children: [], own: [] };
+    nodes.push(node);
+    nodeOfGroup.set(u.object, node);
+  }
   for (const n of nodes.slice(1)) {
-    const outer = nodes.slice(1).filter((o) => o !== n && holds(o.members, n.members) && o.members.size > n.members.size);
-    n.parent = outer.sort((a, b) => a.members.size - b.members.size)[0] ?? root;
+    n.parent = nodeOfGroup.get(n.group.group_parent) ?? root;
     n.parent.children.push(n);
   }
+  const deepen = (n, depth) => { n.depth = depth; for (const c of n.children) deepen(c, depth + 1); };
+  deepen(root, 0);
   for (const n of nodes.slice(1)) {
     n.own = [...n.members].filter((k) => !n.children.some((c) => c.members.has(k)));
   }
-  for (const u of coreLeft) {
-    const members = membersOf(u);
-    const crosses = taken.find((t) => meets(t.members, members) && !holds(t.members, members) && !holds(members, t.members));
-    left.push({ group: u, crosses: crosses?.group ?? null, reason: u.reason ?? null });
-  }
-  for (const u of coreSame) {
-    const members = membersOf(u);
-    const twin = taken.find((t) => same(t.members, members));
-    sameAs.push({ group: u, as: twin?.group ?? null, reason: u.reason ?? null });
-  }
-  return { nodes, root, left, off: all.filter((u) => u.state === "disabled"), same: sameAs };
+  const left = all.filter((u) => stateOf(u) === "left-out")
+    .map((u) => ({ group: u, crosses: byObject.get(u.crosses) ?? null, reason: u.reason ?? null }));
+  const sameAs = all.filter((u) => stateOf(u) === "same")
+    .map((u) => ({ group: u, as: byObject.get(u.same_as) ?? null, reason: u.reason ?? null }));
+  return { nodes, root, left, off: all.filter((u) => stateOf(u) === "disabled"), same: sameAs };
 }
 
 /** The innermost node of `tree` that holds object `k`: the level when no group does. */

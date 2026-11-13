@@ -361,6 +361,9 @@ export function writeFixtures(rnl, dir) {
   // A violation (7.6), of a file of 0.4 read without the standard package, whose draft has errors of its own
   fs.writeFileSync(path.join(dir, "violation.json"), execFileSync(rnl,
     ["view", "tests/viewer/inputs/violation.sp", "--no-std", "--flylines", "--hints"], { cwd: root, encoding: "utf8" }));
+  // Groups of a file of 0.4 (the tree of groups, 11.5), read without the standard package
+  fs.writeFileSync(path.join(dir, "groups-04.json"), execFileSync(rnl,
+    ["view", "tests/viewer/inputs/groups-04.sp", "--no-std"], { cwd: root, encoding: "utf8" }));
   for (const [name, file] of Object.entries(FILES)) {
     fs.writeFileSync(path.join(dir, `${name}.json`), view(rnl, file, root));
   }

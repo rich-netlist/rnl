@@ -13,6 +13,7 @@ import { setPane } from "./panels.js";
 import { current, doc } from "./state.js";
 import { revealLine } from "./text.js";
 import { highlightConstraint } from "./usages.js";
+import { hasGroups, render as renderGroups } from "./groups-view.js";
 import { factObjects, factTextIds } from "./constraint-box.js";
 import { $, span, svgElement } from "./util.js";
 
@@ -96,7 +97,8 @@ export function levelRows(level, report) {
 
 let selectedRow = null; // the row clicked, its element
 let report = null; // the solve shown, which tells what became of the facts
-let view = "constraints";
+let view = "constraints"; // "constraints", "groups" or "report"
+let withConstraints = false; // whether the Document has constraints to list
 
 /** Forget the clicked row, and what it lit in the drawing. */
 function unselect() {
@@ -182,14 +184,29 @@ function applyFilter() {
   setText($("constraints-count"), words.length ? m`${shown} of ${all} constraints` : all === 1 ? m("1 constraint") : m`${all} constraints`);
 }
 
-/** Show the Constraints view or the report of the Solve pane; the report only when there is a solve to report. */
+/**
+ * Show the Constraints view, the Groups view or the report of the Solve pane; the Groups view only when the level shown has
+ * groups, the report only when there is a solve to report.
+ */
 function pick(next) {
-  view = next === "report" && report ? "report" : "constraints";
+  view = next === "groups" && hasGroups() ? "groups" : next === "report" && report ? "report" : "constraints";
   const constraints = view === "constraints" && !$("solve-constraints").dataset.empty;
-  $("solve-report").hidden = constraints;
+  $("solve-report").hidden = view === "groups" || constraints;
   $("solve-constraints").hidden = !constraints;
+  $("solve-groups").hidden = view !== "groups";
   $("solve-view-constraints").setAttribute("aria-pressed", String(constraints));
-  $("solve-view-report").setAttribute("aria-pressed", String(!constraints));
+  $("solve-view-groups").setAttribute("aria-pressed", String(view === "groups"));
+  $("solve-view-report").setAttribute("aria-pressed", String(view !== "groups" && !constraints));
+  renderGroups();
+}
+
+/** The buttons of the views there are something to show in: the bar has none to offer when there is no more than one view. */
+function syncViews() {
+  const groups = hasGroups();
+  $("solve-views").hidden = !withConstraints && !groups;
+  $("solve-view-constraints").hidden = !withConstraints;
+  $("solve-view-groups").hidden = !groups;
+  $("solve-view-report").hidden = !report;
 }
 
 /**
@@ -218,10 +235,10 @@ export function showConstraints(solved = report) {
   // with no rows the Constraints view has nothing to show, and the report's place says why
   if (sections.length === 0) $("solve-constraints").dataset.empty = "1";
   else delete $("solve-constraints").dataset.empty;
-  $("solve-views").hidden = sections.length === 0;
-  $("solve-view-report").hidden = !report;
+  withConstraints = sections.length > 0;
+  syncViews();
   applyFilter();
-  pick(view === "report" && report ? "report" : "constraints");
+  pick(view);
   return sections.length > 0;
 }
 
@@ -232,6 +249,9 @@ export function showReportView() {
 
 $("solve-view-report").addEventListener("click", () => pick("report"));
 $("solve-view-constraints").addEventListener("click", () => pick("constraints"));
+$("solve-view-groups").addEventListener("click", () => pick("groups"));
+// the groups are those of the level shown: another level has its own, or none
+window.addEventListener("viewer-level", () => { syncViews(); pick(view); });
 $("constraints-filter").addEventListener("input", applyFilter);
 // a selection in the drawing, another level or another Document ends what a row lit
 window.addEventListener("constraint-cleared", unselect);

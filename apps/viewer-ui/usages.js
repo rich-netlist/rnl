@@ -110,6 +110,9 @@ function change(u, values) {
   repaint();
 }
 function repaint() { if (context) paintUsages(...context); }
+/** A group's colour and whether its frame is shown, as the Usage view keeps them (the frames are drawn while View > Show Usages is on). */
+export const groupLook = (u) => ({ color: setting(u).color, visible: setting(u).visible });
+export function setGroupVisible(u, visible) { change(u, { visible }); }
 
 export function startUsages() {
   preferences = new Map(Object.entries(load("usage-preferences", {})).filter(([, v]) =>

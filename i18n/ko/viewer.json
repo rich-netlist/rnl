@@ -741,5 +741,11 @@
   "Show &Wire Skeleton Lines": "배선 골격선 표시(&W)",
   "Layout table": "레이아웃 표",
   "Component and pin lines": "소자와 핀의 선",
-  "Wire lines": "배선의 선"
+  "Wire lines": "배선의 선",
+  "Groups": "그룹",
+  "The groups of this level as the solver takes them in: each stands under the smallest group that holds all its members. Click one to light it in the drawing; the check shows or hides its frame. The groups the solver does not take in follow, with the reason.": "이 수준의 그룹을 솔버가 받아들이는 대로 보여 줍니다. 각 그룹은 모든 멤버를 포함하는 가장 작은 그룹 아래에 놓입니다. 클릭하면 그림에서 강조되고, 체크로 그 틀을 표시하거나 숨깁니다. 솔버가 받아들이지 않는 그룹은 이유와 함께 뒤따릅니다.",
+  "Not in the tree ({0})": "트리에 없음 ({0})",
+  "turned off by PRIORITY": "PRIORITY로 꺼짐",
+  "same members": "같은 멤버",
+  "left out": "제외됨"
 }

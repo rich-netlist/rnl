@@ -56,6 +56,8 @@ const STATES = {
   failed: () => m("failed"),
   overridden: () => m("overridden"),
   disabled: () => m("disabled"),
+  same: () => m("same members"),
+  "left-out": () => m("left out"),
 };
 
 /** A state that is not "in-effect", as the rows say it. */

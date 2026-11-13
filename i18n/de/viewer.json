@@ -741,5 +741,11 @@
   "Show &Wire Skeleton Lines": "Skelettlinien der Leitun&gen anzeigen",
   "Layout table": "Layout-Tabelle",
   "Component and pin lines": "Linien der Bauteile und Pins",
-  "Wire lines": "Linien der Leitungen"
+  "Wire lines": "Linien der Leitungen",
+  "Groups": "Gruppen",
+  "The groups of this level as the solver takes them in: each stands under the smallest group that holds all its members. Click one to light it in the drawing; the check shows or hides its frame. The groups the solver does not take in follow, with the reason.": "Die Gruppen dieser Ebene, wie der Löser sie aufnimmt: Jede steht unter der kleinsten Gruppe, die alle ihre Mitglieder enthält. Ein Klick hebt sie in der Zeichnung hervor; das Häkchen zeigt oder verbirgt ihren Rahmen. Die Gruppen, die der Löser nicht aufnimmt, folgen mit dem Grund.",
+  "Not in the tree ({0})": "Nicht im Baum ({0})",
+  "turned off by PRIORITY": "durch PRIORITY abgeschaltet",
+  "same members": "gleiche Mitglieder",
+  "left out": "ausgelassen"
 }

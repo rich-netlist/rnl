@@ -741,5 +741,11 @@
   "Show &Wire Skeleton Lines": "配線の骨格線を表示(&W)",
   "Layout table": "レイアウト表",
   "Component and pin lines": "素子とピンの線",
-  "Wire lines": "配線の線"
+  "Wire lines": "配線の線",
+  "Groups": "グループ",
+  "The groups of this level as the solver takes them in: each stands under the smallest group that holds all its members. Click one to light it in the drawing; the check shows or hides its frame. The groups the solver does not take in follow, with the reason.": "このレベルのグループを、ソルバーが取り込む形で示します。各グループは、そのメンバーをすべて含む最小のグループの下に置かれます。クリックすると図中で強調され、チェックでその枠の表示と非表示を切り替えます。ソルバーが取り込まないグループは、理由とともに後に続きます。",
+  "Not in the tree ({0})": "木に入らないもの（{0}）",
+  "turned off by PRIORITY": "PRIORITY で無効",
+  "same members": "同じメンバー",
+  "left out": "除外"
 }

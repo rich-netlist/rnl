@@ -741,5 +741,11 @@
   "Show &Wire Skeleton Lines": "顯示連線骨架線(&W)",
   "Layout table": "佈局表",
   "Component and pin lines": "實例和接腳的線",
-  "Wire lines": "連線的線"
+  "Wire lines": "連線的線",
+  "Groups": "組",
+  "The groups of this level as the solver takes them in: each stands under the smallest group that holds all its members. Click one to light it in the drawing; the check shows or hides its frame. The groups the solver does not take in follow, with the reason.": "本層的組，依求解器採用它們的方式列出：每個組位於包含它全部成員的最小組之下。點一行在圖中點亮該組；勾選框顯示或隱藏它的框。求解器不採用的組排在後面，並說明原因。",
+  "Not in the tree ({0})": "不在樹中（{0}）",
+  "turned off by PRIORITY": "被 PRIORITY 停用",
+  "same members": "成員相同",
+  "left out": "已排除"
 }

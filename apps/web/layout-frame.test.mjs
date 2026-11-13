@@ -4,42 +4,53 @@ import { attachments, groupTree, layoutTable, nodeOf } from "../viewer-ui/group-
 
 const box = (x0, y0, x1, y1, objects) => ({ kind: "box", points: [[x0, y0], [x1, y1]], objects, id: null });
 
-test("groupTree orders written groups before generated ones and separates twins, crossings and disabled groups", () => {
+test("groupTree is the tree the core gives: the group above each, and the groups left out, repeated or turned off", () => {
+  // the Document's order: the tree, each group after the group above it, then the groups outside it
   const level = {
     usages: [
-      { kind: "group", object: 10, id: "pair_1", state: "in-effect", roles: [{ name: "members", objects: [0, 1] }] },
       { kind: "group", object: 11, id: "%outer", state: "in-effect", roles: [{ name: "members", objects: [0, 1, 2] }] },
-      { kind: "group", object: 12, id: "%inner", state: "in-effect", roles: [{ name: "members", objects: [0, 1] }] },
-      { kind: "group", object: 13, id: "%cross", state: "in-effect", roles: [{ name: "members", objects: [1, 2] }] },
+      { kind: "group", object: 13, id: "%cross", state: "in-effect", group_parent: 11, roles: [{ name: "members", objects: [1, 2] }] },
+      { kind: "group", object: 12, id: "%inner", state: "left-out", crosses: 13, reason: "it crosses %cross", roles: [{ name: "members", objects: [0, 1] }] },
+      { kind: "group", object: 10, id: "pair_1", state: "left-out", crosses: 13, roles: [{ name: "members", objects: [0, 1] }] },
       { kind: "group", object: 14, id: "%off", state: "disabled", roles: [{ name: "members", objects: [0, 2] }] },
+      { kind: "group", object: 15, id: "%empty", state: "left-out", roles: [{ name: "members", objects: [] }] },
     ],
   };
-  // Written groups in reverse order: %cross ([1,2]), then %inner ([0,1], crosses %cross -> left), then %outer ([0,1,2], holds %cross),
-  // then generated pair_1 ([0,1], crosses %cross -> left).
   const tree = groupTree(level);
-  assert.deepEqual(tree.nodes.slice(1).map((n) => n.group.id), ["%cross", "%outer"]);
+  assert.deepEqual(tree.nodes.slice(1).map((n) => n.group.id), ["%outer", "%cross"]);
   const outer = tree.nodes.find((n) => n.group?.id === "%outer");
   const cross = tree.nodes.find((n) => n.group?.id === "%cross");
   assert.equal(outer.parent, tree.root);
   assert.equal(cross.parent, outer);
+  assert.deepEqual([outer.depth, cross.depth], [1, 2]);
   assert.deepEqual(outer.own, [0]);
   assert.equal(nodeOf(tree, 1), cross);
   assert.equal(nodeOf(tree, 0), outer);
   assert.equal(nodeOf(tree, 99), tree.root);
   assert.deepEqual(tree.off.map((u) => u.id), ["%off"]);
-  assert.equal(tree.left.length, 2);
+  assert.deepEqual(tree.left.map((x) => [x.group.id, x.crosses?.id ?? null]), [["%inner", "%cross"], ["pair_1", "%cross"], ["%empty", null]]);
+  assert.equal(tree.left[0].reason, "it crosses %cross");
 
-  // Identical member sets merge into `same`.
+  // a group with the members of another is that one
   const twinTree = groupTree({
     usages: [
-      { kind: "group", object: 20, id: "gen_a", state: "in-effect", roles: [{ name: "members", objects: [0, 1] }] },
       { kind: "group", object: 21, id: "%named", state: "in-effect", roles: [{ name: "members", objects: [0, 1] }] },
+      { kind: "group", object: 20, id: "gen_a", state: "same", same_as: 21, roles: [{ name: "members", objects: [0, 1] }] },
     ],
   });
   assert.deepEqual(twinTree.nodes.slice(1).map((n) => n.group.id), ["%named"]);
   assert.equal(twinTree.same.length, 1);
   assert.equal(twinTree.same[0].group.id, "gen_a");
   assert.equal(twinTree.same[0].as.id, "%named");
+
+  // a level of an earlier version gives no tree: its groups are all at the top
+  const flat = groupTree({
+    usages: [
+      { kind: "group", object: 1, id: "%a", state: "in-effect", roles: [{ name: "members", objects: [0, 1] }] },
+      { kind: "group", object: 2, id: "%b", state: "in-effect", roles: [{ name: "members", objects: [0] }] },
+    ],
+  });
+  assert.deepEqual(flat.root.children.map((n) => n.group.id), ["%a", "%b"]);
 });
 
 test("attachments resolves pin_of/parent chains and point-mark usages from structure and solver_config", () => {

@@ -741,5 +741,11 @@
   "Show &Wire Skeleton Lines": "Afficher les lignes de squelette des f&ils",
   "Layout table": "Table de placement",
   "Component and pin lines": "Lignes des composants et des broches",
-  "Wire lines": "Lignes des fils"
+  "Wire lines": "Lignes des fils",
+  "Groups": "Groupes",
+  "The groups of this level as the solver takes them in: each stands under the smallest group that holds all its members. Click one to light it in the drawing; the check shows or hides its frame. The groups the solver does not take in follow, with the reason.": "Les groupes de ce niveau tels que le solveur les prend en compte : chacun se trouve sous le plus petit groupe qui contient tous ses membres. Un clic le met en évidence dans le dessin ; la case montre ou masque son cadre. Les groupes que le solveur ne retient pas suivent, avec la raison.",
+  "Not in the tree ({0})": "Hors de l'arbre ({0})",
+  "turned off by PRIORITY": "désactivé par PRIORITY",
+  "same members": "mêmes membres",
+  "left out": "écarté"
 }
