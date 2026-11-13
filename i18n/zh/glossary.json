@@ -43,6 +43,12 @@
    "kind": "rnl"
   },
   {
+   "en": "bias circuit",
+   "term": "偏置电路",
+   "kind": "rnl",
+   "note": "$BIAS_CIRCUIT; role members (成员)."
+  },
+  {
    "en": "body",
    "term": "定义体",
    "kind": "rnl",
@@ -290,6 +296,15 @@
    "kind": "rnl"
   },
   {
+   "en": "mirrored layout",
+   "term": "镜像布局",
+   "avoid": [
+    "镜像对称"
+   ],
+   "kind": "rnl",
+   "note": "$MIRRORED_LAYOUT, $MIRRORED_VERTICAL_LAYOUT: only the drawing is mirrored, no electrical meaning. Not the symmetry of a mirrored pair (镜像对称)."
+  },
+  {
    "en": "mirrored pair",
    "sense": "the structure, a mirrored pair",
    "term": "镜像对",
@@ -365,6 +380,12 @@
    "kind": "rnl"
   },
   {
+   "en": "power flow",
+   "term": "功率流",
+   "kind": "rnl",
+   "note": "$POWER_FLOW; the alias is $功率流向. Same three roles as the signal flow."
+  },
+  {
    "en": "primitive",
    "term": "图元",
    "kind": "rnl"
@@ -435,6 +456,12 @@
    "en": "set",
    "term": "集合",
    "kind": "rnl"
+  },
+  {
+   "en": "signal flow",
+   "term": "信号流",
+   "kind": "rnl",
+   "note": "$SIGNAL_FLOW; the alias is $信号流向. Roles path (路径), source (源), load (负载)."
   },
   {
    "en": "skeleton line",

@@ -38,6 +38,12 @@
    "note": "Short: 轉折."
   },
   {
+   "en": "bias circuit",
+   "term": "偏置電路",
+   "kind": "rnl",
+   "note": "$BIAS_CIRCUIT."
+  },
+  {
    "en": "body",
    "term": "定義本體",
    "kind": "rnl"
@@ -240,6 +246,15 @@
    "kind": "rnl"
   },
   {
+   "en": "mirrored layout",
+   "term": "鏡像佈局",
+   "avoid": [
+    "鏡像對稱"
+   ],
+   "kind": "rnl",
+   "note": "$MIRRORED_LAYOUT: only the drawing is mirrored, no electrical meaning."
+  },
+  {
    "en": "mirrored pair",
    "sense": "the structure, a mirrored pair",
    "term": "鏡像對",
@@ -302,6 +317,12 @@
    "kind": "rnl"
   },
   {
+   "en": "power flow",
+   "term": "功率流",
+   "kind": "rnl",
+   "note": "$POWER_FLOW."
+  },
+  {
    "en": "primitive",
    "term": "圖元",
    "kind": "rnl"
@@ -355,6 +376,12 @@
    "en": "set",
    "term": "集合",
    "kind": "rnl"
+  },
+  {
+   "en": "signal flow",
+   "term": "信號流",
+   "kind": "rnl",
+   "note": "$SIGNAL_FLOW."
   },
   {
    "en": "skeleton line",
