@@ -137,3 +137,41 @@ fn a_failed_run_ends_with_an_error_and_done() {
     assert_eq!(kinds[kinds.len() - 2..], ["error", "done"], "{stderr}");
     assert_eq!(events.last().unwrap()["exit"], 2);
 }
+
+#[test]
+fn preview_tells_its_events_too_and_keeps_the_document_on_the_standard_output() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("main.sp"), SOURCE).unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_rnl"))
+        .current_dir(dir.path())
+        .args(["preview", "main.sp", "--no-std", "--progress=json"])
+        .args(["--solver-config", "limit=\"work\",work=2000000000"])
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    let events: Vec<serde_json::Value> =
+        stderr.lines().filter(|l| l.starts_with('{')).map(|l| serde_json::from_str(l).unwrap()).collect();
+    let kinds: Vec<&str> = events.iter().map(|e| e["event"].as_str().unwrap()).collect();
+    assert_eq!(kinds[..2], ["run", "level"], "{stderr}");
+    assert!(kinds.contains(&"level-done"), "{stderr}");
+    let done = events.last().unwrap();
+    assert_eq!((done["event"].as_str(), done["exit"].as_u64()), (Some("done"), Some(0)));
+    assert!(done.get("written").is_none(), "a preview writes nothing");
+    let out: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert!(out["document"].is_object() && out["report"].is_object());
+    // without the option, nothing but the notice is on the standard error
+    let plain = Command::new(env!("CARGO_BIN_EXE_rnl"))
+        .current_dir(dir.path())
+        .args(["preview", "main.sp", "--no-std", "--solver-config", "limit=\"work\",work=2000000000"])
+        .output()
+        .unwrap();
+    assert!(!String::from_utf8(plain.stderr).unwrap().contains("\"event\""));
+    // and a text --progress is solve's alone
+    let refused = Command::new(env!("CARGO_BIN_EXE_rnl"))
+        .current_dir(dir.path())
+        .args(["preview", "main.sp", "--no-std", "--progress"])
+        .output()
+        .unwrap();
+    assert!(!refused.status.success());
+}

@@ -10,8 +10,9 @@ use std::sync::{Arc, Mutex};
 
 use serde_json::json;
 
-use rnl_cli::preview::{one_file, preview, save_copy_with_encoding, Copy, Report, StoppableClock};
-use rnl_cli::solve::{Progress, SolveOptions};
+use rnl_cli::preview::{one_file, preview_progress, save_copy_with_encoding, Copy, Report, StoppableClock};
+use rnl_cli::progress::Event;
+use rnl_cli::solve::SolveOptions;
 use rnl_solver::{SolverOptions, OBJECTIVES};
 use rnl_view::Document;
 use serde::{Deserialize, Serialize};
@@ -43,20 +44,12 @@ pub struct Solved {
     report: Report,
 }
 
-/// Where a solve is, as the page shows it.
-#[derive(Clone, Serialize)]
-struct Step {
-    level: usize,
-    levels: usize,
-    title: String,
-    again: bool,
-}
-
 /// The solver's settings as the page gives them (Solve > Settings): `options` are the settings that
 /// differ from the defaults, written as `rnl solve --solver-options` takes them, such as
 /// `beam=8;time_limit=none`, and `hints_for_low` asks for every conflict group of the facts of
-/// priority low, which no such text sets. None given, or an empty text, are the defaults of
-/// `rnl solve`.
+/// priority low, which no such text sets. `level` is the title of the one level to solve, the circuit
+/// shown; none solves every level (Solve > Solve All Circuits). None given, or an empty text, are the
+/// defaults of `rnl solve`.
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
@@ -64,6 +57,8 @@ pub struct Settings {
     options: String,
     #[serde(default)]
     hints_for_low: bool,
+    #[serde(default)]
+    level: Option<String>,
 }
 
 impl Settings {
@@ -111,8 +106,9 @@ pub fn check_solver_options(options: String) -> Result<(), String> {
 }
 
 /// Solve the netlist the page shows, a file by its path or a text held in memory as the file
-/// `name`, and give it drawn as solved, nothing written. The page is told of each level as it is
-/// solved (`solve-progress`); a solve started while another runs stops that one first.
+/// `name`, and give it drawn as solved, nothing written. The page is told of every step of the solve
+/// as it goes, as the events of docs/solver-progress.md (`solve-progress`); a solve started while
+/// another runs stops that one first.
 #[tauri::command]
 // Tauri injects the window and managed state alongside the separate IPC arguments.
 #[allow(clippy::too_many_arguments)]
@@ -134,8 +130,10 @@ pub async fn solve_preview(
     let library = library.snapshot()?;
     let pool = pool.unwrap_or_default();
     let in_memory = path.is_none();
+    let settings = settings.unwrap_or_default();
     let options = SolveOptions {
-        solver: settings.unwrap_or_default().solver()?,
+        level: settings.level.clone().filter(|title| !title.is_empty()),
+        solver: settings.solver()?,
         formats: formats.unwrap_or_default(),
         ..SolveOptions::default()
     };
@@ -146,9 +144,8 @@ pub async fn solve_preview(
     let solves = solves.inner().clone();
     let running = stop.clone();
     let shown = tauri::async_runtime::spawn_blocking(move || {
-        let watch = |p: &Progress| {
-            let step = Step { level: p.level, levels: p.levels, title: p.title.clone(), again: p.again };
-            let _ = window.emit("solve-progress", step);
+        let watch = |event: &Event| {
+            let _ = window.emit("solve-progress", event);
             !running.load(Ordering::Relaxed)
         };
         let clock = StoppableClock::new(running.clone());
@@ -167,7 +164,7 @@ pub async fn solve_preview(
                     index: &index,
                     enabled: auto_include.unwrap_or(false),
                 };
-                preview(&entry, &files, &options, &clock, &watch)
+                preview_progress(&entry, &files, &options, &clock, &watch)
             }
             (None, Some(name), Some(text)) => {
                 let entry = format!("/{name}");
@@ -179,7 +176,7 @@ pub async fn solve_preview(
                     index: &index,
                     enabled: auto_include.unwrap_or(false),
                 };
-                preview(&entry, &files, &options, &clock, &watch)
+                preview_progress(&entry, &files, &options, &clock, &watch)
             }
             _ => Err("nothing to solve: open a netlist first".to_string()),
         }
@@ -344,6 +341,15 @@ mod tests {
         let first: Vec<&str> = layers.iter().map(|l| l["items"][0]["name"].as_str().unwrap()).collect();
         assert_eq!(first, DEFAULT_LAYERS);
         assert!(layers.iter().all(|l| l["items"].as_array().unwrap().len() == 1 && l["tolerance"] == 0.0));
+    }
+
+    /// The circuit shown is solved alone when the page names it; none, or an empty title, solve every one.
+    #[test]
+    fn a_level_is_given_by_its_title() {
+        let level = |v: serde_json::Value| serde_json::from_value::<Settings>(v).unwrap().level;
+        assert_eq!(level(json!({})), None);
+        assert_eq!(level(json!({ "options": "", "level": null })), None);
+        assert_eq!(level(json!({ "level": "amp" })).as_deref(), Some("amp"));
     }
 
     #[test]

@@ -16,6 +16,12 @@ const entry = args[1] || args[0];
 const text = fs.existsSync(entry) ? fs.readFileSync(entry, "utf8") : null;
 if (/old-fail/.test(text || "")) { console.error("the solver is a preview, whose layouts may be poor\\nnote: a note\\nerror: the netlist fails"); process.exit(1); }
 if (/fail/.test(text || "")) { console.error("hint: RNL8111 solve-preview-notice: the solver is a preview, and its layouts may be poor\\nerror: the netlist fails"); process.exit(1); }
+const events = args.includes("--progress=json");
+if (events) {
+  console.error("hint: RNL8111 solve-preview-notice: the solver is a preview, and its layouts may be poor");
+  for (const e of [{ event: "run", progress: 1, levels: 2 }, { event: "level", level: 0, title: "amp", again: false, limit: "time", seconds: 5 }]) console.error(JSON.stringify(e));
+  if (/stops-late/.test(text || "")) { console.error(JSON.stringify({ event: "error", message: "late" })); console.error("error: the solver stops"); process.exit(1); }
+}
 if (/slow/.test(text || "")) { fs.writeFileSync(process.env.FAKE_STARTED, "1"); setTimeout(() => {}, 60000); return; }
 const seen = { args: args.slice(1), cwd: process.cwd(), files: fs.readdirSync(".").sort(), text };
 console.log(JSON.stringify({ document: { path: entry, seen }, report: { levels: [] } }));
@@ -59,6 +65,23 @@ function call(port, method, path, body, headers = {}) {
 
 const SOLVE = "/rnl-solver/solve";
 
+/** A streamed solve: the status, the type of the answer and its lines, each parsed. */
+function stream(port, body) {
+  return new Promise((resolve, reject) => {
+    const req = request({ host: "127.0.0.1", port, method: "POST", path: SOLVE, headers: { "Content-Type": "application/json" } }, (res) => {
+      const chunks = [];
+      res.on("data", (c) => chunks.push(c));
+      res.on("end", () => {
+        const text = Buffer.concat(chunks).toString("utf8");
+        const json = res.headers["content-type"].startsWith("application/x-ndjson") ? null : JSON.parse(text);
+        resolve({ status: res.statusCode, type: res.headers["content-type"], json, lines: json ? [] : text.split("\n").filter((l) => l !== "") });
+      });
+    });
+    req.on("error", reject);
+    req.end(JSON.stringify(body));
+  });
+}
+
 test("the service says what it runs", async () => {
   const s = await serve("time_limit=none");
   try {
@@ -85,6 +108,56 @@ test("a solve writes the files where the page has them, runs preview on the entr
     assert.equal(seen.args[seen.args.indexOf("--solver-options") + 1], "time_limit=none;beam=8");
     assert.deepEqual(json.report, { levels: [] });
     // nothing is left behind
+    assert.deepEqual(await readdir(join(s.dir, "work")), []);
+  } finally { await s.close(); }
+});
+
+test("a solve of one level asks preview for it by its title; none asks for every level", async () => {
+  const s = await serve();
+  try {
+    const args = async (level) => (await call(s.port, "POST", SOLVE, { entry: "/top.sp", files: { "/top.sp": "* x" }, level })).json.document.seen.args;
+    const one = await args("amp");
+    assert.equal(one[one.indexOf("--level") + 1], "amp");
+    for (const none of [null, "", undefined]) assert.ok(!(await args(none)).includes("--level"));
+  } finally { await s.close(); }
+});
+
+test("a streamed solve gives the events of rnl as they came, then one line with the result", async () => {
+  const s = await serve("time_limit=none");
+  try {
+    const { status, type, lines } = await stream(s.port, { entry: "/top.sp", files: { "/top.sp": "* top" }, level: "amp", stream: true });
+    assert.equal(status, 200);
+    assert.match(type, /^application\/x-ndjson/);
+    const said = lines.map((l) => JSON.parse(l));
+    // the events as rnl wrote them, and not its notice; then the result, whole on its line
+    assert.deepEqual(said.slice(0, 2).map((e) => e.event), ["run", "level"]);
+    assert.deepEqual(said[1], { event: "level", level: 0, title: "amp", again: false, limit: "time", seconds: 5 });
+    assert.equal(said.length, 3);
+    const args = said[2].result.document.seen.args;
+    assert.ok(args.includes("--progress=json"));
+    assert.equal(args[args.indexOf("--level") + 1], "amp");
+    assert.deepEqual(said[2].result.report, { levels: [] });
+    // the same without "stream": one JSON, no events asked for
+    const plain = await call(s.port, "POST", SOLVE, { entry: "/top.sp", files: { "/top.sp": "* top" } });
+    assert.ok(!plain.json.document.seen.args.includes("--progress=json"));
+    assert.deepEqual(await readdir(join(s.dir, "work")), []);
+  } finally { await s.close(); }
+});
+
+test("a streamed solve that fails says so as a plain answer before its first event, and as a line after", async () => {
+  const s = await serve();
+  try {
+    // before any event: a status and an error, as for a plain solve
+    const early = await stream(s.port, { entry: "/top.sp", files: { "/top.sp": "fail" }, stream: true });
+    assert.equal(early.status, 400);
+    assert.equal(early.json.error, "error: the netlist fails");
+    assert.equal((await stream(s.port, { files: {}, stream: true })).status, 400);
+    // after events: the events, then the error as a line, and rnl's own event lines are not in its message
+    const late = await stream(s.port, { entry: "/top.sp", files: { "/top.sp": "stops-late" }, stream: true });
+    assert.equal(late.status, 200);
+    const said = late.lines.map((l) => JSON.parse(l));
+    assert.deepEqual(said.map((e) => e.event ?? "error"), ["run", "level", "error", "error"]);
+    assert.equal(said.at(-1).error, "error: the solver stops");
     assert.deepEqual(await readdir(join(s.dir, "work")), []);
   } finally { await s.close(); }
 });

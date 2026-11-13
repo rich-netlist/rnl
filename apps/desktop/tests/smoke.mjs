@@ -590,6 +590,11 @@ async function drive(app, port, profile, t0, session) {
   // it as a preview, with the report; the file on disk is as it was; Close Preview reads it again
   const onDisk = fs.readFileSync(netlist);
   const includeOnDisk = fs.readFileSync(netlistInclude);
+  // the events of the solve, as the app tells them to the page (docs/solver-progress.md)
+  await page.evaluate(`(() => {
+    window.__solveEvents = [];
+    window.__TAURI__.event.listen("solve-progress", (e) => window.__solveEvents.push(e.payload.event));
+  })()`);
   chooseItem(app.pid, at("solve"));
   await until("the solve's preview", () =>
     page.evaluate(`document.body.classList.contains("preview") && !document.body.classList.contains("solving")`),
@@ -606,6 +611,21 @@ async function drive(app, port, profile, t0, session) {
     page.evaluate(`!document.body.classList.contains("preview") && !document.body.classList.contains("busy")`),
   );
   console.log("Solve > Solve drew the netlist solved as a preview, and the file on disk is as it was");
+  const events = await page.evaluate(`window.__solveEvents`);
+  same(["run", "level", "level-done"].every((e) => events.includes(e)), true, "the events the solve told the page");
+  // Solve > Solve All Circuits: every circuit, with the same events, and the file on disk as it was
+  await page.evaluate(`window.__solveEvents.length = 0`);
+  chooseItem(app.pid, at("solve-all"));
+  await until("the preview of every circuit", () =>
+    page.evaluate(`document.body.classList.contains("preview") && !document.body.classList.contains("solving")`),
+  );
+  same(await page.evaluate(`window.__solveEvents.includes("level-done")`), true, "the events of Solve All Circuits");
+  same(fs.readFileSync(netlist).equals(onDisk), true, "the netlist on disk after Solve All Circuits");
+  chooseItem(app.pid, at("solve-close"));
+  await until("the netlist as written again", () =>
+    page.evaluate(`!document.body.classList.contains("preview") && !document.body.classList.contains("busy")`),
+  );
+  console.log("Solve > Solve All Circuits solved every circuit, with the events of the solve");
 
   // Solve > Settings: the dialog shows the solver's own defaults, which the app gives it, and what
   // the solver does not take is refused in its words (the app checks the options with the solver);

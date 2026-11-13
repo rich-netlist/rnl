@@ -1052,6 +1052,26 @@ mark { background: rgba(255, 196, 61, 0.55); color: inherit; border-radius: 2px;
 .preview-badge[hidden], .preview-close[hidden] { display: none; }
 .preview-close { flex-shrink: 0; border-color: var(--line); background: var(--tab); }
 .preview-badge + .preview-close { margin-left: 4px; }
+/* how the solve goes (solve-progress.js): a panel over the top right of the drawing, which the pointer goes through */
+.solve-progress-host { position: absolute; top: 10px; right: 12px; z-index: 20; pointer-events: none; }
+.solve-progress { display: flex; flex-direction: column; gap: 5px; width: 280px; max-width: calc(100vw - 48px); padding: 9px 11px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--fg); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18); font-size: 12px; }
+.solve-progress[hidden] { display: none; }
+.solve-progress-head { display: flex; align-items: baseline; gap: 8px; }
+.solve-progress-title { flex: 1; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
+.solve-progress-of { flex-shrink: 0; color: var(--muted); font-variant-numeric: tabular-nums; }
+.solve-progress-stage, .solve-progress-time, .solve-progress-tried { color: var(--muted); }
+.solve-progress-time { font-variant-numeric: tabular-nums; }
+.solve-progress-tried[hidden] { display: none; }
+.solve-progress-bar { height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.solve-progress-bar > div { height: 100%; background: var(--accent); }
+.solve-progress.unknown .solve-progress-bar { display: none; }
+.solve-progress-done { margin: 2px 0 0; padding: 5px 0 0; border-top: 1px solid var(--line); list-style: none; display: flex; flex-direction: column; gap: 2px; }
+.solve-progress-done[hidden] { display: none; }
+.solve-progress-done li { display: flex; align-items: baseline; gap: 8px; color: var(--muted); }
+.solve-progress-done .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg); }
+.solve-progress-done .sec { font-variant-numeric: tabular-nums; }
+.solve-progress-done .end { flex-basis: 100%; }
+.solve-progress-done li:has(.end) { flex-wrap: wrap; }
 .solve-status { display: inline-flex; align-items: center; gap: 8px; min-width: 0; color: var(--fg); }
 .solve-status[hidden] { display: none; }
 .solve-status #solve-step { overflow: hidden; text-overflow: ellipsis; }

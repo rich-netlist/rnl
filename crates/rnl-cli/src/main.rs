@@ -406,9 +406,8 @@ fn parse_args() -> Result<Args, Said> {
             "--report" => &["solve", "upgrade"],
             "--in-place" => &["solve", "upgrade", "replace-records"],
             "--solver-options" | "--solver-config" => &["problem", "solve", "preview"],
-            "--progress" | "--progress=json" | "--external-solver" | "--external-arg" | "--external-timeout" => {
-                &["solve"]
-            }
+            "--progress=json" => &["solve", "preview"],
+            "--progress" | "--external-solver" | "--external-arg" | "--external-timeout" => &["solve"],
             "--previous" | "--solver-input" => &["problem"],
             "--png" | "--scale" => &["render"],
             "--primitives" | "--no-svg" | "--status" => &["view", "snapshot"],

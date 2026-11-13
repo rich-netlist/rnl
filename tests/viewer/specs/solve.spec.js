@@ -44,7 +44,7 @@ test.describe("on the desktop", () => {
     const builds = await viewer.builds();
     await solve(page, () => page.keyboard.press("F9"));
     // the default options of rnl solve, and nothing read again for the drawing
-    expect(await solves(viewer)).toEqual([[T4, { options: "", hintsForLow: false }]]);
+    expect(await solves(viewer)).toEqual([[T4, { options: "", hintsForLow: false, level: `${T4}.sp` }]]);
     expect(await viewer.builds()).toBe(builds);
     await expect(page.locator("#preview-badge")).toHaveText("Solved preview: the files are unchanged");
     await expect(page.locator("#solve-step")).toHaveText(/^Solved: (1 level|\d+ levels), (1 fact|\d+ facts) not kept\. A preview: the files are unchanged\./);
@@ -88,9 +88,12 @@ test.describe("on the desktop", () => {
     await page.evaluate(() => (window.fakeShell.hold = true));
     await page.evaluate(() => window.viewer.command("solve"));
     await expect.poll(() => solves(viewer)).toHaveLength(1);
-    await page.evaluate(() => window.fakeShell.step({ level: 0, levels: 2, title: "amp", again: false }));
+    await page.evaluate(() => {
+      window.fakeShell.step({ event: "run", progress: 1, levels: 2 });
+      window.fakeShell.step({ event: "level", level: 0, title: "amp", again: false, limit: "time", seconds: 5 });
+    });
     await expect(page.locator("#solve-step")).toHaveText("Solving amp (1 of 2)…");
-    await page.evaluate(() => window.fakeShell.step({ level: 1, levels: 2, title: "top.sp", again: true }));
+    await page.evaluate(() => window.fakeShell.step({ event: "level", level: 1, title: "top.sp", again: true, limit: "time", seconds: 5 }));
     await expect(page.locator("#solve-step")).toHaveText("Solving top.sp (2 of 2, again after the upgrade to RNL 0.3)…");
     await page.locator("#solve-cancel").click();
     expect(await viewer.calls("cancelSolve")).toEqual([[]]);
@@ -98,6 +101,114 @@ test.describe("on the desktop", () => {
     await expect(page.locator("#solve-cancel")).toBeHidden();
     await expect(page.locator("#preview-badge")).toBeHidden();
     expect(await page.evaluate(() => window.viewer.doc.files[0].text)).toBe(before);
+  });
+
+  test("F9 solves the circuit shown, by its title, and Solve All Circuits every circuit", async ({ page, viewer }) => {
+    await viewer.open("04-hierarchy", DESKTOP);
+    await solve(page);
+    // the circuit shown is another one: the index of the Hierarchy view opens it
+    await page.locator("#tab-hierarchy").click();
+    await page.locator("#index .index-row", { hasText: "amp" }).click();
+    await expect(page.locator("#level-name")).toHaveText("amp");
+    await solve(page);
+    await solve(page, () => page.evaluate(() => window.viewer.command("solve-all")));
+    expect((await solves(viewer)).map(([name, settings]) => [name, settings.level])).toEqual([
+      ["04-hierarchy", "04-hierarchy.sp"],
+      ["04-hierarchy", "amp"],
+      ["04-hierarchy", null],
+    ]);
+  });
+
+  test("the panel over the drawing follows the events of the solve, and is gone when it ends", async ({ page }) => {
+    const panel = page.locator("#solve-progress");
+    const tell = (...events) => page.evaluate((list) => list.forEach((e) => window.fakeShell.step(e)), events);
+    await page.evaluate(() => (window.fakeShell.hold = true));
+    await expect(panel).toBeHidden();
+    await page.evaluate(() => window.viewer.command("solve-all"));
+    // before the solver says anything: the file, and the clock
+    await expect(panel).toBeVisible();
+    await expect(panel.locator(".solve-progress-title")).toHaveText(`${T4}`);
+    await expect(panel.locator(".solve-progress-stage")).toHaveText("Starting");
+    await expect(panel.locator(".solve-progress-time")).toHaveText(/^\d+\.\d s$/);
+    await expect(panel.locator(".solve-progress-bar")).toBeHidden();
+
+    await tell(
+      { event: "run", progress: 1, levels: 2 },
+      { event: "level", level: 0, title: "amp", again: false, limit: "time", seconds: 5 },
+      { event: "stage", level: 0, stage: "resolve", work: 0, elapsed: 0.2 },
+    );
+    await expect(panel.locator(".solve-progress-title")).toHaveText("amp");
+    await expect(panel.locator(".solve-progress-of")).toHaveText("1 of 2");
+    await expect(panel.locator(".solve-progress-stage")).toHaveText("Checking the facts against each other");
+    await expect(panel.locator(".solve-progress-time")).toContainText("s of 5.0 s");
+    await expect(panel.locator(".solve-progress-bar")).toBeVisible();
+    await expect(panel.locator(".solve-progress-tried")).toBeHidden();
+
+    // the candidates tried and the better ones found; a stage the page has no words for is shown by its name
+    await tell(
+      { event: "work", level: 0, stage: "search", work: 1000, elapsed: 0.5, fraction: 0.1, tried: 1 },
+      { event: "best", level: 0, tried: 1, work: 1000, elapsed: 0.5, cost: [3, 1] },
+    );
+    await expect(panel.locator(".solve-progress-tried")).toHaveText("1 candidate tried · 1 better one found");
+    await tell(
+      { event: "work", level: 0, stage: "search", work: 9000, elapsed: 1.5, fraction: 0.3, tried: 1200 },
+      { event: "best", level: 0, tried: 1200, work: 9000, elapsed: 1.5, cost: [2, 1] },
+      { event: "stage", level: 0, stage: "frobnicate", work: 9000, elapsed: 1.6 },
+      { event: "from-the-future", level: 0, anything: true },
+    );
+    await expect(panel.locator(".solve-progress-tried")).toHaveText("1,200 candidates tried · 2 better ones found");
+    await expect(panel.locator(".solve-progress-stage")).toHaveText("frobnicate");
+
+    // a level ends, and the next begins, under a work limit: its share is the fraction the solver tells
+    await tell(
+      { event: "level-done", level: 0, status: "time", work: 9000, seconds: 5.04, kept: 3, discarded: 0 },
+      { event: "level", level: 1, title: "top.sp", again: false, limit: "work", work: 100000 },
+      { event: "work", level: 1, stage: "search", work: 50000, elapsed: 0.4, fraction: 0.5, tried: 7 },
+    );
+    await expect(panel.locator(".solve-progress-title")).toHaveText("top.sp");
+    await expect(panel.locator(".solve-progress-of")).toHaveText("2 of 2");
+    await expect(panel.locator(".solve-progress-time")).toContainText("50% of the work limit");
+    await expect(panel.locator(".solve-progress-bar")).toHaveAttribute("aria-valuenow", "50");
+    await expect(panel.locator(".solve-progress-tried")).toHaveText("7 candidates tried");
+    const done = panel.locator(".solve-progress-done li");
+    await expect(done).toHaveCount(1);
+    await expect(done.locator(".name")).toHaveText("amp");
+    await expect(done.locator(".sec")).toHaveText("5.0 s");
+    await expect(done.locator(".end")).toHaveText("stopped at the time limit");
+
+    // the status bar follows the same events
+    await expect(page.locator("#solve-step")).toHaveText("Solving top.sp (2 of 2)…");
+    // a level solved again, after the upgrade, takes the place of its first line
+    await tell(
+      { event: "level-done", level: 1, status: "complete", work: 1, seconds: 0.5, kept: 1, discarded: 0 },
+      { event: "run", progress: 1, levels: 2 },
+      { event: "level", level: 1, title: "top.sp", again: true, limit: "none" },
+      { event: "level-done", level: 1, status: "complete", work: 1, seconds: 0.7, kept: 1, discarded: 0 },
+    );
+    await expect(done.locator(".name")).toHaveText(["amp", "top.sp"]);
+    await expect(done.locator(".sec")).toHaveText(["5.0 s", "0.7 s"]);
+
+    await page.evaluate(() => window.fakeShell.release());
+    await page.waitForFunction(() => document.body.classList.contains("preview") && !document.body.classList.contains("solving"));
+    await expect(panel).toBeHidden();
+  });
+
+  test("the panel is gone when the solve is canceled, and a new solve starts it again", async ({ page }) => {
+    const panel = page.locator("#solve-progress");
+    await page.evaluate(() => (window.fakeShell.hold = true));
+    await page.evaluate(() => window.viewer.command("solve"));
+    await expect(panel).toBeVisible();
+    await page.evaluate(() => window.fakeShell.step({ event: "level", level: 0, title: "amp", again: false, limit: "none" }));
+    await expect(panel.locator(".solve-progress-time")).toHaveText(/^\d+\.\d s$/);
+    await page.locator("#solve-cancel").click();
+    await expect(panel).toBeHidden();
+    await page.evaluate(() => window.viewer.command("solve"));
+    await expect(panel).toBeVisible();
+    // none of the last solve is left in it
+    await expect(panel.locator(".solve-progress-stage")).toHaveText("Starting");
+    await expect(panel.locator(".solve-progress-done li")).toHaveCount(0);
+    await page.evaluate(() => window.fakeShell.release());
+    await expect(panel).toBeHidden();
   });
 
   test("Reload solves again while a preview is shown, and Close Preview reads the file as written", async ({ page, viewer }) => {

@@ -60,7 +60,7 @@ export const FILES = {
  * file: one with facts discarded, conflict groups and hints by statement. Each has NAME-constraints.json too,
  * the Document of that file with the constraints of its levels (`rnl view --constraints`).
  */
-export const PREVIEWS = ["T4-miller-conflicts"];
+export const PREVIEWS = ["T4-miller-conflicts", "04-hierarchy"];
 
 /**
  * The fixtures of netlists that only a solver draws, and the files of tests/integration/solver they

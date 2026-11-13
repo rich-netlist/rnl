@@ -54,7 +54,7 @@ solve options (the levels are read without their type=\"generated\" records; -o 
                       overrides file/package settings by key; run limits are tool-only
   --progress          report 0.4 stages and consumed work on standard error
   --progress=json     report the solve on standard error as events, one JSON object per line
-                      (docs/solver-progress.md)
+                      (docs/solver-progress.md; solve and preview take it)
   --external-solver P run executable P with the solver input/result JSON protocol
   --external-arg ARG  append one literal argument to P (repeatable; no shell)
   --external-timeout S  stop P after S seconds per level (120 by default)
@@ -279,10 +279,38 @@ pub(crate) fn preview(args: &Args, provider: &FsProvider) -> Result<ExitCode, Sa
     };
     let entry = rnl_cli::path_str(&args.file);
     eprintln!("{}", rnl_cli::SOLVER_PREVIEW_NOTICE);
-    let shown = rnl_cli::preview::preview(&entry, provider, &options, &WallClock::new(), &|_| true)?;
-    let out = serde_json::json!({ "document": shown.document, "report": shown.report });
-    println!("{}", serde_json::to_string_pretty(&out).unwrap());
-    Ok(ExitCode::SUCCESS)
+    if !args.solver.progress_json {
+        let shown = rnl_cli::preview::preview(&entry, provider, &options, &WallClock::new(), &|_| true)?;
+        let out = serde_json::json!({ "document": shown.document, "report": shown.report });
+        println!("{}", serde_json::to_string_pretty(&out).unwrap());
+        return Ok(ExitCode::SUCCESS);
+    }
+    // with --progress=json, as for solve, the events go on the standard error and the run ends with `done`,
+    // after `error` when it fails
+    let started = std::time::Instant::now();
+    let emit = |e: rnl_cli::progress::Event| eprintln!("{}", e.line());
+    let done = |exit| rnl_cli::progress::Event::Done {
+        seconds: started.elapsed().as_secs_f64(),
+        exit: Some(exit),
+        written: None,
+    };
+    let events = |e: &rnl_cli::progress::Event| {
+        eprintln!("{}", e.line());
+        true
+    };
+    match rnl_cli::preview::preview_progress(&entry, provider, &options, &WallClock::new(), &events) {
+        Ok(shown) => {
+            let out = serde_json::json!({ "document": shown.document, "report": shown.report });
+            println!("{}", serde_json::to_string_pretty(&out).unwrap());
+            emit(done(0));
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(message) => {
+            emit(rnl_cli::progress::Event::Error { message: message.clone() });
+            emit(done(2));
+            Err(message.into())
+        }
+    }
 }
 
 /// `rnl solve`: solve, print what became of each level, write the files (plan 5.10). Exits with 1
