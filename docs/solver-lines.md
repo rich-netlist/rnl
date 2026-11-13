@@ -40,6 +40,8 @@ Each enumerated list holds at most 200,000 combinations. All live enumerated lis
 
 Every orientation trial pays its size-dependent listing cost before allocating geometry, through the same checkpoint in time and work modes. Interrupted listing therefore counts as work, and replay stops before the same trial. Output materialization runs after the search limit; profiling reports auto-default refresh, branch attachment, and materialization separately from search.
 
+Standalone solver 0.4.3 propagates coordinate equalities between retained DISTRIBUTEs sharing the same endpoints. Members at the same fractional position align, including reversed spans and different subdivision counts. These consequences guide an inner group even when the span endpoints belong to its parent; they do not add or weaken authored facts. Coordinate aliases and singleton sets use their modeled identity, and inference storage grows linearly with input members. Positive inequalities inside an already merged coordinate class are reported as conflicts immediately instead of consuming the relaxation limit. Both changes use the shared work budget, so work counts require the same solver build for replay.
+
 ## Cost calibration
 
 Local orientation filters inspect the actual candidate after applying authored `ORIENT` and `ORIENT-RELATION` alternatives. This includes choices that have no free orientation class. Same-symbol `ALIGN`, directed `ORDER`, and directed `DISTRIBUTE` constraints therefore filter invalid directions before routing and compaction. These checks use the shared work budget and are part of standalone solver 0.4.2's replay policy.

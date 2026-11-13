@@ -353,6 +353,7 @@ struct Level<'a> {
     hung: BTreeMap<usize, Vec<(usize, usize, Rule)>>,
     leaves: BTreeSet<usize>,
     edges: Vec<Vec<Edge>>,
+    implied_alignments: Vec<Edge>,
     fact_objects: Vec<BTreeSet<usize>>,
     flips: BTreeMap<usize, (Vec<Edge>, bool)>,
     nearest: BTreeMap<(usize, usize), (usize, usize)>,
@@ -509,6 +510,11 @@ pub(crate) fn settle(
         hung: BTreeMap::new(),
         leaves: BTreeSet::new(),
         edges: vec![Vec::new(); problem.facts.len()],
+        implied_alignments: super::distribution::alignments(problem, s)
+            .ok_or_else(|| "budget exhausted while deriving distribution alignments".to_string())?
+            .into_iter()
+            .map(|a| Edge { axis: a.axis, from: a.from, to: a.to, gap: None, sides: (0, 0) })
+            .collect(),
         fact_objects: vec![BTreeSet::new(); problem.facts.len()],
         nearest: BTreeMap::new(),
         flips: BTreeMap::new(),
@@ -2772,7 +2778,7 @@ impl Level<'_> {
             }
             steps.push((Some(f), bounds));
         }
-        for e in implied {
+        for e in implied.iter().chain(&self.implied_alignments) {
             steps.push((None, bounds_of(std::slice::from_ref(e))));
         }
         let boxes_from = steps.len();
@@ -3969,6 +3975,69 @@ pub(super) mod tests {
     }
 
     #[test]
+    fn shared_distribution_spans_align_an_inner_group_before_compaction() {
+        use rnl_runtime::problem::ProblemGroup;
+        let mut facts: Vec<_> = (0..4).map(|object| fact(FactKind::Orient { object, code: Orient::R0 })).collect();
+        for middle in [0, 1] {
+            facts.push(fact(FactKind::Distribute {
+                axis: Axis::X,
+                sense: Sense::Increasing,
+                members: vec![PointRef::Origin(2), PointRef::Origin(middle), PointRef::Origin(3)],
+            }));
+        }
+        let mut p = problem_of(vec![instance(); 4], facts);
+        p.version = "0.4".into();
+        p.groups.push(ProblemGroup {
+            identity: 0,
+            first: true,
+            direct: true,
+            label: "inner".into(),
+            members: vec![0, 1],
+            spacing_x: None,
+            spacing_y: None,
+        });
+        let options = SolverOptions::without_time_limit();
+        let resolved = crate::resolve::resolve(&p, &options, &StoppedClock);
+        let s = crate::structure::analyse(&p, &resolved, &options, crate::options::CAPS, &mut Work::default());
+        let s = crate::search_choices::for_layout(&s, &mut Work::default());
+        assert_eq!(s.kept.len(), 6);
+        let tree = crate::tree::Tree::new(&p, &s, &options);
+        let mut arr = tree.first(&mut Work::default());
+        let inner = s.tree.nodes.iter().position(|node| node.members == vec![0, 1]).unwrap();
+        // The suggestion is side by side, but the two retained distributions
+        // imply the inner objects have the same x even before their ends join.
+        arr.lists[inner] = Some(Item::List(Dir::Row, vec![Item::Leaf(0), Item::Leaf(1)]));
+        let (start, _) = tree.evaluate_rounds(&arr, 0, &mut Work::default());
+        let arrangement = (arr, s.tree.clone());
+        let run = || {
+            settle(
+                &p,
+                &s,
+                &start.placed,
+                &arrangement,
+                &[],
+                &options,
+                &BTreeMap::new(),
+                None,
+                &mut Work::default(),
+                &Stop::default(),
+            )
+        };
+        let (result, _) = crate::budget::with(&StoppedClock, RunLimit::Work(100_000_000), None, run);
+        let result = result.expect("the group must have a completed candidate");
+        let made = result.made.expect("the root must be compacted");
+        assert!(!made.failed && !made.interrupted, "{:?}", made.notes);
+        assert!(made.placed.overlaps.is_empty());
+        let geometry = &made.placed.geometry;
+        assert_eq!(geometry.origin[0][0], geometry.origin[1][0]);
+        for &f in &s.kept {
+            let at = |r: &PointRef, a: Axis| point_value(&p, geometry, r, usize::from(a == Axis::Y), 0);
+            let ori = |k| geometry.orient.get(k).copied();
+            assert_eq!(crate::holds::check_problem(&p, f, &at, &ori, &int(0), &int(0)), Some(true));
+        }
+    }
+
+    #[test]
     fn listed_orientation_choices_keep_local_pin_orders() {
         for related in [false, true] {
             let object = usize::from(related);
@@ -4025,6 +4094,7 @@ pub(super) mod tests {
                 hung: BTreeMap::new(),
                 leaves: BTreeSet::new(),
                 edges: vec![Vec::new(); p.facts.len()],
+                implied_alignments: vec![],
                 fact_objects: vec![BTreeSet::new(); p.facts.len()],
                 nearest: BTreeMap::new(),
                 flips: BTreeMap::new(),
@@ -4140,6 +4210,7 @@ pub(super) mod tests {
                 hung: BTreeMap::new(),
                 leaves: BTreeSet::new(),
                 edges: vec![],
+                implied_alignments: vec![],
                 fact_objects: vec![],
                 nearest: BTreeMap::new(),
                 flips: BTreeMap::new(),
@@ -4224,6 +4295,7 @@ pub(super) mod tests {
             hung: BTreeMap::new(),
             leaves: BTreeSet::new(),
             edges: vec![],
+            implied_alignments: vec![],
             fact_objects: vec![],
             nearest: BTreeMap::new(),
             flips: BTreeMap::new(),
@@ -4282,6 +4354,7 @@ pub(super) mod tests {
             hung: BTreeMap::new(),
             leaves: BTreeSet::new(),
             edges: vec![Vec::new(); p.facts.len()],
+            implied_alignments: vec![],
             fact_objects: vec![BTreeSet::new(); p.facts.len()],
             nearest: BTreeMap::new(),
             flips: BTreeMap::new(),

@@ -389,7 +389,9 @@ impl Store {
                         self.trail.push(Undo::Least(rt, self.least[rt].clone()));
                         self.least[rt] = need;
                         self.pred[rt] = Some((m, to, why));
-                        if Some(rt) == start {
+                        // An inequality within one merged class that raises its
+                        // own value is already a positive cycle, even at settle.
+                        if Some(rt) == start || rt == r {
                             return Err(Some(self.cycle(rt)));
                         }
                         if !waiting[rt] {
@@ -751,6 +753,37 @@ mod tests {
         }
         assert_eq!(s.value(0), q(0));
         assert_eq!(s.value(1), q(3));
+    }
+
+    #[test]
+    fn merged_coordinate_inequalities_detect_positive_self_cycles() {
+        for offset in [-3, 0, 5] {
+            for extra in [-1, 0, 1] {
+                for equality_first in [false, true] {
+                    let mut s = Store::new(vec![q(0); 3], 2, 1000);
+                    let equal = |s: &mut Store| s.equal(1, &q(0), 0, &q(offset), Why::Fact(0));
+                    let bound = |s: &mut Store| s.at_least(1, &q(0), 0, &q(0), &q(offset + extra), Why::Fact(1));
+                    if equality_first {
+                        equal(&mut s);
+                        bound(&mut s);
+                    } else {
+                        bound(&mut s);
+                        equal(&mut s);
+                    }
+                    if extra > 0 {
+                        assert!(!s.settle());
+                        let Some(Outcome::Conflict(why)) = s.failure() else {
+                            panic!("a positive self-cycle is a proof, not an exhausted relaxation limit");
+                        };
+                        assert!(why.contains(&Why::Fact(0)) && why.contains(&Why::Fact(1)));
+                        assert_eq!(s.relaxations, 1);
+                    } else {
+                        assert!(s.settle());
+                        assert_eq!(s.value(1) - s.value(0), q(offset));
+                    }
+                }
+            }
+        }
     }
 
     #[test]

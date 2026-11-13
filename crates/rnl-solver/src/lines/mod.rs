@@ -4,6 +4,7 @@ mod axis;
 mod band;
 mod cost;
 mod current;
+mod distribution;
 mod dots;
 pub(crate) mod engine;
 mod facing;
