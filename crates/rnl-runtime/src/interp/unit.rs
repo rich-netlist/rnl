@@ -760,6 +760,11 @@ impl Interp<'_> {
         let level_kind = self.unit_level_kind(u);
         let is_file_level = matches!(level_kind, Some(LevelKind::File) | Some(LevelKind::Package));
         let pkg = self.units[u].pkg().to_string();
+        // the kind of the level when it is of a Verilog-A file: its file level or a module (2.9)
+        let veriloga = self.units[u]
+            .level
+            .filter(|&lv| self.units[u].kind == UnitKind::Level && self.doc.is_veriloga(&self.doc.levels[lv].file))
+            .and(level_kind);
         for (index, rec) in self.unit_records(u).into_iter().enumerate() {
             let ast = self.parse(rec);
             if !self.read_generated && self.units[u].kind == UnitKind::Level && is_generated_record(&ast) {
@@ -873,6 +878,26 @@ impl Interp<'_> {
                 continue;
             }
             self.units[u].other_records += 1;
+            // outside its modules, a Verilog-A file holds only header records; a module holds no
+            // record with scope and no record of the solver (2.9)
+            let wrong = match veriloga {
+                Some(LevelKind::File) => Some((
+                    codes::HOST_VERILOGA_FILE_RECORD,
+                    "outside its modules, a Verilog-A file holds only header records: this record fails (2.9)",
+                )),
+                Some(_) if header.scope.is_some() || header.type_ == "generated" => Some((
+                    codes::KEYWORD_NOT_IN_MODULE,
+                    "a module of Verilog-A holds only DEFINE-SYMBOL, DEFINE-STYLE and `# @SET-SYMBOL`, in records with no scope that are not the solver's: this record fails (2.9)",
+                )),
+                _ => None,
+            };
+            if let Some((code, message)) = wrong {
+                let loc = self.recs[rec].loc(0);
+                self.diag_in(Severity::Error, code, message, Some(loc), &pkg);
+                let n = self.recs[rec].text.chars().count();
+                self.note_failed(Some(rec), 0, n, false);
+                continue;
+            }
             // `$` aliases replace whole name tokens, in references and bindings alike (16.5)
             let mut ast_body = ast.body.clone().unwrap();
             if let Some(fu) = self.file_unit(u) {
@@ -920,6 +945,18 @@ impl Interp<'_> {
                 if stale && syntax::uses_number(m) {
                     continue;
                 }
+                if veriloga.is_some() && !self.module_statement(m, u) {
+                    let loc = self.recs[rec].loc(m.text_start());
+                    self.diag_in(
+                        Severity::Error,
+                        codes::KEYWORD_NOT_IN_MODULE,
+                        "a module of Verilog-A holds only DEFINE-SYMBOL, DEFINE-STYLE and `# @SET-SYMBOL`: this statement fails (2.9)",
+                        Some(loc),
+                        &pkg,
+                    );
+                    self.note_failed(Some(rec), m.start, m.end, false);
+                    continue;
+                }
                 self.units[u].members.push(UnitMember {
                     rec: Some(rec),
                     k,
@@ -951,6 +988,21 @@ impl Interp<'_> {
                 format!("the main file has no header record: it is read in the tool's default version {DEFAULT_VERSION}, and tools add the header when they write the file (16.1)"),
                 Some(Loc::line(file, 2)),
             );
+        }
+    }
+
+    /// Whether the member `m` of a module of Verilog-A is one that a module holds (2.9): a
+    /// DEFINE-SYMBOL or a DEFINE-STYLE, bound to a name or not, or `# @SET-SYMBOL`.
+    fn module_statement(&self, m: &syntax::Member, u: UnitId) -> bool {
+        let [segment] = m.segments.as_slice() else { return false };
+        let Some(call) = &segment.call else { return false };
+        match self.kw(&call.kw, u).as_str() {
+            "DEFINE-SYMBOL" | "DEFINE-STYLE" => true,
+            "SET-SYMBOL" => {
+                m.binds.is_empty()
+                    && matches!(segment.args.first().map(|a| &a.obj), Some(syntax::ObjExpr::Ref(r)) if r.is_bare_level())
+            }
+            _ => false,
         }
     }
 
@@ -1245,8 +1297,10 @@ impl Interp<'_> {
             }
         }
         // the RNL of a subcircuit covers only itself: scope written inside one is an error, and the
-        // record is read as one of the subcircuit's own (2.6, 2.8)
-        if let (Some(loc), Some(LevelKind::Subckt)) = (scope_at, self.unit_level_kind(u)) {
+        // record is read as one of the subcircuit's own (2.6, 2.8); in a module of Verilog-A the
+        // record fails ([`Self::read_unit`], 2.9)
+        let module = self.units[u].level.is_some_and(|lv| self.doc.is_module(lv));
+        if let (Some(loc), Some(LevelKind::Subckt), false) = (scope_at, self.unit_level_kind(u), module) {
             self.diag_in(
                 Severity::Error,
                 codes::RECORD_HEADER_SCOPE_IN_SUBCIRCUIT, "scope= is not written in a record inside a subcircuit, whose RNL covers only itself; treated as not written, so the record is the subcircuit's own (2.6, 2.8)",

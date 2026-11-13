@@ -2,7 +2,9 @@
 //! HSPICE's `.hdl` brings in is read for its `//` records. Each module is a level, known by its name
 //! or by the name `-master` gives it, whose terminals are its ports, a vector port one terminal for
 //! each bit from the left bound of its range to the right; its `# @SET-SYMBOL` gives the instances of
-//! it their block symbol. A compiled model is not read, and a file of 0.3 reads no Verilog-A file.
+//! it their block symbol, and it holds nothing else: DEFINE-SYMBOL, DEFINE-STYLE and `# @SET-SYMBOL`;
+//! outside its modules, a Verilog-A file holds only header records. A compiled model is not read,
+//! and a file of 0.3 reads no Verilog-A file.
 
 use std::path::Path;
 
@@ -124,4 +126,65 @@ fn a_file_of_0_3_reads_no_verilog_a_file() {
         "* t\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\n.hdl 'dac.va'\nX1 a3 a2 a1 a0 b0 b1 b2 y dac\n.end\n",
     );
     assert_eq!(r.doc.sources.len(), 1);
+}
+
+/// The codes of the errors of `r` with their lines in the Verilog-A file `file`.
+fn errors_in(r: &Interpretation, file: &str) -> Vec<(Code, u32)> {
+    r.diagnostics()
+        .into_iter()
+        .filter(|d| d.severity == Severity::Error)
+        .map(|d| (d.code, d.loc.as_ref().filter(|l| l.file == file).map_or(0, |l| l.line)))
+        .collect()
+}
+
+/// The module `m` of `m.va`, whose record, on lines 4 to 9, writes `body` on line 8, after a style,
+/// its symbol and its block symbol; `before` is written before the module, and `after` after its
+/// record, from line 10.
+fn module(before: &str, body: &str, after: &str) -> Interpretation {
+    let va = format!(
+        "// @RNL(type=\"header\") {{ @VERSION(\"0.4\")}}\n{before}module m(a, b);\n  inout a, b;\n// @RNL {{\n\
+         //   $ST = @DEFINE-STYLE(linecolor=\"#123456\") {{}};\n\
+         //   %s = @DEFINE-SYMBOL(box=[-2, -2, 2, 2]) {{ @RECTANGLE {{(-1, -1) (1, 1)}}; \
+         (-2, 0) @PIN(terminal=\"a\", direction=\"left\"); (2, 0) @PIN(terminal=\"b\", direction=\"right\") }};\n\
+         //   # @SET-SYMBOL %s;\n//   {body}\n// }}\n{after}endmodule\n"
+    );
+    let files = MemoryProvider::new()
+        .with("t.scs", "// t\n// @RNL(type=\"header\") { @VERSION(\"0.4\")}\nahdl_include \"m.va\"\nI1 (x y) m\n")
+        .with("m.va", &va);
+    interpret_file(Path::new("t.scs"), None, &files, &Options { std: false, ..Options::default() }).unwrap()
+}
+
+#[test]
+fn a_module_holds_only_symbols_styles_and_its_block_symbol() {
+    let r = module("", "%t = @DEFINE-SYMBOL { (0, 0) @CIRCLE(radius=1) }", "");
+    assert_eq!(errors_in(&r, "m.va"), Vec::new());
+    assert_eq!(symbol(&r, "I1"), "%s");
+    // anything else fails, with an error at the statement, and the block symbol still holds
+    for body in [
+        "{#R1 #R2} @ALIGN(\"y\")",
+        "(0, 0) @TEXT(\"x\")",
+        "%u = %s",
+        "@USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\")",
+        "# @SELECT-INSTANCE(name=\"*\") => @SET-SYMBOL %s",
+        "&a @CURRENT(\"in\")",
+    ] {
+        let r = module("", body, "");
+        assert_eq!(errors_in(&r, "m.va"), [(codes::KEYWORD_NOT_IN_MODULE, 8)], "{body}");
+        assert_eq!(symbol(&r, "I1"), "%s", "{body}");
+    }
+}
+
+#[test]
+fn a_record_of_a_module_with_scope_or_of_the_solver_fails() {
+    for header in ["(scope=\"m\")", "(type=\"generated\")"] {
+        let r = module("", "", &format!("// @RNL{header} {{ $X = @DEFINE-STYLE {{}} }}\n"));
+        assert_eq!(errors_in(&r, "m.va"), [(codes::KEYWORD_NOT_IN_MODULE, 10)], "{header}");
+    }
+}
+
+#[test]
+fn outside_its_modules_a_verilog_a_file_holds_only_header_records() {
+    let r = module("// @RNL { $S0 = @DEFINE-STYLE {} }\n", "", "");
+    assert_eq!(errors_in(&r, "m.va"), [(codes::HOST_VERILOGA_FILE_RECORD, 2)]);
+    assert_eq!(symbol(&r, "I1"), "%s");
 }

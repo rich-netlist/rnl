@@ -186,6 +186,16 @@
    ]
   },
   {
+   "number": "RNL0018",
+   "name": "host-veriloga-file-record",
+   "severity": "error",
+   "message": "outside its modules, a Verilog-A file holds only header records: this record fails (2.9)",
+   "sections": [
+    "2.9",
+    "2.8"
+   ]
+  },
+  {
    "number": "RNL1000",
    "name": "record-braces-mismatch",
    "severity": "error",
@@ -1846,6 +1856,16 @@
    "message": "@{kw} has no position {role}{alias_hint} (5.3)",
    "sections": [
     "5.3"
+   ]
+  },
+  {
+   "number": "RNL3031",
+   "name": "keyword-not-in-module",
+   "severity": "error",
+   "message": "a module of Verilog-A holds only DEFINE-SYMBOL, DEFINE-STYLE and `# @SET-SYMBOL`[, in records with no scope that are not the solver's]: this {statement|record} fails (2.9)",
+   "sections": [
+    "2.9",
+    "9.2.6"
    ]
   },
   {
