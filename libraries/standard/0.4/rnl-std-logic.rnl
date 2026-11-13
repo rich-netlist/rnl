@@ -413,7 +413,7 @@
 
   /* ---------------------------------------------------------------- *_SUPPLY variants with integer-grid vp and vn */
 
-  /* A AND gate of 2 inputs with supply pins: a, b, y, vp, vn. */
+  /* An AND gate of 2 inputs with supply pins: a, b, y, vp, vn. */
   $AND_2INPUT_SUPPLY = @DEFINE-SYMBOL(box=[-3, -3, 2, 3]) {
     %a = (-3, 1) @PIN(terminal="a", direction="left");
     %b = (-3, -1) @PIN(terminal="b", direction="left");
@@ -430,7 +430,7 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(1.1, 2);
   };
 
-  /* A AND gate of 3 inputs with supply pins: a, b, c, y, vp, vn. */
+  /* An AND gate of 3 inputs with supply pins: a, b, c, y, vp, vn. */
   $AND_3INPUT_SUPPLY = @DEFINE-SYMBOL(box=[-3, -3, 2, 3]) {
     %a = (-3, 1) @PIN(terminal="a", direction="left");
     %b = (-3, 0) @PIN(terminal="b", direction="left");
@@ -449,7 +449,7 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(1.1, 2);
   };
 
-  /* A AND gate of 4 inputs with supply pins: a, b, c, d, y, vp, vn. */
+  /* An AND gate of 4 inputs with supply pins: a, b, c, d, y, vp, vn. */
   $AND_4INPUT_SUPPLY = @DEFINE-SYMBOL(box=[-3, -3, 2, 3]) {
     %a = (-3, 2) @PIN(terminal="a", direction="left");
     %b = (-3, 1) @PIN(terminal="b", direction="left");
@@ -534,7 +534,7 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(1.1, 2);
   };
 
-  /* A OR gate of 2 inputs with supply pins: a, b, y, vp, vn. */
+  /* An OR gate of 2 inputs with supply pins: a, b, y, vp, vn. */
   $OR_2INPUT_SUPPLY = @DEFINE-SYMBOL(box=[-3, -3, 2, 3]) {
     %a = (-3, 1) @PIN(terminal="a", direction="left");
     %b = (-3, -1) @PIN(terminal="b", direction="left");
@@ -552,7 +552,7 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(1.1, 2);
   };
 
-  /* A OR gate of 3 inputs with supply pins: a, b, c, y, vp, vn. */
+  /* An OR gate of 3 inputs with supply pins: a, b, c, y, vp, vn. */
   $OR_3INPUT_SUPPLY = @DEFINE-SYMBOL(box=[-3, -3, 2, 3]) {
     %a = (-3, 1) @PIN(terminal="a", direction="left");
     %b = (-3, 0) @PIN(terminal="b", direction="left");
@@ -572,7 +572,7 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(1.1, 2);
   };
 
-  /* A OR gate of 4 inputs with supply pins: a, b, c, d, y, vp, vn. */
+  /* An OR gate of 4 inputs with supply pins: a, b, c, d, y, vp, vn. */
   $OR_4INPUT_SUPPLY = @DEFINE-SYMBOL(box=[-3, -3, 2, 3]) {
     %a = (-3, 2) @PIN(terminal="a", direction="left");
     %b = (-3, 1) @PIN(terminal="b", direction="left");
@@ -661,7 +661,7 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(1.1, 2);
   };
 
-  /* A XOR gate of 2 inputs with supply pins: a, b, y, vp, vn. */
+  /* An XOR gate of 2 inputs with supply pins: a, b, y, vp, vn. */
   $XOR_2INPUT_SUPPLY = @DEFINE-SYMBOL(box=[-3, -3, 3, 3]) {
     %a = (-3, 1) @PIN(terminal="a", direction="left");
     %b = (-3, -1) @PIN(terminal="b", direction="left");
@@ -680,7 +680,7 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(1.8, 2);
   };
 
-  /* A XOR gate of 3 inputs with supply pins: a, b, c, y, vp, vn. */
+  /* An XOR gate of 3 inputs with supply pins: a, b, c, y, vp, vn. */
   $XOR_3INPUT_SUPPLY = @DEFINE-SYMBOL(box=[-3, -3, 3, 3]) {
     %a = (-3, 1) @PIN(terminal="a", direction="left");
     %b = (-3, 0) @PIN(terminal="b", direction="left");
@@ -701,7 +701,7 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(1.8, 2);
   };
 
-  /* A XOR gate of 4 inputs with supply pins: a, b, c, d, y, vp, vn. */
+  /* An XOR gate of 4 inputs with supply pins: a, b, c, d, y, vp, vn. */
   $XOR_4INPUT_SUPPLY = @DEFINE-SYMBOL(box=[-3, -3, 3, 3]) {
     %a = (-3, 2) @PIN(terminal="a", direction="left");
     %b = (-3, 1) @PIN(terminal="b", direction="left");
@@ -726,7 +726,7 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(1.8, 2);
   };
 
-  /* A XNOR gate of 2 inputs with supply pins: a, b, y, vp, vn. */
+  /* An XNOR gate of 2 inputs with supply pins: a, b, y, vp, vn. */
   $XNOR_2INPUT_SUPPLY = @DEFINE-SYMBOL(box=[-3, -3, 4, 3]) {
     %a = (-3, 1) @PIN(terminal="a", direction="left");
     %b = (-3, -1) @PIN(terminal="b", direction="left");
@@ -746,7 +746,7 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(1.8, 2);
   };
 
-  /* A XNOR gate of 3 inputs with supply pins: a, b, c, y, vp, vn. */
+  /* An XNOR gate of 3 inputs with supply pins: a, b, c, y, vp, vn. */
   $XNOR_3INPUT_SUPPLY = @DEFINE-SYMBOL(box=[-3, -3, 4, 3]) {
     %a = (-3, 1) @PIN(terminal="a", direction="left");
     %b = (-3, 0) @PIN(terminal="b", direction="left");
@@ -768,7 +768,7 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(1.8, 2);
   };
 
-  /* A XNOR gate of 4 inputs with supply pins: a, b, c, d, y, vp, vn. */
+  /* An XNOR gate of 4 inputs with supply pins: a, b, c, d, y, vp, vn. */
   $XNOR_4INPUT_SUPPLY = @DEFINE-SYMBOL(box=[-3, -3, 4, 3]) {
     %a = (-3, 2) @PIN(terminal="a", direction="left");
     %b = (-3, 1) @PIN(terminal="b", direction="left");

@@ -2794,24 +2794,6 @@
             "usages": [
               {
                 "kind": "usage",
-                "id": "@rnl-std-basic.rnl:672:9",
-                "definition": "$NET_LABEL",
-                "roles": [
-                  {
-                    "role": "p",
-                    "set": false,
-                    "member": "&clk",
-                    "terminal": null
-                  }
-                ],
-                "file": null,
-                "line": 672,
-                "source": "body",
-                "made_in": "%net_label_stub_st_clk",
-                "state": "in-effect"
-              },
-              {
-                "kind": "usage",
                 "id": "@09-buses-and-bundles.sp:36:87",
                 "definition": "$IO_PORT",
                 "roles": [
@@ -3363,13 +3345,14 @@
             "pins": []
           },
           {
+            "pin_of": "%st",
             "parent": "%net_label_stub_st_clk",
             "id": "@rnl-std-basic.rnl:672:9",
             "kind": "usage",
             "host": [],
             "definition": "$NET_LABEL",
             "attach": {
-              "p": "&clk"
+              "p": "pin(%st,1)"
             },
             "symbol": {
               "value": "$NET_LABEL_SYMBOL",

@@ -515,7 +515,7 @@
     ? @TEXT("${p}", key="netname", halign="end", valign="middle") => @PLACE(-1.25, 0);
   };
 
-  /* The symbol of $NET_LABEL: a one-unit lead and the name of its net, its pin facing left. */
+  /* The symbol of $NET_LABEL: a one-unit lead and the name of its net, or the names of the nets of a bus pin, its pin facing left. */
   $NET_LABEL_SYMBOL = @DEFINE-SYMBOL {
     %pin = (0, 0) @PIN(terminal="p", direction="left");
     @LINE {(0, 0) (1, 0)};
@@ -569,8 +569,8 @@
   };
   # @SELECT-USAGE(recursive=true) $IO_PORT => @SET-SYMBOL $IO_PORT_SYMBOL;
 
-  /* A net label: the name of a net on a short lead, drawn at a point of its own. */
-  $NET_LABEL = @DEFINE(roles=[["p", "net"]]) {};
+  /* A net label: the name of a net on a short lead, drawn at a point of its own; given a bus pin, such as a pin of a bundle (11.8), it keeps the pin and is one label on all its nets, showing their names (13.6). */
+  $NET_LABEL = @DEFINE(roles=[["p", ["net", "pin"]]]) {};
   # @SELECT-USAGE(recursive=true) $NET_LABEL => @SET-SYMBOL $NET_LABEL_SYMBOL;
 
   /* A no-connect mark on a terminal or pin left unconnected on purpose; a terminal is kept as itself so a mark on a bus bit records which bit is open (12.6). */
@@ -667,9 +667,9 @@
     {?t %p::pin} @ALIGN("y");
   };
 
-  /* A net label directly on a pin, its one-unit lead serving as the stub's short wire. */
+  /* A net label directly on a pin, its one-unit lead serving as the stub's short wire; on a bus pin, one label for the bus. */
   $NET_LABEL_STUB = @DEFINE(roles=[["t", "pin"]]) {
-    %l = $NET_LABEL @ATTACH ?t::net;
+    %l = $NET_LABEL @ATTACH ?t;
     ?t %l::pin @ORIENT-RELATION("R180");
     {?t %l::pin} @ALIGN("x");
     {?t %l::pin} @ALIGN("y");

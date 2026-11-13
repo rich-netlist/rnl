@@ -2122,77 +2122,17 @@
           {
             "id": "&inp",
             "global": false,
-            "port": true,
-            "usages": [
-              {
-                "kind": "usage",
-                "id": "@rnl-std-basic.rnl:672:9#1",
-                "definition": "$NET_LABEL",
-                "roles": [
-                  {
-                    "role": "p",
-                    "set": false,
-                    "member": "&inp",
-                    "terminal": null
-                  }
-                ],
-                "file": null,
-                "line": 672,
-                "source": "body",
-                "made_in": "%net_label_stub_E1_cp",
-                "state": "in-effect"
-              }
-            ]
+            "port": true
           },
           {
             "id": "&inn",
             "global": false,
-            "port": true,
-            "usages": [
-              {
-                "kind": "usage",
-                "id": "@rnl-std-basic.rnl:672:9#2",
-                "definition": "$NET_LABEL",
-                "roles": [
-                  {
-                    "role": "p",
-                    "set": false,
-                    "member": "&inn",
-                    "terminal": null
-                  }
-                ],
-                "file": null,
-                "line": 672,
-                "source": "body",
-                "made_in": "%net_label_stub_E1_cn",
-                "state": "in-effect"
-              }
-            ]
+            "port": true
           },
           {
             "id": "&out",
             "global": false,
-            "port": true,
-            "usages": [
-              {
-                "kind": "usage",
-                "id": "@rnl-std-basic.rnl:672:9#3",
-                "definition": "$NET_LABEL",
-                "roles": [
-                  {
-                    "role": "p",
-                    "set": false,
-                    "member": "&out",
-                    "terminal": null
-                  }
-                ],
-                "file": null,
-                "line": 672,
-                "source": "body",
-                "made_in": "%net_label_stub_E1_p",
-                "state": "in-effect"
-              }
-            ]
+            "port": true
           },
           {
             "id": "&0",
@@ -2527,13 +2467,14 @@
             "pins": []
           },
           {
+            "pin_of": "#E1",
             "parent": "%net_label_stub_E1_cp",
             "id": "@rnl-std-basic.rnl:672:9#1",
             "kind": "usage",
             "host": [],
             "definition": "$NET_LABEL",
             "attach": {
-              "p": "&inp"
+              "p": "pin(#E1,2)"
             },
             "style": {
               "bold": true,
@@ -2625,13 +2566,14 @@
             "pins": []
           },
           {
+            "pin_of": "#E1",
             "parent": "%net_label_stub_E1_cn",
             "id": "@rnl-std-basic.rnl:672:9#2",
             "kind": "usage",
             "host": [],
             "definition": "$NET_LABEL",
             "attach": {
-              "p": "&inn"
+              "p": "pin(#E1,3)"
             },
             "style": {
               "bold": true,
@@ -2723,13 +2665,14 @@
             "pins": []
           },
           {
+            "pin_of": "#E1",
             "parent": "%net_label_stub_E1_p",
             "id": "@rnl-std-basic.rnl:672:9#3",
             "kind": "usage",
             "host": [],
             "definition": "$NET_LABEL",
             "attach": {
-              "p": "&out"
+              "p": "pin(#E1,0)"
             },
             "style": {
               "bold": true,

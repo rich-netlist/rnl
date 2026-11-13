@@ -7,6 +7,12 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 publish.workspace = true
+# the integration tests are one test program, tests/main.rs, not one for each file
+autotests = false
+
+[[test]]
+name = "edit"
+path = "tests/main.rs"
 
 [dependencies]
 rnl-runtime.workspace = true

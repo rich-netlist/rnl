@@ -103,131 +103,17 @@
           {
             "id": "&a",
             "global": false,
-            "port": false,
-            "usages": [
-              {
-                "kind": "usage",
-                "id": "@rnl-std-basic.rnl:672:9#1",
-                "definition": "$NET_LABEL",
-                "roles": [
-                  {
-                    "role": "p",
-                    "set": false,
-                    "member": "&a",
-                    "terminal": null
-                  }
-                ],
-                "file": null,
-                "line": 672,
-                "source": "body",
-                "made_in": "%net_label_stub_R1_p",
-                "state": "in-effect"
-              },
-              {
-                "kind": "usage",
-                "id": "@rnl-std-basic.rnl:672:9#2",
-                "definition": "$NET_LABEL",
-                "roles": [
-                  {
-                    "role": "p",
-                    "set": false,
-                    "member": "&a",
-                    "terminal": null
-                  }
-                ],
-                "file": null,
-                "line": 672,
-                "source": "body",
-                "made_in": "%net_label_stub_C1_p",
-                "state": "in-effect"
-              }
-            ]
+            "port": false
           },
           {
             "id": "&b",
             "global": false,
-            "port": false,
-            "usages": [
-              {
-                "kind": "usage",
-                "id": "@rnl-std-basic.rnl:672:9#3",
-                "definition": "$NET_LABEL",
-                "roles": [
-                  {
-                    "role": "p",
-                    "set": false,
-                    "member": "&b",
-                    "terminal": null
-                  }
-                ],
-                "file": null,
-                "line": 672,
-                "source": "body",
-                "made_in": "%net_label_stub_R1_n",
-                "state": "in-effect"
-              },
-              {
-                "kind": "usage",
-                "id": "@rnl-std-basic.rnl:672:9#4",
-                "definition": "$NET_LABEL",
-                "roles": [
-                  {
-                    "role": "p",
-                    "set": false,
-                    "member": "&b",
-                    "terminal": null
-                  }
-                ],
-                "file": null,
-                "line": 672,
-                "source": "body",
-                "made_in": "%net_label_stub_R2_p",
-                "state": "in-effect"
-              }
-            ]
+            "port": false
           },
           {
             "id": "&c",
             "global": false,
-            "port": false,
-            "usages": [
-              {
-                "kind": "usage",
-                "id": "@rnl-std-basic.rnl:672:9#5",
-                "definition": "$NET_LABEL",
-                "roles": [
-                  {
-                    "role": "p",
-                    "set": false,
-                    "member": "&c",
-                    "terminal": null
-                  }
-                ],
-                "file": null,
-                "line": 672,
-                "source": "body",
-                "made_in": "%net_label_stub_R2_n",
-                "state": "in-effect"
-              },
-              {
-                "kind": "usage",
-                "id": "@rnl-std-basic.rnl:672:9#6",
-                "definition": "$NET_LABEL",
-                "roles": [
-                  {
-                    "role": "p",
-                    "set": false,
-                    "member": "&c",
-                    "terminal": null
-                  }
-                ],
-                "file": null,
-                "line": 672,
-                "source": "body",
-                "made_in": "%net_label_stub_R3_p",
-                "state": "in-effect"
-              }
-            ]
+            "port": false
           },
           {
             "id": "&0",
@@ -883,13 +769,14 @@
             "pins": []
           },
           {
+            "pin_of": "#R1",
             "parent": "%net_label_stub_R1_p",
             "id": "@rnl-std-basic.rnl:672:9#1",
             "kind": "usage",
             "host": [],
             "definition": "$NET_LABEL",
             "attach": {
-              "p": "&a"
+              "p": "pin(#R1,0)"
             },
             "symbol": {
               "value": "$NET_LABEL_SYMBOL",
@@ -961,13 +848,14 @@
             "pins": []
           },
           {
+            "pin_of": "#C1",
             "parent": "%net_label_stub_C1_p",
             "id": "@rnl-std-basic.rnl:672:9#2",
             "kind": "usage",
             "host": [],
             "definition": "$NET_LABEL",
             "attach": {
-              "p": "&a"
+              "p": "pin(#C1,0)"
             },
             "symbol": {
               "value": "$NET_LABEL_SYMBOL",
@@ -1039,13 +927,14 @@
             "pins": []
           },
           {
+            "pin_of": "#R1",
             "parent": "%net_label_stub_R1_n",
             "id": "@rnl-std-basic.rnl:672:9#3",
             "kind": "usage",
             "host": [],
             "definition": "$NET_LABEL",
             "attach": {
-              "p": "&b"
+              "p": "pin(#R1,1)"
             },
             "symbol": {
               "value": "$NET_LABEL_SYMBOL",
@@ -1117,13 +1006,14 @@
             "pins": []
           },
           {
+            "pin_of": "#R2",
             "parent": "%net_label_stub_R2_p",
             "id": "@rnl-std-basic.rnl:672:9#4",
             "kind": "usage",
             "host": [],
             "definition": "$NET_LABEL",
             "attach": {
-              "p": "&b"
+              "p": "pin(#R2,0)"
             },
             "symbol": {
               "value": "$NET_LABEL_SYMBOL",
@@ -1195,13 +1085,14 @@
             "pins": []
           },
           {
+            "pin_of": "#R2",
             "parent": "%net_label_stub_R2_n",
             "id": "@rnl-std-basic.rnl:672:9#5",
             "kind": "usage",
             "host": [],
             "definition": "$NET_LABEL",
             "attach": {
-              "p": "&c"
+              "p": "pin(#R2,1)"
             },
             "symbol": {
               "value": "$NET_LABEL_SYMBOL",
@@ -1273,13 +1164,14 @@
             "pins": []
           },
           {
+            "pin_of": "#R3",
             "parent": "%net_label_stub_R3_p",
             "id": "@rnl-std-basic.rnl:672:9#6",
             "kind": "usage",
             "host": [],
             "definition": "$NET_LABEL",
             "attach": {
-              "p": "&c"
+              "p": "pin(#R3,0)"
             },
             "symbol": {
               "value": "$NET_LABEL_SYMBOL",
@@ -1947,52 +1839,12 @@
           {
             "id": "&p",
             "global": false,
-            "port": true,
-            "usages": [
-              {
-                "kind": "usage",
-                "id": "@rnl-std-basic.rnl:672:9#1",
-                "definition": "$NET_LABEL",
-                "roles": [
-                  {
-                    "role": "p",
-                    "set": false,
-                    "member": "&p",
-                    "terminal": null
-                  }
-                ],
-                "file": null,
-                "line": 672,
-                "source": "body",
-                "made_in": "%net_label_stub_R1_p",
-                "state": "in-effect"
-              }
-            ]
+            "port": true
           },
           {
             "id": "&q",
             "global": false,
-            "port": true,
-            "usages": [
-              {
-                "kind": "usage",
-                "id": "@rnl-std-basic.rnl:672:9#2",
-                "definition": "$NET_LABEL",
-                "roles": [
-                  {
-                    "role": "p",
-                    "set": false,
-                    "member": "&q",
-                    "terminal": null
-                  }
-                ],
-                "file": null,
-                "line": 672,
-                "source": "body",
-                "made_in": "%net_label_stub_R1_n",
-                "state": "in-effect"
-              }
-            ]
+            "port": true
           }
         ]
       },
@@ -2123,13 +1975,14 @@
             "pins": []
           },
           {
+            "pin_of": "#R1",
             "parent": "%net_label_stub_R1_p",
             "id": "@rnl-std-basic.rnl:672:9#1",
             "kind": "usage",
             "host": [],
             "definition": "$NET_LABEL",
             "attach": {
-              "p": "&p"
+              "p": "pin(#R1,0)"
             },
             "symbol": {
               "value": "$NET_LABEL_SYMBOL",
@@ -2201,13 +2054,14 @@
             "pins": []
           },
           {
+            "pin_of": "#R1",
             "parent": "%net_label_stub_R1_n",
             "id": "@rnl-std-basic.rnl:672:9#2",
             "kind": "usage",
             "host": [],
             "definition": "$NET_LABEL",
             "attach": {
-              "p": "&q"
+              "p": "pin(#R1,1)"
             },
             "symbol": {
               "value": "$NET_LABEL_SYMBOL",

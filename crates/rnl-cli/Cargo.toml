@@ -9,6 +9,8 @@ rust-version.workspace = true
 license = "MIT AND OFL-1.1"
 repository.workspace = true
 publish.workspace = true
+# the integration tests are one test program, tests/main.rs, not one for each file
+autotests = false
 
 [lib]
 name = "rnl_cli"
@@ -17,6 +19,10 @@ path = "src/lib.rs"
 [[bin]]
 name = "rnl"
 path = "src/main.rs"
+
+[[test]]
+name = "cli"
+path = "tests/main.rs"
 
 [dependencies]
 rnl-runtime.workspace = true

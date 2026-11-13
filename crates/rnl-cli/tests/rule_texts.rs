@@ -15,8 +15,7 @@ use rnl_runtime::source::MemoryProvider;
 use rnl_runtime::{Interpretation, Options};
 use rnl_view::{BuildOptions, Parts};
 
-#[path = "support/public_packages.rs"]
-mod public_packages;
+use crate::public_packages;
 
 /// A five-transistor amplifier with every structure of the standard package written as a usage, a
 /// port of the standard package drawn with its symbol, and the `extra` statements, in a file that

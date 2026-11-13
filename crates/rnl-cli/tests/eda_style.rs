@@ -2,8 +2,7 @@
 
 use std::path::PathBuf;
 
-#[path = "support/public_packages.rs"]
-mod public_packages;
+use crate::public_packages;
 
 use rnl_cli::{interpret_file, FsProvider};
 use rnl_render::{Kind, RenderOptions};

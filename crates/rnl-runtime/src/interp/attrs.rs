@@ -168,7 +168,8 @@ impl Interp<'_> {
         }
     }
 
-    /// The nets of a terminal: a usage's terminal takes the net of its role member.
+    /// The nets of a terminal: a usage's terminal takes the net of its role member, which is a net,
+    /// a terminal or a pin (12.1); a bus pin gives all its nets.
     pub(crate) fn term_nets(&mut self, s: SceneId, t: ObjId) -> Vec<ObjId> {
         let ObjData::Term { owner, name, .. } = self.o(t).clone() else { return Vec::new() };
         if let ObjData::Usage(u) = self.o(owner).clone() {
@@ -176,6 +177,7 @@ impl Interp<'_> {
             return match role.map(|r| (r, self.o(r).clone())) {
                 Some((r, ObjData::Net { .. })) => vec![r],
                 Some((r, ObjData::Term { .. })) => self.term_nets(s, r),
+                Some((_, ObjData::ScenePin { owner, index })) => self.scene_pin_nets(s, owner, index),
                 _ => Vec::new(),
             };
         }

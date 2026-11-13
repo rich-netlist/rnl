@@ -31,7 +31,7 @@ with LF, CRLF and no final newline. The expected JSON is checked on the LF form.
 Run from the repository root:
 
 ```sh
-cargo test -p rnl-cli --test roundtrip_profile
+cargo test -p rnl-cli --test cli roundtrip_profile::
 ```
 
 To update only this corpus after an intentional change, set `RNL_BLESS_ROUNDTRIP=1`

@@ -617,3 +617,87 @@ M1 d g s 0 nch
     assert!(by_severity(&r_zh, Severity::Warning).is_empty(), "{:?}", by_severity(&r_zh, Severity::Warning));
     assert!(by_severity(&r_zh, Severity::Violation).is_empty(), "{:?}", by_severity(&r_zh, Severity::Violation));
 }
+
+#[test]
+fn a_bundle_pin_left_to_the_fill_gets_one_label_for_the_bus() {
+    // A cell repeated twice as a bundle (11.8): its pin a is on a<1> and a<0>, a bus pin; y and vss
+    // are one net for both members. The fill gives each unwired pin one net label, and the label
+    // of the bus pin shows the whole bus (11.8, 13.6).
+    let text = r#"* bundle pins left to the fill
+* @RNL(type="header") {
+*   @VERSION("0.4");
+*   @USE-PACKAGE(name="rnl-std-all", version="0.4");
+* }
+.subckt unit a y vss
+R1 a y 1k
+R2 y vss 1k
+.ends unit
+XI0<1> a<1> y vss unit
+XI0<0> a<0> y vss unit
+* @RNL {
+*   $UNIT_SYMBOL = @DEFINE-SYMBOL {
+*     @RECTANGLE {(-2, -2) (2, 2)};
+*     (-2, 1) @PIN(terminal="a", direction="left");
+*     (2, 1) @PIN(terminal="y", direction="right");
+*     (0, -2) @PIN(terminal="vss", direction="down");
+*   };
+*   #XI0<1:0> @BUNDLE => @SET-SYMBOL $UNIT_SYMBOL => @PLACE(0, 0);
+* }
+.end
+"#;
+    let r = read(&MemoryProvider::new().with("t.sp", text), &Options::default());
+    assert!(by_severity(&r, Severity::Error).is_empty(), "{:?}", by_severity(&r, Severity::Error));
+    assert!(by_severity(&r, Severity::Warning).is_empty(), "{:?}", by_severity(&r, Severity::Warning));
+    let lv = level(&r);
+    // one label for each pin of the bundle, the bus pin a included; a label keeps the pin it is
+    // given, so that it is on all the nets of the bus pin
+    let mut pins: Vec<String> = lv
+        .objects
+        .iter()
+        .filter(|o| o.definition.as_deref() == Some("$NET_LABEL"))
+        .map(|o| match o.attach.as_slice() {
+            [(role, rnl_runtime::model::Attach::Object(pin))] if role == "p" => pin.clone(),
+            other => panic!("{other:?}"),
+        })
+        .collect();
+    pins.sort();
+    assert_eq!(pins.len(), 3, "{pins:?}");
+    pins.dedup();
+    assert_eq!(pins.len(), 3, "{pins:?}");
+    assert!(pins.iter().all(|p| p.starts_with("pin(")), "{pins:?}");
+}
+
+#[test]
+fn a_fill_label_on_a_pin_stands_for_the_net_of_the_pin() {
+    // A net label of the fill holds the pin it is on (its role p takes the pin); its text still
+    // stands for the net, so that a viewer highlights it with the net and a click on it selects
+    // the net as well as the label (12.1: the pin of the label is on the net of the pin).
+    let text = r#"* a fill label on a pin
+* @RNL(type="header") {
+*   @VERSION("0.4");
+*   @USE-PACKAGE(name="rnl-std-all", version="0.4");
+* }
+R1 a 0 1k
+* @RNL {
+*   #R1 @PLACE(0, 0)
+* }
+* @RNL(type="generated", priority="high") {
+*   %ground_stub_R1_n = $GROUND_STUB @ATTACH #R1::n; %ground_stub_R1_n @PLACE(0, 0);
+*   %ground_stub_R1_n::g @PLACE(0, -4);
+*   %net_label_stub_R1_p = $NET_LABEL_STUB @ATTACH #R1::p; %net_label_stub_R1_p @PLACE(0, 0);
+*   %net_label_stub_R1_p::l @PLACE(0, 3) => @ORIENT("R90")
+* }
+.end
+"#;
+    let files = MemoryProvider::new().with("t.sp", text);
+    let doc = rnl_view::build("t.sp", &files, &rnl_view::BuildOptions::default()).unwrap();
+    let level = &doc.levels[0];
+    let label = level
+        .hits
+        .iter()
+        .find(|h| h.kind == "label" && h.objects.iter().any(|&o| doc.objects[o].kind == "usage"))
+        .unwrap_or_else(|| panic!("no label of a usage among {:?}", level.hits));
+    let kinds: Vec<(&str, &str)> =
+        label.objects.iter().map(|&o| (doc.objects[o].kind, doc.objects[o].name.as_str())).collect();
+    assert!(kinds.contains(&("net", "a")), "{kinds:?}");
+}

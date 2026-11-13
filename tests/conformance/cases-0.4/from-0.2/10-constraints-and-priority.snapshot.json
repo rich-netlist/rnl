@@ -86,27 +86,7 @@
           {
             "id": "&a",
             "global": false,
-            "port": false,
-            "usages": [
-              {
-                "kind": "usage",
-                "id": "@rnl-std-basic.rnl:672:9",
-                "definition": "$NET_LABEL",
-                "roles": [
-                  {
-                    "role": "p",
-                    "set": false,
-                    "member": "&a",
-                    "terminal": null
-                  }
-                ],
-                "file": null,
-                "line": 672,
-                "source": "body",
-                "made_in": "%net_label_stub_R1_p",
-                "state": "in-effect"
-              }
-            ]
+            "port": false
           },
           {
             "id": "&b",
@@ -739,13 +719,14 @@
             "pins": []
           },
           {
+            "pin_of": "#R1",
             "parent": "%net_label_stub_R1_p",
             "id": "@rnl-std-basic.rnl:672:9",
             "kind": "usage",
             "host": [],
             "definition": "$NET_LABEL",
             "attach": {
-              "p": "&a"
+              "p": "pin(#R1,0)"
             },
             "symbol": {
               "value": "$NET_LABEL_SYMBOL",

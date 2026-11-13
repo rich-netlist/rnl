@@ -20,7 +20,7 @@ files hold effective models and diagnostic locations.
 Run both language corpora:
 
 ```sh
-cargo test -p rnl-cli --test roundtrip_profile
+cargo test -p rnl-cli --test cli roundtrip_profile::
 ```
 
 After an intentional, reviewed change, `RNL_BLESS_ROUNDTRIP_0_4=1` updates only
