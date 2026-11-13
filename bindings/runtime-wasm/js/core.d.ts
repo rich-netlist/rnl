@@ -224,10 +224,12 @@ export type Op = { level?: string } & (
   | AddText
   | {
       /**
-       * RNL 0.4: a rule that draws a text on what a selection selects, in the level and the levels
-       * below it (10.4), written `# @SELECT-INSTANCE(name="R*") => @TEXT("", key="name")`. One
-       * action only, an `add-text` with no `attach`, `at`, `name` or `level`. The same rule twice in
-       * a level is written once.
+       * RNL 0.4: a rule that draws a text on what a selection selects (10.4), written
+       * `# @SELECT-INSTANCE(name="R*") => @TEXT("", key="name")`. It acts in the level it is written
+       * in only; give the condition `recursive: true` for the levels below too. One action only, an
+       * `add-text` with no `attach`, `at`, `name` or `level`. The same rule twice in a level is
+       * written once. A condition's name is not checked against the selection's, as for the
+       * `params` of `add-usage`: a wrong one is reported when the netlist is read.
        */
       op: "add-rule";
       select: {
@@ -235,7 +237,7 @@ export type Op = { level?: string } & (
         /** Conditions, in the order given, such as `{ name: "R*" }`. */
         params?: Record<string, Literal>;
       };
-      action: Omit<AddText, "attach" | "at" | "name">;
+      action: Omit<AddText, "attach" | "at" | "name" | "level">;
     }
   | { op: "add-to" | "remove-from"; items: string[]; set: string }
   | { op: "use-package"; name: string; version?: string; path?: string }

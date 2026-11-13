@@ -72,7 +72,8 @@ pub enum Op {
         size: Option<f64>,
         style: Vec<(String, Literal)>,
     },
-    /// A rule (10.4) that adds a text to what a selection selects, in every level below its own: the
+    /// A rule (10.4) that adds a text to what a selection selects, in its own level, and below it with the condition
+    /// `recursive=true` (0.4 selections do not go down by default): the
     /// `kind` of the selection (`instance`, `usage`, `terminal` or `net`), its conditions in the
     /// order given, and the one action, an `AddText` that has neither `attach`, `at` nor `name`.
     AddRule { select: String, params: Vec<(String, Literal)>, action: Box<Op> },

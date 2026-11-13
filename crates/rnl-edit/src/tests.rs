@@ -1331,7 +1331,8 @@ fn terminals_need_the_language_0_4_a_symbol_and_pairs() {
 }
 
 /// A rule (10.4) of the editor interface: `add-rule` writes one `# @SELECT-… => @TEXT(…)` statement,
-/// which draws its text on what it selects, in the level it is written in and the levels below.
+/// which draws its text on what it selects in the level it is written in, and in the levels below
+/// only with the condition `recursive=true`.
 fn rule(level: &str, kind: &str, params: Value, key: &str) -> Value {
     json!({"level": level, "op": "add-rule", "select": {"kind": kind, "params": params},
            "action": {"op": "add-text", "markup": "", "key": key}})
@@ -1420,4 +1421,38 @@ fn a_rule_needs_a_kind_a_single_text_without_a_place_and_the_language_0_4() {
     assert!(with("action", json!({"op": "add-text"})).contains("action:"));
     assert!(with("action", json!({"op": "add-text", "markup": "", "size": "big"})).contains("action:"));
     assert!(with("extra", json!(1)).contains("unknown field `extra`"));
+}
+
+#[test]
+fn a_rule_acts_on_its_own_level_and_on_those_below_only_when_it_is_recursive() {
+    let net = "* rule
+.subckt sub p
+R2 p 0 1k
+.ends sub
+R1 a 0 1k
+X1 a sub
+.end
+";
+    let symbol = r#"* @RNL {
+* $S = @DEFINE-SYMBOL { ? @TEXT("old", key="name") => @PLACE(2,3) };
+* {#R1 #R2} @SET-SYMBOL $S => @PLACE(10,20)
+* }
+.end"#;
+    for recursive in [false, true] {
+        let params = if recursive { json!({"name": "R*", "recursive": true}) } else { json!({"name": "R*"}) };
+        let mut req = request("spice", net, json!([rule("file", "instance", params, "name")]));
+        req.language_version = Some("0.4".into());
+        let out = write(&req).unwrap();
+        assert_eq!(out.contains("recursive=true"), recursive, "{out}");
+        let out = out.replace(".end", symbol);
+        let files = MemoryProvider::new().with(entry("spice"), &out);
+        let r =
+            rnl_view::interpret(entry("spice"), Some("spice"), &files, &Options { std: false, ..Options::default() })
+                .unwrap();
+        let markup = |id: &str| {
+            r.model.levels.iter().flat_map(|l| &l.texts).find(|t| t.object_id == id).map(|t| t.markup.clone())
+        };
+        assert_eq!(markup("#R1::name").as_deref(), Some(""), "{out}");
+        assert_eq!(markup("#R2::name").as_deref(), Some(if recursive { "" } else { "old" }), "{out}");
+    }
 }
