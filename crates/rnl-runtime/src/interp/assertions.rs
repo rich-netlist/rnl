@@ -423,6 +423,8 @@ impl Interp<'_> {
                 match cond {
                     // as SELECT-TERMINAL compares it (10.1)
                     "terminal" => {
+                        // in 0.4 a string of digits is the terminal number (6.4)
+                        let v = &if modern { super::terminal_maps::terminal_value(v) } else { v.clone() };
                         let ok = match v {
                             Lit::Num(n) => index == *n as u32,
                             Lit::Str(w) => name.as_ref().is_some_and(|n| {

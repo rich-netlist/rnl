@@ -2013,10 +2013,23 @@ impl<'p> Interp<'p> {
             let l = self.label(obj);
             return self.fail(ctx, codes::REF_NO_TERMINALS, format!("{l} has no terminals (6.4)"), e.start);
         }
+        // in 0.4 a quoted terminal made only of digits is a number too, as an unquoted one is (6.4)
+        let number = p.number.or_else(|| {
+            let digits =
+                p.quoted && p.sub.is_none() && !p.name.is_empty() && p.name.bytes().all(|b| b.is_ascii_digit());
+            if digits && self.follows_0_4(self.source_unit(ctx)) {
+                p.name.parse::<u32>().ok().filter(|n| *n > 0)
+            } else {
+                None
+            }
+        });
+        // a number reaches a terminal by its place only, also a port named with digits, as in
+        // `.subckt amp 3 1 2`, where `#X1:1` is the port named 3 (6.4)
+        let by_place = number.is_some() && self.follows_0_4(self.source_unit(ctx));
         let mut out = Vec::new();
         for nm in &names {
             let t = match ctx.scene {
-                Some(s) => self.scene_term(s, obj, Some(nm), p.number),
+                Some(s) => self.scene_term(s, obj, (!by_place).then_some(nm.as_str()), number),
                 None => None,
             };
             match t {
