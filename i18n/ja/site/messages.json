@@ -50,5 +50,7 @@
   "timeline_notes": "リリースノート",
   "timeline_range": "{start} 〜 {end}",
   "timeline_next": "今後の予定",
-  "timeline_all": "タイムライン全体"
+  "timeline_all": "タイムライン全体",
+  "archived": "アーカイブ済み",
+  "archived_banner": "これはアーカイブ済みのバージョン（{v}）です。現在の標準は {current} です。{v} のファイルをアップグレードするには、<a href=\"{href}\">アップグレードツール</a>を使用してください。"
 }

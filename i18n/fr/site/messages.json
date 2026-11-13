@@ -50,5 +50,7 @@
   "timeline_notes": "Notes de version",
   "timeline_range": "Du {start} au {end}",
   "timeline_next": "À venir",
-  "timeline_all": "Chronologie complète"
+  "timeline_all": "Chronologie complète",
+  "archived": "archivée",
+  "archived_banner": "Ceci est une version archivée ({v}). La norme actuelle est {current}. Pour mettre à niveau les fichiers de {v}, utilisez <a href=\"{href}\">l’outil de mise à niveau</a>."
 }

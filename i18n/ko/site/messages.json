@@ -50,5 +50,7 @@
   "timeline_notes": "릴리스 노트",
   "timeline_range": "{start} ~ {end}",
   "timeline_next": "다음 계획",
-  "timeline_all": "전체 타임라인"
+  "timeline_all": "전체 타임라인",
+  "archived": "보관됨",
+  "archived_banner": "이 문서는 보관된 버전({v})입니다. 현재 표준은 {current}입니다. {v}의 파일을 업그레이드하려면 <a href=\"{href}\">업그레이드 도구</a>를 사용하세요."
 }
