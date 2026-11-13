@@ -374,7 +374,15 @@ pub fn respace_with_clock(
     if previous.placements.is_empty() {
         return Err("the record of the solver places nothing".into());
     }
-    Ok(budget::without(|| solve_isolated(problem, options, clock, |p, o, c| driver::respace(p, o, c, previous))))
+    let from = driver::Respace { previous, refused: std::cell::RefCell::new(None) };
+    let mut solved =
+        budget::without(|| solve_isolated(problem, options, clock, |p, o, c| driver::respace(p, o, c, &from)));
+    if let Some(why) = from.refused.into_inner() {
+        return Err(why);
+    }
+    // the warning is of a solve, whose row and tree layouts keep their gaps; a respace spaces any of them
+    solved.report.warnings.retain(|w| w != config::SPACING_NOT_USED);
+    Ok(solved)
 }
 
 fn solve_isolated(

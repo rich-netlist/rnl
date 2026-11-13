@@ -57,6 +57,7 @@ and shows an event or a stage it does not know by its name.
 | `score` | Comparing the candidates |
 | `tree` | Laying out the groups |
 | `lines` | Laying out along the signal lines |
+| `respace` | Spacing the drawing again, with `--respace` |
 | `junctions` | Placing the junction dots, outside the solver's budget |
 | `write` | Writing the record back, outside the solver's budget |
 

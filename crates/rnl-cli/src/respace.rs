@@ -76,7 +76,8 @@ pub fn respace_progress(
     solve_progress_skipping(file, files, options, clock, sink, &|p| why_not(p, record(p)), &|p, options, clock| {
         let previous = record(p).ok_or_else(|| format!("the level {} has no record of the solver", p.title))?;
         Ok(BackendResult {
-            solved: rnl_solver::respace_with_clock(p, previous, options, clock)?,
+            solved: rnl_solver::respace_with_clock(p, previous, options, clock)
+                .map_err(|why| format!("the level {} is not respaced, and nothing is written: {why}", p.title))?,
             author: rnl_solver::AUTHOR.to_string(),
             report_available: true,
         })

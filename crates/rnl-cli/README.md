@@ -166,7 +166,7 @@ distinction and the position reference when writing a wire back.
 - **Saving it:** `preview::save_copy` saves a copy of a solve, refusing any place over a file that was read. It saves one file when the solve writes one and reads no other (`preview::one_file`). Otherwise it saves a folder, as `solve -o DIR` writes it.
 - **Watching it:** `solve::solve_watched` tells a watcher of each level before it is solved, and stops at its word. `preview::StoppableClock` is past the time limit once stopped, so that the level under way stops checking its facts.
 - **Following it:** `progress::solve_progress` and `preview::preview_progress` give every step of the solve as an event: each level with its limit, the stages, the work, each better candidate, and each level's end. `rnl solve --progress=json` writes the same events, one JSON object per line, on the standard error. See [solver progress events](../../docs/solver-progress.md).
-- **Spacing it again:** `respace::respace` and `preview::respace` start each level from its record of the solver and space it to the settings' spacing, nothing searched; a level whose record does not fit the netlist as it is now is left as it is, with the reason. See [respacing a solved drawing](../../docs/solver-respace.md).
+- **Spacing it again:** `respace::respace` and `preview::respace` start each level from where its record of the solver puts the objects, route the wires again and widen the gaps to the settings' spacing, nothing searched; a level whose record does not fit the netlist as it is now is left as it is, with the reason. See [respacing a solved drawing](../../docs/solver-respace.md).
 
 ## solve
 

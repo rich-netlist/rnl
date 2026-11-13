@@ -92,3 +92,76 @@ fn the_preview_says_respace_and_draws_the_level_spaced_again() {
     let solved = rnl_cli::preview::preview("main.sp", &plain, &options("limit=\"seed\""), &StoppedClock, &|_| true);
     assert_eq!(solved.unwrap().report.mode, "solve");
 }
+
+#[test]
+fn a_smaller_spacing_leaves_the_drawing_as_it_is() {
+    let before = solved();
+    let files = MemoryProvider::new().with("main.sp", &before);
+    let wide = respace(Path::new("main.sp"), &files, &options("spacing_x=4"), &StoppedClock).unwrap();
+    let wide = wide.files[0].text.clone();
+    assert_ne!(places(&before), places(&wide));
+    // from the wider file, a smaller spacing and none at all widen nothing
+    let files = MemoryProvider::new().with("main.sp", &wide);
+    for config in ["spacing_x=1", "spacing_x=0", "spacing_x=4"] {
+        let run = respace(Path::new("main.sp"), &files, &options(config), &StoppedClock).unwrap();
+        assert_eq!(places(&wide), places(&run.files[0].text), "{config}");
+    }
+}
+
+#[test]
+fn a_respace_that_its_limit_stops_is_an_error_and_nothing_is_written() {
+    let files = MemoryProvider::new().with("main.sp", &solved());
+    let config = "spacing_x=4,limit=\"work\",work=2000";
+    let Err(e) = respace(Path::new("main.sp"), &files, &options(config), &StoppedClock) else {
+        panic!("a limit of 2000 units of work stops the respace");
+    };
+    assert!(e.contains("is not respaced, and nothing is written") && e.contains("limit"), "{e}");
+}
+
+#[test]
+fn a_record_that_breaks_a_written_fact_is_an_error() {
+    // R2 is written where it is; the record is then edited to put it elsewhere
+    let fixed = SOURCE.replace("* &a @ROUTE-NET;", "* #R2 @PLACE(5, 3);\n* &a @ROUTE-NET;");
+    let files = MemoryProvider::new().with("main.sp", &fixed);
+    let run = solve_with_clock(Path::new("main.sp"), &files, &options("limit=\"seed\""), &StoppedClock).unwrap();
+    let text = run.files[0].text.clone();
+    // the record as the solver wrote it is respaced
+    let files = MemoryProvider::new().with("main.sp", &text);
+    let run = respace(Path::new("main.sp"), &files, &options("spacing_x=4"), &StoppedClock).unwrap();
+    assert!(run.not_solved.is_empty() && run.files.len() == 1, "{:?}", run.not_solved);
+    // R2 moved in the record alone: the input digest is the same, the written fact no longer holds
+    let generated = text.rfind("type=\"generated\"").expect("a record of the solver");
+    let was = "#R2 @PLACE(5, 3)";
+    let at = generated + text[generated..].find(was).expect("R2 in the record, where it is written");
+    let edited = format!("{}#R2 @PLACE(31, 17){}", &text[..at], &text[at + was.len()..]);
+    let files = MemoryProvider::new().with("main.sp", &edited);
+    let Err(e) = respace(Path::new("main.sp"), &files, &options("spacing_x=4"), &StoppedClock) else {
+        panic!("the record breaks the written PLACE");
+    };
+    // a PLACE is a fact on x and one on y
+    assert!(e.contains("does not keep 2 facts"), "{e}");
+}
+
+#[test]
+fn a_level_whose_record_is_stale_is_left_while_the_others_are_respaced() {
+    let two = SOURCE.replace(
+        "R1 in a 1k",
+        ".subckt cell p q\nR9 p m 1k\nR8 m q 1k\n* @RNL {\n* $T = @DEFINE-SYMBOL { (-2,0) @PIN(terminal=1,direction=\"left\"); (2,0) @PIN(terminal=2,direction=\"right\"); (-1,-1) (1,-1) (1,1) (-1,1) (-1,-1) @LINE };\n* {#R9 #R8} @SET-SYMBOL $T;\n* &m @ROUTE-NET;\n* }\n.ends\nR1 in a 1k",
+    );
+    let files = MemoryProvider::new().with("main.sp", &two);
+    let run = solve_with_clock(Path::new("main.sp"), &files, &options("limit=\"seed\""), &StoppedClock).unwrap();
+    assert_eq!(run.levels.len(), 2, "{:?}", run.not_solved);
+    // the subcircuit is edited after its solve; the file level is not
+    let edited = run.files[0].text.replace("R8 m q 1k", "R8 m q 2k\nR7 m q 1k");
+    let files = MemoryProvider::new().with("main.sp", &edited);
+    let run = respace(Path::new("main.sp"), &files, &options("spacing_x=4"), &StoppedClock).unwrap();
+    assert_eq!(run.levels.len(), 1);
+    assert_eq!(run.not_solved.len(), 1);
+    assert!(run.not_solved[0].reason.starts_with("mismatch: "), "{:?}", run.not_solved);
+    // the stale level's record is written as it was
+    let record = |t: &str| {
+        let from = t.find(".subckt cell").unwrap();
+        t[from..t.find(".ends").unwrap()].to_string()
+    };
+    assert_eq!(record(&edited), record(&run.files[0].text));
+}

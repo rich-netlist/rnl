@@ -221,6 +221,10 @@ fn apply_tool(o: &mut SolverOptions, settings: &[SolverSetting]) -> Result<(), S
     }
 }
 
+/// The warning of a spacing given to a solve: only the lines layout spaces by it.
+pub(crate) const SPACING_NOT_USED: &str =
+    "spacing_x and spacing_y are retained for line layout; row and tree layouts keep their fixed gaps";
+
 impl SolverOptions {
     /// Defaults in the syntax accepted by --solver-config. Layout stays rows until the 0.4 switch.
     pub fn defaults_config() -> String {
@@ -367,10 +371,7 @@ impl SolverOptions {
             }
         }
         if modern && o.settings.spacing != [0, 0] {
-            warnings.push(SettingProblem::new(
-                None,
-                "spacing_x and spacing_y are retained for line layout; row and tree layouts keep their fixed gaps",
-            ));
+            warnings.push(SettingProblem::new(None, SPACING_NOT_USED));
         }
         SettingsCheck { values, warnings, errors }
     }
@@ -413,10 +414,7 @@ impl SolverOptions {
             out.settings.junction = Some(p.junction.effective().definition.clone().unwrap_or_default());
         }
         if out.settings.spacing != [0, 0] {
-            warnings.push(
-                "spacing_x and spacing_y are retained for line layout; row and tree layouts keep their fixed gaps"
-                    .into(),
-            );
+            warnings.push(SPACING_NOT_USED.into());
         }
         out.settings.overrides.clear();
         (out, warnings)

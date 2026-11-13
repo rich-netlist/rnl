@@ -85,14 +85,38 @@ pub(crate) fn solve_skeleton(problem: &LevelProblem, options: &SolverOptions, cl
     solve_exact_mode(problem, options, clock, CAPS, Some(rounds), None).0
 }
 
-/// The level as its previous result has it, spaced again ([`crate::respace_with_clock`]).
+/// What a respace starts from, and why it is refused, when it is.
+pub(crate) struct Respace<'a> {
+    pub previous: &'a Previous,
+    pub refused: std::cell::RefCell<Option<String>>,
+}
+
+impl Respace<'_> {
+    /// The first reason stands.
+    fn refuse(&self, why: String) {
+        self.refused.borrow_mut().get_or_insert(why);
+    }
+}
+
+/// The note of every respace, in the place of [`METHOD_NOTE`].
+pub(crate) const RESPACE_NOTE: &str = "the facts are resolved (8.5), each object put where the record of the solver \
+     has it and turned as it turns it, the wires routed again (13.7), and the drawing spaced; no candidate is searched";
+
+/// The level as its previous result has it, spaced again ([`crate::respace_with_clock`]). A run
+/// that its limit stops is refused, as its drawing is not the one the settings ask for.
 pub(crate) fn respace(
     problem: &LevelProblem,
     options: &SolverOptions,
     clock: &dyn Clock,
-    previous: &Previous,
+    from: &Respace<'_>,
 ) -> Solved {
-    solve_exact_mode(problem, options, clock, CAPS, None, Some(previous)).0
+    let solved = solve_exact_mode(problem, options, clock, CAPS, None, Some(from)).0;
+    if crate::budget::stopped() {
+        from.refuse(
+            "the limit of the run stopped it before the drawing was routed and spaced; give it a higher limit".into(),
+        );
+    }
+    solved
 }
 
 /// A count and its noun, singular for one: `count(1, "wire")` is "1 wire", `count(2, "wire")` "2
@@ -138,9 +162,9 @@ fn solve_exact_mode(
     clock: &dyn Clock,
     caps: Caps,
     skeleton: Option<u8>,
-    previous: Option<&Previous>,
+    previous: Option<&Respace<'_>>,
 ) -> (Solved, Exact) {
-    let mut notes = vec![METHOD_NOTE.to_string()];
+    let mut notes = vec![if previous.is_some() { RESPACE_NOTE } else { METHOD_NOTE }.to_string()];
     if let Err(e) = options.validate() {
         notes.push(format!("the options are not valid: {e}"));
     }
@@ -622,17 +646,19 @@ pub(crate) fn left_free(s: &Structure, k: usize) -> bool {
 /// turned as it turns it, the others where the resolution's witness has them; routed again, then
 /// spaced to the options' spacing with its line identities and wire topology kept
 /// (`crate::skeleton::space`). Nothing is searched: the candidate is the record's orientations.
+/// A record that does not keep a fact the resolution kept is refused: it is not this solver's
+/// drawing of the level, such as after an edit to the record itself.
 fn respaced(
     problem: &LevelProblem,
     s: &Structure,
-    previous: &Previous,
+    from: &Respace<'_>,
     options: &SolverOptions,
     work: &mut crate::Work,
     notes: &mut Vec<String>,
 ) -> (Candidate, Placed, Routing, Entry) {
     crate::budget::enter("respace");
     let mut geometry = s.witness.clone();
-    for p in &previous.placements {
+    for p in &from.previous.placements {
         for (axis, value) in [p.x, p.y].into_iter().enumerate() {
             if let Some(q) = value.and_then(crate::rational::from_f64) {
                 geometry.origin[p.object][axis] = q;
@@ -650,13 +676,36 @@ fn respaced(
         optimised: true,
         undecided: false,
     };
+    let broken = s
+        .kept
+        .iter()
+        .filter(|&&f| {
+            let g = &placed.geometry;
+            let tol = if s.model.exact.contains(&f) { Q::default() } else { s.model.tol.clone() };
+            let at = |point: &rnl_runtime::problem::PointRef, axis| {
+                crate::resolve::point_value(problem, g, point, crate::model::ax(axis), 0)
+            };
+            let ori = |k: usize| g.orient.get(k).copied();
+            crate::holds::check_problem(problem, f, &at, &ori, &tol, &Q::default()) != Some(true)
+        })
+        .count();
+    if broken > 0 {
+        from.refuse(format!(
+            "the record of the solver does not keep {} of the level, as after an edit to the record; solve the level \
+             again",
+            count(broken, "fact")
+        ));
+    }
     let routing = route(problem, s, &placed.geometry, &placed.origins, options, work);
     let spacing = options.settings.spacing.map(i64::from);
     let spaced = crate::skeleton::space::space(problem, s, &placed, &routing, spacing, options, work);
     notes.extend(spaced.notes);
+    let moved = (0..placed.geometry.origin.len())
+        .filter(|&k| placed.geometry.origin[k] != spaced.placed.geometry.origin[k])
+        .count();
     notes.push(format!(
-        "respaced from the previous result: {} moved to spacing_x={}, spacing_y={}; nothing searched",
-        count(spaced.moved.len(), "object"),
+        "respaced from the previous result: {} moved for spacing_x={}, spacing_y={}; nothing searched",
+        count(moved, "object"),
         spacing[0],
         spacing[1]
     ));

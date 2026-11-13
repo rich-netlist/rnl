@@ -62,10 +62,11 @@ solve options (the levels are read without their type=\"generated\" records; -o 
   --progress          report 0.4 stages and consumed work on standard error
   --progress=json     report the solve on standard error as events, one JSON object per line
                       (docs/solver-progress.md; solve and preview take it)
-  --respace           write each level as the record of the solver last drew it, spaced again to the
-                      spacing of its settings, nothing searched; a level without a record that
-                      fits the netlist as it is now is left as it is, with the reason
-                      (solve and preview take it)
+  --respace           write each level with its objects where the record of the solver last put
+                      them, the wires routed again and the gaps widened to the spacing given with
+                      --solver-config, nothing searched; a level without a record that fits the
+                      netlist as it is now is left as it is, with the reason
+                      (docs/solver-respace.md; solve and preview take it)
   --external-solver P run executable P with the solver input/result JSON protocol
   --external-arg ARG  append one literal argument to P (repeatable; no shell)
   --external-timeout S  stop P after S seconds per level (120 by default)
