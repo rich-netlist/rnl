@@ -151,14 +151,9 @@ struct Refinement {
 
 impl Refinement {
     fn for_problem(problem: &LevelProblem, work: &Work, limit_ns: u64) -> Self {
-        let objects = problem
-            .objects
-            .iter()
-            .filter(|o| {
-                o.symbol.is_some() || o.text.is_some() || o.kind == rnl_runtime::problem::ObjectKind::Annotation
-            })
-            .count() as u64;
-        Self::new(objects, work, limit_ns)
+        // The operation estimate scales with the coordinate problem, including
+        // semantic objects without a drawing, rather than just its visible boxes.
+        Self::new(problem.objects.len() as u64, work, limit_ns)
     }
 
     fn new(objects: u64, work: &Work, limit_ns: u64) -> Self {
@@ -2716,7 +2711,7 @@ mod refinement_tests {
     use super::*;
 
     #[test]
-    fn semantic_points_do_not_change_the_tree_operation_estimate() {
+    fn semantic_coordinate_objects_contribute_without_counting_drawing_metadata_twice() {
         use crate::resolve::tests::{instance, problem_of};
         use rnl_runtime::problem::ObjectKind;
         let mut p = problem_of(vec![instance(); 8], vec![]);
@@ -2730,15 +2725,16 @@ mod refinement_tests {
         point.kind = ObjectKind::Point;
         p.objects.push(point);
         let after = Refinement::for_problem(&p, &work, 50_000);
-        assert_eq!(before.pivot_ns, after.pivot_ns);
-        for pivots in 0..12 {
-            let work = Work { pivots, ..Work::default() };
-            assert_eq!(before.reached(&work), after.reached(&work));
-        }
+        let advanced = Work { pivots: 4, ..Work::default() };
+        assert!(!before.reached(&advanced));
+        assert!(after.reached(&advanced));
+
+        // Attaching a drawing to an existing coordinate object adds no object.
         p.objects[8].symbol = Some(0);
         p.objects[9].kind = ObjectKind::Annotation;
         let drawn = Refinement::for_problem(&p, &work, 50_000);
-        assert!(drawn.pivot_ns > after.pivot_ns);
+        assert_eq!(drawn.pivot_ns, after.pivot_ns);
+        assert_eq!(drawn.reached(&advanced), after.reached(&advanced));
     }
 
     #[test]
