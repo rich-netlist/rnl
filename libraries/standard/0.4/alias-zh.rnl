@@ -380,8 +380,8 @@
   @ALIAS("$双极管匹配组", "$MATCHED_BJT");
   @ALIAS("$电阻匹配组", "$MATCHED_RESISTOR");
   @ALIAS("$电容匹配组", "$MATCHED_CAPACITOR");
-  @ALIAS("$镜像对称", "$MIRRORED_LAYOUT");
-  @ALIAS("$纵向镜像对称", "$MIRRORED_VERTICAL_LAYOUT");
+  @ALIAS("$镜像布局", "$MIRRORED_LAYOUT");
+  @ALIAS("$纵向镜像布局", "$MIRRORED_VERTICAL_LAYOUT");
   @ALIAS("$支路", "$BRANCH");
   @ALIAS("$横向支路", "$BRANCH_HORIZONTAL");
   @ALIAS("$级联", "$CASCADE");
