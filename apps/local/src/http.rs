@@ -42,12 +42,21 @@ impl Request {
 #[derive(Debug)]
 pub struct Rejected(pub u16, pub &'static str);
 
-/// A response: its status, headers and body.
-#[derive(Debug)]
+/// What writes the body of a streamed response, to the connection, after its head: a solve tells its events as it goes.
+type Stream = Box<dyn FnOnce(&mut TcpStream) -> io::Result<()>>;
+
+/// A response: its status, headers and body, or, for a [`Response::streamed`] one, what writes the body as it is made.
 pub struct Response {
     pub status: u16,
     pub headers: Vec<(String, String)>,
     pub body: Vec<u8>,
+    streamed: std::cell::RefCell<Option<Stream>>,
+}
+
+impl std::fmt::Debug for Response {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Response").field("status", &self.status).field("headers", &self.headers).field("body", &self.body.len()).finish()
+    }
 }
 
 impl Response {
@@ -56,6 +65,28 @@ impl Response {
             status,
             headers: vec![("Content-Type".into(), content_type.into())],
             body: body.into(),
+            streamed: std::cell::RefCell::new(None),
+        }
+    }
+
+    /// A 200 whose body is not known when its head is written: `write` writes it to the connection, which the end of ends
+    /// (no `Content-Length`; the connection is closed after every response).
+    pub fn streamed(content_type: &str, write: impl FnOnce(&mut TcpStream) -> io::Result<()> + 'static) -> Response {
+        let response = Response::new(200, content_type, Vec::new());
+        *response.streamed.borrow_mut() = Some(Box::new(write));
+        response
+    }
+
+    /// Whether the body is written as it is made.
+    fn is_streamed(&self) -> bool {
+        self.streamed.borrow().is_some()
+    }
+
+    /// Write the body of a streamed response, if it is one, once.
+    fn stream_to(&self, stream: &mut TcpStream) -> io::Result<()> {
+        match self.streamed.borrow_mut().take() {
+            Some(write) => write(stream),
+            None => Ok(()),
         }
     }
 
@@ -115,7 +146,10 @@ fn head_of(response: &Response) -> String {
         }
         head.push_str(&format!("{name}: {value}\r\n"));
     }
-    head.push_str(&format!("Content-Length: {}\r\n", response.body.len()));
+    // (a streamed body is as long as it is: the end of the connection is its end)
+    if !response.is_streamed() {
+        head.push_str(&format!("Content-Length: {}\r\n", response.body.len()));
+    }
     head.push_str("Connection: close\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nReferrer-Policy: no-referrer\r\n");
     // (no page of another site may frame the program's: it would draw over what the user sees)
     head.push_str("Content-Security-Policy: frame-ancestors 'none'\r\nX-Frame-Options: DENY\r\n\r\n");
@@ -125,8 +159,10 @@ fn head_of(response: &Response) -> String {
 /// Write a response and flush it. Each write may take as long as the stream's write timeout.
 pub fn write_response(stream: &mut TcpStream, response: &Response, head_only: bool) -> io::Result<()> {
     stream.write_all(head_of(response).as_bytes())?;
+    stream.flush()?;
     if !head_only {
         stream.write_all(&response.body)?;
+        response.stream_to(stream)?;
     }
     stream.flush()
 }
@@ -151,6 +187,7 @@ pub fn write_response_within(stream: &mut TcpStream, response: &Response, head_o
     if !head_only {
         send(&response.body)?;
     }
+    // (a streamed body is of the session's own requests alone, which are not written within a time: it is not written here)
     stream.flush()
 }
 
@@ -457,6 +494,22 @@ mod tests {
         let mut text = String::new();
         client.read_to_string(&mut text).unwrap();
         assert!(text.starts_with("HTTP/1.1 200 OK") && text.ends_with("hello"), "{text}");
+    }
+
+    #[test]
+    fn a_streamed_response_has_no_length_and_its_body_is_written_after_its_head() {
+        let (mut client, mut server) = pair();
+        let streamed = Response::streamed("application/x-ndjson", |out| {
+            out.write_all(b"{\"a\":1}\n")?;
+            out.write_all(b"{\"b\":2}\n")
+        });
+        write_response(&mut server, &streamed, false).unwrap();
+        drop(server);
+        let mut text = String::new();
+        client.read_to_string(&mut text).unwrap();
+        let (head, body) = text.split_once("\r\n\r\n").unwrap();
+        assert!(head.starts_with("HTTP/1.1 200 OK") && head.contains("application/x-ndjson") && !head.contains("Content-Length"), "{head}");
+        assert_eq!(body, "{\"a\":1}\n{\"b\":2}\n");
     }
 
     #[test]

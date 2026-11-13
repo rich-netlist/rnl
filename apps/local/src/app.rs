@@ -270,6 +270,11 @@ fn route(app: &App, request: &Request, stream: &TcpStream) -> Result<Response, F
         "/rnl-solver" if get => Ok(Response::json(200, &crate::service::info())),
         "/rnl-solver/solve" if method == "POST" => {
             let solve: crate::service::Request = json_body(request)?;
+            if solve.stream {
+                // (a request that is wrong is answered as such, before a head that says it is not: what fails later is a line)
+                let prepared = crate::service::prepare(&solve).map_err(bad)?;
+                return Ok(Response::streamed("application/x-ndjson; charset=utf-8", move |out| crate::service::stream(prepared, out)));
+            }
             let answer = crate::service::solve(&solve, stream).map_err(bad)?;
             Ok(Response::new(200, "application/json; charset=utf-8", answer.into_bytes()))
         }

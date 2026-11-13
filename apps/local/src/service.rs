@@ -1,18 +1,26 @@
 //! The solver service of the page (the same the development server of the web viewer offers, apps/web/solver-service.mjs):
 //!
 //!   GET  /rnl-solver        {"service": "rnl-solver", "version": ..., "path": ..., "options": ...}
-//!   POST /rnl-solver/solve  {"entry", "files", "pool", "options"}  ->  {"document", "report"}
+//!   POST /rnl-solver/solve  {"entry", "files", "pool", "options", "level", "stream"}  ->  {"document", "report"}
+//!
+//! `level` is the title of the one level to solve (`rnl solve --level`), none for every level. With `"stream": true` the
+//! answer is lines of JSON (`application/x-ndjson`): the events of the solve as they happen (docs/solver-progress.md), then
+//! `{"result": {"document", "report"}}`, or `{"error": message}` if the solve fails after the first line was sent; a request
+//! that is wrong is answered as it is without `stream`, as a 400 with `{"error"}`. The page going away stops the solve.
 //!
 //! The page sends the files of the netlist, with what it has applied over them, and the program solves them in memory
 //! with the core's own `rnl_cli::preview`, as the desktop viewer does (decision 0010): nothing is read from or written
 //! to disk, and the core runs here, not in the browser, so that the solver has the machine's cores and its memory.
 
+use std::cell::RefCell;
 use std::collections::BTreeMap;
+use std::io::{self, Write};
 use std::net::TcpStream;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use rnl_cli::preview::{preview, StoppableClock};
+use rnl_cli::preview::{preview, preview_progress, StoppableClock};
+use rnl_cli::progress::Event;
 use rnl_cli::solve::{Progress, SolveOptions};
 use rnl_runtime::source::MemoryProvider;
 use rnl_solver::SolverOptions;
@@ -29,6 +37,12 @@ pub struct Request {
     /// The solver's settings, written as `rnl solve --solver-options` takes them.
     #[serde(default)]
     pub options: String,
+    /// The title of the one level to solve: none, or empty, solves every level.
+    #[serde(default)]
+    pub level: Option<String>,
+    /// Whether the answer is the events of the solve, as lines of JSON, and then the result.
+    #[serde(default)]
+    pub stream: bool,
 }
 
 /// What the service says of itself.
@@ -46,9 +60,15 @@ fn dir_of(path: &str) -> &str {
     path.rsplit_once('/').map_or("", |(d, _)| d)
 }
 
-/// Solve a request: the JSON text of `{document, report}`. `peer` is the connection of the page, which is watched for the
-/// page going away, as a cancel is: the solve stops at its next level.
-pub fn solve(request: &Request, peer: &TcpStream) -> Result<String, String> {
+/// A request that is right: what a solve is made of.
+pub struct Prepared {
+    entry: String,
+    files: MemoryProvider,
+    options: SolveOptions,
+}
+
+/// Check a request and make what it solves: an error says what is wrong with it.
+pub fn prepare(request: &Request) -> Result<Prepared, String> {
     if !request.entry.starts_with('/') || request.entry.contains("/../") || !request.files.contains_key(&request.entry) {
         return Err("the request has no entry file".into());
     }
@@ -68,33 +88,76 @@ pub fn solve(request: &Request, peer: &TcpStream) -> Result<String, String> {
         }
     }
     let solver = SolverOptions::default().with_overrides(&request.options)?;
-    let options = SolveOptions { solver, ..SolveOptions::default() };
+    let level = request.level.clone().filter(|title| !title.is_empty());
+    Ok(Prepared { entry: request.entry.clone(), files, options: SolveOptions { solver, level, ..SolveOptions::default() } })
+}
 
-    let stop = Arc::new(AtomicBool::new(false));
-    let clock = StoppableClock::new(stop.clone());
-    // the page going away is a cancel: asked at each level, without waiting for anything
-    let gone = || {
-        if peer.set_nonblocking(true).is_err() {
-            return false;
-        }
-        let mut byte = [0u8; 1];
-        let closed = matches!(peer.peek(&mut byte), Ok(0));
-        let _ = peer.set_nonblocking(false);
-        closed
-    };
-    let watch = |_: &Progress| {
-        if gone() {
-            stop.store(true, Ordering::Relaxed);
-        }
-        !stop.load(Ordering::Relaxed)
-    };
-    let shown = preview(&request.entry, &files, &options, &clock, &watch)?;
+/// Whether the page has closed its connection: asked without waiting for anything.
+fn gone(peer: &TcpStream) -> bool {
+    if peer.set_nonblocking(true).is_err() {
+        return false;
+    }
+    let mut byte = [0u8; 1];
+    let closed = matches!(peer.peek(&mut byte), Ok(0));
+    let _ = peer.set_nonblocking(false);
+    closed
+}
+
+/// The JSON text of `{document, report}` of a solve that is done.
+fn solved_json(shown: &rnl_cli::preview::Preview) -> Result<String, String> {
     #[derive(serde::Serialize)]
     struct Solved<'a> {
         document: &'a rnl_view::Document,
         report: &'a rnl_cli::preview::Report,
     }
     serde_json::to_string(&Solved { document: &shown.document, report: &shown.report }).map_err(|e| e.to_string())
+}
+
+/// Solve a request: the JSON text of `{document, report}`. `peer` is the connection of the page, which is watched for the
+/// page going away, as a cancel is: the solve stops at its next level.
+pub fn solve(request: &Request, peer: &TcpStream) -> Result<String, String> {
+    let Prepared { entry, files, options } = prepare(request)?;
+    let stop = Arc::new(AtomicBool::new(false));
+    let clock = StoppableClock::new(stop.clone());
+    // the page going away is a cancel: asked at each level, without waiting for anything
+    let watch = |_: &Progress| {
+        if gone(peer) {
+            stop.store(true, Ordering::Relaxed);
+        }
+        !stop.load(Ordering::Relaxed)
+    };
+    let shown = preview(&entry, &files, &options, &clock, &watch)?;
+    solved_json(&shown)
+}
+
+/// Solve a prepared request and tell the page, on its connection, a line of JSON for each event of the solve as it
+/// happens, then the result, or the error. A line that cannot be written is the page gone, as its closing the connection
+/// is: the solve stops at its next step.
+pub fn stream(prepared: Prepared, out: &mut TcpStream) -> io::Result<()> {
+    let Prepared { entry, files, options } = prepared;
+    let stop = Arc::new(AtomicBool::new(false));
+    let clock = StoppableClock::new(stop.clone());
+    let out = RefCell::new(out);
+    let tell = |line: &str| -> io::Result<()> {
+        let mut out = out.borrow_mut();
+        out.write_all(line.as_bytes())?;
+        out.write_all(b"
+")?;
+        out.flush()
+    };
+    let sink = |event: &Event| {
+        let sent = serde_json::to_string(event).map_err(io::Error::other).and_then(|line| tell(&line));
+        if sent.is_err() || gone(&out.borrow()) {
+            stop.store(true, Ordering::Relaxed);
+        }
+        !stop.load(Ordering::Relaxed)
+    };
+    let end = match preview_progress(&entry, &files, &options, &clock, &sink).and_then(|shown| solved_json(&shown)) {
+        // (the document is already JSON: it is put in the line as it is)
+        Ok(result) => format!("{{\"result\":{result}}}"),
+        Err(message) => serde_json::json!({ "error": message }).to_string(),
+    };
+    tell(&end)
 }
 
 #[cfg(test)]
@@ -110,7 +173,7 @@ mod tests {
     }
 
     fn request(entry: &str, text: &str) -> Request {
-        Request { entry: entry.into(), files: BTreeMap::from([(entry.to_string(), text.to_string())]), pool: Vec::new(), options: String::new() }
+        Request { entry: entry.into(), files: BTreeMap::from([(entry.to_string(), text.to_string())]), pool: Vec::new(), options: String::new(), level: None, stream: false }
     }
 
     #[test]
@@ -142,6 +205,72 @@ mod tests {
         r.options = "no_such_option=1".into();
         let error = solve(&r, &server).unwrap_err();
         assert!(!error.is_empty());
+    }
+
+    /// The lines a streamed solve of `request` tells, read as the page reads them.
+    fn streamed(request: &Request) -> Vec<serde_json::Value> {
+        use std::io::Read;
+        let (mut client, mut server) = pair();
+        let prepared = prepare(request).unwrap();
+        // (on a thread: the answer is larger than the connection holds until it is read)
+        let writer = std::thread::spawn(move || stream(prepared, &mut server).unwrap());
+        let mut text = String::new();
+        client.read_to_string(&mut text).unwrap();
+        writer.join().unwrap();
+        text.lines().map(|line| serde_json::from_str(line).unwrap()).collect()
+    }
+
+    const HIERARCHY: &str = include_str!("../../../tests/conformance/cases/04-hierarchy.sp");
+
+    #[test]
+    fn a_streamed_solve_tells_its_events_and_then_the_result() {
+        let mut r = request("/top.sp", HIERARCHY);
+        r.stream = true;
+        let lines = streamed(&r);
+        assert_eq!(lines[0]["event"], "run");
+        assert_eq!(lines[0]["levels"], 2);
+        assert!(lines.iter().any(|l| l["event"] == "level"));
+        assert!(lines.iter().filter(|l| l["event"] == "level-done").count() >= 2);
+        let last = lines.last().unwrap();
+        assert!(last["result"]["document"]["levels"].as_array().is_some_and(|l| !l.is_empty()));
+        assert!(last["result"]["report"]["levels"].as_array().is_some());
+        // the events come before the result, which is the last line
+        assert_eq!(lines.iter().filter(|l| l.get("result").is_some()).count(), 1);
+    }
+
+    #[test]
+    fn a_level_given_by_its_title_is_the_only_one_solved() {
+        let mut r = request("/top.sp", HIERARCHY);
+        r.stream = true;
+        r.level = Some("amp".into());
+        let lines = streamed(&r);
+        assert_eq!(lines[0]["levels"], 1);
+        let titles: Vec<_> = lines.iter().filter(|l| l["event"] == "level").map(|l| l["title"].as_str().unwrap().to_string()).collect();
+        // (a file read as 0.2 is solved again as 0.3: the same level, told twice)
+        assert!(!titles.is_empty() && titles.iter().all(|t| t == "amp"), "{titles:?}");
+        assert!(lines.last().unwrap().get("result").is_some());
+        // an empty title is none
+        r.level = Some(String::new());
+        assert_eq!(streamed(&r)[0]["levels"], 2);
+    }
+
+    #[test]
+    fn a_solve_that_fails_after_its_first_line_ends_with_the_error() {
+        let mut r = request("/top.sp", HIERARCHY);
+        r.stream = true;
+        r.level = Some("no such level".into());
+        let lines = streamed(&r);
+        let last = lines.last().unwrap();
+        assert!(last["error"].as_str().is_some_and(|e| !e.is_empty()), "{last}");
+    }
+
+    #[test]
+    fn the_answer_to_a_request_without_stream_is_the_result_alone_and_takes_a_level() {
+        let (_client, server) = pair();
+        let mut r = request("/top.sp", HIERARCHY);
+        r.level = Some("amp".into());
+        let json: serde_json::Value = serde_json::from_str(&solve(&r, &server).unwrap()).unwrap();
+        assert_eq!(json["report"]["levels"].as_array().unwrap().len(), 1);
     }
 
     #[test]

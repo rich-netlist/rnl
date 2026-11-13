@@ -1043,8 +1043,8 @@ export default {
      * the text applied over them, are sent to it, and it gives the Document of the netlist as solved and the report,
      * as the desktop's Solve does, of the one level `settings.level` names or of every level. The service tells the
      * events of the solve (docs/solver-progress.md) as lines of JSON as they come, each to `onSolveProgress`'s
-     * handler, then the result (apps/web/solver-service.mjs); a service that does not stream, as the local program's
-     * does not yet, gives the result alone. Cancelling drops the request, and the service stops the solver.
+     * handler, then the result (apps/web/solver-service.mjs); a service that does not stream gives the result alone.
+     * Cancelling drops the request, and the service stops the solver.
      */
     async solve(_source, settings, edits) {
       const request = lastBuilt && builtRequests.get(lastBuilt);

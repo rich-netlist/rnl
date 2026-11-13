@@ -141,6 +141,33 @@ test("Solve runs in the program and shows its preview", async ({ page }) => {
   await expect(page.locator("#preview-badge")).toBeVisible();
 });
 
+test("Solve tells the page the events of the solve before its result, and solves the circuit shown by its title", async ({ page }) => {
+  // (what the page is told is read from a copy of its answer: the page reads the answer itself, and it is gone from the protocol)
+  await page.addInitScript(() => {
+    const fetched = window.fetch;
+    window.fetch = async (input, init) => {
+      const response = await fetched(input, init);
+      if (String(input).endsWith("/rnl-solver/solve")) {
+        window.__solve = { request: JSON.parse(init.body), type: response.headers.get("Content-Type"), text: response.clone().text() };
+      }
+      return response;
+    };
+  });
+  await open(page);
+  await page.evaluate(() => window.viewer.command("solve"));
+  await page.waitForFunction(() => document.body.classList.contains("preview") && !document.body.classList.contains("solving"), null, { timeout: 120000 });
+  const solve = await page.evaluate(async () => ({ ...window.__solve, text: await window.__solve.text }));
+  expect(solve.type).toMatch(/^application\/x-ndjson/);
+  const lines = solve.text.trim().split(/\r?\n/).map((line) => JSON.parse(line));
+  expect(lines[0].event).toBe("run");
+  expect(lines.some((l) => l.event === "level-done")).toBe(true);
+  expect(lines.at(-1).result.document.levels.length).toBeGreaterThan(0);
+  // the request names the circuit shown, which the program solves alone
+  expect(solve.request.stream).toBe(true);
+  expect(typeof solve.request.level).toBe("string");
+  expect(lines[0].levels).toBe(1);
+});
+
 test("the chooser lists the machine's files, goes up and in, and opens the one chosen", async ({ page }) => {
   await open(page);
   await page.evaluate(() => window.viewer.command("open"));

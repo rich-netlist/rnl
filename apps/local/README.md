@@ -29,7 +29,7 @@ A Chromium-family browser is opened as an application window (`--app`); Firefox 
 
 | | |
 | --- | --- |
-| Kept | Open by the path on the command line, and from a chooser that lists the machine's files (File › Open, Include File, Include Folder); **Save** and Save As write the file where it was read from, in the encoding it had, and ask first about a file that changed on disk (decision 0011); **Solve** with the core's own solver, in the program, on the machine's cores; a note when a file the page has read changes on disk (F5 reloads it); the settings in a file of the user's own. |
+| Kept | Open by the path on the command line, and from a chooser that lists the machine's files (File › Open, Include File, Include Folder); **Save** and Save As write the file where it was read from, in the encoding it had, and ask first about a file that changed on disk (decision 0011); **Solve** with the core's own solver, in the program, on the machine's cores, one circuit (`level`) or all of them, telling the page the events of the solve as they happen (`stream`, as lines of JSON: the page's progress panel); a note when a file the page has read changes on disk (F5 reloads it); the settings in a file of the user's own. |
 | Different | The core runs in the browser, as WebAssembly, as on the web: a big design is slower than in the desktop viewer, and bounded by the browser's memory. The menu bar is the page's own. |
 | Not there | Native file dialogs and menus (the page has its own chooser, whose last entry is the browser's), file associations, several windows of one program, the PATH folders of the Library (the web viewer's Include Folder takes their place) and the preloading of Library files. |
 
