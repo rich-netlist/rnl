@@ -165,6 +165,16 @@ fn write_in(request: &WriteRequest, files: Option<&dyn rnl_runtime::source::Prov
                     }
                 }
             }
+            Op::AddRule { action, .. } => {
+                if let Op::AddText { text, style, .. } = &**action {
+                    form::check_math_content(text, version).map_err(|e| Refusal::new(codes::EDIT_FIELD_INVALID, e))?;
+                    for (name, value) in style {
+                        if name == "textvisible" && !matches!(value, ops::Literal::Bool(_)) {
+                            return Err(Refusal::new(codes::EDIT_FIELD_INVALID, "textvisible requires a 0.4 boolean"));
+                        }
+                    }
+                }
+            }
             Op::DefineSymbol { pins, .. } => {
                 for pin in pins {
                     if let Some(label) = &pin.label {
@@ -250,6 +260,9 @@ fn write_in(request: &WriteRequest, files: Option<&dyn rnl_runtime::source::Prov
     // hides no style of a level above it (6.8) and each level reads the same on its own
     let mut styles: BTreeMap<LevelId, Vec<(Vec<String>, String, String)>> = BTreeMap::new();
     let mut next_style = 1;
+    // the rules of each level: the same selection with the same action is written once, where it
+    // first comes
+    let mut rules: BTreeMap<LevelId, std::collections::BTreeSet<String>> = BTreeMap::new();
     for (k, lop) in ops.iter().enumerate() {
         if let Op::UsePackage { name, version, path } = &lop.op {
             let p = form::use_package(name, version.as_deref(), path.as_deref());
@@ -277,11 +290,16 @@ fn write_in(request: &WriteRequest, files: Option<&dyn rnl_runtime::source::Prov
             }
             _ => None,
         };
-        levels.entry(level).or_default().extend(if version == "0.4" {
+        let mut written = if version == "0.4" {
             form::statements_for_language(&lop.op, style.as_deref(), None, true)
         } else {
             form::statements(&lop.op, style.as_deref())
-        });
+        };
+        if matches!(lop.op, Op::AddRule { .. }) {
+            let seen = rules.entry(level).or_default();
+            written.retain(|statement| seen.insert(statement.clone()));
+        }
+        levels.entry(level).or_default().extend(written);
         first_op.entry(level).or_insert(k);
     }
     // a record goes at the end of a level, or before a region written to be encrypted that the end

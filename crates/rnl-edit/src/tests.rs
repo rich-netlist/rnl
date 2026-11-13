@@ -1329,3 +1329,95 @@ fn terminals_need_the_language_0_4_a_symbol_and_pairs() {
         .clone();
     assert!(write(&req).unwrap_err().contains("needs a `symbol`"));
 }
+
+/// A rule (10.4) of the editor interface: `add-rule` writes one `# @SELECT-… => @TEXT(…)` statement,
+/// which draws its text on what it selects, in the level it is written in and the levels below.
+fn rule(level: &str, kind: &str, params: Value, key: &str) -> Value {
+    json!({"level": level, "op": "add-rule", "select": {"kind": kind, "params": params},
+           "action": {"op": "add-text", "markup": "", "key": key}})
+}
+
+#[test]
+fn a_rule_is_written_as_one_select_and_one_text_and_reads_back() {
+    let net = "* rule
+R1 a b 1k
+C1 a b 1n
+.end
+";
+    let ops = json!([
+        rule("file", "instance", json!({"name": "R*"}), "name"),
+        {"level": "file", "op": "add-rule", "select": {"kind": "usage"},
+         "action": {"op": "add-text", "markup": "x", "key": "value", "halign": "end", "offset": [1, -2], "size": 1.5}}
+    ]);
+    let mut req = request("spice", net, ops);
+    assert!(write(&req).unwrap_err().contains("language_version 0.4"));
+    req.language_version = Some("0.4".into());
+    let out = write(&req).unwrap();
+    assert!(out.contains("# @SELECT-INSTANCE(name=\"R*\") => @TEXT(\"\", key=\"name\")"), "{out}");
+    assert!(
+        out.contains("# @SELECT-USAGE => @TEXT(\"x\", key=\"value\", dx=1, dy=-2, halign=\"end\", size=1.5)"),
+        "{out}"
+    );
+    // both devices are drawn with a symbol that labels their names: the rule empties the resistor's
+    let symbol = r#"* @RNL {
+* $S = @DEFINE-SYMBOL { ? @TEXT("old", key="name") => @PLACE(2,3) };
+* {#R1 #C1} @SET-SYMBOL $S => @PLACE(10,20)
+* }
+.end"#;
+    let out = out.replace(".end", symbol);
+    let files = MemoryProvider::new().with(entry("spice"), &out);
+    let r = rnl_view::interpret(entry("spice"), Some("spice"), &files, &Options { std: false, ..Options::default() })
+        .unwrap();
+    assert!(!r.diagnostics().iter().any(|d| d.severity == Severity::Error), "{out}");
+    let markup = |id: &str| r.model.levels[0].texts.iter().find(|t| t.object_id == id).map(|t| t.markup.clone());
+    assert_eq!(markup("#R1::name").as_deref(), Some(""), "{out}");
+    assert_eq!(markup("#C1::name").as_deref(), Some("old"), "the rule selects the resistors only: {out}");
+}
+
+#[test]
+fn the_same_rule_of_a_level_is_written_once_where_it_first_comes() {
+    let ops = json!([
+        rule("subckt:rc_lowpass", "instance", json!({"name": "R*"}), "name"),
+        rule("subckt:rc_lowpass", "instance", json!({"name": "C*"}), "name"),
+        rule("subckt:rc_lowpass", "instance", json!({"name": "R*"}), "name"),
+        rule("file", "instance", json!({"name": "R*"}), "name"),
+    ]);
+    let mut req = request("spice", RC, ops);
+    req.language_version = Some("0.4".into());
+    let out = write(&req).unwrap();
+    let rule_r = "# @SELECT-INSTANCE(name=\"R*\") => @TEXT(\"\", key=\"name\")";
+    assert_eq!(out.matches(rule_r).count(), 2, "once in the subcircuit, once at the file level: {out}");
+    assert!(out.find(rule_r).unwrap() < out.find("name=\"C*\"").unwrap(), "{out}");
+}
+
+#[test]
+fn a_rule_needs_a_kind_a_single_text_without_a_place_and_the_language_0_4() {
+    let mut req = request("spice", RC, json!([]));
+    req.language_version = Some("0.4".into());
+    let refused = |req: &mut WriteRequest, op: Value| {
+        req.ops = vec![op];
+        write(req).unwrap_err()
+    };
+    let base = || rule("subckt:rc_lowpass", "net", json!({}), "name");
+    let mut with = |field: &str, value: Value| {
+        let mut op = base();
+        op[field] = value;
+        refused(&mut req, op)
+    };
+    assert!(with("select", json!({"kind": "wire"})).contains("`select`"));
+    assert!(with("select", json!({"params": {}})).contains("`select`"));
+    assert!(with("select", json!({"kind": "net", "params": {"name": [1]}})).contains("condition `name`"));
+    assert!(with("select", json!({"kind": "net", "params": {"na me": "x"}})).contains("condition `na me`"));
+    assert!(with("select", json!({"kind": "net", "params": {"name": "a\nb"}})).contains("condition `name`"));
+    assert!(with("select", json!({"kind": "net", "extra": 1})).contains("unknown field `extra`"));
+    assert!(with("select", Value::Null).contains("`select` is missing"));
+    assert!(with("action", Value::Null).contains("`action` is missing"));
+    assert!(with("action", json!([{"op": "add-text", "markup": ""}])).contains("`action`"));
+    assert!(with("action", json!({"op": "set", "object": "#R1"})).contains("`action`"));
+    assert!(with("action", json!({"op": "add-text", "markup": "", "attach": "#R1"})).contains("takes no `attach`"));
+    assert!(with("action", json!({"op": "add-text", "markup": "", "at": [0, 0]})).contains("takes no `at`"));
+    assert!(with("action", json!({"op": "add-text", "markup": "", "name": "%t"})).contains("takes no `name`"));
+    assert!(with("action", json!({"op": "add-text"})).contains("action:"));
+    assert!(with("action", json!({"op": "add-text", "markup": "", "size": "big"})).contains("action:"));
+    assert!(with("extra", json!(1)).contains("unknown field `extra`"));
+}

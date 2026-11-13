@@ -9,6 +9,12 @@ export const pins: SymbolPin[] = [
 ];
 export const endpoint: Vertex = { owner: "#R1", pin: 2, reference: "#R1::free" };
 export const text: Op = { op: "add-text", level: "file", attach: "#R1", markup: "R", fix_rotate: true };
+export const rule: Op = {
+  op: "add-rule",
+  level: "file",
+  select: { kind: "instance", params: { name: "R*" } },
+  action: { op: "add-text", markup: "", key: "name" },
+};
 export const request: WriteRequest = {
   write: {
     language_version: "0.4",
@@ -41,6 +47,9 @@ export const missingReference: Vertex = { owner: "#R1", pin: 2 };
 export const wrongFlag: Op = { op: "add-text", markup: "R", fix_rotate: "true" };
 // @ts-expect-error edit role collections contain ids or points, not nested collections
 export const nestedRole: Op = { op: "add-usage", definition: "$D", attach: { members: [["#R1"]] } };
+
+// @ts-expect-error a rule's text goes on what it selects, so it takes no place of its own
+export const placedRule: Op = { op: "add-rule", level: "file", select: { kind: "net" }, action: { op: "add-text", markup: "", attach: "#R1" } };
 
 export function write(core: Core) {
   core.write(released);

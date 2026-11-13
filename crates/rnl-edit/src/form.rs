@@ -281,6 +281,32 @@ fn pin(p: &PinOp) -> String {
     written
 }
 
+/// The `@TEXT(…)` of an add-text op: what it says and how it is drawn.
+fn text_call(op: &Op) -> String {
+    let Op::AddText { key, text, offset, halign, valign, rotate, fix_rotate, upright, size, style, .. } = op else {
+        unreachable!("a text call is written for an add-text")
+    };
+    let mut params = vec![quote(&content(text))];
+    params.extend(key.iter().map(|k| format!("key={}", quote(k))));
+    if let Some([dx, dy]) = offset {
+        params.push(format!("dx={}, dy={}", num(*dx), num(*dy)));
+    }
+    // What a text without a key starts from is the default alignment and no rotation, so a
+    // value equal to it is left out. A text with a key is the sub-object `object::key`, which
+    // starts from what the symbol of the object writes for that key and which later
+    // statements override parameter by parameter (13.3, 8.4): a value left out there is the
+    // symbol's, not the default, so it is written as given.
+    let keyed = key.is_some();
+    params.extend(halign.iter().filter(|h| keyed || *h != "start").map(|h| format!("halign={}", quote(h))));
+    params.extend(valign.iter().filter(|v| keyed || *v != "baseline").map(|v| format!("valign={}", quote(v))));
+    params.extend(rotate.iter().filter(|r| keyed || **r != 0.0).map(|r| format!("rotate={}", num(*r))));
+    params.extend(fix_rotate.iter().map(|fixed| format!("fix_rotate={fixed}")));
+    params.extend(upright.iter().map(|value| format!("upright={value}")));
+    params.extend(size.iter().map(|s| format!("size={}", num(*s))));
+    params.extend(style.iter().map(|(k, v)| format!("{k}={}", literal(v))));
+    format!("@TEXT({})", params.join(", "))
+}
+
 /// The facts of a position: `@PLACE` and `@ORIENT`. An orientation given is written, R0 too: without
 /// an ORIENT the orientation is the solver's to choose (11.2), not R0.
 fn placed(at: &Option<Point>, orient: &Option<String>) -> Vec<String> {
@@ -376,40 +402,8 @@ pub(crate) fn statements_for_language(
                 None => wire,
             }]
         }
-        Op::AddText {
-            name,
-            attach,
-            key,
-            text,
-            at,
-            offset,
-            halign,
-            valign,
-            rotate,
-            fix_rotate,
-            upright,
-            size,
-            style,
-        } => {
-            let mut params = vec![quote(&content(text))];
-            params.extend(key.iter().map(|k| format!("key={}", quote(k))));
-            if let Some([dx, dy]) = offset {
-                params.push(format!("dx={}, dy={}", num(*dx), num(*dy)));
-            }
-            // What a text without a key starts from is the default alignment and no rotation, so a
-            // value equal to it is left out. A text with a key is the sub-object `object::key`, which
-            // starts from what the symbol of the object writes for that key and which later
-            // statements override parameter by parameter (13.3, 8.4): a value left out there is the
-            // symbol's, not the default, so it is written as given.
-            let keyed = key.is_some();
-            params.extend(halign.iter().filter(|h| keyed || *h != "start").map(|h| format!("halign={}", quote(h))));
-            params.extend(valign.iter().filter(|v| keyed || *v != "baseline").map(|v| format!("valign={}", quote(v))));
-            params.extend(rotate.iter().filter(|r| keyed || **r != 0.0).map(|r| format!("rotate={}", num(*r))));
-            params.extend(fix_rotate.iter().map(|fixed| format!("fix_rotate={fixed}")));
-            params.extend(upright.iter().map(|value| format!("upright={value}")));
-            params.extend(size.iter().map(|s| format!("size={}", num(*s))));
-            params.extend(style.iter().map(|(k, v)| format!("{k}={}", literal(v))));
-            let text = format!("@TEXT({})", params.join(", "));
+        Op::AddText { name, attach, at, .. } => {
+            let text = text_call(op);
             let mut out = match (attach, at) {
                 (Some(o), Some(p)) => format!("{o} {text} => @PLACE{}", point(*p)),
                 (Some(o), None) => format!("{o} {text}"),
@@ -420,6 +414,13 @@ pub(crate) fn statements_for_language(
                 out = format!("{out} => {n}");
             }
             vec![out]
+        }
+        // a rule (10.4): the selection of the kind with its conditions, then the text it draws on each
+        // of the objects selected
+        Op::AddRule { select, params, action } => {
+            let params: Vec<String> = params.iter().map(|(k, v)| format!("{k}={}", literal(v))).collect();
+            let params = if params.is_empty() { String::new() } else { format!("({})", params.join(", ")) };
+            vec![format!("# @SELECT-{}{params} => {}", select.to_uppercase(), text_call(action))]
         }
         // several items are one set, whose members are added or removed (5.2.2)
         Op::Membership { add, items, set } => {

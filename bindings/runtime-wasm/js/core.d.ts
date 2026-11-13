@@ -144,6 +144,31 @@ export interface RunStyle {
   overline: boolean;
 }
 
+/** An `add-text` op; `level` and the rest come with the op. */
+export interface AddText {
+  op: "add-text";
+  name?: string;
+  attach?: string;
+  key?: string;
+  markup?: string;
+  lines?: Run[][];
+  at?: Point;
+  offset?: Point;
+  /**
+   * `halign`, `valign` and `rotate` are written as given for a text with a `key`, whose value
+   * left out is the one its symbol gives that key (13.3). For a text without a key, a value
+   * equal to the default (`"start"`, `"baseline"`, 0) is left out.
+   */
+  halign?: string;
+  valign?: string;
+  rotate?: number;
+  /** RNL 0.4: keep the glyph direction while the box side follows the object. */
+  fix_rotate?: boolean;
+  upright?: boolean;
+  size?: number;
+  style?: Record<string, Literal>;
+}
+
 /**
  * An op of an edit transaction, as the editor interface draft writes them (4.1): those the writer
  * writes so far. `level` is `subckt:NAME` or `file:PATH`; a `use-package` goes into the header
@@ -196,28 +221,21 @@ export type Op = { level?: string } & (
     }
   | { op: "add-point"; name: string; at: Point; junction?: boolean }
   | { op: "add-wire"; name?: string; nets: string[]; via: Vertex[]; mode?: string; style?: Record<string, Literal> }
+  | AddText
   | {
-      op: "add-text";
-      name?: string;
-      attach?: string;
-      key?: string;
-      markup?: string;
-      lines?: Run[][];
-      at?: Point;
-      offset?: Point;
       /**
-       * `halign`, `valign` and `rotate` are written as given for a text with a `key`, whose value
-       * left out is the one its symbol gives that key (13.3). For a text without a key, a value
-       * equal to the default (`"start"`, `"baseline"`, 0) is left out.
+       * RNL 0.4: a rule that draws a text on what a selection selects, in the level and the levels
+       * below it (10.4), written `# @SELECT-INSTANCE(name="R*") => @TEXT("", key="name")`. One
+       * action only, an `add-text` with no `attach`, `at`, `name` or `level`. The same rule twice in
+       * a level is written once.
        */
-      halign?: string;
-      valign?: string;
-      rotate?: number;
-      /** RNL 0.4: keep the glyph direction while the box side follows the object. */
-      fix_rotate?: boolean;
-      upright?: boolean;
-      size?: number;
-      style?: Record<string, Literal>;
+      op: "add-rule";
+      select: {
+        kind: "instance" | "usage" | "terminal" | "net";
+        /** Conditions, in the order given, such as `{ name: "R*" }`. */
+        params?: Record<string, Literal>;
+      };
+      action: Omit<AddText, "attach" | "at" | "name">;
     }
   | { op: "add-to" | "remove-from"; items: string[]; set: string }
   | { op: "use-package"; name: string; version?: string; path?: string }

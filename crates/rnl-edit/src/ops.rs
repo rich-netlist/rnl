@@ -72,6 +72,10 @@ pub enum Op {
         size: Option<f64>,
         style: Vec<(String, Literal)>,
     },
+    /// A rule (10.4) that adds a text to what a selection selects, in every level below its own: the
+    /// `kind` of the selection (`instance`, `usage`, `terminal` or `net`), its conditions in the
+    /// order given, and the one action, an `AddText` that has neither `attach`, `at` nor `name`.
+    AddRule { select: String, params: Vec<(String, Literal)>, action: Box<Op> },
     /// ADD-TO or REMOVE-FROM a set (10.5).
     Membership { add: bool, items: Vec<String>, set: String },
     /// A package at the root, in the header record (16.3).
@@ -90,6 +94,7 @@ impl Op {
             Op::AddPoint { .. } => "add-point",
             Op::AddWire { .. } => "add-wire",
             Op::AddText { .. } => "add-text",
+            Op::AddRule { .. } => "add-rule",
             Op::Membership { add: true, .. } => "add-to",
             Op::Membership { add: false, .. } => "remove-from",
             Op::UsePackage { .. } => "use-package",
@@ -255,6 +260,7 @@ pub(crate) fn parse_for_language(k: usize, value: &Value, modern: bool) -> Resul
             "size",
             "style",
         ],
+        "add-rule" => &["select", "action"],
         "add-to" | "remove-from" => &["items", "set"],
         "use-package" => &["name", "version", "path"],
         "add-shape" => &["name", "shape", "points", "params", "style", "layer"],
@@ -419,6 +425,13 @@ pub(crate) fn parse_for_language(k: usize, value: &Value, modern: bool) -> Resul
                 style: r.style()?,
             }
         }
+        "add-rule" => {
+            if !modern {
+                return Err(fail(codes::EDIT_FIELD_INVALID, kind, "requires language_version 0.4".into()));
+            }
+            let (select, params) = r.select()?;
+            Op::AddRule { select, params, action: Box::new(r.rule_action(modern)?) }
+        }
         "add-to" | "remove-from" => {
             Op::Membership { add: kind == "add-to", items: r.strings("items")?, set: r.string("set")? }
         }
@@ -447,6 +460,100 @@ impl Reader<'_> {
             None | Some(Value::Null) => Ok(None),
             Some(Value::String(s)) => Ok(Some(s.clone())),
             Some(_) => Err(self.fail(f, "is not a string")),
+        }
+    }
+
+    /// The selection of a rule: `{"kind": "instance" | "usage" | "terminal" | "net", "params": {…}}`,
+    /// each condition a string without a line break, a number or a boolean, named by an identifier.
+    fn select(&self) -> Result<(String, Vec<(String, Literal)>), Refusal> {
+        let sel = match self.obj.get("select") {
+            None | Some(Value::Null) => {
+                return Err(Refusal::new(
+                    codes::EDIT_FIELD_MISSING,
+                    format!("op {} ({}): `select` is missing", self.k, self.kind),
+                ))
+            }
+            Some(Value::Object(o)) => o,
+            Some(_) => return Err(self.fail("select", "is not an object")),
+        };
+        if let Some(f) = sel.keys().find(|f| *f != "kind" && *f != "params") {
+            return Err(self.fail("select", &format!("has an unknown field `{f}`")));
+        }
+        let kind = match sel.get("kind").and_then(Value::as_str) {
+            Some(k @ ("instance" | "usage" | "terminal" | "net")) => k.to_string(),
+            _ => return Err(self.fail("select", "needs a `kind`: instance, usage, terminal or net")),
+        };
+        let params = match sel.get("params") {
+            None | Some(Value::Null) => Vec::new(),
+            Some(Value::Object(map)) => map
+                .iter()
+                .map(|(name, v)| {
+                    let identifier = name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+                        && name.chars().next().is_some_and(|c| !c.is_ascii_digit());
+                    let lit = match v {
+                        Value::String(s) if !s.contains(['\n', '\r']) => Some(Literal::Str(s.clone())),
+                        Value::Bool(b) => Some(Literal::Bool(*b)),
+                        Value::Number(n) => n.as_f64().map(Literal::Num),
+                        _ => None,
+                    };
+                    match lit {
+                        Some(lit) if identifier => Ok((name.clone(), lit)),
+                        _ => Err(self.fail(
+                            "select",
+                            &format!("condition `{name}` is not an identifier with a string without a line break, a number or a boolean"),
+                        )),
+                    }
+                })
+                .collect::<Result<_, _>>()?,
+            Some(_) => return Err(self.fail("select", "has `params` that is not an object")),
+        };
+        Ok((kind, params))
+    }
+
+    /// The action of a rule: one `add-text` that says what the text is and how it is drawn, and
+    /// has no place of its own: it goes on what the rule selects.
+    fn rule_action(&self, modern: bool) -> Result<Op, Refusal> {
+        let action = match self.obj.get("action") {
+            None | Some(Value::Null) => {
+                return Err(Refusal::new(
+                    codes::EDIT_FIELD_MISSING,
+                    format!("op {} ({}): `action` is missing", self.k, self.kind),
+                ))
+            }
+            Some(Value::Object(a)) if a.get("op").and_then(Value::as_str) == Some("add-text") => a,
+            Some(_) => return Err(self.fail("action", "is not one add-text op, as an object")),
+        };
+        if let Some(f) = ["attach", "at", "name", "level"].iter().find(|f| action.contains_key(**f)) {
+            return Err(self.fail("action", &format!("takes no `{f}`: its text goes on what the rule selects")));
+        }
+        // read as an add-text at a place, which the rule has no use for
+        let mut text = action.clone();
+        text.insert("level".into(), Value::String("file".into()));
+        text.insert("at".into(), Value::Array(vec![Value::from(0), Value::from(0)]));
+        let read = parse_for_language(self.k, &Value::Object(text), modern).map_err(|e| {
+            let prefix = format!("op {} (add-text): ", self.k);
+            let rest = e.message.strip_prefix(&prefix).unwrap_or(&e.message).to_string();
+            Refusal { message: format!("op {} ({}): action: {rest}", self.k, self.kind), ..e }
+        })?;
+        match read.op {
+            Op::AddText { key, text, offset, halign, valign, rotate, fix_rotate, upright, size, style, .. } => {
+                Ok(Op::AddText {
+                    name: None,
+                    attach: None,
+                    key,
+                    text,
+                    at: None,
+                    offset,
+                    halign,
+                    valign,
+                    rotate,
+                    fix_rotate,
+                    upright,
+                    size,
+                    style,
+                })
+            }
+            _ => unreachable!("the action is an add-text"),
         }
     }
 
