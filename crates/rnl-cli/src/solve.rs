@@ -294,6 +294,26 @@ impl Clock for WallClock {
     }
 }
 
+/// The time a step takes, for the report: none on WebAssembly, which has no clock of its own; a
+/// solve there is measured on the clock its caller gives.
+pub(crate) struct Stopwatch(#[cfg(not(target_arch = "wasm32"))] Instant);
+
+impl Stopwatch {
+    pub(crate) fn start() -> Stopwatch {
+        Stopwatch(
+            #[cfg(not(target_arch = "wasm32"))]
+            Instant::now(),
+        )
+    }
+
+    pub(crate) fn elapsed(&self) -> Duration {
+        #[cfg(not(target_arch = "wasm32"))]
+        return self.0.elapsed();
+        #[cfg(target_arch = "wasm32")]
+        Duration::ZERO
+    }
+}
+
 /// The files given by another provider, with the paths of those it gave noted.
 pub(crate) struct Noting<'a> {
     pub(crate) files: &'a dyn Provider,
@@ -666,7 +686,7 @@ fn pass(
             .find(|p| p.level == level && p.title == title)
             .ok_or_else(|| format!("the level {title} is not read again after the levels before it were solved"))?;
         watch(Mark::Problem(&options.solver.for_problem(p).0));
-        let start = Instant::now();
+        let start = Stopwatch::start();
         let BackendResult { solved, author, report_available } = backend(p, &options.solver)?;
         let time = start.elapsed();
         let hash = sig2(p, solved.report.canonical_options.as_deref().unwrap_or(&canonical));

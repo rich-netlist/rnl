@@ -12,6 +12,7 @@ members = [
     "crates/rnl-solver-cli",
     "crates/rnl-cli",
     "bindings/runtime-wasm",
+    "bindings/solver-wasm",
 ]
 
 [workspace.package]

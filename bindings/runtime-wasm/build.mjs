@@ -2,14 +2,16 @@
 // viewer copies:
 //
 //   node bindings/runtime-wasm/build.mjs [--features LIST] [--out DIR] [--packages DIR]
-//                                        [--name NAME] [--version VERSION]
+//                                        [--name NAME] [--version VERSION] [--solver]
 //
 // --features passes cargo features on, such as test-panic for the tests; --out puts the result into
 // DIR instead. The module is built with the workspace's `wasm` profile. --packages brings the .rnl
 // files of DIR with the build: packages.js lists them, and the Worker gives them to every request.
 // --name and --version go into the package.json, for a frontend that links the result as a package
 // or for npm (publish-runtime.yml publishes it as @rich-netlist/runtime): a named package is not
-// private, and has the README of packages/runtime and the licenses of what it holds.
+// private, and has the README of packages/runtime and the licenses of what it holds. --solver
+// also builds the solver's module of its own (bindings/solver-wasm), rnl_solver_wasm.wasm, with
+// solver.js to load it, for a page to load only when it solves.
 
 import { execFileSync } from "node:child_process";
 import { copyFileSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -19,17 +21,19 @@ import { gzipSync } from "node:zlib";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const usage =
-  "usage: node bindings/runtime-wasm/build.mjs [--features LIST] [--out DIR] [--packages DIR] [--name NAME] [--version VERSION]";
+  "usage: node bindings/runtime-wasm/build.mjs [--features LIST] [--out DIR] [--packages DIR] [--name NAME] [--version VERSION] [--solver]";
 
 let out = join(here, "dist");
 const features = [];
 let packages = null;
+let solver = false;
 const manifest = {};
 const args = process.argv.slice(2);
 for (let k = 0; k < args.length; k++) {
   if (args[k] === "--out" && k + 1 < args.length) out = resolve(args[++k]);
   else if (args[k] === "--features" && k + 1 < args.length) features.push("--features", args[++k]);
   else if (args[k] === "--packages" && k + 1 < args.length) packages = resolve(args[++k]);
+  else if (args[k] === "--solver") solver = true;
   else if ((args[k] === "--name" || args[k] === "--version") && k + 1 < args.length) manifest[args[k].slice(2)] = args[++k];
   else {
     console.error(usage);
@@ -93,3 +97,11 @@ const bytes = readFileSync(wasm);
 const size = (n) => `${n} bytes (${(n / 1024).toFixed(0)} KiB)`;
 console.log(`${out}`);
 console.log(`rnl_runtime_wasm.wasm: ${size(bytes.length)}, ${size(gzipSync(bytes, { level: 9 }).length)} gzip-compressed`);
+if (solver) {
+  cargo(["build", "--profile", "wasm", "--target", "wasm32-unknown-unknown", "-p", "rnl-solver-wasm"], { stdio: "inherit" });
+  const built = join(metadata.target_directory, "wasm32-unknown-unknown", "wasm", "rnl_solver_wasm.wasm");
+  copyFileSync(built, join(out, "rnl_solver_wasm.wasm"));
+  copyFileSync(join(here, "..", "solver-wasm", "js", "solver.js"), join(out, "solver.js"));
+  const solverBytes = readFileSync(built);
+  console.log(`rnl_solver_wasm.wasm: ${size(solverBytes.length)}, ${size(gzipSync(solverBytes, { level: 9 }).length)} gzip-compressed`);
+}

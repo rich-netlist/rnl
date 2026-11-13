@@ -264,7 +264,7 @@ pub struct Completion {
     pub elapsed: std::time::Duration,
 }
 pub fn complete_record(ctx: &Context<'_>, written: &Written) -> Result<Completion, String> {
-    let start = std::time::Instant::now();
+    let start = crate::solve::Stopwatch::start();
     if !written.unsolved.is_empty() {
         return Err("first-pass decisions could not all be written".into());
     }

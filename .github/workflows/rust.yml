@@ -186,6 +186,10 @@ jobs:
           cargo build -p rnl-runtime-wasm --example solver_parity
           cargo build -p rnl-runtime-wasm --example solver_parity --target wasm32-unknown-unknown
           node bindings/runtime-wasm/tests/solver-equality.mjs target/debug/examples/solver_parity target/wasm32-unknown-unknown/debug/examples/solver_parity.wasm
+      - name: Solve through the solver's WebAssembly module
+        run: |
+          cargo build -p rnl-solver-wasm --target wasm32-unknown-unknown
+          node bindings/solver-wasm/tests/solve.mjs target/wasm32-unknown-unknown/debug/rnl_solver_wasm.wasm
       - name: Native and WebAssembly builds give identical Documents and snapshots
         run: |
           node bindings/runtime-wasm/tests/overlays.mjs

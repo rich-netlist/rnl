@@ -476,6 +476,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "rnl-solver-wasm"
+version = "0.5.5"
+dependencies = [
+ "rnl-cli",
+ "rnl-runtime",
+ "rnl-solver",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "rnl-view"
 version = "0.5.5"
 dependencies = [
