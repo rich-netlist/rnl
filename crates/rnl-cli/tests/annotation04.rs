@@ -253,6 +253,7 @@ fn editor_set_position_writes_literal_annotation_anchor() {
     let op = rnl_edit::Op::Set {
         object: "%a::position".into(),
         symbol: None,
+        terminals: vec![],
         style: vec![],
         at: Some([6.0, 7.0]),
         orient: None,
