@@ -324,7 +324,12 @@ fn defaults(before: &Interpretation, after: &Interpretation) -> BTreeMap<String,
         let set: BTreeSet<String> = names(problem)
             .into_iter()
             .zip(&problem.objects)
-            .filter(|(name, object)| !known.contains(name) && (object.generated || usages.contains(name)))
+            .filter(|(name, object)| {
+                // Made in the body of another usage (`$MATCHED` inside `$DIFFERENTIAL_PAIR_N`) is the
+                // definition's expansion, as a rule's is.
+                let in_body = object.usage.and_then(|u| problem.usages.get(u)).is_some_and(|u| u.parent.is_some());
+                !known.contains(name) && (object.generated || in_body || usages.contains(name))
+            })
             .map(|(name, _)| name)
             .collect();
         out.insert(problem.title.clone(), set);
@@ -549,6 +554,10 @@ fn snapshot(read: &Interpretation, added: &BTreeMap<String, BTreeSet<String>>) -
             // Whether the ROUTE is an already resolved tree only says how a version of the
             // language wrote it; the net, the hint and the pins are what it asks for, and asking
             // twice for the same is asking once.
+            // A net with fewer than two pins has nothing to join: the ROUTE is a no-op.
+            if route.pins.len() < 2 {
+                continue;
+            }
             let pins = points(&names, &route.pins);
             let key = format!("{} {pins}", route.net);
             if asked.insert(key.clone()) {
@@ -613,8 +622,19 @@ pub(super) fn compare(
             || old.as_ref().is_some_and(|old| is_fill(default.unwrap_or(&no_ids), &category, &item, old));
         let only_look = only_look || package_text || fill;
         let ids = rules.get(&level).unwrap_or(&no_ids);
+        // The upgrade writes a default that 0.3 had by itself (`@ATTACH(gap=2)`) as a parameter,
+        // so that the drawing stays: the object is the same but for parameters it did not list.
+        let explicit_default = category == "objects"
+            && old.as_ref().is_some_and(|old| {
+                let (mut a, mut b) = (old.clone(), value.clone());
+                let listed = a["parameters"] == "[]" && b["parameters"] != "[]";
+                a["parameters"] = Value::Null;
+                b["parameters"] = Value::Null;
+                listed && a == b
+            });
         let by_rule_here = !only_look
-            && about(ids, &item, &format!("{}{}", old.as_ref().map_or(String::new(), Value::to_string), value));
+            && (explicit_default
+                || about(ids, &item, &format!("{}{}", old.as_ref().map_or(String::new(), Value::to_string), value)));
         let difference = Difference { file, level, category, item, before: old, after: Some(value) };
         if only_look {
             look.push(difference);
