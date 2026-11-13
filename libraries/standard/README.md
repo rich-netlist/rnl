@@ -81,6 +81,15 @@ Every symbol writes its box (`box=[x1, y1, x2, y2]`): on any side that has pins,
 
 The series 0.4 is written in the language 0.4, whose text is still a draft, and is bundled so that the files of 0.4 can be read while the toolkit takes in the rules of 0.4 one by one. Every package is version 0.4. Its fifteen files hold one collection package, [`rnl-std-all`](0.4/rnl-std-all.rnl) (replacing `rnl-std`, `rnl-std-core` and `rnl-std-full`), [`rnl-std-semantics`](0.4/rnl-std-semantics.rnl) for circuit-structure and layout definitions (replacing `rnl-std-structures`), [`alias-zh`](0.4/alias-zh.rnl) for Chinese aliases (replacing `rnl-zh`), the optional [`rnl-std-no-labels`](0.4/rnl-std-no-labels.rnl) and [`rnl-std-45deg`](0.4/rnl-std-45deg.rnl) (45-degree symbols and diagonal arrow marks), and the ten sub-packages `rnl-std-all` brings in (`rnl-std-style`, `rnl-std-basic`, `rnl-std-semiconductors`, `rnl-std-spice` or `rnl-std-spectre` for the dialect, `rnl-std-fill`, `rnl-std-semantics`, `rnl-std-functional`, `rnl-std-rf`, `rnl-std-logic` and `rnl-std-signal-flow`). It has more structures than the series 0.3, and some names of 0.3 are gone or split, such as `$CHAIN`, `$DIFFERENTIAL_PAIR` into `$DIFFERENTIAL_PAIR_N` and `$DIFFERENTIAL_PAIR_P`, and `$CURRENT_MIRROR` into `$CURRENT_MIRROR_N` and `$CURRENT_MIRROR_P`; until the toolkit reads all of 0.4, a file that uses it gets the errors of the statements of 0.4 it does not read yet. A file of 0.4 uses no package implicitly and names `rnl-std-all` or individual sub-packages in its header record (16.3). 0.4 is newer than the toolkit's default version, 0.3, so the files of 0.2 and 0.3 do not find its packages without naming the version, `version="0.4"`, and the catalog keeps the series 0.3 (or 0.2) for shared package names unless it is asked for every version (16.2). The project site does not show it until the standard 0.4 is published.
 
+**Names in the series 0.4.**
+
+- A definition whose body only places, with no assertion and no routing, says nothing about the circuit, and its name ends in `_LAYOUT`, such as `$MIRRORED_LAYOUT` and `$MIRRORED_VERTICAL_LAYOUT`. Every other structure states a fact of the circuit and may carry a default drawing as well.
+- `_N` and `_P` at the end of a structure name state the polarity of its transistors, and the structure asserts it for the transistors whose type is known:
+  - `_N`: NMOS, NPN, or an n-channel JFET or MESFET;
+  - `_P`: PMOS, PNP or lateral PNP, or a p-channel JFET or MESFET.
+
+  These are `$DIFFERENTIAL_PAIR_N`, `$CURRENT_MIRROR_N`, `$CASCODE_CURRENT_MIRROR_N` and their `_P` twins, which also draw the n-type with its sources or emitters down and the p-type with them up.
+
 ### Renamed, merged, split and removed in 0.4
 
 `rnl upgrade`, which the core 0.5.x provides, rewrites files of 0.3 and 0.2 by this list. Where the table says *manual*, it reports the place and leaves the text as it was.
@@ -91,7 +100,7 @@ The series 0.4 is written in the language 0.4, whose text is still a draft, and 
 |---|---|
 | `rnl-std` (collection) | `rnl-std-all`, the one collection; it has a header record for each host language |
 | `rnl-std-core`, `rnl-std-full` (collections) | removed: use `rnl-std-all`, or name the packages one by one |
-| `rnl-std-structures` | `rnl-std-semantics` (`$MATCHED`, `$BRANCH`, `$CASCADE`, `$MIRRORED`, `$FLOW` move with it) |
+| `rnl-std-structures` | `rnl-std-semantics` (`$MATCHED`, `$BRANCH`, `$CASCADE`, `$FLOW` move with it, and `$MIRRORED` as `$MIRRORED_LAYOUT`) |
 | — | new, optional, not in `rnl-std-all`: `rnl-std-45deg` |
 
 #### Symbols
@@ -112,8 +121,8 @@ Also: net names on grounds, supplies, bias marks, port tags and net labels use `
 
 | Series 0.3 | Series 0.4 | `rnl upgrade` |
 |---|---|---|
-| `$DIFFERENTIAL_PAIR` | split into `$DIFFERENTIAL_PAIR_N` and `$DIFFERENTIAL_PAIR_P`; roles `left`, `right` (were the two inputs) and an optional single `tail` | with `--approximate`, chosen by the model types of both inputs |
-| `$CURRENT_MIRROR` | split into `$CURRENT_MIRROR_N` and `$CURRENT_MIRROR_P` | with `--approximate`, chosen by the types of `ref` and `out` |
+| `$DIFFERENTIAL_PAIR` | split into `$DIFFERENTIAL_PAIR_N` and `$DIFFERENTIAL_PAIR_P`, which assert the polarity of the two inputs; roles `left`, `right` (were the two inputs) and an optional single `tail` | with `--approximate`, chosen by the model types of both inputs |
+| `$CURRENT_MIRROR` | split into `$CURRENT_MIRROR_N` and `$CURRENT_MIRROR_P`, which assert the polarity of `ref` and `out` | with `--approximate`, chosen by the types of `ref` and `out` |
 | `$CHAIN` | removed | manual: keep the ordering explicitly, or choose another definition |
 | `$SUPPLY_HIGH`, `$SUPPLY_LOW` | removed | manual |
 | `$CASCADE` | four roles become one set role `stages` | manual role mapping |
@@ -123,7 +132,7 @@ Also: net names on grounds, supplies, bias marks, port tags and net labels use `
 | `$GROUND`, `$SUPPLY`, `$IO_PORT` | role `p` takes a net only (was a net or a terminal); `$IO_PORT` asserts that its net is a port | a terminal written directly: attach its net and keep the point |
 | `$NO_CONNECT` | role `t` takes a terminal or a pin | unchanged text |
 | `$GROUND_STUB`, `$SUPPLY_STUB` | `gap` default 2 → 1; role `t` is a pin | writes `gap=2` where the old default was used |
-| `$MIRRORED` | `axis` is a single instance, usage or point; directed distribution | with `--approximate` |
+| `$MIRRORED` | `$MIRRORED_LAYOUT`: a layout only; `axis` is a single instance, usage or point; directed distribution | renamed; the rest with `--approximate` |
 | `$FLOW` | places nothing and takes no direction | restores the old ORDER where it was used |
 
 Definitions that only gained constraints or assertions keep their names, such as `$JUNCTION` and `$MATCHED`, and the upgrade reports them as notices; `$BRANCH` also gained series routing and an order from top to bottom, which the upgrade leaves to a person.
@@ -160,7 +169,7 @@ Definitions and sets:
 | `$GND_STUB` | `$GROUND_STUB` |
 | `$GND_FILL_SET` | `$GROUND_FILL_SET` |
 | `$LABEL_TERM_SET` | `$LABEL_FILL_SET` |
-| `$MIRROR_PAIR` | `$MIRRORED` |
+| `$MIRROR_PAIR` | `$MIRRORED_LAYOUT` |
 
 ## Symbols of 0.2
 

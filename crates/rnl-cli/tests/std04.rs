@@ -701,3 +701,52 @@ R1 a 0 1k
         label.objects.iter().map(|&o| (doc.objects[o].kind, doc.objects[o].name.as_str())).collect();
     assert!(kinds.contains(&("net", "a")), "{kinds:?}");
 }
+
+/// A netlist of 0.4 with the series and one RNL record, `body`.
+fn with_std04(devices: &str, body: &str) -> String {
+    format!(
+        "* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\")}}\n\
+         .model nch nmos\n.model pch pmos\n.subckt cell d g s\n.ends cell\n{devices}* @RNL {{\n*   {body}\n* }}\n.end\n"
+    )
+}
+
+#[test]
+fn n_and_p_structures_assert_the_polarity_of_known_types() {
+    let pairs = "M1 x inp tail 0 nch W=2u L=1u\nM2 y inn tail 0 nch W=2u L=1u\nM3 a inp ptail ptail pch W=2u L=1u\n\
+                 M4 b inn ptail ptail pch W=2u L=1u\nM5 tail bias 0 0 nch W=4u L=1u\nM6 ptail pbias vdd vdd pch W=4u L=1u\n\
+                 X1 c inp t cell\nX2 e inn t cell\nX3 t bias 0 cell\n";
+    let violations = |body: &str| {
+        let r = read(&MemoryProvider::new().with("t.sp", &with_std04(pairs, body)), &Options::default());
+        assert!(by_severity(&r, Severity::Error).is_empty(), "{body}: {:?}", by_severity(&r, Severity::Error));
+        by_severity(&r, Severity::Violation)
+    };
+    let polarity = |v: &[String], words: &str| v.iter().filter(|v| v.contains(words)).count();
+    // the right polarity: no violation of polarity
+    assert_eq!(polarity(&violations("#M1(left) #M2(right) #M5(tail) @AS $DIFFERENTIAL_PAIR_N"), "-type"), 0);
+    assert_eq!(polarity(&violations("#M3(left) #M4(right) #M6(tail) @AS $DIFFERENTIAL_PAIR_P"), "-type"), 0);
+    // the wrong one: one violation, which names the polarity
+    let wrong = violations("#M3(left) #M4(right) #M6(tail) @AS $DIFFERENTIAL_PAIR_N");
+    assert_eq!(polarity(&wrong, "n-type"), 1, "{wrong:?}");
+    let wrong = violations("#M1(ref) #M2(out) @AS $CURRENT_MIRROR_P");
+    assert_eq!(polarity(&wrong, "p-type"), 1, "{wrong:?}");
+    // devices whose type is not known, such as subcircuit instances of a process library, are not checked
+    let unknown = violations("#X1(left) #X2(right) #X3(tail) @AS $DIFFERENTIAL_PAIR_N");
+    assert!(unknown.iter().all(|v| !v.contains("n-type")), "{unknown:?}");
+}
+
+#[test]
+fn the_mirrored_layout_is_named_as_a_layout() {
+    let devices = "M1 x inp tail 0 nch W=2u L=1u\nM2 y inn tail 0 nch W=2u L=1u\n";
+    let r = read(
+        &MemoryProvider::new()
+            .with("t.sp", &with_std04(devices, "%ax = (_, _); #M1(left) #M2(right) %ax(axis) @AS $MIRRORED_LAYOUT")),
+        &Options::default(),
+    );
+    assert!(by_severity(&r, Severity::Error).is_empty(), "{:?}", by_severity(&r, Severity::Error));
+    let old = read(
+        &MemoryProvider::new()
+            .with("t.sp", &with_std04(devices, "%ax = (_, _); #M1(left) #M2(right) %ax(axis) @AS $MIRRORED")),
+        &Options::default(),
+    );
+    assert!(!by_severity(&old, Severity::Error).is_empty(), "the name of 0.3 is gone");
+}

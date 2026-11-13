@@ -696,7 +696,7 @@
               {
                 "kind": "usage",
                 "id": "@03-five-transistor-ota.sp:32:3",
-                "definition": "$MIRRORED",
+                "definition": "$MIRRORED_LAYOUT",
                 "roles": [
                   {
                     "role": "left",
@@ -912,7 +912,7 @@
               {
                 "kind": "usage",
                 "id": "@03-five-transistor-ota.sp:32:3",
-                "definition": "$MIRRORED",
+                "definition": "$MIRRORED_LAYOUT",
                 "roles": [
                   {
                     "role": "right",
@@ -1100,7 +1100,7 @@
               {
                 "kind": "usage",
                 "id": "@03-five-transistor-ota.sp:33:3",
-                "definition": "$MIRRORED",
+                "definition": "$MIRRORED_LAYOUT",
                 "roles": [
                   {
                     "role": "left",
@@ -1254,7 +1254,7 @@
               {
                 "kind": "usage",
                 "id": "@03-five-transistor-ota.sp:33:3",
-                "definition": "$MIRRORED",
+                "definition": "$MIRRORED_LAYOUT",
                 "roles": [
                   {
                     "role": "right",
@@ -1906,7 +1906,7 @@
             "id": "@03-five-transistor-ota.sp:32:3",
             "kind": "usage",
             "host": [],
-            "definition": "$MIRRORED",
+            "definition": "$MIRRORED_LAYOUT",
             "attach": {
               "left": "#M1",
               "right": "#M2",
@@ -1930,7 +1930,7 @@
             "id": "@03-five-transistor-ota.sp:33:3",
             "kind": "usage",
             "host": [],
-            "definition": "$MIRRORED",
+            "definition": "$MIRRORED_LAYOUT",
             "attach": {
               "left": "#M3",
               "right": "#M4",

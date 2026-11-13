@@ -42,7 +42,7 @@ fn standard_mirrored_roles_keep_their_members() {
     let source="* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\nR1 a 0 1k\nR2 b 0 1k\n* @RNL { %pair=#R1(a) #R2(b) (0, 0)(axis) @AS $MIRRORED; %pair::a @TEXT(\"left\") }\n.end\n";
     let result = upgrade("t.sp", &MemoryProvider::new().with("t.sp", source), &UpgradeOptions::default()).unwrap();
     assert!(
-        result.files["t.sp"].contains("#R1(left) #R2(right) (0, 0)(axis) @AS $MIRRORED"),
+        result.files["t.sp"].contains("#R1(left) #R2(right) (0, 0)(axis) @AS $MIRRORED_LAYOUT"),
         "{}",
         result.files["t.sp"]
     );

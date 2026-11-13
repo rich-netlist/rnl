@@ -36,7 +36,7 @@ pub(super) fn renamed(name: &str) -> Option<&'static str> {
         "GND_STUB" => "GROUND_STUB",
         "GND_FILL_SET" => "GROUND_FILL_SET",
         "LABEL_TERM_SET" => "LABEL_FILL_SET",
-        "MIRROR_PAIR" => "MIRRORED",
+        "MIRROR_PAIR" => "MIRRORED_LAYOUT",
         _ => return None,
     })
 }
@@ -53,6 +53,24 @@ pub(super) fn renamed_03_symbol(name: &str) -> Option<&'static str> {
         "DELAY_CELL_SYMBOL" => "DELAY_CELL",
         _ => return None,
     })
+}
+
+/// The general definitions of the series 0.3 that the series 0.4 renames: a definition that only
+/// places is named with `_LAYOUT`.
+pub(super) fn renamed_03_definition(name: &str) -> Option<&'static str> {
+    Some(match name {
+        "MIRRORED" => "MIRRORED_LAYOUT",
+        _ => return None,
+    })
+}
+
+/// The name of the series 0.4 for a name of the series 0.3 of this kind.
+fn renamed_03(name: &str, kind: BindingKind) -> Option<&'static str> {
+    match kind {
+        BindingKind::Symbol => renamed_03_symbol(name),
+        BindingKind::Define => renamed_03_definition(name),
+        BindingKind::Other => None,
+    }
 }
 
 pub(super) fn merged_package(name: &str) -> Option<&'static str> {
@@ -139,12 +157,12 @@ impl Legacy {
             }
         }
         for (old, (package, kind)) in bindings("0.3") {
-            if kind != BindingKind::Symbol {
-                continue;
-            }
-            let Some(new) = renamed_03_symbol(&old) else { continue };
-            let Some((destination, BindingKind::Symbol)) = target.get(new) else { continue };
-            if shadowed.contains(&format!("${old}")) || shadowed.contains(&format!("${new}")) || !known("0.3", &package)
+            let Some(new) = renamed_03(&old, kind) else { continue };
+            let Some((destination, target_kind)) = target.get(new) else { continue };
+            if *target_kind != kind
+                || shadowed.contains(&format!("${old}"))
+                || shadowed.contains(&format!("${new}"))
+                || !known("0.3", &package)
             {
                 continue;
             }
@@ -183,10 +201,8 @@ impl Legacy {
             for (old, (package, kind)) in bindings(version) {
                 let new = if version == "0.2" {
                     renamed(&old).unwrap_or(&old)
-                } else if kind == BindingKind::Symbol {
-                    renamed_03_symbol(&old).unwrap_or(&old)
                 } else {
-                    &old
+                    renamed_03(&old, kind).unwrap_or(&old)
                 };
                 if target.get(new).is_some_and(|(_, tk)| *tk == kind) || shadowed.contains(&format!("${old}")) {
                     continue;

@@ -101,10 +101,10 @@
             message="the members of a $MATCHED_CAPACITOR have one model");
   };
 
-  /* Two symmetric objects at one height, mirror images of each other about an axis.
-     Places; routes nothing: left on the left of axis, right on the right, and right oriented as left
+  /* Two symmetric objects at one height, mirror images of each other about an axis: a layout only,
+     which says nothing about the circuit. Places; routes nothing; asserts nothing: left on the left of axis, right on the right, and right oriented as left
      flipped left-right (14.7). Write the roles the other way round to swap the sides. */
-  $MIRRORED = @DEFINE(
+  $MIRRORED_LAYOUT = @DEFINE(
       roles=[
         ["left", ["instance", "usage"]],
         ["right", ["instance", "usage"]],
@@ -114,10 +114,10 @@
     ?left ?right @ORIENT-RELATION("MY", priority="low");
   };
 
-  /* Two symmetric objects in one column, mirror images of each other about a horizontal axis.
-     Places; routes nothing: top above axis, bottom below, and bottom oriented as top flipped
+  /* Two symmetric objects in one column, mirror images of each other about a horizontal axis: a
+     layout only. Places; routes nothing; asserts nothing: top above axis, bottom below, and bottom oriented as top flipped
      top-bottom (14.7). Write the roles the other way round to swap the sides. */
-  $MIRRORED_VERTICAL = @DEFINE(
+  $MIRRORED_VERTICAL_LAYOUT = @DEFINE(
       roles=[
         ["top", ["instance", "usage"]],
         ["bottom", ["instance", "usage"]],
@@ -215,14 +215,14 @@
      2. Differential pairs, current mirrors and translinear loops
      ============================================================================================== */
 
-  /* A differential pair with its tail below it, as an NMOS pair is drawn.
+  /* A differential pair of n-type transistors with its tail below it.
      Places and routes; a group: matched left and right mirrored about tail, tail below the pair, and
-     sources or emitters pointing down; asserts matched inputs, shared source/emitter net and star
-     connection at the tail node. */
+     sources or emitters pointing down; asserts n-type, matched inputs, shared source/emitter net and
+     star connection at the tail node. */
   $DIFFERENTIAL_PAIR_N = @DEFINE(
       roles=[["left", "instance"], ["right", "instance"], ["tail", ["instance", "usage"]]]) {
     {?left ?right} @AS $MATCHED;
-    ?left(left) ?right(right) ?tail(axis) @AS $MIRRORED;
+    ?left(left) ?right(right) ?tail(axis) @AS $MIRRORED_LAYOUT;
     {{?left ?right} ?tail} @ORDER("top-to-bottom", priority="low");
     {?left ?right ?tail} @ROUTE-OBJECT(priority="low");
     {?left ?right ?tail} @GROUP;
@@ -261,16 +261,22 @@
     {?left ?right ?tail} @SELECT-INSTANCE(type="lpnp")
         => @SELECT-PIN(terminal="e")
         => @ORIENT("down", priority="low");
+    %n_type_set = {?left ?right} @SELECT-INSTANCE(type="nmos");
+    {?left ?right} @SELECT-INSTANCE(type="npn") => @ADD-TO %n_type_set;
+    {?left ?right} @SELECT-INSTANCE(type="njf") => @ADD-TO %n_type_set;
+    {?left ?right} @SELECT-INSTANCE(type="nmf") => @ADD-TO %n_type_set;
+    {?left ?right} @SELECT-INSTANCE(type="*")
+        => @ASSERT-IN(message="the two sides of a $DIFFERENTIAL_PAIR_N are n-type: NMOS, NPN, or an n-channel JFET or MESFET") %n_type_set;
   };
 
-  /* A differential pair with its tail above it, as a PMOS pair is drawn.
+  /* A differential pair of p-type transistors with its tail above it.
      Places and routes; a group: matched left and right mirrored about tail, tail above the pair, and
-     sources or emitters pointing up; asserts matched inputs, shared source/emitter net and star
-     connection at the tail node. */
+     sources or emitters pointing up; asserts p-type, matched inputs, shared source/emitter net and
+     star connection at the tail node. */
   $DIFFERENTIAL_PAIR_P = @DEFINE(
       roles=[["left", "instance"], ["right", "instance"], ["tail", ["instance", "usage"]]]) {
     {?left ?right} @AS $MATCHED;
-    ?left(left) ?right(right) ?tail(axis) @AS $MIRRORED;
+    ?left(left) ?right(right) ?tail(axis) @AS $MIRRORED_LAYOUT;
     {{?left ?right} ?tail} @ORDER("bottom-to-top", priority="low");
     {?left ?right ?tail} @ROUTE-OBJECT(priority="low");
     {?left ?right ?tail} @GROUP;
@@ -309,6 +315,13 @@
     {?left ?right ?tail} @SELECT-INSTANCE(type="lpnp")
         => @SELECT-PIN(terminal="e")
         => @ORIENT("up", priority="low");
+    %p_type_set = {?left ?right} @SELECT-INSTANCE(type="pmos");
+    {?left ?right} @SELECT-INSTANCE(type="pnp") => @ADD-TO %p_type_set;
+    {?left ?right} @SELECT-INSTANCE(type="lpnp") => @ADD-TO %p_type_set;
+    {?left ?right} @SELECT-INSTANCE(type="pjf") => @ADD-TO %p_type_set;
+    {?left ?right} @SELECT-INSTANCE(type="pmf") => @ADD-TO %p_type_set;
+    {?left ?right} @SELECT-INSTANCE(type="*")
+        => @ASSERT-IN(message="the two sides of a $DIFFERENTIAL_PAIR_P are p-type: PMOS, PNP or lateral PNP, or a p-channel JFET or MESFET") %p_type_set;
   };
 
   /* A rail-to-rail input stage: an upper and a lower differential pair on the same inputs.
@@ -331,7 +344,7 @@
   $PSEUDO_DIFFERENTIAL_PAIR = @DEFINE(roles=[["left", "instance"], ["right", "instance"]]) {
     %axis = (_, _);
     {?left ?right} @AS $MATCHED;
-    ?left(left) ?right(right) %axis(axis) @AS $MIRRORED;
+    ?left(left) ?right(right) %axis(axis) @AS $MIRRORED_LAYOUT;
     {?left ?right} @ASSERT-INSTANCE(same=["model", "w", "l", "nf", "m", "area"],
             message="the two sides of a $PSEUDO_DIFFERENTIAL_PAIR are matched");
     {?left ?right} @SELECT-INSTANCE(type="nmos")
@@ -482,15 +495,15 @@
   $CROSS_COUPLED_PAIR = @DEFINE(roles=[["left", "instance"], ["right", "instance"]]) {
     %axis = (_, _);
     {?left ?right} @AS $MATCHED;
-    ?left(left) ?right(right) %axis(axis) @AS $MIRRORED;
+    ?left(left) ?right(right) %axis(axis) @AS $MIRRORED_LAYOUT;
     {?left ?right} @ROUTE-OBJECT(priority="low");
     {?left ?right} @ASSERT-INSTANCE(same=["model", "w", "l", "nf", "m", "area"],
             message="the two sides of a $CROSS_COUPLED_PAIR are matched");
   };
 
-  /* A low-side current mirror: reference and output transistors with sources or emitters pointing down.
-     Places and routes: aligns ref and out in one row with sources or emitters down, asserts shared
-     gate or base net, one model and channel length, and parallel reference transistors. */
+  /* A low-side current mirror of n-type transistors, with sources or emitters pointing down.
+     Places and routes: aligns ref and out in one row with sources or emitters down, asserts n-type,
+     shared gate or base net, one model and channel length, and parallel reference transistors. */
   $CURRENT_MIRROR_N = @DEFINE(roles=[["{ref}", "instance"], ["{out}", "instance"]]) {
     {?ref ?out} @ALIGN("y", priority="low");
     ?ref{1} {?out} @ORIENT-RELATION(["R0", "MY"], priority="low");
@@ -529,11 +542,17 @@
             ["pmos", "b"], ["npn", "b"], ["npn", "s"], ["pnp", "b"], ["pnp", "s"], ["lpnp", "b"],
             ["lpnp", "s"], ["njf", "g"], ["pjf", "g"], ["nmf", "g"], ["pmf", "g"]],
             message="the reference transistors of a $CURRENT_MIRROR_N are in parallel");
+    %n_type_set = {?ref ?out} @SELECT-INSTANCE(type="nmos");
+    {?ref ?out} @SELECT-INSTANCE(type="npn") => @ADD-TO %n_type_set;
+    {?ref ?out} @SELECT-INSTANCE(type="njf") => @ADD-TO %n_type_set;
+    {?ref ?out} @SELECT-INSTANCE(type="nmf") => @ADD-TO %n_type_set;
+    {?ref ?out} @SELECT-INSTANCE(type="*")
+        => @ASSERT-IN(message="the transistors of a $CURRENT_MIRROR_N are n-type: NMOS, NPN, or an n-channel JFET or MESFET") %n_type_set;
   };
 
-  /* A high-side current mirror: reference and output transistors with sources or emitters pointing up.
-     Places and routes: aligns ref and out in one row with sources or emitters up, asserts shared gate
-     or base net, one model and channel length, and parallel reference transistors. */
+  /* A high-side current mirror of p-type transistors, with sources or emitters pointing up.
+     Places and routes: aligns ref and out in one row with sources or emitters up, asserts p-type,
+     shared gate or base net, one model and channel length, and parallel reference transistors. */
   $CURRENT_MIRROR_P = @DEFINE(roles=[["{ref}", "instance"], ["{out}", "instance"]]) {
     {?ref ?out} @ALIGN("y", priority="low");
     ?ref{1} {?out} @ORIENT-RELATION(["R0", "MY"], priority="low");
@@ -572,11 +591,19 @@
             ["pmos", "b"], ["npn", "b"], ["npn", "s"], ["pnp", "b"], ["pnp", "s"], ["lpnp", "b"],
             ["lpnp", "s"], ["njf", "g"], ["pjf", "g"], ["nmf", "g"], ["pmf", "g"]],
             message="the reference transistors of a $CURRENT_MIRROR_P are in parallel");
+    %p_type_set = {?ref ?out} @SELECT-INSTANCE(type="pmos");
+    {?ref ?out} @SELECT-INSTANCE(type="pnp") => @ADD-TO %p_type_set;
+    {?ref ?out} @SELECT-INSTANCE(type="lpnp") => @ADD-TO %p_type_set;
+    {?ref ?out} @SELECT-INSTANCE(type="pjf") => @ADD-TO %p_type_set;
+    {?ref ?out} @SELECT-INSTANCE(type="pmf") => @ADD-TO %p_type_set;
+    {?ref ?out} @SELECT-INSTANCE(type="*")
+        => @ASSERT-IN(message="the transistors of a $CURRENT_MIRROR_P are p-type: PMOS, PNP or lateral PNP, or a p-channel JFET or MESFET") %p_type_set;
   };
 
   /* A low-side cascode current mirror: a mirror row at the bottom with a cascode row above it.
      Places and routes; a group: applies $CURRENT_MIRROR_N to ref and out, places refcascode and
-     outcascode in a row above them with sources or emitters down, and asserts cascode matching. */
+     outcascode in a row above them with sources or emitters down, and asserts n-type cascodes and
+     cascode matching. */
   $CASCODE_CURRENT_MIRROR_N = @DEFINE(
       roles=[
         ["{ref}", "instance"],
@@ -625,11 +652,18 @@
                 message="the bases of the cascodes of a $CASCODE_CURRENT_MIRROR_N share a net");
     {?refcascode ?outcascode} @ASSERT-INSTANCE(same=["model", "l"],
             message="the cascodes of a $CASCODE_CURRENT_MIRROR_N have one model and one length");
+    %n_type_set = {?refcascode ?outcascode} @SELECT-INSTANCE(type="nmos");
+    {?refcascode ?outcascode} @SELECT-INSTANCE(type="npn") => @ADD-TO %n_type_set;
+    {?refcascode ?outcascode} @SELECT-INSTANCE(type="njf") => @ADD-TO %n_type_set;
+    {?refcascode ?outcascode} @SELECT-INSTANCE(type="nmf") => @ADD-TO %n_type_set;
+    {?refcascode ?outcascode} @SELECT-INSTANCE(type="*")
+        => @ASSERT-IN(message="the cascodes of a $CASCODE_CURRENT_MIRROR_N are n-type: NMOS, NPN, or an n-channel JFET or MESFET") %n_type_set;
   };
 
   /* A high-side cascode current mirror: a mirror row at the top with a cascode row below it.
      Places and routes; a group: applies $CURRENT_MIRROR_P to ref and out, places refcascode and
-     outcascode in a row below them with sources or emitters up, and asserts cascode matching. */
+     outcascode in a row below them with sources or emitters up, and asserts p-type cascodes and
+     cascode matching. */
   $CASCODE_CURRENT_MIRROR_P = @DEFINE(
       roles=[
         ["{ref}", "instance"],
@@ -678,6 +712,13 @@
                 message="the bases of the cascodes of a $CASCODE_CURRENT_MIRROR_P share a net");
     {?refcascode ?outcascode} @ASSERT-INSTANCE(same=["model", "l"],
             message="the cascodes of a $CASCODE_CURRENT_MIRROR_P have one model and one length");
+    %p_type_set = {?refcascode ?outcascode} @SELECT-INSTANCE(type="pmos");
+    {?refcascode ?outcascode} @SELECT-INSTANCE(type="pnp") => @ADD-TO %p_type_set;
+    {?refcascode ?outcascode} @SELECT-INSTANCE(type="lpnp") => @ADD-TO %p_type_set;
+    {?refcascode ?outcascode} @SELECT-INSTANCE(type="pjf") => @ADD-TO %p_type_set;
+    {?refcascode ?outcascode} @SELECT-INSTANCE(type="pmf") => @ADD-TO %p_type_set;
+    {?refcascode ?outcascode} @SELECT-INSTANCE(type="*")
+        => @ASSERT-IN(message="the cascodes of a $CASCODE_CURRENT_MIRROR_P are p-type: PMOS, PNP or lateral PNP, or a p-channel JFET or MESFET") %p_type_set;
   };
 
   /* A translinear loop of two groups of transistors, drawn in columns.

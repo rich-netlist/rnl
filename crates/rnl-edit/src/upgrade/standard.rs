@@ -108,7 +108,9 @@ pub(super) fn role_changes(input: &Interpretation) -> BTreeMap<(usize, String), 
                     .map(|n| format!("${n}"))
                     .unwrap_or_else(|| definition.clone())
             } else {
-                definition.clone()
+                super::legacy::renamed_03_definition(definition.trim_start_matches('$'))
+                    .map(|n| format!("${n}"))
+                    .unwrap_or_else(|| definition.clone())
             };
             let Some((_, after)) = target.get(&target_name) else { continue };
             if before.len() != after.len() {
@@ -226,7 +228,9 @@ pub(super) fn definition_policies(input: &Interpretation) -> BTreeMap<(usize, St
                     .map(|n| format!("${n}"))
                     .unwrap_or_else(|| name.clone())
             } else {
-                name.clone()
+                super::legacy::renamed_03_definition(name.trim_start_matches('$'))
+                    .map(|n| format!("${n}"))
+                    .unwrap_or_else(|| name.clone())
             };
             let reason = match target.get(&target_name) {
                 None => Some((
@@ -317,7 +321,7 @@ pub(super) fn definition_policies(input: &Interpretation) -> BTreeMap<(usize, St
                 if policy.review.is_some_and(|r| r.0 == "standard-definition-body") {
                     policy.review = Some(("standard-definition-body", match target_name.as_str() {
                         "$BRANCH" => "BRANCH adds SERIES routing/topology and a low-priority top-to-bottom ORDER; the old definition only aligned x (16.3)",
-                        "$MIRRORED" => "MIRRORED replaces axis-only distribution and ORDER by directed distribution and narrows axis to a single instance, usage or point; net axes and undirected sides require an explicit choice, and directed steps must be at least one unit (14.4, 16.3)",
+                        "$MIRRORED_LAYOUT" => "MIRRORED, now MIRRORED_LAYOUT, replaces axis-only distribution and ORDER by directed distribution and narrows axis to a single instance, usage or point; net axes and undirected sides require an explicit choice, and directed steps must be at least one unit (14.4, 16.3)",
                         "$FLOW" => "FLOW removes the old low-priority ORDER in its direction parameter; retaining the usage alone loses that ordering fact (16.3)",
                         _ => "the standard definition has changed drawing facts or parameter defaults that are not covered by the verified body transformations; see the standard-definition audit (16.3)",
                     }));

@@ -123,7 +123,7 @@ fn layout(statement: &str, approximate: bool) -> Upgrade {
 fn differential_pair_and_mirror_agree_on_sides_and_role_references() {
     let r = layout("%axis = (_, _); %mirror = #M1(a) #M2(b) %axis(axis) @AS $MIRRORED; %pair = #M2(in_p) #M1(in_n) @AS $DIFFERENTIAL_PAIR; %pair::in_p @TEXT(\"input\")", true);
     let text = &r.files["layout.sp"];
-    assert!(text.contains("#M1(left) #M2(right) %axis(axis) @AS $MIRRORED"), "{text}");
+    assert!(text.contains("#M1(left) #M2(right) %axis(axis) @AS $MIRRORED_LAYOUT"), "{text}");
     assert!(text.contains("#M2(right) #M1(left) @AS $DIFFERENTIAL_PAIR_N"), "{text}");
     assert!(text.contains("%pair::right @TEXT"));
     assert!(r.report.files[0].unconverted.is_empty(), "{:?}", r.report.files[0].unconverted);
