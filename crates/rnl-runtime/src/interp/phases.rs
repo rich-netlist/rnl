@@ -75,11 +75,20 @@ struct StyleIndex {
 
 impl Interp<'_> {
     pub(crate) fn run_scene(&mut self, s: SceneId) {
+        // in a level of 0.4 the bundles of step 3 are known when the symbol queue evaluates the
+        // selections of its rules, so that they select a bundle rather than its members (8.2, 10.1);
+        // a level of 0.2 or 0.3 resolves them after the queue's rules, as it did
+        let bundles_first = self.follows_0_4(self.level_unit[self.scenes[s].level]);
         for ph in [3usize, 4] {
             self.scenes[s].phase = ph;
             self.run_tasks(s, ph);
+            if ph == 3 && bundles_first {
+                self.resolve_bundles(s);
+            }
         }
-        self.resolve_bundles(s);
+        if !bundles_first {
+            self.resolve_bundles(s);
+        }
         self.scenes[s].phase = 4;
         self.resolve_symbols(s, false);
         self.resolve_scene_subobjects(s);
