@@ -1065,7 +1065,27 @@ impl Skeleton {
     }
 
     fn usages(&mut self, problem: &LevelProblem) {
-        fn objects_of(problem: &LevelProblem, u: usize, depth: usize, out: &mut BTreeSet<usize>) {
+        // A modern semantic usage has a coordinate object even without a symbol.
+        // Its roles still describe a structure, including when another role names
+        // that coordinate object instead of referring to the usage entry directly.
+        let mut semantic = BTreeMap::new();
+        if problem.version == "0.4" {
+            for (u, usage) in problem.usages.iter().enumerate() {
+                if !self.meter(1) {
+                    return;
+                }
+                if let Some(k) = usage.object.filter(|&k| problem.objects[k].symbol.is_none()) {
+                    semantic.insert(k, u);
+                }
+            }
+        }
+        fn objects_of(
+            problem: &LevelProblem,
+            semantic: &BTreeMap<usize, usize>,
+            u: usize,
+            depth: usize,
+            out: &mut BTreeSet<usize>,
+        ) {
             if depth > 16 || !crate::budget::permit(crate::budget::Step::Structure, 1) {
                 return;
             }
@@ -1076,12 +1096,18 @@ impl Skeleton {
                     }
                     match m {
                         Filler::Object(k) => {
-                            out.insert(*k);
+                            if let Some(&v) = semantic.get(k) {
+                                objects_of(problem, semantic, v, depth + 1, out);
+                            } else {
+                                out.insert(*k);
+                            }
                         }
                         Filler::Terminal { object, .. } | Filler::Pin { object, .. } => {
                             out.insert(*object);
                         }
-                        Filler::Usage(v) if *v < problem.usages.len() => objects_of(problem, *v, depth + 1, out),
+                        Filler::Usage(v) if *v < problem.usages.len() => {
+                            objects_of(problem, semantic, *v, depth + 1, out);
+                        }
                         _ => {}
                     }
                 }
@@ -1091,11 +1117,11 @@ impl Skeleton {
             if !self.meter(1) {
                 return;
             }
-            if usage.object.is_some() {
+            if usage.object.is_some_and(|k| !semantic.contains_key(&k)) {
                 continue;
             }
             let mut objects = BTreeSet::new();
-            objects_of(problem, u, 0, &mut objects);
+            objects_of(problem, &semantic, u, 0, &mut objects);
             for k in objects {
                 self.usages_of.entry(k).or_default().insert(u);
             }
@@ -1358,6 +1384,75 @@ mod tests {
         let o = SolverOptions::without_time_limit();
         let resolved = crate::resolve::resolve(p, &o, &crate::StoppedClock);
         crate::structure::analyse(p, &resolved, &o, crate::options::CAPS, &mut Work::default())
+    }
+
+    #[test]
+    fn semantic_usage_coordinates_preserve_structure_merge_hints() {
+        use rnl_runtime::problem::{ObjectKind, RoleFill, UsageEntry};
+
+        let mut point = crate::resolve::tests::point();
+        point.kind = ObjectKind::Usage;
+        let mut symbol = instance();
+        symbol.kind = ObjectKind::Usage;
+        let mut p = problem_of(vec![instance(), instance(), point, symbol], vec![]);
+        p.version = "0.4".into();
+        let usage = |object, members| UsageEntry {
+            definition: "$STRUCTURE".into(),
+            label: "a structure".into(),
+            reference: Reference::Anonymous,
+            generated: false,
+            rule_made: false,
+            roles: vec![RoleFill { role: "members".into(), members, written: None }],
+            params: vec![],
+            priority: None,
+            parent: None,
+            object,
+            written_numbers: 0,
+            source: None,
+        };
+        p.usages = vec![
+            usage(None, vec![Filler::Object(0), Filler::Pin { object: 1, pin: 0 }]),
+            usage(Some(2), vec![Filler::Usage(0), Filler::Terminal { object: 1, terminal: "a".into(), pin: Some(0) }]),
+            usage(Some(3), vec![Filler::Object(0), Filler::Object(1)]),
+            usage(None, vec![Filler::Object(2), Filler::Object(3)]),
+        ];
+        let memberships = |p: &LevelProblem| {
+            let s = structure(p);
+            read(p, &s, &s.witness, &Routing::default(), &|_| true, false, false, None, false).unwrap().usages_of
+        };
+        let expected =
+            BTreeMap::from([(0, BTreeSet::from([0, 1, 3])), (1, BTreeSet::from([0, 1, 3])), (3, BTreeSet::from([3]))]);
+        assert_eq!(memberships(&p), expected, "a coordinate alone does not make a virtual part");
+        for u in &mut p.usages {
+            u.definition = "$RENAMED".into();
+            u.label = "renamed".into();
+        }
+        assert_eq!(memberships(&p), expected);
+        let s = structure(&p);
+        let run = || {
+            read(&p, &s, &s.witness, &Routing::default(), &|_| true, false, false, None, false).map(|sk| sk.usages_of)
+        };
+        for seconds in [0., 1., 20., 200., 2000.] {
+            let (timed, budget) = crate::budget::with(
+                &crate::resolve::tests::Ticks::default(),
+                crate::RunLimit::Time(seconds),
+                None,
+                run,
+            );
+            let (replayed, _) =
+                crate::budget::with(&crate::StoppedClock, crate::RunLimit::Work(budget.work), None, run);
+            assert_eq!(timed, replayed);
+        }
+        p.version = "0.3".into();
+        assert_eq!(
+            memberships(&p),
+            BTreeMap::from([
+                (0, BTreeSet::from([0])),
+                (1, BTreeSet::from([0])),
+                (2, BTreeSet::from([3])),
+                (3, BTreeSet::from([3])),
+            ]),
+        );
     }
 
     #[test]

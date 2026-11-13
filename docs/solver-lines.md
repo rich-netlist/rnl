@@ -42,6 +42,8 @@ Every orientation trial pays its size-dependent listing cost before allocating g
 
 Standalone solver 0.4.3 propagates coordinate equalities between retained DISTRIBUTEs sharing the same endpoints. Members at the same fractional position align, including reversed spans and different subdivision counts. These consequences guide an inner group even when the span endpoints belong to its parent; they do not add or weaken authored facts. Coordinate aliases and singleton sets use their modeled identity, and inference storage grows linearly with input members. Positive inequalities inside an already merged coordinate class are reported as conflicts immediately instead of consuming the relaxation limit. Both changes use the shared work budget, so work counts require the same solver build for replay.
 
+Standalone solver 0.4.4 preserves structural line-merge hints from semantic usages that have a coordinate object but no symbol. Nested roles naming these objects expand to their members; a virtual part drawn with a symbol remains a single object. This restores the same role-based hints without consulting definition names or adding constraints. The traversal uses the shared work budget, and legacy usage handling stays unchanged.
+
 ## Cost calibration
 
 Local orientation filters inspect the actual candidate after applying authored `ORIENT` and `ORIENT-RELATION` alternatives. This includes choices that have no free orientation class. Same-symbol `ALIGN`, directed `ORDER`, and directed `DISTRIBUTE` constraints therefore filter invalid directions before routing and compaction. These checks use the shared work budget and are part of standalone solver 0.4.2's replay policy.

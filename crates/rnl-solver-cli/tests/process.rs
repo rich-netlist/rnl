@@ -51,7 +51,7 @@ fn independent_lines_returns_the_native_solution_and_skeleton() {
 fn independent_version_and_help_are_not_the_workspace_version() {
     let version = Command::new(env!("CARGO_BIN_EXE_rnl-solver")).arg("--version").output().unwrap();
     assert!(version.status.success());
-    assert_eq!(String::from_utf8(version.stdout).unwrap(), "rnl-solver 0.4.3\n");
+    assert_eq!(String::from_utf8(version.stdout).unwrap(), "rnl-solver 0.4.4\n");
     let help = Command::new(env!("CARGO_BIN_EXE_rnl-solver")).arg("--help").output().unwrap();
     assert!(help.status.success());
     assert!(String::from_utf8(help.stdout).unwrap().contains("--solver-input"));
@@ -185,7 +185,7 @@ fn external_backend_writes_and_reopens_the_same_time_work_bytes() {
         )
         .unwrap();
         assert!(reread.diagnostics().iter().all(|d| d.severity != Severity::Error), "{:?}", reread.diagnostics());
-        assert!(first.files[0].text.contains("rnl-solver 0.4.3"));
+        assert!(first.files[0].text.contains("rnl-solver 0.4.4"));
     }
 }
 

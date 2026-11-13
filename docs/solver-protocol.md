@@ -2,7 +2,7 @@
 
 The `rnl-solver-io` library encodes an independent solver's decisions as JSON and validates them against the original `LevelProblem` before writeback. Protocol version 5 is independent of the solver executable's version.
 
-The `rnl-solver` executable has its own version, currently `0.4.3`. It reads one input JSON document from stdin (or an explicit file) and writes one result document to stdout. Diagnostics go to stderr. Viewers continue using the solver library. Its opt-in [skeleton experiment](solver-skeleton.md) uses the same result protocol.
+The `rnl-solver` executable has its own version, currently `0.4.4`. It reads one input JSON document from stdin (or an explicit file) and writes one result document to stdout. Diagnostics go to stderr. Viewers continue using the solver library. Its opt-in [skeleton experiment](solver-skeleton.md) uses the same result protocol.
 
 ## Commands
 
