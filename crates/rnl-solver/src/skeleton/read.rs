@@ -56,6 +56,9 @@ pub(crate) struct Seg {
     pub along: Option<usize>,
     pub slant: bool,
     pub routed: bool,
+    /// A piece of a written wire that takes the default route of `auto` (13.1): the route is
+    /// what its ends make it, and the wire is drawn by it again once the drawing is spaced.
+    pub default_auto: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -63,6 +66,8 @@ pub(crate) struct Path {
     pub tree: usize,
     pub vertices: Vec<usize>,
     pub routed: Option<usize>,
+    /// Of a written wire that takes the default route of `auto` (13.1).
+    pub default_auto: bool,
     pub nets: Vec<String>,
 }
 
@@ -513,7 +518,7 @@ impl Skeleton {
                 vertices.push(self.vertex(s, key, at, tree));
             }
             let nets = problem.routes.get(wire.route).map(|r| r.net.clone()).into_iter().collect();
-            self.paths.push(Path { tree, vertices, routed: Some(i), nets });
+            self.paths.push(Path { tree, vertices, routed: Some(i), default_auto: false, nets });
         }
         let routes = problem.routes.len();
         for (w, wire) in problem.wires.iter().enumerate() {
@@ -630,7 +635,13 @@ impl Skeleton {
                 }
                 vertices.push(ib);
             }
-            self.paths.push(Path { tree, vertices, routed: None, nets: wire.nets.clone() });
+            self.paths.push(Path {
+                tree,
+                vertices,
+                routed: None,
+                default_auto: auto_paths[w].is_some(),
+                nets: wire.nets.clone(),
+            });
         }
         let found = if crosses { super::cross::find(problem, s, g, routing, self.within.as_ref()) } else { Vec::new() };
         if crate::budget::stopped() {
@@ -657,7 +668,15 @@ impl Skeleton {
                     None
                 };
                 let slant = pa != pb && along.is_none();
-                self.segs.push(Seg { tree: path.tree, a, b, along, slant, routed: path.routed.is_some() });
+                self.segs.push(Seg {
+                    tree: path.tree,
+                    a,
+                    b,
+                    along,
+                    slant,
+                    routed: path.routed.is_some(),
+                    default_auto: path.default_auto,
+                });
                 let (ta, tb) = (self.vertices[a].term.clone(), self.vertices[b].term.clone());
                 for axis in 0..2 {
                     let on_line = along != Some(axis);
@@ -689,7 +708,7 @@ impl Skeleton {
             let least_lead = if self.strict && self.lead_to_branch(i) { lead() * int(2) } else { lead() };
             let least = if self.collapses(i).is_some() || self.z_middle(i) || (self.strict && !self.lead_or_floor(i)) {
                 Q::zero()
-            } else if self.whole {
+            } else if self.whole && !seg.default_auto {
                 least_lead
             } else {
                 min(length, least_lead)
@@ -1567,6 +1586,58 @@ mod tests {
         let one = path.iter().find(|&&v| sk.vertices[v].key == Key::Point(1)).unwrap();
         let two = path.iter().find(|&&v| sk.vertices[v].key == Key::Point(2)).unwrap();
         assert_ne!(one, two);
+    }
+
+    /// A pin that leaves sideways, wired by the default route of `auto` to a pin that faces it
+    /// from one unit beyond: the route turns back with its middle leg halfway, half a unit long
+    /// (13.1). That piece is as long as its ends make it, so a read that asks a whole lead of
+    /// every lead must not ask one of it: the constraints as read would have no solution.
+    #[test]
+    fn a_default_auto_wire_keeps_a_piece_shorter_than_a_lead_in_a_read_of_whole_leads() {
+        use rnl_runtime::problem::ProblemWire;
+        let mut p = problem_of(vec![instance(), instance()], vec![]);
+        p.version = "0.4".into();
+        p.wires.push(ProblemWire {
+            label: "w".into(),
+            reference: Reference::Anonymous,
+            nets: vec![],
+            bus: false,
+            anchors: vec![
+                PointRef::Pin { object: 0, pin: 0, terminal: "g".into() },
+                PointRef::Pin { object: 1, pin: 1, terminal: "d".into() },
+            ],
+            mode: "auto".into(),
+            default_auto: true,
+            generated: false,
+        });
+        let s = structure(&p);
+        let mut g = s.witness.clone();
+        // the gate of the first leaves left from (-3, 0); the drain of the second faces up at (-3, -1)
+        g.origin[0] = [int(0), int(0)];
+        g.origin[1] = [int(-3), int(-3)];
+        let path = crate::route::written_path(&p, &g, 0).unwrap().unwrap();
+        let half = int(1) / int(2);
+        assert_eq!(
+            path,
+            vec![
+                [int(-3), int(0)],
+                [int(-4), int(0)],
+                [int(-4), -half.clone()],
+                [int(-3), -half.clone()],
+                [int(-3), int(-1)]
+            ]
+        );
+        let options = SolverOptions::without_time_limit();
+        for whole in [true, false] {
+            let mut sk =
+                read_for_compaction(&p, &s, &g, &Routing::default(), &|_| true, whole, None, false).expect("read");
+            assert!(sk.paths[0].default_auto);
+            assert!(sk.segs.iter().all(|seg| seg.default_auto));
+            for axis in 0..2 {
+                let report = super::super::pass::pass(&mut sk, axis, &options, &mut Work::default(), None);
+                assert_eq!(report.failed, None, "whole {whole}, axis {axis}");
+            }
+        }
     }
 
     #[test]
