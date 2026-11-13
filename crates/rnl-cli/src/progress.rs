@@ -236,7 +236,7 @@ pub fn solve_progress(
     })
 }
 
-type ClockedBackend<'a> = dyn Fn(&rnl_runtime::problem::LevelProblem, &rnl_solver::SolverOptions, &dyn Clock) -> Result<BackendResult, String>
+pub(crate) type ClockedBackend<'a> = dyn Fn(&rnl_runtime::problem::LevelProblem, &rnl_solver::SolverOptions, &dyn Clock) -> Result<BackendResult, String>
     + 'a;
 
 /// [`solve_progress`] through a caller-selected backend, given the observing clock.
@@ -246,6 +246,19 @@ pub fn solve_progress_using(
     options: &SolveOptions,
     clock: &dyn Clock,
     sink: &dyn Fn(&Event) -> bool,
+    backend: &ClockedBackend<'_>,
+) -> Result<SolveRun, String> {
+    solve_progress_skipping(file, files, options, clock, sink, &|_| None, backend)
+}
+
+/// [`solve_progress_using`], the levels `skip` gives a reason for left as they are.
+pub(crate) fn solve_progress_skipping(
+    file: &Path,
+    files: &dyn Provider,
+    options: &SolveOptions,
+    clock: &dyn Clock,
+    sink: &dyn Fn(&Event) -> bool,
+    skip: &crate::solve::Skip<'_>,
     backend: &ClockedBackend<'_>,
 ) -> Result<SolveRun, String> {
     let observer = Observer { inner: clock, sink, state: RefCell::new(State::default()) };
@@ -292,7 +305,7 @@ pub fn solve_progress_using(
         };
         observer.send(&event) && !observer.state.borrow().cancelled
     };
-    let run = solve_marked(file, files, options, &watch, &|p, options| backend(p, options, &observer))?;
+    let run = solve_marked(file, files, options, &watch, skip, &|p, options| backend(p, options, &observer))?;
     // cancelled in the last level: nothing after it to stop before
     if observer.state.borrow().cancelled {
         return Err(crate::solve::CANCELLED.to_string());

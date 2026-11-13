@@ -62,6 +62,10 @@ solve options (the levels are read without their type=\"generated\" records; -o 
   --progress          report 0.4 stages and consumed work on standard error
   --progress=json     report the solve on standard error as events, one JSON object per line
                       (docs/solver-progress.md; solve and preview take it)
+  --respace           write each level as the record of the solver last drew it, spaced again to the
+                      spacing of its settings, nothing searched; a level without a record that
+                      fits the netlist as it is now is left as it is, with the reason
+                      (solve and preview take it)
   --external-solver P run executable P with the solver input/result JSON protocol
   --external-arg ARG  append one literal argument to P (repeatable; no shell)
   --external-timeout S  stop P after S seconds per level (120 by default)
@@ -100,6 +104,8 @@ pub(crate) struct SolverArgs {
     pub progress_json: bool,
     /// `solve --check`: check the settings only.
     pub check: bool,
+    /// `solve --respace`, `preview --respace`: each level as its record has it, spaced again.
+    pub respace: bool,
     pub configs: Vec<(bool, String)>,
     /// As given; `problem` and `solve` each have their own default.
     pub in_place: bool,
@@ -131,6 +137,7 @@ impl SolverArgs {
             "--progress" => self.progress = true,
             "--progress=json" => self.progress_json = true,
             "--check" => self.check = true,
+            "--respace" => self.respace = true,
             "--solver-config" => {
                 self.configs.push((false, rest.next().ok_or_else(|| needs("--solver-config needs a text"))?))
             }
@@ -167,11 +174,17 @@ impl SolverArgs {
                 (self.external.is_some(), "--external-solver"),
                 (self.profile.is_some(), "--profile"),
                 (self.report, "--report"),
+                (self.respace, "--respace"),
             ];
             if let Some((_, option)) = writes.iter().find(|(given, _)| *given) {
                 let text = format!("solve --check solves and writes nothing, so it takes no {option}");
                 return Err(Said::new(codes::CLI_OPTION_WRONG_COMMAND, text));
             }
+        }
+        if self.respace && self.external.is_some() {
+            return Err(needs(
+                "--respace spaces the record of the embedded solver; it cannot be combined with --external-solver",
+            ));
         }
         if self.profile.is_some() && command != "solve" {
             return Err(Said::new(codes::CLI_OPTION_WRONG_COMMAND, "--profile is an option of solve"));
@@ -282,7 +295,11 @@ pub(crate) fn preview(args: &Args, provider: &FsProvider) -> Result<ExitCode, Sa
     let entry = rnl_cli::path_str(&args.file);
     eprintln!("{}", rnl_cli::SOLVER_PREVIEW_NOTICE);
     if !args.solver.progress_json {
-        let shown = rnl_cli::preview::preview(&entry, provider, &options, &WallClock::new(), &|_| true)?;
+        let shown = if args.solver.respace {
+            rnl_cli::preview::respace(&entry, provider, &options, &WallClock::new(), &|_| true)?
+        } else {
+            rnl_cli::preview::preview(&entry, provider, &options, &WallClock::new(), &|_| true)?
+        };
         let out = serde_json::json!({ "document": shown.document, "report": shown.report });
         println!("{}", serde_json::to_string_pretty(&out).unwrap());
         return Ok(ExitCode::SUCCESS);
@@ -300,7 +317,12 @@ pub(crate) fn preview(args: &Args, provider: &FsProvider) -> Result<ExitCode, Sa
         eprintln!("{}", e.line());
         true
     };
-    match rnl_cli::preview::preview_progress(&entry, provider, &options, &WallClock::new(), &events) {
+    let shown = if args.solver.respace {
+        rnl_cli::preview::respace(&entry, provider, &options, &WallClock::new(), &events)
+    } else {
+        rnl_cli::preview::preview_progress(&entry, provider, &options, &WallClock::new(), &events)
+    };
+    match shown {
         Ok(shown) => {
             let out = serde_json::json!({ "document": shown.document, "report": shown.report });
             println!("{}", serde_json::to_string_pretty(&out).unwrap());
@@ -429,7 +451,12 @@ fn solve_with(args: &Args, provider: &FsProvider) -> Result<(ExitCode, u8, usize
         eprintln!("{}", e.line());
         true
     };
-    let result = if args.solver.progress_json {
+    let result = if args.solver.respace {
+        // the events are written only with --progress=json; the solve goes on either way
+        rnl_cli::respace::respace_progress(&args.file, provider, &options, &observed, &|e| {
+            !args.solver.progress_json || events(e)
+        })
+    } else if args.solver.progress_json {
         let external = args.solver.external.as_ref();
         rnl_cli::progress::solve_progress_using(
             &args.file,

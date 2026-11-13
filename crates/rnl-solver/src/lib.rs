@@ -352,6 +352,31 @@ pub fn solve_with_clock(problem: &LevelProblem, options: &SolverOptions, clock: 
     budget::without(|| solve_isolated(problem, options, clock, driver::solve))
 }
 
+/// The level as its previous result has it, spaced again to the options' spacing: each object
+/// placed and turned as the record of the solver put it, the wires routed again, then the drawing
+/// spaced with its line identities and wire topology kept. Nothing is searched. `previous` is that
+/// record, read onto this problem (`rnl_runtime::previous::previous`); it must be of this problem as
+/// it is now (its hash's input digest is the problem's) and place something, or nothing is done.
+/// The budget is as for [`solve_with_clock`], and a work replay gives the same result from the
+/// same record.
+pub fn respace_with_clock(
+    problem: &LevelProblem,
+    previous: &rnl_runtime::previous::Previous,
+    options: &SolverOptions,
+    clock: &dyn Clock,
+) -> Result<Solved, String> {
+    if problem.version != "0.4" {
+        return Err("respacing needs an RNL 0.4 level".into());
+    }
+    if previous.same_input != Some(true) {
+        return Err("the record of the solver is not of the netlist as it is now: its hash differs".into());
+    }
+    if previous.placements.is_empty() {
+        return Err("the record of the solver places nothing".into());
+    }
+    Ok(budget::without(|| solve_isolated(problem, options, clock, |p, o, c| driver::respace(p, o, c, previous))))
+}
+
 fn solve_isolated(
     problem: &LevelProblem,
     options: &SolverOptions,

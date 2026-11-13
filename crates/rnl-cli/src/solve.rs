@@ -433,6 +433,7 @@ pub fn solve_using(
             Mark::Level(p) => watch(p),
             _ => true,
         },
+        &|_| None,
         backend,
     )
 }
@@ -456,15 +457,20 @@ pub(crate) enum Mark<'a> {
     },
 }
 
-/// [`solve_using`], its watcher told of every [`Mark`].
+/// Why a level is not solved, when it is not: [`NotSolved::reason`].
+pub(crate) type Skip<'a> = dyn Fn(&LevelProblem) -> Option<String> + 'a;
+
+/// [`solve_using`], its watcher told of every [`Mark`], and the levels `skip` gives a reason for
+/// left as they are, in [`SolveRun::not_solved`].
 pub(crate) fn solve_marked(
     file: &Path,
     files: &dyn Provider,
     options: &SolveOptions,
     watch: &dyn Fn(Mark<'_>) -> bool,
+    skip: &Skip<'_>,
     backend: &Backend<'_>,
 ) -> Result<SolveRun, String> {
-    let (run, wants) = pass(file, files, options, &[], watch, backend)?;
+    let (run, wants) = pass(file, files, options, &[], watch, skip, backend)?;
     if wants.is_empty() {
         return Ok(run);
     }
@@ -511,7 +517,7 @@ pub(crate) fn solve_marked(
     }
     // the files read are those of the first pass: the second reads the files raised from memory
     let read = run.read.clone();
-    let mut run = if texts.is_empty() { run } else { pass(file, files, options, &texts, watch, backend)?.0 };
+    let mut run = if texts.is_empty() { run } else { pass(file, files, options, &texts, watch, skip, backend)?.0 };
     run.read = read;
     // a file level that cannot say 0.3 itself, such as a library section without a header record,
     // takes the version of the file that includes it (16.1): when that one is raised, it reads in
@@ -550,6 +556,7 @@ fn pass(
     options: &SolveOptions,
     raised: &[(String, String)],
     watch: &dyn Fn(Mark<'_>) -> bool,
+    skip: &Skip<'_>,
     backend: &Backend<'_>,
 ) -> Result<(SolveRun, Vec<Want>), String> {
     let entry = path_str(file);
@@ -586,7 +593,16 @@ fn pass(
                     before: targets.len(),
                 });
             }
-            None => targets.push((p.level, p.title.clone())),
+            None => match skip(p) {
+                Some(reason) => not_solved.push(NotSolved {
+                    title: p.title.clone(),
+                    kind: p.kind,
+                    path: normalize(&first.doc.levels[p.level].path),
+                    reason,
+                    before: targets.len(),
+                }),
+                None => targets.push((p.level, p.title.clone())),
+            },
         }
     }
     if targets.is_empty() && not_solved.is_empty() {

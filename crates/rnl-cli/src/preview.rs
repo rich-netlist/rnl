@@ -49,6 +49,8 @@ pub struct Report {
     pub one_file: bool,
     /// The whole report as `rnl solve --report` prints it.
     pub text: Vec<String>,
+    /// "solve", or "respace" for [`respace`]: the levels spaced again, nothing searched.
+    pub mode: &'static str,
 }
 
 /// One level solved.
@@ -138,6 +140,22 @@ pub fn preview_progress(
 ) -> Result<Preview, String> {
     let run = crate::progress::solve_progress(Path::new(entry), files, options, clock, sink)?;
     as_solved(entry, run, files, options)
+}
+
+/// [`preview_progress`] of [`crate::respace::respace_progress`]: each level as the record of the
+/// solver last drew it, spaced again, nothing searched; the levels that cannot be are listed in the
+/// report's notes, with the reason.
+pub fn respace(
+    entry: &str,
+    files: &dyn Provider,
+    options: &SolveOptions,
+    clock: &dyn Clock,
+    sink: &dyn Fn(&crate::progress::Event) -> bool,
+) -> Result<Preview, String> {
+    let run = crate::respace::respace_progress(Path::new(entry), files, options, clock, sink)?;
+    let mut shown = as_solved(entry, run, files, options)?;
+    shown.report.mode = "respace";
+    Ok(shown)
 }
 
 /// The run drawn as solved, as [`preview`] gives it.
@@ -285,6 +303,7 @@ fn report(
         files: run.files.iter().map(|f| named(&f.path)).collect(),
         one_file: one_file(&Copy::of(run)),
         text: lines(run, true),
+        mode: "solve",
     }
 }
 

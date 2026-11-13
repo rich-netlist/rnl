@@ -17,6 +17,7 @@ pub mod profile;
 pub mod progress;
 pub mod provider;
 pub mod replace;
+pub mod respace;
 pub mod solve;
 
 /// Core version and source revision shared by the CLI and the desktop About dialog.
