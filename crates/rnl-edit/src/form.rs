@@ -242,6 +242,22 @@ pub fn shape(s: &ShapeOp) -> String {
     }
 }
 
+/// `@SET-SYMBOL`, with the host terminals its pins bind when the request gives them (9.2.4):
+/// `@SET-SYMBOL(terminals=[[1, "d"], [2, "g"]]) $NMOS`.
+fn set_symbol(symbol: &str, terminals: &[(TermKey, String)]) -> String {
+    if terminals.is_empty() {
+        return format!("@SET-SYMBOL {symbol}");
+    }
+    let pairs: Vec<String> = terminals
+        .iter()
+        .map(|(host, name)| match host {
+            TermKey::Num(n) => format!("[{n}, {}]", quote(name)),
+            TermKey::Name(s) => format!("[{}, {}]", quote(s), quote(name)),
+        })
+        .collect();
+    format!("@SET-SYMBOL(terminals=[{}]) {symbol}", pairs.join(", "))
+}
+
 /// A pin (9.2.4): `terminal=` a number, a name, or a list of them for a bus pin.
 fn pin(p: &PinOp) -> String {
     let key = |t: &TermKey| match t {
@@ -304,13 +320,13 @@ pub(crate) fn statements_for_language(
     modern: bool,
 ) -> Vec<String> {
     match op {
-        Op::Set { object, symbol, at, orient, .. } => {
-            let mut facts: Vec<String> = symbol.iter().map(|s| format!("@SET-SYMBOL {s}")).collect();
+        Op::Set { object, symbol, terminals, at, orient, .. } => {
+            let mut facts: Vec<String> = symbol.iter().map(|s| set_symbol(s, terminals)).collect();
             facts.extend(style.map(|s| format!("@SET-STYLE {s}")));
             facts.extend(placed(at, orient));
             vec![format!("{object} {}", facts.join(" => "))]
         }
-        Op::AddUsage { name, definition, attach, params, symbol, at, orient, .. } => {
+        Op::AddUsage { name, definition, attach, params, symbol, terminals, at, orient, .. } => {
             // each object with the role it fills, so that the roles are those of the request
             // whatever order it writes them in, and a role the definition lacks fails (9.4); the
             // parameters by name, so that one the definition lacks fails as well
@@ -320,7 +336,7 @@ pub(crate) fn statements_for_language(
                 params.iter().map(|(k, v)| format!("{}={}", role_name(k), parameter(v))).collect();
             let params = if params.is_empty() { String::new() } else { format!("({})", params.join(", ")) };
             let mut parts = vec![format!("{definition} @ATTACH{params} {}", roles.join(" "))];
-            parts.extend(symbol.iter().map(|s| format!("@SET-SYMBOL {s}")));
+            parts.extend(symbol.iter().map(|s| set_symbol(s, terminals)));
             parts.extend(style.map(|s| format!("@SET-STYLE {s}")));
             parts.extend(placed(at, orient));
             parts.extend(name.iter().cloned());

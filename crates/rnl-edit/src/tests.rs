@@ -1229,3 +1229,94 @@ fn fixed_rotation_round_trips_explicit_false_over_a_symbol_label() {
     assert!(ops::parse(0, &json!({"level":"file", "op":"add-text", "at":[0,0], "markup":"bad", "fix_rotate":"true"}))
         .is_err());
 }
+
+/// A call of a subcircuit whose ports are named otherwise than the symbol's terminals, and a symbol
+/// that binds its pins by name: `terminals` of `set` and `add-usage` say which host terminal each
+/// symbol terminal is, as `@SET-SYMBOL(terminals=…)` does (9.2.4).
+const CALL: &str =
+    "* call\n.subckt nm p q r t\n.ends nm\n.subckt top a b c d\nX1 a b c d nm\nX2 a b c d nm\n.ends top\n";
+
+fn named_pins_symbol() -> Value {
+    json!({"level": "file", "op": "define-symbol", "name": "$S", "pins": [
+        {"terminals": ["d"], "at": [0, 2]}, {"terminals": ["g"], "at": [-3, 0]},
+        {"terminals": ["s"], "at": [0, -2]}, {"terminals": ["b"], "at": [1, 0]}
+    ], "prims": []})
+}
+
+fn binding_warnings(out: &str) -> usize {
+    let files = MemoryProvider::new().with(entry("spice"), out);
+    let r = rnl_view::interpret(entry("spice"), Some("spice"), &files, &Options { std: false, ..Options::default() })
+        .unwrap();
+    assert!(!r.diagnostics().iter().any(|d| d.severity == Severity::Error), "{out}");
+    r.diagnostics().iter().filter(|d| d.code.number().as_deref() == Some("RNL4119")).count()
+}
+
+#[test]
+fn terminals_bind_the_pins_of_a_symbol_to_the_terminals_of_a_call() {
+    let terminals = json!([[1, "d"], [2, "g"], [3, "s"], [4, "b"]]);
+    let ops = json!([
+        named_pins_symbol(),
+        {"level": "subckt:top", "op": "set", "object": "#X1", "symbol": "$S", "terminals": terminals, "at": [0, 0]},
+        {"level": "subckt:top", "op": "set", "object": "#X2", "symbol": "$S", "at": [10, 0]}
+    ]);
+    let mut req = request("spice", CALL, ops);
+    req.language_version = Some("0.4".into());
+    let out = write(&req).unwrap();
+    assert!(
+        out.contains("#X1 @SET-SYMBOL(terminals=[[1, \"d\"], [2, \"g\"], [3, \"s\"], [4, \"b\"]]) $S => @PLACE(0, 0)"),
+        "{out}"
+    );
+    assert!(out.contains("#X2 @SET-SYMBOL $S => @PLACE(10, 0)"), "{out}");
+    // X2 names no terminals, and its ports are not the symbol's: each of its four pins binds nothing.
+    // X1's four read back bound.
+    assert_eq!(binding_warnings(&out), 4, "{out}");
+}
+
+#[test]
+fn terminals_of_a_usage_and_a_host_terminal_by_name_are_written() {
+    let ops = json!([
+        {"level": "file", "op": "define-symbol", "name": "$S", "pins": [{"terminals": ["d"], "at": [0, 2]}], "prims": []},
+        {"level": "subckt:top", "op": "add-usage", "definition": "$FIGURE", "attach": {"p": [3, 4]},
+         "symbol": "$S", "terminals": [["q", "d"]]}
+    ]);
+    let mut req = request("spice", CALL, ops);
+    req.language_version = Some("0.4".into());
+    let out = write(&req).unwrap();
+    assert!(out.contains("@SET-SYMBOL(terminals=[[\"q\", \"d\"]]) $S"), "{out}");
+}
+
+#[test]
+fn terminals_need_the_language_0_4_a_symbol_and_pairs() {
+    let set = |extra: Value| {
+        let mut op = json!({"level": "subckt:top", "op": "set", "object": "#X1", "symbol": "$S", "at": [0, 0]});
+        op.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
+        json!([op])
+    };
+    let mut req = request("spice", CALL, set(json!({"terminals": [[1, "d"]]})));
+    assert!(write(&req).unwrap_err().contains("terminals"), "released output refuses it");
+    assert!(write(&req).unwrap_err().contains("language_version 0.4"));
+    req.language_version = Some("0.4".into());
+    assert!(write(&req).is_ok());
+    // an empty list is no terminals
+    req.ops = set(json!({"terminals": []})).as_array().unwrap().clone();
+    assert!(write(&req).unwrap().contains("#X1 @SET-SYMBOL $S"));
+    for bad in [
+        json!({"terminals": "d"}),
+        json!({"terminals": ["d"]}),
+        json!({"terminals": [[1]]}),
+        json!({"terminals": [[0, "d"]]}),
+        json!({"terminals": [[1, ""]]}),
+        json!({"terminals": [[1.5, "d"]]}),
+        json!({"terminals": [[true, "d"]]}),
+    ] {
+        req.ops = set(bad.clone()).as_array().unwrap().clone();
+        let err = write(&req).unwrap_err();
+        assert!(err.contains("terminals"), "{bad}: {err}");
+    }
+    // without a symbol the terminals bind nothing
+    req.ops = json!([{"level": "subckt:top", "op": "set", "object": "#X1", "at": [0, 0], "terminals": [[1, "d"]]}])
+        .as_array()
+        .unwrap()
+        .clone();
+    assert!(write(&req).unwrap_err().contains("needs a `symbol`"));
+}

@@ -24,6 +24,9 @@ pub enum Op {
     Set {
         object: String,
         symbol: Option<String>,
+        /// The host terminals the symbol's pins bind, each a host terminal (a number or a name)
+        /// with the symbol's terminal name it stands for: `@SET-SYMBOL(terminals=[[1, "d"], …])`.
+        terminals: Vec<(TermKey, String)>,
         style: Vec<(String, Literal)>,
         at: Option<Point>,
         orient: Option<String>,
@@ -37,6 +40,8 @@ pub enum Op {
         attach: Vec<(String, Attach)>,
         params: Vec<(String, Literal)>,
         symbol: Option<String>,
+        /// As for `Set`.
+        terminals: Vec<(TermKey, String)>,
         style: Vec<(String, Literal)>,
         at: Option<Point>,
         orient: Option<String>,
@@ -230,8 +235,8 @@ pub(crate) fn parse_for_language(k: usize, value: &Value, modern: bool) -> Resul
         return Err(fail(codes::EDIT_OP_NOT_WRITTEN_YET, kind, format!("`{f}` is not written yet")));
     }
     let allowed: &[&str] = match kind {
-        "set" => &["object", "symbol", "style", "at", "orient"],
-        "add-usage" => &["name", "definition", "attach", "params", "symbol", "style", "at", "orient"],
+        "set" => &["object", "symbol", "terminals", "style", "at", "orient"],
+        "add-usage" => &["name", "definition", "attach", "params", "symbol", "terminals", "style", "at", "orient"],
         "add-point" => &["name", "at", "junction"],
         "add-wire" => &["name", "nets", "via", "mode", "style"],
         "add-text" => &[
@@ -274,6 +279,7 @@ pub(crate) fn parse_for_language(k: usize, value: &Value, modern: bool) -> Resul
             let op = Op::Set {
                 object: r.string("object")?,
                 symbol: r.opt_string("symbol")?,
+                terminals: r.symbol_terminals(modern)?,
                 style: r.style()?,
                 at: r.opt_point("at")?,
                 orient: r.opt_string("orient")?,
@@ -295,6 +301,7 @@ pub(crate) fn parse_for_language(k: usize, value: &Value, modern: bool) -> Resul
             attach: r.attach()?,
             params: r.params()?,
             symbol: r.opt_string("symbol")?,
+            terminals: r.symbol_terminals(modern)?,
             style: r.style()?,
             at: r.opt_point("at")?,
             orient: r.opt_string("orient")?,
@@ -544,6 +551,45 @@ impl Reader<'_> {
     /// A usage's parameters: each a string, a number, a truth value or a list of them, as the
     /// snapshot gives them back (`ObjectView.params`). A string with a line break is refused: it
     /// would end the comment that carries the record.
+    /// `terminals` of `set` and `add-usage`: pairs of a host terminal (a number from 1, or a name)
+    /// and the symbol's terminal name it stands for. They bind the pins of the object's symbol, so
+    /// they need a `symbol`, and the language 0.4.
+    fn symbol_terminals(&self, modern: bool) -> Result<Vec<(TermKey, String)>, Refusal> {
+        let items = match self.obj.get("terminals") {
+            None | Some(Value::Null) => return Ok(Vec::new()),
+            Some(Value::Array(items)) => items,
+            Some(_) => return Err(self.fail("terminals", "is not a list of [terminal, name] pairs")),
+        };
+        if items.is_empty() {
+            return Ok(Vec::new());
+        }
+        if !modern {
+            return Err(self.fail("terminals", "requires language_version 0.4"));
+        }
+        if !self.obj.get("symbol").is_some_and(Value::is_string) {
+            return Err(self.fail("terminals", "needs a `symbol`, whose pins it binds"));
+        }
+        items
+            .iter()
+            .map(|item| {
+                let pair = item.as_array().filter(|p| p.len() == 2);
+                let host = match pair.map(|p| &p[0]) {
+                    Some(Value::String(s)) if !s.is_empty() => Some(TermKey::Name(s.clone())),
+                    Some(Value::Number(n)) => {
+                        n.as_u64().filter(|n| *n >= 1).and_then(|n| u32::try_from(n).ok()).map(TermKey::Num)
+                    }
+                    _ => None,
+                };
+                let name = pair.and_then(|p| p[1].as_str()).filter(|s| !s.is_empty());
+                match (host, name) {
+                    (Some(host), Some(name)) => Ok((host, name.to_string())),
+                    _ => Err(self
+                        .fail("terminals", "is not a list of [terminal number or name, symbol terminal name] pairs")),
+                }
+            })
+            .collect()
+    }
+
     fn params(&self) -> Result<Vec<(String, Literal)>, Refusal> {
         fn value(v: &Value) -> Option<Literal> {
             Some(match v {

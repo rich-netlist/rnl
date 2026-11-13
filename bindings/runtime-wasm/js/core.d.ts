@@ -155,6 +155,13 @@ export type Op = { level?: string } & (
       object: string;
       symbol?: string;
       /**
+       * The host terminals the symbol's pins bind, each with the symbol's terminal name it stands
+       * for (9.2.4), `[[1, "d"], [2, "g"]]`, written `@SET-SYMBOL(terminals=[[1, "d"], [2, "g"]]) $NMOS`:
+       * for a call whose ports are not named as the symbol's terminals. A host terminal is a number
+       * from 1 or a name. Needs a `symbol` and `language_version: "0.4"`.
+       */
+      terminals?: [number | string, string][];
+      /**
        * Style properties (9.3), such as `{ linecolor: "#2275e2" }`: written as a
        * `$styleN = @DEFINE-STYLE(…) {}` that `@SET-STYLE` gives the object, one definition in each
        * level for the styles of the same properties and values. One the language does not know
@@ -180,6 +187,8 @@ export type Op = { level?: string } & (
        */
       params?: Record<string, ParameterValue>;
       symbol?: string;
+      /** The host terminals the symbol's pins bind, as for `set`. */
+      terminals?: [number | string, string][];
       /** Style properties, written as for `set`. */
       style?: Record<string, Literal>;
       at?: Point;
