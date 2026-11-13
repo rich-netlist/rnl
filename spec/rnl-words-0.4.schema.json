@@ -1,6 +1,6 @@
 {
  "$schema": "https://json-schema.org/draft/2020-12/schema",
- "$id": "rnl-words.schema.json",
+ "$id": "rnl-words-0.4.schema.json",
  "title": "RNL standard word list",
  "description": "Structure of the RNL standard word list (rnl-words-<version>.json, section 5.3 of the standard).",
  "type": "object",

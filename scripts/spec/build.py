@@ -12,7 +12,7 @@ Input, the spec/ folder of the repository (or --spec DIR), with a folder for eac
     V/en/, V/zh/            front.md, ch01.md, ch02.md, …, annex-a.md, annex-b.md, …: the source
     rnl-V.md, rnl-V.zh.md   the combined texts, which must be what the chapters give
     rnl-words-V.json        the word list of the version
-    rnl-words.schema.json   the schema of the word lists, shared by all versions
+    rnl-words*.schema.json  the schema named by each word list's $schema
 
 Output, for each version, in English and Chinese, all from the same chapters and with the same revision
 label: the combined Markdown, the chapters as a zip, one web page, a PDF, and SHA256SUMS. With --site, the
@@ -556,7 +556,11 @@ def build_zip(spec: Path, lang: str, v: str, rev: dict, out: Path) -> None:
     for p, text in files.items():
         m = re.search(r"^## (.+)$", text, re.M)
         rows.append(f"| [{p}]({p}) | {m.group(1) if m else ''} |")
-    for f in (f"rnl-words-{v}.json", "rnl-words.schema.json"):
+    word_list = f"rnl-words-{v}.json"
+    schema = json.loads(read(spec / word_list))["$schema"]
+    if not isinstance(schema, str) or Path(schema).name != schema or ":" in schema or "\\" in schema:
+        raise ValueError(f"{word_list}: $schema must name a file in spec/")
+    for f in (word_list, schema):
         files[f] = read(spec / f)
         rows.append(f"| [{f}]({f}) | |")
     label = revision_label(lang, v, rev)

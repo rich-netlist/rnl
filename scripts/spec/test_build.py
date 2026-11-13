@@ -2,10 +2,13 @@
 
 The build itself needs pandoc (and Typst on PATH for its fonts); the tests that run it are skipped without pandoc."""
 import importlib.util
+import hashlib
+import json
 import re
 import shutil
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -55,6 +58,50 @@ class Selection(unittest.TestCase):
         # not every folder: a draft in spec/ has none until it is released. Add a version here when it is.
         for v in ("0.2", "0.3"):
             self.assertTrue(build.released(REPO_SPEC, v), f"spec/{v}/{build.RELEASED}: the file that marks it as released")
+
+
+class WordSchemas(unittest.TestCase):
+    def test_each_word_list_uses_a_schema_that_declares_its_top_level_fields(self):
+        for v in ("0.2", "0.3", "0.4"):
+            with self.subTest(version=v):
+                words = json.loads(build.read(REPO_SPEC / f"rnl-words-{v}.json"))
+                schema_name = words["$schema"]
+                schema = json.loads(build.read(REPO_SPEC / schema_name))
+                self.assertEqual(schema["$id"], schema_name)
+                self.assertFalse(schema["additionalProperties"])
+                self.assertFalse(set(words) - set(schema["properties"]))
+
+    def test_chapter_archives_include_the_schema_named_by_the_word_list(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            revision = {"n": None, "after": 0, "dirty": False, "date": "2026-01-01", "commit": "test", "epoch": 0}
+            for v in ("0.2", "0.3", "0.4"):
+                folder(root, v, False)
+                for lang in ("en", "zh"):
+                    (root / v / lang / "front.md").write_text("# Test\n", encoding="utf-8")
+                    (root / v / lang / "ch01.md").write_text("## 1 Test\n", encoding="utf-8")
+                word_name = f"rnl-words-{v}.json"
+                words = json.loads(build.read(REPO_SPEC / word_name))
+                schema_name = words["$schema"]
+                for name in (word_name, schema_name):
+                    shutil.copyfile(REPO_SPEC / name, root / name)
+                for lang in ("en", "zh"):
+                    with self.subTest(version=v, language=lang):
+                        build.build_zip(root, lang, v, revision, root)
+                        prefix = build.name(v, lang, "") + "/"
+                        with zipfile.ZipFile(root / build.name(v, lang, "-chapters.zip")) as archive:
+                            archived_words = json.loads(archive.read(prefix + word_name))
+                            self.assertEqual(archived_words["$schema"], schema_name)
+                            self.assertEqual(
+                                {name for name in archive.namelist() if name.endswith(".schema.json")},
+                                {prefix + schema_name},
+                            )
+                            manifest = archive.read(prefix + "MANIFEST.txt").decode("utf-8")
+                            for name in (word_name, schema_name):
+                                data = archive.read(prefix + name)
+                                self.assertEqual(data.decode("utf-8"), build.read(REPO_SPEC / name))
+                                self.assertIn(f"{hashlib.sha256(data).hexdigest()}  {name}", manifest)
+                            self.assertIn(schema_name, archive.read(prefix + "README.md").decode("utf-8"))
 
 
 @unittest.skipUnless(shutil.which("pandoc"), "needs pandoc")

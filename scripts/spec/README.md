@@ -33,7 +33,7 @@ Needs Python 3.10 or later (standard library only), [pandoc](https://pandoc.org/
 | `rnl-0.2.md`, `rnl-0.2.zh.md` | the combined texts, assembled from the chapters and committed |
 | `rnl-words-0.2.json` | the word list of the version |
 | `rnl-0.3-guide.md`, `rnl-0.3-guide.zh.md` | the short guide to the language of a version that has one, as the web page shows it ([The short guide](#the-short-guide)) |
-| `rnl-words.schema.json` | the schema of the word lists, shared by all versions; a new version may add optional properties to it, so that it still describes the lists of the earlier ones |
+| `rnl-words.schema.json`, `rnl-words-0.4.schema.json` | the schema named by each word list's `$schema`; 0.2 and 0.3 share the former, while the draft 0.4 list uses the latter. The chapter archive includes the named schema under that same filename |
 
 The chapters come from the research repository where the language is worked out ([decision 0006](../../docs/decisions/0006-language-versions-from-research-repository.md)).
 
