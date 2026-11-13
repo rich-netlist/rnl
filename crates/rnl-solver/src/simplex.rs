@@ -314,6 +314,12 @@ impl<T: Clone + Ord> Simplex<T> {
         &self.vars[v].value
     }
 
+    /// Neither basic nor referenced by any tableau row. Moving this coordinate
+    /// cannot change another variable, including through an unbounded row.
+    pub(crate) fn is_isolated(&self, v: Var) -> bool {
+        self.vars[v].row.is_none() && self.occurrences[v] == 0
+    }
+
     /// The value of a form under the current values.
     pub(crate) fn eval(&self, e: &LinExpr) -> Q {
         e.eval(|v| self.vars[v].value.clone())

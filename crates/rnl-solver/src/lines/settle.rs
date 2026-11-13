@@ -2387,13 +2387,12 @@ impl Level<'_> {
                         cut = true;
                         break 'listing;
                     }
-                    if !allowed(problem, s, class, v) {
-                        continue;
-                    }
                     let mut trial = values.to_vec();
                     trial[c] = v;
                     let ori = orientations_given(s, &trial, w);
-                    if !fits(&ori, &class.members) {
+                    if !fits(&ori, &class.members)
+                        || !allowed(problem, s, class.members.iter().map(|&(m, _)| (m, ori[m])))
+                    {
                         continue;
                     }
                     let look: Vec<Vec<Q>> = class
@@ -2476,7 +2475,9 @@ impl Level<'_> {
                 }
                 let ori = orientations_given(s, &trial, w);
                 let every: Vec<(usize, Orient)> = (0..ori.len()).map(|m| (m, ori[m])).collect();
-                if fits(&ori, &every) {
+                // List-valued ORIENT facts may have no free class at all, while
+                // ORIENT-RELATION alternatives change a class's member labels.
+                if fits(&ori, &every) && allowed(problem, s, every.iter().copied()) {
                     let mut look = Look::new();
                     for &m in own_leaves {
                         look.row(&drawn(m, ori[m]));
@@ -3965,6 +3966,89 @@ pub(super) mod tests {
         let (start, _) = tree.evaluate_rounds(&arr, 0, &mut Work::default());
         let arrangement = (arr, s.tree.clone());
         (p, s, options, start, arrangement)
+    }
+
+    #[test]
+    fn listed_orientation_choices_keep_local_pin_orders() {
+        for related in [false, true] {
+            let object = usize::from(related);
+            let mut p = problem_of(
+                vec![instance(); object + 1],
+                vec![
+                    fact(if related {
+                        FactKind::OrientRelation { relation: Orient::R0, from: vec![0], to: vec![1] }
+                    } else {
+                        FactKind::Orient { object: 0, code: Orient::R0 }
+                    }),
+                    fact(FactKind::Order {
+                        axis: Axis::X,
+                        sense: Sense::Increasing,
+                        members: vec![PointRef::Pin { object, pin: 0, terminal: "a".into() }, PointRef::Origin(object)],
+                    }),
+                ],
+            );
+            p.version = "0.4".into();
+            p.orient_lists = vec![(0, vec![Orient::R0, Orient::MY])];
+            p.symbols[0].pins[0].pos = (-2., 0.);
+            let options = SolverOptions::without_time_limit();
+            let resolved = crate::resolve::resolve(&p, &options, &StoppedClock);
+            let s = crate::structure::analyse(&p, &resolved, &options, crate::options::CAPS, &mut Work::default());
+            let s = crate::search_choices::for_layout(&s, &mut Work::default());
+            assert_eq!(s.kept.len(), 2);
+            assert_eq!(s.open.classes.is_empty(), !related);
+            let tree = crate::tree::Tree::new(&p, &s, &options);
+            let arr = tree.first(&mut Work::default());
+            let (start, _) = tree.evaluate_rounds(&arr, 0, &mut Work::default());
+            let level = Level {
+                problem: &p,
+                s: &s,
+                tree: &start.placed,
+                nodes: &s.tree,
+                weights: (1, 4),
+                clear: &BTreeMap::new(),
+                hung: BTreeMap::new(),
+                leaves: BTreeSet::new(),
+                edges: vec![Vec::new(); p.facts.len()],
+                fact_objects: vec![BTreeSet::new(); p.facts.len()],
+                nearest: BTreeMap::new(),
+                flips: BTreeMap::new(),
+                levels: true,
+                bands: true,
+                others: vec![],
+            };
+            let own: Vec<_> = (0..=object).collect();
+            let run = || {
+                level.combos(
+                    &own,
+                    &arr.values,
+                    &arr.ways,
+                    &start.placed.geometry.orient,
+                    &BTreeSet::new(),
+                    &BTreeSet::new(),
+                    LISTED,
+                )
+            };
+            let (combos, classes, ways, _) = run();
+            assert!(!combos.is_empty());
+            for (values, chosen, _) in combos {
+                let mut trial = arr.values.clone();
+                let mut alternatives = arr.ways.clone();
+                for (c, v) in classes.iter().zip(values) {
+                    trial[*c] = v;
+                }
+                for (w, v) in ways.iter().zip(chosen) {
+                    alternatives[*w] = v;
+                }
+                let ori = orientations_given(&s, &trial, &alternatives);
+                let offset = s.pin_offset(object, 0, ori[object]).unwrap();
+                assert!(offset[0] <= int(-1), "related={related}, orientations={ori:?}");
+            }
+            for seconds in [0., 1., 10., 100.] {
+                let (timed, report) = crate::budget::with(&Ticks::default(), RunLimit::Time(seconds), None, run);
+                let (replayed, _) = crate::budget::with(&StoppedClock, RunLimit::Work(report.work), None, run);
+                assert_eq!(timed, replayed);
+            }
+        }
     }
 
     #[test]

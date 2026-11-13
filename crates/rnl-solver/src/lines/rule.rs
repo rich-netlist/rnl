@@ -1,7 +1,7 @@
 //! Orientation filters from retained local facts, and the least bends between directed pins.
 
 use crate::rational::Q;
-use crate::structure::{FreeClass, Structure};
+use crate::structure::Structure;
 use rnl_runtime::geom::Orient;
 use rnl_runtime::problem::{Axis, FactKind, LevelProblem, PointRef, Sense};
 use std::collections::BTreeMap;
@@ -28,8 +28,13 @@ pub(super) fn minbend(a: (i64, i64), b: (i64, i64), v: (f64, f64)) -> u32 {
     }
 }
 
-pub(super) fn allowed(problem: &LevelProblem, s: &Structure, class: &FreeClass, v: Orient) -> bool {
-    let members: BTreeMap<usize, Orient> = class.members.iter().map(|&(m, label)| (m, v.then(label))).collect();
+/// Check the actual candidate orientations, after applying authored alternatives.
+pub(super) fn allowed(
+    problem: &LevelProblem,
+    s: &Structure,
+    orientations: impl IntoIterator<Item = (usize, Orient)>,
+) -> bool {
+    let members: BTreeMap<usize, Orient> = orientations.into_iter().collect();
     let point = |r: &PointRef| -> Option<(usize, [Q; 2])> {
         match r {
             PointRef::Origin(k) if members.contains_key(k) => Some((*k, [Q::default(), Q::default()])),
@@ -44,6 +49,15 @@ pub(super) fn allowed(problem: &LevelProblem, s: &Structure, class: &FreeClass, 
     };
     let axis_of = |a: &Axis| if *a == Axis::X { 0 } else { 1 };
     for &f in &s.kept {
+        let size = match &problem.facts[f].kind {
+            FactKind::Align { members, .. }
+            | FactKind::Order { members, .. }
+            | FactKind::Distribute { members, .. } => members.len(),
+            _ => 1,
+        };
+        if !crate::budget::permit(crate::budget::Step::Structure, size.max(1)) {
+            return false;
+        }
         match &problem.facts[f].kind {
             FactKind::Align { axis, members: ms } => {
                 for pair in ms.windows(2) {

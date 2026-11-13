@@ -697,7 +697,34 @@ fn layers(
     // 4. the distance to where the resolution put each origin, or to a text's anchor:
     // d ≥ e − c and d ≥ c − e, for e = v or e = v − base
     let mut objective = LinExpr::default();
+    let mut coupled_targets = BTreeSet::new();
+    if s.language04 {
+        let mut seen = BTreeSet::new();
+        for (_, v) in own {
+            if !seen.insert(*v) {
+                coupled_targets.insert(*v);
+            }
+        }
+        for target in targets {
+            if let Target::From(bases, _) = target {
+                coupled_targets.extend(bases.iter().copied());
+            }
+        }
+    }
     for ((_, v), t) in own.iter().zip(targets) {
+        // An isolated point already at its target contributes exactly zero.
+        // Do not create auxiliary rows that every later check would scan. A
+        // target added later may still couple it to another point or text.
+        if s.language04
+            && !coupled_targets.contains(v)
+            && matches!(t, Target::At(c) if sx.value(*v) == c)
+            && sx.is_isolated(*v)
+        {
+            // Keep the same zero optimum until the normal layer rollback.
+            let at = sx.value(*v).clone();
+            sx.assert_bounds(*v, Some(at.clone()), Some(at), Tag::Def).map_err(fail)?;
+            continue;
+        }
         let d = sx.new_var();
         let (bases, c) = match t {
             Target::At(c) => (&[][..], c),
@@ -912,6 +939,99 @@ fn optimise(
 mod tests {
     use super::*;
     use crate::rational::{frac, int};
+
+    fn point_layers(count: usize) -> (Structure, Simplex<Tag>, Vec<(usize, Var)>) {
+        use crate::resolve::tests::{point, problem_of};
+        let mut p = problem_of(vec![point(); count], vec![]);
+        p.version = "0.4".into();
+        let options = SolverOptions::without_time_limit();
+        let resolved = crate::resolve(&p, &options);
+        let s = crate::structure::analyse(&p, &resolved, &options, crate::options::CAPS, &mut Work::default());
+        let mut sx = Simplex::new();
+        for _ in &s.model.vars {
+            sx.new_var();
+        }
+        let own = (0..count).map(|k| (k, s.model.var(PointId::Origin(k)))).collect();
+        (s, sx, own)
+    }
+
+    #[test]
+    fn isolated_points_at_their_targets_add_no_auxiliary_rows() {
+        for count in [0, 64] {
+            for modern in [false, true] {
+                let (mut s, mut sx, own) = point_layers(count);
+                s.language04 = modern;
+                let targets: Vec<_> = own.iter().map(|_| Target::At(int(0))).collect();
+                layers(&mut sx, &s.model, &s, &s.witness.orient, &own, &targets, 0, None).unwrap();
+                assert!(sx.satisfied());
+                assert!(own.iter().all(|(_, v)| sx.value(*v) == &int(0)));
+                if modern || count == 0 {
+                    assert_eq!(sx.row_count(), 0);
+                } else {
+                    assert!(sx.row_count() > 0, "released versions retain their existing LP construction");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn isolated_fractional_origin_keeps_its_optimum_during_grid_rounding() {
+        for modern in [false, true] {
+            let (mut s, mut sx, own) = point_layers(1);
+            s.language04 = modern;
+            let v = own[0].1;
+            let at = frac(1, 2);
+            let cp = sx.checkpoint();
+            sx.assert_bounds(v, Some(at.clone()), Some(at.clone()), Tag::Def).unwrap();
+            sx.check().unwrap();
+            sx.backtrack(cp);
+            assert_eq!(sx.value(v), &at);
+            layers(&mut sx, &s.model, &s, &s.witness.orient, &own, &[Target::At(at.clone())], 0, None).unwrap();
+            round_to_grid(&mut sx, &[(0, v, false)], &int(1), &BTreeSet::new());
+            assert_eq!(sx.value(v), &at);
+        }
+    }
+
+    #[test]
+    fn repeated_origin_targets_keep_their_combined_weight() {
+        for modern in [false, true] {
+            let (mut s, mut sx, own) = point_layers(1);
+            s.language04 = modern;
+            let v = own[0].1;
+            let own = vec![own[0]; 3];
+            let targets = vec![Target::At(int(0)), Target::At(int(0)), Target::At(int(10))];
+            layers(&mut sx, &s.model, &s, &s.witness.orient, &own, &targets, 0, None).unwrap();
+            assert_eq!(sx.value(v), &int(0));
+        }
+    }
+
+    #[test]
+    fn origin_distance_keeps_points_used_by_existing_rows_or_future_targets() {
+        for future in [false, true] {
+            for modern in [false, true] {
+                let (mut s, mut sx, own) = point_layers(3);
+                s.language04 = modern;
+                let (a, b, c) = (own[0].1, own[1].1, own[2].1);
+                sx.assert_bounds(b, Some(int(0)), Some(int(0)), Tag::Def).unwrap();
+                let last = if future {
+                    sx.assert_bounds(c, Some(int(10)), Some(int(10)), Tag::Def).unwrap();
+                    Target::From(vec![a, b], int(0))
+                } else {
+                    let relation = LinExpr::from_terms([(c, int(2)), (a, int(-1))], int(0));
+                    sx.assert(&relation, Rel::Eq, &int(0), Tag::Def).unwrap();
+                    Target::At(int(10))
+                };
+                sx.check().unwrap();
+                let targets = vec![Target::At(int(0)), Target::At(int(0)), last];
+                layers(&mut sx, &s.model, &s, &s.witness.orient, &own, &targets, 0, None).unwrap();
+                assert!(sx.satisfied());
+                // Omitting a's distance would move it to 20 and worsen the
+                // original objective from 10 to 20 in either construction.
+                assert_eq!(sx.value(a), &int(0), "future={future}, modern={modern}");
+                assert_eq!(sx.value(c), &int(if future { 10 } else { 0 }));
+            }
+        }
+    }
 
     #[test]
     fn modern_rows_repair_port_text_clashes_without_moving_fixed_coordinates() {
