@@ -53,6 +53,10 @@ fn each_setting_says_where_it_comes_from_in_the_order_of_14_10() {
     assert_eq!(setting(top, "beam"), "beam=8 (header)");
     assert_eq!(setting(top, "spacing_x"), "spacing_x=2 (header)");
     assert_eq!(setting(top, "spacing_y"), "spacing_y=4 (command-line)");
+    // where a setting of the file or a package is written
+    assert_eq!(top.settings["spacing_x"].at.as_deref(), Some("main.sp:2"));
+    assert_eq!(top.settings["grid"].at.as_deref(), Some("fixture.rnl:1"));
+    assert_eq!(top.settings["spacing_y"].at, None);
     // the level after the header
     let amp = level(&c, "amp");
     assert_eq!(setting(amp, "beam"), "beam=6 (level)");
@@ -100,6 +104,12 @@ fn every_bad_value_of_the_command_line_is_an_error_not_only_the_first() {
         ]
     );
     assert_eq!(keyed(&l.warnings), ["unknown: unknown solver setting unknown; ignored"]);
+    // a text that does not read is one error, of no key
+    let c =
+        check_settings(None, &MemoryProvider::new(), &SolveOptions::default(), &[ToolSettings::Config("beam=".into())])
+            .unwrap();
+    assert_eq!(c.levels[0].errors.len(), 1);
+    assert_eq!(c.levels[0].errors[0].key, None);
     // a value with an error is not in effect
     assert_eq!(setting(l, "beam"), "beam=4 (default)");
     // with a file, the command line's errors are every level's
@@ -207,7 +217,7 @@ mod command {
         std::fs::write(&file, text).unwrap();
         let out = rnl(&["solve", &file.to_string_lossy(), "--check", "--no-std"]);
         assert_eq!(out.status.code(), Some(0), "{}", String::from_utf8_lossy(&out.stderr));
-        assert!(String::from_utf8_lossy(&out.stdout).contains("beam=6 (header)"));
+        assert!(String::from_utf8_lossy(&out.stdout).contains("beam=6 (header, "));
         assert_eq!(std::fs::read_to_string(&file).unwrap(), text);
         assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1);
     }

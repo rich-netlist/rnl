@@ -62,6 +62,9 @@ pub struct CheckedSetting {
     pub value: serde_json::Value,
     /// Where it comes from: "default", "package:NAME", "header", "level" or "command-line".
     pub from: String,
+    /// Where it is written, `file:line`, for a setting of a package, the file's header or a level.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub at: Option<String>,
 }
 
 /// A problem of one setting, or of the settings together when `key` is none.
@@ -184,13 +187,16 @@ fn level(
         .values
         .into_iter()
         .map(|(key, (value, from))| {
-            let from = match (from, at) {
-                (SettingFrom::Default, _) => "default".to_string(),
-                (SettingFrom::Tool, _) => "command-line".to_string(),
-                (SettingFrom::File(k), Some((r, p))) => origin(r, &p.solver_config[k]),
-                (SettingFrom::File(_), None) => "level".to_string(),
+            let (from, written) = match (from, at) {
+                (SettingFrom::Default, _) => ("default".to_string(), None),
+                (SettingFrom::Tool, _) => ("command-line".to_string(), None),
+                (SettingFrom::File(k), Some((r, p))) => {
+                    let s = &p.solver_config[k];
+                    (origin(r, s), s.source.as_ref().map(|l| format!("{}:{}", l.file, l.line)))
+                }
+                (SettingFrom::File(_), None) => ("level".to_string(), None),
             };
-            (key, CheckedSetting { value: json(&value), from })
+            (key, CheckedSetting { value: json(&value), from, at: written })
         })
         .collect();
     let mut warnings: Vec<CheckedProblem> = check.warnings.into_iter().map(Into::into).collect();
@@ -268,7 +274,8 @@ pub fn check_lines(checked: &Checked) -> Vec<String> {
         }
         let indent = if level.title.is_some() { "  " } else { "" };
         for (key, s) in &level.settings {
-            out.push(format!("{indent}{key}={} ({})", s.value, s.from));
+            let at = s.at.as_ref().map(|at| format!(", {at}")).unwrap_or_default();
+            out.push(format!("{indent}{key}={} ({}{at})", s.value, s.from));
         }
         for (kind, problems) in [("warning", &level.warnings), ("error", &level.errors)] {
             for p in problems {

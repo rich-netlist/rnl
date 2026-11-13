@@ -96,10 +96,11 @@ earlier value. A level's `grid="x"` over a package's `grid=2` therefore gives `g
 
 `rnl solve FILE --check` checks the settings without solving or writing anything. For each
 level it prints every setting in effect and where it comes from (`default`,
-`package:NAME`, `header`, `level`, `command-line`), then the warnings and the errors. Without
+`package:NAME`, `header`, `level`, `command-line`), with `file:line` for a setting written in a
+package, the header or a level, then the warnings and the errors. Without
 FILE, it checks the command line's settings alone. It reports every problem, not only the
 first, each with its key. `--json` prints
-`{"ok", "levels": [{"title", "settings": {KEY: {"value", "from"}}, "warnings": [{"key", "message"}], "errors": [...]}]}`;
+`{"ok", "levels": [{"title", "settings": {KEY: {"value", "from", "at"}}, "warnings": [{"key", "message"}], "errors": [...]}]}`;
 without FILE, `levels` has one entry whose `title` is `null`, and a problem that is not about
 one key has the `key` `null`. It exits with 1 when a level has an error, and with 2 when the
 command line itself is wrong. `rnl_cli::solve::check_settings` gives the same result to a
