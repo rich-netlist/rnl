@@ -12,7 +12,7 @@
      strokes, and a round cap or join, itself; a bus is "bold", twice as wide (9.3). */
 
   /* The base style of every object: lines, texts and fills as Analog Canvas draws them. */
-  $base = @DEFINE-STYLE(linecolor="#1d1d1f", textcolor="#1d1d1f", fillcolor="#ffffff", linewidth=0.16, cap="butt", join="miter", size=1) {};
+  $base = @DEFINE-STYLE(linecolor="#1d1d1f", textcolor="#1d1d1f", fillcolor="#ffffff", linewidth=0.16, cap="butt", join="miter", size=1, bold=true) {};
 
   /* The style of a bus: its lines bold. */
   $bus = @DEFINE-STYLE(linestyle="bold") {};

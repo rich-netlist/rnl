@@ -1,0 +1,1285 @@
+{
+  "failed": false,
+  "levels": [
+    {
+      "title": "01-terminal-names.sp",
+      "kind": "file",
+      "file": "01-terminal-names.sp",
+      "symbols": [
+        {
+          "name": "$TRANSMISSION_LINE",
+          "box": [
+            -4.0,
+            -2.0,
+            4.0,
+            1.2
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                -4.0,
+                0.0
+              ],
+              "terminals": [
+                "p1"
+              ],
+              "label": null,
+              "dir": 180
+            },
+            {
+              "pos": [
+                -2.0,
+                -2.0
+              ],
+              "terminals": [
+                "n1"
+              ],
+              "label": null,
+              "dir": 270
+            },
+            {
+              "pos": [
+                4.0,
+                0.0
+              ],
+              "terminals": [
+                "p2"
+              ],
+              "label": null,
+              "dir": 0
+            },
+            {
+              "pos": [
+                2.0,
+                -2.0
+              ],
+              "terminals": [
+                "n2"
+              ],
+              "label": null,
+              "dir": 270
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -4.0,
+                  0.0
+                ],
+                [
+                  -2.3,
+                  0.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  2.3,
+                  0.0
+                ],
+                [
+                  4.0,
+                  0.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -2.0,
+                  -2.0
+                ],
+                [
+                  -2.0,
+                  -0.8
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  2.0,
+                  -2.0
+                ],
+                [
+                  2.0,
+                  -0.8
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "ELLIPSE",
+              "points": [
+                [
+                  -2.0,
+                  0.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -2.0,
+                  0.8
+                ],
+                [
+                  2.0,
+                  0.8
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -2.0,
+                  -0.8
+                ],
+                [
+                  2.0,
+                  -0.8
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "ARC",
+              "points": [
+                [
+                  2.0,
+                  0.8
+                ],
+                [
+                  2.3,
+                  0.0
+                ],
+                [
+                  2.0,
+                  -0.8
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$RC_LINE",
+          "box": [
+            -4.0,
+            -2.0,
+            4.0,
+            0.8
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                -4.0,
+                0.0
+              ],
+              "terminals": [
+                "a"
+              ],
+              "label": null,
+              "dir": 180
+            },
+            {
+              "pos": [
+                4.0,
+                0.0
+              ],
+              "terminals": [
+                "b"
+              ],
+              "label": null,
+              "dir": 0
+            },
+            {
+              "pos": [
+                0.0,
+                -2.0
+              ],
+              "terminals": [
+                "ref"
+              ],
+              "label": null,
+              "dir": 270
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -4.0,
+                  0.0
+                ],
+                [
+                  -2.0,
+                  0.0
+                ],
+                [
+                  -1.667,
+                  0.4
+                ],
+                [
+                  -1.0,
+                  -0.4
+                ],
+                [
+                  -0.333,
+                  0.4
+                ],
+                [
+                  0.333,
+                  -0.4
+                ],
+                [
+                  1.0,
+                  0.4
+                ],
+                [
+                  1.667,
+                  -0.4
+                ],
+                [
+                  2.0,
+                  0.0
+                ],
+                [
+                  4.0,
+                  0.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -2.0,
+                  -0.9
+                ],
+                [
+                  2.0,
+                  -0.9
+                ]
+              ],
+              "style": {
+                "linewidth": 0.24
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  -0.9
+                ],
+                [
+                  0.0,
+                  -2.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$NJFET",
+          "box": [
+            -3.0,
+            -2.0,
+            0.8,
+            2.0
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                2.0
+              ],
+              "terminals": [
+                "d"
+              ],
+              "label": null,
+              "dir": 90
+            },
+            {
+              "pos": [
+                -3.0,
+                0.0
+              ],
+              "terminals": [
+                "g"
+              ],
+              "label": null,
+              "dir": 180
+            },
+            {
+              "pos": [
+                0.0,
+                -2.0
+              ],
+              "terminals": [
+                "s"
+              ],
+              "label": null,
+              "dir": 270
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.657,
+                  -1.25
+                ],
+                [
+                  -1.657,
+                  1.25
+                ],
+                [
+                  -1.366,
+                  1.25
+                ],
+                [
+                  -1.366,
+                  -1.25
+                ],
+                [
+                  -1.657,
+                  -1.25
+                ]
+              ],
+              "style": {
+                "linestyle": "none"
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.4244,
+                  0.6977
+                ],
+                [
+                  0.0,
+                  0.6977
+                ],
+                [
+                  0.0,
+                  2.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.4244,
+                  -0.6977
+                ],
+                [
+                  0.0,
+                  -0.6977
+                ],
+                [
+                  0.0,
+                  -2.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -3.0,
+                  0.0
+                ],
+                [
+                  -1.5116,
+                  0.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.66,
+                  0.0
+                ],
+                [
+                  -2.3,
+                  0.35
+                ],
+                [
+                  -2.3,
+                  -0.35
+                ],
+                [
+                  -1.66,
+                  0.0
+                ]
+              ],
+              "style": {
+                "linestyle": "none"
+              }
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$NJFET",
+          "box": [
+            -3.0,
+            -2.0,
+            0.8,
+            2.0
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                2.0
+              ],
+              "terminals": [
+                "drain"
+              ],
+              "label": null,
+              "dir": 90
+            },
+            {
+              "pos": [
+                -3.0,
+                0.0
+              ],
+              "terminals": [
+                "gate"
+              ],
+              "label": null,
+              "dir": 180
+            },
+            {
+              "pos": [
+                0.0,
+                -2.0
+              ],
+              "terminals": [
+                "source"
+              ],
+              "label": null,
+              "dir": 270
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.657,
+                  -1.25
+                ],
+                [
+                  -1.657,
+                  1.25
+                ],
+                [
+                  -1.366,
+                  1.25
+                ],
+                [
+                  -1.366,
+                  -1.25
+                ],
+                [
+                  -1.657,
+                  -1.25
+                ]
+              ],
+              "style": {
+                "linestyle": "none"
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.4244,
+                  0.6977
+                ],
+                [
+                  0.0,
+                  0.6977
+                ],
+                [
+                  0.0,
+                  2.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.4244,
+                  -0.6977
+                ],
+                [
+                  0.0,
+                  -0.6977
+                ],
+                [
+                  0.0,
+                  -2.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -3.0,
+                  0.0
+                ],
+                [
+                  -1.5116,
+                  0.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.66,
+                  0.0
+                ],
+                [
+                  -2.3,
+                  0.35
+                ],
+                [
+                  -2.3,
+                  -0.35
+                ],
+                [
+                  -1.66,
+                  0.0
+                ]
+              ],
+              "style": {
+                "linestyle": "none"
+              }
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$JUNCTION_SYMBOL",
+          "box": [
+            -0.4,
+            -0.4,
+            0.4,
+            0.4
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [],
+          "prims": [
+            {
+              "shape": "CIRCLE",
+              "points": [
+                [
+                  0.0,
+                  0.0
+                ]
+              ],
+              "style": {
+                "linestyle": "none"
+              }
+            }
+          ],
+          "nested": []
+        }
+      ],
+      "items": [
+        {
+          "id": "#T1",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            0.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {},
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#O1",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            10.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {},
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#U1",
+          "kind": "instance",
+          "symbol": 1,
+          "at": [
+            20.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {},
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#Z1",
+          "kind": "instance",
+          "symbol": 2,
+          "at": [
+            30.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {},
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#Z2",
+          "kind": "instance",
+          "symbol": 3,
+          "at": [
+            40.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {},
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "a usage of $JUNCTION",
+          "kind": "usage",
+          "symbol": 4,
+          "at": [
+            30.0,
+            3.0
+          ],
+          "orient": "R0",
+          "style": {},
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "a usage of $JUNCTION",
+          "kind": "usage",
+          "symbol": 4,
+          "at": [
+            2.0,
+            -3.0
+          ],
+          "orient": "R0",
+          "style": {},
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "a usage of $JUNCTION",
+          "kind": "usage",
+          "symbol": 4,
+          "at": [
+            8.0,
+            -3.0
+          ],
+          "orient": "R0",
+          "style": {},
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "a usage of $JUNCTION",
+          "kind": "usage",
+          "symbol": 4,
+          "at": [
+            12.0,
+            -3.0
+          ],
+          "orient": "R0",
+          "style": {},
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "a usage of $JUNCTION",
+          "kind": "usage",
+          "symbol": 4,
+          "at": [
+            20.0,
+            -3.0
+          ],
+          "orient": "R0",
+          "style": {},
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "a usage of $JUNCTION",
+          "kind": "usage",
+          "symbol": 4,
+          "at": [
+            30.0,
+            -3.0
+          ],
+          "orient": "R0",
+          "style": {},
+          "layer": "middle",
+          "texts": {}
+        }
+      ],
+      "wires": [
+        {
+          "id": "a wire",
+          "nets": [
+            "b"
+          ],
+          "points": [
+            [
+              4.0,
+              0.0
+            ],
+            [
+              6.0,
+              0.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {},
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "c"
+          ],
+          "points": [
+            [
+              14.0,
+              0.0
+            ],
+            [
+              16.0,
+              0.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {},
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "d"
+          ],
+          "points": [
+            [
+              24.0,
+              0.0
+            ],
+            [
+              26.0,
+              0.0
+            ],
+            [
+              26.0,
+              2.0
+            ],
+            [
+              26.0,
+              3.0
+            ],
+            [
+              30.0,
+              3.0
+            ],
+            [
+              40.0,
+              3.0
+            ],
+            [
+              40.0,
+              2.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {},
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "d"
+          ],
+          "points": [
+            [
+              30.0,
+              3.0
+            ],
+            [
+              30.0,
+              2.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {},
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "0"
+          ],
+          "points": [
+            [
+              -2.0,
+              -3.0
+            ],
+            [
+              2.0,
+              -3.0
+            ],
+            [
+              8.0,
+              -3.0
+            ],
+            [
+              12.0,
+              -3.0
+            ],
+            [
+              20.0,
+              -3.0
+            ],
+            [
+              30.0,
+              -3.0
+            ],
+            [
+              40.0,
+              -3.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {},
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "0"
+          ],
+          "points": [
+            [
+              -2.0,
+              -2.0
+            ],
+            [
+              -2.0,
+              -3.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {},
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "0"
+          ],
+          "points": [
+            [
+              2.0,
+              -2.0
+            ],
+            [
+              2.0,
+              -3.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {},
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "0"
+          ],
+          "points": [
+            [
+              8.0,
+              -2.0
+            ],
+            [
+              8.0,
+              -3.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {},
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "0"
+          ],
+          "points": [
+            [
+              12.0,
+              -2.0
+            ],
+            [
+              12.0,
+              -3.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {},
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "0"
+          ],
+          "points": [
+            [
+              20.0,
+              -2.0
+            ],
+            [
+              20.0,
+              -3.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {},
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "0"
+          ],
+          "points": [
+            [
+              30.0,
+              -2.0
+            ],
+            [
+              30.0,
+              -3.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {},
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "0"
+          ],
+          "points": [
+            [
+              40.0,
+              -2.0
+            ],
+            [
+              40.0,
+              -3.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {},
+          "layer": "middle"
+        }
+      ],
+      "shapes": [],
+      "texts": [
+        {
+          "id": "#T1::name",
+          "anchor": [
+            0.0,
+            1.15
+          ],
+          "lines": [
+            [
+              {
+                "text": "T1",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "middle",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {},
+          "layer": "middle"
+        },
+        {
+          "id": "#O1::name",
+          "anchor": [
+            10.0,
+            1.15
+          ],
+          "lines": [
+            [
+              {
+                "text": "O1",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "middle",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {},
+          "layer": "middle"
+        },
+        {
+          "id": "#U1::name",
+          "anchor": [
+            20.0,
+            0.75
+          ],
+          "lines": [
+            [
+              {
+                "text": "U1",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "middle",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {},
+          "layer": "middle"
+        },
+        {
+          "id": "#Z1::name",
+          "anchor": [
+            30.5,
+            1.05
+          ],
+          "lines": [
+            [
+              {
+                "text": "Z1",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {},
+          "layer": "middle"
+        },
+        {
+          "id": "#Z1::model",
+          "anchor": [
+            30.5,
+            -1.75
+          ],
+          "lines": [
+            []
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {},
+          "layer": "middle"
+        },
+        {
+          "id": "#Z2::name",
+          "anchor": [
+            40.5,
+            1.05
+          ],
+          "lines": [
+            [
+              {
+                "text": "Z2",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {},
+          "layer": "middle"
+        },
+        {
+          "id": "#Z2::model",
+          "anchor": [
+            40.5,
+            -1.75
+          ],
+          "lines": [
+            []
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {},
+          "layer": "middle"
+        }
+      ],
+      "flylines": [],
+      "constraints": [
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        }
+      ],
+      "unplaced": []
+    }
+  ],
+  "diagnostics": []
+}

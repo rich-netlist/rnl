@@ -1,0 +1,19 @@
+// A netlist as Virtuoso writes it: the instances of subcircuits are named I0, I1 and so on
+*! A Spectre netlist exported by Virtuoso, where the instances of subcircuits are named I0 and I1 (16.3): the SPICE rule package does not act on this Spectre section, so they are drawn as subcircuit boxes, not as current sources; the real current source I2 is drawn by its master isource.
+*! The header record comes after simulator lang=spectre and is written with // (16.3). M0 and M1 in the subcircuit inv are drawn as P- and N-type MOS by model type.
+simulator lang=spectre
+// @RNL(type="header") { @USE-PACKAGE(name="rnl-std-all", version="0.4"); @VERSION("0.4")}
+// @RNL { # @SELECT-PIN(recursive=true) => @REMOVE-FROM $LABEL_FILL_SET; # @SELECT-INSTANCE(type="nmos", recursive=true) => @SET-SYMBOL $NMOS_4TERM; # @SELECT-INSTANCE(type="pmos", recursive=true) => @SET-SYMBOL $PMOS_4TERM; %bulk_ground_pins = $GROUND_NET_SET @SELECT-TERMINAL(type="nmos", terminal="b", recursive=true) => @SELECT-PIN(wired=false, recursive=true); $GROUND_NET_SET @SELECT-TERMINAL(type="pmos", terminal="b", recursive=true) => @SELECT-PIN(wired=false, recursive=true) => @ADD-TO %bulk_ground_pins; # @SELECT-USAGE(recursive=true) $NO_CONNECT => @SELECT-PIN(role="t", recursive=true) => @REMOVE-FROM %bulk_ground_pins; %bulk_ground_pins @ADD-TO $GROUND_FILL_SET; %bulk_supply_pins = $SUPPLY_NET_SET @SELECT-TERMINAL(type="nmos", terminal="b", recursive=true) => @SELECT-PIN(wired=false, recursive=true); $SUPPLY_NET_SET @SELECT-TERMINAL(type="pmos", terminal="b", recursive=true) => @SELECT-PIN(wired=false, recursive=true) => @ADD-TO %bulk_supply_pins; # @SELECT-USAGE(recursive=true) $NO_CONNECT => @SELECT-PIN(role="t", recursive=true) => @REMOVE-FROM %bulk_supply_pins; %bulk_supply_pins @ADD-TO $SUPPLY_FILL_SET; $PORT_FILL_NET_SET = # @SELECT-NET(port=true, recursive=true); $SUPPLY_NET_SET @REMOVE-FROM $PORT_FILL_NET_SET; $GROUND_NET_SET @REMOVE-FROM $PORT_FILL_NET_SET; # @SELECT-USAGE(recursive=true) $IO_PORT => @SELECT-NET(recursive=true) => @REMOVE-FROM $PORT_FILL_NET_SET; $IO_PORT @ATTACH $PORT_FILL_NET_SET }
+global 0 vdd!
+subckt inv in out
+    M0 (out in vdd! vdd!) pmos4 w=2u l=180n
+    M1 (out in 0 0) nmos4 w=1u l=180n
+// @RNL { #M0 @PLACE(0, 4); #M1 @PLACE(0, -4) }
+ends inv
+I0 (a b) inv
+I1 (b c) inv
+I2 (vdd! a) isource dc=10u
+V0 (vdd! 0) vsource dc=1.8
+model pmos4 bsim4 type=p
+model nmos4 bsim4 type=n
+// @RNL { #I0 @PLACE(0, 0); #I1 @PLACE(10, 0); #I2 @PLACE(-6, 4); #V0 @PLACE(-12, 0) }

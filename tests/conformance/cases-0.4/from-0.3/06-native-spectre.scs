@@ -1,0 +1,44 @@
+// Every element the Spectre adapter reads natively, each with its default symbol of the series 0.4
+*! A Spectre file of version 0.4 explicitly uses the standard collection 0.4 (16.3) and gets its symbols from the Spectre rule package rnl-std-spectre: built-in elements by master, instances of model cards by model type, P-type last; not by name, and not with rnl-std-spice.
+*! Apart from subcircuit calls, one line for each kind of element the Spectre adapter reads natively, relay and transformer included: terminals by their Spectre names, t0 t1 for switch, p n cp cn for relay, p1 n1 p2 n2 for transformer. The resistor named M3 is drawn as a resistor by its master, not by its name.
+simulator lang=spectre
+// @RNL(type="header") { @USE-PACKAGE(name="rnl-std-all", version="0.4"); @VERSION("0.4")}
+// @RNL { # @SELECT-PIN(recursive=true) => @REMOVE-FROM $LABEL_FILL_SET; # @SELECT-INSTANCE(type="nmos", recursive=true) => @SET-SYMBOL $NMOS_4TERM; # @SELECT-INSTANCE(type="pmos", recursive=true) => @SET-SYMBOL $PMOS_4TERM; # @SELECT-INSTANCE(model="relay", recursive=true) => @SET-SYMBOL $VOLTAGE_CONTROLLED_SWITCH; # @SELECT-INSTANCE(type="sw", recursive=true) => @SET-SYMBOL $VOLTAGE_CONTROLLED_SWITCH; %bulk_ground_pins = $GROUND_NET_SET @SELECT-TERMINAL(type="nmos", terminal="b", recursive=true) => @SELECT-PIN(wired=false, recursive=true); $GROUND_NET_SET @SELECT-TERMINAL(type="pmos", terminal="b", recursive=true) => @SELECT-PIN(wired=false, recursive=true) => @ADD-TO %bulk_ground_pins; # @SELECT-USAGE(recursive=true) $NO_CONNECT => @SELECT-PIN(role="t", recursive=true) => @REMOVE-FROM %bulk_ground_pins; %bulk_ground_pins @ADD-TO $GROUND_FILL_SET; %bulk_supply_pins = $SUPPLY_NET_SET @SELECT-TERMINAL(type="nmos", terminal="b", recursive=true) => @SELECT-PIN(wired=false, recursive=true); $SUPPLY_NET_SET @SELECT-TERMINAL(type="pmos", terminal="b", recursive=true) => @SELECT-PIN(wired=false, recursive=true) => @ADD-TO %bulk_supply_pins; # @SELECT-USAGE(recursive=true) $NO_CONNECT => @SELECT-PIN(role="t", recursive=true) => @REMOVE-FROM %bulk_supply_pins; %bulk_supply_pins @ADD-TO $SUPPLY_FILL_SET; $PORT_FILL_NET_SET = # @SELECT-NET(port=true, recursive=true); $SUPPLY_NET_SET @REMOVE-FROM $PORT_FILL_NET_SET; $GROUND_NET_SET @REMOVE-FROM $PORT_FILL_NET_SET; # @SELECT-USAGE(recursive=true) $IO_PORT => @SELECT-NET(recursive=true) => @REMOVE-FROM $PORT_FILL_NET_SET; $IO_PORT @ATTACH $PORT_FILL_NET_SET }
+r1 (a1 b1) resistor r=1k
+c1 (a2 b2) capacitor c=1p
+l1 (a3 b3) inductor l=1n
+v1 (a4 0) vsource dc=1
+i1 (a5 b5) isource dc=1m
+e1 (a6 b6 c6 d6) vcvs gain=2
+g1 (a7 b7 c7 d7) vccs gm=1m
+f1 (a8 b8) cccs gain=2 probe=v1
+h1 (a9 b9) ccvs rm=1k probe=v1
+b1 (a10 b10) bsource v=2*v(a1)
+sw1 (a11 b11) switch dc_position=1
+p1 (a12 0) port r=50
+d1 (a13 b13) dmod
+q1 (a14 b14 c14) npnmod
+q2 (a15 b15 c15) pnpmod
+m1 (a16 b16 c16 d16) nmosmod
+m2 (a17 b17 c17 d17) pmosmod
+j1 (a18 b18 c18) njfmod
+j2 (a19 b19 c19) pjfmod
+rp1 (a20 b20) rpolymod r=1k
+rel1 (a21 b21 c21 d21) relay
+t1 (a22 b22 c22 d22) transformer n1=1 n2=2
+M3 (a23 b23) resistor r=1k
+model dmod diode
+model npnmod bjt type=npn
+model pnpmod bjt type=pnp
+model nmosmod bsim4 type=n
+model pmosmod bsim4 type=p
+model njfmod jfet type=n
+model pjfmod jfet type=p
+model rpolymod resistor
+// @RNL {
+//   #r1 @PLACE(0, 0); #c1 @PLACE(10, 0); #l1 @PLACE(20, 0); #v1 @PLACE(30, 0); #i1 @PLACE(40, 0);
+//   #e1 @PLACE(0, -10); #g1 @PLACE(10, -10); #f1 @PLACE(20, -10); #h1 @PLACE(30, -10); #b1 @PLACE(40, -10);
+//   #sw1 @PLACE(0, -20); #p1 @PLACE(10, -20); #d1 @PLACE(20, -20); #q1 @PLACE(30, -20); #q2 @PLACE(40, -20);
+//   #m1 @PLACE(0, -30); #m2 @PLACE(10, -30); #j1 @PLACE(20, -30); #j2 @PLACE(30, -30); #rp1 @PLACE(40, -30);
+//   #rel1 @PLACE(0, -40); #t1 @PLACE(10, -40); #M3 @PLACE(20, -40)
+// }

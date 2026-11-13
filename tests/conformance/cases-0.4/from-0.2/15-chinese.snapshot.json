@@ -1,0 +1,4255 @@
+{
+  "schema": "rnl-snapshot/1",
+  "failed": null,
+  "language": "0.4",
+  "levels": [
+    {
+      "id": "file:15-chinese.sp",
+      "kind": "file",
+      "name": "15-chinese.sp",
+      "file": 0,
+      "line": 0,
+      "status": "constraints: 31 ok, 1 needs-solver",
+      "host": {
+        "ports": [],
+        "instances": [
+          {
+            "id": "#M1",
+            "subckt": false,
+            "master": "nch",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "d",
+                "net": "&x"
+              },
+              {
+                "n": 2,
+                "name": "g",
+                "net": "&inp"
+              },
+              {
+                "n": 3,
+                "name": "s",
+                "net": "&tail"
+              },
+              {
+                "n": 4,
+                "name": "b",
+                "net": "&vss"
+              }
+            ]
+          },
+          {
+            "id": "#M2",
+            "subckt": false,
+            "master": "nch",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "d",
+                "net": "&out"
+              },
+              {
+                "n": 2,
+                "name": "g",
+                "net": "&inn"
+              },
+              {
+                "n": 3,
+                "name": "s",
+                "net": "&tail"
+              },
+              {
+                "n": 4,
+                "name": "b",
+                "net": "&vss"
+              }
+            ]
+          },
+          {
+            "id": "#M3",
+            "subckt": false,
+            "master": "pch",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "d",
+                "net": "&x"
+              },
+              {
+                "n": 2,
+                "name": "g",
+                "net": "&x"
+              },
+              {
+                "n": 3,
+                "name": "s",
+                "net": "&vdd"
+              },
+              {
+                "n": 4,
+                "name": "b",
+                "net": "&vdd"
+              }
+            ]
+          },
+          {
+            "id": "#M4",
+            "subckt": false,
+            "master": "pch",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "d",
+                "net": "&out"
+              },
+              {
+                "n": 2,
+                "name": "g",
+                "net": "&x"
+              },
+              {
+                "n": 3,
+                "name": "s",
+                "net": "&vdd"
+              },
+              {
+                "n": 4,
+                "name": "b",
+                "net": "&vdd"
+              }
+            ]
+          },
+          {
+            "id": "#M5",
+            "subckt": false,
+            "master": "nch",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "d",
+                "net": "&tail"
+              },
+              {
+                "n": 2,
+                "name": "g",
+                "net": "&bias"
+              },
+              {
+                "n": 3,
+                "name": "s",
+                "net": "&vss"
+              },
+              {
+                "n": 4,
+                "name": "b",
+                "net": "&vss"
+              }
+            ]
+          },
+          {
+            "id": "#R1",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&vdd"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&n1"
+              }
+            ]
+          },
+          {
+            "id": "#R2",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&n1"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&bias"
+              }
+            ]
+          },
+          {
+            "id": "#R3",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&bias"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&vss"
+              }
+            ]
+          },
+          {
+            "id": "#CL",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&out"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&vss"
+              }
+            ]
+          }
+        ],
+        "nets": [
+          {
+            "id": "&x",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&inp",
+            "global": false,
+            "port": false,
+            "usages": [
+              {
+                "kind": "usage",
+                "id": "%pi",
+                "definition": "$NET_LABEL",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&inp",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 95,
+                "source": "written",
+                "state": "in-effect"
+              }
+            ]
+          },
+          {
+            "id": "&tail",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&vss",
+            "global": false,
+            "port": false,
+            "usages": [
+              {
+                "kind": "usage",
+                "id": "%g0",
+                "definition": "$GROUND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&vss",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 101,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "kind": "usage",
+                "id": "@rnl-std-basic.rnl:638:9",
+                "definition": "$GROUND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&vss",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 638,
+                "source": "body",
+                "made_in": "%gr",
+                "state": "in-effect"
+              },
+              {
+                "kind": "usage",
+                "id": "%gm5",
+                "definition": "$GROUND",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&vss",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 128,
+                "source": "solver",
+                "state": "in-effect"
+              }
+            ]
+          },
+          {
+            "id": "&out",
+            "global": false,
+            "port": false,
+            "usages": [
+              {
+                "kind": "usage",
+                "id": "%po",
+                "definition": "$NET_LABEL",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&out",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 97,
+                "source": "written",
+                "state": "in-effect"
+              }
+            ]
+          },
+          {
+            "id": "&inn",
+            "global": false,
+            "port": false,
+            "usages": [
+              {
+                "kind": "usage",
+                "id": "%pn",
+                "definition": "$NET_LABEL",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&inn",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 96,
+                "source": "written",
+                "state": "in-effect"
+              }
+            ]
+          },
+          {
+            "id": "&vdd",
+            "global": false,
+            "port": false,
+            "usages": [
+              {
+                "kind": "usage",
+                "id": "%sm3",
+                "definition": "$SUPPLY",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&vdd",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 129,
+                "source": "solver",
+                "state": "in-effect"
+              },
+              {
+                "kind": "usage",
+                "id": "%sm4",
+                "definition": "$SUPPLY",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&vdd",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 130,
+                "source": "solver",
+                "state": "in-effect"
+              },
+              {
+                "kind": "usage",
+                "id": "%sr1",
+                "definition": "$SUPPLY",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&vdd",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 131,
+                "source": "solver",
+                "state": "in-effect"
+              }
+            ]
+          },
+          {
+            "id": "&bias",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&n1",
+            "global": false,
+            "port": false
+          }
+        ]
+      },
+      "model": {
+        "symbols": [
+          {
+            "id": "$NMOS",
+            "name": "$NMOS",
+            "package": "rnl-std-semiconductors",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$PMOS",
+            "name": "$PMOS",
+            "package": "rnl-std-semiconductors",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$RESISTOR",
+            "name": "$RESISTOR",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$CAPACITOR",
+            "name": "$CAPACITOR",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$NET_LABEL_SYMBOL",
+            "name": "$NET_LABEL_SYMBOL",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$JUNCTION_SYMBOL",
+            "name": "$JUNCTION_SYMBOL",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$NAMED_GROUND_SYMBOL",
+            "name": "$NAMED_GROUND_SYMBOL",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$SUPPLY_SYMBOL",
+            "name": "$SUPPLY_SYMBOL",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          }
+        ],
+        "symbol": {
+          "value": null,
+          "source": null
+        },
+        "objects": [
+          {
+            "id": "#M1",
+            "kind": "instance",
+            "host": [
+              "#M1"
+            ],
+            "definition": null,
+            "attach": null,
+            "style": {
+              "bold": true,
+              "cap": "butt",
+              "fillcolor": "#ffffff",
+              "join": "miter",
+              "linecolor": "#1f4fd8",
+              "linestyle": "bold",
+              "linewidth": 0.16,
+              "size": 1.0,
+              "textcolor": "#1d1d1f"
+            },
+            "symbol": {
+              "value": "$NMOS",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -6.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(#M1,0)",
+                "index": 0,
+                "names": [
+                  "d"
+                ],
+                "bus": false,
+                "reference": "#M1::d",
+                "local_at": [
+                  0.0,
+                  2.0
+                ],
+                "terminals": [
+                  "#M1:1"
+                ],
+                "at": [
+                  -6.0,
+                  2.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&x"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#M1,1)",
+                "index": 1,
+                "names": [
+                  "g"
+                ],
+                "bus": false,
+                "reference": "#M1::g",
+                "local_at": [
+                  -3.0,
+                  0.0
+                ],
+                "terminals": [
+                  "#M1:2"
+                ],
+                "at": [
+                  -9.0,
+                  0.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&inp"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#M1,2)",
+                "index": 2,
+                "names": [
+                  "s"
+                ],
+                "bus": false,
+                "reference": "#M1::s",
+                "local_at": [
+                  0.0,
+                  -2.0
+                ],
+                "terminals": [
+                  "#M1:3"
+                ],
+                "at": [
+                  -6.0,
+                  -2.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&tail"
+                ]
+              }
+            ],
+            "usages": [
+              {
+                "kind": "usage",
+                "id": "%dp",
+                "definition": "$LEGACY_DIFFPAIR",
+                "roles": [
+                  {
+                    "role": "in_p",
+                    "set": false,
+                    "member": "#M1",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 51,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "kind": "usage",
+                "id": "@15-chinese.sp:57:5",
+                "definition": "$LEGACY_MIRROR_PAIR",
+                "roles": [
+                  {
+                    "role": "a",
+                    "set": false,
+                    "member": "#M1",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 57,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "kind": "usage",
+                "id": "%tc",
+                "definition": "$LEGACY_TAIL_CENTER",
+                "roles": [
+                  {
+                    "role": "a",
+                    "set": false,
+                    "member": "#M1",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 59,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "kind": "usage",
+                "id": "@15-chinese.sp:60:5",
+                "definition": "$LEGACY_FLOW",
+                "roles": [
+                  {
+                    "role": "path",
+                    "set": true,
+                    "member": "#M1",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 60,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "kind": "group",
+                "id": "%core",
+                "definition": "",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "#M1",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 67,
+                "source": "written",
+                "state": "in-effect"
+              }
+            ]
+          },
+          {
+            "id": "#M2",
+            "kind": "instance",
+            "host": [
+              "#M2"
+            ],
+            "definition": null,
+            "attach": null,
+            "style": {
+              "bold": true,
+              "cap": "butt",
+              "fillcolor": "#ffffff",
+              "join": "miter",
+              "linecolor": "#1f4fd8",
+              "linestyle": "bold",
+              "linewidth": 0.16,
+              "size": 1.0,
+              "textcolor": "#1d1d1f"
+            },
+            "symbol": {
+              "value": "$NMOS",
+              "source": null
+            },
+            "at": {
+              "value": [
+                6.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "MY",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(#M2,0)",
+                "index": 0,
+                "names": [
+                  "d"
+                ],
+                "bus": false,
+                "reference": "#M2::d",
+                "local_at": [
+                  0.0,
+                  2.0
+                ],
+                "terminals": [
+                  "#M2:1"
+                ],
+                "at": [
+                  6.0,
+                  2.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&out"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#M2,1)",
+                "index": 1,
+                "names": [
+                  "g"
+                ],
+                "bus": false,
+                "reference": "#M2::g",
+                "local_at": [
+                  -3.0,
+                  0.0
+                ],
+                "terminals": [
+                  "#M2:2"
+                ],
+                "at": [
+                  9.0,
+                  0.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&inn"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#M2,2)",
+                "index": 2,
+                "names": [
+                  "s"
+                ],
+                "bus": false,
+                "reference": "#M2::s",
+                "local_at": [
+                  0.0,
+                  -2.0
+                ],
+                "terminals": [
+                  "#M2:3"
+                ],
+                "at": [
+                  6.0,
+                  -2.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&tail"
+                ]
+              }
+            ],
+            "usages": [
+              {
+                "kind": "usage",
+                "id": "%dp",
+                "definition": "$LEGACY_DIFFPAIR",
+                "roles": [
+                  {
+                    "role": "in_n",
+                    "set": false,
+                    "member": "#M2",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 51,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "kind": "usage",
+                "id": "@15-chinese.sp:57:5",
+                "definition": "$LEGACY_MIRROR_PAIR",
+                "roles": [
+                  {
+                    "role": "b",
+                    "set": false,
+                    "member": "#M2",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 57,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "kind": "usage",
+                "id": "%tc",
+                "definition": "$LEGACY_TAIL_CENTER",
+                "roles": [
+                  {
+                    "role": "b",
+                    "set": false,
+                    "member": "#M2",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 59,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "kind": "usage",
+                "id": "@15-chinese.sp:60:5",
+                "definition": "$LEGACY_FLOW",
+                "roles": [
+                  {
+                    "role": "path",
+                    "set": true,
+                    "member": "#M2",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 60,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "kind": "group",
+                "id": "%core",
+                "definition": "",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "#M2",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 67,
+                "source": "written",
+                "state": "in-effect"
+              }
+            ]
+          },
+          {
+            "id": "#M3",
+            "kind": "instance",
+            "host": [
+              "#M3"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$PMOS",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -6.0,
+                8.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "MY",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(#M3,0)",
+                "index": 0,
+                "names": [
+                  "d"
+                ],
+                "bus": false,
+                "reference": "#M3::d",
+                "local_at": [
+                  0.0,
+                  -2.0
+                ],
+                "terminals": [
+                  "#M3:1"
+                ],
+                "at": [
+                  -6.0,
+                  6.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&x"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#M3,1)",
+                "index": 1,
+                "names": [
+                  "g"
+                ],
+                "bus": false,
+                "reference": "#M3::g",
+                "local_at": [
+                  -3.0,
+                  0.0
+                ],
+                "terminals": [
+                  "#M3:2"
+                ],
+                "at": [
+                  -3.0,
+                  8.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&x"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#M3,2)",
+                "index": 2,
+                "names": [
+                  "s"
+                ],
+                "bus": false,
+                "reference": "#M3::s",
+                "local_at": [
+                  0.0,
+                  2.0
+                ],
+                "terminals": [
+                  "#M3:3"
+                ],
+                "at": [
+                  -6.0,
+                  10.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&vdd"
+                ]
+              }
+            ],
+            "usages": [
+              {
+                "kind": "usage",
+                "id": "@15-chinese.sp:52:5",
+                "definition": "$LEGACY_MIRROR",
+                "roles": [
+                  {
+                    "role": "ref",
+                    "set": false,
+                    "member": "#M3",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 52,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "kind": "usage",
+                "id": "@15-chinese.sp:58:5",
+                "definition": "$LEGACY_MIRROR_PAIR",
+                "roles": [
+                  {
+                    "role": "a",
+                    "set": false,
+                    "member": "#M3",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 58,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "kind": "group",
+                "id": "%core",
+                "definition": "",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "#M3",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 67,
+                "source": "written",
+                "state": "in-effect"
+              }
+            ]
+          },
+          {
+            "id": "#M4",
+            "kind": "instance",
+            "host": [
+              "#M4"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$PMOS",
+              "source": null
+            },
+            "at": {
+              "value": [
+                6.0,
+                8.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(#M4,0)",
+                "index": 0,
+                "names": [
+                  "d"
+                ],
+                "bus": false,
+                "reference": "#M4::d",
+                "local_at": [
+                  0.0,
+                  -2.0
+                ],
+                "terminals": [
+                  "#M4:1"
+                ],
+                "at": [
+                  6.0,
+                  6.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&out"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#M4,1)",
+                "index": 1,
+                "names": [
+                  "g"
+                ],
+                "bus": false,
+                "reference": "#M4::g",
+                "local_at": [
+                  -3.0,
+                  0.0
+                ],
+                "terminals": [
+                  "#M4:2"
+                ],
+                "at": [
+                  3.0,
+                  8.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&x"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#M4,2)",
+                "index": 2,
+                "names": [
+                  "s"
+                ],
+                "bus": false,
+                "reference": "#M4::s",
+                "local_at": [
+                  0.0,
+                  2.0
+                ],
+                "terminals": [
+                  "#M4:3"
+                ],
+                "at": [
+                  6.0,
+                  10.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&vdd"
+                ]
+              }
+            ],
+            "usages": [
+              {
+                "kind": "usage",
+                "id": "@15-chinese.sp:52:5",
+                "definition": "$LEGACY_MIRROR",
+                "roles": [
+                  {
+                    "role": "out",
+                    "set": false,
+                    "member": "#M4",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 52,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "kind": "usage",
+                "id": "@15-chinese.sp:58:5",
+                "definition": "$LEGACY_MIRROR_PAIR",
+                "roles": [
+                  {
+                    "role": "b",
+                    "set": false,
+                    "member": "#M4",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 58,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "kind": "group",
+                "id": "%core",
+                "definition": "",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "#M4",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 67,
+                "source": "written",
+                "state": "in-effect"
+              }
+            ]
+          },
+          {
+            "id": "#M5",
+            "kind": "instance",
+            "host": [
+              "#M5"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$NMOS",
+              "source": null
+            },
+            "at": {
+              "value": [
+                0.0,
+                -6.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(#M5,0)",
+                "index": 0,
+                "names": [
+                  "d"
+                ],
+                "bus": false,
+                "reference": "#M5::d",
+                "local_at": [
+                  0.0,
+                  2.0
+                ],
+                "terminals": [
+                  "#M5:1"
+                ],
+                "at": [
+                  0.0,
+                  -4.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&tail"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#M5,1)",
+                "index": 1,
+                "names": [
+                  "g"
+                ],
+                "bus": false,
+                "reference": "#M5::g",
+                "local_at": [
+                  -3.0,
+                  0.0
+                ],
+                "terminals": [
+                  "#M5:2"
+                ],
+                "at": [
+                  -3.0,
+                  -6.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&bias"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#M5,2)",
+                "index": 2,
+                "names": [
+                  "s"
+                ],
+                "bus": false,
+                "reference": "#M5::s",
+                "local_at": [
+                  0.0,
+                  -2.0
+                ],
+                "terminals": [
+                  "#M5:3"
+                ],
+                "at": [
+                  0.0,
+                  -8.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&vss"
+                ]
+              }
+            ],
+            "usages": [
+              {
+                "kind": "usage",
+                "id": "@15-chinese.sp:53:5",
+                "definition": "$LEGACY_INPUT_STAGE",
+                "roles": [
+                  {
+                    "role": "tail",
+                    "set": false,
+                    "member": "#M5",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 53,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "kind": "usage",
+                "id": "%tc",
+                "definition": "$LEGACY_TAIL_CENTER",
+                "roles": [
+                  {
+                    "role": "t",
+                    "set": false,
+                    "member": "#M5",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 59,
+                "source": "written",
+                "state": "in-effect"
+              },
+              {
+                "kind": "group",
+                "id": "%core",
+                "definition": "",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "#M5",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 67,
+                "source": "written",
+                "state": "in-effect"
+              }
+            ]
+          },
+          {
+            "id": "#R1",
+            "kind": "instance",
+            "host": [
+              "#R1"
+            ],
+            "definition": null,
+            "attach": null,
+            "style": {
+              "linecolor": "#e07000",
+              "textcolor": "#e07000"
+            },
+            "symbol": {
+              "value": "$RESISTOR",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -24.0,
+                -12.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R90",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(#R1,0)",
+                "index": 0,
+                "names": [
+                  "p"
+                ],
+                "bus": false,
+                "reference": "#R1::p",
+                "local_at": [
+                  0.0,
+                  2.0
+                ],
+                "terminals": [
+                  "#R1:1"
+                ],
+                "at": [
+                  -26.0,
+                  -12.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&vdd"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#R1,1)",
+                "index": 1,
+                "names": [
+                  "n"
+                ],
+                "bus": false,
+                "reference": "#R1::n",
+                "local_at": [
+                  0.0,
+                  -2.0
+                ],
+                "terminals": [
+                  "#R1:2"
+                ],
+                "at": [
+                  -22.0,
+                  -12.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&n1"
+                ]
+              }
+            ],
+            "usages": [
+              {
+                "kind": "usage",
+                "id": "%bc",
+                "definition": "$偏置链",
+                "roles": [
+                  {
+                    "role": "电阻",
+                    "set": true,
+                    "member": "#R1",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 73,
+                "source": "written",
+                "state": "in-effect"
+              }
+            ]
+          },
+          {
+            "id": "#R2",
+            "kind": "instance",
+            "host": [
+              "#R2"
+            ],
+            "definition": null,
+            "attach": null,
+            "style": {
+              "linecolor": "#e07000",
+              "textcolor": "#e07000"
+            },
+            "symbol": {
+              "value": "$RESISTOR",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -16.0,
+                -12.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R90",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(#R2,0)",
+                "index": 0,
+                "names": [
+                  "p"
+                ],
+                "bus": false,
+                "reference": "#R2::p",
+                "local_at": [
+                  0.0,
+                  2.0
+                ],
+                "terminals": [
+                  "#R2:1"
+                ],
+                "at": [
+                  -18.0,
+                  -12.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&n1"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#R2,1)",
+                "index": 1,
+                "names": [
+                  "n"
+                ],
+                "bus": false,
+                "reference": "#R2::n",
+                "local_at": [
+                  0.0,
+                  -2.0
+                ],
+                "terminals": [
+                  "#R2:2"
+                ],
+                "at": [
+                  -14.0,
+                  -12.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&bias"
+                ]
+              }
+            ],
+            "usages": [
+              {
+                "kind": "usage",
+                "id": "%bc",
+                "definition": "$偏置链",
+                "roles": [
+                  {
+                    "role": "电阻",
+                    "set": true,
+                    "member": "#R2",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 73,
+                "source": "written",
+                "state": "in-effect"
+              }
+            ]
+          },
+          {
+            "id": "#R3",
+            "kind": "instance",
+            "host": [
+              "#R3"
+            ],
+            "definition": null,
+            "attach": null,
+            "style": {
+              "linecolor": "#e07000",
+              "textcolor": "#e07000"
+            },
+            "symbol": {
+              "value": "$RESISTOR",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -8.0,
+                -12.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R90",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(#R3,0)",
+                "index": 0,
+                "names": [
+                  "p"
+                ],
+                "bus": false,
+                "reference": "#R3::p",
+                "local_at": [
+                  0.0,
+                  2.0
+                ],
+                "terminals": [
+                  "#R3:1"
+                ],
+                "at": [
+                  -10.0,
+                  -12.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&bias"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#R3,1)",
+                "index": 1,
+                "names": [
+                  "n"
+                ],
+                "bus": false,
+                "reference": "#R3::n",
+                "local_at": [
+                  0.0,
+                  -2.0
+                ],
+                "terminals": [
+                  "#R3:2"
+                ],
+                "at": [
+                  -6.0,
+                  -12.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&vss"
+                ]
+              }
+            ],
+            "usages": [
+              {
+                "kind": "usage",
+                "id": "%bc",
+                "definition": "$偏置链",
+                "roles": [
+                  {
+                    "role": "电阻",
+                    "set": true,
+                    "member": "#R3",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 73,
+                "source": "written",
+                "state": "in-effect"
+              }
+            ]
+          },
+          {
+            "id": "#CL",
+            "kind": "instance",
+            "host": [
+              "#CL"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$CAPACITOR",
+              "source": null
+            },
+            "at": {
+              "value": [
+                16.0,
+                1.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(#CL,0)",
+                "index": 0,
+                "names": [
+                  "p"
+                ],
+                "bus": false,
+                "reference": "#CL::p",
+                "local_at": [
+                  0.0,
+                  2.0
+                ],
+                "terminals": [
+                  "#CL:1"
+                ],
+                "at": [
+                  16.0,
+                  3.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&out"
+                ]
+              },
+              {
+                "kind": "pin",
+                "id": "pin(#CL,1)",
+                "index": 1,
+                "names": [
+                  "n"
+                ],
+                "bus": false,
+                "reference": "#CL::n",
+                "local_at": [
+                  0.0,
+                  -2.0
+                ],
+                "terminals": [
+                  "#CL:2"
+                ],
+                "at": [
+                  16.0,
+                  -1.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&vss"
+                ]
+              }
+            ],
+            "usages": [
+              {
+                "kind": "usage",
+                "id": "@15-chinese.sp:60:5",
+                "definition": "$LEGACY_FLOW",
+                "roles": [
+                  {
+                    "role": "path",
+                    "set": true,
+                    "member": "#CL",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 60,
+                "source": "written",
+                "state": "in-effect"
+              }
+            ]
+          },
+          {
+            "id": "%dp",
+            "kind": "usage",
+            "host": [],
+            "definition": "$LEGACY_DIFFPAIR",
+            "attach": {
+              "in_p": "#M1",
+              "in_n": "#M2"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [],
+            "usages": [
+              {
+                "kind": "usage",
+                "id": "@15-chinese.sp:53:5",
+                "definition": "$LEGACY_INPUT_STAGE",
+                "roles": [
+                  {
+                    "role": "pair",
+                    "set": false,
+                    "member": "%dp",
+                    "terminal": null
+                  }
+                ],
+                "file": 0,
+                "line": 53,
+                "source": "written",
+                "state": "in-effect"
+              }
+            ]
+          },
+          {
+            "id": "@15-chinese.sp:52:5",
+            "kind": "usage",
+            "host": [],
+            "definition": "$LEGACY_MIRROR",
+            "attach": {
+              "ref": "#M3",
+              "out": "#M4"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@15-chinese.sp:53:5",
+            "kind": "usage",
+            "host": [],
+            "definition": "$LEGACY_INPUT_STAGE",
+            "attach": {
+              "pair": "%dp",
+              "tail": "#M5"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@15-chinese.sp:57:5",
+            "kind": "usage",
+            "host": [],
+            "definition": "$LEGACY_MIRROR_PAIR",
+            "attach": {
+              "a": "#M1",
+              "b": "#M2",
+              "axis": "%ax"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@15-chinese.sp:58:5",
+            "kind": "usage",
+            "host": [],
+            "definition": "$LEGACY_MIRROR_PAIR",
+            "attach": {
+              "a": "#M3",
+              "b": "#M4",
+              "axis": "%ax"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "%tc",
+            "kind": "usage",
+            "host": [],
+            "definition": "$LEGACY_TAIL_CENTER",
+            "attach": {
+              "a": "#M1",
+              "b": "#M2",
+              "t": "#M5"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": [
+                0.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@15-chinese.sp:60:5",
+            "kind": "usage",
+            "host": [],
+            "definition": "$LEGACY_FLOW",
+            "attach": {
+              "path": [
+                "#M1",
+                "#M2",
+                "#CL"
+              ]
+            },
+            "params": {
+              "direction": "从左到右"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "%bc",
+            "kind": "usage",
+            "host": [],
+            "definition": "$偏置链",
+            "attach": {
+              "电阻": [
+                "#R1",
+                "#R2",
+                "#R3"
+              ]
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "%po",
+            "kind": "usage",
+            "host": [],
+            "definition": "$NET_LABEL",
+            "attach": {
+              "p": "&out"
+            },
+            "symbol": {
+              "value": "$NET_LABEL_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                21.0,
+                4.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(%po,0)",
+                "index": 0,
+                "names": [
+                  "pin"
+                ],
+                "bus": false,
+                "reference": "%po::pin",
+                "local_at": [
+                  0.0,
+                  0.0
+                ],
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  21.0,
+                  4.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&out"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "@15-chinese.sp:93:5",
+            "kind": "usage",
+            "host": [],
+            "definition": "$JUNCTION",
+            "attach": {
+              "p": "%jd"
+            },
+            "symbol": {
+              "value": "$JUNCTION_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -6.0,
+                4.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@15-chinese.sp:93:35",
+            "kind": "usage",
+            "host": [],
+            "definition": "$JUNCTION",
+            "attach": {
+              "p": "%jg"
+            },
+            "symbol": {
+              "value": "$JUNCTION_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -2.0,
+                8.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@15-chinese.sp:93:65",
+            "kind": "usage",
+            "host": [],
+            "definition": "$JUNCTION",
+            "attach": {
+              "p": "%jo"
+            },
+            "symbol": {
+              "value": "$JUNCTION_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                6.0,
+                4.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@15-chinese.sp:93:94",
+            "kind": "usage",
+            "host": [],
+            "definition": "$JUNCTION",
+            "attach": {
+              "p": "%jc"
+            },
+            "symbol": {
+              "value": "$JUNCTION_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                16.0,
+                4.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@15-chinese.sp:93:124",
+            "kind": "usage",
+            "host": [],
+            "definition": "$JUNCTION",
+            "attach": {
+              "p": "%jt"
+            },
+            "symbol": {
+              "value": "$JUNCTION_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                0.0,
+                -3.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@15-chinese.sp:93:154",
+            "kind": "usage",
+            "host": [],
+            "definition": "$JUNCTION",
+            "attach": {
+              "p": "%jb"
+            },
+            "symbol": {
+              "value": "$JUNCTION_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -12.0,
+                -12.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "%pi",
+            "kind": "usage",
+            "host": [],
+            "definition": "$NET_LABEL",
+            "attach": {
+              "p": "&inp"
+            },
+            "symbol": {
+              "value": "$NET_LABEL_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -11.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "MY",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(%pi,0)",
+                "index": 0,
+                "names": [
+                  "pin"
+                ],
+                "bus": false,
+                "reference": "%pi::pin",
+                "local_at": [
+                  0.0,
+                  0.0
+                ],
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  -11.0,
+                  0.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&inp"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "%pn",
+            "kind": "usage",
+            "host": [],
+            "definition": "$NET_LABEL",
+            "attach": {
+              "p": "&inn"
+            },
+            "symbol": {
+              "value": "$NET_LABEL_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                11.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(%pn,0)",
+                "index": 0,
+                "names": [
+                  "pin"
+                ],
+                "bus": false,
+                "reference": "%pn::pin",
+                "local_at": [
+                  0.0,
+                  0.0
+                ],
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  11.0,
+                  0.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&inn"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "%g0",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GROUND",
+            "attach": {
+              "p": "&vss"
+            },
+            "symbol": {
+              "value": "$NAMED_GROUND_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                16.0,
+                -4.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(%g0,0)",
+                "index": 0,
+                "names": [
+                  "pin"
+                ],
+                "bus": false,
+                "reference": "%g0::pin",
+                "local_at": [
+                  0.0,
+                  0.0
+                ],
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  16.0,
+                  -4.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&vss"
+                ]
+              }
+            ]
+          },
+          {
+            "pin_of": "#R3",
+            "id": "%gr",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GROUND_STUB",
+            "attach": {
+              "t": "pin(#R3,1)"
+            },
+            "params": {
+              "gap": 3.0
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "parent": "%gr",
+            "id": "@rnl-std-basic.rnl:638:9",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GROUND",
+            "attach": {
+              "p": "&vss"
+            },
+            "symbol": {
+              "value": "$NAMED_GROUND_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -5.0,
+                -15.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(@rnl-std-basic.rnl:638:9,0)",
+                "index": 0,
+                "names": [
+                  "pin"
+                ],
+                "bus": false,
+                "reference": "%gr::g::pin",
+                "local_at": [
+                  0.0,
+                  0.0
+                ],
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  -5.0,
+                  -15.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&vss"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "%gm5",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GROUND",
+            "attach": {
+              "p": "&vss"
+            },
+            "symbol": {
+              "value": "$NAMED_GROUND_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                0.0,
+                -10.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(%gm5,0)",
+                "index": 0,
+                "names": [
+                  "pin"
+                ],
+                "bus": false,
+                "reference": "%gm5::pin",
+                "local_at": [
+                  0.0,
+                  0.0
+                ],
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  0.0,
+                  -10.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&vss"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "%sm3",
+            "kind": "usage",
+            "host": [],
+            "definition": "$SUPPLY",
+            "attach": {
+              "p": "&vdd"
+            },
+            "symbol": {
+              "value": "$SUPPLY_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -6.0,
+                12.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(%sm3,0)",
+                "index": 0,
+                "names": [
+                  "pin"
+                ],
+                "bus": false,
+                "reference": "%sm3::pin",
+                "local_at": [
+                  0.0,
+                  0.0
+                ],
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  -6.0,
+                  12.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&vdd"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "%sm4",
+            "kind": "usage",
+            "host": [],
+            "definition": "$SUPPLY",
+            "attach": {
+              "p": "&vdd"
+            },
+            "symbol": {
+              "value": "$SUPPLY_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                6.0,
+                12.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(%sm4,0)",
+                "index": 0,
+                "names": [
+                  "pin"
+                ],
+                "bus": false,
+                "reference": "%sm4::pin",
+                "local_at": [
+                  0.0,
+                  0.0
+                ],
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  6.0,
+                  12.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&vdd"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "%sr1",
+            "kind": "usage",
+            "host": [],
+            "definition": "$SUPPLY",
+            "attach": {
+              "p": "&vdd"
+            },
+            "symbol": {
+              "value": "$SUPPLY_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -27.0,
+                -10.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(%sr1,0)",
+                "index": 0,
+                "names": [
+                  "pin"
+                ],
+                "bus": false,
+                "reference": "%sr1::pin",
+                "local_at": [
+                  0.0,
+                  0.0
+                ],
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  -27.0,
+                  -10.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&vdd"
+                ]
+              }
+            ]
+          }
+        ],
+        "points": [
+          {
+            "id": "%ax",
+            "at": {
+              "value": [
+                0.0,
+                3.0
+              ],
+              "source": null
+            },
+            "junction": false
+          },
+          {
+            "id": "%jc",
+            "at": {
+              "value": [
+                16.0,
+                4.0
+              ],
+              "source": null
+            },
+            "junction": true
+          },
+          {
+            "id": "%jd",
+            "at": {
+              "value": [
+                -6.0,
+                4.0
+              ],
+              "source": null
+            },
+            "junction": true
+          },
+          {
+            "id": "%jg",
+            "at": {
+              "value": [
+                -2.0,
+                8.0
+              ],
+              "source": null
+            },
+            "junction": true
+          },
+          {
+            "id": "%jo",
+            "at": {
+              "value": [
+                6.0,
+                4.0
+              ],
+              "source": null
+            },
+            "junction": true
+          },
+          {
+            "id": "%jt",
+            "at": {
+              "value": [
+                0.0,
+                -3.0
+              ],
+              "source": null
+            },
+            "junction": true
+          },
+          {
+            "id": "%jb",
+            "at": {
+              "value": [
+                -12.0,
+                -12.0
+              ],
+              "source": null
+            },
+            "junction": true
+          }
+        ],
+        "wires": [
+          {
+            "id": "@15-chinese.sp:81:8",
+            "nets": [
+              "&x"
+            ],
+            "via": [
+              {
+                "terminal": "#M3:1"
+              },
+              {
+                "point": "%jd"
+              },
+              {
+                "terminal": "#M1:1"
+              }
+            ],
+            "points": [
+              [
+                -6.0,
+                6.0
+              ],
+              [
+                -6.0,
+                4.0
+              ],
+              [
+                -6.0,
+                2.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@15-chinese.sp:82:8",
+            "nets": [
+              "&x"
+            ],
+            "via": [
+              {
+                "terminal": "#M3:2"
+              },
+              {
+                "point": "%jg"
+              },
+              {
+                "terminal": "#M4:2"
+              }
+            ],
+            "points": [
+              [
+                -3.0,
+                8.0
+              ],
+              [
+                -2.0,
+                8.0
+              ],
+              [
+                3.0,
+                8.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@15-chinese.sp:83:8",
+            "nets": [
+              "&x"
+            ],
+            "via": [
+              {
+                "point": "%jd"
+              },
+              {
+                "at": [
+                  -2.0,
+                  4.0
+                ]
+              },
+              {
+                "point": "%jg"
+              }
+            ],
+            "points": [
+              [
+                -6.0,
+                4.0
+              ],
+              [
+                -2.0,
+                4.0
+              ],
+              [
+                -2.0,
+                8.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@15-chinese.sp:84:8",
+            "nets": [
+              "&out"
+            ],
+            "via": [
+              {
+                "terminal": "#M4:1"
+              },
+              {
+                "point": "%jo"
+              },
+              {
+                "terminal": "#M2:1"
+              }
+            ],
+            "points": [
+              [
+                6.0,
+                6.0
+              ],
+              [
+                6.0,
+                4.0
+              ],
+              [
+                6.0,
+                2.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@15-chinese.sp:85:8",
+            "nets": [
+              "&tail"
+            ],
+            "via": [
+              {
+                "terminal": "#M1:3"
+              },
+              {
+                "at": [
+                  -6.0,
+                  -3.0
+                ]
+              },
+              {
+                "point": "%jt"
+              }
+            ],
+            "points": [
+              [
+                -6.0,
+                -2.0
+              ],
+              [
+                -6.0,
+                -3.0
+              ],
+              [
+                0.0,
+                -3.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@15-chinese.sp:86:8",
+            "nets": [
+              "&tail"
+            ],
+            "via": [
+              {
+                "terminal": "#M2:3"
+              },
+              {
+                "at": [
+                  6.0,
+                  -3.0
+                ]
+              },
+              {
+                "point": "%jt"
+              }
+            ],
+            "points": [
+              [
+                6.0,
+                -2.0
+              ],
+              [
+                6.0,
+                -3.0
+              ],
+              [
+                0.0,
+                -3.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@15-chinese.sp:87:8",
+            "nets": [
+              "&tail"
+            ],
+            "via": [
+              {
+                "point": "%jt"
+              },
+              {
+                "terminal": "#M5:1"
+              }
+            ],
+            "points": [
+              [
+                0.0,
+                -3.0
+              ],
+              [
+                0.0,
+                -4.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@15-chinese.sp:88:8",
+            "nets": [
+              "&out"
+            ],
+            "via": [
+              {
+                "point": "%jo"
+              },
+              {
+                "point": "%jc"
+              },
+              {
+                "usage": "%po",
+                "role": "p"
+              }
+            ],
+            "points": [
+              [
+                6.0,
+                4.0
+              ],
+              [
+                16.0,
+                4.0
+              ],
+              [
+                21.0,
+                4.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@15-chinese.sp:89:8",
+            "nets": [
+              "&out"
+            ],
+            "via": [
+              {
+                "point": "%jc"
+              },
+              {
+                "terminal": "#CL:1"
+              }
+            ],
+            "points": [
+              [
+                16.0,
+                4.0
+              ],
+              [
+                16.0,
+                3.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@15-chinese.sp:90:8",
+            "nets": [
+              "&n1"
+            ],
+            "via": [
+              {
+                "terminal": "#R1:2"
+              },
+              {
+                "terminal": "#R2:1"
+              }
+            ],
+            "points": [
+              [
+                -22.0,
+                -12.0
+              ],
+              [
+                -18.0,
+                -12.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@15-chinese.sp:91:8",
+            "nets": [
+              "&bias"
+            ],
+            "via": [
+              {
+                "terminal": "#R2:2"
+              },
+              {
+                "point": "%jb"
+              },
+              {
+                "terminal": "#R3:1"
+              }
+            ],
+            "points": [
+              [
+                -14.0,
+                -12.0
+              ],
+              [
+                -12.0,
+                -12.0
+              ],
+              [
+                -10.0,
+                -12.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@15-chinese.sp:92:8",
+            "nets": [
+              "&bias"
+            ],
+            "via": [
+              {
+                "point": "%jb"
+              },
+              {
+                "at": [
+                  -12.0,
+                  -6.0
+                ]
+              },
+              {
+                "terminal": "#M5:2"
+              }
+            ],
+            "points": [
+              [
+                -12.0,
+                -12.0
+              ],
+              [
+                -12.0,
+                -6.0
+              ],
+              [
+                -3.0,
+                -6.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@15-chinese.sp:98:8",
+            "nets": [
+              "&inp"
+            ],
+            "via": [
+              {
+                "usage": "%pi",
+                "role": "p"
+              },
+              {
+                "terminal": "#M1:2"
+              }
+            ],
+            "points": [
+              [
+                -11.0,
+                0.0
+              ],
+              [
+                -9.0,
+                0.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@15-chinese.sp:99:8",
+            "nets": [
+              "&inn"
+            ],
+            "via": [
+              {
+                "usage": "%pn",
+                "role": "p"
+              },
+              {
+                "terminal": "#M2:2"
+              }
+            ],
+            "points": [
+              [
+                11.0,
+                0.0
+              ],
+              [
+                9.0,
+                0.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@15-chinese.sp:102:8",
+            "nets": [
+              "&vss"
+            ],
+            "via": [
+              {
+                "terminal": "#CL:2"
+              },
+              {
+                "usage": "%g0",
+                "role": "p"
+              }
+            ],
+            "points": [
+              [
+                16.0,
+                -1.0
+              ],
+              [
+                16.0,
+                -4.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@rnl-std-basic.rnl:639:5",
+            "nets": [
+              "&vss"
+            ],
+            "via": [
+              {
+                "owner": "#R3",
+                "pin": 1,
+                "reference": "#R3::n"
+              },
+              {
+                "owner": "@rnl-std-basic.rnl:638:9",
+                "pin": 0,
+                "reference": "@rnl-std-basic.rnl:638:9::pin"
+              }
+            ],
+            "points": [
+              [
+                -6.0,
+                -12.0
+              ],
+              [
+                -5.0,
+                -12.0
+              ],
+              [
+                -5.0,
+                -15.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@15-chinese.sp:128:57",
+            "nets": [
+              "&vss"
+            ],
+            "via": [
+              {
+                "terminal": "#M5:3"
+              },
+              {
+                "usage": "%gm5",
+                "role": "p"
+              }
+            ],
+            "points": [
+              [
+                0.0,
+                -8.0
+              ],
+              [
+                0.0,
+                -10.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@15-chinese.sp:129:57",
+            "nets": [
+              "&vdd"
+            ],
+            "via": [
+              {
+                "terminal": "#M3:3"
+              },
+              {
+                "usage": "%sm3",
+                "role": "p"
+              }
+            ],
+            "points": [
+              [
+                -6.0,
+                10.0
+              ],
+              [
+                -6.0,
+                12.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@15-chinese.sp:130:56",
+            "nets": [
+              "&vdd"
+            ],
+            "via": [
+              {
+                "terminal": "#M4:3"
+              },
+              {
+                "usage": "%sm4",
+                "role": "p"
+              }
+            ],
+            "points": [
+              [
+                6.0,
+                10.0
+              ],
+              [
+                6.0,
+                12.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@15-chinese.sp:131:59",
+            "nets": [
+              "&vdd"
+            ],
+            "via": [
+              {
+                "terminal": "#R1:1"
+              },
+              {
+                "usage": "%sr1",
+                "role": "p"
+              }
+            ],
+            "points": [
+              [
+                -26.0,
+                -12.0
+              ],
+              [
+                -27.0,
+                -12.0
+              ],
+              [
+                -27.0,
+                -10.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          }
+        ],
+        "texts": [
+          {
+            "id": "#M1::wl",
+            "attach": "#M1",
+            "key": "wl",
+            "markup": {
+              "value": "W/L = ${w}/${l}",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "W/L = 4u/0.5u",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -15.0,
+              -4.0
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {
+              "bold": true,
+              "cap": "butt",
+              "fillcolor": "#ffffff",
+              "join": "miter",
+              "linecolor": "#1f4fd8",
+              "linestyle": "bold",
+              "linewidth": 0.16,
+              "size": 1.0,
+              "textcolor": "#1d1d1f"
+            }
+          },
+          {
+            "id": "%title",
+            "attach": null,
+            "key": null,
+            "markup": {
+              "value": "五管 OTA：偏置由 R1、R2、R3 分压给出",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "五管 OTA：偏置由 R1、R2、R3 分压给出",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -28.0,
+              18.0
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.1,
+            "style": {
+              "size": 1.1
+            }
+          },
+          {
+            "id": "#M1::name",
+            "attach": "#M1",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "M1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -5.5,
+              1.05
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {
+              "bold": true,
+              "cap": "butt",
+              "fillcolor": "#ffffff",
+              "join": "miter",
+              "linecolor": "#1f4fd8",
+              "linestyle": "bold",
+              "linewidth": 0.16,
+              "size": 1.0,
+              "textcolor": "#1d1d1f"
+            }
+          },
+          {
+            "id": "#M2::name",
+            "attach": "#M2",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "M2",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              5.5,
+              1.05
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {
+              "bold": true,
+              "cap": "butt",
+              "fillcolor": "#ffffff",
+              "join": "miter",
+              "linecolor": "#1f4fd8",
+              "linestyle": "bold",
+              "linewidth": 0.16,
+              "size": 1.0,
+              "textcolor": "#1d1d1f"
+            }
+          },
+          {
+            "id": "#M3::name",
+            "attach": "#M3",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "M3",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -6.5,
+              9.05
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#M4::name",
+            "attach": "#M4",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "M4",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              6.5,
+              9.05
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#M5::name",
+            "attach": "#M5",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "M5",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              0.5,
+              -4.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R1::name",
+            "attach": "#R1",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "R1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -24.25,
+              -11.05
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {
+              "linecolor": "#e07000",
+              "textcolor": "#e07000"
+            }
+          },
+          {
+            "id": "#R1::value",
+            "attach": "#R1",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "20k",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -22.8,
+              -11.05
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {
+              "linecolor": "#e07000",
+              "textcolor": "#e07000"
+            }
+          },
+          {
+            "id": "#R2::name",
+            "attach": "#R2",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "R2",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -16.25,
+              -11.05
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {
+              "linecolor": "#e07000",
+              "textcolor": "#e07000"
+            }
+          },
+          {
+            "id": "#R2::value",
+            "attach": "#R2",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "20k",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -14.8,
+              -11.05
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {
+              "linecolor": "#e07000",
+              "textcolor": "#e07000"
+            }
+          },
+          {
+            "id": "#R3::name",
+            "attach": "#R3",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "R3",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -8.25,
+              -11.05
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {
+              "linecolor": "#e07000",
+              "textcolor": "#e07000"
+            }
+          },
+          {
+            "id": "#R3::value",
+            "attach": "#R3",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "10k",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -6.8,
+              -11.05
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {
+              "linecolor": "#e07000",
+              "textcolor": "#e07000"
+            }
+          },
+          {
+            "id": "#CL::name",
+            "attach": "#CL",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "CL",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              17.2,
+              1.25
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#CL::value",
+            "attach": "#CL",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "1p",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              17.2,
+              -0.19999999999999996
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "%po::netname",
+            "attach": "%po",
+            "key": "netname",
+            "markup": {
+              "value": "${p}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "out",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              22.3,
+              4.0
+            ],
+            "halign": "start",
+            "valign": "middle",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "%pi::netname",
+            "attach": "%pi",
+            "key": "netname",
+            "markup": {
+              "value": "${p}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "inp",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -12.3,
+              0.0
+            ],
+            "halign": "start",
+            "valign": "middle",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "%pn::netname",
+            "attach": "%pn",
+            "key": "netname",
+            "markup": {
+              "value": "${p}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "inn",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              12.3,
+              0.0
+            ],
+            "halign": "start",
+            "valign": "middle",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "%g0::netname",
+            "attach": "%g0",
+            "key": "netname",
+            "markup": {
+              "value": "${p}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "vss",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              16.0,
+              -6.5
+            ],
+            "halign": "middle",
+            "valign": "top",
+            "rotate": 0.0,
+            "fix_rotate": true,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "@rnl-std-basic.rnl:638:9::netname",
+            "attach": "@rnl-std-basic.rnl:638:9",
+            "key": "netname",
+            "markup": {
+              "value": "${p}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "vss",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -5.0,
+              -17.5
+            ],
+            "halign": "middle",
+            "valign": "top",
+            "rotate": 0.0,
+            "fix_rotate": true,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "%gm5::netname",
+            "attach": "%gm5",
+            "key": "netname",
+            "markup": {
+              "value": "${p}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "vss",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              0.0,
+              -12.5
+            ],
+            "halign": "middle",
+            "valign": "top",
+            "rotate": 0.0,
+            "fix_rotate": true,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "%sm3::netname",
+            "attach": "%sm3",
+            "key": "netname",
+            "markup": {
+              "value": "${p}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "vdd",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -6.0,
+              14.4
+            ],
+            "halign": "middle",
+            "valign": "bottom",
+            "rotate": 0.0,
+            "fix_rotate": true,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "%sm4::netname",
+            "attach": "%sm4",
+            "key": "netname",
+            "markup": {
+              "value": "${p}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "vdd",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              6.0,
+              14.4
+            ],
+            "halign": "middle",
+            "valign": "bottom",
+            "rotate": 0.0,
+            "fix_rotate": true,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "%sr1::netname",
+            "attach": "%sr1",
+            "key": "netname",
+            "markup": {
+              "value": "${p}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "vdd",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -27.0,
+              -7.6
+            ],
+            "halign": "middle",
+            "valign": "bottom",
+            "rotate": 0.0,
+            "fix_rotate": true,
+            "size": 1.0,
+            "style": {}
+          }
+        ],
+        "shapes": [
+          {
+            "id": "@15-chinese.sp:107:7",
+            "shape": "rectangle",
+            "points": [
+              [
+                -3.0,
+                -1.0
+              ]
+            ],
+            "params": {
+              "width": 62.0,
+              "height": 34.0,
+              "fill": "fillcolor"
+            },
+            "style": {
+              "fillcolor": "#1f4fd80d",
+              "linestyle": "dotted"
+            },
+            "layer": "bottom"
+          }
+        ],
+        "groups": [
+          {
+            "id": "%core",
+            "members": [
+              "#M1",
+              "#M2",
+              "#M3",
+              "#M4",
+              "#M5"
+            ],
+            "file": 0,
+            "line": 67,
+            "source": "written",
+            "state": "in-effect"
+          }
+        ]
+      }
+    }
+  ],
+  "dialect": "spice",
+  "packages": [
+    {
+      "name": "rnl-std-style",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-basic",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-semiconductors",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-fill",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-semantics",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-functional",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-rf",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-logic",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-signal-flow",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-spice",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-spectre",
+      "version": "0.4"
+    },
+    {
+      "name": "rnl-std-all",
+      "version": "0.4"
+    }
+  ],
+  "files": [
+    {
+      "path": "15-chinese.sp",
+      "name": "15-chinese.sp"
+    }
+  ]
+}

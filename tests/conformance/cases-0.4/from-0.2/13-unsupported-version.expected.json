@@ -1,0 +1,39 @@
+{
+  "failed": false,
+  "levels": [
+    {
+      "title": "13-unsupported-version.sp",
+      "kind": "file",
+      "file": "13-unsupported-version.sp",
+      "symbols": [],
+      "items": [],
+      "wires": [],
+      "shapes": [],
+      "texts": [],
+      "flylines": [],
+      "constraints": [],
+      "unplaced": [
+        "#R1",
+        "#C1"
+      ]
+    }
+  ],
+  "diagnostics": [
+    {
+      "severity": "error",
+      "code": "RNL2102",
+      "name": "version-unsupported",
+      "file": "13-unsupported-version.sp",
+      "line": 5,
+      "col": 25
+    },
+    {
+      "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
+      "file": "13-unsupported-version.sp",
+      "line": 1,
+      "col": 0
+    }
+  ]
+}

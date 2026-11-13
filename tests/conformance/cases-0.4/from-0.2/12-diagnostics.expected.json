@@ -1,0 +1,2224 @@
+{
+  "failed": false,
+  "levels": [
+    {
+      "title": "12-diagnostics.sp",
+      "kind": "file",
+      "file": "12-diagnostics.sp",
+      "symbols": [
+        {
+          "name": "$NMOS",
+          "box": [
+            -3.0,
+            -2.0,
+            1.4,
+            2.0
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                2.0
+              ],
+              "terminals": [
+                "d"
+              ],
+              "label": null,
+              "dir": 90
+            },
+            {
+              "pos": [
+                -3.0,
+                0.0
+              ],
+              "terminals": [
+                "g"
+              ],
+              "label": null,
+              "dir": 180
+            },
+            {
+              "pos": [
+                0.0,
+                -2.0
+              ],
+              "terminals": [
+                "s"
+              ],
+              "label": null,
+              "dir": 270
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.4244,
+                  0.6977
+                ],
+                [
+                  0.0,
+                  0.6977
+                ],
+                [
+                  0.0,
+                  2.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -2.1802,
+                  0.9593
+                ],
+                [
+                  -2.1802,
+                  -0.9593
+                ],
+                [
+                  -1.8895,
+                  -0.9593
+                ],
+                [
+                  -1.8895,
+                  0.9593
+                ],
+                [
+                  -2.1802,
+                  0.9593
+                ]
+              ],
+              "style": {
+                "linestyle": "none"
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.657,
+                  1.25
+                ],
+                [
+                  -1.657,
+                  -1.25
+                ],
+                [
+                  -1.3663,
+                  -1.25
+                ],
+                [
+                  -1.3663,
+                  1.25
+                ],
+                [
+                  -1.657,
+                  1.25
+                ]
+              ],
+              "style": {
+                "linestyle": "none"
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -2.0349,
+                  0.0
+                ],
+                [
+                  -3.0,
+                  0.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.5116,
+                  -0.6977
+                ],
+                [
+                  0.0,
+                  -0.6977
+                ],
+                [
+                  0.0,
+                  -2.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0581,
+                  -0.6977
+                ],
+                [
+                  -0.8721,
+                  -0.2907
+                ],
+                [
+                  -0.8721,
+                  -1.1047
+                ],
+                [
+                  0.0581,
+                  -0.6977
+                ]
+              ],
+              "style": {
+                "linestyle": "none"
+              }
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$RESISTOR",
+          "box": [
+            -1.0,
+            -2.0,
+            1.0,
+            2.0
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                2.0
+              ],
+              "terminals": [
+                "p"
+              ],
+              "label": null,
+              "dir": 90
+            },
+            {
+              "pos": [
+                0.0,
+                -2.0
+              ],
+              "terminals": [
+                "n"
+              ],
+              "label": null,
+              "dir": 270
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  2.0
+                ],
+                [
+                  0.0,
+                  0.8721
+                ],
+                [
+                  0.5372,
+                  0.6395
+                ],
+                [
+                  -0.4605,
+                  0.407
+                ],
+                [
+                  0.5372,
+                  0.1163
+                ],
+                [
+                  -0.4988,
+                  -0.1744
+                ],
+                [
+                  0.5372,
+                  -0.4651
+                ],
+                [
+                  -0.4605,
+                  -0.7558
+                ],
+                [
+                  0.0,
+                  -0.8721
+                ],
+                [
+                  0.0,
+                  -2.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$CAPACITOR",
+          "box": [
+            -1.2,
+            -2.0,
+            1.2,
+            2.0
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                2.0
+              ],
+              "terminals": [
+                "p"
+              ],
+              "label": null,
+              "dir": 90
+            },
+            {
+              "pos": [
+                0.0,
+                -2.0
+              ],
+              "terminals": [
+                "n"
+              ],
+              "label": null,
+              "dir": 270
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.8051,
+                  0.3234
+                ],
+                [
+                  -0.8051,
+                  0.3234
+                ]
+              ],
+              "style": {
+                "linewidth": 0.24
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.8051,
+                  -0.3234
+                ],
+                [
+                  -0.8051,
+                  -0.3234
+                ]
+              ],
+              "style": {
+                "linewidth": 0.24
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  0.3234
+                ],
+                [
+                  0.0,
+                  2.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  -0.3234
+                ],
+                [
+                  0.0,
+                  -2.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "(viewer default)",
+          "box": [
+            -3.0,
+            -1.0,
+            3.0,
+            1.0
+          ],
+          "box_written": false,
+          "default": true,
+          "pins": [
+            {
+              "pos": [
+                -3.0,
+                0.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": "x",
+              "dir": 180
+            },
+            {
+              "pos": [
+                3.0,
+                0.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": "y",
+              "dir": 0
+            }
+          ],
+          "prims": [
+            {
+              "shape": "RECTANGLE",
+              "points": [
+                [
+                  -2.0,
+                  -1.0
+                ],
+                [
+                  2.0,
+                  1.0
+                ]
+              ],
+              "style": {
+                "linestyle": "dashed"
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -3.0,
+                  0.0
+                ],
+                [
+                  -2.0,
+                  0.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  3.0,
+                  0.0
+                ],
+                [
+                  2.0,
+                  0.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$JUNCTION_SYMBOL",
+          "box": [
+            -0.4,
+            -0.4,
+            0.4,
+            0.4
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [],
+          "prims": [
+            {
+              "shape": "CIRCLE",
+              "points": [
+                [
+                  0.0,
+                  0.0
+                ]
+              ],
+              "style": {
+                "linestyle": "none"
+              }
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$GROUND_SYMBOL",
+          "box": [
+            -1.2,
+            -2.7,
+            1.2,
+            0.0
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                0.0
+              ],
+              "terminals": [
+                "p"
+              ],
+              "label": null,
+              "dir": 90
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  0.0
+                ],
+                [
+                  0.0,
+                  -1.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -0.6395,
+                  -1.0
+                ],
+                [
+                  0.6395,
+                  -1.0
+                ]
+              ],
+              "style": {
+                "linewidth": 0.2907
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -0.407,
+                  -1.5814
+                ],
+                [
+                  0.407,
+                  -1.5814
+                ]
+              ],
+              "style": {
+                "linewidth": 0.2907
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -0.2326,
+                  -2.1047
+                ],
+                [
+                  0.2326,
+                  -2.1047
+                ]
+              ],
+              "style": {
+                "linewidth": 0.2907
+              }
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$NET_LABEL_SYMBOL",
+          "box": [
+            0.0,
+            0.0,
+            1.0,
+            0.0
+          ],
+          "box_written": false,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                0.0
+              ],
+              "terminals": [
+                "p"
+              ],
+              "label": null,
+              "dir": 180
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  0.0
+                ],
+                [
+                  1.0,
+                  0.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        }
+      ],
+      "items": [
+        {
+          "id": "#M1",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            0.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#R1",
+          "kind": "instance",
+          "symbol": 1,
+          "at": [
+            6.0,
+            3.0
+          ],
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#R2",
+          "kind": "instance",
+          "symbol": 1,
+          "at": [
+            6.0,
+            -3.0
+          ],
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#C1",
+          "kind": "instance",
+          "symbol": 2,
+          "at": [
+            10.0,
+            -3.0
+          ],
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#X1",
+          "kind": "instance",
+          "symbol": 3,
+          "at": [
+            -8.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "a usage of $JUNCTION",
+          "kind": "usage",
+          "symbol": 4,
+          "at": [
+            3.0,
+            3.0
+          ],
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "%gs_M1_3",
+          "kind": "usage",
+          "symbol": 5,
+          "at": [
+            0.0,
+            -4.0
+          ],
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "%gs_R2_2",
+          "kind": "usage",
+          "symbol": 5,
+          "at": [
+            6.0,
+            -8.0
+          ],
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "%gs_C1_2",
+          "kind": "usage",
+          "symbol": 5,
+          "at": [
+            10.0,
+            -7.0
+          ],
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "%l",
+          "kind": "usage",
+          "symbol": 6,
+          "at": [
+            0.0,
+            2.0
+          ],
+          "orient": "R90",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "%l",
+          "kind": "usage",
+          "symbol": 6,
+          "at": [
+            -3.0,
+            0.0
+          ],
+          "orient": "R180",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "%l",
+          "kind": "usage",
+          "symbol": 6,
+          "at": [
+            10.0,
+            -1.0
+          ],
+          "orient": "R90",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        }
+      ],
+      "wires": [
+        {
+          "id": "%w",
+          "nets": [
+            "b"
+          ],
+          "points": [
+            [
+              6.0,
+              1.0
+            ],
+            [
+              6.0,
+              -1.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "a"
+          ],
+          "points": [
+            [
+              6.0,
+              5.0
+            ],
+            [
+              6.0,
+              6.0
+            ],
+            [
+              12.0,
+              6.0
+            ],
+            [
+              12.0,
+              1.0
+            ],
+            [
+              8.0,
+              1.0
+            ],
+            [
+              8.0,
+              0.0
+            ],
+            [
+              6.0,
+              0.0
+            ],
+            [
+              6.0,
+              -1.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "0"
+          ],
+          "points": [
+            [
+              0.0,
+              -2.0
+            ],
+            [
+              0.0,
+              -4.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "0"
+          ],
+          "points": [
+            [
+              6.0,
+              -5.0
+            ],
+            [
+              6.0,
+              -8.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "0"
+          ],
+          "points": [
+            [
+              10.0,
+              -5.0
+            ],
+            [
+              10.0,
+              -7.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        }
+      ],
+      "shapes": [],
+      "texts": [
+        {
+          "id": "#M1::note",
+          "anchor": [
+            1.2,
+            1.2
+          ],
+          "lines": [
+            [
+              {
+                "text": "drain?",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#C1::c",
+          "anchor": [
+            11.2,
+            -1.8
+          ],
+          "lines": [
+            [
+              {
+                "text": "ok",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#M1::name",
+          "anchor": [
+            0.5,
+            1.05
+          ],
+          "lines": [
+            [
+              {
+                "text": "M1",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#M1::model",
+          "anchor": [
+            0.5,
+            -1.75
+          ],
+          "lines": [
+            []
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#R1::name",
+          "anchor": [
+            6.95,
+            3.25
+          ],
+          "lines": [
+            [
+              {
+                "text": "R1",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#R1::value",
+          "anchor": [
+            6.95,
+            1.8
+          ],
+          "lines": [
+            [
+              {
+                "text": "1k",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#R2::name",
+          "anchor": [
+            6.95,
+            -2.75
+          ],
+          "lines": [
+            [
+              {
+                "text": "R2",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#R2::value",
+          "anchor": [
+            6.95,
+            -4.2
+          ],
+          "lines": [
+            [
+              {
+                "text": "1k",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#C1::name",
+          "anchor": [
+            11.2,
+            -2.75
+          ],
+          "lines": [
+            [
+              {
+                "text": "C1",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#C1::value",
+          "anchor": [
+            11.2,
+            -4.2
+          ],
+          "lines": [
+            [
+              {
+                "text": "1p",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#X1::name",
+          "anchor": [
+            -8.0,
+            1.3
+          ],
+          "lines": [
+            [
+              {
+                "text": "X1",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "middle",
+          "valign": "bottom",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "%l::netname",
+          "anchor": [
+            0.0,
+            3.3
+          ],
+          "lines": [
+            [
+              {
+                "text": "d",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "middle",
+          "rotate": 0.0,
+          "orient": "R90",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "%l::netname",
+          "anchor": [
+            -4.3,
+            0.0
+          ],
+          "lines": [
+            [
+              {
+                "text": "g",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "middle",
+          "rotate": 0.0,
+          "orient": "R180",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "%l::netname",
+          "anchor": [
+            10.0,
+            0.30000000000000004
+          ],
+          "lines": [
+            [
+              {
+                "text": "b",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "middle",
+          "rotate": 0.0,
+          "orient": "R90",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        }
+      ],
+      "flylines": [
+        [
+          [
+            0.0,
+            2.0
+          ],
+          [
+            0.0,
+            2.0
+          ]
+        ],
+        [
+          [
+            -3.0,
+            0.0
+          ],
+          [
+            -3.0,
+            0.0
+          ]
+        ],
+        [
+          [
+            0.0,
+            -4.0
+          ],
+          [
+            6.0,
+            -5.0
+          ]
+        ],
+        [
+          [
+            6.0,
+            -5.0
+          ],
+          [
+            10.0,
+            -5.0
+          ]
+        ],
+        [
+          [
+            6.0,
+            0.0
+          ],
+          [
+            -11.0,
+            0.0
+          ]
+        ],
+        [
+          [
+            6.0,
+            -1.0
+          ],
+          [
+            10.0,
+            -1.0
+          ]
+        ],
+        [
+          [
+            10.0,
+            -1.0
+          ],
+          [
+            10.0,
+            -1.0
+          ]
+        ],
+        [
+          [
+            6.0,
+            1.0
+          ],
+          [
+            -5.0,
+            0.0
+          ]
+        ]
+      ],
+      "constraints": [
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "failed",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ORIENT-RELATION",
+          "kind": "ORIENT-RELATION",
+          "status": "unsolved",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ORIENT-RELATION",
+          "kind": "ORIENT-RELATION",
+          "status": "unsolved",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ORIENT-RELATION",
+          "kind": "ORIENT-RELATION",
+          "status": "unsolved",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "unsolved",
+          "priority": "low"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "unsolved",
+          "priority": "low"
+        },
+        {
+          "label": "ORIENT-RELATION",
+          "kind": "ORIENT-RELATION",
+          "status": "unsolved",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "unsolved",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "unsolved",
+          "priority": "normal"
+        }
+      ],
+      "unplaced": [
+        "#R3",
+        "%g",
+        "%l"
+      ]
+    },
+    {
+      "title": "sub",
+      "kind": "subckt",
+      "file": "12-diagnostics.sp",
+      "symbols": [],
+      "items": [],
+      "wires": [],
+      "shapes": [],
+      "texts": [],
+      "flylines": [],
+      "constraints": [
+        {
+          "label": "ORIENT-RELATION",
+          "kind": "ORIENT-RELATION",
+          "status": "unsolved",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "unsolved",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "unsolved",
+          "priority": "normal"
+        },
+        {
+          "label": "ORIENT-RELATION",
+          "kind": "ORIENT-RELATION",
+          "status": "unsolved",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "unsolved",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "unsolved",
+          "priority": "normal"
+        }
+      ],
+      "unplaced": [
+        "#R9",
+        "%l",
+        "%l"
+      ]
+    }
+  ],
+  "diagnostics": [
+    {
+      "severity": "hint",
+      "code": "RNL0003",
+      "name": "host-non-ascii-comment",
+      "file": "12-diagnostics.sp",
+      "line": 15,
+      "col": 14
+    },
+    {
+      "severity": "warning",
+      "code": "RNL1013",
+      "name": "record-line-ends-backslash",
+      "file": "12-diagnostics.sp",
+      "line": 66,
+      "col": 75
+    },
+    {
+      "severity": "error",
+      "code": "RNL1002",
+      "name": "record-cut-off",
+      "file": "12-diagnostics.sp",
+      "line": 68,
+      "col": 26
+    },
+    {
+      "severity": "error",
+      "code": "RNL1016",
+      "name": "record-tokens-after-record",
+      "file": "12-diagnostics.sp",
+      "line": 81,
+      "col": 5
+    },
+    {
+      "severity": "error",
+      "code": "RNL2407",
+      "name": "alias-of-outer-form-keyword",
+      "file": "12-diagnostics.sp",
+      "line": 15,
+      "col": 5
+    },
+    {
+      "severity": "error",
+      "code": "RNL2205",
+      "name": "package-not-found",
+      "file": "12-diagnostics.sp",
+      "line": 17,
+      "col": 5
+    },
+    {
+      "severity": "warning",
+      "code": "RNL1103",
+      "name": "syntax-dot-after-reference",
+      "file": "12-diagnostics.sp",
+      "line": 26,
+      "col": 8
+    },
+    {
+      "severity": "warning",
+      "code": "RNL1113",
+      "name": "syntax-keyword-space-paren",
+      "file": "12-diagnostics.sp",
+      "line": 56,
+      "col": 16
+    },
+    {
+      "severity": "warning",
+      "code": "RNL1127",
+      "name": "syntax-pipe-bar",
+      "file": "12-diagnostics.sp",
+      "line": 62,
+      "col": 9
+    },
+    {
+      "severity": "error",
+      "code": "RNL1131",
+      "name": "syntax-positional-after-named",
+      "file": "12-diagnostics.sp",
+      "line": 35,
+      "col": 21
+    },
+    {
+      "severity": "error",
+      "code": "RNL1116",
+      "name": "syntax-named-segment-objects",
+      "file": "12-diagnostics.sp",
+      "line": 52,
+      "col": 11
+    },
+    {
+      "severity": "error",
+      "code": "RNL1129",
+      "name": "syntax-pipe-segment-no-keyword",
+      "file": "12-diagnostics.sp",
+      "line": 55,
+      "col": 12
+    },
+    {
+      "severity": "error",
+      "code": "RNL1130",
+      "name": "syntax-point-malformed",
+      "file": "12-diagnostics.sp",
+      "line": 57,
+      "col": 10
+    },
+    {
+      "severity": "error",
+      "code": "RNL1100",
+      "name": "syntax-angle-point",
+      "file": "12-diagnostics.sp",
+      "line": 61,
+      "col": 9
+    },
+    {
+      "severity": "warning",
+      "code": "RNL1003",
+      "name": "record-free-word-like-name",
+      "file": "12-diagnostics.sp",
+      "line": 27,
+      "col": 15
+    },
+    {
+      "severity": "error",
+      "code": "RNL2901",
+      "name": "scope-no-subcircuit",
+      "file": "12-diagnostics.sp",
+      "line": 65,
+      "col": 3
+    },
+    {
+      "severity": "error",
+      "code": "RNL3027",
+      "name": "keyword-unknown",
+      "file": "12-diagnostics.sp",
+      "line": 22,
+      "col": 15
+    },
+    {
+      "severity": "error",
+      "code": "RNL3221",
+      "name": "ref-not-found",
+      "file": "12-diagnostics.sp",
+      "line": 23,
+      "col": 21
+    },
+    {
+      "severity": "error",
+      "code": "RNL3512",
+      "name": "usage-role-wrong-kind",
+      "file": "12-diagnostics.sp",
+      "line": 24,
+      "col": 5
+    },
+    {
+      "severity": "warning",
+      "code": "RNL3305",
+      "name": "set-empty-literal",
+      "file": "12-diagnostics.sp",
+      "line": 25,
+      "col": 5
+    },
+    {
+      "severity": "error",
+      "code": "RNL3104",
+      "name": "param-distance-min-above-max",
+      "file": "12-diagnostics.sp",
+      "line": 33,
+      "col": 13
+    },
+    {
+      "severity": "error",
+      "code": "RNL5501",
+      "name": "distance-negative-bound-04",
+      "file": "12-diagnostics.sp",
+      "line": 34,
+      "col": 13
+    },
+    {
+      "severity": "error",
+      "code": "RNL3118",
+      "name": "param-unknown",
+      "file": "12-diagnostics.sp",
+      "line": 36,
+      "col": 16
+    },
+    {
+      "severity": "error",
+      "code": "RNL3101",
+      "name": "param-bad-enum",
+      "file": "12-diagnostics.sp",
+      "line": 37,
+      "col": 16
+    },
+    {
+      "severity": "error",
+      "code": "RNL3028",
+      "name": "keyword-unknown-missing-space",
+      "file": "12-diagnostics.sp",
+      "line": 38,
+      "col": 15
+    },
+    {
+      "severity": "error",
+      "code": "RNL3400",
+      "name": "define-body-host-ref",
+      "file": "12-diagnostics.sp",
+      "line": 40,
+      "col": 33
+    },
+    {
+      "severity": "error",
+      "code": "RNL3207",
+      "name": "ref-hole-param-as-object",
+      "file": "12-diagnostics.sp",
+      "line": 41,
+      "col": 56
+    },
+    {
+      "severity": "warning",
+      "code": "RNL3021",
+      "name": "keyword-set-symbol-block-no-effect",
+      "file": "12-diagnostics.sp",
+      "line": 42,
+      "col": 7
+    },
+    {
+      "severity": "warning",
+      "code": "RNL3415",
+      "name": "define-unnamed-unused",
+      "file": "12-diagnostics.sp",
+      "line": 43,
+      "col": 5
+    },
+    {
+      "severity": "error",
+      "code": "RNL3012",
+      "name": "keyword-header-only",
+      "file": "12-diagnostics.sp",
+      "line": 44,
+      "col": 5
+    },
+    {
+      "severity": "error",
+      "code": "RNL3016",
+      "name": "keyword-pin-outside-symbol",
+      "file": "12-diagnostics.sp",
+      "line": 45,
+      "col": 12
+    },
+    {
+      "severity": "error",
+      "code": "RNL3600",
+      "name": "priority-target-not-allowed",
+      "file": "12-diagnostics.sp",
+      "line": 46,
+      "col": 29
+    },
+    {
+      "severity": "error",
+      "code": "RNL3213",
+      "name": "ref-name-cycle",
+      "file": "12-diagnostics.sp",
+      "line": 48,
+      "col": 5
+    },
+    {
+      "severity": "hint",
+      "code": "RNL5005",
+      "name": "constraint-expansion-too-few-places",
+      "file": "12-diagnostics.sp",
+      "line": 48,
+      "col": 31
+    },
+    {
+      "severity": "warning",
+      "code": "RNL3506",
+      "name": "usage-in-symbol-not-drawn",
+      "file": "12-diagnostics.sp",
+      "line": 49,
+      "col": 28
+    },
+    {
+      "severity": "error",
+      "code": "RNL3114",
+      "name": "param-place-needs-x-or-y",
+      "file": "12-diagnostics.sp",
+      "line": 56,
+      "col": 9
+    },
+    {
+      "severity": "error",
+      "code": "RNL3507",
+      "name": "usage-not-a-definition",
+      "file": "12-diagnostics.sp",
+      "line": 58,
+      "col": 5
+    },
+    {
+      "severity": "error",
+      "code": "RNL3300",
+      "name": "select-ancestor-scope-level",
+      "file": "12-diagnostics.sp",
+      "line": 60,
+      "col": 5
+    },
+    {
+      "severity": "error",
+      "code": "RNL3014",
+      "name": "keyword-object-failed",
+      "file": "12-diagnostics.sp",
+      "line": 60,
+      "col": 41
+    },
+    {
+      "severity": "error",
+      "code": "RNL2801",
+      "name": "name-bound-twice",
+      "file": "12-diagnostics.sp",
+      "line": 28,
+      "col": 16
+    },
+    {
+      "severity": "error",
+      "code": "RNL4300",
+      "name": "place-not-taken",
+      "file": "12-diagnostics.sp",
+      "line": 32,
+      "col": 5
+    },
+    {
+      "severity": "error",
+      "code": "RNL5001",
+      "name": "constraint-member-not-locatable",
+      "file": "12-diagnostics.sp",
+      "line": 31,
+      "col": 5
+    },
+    {
+      "severity": "hint",
+      "code": "RNL5102",
+      "name": "conflict-fact-discarded-with-sets",
+      "file": "12-diagnostics.sp",
+      "line": 63,
+      "col": 5
+    },
+    {
+      "severity": "hint",
+      "code": "RNL5102",
+      "name": "conflict-fact-discarded-with-sets",
+      "file": "12-diagnostics.sp",
+      "line": 62,
+      "col": 5
+    },
+    {
+      "severity": "hint",
+      "code": "RNL5102",
+      "name": "conflict-fact-discarded-with-sets",
+      "file": "12-diagnostics.sp",
+      "line": 46,
+      "col": 5
+    },
+    {
+      "severity": "hint",
+      "code": "RNL5102",
+      "name": "conflict-fact-discarded-with-sets",
+      "file": "12-diagnostics.sp",
+      "line": 63,
+      "col": 5
+    },
+    {
+      "severity": "hint",
+      "code": "RNL5102",
+      "name": "conflict-fact-discarded-with-sets",
+      "file": "12-diagnostics.sp",
+      "line": 62,
+      "col": 5
+    },
+    {
+      "severity": "hint",
+      "code": "RNL5102",
+      "name": "conflict-fact-discarded-with-sets",
+      "file": "12-diagnostics.sp",
+      "line": 46,
+      "col": 5
+    },
+    {
+      "severity": "hint",
+      "code": "RNL5104",
+      "name": "conflict-statement-caused-discards",
+      "file": "12-diagnostics.sp",
+      "line": 71,
+      "col": 23
+    },
+    {
+      "severity": "hint",
+      "code": "RNL5104",
+      "name": "conflict-statement-caused-discards",
+      "file": "12-diagnostics.sp",
+      "line": 71,
+      "col": 41
+    },
+    {
+      "severity": "warning",
+      "code": "RNL4204",
+      "name": "wire-net-mismatch",
+      "file": "12-diagnostics.sp",
+      "line": 53,
+      "col": 5
+    },
+    {
+      "severity": "error",
+      "code": "RNL4413",
+      "name": "text-terminal-no-pin",
+      "file": "12-diagnostics.sp",
+      "line": 29,
+      "col": 5
+    },
+    {
+      "severity": "error",
+      "code": "RNL4402",
+      "name": "text-attr-path-fails",
+      "file": "12-diagnostics.sp",
+      "line": 39,
+      "col": 5
+    },
+    {
+      "severity": "error",
+      "code": "RNL4402",
+      "name": "text-attr-path-fails",
+      "file": "12-diagnostics.sp",
+      "line": 54,
+      "col": 49
+    },
+    {
+      "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
+      "file": "12-diagnostics.sp",
+      "line": 1,
+      "col": 0
+    },
+    {
+      "severity": "hint",
+      "code": "RNL3303",
+      "name": "select-usage-not-usage",
+      "file": "12-diagnostics.sp",
+      "line": 59,
+      "col": 5
+    },
+    {
+      "severity": "warning",
+      "code": "RNL2900",
+      "name": "rule-uses-own-level-objects",
+      "file": "12-diagnostics.sp",
+      "line": 51,
+      "col": 5
+    },
+    {
+      "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
+      "file": "12-diagnostics.sp",
+      "line": 8,
+      "col": 0
+    }
+  ]
+}

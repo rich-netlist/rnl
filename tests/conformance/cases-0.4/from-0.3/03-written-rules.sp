@@ -1,0 +1,14 @@
+* A rule package of the other dialect that the file writes is kept
+*! The file itself writes the rule package of the other dialect (a USE-PACKAGE of rnl-std-spectre); what is written comes first, so it takes effect as usual and is not implicitly left out (16.3).
+*! X1 is an instance of a subcircuit named resistor, drawn as a resistor by its master under the Spectre rules; R1 is drawn by the SPICE rules.
+* @RNL(type="header") { @USE-PACKAGE(name="rnl-std-all", version="0.4");
+*   @VERSION("0.4");
+*   @USE-PACKAGE(name="rnl-std-spectre", version="0.4")
+* }
+* @RNL { # @SELECT-PIN(recursive=true) => @REMOVE-FROM $LABEL_FILL_SET; $PORT_FILL_NET_SET = # @SELECT-NET(port=true, recursive=true); $SUPPLY_NET_SET @REMOVE-FROM $PORT_FILL_NET_SET; $GROUND_NET_SET @REMOVE-FROM $PORT_FILL_NET_SET; # @SELECT-USAGE(recursive=true) $IO_PORT => @SELECT-NET(recursive=true) => @REMOVE-FROM $PORT_FILL_NET_SET; $IO_PORT @ATTACH $PORT_FILL_NET_SET }
+.subckt resistor p n
+.ends
+R1 a 0 1k
+X1 a 0 resistor
+* @RNL { #R1 @PLACE(0, 0); #X1 @PLACE(10, 0) }
+.end

@@ -1,0 +1,5 @@
+@RNL(type="header") { @VERSION("0.4"); @PACKAGE(name="case04-no-rules", version="0.4"); @USE-PACKAGE(name="rnl-std-basic", version="0.4") }
+@RNL {
+  # @SELECT-INSTANCE(name="I*", recursive=true) => @SET-SYMBOL $CURRENT_SOURCE;
+  # @SELECT-INSTANCE(model="resistor", recursive=true) => @SET-SYMBOL $RESISTOR
+}

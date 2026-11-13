@@ -1,0 +1,51 @@
+// Two inverters: a subcircuit with its block symbol, two instances, a record written from above
+// @RNL(type="header") { @USE-PACKAGE(name="rnl-std-all", version="0.4"); @USE-PACKAGE(name="rnl-std-basic", version="0.4"); @VERSION("0.4")}
+model nch bsim4 type=n
+model pch bsim4 type=p
+subckt inv (a y vdd vss)
+MP (y a vdd vdd) pch w=2u l=0.18u
+MN (y a vss vss) nch w=1u l=0.18u
+// @RNL {
+//   %inv_sym = @DEFINE-SYMBOL(box=[-3, -2, 3, 2]) {
+//     (-3, 0) @PIN(terminal="a", direction="left"); (3, 0) @PIN(terminal="y", direction="right");
+//     (0, 2) @PIN(terminal="vdd", direction="up"); (0, -2) @PIN(terminal="vss", direction="down");
+//     @LINE {(-1, 1) (1, 0) (-1, -1) (-1, 1)}; (1.25, 0) @CIRCLE(radius=0.25);
+//     @LINE {(-3, 0) (-1, 0)}; @LINE {(1.5, 0) (3, 0)}; @LINE {(0, 2) (0, 0.5)}; @LINE {(0, -2) (0, -0.5)};
+//     ? @TEXT("${name}", key="name") => @PLACE(-1, 1.4)
+//   };
+//   # @SET-SYMBOL %inv_sym;
+//   {#MP #MN} @ALIGN("x");
+//   #MN #MP @DISTANCE("bottom-to-top", min=6);
+//   &vdd @ADD-TO $SUPPLY_NET_SET; &vss @ADD-TO $GROUND_NET_SET;
+//   %port_nets = # @SELECT-NET(port=true); {&vdd &vss} @REMOVE-FROM %port_nets; $IO_PORT @ATTACH %port_nets;
+//   &y @WIRE(mode="auto") {#MP:d #MN:d}
+// }
+// 
+// @RNL(type="generated", priority="high") {
+//   #MP @PLACE(0, 4); #MN @PLACE(0, -4);
+//   %net_label_stub_MP_g = $NET_LABEL_STUB @ATTACH #MP::g;
+//   %net_label_stub_MN_g = $NET_LABEL_STUB @ATTACH #MN::g;
+//   %net_label_stub_MP_g @PLACE(0,0); %net_label_stub_MP_g::l @PLACE(-3,4) => @ORIENT("R180");
+//   %net_label_stub_MN_g @PLACE(0,0); %net_label_stub_MN_g::l @PLACE(-3,-4) => @ORIENT("R180");
+// }
+
+ends inv
+X1 (in mid vdd 0) inv
+X2 (mid out vdd 0) inv
+Vdd (vdd 0) vsource dc=1.8
+// @RNL {
+//   &mid @WIRE(mode="auto") {#X1:y #X2:a};
+//   &vdd @ADD-TO $SUPPLY_NET_SET;
+//   # @SELECT-INSTANCE(model="inv", recursive=true) => @TEXT("${model}", key="cell", dy=-3)
+// }
+// @RNL(scope="inv") {
+//   #MN @SET-STYLE $grey
+// }
+//
+// @RNL(type="generated", priority="high") {
+//   #X1 @PLACE(0, 0); #X2 @PLACE(10, 0); #Vdd @PLACE(-8, 0);
+//   %net_label_stub_X1_a = $NET_LABEL_STUB @ATTACH #X1:a;
+//   %net_label_stub_X2_y = $NET_LABEL_STUB @ATTACH #X2:y;
+//   %net_label_stub_X1_a @PLACE(0,0); %net_label_stub_X1_a::l @PLACE(-3,0) => @ORIENT("R180");
+//   %net_label_stub_X2_y @PLACE(0,0); %net_label_stub_X2_y::l @PLACE(13,0) => @ORIENT("R0");
+// }
