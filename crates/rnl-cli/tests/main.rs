@@ -184,6 +184,7 @@ mod unused_names04;
 mod upgrade;
 mod usage_membership_assertions04;
 mod usage_points;
+mod veriloga04;
 mod view;
 mod violations;
 mod vocabulary_parity;
