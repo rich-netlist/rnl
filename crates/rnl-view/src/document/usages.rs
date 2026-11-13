@@ -1,7 +1,7 @@
 //! Scope-local usage inspection, without constructing the solver's geometric problem.
 use std::collections::{BTreeSet, HashMap, HashSet};
 
-use rnl_runtime::model::{quoted, Attach, GroupInfo, LevelView, ObjectInfo};
+use rnl_runtime::model::{quoted, Attach, GroupInfo, GroupPlace, LevelView, ObjectInfo};
 use rnl_runtime::Interpretation;
 use serde::Serialize;
 
@@ -25,6 +25,21 @@ pub struct Usage {
     /// "usage", or "group" for a set marked with GROUP (11.5), whose one role, `members`, holds
     /// its members.
     pub kind: &'static str,
+    /// For a group of a 0.4 level in the tree of groups: the group above it, by its Document
+    /// object index, as `pin_of`; absent at the top. The tree is that of the solver's rules on the
+    /// members as written (`rnl_runtime::group_tree`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
+    pub group_parent: Option<usize>,
+    /// For a group whose `state` is "same": the group it is, by its Document object index.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
+    pub same_as: Option<usize>,
+    /// For a group whose `state` is "left-out" because it crosses a group in the tree: that group;
+    /// absent for a group left out because it has no members.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
+    pub crosses: Option<usize>,
     pub id: String,
     /// Its definition; empty for a group.
     pub definition: String,
@@ -38,10 +53,12 @@ pub struct Usage {
     pub roles: Vec<UsageRole>,
     /// "in-effect"; "overridden", a fact its statement writes lost a conflict to one of higher
     /// priority (8.5); "disabled", its priority, or that of the usage it is made in, is
-    /// "disabled" (14.8). A group is only "in-effect" or "disabled" (11.5). As
-    /// `MemberOf::state`; an application that failed makes no usage and has no row.
+    /// "disabled" (14.8). A group is "in-effect" or "disabled" (11.5), and in a 0.4 level also
+    /// "same", its members are those of another group (`same_as`), or "left-out", it crosses a
+    /// group in the tree (`crosses`). As `MemberOf::state`; an application that failed makes no
+    /// usage and has no row.
     pub state: &'static str,
-    /// Why it was overridden: the message of the diagnostic.
+    /// Why it was overridden, or for a group why it is "same" or "left-out".
     pub reason: Option<String>,
 }
 
@@ -216,7 +233,9 @@ fn inspect(
     }
     let by_id: HashMap<_, _> = lv.objects.iter().map(|o| (o.id.as_str(), o)).collect();
     let mut memo = HashMap::new();
-    listed
+    let modern = rnl_runtime::interp::unit::keeps_0_4(&lv.language);
+    let rows: HashMap<&str, usize> = lv.groups.iter().enumerate().map(|(r, g)| (g.id.as_str(), r)).collect();
+    let mut usages: Vec<Usage> = listed
         .iter()
         .map(|o| {
             let object = references[&o.id][0];
@@ -298,8 +317,39 @@ fn inspect(
                             || (b[0] == b[2] && b[1] == b[3])
                     })
                 });
-            let (state, reason) = super::member_of::state(r, o);
+            let (mut state, mut reason) = super::member_of::state(r, o);
+            let place = (o.kind == "group" && modern).then(|| rows.get(o.id.as_str())).flatten().map(|&r| lv.groups[r].place);
+            let group = |r: usize| references.get(&lv.groups[r].id).and_then(|v| v.first().copied());
+            let (mut group_parent, mut same_as, mut crosses) = (None, None, None);
+            if state != "disabled" {
+                match place {
+                    Some(GroupPlace::Tree { parent }) => group_parent = parent.and_then(group),
+                    Some(GroupPlace::Same(t)) => {
+                        (state, same_as) = ("same", group(t));
+                        reason = Some(format!("its members are those of the group {}, which stands for it", lv.groups[t].id));
+                    }
+                    Some(GroupPlace::Crosses(t)) => {
+                        (state, crosses) = ("left-out", group(t));
+                        reason = Some(format!(
+                            "it shares members with the group {} without either holding the other, so it is not a block",
+                            lv.groups[t].id
+                        ));
+                    }
+                    Some(GroupPlace::Empty) => {
+                        state = "left-out";
+                        reason = Some("it has no members with a place of their own, so it is not a block".into());
+                    }
+                    Some(GroupPlace::Off) => {
+                        state = "disabled";
+                        reason = Some("the first GROUP on the same members is turned off, and this one with it".into());
+                    }
+                    None => {}
+                }
+            }
             Usage {
+                group_parent,
+                same_as,
+                crosses,
                 pin_of: o.pin_of.as_ref().and_then(|id| pin_owners.get(id)).copied(),
                 parent: o
                     .own_point
@@ -328,7 +378,47 @@ fn inspect(
                 reason,
             }
         })
-        .collect()
+        .collect();
+    if modern {
+        tree_order(&mut usages);
+    }
+    usages
+}
+
+/// Put the groups, which follow the usages, in the order of their tree: each after the group
+/// above it, siblings by their first member, as the solver orders them, the groups outside the
+/// tree last in their own order.
+fn tree_order(usages: &mut Vec<Usage>) {
+    let first = usages.iter().position(|u| u.kind == "group").unwrap_or(usages.len());
+    let groups: Vec<Usage> = usages.drain(first..).collect();
+    let key = |u: &Usage| u.roles.first().and_then(|r| r.objects.iter().min().copied()).unwrap_or(usize::MAX);
+    let in_tree = |u: &Usage| u.state == "in-effect";
+    let mut taken = vec![false; groups.len()];
+    let mut order = Vec::new();
+    fn visit(
+        at: Option<usize>,
+        groups: &[Usage],
+        taken: &mut [bool],
+        order: &mut Vec<usize>,
+        key: &dyn Fn(&Usage) -> usize,
+        in_tree: &dyn Fn(&Usage) -> bool,
+    ) {
+        let mut children: Vec<usize> =
+            (0..groups.len()).filter(|&i| !taken[i] && in_tree(&groups[i]) && groups[i].group_parent == at).collect();
+        children.sort_by_key(|&i| (key(&groups[i]), i));
+        for i in children {
+            if taken[i] {
+                continue;
+            }
+            taken[i] = true;
+            order.push(i);
+            visit(Some(groups[i].object), groups, taken, order, key, in_tree);
+        }
+    }
+    visit(None, &groups, &mut taken, &mut order, &key, &in_tree);
+    order.extend((0..groups.len()).filter(|&i| !taken[i]));
+    let mut groups: Vec<Option<Usage>> = groups.into_iter().map(Some).collect();
+    usages.extend(order.into_iter().map(|i| groups[i].take().unwrap()));
 }
 
 fn add_nets(a: &Attach, level: usize, ix: &mut Index<'_>, refs: &mut HashMap<String, Vec<usize>>) {
@@ -440,6 +530,41 @@ mod tests {
         assert_eq!(pin[0], pin[2]);
         assert_eq!(pin[1], pin[3]);
         assert!(lv.usages.iter().find(|u| u.id == "%set1").unwrap().roles[0].members.len() == 2);
+    }
+
+    #[test]
+    fn groups_of_a_0_4_level_stand_in_the_tree_of_groups() {
+        let body = "%outer={#R1 #R2 #R3} @GROUP; %inner={#R1 #R2} @GROUP; %again={#R1 #R2} @GROUP; \
+                    %cross={#R3 #R4} @GROUP; %far={#R5} @GROUP; %off={#R4 #R5} @GROUP; \
+                    %off @PRIORITY(\"disabled\"); %e={&a} @GROUP";
+        let file = |version: &str| {
+            format!(
+                "* g\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\") }}\nR1 a 0 1k\nR2 a 0 1k\nR3 a 0 1k\nR4 a 0 1k\nR5 a 0 1k\n* @RNL {{ {body} }}\n.end\n"
+            )
+        };
+        let p = MemoryProvider::new().with("g.sp", &file("0.4"));
+        let d = crate::build("g.sp", &p, &BuildOptions::default()).unwrap();
+        let lv = &d.levels[0];
+        let g = |id: &str| lv.usages.iter().find(|u| u.id == id).unwrap();
+        let order: Vec<&str> = lv.usages.iter().filter(|u| u.kind == "group").map(|u| u.id.as_str()).collect();
+        // later declarations first: %cross is taken before %outer, which then crosses it
+        assert_eq!((g("%cross").state, g("%cross").group_parent), ("in-effect", None));
+        assert_eq!((g("%outer").state, g("%outer").crosses), ("left-out", Some(g("%cross").object)));
+        assert_eq!((g("%again").state, g("%again").group_parent), ("in-effect", None));
+        assert_eq!((g("%inner").state, g("%inner").same_as), ("same", Some(g("%again").object)));
+        assert!(g("%inner").reason.as_deref().unwrap().contains("%again"));
+        assert_eq!(g("%far").state, "in-effect");
+        assert_eq!(g("%off").state, "disabled");
+        // a net has no place of its own: no members to make a block of
+        assert_eq!((g("%e").state, g("%e").crosses, g("%e").group_parent), ("left-out", None, None));
+        // the tree first, siblings by their first member, then the groups outside it
+        assert_eq!(order, ["%again", "%cross", "%far", "%outer", "%inner", "%off", "%e"]);
+
+        let p = MemoryProvider::new().with("g.sp", &file("0.3"));
+        let d = crate::build("g.sp", &p, &BuildOptions::default()).unwrap();
+        let lv = &d.levels[0];
+        assert!(lv.usages.iter().all(|u| u.group_parent.is_none() && u.same_as.is_none() && u.crosses.is_none()));
+        assert!(lv.usages.iter().all(|u| u.state == "in-effect" || u.state == "disabled"));
     }
 
     #[test]

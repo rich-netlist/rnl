@@ -3,6 +3,7 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::geom::{Orient, Pt};
+use crate::group_tree::Fate;
 use crate::host::LevelKind;
 use crate::markup;
 use crate::model::*;
@@ -612,6 +613,7 @@ impl Interp<'_> {
         }
         let mut numbered: HashMap<String, usize> = HashMap::new();
         let mut out = Vec::new();
+        let rows: Vec<ObjId> = facts.iter().map(|g| g.set).collect();
         for (g, id) in facts.into_iter().zip(base) {
             let id = if taken[&id] > 1 {
                 let n = numbered.entry(id.clone()).or_default();
@@ -644,9 +646,63 @@ impl Interp<'_> {
                 origin,
                 parent: g.chain.last().map(|p| self.ref_id(s, *p, ids)),
                 disabled: self.group_disabled(s, &g),
+                place: GroupPlace::Off,
             });
         }
+        self.place_groups(s, &rows, &mut out);
         out
+    }
+
+    /// Place the groups of [`Interp::groups`] in the tree of groups, as the solver's problem
+    /// declares them ([`crate::group_tree`]): every GROUP that did not fail, in order, a set by its
+    /// value, those PRIORITY turns off counted for which comes first but left out.
+    fn place_groups(&mut self, s: SceneId, rows: &[ObjId], out: &mut [GroupInfo]) {
+        // members as the problem has them: those with a place of their own
+        let placed: HashSet<ObjId> = self.problem_objects(s).0.into_iter().map(|(o, _)| o).collect();
+        let mut declarations = Vec::new();
+        let mut of_row = vec![None; rows.len()];
+        let mut identities = HashMap::new();
+        for g in self.scenes[s].groups.clone() {
+            if self.failed_group(&g) {
+                continue;
+            }
+            let next = identities.len();
+            let value = self.scene_value(g.set);
+            let first = !identities.contains_key(&value);
+            let identity = *identities.entry(value).or_insert(next);
+            if self.group_disabled(s, &g) {
+                continue;
+            }
+            if let Some(r) = rows.iter().position(|&set| set == g.set) {
+                of_row[r].get_or_insert(declarations.len());
+            }
+            let members =
+                self.group_members(s, &g).into_iter().filter(|m| placed.contains(m)).map(|m| m.0 as usize).collect();
+            declarations.push(crate::group_tree::Declaration { identity, first, direct: g.chain.is_empty(), members });
+        }
+        let Some(selection) = crate::group_tree::select(&declarations, &mut |_| true) else { return };
+        let row_of = |d: usize| of_row.iter().position(|&x| x == Some(d));
+        let mut taken = selection.taken.clone();
+        taken.sort_unstable();
+        let sets: Vec<_> = taken.iter().map(|&d| &declarations[d].members).collect();
+        let Some(parents) = crate::group_tree::nest(&sets, &mut |_| true) else { return };
+        for (r, d) in of_row.iter().enumerate() {
+            let Some(d) = *d else { continue };
+            out[r].place = match selection.fates[d] {
+                Fate::Taken => {
+                    let i = taken.iter().position(|&t| t == d).unwrap();
+                    GroupPlace::Tree { parent: parents[i].and_then(|p| row_of(taken[p])) }
+                }
+                Fate::Same(t) => row_of(t).map_or(GroupPlace::Off, GroupPlace::Same),
+                Fate::Crosses(t) => row_of(t).map_or(GroupPlace::Off, GroupPlace::Crosses),
+                Fate::Repeat => {
+                    let first = declarations.iter().position(|x| x.identity == declarations[d].identity && x.first);
+                    // the first GROUP on these members was turned off, and this one with it
+                    first.and_then(row_of).filter(|&f| f != r).map_or(GroupPlace::Off, GroupPlace::Same)
+                }
+                Fate::Empty => GroupPlace::Empty,
+            };
+        }
     }
 
     pub(crate) fn style_of(&self, s: SceneId, o: ObjId) -> Style {

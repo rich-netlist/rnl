@@ -1,9 +1,12 @@
-//! Build the solver's containment tree from all active GROUP declarations (11.5).
-//! Direct declarations precede expanded ones, later declarations first within each class.
-//! Repeated declarations on one set use its first GROUP. A crossing set is left out, an equal
-//! member set reuses the group already selected. Names affect only the diagnostic text.
+//! Build the solver's containment tree from all active GROUP declarations (11.5), by the rules
+//! of [`rnl_runtime::group_tree`], which a viewer applies too: direct declarations precede
+//! expanded ones, later declarations first within each class; repeated declarations on one set
+//! use its first GROUP; a crossing set is left out, an equal member set reuses the group already
+//! selected. Here the sets taken are then projected onto the elements laid out. Names affect only
+//! the diagnostic text.
 
 use crate::structure::{GroupNode, GroupTree, NodeKind};
+use rnl_runtime::group_tree::{nest, select, Declaration, Fate, Selection, Step};
 use rnl_runtime::problem::LevelProblem;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -31,77 +34,65 @@ pub(crate) fn analyse(problem: &LevelProblem, elements: &[usize]) -> (GroupTree,
         (root(elements), vec!["group search stopped at the shared budget; using one layout block".into()], Vec::new())
     };
     let all: BTreeSet<_> = elements.iter().copied().collect();
-    let mut identities = BTreeSet::new();
-    let mut sets = BTreeMap::new();
-    let mut order = Vec::new();
-    for (g, group) in problem.groups.iter().enumerate() {
-        if !group.first || !identities.insert(group.identity) {
-            continue;
-        }
-        if !crate::budget::permit(crate::budget::Step::Structure, group.members.len()) {
-            return fallback();
-        }
-        sets.insert(g, group.members.iter().copied().collect::<BTreeSet<_>>());
-        order.push(g);
-    }
-    order.reverse();
-    order.sort_by_key(|&g| !problem.groups[g].direct);
-    let mut taken = Vec::<usize>::new();
-    let mut notes = Vec::new();
-    for g in order {
-        if !crate::budget::permit(crate::budget::Step::Structure, elements.len().saturating_mul(taken.len().max(1))) {
-            return fallback();
-        }
-        let set = &sets[&g];
-        if set.is_empty() || taken.iter().any(|t| sets[t] == *set) {
-            continue;
-        }
-        let crossing = taken.iter().copied().find(|t| {
-            let other = &sets[t];
-            !set.is_disjoint(other) && !set.is_subset(other) && !other.is_subset(set)
-        });
-        if let Some(t) = crossing {
-            notes.push(format!(
+    let declarations: Vec<Declaration> = problem
+        .groups
+        .iter()
+        .map(|g| Declaration {
+            identity: g.identity,
+            first: g.first,
+            direct: g.direct,
+            members: g.members.iter().copied().collect(),
+        })
+        .collect();
+    let mut permit = |step: Step| {
+        let size = match step {
+            Step::Declaration(g) => problem.groups[g].members.len(),
+            Step::Compare(n) | Step::Place(n) => elements.len().saturating_mul(n),
+        };
+        crate::budget::permit(crate::budget::Step::Structure, size)
+    };
+    let Some(Selection { fates, order, taken }) = select(&declarations, &mut permit) else {
+        return fallback();
+    };
+    let notes: Vec<String> = order
+        .iter()
+        .filter_map(|&g| match fates[g] {
+            Fate::Crosses(t) => Some(format!(
                 "the group {} crosses {}; it is not searched as a block",
                 problem.groups[g].label, problem.groups[t].label
-            ));
-        } else {
-            taken.push(g);
-        }
-    }
+            )),
+            _ => None,
+        })
+        .collect();
     // Crossings must be decided before projecting onto elements: a shared port can make
     // otherwise disjoint element groups cross. Projection can then make nested sets equal.
     let mut selected = taken.clone();
     selected.sort_unstable();
+    let mut sets = BTreeMap::new();
     let mut projected = Vec::new();
     for g in taken {
-        let set: BTreeSet<_> = sets[&g].intersection(&all).copied().collect();
+        let set: BTreeSet<_> = declarations[g].members.intersection(&all).copied().collect();
         if set.len() >= 2 && !projected.iter().any(|t| sets[t] == set) {
             sets.insert(g, set);
             projected.push(g);
         }
     }
-    let mut taken = projected;
-    taken.sort_by_key(|g| (std::cmp::Reverse(sets[g].len()), *g));
+    projected.sort_by_key(|g| (std::cmp::Reverse(sets[g].len()), *g));
+    let placed: Vec<&BTreeSet<usize>> = projected.iter().map(|g| &sets[g]).collect();
+    let Some(parents) = nest(&placed, &mut permit) else {
+        return fallback();
+    };
     let mut tree = root(elements);
-    let mut node_sets = vec![all];
-    for g in taken {
-        if !crate::budget::permit(crate::budget::Step::Structure, elements.len().saturating_mul(node_sets.len())) {
-            return fallback();
-        }
-        let set = sets[&g].clone();
-        let parent =
-            (0..node_sets.len()).rev().find(|&n| set != node_sets[n] && set.is_subset(&node_sets[n])).unwrap_or(0);
-        let n = tree.nodes.len();
+    for (i, &g) in projected.iter().enumerate() {
         tree.nodes.push(GroupNode {
             kind: NodeKind::Group(g),
-            members: set.iter().copied().collect(),
+            members: sets[&g].iter().copied().collect(),
             children: Vec::new(),
             own: Vec::new(),
             fixed_order: false,
         });
-        node_sets.push(set);
-        tree.nodes[parent].children.push(n);
+        let parent = parents[i].map_or(0, |p| p + 1);
+        tree.nodes[parent].children.push(i + 1);
     }
     for n in 0..tree.nodes.len() {
         let mut children = std::mem::take(&mut tree.nodes[n].children);

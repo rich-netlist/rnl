@@ -6,6 +6,7 @@
 
 pub mod diag;
 pub mod geom;
+pub mod group_tree;
 pub mod host;
 pub mod interp;
 pub mod junction;
