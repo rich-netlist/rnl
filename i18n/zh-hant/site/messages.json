@@ -30,6 +30,7 @@
   "dirty": " + 未提交的變更",
   "compare": "與 {w} 比較",
   "compare_title": "RNL {v} 與 {w} 比較",
+  "english_only": "僅英文",
   "compared": "與 {label} 比較：",
   "added": "新增",
   "removed": "移除",

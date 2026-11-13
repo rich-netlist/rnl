@@ -19,9 +19,10 @@ spec_module.loader.exec_module(build)
 REPO_SPEC = HERE.parents[1] / "spec"
 
 
-def folder(root: Path, v: str, released: bool) -> None:
+def folder(root: Path, v: str, released: bool, zh: bool = True) -> None:
     (root / v / "en").mkdir(parents=True)
-    (root / v / "zh").mkdir()
+    if zh:
+        (root / v / "zh").mkdir()
     if released:
         (root / v / build.RELEASED).write_text("released\n", encoding="utf-8")
 
@@ -53,6 +54,21 @@ class Selection(unittest.TestCase):
     def test_once_the_file_is_there_it_is_the_newest(self):
         (self.spec / "0.4" / build.RELEASED).write_text("released\n", encoding="utf-8")
         self.assertEqual(build.shown_versions(self.spec, self.all), (["0.2", "0.3", "0.4"], ["0.2", "0.3", "0.4"]))
+
+    def test_a_version_in_english_only_is_a_version(self):
+        folder(self.spec, "0.5", False, zh=False)
+        self.assertEqual(build.versions(self.spec), ["0.2", "0.3", "0.4", "0.5"])
+        self.assertEqual(build.langs(self.spec, "0.5"), ["en"])
+        self.assertEqual(build.langs(self.spec, "0.4"), ["en", "zh"])
+
+    def test_a_folder_without_en_is_not_a_version(self):
+        (self.spec / "0.6" / "zh").mkdir(parents=True)
+        self.assertEqual(build.versions(self.spec), self.all)
+
+    def test_the_checks_of_the_translation_leave_an_english_only_version_alone(self):
+        folder(self.spec, "0.5", False, zh=False)
+        self.assertEqual(build.check_structure(self.spec, "0.5"), [])
+        self.assertEqual(build.check_stamps(self.spec, "0.5"), [])
 
     def test_the_versions_published_so_far_have_the_file(self):
         # not every folder: a draft in spec/ has none until it is released. Add a version here when it is.
@@ -154,6 +170,53 @@ class Site(unittest.TestCase):
             self.assertEqual(build.main(["--spec", str(self.spec), "--site", str(self.root / "none"), "--out", str(self.root / "none-out"), "--no-pdf"]), 1)
         finally:
             (self.root / "marker").rename(self.spec / "0.2" / build.RELEASED)
+
+
+@unittest.skipUnless(shutil.which("pandoc"), "needs pandoc")
+class EnglishOnly(unittest.TestCase):
+    """The pages of a copy of spec/ in which 0.3, released, is English only: the Chinese address leads to the
+    English page, and the Chinese version line lists it as English only."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.dir = tempfile.TemporaryDirectory()
+        root = Path(cls.dir.name)
+        spec = root / "spec"
+        shutil.copytree(REPO_SPEC, spec)
+        shutil.rmtree(spec / "0.3" / "zh")
+        (spec / "rnl-0.3.zh.md").unlink()
+        (spec / "rnl-0.3-guide.zh.md").unlink()
+        cls.site = root / "site"
+        cls.code = build.main(["--spec", str(spec), "--site", str(cls.site), "--out", str(root / "out"), "--no-pdf"])
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.dir.cleanup()
+
+    def page(self, *path: str) -> str:
+        return self.site.joinpath(*path).read_text(encoding="utf-8")
+
+    def test_it_builds_and_checks(self):
+        self.assertEqual(self.code, 0)
+
+    def test_the_english_page_and_its_comparison_are_built(self):
+        self.assertTrue((self.site / "en" / "spec" / "0.3" / "index.html").is_file())
+        self.assertTrue((self.site / "en" / "spec" / "0.3" / "compare-0.2.html").is_file())
+        self.assertNotIn("English only", self.page("en", "spec", "0.3", "index.html"))
+
+    def test_the_chinese_address_leads_to_the_english_page_and_has_nothing_else(self):
+        self.assertEqual([p.name for p in (self.site / "zh" / "spec" / "0.3").iterdir()], ["index.html"])
+        page = self.page("zh", "spec", "0.3", "index.html")
+        self.assertIn('<link rel="canonical" href="../../../en/spec/0.3/">', page)
+
+    def test_the_chinese_version_line_lists_it_as_english_only_and_has_no_comparison_with_it(self):
+        page = self.page("zh", "spec", "0.2", "index.html")
+        self.assertRegex(page, r'<a href="\.\./0\.3/">0\.3</a> \(仅英文\)')
+        self.assertFalse((self.site / "zh" / "spec" / "0.2" / "compare-0.3.html").exists())
+
+    def test_the_addresses_that_lead_to_the_newest_version_lead_to_it(self):
+        self.assertIn('href="0.3/"', self.page("zh", "spec", "index.html"))
+        self.assertIn('href="../zh/spec/0.3/"', self.page("spec", "index.html"))
 
 
 if __name__ == "__main__":

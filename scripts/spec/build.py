@@ -98,10 +98,15 @@ def read(p: Path) -> str:
 
 
 def versions(spec: Path) -> list[str]:
-    """The versions in spec/, oldest first: the folders named major.minor that hold en/ and zh/."""
-    found = [d.name for d in spec.iterdir()
-             if d.is_dir() and VERSION_DIR.fullmatch(d.name) and (d / "en").is_dir() and (d / "zh").is_dir()]
+    """The versions in spec/, oldest first: the folders named major.minor that hold en/. The other languages are
+    optional: a version without zh/ is English only, until its Chinese text is added."""
+    found = [d.name for d in spec.iterdir() if d.is_dir() and VERSION_DIR.fullmatch(d.name) and (d / "en").is_dir()]
     return sorted(found, key=lambda v: tuple(int(x) for x in v.split(".")))
+
+
+def langs(spec: Path, v: str) -> list[str]:
+    """The languages version v is written in: en, and zh when it has zh/."""
+    return [lang for lang in LANGS if (spec / v / lang).is_dir()]
 
 
 def released(spec: Path, v: str) -> bool:
@@ -188,6 +193,8 @@ def en_hash(text: str) -> str:
 # --- checks, each for one version -------------------------------------------------------------------
 
 def check_structure(spec: Path, v: str) -> list[str]:
+    if "zh" not in langs(spec, v):
+        return []
     en, zh = parts(spec, v), parts(spec, v, "zh")
     if en != zh:
         return [f"{v}: the parts differ: en/ has {', '.join(en)}; zh/ has {', '.join(zh)}"]
@@ -200,7 +207,7 @@ def check_structure(spec: Path, v: str) -> list[str]:
 
 def check_stamps(spec: Path, v: str) -> list[str]:
     msgs = []
-    for part in translated(spec, v):
+    for part in translated(spec, v) if "zh" in langs(spec, v) else []:
         m = STAMP.match(read(spec / v / "zh" / part))
         want = en_hash(read(spec / v / "en" / part))
         if not m:
@@ -214,7 +221,7 @@ def check_stamps(spec: Path, v: str) -> list[str]:
 def check_word_list(spec: Path, v: str) -> list[str]:
     words = json.loads(read(spec / f"rnl-words-{v}.json"))
     msgs = [] if words.get("version") == v else [f"rnl-words-{v}.json: its version is {words.get('version')}"]
-    for lang in LANGS:
+    for lang in langs(spec, v):
         if read(spec / v / lang / "annex-a.md") != spectools.annex_a(words, lang):
             msgs.append(f"{v}/{lang}/annex-a.md: not what the word list gives")
         ch05 = read(spec / v / lang / "ch05.md")
@@ -259,7 +266,7 @@ def check_refs(spec: Path, v: str) -> list[str]:
     msgs = []
     names = parts(spec, v)
     last = max(int(p[2:-3]) for p in names if p.startswith("ch"))  # numbers beyond the chapters are not sections
-    for lang in LANGS:
+    for lang in langs(spec, v):
         texts = {p: read(spec / v / lang / p) for p in ["front.md"] + names}
         ids = set(HEADING_ID.findall("\n".join(texts.values())))
         for part, text in texts.items():
@@ -270,20 +277,22 @@ def check_refs(spec: Path, v: str) -> list[str]:
 def check_guide(spec: Path, v: str) -> list[str]:
     """The short guide, when the version has one: both languages, one title, the same structure and code in
     both, and every section it cites exists."""
-    found = {lang: guide_path(spec, v, lang).exists() for lang in LANGS}
+    have = langs(spec, v)
+    found = {lang: guide_path(spec, v, lang).exists() for lang in have}
     if not any(found.values()):
         return []
-    msgs = [f"{guide_path(spec, v, lang).name}: missing" for lang in LANGS if not found[lang]]
+    msgs = [f"{guide_path(spec, v, lang).name}: missing" for lang in have if not found[lang]]
     if msgs:
         return msgs
-    texts = {lang: read(guide_path(spec, v, lang)) for lang in LANGS}
+    texts = {lang: read(guide_path(spec, v, lang)) for lang in have}
     for lang, text in texts.items():
         titles = re.findall(r"^# ", prose_blocks(text), re.M)
         if not text.startswith("# ") or len(titles) != 1:
             msgs.append(f"{guide_path(spec, v, lang).name}: it starts with one title, `# ...`, and has no other level 1 heading")
     if msgs:
         return msgs
-    msgs += [f"{v} guide {m}" for m in spectools.compare(texts["en"], texts["zh"], "guide", by_position=True)]
+    if "zh" in texts:
+        msgs += [f"{v} guide {m}" for m in spectools.compare(texts["en"], texts["zh"], "guide", by_position=True)]
     names = parts(spec, v)
     last = max(int(p[2:-3]) for p in names if p.startswith("ch"))
     for lang, text in texts.items():
@@ -298,7 +307,7 @@ def combined(spec: Path, v: str, lang: str) -> str:
 
 
 def check_combined(spec: Path, v: str) -> list[str]:
-    return [f"{name(v, lang, '.md')}: not what the chapters give" for lang in LANGS
+    return [f"{name(v, lang, '.md')}: not what the chapters give" for lang in langs(spec, v)
             if read(spec / name(v, lang, ".md")) != combined(spec, v, lang)]
 
 
@@ -436,16 +445,18 @@ def earlier(all_versions: list[str], v: str) -> list[str]:
 
 
 def version_links(lang: str, v: str, all_versions: list[str], href, compare_href=None,
-                  comparing: str | None = None) -> str:
+                  comparing: str | None = None, has_text=lambda x: True) -> str:
     """The versions, newest first, for the head of the page of v, then the pages that compare v with each
     earlier version, when compare_href is given; nothing while there is only one version. On the page that
-    compares v with the version comparing, that comparison is in bold instead of v."""
+    compares v with the version comparing, that comparison is in bold instead of v. A version of which the language
+    has no text (has_text is false) is marked as English only, and has no comparison."""
     if len(all_versions) < 2:
         return ""
     L = LANGS[lang]
-    items = [f"<b>{x}</b>" if x == v and not comparing else f'<a href="{href(x)}">{x}</a>'
+    items = [f"<b>{x}</b>" if x == v and not comparing else
+             f'<a href="{href(x)}">{x}</a>' + ("" if has_text(x) else f" ({html.escape(L['english_only'])})")
              for x in reversed(all_versions)]
-    for w in reversed(earlier(all_versions, v)) if compare_href else []:
+    for w in [w for w in reversed(earlier(all_versions, v)) if has_text(w)] if compare_href else []:
         text = L["compare"].format(w=w)
         items.append(f"<b>{text}</b>" if w == comparing else f'<a href="{compare_href(w)}">{text}</a>')
     return L["versions"] + " · ".join(items)
@@ -645,7 +656,7 @@ def main(argv: list[str]) -> int:
     spec = args.spec.resolve()
     all_versions = versions(spec)
     if not all_versions:
-        print(f"{spec}: no version folders, such as 0.2/ with en/ and zh/")
+        print(f"{spec}: no version folders, such as 0.2/ with en/")
         return 1
     if args.version and args.version not in all_versions:
         print(f"{spec}: no version {args.version}; there are {', '.join(all_versions)}")
@@ -689,14 +700,20 @@ def main(argv: list[str]) -> int:
             rev = revs[v] = revision(spec, v)
             for lang in LANGS:
                 L = LANGS[lang]
+                if lang not in langs(spec, v):  # English only: the address in this language leads to the English page
+                    if args.site:
+                        redirect(args.site / L["site_dir"].format(v=v) / "index.html", lang, v,
+                                 "../../../" + LANGS["en"]["site_dir"].format(v=v) + "/")
+                    continue
                 shutil.copyfile(spec / name(v, lang, ".md"), out / name(v, lang, ".md"))
                 src = pandoc_input(spec, v, lang, work)
                 build_zip(spec, lang, v, rev, out)
                 if not args.no_pdf:
                     build_pdf(src, lang, v, rev, out, work, fonts)
                 on_site = SITE_URL + L["site_dir"].format(v=v) + "/"
+                has_text = lambda x: lang in langs(spec, x)  # noqa: E731
                 published = version_links(lang, v, shown, lambda x: SITE_URL + L["site_dir"].format(v=x) + "/",
-                                          lambda w: on_site + f"compare-{w}.html")
+                                          lambda w: on_site + f"compare-{w}.html", has_text=has_text)
                 build_html(src, lang, v, rev, out / name(v, lang, ".html"),
                            SITE_URL + L["site_home"], published, out, work)
                 if args.site:
@@ -706,12 +723,12 @@ def main(argv: list[str]) -> int:
                         shutil.copyfile(out / name(v, lang, ext), d / name(v, lang, ext))
                     build_html(html_input(spec, v, lang, work, "../../"), lang, v, rev, d / "index.html", "../../",
                                version_links(lang, v, shown, lambda x: f"../{x}/",
-                                             lambda w: f"compare-{w}.html"), out, work)
-                    for w in earlier(shown, v):
+                                             lambda w: f"compare-{w}.html", has_text=has_text), out, work)
+                    for w in [w for w in earlier(shown, v) if has_text(w)]:
                         revs.setdefault(w, revision(spec, w))
                         page = f"compare-{w}.html"
                         links = version_links(lang, v, shown, lambda x: "./" if x == v else f"../{x}/",
-                                              lambda x: f"compare-{x}.html", comparing=w)
+                                              lambda x: f"compare-{x}.html", comparing=w, has_text=has_text)
                         found = build_compare(doc(w, lang), doc(v, lang), lang, v, w, revs, d / page, "../../", links, work)
                         print(f"built {v} compared with {w}, {lang}: " +
                               ", ".join(f"{len(found[k])} sections {k}" for k in ("changed", "added", "removed")))

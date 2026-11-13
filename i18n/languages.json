@@ -50,6 +50,7 @@
         "dirty": " + uncommitted changes",
         "compare": "compare with {w}",
         "compare_title": "RNL {v} compared with {w}",
+        "english_only": "English only",
         "compared": "Compared with {label}:",
         "added": "added",
         "removed": "removed",
