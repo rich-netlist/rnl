@@ -244,5 +244,65 @@ class EnglishOnly(unittest.TestCase):
         self.assertIn('href="../zh/spec/0.3/"', self.page("spec", "index.html"))
 
 
+class Languages(unittest.TestCase):
+    """What the build reads per language: the word of annex headings, the templates of Annex A, the file names."""
+    spectools = build.spectools
+
+    def test_every_language_of_the_registry_has_the_word_of_its_annexes(self):
+        words = {json.loads(p.read_text(encoding="utf-8"))["annex"]
+                 for p in (HERE.parents[1] / "i18n").glob("*/spec.json")}
+        self.assertEqual(words, {"附录", "附錄", "付録", "부록", "Anhang", "Annexe", "Anexo"})
+        self.assertEqual(self.spectools.annex_words()[0], "Annex")
+        self.assertTrue(words <= set(self.spectools.annex_words()))
+
+    def test_a_heading_is_numbered_by_the_letter_after_the_word_of_its_language(self):
+        for word in self.spectools.annex_words():
+            text = f"## {word} B Examples\n\n### B.1 One\n"
+            self.assertEqual(list(self.spectools.sections(text)), ["(top)", "B", "B.1"], word)
+            self.assertEqual(build.HEADING_ID.findall(text), ["B", "B.1"], word)
+
+    def test_annex_a_of_english_and_chinese_is_what_the_templates_give(self):
+        words = json.loads((REPO_SPEC / "rnl-words-0.3.json").read_text(encoding="utf-8"))
+        for lang in ("en", "zh"):
+            text = (REPO_SPEC / "0.3" / lang / "annex-a.md").read_text(encoding="utf-8")
+            self.assertEqual(self.spectools.annex_a(words, lang), text, lang)
+
+    def test_a_language_without_templates_has_its_annex_a_stamped_and_compared_as_a_part(self):
+        self.assertIsNone(self.spectools.annex_a_phrases("de"))
+        self.assertIsNotNone(self.spectools.annex_a_phrases("zh"))
+        with tempfile.TemporaryDirectory() as d:
+            spec = Path(d)
+            folder(spec, "0.4", True)
+            for name in ("front.md", "ch01.md", "annex-a.md"):
+                (spec / "0.4" / "en" / name).write_text("x\n", encoding="utf-8")
+            self.assertIn("annex-a.md", build.translated(spec, "0.4", "de"))
+            self.assertNotIn("annex-a.md", build.translated(spec, "0.4", "zh"))
+
+    def test_the_principles_and_the_translations_are_found_by_the_language_code(self):
+        spec = Path("spec")
+        self.assertEqual(build.principles_path(spec, "en").name, "rich-netlist.md")
+        self.assertEqual(build.principles_path(spec, "zh").name, "rich-netlist.zh.md")
+        self.assertEqual(build.name("0.4", "zh", ".md"), "rnl-0.4.zh.md")
+        old = build.LANGS.get("de")
+        build.LANGS["de"] = {"suffix": ".de"}
+        try:
+            self.assertEqual(build.principles_path(spec, "de").name, "rich-netlist.de.md")
+            self.assertEqual(build.name("0.4", "de", ".md"), "rnl-0.4.de.md")
+        finally:
+            if old is None:
+                del build.LANGS["de"]
+
+    def test_the_table_of_contents_has_the_title_of_the_language(self):
+        text = self.spectools.assemble("front\n", ["## 1 One\n"], "de", "Inhaltsverzeichnis")
+        self.assertIn("## Inhaltsverzeichnis", text)
+        self.assertIn("## Contents", self.spectools.assemble("front\n", ["## 1 One\n"], "en"))
+
+    def test_a_comparison_names_the_language_and_the_old_words_are_the_Chinese_ones(self):
+        en, other = "## 1 One\n\n- a\n", "## 1 Eins\n"
+        self.assertIn("list items 1 in en, 0 in de", "\n".join(self.spectools.compare(en, other, "ch01", lang="de")))
+        self.assertEqual(self.spectools.compare("", "注册点", "ch01", lang="ja"), [])
+        self.assertTrue(self.spectools.compare("", "注册点", "ch01"))
+
+
 if __name__ == "__main__":
     unittest.main()

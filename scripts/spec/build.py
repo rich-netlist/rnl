@@ -87,7 +87,8 @@ ARCHIVED = "ARCHIVED"  # the file that marks a released version as archived, suc
 VERSION_DIR = re.compile(r"(0|[1-9]\d*)\.(0|[1-9]\d*)")  # a version folder of spec/, such as 0.2 (16.1)
 STAMP = re.compile(r"^<!-- translated from en/(\S+) sha256:([0-9a-f]{12}) -->\n")
 FENCE = re.compile(r"^([ \t]*)```([\w-]+)((?:[ \t]+\S+)+)[ \t]*$", re.M)
-HEADING_ID = re.compile(r"^#{2,4} (?:Annex |附录 )?(\d+(?:\.\d+)*|[A-Z](?:\.\d+)?)\s", re.M)
+HEADING_ID = re.compile(r"^#{2,4} (?:(?:" + "|".join(re.escape(w) for w in spectools.annex_words()) + r") )?"
+                        r"(\d+(?:\.\d+)*|[A-Z](?:\.\d+)?)\s", re.M)  # the annex words are those of i18n/<lang>/spec.json
 
 
 class Failed(Exception):
@@ -142,8 +143,16 @@ def parts(spec: Path, v: str, lang: str = "en") -> list[str]:
     return spectools.parts([p.name for p in (spec / v / lang).glob("*.md")])
 
 
-def translated(spec: Path, v: str) -> list[str]:
-    return ["front.md"] + [p for p in parts(spec, v) if p != "annex-a.md"]  # Annex A is generated in both
+def translated(spec: Path, v: str, lang: str = "en") -> list[str]:
+    """The parts a translation is stamped for: all but Annex A in a language that has the templates of Annex A
+    (i18n/<lang>/spec.json), which generate it as they do in English; a language without them has it written."""
+    generated = spectools.annex_a_phrases(lang) is not None
+    return ["front.md"] + [p for p in parts(spec, v) if not (p == "annex-a.md" and generated)]
+
+
+def translations(spec: Path, v: str) -> list[str]:
+    """The languages of version v other than English."""
+    return [lang for lang in langs(spec, v) if lang != "en"]
 
 
 def name(v: str, lang: str, ext: str) -> str:
@@ -207,28 +216,29 @@ def en_hash(text: str) -> str:
 # --- checks, each for one version -------------------------------------------------------------------
 
 def check_structure(spec: Path, v: str) -> list[str]:
-    if "zh" not in langs(spec, v):
-        return []
-    en, zh = parts(spec, v), parts(spec, v, "zh")
-    if en != zh:
-        return [f"{v}: the parts differ: en/ has {', '.join(en)}; zh/ has {', '.join(zh)}"]
     msgs = []
-    for part in spectools.compared(en):
-        msgs += [f"{v} {m}" for m in spectools.compare(read(spec / v / "en" / part), read(spec / v / "zh" / part),
-                                                        part.removesuffix(".md"))]
+    for lang in translations(spec, v):
+        en, other = parts(spec, v), parts(spec, v, lang)
+        if en != other:
+            msgs.append(f"{v}: the parts differ: en/ has {', '.join(en)}; {lang}/ has {', '.join(other)}")
+            continue
+        for part in spectools.compared(en):
+            msgs += [f"{v} {m}" for m in spectools.compare(read(spec / v / "en" / part), read(spec / v / lang / part),
+                                                            part.removesuffix(".md"), lang=lang)]
     return msgs
 
 
 def check_stamps(spec: Path, v: str) -> list[str]:
     msgs = []
-    for part in translated(spec, v) if "zh" in langs(spec, v) else []:
-        m = STAMP.match(read(spec / v / "zh" / part))
-        want = en_hash(read(spec / v / "en" / part))
-        if not m:
-            msgs.append(f"{v}/zh/{part}: no stamp of the English part it was translated from")
-        elif m.group(1) != part or m.group(2) != want:
-            msgs.append(f"{v}/zh/{part}: translated from en/{part} {m.group(2)}, the English is now {want}: "
-                        f"bring the Chinese in line, then run --stamp")
+    for lang in translations(spec, v):
+        for part in translated(spec, v, lang):
+            m = STAMP.match(read(spec / v / lang / part))
+            want = en_hash(read(spec / v / "en" / part))
+            if not m:
+                msgs.append(f"{v}/{lang}/{part}: no stamp of the English part it was translated from")
+            elif m.group(1) != part or m.group(2) != want:
+                msgs.append(f"{v}/{lang}/{part}: translated from en/{part} {m.group(2)}, the English is now {want}: "
+                            f"bring the translation in line, then run --stamp")
     return msgs
 
 
@@ -236,8 +246,12 @@ def check_word_list(spec: Path, v: str) -> list[str]:
     words = json.loads(read(spec / f"rnl-words-{v}.json"))
     msgs = [] if words.get("version") == v else [f"rnl-words-{v}.json: its version is {words.get('version')}"]
     for lang in langs(spec, v):
-        if read(spec / v / lang / "annex-a.md") != spectools.annex_a(words, lang):
-            msgs.append(f"{v}/{lang}/annex-a.md: not what the word list gives")
+        annex = read(spec / v / lang / "annex-a.md")
+        if spectools.annex_a_phrases(lang) is not None:
+            if annex != spectools.annex_a(words, lang):
+                msgs.append(f"{v}/{lang}/annex-a.md: not what the word list gives")
+        else:  # written by hand, so as the other translated parts: the same sections, rows and code as the English one
+            msgs += [f"{v} {m}" for m in spectools.compare(spectools.annex_a(words, "en"), annex, "annex-a", lang=lang)]
         ch05 = read(spec / v / lang / "ch05.md")
         m = re.search(r"^([ \t]*)```json$", ch05, re.M)
         want = "\n".join(m.group(1) + x if x else x for x in spectools.excerpt(words).split("\n")) if m else None
@@ -305,8 +319,9 @@ def check_guide(spec: Path, v: str) -> list[str]:
             msgs.append(f"{guide_path(spec, v, lang).name}: it starts with one title, `# ...`, and has no other level 1 heading")
     if msgs:
         return msgs
-    if "zh" in texts:
-        msgs += [f"{v} guide {m}" for m in spectools.compare(texts["en"], texts["zh"], "guide", by_position=True)]
+    for lang in texts:
+        if lang != "en":
+            msgs += [f"{v} guide {m}" for m in spectools.compare(texts["en"], texts[lang], "guide", by_position=True, lang=lang)]
     names = parts(spec, v)
     last = max(int(p[2:-3]) for p in names if p.startswith("ch"))
     for lang, text in texts.items():
@@ -317,7 +332,7 @@ def check_guide(spec: Path, v: str) -> list[str]:
 
 def combined(spec: Path, v: str, lang: str) -> str:
     src = spec / v / lang
-    return spectools.assemble(read(src / "front.md"), [read(src / p) for p in parts(spec, v)], lang)
+    return spectools.assemble(read(src / "front.md"), [read(src / p) for p in parts(spec, v)], lang, LANGS[lang]["contents"])
 
 
 def check_combined(spec: Path, v: str) -> list[str]:
@@ -367,8 +382,9 @@ def guide_section(spec: Path, v: str, lang: str, agents: str) -> str:
 
 def principles_path(spec: Path, lang: str) -> Path:
     """The principles of RNL, which are not a part of the standard and not tied to a version: spec/rich-netlist.md
-    and spec/rich-netlist.zh.md. The web page of each version shows them, after the annexes."""
-    return spec / ("rich-netlist.md" if lang == "en" else "rich-netlist.zh.md")
+    and, in another language, spec/rich-netlist.<lang>.md, such as rich-netlist.zh.md. The web page of each version
+    shows them, after the annexes."""
+    return spec / f"rich-netlist{LANGS[lang]['suffix']}.md"
 
 
 NUMBERED_HEADING = re.compile(r"^#{2,4} (\d+(?:\.\d+)*)\.? ")
@@ -651,14 +667,17 @@ def write_moved(site: Path, v: str) -> None:
 # --- main ----------------------------------------------------------------------------------------
 
 def stamp(spec: Path, v: str) -> None:
-    for part in translated(spec, v):
-        p = spec / v / "zh" / part
-        text = STAMP.sub("", read(p))
-        line = f"<!-- translated from en/{part} sha256:{en_hash(read(spec / v / 'en' / part))} -->\n"
-        p.write_text(line + text, encoding="utf-8", newline="\n")
-    for lang in LANGS:  # the combined text holds the stamps too
+    n = 0
+    for lang in translations(spec, v):
+        for part in translated(spec, v, lang):
+            p = spec / v / lang / part
+            text = STAMP.sub("", read(p))
+            line = f"<!-- translated from en/{part} sha256:{en_hash(read(spec / v / 'en' / part))} -->\n"
+            p.write_text(line + text, encoding="utf-8", newline="\n")
+            n += 1
+    for lang in langs(spec, v):  # the combined text holds the stamps too
         (spec / name(v, lang, ".md")).write_text(combined(spec, v, lang), encoding="utf-8", newline="\n")
-    print(f"{v}: stamped {len(translated(spec, v))} Chinese parts and rewrote the combined texts")
+    print(f"{v}: stamped {n} translated parts and rewrote the combined texts")
 
 
 def main(argv: list[str]) -> int:
