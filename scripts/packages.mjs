@@ -7,6 +7,12 @@ import { fileURLToPath } from 'node:url';
 export const root = dirname(dirname(fileURLToPath(import.meta.url)));
 export const packageCache = join(root, '.rnl-packages');
 export const packageLocks = JSON.parse(readFileSync(join(root, 'packages.lock.json'), 'utf8')).packages;
+const seenLocks = new Set();
+for (const { name, version } of packageLocks) {
+  const key = JSON.stringify([name, version]);
+  if (seenLocks.has(key)) throw new Error(`Duplicate lock for ${name} ${version}`);
+  seenLocks.add(key);
+}
 // A package may be locked at several versions; without one, its first.
 function locked(name, version) {
   const entry = packageLocks.find(p => p.name === name && (version === undefined || p.version === version));

@@ -44,12 +44,24 @@ def catalog(url):
     return result, digest(data)
 
 def locks():
-    return json.loads((ROOT/'packages.lock.json').read_text(encoding='utf-8'))['packages']
+    entries = json.loads((ROOT/'packages.lock.json').read_text(encoding='utf-8'))['packages']
+    seen = set()
+    for p in entries:
+        name, version = p['name'], p['version']
+        key = name, version
+        if key in seen:
+            raise ValueError(f'Duplicate lock for {name} {version}')
+        seen.add(key)
+    return entries
 
 def locked(name, version=None):
     """The lock entry of a package: the version asked for, or its first entry, which tests that
     name no version read."""
-    return next(p for p in locks() if p['name'] == name and version in (None, p['version']))
+    entry = next((p for p in locks() if p['name'] == name and version in (None, p['version'])), None)
+    if entry is None:
+        label = name if version is None else f'{name} {version}'
+        raise ValueError(f'No lock for {label}')
+    return entry
 
 def package_dir(name, version=None):
     return CACHE / name / locked(name, version)['version']

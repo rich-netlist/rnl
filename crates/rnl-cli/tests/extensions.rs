@@ -1,5 +1,5 @@
-//! The public package analog-canvas-extensions 0.1 (libraries/analog-canvas-extensions): the symbols of Analog Canvas that the series 0.3 does not
-//! draw, which a file uses by naming the package in its header record (16.2).
+//! The locked versions 0.1 and 0.6 of the public package analog-canvas-extensions.
+//! A file uses its Analog Canvas symbols by naming the package in its header record (16.2).
 
 use std::path::{Path, PathBuf};
 
@@ -20,6 +20,12 @@ const GATES: [&str; 6] = [
     "$CANVAS_XOR_4INPUT",
     "$CANVAS_XNOR_4INPUT",
 ];
+
+#[test]
+#[should_panic(expected = "analog-canvas-extensions 0.999 is not locked")]
+fn rejects_an_unlocked_package_version() {
+    public_packages::version_dir("analog-canvas-extensions", "0.999");
+}
 
 fn package_file() -> PathBuf {
     public_packages::package_dir("analog-canvas-extensions").join("analog-canvas-extensions.rnl")
