@@ -49,6 +49,12 @@
    "note": "$BIAS_CIRCUIT; role members (成员)."
   },
   {
+   "en": "block symbol",
+   "term": "框图符号",
+   "kind": "rnl",
+   "note": "Verilog-A module symbol (2.9); for a subcircuit symbol the older 子电路符号 stays."
+  },
+  {
    "en": "body",
    "term": "定义体",
    "kind": "rnl",
@@ -317,6 +323,12 @@
    "kind": "rnl"
   },
   {
+   "en": "module level",
+   "term": "模块层",
+   "kind": "rnl",
+   "note": "The level of a module ... endmodule in a Verilog-A file."
+  },
+  {
    "en": "name",
    "term": "名称",
    "avoid": [
@@ -538,6 +550,12 @@
    "kind": "rnl",
    "note": "rnl-zh: 用例 is usage.",
    "alias": true
+  },
+  {
+   "en": "vector port",
+   "term": "向量端口",
+   "kind": "rnl",
+   "note": "One terminal per bit, in the order of the declared range."
   },
   {
    "en": "verb",

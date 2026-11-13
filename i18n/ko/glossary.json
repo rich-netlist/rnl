@@ -14,9 +14,30 @@
    "kind": "rnl"
   },
   {
+   "en": "anchor",
+   "term": "기준점",
+   "kind": "rnl"
+  },
+  {
+   "en": "annotation",
+   "term": "어노테이션",
+   "kind": "rnl",
+   "note": "Not 라벨 (label)."
+  },
+  {
+   "en": "appearance queue",
+   "term": "외관 대기열",
+   "kind": "rnl"
+  },
+  {
    "en": "apply",
    "sense": "definition",
    "term": "적용",
+   "kind": "rnl"
+  },
+  {
+   "en": "atomic constraint",
+   "term": "원자 제약",
    "kind": "rnl"
   },
   {
@@ -24,6 +45,11 @@
    "term": "꺾임점",
    "kind": "rnl",
    "note": "Counts and solver objectives say 꺾임 (꺾임 횟수, 꺾임 위치)."
+  },
+  {
+   "en": "block symbol",
+   "term": "블록 심볼",
+   "kind": "rnl"
   },
   {
    "en": "body",
@@ -60,6 +86,11 @@
   {
    "en": "bundle",
    "term": "번들",
+   "kind": "rnl"
+  },
+  {
+   "en": "carrier",
+   "term": "캐리어",
    "kind": "rnl"
   },
   {
@@ -123,6 +154,11 @@
    "term": "버려짐",
    "kind": "rnl",
    "note": "As a verb: 버려지다."
+  },
+  {
+   "en": "empty node",
+   "term": "빈 노드",
+   "kind": "rnl"
   },
   {
    "en": "evaluate",
@@ -202,6 +238,12 @@
    "kind": "rnl"
   },
   {
+   "en": "labels in a column",
+   "term": "세로 한 열로 배치된 라벨",
+   "kind": "rnl",
+   "note": "Short: 한 열."
+  },
+  {
    "en": "layout",
    "term": "레이아웃",
    "kind": "rnl"
@@ -215,6 +257,11 @@
   {
    "en": "level",
    "term": "레벨",
+   "kind": "rnl"
+  },
+  {
+   "en": "limit of the implementation",
+   "term": "구현 한도",
    "kind": "rnl"
   },
   {
@@ -237,6 +284,11 @@
    "note": "Mirror images: 좌우 거울 대칭."
   },
   {
+   "en": "module level",
+   "term": "모듈 레벨",
+   "kind": "rnl"
+  },
+  {
    "en": "name",
    "term": "이름",
    "kind": "rnl"
@@ -257,6 +309,11 @@
    "kind": "rnl"
   },
   {
+   "en": "netlist language",
+   "term": "넷리스트 언어",
+   "kind": "rnl"
+  },
+  {
    "en": "objective",
    "term": "최적화 목표",
    "kind": "rnl",
@@ -268,8 +325,19 @@
    "kind": "rnl"
   },
   {
+   "en": "override",
+   "term": "덮어씀",
+   "kind": "rnl",
+   "note": "덮어쓰임; not 덮어쓰기, which is overwrite."
+  },
+  {
    "en": "package",
    "term": "패키지",
+   "kind": "rnl"
+  },
+  {
+   "en": "package collection",
+   "term": "패키지 컬렉션",
    "kind": "rnl"
   },
   {
@@ -324,6 +392,11 @@
    "kind": "rnl"
   },
   {
+   "en": "round trip",
+   "term": "왕복 변환",
+   "kind": "rnl"
+  },
+  {
    "en": "routing / route",
    "sense": "the router's work",
    "term": "라우팅",
@@ -368,6 +441,17 @@
    "kind": "rnl"
   },
   {
+   "en": "stale",
+   "term": "구식이 된",
+   "kind": "rnl",
+   "note": "Of a solve, once its hash no longer matches."
+  },
+  {
+   "en": "stand-in",
+   "term": "대체 도형",
+   "kind": "rnl"
+  },
+  {
    "en": "standard package",
    "term": "표준 패키지",
    "kind": "rnl"
@@ -389,14 +473,35 @@
    "kind": "rnl"
   },
   {
+   "en": "stub",
+   "term": "스텁",
+   "kind": "rnl"
+  },
+  {
    "en": "subject",
    "term": "주어",
+   "kind": "rnl"
+  },
+  {
+   "en": "subscript",
+   "term": "첨자",
    "kind": "rnl"
   },
   {
    "en": "symbol",
    "term": "심볼",
    "kind": "rnl"
+  },
+  {
+   "en": "taken in",
+   "term": "취해짐",
+   "kind": "rnl"
+  },
+  {
+   "en": "tap",
+   "term": "분기 탭",
+   "kind": "rnl",
+   "note": "branch tap"
   },
   {
    "en": "terminal",
@@ -416,6 +521,12 @@
    "term": "텍스트",
    "kind": "rnl",
    "note": "A style's text color and size are 글자 색상, 글자 크기."
+  },
+  {
+   "en": "textvisible",
+   "term": "텍스트 표시 여부",
+   "kind": "rnl",
+   "note": "The parameter name stays textvisible."
   },
   {
    "en": "tier",
@@ -438,6 +549,11 @@
    "note": "The language page adds the English once: 용례(usage)."
   },
   {
+   "en": "vector port",
+   "term": "벡터 포트",
+   "kind": "rnl"
+  },
+  {
    "en": "verb",
    "term": "서술어",
    "kind": "rnl"
@@ -445,6 +561,11 @@
   {
    "en": "vertical",
    "term": "수직",
+   "kind": "rnl"
+  },
+  {
+   "en": "virtual part",
+   "term": "가상 부품",
    "kind": "rnl"
   },
   {
@@ -785,6 +906,11 @@
    ],
    "kind": "command",
    "note": "The macOS steps say 삭제 (2 texts); the Linux step says 제거."
+  },
+  {
+   "en": "wire hop",
+   "term": "배선 건너뛰기",
+   "kind": "rnl"
   }
  ]
 }

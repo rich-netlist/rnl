@@ -14,9 +14,30 @@
    "kind": "rnl"
   },
   {
+   "en": "anchor",
+   "term": "アンカー",
+   "kind": "rnl"
+  },
+  {
+   "en": "annotation",
+   "term": "注釈",
+   "kind": "rnl",
+   "note": "Not ラベル (label)."
+  },
+  {
    "en": "apply",
    "sense": "definition",
    "term": "適用する",
+   "kind": "rnl"
+  },
+  {
+   "en": "assertion",
+   "term": "表明",
+   "kind": "rnl"
+  },
+  {
+   "en": "atomic constraint",
+   "term": "原子制約",
    "kind": "rnl"
   },
   {
@@ -24,6 +45,16 @@
    "term": "折れ曲がり点",
    "kind": "rnl",
    "note": "3 texts say 折れ曲がり without 点."
+  },
+  {
+   "en": "black box",
+   "term": "ブラックボックス",
+   "kind": "rnl"
+  },
+  {
+   "en": "block symbol",
+   "term": "ブロックシンボル",
+   "kind": "rnl"
   },
   {
    "en": "body",
@@ -55,10 +86,20 @@
    "kind": "rnl"
   },
   {
+   "en": "branch point",
+   "term": "分岐点",
+   "kind": "rnl"
+  },
+  {
    "en": "bundle",
    "term": "バンドル",
    "kind": "rnl",
    "note": "One text glosses it 束ね描画."
+  },
+  {
+   "en": "carrier",
+   "term": "キャリア",
+   "kind": "rnl"
   },
   {
    "en": "comment",
@@ -125,9 +166,19 @@
    "kind": "rnl"
   },
   {
+   "en": "empty node",
+   "term": "空ノード",
+   "kind": "rnl"
+  },
+  {
    "en": "evaluate",
    "sense": "RNL runtime",
    "term": "評価する",
+   "kind": "rnl"
+  },
+  {
+   "en": "extension mechanism",
+   "term": "拡張機構",
    "kind": "rnl"
   },
   {
@@ -156,10 +207,21 @@
    "kind": "rnl"
   },
   {
+   "en": "hard constraint",
+   "term": "ハード制約",
+   "kind": "rnl"
+  },
+  {
    "en": "header record",
    "term": "ヘッダーレコード",
    "kind": "rnl",
    "note": "Short: ヘッダー."
+  },
+  {
+   "en": "hiding",
+   "term": "隠蔽",
+   "kind": "rnl",
+   "note": "A local definition of the same name hides the one above."
   },
   {
    "en": "hierarchy",
@@ -173,6 +235,11 @@
   {
    "en": "horizontal",
    "term": "水平",
+   "kind": "rnl"
+  },
+  {
+   "en": "inline package",
+   "term": "インラインパッケージ",
    "kind": "rnl"
   },
   {
@@ -205,8 +272,18 @@
    "note": "Kept as the parameter name key."
   },
   {
+   "en": "keyword signature",
+   "term": "キーワードシグネチャ",
+   "kind": "rnl"
+  },
+  {
    "en": "label",
    "term": "ラベル",
+   "kind": "rnl"
+  },
+  {
+   "en": "labels in a column",
+   "term": "縦1列",
    "kind": "rnl"
   },
   {
@@ -223,6 +300,11 @@
   {
    "en": "level",
    "term": "レベル",
+   "kind": "rnl"
+  },
+  {
+   "en": "limit of the implementation",
+   "term": "実装上限",
    "kind": "rnl"
   },
   {
@@ -244,6 +326,11 @@
    "en": "mirrored pair",
    "sense": "the symmetry",
    "term": "鏡像対称",
+   "kind": "rnl"
+  },
+  {
+   "en": "module level",
+   "term": "モジュール階層レベル",
    "kind": "rnl"
   },
   {
@@ -271,6 +358,11 @@
    "kind": "rnl"
   },
   {
+   "en": "netlist language",
+   "term": "ネットリスト言語",
+   "kind": "rnl"
+  },
+  {
    "en": "objective",
    "term": "目的関数",
    "kind": "rnl"
@@ -283,6 +375,11 @@
   {
    "en": "package",
    "term": "パッケージ",
+   "kind": "rnl"
+  },
+  {
+   "en": "package collection",
+   "term": "パッケージコレクション",
    "kind": "rnl"
   },
   {
@@ -320,6 +417,11 @@
    "kind": "rnl"
   },
   {
+   "en": "projection",
+   "term": "射影",
+   "kind": "rnl"
+  },
+  {
    "en": "queue",
    "term": "キュー",
    "kind": "rnl"
@@ -332,6 +434,11 @@
   {
    "en": "record header",
    "term": "レコードヘッダー",
+   "kind": "rnl"
+  },
+  {
+   "en": "rigid transformation",
+   "term": "剛体変換",
    "kind": "rnl"
   },
   {
@@ -373,6 +480,11 @@
    "kind": "rnl"
   },
   {
+   "en": "shared point",
+   "term": "共有点",
+   "kind": "rnl"
+  },
+  {
    "en": "skeleton line",
    "term": "骨格線",
    "kind": "general",
@@ -381,6 +493,16 @@
   {
    "en": "solver",
    "term": "ソルバー",
+   "kind": "rnl"
+  },
+  {
+   "en": "stale solution",
+   "term": "古くなった解",
+   "kind": "rnl"
+  },
+  {
+   "en": "stand-in",
+   "term": "代替図形",
    "kind": "rnl"
   },
   {
@@ -410,8 +532,23 @@
    "kind": "rnl"
   },
   {
+   "en": "subscript",
+   "term": "添字",
+   "kind": "rnl"
+  },
+  {
    "en": "symbol",
    "term": "シンボル",
+   "kind": "rnl"
+  },
+  {
+   "en": "take effect",
+   "term": "有効になる",
+   "kind": "rnl"
+  },
+  {
+   "en": "taken in",
+   "term": "取り込まれる",
    "kind": "rnl"
   },
   {
@@ -432,6 +569,12 @@
    "term": "テキスト",
    "kind": "rnl",
    "note": "Style properties say 文字 (文字色, 文字サイズ)."
+  },
+  {
+   "en": "textvisible",
+   "term": "文字表示可否",
+   "kind": "rnl",
+   "note": "The parameter name stays textvisible."
   },
   {
    "en": "tier",
@@ -457,6 +600,11 @@
    "note": "Often glossed 適用オブジェクト（usage）; 1 text says 利用パス for Usage path."
   },
   {
+   "en": "vector port",
+   "term": "ベクタポート",
+   "kind": "rnl"
+  },
+  {
    "en": "verb",
    "term": "述語",
    "kind": "rnl"
@@ -464,6 +612,11 @@
   {
    "en": "vertical",
    "term": "垂直",
+   "kind": "rnl"
+  },
+  {
+   "en": "virtual part",
+   "term": "仮想部品",
    "kind": "rnl"
   },
   {
@@ -804,6 +957,11 @@
    "en": "uninstall",
    "term": "アンインストール",
    "kind": "command"
+  },
+  {
+   "en": "word list",
+   "term": "標準語リスト",
+   "kind": "rnl"
   }
  ]
 }

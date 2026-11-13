@@ -23,6 +23,12 @@
    "kind": "rnl"
   },
   {
+   "en": "annotation",
+   "term": "標註",
+   "kind": "rnl",
+   "note": "Not 標籤 (label)."
+  },
+  {
    "en": "apply",
    "sense": "definition",
    "term": "套用",
@@ -42,6 +48,11 @@
    "term": "偏置電路",
    "kind": "rnl",
    "note": "$BIAS_CIRCUIT."
+  },
+  {
+   "en": "block symbol",
+   "term": "方塊符號",
+   "kind": "rnl"
   },
   {
    "en": "body",
@@ -143,6 +154,11 @@
    "kind": "rnl"
   },
   {
+   "en": "empty node",
+   "term": "空節點",
+   "kind": "rnl"
+  },
+  {
    "en": "evaluate",
    "sense": "RNL runtime",
    "term": "評估",
@@ -191,6 +207,11 @@
    "kind": "rnl"
   },
   {
+   "en": "inline package",
+   "term": "內嵌套件",
+   "kind": "rnl"
+  },
+  {
    "en": "instance",
    "term": "實例",
    "avoid": [
@@ -225,6 +246,11 @@
    "kind": "rnl"
   },
   {
+   "en": "labels in a column",
+   "term": "排成一欄",
+   "kind": "rnl"
+  },
+  {
    "en": "layout",
    "term": "佈局",
    "kind": "rnl"
@@ -241,8 +267,18 @@
    "kind": "rnl"
   },
   {
+   "en": "limit of the implementation",
+   "term": "實作上限",
+   "kind": "rnl"
+  },
+  {
    "en": "manifest",
    "term": "清單",
+   "kind": "rnl"
+  },
+  {
+   "en": "math mode",
+   "term": "數學模式",
    "kind": "rnl"
   },
   {
@@ -267,6 +303,11 @@
    "kind": "rnl"
   },
   {
+   "en": "module level",
+   "term": "模組層級",
+   "kind": "rnl"
+  },
+  {
    "en": "name",
    "term": "名稱",
    "kind": "rnl"
@@ -287,6 +328,12 @@
    "kind": "rnl"
   },
   {
+   "en": "netlist language",
+   "term": "網表語言",
+   "kind": "rnl",
+   "note": "SPICE, Spectre, Verilog-A."
+  },
+  {
    "en": "objective",
    "term": "目標",
    "kind": "rnl"
@@ -299,6 +346,11 @@
   {
    "en": "package",
    "term": "套件",
+   "kind": "rnl"
+  },
+  {
+   "en": "package collection",
+   "term": "套件集合",
    "kind": "rnl"
   },
   {
@@ -373,6 +425,11 @@
    "kind": "rnl"
   },
   {
+   "en": "selective routing",
+   "term": "選擇性走線",
+   "kind": "rnl"
+  },
+  {
    "en": "set",
    "term": "集合",
    "kind": "rnl"
@@ -392,6 +449,11 @@
   {
    "en": "solver",
    "term": "求解器",
+   "kind": "rnl"
+  },
+  {
+   "en": "stand-in",
+   "term": "替代圖形",
    "kind": "rnl"
   },
   {
@@ -425,6 +487,18 @@
    "kind": "rnl"
   },
   {
+   "en": "taken in",
+   "term": "採納",
+   "kind": "rnl",
+   "note": "Not 保留 (kept) or 捨棄 (dropped), which are the solver's."
+  },
+  {
+   "en": "tap",
+   "term": "分接",
+   "kind": "rnl",
+   "note": "A branch tapped off a bus."
+  },
+  {
    "en": "terminal",
    "term": "端子",
    "kind": "rnl"
@@ -434,6 +508,17 @@
    "term": "文字",
    "kind": "rnl",
    "note": "Both senses, as is usual in Taiwan; 純文字, 文字檔."
+  },
+  {
+   "en": "textvisible",
+   "term": "文字可見性",
+   "kind": "rnl",
+   "note": "The parameter name stays textvisible."
+  },
+  {
+   "en": "trunk",
+   "term": "主幹",
+   "kind": "rnl"
   },
   {
    "en": "union",
@@ -448,6 +533,11 @@
    ],
    "kind": "rnl",
    "note": "The owner's choice: 用法 is too easily read as \"way of use\"."
+  },
+  {
+   "en": "vector port",
+   "term": "向量連接埠",
+   "kind": "rnl"
   },
   {
    "en": "verb",

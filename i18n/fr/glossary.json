@@ -4,6 +4,11 @@
  "draft": true,
  "terms": [
   {
+   "en": "absorb",
+   "term": "absorber",
+   "kind": "rnl"
+  },
+  {
    "en": "alias",
    "term": "alias",
    "kind": "rnl"
@@ -11,6 +16,16 @@
   {
    "en": "alias package",
    "term": "paquet d’alias",
+   "kind": "rnl"
+  },
+  {
+   "en": "anchor",
+   "term": "ancre",
+   "kind": "rnl"
+  },
+  {
+   "en": "annotation",
+   "term": "annotation",
    "kind": "rnl"
   },
   {
@@ -22,6 +37,16 @@
   {
    "en": "bend",
    "term": "coude",
+   "kind": "rnl"
+  },
+  {
+   "en": "black box",
+   "term": "boîte noire",
+   "kind": "rnl"
+  },
+  {
+   "en": "block symbol",
+   "term": "symbole de bloc",
    "kind": "rnl"
   },
   {
@@ -59,13 +84,29 @@
    "kind": "rnl"
   },
   {
+   "en": "carrier",
+   "term": "porteur",
+   "kind": "rnl"
+  },
+  {
    "en": "comment",
    "term": "commentaire",
    "kind": "rnl"
   },
   {
+   "en": "commit",
+   "term": "versement",
+   "kind": "rnl",
+   "note": "The verb is verser."
+  },
+  {
    "en": "constraint",
    "term": "contrainte",
+   "kind": "rnl"
+  },
+  {
+   "en": "content digest",
+   "term": "condensat de contenu",
    "kind": "rnl"
   },
   {
@@ -123,9 +164,24 @@
    "kind": "rnl"
   },
   {
+   "en": "empty node",
+   "term": "nœud vide",
+   "kind": "rnl"
+  },
+  {
+   "en": "enclose",
+   "term": "enclore",
+   "kind": "rnl"
+  },
+  {
    "en": "evaluate",
    "sense": "RNL runtime",
    "term": "évaluer",
+   "kind": "rnl"
+  },
+  {
+   "en": "exact RNL",
+   "term": "RNL exact",
    "kind": "rnl"
   },
   {
@@ -156,6 +212,11 @@
    "kind": "rnl"
   },
   {
+   "en": "hiding",
+   "term": "masquage",
+   "kind": "rnl"
+  },
+  {
    "en": "hierarchy",
    "term": "hiérarchie",
    "kind": "rnl"
@@ -163,6 +224,11 @@
   {
    "en": "horizontal",
    "term": "horizontal",
+   "kind": "rnl"
+  },
+  {
+   "en": "house style",
+   "term": "style maison",
    "kind": "rnl"
   },
   {
@@ -199,6 +265,11 @@
    "kind": "rnl"
   },
   {
+   "en": "labels in a column",
+   "term": "étiquettes en une colonne",
+   "kind": "rnl"
+  },
+  {
    "en": "layout",
    "term": "placement",
    "kind": "rnl",
@@ -211,8 +282,19 @@
    "note": "The table of cells the solver cuts a group's place into (Solve menu)."
   },
   {
+   "en": "lead",
+   "term": "patte",
+   "kind": "rnl",
+   "note": "Of a part."
+  },
+  {
    "en": "level",
    "term": "niveau",
+   "kind": "rnl"
+  },
+  {
+   "en": "limit of the implementation",
+   "term": "limite de l’implémentation",
    "kind": "rnl"
   },
   {
@@ -232,6 +314,11 @@
    "term": "symétrie miroir",
    "kind": "rnl",
    "note": "Plain symétrie where the English says symmetry."
+  },
+  {
+   "en": "module level",
+   "term": "niveau de module",
+   "kind": "rnl"
   },
   {
    "en": "name",
@@ -256,6 +343,11 @@
    "kind": "rnl"
   },
   {
+   "en": "netlist language",
+   "term": "langage de netlist",
+   "kind": "rnl"
+  },
+  {
    "en": "objective",
    "term": "objectif",
    "kind": "rnl"
@@ -271,6 +363,11 @@
    "kind": "rnl"
   },
   {
+   "en": "package collection",
+   "term": "collection de paquets",
+   "kind": "rnl"
+  },
+  {
    "en": "phase",
    "term": "phase",
    "kind": "rnl"
@@ -279,6 +376,12 @@
    "en": "pin",
    "term": "broche",
    "kind": "rnl"
+  },
+  {
+   "en": "placeholder",
+   "term": "paramètre générique",
+   "kind": "rnl",
+   "note": "A role: rôle générique."
   },
   {
    "en": "port",
@@ -323,6 +426,12 @@
    "kind": "rnl"
   },
   {
+   "en": "round trip",
+   "term": "aller-retour",
+   "kind": "rnl",
+   "note": "Plural: allers-retours."
+  },
+  {
    "en": "routing / route",
    "sense": "the router's work",
    "term": "routage",
@@ -357,8 +466,19 @@
    "note": "A line of the solver's skeleton, shown in the drawing (Solve menu)."
   },
   {
+   "en": "slot",
+   "term": "emplacement",
+   "kind": "rnl",
+   "note": "A slot of a signature; a diagnostic's location is also emplacement."
+  },
+  {
    "en": "solver",
    "term": "solveur",
+   "kind": "rnl"
+  },
+  {
+   "en": "stand-in",
+   "term": "figure de remplacement",
    "kind": "rnl"
   },
   {
@@ -382,6 +502,11 @@
    "kind": "rnl"
   },
   {
+   "en": "stub",
+   "term": "raccord",
+   "kind": "rnl"
+  },
+  {
    "en": "subject",
    "term": "sujet",
    "kind": "rnl"
@@ -390,6 +515,12 @@
    "en": "symbol",
    "term": "symbole",
    "kind": "rnl"
+  },
+  {
+   "en": "tap",
+   "term": "dérivation",
+   "kind": "rnl",
+   "note": "A branch tapped off a bus; the centre tap of an inductor is prise médiane."
   },
   {
    "en": "terminal",
@@ -409,12 +540,23 @@
    "kind": "rnl"
   },
   {
+   "en": "textvisible",
+   "term": "visibilité du texte",
+   "kind": "rnl",
+   "note": "The parameter name stays textvisible."
+  },
+  {
    "en": "tier",
    "sense": "solver objectives",
    "term": "palier",
    "avoid": [
     "niveau"
    ],
+   "kind": "rnl"
+  },
+  {
+   "en": "title block",
+   "term": "cartouche",
    "kind": "rnl"
   },
   {
@@ -428,6 +570,11 @@
    "kind": "rnl"
   },
   {
+   "en": "vector port",
+   "term": "port vectoriel",
+   "kind": "rnl"
+  },
+  {
    "en": "verb",
    "term": "verbe",
    "kind": "rnl"
@@ -435,6 +582,11 @@
   {
    "en": "vertical",
    "term": "vertical",
+   "kind": "rnl"
+  },
+  {
+   "en": "virtual part",
+   "term": "composant virtuel",
    "kind": "rnl"
   },
   {

@@ -14,6 +14,22 @@
    "kind": "rnl"
   },
   {
+   "en": "anchor",
+   "term": "Anker",
+   "kind": "rnl"
+  },
+  {
+   "en": "annotation",
+   "term": "Anmerkung",
+   "kind": "rnl",
+   "note": "Not Beschriftung (label)."
+  },
+  {
+   "en": "appearance queue",
+   "term": "Darstellungswarteschlange",
+   "kind": "rnl"
+  },
+  {
    "en": "apply",
    "sense": "definition",
    "term": "anwenden",
@@ -31,8 +47,18 @@
    "note": "Applying changes in the interface, as Windows says it (Übernehmen); anwenden is applying a definition, and Anwendung is a usage."
   },
   {
+   "en": "assertion",
+   "term": "Zusicherung",
+   "kind": "rnl"
+  },
+  {
    "en": "bend",
    "term": "Knick",
+   "kind": "rnl"
+  },
+  {
+   "en": "block symbol",
+   "term": "Blocksymbol",
    "kind": "rnl"
   },
   {
@@ -71,8 +97,28 @@
    "kind": "rnl"
   },
   {
+   "en": "carrier",
+   "term": "Träger",
+   "kind": "rnl"
+  },
+  {
+   "en": "carrier line",
+   "term": "Trägerzeile",
+   "kind": "rnl"
+  },
+  {
    "en": "comment",
    "term": "Kommentar",
+   "kind": "rnl"
+  },
+  {
+   "en": "commit",
+   "term": "festschreiben",
+   "kind": "rnl"
+  },
+  {
+   "en": "conformance test",
+   "term": "Konformitätstest",
    "kind": "rnl"
   },
   {
@@ -132,6 +178,11 @@
    "kind": "rnl"
   },
   {
+   "en": "empty node",
+   "term": "leerer Knoten",
+   "kind": "rnl"
+  },
+  {
    "en": "evaluate",
    "sense": "RNL runtime",
    "term": "auswerten",
@@ -140,6 +191,11 @@
   {
    "en": "fact",
    "term": "Fakt",
+   "kind": "rnl"
+  },
+  {
+   "en": "fill rule",
+   "term": "Ergänzungsregel",
    "kind": "rnl"
   },
   {
@@ -172,6 +228,12 @@
    "en": "horizontal",
    "term": "waagerecht",
    "kind": "rnl"
+  },
+  {
+   "en": "house style",
+   "term": "Hausstil",
+   "kind": "rnl",
+   "note": "Package: Hausstilpaket."
   },
   {
    "en": "index",
@@ -208,6 +270,12 @@
    "kind": "rnl"
   },
   {
+   "en": "labels in a column",
+   "term": "Beschriftungen in einer Spalte",
+   "kind": "rnl",
+   "note": "Short: eine Spalte."
+  },
+  {
    "en": "layout",
    "term": "Layout",
    "kind": "rnl"
@@ -221,6 +289,11 @@
   {
    "en": "level",
    "term": "Ebene",
+   "kind": "rnl"
+  },
+  {
+   "en": "limit of the implementation",
+   "term": "Grenze der Implementierung",
    "kind": "rnl"
   },
   {
@@ -246,6 +319,11 @@
    "note": "The gallery lists the $MIRRORED structure as Spiegelung."
   },
   {
+   "en": "module level",
+   "term": "Modulebene",
+   "kind": "rnl"
+  },
+  {
    "en": "name",
    "term": "Name",
    "kind": "rnl"
@@ -266,6 +344,11 @@
    "kind": "rnl"
   },
   {
+   "en": "netlist language",
+   "term": "Netzlistensprache",
+   "kind": "rnl"
+  },
+  {
    "en": "objective",
    "term": "Ziel",
    "kind": "rnl",
@@ -279,6 +362,11 @@
   {
    "en": "package",
    "term": "Paket",
+   "kind": "rnl"
+  },
+  {
+   "en": "package collection",
+   "term": "Paketsammlung",
    "kind": "rnl"
   },
   {
@@ -373,6 +461,11 @@
    "note": "Kept in English; to solve is lösen."
   },
   {
+   "en": "stand-in",
+   "term": "Ersatzdarstellung",
+   "kind": "rnl"
+  },
+  {
    "en": "standard package",
    "term": "Standardpaket",
    "kind": "rnl"
@@ -398,8 +491,20 @@
    "kind": "rnl"
   },
   {
+   "en": "subscript",
+   "sense": "bus subscript",
+   "term": "Subskript",
+   "kind": "rnl",
+   "note": "A bus subscript; in LaTeX text Tiefstellung."
+  },
+  {
    "en": "symbol",
    "term": "Symbol",
+   "kind": "rnl"
+  },
+  {
+   "en": "taken in",
+   "term": "aufgenommen",
    "kind": "rnl"
   },
   {
@@ -420,12 +525,28 @@
    "kind": "rnl"
   },
   {
+   "en": "textvisible",
+   "term": "Textsichtbarkeit",
+   "kind": "rnl",
+   "note": "The parameter name stays textvisible."
+  },
+  {
    "en": "tier",
    "sense": "solver objectives",
    "term": "Stufe",
    "avoid": [
     "Ebene"
    ],
+   "kind": "rnl"
+  },
+  {
+   "en": "title block",
+   "term": "Schriftfeld",
+   "kind": "rnl"
+  },
+  {
+   "en": "topology assertion",
+   "term": "Topologiezusicherung",
    "kind": "rnl"
   },
   {
@@ -443,6 +564,11 @@
    "note": "2 texts say Anwendungsobjekt to tell the usage from the act of applying."
   },
   {
+   "en": "vector port",
+   "term": "Vektorport",
+   "kind": "rnl"
+  },
+  {
    "en": "verb",
    "term": "Verb",
    "kind": "rnl"
@@ -450,6 +576,11 @@
   {
    "en": "vertical",
    "term": "senkrecht",
+   "kind": "rnl"
+  },
+  {
+   "en": "virtual part",
+   "term": "virtuelles Bauteil",
    "kind": "rnl"
   },
   {

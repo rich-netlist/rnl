@@ -4,6 +4,11 @@
  "draft": true,
  "terms": [
   {
+   "en": "absorb",
+   "term": "absorber",
+   "kind": "rnl"
+  },
+  {
    "en": "alias",
    "term": "alias",
    "kind": "rnl",
@@ -15,6 +20,17 @@
    "kind": "rnl"
   },
   {
+   "en": "anchor",
+   "term": "anclaje",
+   "kind": "rnl"
+  },
+  {
+   "en": "annotation",
+   "term": "anotación",
+   "kind": "rnl",
+   "note": "Not etiqueta (label)."
+  },
+  {
    "en": "apply",
    "sense": "definition",
    "term": "aplicar",
@@ -23,6 +39,16 @@
   {
    "en": "bend",
    "term": "codo",
+   "kind": "rnl"
+  },
+  {
+   "en": "black box",
+   "term": "caja negra",
+   "kind": "rnl"
+  },
+  {
+   "en": "block symbol",
+   "term": "símbolo de bloque",
    "kind": "rnl"
   },
   {
@@ -64,8 +90,24 @@
    "kind": "rnl"
   },
   {
+   "en": "carrier",
+   "term": "portador",
+   "kind": "rnl"
+  },
+  {
+   "en": "center tap",
+   "term": "toma central",
+   "kind": "rnl",
+   "note": "Of an inductor."
+  },
+  {
    "en": "comment",
    "term": "comentario",
+   "kind": "rnl"
+  },
+  {
+   "en": "commit",
+   "term": "consignar",
    "kind": "rnl"
   },
   {
@@ -127,6 +169,16 @@
    "kind": "rnl"
   },
   {
+   "en": "empty node",
+   "term": "nodo vacío",
+   "kind": "rnl"
+  },
+  {
+   "en": "enclose",
+   "term": "encerrar",
+   "kind": "rnl"
+  },
+  {
    "en": "evaluate",
    "sense": "RNL runtime",
    "term": "evaluar",
@@ -143,6 +195,11 @@
    "kind": "rnl"
   },
   {
+   "en": "flying capacitor",
+   "term": "condensador volante",
+   "kind": "rnl"
+  },
+  {
    "en": "flyline",
    "term": "línea de conexión",
    "kind": "general",
@@ -151,6 +208,11 @@
   {
    "en": "free text",
    "term": "texto libre",
+   "kind": "rnl"
+  },
+  {
+   "en": "hairline",
+   "term": "trazo mínimo",
    "kind": "rnl"
   },
   {
@@ -169,8 +231,18 @@
    "kind": "rnl"
   },
   {
+   "en": "house style",
+   "term": "estilo de la casa",
+   "kind": "rnl"
+  },
+  {
    "en": "index",
    "term": "índice",
+   "kind": "rnl"
+  },
+  {
+   "en": "inline package",
+   "term": "paquete en línea",
    "kind": "rnl"
   },
   {
@@ -203,6 +275,11 @@
    "kind": "rnl"
   },
   {
+   "en": "labels in a column",
+   "term": "etiquetas en una columna",
+   "kind": "rnl"
+  },
+  {
    "en": "layout",
    "term": "disposición",
    "kind": "rnl"
@@ -216,6 +293,11 @@
   {
    "en": "level",
    "term": "nivel",
+   "kind": "rnl"
+  },
+  {
+   "en": "limit of the implementation",
+   "term": "límite de la implementación",
    "kind": "rnl"
   },
   {
@@ -240,6 +322,11 @@
    "kind": "rnl"
   },
   {
+   "en": "module level",
+   "term": "nivel de módulo",
+   "kind": "rnl"
+  },
+  {
    "en": "name",
    "term": "nombre",
    "kind": "rnl"
@@ -261,6 +348,11 @@
    "kind": "rnl"
   },
   {
+   "en": "netlist language",
+   "term": "lenguaje de netlist",
+   "kind": "rnl"
+  },
+  {
    "en": "objective",
    "term": "objetivo",
    "kind": "rnl"
@@ -271,8 +363,19 @@
    "kind": "rnl"
   },
   {
+   "en": "override",
+   "term": "sustitución",
+   "kind": "rnl",
+   "note": "The verb is sustituir; not sobrescribir (overwrite) or reemplazar (replace)."
+  },
+  {
    "en": "package",
    "term": "paquete",
+   "kind": "rnl"
+  },
+  {
+   "en": "package collection",
+   "term": "colección de paquetes",
    "kind": "rnl"
   },
   {
@@ -289,6 +392,11 @@
   {
    "en": "port",
    "term": "puerto",
+   "kind": "rnl"
+  },
+  {
+   "en": "port tag",
+   "term": "etiqueta de puerto",
    "kind": "rnl"
   },
   {
@@ -322,8 +430,18 @@
    "kind": "rnl"
   },
   {
+   "en": "RF choke",
+   "term": "bobina de choque de RF",
+   "kind": "rnl"
+  },
+  {
    "en": "role",
    "term": "rol",
+   "kind": "rnl"
+  },
+  {
+   "en": "round trip",
+   "term": "ida y vuelta",
    "kind": "rnl"
   },
   {
@@ -365,8 +483,23 @@
    "note": "A line of the solver's skeleton, shown in the drawing (Solve menu)."
   },
   {
+   "en": "slot",
+   "term": "ranura",
+   "kind": "rnl"
+  },
+  {
    "en": "solver",
    "term": "solucionador",
+   "kind": "rnl"
+  },
+  {
+   "en": "staircase",
+   "term": "trazo en escalera",
+   "kind": "rnl"
+  },
+  {
+   "en": "stand-in",
+   "term": "figura sustituta",
    "kind": "rnl"
   },
   {
@@ -390,6 +523,11 @@
    "kind": "rnl"
   },
   {
+   "en": "stub",
+   "term": "tramo corto",
+   "kind": "rnl"
+  },
+  {
    "en": "subject",
    "term": "sujeto",
    "kind": "rnl"
@@ -400,8 +538,24 @@
    "kind": "rnl"
   },
   {
+   "en": "taken in",
+   "term": "se incorporan",
+   "kind": "rnl"
+  },
+  {
+   "en": "tap",
+   "term": "toma",
+   "kind": "rnl",
+   "note": "A branch tapped off a wire."
+  },
+  {
    "en": "terminal",
    "term": "terminal",
+   "kind": "rnl"
+  },
+  {
+   "en": "test bench",
+   "term": "banco de pruebas",
    "kind": "rnl"
   },
   {
@@ -417,6 +571,17 @@
    "kind": "rnl"
   },
   {
+   "en": "textvisible",
+   "term": "visibilidad del texto",
+   "kind": "rnl",
+   "note": "The parameter name stays textvisible."
+  },
+  {
+   "en": "through wire",
+   "term": "cable pasante",
+   "kind": "rnl"
+  },
+  {
    "en": "tier",
    "sense": "solver objectives",
    "term": "rango",
@@ -424,6 +589,12 @@
     "nivel"
    ],
    "kind": "rnl"
+  },
+  {
+   "en": "title block",
+   "term": "cajetín",
+   "kind": "rnl",
+   "note": "The report writes the plural, cajetines."
   },
   {
    "en": "union",
@@ -436,6 +607,11 @@
    "kind": "rnl"
   },
   {
+   "en": "vector port",
+   "term": "puerto vectorial",
+   "kind": "rnl"
+  },
+  {
    "en": "verb",
    "term": "verbo",
    "kind": "rnl"
@@ -443,6 +619,11 @@
   {
    "en": "vertical",
    "term": "vertical",
+   "kind": "rnl"
+  },
+  {
+   "en": "virtual part",
+   "term": "componente virtual",
    "kind": "rnl"
   },
   {
