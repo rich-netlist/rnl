@@ -119,6 +119,11 @@ pub struct Report {
     /// Target assertion violations, also retained in diagnostics and exit status.
     pub assertion_violations: Vec<Diagnostic>,
     pub differences: Vec<Difference>,
+    /// Changes that only the default look of the 0.4 standard package explains: style properties
+    /// such as `bold`, the labels and drawing of a standard symbol, and the offset of a label that its
+    /// symbol places. Connections, facts, geometry and written positions never land here. They are
+    /// shown to be reviewed but do not count against success.
+    pub default_look_changes: Vec<Difference>,
 }
 
 impl Report {
@@ -338,6 +343,7 @@ pub fn upgrade(entry: &str, files: &dyn Provider, options: &UpgradeOptions) -> R
         diagnostics: Vec::new(),
         assertion_violations: Vec::new(),
         differences: Vec::new(),
+        default_look_changes: Vec::new(),
     };
     let mut read = Vec::new();
     for (path, records) in source_records {
@@ -388,6 +394,6 @@ pub fn upgrade(entry: &str, files: &dyn Provider, options: &UpgradeOptions) -> R
         rnl_view::interpret_with(&entry, options.dialect.as_deref(), &options.formats, &provider, &target_options)?;
     report.diagnostics = diagnostics(&after);
     report.assertion_violations = report.diagnostics.iter().filter(|d| d.severity == "violation").cloned().collect();
-    report.differences = compare::compare(&before, &after);
+    (report.differences, report.default_look_changes) = compare::compare(&before, &after);
     Ok(Upgrade { entry, files: output, read, report })
 }

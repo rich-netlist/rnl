@@ -213,3 +213,23 @@ fn keep_generated_upgrades_the_solver_record_instead_of_discarding_it() {
     }
     assert_eq!(std::fs::read_to_string(dir.join("top.sp")).unwrap(), source);
 }
+
+#[test]
+fn a_change_of_the_default_look_does_not_fail_the_upgrade_but_a_real_difference_does() {
+    let dir = scratch("default-look");
+    std::fs::write(
+        dir.join("look.sp"),
+        "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\nM1 d g s b nmos\nR1 d vdd 1k\n.end\n",
+    )
+    .unwrap();
+    let output = run(&dir, &["look.sp", "-o", "look-out", "--report", "look.json"]);
+    assert!(output.status.success(), "{output:?}");
+    let report: serde_json::Value = serde_json::from_slice(&std::fs::read(dir.join("look.json")).unwrap()).unwrap();
+    assert_eq!(report["differences"].as_array().unwrap().len(), 0);
+    assert_eq!(report["default_look_changes"].as_array().unwrap().len(), 2, "{report}");
+    assert!(String::from_utf8(output.stdout).unwrap().contains("2 default-look changes"));
+    let source = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\nR1 a 0 1k\n* @RNL { $S = @DEFINE-SYMBOL { (0, 0) @PIN(terminal=1); (2, 0) @PIN(terminal=1) }; #R1 @SET-SYMBOL $S }\n.end\n";
+    std::fs::write(dir.join("real.sp"), source).unwrap();
+    let output = run(&dir, &["real.sp", "--no-std", "-o", "real-out"]);
+    assert_eq!(output.status.code(), Some(1), "{output:?}");
+}

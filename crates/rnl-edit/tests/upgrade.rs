@@ -281,4 +281,13 @@ fn every_level_of_a_file_has_its_hash_refreshed() {
         let hash = hash_of(output, i);
         assert_eq!(same_input(&hash, problem), Some(true), "{i}: {output}");
     }
+
+#[test]
+fn only_the_default_look_goes_to_default_look_changes() {
+    let source = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\nM1 d g s b nmos\nR1 d vdd 1k\n.end\n";
+    let result = upgrade("t.sp", &MemoryProvider::new().with("t.sp", source), &UpgradeOptions::default()).unwrap();
+    assert!(result.report.differences.is_empty(), "{:?}", result.report.differences);
+    assert!(result.report.successful());
+    let categories: Vec<_> = result.report.default_look_changes.iter().map(|d| d.category.as_str()).collect();
+    assert_eq!(categories, ["positions", "unplaced-drawings"]);
 }

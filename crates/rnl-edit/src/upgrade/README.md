@@ -79,3 +79,7 @@ Each change records its rule, file, original line, before and after text. Unconv
 ## Regression coverage
 
 The integration tests in `../../tests/upgrade_*.rs` cover headers and includes, record-only edits, direction intervals, standard provenance, local symbols, terminal maps, legacy names, host terminals, collection dependencies, drawing selections and manual review reasons. `rnl-cli/tests/upgrade.rs` covers writing, reports, exit codes and source preservation. All fixtures are small independently authored examples.
+
+## Default look
+
+The 0.4 standard package draws some things differently by default. A change that only this explains goes to `default_look_changes` in the report instead of `differences`, and does not fail the upgrade: a style property such as `bold`, the labels and drawing primitives of a symbol, and the offset of a label that its symbol places (a position no scene gives). Everything else stays a difference and exits with status 1: objects, kinds, hosts, orientations, pin positions and networks, the box of a symbol, facts, wires, written positions and any change that is not sure to come from the default look. The terminal summary counts both lists.

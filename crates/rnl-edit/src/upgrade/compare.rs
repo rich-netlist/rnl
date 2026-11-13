@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use rnl_runtime::problem::{FactKind, PointRef, Sense};
+use rnl_runtime::problem::{FactKind, PointRef, Position, Sense};
 use rnl_runtime::Interpretation;
 use serde_json::{json, Value};
 
@@ -45,6 +45,46 @@ fn symbol(table: &[rnl_runtime::model::SymbolView], index: usize, depth: usize) 
         "labels":s.labels.iter().map(|l|json!({"key":l.key,"text":l.text,"at":l.at,"halign":l.halign,"valign":l.valign,"rotate":l.rotate,"fix_rotate":l.fix_rotate.unwrap_or(false),"upright":l.upright.unwrap_or(true),"style":format!("{:?}",l.style)})).collect::<Vec<_>>(),
         "primitives":s.prims.iter().map(|p|json!({"order":p.order,"shape":p.shape.as_str(),"points":p.points,"params":format!("{:?}",p.params),"style":format!("{:?}",p.style),"text":p.text,"halign":p.halign,"valign":p.valign,"rotate":p.rotate,"fix_rotate":p.fix_rotate,"upright":p.upright.unwrap_or(true)})).collect::<Vec<_>>(),
         "nested":s.nested.iter().map(|n|json!({"order":n.order,"at":n.at,"orientation":n.orient.as_str(),"symbol":symbol(table,n.symbol,depth+1)})).collect::<Vec<_>>()})
+}
+
+/// A position that only the symbol gives (a label at its default place) keeps its `local` offset
+/// apart, so that [`without_look`] can set it aside; every other position is compared as written.
+fn position(position: &Position) -> Value {
+    match position {
+        Position::InSymbol { owner, local, replaced: None } => {
+            json!({"symbol_given": {"owner": owner, "local": local}})
+        }
+        other => json!({"written": format!("{other:?}")}),
+    }
+}
+
+/// The value without what only the look of the standard package decides: the style properties, the
+/// labels and drawing primitives of a symbol, and the offset of a label that its symbol places.
+/// Names, kinds, hosts, orientations, pin positions, pin networks, the box, authored positions and
+/// everything else stay. Two values equal after this differ only in default appearance.
+fn without_look(category: &str, value: &Value) -> Value {
+    let mut value = value.clone();
+    let Some(map) = value.as_object_mut() else { return value };
+    match category {
+        "positions" => {
+            if let Some(given) =
+                map.get_mut("position").and_then(|p| p.get_mut("symbol_given")).and_then(Value::as_object_mut)
+            {
+                given.remove("local");
+            }
+        }
+        "objects" | "unplaced-drawings" | "texts" | "shapes" => {
+            map.remove("style");
+            for key in ["geometry", "symbol"] {
+                if let Some(symbol) = map.get_mut(key).and_then(Value::as_object_mut) {
+                    symbol.remove("labels");
+                    symbol.remove("primitives");
+                }
+            }
+        }
+        _ => {}
+    }
+    value
 }
 
 fn snapshot(read: &Interpretation) -> BTreeMap<Key, Value> {
@@ -129,7 +169,7 @@ fn snapshot(read: &Interpretation) -> BTreeMap<Key, Value> {
             put(
                 "positions",
                 index.to_string(),
-                json!({"kind":object.kind.as_str(),"position":format!("{:?}",object.position),"orientation":format!("{:?}",object.orient)}),
+                json!({"kind":object.kind.as_str(),"position":position(&object.position),"orientation":format!("{:?}",object.orient)}),
             );
         }
         for (index, fact) in problem.facts.iter().enumerate() {
@@ -159,14 +199,24 @@ fn snapshot(read: &Interpretation) -> BTreeMap<Key, Value> {
     out
 }
 
-pub(super) fn compare(before: &Interpretation, after: &Interpretation) -> Vec<Difference> {
+/// The differences, and apart from them the changes that only the default look of the standard
+/// package of 0.4 explains (see [`without_look`]). What is not sure to be one stays a difference.
+pub(super) fn compare(before: &Interpretation, after: &Interpretation) -> (Vec<Difference>, Vec<Difference>) {
     let mut before = snapshot(before);
     let after = snapshot(after);
     let mut differences = Vec::new();
+    let mut look = Vec::new();
     for ((file, level, category, item), value) in after {
         let old = before.remove(&(file.clone(), level.clone(), category.clone(), item.clone()));
-        if old.as_ref() != Some(&value) {
-            differences.push(Difference { file, level, category, item, before: old, after: Some(value) });
+        if old.as_ref() == Some(&value) {
+            continue;
+        }
+        let only_look = old.as_ref().is_some_and(|old| without_look(&category, old) == without_look(&category, &value));
+        let difference = Difference { file, level, category, item, before: old, after: Some(value) };
+        if only_look {
+            look.push(difference);
+        } else {
+            differences.push(difference);
         }
     }
     differences.extend(before.into_iter().map(|((file, level, category, item), value)| Difference {
@@ -177,5 +227,5 @@ pub(super) fn compare(before: &Interpretation, after: &Interpretation) -> Vec<Di
         before: Some(value),
         after: None,
     }));
-    differences
+    (differences, look)
 }
