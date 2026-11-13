@@ -2559,13 +2559,7 @@ impl Level<'_> {
         let mut cost = 0;
         for &(m, _) in members.iter().filter(|(m, _)| own.contains(m)) {
             for r in &problem.routes {
-                let pins: Vec<(usize, usize)> = r
-                    .pins
-                    .iter()
-                    .filter_map(
-                        |p| if let PointRef::Pin { object, pin, .. } = p { Some((*object, *pin)) } else { None },
-                    )
-                    .collect();
+                let pins: Vec<(usize, usize)> = r.pins.iter().filter_map(ref_pin).collect();
                 for &(k, p) in pins.iter().filter(|(k, _)| *k == m) {
                     let (Some(here), Some(a)) = (at(k, p, ori[k]), s.exit(k, p, ori[k])) else { continue };
                     let near = pins
@@ -3972,6 +3966,57 @@ pub(super) mod tests {
         let (start, _) = tree.evaluate_rounds(&arr, 0, &mut Work::default());
         let arrangement = (arr, s.tree.clone());
         (p, s, options, start, arrangement)
+    }
+
+    #[test]
+    fn physical_pin_references_keep_the_same_orientation_cost() {
+        let (mut p, s, _, mut start, _) = seed();
+        start.placed.origins[0] = [int(0), int(0)];
+        start.placed.origins[1] = [int(20), int(0)];
+        let own = BTreeSet::from([0, 1]);
+        let members = [(0, Orient::R0), (1, Orient::R0)];
+        let cost = |p: &LevelProblem, ori: &[Orient], joint| {
+            let level = Level {
+                problem: p,
+                s: &s,
+                tree: &start.placed,
+                nodes: &s.tree,
+                weights: (1, 4),
+                clear: &BTreeMap::new(),
+                hung: BTreeMap::new(),
+                leaves: BTreeSet::new(),
+                edges: vec![],
+                implied_alignments: vec![],
+                fact_objects: vec![],
+                nearest: BTreeMap::new(),
+                flips: BTreeMap::new(),
+                levels: true,
+                bands: true,
+                others: vec![],
+            };
+            level.rule_cost(&members, &own, ori, joint)
+        };
+        let terminal = |object| PointRef::Pin { object, pin: 0, terminal: "g".into() };
+        let mut nonzero = false;
+        for joint in [false, true] {
+            for a in Orient::ALL {
+                for b in Orient::ALL {
+                    let ori = [a, b];
+                    p.routes[0].pins = vec![terminal(0), terminal(1)];
+                    let expected = cost(&p, &ori, joint);
+                    nonzero |= expected > 0;
+                    for pins in [vec![pin(0), pin(1)], vec![pin(0), terminal(1)], vec![terminal(0), pin(1)]] {
+                        p.routes[0].pins = pins;
+                        assert_eq!(cost(&p, &ori, joint), expected, "{a:?}/{b:?}, joint={joint}");
+                    }
+                    // A position at a pin is a coordinate, not an electrical endpoint.
+                    p.routes[0].pins =
+                        vec![pin(0), PointRef::PinPosition { object: 1, pin: 0, reference: Reference::Anonymous }];
+                    assert_eq!(cost(&p, &ori, joint), 0);
+                }
+            }
+        }
+        assert!(nonzero, "the fixture must exercise a bend penalty");
     }
 
     #[test]

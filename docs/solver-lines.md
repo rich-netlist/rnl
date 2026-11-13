@@ -44,6 +44,8 @@ Standalone solver 0.4.3 propagates coordinate equalities between retained DISTRI
 
 Standalone solver 0.4.4 preserves structural line-merge hints from semantic usages that have a coordinate object but no symbol. Nested roles naming these objects expand to their members; a virtual part drawn with a symbol remains a single object. This restores the same role-based hints without consulting definition names or adding constraints. The traversal uses the shared work budget, and legacy usage handling stays unchanged.
 
+Standalone solver 0.4.5 uses the same electrical pin identity for terminal and physical symbol-pin references when estimating bends to order orientation candidates. A coordinate-only reference to a pin remains a position and supplies no electrical endpoint. The estimate and its tie order are otherwise unchanged; work replay requires the same build.
+
 ## Cost calibration
 
 Local orientation filters inspect the actual candidate after applying authored `ORIENT` and `ORIENT-RELATION` alternatives. This includes choices that have no free orientation class. Same-symbol `ALIGN`, directed `ORDER`, and directed `DISTRIBUTE` constraints therefore filter invalid directions before routing and compaction. These checks use the shared work budget and are part of standalone solver 0.4.2's replay policy.
