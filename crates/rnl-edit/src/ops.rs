@@ -548,9 +548,6 @@ impl Reader<'_> {
             .collect()
     }
 
-    /// A usage's parameters: each a string, a number, a truth value or a list of them, as the
-    /// snapshot gives them back (`ObjectView.params`). A string with a line break is refused: it
-    /// would end the comment that carries the record.
     /// `terminals` of `set` and `add-usage`: pairs of a host terminal (a number from 1, or a name)
     /// and the symbol's terminal name it stands for. They bind the pins of the object's symbol, so
     /// they need a `symbol`, and the language 0.4.
@@ -569,27 +566,40 @@ impl Reader<'_> {
         if !self.obj.get("symbol").is_some_and(Value::is_string) {
             return Err(self.fail("terminals", "needs a `symbol`, whose pins it binds"));
         }
-        items
+        let pairs = items
             .iter()
             .map(|item| {
                 let pair = item.as_array().filter(|p| p.len() == 2);
                 let host = match pair.map(|p| &p[0]) {
-                    Some(Value::String(s)) if !s.is_empty() => Some(TermKey::Name(s.clone())),
+                    Some(Value::String(s)) if plain_name(s) => Some(TermKey::Name(s.clone())),
                     Some(Value::Number(n)) => {
                         n.as_u64().filter(|n| *n >= 1).and_then(|n| u32::try_from(n).ok()).map(TermKey::Num)
                     }
                     _ => None,
                 };
-                let name = pair.and_then(|p| p[1].as_str()).filter(|s| !s.is_empty());
+                let name = pair.and_then(|p| p[1].as_str()).filter(|s| plain_name(s));
                 match (host, name) {
                     (Some(host), Some(name)) => Ok((host, name.to_string())),
                     _ => Err(self
-                        .fail("terminals", "is not a list of [terminal number or name, symbol terminal name] pairs")),
+                        .fail("terminals", "is not a list of [terminal number or name, symbol terminal name] pairs; a name is not empty, has no line break and is not all digits")),
                 }
             })
-            .collect()
+            .collect::<Result<Vec<_>, _>>()?;
+        // The runtime reads a terminal named twice, on either side, as an error.
+        for (n, (host, name)) in pairs.iter().enumerate() {
+            if pairs[..n].iter().any(|(h, _)| h == host) {
+                return Err(self.fail("terminals", "names a host terminal twice"));
+            }
+            if pairs[..n].iter().any(|(_, m)| m == name) {
+                return Err(self.fail("terminals", &format!("names the symbol terminal `{name}` twice")));
+            }
+        }
+        Ok(pairs)
     }
 
+    /// A usage's parameters: each a string, a number, a truth value or a list of them, as the
+    /// snapshot gives them back (`ObjectView.params`). A string with a line break is refused: it
+    /// would end the comment that carries the record.
     fn params(&self) -> Result<Vec<(String, Literal)>, Refusal> {
         fn value(v: &Value) -> Option<Literal> {
             Some(match v {
@@ -628,6 +638,12 @@ impl Reader<'_> {
             })
             .collect()
     }
+}
+
+/// A terminal name `terminals` can write back: 0.4 reads an all-digit name as a number, and a
+/// line break would end the comment that carries the record.
+fn plain_name(s: &str) -> bool {
+    !s.is_empty() && !s.contains(['\n', '\r']) && !s.chars().all(|c| c.is_ascii_digit())
 }
 
 /// Literals by name, in order: a parameter list or a style.

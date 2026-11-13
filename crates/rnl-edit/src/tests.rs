@@ -1308,6 +1308,15 @@ fn terminals_need_the_language_0_4_a_symbol_and_pairs() {
         json!({"terminals": [[1, ""]]}),
         json!({"terminals": [[1.5, "d"]]}),
         json!({"terminals": [[true, "d"]]}),
+        // a terminal named twice reads back as an error, on either side
+        json!({"terminals": [[1, "d"], [1, "s"]]}),
+        json!({"terminals": [[1, "d"], [2, "d"]]}),
+        json!({"terminals": [["a", "d"], ["a", "s"]]}),
+        // a name with a line break would change; an all-digit name reads as a number
+        json!({"terminals": [[1, "d\ns"]]}),
+        json!({"terminals": [["a\nb", "d"]]}),
+        json!({"terminals": [[1, "2"]]}),
+        json!({"terminals": [["3", "d"]]}),
     ] {
         req.ops = set(bad.clone()).as_array().unwrap().clone();
         let err = write(&req).unwrap_err();
