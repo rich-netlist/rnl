@@ -85,12 +85,21 @@
   },
   {
    "en": "branch",
-   "sense": "wire routing",
+   "sense": "a part that splits off a wire",
    "term": "分叉",
    "avoid": [
-    "支线"
+    "支线",
+    "支路"
    ],
-   "kind": "rnl"
+   "kind": "rnl",
+   "note": "Wires only; a branch taken off a bus is a tap (分接)."
+  },
+  {
+   "en": "branch",
+   "sense": "the $BRANCH structure, a branch of a circuit",
+   "term": "支路",
+   "kind": "rnl",
+   "note": "Only for $BRANCH and a branch of a circuit (series or parallel branch), never for the part of a wire."
   },
   {
    "en": "bundle",
