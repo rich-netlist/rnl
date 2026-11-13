@@ -568,9 +568,11 @@ pub enum GroupPlace {
     Same(usize),
     /// It shares members with this group without either holding the other, and is left out.
     Crosses(usize),
-    /// Not in the tree: turned off, or without members.
+    /// Not in the tree: it has no members.
+    Empty,
+    /// Not in the tree: turned off, itself or by its first GROUP on the same members.
     #[default]
-    Out,
+    Off,
 }
 
 /// An application of a definition, AS or ATTACH, written in a record of the level, that failed

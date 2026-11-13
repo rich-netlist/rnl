@@ -646,7 +646,7 @@ impl Interp<'_> {
                 origin,
                 parent: g.chain.last().map(|p| self.ref_id(s, *p, ids)),
                 disabled: self.group_disabled(s, &g),
-                place: GroupPlace::Out,
+                place: GroupPlace::Off,
             });
         }
         self.place_groups(s, &rows, &mut out);
@@ -657,6 +657,8 @@ impl Interp<'_> {
     /// declares them ([`crate::group_tree`]): every GROUP that did not fail, in order, a set by its
     /// value, those PRIORITY turns off counted for which comes first but left out.
     fn place_groups(&mut self, s: SceneId, rows: &[ObjId], out: &mut [GroupInfo]) {
+        // members as the problem has them: those with a place of their own
+        let placed: HashSet<ObjId> = self.problem_objects(s).0.into_iter().map(|(o, _)| o).collect();
         let mut declarations = Vec::new();
         let mut of_row = vec![None; rows.len()];
         let mut identities = HashMap::new();
@@ -674,7 +676,8 @@ impl Interp<'_> {
             if let Some(r) = rows.iter().position(|&set| set == g.set) {
                 of_row[r].get_or_insert(declarations.len());
             }
-            let members = self.group_members(s, &g).into_iter().map(|m| m.0 as usize).collect();
+            let members =
+                self.group_members(s, &g).into_iter().filter(|m| placed.contains(m)).map(|m| m.0 as usize).collect();
             declarations.push(crate::group_tree::Declaration { identity, first, direct: g.chain.is_empty(), members });
         }
         let Some(selection) = crate::group_tree::select(&declarations, &mut |_| true) else { return };
@@ -690,13 +693,14 @@ impl Interp<'_> {
                     let i = taken.iter().position(|&t| t == d).unwrap();
                     GroupPlace::Tree { parent: parents[i].and_then(|p| row_of(taken[p])) }
                 }
-                Fate::Same(t) => row_of(t).map_or(GroupPlace::Out, GroupPlace::Same),
-                Fate::Crosses(t) => row_of(t).map_or(GroupPlace::Out, GroupPlace::Crosses),
+                Fate::Same(t) => row_of(t).map_or(GroupPlace::Off, GroupPlace::Same),
+                Fate::Crosses(t) => row_of(t).map_or(GroupPlace::Off, GroupPlace::Crosses),
                 Fate::Repeat => {
                     let first = declarations.iter().position(|x| x.identity == declarations[d].identity && x.first);
-                    first.and_then(row_of).filter(|&f| f != r).map_or(GroupPlace::Out, GroupPlace::Same)
+                    // the first GROUP on these members was turned off, and this one with it
+                    first.and_then(row_of).filter(|&f| f != r).map_or(GroupPlace::Off, GroupPlace::Same)
                 }
-                Fate::Empty => GroupPlace::Out,
+                Fate::Empty => GroupPlace::Empty,
             };
         }
     }

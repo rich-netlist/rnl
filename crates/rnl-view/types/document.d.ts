@@ -229,7 +229,8 @@ export type Usage = {
    */
   same_as?: number,
   /**
-   * For a group whose `state` is "left-out": the group in the tree it crosses.
+   * For a group whose `state` is "left-out" because it crosses a group in the tree: that group;
+   * absent for a group left out because it has no members.
    */
   crosses?: number,
   id: string,

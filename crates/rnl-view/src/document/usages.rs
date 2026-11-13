@@ -35,7 +35,8 @@ pub struct Usage {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(test, ts(optional))]
     pub same_as: Option<usize>,
-    /// For a group whose `state` is "left-out": the group in the tree it crosses.
+    /// For a group whose `state` is "left-out" because it crosses a group in the tree: that group;
+    /// absent for a group left out because it has no members.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(test, ts(optional))]
     pub crosses: Option<usize>,
@@ -334,7 +335,15 @@ fn inspect(
                             lv.groups[t].id
                         ));
                     }
-                    _ => {}
+                    Some(GroupPlace::Empty) => {
+                        state = "left-out";
+                        reason = Some("it has no members with a place of their own, so it is not a block".into());
+                    }
+                    Some(GroupPlace::Off) => {
+                        state = "disabled";
+                        reason = Some("the first GROUP on the same members is turned off, and this one with it".into());
+                    }
+                    None => {}
                 }
             }
             Usage {
@@ -526,7 +535,8 @@ mod tests {
     #[test]
     fn groups_of_a_0_4_level_stand_in_the_tree_of_groups() {
         let body = "%outer={#R1 #R2 #R3} @GROUP; %inner={#R1 #R2} @GROUP; %again={#R1 #R2} @GROUP; \
-                    %cross={#R3 #R4} @GROUP; %far={#R5} @GROUP";
+                    %cross={#R3 #R4} @GROUP; %far={#R5} @GROUP; %off={#R4 #R5} @GROUP; \
+                    %off @PRIORITY(\"disabled\"); %e={&a} @GROUP";
         let file = |version: &str| {
             format!(
                 "* g\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\") }}\nR1 a 0 1k\nR2 a 0 1k\nR3 a 0 1k\nR4 a 0 1k\nR5 a 0 1k\n* @RNL {{ {body} }}\n.end\n"
@@ -544,8 +554,11 @@ mod tests {
         assert_eq!((g("%inner").state, g("%inner").same_as), ("same", Some(g("%again").object)));
         assert!(g("%inner").reason.as_deref().unwrap().contains("%again"));
         assert_eq!(g("%far").state, "in-effect");
+        assert_eq!(g("%off").state, "disabled");
+        // a net has no place of its own: no members to make a block of
+        assert_eq!((g("%e").state, g("%e").crosses, g("%e").group_parent), ("left-out", None, None));
         // the tree first, siblings by their first member, then the groups outside it
-        assert_eq!(order, ["%again", "%cross", "%far", "%outer", "%inner"]);
+        assert_eq!(order, ["%again", "%cross", "%far", "%outer", "%inner", "%off", "%e"]);
 
         let p = MemoryProvider::new().with("g.sp", &file("0.3"));
         let d = crate::build("g.sp", &p, &BuildOptions::default()).unwrap();

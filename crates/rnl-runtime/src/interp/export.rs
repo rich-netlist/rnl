@@ -64,51 +64,7 @@ impl Interp<'_> {
             .collect();
         let mut ix = Index::default();
 
-        // the objects, kind by kind, each in the order it was made
-        let mut objs: Vec<(ObjId, ObjectKind)> = Vec::new();
-        for o in self.inst_like(s) {
-            if self.bundle_empty(o) {
-                continue;
-            }
-            let kind =
-                if matches!(self.o(o), ObjData::Bundle { .. }) { ObjectKind::Bundle } else { ObjectKind::Instance };
-            objs.push((o, kind));
-        }
-        let mut usages: Vec<ObjId> = self.scenes[s]
-            .usages
-            .iter()
-            .copied()
-            .filter(|a| !self.usage(*a).in_symbol && !self.is_failed(*a))
-            .collect();
-        usages.sort();
-        usages.dedup();
-        for &a in &usages {
-            if self.scenes[s].symbol.contains_key(&a) || self.usage_own_point(a) {
-                objs.push((a, ObjectKind::Usage));
-            }
-        }
-        let annotations: Vec<ObjId> = self.scenes[s]
-            .prims
-            .iter()
-            .copied()
-            .filter(|&o| {
-                matches!(self.o(o), ObjData::Annotation(_)) && !self.is_obj_failed(o) && !self.drawing_ignored(s, o)
-            })
-            .collect();
-        let mut points = self.scenes[s].points.clone();
-        points.retain(|p| !self.is_failed(*p));
-        points.sort();
-        points.dedup();
-        objs.extend(points.into_iter().map(|p| (p, ObjectKind::Point)));
-        let mut texts: Vec<ObjId> = self.scenes[s]
-            .texts
-            .iter()
-            .copied()
-            .filter(|t| !self.is_obj_failed(*t) && !self.drawing_ignored(s, *t))
-            .collect();
-        texts.sort();
-        texts.dedup();
-        objs.extend(texts.into_iter().map(|t| (t, ObjectKind::Text)));
+        let (mut objs, usages, annotations) = self.problem_objects(s);
         for (k, (o, _)) in objs.iter().enumerate() {
             ix.objects.insert(*o, k);
         }
@@ -814,6 +770,58 @@ impl Interp<'_> {
     /// The `%` names the level binds, those of the records written into it with scope= among them
     /// (2.6, 6.7), with their objects in this scene, in the order they are declared; a name bound
     /// twice keeps its first binding (6.6).
+    /// The objects of a level's problem that have a place of their own, kind by kind, each in the
+    /// order it was made: instances and bundles, usages drawn or with a point of their own, points
+    /// and texts; with the usages and the annotations, which find their place later.
+    pub(super) fn problem_objects(&mut self, s: SceneId) -> (Vec<(ObjId, ObjectKind)>, Vec<ObjId>, Vec<ObjId>) {
+        // the objects, kind by kind, each in the order it was made
+        let mut objs: Vec<(ObjId, ObjectKind)> = Vec::new();
+        for o in self.inst_like(s) {
+            if self.bundle_empty(o) {
+                continue;
+            }
+            let kind =
+                if matches!(self.o(o), ObjData::Bundle { .. }) { ObjectKind::Bundle } else { ObjectKind::Instance };
+            objs.push((o, kind));
+        }
+        let mut usages: Vec<ObjId> = self.scenes[s]
+            .usages
+            .iter()
+            .copied()
+            .filter(|a| !self.usage(*a).in_symbol && !self.is_failed(*a))
+            .collect();
+        usages.sort();
+        usages.dedup();
+        for &a in &usages {
+            if self.scenes[s].symbol.contains_key(&a) || self.usage_own_point(a) {
+                objs.push((a, ObjectKind::Usage));
+            }
+        }
+        let annotations: Vec<ObjId> = self.scenes[s]
+            .prims
+            .iter()
+            .copied()
+            .filter(|&o| {
+                matches!(self.o(o), ObjData::Annotation(_)) && !self.is_obj_failed(o) && !self.drawing_ignored(s, o)
+            })
+            .collect();
+        let mut points = self.scenes[s].points.clone();
+        points.retain(|p| !self.is_failed(*p));
+        points.sort();
+        points.dedup();
+        objs.extend(points.into_iter().map(|p| (p, ObjectKind::Point)));
+        let mut texts: Vec<ObjId> = self.scenes[s]
+            .texts
+            .iter()
+            .copied()
+            .filter(|t| !self.is_obj_failed(*t) && !self.drawing_ignored(s, *t))
+            .collect();
+        texts.sort();
+        texts.dedup();
+        objs.extend(texts.into_iter().map(|t| (t, ObjectKind::Text)));
+        (objs, usages, annotations)
+    }
+
     pub(crate) fn level_names(&self, s: SceneId) -> Vec<(String, ObjId)> {
         let u = self.level_unit[self.scenes[s].level];
         let mut out = Vec::new();
