@@ -15,6 +15,10 @@ use super::obj::*;
 use super::scene::{Fact, FactData};
 use super::Interp;
 
+// Shared upper bounds for diagnostic conflict-set enumeration only.
+const MOST_FACTS: usize = 16;
+const MOST_CHECKS: usize = 4096;
+
 /// The conflicts found while the geometry of a level of the draft 0.3 is resolved, whose hints
 /// name every set of facts taken in that a discarded fact conflicts with (its 8.5): they are given
 /// once the level's geometry is resolved, when the facts kept are known (`report_discards`).
@@ -184,6 +188,82 @@ impl Interp<'_> {
                 });
                 (sc.at_best.get(&(o, axis)).map(|b| b.2), ks.map(|&k| (k, sc.at[k].clone())).collect())
             };
+            if axis == 'o' && !self.scenes[s].orient_codes.is_empty() {
+                // The list is a single fact. Reconstruct 8.5 intersections, and only
+                // report a drop if all alternatives are excluded by higher-ranked facts.
+                let mut ordered = weighed;
+                ordered.sort_by(|(a, x), (b, y)| {
+                    (self.fact_priority(s, y) as u8, y.order(), *b).cmp(&(
+                        self.fact_priority(s, x) as u8,
+                        x.order(),
+                        *a,
+                    ))
+                });
+                let orient_codes = self.scenes[s].orient_codes.clone();
+                let values = |k: usize, fact: &Fact| -> Vec<Orient> {
+                    let FactData::Orient(code) = fact.data else { return Vec::new() };
+                    orient_codes.get(&k).cloned().unwrap_or_else(|| vec![code])
+                };
+                let mut taken: Vec<(usize, Fact)> = Vec::new();
+                let mut allowed: Option<Vec<Orient>> = None;
+                for (k, f) in ordered {
+                    if self.fact_priority(s, &f) == Priority::Disabled {
+                        continue;
+                    }
+                    let own = values(k, &f);
+                    let next = match &allowed {
+                        None => own.clone(),
+                        Some(current) => current.iter().copied().filter(|c| own.contains(c)).collect(),
+                    };
+                    if !next.is_empty() {
+                        allowed = Some(next);
+                        taken.push((k, f));
+                        continue;
+                    }
+                    if self.fact_priority(s, &f) == Priority::Low || f.ctx.is_none() {
+                        continue;
+                    }
+                    // Lists contain only eight possible orientations. Enumerate minimal
+                    // conflicting sets with the same limits used for constraint hints.
+                    let complete_input = taken.len() <= MOST_FACTS;
+                    let n = taken.len().min(MOST_FACTS);
+                    let mut sets = Vec::new();
+                    let mut masks = Vec::<u64>::new();
+                    let mut checks = 0usize;
+                    let mut complete = complete_input;
+                    'sizes: for size in 1..=n {
+                        let mut indices: Vec<usize> = (0..size).collect();
+                        loop {
+                            checks += 1;
+                            if checks > MOST_CHECKS {
+                                complete = false;
+                                break 'sizes;
+                            }
+                            let mask = indices.iter().fold(0u64, |m, i| m | (1u64 << i));
+                            if !masks.iter().any(|m| mask & *m == *m) {
+                                let mut remaining = own.clone();
+                                for &i in &indices {
+                                    let other = values(taken[i].0, &taken[i].1);
+                                    remaining.retain(|c| other.contains(c));
+                                }
+                                if remaining.is_empty() {
+                                    masks.push(mask);
+                                    sets.push(indices.iter().map(|&i| taken[i].clone()).collect());
+                                }
+                            }
+                            if !next_combination(&mut indices, n) {
+                                break;
+                            }
+                        }
+                    }
+                    self.scenes[s].dropped += 1;
+                    if let Some(c) = &f.ctx {
+                        self.note_failed_at(c.rec, f.off, true);
+                    }
+                    self.discard_orientation_hint(s, k, &f, &sets, complete, &mut notes);
+                }
+                continue;
+            }
             let Some(best) = best else { continue };
             let Some(kept) = weighed.iter().find(|(k, _)| *k == best).map(|(_, f)| f.clone()) else { continue };
             let mut taken = vec![kept.clone()];
@@ -290,6 +370,75 @@ impl Interp<'_> {
         }
     }
 
+    /// Name one orientation fact using its stable index in this scene; scalar wording
+    /// remains the historical `fact_text` wording.
+    fn orientation_fact_text(&self, s: SceneId, index: usize, fact: &Fact) -> String {
+        match self.scenes[s].orient_codes.get(&index) {
+            Some(codes) => format!(
+                "the orientation [{}] of {}",
+                codes.iter().copied().map(Orient::as_str).collect::<Vec<_>>().join(", "),
+                self.label(fact.target)
+            ),
+            None => self.fact_text(fact),
+        }
+    }
+
+    /// The indexed variant of discard_hint retains each list's identity when naming
+    /// both the dropped statement and each member of its minimal conflict sets.
+    fn discard_orientation_hint(
+        &mut self,
+        s: SceneId,
+        index: usize,
+        fact: &Fact,
+        sets: &[Vec<(usize, Fact)>],
+        complete: bool,
+        notes: &mut Notes,
+    ) {
+        let what = self.orientation_fact_text(s, index, fact);
+        let named: Vec<String> = sets
+            .iter()
+            .map(|set| {
+                let facts: Vec<String> = set
+                    .iter()
+                    .map(|(i, f)| {
+                        let (at, origin) = self.fact_site(f);
+                        named_at(self.orientation_fact_text(s, *i, f), at, &origin)
+                    })
+                    .collect();
+                match facts.as_slice() {
+                    [one] => one.clone(),
+                    [rest @ .., last] => format!("{} and {last} together", rest.join(", ")),
+                    [] => String::new(),
+                }
+            })
+            .collect();
+        let (code, mut msg) = if named.is_empty() {
+            (
+                codes::CONFLICT_FACT_DISCARDED,
+                format!("{what} conflicts with the facts taken in and is discarded in the order of 8.5"),
+            )
+        } else {
+            (
+                codes::CONFLICT_FACT_DISCARDED_WITH_SETS,
+                format!(
+                    "{what} is discarded in the order of 8.5: it has no solution with {}",
+                    named.join(", nor with ")
+                ),
+            )
+        };
+        if !complete {
+            msg.push_str("; not every such set could be found, so this list may not be complete");
+        }
+        let (at, origin) = self.fact_site(fact);
+        let extra = Extra { cause: None, origin: origin.clone(), in_package: String::new() };
+        self.sink.add(Severity::Hint, code, format!("{msg} (8.5)"), at.clone(), extra);
+        let discarded = named_at(what, at, &origin);
+        for (_, f) in sets.iter().flatten() {
+            let (at, origin) = self.fact_site(f);
+            notes.add(at, origin, &discarded);
+        }
+    }
+
     /// The sets of facts taken in that a constraint conflicts with, for its hint in a level of the
     /// draft 0.3 (8.5), when fixed coordinates violate it (fixed orientations, for
     /// ORIENT-RELATION) that all come before it in the order of 8.5. Of the kept facts that place
@@ -306,9 +455,6 @@ impl Interp<'_> {
         members: &[ObjId],
         involved: &[Fact],
     ) -> (Vec<Vec<Fact>>, bool) {
-        // the most facts searched through, and the most sets checked
-        const MOST_FACTS: usize = 16;
-        const MOST_CHECKS: usize = 4096;
         if cd.kind == ConstraintKind::Table {
             // Both axes and nested items belong to one fact. The solver identifies its
             // conflicting units; this single-axis preview search cannot enumerate them.

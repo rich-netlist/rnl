@@ -46,7 +46,7 @@ fn a_subcircuit_no_file_defines_is_told_once_with_its_instances() {
 fn a_subcircuit_a_rule_gives_a_symbol_is_not_told() {
     // as a PDK device is drawn by the symbol its package or a rule gives it
     let r = interpret(
-        "* t\nX1 a b pdk_res\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\n* @RNL { #X1 @SET-SYMBOL $RESISTOR }\n.end\n",
+        "* t\nX1 a b pdk_res\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\")}\n* @RNL { #X1 @SET-SYMBOL $RESISTOR }\n.end\n",
     );
     assert!(hints(&r).is_empty(), "{:?}", r.diagnostics());
 }

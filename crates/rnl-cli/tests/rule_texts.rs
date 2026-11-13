@@ -105,3 +105,36 @@ fn an_analog_canvas_export_with_structures_checks_without_errors() {
     let r = interpret_file(Path::new("export.sp"), None, &files, &Options::default()).unwrap();
     assert!(errors(&r).is_empty(), "{:?}", errors(&r));
 }
+
+// These 0.4 tests are independent of the 0.3 Analog Canvas compatibility fixture above.
+fn netlist_v04(suppress: bool, extra: &str) -> String {
+    let rule = if suppress { "# @SELECT-USAGE => @TEXT(\"\",key=\"name\");" } else { "" };
+    format!(
+        "* rules\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\") }}\nR1 a b 1k\n* @RNL {{\n\
+         * $D = @DEFINE(roles=[\"x\"]) {{}};\n\
+         * $S = @DEFINE-SYMBOL {{ ? @TEXT(\"label\",key=\"name\") }};\n\
+         * $P = @DEFINE(roles=[\"p\"]) {{ ? @SET-SYMBOL $S }};\n\
+         * #R1(x) @AS $D => %sem;\n\
+         * &a(p) @AS $P => %drawn => @PLACE(0,0);\n\
+         * {rule}\n* {extra}\n* }}\n.end\n"
+    )
+}
+
+#[test]
+fn v04_rule_text_skips_semantic_usage_and_empties_drawn_usage_label() {
+    let before = netlist_v04(false, "");
+    let after = netlist_v04(true, "");
+    assert!(errors(&interpret(&before)).is_empty());
+    assert!(errors(&interpret(&after)).is_empty());
+    assert_eq!(label(&before, "%drawn", "name").as_deref(), Some("label"));
+    assert_eq!(label(&after, "%drawn", "name"), None);
+}
+
+#[test]
+fn v04_direct_text_on_semantic_usage_still_fails() {
+    for statement in ["%sem @TEXT(\"mirror\",key=\"name\")", "%sem @TEXT(\"mirror\")"] {
+        let got = errors(&interpret(&netlist_v04(true, statement)));
+        assert_eq!(got.len(), 1, "{got:?}");
+        assert!(got[0].contains("RNL4414 text-usage-no-symbol"), "{got:?}");
+    }
+}

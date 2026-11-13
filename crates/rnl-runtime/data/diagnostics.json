@@ -2828,6 +2828,16 @@
    ]
   },
   {
+   "number": "RNL3709",
+   "name": "markup-math-depth-limit",
+   "severity": "error",
+   "message": "math nesting exceeds this implementation's limit of 64 levels (1.6, 13.6)",
+   "sections": [
+    "1.6",
+    "13.6"
+   ]
+  },
+  {
    "number": "RNL3800",
    "name": "current-not-host-terminal",
    "severity": "error",

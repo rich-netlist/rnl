@@ -155,7 +155,7 @@ fn writes_move_before_an_unterminated_host_region_and_read_back() {
             let generated = "@RNL(type=\"generated\") { (1,2) @TEXT(\"written\") }";
             for out in [
                 append_record(&r.doc, 0, &text, generated),
-                replace_generated_with_header(&r.doc, 0, &text, generated, "0.3"),
+                replace_generated_with_header(&r.doc, 0, &text, generated, "0.4"),
             ] {
                 assert!(out.ends_with(&region), "{opening}: {out}");
                 assert!(out.find("written").unwrap() < out.find(opening).unwrap());
@@ -256,7 +256,7 @@ fn library_section_comments_do_not_change_selection_or_writeback() {
         let generated = "@RNL(type=\"generated\") { (7,8) @TEXT(\"written\") }";
         for out in [
             append_record(&r.doc, 1, &source, generated),
-            replace_generated_with_header(&r.doc, 1, &source, generated, "0.3"),
+            replace_generated_with_header(&r.doc, 1, &source, generated, "0.4"),
         ] {
             assert!(out.find("written").unwrap() < out.find(closing).unwrap(), "{out}");
             assert!(out.ends_with(&source[source.find(closing).unwrap()..]), "{out}");
@@ -341,7 +341,7 @@ fn whole_file_and_selected_library_readings_keep_their_own_write_boundaries() {
             assert_eq!(record_line(&r.doc, selected_level, &source), Ok(9));
             let record = "@RNL(type=\"generated\") { (7,8) @TEXT(\"written\") }";
             for target in [whole_level, selected_level] {
-                let out = replace_generated_with_header(&r.doc, target, &source, record, "0.3");
+                let out = replace_generated_with_header(&r.doc, target, &source, record, "0.4");
                 let files = MemoryProvider::new().with(main, &text).with(lib, &out);
                 let reread = interpret_file(Path::new(main), None, &files, &options).unwrap();
                 let own = &reread.doc.levels[target].records;
@@ -350,7 +350,7 @@ fn whole_file_and_selected_library_readings_keep_their_own_write_boundaries() {
                 assert!(own.iter().any(|r| r.text.contains("written")), "{main} {order:?}: {out}");
                 assert!(!other.iter().any(|r| r.text.contains("written")), "{out}");
                 assert!(
-                    own.iter().any(|r| r.text.contains("VERSION(\"0.3\")")),
+                    own.iter().any(|r| r.text.contains("VERSION(\"0.4\")")),
                     "the target's header can be updated: {out}"
                 );
                 assert!(!record_texts(&reread).iter().any(|r| r.contains("hidden")));
@@ -387,8 +387,8 @@ fn a_missing_library_section_is_diagnosed_and_has_no_write_place() {
         assert_eq!(record_line(&r.doc, level, &source), Err((1, 5)));
         let record = "@RNL(type=\"generated\") { (7,8) @TEXT(\"written\") }";
         assert_eq!(append_record(&r.doc, level, &source, record), source);
-        assert_eq!(replace_generated_with_header(&r.doc, level, &source, record, "0.3"), source);
-        assert_eq!(rnl_runtime::writeback::with_header(&r.doc, lib, &source, "0.3"), source);
+        assert_eq!(replace_generated_with_header(&r.doc, level, &source, record, "0.4"), source);
+        assert_eq!(rnl_runtime::writeback::with_header(&r.doc, lib, &source, "0.4"), source);
     }
 }
 
@@ -422,7 +422,7 @@ fn encrypted_envelopes_are_not_plaintext_protection_regions() {
         assert!(r.doc.protected.is_empty());
         assert_eq!(r.doc.excluded.len(), 1);
         assert!(r.diagnostics().iter().any(|d| d.message.contains("encrypted text")));
-        let out = rnl_runtime::writeback::with_header(&r.doc, "t.scs", &text, "0.3");
+        let out = rnl_runtime::writeback::with_header(&r.doc, "t.scs", &text, "0.4");
         let reread = read("t.scs", &out);
         assert_eq!(record_texts(&reread).len(), 2, "{out}");
         assert!(record_texts(&reread)[0].contains("header"));
@@ -444,7 +444,7 @@ fn a_pending_newjob_title_or_cpp_continuation_is_not_a_write_position() {
             0,
             text,
             "@RNL(type=\"generated\") { (1,2) @TEXT(\"written\") }",
-            "0.3",
+            "0.4",
         );
         assert!(out.find("written").unwrap() < out.find(opening).unwrap(), "{out}");
         let reread = read(file, &out);
@@ -527,23 +527,23 @@ fn selected_library_headers_move_before_subcircuits_with_real_reader_boundaries(
                 let cell = r.doc.levels.iter().position(|l| l.name == "cell").unwrap();
                 assert_eq!(r.doc.levels[selected].section_lines, Some((2, if protected { 10 } else { 8 })));
                 let record = "@RNL(type=\"generated\") {}";
-                let out = replace_generated_with_header(&r.doc, cell, &source, record, "0.3");
+                let out = replace_generated_with_header(&r.doc, cell, &source, record, "0.4");
                 let expected = format!(
                     "{marker} models\n{open} tt\nR0 {instance}\n\
-                 {marker} @RNL(type=\"header\") {{ @VERSION(\"0.3\") }}\n\
+                 {marker} @RNL(type=\"header\") {{ @VERSION(\"0.4\") }}\n\
                  {protect}{subckt} cell a b\n{unprotect}R1 {instance}\n\
                  {marker} @RNL(type=\"generated\") {{}}\n{ends} cell\n{close} tt\n"
                 );
                 assert_eq!(out, expected, "{main}, {includes}, protected={protected}");
                 assert_eq!(
-                    rnl_runtime::writeback::move_header_for(&r.doc, cell, &source, "0.3"),
+                    rnl_runtime::writeback::move_header_for(&r.doc, cell, &source, "0.4"),
                     expected.replace(&format!("{marker} {record}\n"), ""),
                     "the solver's header prepass must stay in the same reading"
                 );
                 let files = MemoryProvider::new().with(main, &text).with(lib, &out);
                 let reread = interpret_file(Path::new(main), None, &files, &options).unwrap();
                 assert_eq!(reread.doc.levels[selected].records.len(), 1);
-                assert!(reread.doc.levels[selected].records[0].text.contains("VERSION(\"0.3\")"));
+                assert!(reread.doc.levels[selected].records[0].text.contains("VERSION(\"0.4\")"));
                 assert_eq!(reread.doc.levels[cell].records.len(), 1);
                 assert!(
                     reread
@@ -554,7 +554,7 @@ fn selected_library_headers_move_before_subcircuits_with_real_reader_boundaries(
                         .all(|l| l.records.is_empty()),
                     "the whole-file reading must not acquire the section header"
                 );
-                assert_eq!(replace_generated_with_header(&reread.doc, cell, &out, record, "0.3"), out);
+                assert_eq!(replace_generated_with_header(&reread.doc, cell, &out, record, "0.4"), out);
             }
         }
     }

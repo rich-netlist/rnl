@@ -12,11 +12,17 @@ use rnl_runtime::source::MemoryProvider;
 use rnl_runtime::{Interpretation, Options};
 
 fn read(net: &str) -> Interpretation {
-    read_as("/w/t.sp", net)
+    let files = MemoryProvider::new().with("/w/t.sp", net);
+    interpret_file(Path::new("/w/t.sp"), None, &files, &Options::default()).unwrap()
 }
 
 fn read_as(path: &str, net: &str) -> Interpretation {
-    let files = MemoryProvider::new().with(path, net);
+    let marker = if path.ends_with(".scs") { "//" } else { "*" };
+    let header = format!(
+        "{marker} @RNL(type=\"header\") {{ @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }}"
+    );
+    let source = net.replacen('\n', &format!("\n{header}\n"), 1);
+    let files = MemoryProvider::new().with(path, &source);
     interpret_file(Path::new(path), None, &files, &Options::default()).unwrap()
 }
 
@@ -48,7 +54,7 @@ fn a_device_of_the_p_type_is_drawn_as_one_by_whatever_its_model_is_called() {
         M3p d g s pmod_3t w=1u\nM5n d g s e b nsoi_5t\nM5p d g s e b psoi_bin\nMpv d g s s mp\nMnv d g s mn\n\
         MP_bin d g s b pch\nMN_bin d g s b nch\nMP_bin1 d g s b pch.1\n\
         Q_lpnp c b e qlat\nQ5p c b e s dt vbic_pnp\nQ3area c b e pnp_bin 2.0\nQ4n c b e s npn_sub\n.end\n";
-    let r = read(net);
+    let r = read_as("/w/t.sp", net);
     let want = [
         ("M3p", "$PMOS_4TERM"),
         ("M5n", "$NMOS_4TERM"),
@@ -73,7 +79,7 @@ fn a_device_of_the_p_type_is_drawn_as_one_by_whatever_its_model_is_called() {
 fn the_lines_of_hspice_that_are_transmission_lines_are_drawn_as_such() {
     let net = "* t\nW1 a b Vc swm\nW2 in1 ref1 out1 ref2 RLGCMODEL=wmod N=1 L=10m\nU1 a b ref urc L=1u\nU2 in1 ref1 out1 ref2 umod L=10m\n\
                T1 a b c d Z0=50 TD=1n\n.end\n";
-    let r = read(net);
+    let r = read_as("/w/t.sp", net);
     let got: Vec<String> = ["W1", "W2", "U1", "U2", "T1"].iter().map(|n| symbol(&r, n)).collect();
     assert_eq!(got, ["$SWITCH", "$TRANSMISSION_LINE", "$RC_LINE", "$TRANSMISSION_LINE", "$TRANSMISSION_LINE"]);
 }
@@ -83,21 +89,21 @@ fn the_terminals_of_w_t_o_and_u_are_named_as_6_12_says() {
     // W has p and n alone, T and O have p1 n1 p2 n2, U has a b ref
     let net = "* t\nW1 a b Vc swm\nT1 a b c d Z0=50\nO1 a b c d lmod\nU1 a b c urc L=1u\nVc c 0 1\n\
                * @RNL { &a {#W1:p #T1:p1 #O1:n2 #U1:ref} @WIRE }\n.end\n";
-    let r = read(net);
+    let r = read_as("/w/t.sp", net);
     let e = messages(&r, Severity::Error);
     assert!(e.iter().all(|m| !m.contains("terminal")), "{e:?}");
     let net = "* t\nW1 a b Vc swm\nVc c 0 1\n* @RNL { &a {#W1:cp} @WIRE }\n.end\n";
-    let e = messages(&read(net), Severity::Error);
+    let e = messages(&read_as("/w/t.sp", net), Severity::Error);
     assert!(e.iter().any(|m| m.contains("#W1 has no terminal cp")), "{e:?}");
 }
 
 #[test]
 fn a_value_written_with_a_capital_m_is_hinted_as_milli() {
-    let r = read("* t\nR1 a b 10M\nR2 a b 10meg\n.end\n");
+    let r = read_as("/w/t.sp", "* t\nR1 a b 10M\nR2 a b 10meg\n.end\n");
     let hints = messages(&r, Severity::Hint);
     let milli: Vec<&String> = hints.iter().filter(|m| m.contains("10M")).collect();
     assert_eq!(milli.len(), 1, "{hints:?}");
-    assert!(milli[0].contains("t.sp:2") && milli[0].contains("milli in SPICE"), "{}", milli[0]);
+    assert!(milli[0].contains("t.sp:3") && milli[0].contains("milli in SPICE"), "{}", milli[0]);
 }
 
 #[test]
@@ -156,7 +162,7 @@ fn a_transistor_whose_model_card_is_not_found_is_not_drawn_and_is_listed_with_th
     // without a card the standard package has no symbol, and the renderer's own would only pretend
     let net = "* t\n.model nch nmos\n.model qp pnp\n\
         M1 d g s b nch\nM2 d g s b pch\nM3 d g s b pch\nQ1 c b e qp\nQ2 c b e 2n3904\nJ1 d g s jfm\nR1 a b 1k\n.end\n";
-    let r = read(net);
+    let r = read_as("/w/t.sp", net);
     let level = r.model.levels.iter().find(|l| l.title == "t.sp").unwrap();
     let drawn: Vec<String> =
         symbols(&r).into_iter().filter(|(_, s)| s != "-").map(|(n, s)| format!("{n}={s}")).collect();
@@ -181,7 +187,7 @@ fn a_transistor_whose_model_card_is_not_found_is_not_drawn_and_is_listed_with_th
         warnings[0].contains("`pch`")
             && warnings[0].contains("they are not drawn")
             && warnings[0].contains("M2, M3")
-            && warnings[0].contains("t.sp:5"),
+            && warnings[0].contains("t.sp:6"),
         "{}",
         warnings[0]
     );
@@ -192,7 +198,7 @@ fn a_transistor_whose_model_card_is_not_found_is_not_drawn_and_is_listed_with_th
 #[test]
 fn a_transistor_without_a_card_is_drawn_when_the_file_gives_it_a_symbol() {
     let net = "* t\nM1 d g s b pch\nM2 d g s b pch\n* @RNL { #M1 @SET-SYMBOL $PMOS_4TERM }\n.end\n";
-    let r = read(net);
+    let r = read_as("/w/t.sp", net);
     assert_eq!(symbol(&r, "M1"), "$PMOS_4TERM");
     let level = r.model.levels.iter().find(|l| l.title == "t.sp").unwrap();
     let undrawn: Vec<&str> = level.undrawn.iter().map(|u| u.id.as_str()).collect();
@@ -205,4 +211,16 @@ fn a_wire_to_a_device_that_is_not_drawn_fails_as_a_terminal_without_a_pin_does()
     let r = read(net);
     let e = messages(&r, Severity::Error);
     assert!(e.iter().any(|m| m.contains("M2") && m.contains("pin")), "{e:?}");
+}
+
+#[test]
+fn a_wire_to_an_undrawn_device_is_ignored_in_0_4() {
+    let net = "* t\n.model nch nmos\nM1 d g s b nch\nM2 d g s b pch\n* @RNL { #M1 @PLACE(0, 0); &g {#M2:g #M1:g} @WIRE }\n.end\n";
+    let current = read_as("/w/t.sp", net);
+    let errors = messages(&current, Severity::Error);
+    assert!(errors.is_empty(), "{errors:?}");
+    let level = current.model.levels.iter().find(|l| l.title == "t.sp").unwrap();
+    assert!(level.wires.is_empty(), "wire through undrawn M2 must not be drawn: {:?}", level.wires);
+    let warnings = messages(&current, Severity::Warning);
+    assert!(warnings.iter().any(|m| m.contains("M2") && m.contains("not drawn")), "{warnings:?}");
 }

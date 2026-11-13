@@ -876,38 +876,80 @@ impl Interp<'_> {
         self.scenes[s].at_best = best.clone();
         // orientation
         let mut ob: HashMap<ObjId, (Priority, Pos, usize)> = HashMap::new();
-        for k in live_or {
-            let f = &orient[k];
-            // A pin direction is a solver fact, not the owner's unsolved preview orientation.
-            if self.is_pin_direction_input(f.target) {
-                continue;
-            }
-            let p = self.fact_priority(s, f);
-            if p == Priority::Disabled {
-                continue;
-            }
-            let FactData::Orient(code) = f.data else { continue };
-            let order = f.order();
-            match ob.get(&f.target).cloned() {
-                None => {
-                    ob.insert(f.target, (p, order, k));
+        if self.scenes[s].orient_codes.is_empty() {
+            for k in live_or {
+                let f = &orient[k];
+                // A pin direction is a solver fact, not the owner's unsolved preview orientation.
+                if self.is_pin_direction_input(f.target) {
+                    continue;
                 }
-                Some(cur) => {
-                    let FactData::Orient(cc) = orient[cur.2].data else { continue };
-                    if (level(p), &order, k) > (level(cur.0), &cur.1, cur.2) {
-                        if cc != code {
-                            self.drop_fact(s, &orient[cur.2], f);
-                        }
+                let p = self.fact_priority(s, f);
+                if p == Priority::Disabled {
+                    continue;
+                }
+                let FactData::Orient(code) = f.data else { continue };
+                let order = f.order();
+                match ob.get(&f.target).cloned() {
+                    None => {
                         ob.insert(f.target, (p, order, k));
-                    } else if cc != code {
-                        self.drop_fact(s, f, &orient[cur.2]);
+                    }
+                    Some(cur) => {
+                        let FactData::Orient(cc) = orient[cur.2].data else { continue };
+                        if (level(p), &order, k) > (level(cur.0), &cur.1, cur.2) {
+                            if cc != code {
+                                self.drop_fact(s, &orient[cur.2], f);
+                            }
+                            ob.insert(f.target, (p, order, k));
+                        } else if cc != code {
+                            self.drop_fact(s, f, &orient[cur.2]);
+                        }
                     }
                 }
             }
-        }
-        for (o, (_, _, k)) in &ob {
-            if let FactData::Orient(c) = orient[*k].data {
-                self.scenes[s].ori.insert(*o, c);
+            for (o, (_, _, k)) in &ob {
+                if let FactData::Orient(c) = orient[*k].data {
+                    self.scenes[s].ori.insert(*o, c);
+                }
+            }
+        } else {
+            // A list is one hard fact: intersect the alternatives in 8.5 order.
+            // The unsolved preview keeps the first alternative of the highest-ranked fact.
+            let mut ordered = live_or.clone();
+            ordered.sort_by(|&a, &b| {
+                let x = &orient[a];
+                let y = &orient[b];
+                (level(self.fact_priority(s, y)), y.order(), b).cmp(&(level(self.fact_priority(s, x)), x.order(), a))
+            });
+            let mut choices: HashMap<ObjId, Vec<Orient>> = HashMap::new();
+            for k in ordered {
+                let f = &orient[k];
+                if self.is_pin_direction_input(f.target) {
+                    continue;
+                }
+                let priority = self.fact_priority(s, f);
+                if priority == Priority::Disabled {
+                    continue;
+                }
+                let FactData::Orient(code) = f.data else { continue };
+                let values = self.scenes[s].orient_codes.get(&k).cloned().unwrap_or_else(|| vec![code]);
+                if let Some(current) = choices.get_mut(&f.target) {
+                    let intersection: Vec<_> = current.iter().copied().filter(|c| values.contains(c)).collect();
+                    if intersection.is_empty() {
+                        if let Some(winner) = ob.get(&f.target) {
+                            self.drop_fact(s, f, &orient[winner.2]);
+                        }
+                    } else {
+                        *current = intersection;
+                    }
+                } else {
+                    choices.insert(f.target, values);
+                    ob.insert(f.target, (priority, f.order(), k));
+                }
+            }
+            for (object, (_, _, k)) in &ob {
+                if let FactData::Orient(code) = orient[*k].data {
+                    self.scenes[s].ori.insert(*object, code);
+                }
             }
         }
         self.scenes[s].ori_best = ob;

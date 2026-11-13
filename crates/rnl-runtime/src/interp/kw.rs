@@ -1475,6 +1475,19 @@ impl Interp<'_> {
                                     if keyword == "DEFINE" {
                                         self.definition_fields(&params, ctx, call.start)?;
                                     }
+                                    // Only fixed literals are available in this pass. Do not
+                                    // issue ordinary markup warnings here: dynamic values and
+                                    // legacy warning behavior remain application-time checks.
+                                    if keyword == "TEXT" && self.follows_0_4(self.source_unit(ctx)) {
+                                        if let Some(Lit::Str(text)) = get(&params, "text") {
+                                            if crate::markup::problems_with_name_formats(text.as_str(), true)
+                                                .iter()
+                                                .any(|(code, _)| *code == codes::MARKUP_MATH_DEPTH)
+                                            {
+                                                self.check_markup(text, ctx, segment, "text")?;
+                                            }
+                                        }
+                                    }
                                     Ok(())
                                 });
                             if let Err(Stop::Fail(Some(diagnostic))) = checked {
@@ -2874,7 +2887,7 @@ impl Interp<'_> {
             _ => None,
         });
         if let Some(l) = label {
-            self.check_markup(l, ctx, seg, "label");
+            self.check_markup(l, ctx, seg, "label")?;
         }
         let label_name_formats = label.is_some_and(|l| self.follows_0_4(l.unit.unwrap_or(self.source_unit(ctx))));
         let label = label.map(|l| l.as_str().to_string());
@@ -3393,6 +3406,10 @@ impl Interp<'_> {
                     let members = direct_members(body, |word| Some(self.kw(word, def.def_unit)));
                     for entry in members {
                         let seg = &entry.member.segments[entry.segment];
+                        if seg.call.as_ref().is_some_and(|call| self.body_errors.contains_key(&super::eval::ptr(call)))
+                        {
+                            continue;
+                        }
                         if entry.input == InputKind::OtherObject {
                             self.hint_at(
                                 &ctx,
@@ -3460,6 +3477,19 @@ impl Interp<'_> {
                             continue;
                         }
                         if kw == "TEXT" {
+                            // The ordinary TEXT handler is not called in this projection.
+                            // Check the resource limit here without duplicating ordinary
+                            // markup warnings already handled by the source definition.
+                            if let Some(Lit::Str(text)) = get(&rest, "text") {
+                                if self.follows_0_4(text.unit.unwrap_or(self.source_unit(&ctx)))
+                                    && crate::markup::problems_with_name_formats(text.as_str(), true)
+                                        .iter()
+                                        .any(|(code, _)| *code == codes::MARKUP_MATH_DEPTH)
+                                    && self.check_markup(text, &ctx, seg, "text").is_err()
+                                {
+                                    continue;
+                                }
+                            }
                             let items = TextItems {
                                 modern_text: self.follows_0_4(self.source_unit(&ctx)),
                                 text: get(&rest, "text").and_then(|v| match v {
@@ -3609,7 +3639,7 @@ impl Interp<'_> {
         };
         let call_start = seg.call.as_ref().unwrap().start;
         if let Some(t) = &items.text {
-            self.check_markup(t, ctx, seg, "text");
+            self.check_markup(t, ctx, seg, "text")?;
         }
         // the file the key is written in: its aliases decide what `::` finds first (13.3, 16.5)
         let key_unit = match &key {
@@ -3765,11 +3795,11 @@ impl Interp<'_> {
         }
     }
 
-    pub(crate) fn check_markup(&mut self, text: &WStr, ctx: &Ctx, seg: &Segment, parameter: &str) {
+    pub(crate) fn check_markup(&mut self, text: &WStr, ctx: &Ctx, seg: &Segment, parameter: &str) -> R<()> {
         let name_formats = self.follows_0_4(text.unit.unwrap_or(self.source_unit(ctx)));
         let problems = crate::markup::problems_with_name_formats(text.as_str(), name_formats);
         if problems.is_empty() {
-            return;
+            return Ok(());
         }
         let fallback = seg.call.as_ref().map(|call| call.start).unwrap_or(seg.start);
         let at = if self.follows_0_4(self.source_unit(ctx)) {
@@ -3778,8 +3808,17 @@ impl Interp<'_> {
             fallback
         };
         for (code, msg) in problems {
+            if code == codes::MARKUP_MATH_DEPTH && name_formats {
+                return self.fail(
+                    ctx,
+                    codes::MARKUP_MATH_DEPTH_LIMIT,
+                    "math nesting exceeds this implementation's limit of 64 levels (1.6, 13.6)",
+                    at,
+                );
+            }
             self.warn(ctx, code, format!("{msg} (13.6)"), at);
         }
+        Ok(())
     }
 
     fn markup_value_offset(&self, ctx: &Ctx, seg: &Segment, parameter: &str) -> Option<usize> {

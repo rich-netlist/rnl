@@ -1,4 +1,4 @@
-//! Advisories from the 0.3 profile: comment compatibility, visible-name typos and trailing RNL.
+//! Advisories from the RNL profile: comment compatibility, visible-name typos and trailing RNL.
 
 use std::path::Path;
 
@@ -121,8 +121,8 @@ fn free_words_use_inherited_and_scope_published_names_without_leaking_private_na
 
 #[test]
 fn package_names_are_visible_but_package_advice_and_private_names_stay_local() {
-    let package = "@RNL(type=\"header\") { @VERSION(\"0.3\"); @PACKAGE(name=\"p\",version=\"1.0\") }\n@RNL { $Drawing = @DEFINE-SYMBOL { Forward (0,0) @TEXT(\"inside\") }; $Forward = @DEFINE-STYLE {}; $Visible = @DEFINE-STYLE {}; %Hidden=(0,0) }\n";
-    let text = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"p\",path=\"p.rnl\") }\n* @RNL { Visible Hidden (0,0) @TEXT(\"outside\") }\n.end\n";
+    let package = "@RNL(type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"p\",version=\"1.0\") }\n@RNL { $Drawing = @DEFINE-SYMBOL { Forward (0,0) @TEXT(\"inside\") }; $Forward = @DEFINE-STYLE {}; $Visible = @DEFINE-STYLE {}; %Hidden=(0,0) }\n";
+    let text = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"p\",path=\"p.rnl\") }\n* @RNL { Visible Hidden (0,0) @TEXT(\"outside\") }\n.end\n";
     let r = read("t.sp", text, &[("p.rnl", package)]);
     assert_eq!(typo_words(&r), ["Visible"]);
     let p = read("p.rnl", package, &[]);

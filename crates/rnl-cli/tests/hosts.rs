@@ -22,8 +22,8 @@ fn errors(r: &Interpretation) -> Vec<String> {
 fn a_port_on_a_continuation_line_names_a_terminal_of_the_instances() {
     let body = ".subckt cell a\n+ b\nR1 a b 1k\n.ends cell\nX1 in out cell\n* @RNL { #X1:b @TEXT(\"second port\") }\n";
     for (main, text) in [
-        ("t.sp", format!("* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\") }}\n{body}.end\n")),
-        ("t.scs", format!("// t\nsimulator lang=spice\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\") }}\n{body}.end\n")),
+        ("t.sp", format!("* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\") }}\n{body}.end\n")),
+        ("t.scs", format!("// t\nsimulator lang=spice\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\") }}\n{body}.end\n")),
     ] {
         let r = read(main, &text);
         assert!(errors(&r).is_empty(), "{main}: {:?}", errors(&r));
@@ -34,7 +34,7 @@ fn a_port_on_a_continuation_line_names_a_terminal_of_the_instances() {
 
 #[test]
 fn an_end_of_line_comment_of_a_subckt_holds_no_port() {
-    let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\n.subckt cell a b ; two ports\nR1 a b 1k\n\
+    let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\n.subckt cell a b ; two ports\nR1 a b 1k\n\
                 .ends cell\nX1 in out cell\n.end\n";
     let r = read("t.sp", text);
     assert!(errors(&r).is_empty(), "{:?}", errors(&r));
@@ -50,10 +50,10 @@ fn a_comment_line_within_a_statement_is_said_in_both_adapters() {
     let body =
         ".subckt cell a\n* between\n+ b\nR1 a b\n* again\n+ 1k\n* after\nR2 a b 1k\n.ends cell\nX1 in out cell\n";
     for (main, text, first) in [
-        ("t.sp", format!("* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\") }}\n{body}.end\n"), 4),
+        ("t.sp", format!("* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\") }}\n{body}.end\n"), 4),
         (
             "t.scs",
-            format!("// t\nsimulator lang=spice\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\") }}\n{body}.end\n"),
+            format!("// t\nsimulator lang=spice\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\") }}\n{body}.end\n"),
             5,
         ),
     ] {
