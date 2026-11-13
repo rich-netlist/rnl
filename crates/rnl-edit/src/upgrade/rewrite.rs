@@ -19,6 +19,7 @@ pub(super) struct Context {
     pub approximate: bool,
     /// The files use rnl-std-no-labels, whose 0.4 form hides labels with `textvisible=false`.
     pub no_labels: bool,
+    pub keep_generated: bool,
 }
 
 fn pending(member: &Member) -> Option<(&'static str, &'static str)> {
@@ -215,7 +216,7 @@ pub(super) fn file(
     let mut has_std = false;
     let mut has_version = false;
     for record in records {
-        if record_type(record) == "generated" {
+        if record_type(record) == "generated" && !context.keep_generated {
             edits.push(discard_generated(source, record)?);
             report.needs_solve = true;
             continue;

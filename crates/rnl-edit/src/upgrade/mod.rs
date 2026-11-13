@@ -31,7 +31,8 @@ use rnl_runtime::source::{dirname, join, normalize, Layered, MemoryProvider, Pro
 use rnl_runtime::{Interpretation, Options};
 use serde::Serialize;
 
-/// Inputs to the reader. Solver records are validated, then discarded before verification.
+/// Inputs to the reader. Solver records are validated, then discarded before verification, unless
+/// `keep_generated` asks for them to be upgraded with the rest.
 #[derive(Clone, Debug)]
 pub struct UpgradeOptions {
     pub dialect: Option<String>,
@@ -39,11 +40,15 @@ pub struct UpgradeOptions {
     pub std: bool,
     /// Opt in to documented migration choices that need not preserve semantics.
     pub approximate: bool,
+    /// Upgrade the records with `type="generated"` by the rules of authored records, keeping their
+    /// other header fields (`author`, `priority`), instead of discarding them. A `sig2` hash that
+    /// matched the source gets the input digest of the target, so the record stays current.
+    pub keep_generated: bool,
 }
 
 impl Default for UpgradeOptions {
     fn default() -> Self {
-        Self { dialect: None, formats: BTreeMap::new(), std: true, approximate: false }
+        Self { dialect: None, formats: BTreeMap::new(), std: true, approximate: false, keep_generated: false }
     }
 }
 
@@ -157,6 +162,35 @@ fn effective_version(doc: &HostDocument, level: usize) -> String {
     lv.parent.map_or_else(|| DEFAULT_VERSION.into(), |parent| effective_version(doc, parent))
 }
 
+/// `before` and `after` are read without the records of the solver, which is how a hash covers a level.
+/// A record of the solver that matched its level keeps matching: the input digest of its `sig2`
+/// hash becomes that of the upgraded level, and the digest of the options stays. A hash that did not
+/// match before, or that is not a `sig2` hash, stays as written, so that a stale record is still stale.
+fn refresh_hashes(before: &Interpretation, after: &Interpretation, output: &mut BTreeMap<String, String>) {
+    use rnl_runtime::problem::{input_digest, same_input};
+    for problem in &before.problems {
+        let Some(target) = after.problems.iter().find(|p| p.level == problem.level) else { continue };
+        let digest = input_digest(target);
+        for record in &before.doc.levels[problem.level].records {
+            if rnl_runtime::writeback::record_type(record) != "generated" {
+                continue;
+            }
+            let Some(old) = rnl_runtime::writeback::field(record, "hash") else { continue };
+            let Some((tag, rest)) = old.split_once(':') else { continue };
+            let Some((_, options_digest)) = rest.split_once('.') else { continue };
+            if tag != "sig2" || same_input(&old, problem) != Some(true) {
+                continue;
+            }
+            let new = format!("sig2:{digest}.{options_digest}");
+            for text in output.values_mut() {
+                if text.matches(&old).count() == 1 {
+                    *text = text.replace(&old, &new);
+                }
+            }
+        }
+    }
+}
+
 /// Read an input and prepare its upgrade. An error means no output should be written.
 pub fn upgrade(entry: &str, files: &dyn Provider, options: &UpgradeOptions) -> Result<Upgrade, String> {
     let entry = normalize(entry);
@@ -175,7 +209,13 @@ pub fn upgrade(entry: &str, files: &dyn Provider, options: &UpgradeOptions) -> R
         return Err(format!("cannot upgrade an unreadable source; nothing was written\n{}", errors.join("\n")));
     }
     let authored = Options { generated: false, ..runtime.clone() };
-    if before.doc.levels.iter().flat_map(|l| &l.records).any(|r| rnl_runtime::writeback::record_type(r) == "generated")
+    if !options.keep_generated
+        && before
+            .doc
+            .levels
+            .iter()
+            .flat_map(|l| &l.records)
+            .any(|r| rnl_runtime::writeback::record_type(r) == "generated")
     {
         before = rnl_view::interpret_with(&entry, options.dialect.as_deref(), &options.formats, files, &authored)?;
     }
@@ -273,10 +313,11 @@ pub fn upgrade(entry: &str, files: &dyn Provider, options: &UpgradeOptions) -> R
         std: options.std,
         packages,
         owned_packages,
-        references: references::References::new(&before, options.approximate),
+        references: references::References::new(&before, options.approximate, options.keep_generated),
         sets: sets::Sets::new(&before, &entry),
         approximate: options.approximate,
         no_labels: source_records.values().any(|r| rewrite::uses_no_labels(r)),
+        keep_generated: options.keep_generated,
     };
     let mut output = BTreeMap::new();
     let mut report = Report {
@@ -321,7 +362,16 @@ pub fn upgrade(entry: &str, files: &dyn Provider, options: &UpgradeOptions) -> R
     }
     let overlay = MemoryProvider { files: output.clone(), package_dirs: Vec::new() };
     let provider = Layered { layers: vec![&overlay, files] };
-    let target_options = Options { std: false, ..authored };
+    if options.keep_generated {
+        let target = Options { std: false, ..authored.clone() };
+        let current =
+            rnl_view::interpret_with(&entry, options.dialect.as_deref(), &options.formats, &provider, &target)?;
+        let written = rnl_view::interpret_with(&entry, options.dialect.as_deref(), &options.formats, files, &target)?;
+        refresh_hashes(&written, &current, &mut output);
+    }
+    let overlay = MemoryProvider { files: output.clone(), package_dirs: Vec::new() };
+    let provider = Layered { layers: vec![&overlay, files] };
+    let target_options = Options { std: false, generated: options.keep_generated, ..authored };
     let after =
         rnl_view::interpret_with(&entry, options.dialect.as_deref(), &options.formats, &provider, &target_options)?;
     report.diagnostics = diagnostics(&after);

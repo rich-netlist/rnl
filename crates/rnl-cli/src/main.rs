@@ -27,7 +27,8 @@ const USAGE: &str = concat!(
   rnl problem FILE [options]        print what a solver reads of each level, with its hash, as JSON
   rnl solve FILE -o DIR [options]   solve each drawing level and write its record of the solver back
   rnl solver-defaults              print 0.4 solver defaults as RNL named parameters
-  rnl upgrade FILE [-o DIR | --in-place] [--report REPORT.json] [--approximate]  preview migration to 0.4, or save it
+  rnl upgrade FILE [-o DIR | --in-place] [--report REPORT.json] [--approximate] [--keep-generated]
+                                    preview migration to 0.4, or save it
   rnl preview FILE [options]        print the solve as the desktop viewer previews it, as JSON; writes nothing
   rnl snapshot FILE [options]       print the editor interface's snapshot, as JSON
   rnl catalog [options]             print the symbols, definitions and sets of the packages, as JSON
@@ -64,6 +65,9 @@ options:
 upgrade options:
   --approximate      opt into documented choices that may change meaning; off by default
                       report each choice and its risk separately from exact edits
+  --keep-generated   upgrade the records of the solver (type generated) like authored ones, keeping their author
+                      and priority, instead of discarding them; a matching sig2 hash is made current,
+                      and what cannot be rewritten is reported as for authored records
 view options:
   --primitives        give each level's primitives, in scene units with y up
   --no-svg            leave out each level's SVG
@@ -154,6 +158,7 @@ struct Args {
     solver: solver_args::SolverArgs,
     upgrade_report: Option<PathBuf>,
     upgrade_approximate: bool,
+    upgrade_keep_generated: bool,
     author: Option<String>,
     /// `replace-records`' `--records`: the file of the new records.
     records: Option<PathBuf>,
@@ -268,6 +273,7 @@ fn parse_args() -> Result<Args, Said> {
     let mut solver = solver_args::SolverArgs::default();
     let mut upgrade_report = None;
     let mut upgrade_approximate = false;
+    let mut upgrade_keep_generated = false;
     let mut author = None;
     let mut records = None;
     let mut parts = None;
@@ -376,6 +382,7 @@ fn parse_args() -> Result<Args, Said> {
             }
             _ if a.starts_with("--encoding=") => encoding = Some(a[11..].parse().map_err(unknown_encoding)?),
             "--approximate" if command == "upgrade" => upgrade_approximate = true,
+            "--keep-generated" if command == "upgrade" => upgrade_keep_generated = true,
             "--report" if command == "upgrade" => {
                 upgrade_report =
                     Some(PathBuf::from(it.next().ok_or_else(|| needs("upgrade --report needs a JSON path"))?));
@@ -474,6 +481,7 @@ fn parse_args() -> Result<Args, Said> {
     Ok(Args {
         upgrade_report,
         upgrade_approximate,
+        upgrade_keep_generated,
         overlays,
         command,
         file,

@@ -23,13 +23,17 @@ pub(super) struct Usages {
     plans: BTreeMap<(usize, String, u32, u32), Vec<Plan>>,
 }
 impl Usages {
-    pub(super) fn new(input: &Interpretation, policies: &BTreeMap<(usize, String), super::standard::Policy>) -> Self {
+    pub(super) fn new(
+        input: &Interpretation,
+        policies: &BTreeMap<(usize, String), super::standard::Policy>,
+        keep_generated: bool,
+    ) -> Self {
         let mut out = Self::default();
         let mut names = BTreeMap::new();
         let roles = super::standard::role_changes(input);
         for problem in &input.problems {
             for usage in &problem.usages {
-                if usage.generated || usage.parent.is_some() {
+                if (usage.generated && !keep_generated) || usage.parent.is_some() {
                     continue;
                 }
                 let Some(loc) = &usage.source else { continue };

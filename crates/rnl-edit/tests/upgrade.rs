@@ -161,3 +161,66 @@ fn a_malformed_legacy_package_version_is_not_reported_as_a_successful_upgrade() 
     assert!(result.report.diagnostics.iter().any(|d| d.code.as_deref() == Some("RNL2219")));
     assert!(result.files["custom.rnl"].contains(r#"version="1""#));
 }
+
+fn keeping() -> UpgradeOptions {
+    UpgradeOptions { keep_generated: true, ..options() }
+}
+
+const REFERENCE: &str = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\nR1 a 0 1k\nR2 b 0 1k\n* @RNL(type=\"generated\", priority=\"high\", author=\"reference\") {\n*   #R1 @PLACE(3, 4) => @ORIENT(\"R90\");\n*   #R2 @PLACE(3, 9)\n* }\n.end\n";
+
+#[test]
+fn kept_solver_records_are_upgraded_with_their_header_fields_and_their_placements() {
+    let result = upgrade("t.sp", &MemoryProvider::new().with("t.sp", REFERENCE), &keeping()).unwrap();
+    let output = &result.files["t.sp"];
+    assert!(output.contains("@VERSION(\"0.4\")"), "{output}");
+    assert!(output.contains("@RNL(type=\"generated\", priority=\"high\", author=\"reference\")"), "{output}");
+    assert!(output.contains("#R1 @PLACE(3, 4) => @ORIENT(\"R90\")") && output.contains("#R2 @PLACE(3, 9)"), "{output}");
+    assert!(!result.report.files[0].needs_solve);
+    assert!(result.report.files[0].changes.iter().all(|c| c.rule != "discard-solver-record"));
+    assert!(result.report.successful(), "{:?}", result.report);
+    let kept = rnl_view::interpret_with(
+        "t.sp",
+        None,
+        &Default::default(),
+        &MemoryProvider::new().with("t.sp", output),
+        &rnl_runtime::Options { std: false, problems: true, generated: true, ..Default::default() },
+    )
+    .unwrap();
+    assert!(kept.problems[0].facts.len() >= 2, "the placements are facts of the upgraded level");
+}
+
+#[test]
+fn without_the_option_the_same_record_is_still_discarded() {
+    let result = upgrade("t.sp", &MemoryProvider::new().with("t.sp", REFERENCE), &options()).unwrap();
+    assert!(!result.files["t.sp"].contains("author=\"reference\""));
+    assert!(result.report.files[0].needs_solve);
+}
+
+#[test]
+fn a_matching_hash_stays_matching_and_a_stale_one_stays_stale() {
+    use rnl_runtime::problem::{input_digest, same_input};
+    let read = |text: &str| {
+        rnl_view::interpret_with(
+            "t.sp",
+            None,
+            &Default::default(),
+            &MemoryProvider::new().with("t.sp", text),
+            &rnl_runtime::Options { std: false, problems: true, generated: false, ..Default::default() },
+        )
+        .unwrap()
+    };
+    let bare = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\nR1 a 0 1k\n.end\n";
+    let digest = input_digest(&read(bare).problems[0]);
+    let with = |hash: &str| {
+        format!("* title\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\") }}\nR1 a 0 1k\n* @RNL(type=\"generated\", priority=\"high\", author=\"rnl-solver 0.1\", hash=\"{hash}\") {{\n*   #R1 @PLACE(1, 2)\n* }}\n.end\n")
+    };
+    let fresh = format!("sig2:{digest}.00000000000000aa");
+    let result = upgrade("t.sp", &MemoryProvider::new().with("t.sp", &with(&fresh)), &keeping()).unwrap();
+    let output = &result.files["t.sp"];
+    let hash = output.split("hash=\"").nth(1).unwrap().split('"').next().unwrap().to_string();
+    assert!(hash.ends_with(".00000000000000aa"), "{hash}");
+    assert_eq!(same_input(&hash, &read(output).problems[0]), Some(true), "{output}");
+    let stale = "sig2:1111111111111111.00000000000000aa";
+    let result = upgrade("t.sp", &MemoryProvider::new().with("t.sp", &with(stale)), &keeping()).unwrap();
+    assert!(result.files["t.sp"].contains(stale));
+}

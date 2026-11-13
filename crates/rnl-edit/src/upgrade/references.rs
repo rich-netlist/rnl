@@ -120,7 +120,7 @@ fn target_pins() -> BTreeMap<SymbolKey, Pins> {
 }
 
 impl References {
-    pub(super) fn new(input: &Interpretation, approximate: bool) -> Self {
+    pub(super) fn new(input: &Interpretation, approximate: bool, keep_generated: bool) -> Self {
         let (shadowed, aliases) = super::standard::shadows(input);
         let mut result = Self {
             aliases,
@@ -136,7 +136,7 @@ impl References {
             result.definitions.retain(|(_, name), _| name != "$MIRRORED");
         }
         let policies = super::standard::definition_policies(input);
-        result.usage_changes = super::usages::Usages::new(input, &policies);
+        result.usage_changes = super::usages::Usages::new(input, &policies, keep_generated);
         result.approximate = super::approximate::Approximate::new(input, &policies);
         for problem in &input.problems {
             for usage in &problem.usages {

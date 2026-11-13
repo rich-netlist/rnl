@@ -61,7 +61,7 @@ Sections refer to RNL 0.4. Standard package changes refer to the bundled series 
 | WIRE_NET_SET modification / route | Explicit file-owned selection and exclusions, preserving user edits and ROUTE-NET | Context | Standard series, 13.7 |
 | Default net-label, port-tag and 4-term MOS bulk fill | Empty `$LABEL_FILL_SET`, retain `$LABEL_TERMINAL_SET` consumers, generate port tags, and preserve 0.3 4-terminal MOS/switch symbol defaults and ground/supply bulk-pin stubs | Context | Standard series, 10.5, 12.4 |
 | Ground/supply attached to a terminal | Preserve a directly written host terminal attachment through its net and explicit ALIGN x/y; report unresolved contexts | Context | 12.1, 12.3 |
-| Generated numbered references | Discard validated solver records; authored numbered references fail source validation | Context | 5.9 |
+| Generated numbered references | Discard validated solver records (kept and rewritten with `--keep-generated`); authored numbered references fail source validation | Context | 5.9 |
 | New assertion violations or changed default fill | Report every target diagnostic and semantic difference | Verification | 7.6, 15.2-15.4 |
 
 Additive language features (TABLE, orientation lists, assertions, solver settings, pin orientation, text rotation and math) require no rewrite unless an old spelling gains different meaning. Clarifications still participate in validation. Do not alter host netlist lines to hide a difference.
@@ -69,6 +69,8 @@ Additive language features (TABLE, orientation lists, assertions, solver setting
 ## Solver records
 
 After validating the source, migration discards its solver-generated records. The report marks each affected file with `needs_solve: true`; this requests a new solve and does not count as a conversion failure. Verification compares the authored inputs on both sides, so discarded solver decisions do not create artificial differences.
+
+`--keep-generated` (`UpgradeOptions::keep_generated`) keeps them. A record with `type="generated"` is then rewritten by the rules for authored records, its other header fields (`author`, `priority`) are kept, the file is not marked `needs_solve`, and verification compares both sides with the records of the solver read, so a placement that does not survive shows as a difference. A `sig2` hash that matched its level before the upgrade gets the input digest of the upgraded level and keeps its digest of the options; a hash that did not match, or is not `sig2`, is left as written, so a stale record stays stale. What cannot be rewritten is reported as unconverted, with the record's line, as for authored records. The option is off by default.
 
 ## Report
 

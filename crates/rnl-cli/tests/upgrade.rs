@@ -195,3 +195,21 @@ fn approximate_is_explicit_and_has_its_own_report_and_summary_count() {
     }
     assert_eq!(std::fs::read_to_string(dir.join("top.sp")).unwrap(), source);
 }
+
+#[test]
+fn keep_generated_upgrades_the_solver_record_instead_of_discarding_it() {
+    let dir = scratch("keep-generated");
+    let source = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\nR1 a 0 1k\n* @RNL(type=\"generated\", priority=\"high\", author=\"reference\") {\n*   #R1 @PLACE(3, 4)\n* }\n.end\n";
+    std::fs::write(dir.join("top.sp"), source).unwrap();
+    for (flags, kept) in [
+        (vec!["top.sp", "--no-std", "-o", "dropped"], false),
+        (vec!["top.sp", "--no-std", "--keep-generated", "-o", "kept"], true),
+    ] {
+        let result = run(&dir, &flags);
+        assert_ne!(result.status.code(), Some(2), "{result:?}");
+        let written = std::fs::read_to_string(dir.join(flags[flags.len() - 1]).join("top.sp")).unwrap();
+        assert_eq!(written.contains("author=\"reference\""), kept, "{written}");
+        assert_eq!(written.contains("@PLACE(3, 4)"), kept, "{written}");
+    }
+    assert_eq!(std::fs::read_to_string(dir.join("top.sp")).unwrap(), source);
+}

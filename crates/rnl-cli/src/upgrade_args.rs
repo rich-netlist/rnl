@@ -53,6 +53,7 @@ pub(crate) fn run(args: &Args, provider: &FsProvider) -> Result<ExitCode, Said> 
             formats: args.formats.clone(),
             std: args.std,
             approximate: args.upgrade_approximate,
+            keep_generated: args.upgrade_keep_generated,
         },
     )?;
     let mut files: Vec<_> =
