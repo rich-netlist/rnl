@@ -5198,6 +5198,17 @@
    ]
   },
   {
+   "number": "RNL3030",
+   "name": "keyword-bundle-selection",
+   "severity": "error",
+   "message": "BUNDLE takes objects written out, not {the result of a selection|a set that depends on one}: a bundle must exist before the symbols are given (8.2, 10.4, 11.8)",
+   "sections": [
+    "8.2",
+    "10.4",
+    "11.8"
+   ]
+  },
+  {
    "number": "RNL3126",
    "name": "solver-config-value-not-literal",
    "severity": "error",
@@ -5205,6 +5216,17 @@
    "sections": [
     "3.7",
     "14.10"
+   ]
+  },
+  {
+   "number": "RNL4215",
+   "name": "wire-selection",
+   "severity": "error",
+   "message": "WIRE does not take {the result of a selection|a set that depends on one}: a wire made from it would have nothing to be written back as; to draw the pins of a selection as wires, use ROUTE-OBJECT (10.4, 13.1)",
+   "sections": [
+    "10.4",
+    "13.1",
+    "13.7"
    ]
   },
   {
