@@ -2047,7 +2047,7 @@ enum NetRole {
 /// mirror pair; and those of one kind and one role in the same group, or in none: the same symbol,
 /// and the same roles of the nets of their pins, in any order, such as the legs of a ladder,
 /// each from a node of the spine to a net of its own, or loads hung from one net to the ground; an
-/// element on no net that the problem shows has no role. A chain of a `$FLOW` is none of these,
+/// element on no net that the problem shows has no role. A chain of a `$SIGNAL_FLOW` (`$FLOW` before 0.4) is none of these,
 /// nor are the elements in no group as such. Each set sorted, none twice, those of fewer than three
 /// elements left out.
 fn even_sets(problem: &LevelProblem, s: &Structure) -> Vec<Vec<usize>> {

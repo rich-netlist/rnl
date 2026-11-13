@@ -191,6 +191,13 @@ fn definition_shapes(version: &str) -> DefinitionShapes {
     out
 }
 
+/// Whether the 0.4 definition keeps the roles of the old one, in order, and only adds set roles after
+/// them, which an application may leave out: `$FLOW`, with `{path}`, became `$SIGNAL_FLOW`, with
+/// `{path}`, `{source}` and `{load}`.
+fn only_adds_optional_roles(target: &str, before: usize, after: usize) -> bool {
+    matches!((target, before, after), ("$SIGNAL_FLOW", 1, 3))
+}
+
 #[derive(Clone, Default)]
 pub(super) struct Policy {
     pub review: Option<super::manual::Reason>,
@@ -244,7 +251,10 @@ pub(super) fn definition_policies(input: &Interpretation) -> BTreeMap<(usize, St
                         _ => "the standard definition was removed or split; its replacement needs an explicit semantic choice (16.3)",
                     },
                 )),
-                Some((_, _, after_roles, _)) if *after_roles != roles => Some((
+                Some((_, _, after_roles, _))
+                    if *after_roles != roles && !only_adds_optional_roles(&target_name, roles, *after_roles) =>
+                {
+                    Some((
                     "standard-definition-roles",
                     match target_name.as_str() {
                         "$INTEGRATOR" | "$DISCRETE_TIME_INTEGRATOR" | "$QUANTIZER" | "$UNIT_DELAY" => {
@@ -255,7 +265,8 @@ pub(super) fn definition_policies(input: &Interpretation) -> BTreeMap<(usize, St
                         }
                         _ => "the target standard definition has a different role list; preserving the original members requires an explicit choice (9.4, 16.3)",
                     },
-                )),
+                    ))
+                }
                 Some((_, after, _, after_defaults)) if before != *after || defaults != *after_defaults => Some((
                     "standard-definition-body",
                     "the target standard definition changes body facts, assertions or parameter defaults; review those changes before replacing the original application (9.4, 16.3)",
@@ -322,7 +333,7 @@ pub(super) fn definition_policies(input: &Interpretation) -> BTreeMap<(usize, St
                     policy.review = Some(("standard-definition-body", match target_name.as_str() {
                         "$BRANCH" => "BRANCH adds SERIES routing/topology and a low-priority top-to-bottom ORDER; the old definition only aligned x (16.3)",
                         "$MIRRORED_LAYOUT" => "MIRRORED, now MIRRORED_LAYOUT, replaces axis-only distribution and ORDER by directed distribution and narrows axis to a single instance, usage or point; net axes and undirected sides require an explicit choice, and directed steps must be at least one unit (14.4, 16.3)",
-                        "$FLOW" => "FLOW removes the old low-priority ORDER in its direction parameter; retaining the usage alone loses that ordering fact (16.3)",
+                        "$SIGNAL_FLOW" => "FLOW, now SIGNAL_FLOW, removes the old low-priority ORDER in its direction parameter; retaining the usage alone loses that ordering fact (16.3)",
                         _ => "the standard definition has changed drawing facts or parameter defaults that are not covered by the verified body transformations; see the standard-definition audit (16.3)",
                     }));
                 }

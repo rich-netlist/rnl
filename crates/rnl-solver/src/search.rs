@@ -41,7 +41,7 @@
 //!
 //! The root's variants are the complete candidates; P0 joins them, and with the even rows in force
 //! each has a twin with evenly spaced rows, where a row holds three or more of one set to space
-//! evenly at a regular interval ([`evenly`]); never for a row as such, a chain of a `$FLOW` or the
+//! evenly at a regular interval ([`evenly`]); never for a row as such, a chain of a `$SIGNAL_FLOW` (`$FLOW` before 0.4) or the
 //! elements in no group (quality review SE-3). The coordinates of each are then sought by the
 //! lexicographic LP (`crate::coords`). The search makes no more than `Budget::candidates`
 //! candidates; past that it keeps what it has.

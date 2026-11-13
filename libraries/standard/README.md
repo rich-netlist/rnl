@@ -89,6 +89,7 @@ The series 0.4 is written in the language 0.4, whose text is still a draft, and 
   - `_P`: PMOS, PNP or lateral PNP, or a p-channel JFET or MESFET.
 
   These are `$DIFFERENTIAL_PAIR_N`, `$CURRENT_MIRROR_N`, `$CASCODE_CURRENT_MIRROR_N` and their `_P` twins, which also draw the n-type with its sources or emitters down and the p-type with them up.
+- The flow of a signal and the flow of power are told apart: `$SIGNAL_FLOW` and `$POWER_FLOW` each take a path, in order, with the sources before it and the loads after it. The devices that bias the rest of a circuit are marked with `$BIAS_CIRCUIT`. The drawing definition of a bias mark, `$BIAS`, is a different thing and stays.
 
 ### Renamed, merged, split and removed in 0.4
 
@@ -100,7 +101,7 @@ The series 0.4 is written in the language 0.4, whose text is still a draft, and 
 |---|---|
 | `rnl-std` (collection) | `rnl-std-all`, the one collection; it has a header record for each host language |
 | `rnl-std-core`, `rnl-std-full` (collections) | removed: use `rnl-std-all`, or name the packages one by one |
-| `rnl-std-structures` | `rnl-std-semantics` (`$MATCHED`, `$BRANCH`, `$CASCADE`, `$FLOW` move with it, and `$MIRRORED` as `$MIRRORED_LAYOUT`) |
+| `rnl-std-structures` | `rnl-std-semantics` (`$MATCHED`, `$BRANCH`, `$CASCADE` move with it, `$FLOW` as `$SIGNAL_FLOW` and `$MIRRORED` as `$MIRRORED_LAYOUT`) |
 | — | new, optional, not in `rnl-std-all`: `rnl-std-45deg` |
 
 #### Symbols
@@ -133,7 +134,7 @@ Also: net names on grounds, supplies, bias marks, port tags and net labels use `
 | `$NO_CONNECT` | role `t` takes a terminal or a pin | unchanged text |
 | `$GROUND_STUB`, `$SUPPLY_STUB` | `gap` default 2 → 1; role `t` is a pin | writes `gap=2` where the old default was used |
 | `$MIRRORED` | `$MIRRORED_LAYOUT`: a layout only; `axis` is a single instance, usage or point; directed distribution | renamed; the rest with `--approximate` |
-| `$FLOW` | places nothing and takes no direction | restores the old ORDER where it was used |
+| `$FLOW` | `$SIGNAL_FLOW`, with the optional set roles `source` and `load` after `path`, which take devices, structures, ports (`#:in`), terminals and nets; places nothing and takes no direction | renamed; restores the old ORDER where it was used |
 
 Definitions that only gained constraints or assertions keep their names, such as `$JUNCTION` and `$MATCHED`, and the upgrade reports them as notices; `$BRANCH` also gained series routing and an order from top to bottom, which the upgrade leaves to a person.
 

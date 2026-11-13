@@ -190,25 +190,37 @@
     ?members @ORDER("top-to-bottom", priority="low");
   };
 
-  /* A signal path that flows one way.
-     Meaning only: places and routes nothing; records a unidirectional signal path (14.6). */
-  $FLOW = @DEFINE(roles=[["{path}", ["instance", "usage"]]]) {
+  /* A signal path that flows one way: from its sources through the stages of its path, in the order
+     written, to its loads. Meaning only: places and routes nothing (14.6). Sources and loads are each
+     a group without an order, such as the two inputs of a differential signal; they may be devices,
+     structures, ports of the level (#:in), terminals or nets. */
+  $SIGNAL_FLOW = @DEFINE(
+      roles=[
+        ["{path}", ["instance", "usage"]],
+        ["{source}", ["instance", "usage", "terminal", "net"]],
+        ["{load}", ["instance", "usage", "terminal", "net"]]]) {
+  };
+
+  /* A path of power: from its sources, such as a supply or a battery, through the stages of its path
+     that convert or switch it, in the order written, to the loads that use it. Meaning only: places
+     and routes nothing. Sources and loads take the same kinds as in $SIGNAL_FLOW. */
+  $POWER_FLOW = @DEFINE(
+      roles=[
+        ["{path}", ["instance", "usage"]],
+        ["{source}", ["instance", "usage", "terminal", "net"]],
+        ["{load}", ["instance", "usage", "terminal", "net"]]]) {
+  };
+
+  /* A bias circuit: the devices or structures that make the bias of other parts, such as a current
+     reference. Meaning only: places and routes nothing; marks no net (the bias marks of the fill come
+     from $BIAS_NET_SET). */
+  $BIAS_CIRCUIT = @DEFINE(roles=[["{members}", ["instance", "usage"]]]) {
   };
 
   /* A feedback loop: a forward path and a feedback network.
      Meaning only: places and routes nothing. */
   $FEEDBACK_LOOP = @DEFINE(
       roles=[["{forward}", ["instance", "usage"]], ["{feedback}", ["instance", "usage"]]]) {
-  };
-
-  /* The load of an amplifier stage or of a signal path.
-     Meaning only: places and routes nothing. */
-  $LOAD = @DEFINE(roles=[["element", ["instance", "usage"]]]) {
-  };
-
-  /* The signal or bias source at the start of a stage or of a signal path.
-     Meaning only: places and routes nothing. */
-  $SOURCE = @DEFINE(roles=[["element", ["instance", "usage"]]]) {
   };
 
   /* ==============================================================================================
@@ -883,11 +895,9 @@
   };
 
   /* An amplifier stage: a transconductor and its load.
-     Routes; places nothing: applies $LOAD to ?load and routes shared output nets between
-     ?transconductor and ?load. */
+     Routes; places nothing: routes shared output nets between ?transconductor and ?load. */
   $TRANSCONDUCTOR_Z_AMPLIFIER = @DEFINE(
       roles=[["transconductor", ["instance", "usage"]], ["load", ["instance", "usage"]]]) {
-    ?load @AS $LOAD;
     {?transconductor ?load} @ROUTE-OBJECT(priority="low");
   };
 

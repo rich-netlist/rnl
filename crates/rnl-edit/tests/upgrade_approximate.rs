@@ -151,7 +151,7 @@ fn reversed_named_inputs_without_a_witness_follow_the_written_order() {
 fn flow_keeps_the_usage_and_restores_its_effective_direction_and_priority() {
     let r = layout("%path = {#M1 #R1 #M2} @AS(direction=\"right-to-left\", priority=\"high\") $FLOW", false);
     let text = &r.files["layout.sp"];
-    assert!(text.contains("%path = {#M1 #R1 #M2} @AS(priority=\"high\") $FLOW"), "{text}");
+    assert!(text.contains("%path = {#M1 #R1 #M2} @AS(priority=\"high\") $SIGNAL_FLOW"), "{text}");
     assert!(!text.contains("direction="), "{text}");
     assert!(text.contains("{#M1 #R1 #M2} @ORDER(\"right-to-left\", priority=\"high\")"), "{text}");
     assert!(r.report.files[0].unconverted.is_empty(), "{:?}", r.report.files[0].unconverted);

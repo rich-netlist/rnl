@@ -730,7 +730,7 @@
               {
                 "kind": "usage",
                 "id": "@03-five-transistor-ota.sp:35:5",
-                "definition": "$FLOW",
+                "definition": "$SIGNAL_FLOW",
                 "roles": [
                   {
                     "role": "path",
@@ -946,7 +946,7 @@
               {
                 "kind": "usage",
                 "id": "@03-five-transistor-ota.sp:35:5",
-                "definition": "$FLOW",
+                "definition": "$SIGNAL_FLOW",
                 "roles": [
                   {
                     "role": "path",
@@ -1697,7 +1697,7 @@
               {
                 "kind": "usage",
                 "id": "@03-five-transistor-ota.sp:35:5",
-                "definition": "$FLOW",
+                "definition": "$SIGNAL_FLOW",
                 "roles": [
                   {
                     "role": "path",
@@ -1981,13 +1981,15 @@
             "id": "@03-five-transistor-ota.sp:35:5",
             "kind": "usage",
             "host": [],
-            "definition": "$FLOW",
+            "definition": "$SIGNAL_FLOW",
             "attach": {
               "path": [
                 "#M1",
                 "#M2",
                 "#CL"
-              ]
+              ],
+              "source": [],
+              "load": []
             },
             "symbol": {
               "value": null,

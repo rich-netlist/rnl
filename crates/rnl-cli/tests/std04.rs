@@ -750,3 +750,46 @@ fn the_mirrored_layout_is_named_as_a_layout() {
     );
     assert!(!by_severity(&old, Severity::Error).is_empty(), "the name of 0.3 is gone");
 }
+
+#[test]
+fn signal_and_power_flows_take_sources_and_loads_and_the_bias_circuit_its_members() {
+    let devices =
+        "R1 a b 1k\nR2 b c 1k\nC2 c 0 1p\nM1 d c 0 0 nch W=2u L=1u\nIb vdd bias 1u\nM6 bias bias 0 0 nch W=2u L=1u\n";
+    let read04 =
+        |body: &str| read(&MemoryProvider::new().with("t.sp", &with_std04(devices, body)), &Options::default());
+    // the number of the members of each set role, in the order of the roles
+    let roles = |r: &Interpretation, id: &str| -> Vec<(String, usize)> {
+        let lv = level(r);
+        let o = lv.objects.iter().find(|o| o.id == id).unwrap_or_else(|| panic!("no {id}"));
+        o.attach
+            .iter()
+            .map(|(role, attach)| {
+                let n = match attach {
+                    rnl_runtime::model::Attach::Set(members) => members.len(),
+                    _ => 1,
+                };
+                (role.clone(), n)
+            })
+            .collect()
+    };
+    let named = |pairs: &[(&str, usize)]| pairs.iter().map(|(r, n)| (r.to_string(), *n)).collect::<Vec<_>>();
+    // without roles marked, the whole chain is the path, as with $FLOW before
+    let r = read04("%rc = {#R2 #C2} @GROUP; %f = {#R1 {%rc} #M1} @AS $SIGNAL_FLOW");
+    assert!(by_severity(&r, Severity::Error).is_empty(), "{:?}", by_severity(&r, Severity::Error));
+    assert_eq!(roles(&r, "%f"), named(&[("path", 4), ("source", 0), ("load", 0)]));
+    // sources and loads take nets and terminals as they are
+    let r = read04(
+        "%f = &a(source) {#R1 #R2}(path) {#C2 &d}(load) @AS $SIGNAL_FLOW; \
+         %p = &vdd(source) #Ib(path) #M6:1(load) @AS $POWER_FLOW",
+    );
+    assert!(by_severity(&r, Severity::Error).is_empty(), "{:?}", by_severity(&r, Severity::Error));
+    assert_eq!(roles(&r, "%f"), named(&[("path", 2), ("source", 1), ("load", 2)]));
+    assert_eq!(roles(&r, "%p"), named(&[("path", 1), ("source", 1), ("load", 1)]));
+    // the bias circuit has its members only
+    let r = read04("%b = {#Ib #M6} @AS $BIAS_CIRCUIT");
+    assert!(by_severity(&r, Severity::Error).is_empty(), "{:?}", by_severity(&r, Severity::Error));
+    // $SOURCE and $LOAD are gone
+    for old in ["#R1 @AS $SOURCE", "#C2 @AS $LOAD", "{#R1 #M1} @AS $FLOW"] {
+        assert!(!by_severity(&read04(old), Severity::Error).is_empty(), "{old}");
+    }
+}

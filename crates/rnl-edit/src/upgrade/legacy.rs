@@ -37,6 +37,7 @@ pub(super) fn renamed(name: &str) -> Option<&'static str> {
         "GND_FILL_SET" => "GROUND_FILL_SET",
         "LABEL_TERM_SET" => "LABEL_FILL_SET",
         "MIRROR_PAIR" => "MIRRORED_LAYOUT",
+        "FLOW" => "SIGNAL_FLOW",
         _ => return None,
     })
 }
@@ -56,10 +57,11 @@ pub(super) fn renamed_03_symbol(name: &str) -> Option<&'static str> {
 }
 
 /// The general definitions of the series 0.3 that the series 0.4 renames: a definition that only
-/// places is named with `_LAYOUT`.
+/// places is named with `_LAYOUT`, and the flow of a signal is told from the flow of power.
 pub(super) fn renamed_03_definition(name: &str) -> Option<&'static str> {
     Some(match name {
         "MIRRORED" => "MIRRORED_LAYOUT",
+        "FLOW" => "SIGNAL_FLOW",
         _ => return None,
     })
 }

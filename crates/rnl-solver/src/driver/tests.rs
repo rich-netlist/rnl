@@ -1771,7 +1771,7 @@ fn case_structure(file: &str, title: &str) -> (LevelProblem, Structure) {
 
 /// What a candidate with even rows spaces evenly (quality review SE-3): the members of a group,
 /// those that a DISTRIBUTE or a mirror pair joins, and those of one kind and one role, such as the
-/// legs of a ladder; never a row as such, a chain of a `$FLOW` or the elements in no group, which
+/// legs of a ladder; never a row as such, a chain of a `$SIGNAL_FLOW` (`$FLOW` before 0.4) or the elements in no group, which
 /// are no scope of the objectives measured within groups either.
 #[test]
 fn only_groups_pairs_and_elements_of_one_role_are_spaced_evenly() {
@@ -1793,7 +1793,7 @@ fn only_groups_pairs_and_elements_of_one_role_are_spaced_evenly() {
         assert!(sets.contains(&want), "{want:?} in {sets:?}");
     }
     assert!(s.scopes.is_empty());
-    // T5: a chain of a $FLOW and a load of two elements hung from one net: nothing
+    // T5: a chain of a $FLOW (0.3; $SIGNAL_FLOW in 0.4) and a load of two elements hung from one net: nothing
     let (_, s) = case_structure("T5-inverting-amp-rlc.sp", "T5-inverting-amp-rlc.sp");
     assert!(s.even_sets.is_empty(), "{:?}", s.even_sets);
     // T4: the two groups, and no set of the two halves of a mirror pair alone
