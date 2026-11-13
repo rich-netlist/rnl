@@ -137,6 +137,12 @@ Any static host serves the site: copy `dist/` as it is, at the root or under a p
 
 The core's module Worker must come from the page's own origin, so `core/` stays next to the page. A netlist opened by URL from another origin can only be read when that server allows the site's origin with CORS headers.
 
+## The frozen viewer for 0.3 files
+
+The site keeps a second copy of the web viewer at <https://rich-netlist.github.io/rnl/viewer-0.3/>, which reads the files of RNL 0.3 as the viewer of that time did: its page, its core and its WebAssembly are those of a tag, not of `main`. [`pages.yml`](../../.github/workflows/pages.yml) checks the tag out beside the workspace (`FROZEN_VIEWER_TAG`, now `viewer-v0.5.3`), builds it there with its own fonts and its own cache of the WebAssembly, and puts it at `site/dist/viewer-0.3/`. A new release of the 0.5 line changes nothing: when 0.4 is released, the tag is changed to the last of the 0.5 line, and that is all.
+
+`freeze.mjs` adds a banner to the built copy (`node apps/web/freeze.mjs DIST --link ../viewer/`): `frozen-banner.js`, a bar over the top of the page that says it is the old viewer for 0.3 files and links the new one, in the languages of the interface and English. It is a script of its own, added to the built page and not to `apps/viewer-ui`, so the frozen page is the tag's, unchanged but for the bar; it follows the page's language (`lang` of the document and the `language-changed` event). `freeze.test.mjs` covers both.
+
 ## Browsers
 
 The page keeps the browser baseline of decision 0008: Chromium 109, the last Chrome and Edge on Windows 7 and 8.1, and Safari 16; and Firefox from 114, the first with module Workers. It uses no newer feature, such as JSON import attributes, CSS nesting or `Array.prototype.toSorted`; it reads files through `<input type="file">`, a folder through its `webkitdirectory`, and dropped folders through `webkitGetAsEntry`, which all three have, and not through `showOpenFilePicker`, which only Chromium has. Its smoke tests pass in headless Chrome 155, and in Playwright's Firefox 155 and WebKit 26.6 ([Testing](#testing)).
@@ -357,6 +363,7 @@ hover or keyboard focus.
 | `build.mjs` | Builds the core and assembles the site in `dist/`. |
 | `serve.mjs` | Serves `dist/` on this computer, and with `--rnl PATH` the page's Solve through `solver-service.mjs`. |
 | `solver-service.mjs` | The solver service of the development server: runs `rnl preview` on the files a solve sends. |
+| `freeze.mjs`, `frozen-banner.js` | The banner of the frozen viewer for 0.3 files, which the site keeps at `viewer-0.3/`. |
 | [`../viewer-ui/shells/web.js`](../viewer-ui/README.md#the-shell) | The web shell: opening files, a folder, a URL or what is dropped; reading only the files a document needs, with `collect`; building in the core's Worker; the About box; a web page in a new tab. |
 | [`../viewer-ui/dialog.js`](../viewer-ui/README.md#modules) | The dialogs the web shell asks with: which netlist, which address, About. |
 | [`../../bindings/runtime-wasm`](../../bindings/runtime-wasm/README.md) | The core as WebAssembly, and the modules that run it in a Worker and collect the files a document needs. |

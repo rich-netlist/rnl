@@ -2,7 +2,8 @@
 # language tour, the page of the tools, the gallery of the standard packages and the page for agents),
 # the pages of the language standard (scripts/spec/), the RNL skill package for agents, as a zip and as
 # plain text, with llms.txt (scripts/skill/), the web viewer with its samples (apps/web) under viewer/,
-# and the gallery's data, from libraries/, under gallery/. It publishes on a push to main; after a revision
+# the same viewer frozen at an older tag, for 0.3 files, under viewer-0.3/, and the gallery's data, from
+# libraries/, under gallery/. It publishes on a push to main; after a revision
 # of the standard is released, so that its pages carry the new revision label; and after a release of
 # the desktop viewer, so that the page of the tools links to its files.
 # Pull requests only run the build, which fails when an English source or translation markup is invalid, when a
@@ -87,6 +88,10 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   CARGO_BUILD_JOBS: 4
+  # The tag of the viewer for 0.3 files, which the site keeps at viewer-0.3/ as it was then (below, after the
+  # web viewer). It is the newest release of the viewer while 0.3 is the current version of the language; when
+  # 0.4 is released it is the tag of the last release of the 0.5 line, which reads 0.3 files.
+  FROZEN_VIEWER_TAG: viewer-v0.5.3
 
 jobs:
   build:
@@ -194,6 +199,46 @@ jobs:
           node --test apps/web/*.test.mjs
           node apps/web/build.mjs --samples
           cp -r apps/web/dist site/dist/viewer
+
+      # The frozen viewer for 0.3 files, site/dist/viewer-0.3/: the web viewer as it was at the tag
+      # FROZEN_VIEWER_TAG, with its own page, core and WebAssembly, and a banner that says it is the old
+      # viewer and links ../viewer/ (apps/web/freeze.mjs). The tag is checked out beside the workspace and
+      # built there, as the step above builds main, with its own fonts and its own WebAssembly cache.
+      - name: Check out the tag of the frozen viewer
+        run: git worktree add --detach "$RUNNER_TEMP/frozen-viewer" "refs/tags/$FROZEN_VIEWER_TAG"
+      - id: frozen-fonts
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/frozen-viewer/apps/viewer-ui/fonts/
+          key: web-fonts-frozen-${{ env.FROZEN_VIEWER_TAG }}
+      - if: steps.frozen-fonts.outputs.cache-hit != 'true'
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Write the web fonts of the frozen viewer
+        if: steps.frozen-fonts.outputs.cache-hit != 'true'
+        working-directory: ${{ runner.temp }}/frozen-viewer
+        run: pip install fonttools brotli && python scripts/fonts.py web
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/frozen-target/
+          key: pages-frozen-wasm-${{ steps.rust.outputs.version }}-${{ env.FROZEN_VIEWER_TAG }}
+      - name: Build the frozen viewer for 0.3 files
+        working-directory: ${{ runner.temp }}/frozen-viewer
+        env:
+          CARGO_TARGET_DIR: ${{ runner.temp }}/frozen-target
+        run: |
+          node apps/web/build.mjs --samples
+          # (the banner is main's: the tag's page gets nothing of the tag's own but what it was)
+          node "$GITHUB_WORKSPACE/apps/web/freeze.mjs" apps/web/dist --link ../viewer/
+          cp -r apps/web/dist "$GITHUB_WORKSPACE/site/dist/viewer-0.3"
+      - name: Check the frozen viewer
+        run: |
+          test -f site/dist/viewer-0.3/index.html
+          test -f site/dist/viewer-0.3/frozen-banner.js
+          grep -q 'frozen-banner.js' site/dist/viewer-0.3/index.html
+          test -f site/dist/viewer-0.3/core/rnl_runtime_wasm.wasm
+          cmp -s site/dist/viewer-0.3/core/rnl_runtime_wasm.wasm site/dist/viewer/core/rnl_runtime_wasm.wasm && { echo "the frozen viewer has the core of main, not of $FROZEN_VIEWER_TAG"; exit 1; } || true
 
       # The data of the gallery of the standard packages (packages.html), which the pages of both
       # languages load: every package file in libraries/ read, and every symbol drawn by the core the
