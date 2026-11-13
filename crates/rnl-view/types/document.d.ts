@@ -218,6 +218,20 @@ export type Usage = {
    * its members.
    */
   kind: string,
+  /**
+   * For a group of a 0.4 level in the tree of groups: the group above it, by its Document
+   * object index, as `pin_of`; absent at the top. The tree is that of the solver's rules on the
+   * members as written (`rnl_runtime::group_tree`).
+   */
+  group_parent?: number,
+  /**
+   * For a group whose `state` is "same": the group it is, by its Document object index.
+   */
+  same_as?: number,
+  /**
+   * For a group whose `state` is "left-out": the group in the tree it crosses.
+   */
+  crosses?: number,
   id: string,
   /**
    * Its definition; empty for a group.
@@ -238,12 +252,14 @@ export type Usage = {
   /**
    * "in-effect"; "overridden", a fact its statement writes lost a conflict to one of higher
    * priority (8.5); "disabled", its priority, or that of the usage it is made in, is
-   * "disabled" (14.8). A group is only "in-effect" or "disabled" (11.5). As
-   * `MemberOf::state`; an application that failed makes no usage and has no row.
+   * "disabled" (14.8). A group is "in-effect" or "disabled" (11.5), and in a 0.4 level also
+   * "same", its members are those of another group (`same_as`), or "left-out", it crosses a
+   * group in the tree (`crosses`). As `MemberOf::state`; an application that failed makes no
+   * usage and has no row.
    */
   state: string,
   /**
-   * Why it was overridden: the message of the diagnostic.
+   * Why it was overridden, or for a group why it is "same" or "left-out".
    */
   reason: string | null,
 };

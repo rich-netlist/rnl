@@ -552,6 +552,25 @@ pub struct GroupInfo {
     /// PRIORITY turns it off, on itself or on a usage it is made in (11.5, 14.8): the solver does
     /// not get it.
     pub disabled: bool,
+    /// Where it stands in the tree of groups, by the rules of [`crate::group_tree`] on its members
+    /// as written. The solver applies the same rules to the objects it lays out, which can join
+    /// two groups that differ only in members it does not place.
+    pub place: GroupPlace,
+}
+
+/// Where a group stands in the tree of groups ([`GroupInfo::place`]); groups by their index in
+/// [`LevelView::groups`].
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum GroupPlace {
+    /// In the tree, under this group, or at the top.
+    Tree { parent: Option<usize> },
+    /// Its members are those of this group, which stands for it.
+    Same(usize),
+    /// It shares members with this group without either holding the other, and is left out.
+    Crosses(usize),
+    /// Not in the tree: turned off, or without members.
+    #[default]
+    Out,
 }
 
 /// An application of a definition, AS or ATTACH, written in a record of the level, that failed
