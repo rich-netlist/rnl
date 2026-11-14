@@ -244,3 +244,68 @@ fn top_level_io_port_becomes_net_label_only_with_approximate() {
     assert!(approx.report.assertion_violations.is_empty(), "{:?}", approx.report.assertion_violations);
     assert!(approx.report.files[0].approximations.iter().any(|a| a.rule == "approximate-top-level-io-port"));
 }
+
+#[test]
+fn net_label_orientation_is_turned_with_the_pin() {
+    let source = |orient: &str, place: &str| {
+        format!(
+            "* title
+* @RNL(type=\"header\") {{ @VERSION(\"0.3\") }}
+.subckt buf a y
+R1 a y 1k
+.ends
+X1 vin vout buf
+R2 vin vout 1k
+* @RNL {{ $IO_PORT @ATTACH &vout => %pout; {orient} }}
+* @RNL(type=\"generated\", author=\"t\") {{ {place} }}
+.end
+"
+        )
+    };
+    let run = |text: &str| {
+        upgrade(
+            "t.sp",
+            &MemoryProvider::new().with("t.sp", text),
+            &UpgradeOptions { approximate: true, keep_generated: true, ..UpgradeOptions::default() },
+        )
+        .unwrap()
+    };
+    // the explicit codes of the port are turned: R0 and MY, R180 and MX swap; the rest turn with the pin
+    for (before, after) in [("R0", "MY"), ("MY", "R0"), ("R180", "MX"), ("MX", "R180"), ("R90", "MYR90")] {
+        let r = run(&source(
+            &format!("%pout @ORIENT(\"{before}\")"),
+            &format!("%pout @PLACE(4, 2) => @ORIENT(\"{before}\")"),
+        ));
+        let text = &r.files["t.sp"];
+        assert!(text.contains("$NET_LABEL @ATTACH &vout => %pout"), "{text}");
+        assert!(text.contains(&format!("%pout @ORIENT(\"{after}\")")), "{before}: {text}");
+        assert!(text.contains(&format!("%pout @PLACE(4, 2) => @ORIENT(\"{after}\")")), "{before}: {text}");
+        assert!(r.report.differences.is_empty(), "{before}: {:?}", r.report.differences);
+        assert!(r.report.assertion_violations.is_empty(), "{before}: {:?}", r.report.assertion_violations);
+        assert!(
+            r.report.files[0].approximations.iter().filter(|a| a.rule == "approximate-label-orientation").count() == 2,
+            "{before}: {:?}",
+            r.report.files[0].approximations
+        );
+    }
+    // a statement that orients the label with other objects is left for the author, with a note
+    let mixed = run(&source("{%pout #R2} @ORIENT(\"R0\")", "#R2 @PLACE(0, 0)"));
+    let text = &mixed.files["t.sp"];
+    assert!(text.contains("{%pout #R2} @ORIENT(\"R0\")"), "{text}");
+    assert!(
+        mixed.report.files[0].unconverted.iter().any(|u| u.rule == "label-orientation-mixed"),
+        "{:?}",
+        mixed.report.files[0]
+    );
+    // a port that stays an IO_PORT keeps its orientation
+    let kept = run("* title
+* @RNL(type=\"header\") { @VERSION(\"0.3\") }
+.subckt buf a y
+R1 a y 1k
+* @RNL { $IO_PORT @ATTACH &a => %pa; %pa @ORIENT(\"R0\"); $IO_PORT @ATTACH &y }
+.ends
+X1 vin vout buf
+.end
+");
+    assert!(kept.files["t.sp"].contains("%pa @ORIENT(\"R0\")"), "{}", kept.files["t.sp"]);
+}

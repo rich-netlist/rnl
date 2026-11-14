@@ -51,6 +51,9 @@ pub(super) struct Approximate {
     pair_roles: BTreeMap<(usize, String), Pair>,
     mirrors: BTreeMap<Location, (&'static str, &'static str)>,
     top_io_ports: BTreeSet<Location>,
+    /// Every explicit orientation fact by its source position, one flag per fact: whether it orients a
+    /// usage that becomes a NET_LABEL, whose pin faces the other way than the port's.
+    orient_sites: BTreeMap<Location, Vec<bool>>,
     flows: BTreeMap<Location, Flow>,
 }
 
@@ -399,6 +402,7 @@ impl Approximate {
         for p in &input.problems {
             let mut written_sides = BTreeMap::new();
             let mut io_sites = BTreeMap::new();
+            let mut io_objects = Vec::new();
             for f in &p.facts {
                 let Some(loc) = &f.source else { continue };
                 if !f.chain.is_empty() {
@@ -449,6 +453,9 @@ impl Approximate {
                             }
                             _ => false,
                         };
+                    if let Some(object) = u.object {
+                        io_objects.push((object, key.clone()));
+                    }
                     io_sites.entry(key).and_modify(|v| *v &= eligible).or_insert(eligible);
                     continue;
                 }
@@ -552,6 +559,21 @@ impl Approximate {
                 }
                 out.pairs.insert(key, pair);
             }
+            let labels: BTreeSet<usize> = io_objects
+                .iter()
+                .filter(|(_, k)| io_sites.get(k) == Some(&true))
+                .map(|(o, _)| *o)
+                .filter(|o| io_objects.iter().all(|(other, k)| other != o || io_sites.get(k) == Some(&true)))
+                .collect();
+            for f in &p.facts {
+                let (Some(loc), FactKind::Orient { object, .. }) = (&f.source, &f.kind) else { continue };
+                if f.chain.is_empty() {
+                    out.orient_sites
+                        .entry((p.level, normalize(&loc.file), loc.line, loc.col))
+                        .or_default()
+                        .push(labels.contains(object));
+                }
+            }
             out.top_io_ports.extend(io_sites.into_iter().filter_map(|(k, ok)| ok.then_some(k)));
         }
         // A statement read in several drawings gets one edit. Keep its role
@@ -603,6 +625,89 @@ impl Approximate {
         } else {
             Some(value)
         }
+    }
+    /// An explicit orientation of a usage that becomes a NET_LABEL: the label's pin faces left where the
+    /// port's faced right, so the code is turned to the one that draws the pin the same way.
+    fn flip_label_orientation(
+        &self,
+        source: &str,
+        record: &Record,
+        member: &Member,
+        readings: &[usize],
+        report: &mut FileReport,
+        out: &mut Outcome,
+    ) -> Result<(), String> {
+        let Some(call) = member.segments.iter().filter_map(|s| s.call.as_ref()).find(|c| c.kw == "ORIENT") else {
+            return Ok(());
+        };
+        let (a, b) = (record.loc(member.start), record.loc(member.end));
+        let sites: Vec<bool> = readings
+            .iter()
+            .flat_map(|reading| {
+                self.orient_sites
+                    .iter()
+                    .filter(|((level, file, line, col), _)| {
+                        level == reading
+                            && *file == normalize(&a.file)
+                            && (*line, *col) >= (a.line, a.col)
+                            && (*line, *col) <= (b.line, b.col)
+                    })
+                    .flat_map(|(_, flags)| flags.iter().copied())
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        if !sites.contains(&true) {
+            return Ok(());
+        }
+        if sites.contains(&false) {
+            out.review.get_or_insert((
+                "label-orientation-mixed",
+                "this ORIENT sets a port that becomes a NET_LABEL together with other objects; the label's pin faces the other way (R0 and MY, R180 and MX swap): write its orientation apart from the others and turn it",
+            ));
+            return Ok(());
+        }
+        let params = call.params.as_ref();
+        let written = params
+            .iter()
+            .flat_map(|p| p.positional.iter().chain(p.named.iter().map(|n| &n.value)))
+            .find_map(|v| if let Value::Str(s) = v { Orient::parse(s) } else { None });
+        let Some(code) = written else {
+            out.review.get_or_insert((
+                "label-orientation-list",
+                "this ORIENT is not one orientation code; the NET_LABEL's pin faces the other way than the port's (R0 and MY, R180 and MX swap), so turn each code",
+            ));
+            return Ok(());
+        };
+        let turned = Orient::MY.then(code);
+        let chars = record.text.chars().collect::<Vec<_>>();
+        let quoted: Vec<char> = format!("\"{}\"", code.as_str()).chars().collect();
+        let Some(at) =
+            (call.start..call.end.saturating_sub(quoted.len() - 1)).find(|&i| chars[i..].starts_with(&quoted))
+        else {
+            return Ok(());
+        };
+        let edit = record_edit(
+            source,
+            record,
+            at..at + quoted.len(),
+            format!("\"{}\"", turned.as_str()),
+            "approximate-label-orientation",
+        )?;
+        record_approximation(
+            source,
+            record,
+            member,
+            std::slice::from_ref(&edit),
+            "approximate-label-orientation",
+            format!(
+                "The port became a NET_LABEL, whose pin faces left where IO_PORT's faced right; the orientation {} became {} so the pin is drawn the same way. A solver that chose the orientation is unaffected.",
+                code.as_str(),
+                turned.as_str()
+            ),
+            report,
+        )?;
+        out.edits.push(edit);
+        Ok(())
     }
     pub(super) fn role_reference(
         &self,
@@ -770,7 +875,7 @@ impl Approximate {
                     member,
                     std::slice::from_ref(&edit),
                     "approximate-top-level-io-port",
-                    "Top-level non-port IO_PORT replaced by NET_LABEL. NET_LABEL_SYMBOL's pin faces left (opposite to IO_PORT_SYMBOL's right-facing pin), so check any explicit orientation or placement."
+                    "Top-level non-port IO_PORT replaced by NET_LABEL. NET_LABEL_SYMBOL's pin faces left (opposite to IO_PORT_SYMBOL's right-facing pin); an explicit orientation of the usage is turned to the one that draws the pin the same way (see approximate-label-orientation), so check any placement."
                         .into(),
                     report,
                 )?;
@@ -899,6 +1004,9 @@ impl Approximate {
                 "standard-definition-removed",
                 "standard-name-removed",
             ]);
+        }
+        if enabled {
+            self.flip_label_orientation(source, record, member, readings, report, &mut out)?;
         }
         if directions > 0 && directions == converted {
             out.resolved.insert("direction");
