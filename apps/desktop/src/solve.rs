@@ -77,7 +77,8 @@ pub fn solver_table() -> serde_json::Value {
 /// not read at all.
 #[tauri::command]
 pub fn check_solver_settings(config: String) -> Result<serde_json::Value, String> {
-    let checked = check_settings(None, &MemoryProvider::new(), &SolveOptions::default(), &[ToolSettings::Config(config)])?;
+    let checked =
+        check_settings(None, &MemoryProvider::new(), &SolveOptions::default(), &[ToolSettings::Config(config)])?;
     serde_json::to_value(checked).map_err(|e| e.to_string())
 }
 
