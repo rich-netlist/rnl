@@ -784,3 +784,56 @@ fn a_level_not_stopped_by_its_safety_limit_places_all_its_dots() {
         assert_eq!(level.record.matches("$DOT @ATTACH").count(), 4, "{reason:?}: {}", level.record);
     }
 }
+
+/// The level of `text` solved with a dot, the record of which also writes `more`, completed: what
+/// `complete_record` and `complete_what_can_be` say.
+fn completed_with(text: &str, more: &str) -> (Result<String, String>, Result<String, String>) {
+    use rnl_cli::junction_completion_driver::complete_what_can_be;
+    let files = MemoryProvider::new().with("main.sp", text);
+    let opts = Options { std: false, problems: true, generated: false, ..Default::default() };
+    let interpreted = interpret_file(Path::new("main.sp"), None, &files, &opts).unwrap();
+    let p = &interpreted.problems[0];
+    let mut written = write_record(
+        p,
+        &Solution { branches: vec![Branch { at: (0., 0.), junction: true }], ..Default::default() },
+        "test",
+        "test",
+    );
+    // its last statements, after the dot's, whose place in the record stays
+    let end = written.record.rfind("\n}").expect("the end of the record");
+    written.record.insert_str(end, more);
+    let formats = BTreeMap::new();
+    let ctx = Context {
+        entry: "main.sp",
+        dialect: None,
+        formats: &formats,
+        files: &files,
+        runtime: &opts,
+        original: &interpreted,
+        problem: p,
+        original_text: text,
+        host_path: "main.sp",
+        kept: &[],
+        solution: &Solution::default(),
+        tolerance: opts.tolerance,
+        on_interpret: None,
+    };
+    (complete_record(&ctx, &written).map(|c| c.record), complete_what_can_be(&ctx, &written).map(|c| c.record))
+}
+
+#[test]
+fn objects_lost_on_reading_the_record_back_are_named() {
+    use rnl_cli::junction_completion_driver::LOST;
+    // rules write a text and attach a $M at each pin no wire is on; the record wires pins, as a
+    // record of the solver wires the pin of a stub of the fill that a rule of the file selected
+    let text = "* lost\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @SOLVER-CONFIG(junction=\"$DOT\") }\nR1 a 0 1k\n* @RNL { $DOT = @DEFINE(roles=[[\"p\",\"point\"]]) { {? ?p} @ALIGN(\"x\"); {? ?p} @ALIGN(\"y\") }; #R1 @SELECT-PIN(wired=false) => @TEXT(\"${net}\", key=\"k\"); $M = @DEFINE(roles=[[\"p\",\"pin\"]]) {}; #R1 @SELECT-PIN(wired=false) => $M @ATTACH }\n.end\n";
+    let (record, partial) = completed_with(text, ";\n  &a @WIRE {#R1:1 (5, 5)}");
+    let one = format!("#R1:p::k; a usage of $M from the rule at main.sp:4:220 are {LOST}");
+    assert_eq!(record.unwrap_err(), one);
+    // the same without the dots: what is lost is not the dots', and said once
+    assert_eq!(partial.unwrap_err(), one);
+    // both pins wired: both texts, and the two usages of the rule said together
+    let (record, _) = completed_with(text, ";\n  &a @WIRE {#R1:1 (5, 5)};\n  &0 @WIRE {#R1:2 (5, 7)}");
+    let why = record.unwrap_err();
+    assert_eq!(why, format!("#R1:p::k; #R1:n::k; 2 usages of $M from the rule at main.sp:4:220 are {LOST}"));
+}

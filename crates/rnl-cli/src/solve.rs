@@ -946,7 +946,13 @@ fn pass(
             };
             let completion =
                 crate::junction_completion_driver::complete_what_can_be_by(&context, &written, deadline.as_ref())
-                    .map_err(|why| format!("junction placement unresolved in {title}: {why}"))?;
+                    .map_err(|why| {
+                        if why.ends_with(crate::junction_completion_driver::LOST) {
+                            format!("the result of {title} does not read back as it was solved: {why}")
+                        } else {
+                            format!("junction placement unresolved in {title}: {why}")
+                        }
+                    })?;
             written.notes.push(format!(
                 "junction postprocessing: {} candidate trials in {:.3}s (including numbering checks, outside solver budget)",
                 completion.trials,

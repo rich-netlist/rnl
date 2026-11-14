@@ -66,6 +66,64 @@ fn read(ctx: &Context<'_>, record: &str) -> Result<Interpretation, String> {
     Ok(read)
 }
 
+/// Why a record does not read back when objects of the level are lost in it: an object the solve
+/// placed is not made when the document is read with its record. Nothing the dots do can mend it.
+pub const LOST: &str = "not made when the result is read again: a rule selects by what the solve writes back";
+
+/// The objects of `p`, the problem the solve read, that `read`, the document read with the record
+/// written, does not make: those a written name or a rule refers to, none of which a record of the
+/// solver takes away. A rule that selects by what the record writes, such as the pins a stub of
+/// the fill was to go on before it is written, makes them no more. An object with a name is lost
+/// when nothing in `read` is known to be it ([`rnl_runtime::previous::document_ids`]) and the level
+/// of `read` has no object of its id; the usages a rule made and the record does not write, when
+/// the rule makes fewer of them in `read`. Named in [`LOST`], at most three, a usage by its rule's
+/// place.
+fn lost(p: &LevelProblem, read: &Interpretation) -> Option<String> {
+    use std::collections::{BTreeMap, HashSet};
+    // the place of the rule that made a usage, from its id "@file:line:column", with "#n" after it
+    // when the rule made more than one
+    let site = |id: &str| id.split('#').next().unwrap_or(id).trim_start_matches('@').to_string();
+    let ids = rnl_runtime::previous::document_ids(p, read);
+    let again = read.problems.iter().find(|q| q.level == p.level)?;
+    let objects: HashSet<&String> = again.ids.objects.iter().collect();
+    let mut gone = Vec::new();
+    // by the place of its rule: the usages not written, the label of one and its definition
+    let mut unwritten: BTreeMap<String, (usize, &str, &str)> = BTreeMap::new();
+    for ((o, known), id) in p.objects.iter().zip(&ids.objects).zip(&p.ids.objects) {
+        if known.is_some() {
+            continue;
+        }
+        match &o.reference {
+            Reference::Name(name) if !objects.contains(id) => gone.push(name.clone()),
+            Reference::Generated { usage, path } if path.is_empty() => {
+                let (Some(id), Some(entry)) = (p.ids.usages.get(*usage), p.usages.get(*usage)) else { continue };
+                let entry = unwritten.entry(site(id)).or_insert((0, &o.label, &entry.definition));
+                entry.0 += 1;
+            }
+            _ => {}
+        }
+    }
+    for (at, (count, label, definition)) in unwritten {
+        let made = again.ids.usages.iter().filter(|id| site(id) == at).count();
+        match count.saturating_sub(made) {
+            0 => {}
+            1 => gone.push(format!("{label} from the rule at {at}")),
+            n => gone.push(format!("{n} usages of {definition} from the rule at {at}")),
+        }
+    }
+    let (first, rest) = gone.split_first()?;
+    let mut said = first.clone();
+    for name in rest.iter().take(2) {
+        said.push_str("; ");
+        said.push_str(name);
+    }
+    if rest.len() > 2 {
+        said.push_str(&format!("; and {} more", rest.len() - 2));
+    }
+    let verb = if gone.len() == 1 { "is" } else { "are" };
+    Some(format!("{said} {verb} {LOST}"))
+}
+
 fn line_mapping(ctx: &Context<'_>, new_read: &Interpretation, record: &str) -> Result<Vec<Option<u32>>, String> {
     let old_level = ctx.original.doc.levels.get(ctx.problem.level).ok_or("old level missing")?;
     let new_level = new_read.doc.levels.get(ctx.problem.level).ok_or("new level missing")?;
@@ -312,6 +370,9 @@ fn complete_within(
     }
     let record = &written.record;
     let before = read(ctx, record)?;
+    if let Some(why) = lost(ctx.problem, &before) {
+        return Err(why);
+    }
     let line_map = line_mapping(ctx, &before, record)?;
     let problem = before.problems.iter().find(|p| p.level == ctx.problem.level).ok_or("trial problem missing")?;
     // The writer omits coordinates already supplied by following text or a symbol.
@@ -509,6 +570,10 @@ pub fn complete_what_can_be_by(
     };
     let bare = only(written, &[]);
     if let Err(without) = complete_within(ctx, &bare, 1, &mut 0, None) {
+        // objects lost on reading the record back are lost with the dots or without them
+        if without.ends_with(LOST) {
+            return Err(without);
+        }
         return Err(format!("{why}; without any dot: {without}"));
     }
     // the dots one by one, in order, each beside those kept before it: a dot kept may leave no
