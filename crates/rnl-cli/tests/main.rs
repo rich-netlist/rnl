@@ -89,6 +89,7 @@ mod junction_identity04;
 mod junction_identity_edges04;
 mod junction_implicit_point04;
 mod junction_numbering04;
+mod junction_partial04;
 mod junction_pending04;
 mod junction_reified_point04;
 mod junction_retained04;

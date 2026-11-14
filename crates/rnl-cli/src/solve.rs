@@ -839,13 +839,21 @@ fn pass(
                 tolerance: runtime.tolerance.min(options.solver.for_problem(p).0.tolerance),
                 on_interpret: None,
             };
-            let completion = crate::junction_completion_driver::complete_record(&context, &written)
+            let completion = crate::junction_completion_driver::complete_what_can_be(&context, &written)
                 .map_err(|why| format!("junction placement unresolved in {title}: {why}"))?;
             written.notes.push(format!(
                 "junction postprocessing: {} candidate trials in {:.3}s (including numbering checks, outside solver budget)",
                 completion.trials,
                 completion.elapsed.as_secs_f64()
             ));
+            // a dot that cannot be placed costs only itself: the rest of the level is written
+            for (index, why) in &completion.dropped {
+                let junction = &written.junctions[*index];
+                written.unsolved.push(rnl_runtime::solution::Unsolved::junction_unplaced(junction));
+                written
+                    .notes
+                    .push(format!("junction postprocessing: the dot at {} is not written: {why}", junction.target));
+            }
             junction_seconds = Some(completion.elapsed.as_secs_f64());
             written.record = completion.record;
         }

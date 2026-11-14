@@ -4353,6 +4353,15 @@
    ]
   },
   {
+   "number": "RNL8214",
+   "name": "unsolved-junction-unplaced",
+   "severity": "warning",
+   "message": "{decision}{label}: its dot is not written: no place for it keeps the facts of the level as they are drawn (13.2)",
+   "sections": [
+    "13.2"
+   ]
+  },
+  {
    "number": "RNL8400",
    "name": "writeback-region-encrypted",
    "severity": "hint",

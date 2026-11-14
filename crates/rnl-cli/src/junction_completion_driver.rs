@@ -264,6 +264,19 @@ pub struct Completion {
     pub elapsed: std::time::Duration,
 }
 pub fn complete_record(ctx: &Context<'_>, written: &Written) -> Result<Completion, String> {
+    complete_within(ctx, written, MAX_TRIALS, &mut 0)
+}
+
+/// A single global bound on the candidate trials of a level, independent of junction count.
+const MAX_TRIALS: usize = 64;
+
+/// [`complete_record`] with at most `max_trials` candidate trials, counted into `used`.
+fn complete_within(
+    ctx: &Context<'_>,
+    written: &Written,
+    max_trials: usize,
+    used: &mut usize,
+) -> Result<Completion, String> {
     let start = crate::solve::Stopwatch::start();
     if !written.unsolved.is_empty() {
         return Err("first-pass decisions could not all be written".into());
@@ -363,11 +376,10 @@ pub fn complete_record(ctx: &Context<'_>, written: &Written) -> Result<Completio
         }
         plans.push(Plan { end: junction.span.end, usage_id, fixed, candidates });
     }
-    // A single global bound covers the complete level, independent of junction count.
-    const MAX_TRIALS: usize = 64;
     let mut indexes = vec![0usize; plans.len()];
     let mut last_error = String::from("no candidates");
-    for attempt in 0..MAX_TRIALS {
+    for attempt in 0..max_trials {
+        *used += 1;
         let mut trial = record.clone();
         let targets: Vec<_> = plans.iter().zip(&indexes).map(|(p, &i)| (p.usage_id.clone(), p.candidates[i])).collect();
         for (plan, &index) in plans.iter().zip(&indexes).rev() {
@@ -428,4 +440,96 @@ pub fn complete_record(ctx: &Context<'_>, written: &Written) -> Result<Completio
         }
     }
     Err(format!("junction placement unresolved after globally bounded trials: {last_error}"))
+}
+
+/// The record with the dots that can be placed: what [`Partial::record`] holds, and the dots left
+/// out, by their index in [`Written::junctions`], with why.
+pub struct Partial {
+    pub record: String,
+    pub trials: usize,
+    pub elapsed: std::time::Duration,
+    pub dropped: Vec<(usize, String)>,
+}
+
+/// Places every dot when [`complete_record`] can; otherwise keeps, in order, each dot that can
+/// be placed beside those kept before it, and leaves out the rest. A dot that no place keeps the
+/// facts of the level for costs only itself: the rest of the record is written. The record without
+/// any dot must pass the same checks, or nothing is written: what fails then is not the dots'.
+pub fn complete_what_can_be(ctx: &Context<'_>, written: &Written) -> Result<Partial, String> {
+    let start = crate::solve::Stopwatch::start();
+    // one bound on the candidate trials of the level covers every stage, so that the time a level
+    // takes stays bounded however many dots it has; the record without any dot is checked beyond it
+    let mut trials = 0;
+    let why = match complete_within(ctx, written, MAX_TRIALS, &mut trials) {
+        Ok(done) => return Ok(Partial { record: done.record, trials, elapsed: start.elapsed(), dropped: Vec::new() }),
+        Err(why) => why,
+    };
+    let bare = only(written, &[]);
+    if let Err(without) = complete_within(ctx, &bare, 1, &mut 0) {
+        return Err(format!("{why}; without any dot: {without}"));
+    }
+    // the dots one by one, in order, each beside those kept before it: a dot kept may leave no
+    // place for a later one that could have been placed alone
+    let mut kept: Vec<usize> = Vec::new();
+    let mut record = None;
+    let mut dropped = Vec::new();
+    for index in 0..written.junctions.len() {
+        if trials >= MAX_TRIALS {
+            dropped.push((index, "the bound on candidate trials was reached".to_string()));
+            continue;
+        }
+        let mut with = kept.clone();
+        with.push(index);
+        match complete_within(ctx, &only(written, &with), MAX_TRIALS - trials, &mut trials) {
+            Ok(done) => {
+                kept = with;
+                record = Some(done.record);
+            }
+            Err(why) => dropped.push((index, why)),
+        }
+    }
+    let record = record.unwrap_or(bare.record);
+    Ok(Partial { record, trials, elapsed: start.elapsed(), dropped })
+}
+
+/// The written record with only the junctions `keep`, by their index in [`Written::junctions`]:
+/// the ATTACH statements of the others are taken out, with their separators.
+pub fn only(written: &Written, keep: &[usize]) -> Written {
+    const SEPARATOR: &str = ";\n  ";
+    let mut out = written.clone();
+    let mut cuts: Vec<std::ops::Range<usize>> = Vec::new();
+    for (index, junction) in written.junctions.iter().enumerate() {
+        if keep.contains(&index) {
+            continue;
+        }
+        let span = junction.span.clone();
+        let cut = if written.record.get(..span.start).is_some_and(|before| before.ends_with(SEPARATOR)) {
+            span.start - SEPARATOR.len()..span.end
+        } else if written.record.get(span.end..).is_some_and(|after| after.starts_with(SEPARATOR)) {
+            span.start..span.end + SEPARATOR.len()
+        } else {
+            span
+        };
+        cuts.push(cut);
+    }
+    cuts.sort_by_key(|cut| std::cmp::Reverse(cut.start));
+    for cut in &cuts {
+        out.record.replace_range(cut.clone(), "");
+    }
+    // the only statement taken out leaves an empty body
+    const EMPTY: &str = " {\n  \n}";
+    if let Some(body) = out.record.find(EMPTY) {
+        out.record.replace_range(body..body + EMPTY.len(), " {}");
+    }
+    out.junctions = Vec::new();
+    for (index, junction) in written.junctions.iter().enumerate() {
+        if !keep.contains(&index) {
+            continue;
+        }
+        let shift: usize = cuts.iter().filter(|cut| cut.end <= junction.span.start).map(|cut| cut.len()).sum();
+        let mut moved = junction.clone();
+        moved.span = junction.span.start - shift..junction.span.end - shift;
+        out.junctions.push(moved);
+    }
+    out
 }

@@ -130,7 +130,7 @@ fn nested_anonymous_generated_object_keeps_its_numbered_identity() {
 }
 
 #[test]
-fn conflicting_completion_rejects_write_and_preserves_old_record() {
+fn conflicting_completion_leaves_the_dot_out_and_replaces_the_old_record() {
     let text = fixture("", r#"?p ? @DISTANCE("left-to-right",exact=2); ?p ? @DISTANCE("left-to-right",exact=3)"#)
         .replace(
             ".end",
@@ -158,9 +158,12 @@ fn conflicting_completion_rejects_write_and_preserves_old_record() {
             })
         },
     );
-    assert!(result.is_err());
+    let result = result.expect("the level is written without the dot");
     assert_eq!(calls.get(), 1);
-    assert_eq!(files.files.get("main.sp").unwrap(), &text);
+    let record = &result.levels[0].record;
+    assert!(!record.contains("$DOT @ATTACH") && record.contains("%rt1 = (3, 4)"), "{record}");
+    let written = &result.files.iter().find(|file| file.path == "main.sp").expect("written main").text;
+    assert!(!written.contains("%old=(5,5)"), "{written}");
 }
 
 #[test]
