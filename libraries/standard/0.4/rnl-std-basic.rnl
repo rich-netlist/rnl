@@ -618,14 +618,14 @@
     {? ?at} @ALIGN("y");
   };
 
-  /* A port tag on every port net of a level that does not already have an $IO_PORT, arranged in one column. */
+  /* A port tag on every port net of a level that does not already have an $IO_PORT, in one column on the left of the instances of the level, as rnl-std-fill draws them; the fill then adds none in that level (12.4). */
   $PORT_LIST = @DEFINE(roles=[]) {
-    %port_net_set = # @SELECT-NET(port=true);
+    %port_net_set = # @SELECT-NET(port=true); # @SELECT-NET(port=true) => @REMOVE-FROM $PORT_FILL_SET;
     # @SELECT-USAGE $IO_PORT => @SELECT-NET => @REMOVE-FROM %port_net_set;
     $IO_PORT @ATTACH %port_net_set => %tag_set;
-    %tag_set @ORDER("top-to-bottom");
-    %tag_set @ALIGN("x");
-    %tag_set @GROUP;
+    %tag_set @ORDER("top-to-bottom", priority="low"); %tag_set @GROUP;
+    {%tag_set ?} @ALIGN("x", priority="low");
+    %instance_set = # @SELECT-INSTANCE; ? %instance_set @DISTANCE("left-to-right", min=4, priority="low");
   };
 
   /* A non-drawn comment attached to any objects, or to the level itself when target is omitted. */
@@ -683,4 +683,9 @@
   %named_ground_nets = # @SELECT-USAGE(recursive=true) $GROUND => @SELECT-NET(recursive=true);
   # @SELECT-NET(name="0", recursive=true) => @REMOVE-FROM %named_ground_nets;
   %named_ground_nets @SELECT-ANCESTOR-USAGE(recursive=true) $GROUND => @SET-SYMBOL $NAMED_GROUND_SYMBOL;
+
+  /* ---------------------------------------------------------------- the port tags of the fill (12.4) */
+
+  /* The port nets that rnl-std-fill gives a port tag: every port net of every level, supply and ground nets too, less those with an $IO_PORT written and those of a level with a $PORT_LIST. A file takes a net out with REMOVE-FROM, such as # @SELECT-NET(name="vdd") => @REMOVE-FROM $PORT_FILL_SET. */
+  $PORT_FILL_SET = # @SELECT-NET(port=true, recursive=true);
 }

@@ -17,6 +17,6 @@ R2 mid bot 10k
 
 
 
-* @RNL { %ports = # @SELECT-NET(port=true); $IO_PORT @ATTACH %ports }
+*! the port tags come from the fill of the standard package ($PORT_FILL_SET)
 * @RNL(type="generated", priority="high") { #R1 @PLACE(0, 3); #R2 @PLACE(0, -4); &top @SELECT-ANCESTOR-USAGE $IO_PORT => @PLACE(0, 7) => @ORIENT("R270"); &mid @SELECT-ANCESTOR-USAGE $IO_PORT => @PLACE(2, -0.5) => @ORIENT("MY"); &bot @SELECT-ANCESTOR-USAGE $IO_PORT => @PLACE(0, -8) => @ORIENT("R90") }
 .ends

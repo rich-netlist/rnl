@@ -9,7 +9,7 @@
       "name": "03-five-transistor-ota.sp",
       "file": 0,
       "line": 0,
-      "status": "constraints: 24 ok, 2 unsolved, 2 dropped",
+      "status": "constraints: 26 ok, 2 unsolved, 2 dropped",
       "host": {
         "ports": [],
         "instances": [
@@ -4154,6 +4154,19 @@
         ],
         "shapes": [],
         "groups": [
+          {
+            "id": "@rnl-std-fill.rnl:64:3",
+            "members": [],
+            "file": null,
+            "line": 64,
+            "source": "rule",
+            "rule": {
+              "package": "rnl-std-fill",
+              "file": "rnl-std-fill.rnl",
+              "line": 64
+            },
+            "state": "in-effect"
+          },
           {
             "id": "%core",
             "members": [

@@ -208,6 +208,21 @@
           }
         ],
         "shapes": [],
+        "groups": [
+          {
+            "id": "@rnl-std-fill.rnl:64:3",
+            "members": [],
+            "file": null,
+            "line": 64,
+            "source": "rule",
+            "rule": {
+              "package": "rnl-std-fill",
+              "file": "rnl-std-fill.rnl",
+              "line": 64
+            },
+            "state": "in-effect"
+          }
+        ],
         "junction": {
           "definition": "$JUNCTION",
           "symbol": null
@@ -220,7 +235,7 @@
       "name": "sub_dropped",
       "file": 0,
       "line": 22,
-      "status": "2 without a position",
+      "status": "2 without a position; constraints: 4 unsolved",
       "host": {
         "ports": [
           "&a",
@@ -253,7 +268,7 @@
             "usages": [
               {
                 "kind": "usage",
-                "id": "@18-dialect-switch.scs:11:342#1",
+                "id": "@rnl-std-fill.rnl:61:3#1",
                 "definition": "$IO_PORT",
                 "roles": [
                   {
@@ -263,13 +278,13 @@
                     "terminal": null
                   }
                 ],
-                "file": 0,
-                "line": 11,
+                "file": null,
+                "line": 61,
                 "source": "rule",
                 "rule": {
-                  "package": "",
-                  "file": "18-dialect-switch.scs",
-                  "line": 11
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 61
                 },
                 "state": "in-effect"
               }
@@ -282,7 +297,7 @@
             "usages": [
               {
                 "kind": "usage",
-                "id": "@18-dialect-switch.scs:11:342#2",
+                "id": "@rnl-std-fill.rnl:61:3#2",
                 "definition": "$IO_PORT",
                 "roles": [
                   {
@@ -292,13 +307,13 @@
                     "terminal": null
                   }
                 ],
-                "file": 0,
-                "line": 11,
+                "file": null,
+                "line": 61,
                 "source": "rule",
                 "rule": {
-                  "package": "",
-                  "file": "18-dialect-switch.scs",
-                  "line": 11
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 61
                 },
                 "state": "in-effect"
               }
@@ -407,7 +422,7 @@
             ]
           },
           {
-            "id": "@18-dialect-switch.scs:11:342#1",
+            "id": "@rnl-std-fill.rnl:61:3#1",
             "kind": "usage",
             "host": [],
             "definition": "$IO_PORT",
@@ -429,7 +444,7 @@
             "pins": [
               {
                 "kind": "pin",
-                "id": "pin(@18-dialect-switch.scs:11:342#1,0)",
+                "id": "pin(@rnl-std-fill.rnl:61:3#1,0)",
                 "index": 0,
                 "names": [
                   "pin"
@@ -448,10 +463,34 @@
                   "&a"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "kind": "group",
+                "id": "@rnl-std-fill.rnl:64:3",
+                "definition": "",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "@rnl-std-fill.rnl:61:3#1",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 64,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 64
+                },
+                "state": "in-effect"
+              }
             ]
           },
           {
-            "id": "@18-dialect-switch.scs:11:342#2",
+            "id": "@rnl-std-fill.rnl:61:3#2",
             "kind": "usage",
             "host": [],
             "definition": "$IO_PORT",
@@ -473,7 +512,7 @@
             "pins": [
               {
                 "kind": "pin",
-                "id": "pin(@18-dialect-switch.scs:11:342#2,0)",
+                "id": "pin(@rnl-std-fill.rnl:61:3#2,0)",
                 "index": 0,
                 "names": [
                   "pin"
@@ -491,6 +530,30 @@
                 "nets": [
                   "&b"
                 ]
+              }
+            ],
+            "usages": [
+              {
+                "kind": "group",
+                "id": "@rnl-std-fill.rnl:64:3",
+                "definition": "",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "@rnl-std-fill.rnl:61:3#2",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 64,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 64
+                },
+                "state": "in-effect"
               }
             ]
           }
@@ -566,6 +629,24 @@
           }
         ],
         "shapes": [],
+        "groups": [
+          {
+            "id": "@rnl-std-fill.rnl:64:3",
+            "members": [
+              "@rnl-std-fill.rnl:61:3#1",
+              "@rnl-std-fill.rnl:61:3#2"
+            ],
+            "file": null,
+            "line": 64,
+            "source": "rule",
+            "rule": {
+              "package": "rnl-std-fill",
+              "file": "rnl-std-fill.rnl",
+              "line": 64
+            },
+            "state": "in-effect"
+          }
+        ],
         "junction": {
           "definition": "$JUNCTION",
           "symbol": null
@@ -578,7 +659,7 @@
       "name": "sub_kept",
       "file": 0,
       "line": 29,
-      "status": "2 without a position",
+      "status": "2 without a position; constraints: 4 unsolved",
       "host": {
         "ports": [
           "&a",
@@ -611,7 +692,7 @@
             "usages": [
               {
                 "kind": "usage",
-                "id": "@18-dialect-switch.scs:11:342#1",
+                "id": "@rnl-std-fill.rnl:61:3#1",
                 "definition": "$IO_PORT",
                 "roles": [
                   {
@@ -621,13 +702,13 @@
                     "terminal": null
                   }
                 ],
-                "file": 0,
-                "line": 11,
+                "file": null,
+                "line": 61,
                 "source": "rule",
                 "rule": {
-                  "package": "",
-                  "file": "18-dialect-switch.scs",
-                  "line": 11
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 61
                 },
                 "state": "in-effect"
               }
@@ -640,7 +721,7 @@
             "usages": [
               {
                 "kind": "usage",
-                "id": "@18-dialect-switch.scs:11:342#2",
+                "id": "@rnl-std-fill.rnl:61:3#2",
                 "definition": "$IO_PORT",
                 "roles": [
                   {
@@ -650,13 +731,13 @@
                     "terminal": null
                   }
                 ],
-                "file": 0,
-                "line": 11,
+                "file": null,
+                "line": 61,
                 "source": "rule",
                 "rule": {
-                  "package": "",
-                  "file": "18-dialect-switch.scs",
-                  "line": 11
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 61
                 },
                 "state": "in-effect"
               }
@@ -765,7 +846,7 @@
             ]
           },
           {
-            "id": "@18-dialect-switch.scs:11:342#1",
+            "id": "@rnl-std-fill.rnl:61:3#1",
             "kind": "usage",
             "host": [],
             "definition": "$IO_PORT",
@@ -787,7 +868,7 @@
             "pins": [
               {
                 "kind": "pin",
-                "id": "pin(@18-dialect-switch.scs:11:342#1,0)",
+                "id": "pin(@rnl-std-fill.rnl:61:3#1,0)",
                 "index": 0,
                 "names": [
                   "pin"
@@ -806,10 +887,34 @@
                   "&a"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "kind": "group",
+                "id": "@rnl-std-fill.rnl:64:3",
+                "definition": "",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "@rnl-std-fill.rnl:61:3#1",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 64,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 64
+                },
+                "state": "in-effect"
+              }
             ]
           },
           {
-            "id": "@18-dialect-switch.scs:11:342#2",
+            "id": "@rnl-std-fill.rnl:61:3#2",
             "kind": "usage",
             "host": [],
             "definition": "$IO_PORT",
@@ -831,7 +936,7 @@
             "pins": [
               {
                 "kind": "pin",
-                "id": "pin(@18-dialect-switch.scs:11:342#2,0)",
+                "id": "pin(@rnl-std-fill.rnl:61:3#2,0)",
                 "index": 0,
                 "names": [
                   "pin"
@@ -849,6 +954,30 @@
                 "nets": [
                   "&b"
                 ]
+              }
+            ],
+            "usages": [
+              {
+                "kind": "group",
+                "id": "@rnl-std-fill.rnl:64:3",
+                "definition": "",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "@rnl-std-fill.rnl:61:3#2",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 64,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 64
+                },
+                "state": "in-effect"
               }
             ]
           }
@@ -924,6 +1053,24 @@
           }
         ],
         "shapes": [],
+        "groups": [
+          {
+            "id": "@rnl-std-fill.rnl:64:3",
+            "members": [
+              "@rnl-std-fill.rnl:61:3#1",
+              "@rnl-std-fill.rnl:61:3#2"
+            ],
+            "file": null,
+            "line": 64,
+            "source": "rule",
+            "rule": {
+              "package": "rnl-std-fill",
+              "file": "rnl-std-fill.rnl",
+              "line": 64
+            },
+            "state": "in-effect"
+          }
+        ],
         "junction": {
           "definition": "$JUNCTION",
           "symbol": null
@@ -936,7 +1083,7 @@
       "name": "box_cell",
       "file": 1,
       "line": 6,
-      "status": "2 without a position",
+      "status": "2 without a position; constraints: 2 unsolved",
       "host": {
         "ports": [
           "&p",
@@ -951,7 +1098,7 @@
             "usages": [
               {
                 "kind": "usage",
-                "id": "@18-dialect-switch.scs:11:342#1",
+                "id": "@rnl-std-fill.rnl:61:3#1",
                 "definition": "$IO_PORT",
                 "roles": [
                   {
@@ -961,13 +1108,13 @@
                     "terminal": null
                   }
                 ],
-                "file": 0,
-                "line": 11,
+                "file": null,
+                "line": 61,
                 "source": "rule",
                 "rule": {
-                  "package": "",
-                  "file": "18-dialect-switch.scs",
-                  "line": 11
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 61
                 },
                 "state": "in-effect"
               }
@@ -980,7 +1127,7 @@
             "usages": [
               {
                 "kind": "usage",
-                "id": "@18-dialect-switch.scs:11:342#2",
+                "id": "@rnl-std-fill.rnl:61:3#2",
                 "definition": "$IO_PORT",
                 "roles": [
                   {
@@ -990,13 +1137,13 @@
                     "terminal": null
                   }
                 ],
-                "file": 0,
-                "line": 11,
+                "file": null,
+                "line": 61,
                 "source": "rule",
                 "rule": {
-                  "package": "",
-                  "file": "18-dialect-switch.scs",
-                  "line": 11
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 61
                 },
                 "state": "in-effect"
               }
@@ -1021,7 +1168,7 @@
         },
         "objects": [
           {
-            "id": "@18-dialect-switch.scs:11:342#1",
+            "id": "@rnl-std-fill.rnl:61:3#1",
             "kind": "usage",
             "host": [],
             "definition": "$IO_PORT",
@@ -1043,7 +1190,7 @@
             "pins": [
               {
                 "kind": "pin",
-                "id": "pin(@18-dialect-switch.scs:11:342#1,0)",
+                "id": "pin(@rnl-std-fill.rnl:61:3#1,0)",
                 "index": 0,
                 "names": [
                   "pin"
@@ -1062,10 +1209,34 @@
                   "&p"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "kind": "group",
+                "id": "@rnl-std-fill.rnl:64:3",
+                "definition": "",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "@rnl-std-fill.rnl:61:3#1",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 64,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 64
+                },
+                "state": "in-effect"
+              }
             ]
           },
           {
-            "id": "@18-dialect-switch.scs:11:342#2",
+            "id": "@rnl-std-fill.rnl:61:3#2",
             "kind": "usage",
             "host": [],
             "definition": "$IO_PORT",
@@ -1087,7 +1258,7 @@
             "pins": [
               {
                 "kind": "pin",
-                "id": "pin(@18-dialect-switch.scs:11:342#2,0)",
+                "id": "pin(@rnl-std-fill.rnl:61:3#2,0)",
                 "index": 0,
                 "names": [
                   "pin"
@@ -1106,6 +1277,30 @@
                   "&n"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "kind": "group",
+                "id": "@rnl-std-fill.rnl:64:3",
+                "definition": "",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "@rnl-std-fill.rnl:61:3#2",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 64,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 64
+                },
+                "state": "in-effect"
+              }
             ]
           }
         ],
@@ -1113,6 +1308,24 @@
         "wires": [],
         "texts": [],
         "shapes": [],
+        "groups": [
+          {
+            "id": "@rnl-std-fill.rnl:64:3",
+            "members": [
+              "@rnl-std-fill.rnl:61:3#1",
+              "@rnl-std-fill.rnl:61:3#2"
+            ],
+            "file": null,
+            "line": 64,
+            "source": "rule",
+            "rule": {
+              "package": "rnl-std-fill",
+              "file": "rnl-std-fill.rnl",
+              "line": 64
+            },
+            "state": "in-effect"
+          }
+        ],
         "junction": {
           "definition": "$JUNCTION",
           "symbol": null
@@ -1125,7 +1338,7 @@
       "name": "sub_inc",
       "file": 1,
       "line": 9,
-      "status": "2 without a position",
+      "status": "2 without a position; constraints: 6 unsolved",
       "host": {
         "ports": [
           "&a",
@@ -1175,7 +1388,7 @@
             "usages": [
               {
                 "kind": "usage",
-                "id": "@18-dialect-switch.scs:11:342#1",
+                "id": "@rnl-std-fill.rnl:61:3#1",
                 "definition": "$IO_PORT",
                 "roles": [
                   {
@@ -1185,13 +1398,13 @@
                     "terminal": null
                   }
                 ],
-                "file": 0,
-                "line": 11,
+                "file": null,
+                "line": 61,
                 "source": "rule",
                 "rule": {
-                  "package": "",
-                  "file": "18-dialect-switch.scs",
-                  "line": 11
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 61
                 },
                 "state": "in-effect"
               }
@@ -1204,7 +1417,7 @@
             "usages": [
               {
                 "kind": "usage",
-                "id": "@18-dialect-switch.scs:11:342#2",
+                "id": "@rnl-std-fill.rnl:61:3#2",
                 "definition": "$IO_PORT",
                 "roles": [
                   {
@@ -1214,13 +1427,13 @@
                     "terminal": null
                   }
                 ],
-                "file": 0,
-                "line": 11,
+                "file": null,
+                "line": 61,
                 "source": "rule",
                 "rule": {
-                  "package": "",
-                  "file": "18-dialect-switch.scs",
-                  "line": 11
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 61
                 },
                 "state": "in-effect"
               }
@@ -1389,7 +1602,7 @@
             ]
           },
           {
-            "id": "@18-dialect-switch.scs:11:342#1",
+            "id": "@rnl-std-fill.rnl:61:3#1",
             "kind": "usage",
             "host": [],
             "definition": "$IO_PORT",
@@ -1411,7 +1624,7 @@
             "pins": [
               {
                 "kind": "pin",
-                "id": "pin(@18-dialect-switch.scs:11:342#1,0)",
+                "id": "pin(@rnl-std-fill.rnl:61:3#1,0)",
                 "index": 0,
                 "names": [
                   "pin"
@@ -1430,10 +1643,34 @@
                   "&a"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "kind": "group",
+                "id": "@rnl-std-fill.rnl:64:3",
+                "definition": "",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "@rnl-std-fill.rnl:61:3#1",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 64,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 64
+                },
+                "state": "in-effect"
+              }
             ]
           },
           {
-            "id": "@18-dialect-switch.scs:11:342#2",
+            "id": "@rnl-std-fill.rnl:61:3#2",
             "kind": "usage",
             "host": [],
             "definition": "$IO_PORT",
@@ -1455,7 +1692,7 @@
             "pins": [
               {
                 "kind": "pin",
-                "id": "pin(@18-dialect-switch.scs:11:342#2,0)",
+                "id": "pin(@rnl-std-fill.rnl:61:3#2,0)",
                 "index": 0,
                 "names": [
                   "pin"
@@ -1473,6 +1710,30 @@
                 "nets": [
                   "&b"
                 ]
+              }
+            ],
+            "usages": [
+              {
+                "kind": "group",
+                "id": "@rnl-std-fill.rnl:64:3",
+                "definition": "",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "@rnl-std-fill.rnl:61:3#2",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 64,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 64
+                },
+                "state": "in-effect"
               }
             ]
           }
@@ -1581,6 +1842,24 @@
           }
         ],
         "shapes": [],
+        "groups": [
+          {
+            "id": "@rnl-std-fill.rnl:64:3",
+            "members": [
+              "@rnl-std-fill.rnl:61:3#1",
+              "@rnl-std-fill.rnl:61:3#2"
+            ],
+            "file": null,
+            "line": 64,
+            "source": "rule",
+            "rule": {
+              "package": "rnl-std-fill",
+              "file": "rnl-std-fill.rnl",
+              "line": 64
+            },
+            "state": "in-effect"
+          }
+        ],
         "junction": {
           "definition": "$JUNCTION",
           "symbol": null
@@ -1593,7 +1872,7 @@
       "name": "sub_sec_sp",
       "file": 2,
       "line": 9,
-      "status": "2 without a position",
+      "status": "2 without a position; constraints: 4 unsolved",
       "host": {
         "ports": [
           "&a",
@@ -1626,7 +1905,7 @@
             "usages": [
               {
                 "kind": "usage",
-                "id": "@18-dialect-switch.scs:11:342#1",
+                "id": "@rnl-std-fill.rnl:61:3#1",
                 "definition": "$IO_PORT",
                 "roles": [
                   {
@@ -1636,13 +1915,13 @@
                     "terminal": null
                   }
                 ],
-                "file": 0,
-                "line": 11,
+                "file": null,
+                "line": 61,
                 "source": "rule",
                 "rule": {
-                  "package": "",
-                  "file": "18-dialect-switch.scs",
-                  "line": 11
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 61
                 },
                 "state": "in-effect"
               }
@@ -1655,7 +1934,7 @@
             "usages": [
               {
                 "kind": "usage",
-                "id": "@18-dialect-switch.scs:11:342#2",
+                "id": "@rnl-std-fill.rnl:61:3#2",
                 "definition": "$IO_PORT",
                 "roles": [
                   {
@@ -1665,13 +1944,13 @@
                     "terminal": null
                   }
                 ],
-                "file": 0,
-                "line": 11,
+                "file": null,
+                "line": 61,
                 "source": "rule",
                 "rule": {
-                  "package": "",
-                  "file": "18-dialect-switch.scs",
-                  "line": 11
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 61
                 },
                 "state": "in-effect"
               }
@@ -1780,7 +2059,7 @@
             ]
           },
           {
-            "id": "@18-dialect-switch.scs:11:342#1",
+            "id": "@rnl-std-fill.rnl:61:3#1",
             "kind": "usage",
             "host": [],
             "definition": "$IO_PORT",
@@ -1802,7 +2081,7 @@
             "pins": [
               {
                 "kind": "pin",
-                "id": "pin(@18-dialect-switch.scs:11:342#1,0)",
+                "id": "pin(@rnl-std-fill.rnl:61:3#1,0)",
                 "index": 0,
                 "names": [
                   "pin"
@@ -1821,10 +2100,34 @@
                   "&a"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "kind": "group",
+                "id": "@rnl-std-fill.rnl:64:3",
+                "definition": "",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "@rnl-std-fill.rnl:61:3#1",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 64,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 64
+                },
+                "state": "in-effect"
+              }
             ]
           },
           {
-            "id": "@18-dialect-switch.scs:11:342#2",
+            "id": "@rnl-std-fill.rnl:61:3#2",
             "kind": "usage",
             "host": [],
             "definition": "$IO_PORT",
@@ -1846,7 +2149,7 @@
             "pins": [
               {
                 "kind": "pin",
-                "id": "pin(@18-dialect-switch.scs:11:342#2,0)",
+                "id": "pin(@rnl-std-fill.rnl:61:3#2,0)",
                 "index": 0,
                 "names": [
                   "pin"
@@ -1864,6 +2167,30 @@
                 "nets": [
                   "&b"
                 ]
+              }
+            ],
+            "usages": [
+              {
+                "kind": "group",
+                "id": "@rnl-std-fill.rnl:64:3",
+                "definition": "",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "@rnl-std-fill.rnl:61:3#2",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 64,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 64
+                },
+                "state": "in-effect"
               }
             ]
           }
@@ -1939,6 +2266,24 @@
           }
         ],
         "shapes": [],
+        "groups": [
+          {
+            "id": "@rnl-std-fill.rnl:64:3",
+            "members": [
+              "@rnl-std-fill.rnl:61:3#1",
+              "@rnl-std-fill.rnl:61:3#2"
+            ],
+            "file": null,
+            "line": 64,
+            "source": "rule",
+            "rule": {
+              "package": "rnl-std-fill",
+              "file": "rnl-std-fill.rnl",
+              "line": 64
+            },
+            "state": "in-effect"
+          }
+        ],
         "junction": {
           "definition": "$JUNCTION",
           "symbol": null
@@ -1951,7 +2296,7 @@
       "name": "sub_sec_scs",
       "file": 2,
       "line": 22,
-      "status": "2 without a position",
+      "status": "2 without a position; constraints: 4 unsolved",
       "host": {
         "ports": [
           "&a",
@@ -1984,7 +2329,7 @@
             "usages": [
               {
                 "kind": "usage",
-                "id": "@18-dialect-switch.scs:11:342#1",
+                "id": "@rnl-std-fill.rnl:61:3#1",
                 "definition": "$IO_PORT",
                 "roles": [
                   {
@@ -1994,13 +2339,13 @@
                     "terminal": null
                   }
                 ],
-                "file": 0,
-                "line": 11,
+                "file": null,
+                "line": 61,
                 "source": "rule",
                 "rule": {
-                  "package": "",
-                  "file": "18-dialect-switch.scs",
-                  "line": 11
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 61
                 },
                 "state": "in-effect"
               }
@@ -2013,7 +2358,7 @@
             "usages": [
               {
                 "kind": "usage",
-                "id": "@18-dialect-switch.scs:11:342#2",
+                "id": "@rnl-std-fill.rnl:61:3#2",
                 "definition": "$IO_PORT",
                 "roles": [
                   {
@@ -2023,13 +2368,13 @@
                     "terminal": null
                   }
                 ],
-                "file": 0,
-                "line": 11,
+                "file": null,
+                "line": 61,
                 "source": "rule",
                 "rule": {
-                  "package": "",
-                  "file": "18-dialect-switch.scs",
-                  "line": 11
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 61
                 },
                 "state": "in-effect"
               }
@@ -2138,7 +2483,7 @@
             ]
           },
           {
-            "id": "@18-dialect-switch.scs:11:342#1",
+            "id": "@rnl-std-fill.rnl:61:3#1",
             "kind": "usage",
             "host": [],
             "definition": "$IO_PORT",
@@ -2160,7 +2505,7 @@
             "pins": [
               {
                 "kind": "pin",
-                "id": "pin(@18-dialect-switch.scs:11:342#1,0)",
+                "id": "pin(@rnl-std-fill.rnl:61:3#1,0)",
                 "index": 0,
                 "names": [
                   "pin"
@@ -2179,10 +2524,34 @@
                   "&a"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "kind": "group",
+                "id": "@rnl-std-fill.rnl:64:3",
+                "definition": "",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "@rnl-std-fill.rnl:61:3#1",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 64,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 64
+                },
+                "state": "in-effect"
+              }
             ]
           },
           {
-            "id": "@18-dialect-switch.scs:11:342#2",
+            "id": "@rnl-std-fill.rnl:61:3#2",
             "kind": "usage",
             "host": [],
             "definition": "$IO_PORT",
@@ -2204,7 +2573,7 @@
             "pins": [
               {
                 "kind": "pin",
-                "id": "pin(@18-dialect-switch.scs:11:342#2,0)",
+                "id": "pin(@rnl-std-fill.rnl:61:3#2,0)",
                 "index": 0,
                 "names": [
                   "pin"
@@ -2222,6 +2591,30 @@
                 "nets": [
                   "&b"
                 ]
+              }
+            ],
+            "usages": [
+              {
+                "kind": "group",
+                "id": "@rnl-std-fill.rnl:64:3",
+                "definition": "",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "@rnl-std-fill.rnl:61:3#2",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 64,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 64
+                },
+                "state": "in-effect"
               }
             ]
           }
@@ -2297,6 +2690,24 @@
           }
         ],
         "shapes": [],
+        "groups": [
+          {
+            "id": "@rnl-std-fill.rnl:64:3",
+            "members": [
+              "@rnl-std-fill.rnl:61:3#1",
+              "@rnl-std-fill.rnl:61:3#2"
+            ],
+            "file": null,
+            "line": 64,
+            "source": "rule",
+            "rule": {
+              "package": "rnl-std-fill",
+              "file": "rnl-std-fill.rnl",
+              "line": 64
+            },
+            "state": "in-effect"
+          }
+        ],
         "junction": {
           "definition": "$JUNCTION",
           "symbol": null

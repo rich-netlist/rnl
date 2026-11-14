@@ -9,7 +9,7 @@
       "name": "10-constraints-and-priority.sp",
       "file": 0,
       "line": 0,
-      "status": "constraints: 8 ok, 3 dropped, 2 disabled, 1 unsolved, 1 needs-solver",
+      "status": "constraints: 10 ok, 3 dropped, 2 disabled, 1 unsolved, 1 needs-solver",
       "host": {
         "ports": [],
         "instances": [
@@ -1245,6 +1245,21 @@
           }
         ],
         "shapes": [],
+        "groups": [
+          {
+            "id": "@rnl-std-fill.rnl:64:3",
+            "members": [],
+            "file": null,
+            "line": 64,
+            "source": "rule",
+            "rule": {
+              "package": "rnl-std-fill",
+              "file": "rnl-std-fill.rnl",
+              "line": 64
+            },
+            "state": "in-effect"
+          }
+        ],
         "junction": {
           "definition": "$JUNCTION",
           "symbol": null

@@ -153,7 +153,7 @@
                   }
                 ],
                 "file": 0,
-                "line": 84,
+                "line": 83,
                 "source": "solver",
                 "state": "in-effect"
               },
@@ -170,7 +170,7 @@
                   }
                 ],
                 "file": 0,
-                "line": 85,
+                "line": 84,
                 "source": "solver",
                 "state": "in-effect"
               },
@@ -187,7 +187,7 @@
                   }
                 ],
                 "file": 0,
-                "line": 86,
+                "line": 85,
                 "source": "solver",
                 "state": "in-effect"
               }
@@ -211,7 +211,7 @@
                   }
                 ],
                 "file": 0,
-                "line": 79,
+                "line": 78,
                 "source": "solver",
                 "state": "in-effect"
               },
@@ -228,7 +228,7 @@
                   }
                 ],
                 "file": 0,
-                "line": 80,
+                "line": 79,
                 "source": "solver",
                 "state": "in-effect"
               },
@@ -245,7 +245,7 @@
                   }
                 ],
                 "file": 0,
-                "line": 81,
+                "line": 80,
                 "source": "solver",
                 "state": "in-effect"
               },
@@ -262,7 +262,7 @@
                   }
                 ],
                 "file": 0,
-                "line": 82,
+                "line": 81,
                 "source": "solver",
                 "state": "in-effect"
               },
@@ -279,7 +279,7 @@
                   }
                 ],
                 "file": 0,
-                "line": 83,
+                "line": 82,
                 "source": "solver",
                 "state": "in-effect"
               }
@@ -1379,7 +1379,7 @@
         "points": [],
         "wires": [
           {
-            "id": "@04-hierarchy.sp:63:5",
+            "id": "@04-hierarchy.sp:62:5",
             "nets": [
               "&a"
             ],
@@ -1409,7 +1409,7 @@
             "style": {}
           },
           {
-            "id": "@04-hierarchy.sp:64:5",
+            "id": "@04-hierarchy.sp:63:5",
             "nets": [
               "&b"
             ],
@@ -1435,7 +1435,7 @@
             "style": {}
           },
           {
-            "id": "@04-hierarchy.sp:65:5",
+            "id": "@04-hierarchy.sp:64:5",
             "nets": [
               "&c"
             ],
@@ -1469,7 +1469,7 @@
             "style": {}
           },
           {
-            "id": "@04-hierarchy.sp:79:61",
+            "id": "@04-hierarchy.sp:78:61",
             "nets": [
               "&0"
             ],
@@ -1496,7 +1496,7 @@
             "style": {}
           },
           {
-            "id": "@04-hierarchy.sp:80:62",
+            "id": "@04-hierarchy.sp:79:62",
             "nets": [
               "&0"
             ],
@@ -1523,7 +1523,7 @@
             "style": {}
           },
           {
-            "id": "@04-hierarchy.sp:81:62",
+            "id": "@04-hierarchy.sp:80:62",
             "nets": [
               "&0"
             ],
@@ -1554,7 +1554,7 @@
             "style": {}
           },
           {
-            "id": "@04-hierarchy.sp:82:65",
+            "id": "@04-hierarchy.sp:81:65",
             "nets": [
               "&0"
             ],
@@ -1581,7 +1581,7 @@
             "style": {}
           },
           {
-            "id": "@04-hierarchy.sp:83:64",
+            "id": "@04-hierarchy.sp:82:64",
             "nets": [
               "&0"
             ],
@@ -1608,7 +1608,7 @@
             "style": {}
           },
           {
-            "id": "@04-hierarchy.sp:84:60",
+            "id": "@04-hierarchy.sp:83:60",
             "nets": [
               "&vdd"
             ],
@@ -1635,7 +1635,7 @@
             "style": {}
           },
           {
-            "id": "@04-hierarchy.sp:85:61",
+            "id": "@04-hierarchy.sp:84:61",
             "nets": [
               "&vdd"
             ],
@@ -1662,7 +1662,7 @@
             "style": {}
           },
           {
-            "id": "@04-hierarchy.sp:86:64",
+            "id": "@04-hierarchy.sp:85:64",
             "nets": [
               "&vdd"
             ],
@@ -2131,6 +2131,21 @@
           }
         ],
         "shapes": [],
+        "groups": [
+          {
+            "id": "@rnl-std-fill.rnl:64:3",
+            "members": [],
+            "file": null,
+            "line": 64,
+            "source": "rule",
+            "rule": {
+              "package": "rnl-std-fill",
+              "file": "rnl-std-fill.rnl",
+              "line": 64
+            },
+            "state": "in-effect"
+          }
+        ],
         "junction": {
           "definition": "$JUNCTION",
           "symbol": null
@@ -2143,7 +2158,7 @@
       "name": "rdiv",
       "file": 1,
       "line": 3,
-      "status": null,
+      "status": "constraints: 3 ok, 7 dropped",
       "host": {
         "ports": [
           "&top",
@@ -2194,7 +2209,7 @@
             "usages": [
               {
                 "kind": "usage",
-                "id": "@04-hierarchy-lib.inc:20:45#1",
+                "id": "@rnl-std-fill.rnl:61:3#1",
                 "definition": "$IO_PORT",
                 "roles": [
                   {
@@ -2204,13 +2219,13 @@
                     "terminal": null
                   }
                 ],
-                "file": 1,
-                "line": 20,
+                "file": null,
+                "line": 61,
                 "source": "rule",
                 "rule": {
-                  "package": "",
-                  "file": "04-hierarchy-lib.inc",
-                  "line": 20
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 61
                 },
                 "state": "in-effect"
               }
@@ -2223,7 +2238,7 @@
             "usages": [
               {
                 "kind": "usage",
-                "id": "@04-hierarchy-lib.inc:20:45#2",
+                "id": "@rnl-std-fill.rnl:61:3#2",
                 "definition": "$IO_PORT",
                 "roles": [
                   {
@@ -2233,13 +2248,13 @@
                     "terminal": null
                   }
                 ],
-                "file": 1,
-                "line": 20,
+                "file": null,
+                "line": 61,
                 "source": "rule",
                 "rule": {
-                  "package": "",
-                  "file": "04-hierarchy-lib.inc",
-                  "line": 20
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 61
                 },
                 "state": "in-effect"
               }
@@ -2252,7 +2267,7 @@
             "usages": [
               {
                 "kind": "usage",
-                "id": "@04-hierarchy-lib.inc:20:45#3",
+                "id": "@rnl-std-fill.rnl:61:3#3",
                 "definition": "$IO_PORT",
                 "roles": [
                   {
@@ -2262,13 +2277,13 @@
                     "terminal": null
                   }
                 ],
-                "file": 1,
-                "line": 20,
+                "file": null,
+                "line": 61,
                 "source": "rule",
                 "rule": {
-                  "package": "",
-                  "file": "04-hierarchy-lib.inc",
-                  "line": 20
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 61
                 },
                 "state": "in-effect"
               }
@@ -2494,7 +2509,7 @@
             "pins": []
           },
           {
-            "id": "@04-hierarchy-lib.inc:20:45#1",
+            "id": "@rnl-std-fill.rnl:61:3#1",
             "kind": "usage",
             "host": [],
             "definition": "$IO_PORT",
@@ -2519,7 +2534,7 @@
             "pins": [
               {
                 "kind": "pin",
-                "id": "pin(@04-hierarchy-lib.inc:20:45#1,0)",
+                "id": "pin(@rnl-std-fill.rnl:61:3#1,0)",
                 "index": 0,
                 "names": [
                   "pin"
@@ -2541,10 +2556,34 @@
                   "&top"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "kind": "group",
+                "id": "@rnl-std-fill.rnl:64:3",
+                "definition": "",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "@rnl-std-fill.rnl:61:3#1",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 64,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 64
+                },
+                "state": "in-effect"
+              }
             ]
           },
           {
-            "id": "@04-hierarchy-lib.inc:20:45#2",
+            "id": "@rnl-std-fill.rnl:61:3#2",
             "kind": "usage",
             "host": [],
             "definition": "$IO_PORT",
@@ -2569,7 +2608,7 @@
             "pins": [
               {
                 "kind": "pin",
-                "id": "pin(@04-hierarchy-lib.inc:20:45#2,0)",
+                "id": "pin(@rnl-std-fill.rnl:61:3#2,0)",
                 "index": 0,
                 "names": [
                   "pin"
@@ -2591,10 +2630,34 @@
                   "&mid"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "kind": "group",
+                "id": "@rnl-std-fill.rnl:64:3",
+                "definition": "",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "@rnl-std-fill.rnl:61:3#2",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 64,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 64
+                },
+                "state": "in-effect"
+              }
             ]
           },
           {
-            "id": "@04-hierarchy-lib.inc:20:45#3",
+            "id": "@rnl-std-fill.rnl:61:3#3",
             "kind": "usage",
             "host": [],
             "definition": "$IO_PORT",
@@ -2619,7 +2682,7 @@
             "pins": [
               {
                 "kind": "pin",
-                "id": "pin(@04-hierarchy-lib.inc:20:45#3,0)",
+                "id": "pin(@rnl-std-fill.rnl:61:3#3,0)",
                 "index": 0,
                 "names": [
                   "pin"
@@ -2640,6 +2703,30 @@
                 "nets": [
                   "&bot"
                 ]
+              }
+            ],
+            "usages": [
+              {
+                "kind": "group",
+                "id": "@rnl-std-fill.rnl:64:3",
+                "definition": "",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "@rnl-std-fill.rnl:61:3#3",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 64,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 64
+                },
+                "state": "in-effect"
               }
             ]
           }
@@ -2925,8 +3012,8 @@
             }
           },
           {
-            "id": "@04-hierarchy-lib.inc:20:45#1::netname",
-            "attach": "@04-hierarchy-lib.inc:20:45#1",
+            "id": "@rnl-std-fill.rnl:61:3#1::netname",
+            "attach": "@rnl-std-fill.rnl:61:3#1",
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -2958,8 +3045,8 @@
             "style": {}
           },
           {
-            "id": "@04-hierarchy-lib.inc:20:45#2::netname",
-            "attach": "@04-hierarchy-lib.inc:20:45#2",
+            "id": "@rnl-std-fill.rnl:61:3#2::netname",
+            "attach": "@rnl-std-fill.rnl:61:3#2",
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -2991,8 +3078,8 @@
             "style": {}
           },
           {
-            "id": "@04-hierarchy-lib.inc:20:45#3::netname",
-            "attach": "@04-hierarchy-lib.inc:20:45#3",
+            "id": "@rnl-std-fill.rnl:61:3#3::netname",
+            "attach": "@rnl-std-fill.rnl:61:3#3",
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -3025,6 +3112,25 @@
           }
         ],
         "shapes": [],
+        "groups": [
+          {
+            "id": "@rnl-std-fill.rnl:64:3",
+            "members": [
+              "@rnl-std-fill.rnl:61:3#1",
+              "@rnl-std-fill.rnl:61:3#2",
+              "@rnl-std-fill.rnl:61:3#3"
+            ],
+            "file": null,
+            "line": 64,
+            "source": "rule",
+            "rule": {
+              "package": "rnl-std-fill",
+              "file": "rnl-std-fill.rnl",
+              "line": 64
+            },
+            "state": "in-effect"
+          }
+        ],
         "junction": {
           "definition": "$JUNCTION",
           "symbol": "$JUNCTION_SYMBOL"
@@ -3037,7 +3143,7 @@
       "name": "amp",
       "file": 0,
       "line": 8,
-      "status": null,
+      "status": "constraints: 4 ok, 2 dropped",
       "host": {
         "ports": [
           "&in",
@@ -3110,7 +3216,7 @@
                   }
                 ],
                 "file": 0,
-                "line": 36,
+                "line": 35,
                 "source": "written",
                 "state": "in-effect"
               }
@@ -3123,7 +3229,7 @@
             "usages": [
               {
                 "kind": "usage",
-                "id": "@04-hierarchy.sp:35:5",
+                "id": "@rnl-std-fill.rnl:61:3",
                 "definition": "$IO_PORT",
                 "roles": [
                   {
@@ -3133,13 +3239,13 @@
                     "terminal": null
                   }
                 ],
-                "file": 0,
-                "line": 35,
+                "file": null,
+                "line": 61,
                 "source": "rule",
                 "rule": {
-                  "package": "",
-                  "file": "04-hierarchy.sp",
-                  "line": 35
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 61
                 },
                 "state": "in-effect"
               }
@@ -3163,7 +3269,7 @@
                   }
                 ],
                 "file": 0,
-                "line": 51,
+                "line": 50,
                 "source": "solver",
                 "state": "in-effect"
               }
@@ -3187,7 +3293,7 @@
                   }
                 ],
                 "file": 0,
-                "line": 50,
+                "line": 49,
                 "source": "solver",
                 "state": "in-effect"
               }
@@ -3646,7 +3752,7 @@
             ]
           },
           {
-            "id": "@04-hierarchy.sp:41:5",
+            "id": "@04-hierarchy.sp:40:5",
             "kind": "usage",
             "host": [],
             "definition": "$JUNCTION",
@@ -3773,7 +3879,7 @@
             ]
           },
           {
-            "id": "@04-hierarchy.sp:35:5",
+            "id": "@rnl-std-fill.rnl:61:3",
             "kind": "usage",
             "host": [],
             "definition": "$IO_PORT",
@@ -3798,7 +3904,7 @@
             "pins": [
               {
                 "kind": "pin",
-                "id": "pin(@04-hierarchy.sp:35:5,0)",
+                "id": "pin(@rnl-std-fill.rnl:61:3,0)",
                 "index": 0,
                 "names": [
                   "pin"
@@ -3820,6 +3926,30 @@
                   "&out"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "kind": "group",
+                "id": "@rnl-std-fill.rnl:64:3",
+                "definition": "",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "@rnl-std-fill.rnl:61:3",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 64,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 64
+                },
+                "state": "in-effect"
+              }
             ]
           }
         ],
@@ -3838,7 +3968,7 @@
         ],
         "wires": [
           {
-            "id": "@04-hierarchy.sp:37:5",
+            "id": "@04-hierarchy.sp:36:5",
             "nets": [
               "&in"
             ],
@@ -3865,7 +3995,7 @@
             "style": {}
           },
           {
-            "id": "@04-hierarchy.sp:39:5",
+            "id": "@04-hierarchy.sp:38:5",
             "nets": [
               "&out"
             ],
@@ -3898,7 +4028,7 @@
             "style": {}
           },
           {
-            "id": "@04-hierarchy.sp:40:5",
+            "id": "@04-hierarchy.sp:39:5",
             "nets": [
               "&out"
             ],
@@ -3927,7 +4057,7 @@
             "style": {}
           },
           {
-            "id": "@04-hierarchy.sp:50:61",
+            "id": "@04-hierarchy.sp:49:61",
             "nets": [
               "&vss"
             ],
@@ -3954,7 +4084,7 @@
             "style": {}
           },
           {
-            "id": "@04-hierarchy.sp:51:61",
+            "id": "@04-hierarchy.sp:50:61",
             "nets": [
               "&vdd"
             ],
@@ -4209,8 +4339,8 @@
             "style": {}
           },
           {
-            "id": "@04-hierarchy.sp:35:5::netname",
-            "attach": "@04-hierarchy.sp:35:5",
+            "id": "@rnl-std-fill.rnl:61:3::netname",
+            "attach": "@rnl-std-fill.rnl:61:3",
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -4243,6 +4373,23 @@
           }
         ],
         "shapes": [],
+        "groups": [
+          {
+            "id": "@rnl-std-fill.rnl:64:3",
+            "members": [
+              "@rnl-std-fill.rnl:61:3"
+            ],
+            "file": null,
+            "line": 64,
+            "source": "rule",
+            "rule": {
+              "package": "rnl-std-fill",
+              "file": "rnl-std-fill.rnl",
+              "line": 64
+            },
+            "state": "in-effect"
+          }
+        ],
         "junction": {
           "definition": "$JUNCTION",
           "symbol": "$JUNCTION_SYMBOL"

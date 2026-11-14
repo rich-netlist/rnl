@@ -1655,6 +1655,18 @@
           "kind": "DISTANCE",
           "status": "ok",
           "priority": "low"
+        },
+        {
+          "label": "ORDER",
+          "kind": "ORDER",
+          "status": "ok",
+          "priority": "low"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "low"
         }
       ],
       "unplaced": []
@@ -2437,9 +2449,43 @@
           "kind": "ALIGN",
           "status": "ok",
           "priority": "normal"
+        },
+        {
+          "label": "ORDER",
+          "kind": "ORDER",
+          "status": "unsolved",
+          "priority": "low"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "unsolved",
+          "priority": "low"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "unsolved",
+          "priority": "low"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "unsolved",
+          "priority": "low"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "unsolved",
+          "priority": "low"
         }
       ],
-      "unplaced": []
+      "unplaced": [
+        "a usage of $IO_PORT",
+        "a usage of $IO_PORT",
+        "a usage of $IO_PORT"
+      ]
     }
   ],
   "diagnostics": [
@@ -2474,6 +2520,14 @@
       "file": "rnl-std-basic.rnl",
       "line": 640,
       "col": 5
+    },
+    {
+      "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
+      "file": "08-styles-and-text.sp",
+      "line": 6,
+      "col": 0
     }
   ]
 }

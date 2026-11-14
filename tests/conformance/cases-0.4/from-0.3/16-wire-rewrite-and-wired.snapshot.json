@@ -9,7 +9,7 @@
       "name": "16-wire-rewrite-and-wired.sp",
       "file": 0,
       "line": 0,
-      "status": "2 without a position; constraints: 6 unsolved",
+      "status": "2 without a position; constraints: 6 unsolved, 2 ok",
       "host": {
         "ports": [],
         "instances": [
@@ -789,6 +789,21 @@
           }
         ],
         "shapes": [],
+        "groups": [
+          {
+            "id": "@rnl-std-fill.rnl:64:3",
+            "members": [],
+            "file": null,
+            "line": 64,
+            "source": "rule",
+            "rule": {
+              "package": "rnl-std-fill",
+              "file": "rnl-std-fill.rnl",
+              "line": 64
+            },
+            "state": "in-effect"
+          }
+        ],
         "junction": {
           "definition": "$JUNCTION",
           "symbol": null

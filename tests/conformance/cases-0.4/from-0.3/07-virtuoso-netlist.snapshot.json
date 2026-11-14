@@ -9,7 +9,7 @@
       "name": "07-virtuoso-netlist.scs",
       "file": 0,
       "line": 0,
-      "status": "1 without a position; constraints: 2 unsolved",
+      "status": "1 without a position; constraints: 2 unsolved, 2 ok",
       "host": {
         "ports": [],
         "instances": [
@@ -678,6 +678,21 @@
           }
         ],
         "shapes": [],
+        "groups": [
+          {
+            "id": "@rnl-std-fill.rnl:64:3",
+            "members": [],
+            "file": null,
+            "line": 64,
+            "source": "rule",
+            "rule": {
+              "package": "rnl-std-fill",
+              "file": "rnl-std-fill.rnl",
+              "line": 64
+            },
+            "state": "in-effect"
+          }
+        ],
         "junction": {
           "definition": "$JUNCTION",
           "symbol": null
@@ -690,7 +705,7 @@
       "name": "inv",
       "file": 0,
       "line": 8,
-      "status": "4 without a position; constraints: 4 unsolved",
+      "status": "4 without a position; constraints: 10 unsolved",
       "host": {
         "ports": [
           "&in",
@@ -760,7 +775,7 @@
             "usages": [
               {
                 "kind": "usage",
-                "id": "@07-virtuoso-netlist.scs:6:1405#1",
+                "id": "@rnl-std-fill.rnl:61:3#1",
                 "definition": "$IO_PORT",
                 "roles": [
                   {
@@ -770,13 +785,13 @@
                     "terminal": null
                   }
                 ],
-                "file": 0,
-                "line": 6,
+                "file": null,
+                "line": 61,
                 "source": "rule",
                 "rule": {
-                  "package": "",
-                  "file": "07-virtuoso-netlist.scs",
-                  "line": 6
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 61
                 },
                 "state": "in-effect"
               }
@@ -789,7 +804,7 @@
             "usages": [
               {
                 "kind": "usage",
-                "id": "@07-virtuoso-netlist.scs:6:1405#2",
+                "id": "@rnl-std-fill.rnl:61:3#2",
                 "definition": "$IO_PORT",
                 "roles": [
                   {
@@ -799,13 +814,13 @@
                     "terminal": null
                   }
                 ],
-                "file": 0,
-                "line": 6,
+                "file": null,
+                "line": 61,
                 "source": "rule",
                 "rule": {
-                  "package": "",
-                  "file": "07-virtuoso-netlist.scs",
-                  "line": 6
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 61
                 },
                 "state": "in-effect"
               }
@@ -1252,7 +1267,7 @@
             ]
           },
           {
-            "id": "@07-virtuoso-netlist.scs:6:1405#1",
+            "id": "@rnl-std-fill.rnl:61:3#1",
             "kind": "usage",
             "host": [],
             "definition": "$IO_PORT",
@@ -1274,7 +1289,7 @@
             "pins": [
               {
                 "kind": "pin",
-                "id": "pin(@07-virtuoso-netlist.scs:6:1405#1,0)",
+                "id": "pin(@rnl-std-fill.rnl:61:3#1,0)",
                 "index": 0,
                 "names": [
                   "pin"
@@ -1293,10 +1308,34 @@
                   "&in"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "kind": "group",
+                "id": "@rnl-std-fill.rnl:64:3",
+                "definition": "",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "@rnl-std-fill.rnl:61:3#1",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 64,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 64
+                },
+                "state": "in-effect"
+              }
             ]
           },
           {
-            "id": "@07-virtuoso-netlist.scs:6:1405#2",
+            "id": "@rnl-std-fill.rnl:61:3#2",
             "kind": "usage",
             "host": [],
             "definition": "$IO_PORT",
@@ -1318,7 +1357,7 @@
             "pins": [
               {
                 "kind": "pin",
-                "id": "pin(@07-virtuoso-netlist.scs:6:1405#2,0)",
+                "id": "pin(@rnl-std-fill.rnl:61:3#2,0)",
                 "index": 0,
                 "names": [
                   "pin"
@@ -1336,6 +1375,30 @@
                 "nets": [
                   "&out"
                 ]
+              }
+            ],
+            "usages": [
+              {
+                "kind": "group",
+                "id": "@rnl-std-fill.rnl:64:3",
+                "definition": "",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "@rnl-std-fill.rnl:61:3#2",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 64,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 64
+                },
+                "state": "in-effect"
               }
             ]
           }
@@ -1411,6 +1474,24 @@
           }
         ],
         "shapes": [],
+        "groups": [
+          {
+            "id": "@rnl-std-fill.rnl:64:3",
+            "members": [
+              "@rnl-std-fill.rnl:61:3#1",
+              "@rnl-std-fill.rnl:61:3#2"
+            ],
+            "file": null,
+            "line": 64,
+            "source": "rule",
+            "rule": {
+              "package": "rnl-std-fill",
+              "file": "rnl-std-fill.rnl",
+              "line": 64
+            },
+            "state": "in-effect"
+          }
+        ],
         "junction": {
           "definition": "$JUNCTION",
           "symbol": null

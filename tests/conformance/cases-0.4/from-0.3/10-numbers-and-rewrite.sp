@@ -2,7 +2,7 @@
 *! The solver's record refers to objects without a name by number (5.9): the wire in the author's record is %#1, the free point on it %#2, and the record's own objects follow; the ground-stub body wire is %#3 and (4, 6) is %#4.
 *! numbering is the check of these objects; the numbers take effect only when it matches. WIRE given a wire rewrites it (13.1): this statement rewrites the points of %#1 in Manhattan mode and makes no new wire.
 * @RNL(type="header") { @USE-PACKAGE(name="rnl-std-all", version="0.4"); @VERSION("0.4")}
-* @RNL { # @SELECT-PIN(recursive=true) => @REMOVE-FROM $LABEL_FILL_SET; $UNFILLED_PORT_NETS = # @SELECT-NET(port=true, recursive=true); $SUPPLY_NET_SET @REMOVE-FROM $UNFILLED_PORT_NETS; $GROUND_NET_SET @REMOVE-FROM $UNFILLED_PORT_NETS; # @SELECT-USAGE(recursive=true) $IO_PORT => @SELECT-NET(recursive=true) => @REMOVE-FROM $UNFILLED_PORT_NETS; $IO_PORT @ATTACH $UNFILLED_PORT_NETS }
+* @RNL { # @SELECT-PIN(recursive=true) => @REMOVE-FROM $LABEL_FILL_SET; $SUPPLY_NET_SET @REMOVE-FROM $PORT_FILL_SET; $GROUND_NET_SET @REMOVE-FROM $PORT_FILL_SET }
 R1 a b 1k
 R2 b 0 1k
 * @RNL {

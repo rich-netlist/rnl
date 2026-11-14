@@ -2451,6 +2451,18 @@
           "kind": "ALIGN",
           "status": "ok",
           "priority": "normal"
+        },
+        {
+          "label": "ORDER",
+          "kind": "ORDER",
+          "status": "ok",
+          "priority": "low"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "low"
         }
       ],
       "unplaced": []

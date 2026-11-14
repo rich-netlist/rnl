@@ -3,7 +3,7 @@
 *! Indices: #XI0<3:0>, &Q<3:0>, #XR:Q<3>, #RL<3:0>, a step and mixed &Q<0:3:2, 1>; a bus wire takes a set of nets, and ${net} joins them with commas;
 *! a bus pin of a block symbol (terminal= takes an array); taps sharing a point with the bus; BUNDLE drawing the iterated instances as one, wired to the bundle's terminals; the standard package draws buses thicker.
 .subckt dff d clk q
-* @RNL { %dff_ports = # @SELECT-NET(port=true); $IO_PORT @ATTACH %dff_ports }
+*! the port tags of dff come from the fill of the standard package ($PORT_FILL_SET)
 * @RNL(type="generated", priority="high") { &d @SELECT-ANCESTOR-USAGE $IO_PORT => @PLACE(-2, 1); &clk @SELECT-ANCESTOR-USAGE $IO_PORT => @PLACE(-2, -1); &q @SELECT-ANCESTOR-USAGE $IO_PORT => @PLACE(2, 1) => @ORIENT("MY") }
 * 
 
@@ -33,7 +33,7 @@ XI0<0> D<0> clk Q<0> dff
 *   #XI0<3:0> @BUNDLE => @SET-SYMBOL $DFF => %st;
 *   %st @TEXT("XI0<3:0>", key="name");
 *   %st @TEXT("${model}", key="model", dx=-2, dy=-2.8);
-*   %port_nets = # @SELECT-NET(port=true); {&D<3:0> &Q<3:0>} @REMOVE-FROM %port_nets; $IO_PORT @ATTACH %port_nets;
+*   {&D<3:0> &Q<3:0>} @REMOVE-FROM $PORT_FILL_SET;
 *   %dp = (-7, 1); %qp = (7, 1);
 *   %bd = &D<3:0> @WIRE(mode="auto") {%dp %st::data_in};
 *   %bq = &Q<3:0> @WIRE(mode="auto") {%st::data_out %qp};

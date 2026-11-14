@@ -356,6 +356,18 @@
           "kind": "DISTANCE",
           "status": "unsolved",
           "priority": "low"
+        },
+        {
+          "label": "ORDER",
+          "kind": "ORDER",
+          "status": "ok",
+          "priority": "low"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "low"
         }
       ],
       "unplaced": [
@@ -372,7 +384,20 @@
       "shapes": [],
       "texts": [],
       "flylines": [],
-      "constraints": [],
+      "constraints": [
+        {
+          "label": "ORDER",
+          "kind": "ORDER",
+          "status": "unsolved",
+          "priority": "low"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "unsolved",
+          "priority": "low"
+        }
+      ],
       "unplaced": [
         "a usage of $IO_PORT",
         "a usage of $IO_PORT"
@@ -786,7 +811,44 @@
           ]
         ]
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "label": "ORDER",
+          "kind": "ORDER",
+          "status": "unsolved",
+          "priority": "low"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "unsolved",
+          "priority": "low"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "unsolved",
+          "priority": "low"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "unsolved",
+          "priority": "low"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "unsolved",
+          "priority": "low"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "unsolved",
+          "priority": "low"
+        }
+      ],
       "unplaced": [
         "a usage of $IO_PORT",
         "a usage of $IO_PORT"
@@ -1007,7 +1069,32 @@
         }
       ],
       "flylines": [],
-      "constraints": [],
+      "constraints": [
+        {
+          "label": "ORDER",
+          "kind": "ORDER",
+          "status": "unsolved",
+          "priority": "low"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "unsolved",
+          "priority": "low"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "unsolved",
+          "priority": "low"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "unsolved",
+          "priority": "low"
+        }
+      ],
       "unplaced": [
         "a usage of $IO_PORT",
         "a usage of $IO_PORT"

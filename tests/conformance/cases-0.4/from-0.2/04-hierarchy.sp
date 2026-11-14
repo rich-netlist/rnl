@@ -31,8 +31,7 @@ R1 vdd out 10k
 *   # @SET-SYMBOL %amp_block;
 *   #M1 @SET-SYMBOL $NMOS;
 *   &vdd @ADD-TO $SUPPLY_NET_SET; &vss @ADD-TO $GROUND_NET_SET;
-*   %ports = # @SELECT-NET(port=true); {&in &vdd &vss} @REMOVE-FROM %ports;
-*   $IO_PORT @ATTACH %ports;
+*   {&in &vdd &vss} @REMOVE-FROM $PORT_FILL_SET;
 *   %pin = $IO_PORT @ATTACH &in;
 *   &in @WIRE(mode="auto") {%pin:p #M1:2};
 *   %jo = (0, 3);

@@ -9,7 +9,7 @@
       "name": "17-conflict-priority-and-tolerance.sp",
       "file": 0,
       "line": 0,
-      "status": "20 without a position; constraints: 2 failed, 3 ok, 2 needs-solver, 60 unsolved",
+      "status": "20 without a position; constraints: 2 failed, 5 ok, 2 needs-solver, 60 unsolved",
       "host": {
         "ports": [],
         "instances": [
@@ -3027,6 +3027,21 @@
           }
         ],
         "shapes": [],
+        "groups": [
+          {
+            "id": "@rnl-std-fill.rnl:64:3",
+            "members": [],
+            "file": null,
+            "line": 64,
+            "source": "rule",
+            "rule": {
+              "package": "rnl-std-fill",
+              "file": "rnl-std-fill.rnl",
+              "line": 64
+            },
+            "state": "in-effect"
+          }
+        ],
         "junction": {
           "definition": "$JUNCTION",
           "symbol": null

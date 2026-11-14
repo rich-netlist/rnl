@@ -1505,6 +1505,18 @@
           "kind": "ALIGN",
           "status": "ok",
           "priority": "normal"
+        },
+        {
+          "label": "ORDER",
+          "kind": "ORDER",
+          "status": "ok",
+          "priority": "low"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "low"
         }
       ],
       "unplaced": []
@@ -1902,9 +1914,36 @@
           "kind": "ALIGN",
           "status": "ok",
           "priority": "normal"
+        },
+        {
+          "label": "ORDER",
+          "kind": "ORDER",
+          "status": "unsolved",
+          "priority": "low"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "unsolved",
+          "priority": "low"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "unsolved",
+          "priority": "low"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "unsolved",
+          "priority": "low"
         }
       ],
-      "unplaced": []
+      "unplaced": [
+        "a usage of $IO_PORT",
+        "a usage of $IO_PORT"
+      ]
     }
   ],
   "diagnostics": [
@@ -1931,6 +1970,14 @@
       "file": "19-set-cycles.sp",
       "line": 13,
       "col": 184
+    },
+    {
+      "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
+      "file": "19-set-cycles.sp",
+      "line": 11,
+      "col": 0
     }
   ]
 }
