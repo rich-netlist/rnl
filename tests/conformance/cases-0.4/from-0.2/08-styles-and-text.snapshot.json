@@ -1262,6 +1262,7 @@
           {
             "id": "#Rin::name",
             "attach": "#Rin",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "R_{in}",
@@ -1314,6 +1315,10 @@
           {
             "id": "@08-styles-and-text.sp:65:5",
             "attach": "%vo",
+            "attach_point": [
+              18.0,
+              0.0
+            ],
             "key": null,
             "markup": {
               "value": "V_{out}",
@@ -1366,6 +1371,10 @@
           {
             "id": "@08-styles-and-text.sp:70:5",
             "attach": null,
+            "attach_point": [
+              17.2,
+              6.6
+            ],
             "key": null,
             "markup": {
               "value": "A_{v} = −\\frac{R_{f}}{R_{in}} = −10",
@@ -1491,6 +1500,10 @@
           {
             "id": "@08-styles-and-text.sp:71:5",
             "attach": null,
+            "attach_point": [
+              -7.0,
+              9.0
+            ],
             "key": null,
             "markup": {
               "value": "\\textbf{Inverting amplifier}\\\\\\textit{V}_{\\textit{DD}} = 1.8 V, I_{D_{1}} = 10 \\mu A, \\overline{RST} \\pm 5\\%",
@@ -1615,6 +1628,10 @@
           {
             "id": "@08-styles-and-text.sp:72:5",
             "attach": null,
+            "attach_point": [
+              -7.0,
+              -9.0
+            ],
             "key": null,
             "markup": {
               "value": "escapes, a\\_b \\$5 \\${x} \\{ \\} C:\\temp, unknown \\sqrt{2}",
@@ -1657,6 +1674,10 @@
           {
             "id": "@08-styles-and-text.sp:74:5",
             "attach": "%p",
+            "attach_point": [
+              -7.0,
+              -11.0
+            ],
             "key": null,
             "markup": {
               "value": "this note is at (${x}, ${y})",
@@ -1699,6 +1720,10 @@
           {
             "id": "@08-styles-and-text.sp:75:5",
             "attach": null,
+            "attach_point": [
+              -9.0,
+              0.0
+            ],
             "key": null,
             "markup": {
               "value": "rot=90 note",
@@ -1741,6 +1766,7 @@
           {
             "id": "#Vin::name",
             "attach": "#Vin",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -1783,6 +1809,7 @@
           {
             "id": "#Vin::value",
             "attach": "#Vin",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -1825,6 +1852,7 @@
           {
             "id": "#Rin::value",
             "attach": "#Rin",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -1867,6 +1895,7 @@
           {
             "id": "#Rf::name",
             "attach": "#Rf",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -1909,6 +1938,7 @@
           {
             "id": "#Rf::value",
             "attach": "#Rf",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -1951,6 +1981,7 @@
           {
             "id": "#X1::name",
             "attach": "#X1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3107,6 +3138,7 @@
           {
             "id": "#E1::name",
             "attach": "#E1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3149,6 +3181,7 @@
           {
             "id": "#E1::value",
             "attach": "#E1",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -3191,6 +3224,7 @@
           {
             "id": "@rnl-std-basic.rnl:672:9#1::netname",
             "attach": "@rnl-std-basic.rnl:672:9#1",
+            "attach_point": null,
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -3233,6 +3267,7 @@
           {
             "id": "@rnl-std-basic.rnl:672:9#2::netname",
             "attach": "@rnl-std-basic.rnl:672:9#2",
+            "attach_point": null,
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -3275,6 +3310,7 @@
           {
             "id": "@rnl-std-basic.rnl:672:9#3::netname",
             "attach": "@rnl-std-basic.rnl:672:9#3",
+            "attach_point": null,
             "key": "netname",
             "markup": {
               "value": "${p}",

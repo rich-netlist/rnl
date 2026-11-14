@@ -143,6 +143,7 @@
           {
             "id": "#Rtop::name",
             "attach": "#Rtop",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -176,6 +177,7 @@
           {
             "id": "#Rtop::value",
             "attach": "#Rtop",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -564,6 +566,7 @@
           {
             "id": "#X1::name",
             "attach": "#X1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -597,6 +600,7 @@
           {
             "id": "#X1::value",
             "attach": "#X1",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -988,6 +992,7 @@
           {
             "id": "#X2::name",
             "attach": "#X2",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -1021,6 +1026,7 @@
           {
             "id": "#X2::value",
             "attach": "#X2",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -1764,6 +1770,7 @@
           {
             "id": "#X3::name",
             "attach": "#X3",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -1797,6 +1804,7 @@
           {
             "id": "#X3::value",
             "attach": "#X3",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -1830,6 +1838,7 @@
           {
             "id": "#I0::name",
             "attach": "#I0",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -1863,6 +1872,7 @@
           {
             "id": "#I0::model",
             "attach": "#I0",
+            "attach_point": null,
             "key": "model",
             "markup": {
               "value": "${model}",
@@ -2254,6 +2264,7 @@
           {
             "id": "#Rsec::name",
             "attach": "#Rsec",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2287,6 +2298,7 @@
           {
             "id": "#Rsec::value",
             "attach": "#Rsec",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -2678,6 +2690,7 @@
           {
             "id": "#Xsec::name",
             "attach": "#Xsec",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2711,6 +2724,7 @@
           {
             "id": "#Xsec::value",
             "attach": "#Xsec",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",

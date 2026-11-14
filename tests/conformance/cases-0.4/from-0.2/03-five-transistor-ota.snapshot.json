@@ -3503,6 +3503,7 @@
           {
             "id": "#M1::name",
             "attach": "#M1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3546,6 +3547,7 @@
           {
             "id": "#M2::name",
             "attach": "#M2",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3589,6 +3591,7 @@
           {
             "id": "#M3::name",
             "attach": "#M3",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3622,6 +3625,7 @@
           {
             "id": "#M4::name",
             "attach": "#M4",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3655,6 +3659,7 @@
           {
             "id": "#M5::name",
             "attach": "#M5",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3688,6 +3693,7 @@
           {
             "id": "#M6::name",
             "attach": "#M6",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3721,6 +3727,7 @@
           {
             "id": "#Ib::name",
             "attach": "#Ib",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3754,6 +3761,7 @@
           {
             "id": "#Ib::value",
             "attach": "#Ib",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -3787,6 +3795,7 @@
           {
             "id": "#CL::name",
             "attach": "#CL",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3820,6 +3829,7 @@
           {
             "id": "#CL::value",
             "attach": "#CL",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -3853,6 +3863,7 @@
           {
             "id": "#Vdd::name",
             "attach": "#Vdd",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3886,6 +3897,7 @@
           {
             "id": "#Vdd::value",
             "attach": "#Vdd",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -3919,6 +3931,7 @@
           {
             "id": "%pi::netname",
             "attach": "%pi",
+            "attach_point": null,
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -3952,6 +3965,7 @@
           {
             "id": "%pn::netname",
             "attach": "%pn",
+            "attach_point": null,
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -3985,6 +3999,7 @@
           {
             "id": "%po::netname",
             "attach": "%po",
+            "attach_point": null,
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -4018,6 +4033,7 @@
           {
             "id": "%ss_M3_3::netname",
             "attach": "%ss_M3_3",
+            "attach_point": null,
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -4052,6 +4068,7 @@
           {
             "id": "%ss_M4_3::netname",
             "attach": "%ss_M4_3",
+            "attach_point": null,
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -4086,6 +4103,7 @@
           {
             "id": "%ss_Ib_1::netname",
             "attach": "%ss_Ib_1",
+            "attach_point": null,
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -4120,6 +4138,7 @@
           {
             "id": "%ss_Vdd_1::netname",
             "attach": "%ss_Vdd_1",
+            "attach_point": null,
             "key": "netname",
             "markup": {
               "value": "${p}",

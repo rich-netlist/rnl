@@ -2059,6 +2059,7 @@
           {
             "id": "@05-definitions.sp:38:31",
             "attach": "%tp",
+            "attach_point": null,
             "key": null,
             "markup": {
               "value": "TP1 = ${p}",
@@ -2092,6 +2093,7 @@
           {
             "id": "#V1::name",
             "attach": "#V1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2125,6 +2127,7 @@
           {
             "id": "#V1::value",
             "attach": "#V1",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -2158,6 +2161,7 @@
           {
             "id": "#R1::name",
             "attach": "#R1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2191,6 +2195,7 @@
           {
             "id": "#R1::value",
             "attach": "#R1",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -2224,6 +2229,7 @@
           {
             "id": "#C1::name",
             "attach": "#C1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2260,6 +2266,7 @@
           {
             "id": "#C1::value",
             "attach": "#C1",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -2296,6 +2303,7 @@
           {
             "id": "#R2::name",
             "attach": "#R2",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2329,6 +2337,7 @@
           {
             "id": "#R2::value",
             "attach": "#R2",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -2362,6 +2371,7 @@
           {
             "id": "#C2::name",
             "attach": "#C2",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2398,6 +2408,7 @@
           {
             "id": "#C2::value",
             "attach": "#C2",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -2434,6 +2445,7 @@
           {
             "id": "#R3::name",
             "attach": "#R3",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2467,6 +2479,7 @@
           {
             "id": "#R3::value",
             "attach": "#R3",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -2500,6 +2513,7 @@
           {
             "id": "#C3::name",
             "attach": "#C3",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2536,6 +2550,7 @@
           {
             "id": "#C3::value",
             "attach": "#C3",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -2572,6 +2587,7 @@
           {
             "id": "#RL::name",
             "attach": "#RL",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2605,6 +2621,7 @@
           {
             "id": "#RL::value",
             "attach": "#RL",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",

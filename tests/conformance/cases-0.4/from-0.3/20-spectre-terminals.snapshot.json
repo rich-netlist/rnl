@@ -2275,6 +2275,7 @@
           {
             "id": "#r1::name",
             "attach": "#r1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2308,6 +2309,7 @@
           {
             "id": "#r1::value",
             "attach": "#r1",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -2341,6 +2343,7 @@
           {
             "id": "#r_custom::name",
             "attach": "#r_custom",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2374,6 +2377,7 @@
           {
             "id": "#r_custom::value",
             "attach": "#r_custom",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -2407,6 +2411,7 @@
           {
             "id": "#d1::name",
             "attach": "#d1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2440,6 +2445,7 @@
           {
             "id": "#e1::name",
             "attach": "#e1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2473,6 +2479,7 @@
           {
             "id": "#e1::value",
             "attach": "#e1",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -2506,6 +2513,7 @@
           {
             "id": "#rel1::name",
             "attach": "#rel1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2539,6 +2547,7 @@
           {
             "id": "#xf1::name",
             "attach": "#xf1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2572,6 +2581,7 @@
           {
             "id": "#mp1::name",
             "attach": "#mp1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2605,6 +2615,7 @@
           {
             "id": "#qb1::name",
             "attach": "#qb1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2638,6 +2649,7 @@
           {
             "id": "#dj1::name",
             "attach": "#dj1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2671,6 +2683,7 @@
           {
             "id": "#jp1::name",
             "attach": "#jp1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2704,6 +2717,7 @@
           {
             "id": "#rd1::name",
             "attach": "#rd1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2737,6 +2751,7 @@
           {
             "id": "#rd1::value",
             "attach": "#rd1",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",

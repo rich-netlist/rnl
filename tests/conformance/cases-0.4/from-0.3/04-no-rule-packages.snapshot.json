@@ -244,6 +244,7 @@
           {
             "id": "#I0::name",
             "attach": "#I0",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -277,6 +278,7 @@
           {
             "id": "#R0::name",
             "attach": "#R0",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -310,6 +312,7 @@
           {
             "id": "#R0::value",
             "attach": "#R0",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
