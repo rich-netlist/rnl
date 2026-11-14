@@ -143,6 +143,7 @@
           {
             "id": "#R1::name",
             "attach": "#R1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "R1 저항",
@@ -176,6 +177,10 @@
           {
             "id": "@18-fallback-text.sp:10:5",
             "attach": null,
+            "attach_point": [
+              6.0,
+              8.0
+            ],
             "key": null,
             "markup": {
               "value": "[한글 저항]",
@@ -209,6 +214,10 @@
           {
             "id": "@18-fallback-text.sp:11:5",
             "attach": null,
+            "attach_point": [
+              6.0,
+              6.0
+            ],
             "key": null,
             "markup": {
               "value": "R = 10 kΩ ⚡ ⚠️ 1️⃣",
@@ -242,6 +251,10 @@
           {
             "id": "@18-fallback-text.sp:12:5",
             "attach": null,
+            "attach_point": [
+              6.0,
+              4.0
+            ],
             "key": null,
             "markup": {
               "value": "👨‍👩‍👧 👍🏽 🇨🇳 🏳️‍🌈",
@@ -275,6 +288,10 @@
           {
             "id": "@18-fallback-text.sp:13:5",
             "attach": null,
+            "attach_point": [
+              6.0,
+              2.0
+            ],
             "key": null,
             "markup": {
               "value": "مقاومة 10k",
@@ -308,6 +325,10 @@
           {
             "id": "@18-fallback-text.sp:14:5",
             "attach": null,
+            "attach_point": [
+              6.0,
+              0.0
+            ],
             "key": null,
             "markup": {
               "value": "प्रतिरोध R1, कि",
@@ -341,6 +362,10 @@
           {
             "id": "@18-fallback-text.sp:15:5",
             "attach": null,
+            "attach_point": [
+              6.0,
+              -2.0
+            ],
             "key": null,
             "markup": {
               "value": "ตัวต้านทาน R2",
@@ -374,6 +399,10 @@
           {
             "id": "@18-fallback-text.sp:16:5",
             "attach": null,
+            "attach_point": [
+              6.0,
+              -4.0
+            ],
             "key": null,
             "markup": {
               "value": "x̂ = x́ + v⃗, a​b",
@@ -407,6 +436,10 @@
           {
             "id": "@18-fallback-text.sp:17:5",
             "attach": null,
+            "attach_point": [
+              6.0,
+              -6.0
+            ],
             "key": null,
             "markup": {
               "value": "\\textbf{한글 Bold ⚡} \\textit{\\overline{x̂ y}} V_{저항}^{⚡}",
@@ -490,6 +523,10 @@
           {
             "id": "@18-fallback-text.sp:18:5",
             "attach": null,
+            "attach_point": [
+              12.0,
+              -9.0
+            ],
             "key": null,
             "markup": {
               "value": "\\frac{저항}{R_{1}} 电阻",
@@ -566,6 +603,10 @@
           {
             "id": "@18-fallback-text.sp:19:5",
             "attach": null,
+            "attach_point": [
+              18.0,
+              -12.0
+            ],
             "key": null,
             "markup": {
               "value": "R1 저항 ⚡",
@@ -599,6 +640,10 @@
           {
             "id": "@18-fallback-text.sp:20:5",
             "attach": null,
+            "attach_point": [
+              -4.0,
+              0.0
+            ],
             "key": null,
             "markup": {
               "value": "한글 ⚡ R",
@@ -634,6 +679,7 @@
           {
             "id": "#R1::value",
             "attach": "#R1",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",

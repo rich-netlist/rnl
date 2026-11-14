@@ -1869,6 +1869,10 @@
           {
             "id": "@14-route.sp:20:5",
             "attach": null,
+            "attach_point": [
+              -5.0,
+              0.0
+            ],
             "key": null,
             "markup": {
               "value": "v_{in}",
@@ -1912,6 +1916,10 @@
           {
             "id": "@14-route.sp:21:5",
             "attach": null,
+            "attach_point": [
+              -2.0,
+              14.0
+            ],
             "key": null,
             "markup": {
               "value": "弱模型的写法：器件位置加 ROUTE，导线、分叉和圆点都交给求解器",
@@ -1945,6 +1953,7 @@
           {
             "id": "#Q1::name",
             "attach": "#Q1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -1978,6 +1987,7 @@
           {
             "id": "#R1::name",
             "attach": "#R1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2011,6 +2021,7 @@
           {
             "id": "#R1::value",
             "attach": "#R1",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -2044,6 +2055,7 @@
           {
             "id": "#R2::name",
             "attach": "#R2",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2077,6 +2089,7 @@
           {
             "id": "#R2::value",
             "attach": "#R2",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -2110,6 +2123,7 @@
           {
             "id": "#RC::name",
             "attach": "#RC",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2143,6 +2157,7 @@
           {
             "id": "#RC::value",
             "attach": "#RC",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -2176,6 +2191,7 @@
           {
             "id": "#RE::name",
             "attach": "#RE",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2209,6 +2225,7 @@
           {
             "id": "#RE::value",
             "attach": "#RE",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -2242,6 +2259,7 @@
           {
             "id": "#C1::name",
             "attach": "#C1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2275,6 +2293,7 @@
           {
             "id": "#C1::value",
             "attach": "#C1",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -2308,6 +2327,7 @@
           {
             "id": "#C2::name",
             "attach": "#C2",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2341,6 +2361,7 @@
           {
             "id": "#C2::value",
             "attach": "#C2",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -2374,6 +2395,7 @@
           {
             "id": "#RL::name",
             "attach": "#RL",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2407,6 +2429,7 @@
           {
             "id": "#RL::value",
             "attach": "#RL",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -2440,6 +2463,7 @@
           {
             "id": "#Vcc::name",
             "attach": "#Vcc",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2473,6 +2497,7 @@
           {
             "id": "#Vcc::value",
             "attach": "#Vcc",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -2506,6 +2531,7 @@
           {
             "id": "#Vin::name",
             "attach": "#Vin",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2539,6 +2565,7 @@
           {
             "id": "#Vin::value",
             "attach": "#Vin",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -2572,6 +2599,7 @@
           {
             "id": "%ss_R1_1::netname",
             "attach": "%ss_R1_1",
+            "attach_point": null,
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -2606,6 +2634,7 @@
           {
             "id": "%ss_RC_1::netname",
             "attach": "%ss_RC_1",
+            "attach_point": null,
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -2640,6 +2669,7 @@
           {
             "id": "%ss_Vcc_1::netname",
             "attach": "%ss_Vcc_1",
+            "attach_point": null,
             "key": "netname",
             "markup": {
               "value": "${p}",

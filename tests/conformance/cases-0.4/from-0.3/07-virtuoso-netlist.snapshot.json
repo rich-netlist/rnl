@@ -521,6 +521,7 @@
           {
             "id": "#I0::name",
             "attach": "#I0",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -554,6 +555,7 @@
           {
             "id": "#I0::model",
             "attach": "#I0",
+            "attach_point": null,
             "key": "model",
             "markup": {
               "value": "${model}",
@@ -587,6 +589,7 @@
           {
             "id": "#I1::name",
             "attach": "#I1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -620,6 +623,7 @@
           {
             "id": "#I1::model",
             "attach": "#I1",
+            "attach_point": null,
             "key": "model",
             "markup": {
               "value": "${model}",
@@ -653,6 +657,7 @@
           {
             "id": "#I2::name",
             "attach": "#I2",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -686,6 +691,7 @@
           {
             "id": "#I2::value",
             "attach": "#I2",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -719,6 +725,7 @@
           {
             "id": "#V0::name",
             "attach": "#V0",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -752,6 +759,7 @@
           {
             "id": "#V0::value",
             "attach": "#V0",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -1515,6 +1523,7 @@
           {
             "id": "#M0::name",
             "attach": "#M0",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -1548,6 +1557,7 @@
           {
             "id": "#M1::name",
             "attach": "#M1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",

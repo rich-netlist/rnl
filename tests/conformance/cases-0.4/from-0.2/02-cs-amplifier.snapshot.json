@@ -1613,6 +1613,10 @@
           {
             "id": "@02-cs-amplifier.sp:23:5",
             "attach": "%vo",
+            "attach_point": [
+              6.0,
+              4.0
+            ],
             "key": null,
             "markup": {
               "value": "V_{out}",
@@ -1656,6 +1660,7 @@
           {
             "id": "@02-cs-amplifier.sp:30:92",
             "attach": "@02-cs-amplifier.sp:30:38",
+            "attach_point": null,
             "key": null,
             "markup": {
               "value": "I_{D}",
@@ -1699,6 +1704,7 @@
           {
             "id": "#M1::model",
             "attach": "#M1",
+            "attach_point": null,
             "key": "model",
             "markup": {
               "value": "W/L=${w}/${l}",
@@ -1732,6 +1738,7 @@
           {
             "id": "#M2::name",
             "attach": "#M2",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "M_{2}（负载）",
@@ -1785,6 +1792,10 @@
           {
             "id": "@02-cs-amplifier.sp:34:5",
             "attach": null,
+            "attach_point": [
+              -15.0,
+              13.0
+            ],
             "key": null,
             "markup": {
               "value": "A_{v} = −g_{m1}(r_{o1} \\parallel r_{o2})",
@@ -1898,6 +1909,7 @@
           {
             "id": "#M1::name",
             "attach": "#M1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -1931,6 +1943,7 @@
           {
             "id": "#Vdd::name",
             "attach": "#Vdd",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -1964,6 +1977,7 @@
           {
             "id": "#Vdd::value",
             "attach": "#Vdd",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -1997,6 +2011,7 @@
           {
             "id": "#Vin::name",
             "attach": "#Vin",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2030,6 +2045,7 @@
           {
             "id": "#Vin::value",
             "attach": "#Vin",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -2063,6 +2079,7 @@
           {
             "id": "#Vb::name",
             "attach": "#Vb",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2096,6 +2113,7 @@
           {
             "id": "#Vb::value",
             "attach": "#Vb",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -2129,6 +2147,7 @@
           {
             "id": "@rnl-std-basic.rnl:647:9#1::netname",
             "attach": "@rnl-std-basic.rnl:647:9#1",
+            "attach_point": null,
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -2163,6 +2182,7 @@
           {
             "id": "@rnl-std-basic.rnl:647:9#2::netname",
             "attach": "@rnl-std-basic.rnl:647:9#2",
+            "attach_point": null,
             "key": "netname",
             "markup": {
               "value": "${p}",
