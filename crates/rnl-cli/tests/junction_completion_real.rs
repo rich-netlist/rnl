@@ -640,3 +640,147 @@ fn actual_solve_preserves_external_fixed_axes() {
         assert_eq!(completion_suffix(record, "$DOT"), expected, "{record}");
     }
 }
+
+/// The level `four dots` of [`all_junctions_share_one_global_interpretation_budget`], its four dots
+/// placed by [`complete_what_can_be_by`] with `deadline`, and the readings of the document it took.
+fn four_dots_by(
+    deadline: Option<&rnl_cli::junction_completion_driver::Deadline>,
+) -> (Result<rnl_cli::junction_completion_driver::Partial, String>, String, usize) {
+    use rnl_cli::junction_completion_driver::{complete_what_can_be_by, only};
+    use std::cell::Cell;
+    let text = "* four dots\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @SOLVER-CONFIG(junction=\"$DOT\") }\nR1 a 0 1k\n* @RNL { $DOT = @DEFINE(roles=[[\"p\",\"point\"]]) { {? ?p} @ALIGN(\"x\"); {? ?p} @ALIGN(\"y\") } }\n.end\n";
+    let files = MemoryProvider::new().with("main.sp", text);
+    let opts = Options { std: false, problems: true, generated: false, ..Default::default() };
+    let original = interpret_file(Path::new("main.sp"), None, &files, &opts).unwrap();
+    let p = &original.problems[0];
+    let solution = Solution {
+        branches: (0..4).map(|i| Branch { at: (i as f64, 0.), junction: true }).collect(),
+        ..Default::default()
+    };
+    let written = write_record(p, &solution, "test", "test");
+    let formats = BTreeMap::new();
+    let calls = Cell::new(0);
+    let ctx = Context {
+        entry: "main.sp",
+        dialect: None,
+        formats: &formats,
+        files: &files,
+        runtime: &opts,
+        original: &original,
+        problem: p,
+        original_text: text,
+        host_path: "main.sp",
+        kept: &[],
+        solution: &solution,
+        tolerance: opts.tolerance,
+        on_interpret: Some(&|| calls.set(calls.get() + 1)),
+    };
+    let result = complete_what_can_be_by(&ctx, &written, deadline);
+    (result, only(&written, &[]).record, calls.get())
+}
+
+/// A level whose time ran out before its dots were tried: no dot is tried, each is left out for the
+/// time, not for want of a place, and the record without them is checked all the same and written.
+#[test]
+fn dots_not_tried_before_the_deadline_are_left_out_for_the_time() {
+    use rnl_cli::junction_completion_driver::{Deadline, RAN_OUT};
+    let passed = Deadline::after(std::time::Duration::ZERO);
+    let (result, bare, readings) = four_dots_by(Some(&passed));
+    let partial = result.expect("the record without the dots reads back");
+    assert_eq!(partial.trials, 0);
+    assert_eq!(partial.dropped.iter().map(|d| d.0).collect::<Vec<_>>(), [0, 1, 2, 3]);
+    assert!(partial.dropped.iter().all(|d| d.1 == RAN_OUT), "{:?}", partial.dropped);
+    assert_eq!(partial.record, bare);
+    assert_eq!(partial.record.matches("@ATTACH").count(), 0);
+    // the check of the record without any dot only: its reading and its one trial
+    assert_eq!(readings, 2);
+}
+
+/// With no deadline, or one far off, the dots are placed as they always were.
+#[test]
+fn without_a_deadline_the_dots_are_placed_as_before() {
+    use rnl_cli::junction_completion_driver::Deadline;
+    let (none, _, readings) = four_dots_by(None);
+    let none = none.expect("placed");
+    assert!(none.dropped.is_empty());
+    assert_eq!((none.trials, readings), (1, 2));
+    assert_eq!(none.record.matches("@ATTACH").count(), 4);
+    let far = Deadline::after(std::time::Duration::from_secs(3600));
+    let (late, _, _) = four_dots_by(Some(&far));
+    let late = late.expect("placed");
+    assert_eq!((late.record, late.trials, late.dropped.len()), (none.record, none.trials, 0));
+}
+
+/// A level of four dots solved by a backend that takes `seconds` and stops for `reason`, under a
+/// safety limit of 1 s: the options the backend was given, the run, and its wall time.
+fn four_dots_stopped(
+    seconds: f64,
+    reason: rnl_solver::StopReason,
+) -> (rnl_solver::SolverOptions, rnl_cli::solve::SolveRun, f64) {
+    use rnl_cli::solve::{solve_using, BackendResult, SolveOptions};
+    use std::cell::RefCell;
+    let text = "* four dots\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @SOLVER-CONFIG(junction=\"$DOT\") }\nR1 a 0 1k\n* @RNL { $DOT = @DEFINE(roles=[[\"p\",\"point\"]]) { {? ?p} @ALIGN(\"x\"); {? ?p} @ALIGN(\"y\") } }\n.end\n";
+    let files = MemoryProvider::new().with("main.sp", text);
+    let solver =
+        rnl_solver::SolverOptions::default().with_config(r#"limit="work", work=1000, safety_seconds=1"#).unwrap();
+    let given = RefCell::new(None);
+    let start = std::time::Instant::now();
+    let run = solve_using(
+        Path::new("main.sp"),
+        &files,
+        // the whole file's time, which a level of a limit of work does not share, so that the run is
+        // on the wall clock, which the limits are read on
+        &SolveOptions { std: false, solver, total_seconds: Some(3600.), ..Default::default() },
+        &|_| true,
+        &|p, options| {
+            *given.borrow_mut() = Some(options.for_problem(p).0);
+            std::thread::sleep(std::time::Duration::from_secs_f64(seconds));
+            let mut solved = rnl_solver::Solved {
+                solution: Solution {
+                    branches: (0..4).map(|i| Branch { at: (i as f64, 0.), junction: true }).collect(),
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+            solved.report.budget =
+                Some(rnl_solver::BudgetReport { limit: rnl_solver::RunLimit::Work(1000), work: 1000, reason });
+            Ok(BackendResult { solved, author: "test".into(), report_available: true })
+        },
+    )
+    .expect("the level is written");
+    let wall = start.elapsed().as_secs_f64();
+    (given.into_inner().expect("the backend ran"), run, wall)
+}
+
+/// A level its safety limit stopped, its search using all of the limit: its dots are not tried
+/// once the limit is past, each is left out for the time, and the level is written. The run ends
+/// within the limit, the check of the record without any dot, and the write: on this level, well
+/// within a second of the limit, where all four dots tried one by one would take longer.
+#[test]
+fn a_level_stopped_by_its_safety_limit_ends_near_it() {
+    let (given, run, wall) = four_dots_stopped(1.0, rnl_solver::StopReason::Safety);
+    // the search was given less than the limit: the rest is kept for the dots and the write
+    let safety = given.safety_seconds.expect("a safety limit");
+    assert!((0.75..1.0).contains(&safety), "{safety}");
+    let level = &run.levels[0];
+    assert!(level.written.notes.iter().any(|n| n.contains("kept for junction placement")), "{:?}", level.written.notes);
+    let time: Vec<_> =
+        level.written.unsolved.iter().filter(|u| u.reason.contains("ran out before it was tried")).collect();
+    assert_eq!(time.len(), 4, "{:?}", level.written.unsolved);
+    assert!(time.iter().all(|u| u.code == rnl_runtime::diag::codes::UNSOLVED_JUNCTION_UNPLACED));
+    assert!(!level.record.contains("$DOT @ATTACH"), "{}", level.record);
+    assert!(level.written.notes.iter().any(|n| n.contains("0 candidate trials")), "{:?}", level.written.notes);
+    assert!(wall < 1.0 + 1.0, "{wall}");
+}
+
+/// A level stopped by its work, or by its time, is replayed by its work, which places its dots with
+/// no time to them: it places them all as well, however long its search took.
+#[test]
+fn a_level_not_stopped_by_its_safety_limit_places_all_its_dots() {
+    for reason in [rnl_solver::StopReason::Work, rnl_solver::StopReason::Time] {
+        let (_, run, _) = four_dots_stopped(1.0, reason);
+        let level = &run.levels[0];
+        assert!(level.written.unsolved.is_empty(), "{reason:?}: {:?}", level.written.unsolved);
+        assert_eq!(level.record.matches("$DOT @ATTACH").count(), 4, "{reason:?}: {}", level.record);
+    }
+}
