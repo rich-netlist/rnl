@@ -794,3 +794,28 @@ fn signal_and_power_flows_take_sources_and_loads_and_the_bias_circuit_its_member
         assert!(!by_severity(&read04(old), Severity::Error).is_empty(), "{old}");
     }
 }
+
+#[test]
+fn port_fill_puts_each_level_in_a_column_of_its_own() {
+    // The fill's port tags and instances are selected with recursive=true; each level is evaluated
+    // on its own (10.1, 10.3), so a level's column is kept left of its own instances only.
+    let text = "* two levels with ports\n\
+* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }\n\
+.subckt blk a b\nR1 a b 1k\n.ends\n\
+.subckt top in out\nX1 in mid blk\nR2 mid out 1k\n.ends\n\
+X0 n1 n2 top\n.end\n";
+    let r = read(&MemoryProvider::new().with("t.sp", text), &Options::default());
+    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
+    let count = |title: &str, kind: &str| {
+        let level = r.model.levels.iter().find(|l| l.title == title).unwrap();
+        level.constraints.iter().filter(|c| c.kind == kind && c.priority == "low").count()
+    };
+    let tags = |title: &str| {
+        let level = r.model.levels.iter().find(|l| l.title == title).unwrap();
+        level.objects.iter().filter(|o| o.definition.as_deref() == Some("$IO_PORT")).count()
+    };
+    assert_eq!((tags("blk"), tags("top")), (2, 2));
+    // a DISTANCE for each pair of a tag and an instance of the same level: 2 x 1 and 2 x 2
+    assert_eq!(count("blk", "DISTANCE"), 2);
+    assert_eq!(count("top", "DISTANCE"), 4);
+}
