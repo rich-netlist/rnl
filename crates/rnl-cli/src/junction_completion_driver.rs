@@ -453,18 +453,25 @@ pub struct Partial {
 
 /// Places every dot when [`complete_record`] can; otherwise keeps, in order, each dot that can
 /// be placed beside those kept before it, and leaves out the rest. A dot that no place keeps the
-/// facts of the level for, such as one beside an assertion that the file already violates, costs
-/// only itself: the rest of the record is written.
-pub fn complete_what_can_be(ctx: &Context<'_>, written: &Written) -> Partial {
+/// facts of the level for costs only itself: the rest of the record is written. The record without
+/// any dot must pass the same checks, or nothing is written: what fails then is not the dots'.
+pub fn complete_what_can_be(ctx: &Context<'_>, written: &Written) -> Result<Partial, String> {
     let start = crate::solve::Stopwatch::start();
-    if let Ok(done) = complete_record(ctx, written) {
-        return Partial { record: done.record, trials: done.trials, elapsed: done.elapsed, dropped: Vec::new() };
+    let why = match complete_record(ctx, written) {
+        Ok(done) => {
+            return Ok(Partial { record: done.record, trials: done.trials, elapsed: done.elapsed, dropped: Vec::new() })
+        }
+        Err(why) => why,
+    };
+    let mut trials = 0;
+    let bare = only(written, &[]);
+    if let Err(without) = complete_within(ctx, &bare, 1, &mut trials) {
+        return Err(format!("{why}; without any dot: {without}"));
     }
     // the dots are tried one by one under one more global bound, so that the time a level takes
     // stays bounded however many dots it has
     let mut kept: Vec<usize> = Vec::new();
     let mut record = None;
-    let mut trials = 0;
     let mut dropped = Vec::new();
     for index in 0..written.junctions.len() {
         if trials >= MAX_TRIALS {
@@ -481,8 +488,8 @@ pub fn complete_what_can_be(ctx: &Context<'_>, written: &Written) -> Partial {
             Err(why) => dropped.push((index, why)),
         }
     }
-    let record = record.unwrap_or_else(|| only(written, &[]).record);
-    Partial { record, trials, elapsed: start.elapsed(), dropped }
+    let record = record.unwrap_or(bare.record);
+    Ok(Partial { record, trials, elapsed: start.elapsed(), dropped })
 }
 
 /// The written record with only the junctions `keep`, by their index in [`Written::junctions`]:

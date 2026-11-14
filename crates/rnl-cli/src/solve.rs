@@ -819,36 +819,28 @@ fn pass(
         let mut junction_seconds = None;
         if p.version == "0.4" && !written.junctions.is_empty() {
             watch(Mark::Stage("junctions"));
-            let completion = if report_available {
-                let both = Layered { layers: vec![&memory, &files] };
-                let original_text = text_of(&r, &both, &host.file, &path)?;
-                let context = crate::junction_completion_driver::Context {
-                    entry: &entry,
-                    dialect: options.dialect.as_deref(),
-                    formats: &options.formats,
-                    files: &both,
-                    runtime: &runtime,
-                    original: &r,
-                    problem: p,
-                    original_text: &original_text,
-                    host_path: &path,
-                    kept: &solved.report.kept,
-                    solution: &solved.solution,
-                    tolerance: runtime.tolerance.min(options.solver.for_problem(p).0.tolerance),
-                    on_interpret: None,
-                };
-                crate::junction_completion_driver::complete_what_can_be(&context, &written)
-            } else {
-                // without the facts the solver kept, no place of a dot can be checked
-                crate::junction_completion_driver::Partial {
-                    record: crate::junction_completion_driver::only(&written, &[]).record,
-                    trials: 0,
-                    elapsed: std::time::Duration::ZERO,
-                    dropped: (0..written.junctions.len())
-                        .map(|index| (index, "the solver reported no facts it kept".to_string()))
-                        .collect(),
-                }
+            if !report_available {
+                return Err(format!("junction placement unresolved in {title}: backend omitted retained-fact report"));
+            }
+            let both = Layered { layers: vec![&memory, &files] };
+            let original_text = text_of(&r, &both, &host.file, &path)?;
+            let context = crate::junction_completion_driver::Context {
+                entry: &entry,
+                dialect: options.dialect.as_deref(),
+                formats: &options.formats,
+                files: &both,
+                runtime: &runtime,
+                original: &r,
+                problem: p,
+                original_text: &original_text,
+                host_path: &path,
+                kept: &solved.report.kept,
+                solution: &solved.solution,
+                tolerance: runtime.tolerance.min(options.solver.for_problem(p).0.tolerance),
+                on_interpret: None,
             };
+            let completion = crate::junction_completion_driver::complete_what_can_be(&context, &written)
+                .map_err(|why| format!("junction placement unresolved in {title}: {why}"))?;
             written.notes.push(format!(
                 "junction postprocessing: {} candidate trials in {:.3}s (including numbering checks, outside solver budget)",
                 completion.trials,

@@ -462,8 +462,12 @@ R1 a 0 1k
             },
         )
     }
-    assert!(attempt("0").is_err(), "strict tolerance must not accept a 1e-7 discrepancy");
-    assert!(attempt("0.000001").is_ok(), "normal tolerance permits the discrepancy");
+    // strict tolerance does not accept a 1e-7 discrepancy: the dot is left out, the rest written
+    let strict = attempt("0").expect("the level is written without the dot");
+    assert!(!strict.levels[0].record.contains("$DOT @ATTACH"), "{}", strict.levels[0].record);
+    assert_eq!(strict.levels[0].written.unsolved[0].code, rnl_runtime::diag::codes::UNSOLVED_JUNCTION_UNPLACED);
+    let normal = attempt("0.000001").expect("normal tolerance permits the discrepancy");
+    assert!(normal.levels[0].record.contains("$DOT @ATTACH %rt1 => @PLACE"), "{}", normal.levels[0].record);
 }
 
 #[test]
@@ -523,8 +527,15 @@ fn a_new_dropped_constraint_is_not_excused_by_an_existing_drop() {
         solver: rnl_solver::SolverOptions::default().with_config("layout=\"lines\",limit=\"seed\"").unwrap(),
         ..Default::default()
     };
-    let error = solve_with_clock(Path::new("main.sp"), &files, &options, &rnl_solver::StoppedClock).unwrap_err();
-    assert!(error.contains("new or changed fact is unresolved or not satisfied"), "{error}");
+    // the new drop is the dot's, as the constraint names the dots: the dot is left out
+    let solved = solve_with_clock(Path::new("main.sp"), &files, &options, &rnl_solver::StoppedClock).unwrap();
+    let level = &solved.levels[0];
+    assert!(!level.record.contains("$DOT @ATTACH"), "{}", level.record);
+    assert!(
+        level.written.notes.iter().any(|n| n.contains("new or changed fact is unresolved or not satisfied")),
+        "{:?}",
+        level.written.notes
+    );
 }
 
 #[test]
@@ -557,8 +568,14 @@ fn existing_assertion_violation_is_preserved_but_a_new_one_is_rejected() {
         };
         let result = solve_with_clock(Path::new("main.sp"), &files, &options, &rnl_solver::StoppedClock);
         if introduced {
-            let error = result.unwrap_err();
-            assert!(error.contains("trial interpretation has an error or violation"), "{error}");
+            // the violation the dot would bring is refused: the dot is left out
+            let level = &result.unwrap().levels[0];
+            assert!(!level.record.contains("$DOT @ATTACH"), "{}", level.record);
+            assert!(
+                level.written.notes.iter().any(|n| n.contains("trial interpretation has an error or violation")),
+                "{:?}",
+                level.written.notes
+            );
         } else {
             let result = result.unwrap();
             let saved = MemoryProvider::new().with("main.sp", &result.files[0].text);

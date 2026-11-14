@@ -525,10 +525,10 @@ pub fn validate_interpreted_trial(input: TrialValidation<'_>) -> Result<(), Stri
     let trial_problem = after.problems.iter().find(|v| v.level == level).ok_or("missing trial problem")?;
     retained_facts_preserved(original_problem, trial_problem, host_file, line_map, kept, after, tolerance)?;
     let drawn = current_drawn(trial_problem, after);
-    // A fact that a dot makes must hold. Another fact, such as one of a label that the first pass
-    // left unresolved beside an assertion the file violates, is not the dots' to settle: it needs
-    // only to come out as it did before any dot was placed, and the checks below keep every old
-    // object where it was.
+    // A fact that a dot makes, or that names a dot or anything of one, must hold. Another fact,
+    // such as one of a label that the first pass left unresolved beside an assertion the file
+    // violates, is not the dots' to settle: it needs only to come out as it did before any dot was
+    // placed, and the checks below keep every old object where it was.
     let dots: Vec<usize> = trial_problem
         .usages
         .iter()
@@ -539,6 +539,28 @@ pub fn validate_interpreted_trial(input: TrialValidation<'_>) -> Result<(), Stri
                 .is_some_and(|id| targets.iter().any(|(usage_id, _)| usage_id == id))
         })
         .map(|(index, _)| index)
+        .collect();
+    let owners: Vec<&Reference> = dots
+        .iter()
+        .filter_map(|&u| trial_problem.usages[u].object)
+        .map(|own| &trial_problem.objects[own].reference)
+        .collect();
+    let unrelated = Reference::Name(String::new());
+    // the objects of the dots are left unmapped, so that a fact naming one does not remap
+    let map: Vec<usize> = trial_problem
+        .objects
+        .iter()
+        .enumerate()
+        .map(|(index, object)| {
+            let of_a_dot = owners.iter().any(|own| {
+                **own == object.reference || rebased_reference(&object.reference, own, &unrelated).is_some()
+            });
+            if of_a_dot {
+                usize::MAX
+            } else {
+                index
+            }
+        })
         .collect();
     let initial = before.problems.iter().find(|v| v.level == level).ok_or("missing initial problem")?;
     let initial_drawn = current_drawn(initial, before);
@@ -558,7 +580,9 @@ pub fn validate_interpreted_trial(input: TrialValidation<'_>) -> Result<(), Stri
         if holds == Some(true) {
             continue;
         }
-        let of_a_dot = trial_problem.facts[index].chain.iter().any(|usage| dots.contains(usage));
+        let fact = &trial_problem.facts[index];
+        let of_a_dot = fact.chain.iter().any(|usage| dots.contains(usage))
+            || remap_fact(&mut fact.kind.clone(), &map, trial_problem, trial_problem).is_err();
         let fact = (key(trial_problem, index), holds);
         if !of_a_dot {
             if let Some(same) = as_before.iter_mut().find(|old| old.as_ref() == Some(&fact)) {
