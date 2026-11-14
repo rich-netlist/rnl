@@ -202,6 +202,7 @@ R11 g0c1r1 g1c0r1 1k
 *   {#R3 #R7} @ALIGN("y");
 *   {#R4 #R6} @ALIGN("y");
 *   {&g0c0r1 &g0c1r1 &g1c0r1 &g1c1r1} @ROUTE-NET;
+*   # @SELECT-NET(port=true) => @REMOVE-FROM $PORT_FILL_SET;
 * }
 .ends
 "#;
