@@ -14,6 +14,7 @@ mod assertions;
 mod auto_geometry_limit04;
 mod auto_wire04;
 mod auto_wire_fatal;
+mod behaviour04;
 mod bundle_rules04;
 mod bundle_terminals;
 mod bus_taps04;
