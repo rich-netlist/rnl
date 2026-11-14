@@ -109,7 +109,8 @@ impl Roots {
     /// hidden part in its path. Its folder is allowed as for a file of the command line, unless that folder is too broad,
     /// and then the file alone is.
     pub fn open_file(&self, file: &Path) -> Result<PathBuf, String> {
-        let real = canonical(file).filter(|f| f.is_file()).ok_or_else(|| format!("{} is not a file", file.display()))?;
+        let real =
+            canonical(file).filter(|f| f.is_file()).ok_or_else(|| format!("{} is not a file", file.display()))?;
         if hidden(&real) {
             return Err("a hidden file, or one in a hidden folder, is not opened".into());
         }
@@ -136,7 +137,10 @@ impl Roots {
             return Err("a hidden folder is not given to the page".into());
         }
         if broad(&real) {
-            return Err(format!("{} is too much to give: choose the folder of a project (or start the program with --allow)", real.display()));
+            return Err(format!(
+                "{} is too much to give: choose the folder of a project (or start the program with --allow)",
+                real.display()
+            ));
         }
         self.allow(&real)
     }
@@ -164,7 +168,10 @@ impl Roots {
         }
         let dirs = self.list();
         let root = dirs.iter().find(|d| resolved.starts_with(d)).ok_or_else(|| {
-            format!("{} is not in a folder the program was told to allow; start it with --allow FOLDER to add one", resolved.display())
+            format!(
+                "{} is not in a folder the program was told to allow; start it with --allow FOLDER to add one",
+                resolved.display()
+            )
         })?;
         let below = resolved.strip_prefix(root).unwrap_or(&resolved);
         if hidden(below) {
@@ -262,14 +269,21 @@ fn lf(text: &str) -> String {
 /// that another program changed since, does not.
 fn unchanged(at: &Path, read: &str) -> bool {
     // (a file too large for the page to have read is not what it read)
-    std::fs::metadata(at).is_ok_and(|m| m.len() <= MAX_FILE) && std::fs::read(at).is_ok_and(|bytes| lf(&codec::decode(&bytes)) == lf(read))
+    std::fs::metadata(at).is_ok_and(|m| m.len() <= MAX_FILE)
+        && std::fs::read(at).is_ok_and(|bytes| lf(&codec::decode(&bytes)) == lf(read))
 }
 
 /// Write the files of the netlist `entry` where they were read from, each in its own encoding, and say which were
 /// written. Unless `overwrite`, a file that no longer holds what the page read from it is not written, and nor is any of
 /// the others: the names of those files are given back, for the user to say. Each path is checked against the folders
 /// allowed; a file that is not below one is an error before anything is written.
-pub fn save_all(roots: &Roots, entry: &str, files: &[SavedFile], overwrite: bool, encoding: OutputEncoding) -> Result<Saved, String> {
+pub fn save_all(
+    roots: &Roots,
+    entry: &str,
+    files: &[SavedFile],
+    overwrite: bool,
+    encoding: OutputEncoding,
+) -> Result<Saved, String> {
     let mut targets = Vec::new();
     for f in files {
         let at = roots.check(&located(entry, &f.path), true).map_err(|e| format!("{}: {e}", f.name))?;
@@ -377,7 +391,10 @@ fn overwrite<T: Target>(file: &mut T, new: &[u8]) -> std::io::Result<()> {
         file.set_len(new.len() as u64)?;
         file.sync()?;
         if file.read_all()? != new {
-            return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "what was written is not what is read back"));
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "what was written is not what is read back",
+            ));
         }
         Ok(())
     })();
@@ -386,7 +403,9 @@ fn overwrite<T: Target>(file: &mut T, new: &[u8]) -> std::io::Result<()> {
         let restored = file.put(&old).and_then(|()| file.set_len(old.len() as u64)).and_then(|()| file.sync());
         return Err(match restored {
             Ok(()) => e,
-            Err(again) => std::io::Error::new(e.kind(), format!("{e}; and the old text could not be put back: {again}")),
+            Err(again) => {
+                std::io::Error::new(e.kind(), format!("{e}; and the old text could not be put back: {again}"))
+            }
         });
     }
     Ok(())
@@ -397,7 +416,10 @@ fn write_in_place(at: &Path, bytes: &[u8]) -> std::io::Result<()> {
     let mut file = std::fs::OpenOptions::new().read(true).write(true).open(at)?;
     // (the old text is kept in memory while it is written over)
     if file.metadata()?.len() > MAX_FILE {
-        return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "the file is too large to be saved in place"));
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "the file is too large to be saved in place",
+        ));
     }
     overwrite(&mut file, bytes)
 }
@@ -418,7 +440,9 @@ fn replaced_by_rename(at: &Path, bytes: &[u8], old: &std::fs::Metadata) -> std::
     let mut file = match std::fs::OpenOptions::new().write(true).create_new(true).open(&temp) {
         Ok(file) => file,
         // (a folder that is not the user's to write in, or whose sticky bit would not let the file be replaced)
-        Err(e) if e.kind() == ErrorKind::PermissionDenied || e.kind() == ErrorKind::ReadOnlyFilesystem => return Ok(false),
+        Err(e) if e.kind() == ErrorKind::PermissionDenied || e.kind() == ErrorKind::ReadOnlyFilesystem => {
+            return Ok(false)
+        }
         Err(e) => return Err(e),
     };
     let done = (|| -> std::io::Result<bool> {
@@ -486,19 +510,34 @@ pub enum SavedAs {
 /// of the netlist it came from (`source`, which must be a file the page may read too), unless the user chose UTF-8. Encoded
 /// before the destination is touched. A file of that name that is there is not replaced unless `overwrite`, and a link is
 /// never written through, whatever it points to: the name chosen is a file of its folder or it is not written.
-pub fn save_as(roots: &Roots, source: Option<&Path>, to: &Path, text: &str, encoding: OutputEncoding, overwrite: bool) -> Result<SavedAs, String> {
+pub fn save_as(
+    roots: &Roots,
+    source: Option<&Path>,
+    to: &Path,
+    text: &str,
+    encoding: OutputEncoding,
+    overwrite: bool,
+) -> Result<SavedAs, String> {
     let to = roots.check(to, false)?;
-    let source = source.and_then(|s| roots.check(s, true).ok()).filter(|s| std::fs::metadata(s).is_ok_and(|m| m.is_file() && m.len() <= MAX_FILE));
+    let source = source
+        .and_then(|s| roots.check(s, true).ok())
+        .filter(|s| std::fs::metadata(s).is_ok_and(|m| m.is_file() && m.len() <= MAX_FILE));
     let bytes = codec::encode_file(source.as_deref(), text, encoding)?;
     match std::fs::symlink_metadata(&to) {
-        Ok(meta) if meta.file_type().is_symlink() => return Err(format!("{} is a link: it is not written through; choose another name", to.display())),
+        Ok(meta) if meta.file_type().is_symlink() => {
+            return Err(format!("{} is a link: it is not written through; choose another name", to.display()))
+        }
         Ok(meta) if !meta.is_file() => return Err(format!("{} is not a file", to.display())),
         Ok(_) if !overwrite => return Ok(SavedAs::Exists(to)),
         Ok(_) => write_replacing(&to, &bytes)?,
         // (create_new does not follow a link that appeared since the look above: it fails)
         Err(_) => {
             use std::io::Write;
-            let mut file = std::fs::OpenOptions::new().write(true).create_new(true).open(&to).map_err(|e| format!("{}: {e}", to.display()))?;
+            let mut file = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&to)
+                .map_err(|e| format!("{}: {e}", to.display()))?;
             file.write_all(&bytes).and_then(|()| file.sync_all()).map_err(|e| format!("{}: {e}", to.display()))?;
         }
     }
@@ -582,7 +621,10 @@ mod tests {
         std::fs::write(dir.join("a.sp"), "x").unwrap();
         std::fs::write(dir.join(".hidden"), "x").unwrap();
         let (_, entries, truncated) = list_dir(&dir).unwrap();
-        assert_eq!(entries.iter().map(|e| (e.name.as_str(), e.dir)).collect::<Vec<_>>(), vec![("b", true), ("a.sp", false)]);
+        assert_eq!(
+            entries.iter().map(|e| (e.name.as_str(), e.dir)).collect::<Vec<_>>(),
+            vec![("b", true), ("a.sp", false)]
+        );
         assert!(!truncated);
         assert!(list_dir(&dir.join("a.sp")).is_err());
     }
@@ -606,7 +648,12 @@ mod tests {
     }
 
     fn saved(path: &str, text: &str, read: Option<&str>) -> SavedFile {
-        SavedFile { path: path.into(), name: path.rsplit('/').next().unwrap().into(), text: text.into(), read: read.map(String::from) }
+        SavedFile {
+            path: path.into(),
+            name: path.rsplit('/').next().unwrap().into(),
+            text: text.into(),
+            read: read.map(String::from),
+        }
     }
 
     #[test]
@@ -619,16 +666,37 @@ mod tests {
         let entry = top.to_string_lossy().into_owned();
         // another program changed it since the page read it: nothing is written
         std::fs::write(&top, "R1 a b 2k\r\n.end\r\n").unwrap();
-        let asked = save_all(&roots, &entry, &[saved("top.sp", "R1 a b 3k\n.end\n", Some("R1 a b 1k\n.end\n"))], false, OutputEncoding::Preserve).unwrap();
+        let asked = save_all(
+            &roots,
+            &entry,
+            &[saved("top.sp", "R1 a b 3k\n.end\n", Some("R1 a b 1k\n.end\n"))],
+            false,
+            OutputEncoding::Preserve,
+        )
+        .unwrap();
         assert_eq!(asked, Saved { said: None, changed: vec!["top.sp".into()] });
         assert_eq!(std::fs::read(&top).unwrap(), b"R1 a b 2k\r\n.end\r\n");
         // the user said to overwrite
-        let done = save_all(&roots, &entry, &[saved("top.sp", "R1 a b 3k\n.end\n", Some("R1 a b 1k\n.end\n"))], true, OutputEncoding::Preserve).unwrap();
+        let done = save_all(
+            &roots,
+            &entry,
+            &[saved("top.sp", "R1 a b 3k\n.end\n", Some("R1 a b 1k\n.end\n"))],
+            true,
+            OutputEncoding::Preserve,
+        )
+        .unwrap();
         assert_eq!(done.said.as_deref(), Some("Saved top.sp."));
         assert_eq!(std::fs::read(&top).unwrap(), b"R1 a b 3k\n.end\n");
         // a file that is what was read is written, line ends apart
         std::fs::write(&top, "R1 a b 1k\r\n").unwrap();
-        let again = save_all(&roots, &entry, &[saved("top.sp", "R1 a b 5k\r\n", Some("R1 a b 1k\n"))], false, OutputEncoding::Preserve).unwrap();
+        let again = save_all(
+            &roots,
+            &entry,
+            &[saved("top.sp", "R1 a b 5k\r\n", Some("R1 a b 1k\n"))],
+            false,
+            OutputEncoding::Preserve,
+        )
+        .unwrap();
         assert!(again.changed.is_empty());
     }
 
@@ -665,7 +733,14 @@ mod tests {
         std::fs::write(outside.join("x.sp"), "x").unwrap();
         let roots = Roots::default();
         roots.allow(&inside).unwrap();
-        let err = save_all(&roots, &inside.join("a.sp").to_string_lossy(), &[saved(&outside.join("x.sp").to_string_lossy(), "y", None)], true, OutputEncoding::Preserve).unwrap_err();
+        let err = save_all(
+            &roots,
+            &inside.join("a.sp").to_string_lossy(),
+            &[saved(&outside.join("x.sp").to_string_lossy(), "y", None)],
+            true,
+            OutputEncoding::Preserve,
+        )
+        .unwrap_err();
         assert!(err.contains("--allow"), "{err}");
         assert_eq!(std::fs::read(outside.join("x.sp")).unwrap(), b"x");
     }
@@ -677,9 +752,17 @@ mod tests {
         std::fs::write(&from, b"* caf\xe9\n").unwrap();
         let roots = Roots::default();
         roots.allow(&dir).unwrap();
-        let SavedAs::Written(to) = save_as(&roots, Some(&from), &dir.join("copy.sp"), "* caf\u{e9}\n", OutputEncoding::Preserve, false).unwrap() else { panic!("not written") };
+        let SavedAs::Written(to) =
+            save_as(&roots, Some(&from), &dir.join("copy.sp"), "* caf\u{e9}\n", OutputEncoding::Preserve, false)
+                .unwrap()
+        else {
+            panic!("not written")
+        };
         assert_eq!(std::fs::read(to).unwrap(), b"* caf\xe9\n");
-        assert!(save_as(&roots, Some(&from), &dir.join("sub/x.sp"), "x", OutputEncoding::Utf8, false).is_err(), "its folder does not exist");
+        assert!(
+            save_as(&roots, Some(&from), &dir.join("sub/x.sp"), "x", OutputEncoding::Utf8, false).is_err(),
+            "its folder does not exist"
+        );
         assert!(save_as(&roots, None, Path::new("/nope/x.sp"), "x", OutputEncoding::Utf8, false).is_err());
     }
 
@@ -690,9 +773,15 @@ mod tests {
         roots.allow(&dir).unwrap();
         let there = dir.join("there.sp");
         std::fs::write(&there, "mine\n").unwrap();
-        assert_eq!(save_as(&roots, None, &there, "new\n", OutputEncoding::Utf8, false).unwrap(), SavedAs::Exists(there.clone()));
+        assert_eq!(
+            save_as(&roots, None, &there, "new\n", OutputEncoding::Utf8, false).unwrap(),
+            SavedAs::Exists(there.clone())
+        );
         assert_eq!(std::fs::read_to_string(&there).unwrap(), "mine\n");
-        assert_eq!(save_as(&roots, None, &there, "new\n", OutputEncoding::Utf8, true).unwrap(), SavedAs::Written(there.clone()));
+        assert_eq!(
+            save_as(&roots, None, &there, "new\n", OutputEncoding::Utf8, true).unwrap(),
+            SavedAs::Written(there.clone())
+        );
         assert_eq!(std::fs::read_to_string(&there).unwrap(), "new\n");
         // a folder is no file to write
         std::fs::create_dir_all(dir.join("folder")).unwrap();
@@ -706,7 +795,8 @@ mod tests {
             std::os::unix::fs::symlink(dir.join("not-yet.txt"), dir.join("dangling.sp")).unwrap();
             for name in ["link.sp", "dangling.sp"] {
                 for overwrite in [false, true] {
-                    let err = save_as(&roots, None, &dir.join(name), "x\n", OutputEncoding::Utf8, overwrite).unwrap_err();
+                    let err =
+                        save_as(&roots, None, &dir.join(name), "x\n", OutputEncoding::Utf8, overwrite).unwrap_err();
                     assert!(err.contains("link"), "{err}");
                 }
             }
@@ -732,7 +822,8 @@ mod tests {
             use std::os::unix::fs::PermissionsExt;
             assert_eq!(std::fs::metadata(&top).unwrap().permissions().mode() & 0o777, 0o640);
         }
-        let names: Vec<String> = std::fs::read_dir(&dir).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect();
+        let names: Vec<String> =
+            std::fs::read_dir(&dir).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect();
         assert_eq!(names, vec!["top.sp".to_string()], "no temporary file is left");
         // a file the user may not write is not replaced, as a write would not (a read-only file)
         let mut mode = std::fs::metadata(&top).unwrap().permissions();
@@ -764,8 +855,13 @@ mod tests {
         assert_eq!(std::fs::read(&top).unwrap(), b"new\n");
         assert_ne!(after.ino(), before.ino(), "a file that has no other name is replaced whole");
         // a group the user is in that is not the folder's: the new file is given it, as the old file had it
-        let groups = std::process::Command::new("id").arg("-G").output().map(|o| String::from_utf8_lossy(&o.stdout).into_owned()).unwrap_or_default();
-        if let Some(other) = groups.split_whitespace().filter_map(|g| g.parse::<u32>().ok()).find(|g| *g != after.gid()) {
+        let groups = std::process::Command::new("id")
+            .arg("-G")
+            .output()
+            .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
+            .unwrap_or_default();
+        if let Some(other) = groups.split_whitespace().filter_map(|g| g.parse::<u32>().ok()).find(|g| *g != after.gid())
+        {
             std::os::unix::fs::chown(&top, None, Some(other)).unwrap();
             write_replacing(&top, b"newer\n").unwrap();
             assert_eq!(std::fs::metadata(&top).unwrap().gid(), other, "the group of the file stays");
@@ -799,7 +895,8 @@ mod tests {
         if !may_write_in_it {
             assert_eq!(std::fs::metadata(&top).unwrap().ino(), inode, "the file was written, not replaced");
         }
-        let names: Vec<String> = std::fs::read_dir(&dir).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect();
+        let names: Vec<String> =
+            std::fs::read_dir(&dir).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect();
         assert_eq!(names, vec!["top.sp".to_string()]);
     }
 
@@ -866,12 +963,22 @@ mod tests {
         assert_eq!(err.kind(), std::io::ErrorKind::StorageFull);
         assert_eq!(file.data, old, "byte for byte");
         // a flush that fails after all of a shorter text was written over the start of the old one
-        let mut file = Failing { data: b"the old text of the file, which is long\n".to_vec(), room: 100, fail_sync: true, syncs: 0 };
+        let mut file = Failing {
+            data: b"the old text of the file, which is long\n".to_vec(),
+            room: 100,
+            fail_sync: true,
+            syncs: 0,
+        };
         let old = file.data.clone();
         assert!(overwrite(&mut file, b"short\n").is_err());
         assert_eq!(file.data, old, "byte for byte");
         // what fits is written whole, cut to its length, and a longer file is made shorter
-        let mut file = Failing { data: b"the old text of the file, which is long\n".to_vec(), room: 100, fail_sync: false, syncs: 0 };
+        let mut file = Failing {
+            data: b"the old text of the file, which is long\n".to_vec(),
+            room: 100,
+            fail_sync: false,
+            syncs: 0,
+        };
         overwrite(&mut file, b"short\n").unwrap();
         assert_eq!(file.data, b"short\n");
         let mut file = Failing { data: b"ab".to_vec(), room: 100, fail_sync: false, syncs: 0 };
@@ -899,7 +1006,14 @@ mod tests {
         let roots = Roots::default();
         roots.allow(&dir).unwrap();
         let entry = dir.join("top.sp").to_string_lossy().into_owned();
-        let err = save_all(&roots, &entry, &[saved(&dir.join("folder").to_string_lossy(), "x", None)], true, OutputEncoding::Preserve).unwrap_err();
+        let err = save_all(
+            &roots,
+            &entry,
+            &[saved(&dir.join("folder").to_string_lossy(), "x", None)],
+            true,
+            OutputEncoding::Preserve,
+        )
+        .unwrap_err();
         assert!(err.contains("regular file"), "{err}");
     }
 

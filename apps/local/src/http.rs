@@ -55,7 +55,11 @@ pub struct Response {
 
 impl std::fmt::Debug for Response {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Response").field("status", &self.status).field("headers", &self.headers).field("body", &self.body.len()).finish()
+        f.debug_struct("Response")
+            .field("status", &self.status)
+            .field("headers", &self.headers)
+            .field("body", &self.body.len())
+            .finish()
     }
 }
 
@@ -170,7 +174,12 @@ pub fn write_response(stream: &mut TcpStream, response: &Response, head_only: bo
 /// Write a response and flush it, all of it in `total` at most: for a client that is not of the session, whose answer is
 /// not worth a place for as long as a client likes to take. A reader that takes a byte now and then holds a place for as
 /// long as the write timeout of each write, which a response of megabytes is made of many; this is for all of them.
-pub fn write_response_within(stream: &mut TcpStream, response: &Response, head_only: bool, total: Duration) -> io::Result<()> {
+pub fn write_response_within(
+    stream: &mut TcpStream,
+    response: &Response,
+    head_only: bool,
+    total: Duration,
+) -> io::Result<()> {
     let deadline = Instant::now() + total;
     let mut send = |bytes: &[u8]| -> io::Result<()> {
         for piece in bytes.chunks(16 * 1024) {
@@ -206,7 +215,8 @@ pub struct Pace {
 }
 
 /// What the program asks of the body of a request that is of the session.
-pub const BODY_PACE: Pace = Pace { idle: Duration::from_secs(30), window: Duration::from_secs(30), min_rate: 64 * 1024 };
+pub const BODY_PACE: Pace =
+    Pace { idle: Duration::from_secs(30), window: Duration::from_secs(30), min_rate: 64 * 1024 };
 
 /// A request's head, read: the request without its body, the length of the body it says it has, and the first bytes of that
 /// body, which came with the head.
@@ -218,7 +228,12 @@ pub struct Head {
 }
 
 /// Read some bytes of the stream, no later than `deadline`.
-fn read_some(stream: &mut TcpStream, buffer: &mut [u8], deadline: Instant, what: &'static str) -> Result<usize, Rejected> {
+fn read_some(
+    stream: &mut TcpStream,
+    buffer: &mut [u8],
+    deadline: Instant,
+    what: &'static str,
+) -> Result<usize, Rejected> {
     let left = deadline.saturating_duration_since(Instant::now());
     if left.is_zero() {
         return Err(Rejected(408, "the request came too slowly"));
@@ -226,7 +241,9 @@ fn read_some(stream: &mut TcpStream, buffer: &mut [u8], deadline: Instant, what:
     stream.set_read_timeout(Some(left)).map_err(|_| Rejected(400, what))?;
     match stream.read(buffer) {
         Ok(n) => Ok(n),
-        Err(e) if matches!(e.kind(), io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut) => Err(Rejected(408, "the request came too slowly")),
+        Err(e) if matches!(e.kind(), io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut) => {
+            Err(Rejected(408, "the request came too slowly"))
+        }
         Err(_) => Err(Rejected(400, what)),
     }
 }
@@ -306,7 +323,11 @@ pub fn read_head_within(stream: &mut TcpStream, time: Duration) -> Result<Head, 
     if early.len() > length {
         return Err(Rejected(400, "more was sent than the Content-Length says"));
     }
-    Ok(Head { request: Request { method: method.to_string(), path, query: query.to_string(), headers, body: Vec::new() }, length, early })
+    Ok(Head {
+        request: Request { method: method.to_string(), path, query: query.to_string(), headers, body: Vec::new() },
+        length,
+        early,
+    })
 }
 
 /// Read the body the head says it has, at the pace `BODY_PACE` asks, and give the request whole.
@@ -429,7 +450,9 @@ mod tests {
             }
         });
         let started = Instant::now();
-        let Err(Rejected(status, _)) = read_head_within(&mut server, Duration::from_millis(400)) else { panic!("the head was taken") };
+        let Err(Rejected(status, _)) = read_head_within(&mut server, Duration::from_millis(400)) else {
+            panic!("the head was taken")
+        };
         assert_eq!(status, 408);
         assert!(started.elapsed() < Duration::from_secs(2), "{:?}", started.elapsed());
         drop(server);
@@ -440,7 +463,9 @@ mod tests {
     fn a_body_that_comes_slowly_is_taken_while_it_comes_and_not_while_it_stops_or_trickles() {
         let pace = Pace { idle: Duration::from_millis(300), window: Duration::from_millis(200), min_rate: 20_000 };
         let head = |client: &mut TcpStream, server: &mut TcpStream, length: usize| {
-            client.write_all(format!("POST /x HTTP/1.1\r\nHost: h\r\nContent-Length: {length}\r\n\r\n").as_bytes()).unwrap();
+            client
+                .write_all(format!("POST /x HTTP/1.1\r\nHost: h\r\nContent-Length: {length}\r\n\r\n").as_bytes())
+                .unwrap();
             read_head(server).unwrap()
         };
         // a body of 100 KB that takes a second (100 KB/s: slow, and far above the least): taken, though it takes longer than a fixed time would give
@@ -508,7 +533,12 @@ mod tests {
         let mut text = String::new();
         client.read_to_string(&mut text).unwrap();
         let (head, body) = text.split_once("\r\n\r\n").unwrap();
-        assert!(head.starts_with("HTTP/1.1 200 OK") && head.contains("application/x-ndjson") && !head.contains("Content-Length"), "{head}");
+        assert!(
+            head.starts_with("HTTP/1.1 200 OK")
+                && head.contains("application/x-ndjson")
+                && !head.contains("Content-Length"),
+            "{head}"
+        );
         assert_eq!(body, "{\"a\":1}\n{\"b\":2}\n");
     }
 
