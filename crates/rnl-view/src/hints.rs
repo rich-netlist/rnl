@@ -1163,8 +1163,10 @@ impl<'a> Drawing<'a> {
     }
 
     /// A wire leaving a pin against the pin's direction: its first segment does not go the way the
-    /// pin points, within 60 degrees.
+    /// pin points, within 60 degrees. In 0.4 a wire may leave a pin at a right angle to it, as the
+    /// default route of `auto` does (13.1): only a segment with a part against the pin is wrong.
     fn exits(&self, out: &mut Vec<Hint>) {
+        let right_angle = rnl_runtime::interp::unit::keeps_0_4(&self.lv.language);
         for (w, wire) in self.wires.iter().enumerate() {
             let pts = &wire.points;
             if pts.len() < 2 {
@@ -1185,7 +1187,12 @@ impl<'a> Drawing<'a> {
                 let go = unit((next.0 - end.0, next.1 - end.1));
                 if here.iter().any(|p| {
                     let d = p.dir.unwrap();
-                    go.0 * d.0 + go.1 * d.1 > 0.5
+                    let along = go.0 * d.0 + go.1 * d.1;
+                    if right_angle {
+                        along > -1e-9
+                    } else {
+                        along > 0.5
+                    }
                 }) {
                     continue;
                 }

@@ -1624,16 +1624,9 @@ mod tests {
         g.origin[1] = [int(-3), int(-3)];
         let path = crate::route::written_path(&p, &g, 0).unwrap().unwrap();
         let half = int(1) / int(2);
-        assert_eq!(
-            path,
-            vec![
-                [int(-3), int(0)],
-                [int(-4), int(0)],
-                [int(-4), -half.clone()],
-                [int(-3), -half.clone()],
-                [int(-3), int(-1)]
-            ]
-        );
+        // since a pin may be left at a right angle (13.1), the route goes straight down; the
+        // whole-lead read must still find a solution with it
+        assert_eq!(path, vec![[int(-3), int(0)], [int(-3), int(-1)]]);
         let options = SolverOptions::without_time_limit();
         for whole in [true, false] {
             let mut sk =

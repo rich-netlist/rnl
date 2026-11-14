@@ -20,16 +20,18 @@ fn geometry_errors(r: &Interpretation) -> usize {
         .filter(|d| d.severity == Severity::Error && d.code.number().as_deref() == Some("RNL9405"))
         .count()
 }
+/// A pin at the largest coordinate that faces up: a wire to a point below it cannot leave it
+/// upward and come back past it, nor at a right angle, as no finite coordinate lies beside it.
 fn prefix() -> String {
     format!(
-        r#"$S = @DEFINE-SYMBOL {{ %p = (0,0) @PIN(terminal=1,direction="right") }};
+        r#"$S = @DEFINE-SYMBOL {{ %p = (0,0) @PIN(terminal=1,direction="up") }};
         #R1 @SET-SYMBOL $S => @PLACE({MAX},0)"#
     )
 }
 
 #[test]
 fn known_auto_path_failure_is_one_error_across_model_and_problem_consumers() {
-    let r = read(&format!(r#"{}; &a @WIRE {{#R1::p ({MAX},4)}}"#, prefix()));
+    let r = read(&format!(r#"{}; &a @WIRE {{#R1::p ({MAX},-4)}}"#, prefix()));
     assert_eq!(geometry_errors(&r), 1, "{:?}", r.diagnostics());
     assert!(r.model.levels[0].wires.is_empty(), "no diagonal fallback is drawn");
 }
@@ -51,7 +53,7 @@ fn ignored_undrawn_wire_does_not_report_geometry_error() {
 fn effective_rewrite_is_checked_and_reported_once() {
     let r = read(&format!(
         r#"{}; %w = &a @WIRE(mode="straight") {{(0,0) (1,0)}};
-        %w @WIRE {{#R1::p ({MAX},4)}}"#,
+        %w @WIRE {{#R1::p ({MAX},-4)}}"#,
         prefix()
     ));
     assert_eq!(geometry_errors(&r), 1, "{:?}", r.diagnostics());

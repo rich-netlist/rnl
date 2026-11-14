@@ -3,6 +3,15 @@
 //! The input is a whole wire, not a collection of independent routes: endpoint directions apply
 //! only at the ends, and a waypoint cannot reverse the incoming leg. The result keeps one path per
 //! input segment so every written waypoint retains its identity even if consecutive legs align.
+//!
+//! An end that is a pin with a direction is directed: the wire leaves it along that direction or
+//! at a right angle to it, and arrives at it against that direction or at a right angle to it,
+//! never the other way; leaving or arriving at a right angle counts as a bend. Of the routes that
+//! satisfy this, the default has the fewest bends; then it is the shortest, a leg that goes out
+//! only to come back being 1 long; then it turns at fewer of its directed ends, keeping the
+//! direction of the first end before that of the last; then its middle leg lies halfway between
+//! the ends; between two undirected ends it goes horizontally first; and a detour goes to the
+//! left of the first directed end (13.1).
 
 use super::Pt;
 use std::cmp::Ordering;
@@ -51,7 +60,11 @@ struct Candidate {
     points: Vec<Pt>,
     first: Dir,
     last: Dir,
+    /// Bends of the path, a right angle at a directed end counted as one.
     bends: usize,
+    /// Right angles at the directed ends, and whether the first end has one.
+    turns: u8,
+    turn_first: u8,
     length: f64,
     deviation: f64,
     horizontal: u8,
@@ -62,6 +75,8 @@ impl Candidate {
         self.bends
             .cmp(&other.bends)
             .then_with(|| cmp_number(self.length, other.length))
+            .then(self.turns.cmp(&other.turns))
+            .then(self.turn_first.cmp(&other.turn_first))
             .then_with(|| cmp_number(self.deviation, other.deviation))
             .then(self.horizontal.cmp(&other.horizontal))
             .then_with(|| cmp_number(self.side, other.side))
@@ -198,9 +213,20 @@ fn candidates(a: Pt, da: Option<Direction>, b: Pt, db: Option<Direction>, single
                 }
                 let first = direction(pts[0], pts[1]);
                 let last = direction(pts[pts.len() - 2], b);
-                if da.is_some_and(|d| d.vector() != first) || db.is_some_and(|d| !opposite(d.vector(), last)) {
-                    continue;
-                }
+                // a directed end is left along its direction and reached against it, or at a right
+                // angle, which counts as a bend; never backwards
+                let turn_a = match da {
+                    Some(d) if d.vector() == first => 0u8,
+                    Some(d) if opposite(d.vector(), first) => continue,
+                    Some(_) => 1,
+                    None => 0,
+                };
+                let turn_b = match db {
+                    Some(d) if opposite(d.vector(), last) => 0u8,
+                    Some(d) if d.vector() == last => continue,
+                    Some(_) => 1,
+                    None => 0,
+                };
                 let length = pts
                     .windows(2)
                     .map(|v| scaled_delta(v[1].0, v[0].0, scale).abs() + scaled_delta(v[1].1, v[0].1, scale).abs())
@@ -220,7 +246,9 @@ fn candidates(a: Pt, da: Option<Direction>, b: Pt, db: Option<Direction>, single
                     points: pts,
                     first,
                     last,
-                    bends,
+                    bends: bends + usize::from(turn_a + turn_b),
+                    turns: turn_a + turn_b,
+                    turn_first: turn_a,
                     length,
                     deviation,
                     horizontal: u8::from(first.1 != 0),
@@ -228,10 +256,11 @@ fn candidates(a: Pt, da: Option<Direction>, b: Pt, db: Option<Direction>, single
                 });
             }
         }
-        if all.len() > start_len && min_bends.is_none() {
-            min_bends = Some(bends);
+        // the fewest bends found, end turns counted: a later round has more bends of its own
+        if let Some(n) = all[start_len..].iter().map(|c| c.bends).min() {
+            min_bends = Some(min_bends.map_or(n, |m: usize| m.min(n)));
         }
-        if single && min_bends.is_some() || min_bends.is_some_and(|n| bends >= n + 2) {
+        if single && min_bends.is_some_and(|n| bends >= n) || min_bends.is_some_and(|n| bends >= n + 2) {
             break;
         }
     }
@@ -251,6 +280,8 @@ fn candidates(a: Pt, da: Option<Direction>, b: Pt, db: Option<Direction>, single
 #[derive(Clone)]
 struct State {
     bends: usize,
+    turns: u8,
+    turn_first: u8,
     length: f64,
     last: Dir,
     key: Candidate,
@@ -261,7 +292,12 @@ struct Link {
     prev: Option<usize>,
 }
 fn state_cmp(a: &State, b: &State) -> Ordering {
-    a.bends.cmp(&b.bends).then_with(|| cmp_number(a.length, b.length)).then_with(|| a.key.cmp_key(&b.key))
+    a.bends
+        .cmp(&b.bends)
+        .then_with(|| cmp_number(a.length, b.length))
+        .then(a.turns.cmp(&b.turns))
+        .then(a.turn_first.cmp(&b.turn_first))
+        .then_with(|| a.key.cmp_key(&b.key))
 }
 
 /// Route a complete wire. `first` and `last` are outward scene directions of the endpoint pins;
@@ -306,7 +342,15 @@ pub fn auto_wire(points: &[Pt], first: Option<Direction>, last: Option<Direction
             for c in cs {
                 let path = links.len();
                 links.push(Link { points: c.points.clone(), prev: None });
-                let s = State { bends: c.bends, length: c.length, last: c.last, path, key: c };
+                let s = State {
+                    bends: c.bends,
+                    turns: c.turns,
+                    turn_first: c.turn_first,
+                    length: c.length,
+                    last: c.last,
+                    path,
+                    key: c,
+                };
                 if let Some(j) = next.iter().position(|x| x.last == s.last) {
                     if state_cmp(&s, &next[j]) == Ordering::Less {
                         next[j] = s;
@@ -325,6 +369,8 @@ pub fn auto_wire(points: &[Pt], first: Option<Direction>, last: Option<Direction
                     links.push(Link { points: c.points.clone(), prev: Some(old.path) });
                     let s = State {
                         bends: old.bends + c.bends + usize::from(old.last != c.first),
+                        turns: old.turns + c.turns,
+                        turn_first: old.turn_first,
                         length: old.length + c.length,
                         last: c.last,
                         key: c.clone(),
@@ -383,27 +429,27 @@ mod tests {
         );
         assert_eq!(
             auto_wire(&[(0.0, 0.0), (0.0, 3.0)], Some(Direction::Right), Some(Direction::Left)).unwrap(),
-            vec![vec![(0.0, 0.0), (1.0, 0.0), (1.0, 1.5), (-1.0, 1.5), (-1.0, 3.0), (0.0, 3.0)]],
+            vec![vec![(0.0, 0.0), (0.0, 3.0)]],
             "directed_left_3"
         );
         assert_eq!(
             auto_wire(&[(0.0, 0.0), (-4.0, 3.0)], Some(Direction::Right), Some(Direction::Left)).unwrap(),
-            vec![vec![(0.0, 0.0), (1.0, 0.0), (1.0, 1.5), (-5.0, 1.5), (-5.0, 3.0), (-4.0, 3.0)]],
+            vec![vec![(0.0, 0.0), (0.0, 1.5), (-4.0, 1.5), (-4.0, 3.0)]],
             "directed_left_4"
         );
         assert_eq!(
             auto_wire(&[(0.0, 0.0), (-4.0, 0.0)], Some(Direction::Right), Some(Direction::Left)).unwrap(),
-            vec![vec![(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (-5.0, 1.0), (-5.0, 0.0), (-4.0, 0.0)]],
+            vec![vec![(0.0, 0.0), (0.0, 1.0), (-4.0, 1.0), (-4.0, 0.0)]],
             "directed_left_5"
         );
         assert_eq!(
             auto_wire(&[(0.0, 0.0), (-4.0, -3.0)], Some(Direction::Right), Some(Direction::Left)).unwrap(),
-            vec![vec![(0.0, 0.0), (1.0, 0.0), (1.0, -1.5), (-5.0, -1.5), (-5.0, -3.0), (-4.0, -3.0)]],
+            vec![vec![(0.0, 0.0), (0.0, -1.5), (-4.0, -1.5), (-4.0, -3.0)]],
             "directed_left_6"
         );
         assert_eq!(
             auto_wire(&[(0.0, 0.0), (0.0, -3.0)], Some(Direction::Right), Some(Direction::Left)).unwrap(),
-            vec![vec![(0.0, 0.0), (1.0, 0.0), (1.0, -1.5), (-1.0, -1.5), (-1.0, -3.0), (0.0, -3.0)]],
+            vec![vec![(0.0, 0.0), (0.0, -3.0)]],
             "directed_left_7"
         );
         assert_eq!(
@@ -413,77 +459,77 @@ mod tests {
         );
         assert_eq!(
             auto_wire(&[(0.0, 0.0), (4.0, 0.0)], Some(Direction::Right), Some(Direction::Right)).unwrap(),
-            vec![vec![(0.0, 0.0), (2.0, 0.0), (2.0, 1.0), (5.0, 1.0), (5.0, 0.0), (4.0, 0.0)]],
+            vec![vec![(0.0, 0.0), (2.0, 0.0), (2.0, 1.0), (4.0, 1.0), (4.0, 0.0)]],
             "directed_right_1"
         );
         assert_eq!(
             auto_wire(&[(0.0, 0.0), (4.0, 3.0)], Some(Direction::Right), Some(Direction::Right)).unwrap(),
-            vec![vec![(0.0, 0.0), (5.0, 0.0), (5.0, 3.0), (4.0, 3.0)]],
+            vec![vec![(0.0, 0.0), (4.0, 0.0), (4.0, 3.0)]],
             "directed_right_2"
         );
         assert_eq!(
             auto_wire(&[(0.0, 0.0), (0.0, 3.0)], Some(Direction::Right), Some(Direction::Right)).unwrap(),
-            vec![vec![(0.0, 0.0), (1.0, 0.0), (1.0, 3.0), (0.0, 3.0)]],
+            vec![vec![(0.0, 0.0), (0.0, 3.0)]],
             "directed_right_3"
         );
         assert_eq!(
             auto_wire(&[(0.0, 0.0), (-4.0, 3.0)], Some(Direction::Right), Some(Direction::Right)).unwrap(),
-            vec![vec![(0.0, 0.0), (1.0, 0.0), (1.0, 3.0), (-4.0, 3.0)]],
+            vec![vec![(0.0, 0.0), (0.0, 3.0), (-4.0, 3.0)]],
             "directed_right_4"
         );
         assert_eq!(
             auto_wire(&[(0.0, 0.0), (-4.0, 0.0)], Some(Direction::Right), Some(Direction::Right)).unwrap(),
-            vec![vec![(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (-2.0, 1.0), (-2.0, 0.0), (-4.0, 0.0)]],
+            vec![vec![(0.0, 0.0), (0.0, 1.0), (-2.0, 1.0), (-2.0, 0.0), (-4.0, 0.0)]],
             "directed_right_5"
         );
         assert_eq!(
             auto_wire(&[(0.0, 0.0), (-4.0, -3.0)], Some(Direction::Right), Some(Direction::Right)).unwrap(),
-            vec![vec![(0.0, 0.0), (1.0, 0.0), (1.0, -3.0), (-4.0, -3.0)]],
+            vec![vec![(0.0, 0.0), (0.0, -3.0), (-4.0, -3.0)]],
             "directed_right_6"
         );
         assert_eq!(
             auto_wire(&[(0.0, 0.0), (0.0, -3.0)], Some(Direction::Right), Some(Direction::Right)).unwrap(),
-            vec![vec![(0.0, 0.0), (1.0, 0.0), (1.0, -3.0), (0.0, -3.0)]],
+            vec![vec![(0.0, 0.0), (0.0, -3.0)]],
             "directed_right_7"
         );
         assert_eq!(
             auto_wire(&[(0.0, 0.0), (4.0, -3.0)], Some(Direction::Right), Some(Direction::Right)).unwrap(),
-            vec![vec![(0.0, 0.0), (5.0, 0.0), (5.0, -3.0), (4.0, -3.0)]],
+            vec![vec![(0.0, 0.0), (4.0, 0.0), (4.0, -3.0)]],
             "directed_right_8"
         );
         assert_eq!(
             auto_wire(&[(0.0, 0.0), (4.0, 0.0)], Some(Direction::Right), Some(Direction::Up)).unwrap(),
-            vec![vec![(0.0, 0.0), (2.0, 0.0), (2.0, 1.0), (4.0, 1.0), (4.0, 0.0)]],
+            vec![vec![(0.0, 0.0), (4.0, 0.0)]],
             "directed_up_1"
         );
         assert_eq!(
             auto_wire(&[(0.0, 0.0), (4.0, 3.0)], Some(Direction::Right), Some(Direction::Up)).unwrap(),
-            vec![vec![(0.0, 0.0), (2.0, 0.0), (2.0, 4.0), (4.0, 4.0), (4.0, 3.0)]],
+            vec![vec![(0.0, 0.0), (2.0, 0.0), (2.0, 3.0), (4.0, 3.0)]],
             "directed_up_2"
         );
         assert_eq!(
             auto_wire(&[(0.0, 0.0), (0.0, 3.0)], Some(Direction::Right), Some(Direction::Up)).unwrap(),
-            vec![vec![(0.0, 0.0), (1.0, 0.0), (1.0, 4.0), (0.0, 4.0), (0.0, 3.0)]],
+            vec![vec![(0.0, 0.0), (1.0, 0.0), (1.0, 3.0), (0.0, 3.0)]],
             "directed_up_3"
         );
         assert_eq!(
             auto_wire(&[(0.0, 0.0), (-4.0, 3.0)], Some(Direction::Right), Some(Direction::Up)).unwrap(),
-            vec![vec![(0.0, 0.0), (1.0, 0.0), (1.0, 4.0), (-4.0, 4.0), (-4.0, 3.0)]],
+            vec![vec![(0.0, 0.0), (0.0, 3.0), (-4.0, 3.0)]],
             "directed_up_4"
         );
         assert_eq!(
             auto_wire(&[(0.0, 0.0), (-4.0, 0.0)], Some(Direction::Right), Some(Direction::Up)).unwrap(),
-            vec![vec![(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (-4.0, 1.0), (-4.0, 0.0)]],
+            vec![vec![(0.0, 0.0), (0.0, 1.0), (-4.0, 1.0), (-4.0, 0.0)]],
             "directed_up_5"
         );
         assert_eq!(
             auto_wire(&[(0.0, 0.0), (-4.0, -3.0)], Some(Direction::Right), Some(Direction::Up)).unwrap(),
-            vec![vec![(0.0, 0.0), (1.0, 0.0), (1.0, -1.5), (-4.0, -1.5), (-4.0, -3.0)]],
+            vec![vec![(0.0, 0.0), (0.0, -1.5), (-4.0, -1.5), (-4.0, -3.0)]],
             "directed_up_6"
         );
         assert_eq!(
             auto_wire(&[(0.0, 0.0), (0.0, -3.0)], Some(Direction::Right), Some(Direction::Up)).unwrap(),
-            vec![vec![(0.0, 0.0), (1.0, 0.0), (1.0, -1.5), (0.0, -1.5), (0.0, -3.0)]],
+            vec![vec![(0.0, 0.0), (0.0, -3.0)]],
             "directed_up_7"
         );
         assert_eq!(
@@ -493,7 +539,7 @@ mod tests {
         );
         assert_eq!(
             auto_wire(&[(0.0, 0.0), (4.0, 0.0)], Some(Direction::Right), Some(Direction::Down)).unwrap(),
-            vec![vec![(0.0, 0.0), (2.0, 0.0), (2.0, -1.0), (4.0, -1.0), (4.0, 0.0)]],
+            vec![vec![(0.0, 0.0), (4.0, 0.0)]],
             "directed_down_1"
         );
         assert_eq!(
@@ -503,32 +549,32 @@ mod tests {
         );
         assert_eq!(
             auto_wire(&[(0.0, 0.0), (0.0, 3.0)], Some(Direction::Right), Some(Direction::Down)).unwrap(),
-            vec![vec![(0.0, 0.0), (1.0, 0.0), (1.0, 1.5), (0.0, 1.5), (0.0, 3.0)]],
+            vec![vec![(0.0, 0.0), (0.0, 3.0)]],
             "directed_down_3"
         );
         assert_eq!(
             auto_wire(&[(0.0, 0.0), (-4.0, 3.0)], Some(Direction::Right), Some(Direction::Down)).unwrap(),
-            vec![vec![(0.0, 0.0), (1.0, 0.0), (1.0, 1.5), (-4.0, 1.5), (-4.0, 3.0)]],
+            vec![vec![(0.0, 0.0), (0.0, 1.5), (-4.0, 1.5), (-4.0, 3.0)]],
             "directed_down_4"
         );
         assert_eq!(
             auto_wire(&[(0.0, 0.0), (-4.0, 0.0)], Some(Direction::Right), Some(Direction::Down)).unwrap(),
-            vec![vec![(0.0, 0.0), (1.0, 0.0), (1.0, -1.0), (-4.0, -1.0), (-4.0, 0.0)]],
+            vec![vec![(0.0, 0.0), (0.0, -1.0), (-4.0, -1.0), (-4.0, 0.0)]],
             "directed_down_5"
         );
         assert_eq!(
             auto_wire(&[(0.0, 0.0), (-4.0, -3.0)], Some(Direction::Right), Some(Direction::Down)).unwrap(),
-            vec![vec![(0.0, 0.0), (1.0, 0.0), (1.0, -4.0), (-4.0, -4.0), (-4.0, -3.0)]],
+            vec![vec![(0.0, 0.0), (0.0, -3.0), (-4.0, -3.0)]],
             "directed_down_6"
         );
         assert_eq!(
             auto_wire(&[(0.0, 0.0), (0.0, -3.0)], Some(Direction::Right), Some(Direction::Down)).unwrap(),
-            vec![vec![(0.0, 0.0), (1.0, 0.0), (1.0, -4.0), (0.0, -4.0), (0.0, -3.0)]],
+            vec![vec![(0.0, 0.0), (1.0, 0.0), (1.0, -3.0), (0.0, -3.0)]],
             "directed_down_7"
         );
         assert_eq!(
             auto_wire(&[(0.0, 0.0), (4.0, -3.0)], Some(Direction::Right), Some(Direction::Down)).unwrap(),
-            vec![vec![(0.0, 0.0), (2.0, 0.0), (2.0, -4.0), (4.0, -4.0), (4.0, -3.0)]],
+            vec![vec![(0.0, 0.0), (2.0, 0.0), (2.0, -3.0), (4.0, -3.0)]],
             "directed_down_8"
         );
         assert_eq!(
@@ -543,27 +589,27 @@ mod tests {
         );
         assert_eq!(
             auto_wire(&[(0.0, 0.0), (0.0, 3.0)], Some(Direction::Right), None).unwrap(),
-            vec![vec![(0.0, 0.0), (1.0, 0.0), (1.0, 3.0), (0.0, 3.0)]],
+            vec![vec![(0.0, 0.0), (0.0, 3.0)]],
             "directed_free_3"
         );
         assert_eq!(
             auto_wire(&[(0.0, 0.0), (-4.0, 3.0)], Some(Direction::Right), None).unwrap(),
-            vec![vec![(0.0, 0.0), (1.0, 0.0), (1.0, 3.0), (-4.0, 3.0)]],
+            vec![vec![(0.0, 0.0), (0.0, 3.0), (-4.0, 3.0)]],
             "directed_free_4"
         );
         assert_eq!(
             auto_wire(&[(0.0, 0.0), (-4.0, 0.0)], Some(Direction::Right), None).unwrap(),
-            vec![vec![(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (-4.0, 1.0), (-4.0, 0.0)]],
+            vec![vec![(0.0, 0.0), (0.0, 1.0), (-4.0, 1.0), (-4.0, 0.0)]],
             "directed_free_5"
         );
         assert_eq!(
             auto_wire(&[(0.0, 0.0), (-4.0, -3.0)], Some(Direction::Right), None).unwrap(),
-            vec![vec![(0.0, 0.0), (1.0, 0.0), (1.0, -3.0), (-4.0, -3.0)]],
+            vec![vec![(0.0, 0.0), (0.0, -3.0), (-4.0, -3.0)]],
             "directed_free_6"
         );
         assert_eq!(
             auto_wire(&[(0.0, 0.0), (0.0, -3.0)], Some(Direction::Right), None).unwrap(),
-            vec![vec![(0.0, 0.0), (1.0, 0.0), (1.0, -3.0), (0.0, -3.0)]],
+            vec![vec![(0.0, 0.0), (0.0, -3.0)]],
             "directed_free_7"
         );
         assert_eq!(
@@ -633,7 +679,7 @@ mod tests {
         );
         assert_eq!(
             auto_wire(&[(0.0, 0.0), (-4.0, 0.0), (-4.0, 4.0)], Some(Direction::Right), None).unwrap(),
-            vec![vec![(0.0, 0.0), (1.0, 0.0), (1.0, -1.0), (-4.0, -1.0), (-4.0, 0.0)], vec![(-4.0, 0.0), (-4.0, 4.0)]],
+            vec![vec![(0.0, 0.0), (0.0, -1.0), (-4.0, -1.0), (-4.0, 0.0)], vec![(-4.0, 0.0), (-4.0, 4.0)]],
             "chain_5"
         );
         assert_eq!(
@@ -692,6 +738,28 @@ mod tests {
         }
     }
     #[test]
+    fn a_directed_end_may_be_left_or_reached_at_a_right_angle_counted_as_a_bend() {
+        let right = Some(Direction::Right);
+        // a ground pin one unit below a pin that faces right: down at once, one bend, where
+        // leaving along the pin first took three
+        let stub = auto_wire(&[(0., 0.), (0., -1.)], right, Some(Direction::Up)).unwrap();
+        assert_eq!(stub, vec![vec![(0., 0.), (0., -1.)]]);
+        // a point straight behind a pin that faces right: up, left, then down, the leg out 1 long
+        // and to the left of the pin's direction, rather than right, up, left and down
+        let behind = auto_wire(&[(0., 0.), (-3., 0.)], right, None).unwrap();
+        assert_eq!(behind, vec![vec![(0., 0.), (0., 1.), (-3., 1.), (-3., 0.)]]);
+        // with as many bends, the shorter route wins, even when it turns at the pin
+        let below = auto_wire(&[(0., 0.), (2., -1.)], Some(Direction::Up), None).unwrap();
+        assert_eq!(below, vec![vec![(0., 0.), (2., 0.), (2., -1.)]]);
+        // never backwards: a pin that faces right is not left to the left
+        let back = auto_wire(&[(0., 0.), (-3., 0.)], right, Some(Direction::Right)).unwrap();
+        assert_ne!(direction(back[0][0], back[0][1]), (-1, 0), "{back:?}");
+        assert_ne!(direction(back[0][back[0].len() - 2], (-3., 0.)), (1, 0), "{back:?}");
+        // when the bends and the length are equal, the route keeps the direction of the pins
+        let ahead = auto_wire(&[(0., 0.), (4., 3.)], right, None).unwrap();
+        assert_eq!(ahead, vec![vec![(0., 0.), (4., 0.), (4., 3.)]]);
+    }
+    #[test]
     fn repeated_waypoints_keep_segment_slots_and_direction() {
         assert_eq!(auto_wire(&[], None, None), Some(vec![]));
         assert_eq!(auto_wire(&[(1., 2.)], None, None), Some(vec![]));
@@ -738,9 +806,10 @@ mod tests {
         );
         let below = f64::from_bits(m.to_bits() - 1);
         assert_eq!(auto_wire(&[(below, 0.0), (m, 0.0)], None, None), Some(vec![vec![(below, 0.0), (m, 0.0)]]));
-        assert!(
-            auto_wire(&[(m, 0.0), (m, 4.0)], Some(Direction::Right), None).is_none(),
-            "an unrepresentable outward stub is not invented"
+        // an unrepresentable outward stub is not invented: the pin is left at a right angle
+        assert_eq!(
+            auto_wire(&[(m, 0.0), (m, 4.0)], Some(Direction::Right), None),
+            Some(vec![vec![(m, 0.0), (m, 4.0)]])
         );
     }
     #[test]

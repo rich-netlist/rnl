@@ -874,16 +874,19 @@ fn default_wire_rotates_pin_exit_but_not_its_position_point() {
     }];
     let mut geometry = Geometry::new(2);
     geometry.orient[0] = Orient::R90;
-    geometry.origin[1] = p(4, 0);
+    // a point straight behind the pin, which the turned pin faces away from
+    geometry.origin[1] = p(0, 0);
     let pin_path = written_path(&problem, &geometry, 0).unwrap().unwrap();
-    let expected = shared_auto_path(&[p(0, -3), p(4, 0)], Some(Direction::Down), None).unwrap();
+    let expected = shared_auto_path(&[p(0, -3), p(0, 0)], Some(Direction::Down), None).unwrap();
     assert_eq!(pin_path, expected);
-    assert_eq!(pin_path[0][0], pin_path[1][0]);
-    assert!(pin_path[1][1] < pin_path[0][1]);
+    // it leaves the pin at a right angle, not against its direction, which is down (13.1)
+    assert_eq!(pin_path[0][1], pin_path[1][1]);
+    assert_ne!(pin_path[0][0], pin_path[1][0]);
     problem.wires[0].anchors[0] =
         PointRef::PinPosition { object: 0, pin: 0, reference: Reference::Name("#M::g::position".into()) };
     let position_path = written_path(&problem, &geometry, 0).unwrap().unwrap();
-    assert_eq!(position_path, shared_auto_path(&[p(0, -3), p(4, 0)], None, None).unwrap());
+    assert_eq!(position_path, shared_auto_path(&[p(0, -3), p(0, 0)], None, None).unwrap());
+    assert_eq!(position_path.len(), 2, "a position point has no direction: straight up");
 }
 
 #[test]

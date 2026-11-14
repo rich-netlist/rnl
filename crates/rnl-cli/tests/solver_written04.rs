@@ -40,9 +40,10 @@ fn authored_auto_wire_is_written_with_its_core_path_and_reopens_solved() {
     assert_eq!(
         level.solved.solution.wire_routes[0].points,
         vec![
+            // up out of the first pin, and into the second at a right angle: as many bends as
+            // going over and down into it, and shorter (13.1)
             WirePoint::Anchor(level.problem.wires[0].anchors[0].clone()),
-            WirePoint::Bend((0., 3.)),
-            WirePoint::Bend((4., 3.)),
+            WirePoint::Bend((0., 2.)),
             WirePoint::Anchor(level.problem.wires[0].anchors[1].clone()),
         ],
     );

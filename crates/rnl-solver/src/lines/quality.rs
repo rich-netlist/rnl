@@ -415,10 +415,11 @@ mod tests {
     }
 
     /// A wire that takes the default route of `auto` (13.1) from a pin that leaves sideways to a
-    /// pin one unit beyond it turns back: out by one, half a unit over, back, and in. The order of
-    /// the lines layout and the routing objectives count it as it is drawn, three bends and a
-    /// length of three, so that a placement whose pins face each other, with a straight wire of
-    /// length one, ranks before it. Neither is taken for a drawing that could not be measured.
+    /// pin one unit below it leaves the first at a right angle, straight down into the second: one
+    /// bend, the turn at the pin, and a length of one. The order of the lines layout and the
+    /// routing objectives count it as it is drawn, so that a placement whose pins face each
+    /// other, with a straight wire of length one and no bend, ranks before it. Neither is taken
+    /// for a drawing that could not be measured.
     #[test]
     fn a_default_auto_wire_that_turns_back_counts_its_bends_and_its_length() {
         use crate::resolve::tests::{instance, problem_of};
@@ -471,13 +472,13 @@ mod tests {
         let back = lab_order(&p, &s, &turned, &routing, (1, 4), None);
         let straight = lab_order(&p, &s, &facing, &routing, (1, 4), None);
         assert!(!back.interrupted && !straight.interrupted);
-        assert_eq!((back.crossings, back.bends, back.length.clone()), (0, 3, int(3)));
+        assert_eq!((back.crossings, back.bends, back.length.clone()), (0, 1, int(1)));
         assert_eq!((straight.crossings, straight.bends, straight.length.clone()), (0, 0, int(1)));
         assert!(straight < back);
         // the routing objectives are given the same paths
         let drawn = crate::score::drawn(&p, &s, &turned.geometry, &routing).expect("a wire that can be drawn");
         assert_eq!(drawn.paths.len(), 1);
-        assert_eq!(drawn.paths[0].1.len(), 5);
+        assert_eq!(drawn.paths[0].1.len(), 2);
         let drawn = crate::score::drawn(&p, &s, &facing.geometry, &routing).expect("a wire that can be drawn");
         assert_eq!(drawn.paths[0].1.len(), 2);
     }
