@@ -48,10 +48,10 @@ use serde::{Deserialize, Serialize};
 /// `std_version`).
 #[derive(Deserialize, Debug)]
 pub struct SolveRequest {
-    /// The path of the file to solve, as the frontend names it. A [`check`] may leave it out, to
-    /// check `solver_config` alone.
+    /// The path of the file to solve, as the frontend names it. A solve needs it; a [`check`] may
+    /// leave it out, to check `solver_config` alone.
     #[serde(default)]
-    pub entry: String,
+    pub entry: Option<String>,
     /// The texts of the workspace by path, the entry's among them. Two paths that are one file,
     /// such as `a/b.sp` and `a\b.sp`, are an error. The answer names each file written by the
     /// path it has here.
@@ -179,9 +179,8 @@ pub fn check(request: &[u8]) -> serde_json::Value {
         Err(e) => return error(e),
     };
     let tool = [rnl_cli::solve::ToolSettings::Config(std::mem::take(&mut request.solver_config))];
-    let entry = std::mem::take(&mut request.entry);
+    let file = request.entry.take().map(|entry| std::path::PathBuf::from(normalize(&entry)));
     let options = read_options(&mut request, SolverOptions::default());
-    let file = (!entry.is_empty()).then(|| std::path::PathBuf::from(normalize(&entry)));
     match rnl_cli::solve::check_settings(file.as_deref(), &files, &options, &tool) {
         Ok(checked) => serde_json::to_value(&checked).expect("a check serializes"),
         Err(e) => error(e),
@@ -194,6 +193,9 @@ pub fn solve(request: &[u8], now: &dyn Fn() -> f64, progress: &dyn Fn(&str) -> b
     let mut request: SolveRequest = match serde_json::from_slice(request) {
         Ok(r) => r,
         Err(e) => return Answer::Error { error: format!("the request is not valid: {e}") },
+    };
+    let Some(entry) = request.entry.take() else {
+        return Answer::Error { error: "the request is not valid: missing field `entry`".into() };
     };
     let solver = match SolverOptions::default().with_config(&request.solver_config) {
         Ok(s) => s,
@@ -208,9 +210,9 @@ pub fn solve(request: &[u8], now: &dyn Fn() -> f64, progress: &dyn Fn(&str) -> b
     let clock = Now { now, read: std::cell::Cell::new(None) };
     let sink = |e: &rnl_cli::progress::Event| progress(&e.line());
     let shown = if request.respace {
-        rnl_cli::preview::respace(&request.entry, &files, &options, &clock, &sink)
+        rnl_cli::preview::respace(&entry, &files, &options, &clock, &sink)
     } else {
-        rnl_cli::preview::preview_progress(&request.entry, &files, &options, &clock, &sink)
+        rnl_cli::preview::preview_progress(&entry, &files, &options, &clock, &sink)
     };
     match shown {
         Ok(shown) => Answer::Solved {
@@ -447,5 +449,16 @@ R2 a 0 1k
         let answer = solve(&request(serde_json::json!({ "solver_config": "beam=0" })), &|| 0., &|_| true);
         assert!(matches!(&answer, Answer::Error { error } if error.starts_with("solver_config:")), "{answer:?}");
         assert!(matches!(solve(b"{", &|| 0., &|_| true), Answer::Error { .. }));
+        let answer = solve(br#"{"files":{}}"#, &|| 0., &|_| true);
+        assert!(matches!(&answer, Answer::Error { error } if error.ends_with("missing field `entry`")), "{answer:?}");
+    }
+
+    #[test]
+    fn a_check_that_cannot_be_given_says_why() {
+        assert!(check(b"{").get("error").is_some());
+        let missing = check(&request(serde_json::json!({ "entry": "/w/other.sp" })));
+        assert!(missing.get("error").is_some(), "{missing}");
+        let checked = check(&request(serde_json::json!({})));
+        assert_eq!(checked["ok"], true, "{checked}");
     }
 }

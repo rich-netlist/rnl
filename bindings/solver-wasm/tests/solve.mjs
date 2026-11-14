@@ -66,6 +66,11 @@ assert.equal(alone.levels.length, 1);
 assert.equal(alone.levels[0].title, null);
 assert.deepEqual(alone.levels[0].errors.map((e) => e.key), ["beam"]);
 assert.match(solver.check({ ...request, files: { "/w/main.sp": source, "\\w\\main.sp": source } }).error, /are one file$/);
+assert.ok(solver.check({ ...request, entry: "/w/other.sp" }).error);
+// a request that is not JSON is refused before the module, which goes on answering
+assert.throws(() => solver.check({ ...request, extra: 1n }), TypeError);
+assert.equal(solver.check(request).ok, true);
+assert.match(solver.solve({ files: {} }).error, /missing field `entry`$/);
 
 const bad = solver.solve({ ...request, solver_config: "beam=0" });
 assert.match(bad.error, /^solver_config:/);
@@ -191,12 +196,23 @@ if (rnl) {
   assert.equal(printed.status, 0, printed.stderr);
   assert.deepEqual(solver.settings(), JSON.parse(printed.stdout));
   console.log(`the table of the settings is that of ${rnl} solver-defaults --json`);
-  // the check is that of the CLI
-  writeFileSync(join(dir, "main.sp"), source);
-  const config = 'beam=6,grid="x"';
-  const cli = spawnSync(rnl, ["solve", join(dir, "main.sp"), "--check", "--json", "--no-std", "--solver-config", config], { encoding: "utf8" });
-  assert.equal(cli.status, 1, cli.stderr);
-  assert.deepEqual(solver.check({ ...request, solver_config: config }), JSON.parse(cli.stdout));
-  rmSync(dir, { recursive: true, force: true });
+  // the check is that of the CLI: of a file, with settings and without, and of settings alone
+  try {
+    writeFileSync(join(dir, "main.sp"), source);
+    for (const [config, status, file] of [
+      ['beam=6,grid="x"', 1, true],
+      ["", 0, true],
+      ["beam=0", 1, false],
+      ['layout="rows",beam=8', 0, false],
+    ]) {
+      const args = ["solve", ...(file ? [join(dir, "main.sp"), "--no-std"] : []), "--check", "--json"];
+      const cli = spawnSync(rnl, [...args, ...(config ? ["--solver-config", config] : [])], { encoding: "utf8" });
+      assert.equal(cli.status, status, cli.stderr);
+      const asked = file ? { ...request, solver_config: config } : { solver_config: config };
+      assert.deepEqual(solver.check(asked), JSON.parse(cli.stdout), `check of ${config || "nothing"}`);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
   console.log(`the check of the settings is that of ${rnl} solve --check --json`);
 }

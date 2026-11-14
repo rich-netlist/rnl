@@ -91,24 +91,38 @@ export async function loadSolver(source, { now = () => performance.now() } = {})
     }
   }
 
-  /** A call that takes no callback: its answer, read where the module says. */
-  function call(run) {
+  /** Why the instance stopped: its panic's message, or the size it could not allocate. */
+  function failure(api) {
+    try {
+      const panic = api.rnl_panic_len() >>> 0;
+      const failed = api.rnl_alloc_failed() >>> 0;
+      return panic ? text(api.rnl_panic_message(), panic) : failed ? `out of memory allocating ${failed} bytes` : "";
+    } catch {
+      return ""; // the instance cannot say
+    }
+  }
+
+  /**
+   * A call of the export `name` that takes no callback, with `request` written first when given:
+   * its answer, read where the module says. Only the module's part is guarded, so that an error of
+   * the request's JSON leaves the instance as it is.
+   */
+  function call(name, request) {
     if (solving) throw new Error("The solver is solving: a progress callback cannot call it.");
     if (broken) throw new Error(`The solver could not start again after a failure: ${broken.message}`, { cause: broken });
     if (!instance) throw new Error("The solver is starting again after a failure; call it again in a moment.");
     const api = instance.exports;
+    const bytes = request === undefined ? null : encoder.encode(JSON.stringify(request));
     let answer;
     try {
-      const length = run(api) >>> 0;
+      if (bytes) {
+        const at = api.rnl_request(bytes.length) >>> 0;
+        new Uint8Array(api.memory.buffer, at, bytes.length).set(bytes);
+      }
+      const length = api[name]() >>> 0;
       answer = text(api.rnl_response(), length);
     } catch (e) {
-      let why = "";
-      try {
-        const panic = api.rnl_panic_len() >>> 0;
-        why = panic ? text(api.rnl_panic_message(), panic) : "";
-      } catch {
-        // the instance cannot say
-      }
+      const why = failure(api);
       restart();
       throw new Error(`The solver stopped: ${why || e.message}`, { cause: e });
     }
@@ -135,14 +149,7 @@ export async function loadSolver(source, { now = () => performance.now() } = {})
         answer = text(api.rnl_response(), length);
       } catch (e) {
         // a panic, or a trap such as running out of memory
-        let why = "";
-        try {
-          const panic = api.rnl_panic_len() >>> 0;
-          const failed = api.rnl_alloc_failed() >>> 0;
-          why = panic ? text(api.rnl_panic_message(), panic) : failed ? `out of memory allocating ${failed} bytes` : "";
-        } catch {
-          // the instance cannot say
-        }
+        const why = failure(api);
         restart();
         throw new Error(`The solver stopped: ${why || e.message}`, { cause: e });
       } finally {
@@ -159,7 +166,7 @@ export async function loadSolver(source, { now = () => performance.now() } = {})
      * @returns {object}
      */
     settings() {
-      return call((api) => api.rnl_settings());
+      return call("rnl_settings");
     },
 
     /**
@@ -172,12 +179,7 @@ export async function loadSolver(source, { now = () => performance.now() } = {})
      * @returns {object} The check, or `{ error }`.
      */
     check(request) {
-      return call((api) => {
-        const bytes = encoder.encode(JSON.stringify(request));
-        const at = api.rnl_request(bytes.length) >>> 0;
-        new Uint8Array(api.memory.buffer, at, bytes.length).set(bytes);
-        return api.rnl_check();
-      });
+      return call("rnl_check", request);
     },
   };
 }
