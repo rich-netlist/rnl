@@ -10,8 +10,10 @@
 //! 3. `rnl_solve()` solves it and returns the length of the answer, an [`Answer`] as UTF-8 JSON;
 //!    `rnl_response()` returns where it is.
 //!
-//! `rnl_settings()` takes no request: it puts the table of the solver's settings there, as
-//! `rnl solver-defaults --json` prints it, and returns its length.
+//! `rnl_check()` checks the settings of the request written so, as `rnl solve --check --json`
+//! does, nothing solved, and returns the length of the answer. `rnl_settings()` takes no request:
+//! it puts the table of the solver's settings there, as `rnl solver-defaults --json` prints it,
+//! and returns its length. Neither calls an import.
 //!
 //! Unlike the core's module, this one imports three functions from `env`, which the Worker that
 //! runs it gives:
@@ -46,8 +48,10 @@ use serde::{Deserialize, Serialize};
 /// `std_version`).
 #[derive(Deserialize, Debug)]
 pub struct SolveRequest {
-    /// The path of the file to solve, as the frontend names it.
-    pub entry: String,
+    /// The path of the file to solve, as the frontend names it. A solve needs it; a [`check`] may
+    /// leave it out, to check `solver_config` alone.
+    #[serde(default)]
+    pub entry: Option<String>,
     /// The texts of the workspace by path, the entry's among them. Two paths that are one file,
     /// such as `a/b.sp` and `a\b.sp`, are an error. The answer names each file written by the
     /// path it has here.
@@ -131,42 +135,84 @@ impl Clock for Now<'_> {
     }
 }
 
+/// The files of a request by their normal paths, as the solve reads them, and each normal path
+/// with the path of the request; an error when two paths of the request are one file.
+fn workspace(request: &mut SolveRequest) -> Result<(MemoryProvider, BTreeMap<String, String>), String> {
+    let mut asked: BTreeMap<String, String> = BTreeMap::new();
+    for path in request.files.keys() {
+        if let Some(other) = asked.insert(normalize(path), path.clone()) {
+            return Err(format!("files: {other} and {path} are one file"));
+        }
+    }
+    let files = MemoryProvider {
+        files: std::mem::take(&mut request.files).into_iter().map(|(p, t)| (normalize(&p), t)).collect(),
+        package_dirs: request.package_dirs.iter().map(|p| normalize(p)).collect(),
+    };
+    Ok((files, asked))
+}
+
+/// How the files of a request are read, its settings aside.
+fn read_options(request: &mut SolveRequest, solver: SolverOptions) -> SolveOptions {
+    SolveOptions {
+        dialect: request.dialect.take(),
+        formats: std::mem::take(&mut request.formats),
+        std: request.std,
+        include_std: request.include_std,
+        level: request.level.take(),
+        solver,
+    }
+}
+
+/// Check the settings of `request`, a [`SolveRequest`] as JSON, as `rnl solve --check --json`
+/// does, nothing solved: each level's settings with where they come from, and their problems
+/// ([`rnl_cli::solve::Checked`]); without an `entry`, `solver_config` alone over the defaults.
+/// `respace` is not read. Each `at` is `FILE:LINE`, the file named as the core's diagnostics name
+/// it. An error is `{"error": …}`.
+pub fn check(request: &[u8]) -> serde_json::Value {
+    let error = |error: String| serde_json::json!({ "error": error });
+    let mut request: SolveRequest = match serde_json::from_slice(request) {
+        Ok(r) => r,
+        Err(e) => return error(format!("the request is not valid: {e}")),
+    };
+    let (files, _) = match workspace(&mut request) {
+        Ok(w) => w,
+        Err(e) => return error(e),
+    };
+    let tool = [rnl_cli::solve::ToolSettings::Config(std::mem::take(&mut request.solver_config))];
+    let file = request.entry.take().map(|entry| std::path::PathBuf::from(normalize(&entry)));
+    let options = read_options(&mut request, SolverOptions::default());
+    match rnl_cli::solve::check_settings(file.as_deref(), &files, &options, &tool) {
+        Ok(checked) => serde_json::to_value(&checked).expect("a check serializes"),
+        Err(e) => error(e),
+    }
+}
+
 /// Solve `request`, a [`SolveRequest`] as JSON, with the time from `now` in milliseconds, and each
 /// progress event given to `progress` as JSON, which answers false to cancel.
 pub fn solve(request: &[u8], now: &dyn Fn() -> f64, progress: &dyn Fn(&str) -> bool) -> Answer {
-    let request: SolveRequest = match serde_json::from_slice(request) {
+    let mut request: SolveRequest = match serde_json::from_slice(request) {
         Ok(r) => r,
         Err(e) => return Answer::Error { error: format!("the request is not valid: {e}") },
+    };
+    let Some(entry) = request.entry.take() else {
+        return Answer::Error { error: "the request is not valid: missing field `entry`".into() };
     };
     let solver = match SolverOptions::default().with_config(&request.solver_config) {
         Ok(s) => s,
         Err(e) => return Answer::Error { error: format!("solver_config: {e}") },
     };
-    let options = SolveOptions {
-        dialect: request.dialect,
-        formats: request.formats,
-        std: request.std,
-        include_std: request.include_std,
-        level: request.level,
-        solver,
-    };
     // the solve names files by their normal paths; the answer, by the paths of the request
-    let mut asked: BTreeMap<String, String> = BTreeMap::new();
-    for path in request.files.keys() {
-        if let Some(other) = asked.insert(normalize(path), path.clone()) {
-            return Answer::Error { error: format!("files: {other} and {path} are one file") };
-        }
-    }
-    let files = MemoryProvider {
-        files: request.files.into_iter().map(|(p, t)| (normalize(&p), t)).collect(),
-        package_dirs: request.package_dirs.iter().map(|p| normalize(p)).collect(),
+    let (files, asked) = match workspace(&mut request) {
+        Ok(w) => w,
+        Err(error) => return Answer::Error { error },
     };
+    let options = read_options(&mut request, solver);
     let clock = Now { now, read: std::cell::Cell::new(None) };
     let sink = |e: &rnl_cli::progress::Event| progress(&e.line());
     let shown = if request.respace {
-        rnl_cli::preview::respace(&request.entry, &files, &options, &clock, &sink)
+        rnl_cli::preview::respace(&entry, &files, &options, &clock, &sink)
     } else {
-        rnl_cli::preview::preview_progress(&request.entry, &files, &options, &clock, &sink)
+        rnl_cli::preview::preview_progress(&entry, &files, &options, &clock, &sink)
     };
     match shown {
         Ok(shown) => Answer::Solved {
@@ -257,6 +303,18 @@ pub extern "C" fn rnl_solve() -> usize {
         rnl_cancelled() == 0
     };
     let answer = serde_json::to_string(&solve(&request, &now, &progress)).expect("an answer serializes");
+    let mut response = lock(&RESPONSE);
+    *response = answer;
+    response.len()
+}
+
+/// Check the settings of the request written where [`rnl_request`] said, as [`check`] does, and
+/// return the length of the answer. It calls no import.
+#[no_mangle]
+pub extern "C" fn rnl_check() -> usize {
+    begin();
+    let request = std::mem::take(&mut *lock(&REQUEST));
+    let answer = serde_json::to_string(&check(&request)).expect("an answer serializes");
     let mut response = lock(&RESPONSE);
     *response = answer;
     response.len()
@@ -391,5 +449,16 @@ R2 a 0 1k
         let answer = solve(&request(serde_json::json!({ "solver_config": "beam=0" })), &|| 0., &|_| true);
         assert!(matches!(&answer, Answer::Error { error } if error.starts_with("solver_config:")), "{answer:?}");
         assert!(matches!(solve(b"{", &|| 0., &|_| true), Answer::Error { .. }));
+        let answer = solve(br#"{"files":{}}"#, &|| 0., &|_| true);
+        assert!(matches!(&answer, Answer::Error { error } if error.ends_with("missing field `entry`")), "{answer:?}");
+    }
+
+    #[test]
+    fn a_check_that_cannot_be_given_says_why() {
+        assert!(check(b"{").get("error").is_some());
+        let missing = check(&request(serde_json::json!({ "entry": "/w/other.sp" })));
+        assert!(missing.get("error").is_some(), "{missing}");
+        let checked = check(&request(serde_json::json!({})));
+        assert_eq!(checked["ok"], true, "{checked}");
     }
 }

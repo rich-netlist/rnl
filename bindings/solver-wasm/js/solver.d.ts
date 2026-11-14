@@ -55,6 +55,38 @@ export interface Solver {
    * what a settings page is drawn from. Fields are only ever added.
    */
   settings(): SettingsTable;
+  /**
+   * The settings of each level of a request, as `rnl solve --check --json` prints them, nothing
+   * solved. Without `entry`, its `solver_config` alone is checked.
+   */
+  check(request: Partial<SolveRequest>): Checked | { error: string };
+}
+
+/** One setting in effect: its value, where it comes from and where it is written. */
+export interface CheckedSetting {
+  value: number | string | boolean | (number | string | boolean)[];
+  /** "default", "package:NAME", "header", "level" or "command-line". */
+  from: string;
+  /** `file:line`, the file named as the core's diagnostics name it. */
+  at?: string;
+}
+
+/** A problem of one setting, or of the settings together when `key` is null. */
+export interface CheckedProblem {
+  key: string | null;
+  message: string;
+  /** For a value of the file that the solve leaves out: that value, where it comes from and where it is written. */
+  refused?: CheckedSetting;
+}
+
+export interface Checked {
+  ok: boolean;
+  levels: {
+    title: string | null;
+    settings: Record<string, CheckedSetting>;
+    warnings: CheckedProblem[];
+    errors: CheckedProblem[];
+  }[];
 }
 
 /** One setting of the table. A field that does not apply to it is left out. */
