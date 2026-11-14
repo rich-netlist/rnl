@@ -1314,6 +1314,17 @@ body.menubar-shown { grid-template-rows: auto minmax(0, 1fr) auto; }
 .settings-hint { color: var(--muted); font-size: 12px; }
 .settings-text { color: var(--muted); font-size: 12px; font-family: ui-monospace, "Cascadia Mono", Consolas, monospace, var(--ui-cjk); }
 .settings-restore { padding: 3px 12px; border-color: var(--line); background: var(--tab); }
+.setting { display: flex; flex-direction: column; gap: 1px; padding: 2px 0; }
+.setting[hidden] { display: none; }
+.setting.unused { opacity: 0.55; }
+.setting.refused input, .setting.refused select { outline: 1px solid var(--error); }
+.settings-key { font-weight: 600; }
+.settings-label select { max-width: 14em; }
+.settings-label label { display: inline-flex; align-items: center; gap: 4px; flex: none; white-space: nowrap; }
+.settings-label input[type="text"] { flex: 0 1 18em; min-width: 8em; }
+.settings-given { margin-top: 6px; }
+.settings-given-list { margin: 2px 0 0; padding-left: 18px; font-size: 12px; }
+.settings-given-list .key { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace, var(--ui-cjk); }
 .dialog-body hr { width: 100%; margin: 2px 0; border: 0; border-top: 1px solid var(--line); }
 .objective-list { display: flex; flex-direction: column; margin: 4px 0 0; padding: 0; list-style: none; border: 1px solid var(--line); border-radius: 4px; }
 .objective { padding: 4px 8px; border-bottom: 1px solid var(--line); }

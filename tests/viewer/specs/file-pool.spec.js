@@ -40,13 +40,13 @@ for (const platform of ["desktop", "web"]) {
 test("desktop migrates browser settings once and persists ordered PATH with the other settings", async ({ page, viewer }) => {
   await viewer.open(null, { platform: "desktop" });
   await page.evaluate(() => {
-    localStorage.setItem("solve-options", JSON.stringify({ grid: 3 }));
+    localStorage.setItem("solve-config", JSON.stringify({ grid: 3 }));
     localStorage.setItem("grid-style", JSON.stringify("lines"));
     localStorage.setItem("search-paths", JSON.stringify(["/first", "/second"]));
   });
   await viewer.open(null, { platform: "desktop", settings: "1", pool: "1" });
-  expect(await page.evaluate(() => window.fakeShell.legacy["solve-options"])).toEqual({ grid: 3 });
-  expect(await page.evaluate(() => localStorage.getItem("solve-options"))).toBeNull();
+  expect(await page.evaluate(() => window.fakeShell.legacy["solve-config"])).toEqual({ grid: 3 });
+  expect(await page.evaluate(() => localStorage.getItem("solve-config"))).toBeNull();
   await page.locator("#tab-files").click();
   await expect(page.locator("#path-note")).toContainText("/user/config/settings.json");
   await page.locator('[data-group="path:/first"]').getByRole("button", { name: "Move down in PATH", exact: true }).click();
@@ -59,5 +59,5 @@ test("desktop migrates browser settings once and persists ordered PATH with the 
   await viewer.open(null, { platform: "desktop", settings: "1", pool: "1" });
   await expect(page.locator(".lib-path")).toHaveText(["/second", "/third"]);
   expect(await page.evaluate(() => window.viewer.grid.style)).toBe("lines");
-  expect(await page.evaluate(() => JSON.parse(sessionStorage.getItem("fake-settings"))["solve-options"])).toEqual({ grid: 3 });
+  expect(await page.evaluate(() => JSON.parse(sessionStorage.getItem("fake-settings"))["solve-config"])).toEqual({ grid: 3 });
 });

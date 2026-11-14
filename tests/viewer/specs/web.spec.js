@@ -1658,7 +1658,7 @@ test("the files of a manifest are searched as the Library's: Auto Include finds 
 
 /** The site served with the rnl the tests built (serve.mjs --rnl), on a port of its own: the process and the site's address. */
 async function solverServer() {
-  const server = spawn(process.execPath, [path.join(root, "apps", "web", "serve.mjs"), "--port", "0", "--rnl", process.env.RNL_BIN, "--solver-options", "time_limit=none"], { stdio: ["ignore", "pipe", "inherit"] });
+  const server = spawn(process.execPath, [path.join(root, "apps", "web", "serve.mjs"), "--port", "0", "--rnl", process.env.RNL_BIN, "--solver-config", "seconds=300"], { stdio: ["ignore", "pipe", "inherit"] });
   const url = await new Promise((resolve, reject) => {
     let out = "";
     server.stdout.on("data", (chunk) => {
@@ -1706,7 +1706,7 @@ test("the Solve view lists the constraints of a netlist before any solve; a deve
     await page.waitForFunction(() => document.body.classList.contains("preview") && !document.body.classList.contains("solving"));
     expect(posts).toHaveLength(1);
     expect(posts[0].entry).toMatch(/10-constraints-and-priority\.sp$/);
-    expect(posts[0].options).toBe("");
+    expect(posts[0].config).toBe("");
     await expect(page.locator("#solve-views")).toBeVisible();
     const rows = page.locator("#constraints-list li.constraint");
     expect(await rows.count()).toBe(18);
@@ -1735,7 +1735,7 @@ test("the Solve view lists the constraints of a netlist before any solve; a deve
 async function watchSolverWorker(page) {
   await page.addInitScript(() => {
     const Original = window.Worker;
-    window.__solver = { requests: [], events: [], started: 0 };
+    window.__solver = { requests: [], events: [], started: 0, tables: 0, checks: [] };
     window.Worker = class extends Original {
       constructor(url, options) {
         super(url, options);
@@ -1743,8 +1743,11 @@ async function watchSolverWorker(page) {
         window.__solver.started += 1;
         const post = this.postMessage.bind(this);
         this.postMessage = (message, ...rest) => {
-          const { files, ...request } = message.request;
-          window.__solver.requests.push({ ...request, files: Object.keys(files) });
+          if (message.request) {
+            const { files, ...request } = message.request;
+            window.__solver.requests.push({ ...request, files: Object.keys(files) });
+          } else if (message.table) window.__solver.tables += 1;
+          else if (message.check) window.__solver.checks.push(message.check.solver_config);
           return post(message, ...rest);
         };
         this.addEventListener("message", (e) => {
@@ -1822,6 +1825,28 @@ test("a solve in the browser is cancelled by stopping its Worker, and the next S
   await page.keyboard.press("F9");
   await page.waitForFunction(() => document.body.classList.contains("preview") && !document.body.classList.contains("solving"), null, { timeout: 90000 });
   expect(await page.evaluate(() => window.__solver.started)).toBe(2);
+});
+
+test("the settings dialog of the web viewer is drawn from the solver's module, which checks them, and a solve takes them", async ({ page }) => {
+  test.setTimeout(120000);
+  await watchSolverWorker(page);
+  await page.goto(`${process.env.RNL_WEB_URL}/?url=samples/cases/04-hierarchy.sp`);
+  await expect(page).toHaveTitle(/^04-hierarchy.sp/);
+  await page.waitForFunction(() => !document.body.classList.contains("busy"));
+  expect(await page.evaluate(() => window.__solver.started)).toBe(0);
+  await page.evaluate(() => window.viewer.command("solve-settings"));
+  const dialog = page.locator("dialog.dialog");
+  await expect(dialog.getByLabel("layout", { exact: true }).locator("option")).toHaveText(["rows", "tree", "lines"]);
+  await dialog.getByLabel("layout", { exact: true }).selectOption("rows");
+  await dialog.getByLabel("beam", { exact: true }).fill("8");
+  await dialog.getByRole("button", { name: "OK" }).click();
+  await expect(dialog).toHaveCount(0);
+  // the solver's module gave the table and checked the settings before they were kept
+  expect(await page.evaluate(() => [window.__solver.started, window.__solver.tables, window.__solver.checks])).toEqual([1, 1, ['beam=8,layout="rows"']]);
+  await page.keyboard.press("F9");
+  await page.waitForFunction(() => document.body.classList.contains("preview") && !document.body.classList.contains("solving"), null, { timeout: 90000 });
+  const [request] = await page.evaluate(() => window.__solver.requests);
+  expect(request.solver_config).toBe('beam=8,layout="rows"');
 });
 
 test("a manifest's files are edited, downloaded and solved by a development server's solver, with the edit and the manifest's files and pool", async ({ page }) => {

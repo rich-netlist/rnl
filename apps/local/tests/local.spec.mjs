@@ -168,6 +168,25 @@ test("Solve tells the page the events of the solve before its result, and solves
   expect(lines[0].levels).toBe(1);
 });
 
+test("Solve > Settings draws its dialog from the program's table of the solver's settings, and the program checks them", async ({ page }) => {
+  await open(page);
+  await page.evaluate(() => window.viewer.command("solve-settings"));
+  const dialog = page.locator("dialog.dialog");
+  await expect(dialog.locator(".dialog-title")).toHaveText("Solver Settings");
+  await expect(dialog.locator("fieldset")).not.toHaveCount(0);
+  await expect(dialog.getByLabel("layout", { exact: true }).locator("option")).toHaveText(["rows", "tree", "lines"]);
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toHaveCount(0);
+  // the program's own check says which setting it refuses, and does not call a check that found errors a failure
+  const checked = await page.evaluate(async () => {
+    const response = await fetch("rnl-solver/check", { method: "POST", headers: { "Content-Type": "application/json", "X-RNL": "1" }, body: JSON.stringify({ config: "beam=0" }) });
+    return { status: response.status, json: await response.json() };
+  });
+  expect(checked.status).toBe(200);
+  expect(checked.json.ok).toBe(false);
+  expect(checked.json.levels[0].errors[0].key).toBe("beam");
+});
+
 test("the chooser lists the machine's files, goes up and in, and opens the one chosen", async ({ page }) => {
   await open(page);
   await page.evaluate(() => window.viewer.command("open"));

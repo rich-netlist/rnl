@@ -1,7 +1,12 @@
 //! The solver service of the page (the same the development server of the web viewer offers, apps/web/solver-service.mjs):
 //!
-//!   GET  /rnl-solver        {"service": "rnl-solver", "version": ..., "path": ..., "options": ...}
-//!   POST /rnl-solver/solve  {"entry", "files", "pool", "options", "level", "stream"}  ->  {"document", "report"}
+//!   GET  /rnl-solver        {"service": "rnl-solver", "version": ..., "path": ..., "config": ...}
+//!   GET  /rnl-solver/table  the table of the solver's settings (docs/solver-settings-table.md), which the page's settings
+//!                           dialog is drawn from: what `rnl solver-defaults --json` prints
+//!   POST /rnl-solver/check  {"config"}  ->  what `rnl solve --check --json` prints of those settings, with no file
+//!   POST /rnl-solver/solve  {"entry", "files", "pool", "config", "level", "stream"}  ->  {"document", "report"}
+//!
+//! `config` is the settings that differ from the defaults, as RNL named parameters, as `--solver-config` takes them.
 //!
 //! `level` is the title of the one level to solve (`rnl solve --level`), none for every level. With `"stream": true` the
 //! answer is lines of JSON (`application/x-ndjson`): the events of the solve as they happen (docs/solver-progress.md), then
@@ -21,7 +26,7 @@ use std::sync::Arc;
 
 use rnl_cli::preview::{preview, preview_progress, StoppableClock};
 use rnl_cli::progress::Event;
-use rnl_cli::solve::{Progress, SolveOptions};
+use rnl_cli::solve::{check_settings, Progress, SolveOptions, ToolSettings};
 use rnl_runtime::source::MemoryProvider;
 use rnl_solver::SolverOptions;
 use serde::Deserialize;
@@ -34,9 +39,9 @@ pub struct Request {
     /// The paths of the files of the Library among them: the packages by name, the includes by path.
     #[serde(default)]
     pub pool: Vec<String>,
-    /// The solver's settings, written as `rnl solve --solver-options` takes them.
+    /// The solver's settings, written as RNL named parameters as `rnl solve --solver-config` takes them.
     #[serde(default)]
-    pub options: String,
+    pub config: String,
     /// The title of the one level to solve: none, or empty, solves every level.
     #[serde(default)]
     pub level: Option<String>,
@@ -51,8 +56,32 @@ pub fn info() -> serde_json::Value {
         "service": "rnl-solver",
         "version": format!("rnl {} ({})", rnl_cli::CORE_VERSION, rnl_cli::BUILD_COMMIT),
         "path": "built into the program",
-        "options": "",
+        "config": "",
     })
+}
+
+/// The table of the solver's settings, which the page's settings dialog is drawn from.
+pub fn table() -> serde_json::Value {
+    rnl_cli::solver_table::settings_table_json()
+}
+
+/// What the page asks to check: settings as named parameters.
+#[derive(Debug, Deserialize)]
+pub struct Check {
+    #[serde(default)]
+    pub config: String,
+}
+
+/// What `rnl solve --check --json` says of settings written as named parameters, with no file: one level, with each
+/// setting in effect and the problems of each, by key. Err when the text does not read at all.
+pub fn check(request: &Check) -> Result<serde_json::Value, String> {
+    let checked = check_settings(
+        None,
+        &MemoryProvider::new(),
+        &SolveOptions::default(),
+        &[ToolSettings::Config(request.config.clone())],
+    )?;
+    serde_json::to_value(checked).map_err(|e| e.to_string())
 }
 
 /// The directory of a path of the page's workspace, `/`-separated.
@@ -87,7 +116,7 @@ pub fn prepare(request: &Request) -> Result<Prepared, String> {
             }
         }
     }
-    let solver = SolverOptions::default().with_overrides(&request.options)?;
+    let solver = SolverOptions::default().with_config(&request.config)?;
     let level = request.level.clone().filter(|title| !title.is_empty());
     Ok(Prepared { entry: request.entry.clone(), files, options: SolveOptions { solver, level, ..SolveOptions::default() } })
 }
@@ -173,7 +202,7 @@ mod tests {
     }
 
     fn request(entry: &str, text: &str) -> Request {
-        Request { entry: entry.into(), files: BTreeMap::from([(entry.to_string(), text.to_string())]), pool: Vec::new(), options: String::new(), level: None, stream: false }
+        Request { entry: entry.into(), files: BTreeMap::from([(entry.to_string(), text.to_string())]), pool: Vec::new(), config: String::new(), level: None, stream: false }
     }
 
     #[test]
@@ -199,12 +228,27 @@ mod tests {
     }
 
     #[test]
-    fn a_solver_option_that_is_wrong_is_an_error_in_the_solvers_words() {
+    fn a_solver_setting_that_is_wrong_is_an_error_in_the_solvers_words() {
         let (_client, server) = pair();
         let mut r = request("/top.sp", "R1 a b 1k\n.end\n");
-        r.options = "no_such_option=1".into();
+        r.config = "beam=0".into();
         let error = solve(&r, &server).unwrap_err();
-        assert!(!error.is_empty());
+        assert!(error.contains("the beam must be at least 1"), "{error}");
+    }
+
+    #[test]
+    fn the_table_of_settings_and_the_check_are_the_solvers() {
+        let table = table();
+        assert_eq!(table["version"], 1);
+        assert!(table["settings"].as_array().is_some_and(|s| s.iter().any(|row| row["key"] == "beam")));
+        // settings that do: ok, and each says where it comes from
+        let checked = check(&Check { config: "beam=8,layout=\"rows\"".into() }).unwrap();
+        assert_eq!(checked["ok"], true);
+        assert_eq!(checked["levels"][0]["settings"]["beam"]["from"], "command-line");
+        // settings that do not: not ok, and the error says which setting
+        let checked = check(&Check { config: "beam=0".into() }).unwrap();
+        assert_eq!(checked["ok"], false);
+        assert_eq!(checked["levels"][0]["errors"][0]["key"], "beam");
     }
 
     /// The lines a streamed solve of `request` tells, read as the page reads them.

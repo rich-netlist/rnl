@@ -17,7 +17,7 @@ import { currentSource, isLoading, openSource, showBuilt } from "./open.js";
 import { setPane } from "./panels.js";
 import { shell } from "./shell.js";
 import { progressBegin, progressEnd, progressEvent } from "./solve-progress.js";
-import { solverSettings } from "./solve-settings.js";
+import { noteReport, solverSettings } from "./solve-settings.js";
 import { constraintsWanted, current, doc, setConstraintsWanted } from "./state.js";
 import { revealLine } from "./text.js";
 import { $, span } from "./util.js";
@@ -110,6 +110,7 @@ export async function solve({ all = false } = {}) {
     const level = all ? null : doc.levels[current]?.title ?? null;
     const solved = await shell.solve(given, { ...solverSettings(), level }, changes(true));
     shown = { source, report: solved.report };
+    noteReport(solved.report);
     showBuilt(solved.document, true);
     // the solved layout can lie outside the view of the netlist as it was
     fit();
@@ -122,7 +123,10 @@ export async function solve({ all = false } = {}) {
     // counts as whole phrases, which a language words as it counts (apps/viewer-ui/README.md)
     const levels = r.levels.length === 1 ? m("1 level") : m`${r.levels.length} levels`;
     const facts = discarded === 1 ? m("1 fact not kept") : m`${discarded} facts not kept`;
-    status(m`Solved: ${levels}, ${facts}. A preview: the files are unchanged.${later}`, false);
+    // a setting the solver does not take is an error, but the solve went on without it: told apart from a solve that failed
+    const wrong = settingErrors(r);
+    const settings = wrong === 0 ? "" : wrong === 1 ? m(" 1 error in the settings: the solve went on without that value.") : m` ${wrong} errors in the settings: the solve went on without those values.`;
+    status(m`Solved: ${levels}, ${facts}.${settings} A preview: the files are unchanged.${later}`, false);
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     if (message === CANCELLED) status(m("The solve was canceled; the netlist is shown as it was."), false);
@@ -254,6 +258,11 @@ const STATUS_HEADINGS = {
   kept: m("Kept"),
 };
 
+/** How many errors the check of the levels' settings found in a report: the solver went on without the values it refused. */
+function settingErrors(report) {
+  return report.levels.reduce((n, l) => n + (l.check?.errors?.length ?? 0), 0);
+}
+
 /** The report of a solve, in the Solve view of the side panel (crates/rnl-cli/src/preview.rs). */
 function renderReport(report) {
   const box = $("solve-report");
@@ -283,6 +292,10 @@ function renderReport(report) {
       group(section, STATUS_HEADINGS[status], items, status !== "kept");
     }
     group(section, m("Statements involved in discarding low-priority facts (8.5)"), level.statements.map((s) => line("solve-line", [span("msg", s.text)], s.at)));
+    // what the check of the level's settings found, each with the setting it is about; the solve went on without a value it refused
+    const checked = level.check ?? { errors: [], warnings: [] };
+    const aboutSetting = (p, cls) => line(cls, [span("st", p.key ?? ""), span("msg", p.message)], null);
+    group(section, m("Settings"), [...(checked.errors ?? []).map((p) => aboutSetting(p, "solve-line error")), ...(checked.warnings ?? []).map((p) => aboutSetting(p, "solve-line warning"))]);
     group(section, m("Errors"), level.errors.map((e) => plain(e, "solve-line error")));
     group(section, m("Warnings"), level.warnings.map((w) => plain(w, "solve-line warning")));
     group(section, m("Items not representable in the @RNL record"), level.unsolved.map((u) => plain(u)));
@@ -297,6 +310,8 @@ function renderReport(report) {
     const k = n(s);
     if (k) append(counts, span(cls, m(STATUS_COUNTS[s], k)));
   }
+  const wrong = settingErrors(report);
+  if (wrong) append(counts, span("n-error", wrong === 1 ? m("1 error in the settings") : m`${wrong} errors in the settings`));
   if (counts.childElementCount === 0) append(counts, span("none", m("every fact kept")));
 }
 

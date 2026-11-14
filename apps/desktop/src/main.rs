@@ -501,8 +501,8 @@ fn main() {
             menu::ui_languages,
             menu::ui_catalog,
             solve::solve_preview,
-            solve::solver_defaults,
-            solve::check_solver_options,
+            solve::solver_table,
+            solve::check_solver_settings,
             solve::cancel_solve,
             solve::save_solved_copy
         ])

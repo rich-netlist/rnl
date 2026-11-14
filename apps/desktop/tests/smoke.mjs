@@ -628,19 +628,18 @@ async function drive(app, port, profile, t0, session) {
   console.log("Solve > Solve All Circuits solved every circuit, with the events of the solve");
 
   // Solve > Settings: the dialog shows the solver's own defaults, which the app gives it, and what
-  // the solver does not take is refused in its words (the app checks the options with the solver);
+  // the solver does not take is refused in its words (the app checks the settings with the solver);
   // Cancel keeps nothing
   chooseItem(app.pid, at("solve-settings"));
   const beam = await until("the settings dialog with the solver's beam", () =>
     page.evaluate(`(() => {
-      const label = [...document.querySelectorAll("dialog.dialog .settings-label")].find((l) => l.textContent.startsWith("Beam"));
-      return label ? label.querySelector("input").value : null;
+      const input = document.querySelector('dialog.dialog [aria-label="beam"]');
+      return input ? input.value : null;
     })()`),
   );
   same(/^[1-9][0-9]*$/.test(beam), true, "the beam of the solver's defaults in the dialog");
   await page.evaluate(`(() => {
-    const label = [...document.querySelectorAll("dialog.dialog .settings-label")].find((l) => l.textContent.startsWith("Beam"));
-    const input = label.querySelector("input");
+    const input = document.querySelector('dialog.dialog [aria-label="beam"]');
     input.value = "0";
     input.dispatchEvent(new Event("input", { bubbles: true }));
     [...document.querySelectorAll("dialog.dialog button")].find((b) => b.textContent === "OK").click();
@@ -651,11 +650,11 @@ async function drive(app, port, profile, t0, session) {
       return error && !error.hidden ? error.textContent : null;
     })()`),
   );
-  same(refused, "the beam must be at least 1", "what the solver says of a beam of 0");
+  same(refused, "beam must be at least 1.", "what the dialog says of a beam of 0, by the table's bound");
   await page.evaluate(`[...document.querySelectorAll("dialog.dialog button")].find((b) => b.textContent === "Cancel").click()`);
   await until("the dialog to close", async () => !(await page.evaluate(`!!document.querySelector("dialog.dialog")`)), 10_000);
-  same(await page.evaluate(`localStorage.getItem("solve-options")`), null, "the settings kept after Cancel");
-  console.log("Solve > Settings showed the solver's defaults, and the solver refused a beam of 0 in its own words");
+  same(await page.evaluate(`localStorage.getItem("solve-config")`), null, "the settings kept after Cancel");
+  console.log("Solve > Settings was drawn from the solver's table, and refused a beam of 0 by the table's bound");
   // Edit > Edit Text, Apply Changes and File > Save (decision 0011), on a copy of the netlist: the
   // text boxes appear and the menu's check mark follows; a change is not applied until Apply Changes
   // builds the netlist natively from the text in memory, over the files, and the file on disk is as

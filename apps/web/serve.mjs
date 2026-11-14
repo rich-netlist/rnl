@@ -11,8 +11,8 @@
 // With --rnl PATH (or RNL_SOLVER) it also offers the page a Solve that runs the `rnl` command at PATH,
 // such as target/debug/rnl, on every press (solver-service.mjs): build `rnl` again after a change to the
 // solver, press Solve, and the new result is shown, without building the viewer or restarting this.
-// --solver-options S gives every solve those settings, as `rnl solve --solver-options` reads them,
-// such as time_limit=none. Only the page of this server may use it.
+// --solver-config S gives every solve those settings, as `rnl solve --solver-config` reads them,
+// RNL named parameters such as seconds=120. Only the page of this server may use it.
 
 import { createServer } from "node:http";
 import { existsSync, readFile, stat } from "node:fs";
@@ -22,7 +22,7 @@ import { createService, runVersion } from "./solver-service.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const site = join(here, "dist");
-const usage = "usage: node apps/web/serve.mjs [--port N] [--rnl PATH] [--solver-options S]";
+const usage = "usage: node apps/web/serve.mjs [--port N] [--rnl PATH] [--solver-config S]";
 
 let port = 8000;
 let rnl = process.env.RNL_SOLVER || null;
@@ -31,7 +31,7 @@ const args = process.argv.slice(2);
 for (let k = 0; k < args.length; k++) {
   if (args[k] === "--port" && k + 1 < args.length && /^\d+$/.test(args[k + 1])) port = Number(args[++k]);
   else if (args[k] === "--rnl" && k + 1 < args.length) rnl = resolve(args[++k]);
-  else if (args[k] === "--solver-options" && k + 1 < args.length) solverOptions = args[++k];
+  else if (args[k] === "--solver-config" && k + 1 < args.length) solverOptions = args[++k];
   else {
     console.error(usage);
     process.exit(2);
@@ -74,7 +74,7 @@ function fileOf(pathname) {
 let service = null;
 if (rnl) {
   try {
-    service = createService({ rnl, version: await runVersion(rnl), options: solverOptions });
+    service = createService({ rnl, version: await runVersion(rnl), config: solverOptions });
   } catch (e) {
     console.error(e.message);
     process.exit(1);
@@ -124,6 +124,6 @@ const server = createServer(async (request, response) => {
 
 server.listen(port, "127.0.0.1", () => {
   console.log(`The web viewer: http://127.0.0.1:${server.address().port}/`);
-  if (service) console.log(`Solve runs ${service.info.version} at ${rnl}${solverOptions ? ` with --solver-options "${solverOptions}"` : ""}`);
+  if (service) console.log(`Solve runs ${service.info.version} at ${rnl}${solverOptions ? ` with --solver-config "${solverOptions}"` : ""}`);
   console.log("Press Ctrl+C to stop.");
 });

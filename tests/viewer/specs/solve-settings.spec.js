@@ -1,8 +1,8 @@
-// The desktop's Solve > Settings (apps/viewer-ui/solve-settings.js): a dialog for the options of the
-// solver, with the time limit that Solve > Time Limit had. The defaults come from the shell, the page
-// keeps only what differs from them, and a solve gets that written as `rnl solve --solver-options`
-// takes it, which the shell can ask the solver to check. The fake shell's defaults are those of the
-// solver at the time of writing; the page is tested against their shape.
+// Solve > Settings (apps/viewer-ui/solve-settings.js): a dialog for the settings of the solver, drawn from the
+// table the shell gives (docs/solver-settings-table.md), so that the page keeps no key, bound or default of its
+// own. The page keeps only what differs from the table's defaults, and a solve gets that written as RNL named
+// parameters, as `rnl solve --solver-config` takes them, which the shell can ask the solver to check. The fake
+// shell's table is the solver's at the time of writing; the page is tested against its shape.
 
 import { dialogGone, expect, test } from "../viewer.js";
 
@@ -12,13 +12,16 @@ const DEFAULT_ORDER = [
   "current_direction", "turns", "ground_direction", "component_alignment", "distribution", "symmetry",
   "terminal_wire_alignment", "area", "crossings", "wire_length", "aspect",
 ];
-const OFF = ["signal_flow", "labels", "bend_alignment"];
+const OFF = ["signal_flow", "labels", "bend_alignment", "overlaps", "crowding", "misleading", "wire_over_symbol"];
 
 /** The dialog shown. */
 const dialog = (page) => page.locator("dialog.dialog");
 
-/** A field of the dialog, by its label. */
-const field = (page, label) => dialog(page).getByLabel(label, { exact: true });
+/** The setting of a key in the dialog. */
+const setting = (page, key) => dialog(page).locator(`.setting[data-key="${key}"]`);
+
+/** The control of a setting, by its key. */
+const field = (page, key) => dialog(page).getByLabel(key, { exact: true });
 
 /** An objective's row of the dialog. */
 const objective = (page, name) => dialog(page).locator(`.objective[data-name="${name}"]`);
@@ -50,16 +53,16 @@ async function solved(page, viewer) {
   await page.evaluate(() => window.viewer.command("solve"));
   await expect.poll(async () => (await viewer.calls("solve")).length).toBe(before + 1);
   await page.waitForFunction(() => document.body.classList.contains("preview") && !document.body.classList.contains("solving"));
-  // the options, not which circuit (solve.spec.js)
-  const { level, ...options } = (await viewer.calls("solve")).at(-1)[1];
-  return options;
+  // the settings, not which circuit (solve.spec.js)
+  const { level, ...settings } = (await viewer.calls("solve")).at(-1)[1];
+  return settings;
 }
 
 test("the web has no Solve settings, and its command does nothing", async ({ page, viewer }) => {
   await viewer.open(T4);
   await page.evaluate(() => window.viewer.command("solve-settings"));
   await expect(dialog(page)).toHaveCount(0);
-  expect(await viewer.calls("solverDefaults")).toEqual([]);
+  expect(await viewer.calls("solverTable")).toEqual([]);
 });
 
 test.describe("on the desktop", () => {
@@ -80,99 +83,122 @@ test.describe("on the desktop", () => {
     expect(solve.at(-1)).toEqual(["solve-settings", "S&ettings..."]);
   });
 
-  test("the dialog shows the solver's defaults, and says what these settings are not", async ({ page, viewer }) => {
+  test("the dialog is drawn from the solver's table: its groups, its defaults, what it says of each, and what these settings are not", async ({ page, viewer }) => {
     await open(page);
-    expect(await viewer.calls("solverDefaults")).toEqual([[]]);
-    await expect(field(page, "Time limit")).toHaveValue("5");
-    await expect(field(page, "No limit")).not.toBeChecked();
-    await expect(field(page, "Tolerance")).toHaveValue("0.000001");
-    await expect(field(page, "Grid")).toHaveValue("1");
-    await expect(field(page, "No rounding")).not.toBeChecked();
-    await expect(field(page, "Beam")).toHaveValue("4");
-    await expect(field(page, "Candidates")).toHaveValue("256");
-    await expect(field(page, "Router cells")).toHaveValue("200000");
-    await expect(field(page, "Seek every conflict group of the facts of priority low")).not.toBeChecked();
+    expect(await viewer.calls("solverTable")).toEqual([[]]);
+    // the groups, in the table's order, with its titles
+    await expect(dialog(page).locator("fieldset > legend")).toHaveText([
+      "Layout", "Search and preferences", "Limit of each level's solve", "Caps on the search and the router", "Report",
+    ]);
+    // the defaults of the table
+    await expect(field(page, "layout")).toHaveValue("lines");
+    await expect(field(page, "spacing_x")).toHaveValue("0");
+    await expect(field(page, "spacing_y")).toHaveValue("0");
+    await expect(field(page, "beam")).toHaveValue("4");
+    await expect(field(page, "grid")).toHaveValue("1");
+    await expect(field(page, "tolerance")).toHaveValue("0.000001");
+    await expect(field(page, "limit")).toHaveValue("time");
+    await expect(field(page, "seconds")).toHaveValue("10");
+    await expect(field(page, "candidates")).toHaveValue("256");
+    await expect(field(page, "astar_expansions")).toHaveValue("200000");
+    await expect(field(page, "report_hints")).not.toBeChecked();
+    // what the solver says of a setting and of a choice
+    await expect(setting(page, "beam").locator(".settings-hint")).toContainText("How many partial candidates the row search keeps");
+    await expect(setting(page, "layout").locator(".choice-what")).toHaveText("Components placed along the lines of their wires, then the drawing compacted on the grid.");
+    // a setting with no default is given or not: junction is not, and its box waits until it is
+    await expect(setting(page, "junction").getByLabel("set")).not.toBeChecked();
+    await expect(field(page, "junction")).toBeDisabled();
     // the priority of a constraint is written in the netlist
     await expect(dialog(page).locator(".settings-note")).toContainText("priority of a constraint, low, normal or high, is written in the netlist");
     await expect(dialog(page).locator(".settings-note")).toContainText("not set here");
     // the objectives: the default layers in order, then those that are off
     expect(await order(page)).toEqual([...DEFAULT_ORDER.map((n) => [n, true]), ...OFF.map((n) => [n, false])]);
     await expect(dialog(page).locator(".objective-level")).toHaveText([
-      "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "off", "off", "off",
+      "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", ...OFF.map(() => "off"),
     ]);
+    // an objective that this version does not compute says so
+    await expect(objective(page, "labels").locator(".objective-what")).toContainText("(not computed by this version)");
+    await expect(objective(page, "turns").locator(".objective-what")).not.toContainText("not computed");
     await expect(asText(page)).toHaveText("The defaults of rnl solve.");
     // Cancel keeps nothing, and a solve gets the defaults
     await dialog(page).getByRole("button", { name: "Cancel" }).click();
     await dialogGone(page);
-    expect(await viewer.stored("solve-options")).toBeNull();
-    expect(await solved(page, viewer)).toEqual({ options: "", hintsForLow: false });
+    expect(await viewer.stored("solve-config")).toBeNull();
+    expect(await solved(page, viewer)).toEqual({ config: "" });
   });
 
-  test("a time limit set, and no limit, reach the solve; Restore Defaults takes them back", async ({ page, viewer }) => {
+  test("a setting's conditions: the spacing is not used outside the lines layout, the work and the seconds follow the limit", async ({ page }) => {
     await open(page);
-    await field(page, "Time limit").fill("2.5");
-    await expect(asText(page)).toHaveText('Equivalent CLI command: rnl solve --solver-options "time_limit=2.5"');
-    await ok(page);
-    expect(await viewer.stored("solve-options")).toEqual({ time_limit: 2.5 });
-    expect(await solved(page, viewer)).toEqual({ options: "time_limit=2.5", hintsForLow: false });
-    // the solver is asked whether it takes them, as `--solver-options` writes them
-    expect((await viewer.calls("checkSolverOptions")).at(-1)).toEqual(["time_limit=2.5"]);
-    // what was kept shows again, and no limit disables the number
+    // the lines layout uses the spacing; the beam is the rows': greyed, but still there to set
+    await expect(setting(page, "spacing_x")).not.toHaveClass(/unused/);
+    await expect(setting(page, "beam")).toHaveClass(/unused/);
+    await field(page, "layout").selectOption("rows");
+    await expect(setting(page, "spacing_x")).toHaveClass(/unused/);
+    await expect(setting(page, "beam")).not.toHaveClass(/unused/);
+    await expect(setting(page, "candidates")).not.toHaveClass(/unused/);
+    // a time limit has seconds; the work is shown only for a limit of work, where it is required
+    await expect(setting(page, "seconds")).toBeVisible();
+    await expect(setting(page, "work")).toBeHidden();
+    await expect(setting(page, "safety_seconds")).toBeHidden();
+    await field(page, "limit").selectOption("work");
+    await expect(setting(page, "seconds")).toBeHidden();
+    await expect(setting(page, "work")).toBeVisible();
+    await expect(setting(page, "work").getByLabel("set")).toBeChecked();
+    await expect(setting(page, "work").getByLabel("set")).toBeDisabled();
+    await expect(setting(page, "safety_seconds")).toBeVisible();
+  });
+
+  test("the settings reach the solve as named parameters, and the solver is asked whether it takes them", async ({ page, viewer }) => {
     await open(page);
-    await expect(field(page, "Time limit")).toHaveValue("2.5");
-    await field(page, "No limit").check();
-    await expect(field(page, "Time limit")).toBeDisabled();
+    await field(page, "spacing_x").fill("3");
+    await field(page, "layout").selectOption("rows");
+    await field(page, "beam").fill("8");
+    await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --solver-config 'beam=8,layout="rows",spacing_x=3'`);
     await ok(page);
-    expect(await solved(page, viewer)).toEqual({ options: "time_limit=none", hintsForLow: false });
+    expect(await viewer.stored("solve-config")).toEqual({ beam: 8, layout: "rows", spacing_x: 3 });
+    expect((await viewer.calls("checkSettings")).at(-1)).toEqual(['beam=8,layout="rows",spacing_x=3']);
+    expect(await solved(page, viewer)).toEqual({ config: 'beam=8,layout="rows",spacing_x=3' });
+    // what was kept shows again
+    await open(page);
+    await expect(field(page, "layout")).toHaveValue("rows");
+    await expect(field(page, "spacing_x")).toHaveValue("3");
     // Restore Defaults sets the fields, and OK keeps no change at all
-    await open(page);
-    await expect(field(page, "No limit")).toBeChecked();
     await dialog(page).getByRole("button", { name: "Restore Defaults" }).click();
-    await expect(field(page, "Time limit")).toHaveValue("5");
-    await expect(field(page, "No limit")).not.toBeChecked();
+    await expect(field(page, "layout")).toHaveValue("lines");
+    await expect(field(page, "spacing_x")).toHaveValue("0");
     await ok(page);
-    expect(await viewer.stored("solve-options")).toEqual({});
-    expect(await solved(page, viewer)).toEqual({ options: "", hintsForLow: false });
+    expect(await viewer.stored("solve-config")).toEqual({});
+    expect(await solved(page, viewer)).toEqual({ config: "" });
   });
 
-  test("the other options reach the solve in the order the solver writes its own", async ({ page, viewer }) => {
+  test("a limit of work, no rounding to a grid, and a junction given or not: each as the table types it", async ({ page, viewer }) => {
     await open(page);
-    await field(page, "Tolerance").fill("0.001");
-    await field(page, "No rounding").check();
-    await field(page, "Beam").fill("8");
-    await field(page, "Candidates").fill("10");
-    await field(page, "Router cells").fill("5000");
-    await field(page, "Seek every conflict group of the facts of priority low").check();
-    await expect(asText(page)).toHaveText(
-      'Equivalent CLI command: rnl solve --report --solver-options "tolerance=0.001;grid=none;beam=8;budget=candidates:10,astar_expansions:5000"',
-    );
+    await field(page, "limit").selectOption("work");
+    await field(page, "work").fill("5000");
+    // `grid` is a number or false: the box beside it says what false means
+    await field(page, "Positions are not rounded to a grid.").check();
+    await expect(field(page, "grid")).toBeDisabled();
+    // a string that is given: the junction, whose empty text draws none
+    await setting(page, "junction").getByLabel("set").check();
+    await expect(field(page, "junction")).toBeEnabled();
+    await field(page, "junction").fill("$JUNCTION");
+    await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --solver-config 'grid=false,junction="$JUNCTION",limit="work",work=5000'`);
     await ok(page);
-    expect(await viewer.stored("solve-options")).toEqual({
-      tolerance: 0.001,
-      grid: "none",
-      beam: 8,
-      budget: { candidates: 10, astar_expansions: 5000 },
-      hints_for_low: true,
-    });
-    expect(await solved(page, viewer)).toEqual({
-      options: "tolerance=0.001;grid=none;beam=8;budget=candidates:10,astar_expansions:5000",
-      hintsForLow: true,
-    });
-    // a number for the grid again
+    expect(await solved(page, viewer)).toEqual({ config: 'grid=false,junction="$JUNCTION",limit="work",work=5000' });
+    // a number for the grid again, and the junction not given
     await open(page);
-    await expect(field(page, "No rounding")).toBeChecked();
-    await field(page, "No rounding").uncheck();
-    await field(page, "Grid").fill("0.5");
-    await field(page, "Candidates").fill("256");
+    await expect(field(page, "Positions are not rounded to a grid.")).toBeChecked();
+    await field(page, "Positions are not rounded to a grid.").uncheck();
+    await field(page, "grid").fill("0.5");
+    await setting(page, "junction").getByLabel("set").uncheck();
     await ok(page);
-    expect((await viewer.stored("solve-options")).grid).toBe(0.5);
-    expect((await viewer.stored("solve-options")).budget).toEqual({ astar_expansions: 5000 });
+    expect(await viewer.stored("solve-config")).toEqual({ grid: 0.5, limit: "work", work: 5000 });
   });
 
   test("the objectives move up and down, and the order is what the solver gets", async ({ page, viewer }) => {
     await open(page);
     await expect(objective(page, "current_direction").getByRole("button", { name: "Move up: current_direction" })).toBeDisabled();
-    await expect(objective(page, "bend_alignment").getByRole("button", { name: "Move down: bend_alignment" })).toBeDisabled();
+    await expect(objective(page, "wire_over_symbol").getByRole("button", { name: "Move down: wire_over_symbol" })).toBeDisabled();
     // area, the eighth, goes up past terminal_wire_alignment and symmetry, and keeps the focus
     const up = objective(page, "area").getByRole("button", { name: "Move up: area" });
     await up.click();
@@ -182,20 +208,20 @@ test.describe("on the desktop", () => {
     moved.splice(7, 1);
     moved.splice(5, 0, "area");
     expect((await order(page)).slice(0, 11).map(([n]) => n)).toEqual(moved);
-    await expect(asText(page)).toContainText(`objectives=${moved.join(",")}`);
+    await expect(asText(page)).toContainText(`objectives="${moved.join(",")}"`);
     // an objective that is off can move too: signal_flow goes to the top
     for (let k = 0; k < 11; k++) await objective(page, "signal_flow").getByRole("button", { name: "Move up: signal_flow" }).click();
     expect((await order(page))[0]).toEqual(["signal_flow", false]);
     await ok(page);
-    expect(await viewer.stored("solve-options")).toEqual({ objectives: moved.map((name) => ({ items: [{ name, weight: 1 }], tolerance: 0 })) });
-    expect((await solved(page, viewer)).options).toBe(`objectives=${moved.join(",")}`);
+    expect(await viewer.stored("solve-config")).toEqual({ objectives: moved.join(",") });
+    expect((await solved(page, viewer)).config).toBe(`objectives="${moved.join(",")}"`);
     // moved back, they are the defaults again, and nothing is kept for them
     await open(page);
     await expect(objective(page, "signal_flow")).toHaveClass(/off/);
     await expect(objective(page, "area").locator(".objective-level")).toHaveText("6");
     await dialog(page).getByRole("button", { name: "Restore Defaults" }).click();
     await ok(page);
-    expect(await viewer.stored("solve-options")).toEqual({});
+    expect(await viewer.stored("solve-config")).toEqual({});
   });
 
   test("objectives are turned on and off, and the solver gets those that are on", async ({ page, viewer }) => {
@@ -208,15 +234,15 @@ test.describe("on the desktop", () => {
     await expect(objective(page, "ground_direction").locator(".objective-level")).toHaveText("2");
     await expect(objective(page, "signal_flow").locator(".objective-level")).toHaveText("11");
     const on = DEFAULT_ORDER.filter((n) => n !== "turns").concat("signal_flow");
-    await expect(asText(page)).toContainText(`objectives=${on.join(",")}`);
+    await expect(asText(page)).toContainText(`objectives="${on.join(",")}"`);
     await ok(page);
-    expect((await solved(page, viewer)).options).toBe(`objectives=${on.join(",")}`);
+    expect((await solved(page, viewer)).config).toBe(`objectives="${on.join(",")}"`);
     // all of them off is no objective at all: the solver only satisfies the facts
     await open(page);
     for (const name of on) await objective(page, name).getByLabel(`${name} is on`).uncheck();
-    await expect(asText(page)).toContainText("objectives=none");
+    await expect(asText(page)).toContainText('objectives="none"');
     await ok(page);
-    expect((await solved(page, viewer)).options).toBe("objectives=none");
+    expect((await solved(page, viewer)).config).toBe('objectives="none"');
   });
 
   test("objectives share a level with weights, and the level has a tolerance", async ({ page, viewer }) => {
@@ -232,18 +258,10 @@ test.describe("on the desktop", () => {
     await expect(objective(page, "aspect").locator(".objective-level")).toHaveText("10");
     // only the objective that begins a level has a tolerance of the level
     await expect(objective(page, "wire_length").getByLabel("equal within")).toBeHidden();
-    await expect(asText(page)).toContainText(
-      `objectives=${DEFAULT_ORDER.slice(0, 8).join(",")},crossings+wire_length*2~0.5,aspect"`,
-    );
+    await expect(asText(page)).toContainText(`objectives="${DEFAULT_ORDER.slice(0, 8).join(",")},crossings+wire_length*2~0.5,aspect"`);
     await ok(page);
-    const kept = await viewer.stored("solve-options");
-    expect(kept.objectives[8]).toEqual({
-      items: [{ name: "crossings", weight: 1 }, { name: "wire_length", weight: 2 }],
-      tolerance: 0.5,
-    });
-    expect(kept.objectives).toHaveLength(10);
-    // shown again as it was kept; "with the one above" follows the order: wire_length moved up over
-    // crossings is together with area now, and crossings begins a level, with a tolerance to set
+    expect((await viewer.stored("solve-config")).objectives).toBe(`${DEFAULT_ORDER.slice(0, 8).join(",")},crossings+wire_length*2~0.5,aspect`);
+    // shown again as it was kept
     await open(page);
     await expect(objective(page, "wire_length").getByLabel("with the one above")).toBeChecked();
     await expect(objective(page, "wire_length").getByLabel("weight")).toHaveValue("2");
@@ -251,70 +269,123 @@ test.describe("on the desktop", () => {
     await objective(page, "wire_length").getByRole("button", { name: "Move up: wire_length" }).click();
     await expect(objective(page, "wire_length").locator(".objective-level")).toHaveText("+");
     await expect(objective(page, "crossings").locator(".objective-level")).toHaveText("9");
-    await expect(objective(page, "crossings").getByLabel("equal within")).toBeVisible();
-    await expect(objective(page, "area").getByLabel("equal within")).toBeVisible();
     await dialog(page).getByRole("button", { name: "Cancel" }).click();
     await dialogGone(page);
     // Cancel kept the first order
-    expect((await viewer.stored("solve-options")).objectives[8].items[0].name).toBe("crossings");
+    expect((await viewer.stored("solve-config")).objectives).toContain("crossings+wire_length*2~0.5");
   });
 
-  test("a value that is not a number is refused where it is, and the solver's refusal is shown", async ({ page, viewer }) => {
+  test("a value out of the bounds the table gives is refused where it is, and the solver's refusal is shown at its setting", async ({ page, viewer }) => {
     await open(page);
-    await field(page, "Beam").fill("");
+    await field(page, "beam").fill("");
     await dialog(page).getByRole("button", { name: "OK" }).click();
-    await expect(dialog(page).locator(".dialog-error")).toHaveText("Beam must be a positive whole number.");
-    await field(page, "Beam").fill("2.5");
+    await expect(dialog(page).locator(".dialog-error")).toHaveText("beam must be a number.");
+    await field(page, "beam").fill("2.5");
     await dialog(page).getByRole("button", { name: "OK" }).click();
-    await expect(dialog(page).locator(".dialog-error")).toHaveText("Beam must be a positive whole number.");
-    await field(page, "Beam").fill("4");
-    await field(page, "Time limit").fill("");
+    await expect(dialog(page).locator(".dialog-error")).toHaveText("beam must be a whole number.");
+    await field(page, "beam").fill("0");
     await dialog(page).getByRole("button", { name: "OK" }).click();
-    await expect(dialog(page).locator(".dialog-error")).toHaveText("Time limit must be a number of seconds, or no limit.");
-    await field(page, "Time limit").fill("5");
+    await expect(dialog(page).locator(".dialog-error")).toHaveText("beam must be at least 1.");
+    await field(page, "beam").fill("4");
+    await field(page, "spacing_x").fill("21");
+    await dialog(page).getByRole("button", { name: "OK" }).click();
+    await expect(dialog(page).locator(".dialog-error")).toHaveText("spacing_x must be at most 20.");
+    await field(page, "spacing_x").fill("0");
+    await field(page, "Positions are not rounded to a grid.").uncheck();
+    await field(page, "grid").fill("0");
+    await dialog(page).getByRole("button", { name: "OK" }).click();
+    await expect(dialog(page).locator(".dialog-error")).toHaveText("grid must be more than 0.");
+    await field(page, "grid").fill("1");
     await objective(page, "area").getByLabel("weight").fill("1.5");
     await dialog(page).getByRole("button", { name: "OK" }).click();
     await expect(dialog(page).locator(".dialog-error")).toHaveText("Weight of area must be a whole number.");
     await objective(page, "area").getByLabel("weight").fill("1");
     // nothing reached the solver or was kept while it would not do
-    expect(await viewer.calls("checkSolverOptions")).toEqual([]);
-    expect(await viewer.stored("solve-options")).toBeNull();
-    // what the solver itself says is wrong stays in the dialog, in its words
-    await page.evaluate(() => (window.fakeShell.optionsError = "the beam must be at least 1"));
-    await field(page, "Beam").fill("0");
+    expect(await viewer.calls("checkSettings")).toEqual([]);
+    expect(await viewer.stored("solve-config")).toBeNull();
+    // what the solver itself says is wrong stays in the dialog, in its words, and marks its setting
+    await page.evaluate(() => (window.fakeShell.settingErrors = [{ key: "tolerance", message: "the tolerance is not a number the solver takes" }]));
+    await field(page, "tolerance").fill("0.5");
     await dialog(page).getByRole("button", { name: "OK" }).click();
-    await expect(dialog(page).locator(".dialog-error")).toHaveText("the beam must be at least 1");
+    await expect(dialog(page).locator(".dialog-error")).toHaveText("the tolerance is not a number the solver takes");
+    await expect(setting(page, "tolerance")).toHaveClass(/refused/);
+    await expect(setting(page, "beam")).not.toHaveClass(/refused/);
     await expect(dialog(page)).toHaveCount(1);
-    expect(await viewer.calls("checkSolverOptions")).toEqual([["beam=0"]]);
-    expect(await viewer.stored("solve-options")).toBeNull();
-    // and the dialog is usable again: a beam that will do keeps it
-    await page.evaluate(() => (window.fakeShell.optionsError = null));
-    await field(page, "Beam").fill("2");
+    expect(await viewer.calls("checkSettings")).toEqual([["tolerance=0.5"]]);
+    expect(await viewer.stored("solve-config")).toBeNull();
+    // and the dialog is usable again: a value that will do keeps it
+    await page.evaluate(() => (window.fakeShell.settingErrors = []));
+    await field(page, "tolerance").fill("0.001");
     await ok(page);
-    expect(await viewer.stored("solve-options")).toEqual({ beam: 2 });
+    expect(await viewer.stored("solve-config")).toEqual({ tolerance: 0.001 });
   });
 
-  test("the settings stay for the next start, and the time limit of Solve > Time Limit is one of them", async ({ page, viewer }) => {
+  test("the settings stay for the next start", async ({ page, viewer }) => {
     await open(page);
-    await field(page, "Beam").fill("6");
+    await field(page, "beam").fill("6");
     await ok(page);
     await page.reload();
     await viewer.started();
     await viewer.idle();
     await open(page);
-    await expect(field(page, "Beam")).toHaveValue("6");
+    await expect(field(page, "beam")).toHaveValue("6");
     await dialog(page).getByRole("button", { name: "Cancel" }).click();
     await dialogGone(page);
-    expect(await solved(page, viewer)).toEqual({ options: "beam=6", hintsForLow: false });
-    // a time limit kept by the menu item that the settings replaced still counts, until they are kept
+    expect(await solved(page, viewer)).toEqual({ config: "beam=6" });
+  });
+
+  test("the dialog says what the netlist and its packages give, from the last solve, which a value set here wins over", async ({ page, viewer }) => {
     await page.evaluate(() => {
-      localStorage.removeItem("solve-options");
-      localStorage.setItem("solve-time-limit", JSON.stringify("none"));
+      window.fakeShell.levelCheck = {
+        settings: {
+          layout: { value: "lines", from: "default" },
+          spacing_x: { value: 2, from: "header", at: "t4.sp:3" },
+          objectives: { value: "turns", from: "package:style" },
+          beam: { value: 8, from: "command-line" },
+        },
+        warnings: [],
+        errors: [],
+      };
     });
-    expect((await solved(page, viewer)).options).toBe("time_limit=none");
+    // before a solve there is nothing of the netlist to say
     await open(page);
-    await expect(field(page, "No limit")).toBeChecked();
-    await ok(page);
-    expect(await viewer.stored("solve-options")).toEqual({ time_limit: "none" });
+    await expect(dialog(page).locator(".settings-given")).toHaveCount(0);
+    await dialog(page).getByRole("button", { name: "Cancel" }).click();
+    await dialogGone(page);
+    await solved(page, viewer);
+    await open(page);
+    await expect(dialog(page).locator(".settings-given-list li")).toHaveText([
+      "spacing_x = 2 (header, t4.sp:3)",
+      'objectives = "turns" (package:style)',
+    ]);
+    // the settings of the default and of the command line are not the netlist's
+    await expect(dialog(page).locator(".settings-given")).not.toContainText("layout");
+  });
+
+  test("a setting the solver does not take is an error of the solve, told apart from a solve that failed", async ({ page, viewer }) => {
+    await page.evaluate(() => {
+      window.fakeShell.levelCheck = {
+        settings: {},
+        warnings: [{ key: "tolerance", message: "ignored" }],
+        errors: [{ key: "beam", message: "the beam must be at least 1", refused: 0 }],
+      };
+    });
+    await solved(page, viewer);
+    // the solve was shown: a preview, with the report; the status says how many errors the settings have
+    await expect(page.locator("#preview-badge")).toBeVisible();
+    await expect(page.locator("#solve-step")).toContainText("1 error in the settings: the solve went on without that value.");
+    await expect(page.locator("#solve-counts")).toContainText("1 error in the settings");
+    // the report lists them under Settings, each with the key it is about
+    const group = page.locator("#solve-report .solve-group", { hasText: "Settings (2)" });
+    await expect(group.locator(".solve-line .st")).toHaveText(["beam", "tolerance"]);
+    await expect(group.locator(".solve-line.error .msg")).toHaveText("the beam must be at least 1");
+    await expect(group.locator(".solve-line.warning .msg")).toHaveText("ignored");
+    // a solve that failed is another thing: no preview, and a dialog says why
+    await page.evaluate(() => (window.fakeShell.solveFail = "nothing was solved"));
+    await page.evaluate(() => window.viewer.command("solve-close"));
+    await expect(page.locator("#preview-badge")).toBeHidden();
+    await expect(page.locator("body")).not.toHaveClass(/busy/);
+    await page.evaluate(() => window.viewer.command("solve"));
+    await expect(dialog(page)).toContainText("The netlist could not be solved: nothing was solved");
   });
 });

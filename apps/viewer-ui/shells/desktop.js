@@ -178,13 +178,10 @@ export default {
         : { name: source.name, text: source.text, settings, edits: edits || null, pool, autoInclude, formats: fileFormats() },
     );
   },
-  // the solver's own defaults and options, which Solve > Settings shows and checks
-  solverDefaults: () => invoke("solver_defaults"),
-  checkSolverOptions: (options) =>
-    invoke("check_solver_options", { options }).then(
-      () => null,
-      (e) => (e instanceof Error ? e.message : String(e)),
-    ),
+  // the solver's table of settings, which Solve > Settings draws its dialog from, and what it says of settings given
+  // as named parameters (`rnl solve --check --json`)
+  solverTable: () => invoke("solver_table"),
+  checkSettings: (config) => invoke("check_solver_settings", { config }),
   cancelSolve() {
     invoke("cancel_solve").catch(() => {});
   },

@@ -70,7 +70,7 @@ It implements the Shell of [`shell.js`](../../apps/viewer-ui/shell.js). A source
 | `fail` | A message the next build rejects with. |
 | `next` | A fixture the next build returns instead of its source's, as if the file had changed. |
 | `menu(id)` | Choose a command in the platform's menu. |
-| `optionsError` | On the desktop: what the solver says is wrong with the settings it is asked to check (`checkSolverOptions`), null when they will do. |
+| `settingErrors`, `levelCheck` | With the solver: what the solver refuses in the settings it is asked to check (`checkSettings`), `[{ key, message }]`, empty when they will do; and the `check` that each level of the next solve's report carries, what the settings of the level came from and its warnings and errors. The table of settings the dialog is drawn from is the solver's own, copied into the fake shell. |
 | `buildEdits`, `solveEdits` | The edits each build and each solve was given, in order; undefined for a build of the files as they are. |
 | `buildFormats`, `detected`, `keepsFormat` | The format choices each build was given, `{ path: format }`, in order, which the shell's Document then reads its files in; the defaults `detectFormat` gives by path, else by the `.scs` extension; and whether a choice is kept in the settings, true by default. A fixture without the core's format fields gets them: the two formats, and each host file's default by its extension. |
 | `changedOnDisk`, `overwrites` | The names of files that another program changed since they were read, which the next Save, unless it overwrites, reports instead of writing; and whether each Save was to overwrite. |
