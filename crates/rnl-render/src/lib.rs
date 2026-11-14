@@ -22,7 +22,7 @@ use rnl_runtime::interp::obj::{Lit, PrimParams, Shape};
 use rnl_runtime::markup::{self, Line};
 use rnl_runtime::model::{Layer, LevelView, Style, SymbolView, TextView};
 
-pub use svg::svg_document;
+pub use svg::{svg_document, with_net_names};
 pub use text::{lay_out, lay_out_reflected_baseline, Face};
 
 /// Lay out 0.4 text once for drawing and solving. Coordinates are scene x-right/y-up.
@@ -245,6 +245,10 @@ pub struct RenderOptions {
     /// each a primitive of its own and, in the SVG, a group of class "flyline", which a viewer can
     /// hide; false by default.
     pub flylines: bool,
+    /// Write the name of each connected part of every net (`LevelView::net_labels`) over the
+    /// drawing, as a viewer's View > Show Net Names does: in the SVG only, a group of class
+    /// "net-labels" after everything else; false by default.
+    pub net_names: bool,
 }
 
 /// The `data-id` of the SVG group that draws a level's flyline `k`, and the owner of its
@@ -255,13 +259,18 @@ pub fn flyline_id(k: usize) -> String {
 
 impl Default for RenderOptions {
     fn default() -> RenderOptions {
-        RenderOptions { scale: 14.0, flylines: false }
+        RenderOptions { scale: 14.0, flylines: false, net_names: false }
     }
 }
 
 /// Draw one level as an SVG document.
 pub fn svg(lv: &LevelView, o: &RenderOptions) -> String {
-    svg_document(&primitives(lv, o), o)
+    let s = svg_document(&primitives(lv, o), o);
+    if o.net_names {
+        svg::with_net_names(&s, lv, o.scale)
+    } else {
+        s
+    }
 }
 
 /// One stroke of a line, its style resolved (9.3): a shape's strokes are drawn along its outline,

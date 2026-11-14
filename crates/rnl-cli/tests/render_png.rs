@@ -73,3 +73,36 @@ fn scale_takes_a_number_above_0_and_at_most_16() {
         assert!(err.contains("--scale needs a number above 0 and at most 16"), "{bad}: {err}");
     }
 }
+
+#[test]
+fn net_names_are_written_when_asked() {
+    let d = dir("render-net-names");
+    // two resistors placed, and a wire on b
+    let placed = "* t
+* @RNL(type=\"header\") { @VERSION(\"0.4\") }
+R1 a b 1k
+R2 b c 1k
+* @RNL {
+*   $S = @DEFINE-SYMBOL { (0,0) @PIN(terminal=1); (2,0) @PIN(terminal=2) };
+*   # @SELECT-INSTANCE => @SET-SYMBOL $S;
+*   #R1 @PLACE(0, 0); #R2 @PLACE(4, 0);
+*   &b @WIRE {#R1:2 #R2:1}
+* }
+.end
+";
+    std::fs::write(d.join("t.sp"), placed).unwrap();
+    let out = render(&d, &[]);
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    let plain = std::fs::read_to_string(d.join("out").join("t.svg")).unwrap();
+    assert!(!plain.contains("net-labels"), "off by default");
+    let out = render(&d, &["--net-names"]);
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    let named = std::fs::read_to_string(d.join("out").join("t.svg")).unwrap();
+    assert_eq!(named.matches("<g class=\"net-labels\"").count(), 1, "{named}");
+    for net in ["a", "b", "c"] {
+        assert!(named.contains(&format!("paint-order=\"stroke\">{net}</text>")), "{net} in {named}");
+    }
+    // and in the image
+    let out = render(&d, &["--net-names", "--png"]);
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+}

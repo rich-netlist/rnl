@@ -5,6 +5,7 @@
 use std::fmt::Write;
 
 use rnl_runtime::geom::Pt;
+use rnl_runtime::model::LevelView;
 
 use crate::text::{FAMILY, SLANT};
 use crate::{Kind, PathSeg, Primitive, RenderOptions, Stroke, TextPrim};
@@ -295,6 +296,36 @@ pub fn svg_document(prims: &[Primitive], o: &RenderOptions) -> String {
     }
     s.push_str("\n</svg>\n");
     s
+}
+
+/// The size of a net name in the pixels of the SVG, and its colour and halo's, as a viewer writes
+/// them (View > Show Net Names).
+const NET_NAME_SIZE: f64 = 11.0;
+const NET_NAME_INK: &str = "#6b6b6b";
+const NET_NAME_HALO: &str = "#ffffff";
+
+/// `svg`, an SVG document of the level `lv` drawn at `scale` (by [`svg_document`], or a viewer's
+/// document built from it), with the name of each connected part of every net written over it
+/// (`LevelView::net_labels`): a group of class "net-labels" after everything else, each name
+/// centred on its place, grey, with a halo of the paper's white so that it reads over the lines
+/// under it, in the drawing's font, at one size in the SVG's pixels.
+pub fn with_net_names(svg: &str, lv: &LevelView, scale: f64) -> String {
+    if lv.net_labels.is_empty() {
+        return svg.to_string();
+    }
+    let Some(end) = svg.rfind("</svg>") else { return svg.to_string() };
+    let mut g = String::from("<g class=\"net-labels\" pointer-events=\"none\">");
+    for l in &lv.net_labels {
+        let _ = write!(
+            g,
+            "<text x=\"{:.2}\" y=\"{:.2}\" text-anchor=\"middle\" dominant-baseline=\"central\" font-size=\"{NET_NAME_SIZE}\" fill=\"{NET_NAME_INK}\" stroke=\"{NET_NAME_HALO}\" stroke-width=\"3\" stroke-linejoin=\"round\" paint-order=\"stroke\">{}</text>",
+            l.at.0 * scale,
+            -l.at.1 * scale,
+            esc(&l.net)
+        );
+    }
+    g.push_str("</g>\n");
+    format!("{}{g}{}", &svg[..end], &svg[end..])
 }
 
 #[cfg(test)]

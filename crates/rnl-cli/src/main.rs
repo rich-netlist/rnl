@@ -87,6 +87,8 @@ render options:
                       itself with the fonts it holds, so that it needs no font of the computer;
                       CJK text is drawn in it as empty boxes
   --scale N           the pixels of the PNG image for a unit of the SVG, 2 by default; at most 16
+  --net-names         write the name of each connected part of every net over the drawing, as a
+                      viewer's View > Show Net Names does: grey, in a group of class \"net-labels\"
 render options for inspection (all disabled by default):
   --usages MODE       usage frames: semantic (no drawing of their own) or all
   --currents          show in/out terminal currents, including explicit subcircuit port symbols
@@ -146,6 +148,8 @@ struct Args {
     primitives: bool,
     /// `--flylines`.
     flylines: bool,
+    /// `render`'s `--net-names`.
+    net_names: bool,
     /// `render`'s `--png`, and its `--scale`.
     png: bool,
     scale: f32,
@@ -268,7 +272,7 @@ fn parse_args() -> Result<Args, Said> {
     let mut dialect = None;
     let mut formats = BTreeMap::new();
     let (mut svg, mut primitives, mut status) = (true, false, false);
-    let (mut flylines, mut hints) = (false, false);
+    let (mut flylines, mut hints, mut net_names) = (false, false, false);
     let (mut png, mut scale) = (false, None);
     let mut level = None;
     let mut solver = solver_args::SolverArgs::default();
@@ -346,6 +350,7 @@ fn parse_args() -> Result<Args, Said> {
             "--no-svg" => svg = false,
             "--primitives" => primitives = true,
             "--flylines" => flylines = true,
+            "--net-names" => net_names = true,
             "--png" => png = true,
             "--scale" => {
                 let n = it.next().ok_or_else(|| needs("--scale needs a number, such as 2"))?;
@@ -410,7 +415,7 @@ fn parse_args() -> Result<Args, Said> {
             "--progress=json" | "--respace" | "--timeall" => &["solve", "preview"],
             "--progress" | "--check" | "--external-solver" | "--external-arg" | "--external-timeout" => &["solve"],
             "--previous" | "--solver-input" => &["problem"],
-            "--png" | "--scale" => &["render"],
+            "--png" | "--scale" | "--net-names" => &["render"],
             "--primitives" | "--no-svg" | "--status" => &["view", "snapshot"],
             "--flylines" => &["view", "snapshot", "render"],
             "--hints" => &["view"],
@@ -508,6 +513,7 @@ fn parse_args() -> Result<Args, Said> {
         svg,
         primitives,
         flylines,
+        net_names,
         png,
         scale: scale.unwrap_or(2.0),
         hints,
@@ -813,12 +819,22 @@ fn run(args: &Args) -> Result<ExitCode, Said> {
             std::fs::create_dir_all(&out).map_err(io)?;
             let stem = args.file.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "out".into());
             for (k, lv) in r.model.levels.iter().enumerate() {
+                let render = rnl_render::RenderOptions {
+                    flylines: args.flylines,
+                    net_names: args.net_names,
+                    ..rnl_render::RenderOptions::default()
+                };
                 let svg = match &overlays {
-                    Some(d) => rnl_view::overlays::svg(&d.levels[k], &args.overlays)?,
-                    None => rnl_render::svg(
-                        lv,
-                        &rnl_render::RenderOptions { flylines: args.flylines, ..rnl_render::RenderOptions::default() },
-                    ),
+                    Some(d) => {
+                        let svg = rnl_view::overlays::svg(&d.levels[k], &args.overlays)?;
+                        // the viewer's document is drawn at the default scale, as `render` is
+                        if args.net_names {
+                            rnl_render::with_net_names(&svg, lv, render.scale)
+                        } else {
+                            svg
+                        }
+                    }
+                    None => rnl_render::svg(lv, &render),
                 };
                 let suffix = if args.png { "png" } else { "svg" };
                 let name = if k == 0 {

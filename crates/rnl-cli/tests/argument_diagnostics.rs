@@ -32,6 +32,7 @@ fn options_that_used_to_be_ignored_identify_the_option_and_command() {
         vec!["--no-svg"],
         vec!["--status"],
         vec!["--flylines"],
+        vec!["--net-names"],
         vec!["--hints"],
         vec!["--package", "example"],
         vec!["--all-versions"],
