@@ -391,3 +391,25 @@ fn a_junction_dot_or_a_net_symbol_of_any_name() {
     let hs = hints(devices, &format!("{own}{pieces};\n$DOT @ATTACH #R3:1"));
     assert!(!kinds(&hs).iter().any(|k| matches!(k, Kind::NameOnly | Kind::PartlyNamed)), "{hs:#?}");
 }
+
+/// Texts over texts are judged by the box the solver keeps them clear by
+/// (`rnl_render::clearance_box`): along their lines, 0.1 of their size past the advances at each
+/// end. Two texts on one line whose advances are 0.15 apart lie over each other by 0.05; 0.25
+/// apart, they do not.
+#[test]
+fn texts_over_texts_are_judged_by_the_box_the_solver_keeps_them_clear_by() {
+    for version in ["0.3", "0.4"] {
+        let over = |gap: f64| {
+            let text = format!(
+                "* t\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\") }}\nR1 a b 1k\n{}.end\n",
+                records(&format!(
+                    "#R1 @PLACE(0, 0);\n(-6, 6) @TEXT(\"left\", halign=\"end\");\n({}, 6) @TEXT(\"right\", halign=\"start\")",
+                    -6.0 + gap
+                ))
+            );
+            has(&hints_of(&text), Kind::TextOverText, &["\"left\"", "\"right\""])
+        };
+        assert!(over(0.15), "{version}: 0.15 apart");
+        assert!(!over(0.25), "{version}: 0.25 apart");
+    }
+}

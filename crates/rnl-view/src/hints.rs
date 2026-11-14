@@ -306,6 +306,9 @@ struct TextAt {
     name: String,
     /// The box of its glyphs: from the baseline to the height of a capital, not the line's box.
     bbox: [f64; 4],
+    /// The box it is kept clear of other texts by, the solver's, and judged by over texts
+    /// (`rnl_render::clearance_box`).
+    clear: [f64; 4],
     loc: Option<Loc>,
     /// The pin it is attached to, by its index in [`Drawing::pins`].
     pin: Option<usize>,
@@ -882,7 +885,8 @@ impl<'a> Drawing<'a> {
             });
         }
         let boxes = rnl_render::text_boxes(lv, &rnl_render::RenderOptions::default());
-        for (t, b) in lv.texts.iter().zip(boxes) {
+        let clear = rnl_render::text_clearance_boxes(lv, &rnl_render::RenderOptions::default());
+        for ((t, b), clear) in lv.texts.iter().zip(boxes).zip(clear) {
             let Some(line_box) = b else { continue };
             if line_box[2] - line_box[0] < EPS || line_box[3] - line_box[1] < EPS {
                 continue;
@@ -908,10 +912,11 @@ impl<'a> Drawing<'a> {
             };
             let loc =
                 site(&t.object_id).filter(|l| !(l.file.ends_with(".rnl") && !lv.file.ends_with(".rnl"))).or(owner_loc);
-            for c in cells(bbox) {
+            let clear = clear.unwrap_or(bbox);
+            for c in cells(clear) {
                 d.text_cells.entry(c).or_default().push(d.texts.len());
             }
-            d.texts.push(TextAt { name, bbox, loc, pin });
+            d.texts.push(TextAt { name, bbox, clear, loc, pin });
         }
         d
     }
@@ -1766,7 +1771,8 @@ impl<'a> Drawing<'a> {
         }
     }
 
-    /// Wires over texts and texts over texts, by the boxes of their glyphs.
+    /// Wires over texts, by the boxes of their glyphs, and texts over texts, by the boxes the solver
+    /// keeps them clear of each other by: any overlap with some area, as the solver counts it.
     fn texts(&self, out: &mut Vec<Hint>) {
         for t in &self.texts {
             let mut seen = BTreeSet::new();
@@ -1787,10 +1793,10 @@ impl<'a> Drawing<'a> {
         }
         for (i, a) in self.texts.iter().enumerate() {
             let near_by: BTreeSet<usize> =
-                cells(a.bbox).flat_map(|c| self.text_cells.get(&c).into_iter().flatten().copied()).collect();
+                cells(a.clear).flat_map(|c| self.text_cells.get(&c).into_iter().flatten().copied()).collect();
             for j in near_by {
                 let b = &self.texts[j];
-                if j > i && boxes_overlap(a.bbox, b.bbox, 0.05) {
+                if j > i && boxes_overlap(a.clear, b.clear, EPS) {
                     self.hint(
                         out,
                         Kind::TextOverText,

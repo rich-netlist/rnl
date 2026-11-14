@@ -345,7 +345,7 @@ fn annotation_separations(
         if seen.get(&(a, b)) == Some(&boxes) {
             continue;
         }
-        let relation = apart((a, pa, boxes.0.clone()), (b, pb, boxes.1.clone()), origins, grid);
+        let relation = apart((a, pa, boxes.0.clone()), (b, pb, boxes.1.clone()), origins, grid, None);
         out.push(((a, b), boxes, relation));
     }
     out
@@ -434,6 +434,9 @@ pub(crate) fn port_clashes(s: &Structure, origins: &[[Q; 2]], ori: &[Orient]) ->
 /// value now.
 type SideBound = (usize, Vec<(PointId, Q)>, Q, Q);
 
+/// A bound: an axis, the terms on it, and their least sum.
+type Bound = (usize, Vec<(PointId, Q)>, Q);
+
 /// The relation that puts two symbols apart: `b` right of, left of, above or below `a`, a unit
 /// apart, those that move least first, then the same touching; each distance rounded up to the
 /// grid.
@@ -448,7 +451,61 @@ pub(crate) fn separation(
     let (pa, pb) = (s.model.origin_point.get(a).copied().flatten()?, s.model.origin_point.get(b).copied().flatten()?);
     let ba = s.box_offset(a, ori[a])?;
     let bb = s.box_offset(b, ori[b])?;
-    Some(apart((a, pa, ba), (b, pb, bb), origins, grid))
+    let instead = behind(s, origins, ori, (a, pa, &ba), (b, pb, &bb));
+    Some(apart((a, pa, ba), (b, pb, bb), origins, grid, instead))
+}
+
+/// For two symbols to be put apart, one of them a stub that rises from a pin of an object other than
+/// the second (`ObjectInfo::stub`): the side that would put the stub beyond the other along the way it
+/// rises, where the wire from its pin crosses the other symbol and reads as joined to its pins, and
+/// what takes its place, the other wholly behind the pin, with the stub wholly beyond it, which puts
+/// them apart too; the stub is held beyond its pin here, as no fact need hold it. None for any other
+/// pair, a stub that does not rise, or a language before 0.4.
+fn behind(
+    s: &Structure,
+    origins: &[[Q; 2]],
+    ori: &[Orient],
+    (a, pa, ba): (usize, PointId, &[Q; 4]),
+    (b, pb, bb): (usize, PointId, &[Q; 4]),
+) -> Option<(usize, SideBound, Bound)> {
+    if !s.language04 {
+        return None;
+    }
+    let one = Q::one;
+    for (stub, ps, bs, other, po, bo, first) in [(a, pa, ba, b, pb, bb, true), (b, pb, bb, a, pa, ba, false)] {
+        let Some(info) = &s.objects[stub].stub else { continue };
+        let (host, pin) = info.host;
+        if host == other || info.rise.is_zero() {
+            continue;
+        }
+        let Some(ph) = s.model.origin_point.get(host).copied().flatten() else { continue };
+        let Some(at) = s.pin_offset(host, pin, ori[host]) else { continue };
+        let pin_y = at[1].clone();
+        let up = info.rise.is_positive();
+        // the side of `apart` that puts the stub beyond the other: above it when it rises, below
+        // when it falls; for the stub `a`, sides 3 (a above b) and 2 (b above a)
+        let side = match (first, up) {
+            (true, true) | (false, false) => 3,
+            (true, false) | (false, true) => 2,
+        };
+        let (bound, beyond): (SideBound, Bound) = if up {
+            (
+                // the other's top no higher than the pin
+                (1, vec![(ph, one()), (po, -one())], &bo[3] - &pin_y, &origins[host][1] - &origins[other][1]),
+                // the stub's bottom no lower than the pin
+                (1, vec![(ps, one()), (ph, -one())], &pin_y - &bs[1]),
+            )
+        } else {
+            (
+                // the other's bottom no lower than the pin
+                (1, vec![(po, one()), (ph, -one())], &pin_y - &bo[1], &origins[other][1] - &origins[host][1]),
+                // the stub's top no higher than the pin
+                (1, vec![(ph, one()), (ps, -one())], &bs[3] - &pin_y),
+            )
+        };
+        return Some((side, bound, beyond));
+    }
+    None
 }
 
 /// The relation that puts two symbols apart with their texts.
@@ -462,28 +519,36 @@ fn dressed_separation(
 ) -> Option<Tagged> {
     let (pa, pb) = (s.model.origin_point.get(a).copied().flatten()?, s.model.origin_point.get(b).copied().flatten()?);
     let (ba, bb) = (crate::search::dressed_box(s, a, ori[a])?, crate::search::dressed_box(s, b, ori[b])?);
-    Some(apart((a, pa, ba), (b, pb, bb), origins, grid))
+    let instead = behind(s, origins, ori, (a, pa, &ba), (b, pb, &bb));
+    Some(apart((a, pa, ba), (b, pb, bb), origins, grid, instead))
 }
 
 /// The relation that puts two boxes apart, each about the origin of its symbol: the symbol, its
-/// origin's point and the box.
+/// origin's point and the box; `instead`, a side replaced by another and a bound that goes with it
+/// ([`behind`]).
 fn apart(
     (a, pa, ba): (usize, PointId, [Q; 4]),
     (b, pb, bb): (usize, PointId, [Q; 4]),
     origins: &[[Q; 2]],
     grid: &Option<Q>,
+    instead: Option<(usize, SideBound, Bound)>,
 ) -> Tagged {
     let one = Q::one;
     let b_minus_a = || vec![(pb, one()), (pa, -one())];
     let a_minus_b = || vec![(pa, one()), (pb, -one())];
     let d = |axis: usize| &origins[b][axis] - &origins[a][axis];
     // (axis, terms, the constant at no gap, the value now)
-    let sides: [SideBound; 4] = [
+    let mut sides: [SideBound; 4] = [
         (0, b_minus_a(), &ba[2] - &bb[0], d(0)),
         (0, a_minus_b(), &bb[2] - &ba[0], -d(0)),
         (1, b_minus_a(), &ba[3] - &bb[1], d(1)),
         (1, a_minus_b(), &bb[3] - &ba[1], -d(1)),
     ];
+    let mut also = None;
+    if let Some((i, side, beyond)) = instead {
+        sides[i] = side;
+        also = Some((i, beyond));
+    }
     let mut order: Vec<usize> = (0..4).collect();
     order.sort_by_key(|&i| (&sides[i].2 - &sides[i].3, i));
     let mut alternatives = Vec::new();
@@ -491,7 +556,11 @@ fn apart(
         for &i in &order {
             let (axis, terms, c, _) = &sides[i];
             // on the grid, as the constants of the other relations are
-            alternatives.push(vec![(*axis, terms.clone(), up(c + &gap, grid))]);
+            let mut alternative = vec![(*axis, terms.clone(), up(c + &gap, grid))];
+            if let Some((_, (axis, terms, c))) = also.as_ref().filter(|(j, _)| *j == i) {
+                alternative.push((*axis, terms.clone(), up(c.clone(), grid)));
+            }
+            alternatives.push(alternative);
         }
     }
     Tagged { kind: RelKind::Separation, rel: Relation::OneOf(alternatives) }

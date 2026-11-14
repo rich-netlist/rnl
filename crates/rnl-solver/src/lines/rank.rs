@@ -1,8 +1,10 @@
-//! Tree-stage ranking for line layout: retained facts, validity rules, then wire quality.
+//! Tree-stage ranking for line layout: retained facts that must hold, false joins, the facts of
+//! low priority, validity rules, then wire quality.
 
 use std::cell::RefCell;
 
 use num_traits::Zero;
+use rnl_runtime::interp::obj::Priority;
 use rnl_runtime::problem::{Axis, LevelProblem, PointRef};
 
 use crate::coords::Placed;
@@ -28,7 +30,7 @@ impl Rank {
             .filter(|&i| s.active.layers[i].items.iter().any(|(o, _)| valid.contains(o)))
             .collect();
         let annotations = !s.annotation_views.is_empty();
-        let n = 2 + 2 * usize::from(annotations) + rules.len() + super::quality::LAB_KEY;
+        let n = 4 + 2 * usize::from(annotations) + rules.len() + super::quality::LAB_KEY;
         let layers = (0..n).map(|_| ActiveLayer { items: Vec::new(), tolerance: Q::zero() }).collect();
         Rank {
             active: Active { layers, inert: Vec::new(), configured_only: true },
@@ -57,12 +59,18 @@ impl Rank {
         let tol = crate::rational::from_f64(options.tolerance).unwrap_or_else(Q::zero);
         let at = |m: &PointRef, axis: Axis| point_value(problem, g, m, usize::from(axis == Axis::Y), 0);
         let ori = |k: usize| g.orient.get(k).copied();
-        let broken = s
+        let broken: Vec<usize> = s
             .kept
             .iter()
-            .filter(|&&f| crate::holds::check_problem(problem, f, &at, &ori, &tol, &tol) != Some(true))
-            .count();
-        let mut layers: Vec<Q> = vec![int(broken as i64)];
+            .copied()
+            .filter(|&f| crate::holds::check_problem(problem, f, &at, &ori, &tol, &tol) != Some(true))
+            .collect();
+        let low = broken.iter().filter(|&&f| problem.facts[f].priority == Priority::Low).count();
+        // a drawing that reads as connected where it is not is wrong: it ranks after the facts that
+        // must hold and before those of low priority, which a fill writes as a preference
+        let joins = crate::score::drawn(problem, s, g, routing)
+            .map_or(0, |wires| crate::score::false_joins(problem, s, &placed.origins, g, &wires));
+        let mut layers: Vec<Q> = vec![int((broken.len() - low) as i64), int(joins as i64), int(low as i64)];
         if self.annotations {
             let (overlaps, hits) =
                 super::quality::annotation_cost(problem, s, placed, routing).expect("validated annotation geometry");
@@ -100,7 +108,7 @@ impl Rank {
 
     pub(crate) fn note(&self, s: &Structure) -> String {
         let seen = self.seen.borrow();
-        let mut leading = vec!["facts broken".to_string()];
+        let mut leading = vec!["facts broken".to_string(), "false joins".into(), "low facts broken".into()];
         if self.annotations {
             leading.extend(["annotation overlaps".into(), "wires through annotations".into()]);
         }

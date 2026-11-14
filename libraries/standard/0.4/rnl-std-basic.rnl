@@ -406,7 +406,7 @@
     @LINE {(-2, 0) (-0.7428, 0)};
     (0, -1.1511) @CIRCLE(radius=0.3199);
     @LINE {(0, -1.471) (0, -2)};
-    ? @TEXT("${name}", key="name", halign="middle") => @PLACE(-0.85, 2.35);
+    ? @TEXT("${name}", key="name") => @PLACE(0.9, 0.25);
   };
 
   /* A voltage-controlled switch (S), its differential control pins below it. Terminals: p n cp cn. */

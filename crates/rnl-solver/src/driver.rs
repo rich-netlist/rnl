@@ -53,7 +53,7 @@ use crate::options::{Caps, CAPS};
 use crate::rational::{to_f64, Q};
 use crate::resolve::Resolved;
 use crate::route::{route, style_notes, Failure, Routing};
-use crate::score::{crowding, drawn, measured_layers, misleading, order, Entry};
+use crate::score::{crowding, drawn, measured_layers, order, Entry};
 use crate::search::{search, Candidate, RelKind};
 use crate::structure::{analyse, Role, Structure};
 use crate::{Clock, SolveReport, Solved, SolverOptions, StoppedClock, Unrouted};
@@ -237,7 +237,13 @@ fn solve_exact_mode(
                         + crate::annotation::overlaps(problem, &structure, &placed.geometry, &placed.origins)
                             .expect("validated annotation bounds"),
                     crowding: crowding(&structure, &placed.origins, &placed.geometry.orient, &placed.dropped),
-                    misleading: misleading(problem, &structure, &placed.origins, &placed.geometry, &written),
+                    misleading: crate::score::false_joins(
+                        problem,
+                        &structure,
+                        &placed.origins,
+                        &placed.geometry,
+                        &written,
+                    ),
                     joins_left: 0,
                     layers: measured_layers(problem, &structure, &placed, None),
                     code: c.code(&structure),
@@ -300,7 +306,13 @@ fn solve_exact_mode(
             let Ok(wires) = drawn(problem, &structure, &p.placed.geometry, &routing) else { continue };
             let score = measured_layers(problem, &structure, &p.placed, Some(&wires));
             let entry = Entry {
-                misleading: misleading(problem, &structure, &p.placed.origins, &p.placed.geometry, &wires),
+                misleading: crate::score::false_joins(
+                    problem,
+                    &structure,
+                    &p.placed.origins,
+                    &p.placed.geometry,
+                    &wires,
+                ),
                 joins_left: routing.joins_left(),
                 layers: score,
                 ..p.entry.clone()
@@ -402,7 +414,7 @@ fn solve_exact_mode(
                                 + crate::annotation::overlaps(problem, &structure, &p.geometry, &p.origins)
                                     .expect("validated annotation bounds"),
                             crowding: crowding(&structure, &p.origins, &p.geometry.orient, &p.dropped),
-                            misleading: misleading(problem, &structure, &p.origins, &p.geometry, &wires),
+                            misleading: crate::score::false_joins(problem, &structure, &p.origins, &p.geometry, &wires),
                             joins_left: r.joins_left(),
                         };
                         refined += 1;
@@ -716,7 +728,7 @@ fn respaced(
             written_path_error: None,
             overlaps: placed.overlaps.len(),
             crowding: crowding(s, &placed.origins, &placed.geometry.orient, &placed.dropped),
-            misleading: misleading(problem, s, &placed.origins, &placed.geometry, &wires),
+            misleading: crate::score::false_joins(problem, s, &placed.origins, &placed.geometry, &wires),
             joins_left: routing.joins_left(),
             layers: measured_layers(problem, s, &placed, Some(&wires)),
             code: Vec::new(),
