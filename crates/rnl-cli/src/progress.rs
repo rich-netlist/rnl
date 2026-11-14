@@ -319,7 +319,7 @@ pub(crate) fn solve_progress_skipping(
         observer.state.borrow_mut().solved_in.push((clock.elapsed() - from).max(0.));
         result
     };
-    let mut run = solve_marked(file, files, options, &watch, skip, &timed)?;
+    let mut run = solve_marked(file, files, options, clock, &watch, skip, &timed)?;
     // cancelled in the last level: nothing after it to stop before
     if observer.state.borrow().cancelled {
         return Err(crate::solve::CANCELLED.to_string());

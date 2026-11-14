@@ -81,6 +81,10 @@ pub struct SolveRequest {
     /// --respace` does (`docs/solver-respace.md`).
     #[serde(default)]
     pub respace: bool,
+    /// The whole file's time, in seconds, as `rnl solve --timeall` takes it: what the levels of a
+    /// time limit share, on the clock of the solve. A respace searches nothing and does not read it.
+    #[serde(default)]
+    pub timeall: Option<f64>,
 }
 
 fn yes() -> bool {
@@ -160,6 +164,7 @@ fn read_options(request: &mut SolveRequest, solver: SolverOptions) -> SolveOptio
         include_std: request.include_std,
         level: request.level.take(),
         solver,
+        total_seconds: request.timeall,
     }
 }
 
@@ -197,6 +202,9 @@ pub fn solve(request: &[u8], now: &dyn Fn() -> f64, progress: &dyn Fn(&str) -> b
     let Some(entry) = request.entry.take() else {
         return Answer::Error { error: "the request is not valid: missing field `entry`".into() };
     };
+    if request.timeall.is_some_and(|s| !(s.is_finite() && s > 0.)) {
+        return Answer::Error { error: "timeall: the seconds must be positive and finite".into() };
+    }
     let solver = match SolverOptions::default().with_config(&request.solver_config) {
         Ok(s) => s,
         Err(e) => return Answer::Error { error: format!("solver_config: {e}") },

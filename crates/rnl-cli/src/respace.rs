@@ -71,6 +71,8 @@ pub fn respace_progress(
     clock: &dyn Clock,
     sink: &dyn Fn(&Event) -> bool,
 ) -> Result<SolveRun, String> {
+    // nothing is searched: the whole file's time is not read
+    let options = &SolveOptions { total_seconds: None, ..options.clone() };
     let records = records(file, files, options)?;
     let record = |p: &LevelProblem| records.get(&(p.level, p.title.clone()));
     solve_progress_skipping(file, files, options, clock, sink, &|p| why_not(p, record(p)), &|p, options, clock| {

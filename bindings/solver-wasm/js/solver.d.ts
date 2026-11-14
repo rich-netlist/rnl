@@ -25,6 +25,8 @@ export interface SolveRequest {
   level?: string;
   /** Space each level again from its record of the solver, nothing searched. */
   respace?: boolean;
+  /** The whole file's time in seconds, as `rnl solve --timeall` takes it: what the levels of a time limit share. */
+  timeall?: number;
 }
 
 /** The Document drawn as solved, the report and the texts written, by the paths of the request. */

@@ -32,6 +32,21 @@ end to end. Compare the level's solver time with the CLI/process time when diagn
 an overrun; profiling can itself slow search and move a time cutoff. Replaying the
 reported work is the way to inspect the same search trajectory.
 
+`--timeall S` gives the whole file a time as well: `solve` and `preview` take it, and a request
+to the solver's WebAssembly module takes it as `timeall`. The levels of 0.4 of a time limit share its
+`S` seconds, which run from the start of the solve. Each level has the least of its own limit
+and an even share of what is left: the seconds left, in whole milliseconds, over the levels of a
+time limit still to solve, itself among them. What a level leaves goes to those after it. Once
+nothing is left, each level still to solve has its seed only. A level of a limit of work, or of
+its seed, is solved as its limit says, and its time counts against the others'. The share is
+given to the level as the tool's last settings, so the `level` event of the progress tells it,
+and the work the level reports replays it as any other. A respace searches nothing and does not read it. A file of 0.2 that is
+raised to 0.3 is solved twice, and each pass has the whole time; the second is the one written.
+
+```sh
+rnl solve circuit.sp -o solved --timeall 60
+```
+
 `SolveReport.canonical_options` is the options text to pass to `sig2` when saving a 0.4
 result. It normalizes the time limit to the admitted work, so replay preserves the record's
 hash as well as its placements and wires. A caller must not hash its original time settings

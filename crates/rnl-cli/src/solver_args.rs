@@ -62,6 +62,10 @@ solve options (the levels are read without their type=\"generated\" records; -o 
   --progress          report 0.4 stages and consumed work on standard error
   --progress=json     report the solve on standard error as events, one JSON object per line
                       (docs/solver-progress.md; solve and preview take it)
+  --timeall S         the seconds that all levels of a time limit share, the whole file's time:
+                      each has at most what is left of them, shared evenly among the levels still
+                      to solve, and only its seed once they are spent; a level of a limit of work
+                      or of its seed is solved as its limit says (solve and preview take it)
   --respace           write each level with its objects where the record of the solver last put
                       them, the wires routed again and the gaps widened to the spacing given with
                       --solver-config, nothing searched; a level without a record that fits the
@@ -100,6 +104,8 @@ pub(crate) struct SolverArgs {
     pub external: Option<PathBuf>,
     pub external_args: Vec<String>,
     pub external_timeout: Option<f64>,
+    /// `solve --timeall`, `preview --timeall`: the whole file's time, in seconds.
+    pub timeall: Option<f64>,
     pub solver_input: bool,
     pub progress: bool,
     pub progress_json: bool,
@@ -134,6 +140,16 @@ impl SolverArgs {
                     return Err(needs("--external-timeout needs positive finite seconds"));
                 }
                 self.external_timeout = Some(seconds);
+            }
+            "--timeall" => {
+                let value = rest.next().ok_or_else(|| needs("--timeall needs seconds"))?;
+                self.timeall = Some(
+                    value
+                        .parse::<f64>()
+                        .ok()
+                        .filter(|s| s.is_finite() && *s > 0.)
+                        .ok_or_else(|| needs("--timeall needs positive finite seconds, such as 60"))?,
+                );
             }
             "--progress" => self.progress = true,
             "--progress=json" => self.progress_json = true,
@@ -176,6 +192,7 @@ impl SolverArgs {
                 (self.profile.is_some(), "--profile"),
                 (self.report, "--report"),
                 (self.respace, "--respace"),
+                (self.timeall.is_some(), "--timeall"),
             ];
             if let Some((_, option)) = writes.iter().find(|(given, _)| *given) {
                 let text = format!("solve --check solves and writes nothing, so it takes no {option}");
@@ -184,6 +201,10 @@ impl SolverArgs {
         }
         if self.respace && self.external.is_some() {
             let text = "--respace spaces the record of the embedded solver, so it takes no --external-solver";
+            return Err(Said::new(codes::CLI_OPTION_WRONG_COMMAND, text));
+        }
+        if self.respace && self.timeall.is_some() {
+            let text = "--respace searches nothing, so it takes no --timeall";
             return Err(Said::new(codes::CLI_OPTION_WRONG_COMMAND, text));
         }
         if self.profile.is_some() && command != "solve" {
@@ -291,6 +312,7 @@ pub(crate) fn preview(args: &Args, provider: &FsProvider) -> Result<ExitCode, Sa
         include_std: args.include_std,
         level: args.level.clone(),
         solver,
+        total_seconds: args.solver.timeall,
     };
     let entry = rnl_cli::path_str(&args.file);
     eprintln!("{}", rnl_cli::SOLVER_PREVIEW_NOTICE);
@@ -430,6 +452,7 @@ fn solve_with(args: &Args, provider: &FsProvider) -> Result<(ExitCode, u8, usize
         include_std: args.include_std,
         level: args.level.clone(),
         solver,
+        total_seconds: args.solver.timeall,
     };
     let profile_clock = args
         .solver

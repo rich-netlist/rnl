@@ -268,6 +268,7 @@ fn the_report_of_a_solve_tells_of_each_fact_and_the_document_with_its_record_kee
         include_std: false,
         level: None,
         solver: SolverOptions::default(),
+        total_seconds: None,
     };
     let shown = preview("/w/a.sp", &files, &options, &NoTime, &|_| true).unwrap();
     let report = &shown.report.levels[0];
