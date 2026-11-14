@@ -72,15 +72,16 @@
   %bulk_pin_set @REMOVE-FROM $GROUND_FILL_SET;
   %own_pin_set @REMOVE-FROM $SUPPLY_FILL_SET;
   %bulk_pin_set @REMOVE-FROM $SUPPLY_FILL_SET;
-  %piece_label_set = # @SELECT-NET(split=true, recursive=true) => @SELECT-PIN(piece_first=true, wired=true, recursive=true);
+  /* The first pins of the wired pieces, on nets other than ground and supply nets, which the fill gives a $PIECE_LABEL; a file takes a pin out with REMOVE-FROM. */
+  $PIECE_FILL_SET = # @SELECT-NET(split=true, recursive=true) => @SELECT-PIN(piece_first=true, wired=true, recursive=true);
   /* A port net of $PORT_FILL_SET: its tag comes after the pieces are fixed, so each wired piece of it gets a $PIECE_LABEL too, split or not. */
-  $PORT_FILL_SET @SELECT-PIN(piece_first=true, wired=true, recursive=true) => @ADD-TO %piece_label_set;
+  $PORT_FILL_SET @SELECT-PIN(piece_first=true, wired=true, recursive=true) => @ADD-TO $PIECE_FILL_SET;
   %rail_piece_pin_set = {$GROUND_NET_SET $SUPPLY_NET_SET} @SELECT-PIN(recursive=true);
   %bulk_pin_set @REMOVE-FROM %rail_piece_pin_set;
-  %rail_piece_pin_set @REMOVE-FROM %piece_label_set;
-  %own_pin_set @REMOVE-FROM %piece_label_set;
-  # @SELECT-USAGE(recursive=true) $PIECE_LABEL => @SELECT-PIN(role="t", recursive=true) => @REMOVE-FROM %piece_label_set;
-  # @SELECT-USAGE(recursive=true) $NET_LABEL_STUB => @SELECT-PIN(role="t", recursive=true) => @REMOVE-FROM %piece_label_set;
-  # @SELECT-USAGE(recursive=true) $IO_PORT_STUB => @SELECT-PIN(role="t", recursive=true) => @REMOVE-FROM %piece_label_set;
-  $PIECE_LABEL @ATTACH %piece_label_set;
+  %rail_piece_pin_set @REMOVE-FROM $PIECE_FILL_SET;
+  %own_pin_set @REMOVE-FROM $PIECE_FILL_SET;
+  # @SELECT-USAGE(recursive=true) $PIECE_LABEL => @SELECT-PIN(role="t", recursive=true) => @REMOVE-FROM $PIECE_FILL_SET;
+  # @SELECT-USAGE(recursive=true) $NET_LABEL_STUB => @SELECT-PIN(role="t", recursive=true) => @REMOVE-FROM $PIECE_FILL_SET;
+  # @SELECT-USAGE(recursive=true) $IO_PORT_STUB => @SELECT-PIN(role="t", recursive=true) => @REMOVE-FROM $PIECE_FILL_SET;
+  $PIECE_LABEL @ATTACH $PIECE_FILL_SET;
 }

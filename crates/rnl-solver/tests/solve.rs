@@ -180,6 +180,7 @@ R6 m b 1k
 *   {#R1:2 #R2:1} @ROUTE-OBJECT;
 *   {#R3:2 #R4:1} @ROUTE-OBJECT;
 *   {#R5:2 #R6:1} @ROUTE-OBJECT;
+*   # @SELECT-PIN(recursive=true) => @REMOVE-FROM $PIECE_FILL_SET;
 * }
 .ends
 "#;
