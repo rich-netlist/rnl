@@ -250,8 +250,9 @@ impl Interp<'_> {
     }
 
     /// Every value of every key that applies to the level (14.10), by key, and the values of a
-    /// key in the order of 14.10: the packages in their effective order, the file's header, the
-    /// level's records. A later value does not replace an earlier one here: the solver takes per
+    /// key in the order of 14.10: the packages in their effective order, the headers of the files
+    /// that include the level's file, outermost first, the header of its own file, the level's
+    /// records. A later value does not replace an earlier one here: the solver takes per
     /// key the last value it accepts, so an earlier one stands when a later one is refused. The
     /// values of the keys this standard names that the core does not take are left out, with an
     /// error: of `spacing_x` and `spacing_y` when they are read, of `junction` here, a value that
@@ -270,8 +271,17 @@ impl Interp<'_> {
         for (_, unit) in packages {
             settings.extend(self.units[unit].solver_config.iter().cloned());
         }
+        // the header records of the outer files, then those of the included files, down to the
+        // level's own file (14.10), as for DEVICE (6.12)
         let file = self.doc.file_level(level);
-        settings.extend(self.units[self.level_unit[file]].solver_config.iter().cloned());
+        let mut chain = self.doc.ancestors(file);
+        chain.reverse();
+        chain.push(file);
+        for lv in chain {
+            if self.doc.levels[lv].kind == crate::host::LevelKind::File {
+                settings.extend(self.units[self.level_unit[lv]].solver_config.iter().cloned());
+            }
+        }
         let mut facts = self.scenes[scene].solver_config.clone();
         facts.sort_by(|a, b| a.pos.cmp(&b.pos));
         for fact in facts {

@@ -184,15 +184,23 @@ fn file_settings(o: &mut SolverOptions, settings: &[SolverSetting], tool: &[Solv
                 taken.insert(&s.key, k);
             }
             Err(e) => {
-                let before = match by_tool {
-                    Some(t) => format!("the tool's {}", written(t)),
-                    None => taken.get(s.key.as_str()).map_or("the default".to_string(), |&j| written(&settings[j])),
+                let message = match by_tool {
+                    // a solve does not start with a value of the tool that is not taken
+                    Some(t) if apply(&mut o.clone(), t).is_err() => format!(
+                        "{e}; {} is left out, and so is the tool's {}, which is not taken either",
+                        written(s),
+                        written(t)
+                    ),
+                    Some(t) => {
+                        format!("{e}; {} is left out, and the tool's {} stays in effect", written(s), written(t))
+                    }
+                    None => {
+                        let before =
+                            taken.get(s.key.as_str()).map_or("the default".to_string(), |&j| written(&settings[j]));
+                        format!("{e}; {} is left out, and {before} stays in effect", written(s))
+                    }
                 };
-                out.refused.push(SettingProblem {
-                    key: Some(s.key.clone()),
-                    message: format!("{e}; {} is left out, and {before} stays in effect", written(s)),
-                    refused: Some(k),
-                });
+                out.refused.push(SettingProblem { key: Some(s.key.clone()), message, refused: Some(k) });
             }
         }
     }
@@ -571,6 +579,19 @@ mod tests {
         assert!(warnings.is_empty(), "{warnings:?}");
         assert_eq!(errors.len(), 2, "{errors:?}");
         assert!(errors[1].ends_with("grid=\"x\" is left out, and the tool's grid=5 stays in effect"), "{errors:?}");
+        // when the tool's own value is not taken either, the file's error says so: no value stays
+        let tool = [(settings("grid=\"y\"").remove(0), false)];
+        let check = SolverOptions::check_settings(&tool, Some(&p));
+        let file: Vec<_> = check.errors.iter().filter(|e| e.refused.is_some()).collect();
+        assert_eq!(file.len(), 2, "{:?}", check.errors);
+        assert!(
+            file[1]
+                .message
+                .ends_with("grid=\"x\" is left out, and so is the tool's grid=\"y\", which is not taken either"),
+            "{:?}",
+            file
+        );
+        assert!(check.errors.iter().any(|e| e.refused.is_none() && e.key.as_deref() == Some("grid")));
         // a key the solver does not know is a warning, not an error
         p.solver_config = settings("unknown=1");
         let (_, warnings, errors) = SolverOptions::default().for_problem(&p);
