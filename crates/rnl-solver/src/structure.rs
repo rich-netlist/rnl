@@ -1201,25 +1201,18 @@ fn line_chars(runs: &[Run]) -> usize {
         .sum()
 }
 
-/// How far the box of a text reaches past the advances of its runs at each end of its lines, in
-/// sizes of the text: a margin for glyphs that reach past their advances, and for the rounding of
-/// the advances that a frontend draws.
+/// `rnl_render::TEXT_MARGIN` as a fraction, which the box of a text of 0.4 adds to the renderer's
+/// box exactly: the one measure of a text's clearance (`rnl_render::clearance_box`).
 const TEXT_MARGIN: (i64, i64) = (1, 10);
-
-/// How far above and below its baseline a run's glyphs reach, in sizes of the run: the capitals,
-/// digits and ascenders of the Latin letters, about 0.72 high in the shipped fonts, and their
-/// descenders, about 0.24 deep, with a margin; the ideographs, which fill the em box from 0.12
-/// below the baseline to 0.88 above it, nearly so.
-const RUN_ABOVE: (i64, i64) = (4, 5);
-const RUN_BELOW: (i64, i64) = (2, 5);
 
 /// The box of a text of a symbol anchored at `at` in the symbol's coordinates (9.2.5), about the
 /// owner's origin with the owner turned by `turn`, as the renderer lays it out (quality review
 /// ST-7): along its lines, from the start of the first run to the end of the last, each run as
 /// wide as the advances of its characters in the shipped fonts (`rnl_render::lay_out`, decision
 /// 0009), with the style's size, bold and italic (9.3; the font named is a hint that the layout
-/// does not follow), and `TEXT_MARGIN` more at each end; across them, each run from `RUN_BELOW`
-/// below its baseline to `RUN_ABOVE` above it, and the bars of fractions and overlines, the lines
+/// does not follow), and `TEXT_MARGIN` more at each end; across them, each run from
+/// `rnl_render::RUN_BELOW` below its baseline to `RUN_ABOVE` above it, and the bars of fractions
+/// and overlines (`rnl_render::clearance_box`, which the check of texts over texts reads too), the lines
 /// and the box beside the anchor where the renderer puts them as `halign` and `valign` say; the
 /// sides on a hundredth of a unit, outwards. The anchor turns with the owner, but the glyphs read
 /// upright, as the renderer draws them: the text runs across or up by `rotate` and `turn`, with
@@ -1327,23 +1320,10 @@ pub(crate) fn text_box(t: &TextInfo, at: &(Q, Q), turn: Orient) -> Option<[Q; 4]
     } else {
         rnl_render::lay_out(&mut laid, scale)
     };
-    let ratio = |(n, d): (i64, i64)| n as f64 / d as f64;
-    // across the lines, the glyphs of each run rather than the ascender and the descender of the
-    // face, which the renderer's box reaches and which go well past them
-    let (mut y1, mut y2) = (f64::MAX, f64::MIN);
-    for r in &laid.runs {
-        y1 = y1.min(r.at.1 - ratio(RUN_BELOW) * r.size);
-        y2 = y2.max(r.at.1 + ratio(RUN_ABOVE) * r.size);
-    }
-    for b in &laid.bars {
-        let half = b.stroke.width / 2.0;
-        y1 = y1.min(b.a.1.min(b.b.1) - half);
-        y2 = y2.max(b.a.1.max(b.b.1) + half);
-    }
-    if y1 > y2 {
-        return None;
-    }
-    let margin = ratio(TEXT_MARGIN) * size;
+    // the one measure of a text's clearance, which the check of texts over texts reads too: along
+    // the lines the box laid out and a margin at each end, across them the glyphs of each run
+    // rather than the ascender and the descender of the face, which go well past them
+    let [x1, y1, x2, y2] = rnl_render::clearance_box(&laid, laid_box, false)?;
     let hundredths = |v: f64, up: bool| {
         // the noise of the floating point off first, so that a side on a hundredth stays there
         let c = (v * 100.0 * 1e6).round() / 1e6;
@@ -1351,12 +1331,7 @@ pub(crate) fn text_box(t: &TextInfo, at: &(Q, Q), turn: Orient) -> Option<[Q; 4]
         // a box the size of a page, as no text drawn is wider than that
         frac(c.clamp(-1e12, 1e12) as i64, 100)
     };
-    let b = [
-        hundredths(laid_box[0] - margin, false),
-        hundredths(y1, false),
-        hundredths(laid_box[2] + margin, true),
-        hundredths(y2, true),
-    ];
+    let b = [hundredths(x1, false), hundredths(y1, false), hundredths(x2, true), hundredths(y2, true)];
     // a text that reads up has the tops of its glyphs to the left
     let b = if vertical { turned_box(&b, Orient::R90)? } else { b };
     let at = [turned(turn, at, 0), turned(turn, at, 1)];
@@ -2818,6 +2793,12 @@ fn elements_of(r: &PointRef, out: &mut Vec<usize>) {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+
+    #[test]
+    fn the_margin_of_a_text_is_the_one_of_the_renderer() {
+        // the one measure of a text's clearance, which the check of texts over texts reads too
+        assert_eq!(TEXT_MARGIN.0 as f64 / TEXT_MARGIN.1 as f64, rnl_render::TEXT_MARGIN);
+    }
 
     #[test]
     fn fixed_vertical_facts_refine_modern_current_depth_rows() {
