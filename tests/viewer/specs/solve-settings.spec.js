@@ -76,7 +76,7 @@ test.describe("on the desktop", () => {
       return table.menus.find((m) => m.label === "&Solve").items.filter((i) => i !== "-").map((i) => [i.id, i.label]);
     });
     expect(solve.map(([id]) => id)).toEqual([
-      "solve", "solve-all", "solve-close", "solve-save", "solve-save-utf8",
+      "solve", "solve-all", "solve-respace", "solve-respace-all", "solve-close", "solve-save", "solve-save-utf8",
       "toggle-layout", "toggle-skeleton-symbols", "toggle-skeleton-wires",
       "solve-settings",
     ]);

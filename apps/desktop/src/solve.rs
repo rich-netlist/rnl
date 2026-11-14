@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
-use rnl_cli::preview::{one_file, preview_progress, save_copy_with_encoding, Copy, Report, StoppableClock};
+use rnl_cli::preview::{one_file, preview_progress, respace, save_copy_with_encoding, Copy, Report, StoppableClock};
 use rnl_cli::progress::Event;
 use rnl_cli::solve::{check_settings, SolveOptions, ToolSettings};
 use rnl_runtime::source::MemoryProvider;
@@ -47,8 +47,9 @@ pub struct Solved {
 /// differ from the defaults, written as RNL named parameters as `rnl solve --solver-config` takes
 /// them, such as `layout="rows",beam=8`. `timeall` is the seconds that all levels of a time limit share
 /// (`rnl solve --timeall`), none for each level's own. `level` is the title of the one level to solve, the circuit
-/// shown; none solves every level (Solve > Solve All Circuits). None given, or an empty text, are the
-/// defaults of `rnl solve`.
+/// shown; none solves every level (Solve > Solve All Circuits). `respace` draws each level where the record of the
+/// solver in the file last put its objects, spaced again as `config` says, nothing searched (Solve > Respace). None
+/// given, or an empty text, are the defaults of `rnl solve`.
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
@@ -58,6 +59,8 @@ pub struct Settings {
     timeall: Option<f64>,
     #[serde(default)]
     level: Option<String>,
+    #[serde(default)]
+    respace: bool,
 }
 
 impl Settings {
@@ -119,6 +122,7 @@ pub async fn solve_preview(
     let pool = pool.unwrap_or_default();
     let in_memory = path.is_none();
     let settings = settings.unwrap_or_default();
+    let spaced = settings.respace;
     let options = SolveOptions {
         level: settings.level.clone().filter(|title| !title.is_empty()),
         solver: settings.solver()?,
@@ -153,7 +157,11 @@ pub async fn solve_preview(
                     index: &index,
                     enabled: auto_include.unwrap_or(false),
                 };
-                preview_progress(&entry, &files, &options, &clock, &watch)
+                if spaced {
+                    respace(&entry, &files, &options, &clock, &watch)
+                } else {
+                    preview_progress(&entry, &files, &options, &clock, &watch)
+                }
             }
             (None, Some(name), Some(text)) => {
                 let entry = format!("/{name}");
@@ -165,7 +173,11 @@ pub async fn solve_preview(
                     index: &index,
                     enabled: auto_include.unwrap_or(false),
                 };
-                preview_progress(&entry, &files, &options, &clock, &watch)
+                if spaced {
+                    respace(&entry, &files, &options, &clock, &watch)
+                } else {
+                    preview_progress(&entry, &files, &options, &clock, &watch)
+                }
             }
             _ => Err("nothing to solve: open a netlist first".to_string()),
         }
@@ -341,6 +353,15 @@ mod tests {
         assert_eq!(time(json!({ "timeall": 90 })), Ok(Some(90.0)));
         assert!(time(json!({ "timeall": 0 })).is_err());
         assert!(time(json!({ "timeall": -1 })).is_err());
+    }
+
+    /// A respace is asked for by the page, and a solve is the default.
+    #[test]
+    fn a_respace_is_asked_for_by_the_page() {
+        let respace = |v: serde_json::Value| serde_json::from_value::<Settings>(v).unwrap().respace;
+        assert!(!respace(json!({})));
+        assert!(!respace(json!({ "respace": false })));
+        assert!(respace(json!({ "config": "spacing_x=2", "respace": true })));
     }
 
     /// The circuit shown is solved alone when the page names it; none, or an empty title, solve every one.

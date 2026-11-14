@@ -1109,7 +1109,7 @@ export default {
         const response = await fetch(new URL("rnl-solver/solve", location.href), { method: "POST", signal: own.signal,
           // (X-RNL: the local program, which serves the page to one browser, asks for it of every request that does anything)
           headers: { "Content-Type": "application/json", "X-RNL": "1" },
-          body: JSON.stringify({ entry: request.entry, files, pool: request.pool, config: settings?.config || "", timeall: settings?.timeall ?? null, level: settings?.level ?? null, stream: true }) });
+          body: JSON.stringify({ entry: request.entry, files, pool: request.pool, config: settings?.config || "", timeall: settings?.timeall ?? null, respace: settings?.respace === true, level: settings?.level ?? null, stream: true }) });
         if (!/^application\/x-ndjson/.test(response.headers.get("Content-Type") || "")) {
           const answer = await response.json().catch(() => ({ error: `the solver service answered ${response.status}` }));
           if (!response.ok) throw answer.error || `the solver service answered ${response.status}`;
@@ -1182,7 +1182,7 @@ export default {
       own.signal.addEventListener("abort", () => stopSolver("the solve was cancelled"), { once: true });
       try {
         const answer = await callSolver(inBrowser, { request: { entry: request.entry, files, package_dirs: packageDirs, formats: request.formats ?? {},
-          solver_config: settings?.config || "", ...(settings?.timeall ? { timeall: settings.timeall } : {}), level: settings?.level ?? null } }, (event) => solveProgress?.(event));
+          solver_config: settings?.config || "", ...(settings?.timeall ? { timeall: settings.timeall } : {}), ...(settings?.respace ? { respace: true } : {}), level: settings?.level ?? null } }, (event) => solveProgress?.(event));
         if (answer.cancelled) throw "the solve was cancelled";
         if (answer.error !== undefined) throw answer.error;
         return answer;

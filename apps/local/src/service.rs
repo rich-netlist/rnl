@@ -4,7 +4,7 @@
 //!   GET  /rnl-solver/table  the table of the solver's settings (docs/solver-settings-table.md), which the page's settings
 //!                           dialog is drawn from: what `rnl solver-defaults --json` prints
 //!   POST /rnl-solver/check  {"config"}  ->  what `rnl solve --check --json` prints of those settings, with no file
-//!   POST /rnl-solver/solve  {"entry", "files", "pool", "config", "timeall", "level", "stream"}  ->  {"document", "report"}
+//!   POST /rnl-solver/solve  {"entry", "files", "pool", "config", "timeall", "level", "respace", "stream"}  ->  {"document", "report"}
 //!
 //! `config` is the settings that differ from the defaults, as RNL named parameters, as `--solver-config` takes them.
 //!
@@ -24,7 +24,7 @@ use std::net::TcpStream;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use rnl_cli::preview::{preview, preview_progress, StoppableClock};
+use rnl_cli::preview::{preview, preview_progress, respace, StoppableClock};
 use rnl_cli::progress::Event;
 use rnl_cli::solve::{check_settings, Progress, SolveOptions, ToolSettings};
 use rnl_runtime::source::MemoryProvider;
@@ -48,6 +48,10 @@ pub struct Request {
     /// The title of the one level to solve: none, or empty, solves every level.
     #[serde(default)]
     pub level: Option<String>,
+    /// Each level as the record of the solver in the file last drew it, spaced again as the settings say, nothing
+    /// searched (`rnl preview --respace`).
+    #[serde(default)]
+    pub respace: bool,
     /// Whether the answer is the events of the solve, as lines of JSON, and then the result.
     #[serde(default)]
     pub stream: bool,
@@ -97,6 +101,7 @@ pub struct Prepared {
     entry: String,
     files: MemoryProvider,
     options: SolveOptions,
+    respace: bool,
 }
 
 /// Check a request and make what it solves: an error says what is wrong with it.
@@ -125,7 +130,7 @@ pub fn prepare(request: &Request) -> Result<Prepared, String> {
         return Err("timeall must be a positive number of seconds".into());
     }
     let options = SolveOptions { solver, level, total_seconds: request.timeall, ..SolveOptions::default() };
-    Ok(Prepared { entry: request.entry.clone(), files, options })
+    Ok(Prepared { entry: request.entry.clone(), files, options, respace: request.respace })
 }
 
 /// Whether the page has closed its connection: asked without waiting for anything.
@@ -152,7 +157,7 @@ fn solved_json(shown: &rnl_cli::preview::Preview) -> Result<String, String> {
 /// Solve a request: the JSON text of `{document, report}`. `peer` is the connection of the page, which is watched for the
 /// page going away, as a cancel is: the solve stops at its next level.
 pub fn solve(request: &Request, peer: &TcpStream) -> Result<String, String> {
-    let Prepared { entry, files, options } = prepare(request)?;
+    let Prepared { entry, files, options, respace: spaced } = prepare(request)?;
     let stop = Arc::new(AtomicBool::new(false));
     let clock = StoppableClock::new(stop.clone());
     // the page going away is a cancel: asked at each level, without waiting for anything
@@ -162,7 +167,17 @@ pub fn solve(request: &Request, peer: &TcpStream) -> Result<String, String> {
         }
         !stop.load(Ordering::Relaxed)
     };
-    let shown = preview(&entry, &files, &options, &clock, &watch)?;
+    let shown = if spaced {
+        // (a respace tells its events, not the steps of a search: the page going away is asked at each)
+        respace(&entry, &files, &options, &clock, &|_: &Event| {
+            if gone(peer) {
+                stop.store(true, Ordering::Relaxed);
+            }
+            !stop.load(Ordering::Relaxed)
+        })?
+    } else {
+        preview(&entry, &files, &options, &clock, &watch)?
+    };
     solved_json(&shown)
 }
 
@@ -170,7 +185,7 @@ pub fn solve(request: &Request, peer: &TcpStream) -> Result<String, String> {
 /// happens, then the result, or the error. A line that cannot be written is the page gone, as its closing the connection
 /// is: the solve stops at its next step.
 pub fn stream(prepared: Prepared, out: &mut TcpStream) -> io::Result<()> {
-    let Prepared { entry, files, options } = prepared;
+    let Prepared { entry, files, options, respace: spaced } = prepared;
     let stop = Arc::new(AtomicBool::new(false));
     let clock = StoppableClock::new(stop.clone());
     let out = RefCell::new(out);
@@ -188,7 +203,8 @@ pub fn stream(prepared: Prepared, out: &mut TcpStream) -> io::Result<()> {
         }
         !stop.load(Ordering::Relaxed)
     };
-    let end = match preview_progress(&entry, &files, &options, &clock, &sink).and_then(|shown| solved_json(&shown)) {
+    let shown = if spaced { respace(&entry, &files, &options, &clock, &sink) } else { preview_progress(&entry, &files, &options, &clock, &sink) };
+    let end = match shown.and_then(|shown| solved_json(&shown)) {
         // (the document is already JSON: it is put in the line as it is)
         Ok(result) => format!("{{\"result\":{result}}}"),
         Err(message) => serde_json::json!({ "error": message }).to_string(),
@@ -209,7 +225,7 @@ mod tests {
     }
 
     fn request(entry: &str, text: &str) -> Request {
-        Request { entry: entry.into(), files: BTreeMap::from([(entry.to_string(), text.to_string())]), pool: Vec::new(), config: String::new(), timeall: None, level: None, stream: false }
+        Request { entry: entry.into(), files: BTreeMap::from([(entry.to_string(), text.to_string())]), pool: Vec::new(), config: String::new(), timeall: None, level: None, respace: false, stream: false }
     }
 
     #[test]
@@ -300,6 +316,22 @@ mod tests {
             let error = solve(&r, &server).unwrap_err();
             assert!(error.contains("timeall must be a positive number"), "{bad}: {error}");
         }
+    }
+
+    #[test]
+    fn a_respace_is_a_preview_with_its_mode_and_leaves_a_level_without_a_record() {
+        let (_client, server) = pair();
+        let mut r = request("/top.sp", HIERARCHY);
+        r.config = "spacing_x=3".into();
+        r.respace = true;
+        let json: serde_json::Value = serde_json::from_str(&solve(&r, &server).unwrap()).unwrap();
+        assert_eq!(json["report"]["mode"], "respace");
+        // (this netlist is not of 0.4, so no level can be respaced: each is left as it is, with the reason)
+        assert!(json["report"]["notes"].as_array().is_some_and(|n| n.iter().any(|t| t.as_str().is_some_and(|t| t.contains("not solved") && t.contains("unsupported")))), "{}", json["report"]["notes"]);
+        // and a solve says it is one
+        r.respace = false;
+        let json: serde_json::Value = serde_json::from_str(&solve(&r, &server).unwrap()).unwrap();
+        assert_eq!(json["report"]["mode"], "solve");
     }
 
     #[test]

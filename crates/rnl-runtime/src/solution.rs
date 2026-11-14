@@ -188,6 +188,18 @@ impl Unsolved {
     pub fn needs_0_3(&self) -> bool {
         self.code == codes::UNSOLVED_NO_NUMBERS || self.code == codes::UNSOLVED_NO_REWRITE
     }
+
+    /// A dot that a tool leaves out of the record, as no place for it keeps the facts of the
+    /// level as they are drawn: the rest of the record is written without it.
+    pub fn junction_unplaced(junction: &JunctionWrite) -> Unsolved {
+        Unsolved {
+            decision: junction.decision,
+            label: junction.target.clone(),
+            code: codes::UNSOLVED_JUNCTION_UNPLACED,
+            reason: "its dot is not written: no place for it keeps the facts of the level as they are drawn (13.2)"
+                .into(),
+        }
+    }
 }
 
 impl fmt::Display for Unsolved {
@@ -235,6 +247,8 @@ pub struct JunctionWrite {
     pub target: String,
     /// Original physical point identity for a junction on an existing point.
     pub original: Option<PointRef>,
+    /// The decision of the solution that the dot is: a branch point's or a dot on an existing point.
+    pub decision: Decision,
 }
 
 /// Why a decision is unsolved: its kind and the reason given.
@@ -840,7 +854,7 @@ pub fn write_record(p: &LevelProblem, solution: &Solution, author: &str, hash: &
                         needed[root] = true;
                     }
                     accepted_junctions.push(point);
-                    extra_junctions.push((reference, point.clone()));
+                    extra_junctions.push((index, reference, point.clone()));
                 }
                 Err(why) => lost(Decision::Junction { index }, &crate::problem::point_name(p, point), why),
             }
@@ -893,25 +907,27 @@ pub fn write_record(p: &LevelProblem, solution: &Solution, author: &str, hash: &
     let junction = if modern { p.junction.effective().definition.as_deref() } else { Some("$JUNCTION") };
     let warnings = if modern { p.junction.warning().into_iter().collect() } else { Vec::new() };
     let mut junctions = Vec::new();
-    for (b, name) in solution.branches.iter().zip(&branch_names) {
+    for (index, (b, name)) in solution.branches.iter().zip(&branch_names).enumerate() {
         if let (true, Some(name), Some(definition)) = (b.junction, name, junction) {
             junctions.push(JunctionWrite {
                 statement: statements.len(),
                 span: 0..0,
                 target: format!("%{name}"),
                 original: None,
+                decision: Decision::Branch { index },
             });
             statements.push(format!("{definition} @ATTACH %{name}"));
         }
     }
 
     if let Some(definition) = junction {
-        for (point, original) in extra_junctions {
+        for (index, point, original) in extra_junctions {
             junctions.push(JunctionWrite {
                 statement: statements.len(),
                 span: 0..0,
                 target: refs.text(&point),
                 original: Some(original),
+                decision: Decision::Junction { index },
             });
             statements.push(format!("{definition} @ATTACH {}", refs.text(&point)));
         }

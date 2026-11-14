@@ -118,6 +118,8 @@
       "items": [
         { "id": "solve", "label": "&Solve", "keys": ["F9"], "platforms": ["desktop"], "with": "solve" },
         { "id": "solve-all", "label": "Solve &All Circuits", "platforms": ["desktop"], "with": "solve" },
+        { "id": "solve-respace", "label": "&Respace", "platforms": ["desktop"], "with": "solve" },
+        { "id": "solve-respace-all", "label": "Respace All Circuits", "platforms": ["desktop"], "with": "solve" },
         { "id": "solve-close", "label": "&Close Preview", "platforms": ["desktop"], "with": "solve" },
         "-",
         { "id": "solve-save", "label": "Save Solved &Copy As...", "keys": ["Ctrl+Shift+S"], "platforms": ["desktop"] },

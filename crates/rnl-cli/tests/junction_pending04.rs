@@ -61,7 +61,7 @@ fn pending_fact_reported_kept_still_requires_drawn_proof() {
 }
 
 #[test]
-fn newly_added_unresolved_fact_is_rejected() {
-    let error = check(false, true).expect_err("an added pending fact has no proof");
-    assert!(error.contains("new or changed fact is unresolved or not satisfied"), "{error}");
+fn an_added_fact_unresolved_before_the_dots_is_not_theirs_to_settle() {
+    // no dot makes or names it, and it comes out as it did before the dots were placed
+    check(false, true).expect("an added fact that no dot touches and that did not change");
 }

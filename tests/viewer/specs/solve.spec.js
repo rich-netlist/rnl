@@ -119,6 +119,30 @@ test.describe("on the desktop", () => {
     ]);
   });
 
+  test("Respace draws the circuit shown from the file's record, never from the preview shown, and says so", async ({ page, viewer }) => {
+    await solve(page);
+    await expect(page.locator("#solve-step")).toContainText("Solved:");
+    // with a preview shown, respace asks for the file again: the shell is given the source, not the preview
+    await solve(page, () => page.evaluate(() => window.viewer.command("solve-respace")));
+    await expect(page.locator("#solve-step")).toContainText("Respaced:");
+    await expect(page.locator("#solve-report .solve-note")).toContainText("A preview of the respace");
+    await expect(page.locator("#preview-badge")).toHaveText("Respaced preview: the files are unchanged");
+    await solve(page, () => page.evaluate(() => window.viewer.command("solve-respace-all")));
+    const calls = await solves(viewer);
+    expect(calls.map(([name, settings]) => [name, settings.respace ?? false, settings.level])).toEqual([
+      [T4, false, `${T4}.sp`],
+      [T4, true, `${T4}.sp`],
+      [T4, true, null],
+    ]);
+    // the spacing is the settings', and a time for the whole file is not given to a respace
+    expect(calls[1][1].config).toBe("");
+    // a solve after it is a solve again
+    await solve(page);
+    await expect(page.locator("#solve-step")).toContainText("Solved:");
+    await expect(page.locator("#solve-report .solve-note")).toContainText("A preview of the solve");
+    await expect(page.locator("#preview-badge")).toHaveText("Solved preview: the files are unchanged");
+  });
+
   test("the panel over the drawing follows the events of the solve, and is gone when it ends", async ({ page }) => {
     const panel = page.locator("#solve-progress");
     const tell = (...events) => page.evaluate((list) => list.forEach((e) => window.fakeShell.step(e)), events);
