@@ -2278,6 +2278,21 @@
           }
         ],
         "shapes": [],
+        "groups": [
+          {
+            "id": "@rnl-std-fill.rnl:64:3",
+            "members": [],
+            "file": null,
+            "line": 64,
+            "source": "rule",
+            "rule": {
+              "package": "rnl-std-fill",
+              "file": "rnl-std-fill.rnl",
+              "line": 64
+            },
+            "state": "in-effect"
+          }
+        ],
         "junction": {
           "definition": "$JUNCTION",
           "symbol": "$JUNCTION_SYMBOL"
@@ -2290,7 +2305,7 @@
       "name": "dff",
       "file": 0,
       "line": 5,
-      "status": null,
+      "status": "constraints: 2 dropped",
       "host": {
         "ports": [
           "&d",
@@ -2306,7 +2321,7 @@
             "usages": [
               {
                 "kind": "usage",
-                "id": "@09-buses-and-bundles.sp:6:49#1",
+                "id": "@rnl-std-fill.rnl:61:3#1",
                 "definition": "$IO_PORT",
                 "roles": [
                   {
@@ -2316,13 +2331,13 @@
                     "terminal": null
                   }
                 ],
-                "file": 0,
-                "line": 6,
+                "file": null,
+                "line": 61,
                 "source": "rule",
                 "rule": {
-                  "package": "",
-                  "file": "09-buses-and-bundles.sp",
-                  "line": 6
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 61
                 },
                 "state": "in-effect"
               }
@@ -2335,7 +2350,7 @@
             "usages": [
               {
                 "kind": "usage",
-                "id": "@09-buses-and-bundles.sp:6:49#2",
+                "id": "@rnl-std-fill.rnl:61:3#2",
                 "definition": "$IO_PORT",
                 "roles": [
                   {
@@ -2345,13 +2360,13 @@
                     "terminal": null
                   }
                 ],
-                "file": 0,
-                "line": 6,
+                "file": null,
+                "line": 61,
                 "source": "rule",
                 "rule": {
-                  "package": "",
-                  "file": "09-buses-and-bundles.sp",
-                  "line": 6
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 61
                 },
                 "state": "in-effect"
               }
@@ -2364,7 +2379,7 @@
             "usages": [
               {
                 "kind": "usage",
-                "id": "@09-buses-and-bundles.sp:6:49#3",
+                "id": "@rnl-std-fill.rnl:61:3#3",
                 "definition": "$IO_PORT",
                 "roles": [
                   {
@@ -2374,13 +2389,13 @@
                     "terminal": null
                   }
                 ],
-                "file": 0,
-                "line": 6,
+                "file": null,
+                "line": 61,
                 "source": "rule",
                 "rule": {
-                  "package": "",
-                  "file": "09-buses-and-bundles.sp",
-                  "line": 6
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 61
                 },
                 "state": "in-effect"
               }
@@ -2405,7 +2420,7 @@
         },
         "objects": [
           {
-            "id": "@09-buses-and-bundles.sp:6:49#1",
+            "id": "@rnl-std-fill.rnl:61:3#1",
             "kind": "usage",
             "host": [],
             "definition": "$IO_PORT",
@@ -2430,7 +2445,7 @@
             "pins": [
               {
                 "kind": "pin",
-                "id": "pin(@09-buses-and-bundles.sp:6:49#1,0)",
+                "id": "pin(@rnl-std-fill.rnl:61:3#1,0)",
                 "index": 0,
                 "names": [
                   "pin"
@@ -2452,10 +2467,34 @@
                   "&d"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "kind": "group",
+                "id": "@rnl-std-fill.rnl:64:3",
+                "definition": "",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "@rnl-std-fill.rnl:61:3#1",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 64,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 64
+                },
+                "state": "in-effect"
+              }
             ]
           },
           {
-            "id": "@09-buses-and-bundles.sp:6:49#2",
+            "id": "@rnl-std-fill.rnl:61:3#2",
             "kind": "usage",
             "host": [],
             "definition": "$IO_PORT",
@@ -2480,7 +2519,7 @@
             "pins": [
               {
                 "kind": "pin",
-                "id": "pin(@09-buses-and-bundles.sp:6:49#2,0)",
+                "id": "pin(@rnl-std-fill.rnl:61:3#2,0)",
                 "index": 0,
                 "names": [
                   "pin"
@@ -2502,10 +2541,34 @@
                   "&clk"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "kind": "group",
+                "id": "@rnl-std-fill.rnl:64:3",
+                "definition": "",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "@rnl-std-fill.rnl:61:3#2",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 64,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 64
+                },
+                "state": "in-effect"
+              }
             ]
           },
           {
-            "id": "@09-buses-and-bundles.sp:6:49#3",
+            "id": "@rnl-std-fill.rnl:61:3#3",
             "kind": "usage",
             "host": [],
             "definition": "$IO_PORT",
@@ -2530,7 +2593,7 @@
             "pins": [
               {
                 "kind": "pin",
-                "id": "pin(@09-buses-and-bundles.sp:6:49#3,0)",
+                "id": "pin(@rnl-std-fill.rnl:61:3#3,0)",
                 "index": 0,
                 "names": [
                   "pin"
@@ -2552,6 +2615,30 @@
                   "&q"
                 ]
               }
+            ],
+            "usages": [
+              {
+                "kind": "group",
+                "id": "@rnl-std-fill.rnl:64:3",
+                "definition": "",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "@rnl-std-fill.rnl:61:3#3",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 64,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 64
+                },
+                "state": "in-effect"
+              }
             ]
           }
         ],
@@ -2559,8 +2646,8 @@
         "wires": [],
         "texts": [
           {
-            "id": "@09-buses-and-bundles.sp:6:49#1::netname",
-            "attach": "@09-buses-and-bundles.sp:6:49#1",
+            "id": "@rnl-std-fill.rnl:61:3#1::netname",
+            "attach": "@rnl-std-fill.rnl:61:3#1",
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -2592,8 +2679,8 @@
             "style": {}
           },
           {
-            "id": "@09-buses-and-bundles.sp:6:49#2::netname",
-            "attach": "@09-buses-and-bundles.sp:6:49#2",
+            "id": "@rnl-std-fill.rnl:61:3#2::netname",
+            "attach": "@rnl-std-fill.rnl:61:3#2",
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -2625,8 +2712,8 @@
             "style": {}
           },
           {
-            "id": "@09-buses-and-bundles.sp:6:49#3::netname",
-            "attach": "@09-buses-and-bundles.sp:6:49#3",
+            "id": "@rnl-std-fill.rnl:61:3#3::netname",
+            "attach": "@rnl-std-fill.rnl:61:3#3",
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -2659,6 +2746,25 @@
           }
         ],
         "shapes": [],
+        "groups": [
+          {
+            "id": "@rnl-std-fill.rnl:64:3",
+            "members": [
+              "@rnl-std-fill.rnl:61:3#1",
+              "@rnl-std-fill.rnl:61:3#2",
+              "@rnl-std-fill.rnl:61:3#3"
+            ],
+            "file": null,
+            "line": 64,
+            "source": "rule",
+            "rule": {
+              "package": "rnl-std-fill",
+              "file": "rnl-std-fill.rnl",
+              "line": 64
+            },
+            "state": "in-effect"
+          }
+        ],
         "junction": {
           "definition": "$JUNCTION",
           "symbol": null
@@ -2671,7 +2777,7 @@
       "name": "reg4",
       "file": 0,
       "line": 11,
-      "status": "constraints: 1 unsolved, 2 ok",
+      "status": "constraints: 1 unsolved, 4 ok, 1 dropped",
       "host": {
         "ports": [
           "&\"D<3>\"",
@@ -2802,7 +2908,7 @@
             "usages": [
               {
                 "kind": "usage",
-                "id": "@09-buses-and-bundles.sp:36:87",
+                "id": "@rnl-std-fill.rnl:61:3",
                 "definition": "$IO_PORT",
                 "roles": [
                   {
@@ -2812,13 +2918,13 @@
                     "terminal": null
                   }
                 ],
-                "file": 0,
-                "line": 36,
+                "file": null,
+                "line": 61,
                 "source": "rule",
                 "rule": {
-                  "package": "",
-                  "file": "09-buses-and-bundles.sp",
-                  "line": 36
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 61
                 },
                 "state": "in-effect"
               }
@@ -3406,7 +3512,7 @@
             ]
           },
           {
-            "id": "@09-buses-and-bundles.sp:36:87",
+            "id": "@rnl-std-fill.rnl:61:3",
             "kind": "usage",
             "host": [],
             "definition": "$IO_PORT",
@@ -3431,7 +3537,7 @@
             "pins": [
               {
                 "kind": "pin",
-                "id": "pin(@09-buses-and-bundles.sp:36:87,0)",
+                "id": "pin(@rnl-std-fill.rnl:61:3,0)",
                 "index": 0,
                 "names": [
                   "pin"
@@ -3452,6 +3558,30 @@
                 "nets": [
                   "&clk"
                 ]
+              }
+            ],
+            "usages": [
+              {
+                "kind": "group",
+                "id": "@rnl-std-fill.rnl:64:3",
+                "definition": "",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "@rnl-std-fill.rnl:61:3",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 64,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 64
+                },
+                "state": "in-effect"
               }
             ]
           }
@@ -3711,8 +3841,8 @@
             "style": {}
           },
           {
-            "id": "@09-buses-and-bundles.sp:36:87::netname",
-            "attach": "@09-buses-and-bundles.sp:36:87",
+            "id": "@rnl-std-fill.rnl:61:3::netname",
+            "attach": "@rnl-std-fill.rnl:61:3",
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -3745,6 +3875,23 @@
           }
         ],
         "shapes": [],
+        "groups": [
+          {
+            "id": "@rnl-std-fill.rnl:64:3",
+            "members": [
+              "@rnl-std-fill.rnl:61:3"
+            ],
+            "file": null,
+            "line": 64,
+            "source": "rule",
+            "rule": {
+              "package": "rnl-std-fill",
+              "file": "rnl-std-fill.rnl",
+              "line": 64
+            },
+            "state": "in-effect"
+          }
+        ],
         "junction": {
           "definition": "$JUNCTION",
           "symbol": null

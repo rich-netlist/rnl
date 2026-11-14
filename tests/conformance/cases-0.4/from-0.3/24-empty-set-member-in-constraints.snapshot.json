@@ -9,7 +9,7 @@
       "name": "24-empty-set-member-in-constraints.sp",
       "file": 0,
       "line": 0,
-      "status": "4 without a position; constraints: 3 ok, 1 needs-solver, 1 failed, 12 unsolved",
+      "status": "4 without a position; constraints: 5 ok, 1 needs-solver, 1 failed, 12 unsolved",
       "host": {
         "ports": [],
         "instances": [
@@ -651,6 +651,21 @@
           }
         ],
         "shapes": [],
+        "groups": [
+          {
+            "id": "@rnl-std-fill.rnl:64:3",
+            "members": [],
+            "file": null,
+            "line": 64,
+            "source": "rule",
+            "rule": {
+              "package": "rnl-std-fill",
+              "file": "rnl-std-fill.rnl",
+              "line": 64
+            },
+            "state": "in-effect"
+          }
+        ],
         "junction": {
           "definition": "$JUNCTION",
           "symbol": null

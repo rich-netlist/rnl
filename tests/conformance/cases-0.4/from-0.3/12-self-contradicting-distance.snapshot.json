@@ -9,7 +9,7 @@
       "name": "12-self-contradicting-distance.sp",
       "file": 0,
       "line": 0,
-      "status": "6 without a position; constraints: 1 ok, 1 failed, 16 unsolved",
+      "status": "6 without a position; constraints: 3 ok, 1 failed, 16 unsolved",
       "host": {
         "ports": [],
         "instances": [
@@ -857,6 +857,21 @@
           }
         ],
         "shapes": [],
+        "groups": [
+          {
+            "id": "@rnl-std-fill.rnl:64:3",
+            "members": [],
+            "file": null,
+            "line": 64,
+            "source": "rule",
+            "rule": {
+              "package": "rnl-std-fill",
+              "file": "rnl-std-fill.rnl",
+              "line": 64
+            },
+            "state": "in-effect"
+          }
+        ],
         "junction": {
           "definition": "$JUNCTION",
           "symbol": null

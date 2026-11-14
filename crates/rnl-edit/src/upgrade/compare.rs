@@ -267,6 +267,18 @@ fn facts(names: &Names, kind: &FactKind) -> Vec<String> {
     vec![fact(names, kind)]
 }
 
+/// Whether a fact has too few members to say anything, such as the column of the port tags of a
+/// level without ports that the fill of 0.4 writes: it holds by itself, as a ROUTE of one pin does.
+fn says_nothing(kind: &FactKind) -> bool {
+    match kind {
+        FactKind::Align { members, .. } | FactKind::Order { members, .. } | FactKind::Distribute { members, .. } => {
+            members.len() < 2
+        }
+        FactKind::Distance { from, to, .. } => from.is_empty() || to.is_empty(),
+        _ => false,
+    }
+}
+
 /// The fact as it says, with identities in place of indexes and without its rank.
 fn fact(names: &Names, kind: &FactKind) -> String {
     let n = |k: &usize| names.get(*k).map_or_else(|| format!("object {k}"), |n| mark(n));
@@ -684,6 +696,9 @@ fn snapshot(read: &Interpretation, added: &BTreeMap<String, BTreeSet<String>>) -
             );
         }
         for item in &problem.facts {
+            if says_nothing(&item.kind) {
+                continue;
+            }
             for text in facts(&names, &item.kind) {
                 put("facts", &format!("{text} {:?}", item.priority), json!(text));
             }
@@ -729,6 +744,9 @@ fn snapshot(read: &Interpretation, added: &BTreeMap<String, BTreeSet<String>>) -
             }
         }
         for group in &problem.groups {
+            if group.members.is_empty() {
+                continue;
+            }
             let mut members: Vec<_> = group.members.iter().map(|m| mark(&names[*m])).collect();
             members.sort();
             put("groups", &members.join(","), json!(members));

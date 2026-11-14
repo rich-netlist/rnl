@@ -151,6 +151,21 @@
           }
         ],
         "shapes": [],
+        "groups": [
+          {
+            "id": "@rnl-std-fill.rnl:64:3",
+            "members": [],
+            "file": null,
+            "line": 64,
+            "source": "rule",
+            "rule": {
+              "package": "rnl-std-fill",
+              "file": "rnl-std-fill.rnl",
+              "line": 64
+            },
+            "state": "in-effect"
+          }
+        ],
         "junction": {
           "definition": "$JUNCTION",
           "symbol": null
@@ -163,7 +178,7 @@
       "name": "cell",
       "file": 0,
       "line": 16,
-      "status": "3 without a position; constraints: 4 unsolved",
+      "status": "3 without a position; constraints: 8 unsolved",
       "host": {
         "ports": [
           "&inp",
@@ -237,7 +252,7 @@
             "usages": [
               {
                 "kind": "usage",
-                "id": "@23-generation-set-difference.sp:14:346",
+                "id": "@rnl-std-fill.rnl:61:3",
                 "definition": "$IO_PORT",
                 "roles": [
                   {
@@ -247,13 +262,13 @@
                     "terminal": null
                   }
                 ],
-                "file": 0,
-                "line": 14,
+                "file": null,
+                "line": 61,
                 "source": "rule",
                 "rule": {
-                  "package": "",
-                  "file": "23-generation-set-difference.sp",
-                  "line": 14
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 61
                 },
                 "state": "in-effect"
               }
@@ -662,7 +677,7 @@
             ]
           },
           {
-            "id": "@23-generation-set-difference.sp:14:346",
+            "id": "@rnl-std-fill.rnl:61:3",
             "kind": "usage",
             "host": [],
             "definition": "$IO_PORT",
@@ -684,7 +699,7 @@
             "pins": [
               {
                 "kind": "pin",
-                "id": "pin(@23-generation-set-difference.sp:14:346,0)",
+                "id": "pin(@rnl-std-fill.rnl:61:3,0)",
                 "index": 0,
                 "names": [
                   "pin"
@@ -702,6 +717,30 @@
                 "nets": [
                   "&out"
                 ]
+              }
+            ],
+            "usages": [
+              {
+                "kind": "group",
+                "id": "@rnl-std-fill.rnl:64:3",
+                "definition": "",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "@rnl-std-fill.rnl:61:3",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 64,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 64
+                },
+                "state": "in-effect"
               }
             ]
           }
@@ -876,6 +915,23 @@
           }
         ],
         "shapes": [],
+        "groups": [
+          {
+            "id": "@rnl-std-fill.rnl:64:3",
+            "members": [
+              "@rnl-std-fill.rnl:61:3"
+            ],
+            "file": null,
+            "line": 64,
+            "source": "rule",
+            "rule": {
+              "package": "rnl-std-fill",
+              "file": "rnl-std-fill.rnl",
+              "line": 64
+            },
+            "state": "in-effect"
+          }
+        ],
         "junction": {
           "definition": "$JUNCTION",
           "symbol": null

@@ -247,18 +247,12 @@ impl Sets {
                 statements.push(format!("{bs} @ADD-TO $SUPPLY_FILL_SET"));
             }
         }
-        // 0.3 adds one free port tag per untagged port net. PORT_LIST would add
-        // layout facts, so retain the former selection and generation explicitly.
-        if !shadowed.contains("$PORT_FILL_SET") && !shadowed.contains("$IO_PORT") {
-            let name = fresh("$RNL_UPGRADE_PORT_FILL_SET");
-            statements.push(format!("{name} = # @SELECT-NET(port=true, recursive=true)"));
-            statements.push(format!("$SUPPLY_NET_SET @REMOVE-FROM {name}"));
-            statements.push(format!("$GROUND_NET_SET @REMOVE-FROM {name}"));
-            statements.push(format!(
-                "# @SELECT-USAGE(recursive=true) $IO_PORT => @SELECT-NET(recursive=true) => @REMOVE-FROM {name}"
-            ));
-            statements.push(format!("$IO_PORT @ATTACH {name}"));
-            result.names.insert("PORT_FILL_SET".into(), name);
+        // Both fills tag the untagged port nets through $PORT_FILL_SET, but 0.3 leaves out the
+        // supply and ground nets, where the 0.4 fill tags them too; take them out again. A file's
+        // own edits of $PORT_FILL_SET keep the name, which is the same set in 0.4.
+        if !shadowed.contains("$PORT_FILL_SET") {
+            statements.push("$SUPPLY_NET_SET @REMOVE-FROM $PORT_FILL_SET".into());
+            statements.push("$GROUND_NET_SET @REMOVE-FROM $PORT_FILL_SET".into());
         }
         if !statements.is_empty() {
             result.entry = entry.into();

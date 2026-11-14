@@ -1609,7 +1609,20 @@
           ]
         ]
       ],
-      "constraints": [],
+      "constraints": [
+        {
+          "label": "ORDER",
+          "kind": "ORDER",
+          "status": "ok",
+          "priority": "low"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "low"
+        }
+      ],
       "unplaced": []
     },
     {
@@ -2310,6 +2323,54 @@
           "kind": "ALIGN",
           "status": "ok",
           "priority": "normal"
+        },
+        {
+          "label": "ORDER",
+          "kind": "ORDER",
+          "status": "ok",
+          "priority": "low"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "dropped",
+          "priority": "low"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "dropped",
+          "priority": "low"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "dropped",
+          "priority": "low"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "dropped",
+          "priority": "low"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "dropped",
+          "priority": "low"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "dropped",
+          "priority": "low"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "dropped",
+          "priority": "low"
         }
       ],
       "unplaced": []
@@ -3406,6 +3467,30 @@
           "kind": "ALIGN",
           "status": "ok",
           "priority": "normal"
+        },
+        {
+          "label": "ORDER",
+          "kind": "ORDER",
+          "status": "ok",
+          "priority": "low"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "low"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "dropped",
+          "priority": "low"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "dropped",
+          "priority": "low"
         }
       ],
       "unplaced": []

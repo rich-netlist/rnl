@@ -151,7 +151,20 @@
         }
       ],
       "flylines": [],
-      "constraints": [],
+      "constraints": [
+        {
+          "label": "ORDER",
+          "kind": "ORDER",
+          "status": "ok",
+          "priority": "low"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "low"
+        }
+      ],
       "unplaced": []
     },
     {
@@ -492,12 +505,50 @@
           "kind": "ALIGN",
           "status": "unsolved",
           "priority": "normal"
+        },
+        {
+          "label": "ORDER",
+          "kind": "ORDER",
+          "status": "unsolved",
+          "priority": "low"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "unsolved",
+          "priority": "low"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "unsolved",
+          "priority": "low"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "unsolved",
+          "priority": "low"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "unsolved",
+          "priority": "low"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "unsolved",
+          "priority": "low"
         }
       ],
       "unplaced": [
         "a usage of $GROUND",
         "%l",
-        "%l"
+        "%l",
+        "a usage of $IO_PORT",
+        "a usage of $IO_PORT"
       ]
     }
   ],

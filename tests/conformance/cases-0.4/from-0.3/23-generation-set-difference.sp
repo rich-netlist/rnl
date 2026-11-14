@@ -11,7 +11,7 @@
 * @RNL(type="header") { @USE-PACKAGE(name="rnl-std-all", version="0.4");
 *   @VERSION("0.4")
 * }
-* @RNL { # @SELECT-PIN(recursive=true) => @REMOVE-FROM $LABEL_FILL_SET; $UNFILLED_PORT_NETS = # @SELECT-NET(port=true, recursive=true); $SUPPLY_NET_SET @REMOVE-FROM $UNFILLED_PORT_NETS; $GROUND_NET_SET @REMOVE-FROM $UNFILLED_PORT_NETS; # @SELECT-USAGE(recursive=true) $IO_PORT => @SELECT-NET(recursive=true) => @REMOVE-FROM $UNFILLED_PORT_NETS; $IO_PORT @ATTACH $UNFILLED_PORT_NETS }
+* @RNL { # @SELECT-PIN(recursive=true) => @REMOVE-FROM $LABEL_FILL_SET; $SUPPLY_NET_SET @REMOVE-FROM $PORT_FILL_SET; $GROUND_NET_SET @REMOVE-FROM $PORT_FILL_SET }
 
 .subckt cell inp out
 R1 inp 0 1k

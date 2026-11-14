@@ -5,7 +5,7 @@
 *   @VERSION("0.4");
 *   @USE-PACKAGE(name="rnl-std-spectre", version="0.4")
 * }
-* @RNL { # @SELECT-PIN(recursive=true) => @REMOVE-FROM $LABEL_FILL_SET; $PORT_FILL_NET_SET = # @SELECT-NET(port=true, recursive=true); $SUPPLY_NET_SET @REMOVE-FROM $PORT_FILL_NET_SET; $GROUND_NET_SET @REMOVE-FROM $PORT_FILL_NET_SET; # @SELECT-USAGE(recursive=true) $IO_PORT => @SELECT-NET(recursive=true) => @REMOVE-FROM $PORT_FILL_NET_SET; $IO_PORT @ATTACH $PORT_FILL_NET_SET }
+* @RNL { # @SELECT-PIN(recursive=true) => @REMOVE-FROM $LABEL_FILL_SET; $SUPPLY_NET_SET @REMOVE-FROM $PORT_FILL_SET; $GROUND_NET_SET @REMOVE-FROM $PORT_FILL_SET }
 .subckt resistor p n
 .ends
 R1 a 0 1k

@@ -248,6 +248,7 @@
   @ALIAS("$电源补位集", "$SUPPLY_FILL_SET");
   @ALIAS("$偏置补位集", "$BIAS_FILL_SET");
   @ALIAS("$网名标签补位集", "$LABEL_FILL_SET");
+  @ALIAS("$端口补位集", "$PORT_FILL_SET");
   @ALIAS("$地", "$GROUND");
   @ALIAS("$电源", "$SUPPLY");
   @ALIAS("$偏置", "$BIAS");

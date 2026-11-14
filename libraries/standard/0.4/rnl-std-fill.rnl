@@ -1,8 +1,8 @@
 /* rnl-std-fill 0.4, a package of the standard series 0.4 (16.3).
    The sets and rules of the automatic fill: attaches ground, supply, bias and net-label stubs to
-   unwired pins, including the pins of virtual parts (10.5, 16.3). A file that does not want the
-   fill drops it with an empty inline package of its name; ports are drawn explicitly with $IO_PORT
-   or $PORT_LIST (12.4). */
+   unwired pins, including the pins of virtual parts, and a port tag to every port net in
+   $PORT_FILL_SET (10.5, 12.4, 16.3). A file that does not want the fill drops it with an empty
+   inline package of its name. */
 @RNL(type="header") {
   @VERSION("0.4");
   @PACKAGE(name="rnl-std-fill", version="0.4");
@@ -55,4 +55,13 @@
   # @SELECT-USAGE(recursive=true) $NET_LABEL_STUB => @SELECT-PIN(role="t", recursive=true) => @REMOVE-FROM $LABEL_FILL_SET;
   # @SELECT-USAGE(recursive=true) $IO_PORT_STUB => @SELECT-PIN(role="t", recursive=true) => @REMOVE-FROM $LABEL_FILL_SET;
   $NET_LABEL_STUB @ATTACH $LABEL_FILL_SET;
+
+  /* The port nets of $PORT_FILL_SET that have no $IO_PORT written get a port tag; the tags of a level stand in one column on the left of its instances, as $PORT_LIST draws them. */
+  # @SELECT-USAGE(recursive=true) $IO_PORT => @SELECT-NET(recursive=true) => @REMOVE-FROM $PORT_FILL_SET;
+  $IO_PORT @ATTACH $PORT_FILL_SET => %port_tag_set;
+  %port_tag_set @ORDER("top-to-bottom", priority="low");
+  %port_tag_set @ALIGN("x", priority="low");
+  %port_tag_set @GROUP;
+  %port_instance_set = # @SELECT-INSTANCE(recursive=true);
+  %port_tag_set %port_instance_set @DISTANCE("left-to-right", min=4, priority="low");
 }

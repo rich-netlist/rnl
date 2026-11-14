@@ -307,6 +307,7 @@ XU1 clk nc_d3 bus_d2 bus_d1 bus_d0 q0 nc_q1 reg4
 *   &q0 @WIRE {#XU1::q0 (6, 1)};
 *   %nc_msb = #XU1:d3 @AS $NO_CONNECT;
 *   %nc_q1 = #XU1:q1 @AS $NO_CONNECT;
+*   # @SELECT-NET(port=true) => @REMOVE-FROM $PORT_FILL_SET;
 * }
 .ends
 .end

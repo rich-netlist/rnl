@@ -24,13 +24,14 @@ fn removed_routing_set_retains_its_selection_and_user_edits() {
 }
 
 #[test]
-fn old_port_fill_is_explicit_without_adding_port_list_layout_facts() {
-    let source = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\n.subckt child a\nR1 a 0 1k\n.ends\n.end\n";
+fn old_port_fill_keeps_supply_and_ground_nets_out_of_the_standard_port_fill() {
+    let source = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\n.subckt child a\nR1 a 0 1k\n* @RNL { &a @REMOVE-FROM $PORT_FILL_SET }\n.ends\n.end\n";
     let result = upgrade("t.sp", &MemoryProvider::new().with("t.sp", source), &UpgradeOptions::default()).unwrap();
     let text = &result.files["t.sp"];
-    assert!(text.contains("$RNL_UPGRADE_PORT_FILL_SET = # @SELECT-NET(port=true, recursive=true)"), "{text}");
-    assert!(text.contains("$IO_PORT @ATTACH $RNL_UPGRADE_PORT_FILL_SET"));
-    assert!(!text.contains("$PORT_LIST"));
+    assert!(text.contains("$SUPPLY_NET_SET @REMOVE-FROM $PORT_FILL_SET"), "{text}");
+    assert!(text.contains("$GROUND_NET_SET @REMOVE-FROM $PORT_FILL_SET"), "{text}");
+    assert!(text.contains("&a @REMOVE-FROM $PORT_FILL_SET"), "{text}");
+    assert!(!text.contains("RNL_UPGRADE_PORT_FILL_SET") && !text.contains("$IO_PORT @ATTACH"), "{text}");
 }
 
 #[test]
@@ -64,7 +65,7 @@ fn new_policy_without_a_header_keeps_host_lines_and_crlf() {
     let result = upgrade("t.sp", &MemoryProvider::new().with("t.sp", source), &UpgradeOptions::default()).unwrap();
     let text = &result.files["t.sp"];
     let policy = text.split("\r\n").find(|line| line.starts_with("* @RNL {")).unwrap();
-    assert!(policy.contains("$RNL_UPGRADE_PORT_FILL_SET"), "{text}");
+    assert!(policy.contains("@REMOVE-FROM $PORT_FILL_SET"), "{text}");
     assert!(policy.contains("@REMOVE-FROM $LABEL_FILL_SET"), "{text}");
     assert!(!text.replace("\r\n", "").contains('\n'));
     let host = |s: &str| s.lines().filter(|l| !l.starts_with("* @RNL")).collect::<Vec<_>>().join("\n");

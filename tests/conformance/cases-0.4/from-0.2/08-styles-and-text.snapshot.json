@@ -9,7 +9,7 @@
       "name": "08-styles-and-text.sp",
       "file": 0,
       "line": 0,
-      "status": "constraints: 7 ok, 1 needs-solver",
+      "status": "constraints: 9 ok, 1 needs-solver",
       "host": {
         "ports": [],
         "instances": [
@@ -2074,6 +2074,21 @@
             "layer": "middle"
           }
         ],
+        "groups": [
+          {
+            "id": "@rnl-std-fill.rnl:64:3",
+            "members": [],
+            "file": null,
+            "line": 64,
+            "source": "rule",
+            "rule": {
+              "package": "rnl-std-fill",
+              "file": "rnl-std-fill.rnl",
+              "line": 64
+            },
+            "state": "in-effect"
+          }
+        ],
         "junction": {
           "definition": "$JUNCTION",
           "symbol": "$JUNCTION_SYMBOL"
@@ -2086,7 +2101,7 @@
       "name": "opamp",
       "file": 0,
       "line": 6,
-      "status": null,
+      "status": "3 without a position; constraints: 11 ok, 5 unsolved",
       "host": {
         "ports": [
           "&inp",
@@ -2126,17 +2141,89 @@
           {
             "id": "&inp",
             "global": false,
-            "port": true
+            "port": true,
+            "usages": [
+              {
+                "kind": "usage",
+                "id": "@rnl-std-fill.rnl:61:3#1",
+                "definition": "$IO_PORT",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&inp",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 61,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 61
+                },
+                "state": "in-effect"
+              }
+            ]
           },
           {
             "id": "&inn",
             "global": false,
-            "port": true
+            "port": true,
+            "usages": [
+              {
+                "kind": "usage",
+                "id": "@rnl-std-fill.rnl:61:3#2",
+                "definition": "$IO_PORT",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&inn",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 61,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 61
+                },
+                "state": "in-effect"
+              }
+            ]
           },
           {
             "id": "&out",
             "global": false,
-            "port": true
+            "port": true,
+            "usages": [
+              {
+                "kind": "usage",
+                "id": "@rnl-std-fill.rnl:61:3#3",
+                "definition": "$IO_PORT",
+                "roles": [
+                  {
+                    "role": "p",
+                    "set": false,
+                    "member": "&out",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 61,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 61
+                },
+                "state": "in-effect"
+              }
+            ]
           },
           {
             "id": "&0",
@@ -2186,6 +2273,14 @@
           {
             "id": "$NET_LABEL_SYMBOL",
             "name": "$NET_LABEL_SYMBOL",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$IO_PORT_SYMBOL",
+            "name": "$IO_PORT_SYMBOL",
             "package": "rnl-std-basic",
             "level": null,
             "default": false,
@@ -2730,6 +2825,240 @@
                 ]
               }
             ]
+          },
+          {
+            "id": "@rnl-std-fill.rnl:61:3#1",
+            "kind": "usage",
+            "host": [],
+            "definition": "$IO_PORT",
+            "attach": {
+              "p": "&inp"
+            },
+            "style": {
+              "bold": true,
+              "cap": "butt",
+              "fillcolor": "#ffffff",
+              "join": "miter",
+              "linecolor": "#37474f",
+              "linewidth": 0.16,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            },
+            "symbol": {
+              "value": "$IO_PORT_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(@rnl-std-fill.rnl:61:3#1,0)",
+                "index": 0,
+                "names": [
+                  "pin"
+                ],
+                "bus": false,
+                "local_at": [
+                  0.0,
+                  0.0
+                ],
+                "terminals": [
+                  "p"
+                ],
+                "at": null,
+                "dir": 0,
+                "nets": [
+                  "&inp"
+                ]
+              }
+            ],
+            "usages": [
+              {
+                "kind": "group",
+                "id": "@rnl-std-fill.rnl:64:3",
+                "definition": "",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "@rnl-std-fill.rnl:61:3#1",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 64,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 64
+                },
+                "state": "in-effect"
+              }
+            ]
+          },
+          {
+            "id": "@rnl-std-fill.rnl:61:3#2",
+            "kind": "usage",
+            "host": [],
+            "definition": "$IO_PORT",
+            "attach": {
+              "p": "&inn"
+            },
+            "style": {
+              "bold": true,
+              "cap": "butt",
+              "fillcolor": "#ffffff",
+              "join": "miter",
+              "linecolor": "#37474f",
+              "linewidth": 0.16,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            },
+            "symbol": {
+              "value": "$IO_PORT_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(@rnl-std-fill.rnl:61:3#2,0)",
+                "index": 0,
+                "names": [
+                  "pin"
+                ],
+                "bus": false,
+                "local_at": [
+                  0.0,
+                  0.0
+                ],
+                "terminals": [
+                  "p"
+                ],
+                "at": null,
+                "dir": 0,
+                "nets": [
+                  "&inn"
+                ]
+              }
+            ],
+            "usages": [
+              {
+                "kind": "group",
+                "id": "@rnl-std-fill.rnl:64:3",
+                "definition": "",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "@rnl-std-fill.rnl:61:3#2",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 64,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 64
+                },
+                "state": "in-effect"
+              }
+            ]
+          },
+          {
+            "id": "@rnl-std-fill.rnl:61:3#3",
+            "kind": "usage",
+            "host": [],
+            "definition": "$IO_PORT",
+            "attach": {
+              "p": "&out"
+            },
+            "style": {
+              "bold": true,
+              "cap": "butt",
+              "fillcolor": "#ffffff",
+              "join": "miter",
+              "linecolor": "#37474f",
+              "linewidth": 0.16,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            },
+            "symbol": {
+              "value": "$IO_PORT_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(@rnl-std-fill.rnl:61:3#3,0)",
+                "index": 0,
+                "names": [
+                  "pin"
+                ],
+                "bus": false,
+                "local_at": [
+                  0.0,
+                  0.0
+                ],
+                "terminals": [
+                  "p"
+                ],
+                "at": null,
+                "dir": 0,
+                "nets": [
+                  "&out"
+                ]
+              }
+            ],
+            "usages": [
+              {
+                "kind": "group",
+                "id": "@rnl-std-fill.rnl:64:3",
+                "definition": "",
+                "roles": [
+                  {
+                    "role": "members",
+                    "set": true,
+                    "member": "@rnl-std-fill.rnl:61:3#3",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 64,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 64
+                },
+                "state": "in-effect"
+              }
+            ]
           }
         ],
         "points": [],
@@ -2987,6 +3316,25 @@
           }
         ],
         "shapes": [],
+        "groups": [
+          {
+            "id": "@rnl-std-fill.rnl:64:3",
+            "members": [
+              "@rnl-std-fill.rnl:61:3#1",
+              "@rnl-std-fill.rnl:61:3#2",
+              "@rnl-std-fill.rnl:61:3#3"
+            ],
+            "file": null,
+            "line": 64,
+            "source": "rule",
+            "rule": {
+              "package": "rnl-std-fill",
+              "file": "rnl-std-fill.rnl",
+              "line": 64
+            },
+            "state": "in-effect"
+          }
+        ],
         "junction": {
           "definition": "$JUNCTION",
           "symbol": null

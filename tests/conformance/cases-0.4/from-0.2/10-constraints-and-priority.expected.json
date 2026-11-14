@@ -904,6 +904,18 @@
           "kind": "ALIGN",
           "status": "needs-solver",
           "priority": "high"
+        },
+        {
+          "label": "ORDER",
+          "kind": "ORDER",
+          "status": "ok",
+          "priority": "low"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "low"
         }
       ],
       "unplaced": []
