@@ -282,6 +282,7 @@ fn collect(
                 id: "symbol-label".into(),
                 object_id: String::new(),
                 attach: None,
+                attach_point: None,
                 target: None,
                 key: label.key.clone(),
                 markup: label.text.clone(),

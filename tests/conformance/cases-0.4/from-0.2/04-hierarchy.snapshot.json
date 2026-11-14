@@ -1800,6 +1800,7 @@
           {
             "id": "#X1::name",
             "attach": "#X1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -1833,6 +1834,7 @@
           {
             "id": "#X1::sub",
             "attach": "#X1",
+            "attach_point": null,
             "key": "sub",
             "markup": {
               "value": "${model}",
@@ -1866,6 +1868,7 @@
           {
             "id": "#X2::name",
             "attach": "#X2",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -1899,6 +1902,7 @@
           {
             "id": "#X2::sub",
             "attach": "#X2",
+            "attach_point": null,
             "key": "sub",
             "markup": {
               "value": "${model}",
@@ -1932,6 +1936,7 @@
           {
             "id": "#X3::name",
             "attach": "#X3",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -1965,6 +1970,7 @@
           {
             "id": "#X3::model",
             "attach": "#X3",
+            "attach_point": null,
             "key": "model",
             "markup": {
               "value": "${model}",
@@ -1998,6 +2004,7 @@
           {
             "id": "#Vdd::name",
             "attach": "#Vdd",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2041,6 +2048,7 @@
           {
             "id": "#Vdd::value",
             "attach": "#Vdd",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -2084,6 +2092,7 @@
           {
             "id": "#Vin::name",
             "attach": "#Vin",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2127,6 +2136,7 @@
           {
             "id": "#Vin::value",
             "attach": "#Vin",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -2170,6 +2180,7 @@
           {
             "id": "%ss_X1_3::netname",
             "attach": "%ss_X1_3",
+            "attach_point": null,
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -2204,6 +2215,7 @@
           {
             "id": "%ss_X2_3::netname",
             "attach": "%ss_X2_3",
+            "attach_point": null,
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -2238,6 +2250,7 @@
           {
             "id": "%ss_Vdd_1::netname",
             "attach": "%ss_Vdd_1",
+            "attach_point": null,
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -3010,6 +3023,7 @@
           {
             "id": "#R1::name",
             "attach": "#R1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3046,6 +3060,7 @@
           {
             "id": "#R1::value",
             "attach": "#R1",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -3082,6 +3097,7 @@
           {
             "id": "#R2::name",
             "attach": "#R2",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3118,6 +3134,7 @@
           {
             "id": "#R2::value",
             "attach": "#R2",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -3154,6 +3171,7 @@
           {
             "id": "@rnl-std-fill.rnl:61:3#1::netname",
             "attach": "@rnl-std-fill.rnl:61:3#1",
+            "attach_point": null,
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -3187,6 +3205,7 @@
           {
             "id": "@rnl-std-fill.rnl:61:3#2::netname",
             "attach": "@rnl-std-fill.rnl:61:3#2",
+            "attach_point": null,
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -3220,6 +3239,7 @@
           {
             "id": "@rnl-std-fill.rnl:61:3#3::netname",
             "attach": "@rnl-std-fill.rnl:61:3#3",
+            "attach_point": null,
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -4255,6 +4275,7 @@
           {
             "id": "#R1::name",
             "attach": "#R1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "R_{L}",
@@ -4301,6 +4322,7 @@
           {
             "id": "#M1::name",
             "attach": "#M1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -4344,6 +4366,7 @@
           {
             "id": "#R1::value",
             "attach": "#R1",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -4380,6 +4403,7 @@
           {
             "id": "%pin::netname",
             "attach": "%pin",
+            "attach_point": null,
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -4413,6 +4437,7 @@
           {
             "id": "%gs_M1_3::netname",
             "attach": "%gs_M1_3",
+            "attach_point": null,
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -4447,6 +4472,7 @@
           {
             "id": "%ss_R1_1::netname",
             "attach": "%ss_R1_1",
+            "attach_point": null,
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -4481,6 +4507,7 @@
           {
             "id": "@rnl-std-fill.rnl:61:3::netname",
             "attach": "@rnl-std-fill.rnl:61:3",
+            "attach_point": null,
             "key": "netname",
             "markup": {
               "value": "${p}",

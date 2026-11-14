@@ -592,6 +592,7 @@
           {
             "id": "#R1::name",
             "attach": "#R1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -625,6 +626,7 @@
           {
             "id": "#R1::value",
             "attach": "#R1",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -658,6 +660,7 @@
           {
             "id": "#R2::name",
             "attach": "#R2",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -691,6 +694,7 @@
           {
             "id": "#R2::value",
             "attach": "#R2",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -724,6 +728,7 @@
           {
             "id": "@16-wire-rewrite-and-wired.sp:17:3#1",
             "attach": "pin(#R1,0)",
+            "attach_point": null,
             "key": null,
             "markup": {
               "value": "w1",
@@ -757,6 +762,7 @@
           {
             "id": "@16-wire-rewrite-and-wired.sp:17:3#2",
             "attach": "pin(#R3,0)",
+            "attach_point": null,
             "key": null,
             "markup": {
               "value": "w1",

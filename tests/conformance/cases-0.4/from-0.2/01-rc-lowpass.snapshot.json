@@ -778,6 +778,7 @@
           {
             "id": "@01-rc-lowpass.sp:14:29",
             "attach": "@01-rc-lowpass.sp:14:5",
+            "attach_point": null,
             "key": null,
             "markup": {
               "value": "(${p::x}, ${p::y})",
@@ -813,6 +814,10 @@
           {
             "id": "@01-rc-lowpass.sp:15:5",
             "attach": "%o",
+            "attach_point": [
+              17.0,
+              6.0
+            ],
             "key": null,
             "markup": {
               "value": "V_{out}",
@@ -856,6 +861,10 @@
           {
             "id": "@01-rc-lowpass.sp:16:5",
             "attach": null,
+            "attach_point": [
+              6.0,
+              11.0
+            ],
             "key": null,
             "markup": {
               "value": "RC 低通：f_{c} = 1/(2\\pi RC) ≈ 159 kHz",
@@ -909,6 +918,7 @@
           {
             "id": "#V1::name",
             "attach": "#V1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -942,6 +952,7 @@
           {
             "id": "#V1::value",
             "attach": "#V1",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -975,6 +986,7 @@
           {
             "id": "#R1::name",
             "attach": "#R1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -1008,6 +1020,7 @@
           {
             "id": "#R1::value",
             "attach": "#R1",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -1041,6 +1054,7 @@
           {
             "id": "#C1::name",
             "attach": "#C1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -1074,6 +1088,7 @@
           {
             "id": "#C1::value",
             "attach": "#C1",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",

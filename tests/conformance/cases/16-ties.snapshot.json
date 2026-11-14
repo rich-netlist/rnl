@@ -682,6 +682,7 @@
           {
             "id": "#R7::name",
             "attach": "#R7",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -715,6 +716,7 @@
           {
             "id": "#R7::value",
             "attach": "#R7",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",

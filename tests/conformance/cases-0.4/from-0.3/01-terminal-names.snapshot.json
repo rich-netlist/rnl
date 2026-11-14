@@ -1396,6 +1396,7 @@
           {
             "id": "#T1::name",
             "attach": "#T1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -1429,6 +1430,7 @@
           {
             "id": "#O1::name",
             "attach": "#O1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -1462,6 +1464,7 @@
           {
             "id": "#U1::name",
             "attach": "#U1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -1495,6 +1498,7 @@
           {
             "id": "#Z1::name",
             "attach": "#Z1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -1528,6 +1532,7 @@
           {
             "id": "#Z2::name",
             "attach": "#Z2",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",

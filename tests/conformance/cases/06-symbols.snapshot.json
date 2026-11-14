@@ -1714,6 +1714,7 @@
           {
             "id": "#R1::code",
             "attach": "#R1",
+            "attach_point": null,
             "key": "code",
             "markup": {
               "value": "R0",
@@ -1747,6 +1748,7 @@
           {
             "id": "#R2::code",
             "attach": "#R2",
+            "attach_point": null,
             "key": "code",
             "markup": {
               "value": "R90",
@@ -1780,6 +1782,7 @@
           {
             "id": "#R3::code",
             "attach": "#R3",
+            "attach_point": null,
             "key": "code",
             "markup": {
               "value": "R180",
@@ -1813,6 +1816,7 @@
           {
             "id": "#R4::code",
             "attach": "#R4",
+            "attach_point": null,
             "key": "code",
             "markup": {
               "value": "R270",
@@ -1846,6 +1850,7 @@
           {
             "id": "#R5::code",
             "attach": "#R5",
+            "attach_point": null,
             "key": "code",
             "markup": {
               "value": "MX",
@@ -1879,6 +1884,7 @@
           {
             "id": "#R6::code",
             "attach": "#R6",
+            "attach_point": null,
             "key": "code",
             "markup": {
               "value": "MY",
@@ -1912,6 +1918,7 @@
           {
             "id": "#R7::code",
             "attach": "#R7",
+            "attach_point": null,
             "key": "code",
             "markup": {
               "value": "MXR90\\\\变体：加圆点",
@@ -1957,6 +1964,7 @@
           {
             "id": "#R8::code",
             "attach": "#R8",
+            "attach_point": null,
             "key": "code",
             "markup": {
               "value": "MYR90\\\\变体：挪引脚 1",
@@ -2002,6 +2010,7 @@
           {
             "id": "#D2::code",
             "attach": "#D2",
+            "attach_point": null,
             "key": "code",
             "markup": {
               "value": "LED R90",
@@ -2035,6 +2044,7 @@
           {
             "id": "#D1::code",
             "attach": "#D1",
+            "attach_point": null,
             "key": "code",
             "markup": {
               "value": "LED R0",
@@ -2068,6 +2078,7 @@
           {
             "id": "#R1::name",
             "attach": "#R1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2101,6 +2112,7 @@
           {
             "id": "#R1::side",
             "attach": "#R1",
+            "attach_point": null,
             "key": "side",
             "markup": {
               "value": "rot=90",
@@ -2136,6 +2148,7 @@
           {
             "id": "#R2::name",
             "attach": "#R2",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2169,6 +2182,7 @@
           {
             "id": "#R2::side",
             "attach": "#R2",
+            "attach_point": null,
             "key": "side",
             "markup": {
               "value": "rot=90",
@@ -2204,6 +2218,7 @@
           {
             "id": "#R3::name",
             "attach": "#R3",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2237,6 +2252,7 @@
           {
             "id": "#R3::side",
             "attach": "#R3",
+            "attach_point": null,
             "key": "side",
             "markup": {
               "value": "rot=90",
@@ -2272,6 +2288,7 @@
           {
             "id": "#R4::name",
             "attach": "#R4",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2305,6 +2322,7 @@
           {
             "id": "#R4::side",
             "attach": "#R4",
+            "attach_point": null,
             "key": "side",
             "markup": {
               "value": "rot=90",
@@ -2340,6 +2358,7 @@
           {
             "id": "#R5::name",
             "attach": "#R5",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2373,6 +2392,7 @@
           {
             "id": "#R5::side",
             "attach": "#R5",
+            "attach_point": null,
             "key": "side",
             "markup": {
               "value": "rot=90",
@@ -2408,6 +2428,7 @@
           {
             "id": "#R6::name",
             "attach": "#R6",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2441,6 +2462,7 @@
           {
             "id": "#R6::side",
             "attach": "#R6",
+            "attach_point": null,
             "key": "side",
             "markup": {
               "value": "rot=90",
@@ -2476,6 +2498,7 @@
           {
             "id": "#R7::name",
             "attach": "#R7",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2509,6 +2532,7 @@
           {
             "id": "#R7::side",
             "attach": "#R7",
+            "attach_point": null,
             "key": "side",
             "markup": {
               "value": "rot=90",
@@ -2544,6 +2568,7 @@
           {
             "id": "#R8::name",
             "attach": "#R8",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2577,6 +2602,7 @@
           {
             "id": "#R8::side",
             "attach": "#R8",
+            "attach_point": null,
             "key": "side",
             "markup": {
               "value": "rot=90",
@@ -2612,6 +2638,7 @@
           {
             "id": "#D1::name",
             "attach": "#D1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2645,6 +2672,7 @@
           {
             "id": "#D2::name",
             "attach": "#D2",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2678,6 +2706,7 @@
           {
             "id": "#X1::name",
             "attach": "#X1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name} (${model})",
