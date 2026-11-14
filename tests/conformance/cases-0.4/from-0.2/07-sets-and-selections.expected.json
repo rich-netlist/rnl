@@ -2261,6 +2261,106 @@
             "textcolor": "#1d1d1f"
           },
           "layer": "middle"
+        },
+        {
+          "id": "pin 2 of #M1::netname",
+          "anchor": [
+            6.6,
+            0.5
+          ],
+          "lines": [
+            [
+              {
+                "text": "bias",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "end",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 0.8,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "pin 2 of #M2::netname",
+          "anchor": [
+            14.6,
+            0.5
+          ],
+          "lines": [
+            [
+              {
+                "text": "bias",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "end",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 0.8,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "pin 2 of #M3::netname",
+          "anchor": [
+            22.6,
+            0.5
+          ],
+          "lines": [
+            [
+              {
+                "text": "bias",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "end",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1f4fd8",
+            "linestyle": "bold",
+            "linewidth": 0.16,
+            "size": 0.8,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
         }
       ],
       "flylines": [
