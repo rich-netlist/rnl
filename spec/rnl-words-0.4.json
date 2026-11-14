@@ -1634,11 +1634,6 @@
      "since": "0.4"
     },
     {
-     "name": "piece_first",
-     "type": "bool",
-     "since": "0.4"
-    },
-    {
      "name": "role",
      "type": "string",
      "since": "0.4"
@@ -1691,11 +1686,6 @@
      "name": "wired",
      "type": "bool",
      "since": "0.2"
-    },
-    {
-     "name": "split",
-     "type": "bool",
-     "since": "0.4"
     },
     {
      "name": "global",

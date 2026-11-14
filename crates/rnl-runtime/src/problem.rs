@@ -762,11 +762,6 @@ pub fn point_name(p: &LevelProblem, r: &PointRef) -> String {
     }
 }
 
-/// The pieces of each net of a level by the index of the net in [`LevelProblem::nets`], each pin
-/// by its object and its pin, as [`PointRef::pin_key`] gives them: the pieces the selections see
-/// ([`crate::Interpretation::selection_pieces`]).
-pub type PieceKeys = Vec<Vec<Vec<(usize, usize)>>>;
-
 /// The pieces of each net of a level, as a solver reads it, by the index of the net in
 /// [`LevelProblem::nets`]: the pins on the net ([`ProblemNet::pins`]) that one tree of a ROUTE
 /// joins (13.7), or that written wires join, are one piece, and a pin in neither is a piece by

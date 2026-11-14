@@ -176,14 +176,6 @@ pub struct Interpretation {
     /// [`Options::problems`] is set. Built without the generated records ([`Options::solver`]),
     /// it is the solver's input (2.8, 17).
     pub problems: Vec<crate::problem::LevelProblem>,
-    /// The pieces of each net as the conditions `split` and `piece_first` see them (10.1), by
-    /// level as [`Self::problems`] and by net as [`crate::problem::LevelProblem::nets`]; each
-    /// piece first pin first, each pin by its object and its pin, as
-    /// [`crate::problem::PointRef::pin_key`] gives them. They are the pieces at the stage where
-    /// the conditions are read, before what step 6 makes; [`crate::problem::net_pieces`] gives
-    /// those of the whole level. Empty unless [`Options::problems`] is set, and for each net when
-    /// no file read follows 0.4.
-    pub selection_pieces: Vec<crate::problem::PieceKeys>,
     /// The numbers of the objects without a name of each drawing level, with their checks, whatever
     /// its version (5.9); empty for a package file checked on its own. See [`crate::numbering`].
     pub numbering: Vec<LevelNumbering>,
@@ -295,9 +287,6 @@ pub struct Interp<'p> {
     pub(crate) read_generated: bool,
     /// Build the problems (`Options::problems`).
     pub(crate) want_problems: bool,
-    /// The pieces of the nets of each level that the selections see, built with the problems
-    /// ([`Interpretation::selection_pieces`]).
-    pub(crate) selection_pieces: Vec<crate::problem::PieceKeys>,
     /// The tolerance of the checks against written coordinates (`Options::tolerance`, 11.7).
     pub(crate) tol: f64,
     tool_solver_config: Vec<crate::problem::SolverSetting>,
@@ -438,7 +427,6 @@ impl<'p> Interp<'p> {
             std_version: options.std_version.clone(),
             read_generated: options.generated,
             want_problems: options.problems,
-            selection_pieces: Vec::new(),
             tol: options.tolerance,
             tool_solver_config: options.solver_config.clone(),
             std_units: HashMap::new(),
@@ -1040,7 +1028,6 @@ impl<'p> Interp<'p> {
             refs: std::mem::take(&mut self.refs),
             failed: std::mem::take(&mut self.failed_spans),
             problems,
-            selection_pieces: std::mem::take(&mut self.selection_pieces),
             numbering,
             unsupported,
             imported_aliases,
