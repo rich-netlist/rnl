@@ -278,6 +278,8 @@ struct PinAt {
     /// Its connectivity identities, separate from the source expression shown in hints.
     keys: Vec<VertexKey>,
     reference: String,
+    /// Its object and its place among the pins of its symbol, as a solver's problem names it.
+    owner_pin: (String, usize),
 }
 
 struct WireAt {
@@ -354,8 +356,10 @@ struct Drawing<'a> {
     seg_cells: HashMap<(i64, i64), Vec<usize>>,
     /// The texts by the cells their boxes cover.
     text_cells: HashMap<(i64, i64), Vec<usize>>,
-    /// The nets a ROUTE asks to wire (13.7), as the problem names them: a solver joins their pins.
-    routed: BTreeSet<String>,
+    /// The pieces of the nets as a solver reads the level (`problem::net_pieces`), by the objects
+    /// and places of their pins: the pins that a tree of a ROUTE joins are one piece before the
+    /// solver draws it.
+    pieces: Vec<Vec<(String, usize)>>,
 }
 
 /// The geometry hints of one level as it is drawn; `problem` is what a solver reads of it, read
@@ -396,6 +400,20 @@ pub fn interpretation_hints(r: &rnl_runtime::Interpretation) -> Vec<LevelHints> 
 }
 
 // ---------------------------------------------------------------- geometry
+
+/// The pieces of the nets of a level as a solver reads it, by the objects and places of their pins.
+fn problem_pieces(p: &LevelProblem) -> Vec<Vec<(String, usize)>> {
+    let key = |point: &rnl_runtime::problem::PointRef| {
+        let (object, pin) = point.pin_key()?;
+        Some((p.ids.objects.get(object)?.clone(), pin))
+    };
+    rnl_runtime::problem::net_pieces(p)
+        .into_iter()
+        .flatten()
+        .filter(|piece| piece.len() >= 2)
+        .map(|piece| piece.iter().filter_map(key).collect())
+        .collect()
+}
 
 /// The nets a usage's roles are attached to, as `&name`.
 fn role_nets(o: &ObjectInfo) -> Vec<&str> {
@@ -656,7 +674,7 @@ impl<'a> Drawing<'a> {
             vertex_at: HashMap::new(),
             seg_cells: HashMap::new(),
             text_cells: HashMap::new(),
-            routed: problem.map(|p| p.routes.iter().map(|r| r.net.clone()).collect()).unwrap_or_default(),
+            pieces: problem.map(problem_pieces).unwrap_or_default(),
         };
         // the ports of the level, for what each object is (`classify`)
         let ports: BTreeSet<String> = problem
@@ -750,6 +768,7 @@ impl<'a> Drawing<'a> {
                     name: pin_name,
                     keys,
                     reference,
+                    owner_pin: (id.clone(), j),
                 });
             }
             if class == Class::Mark {
@@ -1535,6 +1554,25 @@ impl<'a> Drawing<'a> {
                 }
             }
         }
+        // the pins of one piece as a solver reads the level, such as those a tree of a ROUTE joins,
+        // are joined although the tree is not drawn yet (13.7)
+        let by_key: HashMap<&(String, usize), usize> =
+            self.pins.iter().enumerate().map(|(k, p)| (&p.owner_pin, k)).collect();
+        let mut routed: BTreeSet<usize> = BTreeSet::new();
+        for piece in &self.pieces {
+            let ks: Vec<usize> = piece
+                .iter()
+                .filter_map(|key| by_key.get(key).copied())
+                .collect::<BTreeSet<usize>>()
+                .into_iter()
+                .collect();
+            for pair in ks.windows(2) {
+                union(&mut up, nw + pair[0], nw + pair[1]);
+            }
+            if ks.len() >= 2 {
+                routed.extend(ks);
+            }
+        }
         // the runs of a wire drawn in parts are joined by its flylines over the gaps (the flylines
         // between the parts of a net join nothing: they show what is not wired)
         let mut first_run: HashMap<&str, usize> = HashMap::new();
@@ -1549,7 +1587,6 @@ impl<'a> Drawing<'a> {
         let mut rails: BTreeSet<&String> =
             self.pins.iter().filter(|p| self.parts[p.part].class == Class::Rail).flat_map(|p| p.nets.iter()).collect();
         rails.extend(self.lv.unplaced_items.iter().flat_map(|it| it.pin_nets.iter().flatten()));
-        rails.extend(self.pins.iter().flat_map(|p| p.nets.iter()).filter(|n| self.routed.contains(*n)));
         let labelled: BTreeSet<usize> = self.texts.iter().filter_map(|t| t.pin).collect();
         let mut by_net: BTreeMap<&String, Vec<usize>> = BTreeMap::new();
         for (k, p) in self.pins.iter().enumerate() {
@@ -1568,6 +1605,7 @@ impl<'a> Drawing<'a> {
             let r = find(&mut up, i);
             wired.insert(r);
         }
+        let routed: BTreeSet<usize> = routed.into_iter().map(|k| find(&mut up, nw + k)).collect();
         for (n, ks) in by_net {
             if ks.len() < 2 {
                 continue;
@@ -1577,7 +1615,7 @@ impl<'a> Drawing<'a> {
                 let r = find(&mut up, nw + k);
                 pieces.entry(r).or_default().push(k);
             }
-            let any_wired = pieces.keys().any(|r| wired.contains(r));
+            let any_wired = pieces.keys().any(|r| wired.contains(r) || routed.contains(r));
             if pieces.len() >= 2 && any_wired {
                 let said: Vec<String> = pieces
                     .iter()
@@ -1585,6 +1623,8 @@ impl<'a> Drawing<'a> {
                         let names: Vec<String> = ks.iter().map(|&k| self.pins[k].name.clone()).collect();
                         let how = if wired.contains(r) {
                             "wired"
+                        } else if routed.contains(r) {
+                            "routed"
                         } else if ks.iter().any(|k| labelled.contains(k)) {
                             "a label"
                         } else if ks.iter().any(|&k| self.parts[self.pins[k].part].class == Class::Port) {
@@ -1611,7 +1651,7 @@ impl<'a> Drawing<'a> {
             }
             // a device's pin alone in its piece, with no label at it
             for (r, ks) in &pieces {
-                if ks.len() != 1 || wired.contains(r) {
+                if ks.len() != 1 || wired.contains(r) || routed.contains(r) {
                     continue;
                 }
                 let k = ks[0];

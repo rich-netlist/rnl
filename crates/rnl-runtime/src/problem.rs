@@ -761,6 +761,79 @@ pub fn point_name(p: &LevelProblem, r: &PointRef) -> String {
     }
 }
 
+/// The pieces of each net of a level, as a solver reads it, by the index of the net in
+/// [`LevelProblem::nets`]: the pins on the net ([`ProblemNet::pins`]) that one tree of a ROUTE
+/// joins (13.7), or that written wires join, are one piece, and a pin in neither is a piece by
+/// itself. Trees and wires that share a pin or a point are one. The pins of each piece, and the
+/// pieces by their first pin, are in the order of [`ProblemNet::pins`]. A whole-net ROUTE of an
+/// earlier version joins every pin of its net. A net drawn in two or more
+/// pieces is joined between them by its name alone (10.2).
+pub fn net_pieces(p: &LevelProblem) -> Vec<Vec<Vec<PointRef>>> {
+    use std::collections::HashMap;
+    // a pin by its object and pin, any other point by its object
+    fn key(point: &PointRef) -> Option<(usize, Option<usize>)> {
+        match point {
+            PointRef::Origin(object) => Some((*object, None)),
+            PointRef::Pin { object, pin, .. }
+            | PointRef::SymbolPin { object, pin, .. }
+            | PointRef::PinPosition { object, pin, .. } => Some((*object, Some(*pin))),
+            PointRef::Centre(_) => None,
+        }
+    }
+    type Key = (usize, Option<usize>);
+    fn find(up: &mut HashMap<Key, Key>, x: Key) -> Key {
+        let mut root = x;
+        while let Some(&next) = up.get(&root).filter(|next| **next != root) {
+            root = next;
+        }
+        up.insert(x, root);
+        root
+    }
+    fn join(up: &mut HashMap<Key, Key>, points: &[PointRef]) {
+        let mut keys = points.iter().filter_map(key);
+        let Some(first) = keys.next() else { return };
+        for other in keys {
+            let (a, b) = (find(up, first), find(up, other));
+            if a != b {
+                up.insert(b, a);
+            }
+        }
+    }
+    let mut up: HashMap<Key, Key> = HashMap::new();
+    for route in &p.routes {
+        join(&mut up, &route.pins);
+        // the whole-net request of an earlier version joins every pin of its net
+        if !route.tree {
+            if let Some(net) = p.nets.iter().find(|net| net.name == route.net) {
+                join(&mut up, &net.pins);
+            }
+        }
+        for &w in &route.wires {
+            if let Some(wire) = p.wires.get(w) {
+                join(&mut up, &wire.anchors);
+            }
+        }
+    }
+    for wire in &p.wires {
+        join(&mut up, &wire.anchors);
+    }
+    p.nets
+        .iter()
+        .map(|net| {
+            let mut pieces: Vec<(Key, Vec<PointRef>)> = Vec::new();
+            for pin in &net.pins {
+                let Some(k) = key(pin) else { continue };
+                let root = find(&mut up, k);
+                match pieces.iter_mut().find(|(r, _)| *r == root) {
+                    Some((_, piece)) => piece.push(pin.clone()),
+                    None => pieces.push((root, vec![pin.clone()])),
+                }
+            }
+            pieces.into_iter().map(|(_, piece)| piece).collect()
+        })
+        .collect()
+}
+
 /// What the fact of rank `k` says, in one line, such as `ALIGN y {#M1 #M2}` or `the x of #M1 = 3`.
 pub fn fact_statement(p: &LevelProblem, k: usize) -> String {
     let f = &p.facts[k];

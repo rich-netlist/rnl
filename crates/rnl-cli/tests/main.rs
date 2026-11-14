@@ -74,6 +74,7 @@ mod group_spacing04;
 mod groups;
 mod groups04;
 mod header;
+mod hint_net_pieces04;
 mod hints;
 mod host_diagnostics04;
 mod host_input_diagnostics04;
