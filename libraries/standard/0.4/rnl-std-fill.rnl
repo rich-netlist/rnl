@@ -74,7 +74,8 @@
   %bulk_pin_set @REMOVE-FROM $SUPPLY_FILL_SET;
   /* The first pins of the wired pieces, on nets other than ground and supply nets, which the fill gives a $PIECE_LABEL; a file takes pins out with a selection, such as #R1 @SELECT-PIN => @REMOVE-FROM $PIECE_FILL_SET. */
   $PIECE_FILL_SET = # @SELECT-NET(split=true, recursive=true) => @SELECT-PIN(piece_first=true, wired=true, recursive=true);
-  /* A port net of $PORT_FILL_SET: its tag comes after the pieces are fixed, so each wired piece of it gets a $PIECE_LABEL too, split or not. */
+  /* A port net of $PORT_FILL_SET: its tag comes after the pieces are fixed, so each wired piece of it gets a $PIECE_LABEL too, split or not; a pin already there is taken out first, as ADD-TO keeps repeated members (5.2.2). */
+  $PORT_FILL_SET @SELECT-PIN(piece_first=true, wired=true, recursive=true) => @REMOVE-FROM $PIECE_FILL_SET;
   $PORT_FILL_SET @SELECT-PIN(piece_first=true, wired=true, recursive=true) => @ADD-TO $PIECE_FILL_SET;
   %ground_supply_pin_set = {$GROUND_NET_SET $SUPPLY_NET_SET} @SELECT-PIN(recursive=true);
   %bulk_pin_set @REMOVE-FROM %ground_supply_pin_set;

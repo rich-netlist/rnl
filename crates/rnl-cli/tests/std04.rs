@@ -952,3 +952,21 @@ fn piece_labels_written_back_by_a_solver_are_not_doubled_when_read_again() {
     assert!(errors(&back).is_empty(), "{:?}", errors(&back));
     assert_eq!(attached(&back, "$PIECE_LABEL"), before, "{written}");
 }
+
+#[test]
+fn a_port_net_drawn_in_pieces_gets_one_piece_label_on_each_piece() {
+    // A port net drawn in pieces comes into $PIECE_FILL_SET by both rules, as split and as a port
+    // net; ADD-TO keeps repeated members (5.2.2), so each pin must still get one label. The port b
+    // in two pieces, and the ground port vss with its bulk pins wired, a piece led by a bulk pin.
+    let r = read_pieces(&pieces_file(
+        "b vss",
+        "R1 a b 1k\nR2 b c 1k\nR3 b d 1k\nR4 b e 1k\n\
+M1 d1 g1 s1 vss nch\nM2 d2 g2 s2 vss nch\nM3 d3 g3 s3 vss nch\nR5 x vss 1k\n",
+        "*   &vss @ADD-TO $GROUND_NET_SET;\n*   {#M1 #M2 #M3} @SET-SYMBOL $NMOS_4TERM;\n\
+*   {#R1:2 #R2:1} @ROUTE-OBJECT;\n*   {#R3:1 #R4:1} @ROUTE-OBJECT;\n\
+*   {#M1:b #M2:b #M3:b} @ROUTE-OBJECT(priority=\"high\");\n",
+    ));
+    let pieces = attached(&r, "$PIECE_LABEL");
+    assert_eq!(pieces.len(), 3, "{pieces:?}");
+    assert!(on(&pieces, "R1") && on(&pieces, "R3") && on(&pieces, "M1"), "{pieces:?}");
+}
