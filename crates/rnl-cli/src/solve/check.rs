@@ -1,11 +1,12 @@
 //! `rnl solve --check`: the solver's settings of each level checked, with where each comes from, and
 //! nothing solved or written (14.10).
 //!
-//! The settings of a level are merged in the order of 14.10: the solver's defaults, the packages,
+//! The settings of a level are taken in the order of 14.10: the solver's defaults, the packages,
 //! the file's header, the level's own records, the command line, a later one winning by key. A
 //! value that the solver does not take is a warning when the file gives it, and the solve then
-//! ignores it, and an error when the command line gives it, as a solve then does not start.
-//! Without a file, the command line's settings alone are checked, over the defaults.
+//! ignores it, and the value before it stands, or the default; it is an error when the command
+//! line gives it, as a solve then does not start. Without a file, the command line's settings
+//! alone are checked, over the defaults.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -68,15 +69,20 @@ pub struct CheckedSetting {
 }
 
 /// A problem of one setting, or of the settings together when `key` is none.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct CheckedProblem {
     pub key: Option<String>,
     pub message: String,
+    /// For a value of the file that the solver refuses, and a solve ignores: that value, where it
+    /// comes from and where it is written. The value that stands instead is the key's in
+    /// `settings`, and the message names it too.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub refused: Option<CheckedSetting>,
 }
 
-impl From<SettingProblem> for CheckedProblem {
-    fn from(p: SettingProblem) -> CheckedProblem {
-        CheckedProblem { key: p.key, message: p.message }
+impl CheckedProblem {
+    fn new(key: Option<String>, message: String) -> CheckedProblem {
+        CheckedProblem { key, message, refused: None }
     }
 }
 
@@ -162,13 +168,11 @@ fn tool_settings(tool: &[ToolSettings]) -> (Vec<(SolverSetting, bool)>, Vec<Chec
         } else {
             match rnl_runtime::solver_settings::parse_overrides(text) {
                 Ok(settings) => (settings, Vec::new()),
-                Err(e) => (Vec::new(), vec![SettingProblem { key: None, message: e.message }]),
+                Err(e) => (Vec::new(), vec![SettingProblem::new(None, e.message)]),
             }
         };
         let option = if old { "--solver-options" } else { "--solver-config" };
-        problems.extend(
-            found.into_iter().map(|p| CheckedProblem { key: p.key, message: format!("{option}: {}", p.message) }),
-        );
+        problems.extend(found.into_iter().map(|p| CheckedProblem::new(p.key, format!("{option}: {}", p.message))));
         merged.extend(settings.into_iter().map(|s| (s.key.clone(), (s, old))));
     }
     (merged.into_values().collect(), problems)
@@ -183,25 +187,34 @@ fn level(
     read: Vec<(Severity, CheckedProblem)>,
 ) -> CheckedLevel {
     let check = SolverOptions::check_settings(tool, at.map(|(_, p)| p));
+    // the value of the file of index k
+    let file = |k: usize| {
+        at.map(|(r, p)| {
+            let s = &p.solver_config[k];
+            let written = s.source.as_ref().map(|l| format!("{}:{}", l.file, l.line));
+            CheckedSetting { value: json(&s.value), from: origin(r, s), at: written }
+        })
+    };
     let settings = check
         .values
         .into_iter()
         .map(|(key, (value, from))| {
-            let (from, written) = match (from, at) {
-                (SettingFrom::Default, _) => ("default".to_string(), None),
-                (SettingFrom::Tool, _) => ("command-line".to_string(), None),
-                (SettingFrom::File(k), Some((r, p))) => {
-                    let s = &p.solver_config[k];
-                    (origin(r, s), s.source.as_ref().map(|l| format!("{}:{}", l.file, l.line)))
-                }
-                (SettingFrom::File(_), None) => ("level".to_string(), None),
+            let other = |from: &str| CheckedSetting { value: json(&value), from: from.into(), at: None };
+            let setting = match from {
+                SettingFrom::Default => other("default"),
+                SettingFrom::Tool => other("command-line"),
+                SettingFrom::File(k) => file(k).unwrap_or_else(|| other("level")),
             };
-            (key, CheckedSetting { value: json(&value), from, at: written })
+            (key, setting)
         })
         .collect();
-    let mut warnings: Vec<CheckedProblem> = check.warnings.into_iter().map(Into::into).collect();
+    let problem = |p: SettingProblem| CheckedProblem {
+        refused: p.refused.and_then(file),
+        ..CheckedProblem::new(p.key, p.message)
+    };
+    let mut warnings: Vec<CheckedProblem> = check.warnings.into_iter().map(problem).collect();
     let mut errors: Vec<CheckedProblem> = tool_errors.to_vec();
-    errors.extend(check.errors.into_iter().map(Into::into));
+    errors.extend(check.errors.into_iter().map(problem));
     for (severity, problem) in read {
         if severity == Severity::Error {
             errors.push(problem);
@@ -248,7 +261,7 @@ fn reading_problems(r: &Interpretation, p: &LevelProblem) -> Vec<(Severity, Chec
         })
         .map(|d| {
             let place = d.loc.as_ref().map(|l| format!("{}:{}: ", l.file, l.line)).unwrap_or_default();
-            (d.severity, CheckedProblem { key: None, message: format!("{place}{}", d.message) })
+            (d.severity, CheckedProblem::new(None, format!("{place}{}", d.message)))
         })
         .collect()
 }

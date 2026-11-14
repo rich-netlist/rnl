@@ -1,5 +1,7 @@
-//! Solver-owned values of SOLVER-CONFIG. The runtime has already applied package, header
-//! and level precedence; explicitly supplied tool values come last.
+//! Solver-owned values of SOLVER-CONFIG. The runtime gives every value of each key, in the order
+//! of 14.10 (packages, the file's header, the level); the solver takes per key the last value it
+//! accepts, so an earlier value stands when a later one is refused. Explicitly supplied tool
+//! values come last and replace the file's values of their keys.
 
 use rnl_runtime::interp::obj::Lit;
 use rnl_runtime::problem::{LevelProblem, SolverSetting};
@@ -119,12 +121,78 @@ fn apply(o: &mut SolverOptions, s: &SolverSetting) -> Result<(), String> {
 pub struct SettingProblem {
     pub key: Option<String>,
     pub message: String,
+    /// The value of the file that is refused, by its index in the level's settings
+    /// ([`LevelProblem::solver_config`]).
+    pub refused: Option<usize>,
 }
 
 impl SettingProblem {
-    fn new(key: Option<&str>, message: impl Into<String>) -> SettingProblem {
-        SettingProblem { key: key.map(str::to_string), message: message.into() }
+    pub fn new(key: Option<&str>, message: impl Into<String>) -> SettingProblem {
+        SettingProblem { key: key.map(str::to_string), message: message.into(), refused: None }
     }
+}
+
+/// A value of the file as a warning names it: `key=value`, and where it is written.
+fn written(s: &SolverSetting) -> String {
+    let at = s.source.as_ref().map(|l| format!(" at {}:{}", l.file, l.line)).unwrap_or_default();
+    format!("{}={}{at}", s.key, s.value.show())
+}
+
+/// The file's settings applied key by key ([`file_settings`]).
+struct FileSettings {
+    /// Each value in effect, by its index in the level's settings.
+    taken: Vec<usize>,
+    /// Each value refused, by its index, with the problem: a value of a key later than the one
+    /// in effect, or than the default.
+    refused: Vec<SettingProblem>,
+    /// The tool-only run settings the file gives, each key once, which are ignored.
+    run: Vec<String>,
+}
+
+/// The file's settings applied to `o`, key by key: of each key that `tool` does not give, the last
+/// value that the solver accepts. A value after it is refused, saying what stands instead: the
+/// accepted one, or the default. A value before it is not read, as a later value replaces it.
+fn file_settings(o: &mut SolverOptions, settings: &[SolverSetting], tool: &[SolverSetting]) -> FileSettings {
+    let mut out = FileSettings { taken: Vec::new(), refused: Vec::new(), run: Vec::new() };
+    let mut keys: Vec<&str> = Vec::new();
+    for s in settings {
+        if !keys.contains(&s.key.as_str()) {
+            keys.push(&s.key);
+        }
+    }
+    for key in keys {
+        if is_run_setting(key) {
+            out.run.push(key.to_string());
+            continue;
+        }
+        if tool.iter().any(|t| t.key == key) {
+            continue;
+        }
+        let values: Vec<usize> = (0..settings.len()).filter(|&k| settings[k].key == key).collect();
+        let mut refused = Vec::new();
+        let mut taken = None;
+        for &k in values.iter().rev() {
+            let mut next = o.clone();
+            match apply(&mut next, &settings[k]) {
+                Ok(()) => {
+                    *o = next;
+                    taken = Some(k);
+                    break;
+                }
+                Err(e) => refused.push((k, e)),
+            }
+        }
+        let stands = taken.map_or("the default".to_string(), |k| written(&settings[k]));
+        for (k, e) in refused.into_iter().rev() {
+            out.refused.push(SettingProblem {
+                key: Some(key.to_string()),
+                message: format!("{e}; {} is ignored, and {stands} stands", written(&settings[k])),
+                refused: Some(k),
+            });
+        }
+        out.taken.extend(taken);
+    }
+    out
 }
 
 /// Where an effective setting comes from (14.10).
@@ -132,8 +200,8 @@ impl SettingProblem {
 pub enum SettingFrom {
     /// The solver's default ([`SolverOptions::defaults_config`]).
     Default,
-    /// The level's own settings, [`LevelProblem::solver_config`], by index: from a package, the
-    /// file's header or the level, as the runtime merged them.
+    /// The level's own settings, [`LevelProblem::solver_config`], by the index of the value in
+    /// effect: from a package, the file's header or the level.
     File(usize),
     /// The tool: a command line, or a viewer.
     Tool,
@@ -300,12 +368,13 @@ impl SolverOptions {
     }
 
     /// What a solve of `problem` would take, key by key, with where each setting comes from, and
-    /// what is wrong (14.10): the solver's defaults, then the level's settings as the runtime merged
-    /// them (packages, the file's header, the level), then the tool's, `tool`, merged by key, each
-    /// with whether it comes from an old `--solver-options` text. Without a problem, the tool's
-    /// over the defaults. As in a solve, a bad value of the file is a warning and is ignored, and a
-    /// bad value of the tool is an error; a level before 0.4 reads no SOLVER-CONFIG, and of the
-    /// tool only the old `--solver-options`.
+    /// what is wrong (14.10): the solver's defaults, then the level's settings (packages, the
+    /// file's header, the level), of each key the last value the solver accepts, then the tool's,
+    /// `tool`, merged by key, each with whether it comes from an old `--solver-options` text.
+    /// Without a problem, the tool's over the defaults. As in a solve, a bad value of the file is
+    /// a warning, which names the value that stands instead, and is ignored, and a bad value of
+    /// the tool is an error; a level before 0.4 reads no SOLVER-CONFIG, and of the tool only the
+    /// old `--solver-options`.
     pub fn check_settings(tool: &[(SolverSetting, bool)], problem: Option<&LevelProblem>) -> SettingsCheck {
         let defaults = rnl_runtime::solver_settings::parse_overrides(&Self::defaults_config()).unwrap_or_default();
         let mut values: BTreeMap<_, _> =
@@ -329,24 +398,16 @@ impl SolverOptions {
         }
         let mut o = Self::default();
         if let Some(p) = problem.filter(|_| modern) {
-            for (k, s) in p.solver_config.iter().enumerate() {
-                if is_run_setting(&s.key) {
-                    let message = format!("{} is a tool-only run setting and is ignored in the file", s.key);
-                    warnings.push(SettingProblem::new(Some(&s.key), message));
-                    continue;
-                }
-                if read.iter().any(|t| t.key == s.key) {
-                    continue;
-                }
-                let mut next = o.clone();
-                match apply(&mut next, s) {
-                    Ok(()) => {
-                        o = next;
-                        values.insert(s.key.clone(), (s.value.clone(), SettingFrom::File(k)));
-                    }
-                    Err(e) => warnings.push(SettingProblem::new(Some(&s.key), format!("{e}; ignored"))),
-                }
+            let file = file_settings(&mut o, &p.solver_config, &read);
+            for key in file.run {
+                let message = format!("{key} is a tool-only run setting and is ignored in the file");
+                warnings.push(SettingProblem::new(Some(&key), message));
             }
+            for k in file.taken {
+                let s = &p.solver_config[k];
+                values.insert(s.key.clone(), (s.value.clone(), SettingFrom::File(k)));
+            }
+            warnings.extend(file.refused);
         }
         let errors = tool_problems(&mut o, &read);
         for s in &read {
@@ -387,7 +448,8 @@ impl SolverOptions {
         SettingsCheck { values, warnings, errors }
     }
 
-    /// Materialize effective settings. Bad file values warn and keep the previous/default value.
+    /// Materialize effective settings. Of each key of the file, the last value the solver accepts;
+    /// a later value is refused with a warning, and the earlier value, or the default, stands.
     pub fn for_problem(&self, p: &LevelProblem) -> (Self, Vec<String>) {
         let mut out = self.clone();
         let mut warnings = Vec::new();
@@ -400,20 +462,11 @@ impl SolverOptions {
         if self.settings.legacy_alias {
             warnings.push("--solver-options is deprecated; use --solver-config with RNL named parameters".into());
         }
-        for s in &p.solver_config {
-            if is_run_setting(&s.key) {
-                warnings.push(format!("{} is a tool-only run setting and is ignored in the file", s.key));
-                continue;
-            }
-            if self.settings.overrides.iter().any(|o| o.key == s.key) {
-                continue;
-            }
-            let mut next = out.clone();
-            match apply(&mut next, s) {
-                Ok(()) => out = next,
-                Err(e) => warnings.push(format!("{e}; ignored")),
-            }
+        let file = file_settings(&mut out, &p.solver_config, &self.settings.overrides);
+        for key in file.run {
+            warnings.push(format!("{key} is a tool-only run setting and is ignored in the file"));
         }
+        warnings.extend(file.refused.into_iter().map(|p| p.message));
         if let Err(e) = apply_tool(&mut out, &self.settings.overrides) {
             warnings.push(format!("invalid tool settings: {e}"));
         }
@@ -461,6 +514,39 @@ mod tests {
         // the good ones are in effect, from the tool; the bad ones are not
         assert_eq!(check.values["tolerance"], (Lit::Num(0.5), SettingFrom::Tool));
         assert_eq!(check.values["beam"].1, SettingFrom::Default);
+    }
+
+    #[test]
+    fn a_refused_value_of_the_file_leaves_the_earlier_one_in_effect() {
+        let settings = |text: &str| rnl_runtime::solver_settings::parse_overrides(text).unwrap();
+        let mut p = problem_of(Vec::new(), Vec::new());
+        p.version = "0.4".into();
+        // as the runtime gives them: by key, the values of a key in the order of 14.10
+        p.solver_config = [settings("beam=6"), settings("grid=2"), settings("grid=\"x\"")].concat();
+        let (o, warnings) = SolverOptions::default().for_problem(&p);
+        assert_eq!((o.grid, o.beam), (Some(2.0), 6));
+        assert_eq!(warnings, ["grid must be a finite number; grid=\"x\" is ignored, and grid=2 stands"]);
+        let check = SolverOptions::check_settings(&[], Some(&p));
+        assert_eq!(check.values["grid"], (Lit::Num(2.0), SettingFrom::File(1)));
+        assert_eq!(check.values["beam"], (Lit::Num(6.0), SettingFrom::File(0)));
+        assert_eq!(check.warnings.len(), 1);
+        assert_eq!((check.warnings[0].key.as_deref(), check.warnings[0].refused), (Some("grid"), Some(2)));
+        // a bad value before a good one is not read: the later one replaces it
+        p.solver_config = [settings("grid=\"x\""), settings("grid=3")].concat();
+        let (o, warnings) = SolverOptions::default().for_problem(&p);
+        assert_eq!(o.grid, Some(3.0));
+        assert!(warnings.is_empty(), "{warnings:?}");
+        // each refused value warns, in order, and with none accepted the default stands
+        p.solver_config = [settings("grid=0"), settings("grid=\"x\"")].concat();
+        let (o, warnings) = SolverOptions::default().for_problem(&p);
+        assert_eq!(o.grid, SolverOptions::default().grid);
+        assert_eq!(warnings.len(), 2);
+        assert!(warnings[0].contains("grid=0 is ignored, and the default stands"), "{warnings:?}");
+        assert!(warnings[1].contains("grid=\"x\" is ignored, and the default stands"), "{warnings:?}");
+        // the tool's value replaces every value of the file's
+        let (o, warnings) = SolverOptions::default().with_config("grid=5").unwrap().for_problem(&p);
+        assert_eq!(o.grid, Some(5.0));
+        assert!(warnings.is_empty(), "{warnings:?}");
     }
 
     #[test]

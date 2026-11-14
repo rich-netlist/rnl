@@ -638,7 +638,10 @@ pub struct LevelProblem {
     pub junction: crate::junction::JunctionConfig,
     /// Existing effective junction targets, identified by point identity rather than coordinates.
     pub existing_junctions: Vec<PointRef>,
-    /// Effective settings, by key, after package, file-header and level overrides (14.10).
+    /// The settings, by key: every value that applies to the level, and the values of a key in
+    /// the order of 14.10, packages, the file's header, the level's records. A key may repeat. A
+    /// solver takes per key the last value it accepts, so an earlier value stands when a later
+    /// one is refused.
     pub solver_config: Vec<SolverSetting>,
     /// The host level: its index in the host document's levels.
     pub level: usize,

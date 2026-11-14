@@ -39,15 +39,16 @@ pub fn parse_overrides(text: &str) -> Result<Vec<SolverSetting>, ParseError> {
         .collect()
 }
 
-/// Merge only explicitly supplied tool values over file/package values, by key. Solver defaults
-/// are not overrides. The returned order is canonical, independent of the tool's spelling order.
+/// Merge only explicitly supplied tool values over file/package values: a key the tool gives has
+/// the tool's last value alone, and every other key keeps all its values, in order (14.10).
+/// Solver defaults are not overrides. The returned order is by key, independent of the tool's
+/// spelling order.
 pub fn with_overrides(settings: &[SolverSetting], text: &str) -> Result<Vec<SolverSetting>, ParseError> {
-    let overrides = parse_overrides(text)?;
-    let mut values: BTreeMap<_, _> = settings.iter().cloned().map(|s| (s.key.clone(), s)).collect();
-    for s in overrides {
-        values.insert(s.key.clone(), s);
-    }
-    Ok(values.into_values().collect())
+    let tool: BTreeMap<_, _> = parse_overrides(text)?.into_iter().map(|s| (s.key.clone(), s)).collect();
+    let mut values: Vec<_> = settings.iter().filter(|s| !tool.contains_key(&s.key)).cloned().collect();
+    values.extend(tool.into_values());
+    values.sort_by(|a, b| a.key.cmp(&b.key));
+    Ok(values)
 }
 
 #[cfg(test)]
@@ -93,5 +94,18 @@ mod tests {
         assert_eq!(with_overrides(&original, "").unwrap(), original);
         assert!(with_overrides(&original, "b=9,c=?bad").is_err());
         assert_eq!(original[1].value, Lit::Num(2.0));
+        // a key the file gives twice keeps both values, unless the tool gives it
+        let mut twice = parse_overrides("a=1,b=2").unwrap();
+        twice.insert(1, parse_overrides("a=5").unwrap().remove(0));
+        let values = with_overrides(&twice, "b=3").unwrap();
+        assert_eq!(
+            values.iter().map(|s| (s.key.as_str(), s.value.show())).collect::<Vec<_>>(),
+            [("a", "1".into()), ("a", "5".into()), ("b", "3".into())]
+        );
+        let values = with_overrides(&twice, "a=7").unwrap();
+        assert_eq!(
+            values.iter().map(|s| (s.key.as_str(), s.value.show())).collect::<Vec<_>>(),
+            [("a", "7".into()), ("b", "2".into())]
+        );
     }
 }

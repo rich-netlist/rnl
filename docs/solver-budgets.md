@@ -81,17 +81,19 @@ The line layout spaces by a nonzero spacing. Under the row and the group-tree la
 parsed and hashed, with a warning that they keep their fixed gaps.
 
 Run settings in a file warn and are ignored. Unknown keys warn and are ignored. Invalid
-known file values warn and leave the effective default in place; invalid tool values are
-rejected before solving. The problem hash includes file settings. Junction names are
+known file values warn and leave the value before them in place, or the default; invalid tool
+values are rejected before solving. The problem hash includes every file value of a key. Junction names are
 resolved by the runtime in the target level, including tool overrides, so an override
 retains the same name and alias rules as a file setting. Tool overrides enter the options
 digest, while the input digest retains the original file settings. A saved result therefore
 remains solved when reopened without the command-line overrides. `JunctionConfig.effective()`
 selects the resolved tool value for writing; its base definition still identifies the file.
 
-A key is merged before its value is checked: a later value takes the place of an earlier
-one, and when the later one is invalid, the solver warns and takes the default, not the
-earlier value. A level's `grid="x"` over a package's `grid=2` therefore gives `grid=1`.
+A key's values are checked one by one, not merged first: the runtime gives every value of a
+key in the order above, and the solver takes the last one it accepts. A refused value warns,
+naming the value that stands instead, the one before it or the default, and the other keys of
+the same `SOLVER-CONFIG` still apply. A level's `grid="x"` over a package's `grid=2` therefore
+gives `grid=2` and a warning.
 
 `rnl solve FILE --check` checks the settings without solving or writing anything. For each
 level it prints every setting in effect and where it comes from (`default`,

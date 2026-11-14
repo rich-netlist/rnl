@@ -97,7 +97,35 @@ fn package_headers_precede_file_header_and_level_records() {
     clean(&r);
     let s = settings(&r, 0);
     assert_eq!((s["a"].as_str(), s["b"].as_str(), s["c"].as_str(), s["d"].as_str()), ("2", "20", "30", "1"));
-    assert_eq!(r.problems[0].solver_config.iter().find(|s| s.key == "a").unwrap().package, "p");
+    // every value of a key is given, in that order: q's, p's, the header's, the level's
+    let of = |key: &str| -> Vec<(String, String)> {
+        let values = r.problems[0].solver_config.iter().filter(|s| s.key == key);
+        values.map(|s| (s.package.clone(), s.value.show())).collect()
+    };
+    let value = |package: &str, value: &str| (package.to_string(), value.to_string());
+    assert_eq!(of("a"), [value("q", "1"), value("p", "2")]);
+    assert_eq!(of("c"), [value("q", "1"), value("p", "2"), value("", "30")]);
+    assert_eq!(of("d"), [value("q", "1")]);
+}
+
+#[test]
+fn a_refused_value_leaves_the_one_before_it_and_the_other_keys_apply() {
+    // the package's grid=2 and the level's grid="x", with a good beam in the same statement
+    let main = source("0.4", "@USE-PACKAGE(name=\"p\")", "@SOLVER-CONFIG(grid=\"x\", beam=6)");
+    let r = read_files(&with_packages(&main, &[("p", package("p", "@SOLVER-CONFIG(grid=2)", ""))]));
+    clean(&r);
+    let grid: Vec<_> = r.problems[0].solver_config.iter().filter(|s| s.key == "grid").map(|s| s.value.show()).collect();
+    assert_eq!(grid, ["2", "\"x\""]);
+    let (o, warnings) = rnl_solver::SolverOptions::default().for_problem(&r.problems[0]);
+    assert_eq!((o.grid, o.beam), (Some(2.0), 6));
+    assert_eq!(warnings.len(), 1, "{warnings:?}");
+    assert!(
+        warnings[0].starts_with("grid must be a finite number; grid=\"x\" at main.sp:4 is ignored, and grid=2 at"),
+        "{warnings:?}"
+    );
+    // an earlier value is input too, as it stands when a later one is refused
+    let other = read_files(&with_packages(&main, &[("p", package("p", "@SOLVER-CONFIG(grid=3)", ""))]));
+    assert_ne!(input_digest(&r.problems[0]), input_digest(&other.problems[0]));
 }
 
 #[test]
@@ -159,15 +187,19 @@ fn file_defaults_apply_to_its_subcircuits_but_level_settings_do_not_inherit() {
 }
 
 #[test]
-fn only_effective_values_affect_the_input_digest() {
+fn every_value_of_a_key_affects_the_input_digest_not_the_order_of_the_keys() {
     let a = read("@SOLVER-CONFIG(a=1,b=2)", "@SOLVER-CONFIG(a=3)");
     let b = read("@SOLVER-CONFIG(b=2,a=3)", "");
     let c = read("@SOLVER-CONFIG(b=2,a=4)", "");
-    for r in [&a, &b, &c] {
+    let d = read("@SOLVER-CONFIG(b=2,a=1)", "@SOLVER-CONFIG(a=3)");
+    for r in [&a, &b, &c, &d] {
         clean(r);
     }
-    assert_eq!(input_digest(&a.problems[0]), input_digest(&b.problems[0]));
+    // a=1 is input too, as it stands when the level's a=3 is refused
+    assert_ne!(input_digest(&a.problems[0]), input_digest(&b.problems[0]));
     assert_ne!(input_digest(&b.problems[0]), input_digest(&c.problems[0]));
+    // the order in which the keys are written, and where, are not
+    assert_eq!(input_digest(&a.problems[0]), input_digest(&d.problems[0]));
 }
 
 #[test]

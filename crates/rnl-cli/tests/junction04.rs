@@ -260,6 +260,32 @@ fn local_junction_names_are_not_accepted_in_headers_or_tool_overrides() {
 }
 
 #[test]
+fn a_junction_that_names_no_definition_leaves_the_earlier_one_in_effect() {
+    // the level's value names nothing here, so the header's stands, with a warning of the level's
+    let r = read(r#"@SOLVER-CONFIG(junction="$DOT")"#, &format!(r#"{DOT} @SOLVER-CONFIG(junction="$MISSING")"#));
+    clean(&r);
+    let junction = &r.problems[0].junction;
+    assert_eq!(junction.definition.as_deref(), Some("$DOT"));
+    assert_eq!(junction.invalid.as_ref().unwrap().value.str(), Some("$MISSING"));
+    let w = write(&r.problems[0]);
+    assert!(w.record.contains("$DOT @ATTACH %rt1"), "{}", w.record);
+    assert_eq!(w.warnings.len(), 1);
+    assert!(w.warnings[0].message.contains("it is ignored, and the earlier $DOT is used"), "{:?}", w.warnings);
+    assert_eq!(w.warnings[0].loc.as_ref().unwrap().line, 4);
+    // a later value that names a definition replaces the earlier one, with no warning
+    let r = read(r#"@SOLVER-CONFIG(junction="$MISSING")"#, &format!(r#"{DOT} @SOLVER-CONFIG(junction="$DOT")"#));
+    clean(&r);
+    assert_eq!(r.problems[0].junction.definition.as_deref(), Some("$DOT"));
+    assert!(r.problems[0].junction.invalid.is_none());
+    // an empty value after a good one draws no dots, and with none that names one there are none
+    let r = read(r#"@SOLVER-CONFIG(junction="$DOT")"#, &format!(r#"{DOT} @SOLVER-CONFIG(junction="")"#));
+    assert!(r.problems[0].junction.definition.is_none() && r.problems[0].junction.invalid.is_none());
+    let r = read(r#"@SOLVER-CONFIG(junction="$GONE")"#, r#"@SOLVER-CONFIG(junction="$MISSING")"#);
+    assert!(r.problems[0].junction.definition.is_none());
+    assert!(write(&r.problems[0]).warnings[0].message.contains("no dots are written"));
+}
+
+#[test]
 fn local_junction_still_requires_a_definition_and_a_complete_name() {
     for (value, body) in [
         ("%p", "%p=(0,0)"),

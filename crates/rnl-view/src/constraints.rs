@@ -42,7 +42,9 @@ pub struct LevelConstraints {
     pub routes: Vec<ConstraintRoute>,
     /// The sets given GROUP that are in effect (11.5).
     pub groups: Vec<ConstraintGroup>,
-    /// Effective literal settings, by key (14.10); absent when none were written.
+    /// The literal settings, by key: every value, and a key given in more than one place
+    /// repeats, its values in the order of 14.10. A solver takes per key the last value it
+    /// accepts. Absent when none were written.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[cfg_attr(test, ts(as = "Option<Vec<SolverSettingView>>", optional))]
     pub solver_config: Vec<SolverSettingView>,
@@ -59,7 +61,7 @@ pub enum SolverLiteral {
     Array(Vec<SolverLiteral>),
 }
 
-/// One effective setting, retaining the source for diagnostics (14.10).
+/// One value of a setting, retaining the source for diagnostics (14.10).
 #[derive(Serialize, Debug, Clone, PartialEq)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct SolverSettingView {

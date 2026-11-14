@@ -523,7 +523,9 @@ export type LevelConstraints = {
    */
   groups: Array<ConstraintGroup>,
   /**
-   * Effective literal settings, by key (14.10); absent when none were written.
+   * The literal settings, by key: every value, and a key given in more than one place
+   * repeats, its values in the order of 14.10. A solver takes per key the last value it
+   * accepts. Absent when none were written.
    */
   solver_config?: Array<SolverSettingView>,
 };
@@ -534,7 +536,7 @@ export type LevelConstraints = {
 export type SolverLiteral = number | string | boolean | Array<SolverLiteral>;
 
 /**
- * One effective setting, retaining the source for diagnostics (14.10).
+ * One value of a setting, retaining the source for diagnostics (14.10).
  */
 export type SolverSettingView = { key: string, value: SolverLiteral, source: ConstraintSource | null, package: string };
 

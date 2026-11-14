@@ -268,26 +268,32 @@ explicit zero. Released-language records retain their earlier parameter rules.
 
 Draft 0.4 `SOLVER-CONFIG` supplies literal settings to each `LevelProblem` (14.10).
 Package headers in effective position order are followed by the file's header,
-then the level's records; later values replace earlier values by key. A package
-reached only through language-qualified header uses supplies no settings. Records
-with `language`, generated records, package contents and inline packages warn and
-have no effect. An included file keeps its own header defaults.
+then the level's records. The core does not merge them: `LevelProblem::solver_config`
+lists every value, by key, and a key that is given more than once repeats, its
+values in that order. A consumer takes per key the last value it accepts, so a
+refused value leaves the one before it in effect, or the default; the other keys
+of the same statement still apply. A package reached only through
+language-qualified header uses supplies no settings. Records with `language`,
+generated records, package contents and inline packages warn and have no effect.
+An included file keeps its own header defaults.
 
 `LevelProblem::solver_config` preserves literal types and source locations; strings
-also keep their definition environment. The input digest covers effective keys
-and values, not source locations or overridden values. `rnl problem` and viewer
-constraints expose `solver_config` only when it is nonempty. No geometric fact is
-created, and the core does not impose a solver's key or value policy.
+also keep their definition environment. The input digest covers every key and
+value in that order, not source locations: an earlier value of a key is input too,
+as it stands when a later one is refused. A level that gives each key once has the
+same digest as before. `rnl problem` and viewer constraints expose `solver_config`
+only when it is nonempty. No geometric fact is created, and the core does not
+impose a solver's key or value policy.
 
 `solver_settings::parse_overrides` reads tool settings using the same parameter
-text as the parentheses of `SOLVER-CONFIG`. `with_overrides` merges explicitly
-written values over file values. These are integration APIs: existing CLI solver
+text as the parentheses of `SOLVER-CONFIG`. `with_overrides` replaces the file's
+values of each key the tool writes with the tool's. These are integration APIs: existing CLI solver
 option parsing and solver layout policy are not changed by this core input change.
 Consumers remain responsible for validating supported keys and resolving the
 `junction` definition as a name in the target level (13.2).
 
 
-In draft 0.4, `LevelProblem.junction` resolves the effective `SOLVER-CONFIG` `junction` string in the target level, as a generated record would. It keeps a writable reference to a definition whose first role accepts a point. An absent setting or empty string disables dots. Invalid settings are retained for a located `RNL8118 junction-definition-invalid` warning when a tool consumes them; ordinary reading does not issue solver-policy warnings. `solution::Written.warnings` returns these structured diagnostics. The CLI solve report and preview include them. The resolved reference contributes to the input digest, without source locations.
+In draft 0.4, `LevelProblem.junction` resolves the `SOLVER-CONFIG` `junction` string in the target level, as a generated record would: the last value that names a definition whose first role accepts a point. It keeps a writable reference to that definition. An absent setting or empty string disables dots. When the last value names none, it is retained for a located `RNL8118 junction-definition-invalid` warning when a tool consumes it, and the value before it is used, or none; ordinary reading does not issue solver-policy warnings. `solution::Written.warnings` returns these structured diagnostics. The CLI solve report and preview include them. The resolved reference contributes to the input digest, without source locations.
 
 `PointInfo.junction` uses the identity of this configured definition and the point in its first role, including aliases of the same definition. It does not infer a dot from a name, position or wire count. Junction appearances still come from ordinary definition usages and their symbols. Released 0.2/0.3 recognition and writeback retain their existing behavior.
 

@@ -1,4 +1,4 @@
-//! Literal solver settings and their effective key-by-key order (14.10).
+//! Literal solver settings: every value of each key, in the order of 14.10.
 use super::ctx::Ctx;
 use super::eval::{ArgV, R};
 use super::obj::{Lit, ObjId, Pos, RecId, SceneId, UnitId, WStr, NOTHING};
@@ -8,7 +8,7 @@ use crate::diag::{codes, Code, Severity};
 use crate::host::language::Languages;
 use crate::problem::SolverSetting;
 use crate::syntax::{Named, Params, Segment, Value};
-use std::collections::{BTreeMap, HashSet};
+use std::collections::HashSet;
 use std::rc::Rc;
 
 #[derive(Clone, Debug)]
@@ -218,6 +218,10 @@ impl Interp<'_> {
         Ok((NOTHING, false))
     }
 
+    /// Every value of every key that applies to the level (14.10), by key, and the values of a
+    /// key in the order of 14.10: the packages in their effective order, the file's header, the
+    /// level's records. A later value does not replace an earlier one here: a consumer takes per
+    /// key the last value it accepts, so an earlier one stands when a later one is refused.
     pub(super) fn solver_config_for(&mut self, scene: SceneId) -> Vec<SolverSetting> {
         let level = self.scenes[scene].level;
         let effective = self.effective_packages(level);
@@ -228,26 +232,22 @@ impl Interp<'_> {
             .map(|e| (self.position_of(scene, e.unit, None, None), e.unit))
             .collect();
         packages.sort_by(|a, b| a.0.cmp(&b.0));
-        let mut settings = BTreeMap::new();
+        let mut settings = Vec::new();
         for (_, unit) in packages {
-            for value in &self.units[unit].solver_config {
-                settings.insert(value.key.clone(), value.clone());
-            }
+            settings.extend(self.units[unit].solver_config.iter().cloned());
         }
         let file = self.doc.file_level(level);
-        for value in &self.units[self.level_unit[file]].solver_config {
-            settings.insert(value.key.clone(), value.clone());
-        }
+        settings.extend(self.units[self.level_unit[file]].solver_config.iter().cloned());
         let mut facts = self.scenes[scene].solver_config.clone();
         facts.sort_by(|a, b| a.pos.cmp(&b.pos));
         for fact in facts {
             if self.failed_body(&fact.site) {
                 continue;
             }
-            for value in fact.values {
-                settings.insert(value.key.clone(), value);
-            }
+            settings.extend(fact.values);
         }
-        settings.into_values().collect()
+        // by key, a stable sort keeping each key's values in their order
+        settings.sort_by(|a, b| a.key.cmp(&b.key));
+        settings
     }
 }

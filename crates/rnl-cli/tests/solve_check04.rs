@@ -65,18 +65,32 @@ fn each_setting_says_where_it_comes_from_in_the_order_of_14_10() {
 }
 
 #[test]
-fn a_bad_value_of_the_file_is_a_warning_and_is_not_in_effect() {
+fn a_bad_value_of_the_file_is_a_warning_and_the_value_before_it_stands() {
     let c = check(MAIN, &[]);
     let amp = level(&c, "amp");
     let warnings = keyed(&amp.warnings);
-    assert!(warnings.contains(&"grid: grid must be a finite number; ignored".to_string()), "{warnings:?}");
+    let grid =
+        "grid: grid must be a finite number; grid=\"x\" at main.sp:5 is ignored, and grid=2 at fixture.rnl:1 stands";
+    assert!(warnings.contains(&grid.to_string()), "{warnings:?}");
     assert!(warnings.contains(&"seconds: seconds is a tool-only run setting and is ignored in the file".to_string()));
-    assert!(warnings.iter().any(|w| w.starts_with("tolerance: the tolerance must be a number not below 0")));
-    // the level's grid took the place of the package's when the runtime merged them by key, so a
-    // solve, which ignores it, takes the default, and so does the check
-    assert_eq!(setting(amp, "grid"), "grid=1 (default)");
+    let tolerance = "tolerance: the tolerance must be a number not below 0, not -1; tolerance=-1 at main.sp:2 is ignored, and the default stands";
+    assert!(warnings.contains(&tolerance.to_string()), "{warnings:?}");
+    // the level's grid is refused, so the package's stands: a refused value does not discard
+    // the values before it
+    assert_eq!(setting(amp, "grid"), "grid=2 (package:fixture)");
     assert_eq!(setting(level(&c, "main.sp"), "grid"), "grid=2 (package:fixture)");
     assert_eq!(setting(amp, "seconds"), "seconds=10 (default)");
+    // the refused value, with where it comes from
+    let refused = amp.warnings.iter().find(|w| w.key.as_deref() == Some("grid")).unwrap().refused.clone().unwrap();
+    assert_eq!(refused.value, "x");
+    assert_eq!((refused.from.as_str(), refused.at.as_deref()), ("level", Some("main.sp:5")));
+    // the other settings of the same SOLVER-CONFIG apply
+    assert_eq!(setting(amp, "beam"), "beam=6 (level)");
+    assert_eq!(setting(amp, "layout"), "layout=\"tree\" (level)");
+    // and so it reads in the text
+    let lines = rnl_cli::solve::check_lines(&c);
+    assert!(lines.contains(&"  grid=2 (package:fixture, fixture.rnl:1)".to_string()), "{lines:?}");
+    assert!(lines.contains(&format!("  warning: {grid}")), "{lines:?}");
     // a warning of the level stays with its level
     assert!(!keyed(&level(&c, "main.sp").warnings).iter().any(|w| w.starts_with("grid")));
     assert!(amp.errors.is_empty() && c.ok);
