@@ -905,7 +905,10 @@ impl Search<'_, '_> {
     fn batch(&mut self, id: usize, size: usize, force: bool, work: &mut Work, stop: &Stop) -> Result<(), String> {
         let c = self.nodes[id].core;
         loop {
-            if crate::budget::stopped() {
+            // a trial stopped between its halves is still settled below: the solutions of its first
+            // half are held in it, and the best may be among them
+            let halfway = self.trials.get(&c).is_some_and(|t| t.tried.is_some());
+            if crate::budget::stopped() && !halfway {
                 return Ok(());
             }
             let first = self.cores[c].batches == 0;
