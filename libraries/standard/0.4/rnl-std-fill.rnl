@@ -2,7 +2,7 @@
    The sets and rules of the automatic fill: attaches ground, supply, bias and net-label stubs to
    unwired pins, including the pins of virtual parts, and a port tag to every port net in
    $PORT_FILL_SET (10.5, 12.4, 16.3). A file that does not want the fill drops it with an empty
-   inline package of its name. */
+   inline package of its name. The *_FILL_SET sets hold what the fill is still to stub: once a solve writes the stubs back they no longer hold those pins, so build no other rule on them. */
 @RNL(type="header") {
   @VERSION("0.4");
   @PACKAGE(name="rnl-std-fill", version="0.4");

@@ -1,6 +1,6 @@
 * Current mirror bank: sets, selections and generation rules
 *! Sets: names, nesting flattened, ADD-TO / REMOVE-FROM, UNION, used before defined (order does not matter); selections: by model, SELECT-TERMINAL(terminal=) in a pipe,
-*! current=, global=, SELECT-WIRE; generating: an ATTACH of a current arrow to each terminal selected by CURRENT, net names added to unconnected terminals (the standard package's $LABEL_TERM_SET), a rule changing a label's content by key;
+*! current=, global=, SELECT-WIRE; generating: an ATTACH of a current arrow to each terminal selected by CURRENT, net names added to the unwired pins of instances off the rails (selected, not taken from the fill's $LABEL_FILL_SET, which a solve empties), a rule changing a label's content by key;
 *! M3's ground is drawn on its source pin: with a usage as the scope, only the members of this kind are taken, the standard package can select that terminal, and adds no ground to it (10.1).
 .global vdd!
 .model nch nmos level=1
@@ -30,7 +30,7 @@ Iref vdd! bias 10u
 *   # @SELECT-INSTANCE(name="R*", recursive=true) => @TEXT("R=${value}", key="value");
 *   $wire_green = @DEFINE-STYLE(linecolor="#2e7d32") {};
 *   # @SELECT-WIRE(recursive=true) => @SET-STYLE $wire_green;
-*   $LABEL_FILL_SET @TEXT("${net}", key="netname", dx=-0.4, dy=0.5, halign="end", size=0.8);
+*   %unwired = # @SELECT-INSTANCE(recursive=true) => @SELECT-PIN(wired=false, recursive=true); {$GROUND_NET_SET $SUPPLY_NET_SET} @SELECT-PIN(recursive=true) => @REMOVE-FROM %unwired; %unwired @TEXT("${net}", key="netname", dx=-0.4, dy=0.5, halign="end", size=0.8);
 *   # @SELECT-USAGE $NET_LABEL => @TEXT("${p}", key="netname", dx=-0.4, dy=0.5, halign="end", size=0.8);
 *   %late = {#M3};
 *   $GROUND @ATTACH #M3:3::net => @PLACE(26, -2) => %m3_ground; #M3:3::net @WIRE(mode="auto") {#M3:3 %m3_ground:p}; $PIN_SCOPE = @DEFINE(roles=[["p", "pin"]]) {}; %pin_scope = $PIN_SCOPE @ATTACH #M3:3; %scope_pins = %pin_scope @SELECT-PIN; #M3:3 @SELECT-PIN => @ASSERT-IN %scope_pins;

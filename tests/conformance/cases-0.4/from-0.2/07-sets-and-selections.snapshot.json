@@ -3014,6 +3014,119 @@
               "size": 0.8,
               "textcolor": "#1d1d1f"
             }
+          },
+          {
+            "id": "pin(#M1,1)::netname",
+            "attach": "pin(#M1,1)",
+            "key": "netname",
+            "markup": {
+              "value": "${net}",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "bias",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              6.6,
+              0.5
+            ],
+            "halign": "end",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 0.8,
+            "style": {
+              "size": 0.8
+            }
+          },
+          {
+            "id": "pin(#M2,1)::netname",
+            "attach": "pin(#M2,1)",
+            "key": "netname",
+            "markup": {
+              "value": "${net}",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "bias",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              14.6,
+              0.5
+            ],
+            "halign": "end",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 0.8,
+            "style": {
+              "size": 0.8
+            }
+          },
+          {
+            "id": "pin(#M3,1)::netname",
+            "attach": "pin(#M3,1)",
+            "key": "netname",
+            "markup": {
+              "value": "${net}",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "bias",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              22.6,
+              0.5
+            ],
+            "halign": "end",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 0.8,
+            "style": {
+              "bold": true,
+              "cap": "butt",
+              "fillcolor": "#ffffff",
+              "join": "miter",
+              "linecolor": "#1f4fd8",
+              "linestyle": "bold",
+              "linewidth": 0.16,
+              "size": 0.8,
+              "textcolor": "#1d1d1f"
+            }
           }
         ],
         "shapes": [],
