@@ -27,24 +27,24 @@
   %bulk_pin_set = # @SELECT-TERMINAL(type="nmos", terminal="b", recursive=true) => @SELECT-PIN(recursive=true);
   # @SELECT-TERMINAL(type="pmos", terminal="b", recursive=true) => @SELECT-PIN(recursive=true) => @ADD-TO %bulk_pin_set;
 
-  /* The unwired pins on ground nets, which the fill gives a ground stub. */
+  /* The unwired pins on ground nets, which the fill gives a ground stub. Each set below is stubbed without its repeats (UNION, 5.2.2) and without the pins that already have a stub of its kind, so a pin that a file adds again, or adds after a solve wrote its stub back, gets one stub. */
   $GROUND_FILL_SET = $GROUND_NET_SET @SELECT-PIN(wired=false, recursive=true);
   %own_pin_set @REMOVE-FROM $GROUND_FILL_SET;
-  %bulk_pin_set @REMOVE-FROM $GROUND_FILL_SET;
-  $GROUND_STUB @ATTACH $GROUND_FILL_SET;
+  %bulk_pin_set @REMOVE-FROM $GROUND_FILL_SET; %ground_stub_pin_set = $GROUND_FILL_SET @UNION; # @SELECT-USAGE(recursive=true) $GROUND_STUB => @SELECT-PIN(role="t", recursive=true) => @REMOVE-FROM %ground_stub_pin_set;
+  $GROUND_STUB @ATTACH %ground_stub_pin_set;
 
   /* The unwired pins on supply nets, which the fill gives a supply stub. */
   $SUPPLY_FILL_SET = $SUPPLY_NET_SET @SELECT-PIN(wired=false, recursive=true);
   %own_pin_set @REMOVE-FROM $SUPPLY_FILL_SET;
-  %bulk_pin_set @REMOVE-FROM $SUPPLY_FILL_SET;
-  $SUPPLY_STUB @ATTACH $SUPPLY_FILL_SET;
+  %bulk_pin_set @REMOVE-FROM $SUPPLY_FILL_SET; %supply_stub_pin_set = $SUPPLY_FILL_SET @UNION; # @SELECT-USAGE(recursive=true) $SUPPLY_STUB => @SELECT-PIN(role="t", recursive=true) => @REMOVE-FROM %supply_stub_pin_set;
+  $SUPPLY_STUB @ATTACH %supply_stub_pin_set;
 
   /* The unwired pins on bias nets, which the fill gives a bias stub. */
   $BIAS_FILL_SET = $BIAS_NET_SET @SELECT-PIN(wired=false, recursive=true);
   %own_pin_set @REMOVE-FROM $BIAS_FILL_SET;
   %bulk_pin_set @REMOVE-FROM $BIAS_FILL_SET;
-  # @SELECT-USAGE(recursive=true) $BIAS_STUB => @SELECT-PIN(role="t", recursive=true) => @REMOVE-FROM $BIAS_FILL_SET;
-  $BIAS_STUB @ATTACH $BIAS_FILL_SET;
+  # @SELECT-USAGE(recursive=true) $BIAS_STUB => @SELECT-PIN(role="t", recursive=true) => @REMOVE-FROM $BIAS_FILL_SET; %bias_stub_pin_set = $BIAS_FILL_SET @UNION; # @SELECT-USAGE(recursive=true) $BIAS_STUB => @SELECT-PIN(role="t", recursive=true) => @REMOVE-FROM %bias_stub_pin_set;
+  $BIAS_STUB @ATTACH %bias_stub_pin_set;
 
   %rail_pin_set = {$GROUND_NET_SET $SUPPLY_NET_SET $BIAS_NET_SET} @SELECT-PIN(recursive=true);
   %bulk_pin_set @REMOVE-FROM %rail_pin_set;
@@ -53,12 +53,12 @@
   %rail_pin_set @REMOVE-FROM $LABEL_FILL_SET;
   %own_pin_set @REMOVE-FROM $LABEL_FILL_SET;
   # @SELECT-USAGE(recursive=true) $NET_LABEL_STUB => @SELECT-PIN(role="t", recursive=true) => @REMOVE-FROM $LABEL_FILL_SET;
-  # @SELECT-USAGE(recursive=true) $IO_PORT_STUB => @SELECT-PIN(role="t", recursive=true) => @REMOVE-FROM $LABEL_FILL_SET;
-  $NET_LABEL_STUB @ATTACH $LABEL_FILL_SET;
+  # @SELECT-USAGE(recursive=true) $IO_PORT_STUB => @SELECT-PIN(role="t", recursive=true) => @REMOVE-FROM $LABEL_FILL_SET; %label_stub_pin_set = $LABEL_FILL_SET @UNION; # @SELECT-USAGE(recursive=true) $NET_LABEL_STUB => @SELECT-PIN(role="t", recursive=true) => @REMOVE-FROM %label_stub_pin_set; # @SELECT-USAGE(recursive=true) $IO_PORT_STUB => @SELECT-PIN(role="t", recursive=true) => @REMOVE-FROM %label_stub_pin_set;
+  $NET_LABEL_STUB @ATTACH %label_stub_pin_set;
 
   /* The port nets of $PORT_FILL_SET that have no $IO_PORT written get a port tag; the tags of a level stand in one column on the left of its instances, as $PORT_LIST draws them. */
-  # @SELECT-USAGE(recursive=true) $IO_PORT => @SELECT-NET(recursive=true) => @REMOVE-FROM $PORT_FILL_SET;
-  $IO_PORT @ATTACH $PORT_FILL_SET => %port_tag_set;
+  # @SELECT-USAGE(recursive=true) $IO_PORT => @SELECT-NET(recursive=true) => @REMOVE-FROM $PORT_FILL_SET; %port_fill_net_set = $PORT_FILL_SET @UNION; # @SELECT-USAGE(recursive=true) $IO_PORT => @SELECT-NET(recursive=true) => @REMOVE-FROM %port_fill_net_set;
+  $IO_PORT @ATTACH %port_fill_net_set => %port_tag_set;
   %port_tag_set @ORDER("top-to-bottom", priority="low");
   %port_tag_set @ALIGN("x", priority="low");
   %port_tag_set @GROUP;

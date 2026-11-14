@@ -819,3 +819,46 @@ X0 n1 n2 top\n.end\n";
     assert_eq!(count("blk", "DISTANCE"), 2);
     assert_eq!(count("top", "DISTANCE"), 4);
 }
+
+/// The net-label stubs of the level, by the pin each is attached to.
+fn label_stub_pins(lv: &LevelView) -> Vec<String> {
+    let stubs = lv.objects.iter().filter(|o| o.definition.as_deref() == Some("$NET_LABEL_STUB"));
+    let mut pins: Vec<String> = stubs.flat_map(|o| o.attach.iter().map(|(_, a)| format!("{a:?}"))).collect();
+    pins.sort();
+    pins
+}
+
+#[test]
+fn the_fill_stubs_a_pin_once_when_a_file_adds_it_again() {
+    // the fill already labels the bulk pin and the unwired gate; adding them again changes nothing,
+    // and a stub written back (as a solve writes it) is not repeated either
+    let text = |written: &str| {
+        format!(
+            r#"* t
+* @RNL(type="header") {{ @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4") }}
+.model nch nmos level=1
+M1 d g 0 b nch w=1u l=1u
+R1 d 0 1k
+* @RNL {{
+*   {written}
+*   # @SELECT-TERMINAL(terminal="b") => @SELECT-PIN => @ADD-TO $LABEL_FILL_SET;
+*   # @SELECT-TERMINAL(terminal="g") => @SELECT-PIN => @ADD-TO $LABEL_FILL_SET
+* }}
+.end
+"#
+        )
+    };
+    let fresh = read(&MemoryProvider::new().with("t.sp", &text("")), &Options::solver());
+    assert!(errors(&fresh).is_empty(), "{:?}", errors(&fresh));
+    let pins = label_stub_pins(level(&fresh));
+    let mut once = pins.clone();
+    once.dedup();
+    assert_eq!(pins, once, "a pin has two net-label stubs");
+    assert_eq!(pins.len(), 4, "{pins:?}");
+    let back = read(
+        &MemoryProvider::new().with("t.sp", &text("%net_label_stub_M1_b = $NET_LABEL_STUB @ATTACH #M1::b;")),
+        &Options::solver(),
+    );
+    assert!(errors(&back).is_empty(), "{:?}", errors(&back));
+    assert_eq!(label_stub_pins(level(&back)), pins);
+}
