@@ -435,24 +435,6 @@ impl Interp<'_> {
                 name,
             });
         }
-        // the pieces of each net that the selections see (10.1)
-        let mut pieces = vec![Vec::new(); nets.len()];
-        for (net, of_net) in self.scenes[s].selection_pieces.clone().unwrap_or_default() {
-            let Some(&k) = net_at.get(&net) else { continue };
-            pieces[k] = of_net
-                .iter()
-                .map(|piece| {
-                    piece
-                        .iter()
-                        .filter_map(|&pin| match *self.o(pin) {
-                            ObjData::ScenePin { owner, index } => Some((*ix.objects.get(&owner)?, index)),
-                            _ => None,
-                        })
-                        .collect()
-                })
-                .collect();
-        }
-        self.selection_pieces.push(pieces);
         // the pins on each net: every terminal with a pin of an instance, a bundle or a virtual
         // part, on each of its nets; and the nets of each virtual part and of each text, by what it
         // is attached to

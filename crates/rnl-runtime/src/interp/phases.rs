@@ -110,11 +110,6 @@ impl Interp<'_> {
         self.run_tasks(s, 5);
         self.resolve_currents(s, false);
         self.scenes[s].phase = 6;
-        // the pieces of the nets that its selections see, before anything it makes; the
-        // conditions that read them are words of 0.4
-        if (0..self.units.len()).any(|unit| self.follows_0_4(unit)) {
-            self.scenes[s].selection_pieces = Some(self.net_pieces(s, true));
-        }
         self.run_tasks(s, 6);
         self.resolve_symbols(s, true);
         self.resolve_scene_subobjects(s);
