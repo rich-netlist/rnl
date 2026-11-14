@@ -45,6 +45,7 @@ mod diagnostic_context04;
 mod diagnostic_contexts04;
 mod diagnostic_counts04;
 mod diagnostic_locations04;
+mod diagnostics_records04;
 mod dialects;
 mod directions;
 mod distance_bounds;
