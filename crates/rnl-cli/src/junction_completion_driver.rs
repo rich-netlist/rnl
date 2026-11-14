@@ -264,20 +264,49 @@ pub struct Completion {
     pub elapsed: std::time::Duration,
 }
 pub fn complete_record(ctx: &Context<'_>, written: &Written) -> Result<Completion, String> {
-    complete_within(ctx, written, MAX_TRIALS, &mut 0)
+    complete_within(ctx, written, MAX_TRIALS, &mut 0, None)
 }
 
 /// A single global bound on the candidate trials of a level, independent of junction count.
 const MAX_TRIALS: usize = 64;
 
-/// [`complete_record`] with at most `max_trials` candidate trials, counted into `used`.
+/// Why a dot is left out when the level's time ran out before it was tried, apart from a dot that
+/// has no place: the time, not the dot.
+pub const RAN_OUT: &str = "the time of the level ran out before the dot was tried";
+
+/// When the time of a level runs out for the completion: `after` from the moment it is made. It is
+/// read before each trial, so that no trial begins once it has passed; a trial begun before may end
+/// after it. Where there is no clock (WebAssembly), only a deadline of no time has passed.
+pub struct Deadline {
+    since: crate::solve::Stopwatch,
+    after: std::time::Duration,
+}
+
+impl Deadline {
+    /// The deadline `after` from now.
+    pub fn after(after: std::time::Duration) -> Deadline {
+        Deadline { since: crate::solve::Stopwatch::start(), after }
+    }
+
+    fn passed(&self) -> bool {
+        self.after.is_zero() || self.since.elapsed() >= self.after
+    }
+}
+
+/// [`complete_record`] with at most `max_trials` candidate trials, counted into `used`, and none
+/// begun after `deadline`: then it fails with [`RAN_OUT`].
 fn complete_within(
     ctx: &Context<'_>,
     written: &Written,
     max_trials: usize,
     used: &mut usize,
+    deadline: Option<&Deadline>,
 ) -> Result<Completion, String> {
     let start = crate::solve::Stopwatch::start();
+    let late = || deadline.is_some_and(Deadline::passed);
+    if late() {
+        return Err(RAN_OUT.into());
+    }
     if !written.unsolved.is_empty() {
         return Err("first-pass decisions could not all be written".into());
     }
@@ -379,6 +408,9 @@ fn complete_within(
     let mut indexes = vec![0usize; plans.len()];
     let mut last_error = String::from("no candidates");
     for attempt in 0..max_trials {
+        if late() {
+            return Err(RAN_OUT.into());
+        }
         *used += 1;
         let mut trial = record.clone();
         let targets: Vec<_> = plans.iter().zip(&indexes).map(|(p, &i)| (p.usage_id.clone(), p.candidates[i])).collect();
@@ -456,16 +488,27 @@ pub struct Partial {
 /// facts of the level for costs only itself: the rest of the record is written. The record without
 /// any dot must pass the same checks, or nothing is written: what fails then is not the dots'.
 pub fn complete_what_can_be(ctx: &Context<'_>, written: &Written) -> Result<Partial, String> {
+    complete_what_can_be_by(ctx, written, None)
+}
+
+/// [`complete_what_can_be`] with no trial begun after `deadline`: the dots not tried by then are
+/// left out, each with [`RAN_OUT`]. The record without any dot is checked all the same, however late,
+/// since nothing is written that does not read back as it was solved.
+pub fn complete_what_can_be_by(
+    ctx: &Context<'_>,
+    written: &Written,
+    deadline: Option<&Deadline>,
+) -> Result<Partial, String> {
     let start = crate::solve::Stopwatch::start();
     // one bound on the candidate trials of the level covers every stage, so that the time a level
     // takes stays bounded however many dots it has; the record without any dot is checked beyond it
     let mut trials = 0;
-    let why = match complete_within(ctx, written, MAX_TRIALS, &mut trials) {
+    let why = match complete_within(ctx, written, MAX_TRIALS, &mut trials, deadline) {
         Ok(done) => return Ok(Partial { record: done.record, trials, elapsed: start.elapsed(), dropped: Vec::new() }),
         Err(why) => why,
     };
     let bare = only(written, &[]);
-    if let Err(without) = complete_within(ctx, &bare, 1, &mut 0) {
+    if let Err(without) = complete_within(ctx, &bare, 1, &mut 0, None) {
         return Err(format!("{why}; without any dot: {without}"));
     }
     // the dots one by one, in order, each beside those kept before it: a dot kept may leave no
@@ -474,13 +517,17 @@ pub fn complete_what_can_be(ctx: &Context<'_>, written: &Written) -> Result<Part
     let mut record = None;
     let mut dropped = Vec::new();
     for index in 0..written.junctions.len() {
+        if deadline.is_some_and(Deadline::passed) {
+            dropped.push((index, RAN_OUT.to_string()));
+            continue;
+        }
         if trials >= MAX_TRIALS {
             dropped.push((index, "the bound on candidate trials was reached".to_string()));
             continue;
         }
         let mut with = kept.clone();
         with.push(index);
-        match complete_within(ctx, &only(written, &with), MAX_TRIALS - trials, &mut trials) {
+        match complete_within(ctx, &only(written, &with), MAX_TRIALS - trials, &mut trials, deadline) {
             Ok(done) => {
                 kept = with;
                 record = Some(done.record);

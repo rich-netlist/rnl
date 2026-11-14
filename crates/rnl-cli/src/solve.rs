@@ -87,7 +87,7 @@ use rnl_runtime::writeback::{
     replace_generated_with_header, spelled_like_new_words, takes_version_of, PIN_STD_0_2,
 };
 use rnl_runtime::{Interpretation, Options};
-use rnl_solver::{Clock, Discarded, RunLimit, Solved, SolverOptions, Statement, AUTHOR};
+use rnl_solver::{Clock, Discarded, RunLimit, Solved, SolverOptions, Statement, StopReason, AUTHOR};
 
 mod check;
 pub use check::{
@@ -553,6 +553,80 @@ impl Total<'_> {
     }
 }
 
+/// What a level's junction placement is expected to take, in readings of the document: the dots
+/// all at once, as most levels place them, and the record without any dot, with room to spare. A
+/// level that places its dots one by one may take more, and leaves out those its limit has no time
+/// left for; a reading of a level with its record can take far longer than one of the document.
+const RESERVED_READINGS: f64 = 16.;
+
+/// The most of a level's limit kept for junction placement and the write.
+const RESERVED_SHARE: f64 = 0.25;
+
+/// A level's limit of time, or of safety, less what junction placement and the write after the
+/// solve are expected to take: [`RESERVED_READINGS`] readings of the document, and no more than
+/// [`RESERVED_SHARE`] of the limit. The solve stops that much sooner, so that the level ends near
+/// its limit, not past it by the time its dots take.
+struct Reserve {
+    /// The level's options with the limit less the reserve, as the tool's last settings; none when
+    /// nothing is kept.
+    options: Option<SolverOptions>,
+    /// The limit, and what is left of it for the solve, in whole milliseconds.
+    limit: f64,
+    left: f64,
+    /// The safety limit, when it is that limit that is kept: what junction placement has, from
+    /// the start of the solve, when it stopped the solve.
+    safety: Option<f64>,
+}
+
+impl Reserve {
+    /// The reserve of the level `p` solved with `solver`, a reading of its document taking
+    /// `reading` seconds: none for a level before 0.4, for a level with no limit of time or of
+    /// safety, or on a clock that does not advance, where no limit of time is read.
+    fn of(
+        solver: &SolverOptions,
+        p: &LevelProblem,
+        clock: &dyn Clock,
+        reading: f64,
+    ) -> Result<Option<Reserve>, String> {
+        if p.version != "0.4" || !clock.advances() {
+            return Ok(None);
+        }
+        let own = solver.for_problem(p).0;
+        let (limit, key, safety) = match rnl_solver::run_limit(&own, clock) {
+            RunLimit::Time(seconds) => (seconds, "limit=\"time\", seconds", false),
+            _ => match own.safety_seconds {
+                Some(seconds) => (seconds, "safety_seconds", true),
+                None => return Ok(None),
+            },
+        };
+        if !limit.is_finite() {
+            return Ok(None);
+        }
+        // whole milliseconds, which the text of the options writes as they are: kept rounded down
+        let kept = ((RESERVED_READINGS * reading).min(RESERVED_SHARE * limit) * 1000.).floor() / 1000.;
+        let left = ((limit - kept) * 1000.).round() / 1000.;
+        let options = if kept > 0. && left < limit {
+            let text = format!("{key}={}", rnl_runtime::geom::fmt_num(left));
+            Some(solver.with_config(&text).map_err(|e| format!("the reserve of {}: {e}", p.title))?)
+        } else {
+            None
+        };
+        Ok(Some(Reserve { options, limit, left: left.min(limit), safety: safety.then_some(limit) }))
+    }
+
+    /// What the level is told of the reserve, when something was kept.
+    fn note(&self) -> Option<String> {
+        self.options.as_ref()?;
+        Some(format!(
+            "the level's {} limit of {}s solved within {}s, {}s kept for junction placement and the write",
+            if self.safety.is_some() { "safety" } else { "time" },
+            rnl_runtime::geom::fmt_num(self.limit),
+            rnl_runtime::geom::fmt_num(self.left),
+            rnl_runtime::geom::fmt_num(((self.limit - self.left) * 1000.).round() / 1000.)
+        ))
+    }
+}
+
 /// [`solve_using`], its watcher told of every [`Mark`], and the levels `skip` gives a reason for
 /// left as they are, in [`SolveRun::not_solved`]. The whole file's time, when it is given, is
 /// measured on `clock`.
@@ -565,8 +639,8 @@ pub(crate) fn solve_marked(
     skip: &Skip<'_>,
     backend: &Backend<'_>,
 ) -> Result<SolveRun, String> {
-    let total = options.total_seconds.map(|seconds| (seconds, clock));
-    let (run, wants) = pass(file, files, options, total, &[], watch, skip, backend)?;
+    let total = options.total_seconds;
+    let (run, wants) = pass(file, files, options, total, clock, &[], watch, skip, backend)?;
     if wants.is_empty() {
         return Ok(run);
     }
@@ -614,7 +688,7 @@ pub(crate) fn solve_marked(
     // the files read are those of the first pass: the second reads the files raised from memory
     let read = run.read.clone();
     let mut run =
-        if texts.is_empty() { run } else { pass(file, files, options, total, &texts, watch, skip, backend)?.0 };
+        if texts.is_empty() { run } else { pass(file, files, options, total, clock, &texts, watch, skip, backend)?.0 };
     run.read = read;
     // a file level that cannot say 0.3 itself, such as a library section without a header record,
     // takes the version of the file that includes it (16.1): when that one is raised, it reads in
@@ -652,7 +726,8 @@ fn pass(
     file: &Path,
     files: &dyn Provider,
     options: &SolveOptions,
-    total: Option<(f64, &dyn Clock)>,
+    total: Option<f64>,
+    clock: &dyn Clock,
     raised: &[(String, String)],
     watch: &dyn Fn(Mark<'_>) -> bool,
     skip: &Skip<'_>,
@@ -660,7 +735,7 @@ fn pass(
 ) -> Result<(SolveRun, Vec<Want>), String> {
     let entry = path_str(file);
     // the whole file's time runs from the start of the pass: of a file raised, the second is kept
-    let total = total.map(|(seconds, clock)| Total { seconds, begun: clock.elapsed(), clock });
+    let total = total.map(|seconds| Total { seconds, begun: clock.elapsed(), clock });
     let runtime = options.runtime();
     let files = Noting::new(files);
     let mut memory = MemoryProvider::new();
@@ -672,7 +747,10 @@ fn pass(
         let both = Layered { layers: vec![memory, &files] };
         rnl_view::interpret_with(&entry, options.dialect.as_deref(), &options.formats, &both, &runtime)
     };
+    // the time of a reading of the document, on the clock the limits are read on
+    let reading = clock.elapsed();
     let mut first = read(&memory)?;
+    let mut read_seconds = clock.elapsed() - reading;
     let errors = first.diagnostics().iter().filter(|d| d.severity == Severity::Error).count();
     let mut targets: Vec<(usize, String)> = Vec::new();
     let mut not_solved = Vec::new();
@@ -766,7 +844,12 @@ fn pass(
         // its file was written back
         let r = match current.take() {
             Some(r) => r,
-            None => read(&memory)?,
+            None => {
+                let reading = clock.elapsed();
+                let r = read(&memory)?;
+                read_seconds = clock.elapsed() - reading;
+                r
+            }
         };
         let p = r
             .problems
@@ -779,10 +862,27 @@ fn pass(
             None => None,
         };
         let solver = shared.as_ref().unwrap_or(&options.solver);
+        // the level's limit of time, or of safety, less what junction placement and the write take
+        let reserve = Reserve::of(solver, p, clock, read_seconds)?;
+        // the level is told of its own limit; the reserve is the tool's, which a note tells of
         watch(Mark::Problem(&solver.for_problem(p).0));
+        let solver = reserve.as_ref().and_then(|r| r.options.as_ref()).unwrap_or(solver);
         let start = Stopwatch::start();
+        let begun = clock.elapsed();
         let BackendResult { solved, author, report_available } = backend(p, solver)?;
         let time = start.elapsed();
+        // a level stopped by its safety limit, which is not replayed by its work, places its dots
+        // within what is left of that limit; one stopped by its time, or by its work, places them
+        // all, as its replay does
+        let deadline = reserve
+            .as_ref()
+            .and_then(|r| r.safety)
+            .filter(|_| solved.report.budget.is_some_and(|b| b.reason == StopReason::Safety));
+        let deadline = deadline.map(|limit| {
+            crate::junction_completion_driver::Deadline::after(Duration::from_secs_f64(
+                (limit - (clock.elapsed() - begun)).max(0.),
+            ))
+        });
         // without the solver's own text of the options, theirs as the level takes them: a level
         // before 0.4 has no layout to name
         let hash = match solved.report.canonical_options.as_deref() {
@@ -790,6 +890,11 @@ fn pass(
             None => sig2(p, &solver.for_problem(p).0.canonical()),
         };
         let mut written = write_record(p, &solved.solution, &author, &hash);
+        // told only of a level its limit stopped, which the reserve changed
+        let stopped = solved.report.budget.is_some_and(|b| matches!(b.reason, StopReason::Time | StopReason::Safety));
+        if let Some(r) = reserve.as_ref().filter(|_| stopped) {
+            written.notes.extend(r.note());
+        }
         let mut write_errors = Vec::new();
         let host = &r.doc.levels[p.level];
         let path = normalize(&host.path);
@@ -839,8 +944,9 @@ fn pass(
                 tolerance: runtime.tolerance.min(options.solver.for_problem(p).0.tolerance),
                 on_interpret: None,
             };
-            let completion = crate::junction_completion_driver::complete_what_can_be(&context, &written)
-                .map_err(|why| format!("junction placement unresolved in {title}: {why}"))?;
+            let completion =
+                crate::junction_completion_driver::complete_what_can_be_by(&context, &written, deadline.as_ref())
+                    .map_err(|why| format!("junction placement unresolved in {title}: {why}"))?;
             written.notes.push(format!(
                 "junction postprocessing: {} candidate trials in {:.3}s (including numbering checks, outside solver budget)",
                 completion.trials,
@@ -849,7 +955,13 @@ fn pass(
             // a dot that cannot be placed costs only itself: the rest of the level is written
             for (index, why) in &completion.dropped {
                 let junction = &written.junctions[*index];
-                written.unsolved.push(rnl_runtime::solution::Unsolved::junction_unplaced(junction));
+                let mut unsolved = rnl_runtime::solution::Unsolved::junction_unplaced(junction);
+                if why == crate::junction_completion_driver::RAN_OUT {
+                    // the time, not the place: the dot was not tried
+                    unsolved.reason =
+                        "its dot is not written: the time of the level ran out before it was tried (13.2)".into();
+                }
+                written.unsolved.push(unsolved);
                 written
                     .notes
                     .push(format!("junction postprocessing: the dot at {} is not written: {why}", junction.target));
