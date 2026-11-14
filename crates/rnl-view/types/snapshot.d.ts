@@ -704,3 +704,19 @@ export type AnnotationGraphic = {
    */
   visible?: boolean,
 };
+
+/**
+ * The junction dots of a 0.4 level ([`LevelModel::junction`]).
+ */
+export type JunctionView = {
+  /**
+   * The definition, as a usage names it: `$JUNCTION`, or `%dot` for one a level defines.
+   */
+  definition: string,
+  /**
+   * The symbol its dots in the level are drawn with, by its id in `symbols`, whose `definition`
+   * gives its graphics, such as the radius of its circle; null while the level has no dot yet,
+   * such as before a solve, as the symbol a rule gives a usage is only known for one.
+   */
+  symbol: string | null,
+};
