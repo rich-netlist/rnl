@@ -1595,10 +1595,11 @@ mod tests {
         assert_ne!(one, two);
     }
 
-    /// A pin that leaves sideways, wired by the default route of `auto` to a pin that faces it
-    /// from one unit beyond: the route turns back with its middle leg halfway, half a unit long
-    /// (13.1). That piece is as long as its ends make it, so a read that asks a whole lead of
-    /// every lead must not ask one of it: the constraints as read would have no solution.
+    /// Two gates that face each other one unit apart and one unit off, wired by the default route
+    /// of `auto`: a Z through the middle, out half a unit, over, and in half a unit, ties an L that
+    /// turns at a gate in bends and length, and is taken as it keeps both gates' directions (13.1).
+    /// Its leads are half a unit long, as long as their ends make them, so a read that asks a whole
+    /// lead of every lead must not ask one of them: the constraints as read would have no solution.
     #[test]
     fn a_default_auto_wire_keeps_a_piece_shorter_than_a_lead_in_a_read_of_whole_leads() {
         use rnl_runtime::problem::ProblemWire;
@@ -1611,7 +1612,7 @@ mod tests {
             bus: false,
             anchors: vec![
                 PointRef::Pin { object: 0, pin: 0, terminal: "g".into() },
-                PointRef::Pin { object: 1, pin: 1, terminal: "d".into() },
+                PointRef::Pin { object: 1, pin: 0, terminal: "g".into() },
             ],
             mode: "auto".into(),
             default_auto: true,
@@ -1619,25 +1620,37 @@ mod tests {
         });
         let s = structure(&p);
         let mut g = s.witness.clone();
-        // the gate of the first leaves left from (-3, 0); the drain of the second faces up at (-3, -1)
+        let options = SolverOptions::without_time_limit();
+        let solves = |p: &rnl_runtime::problem::LevelProblem, g: &Geometry| {
+            for whole in [true, false] {
+                let mut sk =
+                    read_for_compaction(p, &s, g, &Routing::default(), &|_| true, whole, None, false).expect("read");
+                assert!(sk.paths[0].default_auto);
+                assert!(sk.segs.iter().all(|seg| seg.default_auto));
+                for axis in 0..2 {
+                    let report = super::super::pass::pass(&mut sk, axis, &options, &mut Work::default(), None);
+                    assert_eq!(report.failed, None, "whole {whole}, axis {axis}");
+                }
+            }
+        };
+        // the gate of the first leaves left from (-3, 0); the gate of the second, turned, leaves
+        // right from (-4, -1)
         g.origin[0] = [int(0), int(0)];
-        g.origin[1] = [int(-3), int(-3)];
+        g.orient[1] = rnl_runtime::geom::Orient::R180;
+        g.origin[1] = [int(-7), int(-1)];
         let path = crate::route::written_path(&p, &g, 0).unwrap().unwrap();
         let half = int(1) / int(2);
-        // since a pin may be left at a right angle (13.1), the route goes straight down; the
-        // whole-lead read must still find a solution with it
+        let middle = int(-3) - half.clone();
+        assert_eq!(path, vec![[int(-3), int(0)], [middle.clone(), int(0)], [middle, int(-1)], [int(-4), int(-1)]]);
+        solves(&p, &g);
+        // the drain of the second faces up at (-3, -1), below the gate of the first: the route leaves
+        // the gate at a right angle, straight down, and is read as well
+        p.wires[0].anchors[1] = PointRef::Pin { object: 1, pin: 1, terminal: "d".into() };
+        g.orient[1] = s.witness.orient[1];
+        g.origin[1] = [int(-3), int(-3)];
+        let path = crate::route::written_path(&p, &g, 0).unwrap().unwrap();
         assert_eq!(path, vec![[int(-3), int(0)], [int(-3), int(-1)]]);
-        let options = SolverOptions::without_time_limit();
-        for whole in [true, false] {
-            let mut sk =
-                read_for_compaction(&p, &s, &g, &Routing::default(), &|_| true, whole, None, false).expect("read");
-            assert!(sk.paths[0].default_auto);
-            assert!(sk.segs.iter().all(|seg| seg.default_auto));
-            for axis in 0..2 {
-                let report = super::super::pass::pass(&mut sk, axis, &options, &mut Work::default(), None);
-                assert_eq!(report.failed, None, "whole {whole}, axis {axis}");
-            }
-        }
+        solves(&p, &g);
         // a default auto wire drawn straight has no such piece: half a unit long between a source
         // that leaves down and a drain that faces it, it is still asked a whole lead
         p.wires[0].anchors[0] = PointRef::Pin { object: 0, pin: 2, terminal: "s".into() };
