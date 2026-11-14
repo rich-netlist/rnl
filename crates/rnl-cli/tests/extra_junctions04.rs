@@ -61,7 +61,10 @@ fn no_configuration_and_an_empty_value_disable_extra_dots() {
         assert!(w.unsolved.is_empty() && w.warnings.is_empty());
     }
     let r = read("0.4", r#"@SOLVER-CONFIG(junction="$MISSING")"#, "%p=(0,0)");
-    clean(&r);
+    let all = r.diagnostics();
+    let errors: Vec<_> = all.iter().filter(|d| d.severity == Severity::Error).collect();
+    assert_eq!(errors.len(), 1);
+    assert_eq!(errors[0].code, codes::SOLVER_CONFIG_JUNCTION_NOT_TAKEN);
     let w = write_record(
         &r.problems[0],
         &Solution { junctions: vec![PointRef::Origin(0)], ..Default::default() },
@@ -69,8 +72,7 @@ fn no_configuration_and_an_empty_value_disable_extra_dots() {
         "hash",
     );
     assert!(!w.record.contains("@ATTACH"));
-    assert_eq!(w.warnings.len(), 1);
-    assert_eq!(w.warnings[0].code, codes::JUNCTION_DEFINITION_INVALID);
+    assert!(w.warnings.is_empty());
 }
 
 #[test]

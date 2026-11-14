@@ -72,6 +72,22 @@ fn set_unit(value: &mut Lit, unit: UnitId) {
 }
 
 const VALUE: &str = "a SOLVER-CONFIG value is a number, string, boolean, or a flat array of these (14.10)";
+
+/// Whether the core takes a value of `spacing_x` or `spacing_y`: a finite whole number of grid
+/// units (11.5). A value of another key is the solver's to judge, and `junction` is judged in each
+/// level, as it names a definition there ([`Interp::solver_config_for`]).
+fn spacing_taken(key: &str, value: &Lit) -> bool {
+    !matches!(key, "spacing_x" | "spacing_y") || matches!(value, Lit::Num(n) if n.is_finite() && n.fract() == 0.0)
+}
+
+/// The error of a value of `spacing_x` or `spacing_y` that the core does not take: it fails its
+/// key alone, and the statement's other keys apply (14.10).
+fn spacing_error(key: &str) -> String {
+    format!(
+        "the {key} of @SOLVER-CONFIG must be a finite whole number of grid units (11.5); the value is left out, \
+         and the one before it stays in effect (14.10)"
+    )
+}
 const CONTEXT: &str="SOLVER-CONFIG has no effect in this context; write it in an unqualified file or package header, or a level record (14.10)";
 
 impl Interp<'_> {
@@ -164,6 +180,17 @@ impl Interp<'_> {
                 );
                 return;
             };
+            if !spacing_taken(&item.name, &value) {
+                let at = Some(self.recs[rec].loc(item.off));
+                self.diag_in(
+                    Severity::Error,
+                    codes::SOLVER_CONFIG_SPACING_NOT_WHOLE,
+                    spacing_error(&item.name),
+                    at,
+                    &package,
+                );
+                continue;
+            }
             values.push(SolverSetting {
                 key: item.name.clone(),
                 value,
@@ -207,6 +234,10 @@ impl Interp<'_> {
                 return self.fail(ctx, codes::SOLVER_CONFIG_VALUE_NOT_LITERAL, VALUE, item.off);
             }
             set_unit(&mut value, unit);
+            if !spacing_taken(&key, &value) {
+                self.err(ctx, codes::SOLVER_CONFIG_SPACING_NOT_WHOLE, spacing_error(&key), item.off);
+                continue;
+            }
             values.push(SolverSetting {
                 key,
                 value,
@@ -220,8 +251,11 @@ impl Interp<'_> {
 
     /// Every value of every key that applies to the level (14.10), by key, and the values of a
     /// key in the order of 14.10: the packages in their effective order, the file's header, the
-    /// level's records. A later value does not replace an earlier one here: a consumer takes per
-    /// key the last value it accepts, so an earlier one stands when a later one is refused.
+    /// level's records. A later value does not replace an earlier one here: the solver takes per
+    /// key the last value it accepts, so an earlier one stands when a later one is refused. The
+    /// values of the keys this standard names that the core does not take are left out, with an
+    /// error: of `spacing_x` and `spacing_y` when they are read, of `junction` here, a value that
+    /// names no definition whose first role accepts a point in this level (13.2).
     pub(super) fn solver_config_for(&mut self, scene: SceneId) -> Vec<SolverSetting> {
         let level = self.scenes[scene].level;
         let effective = self.effective_packages(level);
@@ -248,6 +282,33 @@ impl Interp<'_> {
         }
         // by key, a stable sort keeping each key's values in their order
         settings.sort_by(|a, b| a.key.cmp(&b.key));
+        let unit = self.level_unit[level];
+        if self.follows_0_4(unit) {
+            let mut taken = Vec::with_capacity(settings.len());
+            for s in settings {
+                if s.key == "junction"
+                    && s.value.str() != Some("")
+                    && self.junction_definition(scene, unit, &s).is_none()
+                {
+                    let message = format!(
+                        "junction={} must name a definition whose first role accepts a point in the level {}, or be \
+                         empty (13.2); the value is left out, and the one before it stays in effect (14.10)",
+                        s.value.show(),
+                        self.doc.levels[level].title()
+                    );
+                    self.diag_in(
+                        Severity::Error,
+                        codes::SOLVER_CONFIG_JUNCTION_NOT_TAKEN,
+                        message,
+                        s.source.clone(),
+                        &s.package,
+                    );
+                    continue;
+                }
+                taken.push(s);
+            }
+            settings = taken;
+        }
         settings
     }
 }

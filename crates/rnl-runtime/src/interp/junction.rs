@@ -16,12 +16,16 @@ impl Interp<'_> {
             return (file, object);
         }
         let setting = self.tool_solver_config.iter().rev().find(|s| s.key == "junction").cloned();
-        if let Some(setting) = setting {
-            let (tool, object) = self.junction_for(scene, &[setting]);
+        let Some(setting) = setting else { return (file, object) };
+        let (mut tool, tool_object) = self.junction_for(scene, &[setting]);
+        if tool.invalid.is_some() {
+            // a value that is not taken fails only its key: the file's definition stays (14.10)
+            tool.definition = file.definition.clone();
             file.tool_override = Some(Box::new(tool));
             (file, object)
         } else {
-            (file, object)
+            file.tool_override = Some(Box::new(tool));
+            (file, tool_object)
         }
     }
 
@@ -55,7 +59,7 @@ impl Interp<'_> {
 
     /// The definition that a value of `junction` names in the level, and its name as a usage
     /// writes it; None when it names none whose first role accepts a point (13.2).
-    fn junction_definition(
+    pub(super) fn junction_definition(
         &mut self,
         scene: SceneId,
         unit: UnitId,

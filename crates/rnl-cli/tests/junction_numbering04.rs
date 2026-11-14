@@ -121,7 +121,7 @@ fn numbered_anonymous_usages_survive_junction_completion_and_reinterpretation() 
 #[test]
 fn headerless_included_file_inherits_04_and_writes_numbered_usages_in_two_levels() {
     let main = r#"* include junctions
-* @RNL(type="header") { @VERSION("0.4"); @SOLVER-CONFIG(junction="$DOT") }
+* @RNL(type="header") { @VERSION("0.4") }
 .include "child.inc"
 X1 a b first
 X2 a b second

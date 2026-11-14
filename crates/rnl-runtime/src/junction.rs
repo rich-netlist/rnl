@@ -8,9 +8,11 @@ use crate::problem::SolverSetting;
 pub struct JunctionConfig {
     /// A validated, writable definition reference, or no dots.
     pub definition: Option<String>,
-    /// The last value of the setting, when it failed resolution. Kept for a consumer's located
-    /// warning. `definition` is then that of the last earlier value that names one, if any
-    /// (14.10): a refused value does not discard the values before it.
+    /// A value that failed resolution, kept for a consumer's located warning: the last one, when
+    /// `definition` is that of an earlier value, or none (14.10). In practice a tool's value: the
+    /// file's own values are judged in reading, where one that names no definition is an error and
+    /// is left out of the settings. A tool's value that names none leaves the file's definition in
+    /// effect, which its `definition` then repeats.
     pub invalid: Option<SolverSetting>,
     /// An explicit tool override, resolved in the same level. Operational metadata: the
     /// file's definition above remains the input identity used by sig2.

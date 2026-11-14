@@ -90,10 +90,14 @@ remains solved when reopened without the command-line overrides. `JunctionConfig
 selects the resolved tool value for writing; its base definition still identifies the file.
 
 A key's values are checked one by one, not merged first: the runtime gives every value of a
-key in the order above, and the solver takes the last one it accepts. A refused value warns,
-naming the value that stands instead, the one before it or the default, and the other keys of
-the same `SOLVER-CONFIG` still apply. A level's `grid="x"` over a package's `grid=2` therefore
-gives `grid=2` and a warning.
+key in the order above, and the solver takes them in that order. A value it does not take
+fails its key alone and warns, naming the value that stays in effect, the one before it or the
+default, and the other keys of the same `SOLVER-CONFIG` still apply; so of each key the last
+value the solver accepts is in effect. A level's `grid="x"` over a package's `grid=2`
+therefore gives `grid=2` and a warning. The runtime itself judges `spacing_x`, `spacing_y`
+(a finite whole number) and `junction` (a definition whose first role accepts a point in the
+level): a value it does not take is an error in reading and is not passed on, so the value
+before it stays in effect the same way.
 
 `rnl solve FILE --check` checks the settings without solving or writing anything. For each
 level it prints every setting in effect and where it comes from (`default`,

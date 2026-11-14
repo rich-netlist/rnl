@@ -39,15 +39,26 @@ fn with_packages(main: &str, packages: &[(&str, String)]) -> MemoryProvider {
 }
 
 #[test]
-fn literals_and_open_keys_pass_unchanged_without_core_type_policy() {
+fn open_keys_pass_unchanged_and_the_core_judges_only_the_keys_the_standard_names() {
     let r = read(
         "@SOLVER-CONFIG(spacing_x=\"solver decides\",junction=3,custom=[1,\"two\",true],empty=[])",
-        "@SOLVER-CONFIG(other=false)",
+        "@SOLVER-CONFIG(other=false, spacing_y=1.5)",
     );
-    clean(&r);
+    // a value of a named key that the core does not take is an error for that key alone, and is
+    // not passed on; the other keys of the same statement are
+    let all = r.diagnostics();
+    let mut errors: Vec<_> = all.iter().filter(|d| d.severity == Severity::Error).map(|d| d.code).collect();
+    errors.sort();
+    assert_eq!(
+        errors,
+        [
+            codes::SOLVER_CONFIG_SPACING_NOT_WHOLE,
+            codes::SOLVER_CONFIG_SPACING_NOT_WHOLE,
+            codes::SOLVER_CONFIG_JUNCTION_NOT_TAKEN
+        ]
+    );
     let s = settings(&r, 0);
-    assert_eq!(s["spacing_x"], "\"solver decides\"");
-    assert_eq!(s["junction"], "3");
+    assert!(!s.contains_key("spacing_x") && !s.contains_key("spacing_y") && !s.contains_key("junction"));
     assert_eq!(s["custom"], "[1, \"two\", true]");
     assert_eq!(s["other"], "false");
     assert_eq!(s["empty"], "[]");
@@ -120,7 +131,7 @@ fn a_refused_value_leaves_the_one_before_it_and_the_other_keys_apply() {
     assert_eq!((o.grid, o.beam), (Some(2.0), 6));
     assert_eq!(warnings.len(), 1, "{warnings:?}");
     assert!(
-        warnings[0].starts_with("grid must be a finite number; grid=\"x\" at main.sp:4 is ignored, and grid=2 at"),
+        warnings[0].starts_with("grid must be a finite number; grid=\"x\" at main.sp:4 is left out, and grid=2 at"),
         "{warnings:?}"
     );
     // an earlier value is input too, as it stands when a later one is refused
@@ -204,7 +215,7 @@ fn every_value_of_a_key_affects_the_input_digest_not_the_order_of_the_keys() {
 
 #[test]
 fn settings_keep_string_source_and_make_no_output_object() {
-    let r = read("@SOLVER-CONFIG(junction=\"$CUSTOM\")", "");
+    let r = read("@SOLVER-CONFIG(junction=\"$CUSTOM\")", "$CUSTOM = @DEFINE(roles=[[\"p\",\"point\"]]) {}");
     clean(&r);
     assert!(matches!(&r.problems[0].solver_config[0].value,Lit::Str(s) if s.unit.is_some()));
     let r = read("", "#R1 @SOLVER-CONFIG(a=1)");
@@ -367,7 +378,15 @@ fn new_settings_words_do_not_expand_the_released_alias_vocabulary() {
     for version in ["0.2", "0.3", "0.4"] {
         let files = MemoryProvider::new().with(
             "main.sp",
-            &source(version, r#"@ALIAS("@SC","@SOLVER-CONFIG"); @ALIAS("dot","junction")"#, r#"@SC(dot="$CUSTOM")"#),
+            &source(
+                version,
+                r#"@ALIAS("@SC","@SOLVER-CONFIG"); @ALIAS("dot","junction")"#,
+                if version == "0.4" {
+                    r#"$CUSTOM = @DEFINE(roles=["p"]) {}; @SC(dot="$CUSTOM")"#
+                } else {
+                    r#"@SC(dot="$CUSTOM")"#
+                },
+            ),
         );
         let r = read_files(&files);
         if version == "0.4" {
@@ -389,7 +408,7 @@ fn alias_packages_and_ordinary_packages_check_new_words_in_their_version() {
     for version in ["0.2", "0.3", "0.4"] {
         let main = source(version, r#"@USE-ALIASES(name="alias"); @USE-PACKAGE(name="ordinary")"#, "@SC(dot=\"$D\")");
         let a=format!("@RNL(type=\"header\") {{ @VERSION(\"{version}\"); @PACKAGE(name=\"alias\",version=\"1.0\"); @ALIAS(\"@SC\",\"@SOLVER-CONFIG\"); @ALIAS(\"dot\",\"junction\") }}\n");
-        let p=format!("@RNL(type=\"header\") {{ @VERSION(\"{version}\"); @PACKAGE(name=\"ordinary\",version=\"1.0\"); @ALIAS(\"dot\",\"junction\") }}\n@RNL {{ $D = @DEFINE(roles=[]) {{}} }}\n");
+        let p=format!("@RNL(type=\"header\") {{ @VERSION(\"{version}\"); @PACKAGE(name=\"ordinary\",version=\"1.0\"); @ALIAS(\"dot\",\"junction\") }}\n@RNL {{ $D = @DEFINE(roles=[\"p\"]) {{}} }}\n");
         let r = read_files(&with_packages(&main, &[("alias", a), ("ordinary", p)]));
         if version == "0.4" {
             clean(&r);

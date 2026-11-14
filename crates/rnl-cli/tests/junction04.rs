@@ -24,6 +24,14 @@ fn read(header: &str, body: &str) -> Interpretation {
 fn clean(r: &Interpretation) {
     assert!(!r.diagnostics().iter().any(|d| d.severity == Severity::Error), "{:?}", r.diagnostics());
 }
+/// The lines of the errors of the reading, each a value of `junction` that it does not take
+/// (14.10); there is no other error.
+fn not_taken(r: &Interpretation) -> Vec<u32> {
+    let all = r.diagnostics();
+    let errors: Vec<_> = all.iter().filter(|d| d.severity == Severity::Error).collect();
+    assert!(errors.iter().all(|d| d.code == codes::SOLVER_CONFIG_JUNCTION_NOT_TAKEN), "{errors:?}");
+    errors.iter().map(|d| d.loc.as_ref().unwrap().line).collect()
+}
 fn write(p: &LevelProblem) -> rnl_runtime::solution::Written {
     write_record(
         p,
@@ -74,7 +82,7 @@ fn absent_and_empty_settings_do_not_guess_a_standard_name() {
     }
 }
 #[test]
-fn invalid_config_is_a_located_consumer_warning_not_a_read_error() {
+fn a_value_that_names_no_definition_is_an_error_of_the_reading_for_its_key_alone() {
     for value in [
         "3",
         "true",
@@ -87,15 +95,14 @@ fn invalid_config_is_a_located_consumer_warning_not_a_read_error() {
         r#""$""#,
     ] {
         let r = read(&format!("@SOLVER-CONFIG(junction={value})"), DOT);
-        clean(&r);
-        assert!(!r.diagnostics().iter().any(|d| d.code == codes::JUNCTION_DEFINITION_INVALID));
+        assert_eq!(not_taken(&r), [2], "{value}");
+        // it is not passed on, so no definition is in effect and no dots are drawn
+        assert!(r.problems[0].solver_config.iter().all(|s| s.key != "junction"), "{value}");
+        assert!(r.problems[0].junction.definition.is_none() && r.problems[0].junction.invalid.is_none());
         let w = write(&r.problems[0]);
         assert!(!w.record.contains("@ATTACH"), "{value}");
-        assert_eq!(w.warnings.len(), 1, "{value}");
-        let d = &w.warnings[0];
-        assert_eq!(d.code, codes::JUNCTION_DEFINITION_INVALID);
-        assert_eq!(d.severity, Severity::Warning);
-        assert_eq!(d.loc.as_ref().unwrap().line, 2);
+        // the reading reports it, and the writer does not again
+        assert!(w.warnings.is_empty(), "{value}");
     }
 }
 #[test]
@@ -107,9 +114,9 @@ fn symbol_style_roleless_and_nonpoint_first_role_are_invalid() {
         r#"$DOT = @DEFINE(roles=[["p","net"],["q","point"]]) {}"#,
     ] {
         let r = read(r#"@SOLVER-CONFIG(junction="$DOT")"#, definition);
-        clean(&r);
+        assert_eq!(not_taken(&r), [2], "{definition}");
         assert!(r.problems[0].junction.definition.is_none());
-        assert_eq!(write(&r.problems[0]).warnings.len(), 1);
+        assert!(write(&r.problems[0]).warnings.is_empty());
     }
 }
 #[test]
@@ -142,11 +149,12 @@ fn package_setting_uses_target_shadow_not_package_private_definition() {
     let main = source("0.4", r#"@USE-PACKAGE(name="dots")"#, r#"$DOT = @DEFINE(roles=[["n","net"]]) {}"#);
     fs.insert("main.sp", &main);
     let r = files(&fs);
-    clean(&r);
+    assert_eq!(not_taken(&r).len(), 1);
+    let all = r.diagnostics();
+    let error = all.iter().find(|d| d.severity == Severity::Error).unwrap();
+    assert_eq!(error.in_package, "dots");
+    assert!(error.loc.as_ref().unwrap().file.ends_with("dots.rnl"));
     assert!(r.problems[0].junction.definition.is_none());
-    let warning = write(&r.problems[0]).warnings.remove(0);
-    assert_eq!(warning.in_package, "dots");
-    assert!(warning.loc.unwrap().file.ends_with("dots.rnl"));
     fs.insert("main.sp", &source("0.4", r#"@USE-PACKAGE(name="dots")"#, ""));
     let r = files(&fs);
     clean(&r);
@@ -157,9 +165,12 @@ fn subcircuit_names_override_file_names_independently() {
     let text = source("0.4", r#"@SOLVER-CONFIG(junction="$DOT")"#, DOT)
         + ".subckt child a b\nR2 a b 1k\n* @RNL {$DOT = @DEFINE(roles=[[\"n\",\"net\"]]) {}}\n.ends child\n";
     let r = files(&MemoryProvider::new().with("main.sp", &text));
-    clean(&r);
+    // the header's value is taken in the top level and not in the child, which says so
+    assert_eq!(not_taken(&r), [2]);
+    let all = r.diagnostics();
+    assert!(all.iter().any(|d| d.severity == Severity::Error && d.message.contains("level child")), "{all:?}");
     assert_eq!(r.problems[0].junction.definition.as_deref(), Some("$DOT"));
-    assert!(r.problems.iter().find(|p| p.name == "child").unwrap().junction.invalid.is_some());
+    assert!(r.problems.iter().find(|p| p.name == "child").unwrap().junction.definition.is_none());
 }
 #[test]
 fn released_versions_keep_standard_name_writeback() {
@@ -229,9 +240,9 @@ fn local_junction_names_do_not_escape_their_subcircuit() {
         + ".subckt child a b\nR2 a b 1k\n* @RNL { @SOLVER-CONFIG(junction=\"%dot\")}\n.ends child\n"
         + ".subckt other a b\nR3 a b 1k\n* @RNL {%dot = @DEFINE(roles=[[\"p\",\"point\"]]) {}; @SOLVER-CONFIG(junction=\"%dot\")}\n.ends other\n";
     let r = files(&MemoryProvider::new().with("main.sp", &text));
-    clean(&r);
+    assert_eq!(not_taken(&r), [7]);
     assert_eq!(r.problems[0].junction.definition.as_deref(), Some("%dot"));
-    assert!(r.problems.iter().find(|p| p.name == "child").unwrap().junction.invalid.is_some());
+    assert!(r.problems.iter().find(|p| p.name == "child").unwrap().junction.definition.is_none());
     assert_eq!(r.problems.iter().find(|p| p.name == "other").unwrap().junction.definition.as_deref(), Some("%dot"));
 }
 
@@ -239,8 +250,8 @@ fn local_junction_names_do_not_escape_their_subcircuit() {
 fn local_junction_names_are_not_accepted_in_headers_or_tool_overrides() {
     let body = "%dot = @DEFINE(roles=[[\"p\",\"point\"]]) {}";
     let r = read(r#"@SOLVER-CONFIG(junction="%dot")"#, body);
-    clean(&r);
-    assert!(r.problems[0].junction.invalid.is_some());
+    assert_eq!(not_taken(&r), [2]);
+    assert!(r.problems[0].junction.definition.is_none());
     let input = source("0.4", "", &format!("{body}; @SOLVER-CONFIG(junction=\"%dot\")"));
     let r = interpret_file(
         Path::new("main.sp"),
@@ -254,35 +265,42 @@ fn local_junction_names_are_not_accepted_in_headers_or_tool_overrides() {
         },
     )
     .unwrap();
+    // the tool's value is not the reading's to report; it fails its key alone, so the file's stays
     clean(&r);
     assert_eq!(r.problems[0].junction.definition.as_deref(), Some("%dot"));
     assert!(r.problems[0].junction.effective().invalid.is_some());
+    assert_eq!(r.problems[0].junction.effective().definition.as_deref(), Some("%dot"));
+    let w = write(&r.problems[0]);
+    assert!(w.record.contains("%dot @ATTACH %rt1"), "{}", w.record);
+    assert_eq!(w.warnings.len(), 1);
+    assert!(w.warnings[0].message.contains("it is ignored, and the earlier %dot is used"), "{:?}", w.warnings);
 }
 
 #[test]
 fn a_junction_that_names_no_definition_leaves_the_earlier_one_in_effect() {
-    // the level's value names nothing here, so the header's stands, with a warning of the level's
+    // the level's value names nothing here, so the header's stays in effect
     let r = read(r#"@SOLVER-CONFIG(junction="$DOT")"#, &format!(r#"{DOT} @SOLVER-CONFIG(junction="$MISSING")"#));
-    clean(&r);
+    assert_eq!(not_taken(&r), [4]);
     let junction = &r.problems[0].junction;
     assert_eq!(junction.definition.as_deref(), Some("$DOT"));
-    assert_eq!(junction.invalid.as_ref().unwrap().value.str(), Some("$MISSING"));
+    assert!(junction.invalid.is_none());
+    let values: Vec<_> = r.problems[0].solver_config.iter().map(|s| s.value.show()).collect();
+    assert_eq!(values, ["\"$DOT\""]);
     let w = write(&r.problems[0]);
     assert!(w.record.contains("$DOT @ATTACH %rt1"), "{}", w.record);
-    assert_eq!(w.warnings.len(), 1);
-    assert!(w.warnings[0].message.contains("it is ignored, and the earlier $DOT is used"), "{:?}", w.warnings);
-    assert_eq!(w.warnings[0].loc.as_ref().unwrap().line, 4);
-    // a later value that names a definition replaces the earlier one, with no warning
+    assert!(w.warnings.is_empty(), "{:?}", w.warnings);
+    // a value is judged where it is written, even when a later one replaces it
     let r = read(r#"@SOLVER-CONFIG(junction="$MISSING")"#, &format!(r#"{DOT} @SOLVER-CONFIG(junction="$DOT")"#));
-    clean(&r);
+    assert_eq!(not_taken(&r), [2]);
     assert_eq!(r.problems[0].junction.definition.as_deref(), Some("$DOT"));
-    assert!(r.problems[0].junction.invalid.is_none());
-    // an empty value after a good one draws no dots, and with none that names one there are none
+    // an empty value after a good one draws no dots, and with none taken there are none
     let r = read(r#"@SOLVER-CONFIG(junction="$DOT")"#, &format!(r#"{DOT} @SOLVER-CONFIG(junction="")"#));
+    clean(&r);
     assert!(r.problems[0].junction.definition.is_none() && r.problems[0].junction.invalid.is_none());
     let r = read(r#"@SOLVER-CONFIG(junction="$GONE")"#, r#"@SOLVER-CONFIG(junction="$MISSING")"#);
+    assert_eq!(not_taken(&r), [2, 4]);
     assert!(r.problems[0].junction.definition.is_none());
-    assert!(write(&r.problems[0]).warnings[0].message.contains("no dots are written"));
+    assert!(write(&r.problems[0]).warnings.is_empty());
 }
 
 #[test]
@@ -294,8 +312,8 @@ fn local_junction_still_requires_a_definition_and_a_complete_name() {
         ("%dot{1}", "%dot = @DEFINE(roles=[[\"p\",\"point\"]]) {}"),
     ] {
         let r = read("", &format!("{body}; @SOLVER-CONFIG(junction=\"{value}\")"));
-        clean(&r);
-        assert!(r.problems[0].junction.invalid.is_some(), "{value}");
+        assert_eq!(not_taken(&r), [4], "{value}");
+        assert!(r.problems[0].junction.definition.is_none(), "{value}");
     }
 }
 #[test]

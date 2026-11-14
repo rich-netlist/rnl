@@ -5248,6 +5248,26 @@
    ]
   },
   {
+   "number": "RNL3127",
+   "name": "solver-config-spacing-not-whole",
+   "severity": "error",
+   "message": "the {key} of @SOLVER-CONFIG must be a finite whole number of grid units (11.5); the value is left out, and the one before it stays in effect (14.10)",
+   "sections": [
+    "11.5",
+    "14.10"
+   ]
+  },
+  {
+   "number": "RNL3128",
+   "name": "solver-config-junction-not-taken",
+   "severity": "error",
+   "message": "junction={value} must name a definition whose first role accepts a point in the level {level}, or be empty (13.2); the value is left out, and the one before it stays in effect (14.10)",
+   "sections": [
+    "13.2",
+    "14.10"
+   ]
+  },
+  {
    "number": "RNL4215",
    "name": "wire-selection",
    "severity": "error",

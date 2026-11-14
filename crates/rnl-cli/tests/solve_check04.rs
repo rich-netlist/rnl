@@ -65,17 +65,17 @@ fn each_setting_says_where_it_comes_from_in_the_order_of_14_10() {
 }
 
 #[test]
-fn a_bad_value_of_the_file_is_a_warning_and_the_value_before_it_stands() {
+fn a_bad_value_of_the_file_is_a_warning_and_the_value_before_it_stays() {
     let c = check(MAIN, &[]);
     let amp = level(&c, "amp");
     let warnings = keyed(&amp.warnings);
     let grid =
-        "grid: grid must be a finite number; grid=\"x\" at main.sp:5 is ignored, and grid=2 at fixture.rnl:1 stands";
+        "grid: grid must be a finite number; grid=\"x\" at main.sp:5 is left out, and grid=2 at fixture.rnl:1 stays in effect";
     assert!(warnings.contains(&grid.to_string()), "{warnings:?}");
     assert!(warnings.contains(&"seconds: seconds is a tool-only run setting and is ignored in the file".to_string()));
-    let tolerance = "tolerance: the tolerance must be a number not below 0, not -1; tolerance=-1 at main.sp:2 is ignored, and the default stands";
+    let tolerance = "tolerance: the tolerance must be a number not below 0, not -1; tolerance=-1 at main.sp:2 is left out, and the default stays in effect";
     assert!(warnings.contains(&tolerance.to_string()), "{warnings:?}");
-    // the level's grid is refused, so the package's stands: a refused value does not discard
+    // the level's grid is not taken, so the package's stays in effect: a refused value does not discard
     // the values before it
     assert_eq!(setting(amp, "grid"), "grid=2 (package:fixture)");
     assert_eq!(setting(level(&c, "main.sp"), "grid"), "grid=2 (package:fixture)");
