@@ -108,6 +108,24 @@ Nothing is written where a reading loses it (2.2). A record goes at the end of i
 
 A tool writes only 0.3: one that writes into a file of 0.2 raises the file to 0.3 (16.1): `writeback::raise_version(doc, text, levels)` makes the VERSION of the header record of each file level of `levels` that reads the file say 0.3, with `writeback::PIN_STD_0_2`, `@USE-PACKAGE(name="rnl-std", version="0.2")`, after it when its `pin` is true, so that it keeps the standard series 0.2 (16.3), all in one pass over the text. A library section read is a file of its own (2.8), a file level with its header record and its version (`HostDocument::file_level`, `file_level_at`, and for an instance `file_level_of`, by `Instance::file_level`, the include or section the adapter read it through, so that a file or section read twice by files of 0.2 and of 0.3 is two file levels and its instances are of the version of each): of two sections of one library, only the one asked for is raised, and the text outside it stays as it is. `writeback::pins_std(doc, level)` says whether the file level or one above it, which includes it, pins the standard package already. Before that, `writeback::spelled_like_new_words(doc, level, imported)` lists the names in the text of the file level spelled like a word that 0.3 adds, `numbering`, whose meaning the raise may change, with the aliases that its header record imports from alias packages among `imported` (`Interpretation::imported_aliases`): a tool gives a warning for each, and raises the file all the same (16.1, 16.5). Read in 0.3, such an alias is an error, whether the file declares it or imports it from an alias package of 0.2, which is read in its own version, and it is not used. `writeback::takes_version_of(doc, level, apart)` lists the file levels that the file level includes, through the files in between, whose header records write no VERSION: they take its version (16.1), so raised it has them read in 0.3 too, and a tool warns of each, and of the names in each that `spelled_like_new_words` lists. `solution::Unsolved::needs_0_3` tells the decisions that a record of 0.3 holds and one of 0.2 cannot.
 
+### The default route of `auto` (the draft 0.4)
+
+`geom::auto::auto_wire` draws an `auto` wire of 0.4 that has no route of a solver, and the
+solver calls it for the same path (13.1). An end that is a pin with a direction, after the
+orientation of its object, is directed: the wire leaves it along that direction or at a right
+angle to it, and arrives at it against that direction or at a right angle to it, never the other
+way; a right angle at an end counts as a bend. Of these routes it takes the one with the fewest
+bends; then the shortest, a leg that goes out only to come back being 1 long; then the one that
+turns at fewer directed ends, keeping the direction of the first end before that of the last;
+then the one whose middle leg lies halfway between the ends; between two undirected ends, the one
+that goes horizontally first; and a detour goes to the left of the first directed end. Its bends
+keep their exact values and may fall on half units. A wire of 0.2 or 0.3 is drawn as before.
+
+| Before: out of each pin first | After: a right angle at the pin |
+| --- | --- |
+| ![Before](../../docs/images/auto-right-angle-before.png) | ![After](../../docs/images/auto-right-angle-after.png) |
+| ![Before](../../docs/images/auto-right-angle-corner-before.png) | ![After](../../docs/images/auto-right-angle-corner-after.png) |
+
 ### WIRE given a wire (the draft 0.3)
 
 In a statement of a file of the draft 0.3, the net slot of WIRE takes a net, a set of nets or one wire (13.1). Given a wire, WIRE makes no new wire: the statement is read as a new WIRE would be, and its list of points and its mode, `"auto"` when not written, replace the wire's; the net of the wire stays. Its style parameters are direct style of the wire, as if a SET-STYLE were written for the wire at the statement (8.3), also when a later rewrite replaces this one, but not when it fails; the handle it passes on is the wire.
