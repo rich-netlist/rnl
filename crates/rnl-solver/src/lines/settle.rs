@@ -123,7 +123,10 @@ pub(crate) struct Settled {
     pub lists: Vec<Option<Item>>,
 }
 
-type Score = (bool, usize, usize, bool, usize, LabOrder, usize);
+/// An outcome's rank, least first: whether the level's drawing failed, then its false joins (at the
+/// root, `score::false_joins`) and the groups dissolved or stretched, the parts not routed, whether it
+/// failed, the conflicts of the merge, the lab's order, the steps of routing.
+type Score = (bool, (usize, usize), usize, bool, usize, LabOrder, usize);
 
 type Choice = (usize, Vec<usize>, Vec<usize>);
 
@@ -1236,9 +1239,16 @@ impl Search<'_, '_> {
         };
         drop(span);
         let failed = made.as_ref().is_some_and(|m| m.failed);
+        // a drawing that reads as connected where it is not is wrong: of the level's drawings, one
+        // without is taken first
+        let joins = match (&made, root) {
+            (Some(m), true) => crate::score::drawn(problem, s, &m.placed.geometry, &m.routing)
+                .map_or(0, |w| crate::score::false_joins(problem, s, &m.placed.origins, &m.placed.geometry, &w)),
+            _ => 0,
+        };
         let score: Score = (
             root && failed,
-            t.score.0,
+            (joins, t.score.0),
             t.score.1,
             failed,
             made.as_ref().map_or(0, |m| m.conflicts.len()),
@@ -1405,7 +1415,7 @@ impl Search<'_, '_> {
     fn finish(mut self, exhausted: bool, work: &Work) -> Result<Settled, String> {
         let drawing = |o: usize| {
             let s = &self.outcomes[o].score;
-            (s.0, s.3, s.2, s.4, &s.5, s.6)
+            (s.0, s.1 .0, s.3, s.2, s.4, &s.5, s.6)
         };
         let other = self.lost.iter().map(|s| s.0).min_by(|&a, &b| drawing(a).cmp(&drawing(b)).then(a.cmp(&b)));
         let better = |o: usize| self.best.is_none_or(|b| drawing(o) < drawing(b));

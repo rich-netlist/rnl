@@ -2307,7 +2307,7 @@ impl<'a> Tree<'a> {
                 + crate::annotation::overlaps(self.problem, self.s, &placed.geometry, &placed.origins)
                     .expect("validated annotation bounds"),
             crowding: crate::score::crowding(self.s, &placed.origins, &placed.geometry.orient, &placed.dropped),
-            misleading: crate::score::misleading(self.problem, self.s, &placed.origins, &placed.geometry, &wires),
+            misleading: crate::score::false_joins(self.problem, self.s, &placed.origins, &placed.geometry, &wires),
             joins_left: routing.joins_left(),
             layers: objectives,
             code: code.to_vec(),

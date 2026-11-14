@@ -46,8 +46,8 @@ pub(crate) struct Entry {
     /// What crowds the drawing ([`crowding`]): the gaps between neighbours left out, and the texts
     /// over another symbol.
     pub crowding: usize,
-    /// The places where the wires mislead ([`misleading`]); before routing, those of the wires
-    /// written.
+    /// The false joins ([`false_joins`]): the places where the wires mislead, and in 0.4 the wires
+    /// through a symbol; before routing, those of the wires written.
     pub misleading: usize,
     /// The joins routing left undone (`Routing::joins_left`); 0 before routing.
     pub joins_left: usize,
@@ -148,6 +148,21 @@ pub(crate) fn misleading(
         count += wire_over_symbol(problem, s, origins, g, routed);
     }
     count
+}
+
+/// The false joins of a candidate: the places where its wires read as connected where they are
+/// not ([`misleading`]), and in a level of 0.4, where [`misleading`] leaves them to the objective
+/// `wire_over_symbol`, the wires through a symbol ([`wire_over_symbol`]). A drawing with one is
+/// wrong, not a worse preference, so it ranks before every objective, configured or not ([`order`]).
+pub(crate) fn false_joins(
+    problem: &LevelProblem,
+    s: &Structure,
+    origins: &[[Q; 2]],
+    g: &Geometry,
+    routed: &Routed,
+) -> usize {
+    let through = if s.language04 { wire_over_symbol(problem, s, origins, g, routed) } else { 0 };
+    misleading(problem, s, origins, g, routed) + through
 }
 
 /// Segments through symbol interiors, excluding leads ending at an internal pin.
@@ -361,8 +376,18 @@ pub(crate) fn order(active: &Active, entries: &[Entry]) -> Vec<usize> {
         return result;
     }
     if active.configured_only {
-        let refs: Vec<_> = entries.iter().map(|e| (e.layers.as_slice(), e.code.as_slice())).collect();
-        return active.rank(&refs);
+        // the false joins first (`Entry::misleading`, [`false_joins`]), then the layers configured
+        let mut joins: Vec<usize> = entries.iter().map(|e| e.misleading).collect();
+        joins.sort_unstable();
+        joins.dedup();
+        let mut out = Vec::with_capacity(entries.len());
+        for j in joins {
+            let members: Vec<usize> = (0..entries.len()).filter(|&i| entries[i].misleading == j).collect();
+            let refs: Vec<_> =
+                members.iter().map(|&i| (entries[i].layers.as_slice(), entries[i].code.as_slice())).collect();
+            out.extend(active.rank(&refs).into_iter().map(|k| members[k]));
+        }
+        return out;
     }
     let key = |e: &Entry| (e.overlaps, e.crowding, e.misleading, e.joins_left);
     let mut keys: Vec<(usize, usize, usize, usize)> = entries.iter().map(key).collect();

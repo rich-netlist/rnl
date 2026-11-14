@@ -72,7 +72,7 @@ pub(crate) fn lay_out(
                 + crate::annotation::overlaps(problem, s, &placed.geometry, &placed.origins)
                     .expect("validated annotation bounds"),
             crowding: crate::score::crowding(s, &placed.origins, &placed.geometry.orient, &placed.dropped),
-            misleading: crate::score::misleading(problem, s, &placed.origins, &placed.geometry, &wires),
+            misleading: crate::score::false_joins(problem, s, &placed.origins, &placed.geometry, &wires),
             joins_left: routing.left.iter().map(|n| n.parts.saturating_sub(1)).sum(),
             layers: crate::score::measured_layers(problem, s, placed, Some(&wires)),
             code: before.code.clone(),

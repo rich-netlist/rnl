@@ -55,7 +55,7 @@ pub(super) fn entry(problem: &LevelProblem, s: &Structure, placed: &Placed, rout
             + crate::annotation::overlaps(problem, s, &placed.geometry, &placed.origins)
                 .expect("validated annotation bounds"),
         crowding: crate::score::crowding(s, &placed.origins, &placed.geometry.orient, &placed.dropped),
-        misleading: crate::score::misleading(problem, s, &placed.origins, &placed.geometry, &wires),
+        misleading: crate::score::false_joins(problem, s, &placed.origins, &placed.geometry, &wires),
         joins_left: routing.joins_left(),
         layers: measured_layers(problem, s, placed, Some(&wires)),
         code: code.to_vec(),
