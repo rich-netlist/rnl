@@ -46,7 +46,8 @@ impl Watcher {
             Err(_) => return,
         };
         // (the file system is asked without the lock: a slow network mount does not hold up the page)
-        let now: Vec<(PathBuf, Option<u64>)> = paths.into_iter().map(|p| (crate::files::modified(&p), p)).map(|(m, p)| (p, m)).collect();
+        let now: Vec<(PathBuf, Option<u64>)> =
+            paths.into_iter().map(|p| (crate::files::modified(&p), p)).map(|(m, p)| (p, m)).collect();
         let Ok(mut inner) = self.inner.lock() else { return };
         for (path, stamp) in now {
             if inner.stamps.get(&path) != Some(&stamp) {

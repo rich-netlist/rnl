@@ -28,7 +28,9 @@ pub fn random_hex() -> String {
         use std::hash::{BuildHasher, Hasher};
         for chunk in bytes.chunks_mut(8) {
             let mut hasher = RandomState::new().build_hasher();
-            hasher.write_u128(std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos()));
+            hasher.write_u128(
+                std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos()),
+            );
             chunk.copy_from_slice(&hasher.finish().to_le_bytes()[..chunk.len()]);
         }
     }
@@ -127,7 +129,18 @@ mod tests {
         for ok in ["127.0.0.1:8765", "localhost:1", "LOCALHOST:65535", "[::1]:8000", "127.0.0.1", "localhost"] {
             assert!(host_ok(ok), "{ok}");
         }
-        for bad in ["example.com", "example.com:8765", "127.0.0.1.example.com:80", "evil.localhost.example:80", "127.0.0.1:", "127.0.0.1:80a", "[::1", "0.0.0.0:80", "localhost:123456", ""] {
+        for bad in [
+            "example.com",
+            "example.com:8765",
+            "127.0.0.1.example.com:80",
+            "evil.localhost.example:80",
+            "127.0.0.1:",
+            "127.0.0.1:80a",
+            "[::1",
+            "0.0.0.0:80",
+            "localhost:123456",
+            "",
+        ] {
             assert!(!host_ok(bad), "{bad}");
         }
     }
@@ -155,13 +168,26 @@ mod tests {
 
     #[test]
     fn a_change_must_come_from_the_page_of_this_server() {
-        let page = [("host", "127.0.0.1:8765"), ("x-rnl", "1"), ("origin", "http://127.0.0.1:8765"), ("sec-fetch-site", "same-origin")];
+        let page = [
+            ("host", "127.0.0.1:8765"),
+            ("x-rnl", "1"),
+            ("origin", "http://127.0.0.1:8765"),
+            ("sec-fetch-site", "same-origin"),
+        ];
         assert!(from_the_page(&request(&page)));
         // no header: a form of another page could send it
         assert!(!from_the_page(&request(&[("host", "127.0.0.1:8765")])));
         // another origin, though it knows the header
-        assert!(!from_the_page(&request(&[("host", "127.0.0.1:8765"), ("x-rnl", "1"), ("origin", "http://127.0.0.1:9999")])));
-        assert!(!from_the_page(&request(&[("host", "127.0.0.1:8765"), ("x-rnl", "1"), ("sec-fetch-site", "cross-site")])));
+        assert!(!from_the_page(&request(&[
+            ("host", "127.0.0.1:8765"),
+            ("x-rnl", "1"),
+            ("origin", "http://127.0.0.1:9999")
+        ])));
+        assert!(!from_the_page(&request(&[
+            ("host", "127.0.0.1:8765"),
+            ("x-rnl", "1"),
+            ("sec-fetch-site", "cross-site")
+        ])));
         // a client that is no browser says neither origin nor site
         assert!(from_the_page(&request(&[("host", "127.0.0.1:8765"), ("x-rnl", "1")])));
     }

@@ -115,12 +115,22 @@ usage: rnl-viewer-local [OPTIONS] [FILE]...
 ";
 
 fn parse(args: impl Iterator<Item = String>) -> Result<Options, String> {
-    let mut o = Options { port: 0, browser: true, named_browser: std::env::var("RNL_BROWSER").ok().filter(|b| !b.is_empty()), allow: Vec::new(), site: None, settings: None, files: Vec::new() };
+    let mut o = Options {
+        port: 0,
+        browser: true,
+        named_browser: std::env::var("RNL_BROWSER").ok().filter(|b| !b.is_empty()),
+        allow: Vec::new(),
+        site: None,
+        settings: None,
+        files: Vec::new(),
+    };
     let mut args = args.peekable();
     while let Some(arg) = args.next() {
         let mut value = |name: &str| args.next().ok_or_else(|| format!("{name} needs a value"));
         match arg.as_str() {
-            "--port" => o.port = value("--port")?.parse().map_err(|_| "--port takes a number from 0 to 65535".to_string())?,
+            "--port" => {
+                o.port = value("--port")?.parse().map_err(|_| "--port takes a number from 0 to 65535".to_string())?
+            }
             "--no-browser" => o.browser = false,
             "--browser" => o.named_browser = Some(value("--browser")?),
             "--allow" => o.allow.push(PathBuf::from(value("--allow")?)),
@@ -179,7 +189,8 @@ fn run(options: Options) -> Result<(), String> {
         initial.push(files::canonical(&absolute).unwrap_or(absolute));
     }
 
-    let listener = TcpListener::bind(SocketAddr::from((Ipv4Addr::LOCALHOST, options.port))).map_err(|e| format!("cannot listen on 127.0.0.1:{}: {e}", options.port))?;
+    let listener = TcpListener::bind(SocketAddr::from((Ipv4Addr::LOCALHOST, options.port)))
+        .map_err(|e| format!("cannot listen on 127.0.0.1:{}: {e}", options.port))?;
     let port = listener.local_addr().map_err(|e| e.to_string())?.port();
     let (auth, token) = security::Auth::new();
     let app = Arc::new(App {
@@ -227,7 +238,11 @@ fn run(options: Options) -> Result<(), String> {
                 }
                 match launch::open(&browser, &launch::file_url(&file), &profile) {
                     Ok(child) => {
-                        println!("Opened in {} {}.", browser.path.display(), browser.major.map_or(String::new(), |v| v.to_string()));
+                        println!(
+                            "Opened in {} {}.",
+                            browser.path.display(),
+                            browser.major.map_or(String::new(), |v| v.to_string())
+                        );
                         browser_child = Some(child);
                         browser_started = Some((browser.clone(), profile.clone()));
                         address_file = Some(file);

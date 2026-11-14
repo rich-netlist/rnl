@@ -70,7 +70,9 @@ pub fn acceptable(kind: Kind, major: Option<u32>) -> bool {
 /// The words for a browser that is too old: what it is, what the page needs, and the two ways out.
 pub fn too_old(browser: &Browser) -> String {
     let what = match browser.kind {
-        Kind::Firefox => format!("Firefox {}", browser.major.map_or("(version unknown)".to_string(), |v| v.to_string())),
+        Kind::Firefox => {
+            format!("Firefox {}", browser.major.map_or("(version unknown)".to_string(), |v| v.to_string()))
+        }
         _ => format!("{} {}", browser.path.display(), browser.major.map_or(String::new(), |v| v.to_string())),
     };
     format!(
@@ -82,7 +84,13 @@ pub fn too_old(browser: &Browser) -> String {
 
 /// Run `path --version`, at most five seconds: what it printed.
 fn version_of(path: &Path) -> Option<String> {
-    let mut child = Command::new(path).arg("--version").stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn().ok()?;
+    let mut child = Command::new(path)
+        .arg("--version")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .ok()?;
     let start = Instant::now();
     loop {
         match child.try_wait().ok()? {
@@ -114,7 +122,11 @@ pub fn find(named: Option<&str>, beside: Option<&Path>) -> Result<Browser, Strin
         Browser { kind: kind_of(&path), path, major }
     };
     if let Some(name) = named {
-        let path = if name.contains('/') || name.contains('\\') { PathBuf::from(name) } else { on_path(name).ok_or_else(|| format!("{name} is not on the PATH"))? };
+        let path = if name.contains('/') || name.contains('\\') {
+            PathBuf::from(name)
+        } else {
+            on_path(name).ok_or_else(|| format!("{name} is not on the PATH"))?
+        };
         if !path.is_file() {
             return Err(format!("{} is not a program", path.display()));
         }
@@ -218,7 +230,10 @@ pub fn cache_dir() -> PathBuf {
         .filter(|p| p.is_absolute())
         .or_else(|| crate::files::home().map(|h| h.join(".cache")))
         .map(|p| p.join("rnl-viewer-local"))
-        .unwrap_or_else(|| std::env::temp_dir().join(format!("rnl-viewer-local-{}", euid().map_or_else(|| "user".to_string(), |u| u.to_string()))))
+        .unwrap_or_else(|| {
+            std::env::temp_dir()
+                .join(format!("rnl-viewer-local-{}", euid().map_or_else(|| "user".to_string(), |u| u.to_string())))
+        })
 }
 
 /// The user this process runs as (its effective user id): on Linux, what `/proc` says; else, and if `/proc` cannot be read, the
@@ -226,9 +241,9 @@ pub fn cache_dir() -> PathBuf {
 fn euid() -> Option<u32> {
     static EUID: std::sync::OnceLock<Option<u32>> = std::sync::OnceLock::new();
     *EUID.get_or_init(|| {
-        let from_proc = std::fs::read_to_string("/proc/self/status")
-            .ok()
-            .and_then(|status| status.lines().find_map(|l| l.strip_prefix("Uid:")).and_then(|v| v.split_whitespace().nth(1)?.parse().ok()));
+        let from_proc = std::fs::read_to_string("/proc/self/status").ok().and_then(|status| {
+            status.lines().find_map(|l| l.strip_prefix("Uid:")).and_then(|v| v.split_whitespace().nth(1)?.parse().ok())
+        });
         from_proc.or_else(owner_of_a_new_file)
     })
 }
@@ -236,7 +251,11 @@ fn euid() -> Option<u32> {
 #[cfg(unix)]
 fn owner_of_a_new_file() -> Option<u32> {
     use std::os::unix::fs::MetadataExt;
-    let path = std::env::temp_dir().join(format!("rnl-viewer-uid-{}-{}", std::process::id(), &crate::security::random_hex()[..16]));
+    let path = std::env::temp_dir().join(format!(
+        "rnl-viewer-uid-{}-{}",
+        std::process::id(),
+        &crate::security::random_hex()[..16]
+    ));
     let file = std::fs::OpenOptions::new().write(true).create_new(true).open(&path).ok()?;
     let uid = file.metadata().ok().map(|m| m.uid());
     drop(file);
@@ -369,7 +388,8 @@ fn remove_stale(parent: &Path, host: &str) {
 /// in is not changed, only the new one is, so that nobody else's folder is made less than it was. The file is made by the
 /// call that fails if it is there, and does not follow a link.
 pub fn address_file(url: &str) -> Result<PathBuf, String> {
-    let parent = match std::env::var_os("XDG_RUNTIME_DIR").map(PathBuf::from).filter(|p| p.is_absolute() && p.is_dir()) {
+    let parent = match std::env::var_os("XDG_RUNTIME_DIR").map(PathBuf::from).filter(|p| p.is_absolute() && p.is_dir())
+    {
         Some(runtime) => runtime,
         None => {
             let cache = cache_dir();
@@ -569,7 +589,13 @@ mod tests {
         let status = child.wait().unwrap();
         assert!(!status.success());
         let text = ended_at_once(&browser, &status, &profile);
-        assert!(text.contains("ended as soon as it was started") && text.contains("libX11-xcb.so.1") && text.contains("--no-browser") && text.contains("ssh -L"), "{text}");
+        assert!(
+            text.contains("ended as soon as it was started")
+                && text.contains("libX11-xcb.so.1")
+                && text.contains("--no-browser")
+                && text.contains("ssh -L"),
+            "{text}"
+        );
     }
 
     #[test]

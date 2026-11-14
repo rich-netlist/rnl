@@ -106,7 +106,8 @@ pub struct Prepared {
 
 /// Check a request and make what it solves: an error says what is wrong with it.
 pub fn prepare(request: &Request) -> Result<Prepared, String> {
-    if !request.entry.starts_with('/') || request.entry.contains("/../") || !request.files.contains_key(&request.entry) {
+    if !request.entry.starts_with('/') || request.entry.contains("/../") || !request.files.contains_key(&request.entry)
+    {
         return Err("the request has no entry file".into());
     }
     let mut files = MemoryProvider::new();
@@ -192,8 +193,10 @@ pub fn stream(prepared: Prepared, out: &mut TcpStream) -> io::Result<()> {
     let tell = |line: &str| -> io::Result<()> {
         let mut out = out.borrow_mut();
         out.write_all(line.as_bytes())?;
-        out.write_all(b"
-")?;
+        out.write_all(
+            b"
+",
+        )?;
         out.flush()
     };
     let sink = |event: &Event| {
@@ -203,7 +206,11 @@ pub fn stream(prepared: Prepared, out: &mut TcpStream) -> io::Result<()> {
         }
         !stop.load(Ordering::Relaxed)
     };
-    let shown = if spaced { respace(&entry, &files, &options, &clock, &sink) } else { preview_progress(&entry, &files, &options, &clock, &sink) };
+    let shown = if spaced {
+        respace(&entry, &files, &options, &clock, &sink)
+    } else {
+        preview_progress(&entry, &files, &options, &clock, &sink)
+    };
     let end = match shown.and_then(|shown| solved_json(&shown)) {
         // (the document is already JSON: it is put in the line as it is)
         Ok(result) => format!("{{\"result\":{result}}}"),
@@ -225,7 +232,16 @@ mod tests {
     }
 
     fn request(entry: &str, text: &str) -> Request {
-        Request { entry: entry.into(), files: BTreeMap::from([(entry.to_string(), text.to_string())]), pool: Vec::new(), config: String::new(), timeall: None, level: None, respace: false, stream: false }
+        Request {
+            entry: entry.into(),
+            files: BTreeMap::from([(entry.to_string(), text.to_string())]),
+            pool: Vec::new(),
+            config: String::new(),
+            timeall: None,
+            level: None,
+            respace: false,
+            stream: false,
+        }
     }
 
     #[test]
@@ -327,7 +343,13 @@ mod tests {
         let json: serde_json::Value = serde_json::from_str(&solve(&r, &server).unwrap()).unwrap();
         assert_eq!(json["report"]["mode"], "respace");
         // (this netlist is not of 0.4, so no level can be respaced: each is left as it is, with the reason)
-        assert!(json["report"]["notes"].as_array().is_some_and(|n| n.iter().any(|t| t.as_str().is_some_and(|t| t.contains("not solved") && t.contains("unsupported")))), "{}", json["report"]["notes"]);
+        assert!(
+            json["report"]["notes"].as_array().is_some_and(|n| n
+                .iter()
+                .any(|t| t.as_str().is_some_and(|t| t.contains("not solved") && t.contains("unsupported")))),
+            "{}",
+            json["report"]["notes"]
+        );
         // and a solve says it is one
         r.respace = false;
         let json: serde_json::Value = serde_json::from_str(&solve(&r, &server).unwrap()).unwrap();
@@ -341,7 +363,8 @@ mod tests {
         r.level = Some("amp".into());
         let lines = streamed(&r);
         assert_eq!(lines[0]["levels"], 1);
-        let titles: Vec<_> = lines.iter().filter(|l| l["event"] == "level").map(|l| l["title"].as_str().unwrap().to_string()).collect();
+        let titles: Vec<_> =
+            lines.iter().filter(|l| l["event"] == "level").map(|l| l["title"].as_str().unwrap().to_string()).collect();
         // (a file read as 0.2 is solved again as 0.3: the same level, told twice)
         assert!(!titles.is_empty() && titles.iter().all(|t| t == "amp"), "{titles:?}");
         assert!(lines.last().unwrap().get("result").is_some());

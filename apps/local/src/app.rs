@@ -120,7 +120,11 @@ pub fn admit(app: &App, request: &Request) -> Result<usize, Response> {
     if matches!(method, "POST" | "PUT") && !security::from_the_page(request) {
         return Err(Response::error(403, "only the page of this program may change anything"));
     }
-    Ok(if matches!(request.path.as_str(), "/rnl-solver/solve" | "/api/save" | "/api/save-as") { MAX_BODY } else { MAX_SMALL_BODY })
+    Ok(if matches!(request.path.as_str(), "/rnl-solver/solve" | "/api/save" | "/api/save-as") {
+        MAX_BODY
+    } else {
+        MAX_SMALL_BODY
+    })
 }
 
 /// Whether a path is of what reads or writes the user's files, or solves.
@@ -246,7 +250,10 @@ fn page_query_ok(query: &str) -> bool {
     for pair in query.split('&') {
         match pair.split_once('=') {
             Some(("shell", "local")) => shell = true,
-            Some(("viewer-session", token)) if !token.is_empty() && token.len() <= 64 && token.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-') => {}
+            Some(("viewer-session", token))
+                if !token.is_empty()
+                    && token.len() <= 64
+                    && token.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-') => {}
             _ => return false,
         }
     }
@@ -279,7 +286,9 @@ fn route(app: &App, request: &Request, stream: &TcpStream) -> Result<Response, F
             if solve.stream {
                 // (a request that is wrong is answered as such, before a head that says it is not: what fails later is a line)
                 let prepared = crate::service::prepare(&solve).map_err(bad)?;
-                return Ok(Response::streamed("application/x-ndjson; charset=utf-8", move |out| crate::service::stream(prepared, out)));
+                return Ok(Response::streamed("application/x-ndjson; charset=utf-8", move |out| {
+                    crate::service::stream(prepared, out)
+                }));
             }
             let answer = crate::service::solve(&solve, stream).map_err(bad)?;
             Ok(Response::new(200, "application/json; charset=utf-8", answer.into_bytes()))
@@ -294,7 +303,10 @@ fn route(app: &App, request: &Request, stream: &TcpStream) -> Result<Response, F
                 "settings": app.settings.path().to_string_lossy(),
             }),
         )),
-        "/api/settings" if get => Ok(Response::json(200, &json!({ "path": app.settings.path().to_string_lossy(), "values": app.settings.values() }))),
+        "/api/settings" if get => Ok(Response::json(
+            200,
+            &json!({ "path": app.settings.path().to_string_lossy(), "values": app.settings.values() }),
+        )),
         "/api/settings" if matches!(method, "PUT" | "POST") => {
             #[derive(Deserialize)]
             struct Set {
@@ -306,7 +318,12 @@ fn route(app: &App, request: &Request, stream: &TcpStream) -> Result<Response, F
             Ok(Response::json(200, &json!({})))
         }
         "/api/ls" if get => {
-            let dir = request.param("dir").filter(|d| !d.is_empty()).map(|d| files::machine_path(&d)).or_else(files::home).ok_or_else(|| bad("which folder?"))?;
+            let dir = request
+                .param("dir")
+                .filter(|d| !d.is_empty())
+                .map(|d| files::machine_path(&d))
+                .or_else(files::home)
+                .ok_or_else(|| bad("which folder?"))?;
             let (real, entries, truncated) = files::list_dir(&dir).map_err(bad)?;
             Ok(Response::json(
                 200,
@@ -351,7 +368,9 @@ fn route(app: &App, request: &Request, stream: &TcpStream) -> Result<Response, F
                 encoding: Option<String>,
             }
             let save: Save = json_body(request)?;
-            let saved = files::save_all(&app.roots, &save.entry, &save.files, save.overwrite, encoding(&save.encoding)?).map_err(|e| Failure(500, e))?;
+            let saved =
+                files::save_all(&app.roots, &save.entry, &save.files, save.overwrite, encoding(&save.encoding)?)
+                    .map_err(|e| Failure(500, e))?;
             if saved.said.is_some() {
                 for f in &save.files {
                     if let Ok(at) = app.roots.check(&files::located(&save.entry, &f.path), true) {
@@ -375,7 +394,16 @@ fn route(app: &App, request: &Request, stream: &TcpStream) -> Result<Response, F
             let save: SaveAs = json_body(request)?;
             let source = save.source.as_deref().map(files::machine_path);
             let to = files::machine_path(&save.to);
-            match files::save_as(&app.roots, source.as_deref(), &to, &save.text, encoding(&save.encoding)?, save.overwrite).map_err(|e| Failure(500, e))? {
+            match files::save_as(
+                &app.roots,
+                source.as_deref(),
+                &to,
+                &save.text,
+                encoding(&save.encoding)?,
+                save.overwrite,
+            )
+            .map_err(|e| Failure(500, e))?
+            {
                 SavedAs::Written(to) => {
                     app.watcher.watch(&to);
                     app.watcher.wrote(&to);
@@ -397,7 +425,9 @@ fn route(app: &App, request: &Request, stream: &TcpStream) -> Result<Response, F
             Ok(Response::json(200, &json!({ "version": version, "changed": changed })))
         }
         path if path.starts_with("/f/") && get => file(app, &path[2..]),
-        path if path.starts_with("/f/") && method == "PUT" => Err(Failure(405, "files are written by /api/save".into())),
+        path if path.starts_with("/f/") && method == "PUT" => {
+            Err(Failure(405, "files are written by /api/save".into()))
+        }
         _ => Err(Failure(404, "no such address".into())),
     }
 }
@@ -414,7 +444,8 @@ fn file(app: &App, path: &str) -> Result<Response, Failure> {
     }
     let bytes = std::fs::read(&real).map_err(|e| Failure(404, format!("{}: {e}", real.display())))?;
     app.watcher.watch(&real);
-    Ok(Response::new(200, "application/octet-stream", bytes).header("X-RNL-Path", &encode_path(&files::page_path(&real))))
+    Ok(Response::new(200, "application/octet-stream", bytes)
+        .header("X-RNL-Path", &encode_path(&files::page_path(&real))))
 }
 
 #[cfg(test)]
@@ -427,7 +458,9 @@ mod tests {
     /// An app on a temporary folder, with a netlist in it, and a session.
     fn app(site: Site) -> (App, String, PathBuf) {
         // (a folder in a folder: the folder above the file's is then the app's own, not the temporary folder of the machine)
-        let dir = std::env::temp_dir().join(format!("rnl-local-app-{}-{}", std::process::id(), &crate::security::random_hex()[..8])).join("work");
+        let dir = std::env::temp_dir()
+            .join(format!("rnl-local-app-{}-{}", std::process::id(), &crate::security::random_hex()[..8]))
+            .join("work");
         std::fs::create_dir_all(&dir).unwrap();
         let top = dir.join("top.sp");
         std::fs::write(&top, "R1 a b 1k\n.end\n").unwrap();
@@ -468,7 +501,8 @@ mod tests {
         let head = String::from_utf8_lossy(&text[..split]).into_owned();
         let mut lines = head.split("\r\n");
         let status = lines.next().unwrap().split(' ').nth(1).unwrap().parse().unwrap();
-        let headers = lines.filter_map(|l| l.split_once(": ")).map(|(n, v)| (n.to_ascii_lowercase(), v.to_string())).collect();
+        let headers =
+            lines.filter_map(|l| l.split_once(": ")).map(|(n, v)| (n.to_ascii_lowercase(), v.to_string())).collect();
         (status, headers, text[split + 4..].to_vec())
     }
 
@@ -585,7 +619,13 @@ mod tests {
         assert!(headers.iter().any(|(n, v)| n == "location" && v == "/?shell=local"));
         assert_eq!(ask(&app, &get("/?shell=local", None), b"").0, 200);
         // the page takes nothing else in its address: what another site may put there does not reach it
-        for query in ["shell=local&url=https://evil.example/x.sp", "shell=local&manifest=https://evil.example/m.json", "embed=1&shell=local", "shell=local&api=1&origin=*", "url=x"] {
+        for query in [
+            "shell=local&url=https://evil.example/x.sp",
+            "shell=local&manifest=https://evil.example/m.json",
+            "embed=1&shell=local",
+            "shell=local&api=1&origin=*",
+            "url=x",
+        ] {
             let (status, headers, _) = ask(&app, &get(&format!("/?{query}"), None), b"");
             assert_eq!(status, 302, "{query}");
             assert!(headers.iter().any(|(n, v)| n == "location" && v == "/?shell=local"), "{query}");
@@ -674,11 +714,18 @@ mod tests {
         assert_eq!(call("/api/allow", json!({ "dir": files::page_path(&project) })), 200);
         // the chooser lists names, never hidden ones, whatever it is asked
         std::fs::write(dir.join("shown.sp"), "x").unwrap();
-        let (status, _, body) = ask(&app, &get(&format!("/api/ls?dir={}&hidden=1", encode_path(&files::page_path(&dir))), Some(&key)), b"");
+        let (status, _, body) =
+            ask(&app, &get(&format!("/api/ls?dir={}&hidden=1", encode_path(&files::page_path(&dir))), Some(&key)), b"");
         assert_eq!(status, 200);
         let listing = String::from_utf8_lossy(&body).into_owned();
-        assert!(listing.contains("shown.sp") && !listing.contains(".ssh") && !listing.contains(".hidden.sp"), "{listing}");
-        assert!(listing.contains("\"truncated\":false"), "a listing says whether it is the whole of the folder: {listing}");
+        assert!(
+            listing.contains("shown.sp") && !listing.contains(".ssh") && !listing.contains(".hidden.sp"),
+            "{listing}"
+        );
+        assert!(
+            listing.contains("\"truncated\":false"),
+            "a listing says whether it is the whole of the folder: {listing}"
+        );
         // the page says each time it asks what changed how many files it has with changes not saved: the program does not stop while it has
         assert_eq!(app.has_unsaved(), 0);
         assert_eq!(ask(&app, &get("/api/changes?since=0&unsaved=3", Some(&key)), b"").0, 200);

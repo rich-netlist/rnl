@@ -46,7 +46,11 @@ fn collect(root: &Path, dir: &Path, into: &mut Vec<(String, PathBuf)>) {
             collect(root, &path, into);
         } else {
             let relative = path.strip_prefix(root).expect("a file below the root");
-            let name = relative.components().map(|c| c.as_os_str().to_string_lossy().into_owned()).collect::<Vec<_>>().join("/");
+            let name = relative
+                .components()
+                .map(|c| c.as_os_str().to_string_lossy().into_owned())
+                .collect::<Vec<_>>()
+                .join("/");
             into.push((name, fs::canonicalize(&path).unwrap_or(path)));
         }
     }
