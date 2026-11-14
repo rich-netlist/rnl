@@ -155,6 +155,8 @@ export function command(id, options = {}) {
     ] }); break;
     case "solve": solve(); break;
     case "solve-all": solve({ all: true }); break;
+    case "solve-respace": solve({ respace: true }); break;
+    case "solve-respace-all": solve({ all: true, respace: true }); break;
     case "solve-close": closePreview(); break;
     case "solve-save": saveSolved(); break;
     case "solve-save-utf8": saveSolved("utf8"); break;

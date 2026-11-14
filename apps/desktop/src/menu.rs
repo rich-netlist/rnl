@@ -572,7 +572,7 @@ mod tests {
     }
 
     /// The Solve menu, which only the desktop offers (decision 0010): Solve, with its key shown after
-    /// a tab on Windows (`tabbed`) and as the accelerator elsewhere, Solve All Circuits, Close Preview,
+    /// a tab on Windows (`tabbed`) and as the accelerator elsewhere, Solve All Circuits, Respace and Respace All Circuits, Close Preview,
     /// Save Solved Copy As and Settings.
     fn solve(tabbed: bool) -> (String, Vec<Shown>) {
         let keyed = |id: &str, text: &str, shown: &str, accelerator: &str| {
@@ -587,6 +587,8 @@ mod tests {
             vec![
                 keyed("solve", "&Solve", "F9", "F9"),
                 item("solve-all", "Solve &All Circuits", None),
+                item("solve-respace", "&Respace", None),
+                item("solve-respace-all", "Respace All Circuits", None),
                 item("solve-close", "&Close Preview", None),
                 Shown::Separator,
                 keyed("solve-save", "Save Solved &Copy As...", "Ctrl+Shift+S", "CmdOrCtrl+Shift+S"),

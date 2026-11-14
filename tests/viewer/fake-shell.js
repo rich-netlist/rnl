@@ -257,6 +257,7 @@ const solving = {
     const response = await fetch(`/fixtures/${encodeURIComponent(src.fixture)}-preview.json`);
     if (!response.ok) throw `${src.name}: there is no such preview`;
     const solved = await response.json();
+    if (settings?.respace) solved.report.mode = "respace";
     if (solveCancelled) throw "the solve was cancelled";
     if (fake.hold) await new Promise((resolve, reject) => (held = { resolve, reject }));
     // what the check of each level's settings found, as a solve's report gives it (`levels[].check`)

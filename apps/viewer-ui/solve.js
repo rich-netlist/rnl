@@ -88,8 +88,14 @@ window.addEventListener("open-finished", () => {
  * Solve All Circuits); while a preview is shown, solve its file again, and File > Reload does the
  * same then. The file is read again first, so that the solve is of the file as it is now. The
  * circuits not solved are drawn as the file has them.
+ *
+ * With `respace` (Solve > Respace), each circuit is drawn where the record of the solver in the file last put its
+ * objects, the wires routed again and the gaps widened to the spacing of the settings, nothing searched
+ * (docs/solver-respace.md). It starts from the file, never from the preview shown: a spacing only grows, so
+ * the spacing is changed in the settings and the file respaced again, not the preview. A circuit that has no usable
+ * record is left as it is, and the report says why.
  */
-export async function solve({ all = false } = {}) {
+export async function solve({ all = false, respace = false } = {}) {
   if (!shell || !shell.solve || running || modal() || isLoading()) return;
   const source = shown ? shown.source : currentSource();
   if (!source || !doc) {
@@ -100,7 +106,7 @@ export async function solve({ all = false } = {}) {
   if (editing && !await stopEditing()) return; // do not solve stale text if applying failed
   running = true;
   document.body.classList.add("solving");
-  status(m`Solving ${source.name}…`, true);
+  status(respace ? m`Respacing ${source.name}…` : m`Solving ${source.name}…`, true);
   // the file's own name, not the address or the folders it was read from, until the solver names the first circuit
   progressBegin(source.name.split(/[\\/]/).pop() || source.name);
   try {
@@ -108,7 +114,9 @@ export async function solve({ all = false } = {}) {
     const given = source.text === undefined && source.path?.startsWith("<") ? { ...source, text: doc.files[0].text } : source;
     // the circuit shown is asked for by its title, as `rnl solve --level` takes it
     const level = all ? null : doc.levels[current]?.title ?? null;
-    const solved = await shell.solve(given, { ...solverSettings(), level }, changes(true));
+    // (the whole file's time is not read by a respace)
+    const asked = respace ? { ...solverSettings(), timeall: null, respace: true, level } : { ...solverSettings(), level };
+    const solved = await shell.solve(given, asked, changes(true));
     shown = { source, report: solved.report };
     noteReport(solved.report);
     showBuilt(solved.document, true);
@@ -116,7 +124,7 @@ export async function solve({ all = false } = {}) {
     fit();
     renderReport(solved.report);
     showConstraints(solved.report);
-    showPreview(true);
+    showPreview(true, respace);
     const r = solved.report;
     const discarded = r.levels.reduce((n, l) => n + l.facts.filter((f) => f.status !== "kept").length, 0);
     const later = unappliedPaths().length > 0 ? m(" Changes not applied yet are not in it.") : "";
@@ -126,7 +134,10 @@ export async function solve({ all = false } = {}) {
     // a setting the solver does not take is an error, but the solve went on without it: told apart from a solve that failed
     const wrong = settingErrors(r);
     const settings = wrong === 0 ? "" : wrong === 1 ? m(" 1 error in the settings: the solve went on without that value.") : m` ${wrong} errors in the settings: the solve went on without those values.`;
-    status(m`Solved: ${levels}, ${facts}.${settings} A preview: the files are unchanged.${later}`, false);
+    // the circuits that a respace left as they were, with the reason in the report, are not among its levels
+    const left = respace ? r.notes.length : 0;
+    const leftText = left === 0 ? "" : left === 1 ? m(" 1 circuit is left as it is: the report says why.") : m` ${left} circuits are left as they are: the report says why.`;
+    status(respace ? m`Respaced: ${levels}, ${facts}.${leftText}${settings} A preview: the files are unchanged.${later}` : m`Solved: ${levels}, ${facts}.${settings} A preview: the files are unchanged.${later}`, false);
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     if (message === CANCELLED) status(m("The solve was canceled; the netlist is shown as it was."), false);
@@ -206,9 +217,10 @@ function status(text, cancellable) {
   $("solve-cancel").hidden = !cancellable;
 }
 
-/** Show or hide what says that the drawing is a preview, and the report of the solve. */
-function showPreview(on) {
+/** Show or hide what says that the drawing is a preview, and the report of the solve; `respaced`: of a respace. */
+function showPreview(on, respaced = false) {
   document.body.classList.toggle("preview", on);
+  if (on) setText($("preview-badge"), respaced ? m("Respaced preview: the files are unchanged") : m("Solved preview: the files are unchanged"));
   $("preview-badge").hidden = !on;
   $("preview-close").hidden = !on;
   if (!on && !$("pane-solve").hidden) setPane("netlist");
@@ -269,7 +281,9 @@ function renderReport(report) {
   box.replaceChildren();
   const note = document.createElement("p");
   note.className = "solve-note";
-  setText(note, m("A preview of the solve: nothing was written, and the files are as they were. Solve › Save Solved Copy As saves the files solved elsewhere; Solve › Close Preview shows the file as written."));
+  setText(note, report.mode === "respace"
+    ? m("A preview of the respace: nothing was written, and the files are as they were. A circuit that is not respaced is left as it is, with the reason. Solve › Save Solved Copy As saves the files elsewhere; Solve › Close Preview shows the file as written.")
+    : m("A preview of the solve: nothing was written, and the files are as they were. Solve › Save Solved Copy As saves the files solved elsewhere; Solve › Close Preview shows the file as written."));
   append(box, note);
   const plain = (text, cls = "solve-line") => line(cls, [span("msg", text)], null);
   group(box, m("Files"), report.notes.map((n) => plain(n)));

@@ -131,6 +131,15 @@ test("the whole file's time reaches preview as --timeall; a time that is not a p
   } finally { await s.close(); }
 });
 
+test("a respace asks preview for --respace; a solve does not", async () => {
+  const s = await serve();
+  try {
+    const args = async (respace) => (await call(s.port, "POST", SOLVE, { entry: "/top.sp", files: { "/top.sp": "* x" }, config: "spacing_x=3", respace })).json.document.seen.args;
+    assert.ok((await args(true)).includes("--respace"));
+    for (const none of [false, undefined]) assert.ok(!(await args(none)).includes("--respace"));
+  } finally { await s.close(); }
+});
+
 test("a solve of one level asks preview for it by its title; none asks for every level", async () => {
   const s = await serve();
   try {

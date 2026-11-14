@@ -1827,6 +1827,23 @@ test("a solve in the browser is cancelled by stopping its Worker, and the next S
   expect(await page.evaluate(() => window.__solver.started)).toBe(2);
 });
 
+test("Respace in the browser asks the solver's module for a respace of the file, and a level it cannot respace is left as it is, with the reason", async ({ page }) => {
+  test.setTimeout(120000);
+  await watchSolverWorker(page);
+  await page.goto(`${process.env.RNL_WEB_URL}/?url=samples/cases/04-hierarchy.sp`);
+  await expect(page).toHaveTitle(/^04-hierarchy.sp/);
+  await page.waitForFunction(() => !document.body.classList.contains("busy"));
+  await page.evaluate(() => window.viewer.command("solve-respace"));
+  await page.waitForFunction(() => document.body.classList.contains("preview") && !document.body.classList.contains("solving"), null, { timeout: 90000 });
+  const [request] = await page.evaluate(() => window.__solver.requests);
+  expect(request.respace).toBe(true);
+  await expect(page.locator("#solve-step")).toContainText("Respaced:");
+  await page.locator("#solve-view-report").click();
+  await expect(page.locator("#solve-report .solve-note")).toContainText("A preview of the respace");
+  // this sample has no record of the solver that fits: the report says why, and the level is as it was
+  await expect(page.locator("#solve-report")).toContainText("not solved");
+});
+
 test("the settings dialog of the web viewer is drawn from the solver's module, which checks them, and a solve takes them", async ({ page }) => {
   test.setTimeout(120000);
   await watchSolverWorker(page);
