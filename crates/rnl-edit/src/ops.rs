@@ -17,6 +17,18 @@ pub struct LevelOp {
     pub op: Op,
 }
 
+/// What a rule's selection says: its kind, the definition for a usage, and its conditions in order.
+type RuleSelect = (String, Option<String>, Vec<(String, Literal)>);
+
+/// What a rule (10.4) does to what it selects.
+#[derive(Debug, Clone, PartialEq)]
+pub enum RuleAction {
+    /// Draw a text: an `AddText` without a place of its own.
+    Text(Box<Op>),
+    /// `@SET-SYMBOL $NAME`: draw it with that symbol.
+    SetSymbol(String),
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Op {
     /// Facts about a host object: its symbol, style, position and orientation. The style is its
@@ -72,11 +84,12 @@ pub enum Op {
         size: Option<f64>,
         style: Vec<(String, Literal)>,
     },
-    /// A rule (10.4) that adds a text to what a selection selects, in its own level, and below it with the condition
+    /// A rule (10.4) that acts on what a selection selects, in its own level, and below it with the condition
     /// `recursive=true` (0.4 selections do not go down by default): the
     /// `kind` of the selection (`instance`, `usage`, `terminal` or `net`), its conditions in the
-    /// order given, and the one action, an `AddText` that has neither `attach`, `at` nor `name`.
-    AddRule { select: String, params: Vec<(String, Literal)>, action: Box<Op> },
+    /// order given, for a usage the definition it is of (`$JUNCTION`), and the one action: an
+    /// `AddText` that has neither `attach`, `at` nor `name`, or a symbol to set.
+    AddRule { select: String, definition: Option<String>, params: Vec<(String, Literal)>, action: RuleAction },
     /// ADD-TO or REMOVE-FROM a set (10.5).
     Membership { add: bool, items: Vec<String>, set: String },
     /// A package at the root, in the header record (16.3).
@@ -430,8 +443,12 @@ pub(crate) fn parse_for_language(k: usize, value: &Value, modern: bool) -> Resul
             if !modern {
                 return Err(fail(codes::EDIT_FIELD_INVALID, kind, "requires language_version 0.4".into()));
             }
-            let (select, params) = r.select()?;
-            Op::AddRule { select, params, action: Box::new(r.rule_action(modern)?) }
+            let (select, definition, params) = r.select()?;
+            let action = r.rule_action(modern)?;
+            if definition.is_some() && select != "usage" {
+                return Err(r.fail("select", "names a `definition` only for the kind usage"));
+            }
+            Op::AddRule { select, definition, params, action }
         }
         "add-to" | "remove-from" => {
             Op::Membership { add: kind == "add-to", items: r.strings("items")?, set: r.string("set")? }
@@ -466,7 +483,7 @@ impl Reader<'_> {
 
     /// The selection of a rule: `{"kind": "instance" | "usage" | "terminal" | "net", "params": {…}}`,
     /// each condition a string without a line break, a number or a boolean, named by an identifier.
-    fn select(&self) -> Result<(String, Vec<(String, Literal)>), Refusal> {
+    fn select(&self) -> Result<RuleSelect, Refusal> {
         let sel = match self.obj.get("select") {
             None | Some(Value::Null) => {
                 return Err(Refusal::new(
@@ -477,12 +494,17 @@ impl Reader<'_> {
             Some(Value::Object(o)) => o,
             Some(_) => return Err(self.fail("select", "is not an object")),
         };
-        if let Some(f) = sel.keys().find(|f| *f != "kind" && *f != "params") {
+        if let Some(f) = sel.keys().find(|f| *f != "kind" && *f != "params" && *f != "definition") {
             return Err(self.fail("select", &format!("has an unknown field `{f}`")));
         }
         let kind = match sel.get("kind").and_then(Value::as_str) {
             Some(k @ ("instance" | "usage" | "terminal" | "net")) => k.to_string(),
             _ => return Err(self.fail("select", "needs a `kind`: instance, usage, terminal or net")),
+        };
+        let definition = match sel.get("definition") {
+            None | Some(Value::Null) => None,
+            Some(Value::String(d)) if dollar_name(d) => Some(d.clone()),
+            Some(_) => return Err(self.fail("select", "has a `definition` that is not `$NAME`")),
         };
         let params = match sel.get("params") {
             None | Some(Value::Null) => Vec::new(),
@@ -508,12 +530,12 @@ impl Reader<'_> {
                 .collect::<Result<_, _>>()?,
             Some(_) => return Err(self.fail("select", "has `params` that is not an object")),
         };
-        Ok((kind, params))
+        Ok((kind, definition, params))
     }
 
     /// The action of a rule: one `add-text` that says what the text is and how it is drawn, and
     /// has no place of its own: it goes on what the rule selects.
-    fn rule_action(&self, modern: bool) -> Result<Op, Refusal> {
+    fn rule_action(&self, modern: bool) -> Result<RuleAction, Refusal> {
         let action = match self.obj.get("action") {
             None | Some(Value::Null) => {
                 return Err(Refusal::new(
@@ -522,7 +544,16 @@ impl Reader<'_> {
                 ))
             }
             Some(Value::Object(a)) if a.get("op").and_then(Value::as_str) == Some("add-text") => a,
-            Some(_) => return Err(self.fail("action", "is not one add-text op, as an object")),
+            Some(Value::Object(a)) if a.get("op").and_then(Value::as_str) == Some("set") => {
+                if let Some(f) = a.keys().find(|f| *f != "op" && *f != "symbol") {
+                    return Err(self.fail("action", &format!("a set takes only a `symbol`, not `{f}`")));
+                }
+                return match a.get("symbol") {
+                    Some(Value::String(name)) if dollar_name(name) => Ok(RuleAction::SetSymbol(name.clone())),
+                    _ => Err(self.fail("action", "a set needs a `symbol` written `$NAME`")),
+                };
+            }
+            Some(_) => return Err(self.fail("action", "is not one add-text or set op, as an object")),
         };
         if let Some(f) = ["attach", "at", "name", "level"].iter().find(|f| action.contains_key(**f)) {
             return Err(self.fail("action", &format!("takes no `{f}`: its text goes on what the rule selects")));
@@ -538,7 +569,7 @@ impl Reader<'_> {
         })?;
         match read.op {
             Op::AddText { key, text, offset, halign, valign, rotate, fix_rotate, upright, size, style, .. } => {
-                Ok(Op::AddText {
+                Ok(RuleAction::Text(Box::new(Op::AddText {
                     name: None,
                     attach: None,
                     key,
@@ -552,7 +583,7 @@ impl Reader<'_> {
                     upright,
                     size,
                     style,
-                })
+                })))
             }
             _ => unreachable!("the action is an add-text"),
         }
@@ -746,6 +777,18 @@ impl Reader<'_> {
             })
             .collect()
     }
+}
+
+/// `$NAME` as it is written: an identifier after the `$`, or any other name in quotes, a quote in
+/// it doubled, which is the name itself and never an alias (16.5): `$"大点"`.
+fn dollar_name(s: &str) -> bool {
+    let Some(rest) = s.strip_prefix('$') else { return false };
+    if let Some(quoted) = rest.strip_prefix('"').and_then(|r| r.strip_suffix('"')) {
+        return !quoted.is_empty() && !quoted.contains(['\n', '\r']) && !quoted.replace("\"\"", "").contains('"');
+    }
+    !rest.is_empty()
+        && rest.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+        && !rest.starts_with(|c: char| c.is_ascii_digit())
 }
 
 /// A terminal name `terminals` can write back: 0.4 reads an all-digit name as a number, and a

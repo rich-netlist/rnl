@@ -43,7 +43,7 @@ use rnl_runtime::writeback::{add_header, append_record, carrier_at, record_line}
 use serde::Deserialize;
 use serde_json::Value;
 
-pub use ops::{LevelOp, Op};
+pub use ops::{LevelOp, Op, RuleAction};
 
 /// The language version the header record declares: the toolkit's default (16.1).
 pub const VERSION: &str = "0.3";
@@ -165,7 +165,7 @@ fn write_in(request: &WriteRequest, files: Option<&dyn rnl_runtime::source::Prov
                     }
                 }
             }
-            Op::AddRule { action, .. } => {
+            Op::AddRule { action: ops::RuleAction::Text(action), .. } => {
                 if let Op::AddText { text, style, .. } = &**action {
                     form::check_math_content(text, version).map_err(|e| Refusal::new(codes::EDIT_FIELD_INVALID, e))?;
                     for (name, value) in style {

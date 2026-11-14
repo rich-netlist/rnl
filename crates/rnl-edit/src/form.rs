@@ -417,10 +417,15 @@ pub(crate) fn statements_for_language(
         }
         // a rule (10.4): the selection of the kind with its conditions, then the text it draws on each
         // of the objects selected
-        Op::AddRule { select, params, action } => {
+        Op::AddRule { select, definition, params, action } => {
             let params: Vec<String> = params.iter().map(|(k, v)| format!("{k}={}", literal(v))).collect();
             let params = if params.is_empty() { String::new() } else { format!("({})", params.join(", ")) };
-            vec![format!("# @SELECT-{}{params} => {}", select.to_uppercase(), text_call(action))]
+            let of = definition.as_ref().map(|d| format!(" {d}")).unwrap_or_default();
+            let does = match action {
+                crate::ops::RuleAction::Text(text) => text_call(text),
+                crate::ops::RuleAction::SetSymbol(symbol) => format!("@SET-SYMBOL {symbol}"),
+            };
+            vec![format!("# @SELECT-{}{params}{of} => {does}", select.to_uppercase())]
         }
         // several items are one set, whose members are added or removed (5.2.2)
         Op::Membership { add, items, set } => {

@@ -234,10 +234,16 @@ export type Op = { level?: string } & (
       op: "add-rule";
       select: {
         kind: "instance" | "usage" | "terminal" | "net";
+        /** For a usage, the definition it is of, written after the conditions: `$JUNCTION`. */
+        definition?: string;
         /** Conditions, in the order given, such as `{ name: "R*" }`. */
         params?: Record<string, Literal>;
       };
-      action: Omit<AddText, "attach" | "at" | "name" | "level">;
+      /**
+       * An `add-text` with no `attach`, `at`, `name` or `level`, or a `set` of the symbol the
+       * selected are drawn with, written `@SET-SYMBOL $NAME` (a `definition` goes with a usage).
+       */
+      action: Omit<AddText, "attach" | "at" | "name" | "level"> | { op: "set"; symbol: string };
     }
   | { op: "add-to" | "remove-from"; items: string[]; set: string }
   | { op: "use-package"; name: string; version?: string; path?: string }

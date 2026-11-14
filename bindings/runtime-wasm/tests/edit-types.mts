@@ -15,6 +15,12 @@ export const rule: Op = {
   select: { kind: "instance", params: { name: "R*" } },
   action: { op: "add-text", markup: "", key: "name" },
 };
+export const dots: Op = {
+  op: "add-rule",
+  level: "file",
+  select: { kind: "usage", definition: "$JUNCTION", params: { recursive: true } },
+  action: { op: "set", symbol: "$BIG_DOT" },
+};
 export const request: WriteRequest = {
   write: {
     language_version: "0.4",
