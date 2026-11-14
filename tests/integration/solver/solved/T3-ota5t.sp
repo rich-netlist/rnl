@@ -36,7 +36,7 @@ M5 tail vbias vss vss nch W=4u L=1u
 *   &vss @ADD-TO $GROUND_NET_SET;
 *   $WIRE_NET_SET @ROUTE
 * }
-* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:ab3e7987ac2f925c.1f3b310f8bee492a") {
+* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:ab3e7987ac2f925c.811e49dbe089c7ab") {
 *   %gnd_stub_M5_s = $GND_STUB @ATTACH(gap=2) #M5:s;
 *   %supply_stub_M3_s = $SUPPLY_STUB @ATTACH(gap=2) #M3:s;
 *   %supply_stub_M4_s = $SUPPLY_STUB @ATTACH(gap=2) #M4:s;
@@ -97,7 +97,7 @@ CL out 0 1p
 *   {{#VIP #VIN} #XU1 #CL} @AS $FLOW;
 *   $WIRE_NET_SET @ROUTE
 * }
-* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:cff169f7ae0ac311.1f3b310f8bee492a") {
+* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:cff169f7ae0ac311.811e49dbe089c7ab") {
 *   %gnd_stub_XU1_vss = $GND_STUB @ATTACH(gap=2) #XU1:vss;
 *   %gnd_stub_VDD_n = $GND_STUB @ATTACH(gap=2) #VDD:n;
 *   %gnd_stub_VB_n = $GND_STUB @ATTACH(gap=2) #VB:n;
