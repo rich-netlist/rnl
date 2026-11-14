@@ -161,6 +161,77 @@ fn the_netlists_of_the_review_are_routed_whole_and_read_back() {
     }
 }
 
+/// Two trees of one net, as two structures make them: routed apart by default, each joined by the
+/// net's name, and as one with `join_trees`, every pin of the net in one connected drawing, each
+/// wire given back by the first tree of its net. A tree of another net after them keeps its own
+/// index, as the problem has it.
+#[test]
+fn join_trees_routes_the_trees_of_a_net_as_one() {
+    let text = r#"* two trees
+* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4") }
+.subckt two a b
+R1 a n 1k
+R2 n b 1k
+R3 a n 1k
+R4 n b 1k
+R5 a m 1k
+R6 m b 1k
+* @RNL {
+*   {#R1:2 #R2:1} @ROUTE-OBJECT;
+*   {#R3:2 #R4:1} @ROUTE-OBJECT;
+*   {#R5:2 #R6:1} @ROUTE-OBJECT;
+* }
+.ends
+"#;
+    let files = MemoryProvider::new().with("/w/two.sp", text);
+    let p = problems("/w/two.sp", &files).into_iter().find(|p| p.title == "two").unwrap();
+    assert_eq!(p.routes.iter().map(|r| r.net.as_str()).collect::<Vec<_>>(), ["n", "n", "m"]);
+    // the parts the wires join the pins into, by their counts of pins
+    let parts = |solved: &rnl_solver::Solved| {
+        let mut part: Vec<std::collections::BTreeSet<String>> = Vec::new();
+        for w in &solved.solution.wires {
+            let mut ends: std::collections::BTreeSet<String> = w
+                .points
+                .iter()
+                .filter_map(|q| match q {
+                    WirePoint::Anchor(a) => Some(format!("{a:?}")),
+                    WirePoint::Branch(b) => Some(format!("branch {b}")),
+                    WirePoint::Bend(_) => None,
+                })
+                .collect();
+            part.retain(|s| {
+                let apart = s.is_disjoint(&ends);
+                if !apart {
+                    ends.extend(s.iter().cloned());
+                }
+                apart
+            });
+            part.push(ends);
+        }
+        let mut sizes: Vec<usize> =
+            part.iter().map(|s| s.iter().filter(|k| !k.starts_with("branch")).count()).collect();
+        sizes.sort_unstable();
+        sizes
+    };
+    // in rows, which route the trees as the line layout does in far less time; the skeleton of the
+    // line layout is given back as the wires are (`join_tests` in the crate)
+    let options = SolverOptions::default().with_config(r#"layout="rows", limit="seed""#).unwrap();
+    let apart = solve(&p, &options);
+    assert!(apart.report.unrouted.is_empty(), "{:?}", apart.report.unrouted);
+    assert_eq!(parts(&apart), [2, 2, 2], "{:?}", apart.solution.wires);
+    let joined = solve(&p, &options.with_config("join_trees=true").unwrap());
+    assert!(joined.report.unrouted.is_empty(), "{:?}", joined.report.unrouted);
+    assert_eq!(parts(&joined), [2, 4], "{:?}", joined.solution.wires);
+    // each wire by the first tree of its net in the problem: 0 for n, 2 for m
+    let mut routes: Vec<usize> = joined.solution.wires.iter().map(|w| w.route).collect();
+    routes.sort_unstable();
+    routes.dedup();
+    assert_eq!(routes, [0, 2], "{:?}", joined.solution.wires);
+    let note = "join_trees: the 3 trees of the ROUTEs routed as 2, one for each net";
+    assert!(joined.report.notes.iter().any(|n| n == note), "{:?}", joined.report.notes);
+    assert!(joined.report.canonical_options.as_deref().is_some_and(|c| c.contains(";join_trees=true")));
+}
+
 /// A level whose search is stopped while it tries a group both stretched in bands and dissolved,
 /// between the two: the solutions the bands made are held in the trial, the best among them, and
 /// were lost, so that the level panicked, its best not made at a node. They are kept, and the level

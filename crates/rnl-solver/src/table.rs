@@ -206,6 +206,13 @@ pub fn settings_table() -> SettingsTable {
         spacing("spacing_x", "Grid units added to the gaps between columns of the line layout, -1 to close them up; respacing uses it in every layout."),
         spacing("spacing_y", "Grid units added to the gaps between rows of the line layout, -1 to close them up; respacing uses it in every layout."),
         row(
+            "join_trees",
+            "layout",
+            SettingKind::Boolean,
+            "Route the wire trees of each net as one, so that a net that several structures wire is drawn \
+             connected rather than in pieces joined by its name.",
+        ),
+        row(
             "junction",
             "layout",
             SettingKind::String,

@@ -358,7 +358,7 @@ impl Default for SolverOptions {
     }
 }
 
-const KEYS: [&str; 13] = [
+const KEYS: [&str; 14] = [
     "tolerance",
     "grid",
     "objectives",
@@ -369,6 +369,7 @@ const KEYS: [&str; 13] = [
     "layout",
     "spacing_x",
     "spacing_y",
+    "join_trees",
     "search",
     "report_hints",
     "junction_utf8",
@@ -414,6 +415,10 @@ impl SolverOptions {
         }
         if self.settings.spacing != [0, 0] {
             text.push_str(&format!(";spacing_x={};spacing_y={}", self.settings.spacing[0], self.settings.spacing[1]));
+        }
+        // named only when on, so that the text of the defaults is as it was
+        if self.settings.join_trees {
+            text.push_str(";join_trees=true");
         }
         if let Some(junction) = &self.settings.junction {
             // UTF-8 hex keeps arbitrary quoted definition names independent of this format's
@@ -486,6 +491,9 @@ impl SolverOptions {
                 }
                 "report_hints" => {
                     options.hints_for_low = value.parse().map_err(|_| "report_hints must be true or false")?
+                }
+                "join_trees" => {
+                    options.settings.join_trees = value.parse().map_err(|_| "join_trees must be true or false")?
                 }
                 "junction_utf8" => {
                     if value.len() % 2 != 0 || !value.is_ascii() {
@@ -630,6 +638,13 @@ mod tests {
              budget=candidates:7,astar_expansions:8;time_limit=none"
         );
         assert_eq!(SolverOptions::parse(&text), Ok(options.clone()));
+        // the trees of a net as one: named only when on
+        let mut joined = options.clone();
+        joined.settings.join_trees = true;
+        let text = joined.canonical();
+        assert!(text.ends_with(";join_trees=true"), "{text}");
+        assert_eq!(SolverOptions::parse(&text), Ok(joined));
+        assert!(SolverOptions::parse("join_trees=yes").unwrap_err().contains("true or false"));
         options.objectives = Objectives::none();
         options.grid = Some(0.5);
         options.time_limit = Some(0.25);

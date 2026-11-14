@@ -28,6 +28,13 @@ pub struct Settings {
     pub junction: Option<String>,
     pub legacy_alias: bool,
     pub spacing: [i32; 2],
+    /// Whether the trees of the ROUTEs of one net are routed as one (`join_trees`): every tree of
+    /// a net joined into its first, its pins and wires, with its style. False by default, as the
+    /// core gives each tree on its own (13.7), and two structures on one net are then joined by its
+    /// name; true draws the net connected. A wire routed then refers to the first tree of its
+    /// net, whose own pins are not all the pins the wire may end at. A level before 0.4 does not
+    /// read it.
+    pub join_trees: bool,
     /// Only values explicitly supplied by the caller. Defaults must not mask file values.
     pub overrides: Vec<SolverSetting>,
 }
@@ -50,7 +57,15 @@ fn known(key: &str) -> bool {
     is_run_setting(key)
         || matches!(
             key,
-            "junction" | "layout" | "spacing_x" | "spacing_y" | "tolerance" | "grid" | "beam" | "objectives"
+            "junction"
+                | "layout"
+                | "spacing_x"
+                | "spacing_y"
+                | "join_trees"
+                | "tolerance"
+                | "grid"
+                | "beam"
+                | "objectives"
         )
 }
 
@@ -96,6 +111,10 @@ fn apply(o: &mut SolverOptions, s: &SolverSetting) -> Result<(), String> {
                 return Err(format!("{} must be an integer from -1 to 20", s.key));
             }
             o.settings.spacing[usize::from(s.key == "spacing_y")] = n as i32;
+        }
+        "join_trees" => {
+            let Lit::Bool(value) = s.value else { return Err("join_trees must be a boolean".into()) };
+            o.settings.join_trees = value;
         }
         "tolerance" => o.tolerance = number(s)?,
         "grid" => o.grid = if s.value == Lit::Bool(false) { None } else { Some(number(s)?) },
@@ -314,7 +333,7 @@ impl SolverOptions {
     /// Defaults in the syntax accepted by --solver-config.
     pub fn defaults_config() -> String {
         let d = Self::default();
-        format!("layout=\"lines\", spacing_x=0, spacing_y=0, limit=\"time\", seconds=10, safety_seconds=30, tolerance={}, grid=1, beam={}, candidates={}, astar_expansions={}", rnl_runtime::geom::fmt_num(d.tolerance), d.beam, d.budget.candidates, d.budget.astar_expansions)
+        format!("layout=\"lines\", spacing_x=0, spacing_y=0, join_trees=false, limit=\"time\", seconds=10, safety_seconds=30, tolerance={}, grid=1, beam={}, candidates={}, astar_expansions={}", rnl_runtime::geom::fmt_num(d.tolerance), d.beam, d.budget.candidates, d.budget.astar_expansions)
     }
     /// Parse tool settings using RNL literal syntax; reject invalid values before solving.
     pub fn with_config(&self, text: &str) -> Result<Self, String> {
@@ -480,6 +499,8 @@ impl SolverOptions {
             // the layouts are those of 0.4: an earlier level is laid out in rows, as it always was,
             // and the options its hash covers name no layout, as they never did
             out.settings.layout = Layout::default();
+            // its trees are its nets' already, and it does not read the setting
+            out.settings.join_trees = false;
             return (out, warnings, Vec::new());
         }
         if self.settings.legacy_alias {
@@ -540,6 +561,22 @@ mod tests {
         // the good ones are in effect, from the tool; the bad ones are not
         assert_eq!(check.values["tolerance"], (Lit::Num(0.5), SettingFrom::Tool));
         assert_eq!(check.values["beam"].1, SettingFrom::Default);
+    }
+
+    #[test]
+    fn join_trees_is_a_boolean_a_file_may_give() {
+        let settings = |text: &str| rnl_runtime::solver_settings::parse_overrides(text).unwrap();
+        let mut p = problem_of(Vec::new(), Vec::new());
+        p.version = "0.4".into();
+        p.solver_config = settings("join_trees=true");
+        let (o, warnings, errors) = SolverOptions::default().for_problem(&p);
+        assert!(o.settings.join_trees);
+        assert!(warnings.is_empty() && errors.is_empty(), "{warnings:?} {errors:?}");
+        assert!(!SolverOptions::default().settings.join_trees);
+        let tool = SolverOptions::default().with_config("join_trees=false").unwrap();
+        assert!(!tool.for_problem(&p).0.settings.join_trees);
+        let err = SolverOptions::default().with_config("join_trees=1").unwrap_err();
+        assert!(err.contains("join_trees must be a boolean"), "{err}");
     }
 
     #[test]
