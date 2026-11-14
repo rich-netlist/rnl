@@ -1,6 +1,6 @@
 //! Circuit and drawing selections of 0.4 (10.1).
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::host::glob;
 
@@ -195,6 +195,88 @@ impl Interp<'_> {
     ) -> bool {
         params.get("drawn").and_then(Lit::boolean).is_none_or(|want| self.object_drawn(scene, object) == want)
             && params.get("symbol").and_then(Lit::str).is_none_or(|pattern| self.symbol_matches(scene, object, pattern))
+    }
+
+    /// 10.2: the pieces of each net, as `wired` sees the drawing. The pins on a net, those of
+    /// virtual parts included, that one routing tree joins (13.7) or that written wires join are
+    /// one piece; a pin in neither is a piece by itself. Each piece lists its pins in order, its
+    /// first pin first: the pins of virtual parts by the order of the positions of their usages
+    /// (8.5), then those of instances by the order of their lines and then of their terminal
+    /// numbers.
+    pub(super) fn net_pieces(&mut self, scene: SceneId, snapshot: bool) -> HashMap<ObjId, Vec<Vec<ObjId>>> {
+        fn find(up: &mut HashMap<ObjId, ObjId>, x: ObjId) -> ObjId {
+            let mut root = x;
+            while let Some(&next) = up.get(&root).filter(|next| **next != root) {
+                root = next;
+            }
+            up.insert(x, root);
+            root
+        }
+        fn union(up: &mut HashMap<ObjId, ObjId>, a: ObjId, b: ObjId) {
+            let (a, b) = (find(up, a), find(up, b));
+            if a != b {
+                up.insert(b, a);
+            }
+        }
+        // the pins of each net, in order: those of virtual parts first, in the order of selection,
+        // which is that of the positions of their usages; then those of instances, in the order
+        // of their lines and of the lowest terminal number each pin draws
+        let owners = self.selection_drawables(scene, snapshot, true);
+        // (virtual part or instance, place, lowest terminal, pin index), net, pin
+        type Ordered = ((bool, usize, u32, usize), ObjId, ObjId);
+        let mut ordered: Vec<Ordered> = Vec::new();
+        for (rank, owner) in owners.into_iter().enumerate() {
+            let instance = matches!(self.o(owner), ObjData::Inst { .. } | ObjData::Bundle { .. });
+            for pin in self.owner_pins(scene, owner) {
+                let ObjData::ScenePin { owner, index } = *self.o(pin) else { continue };
+                let terminal = self
+                    .selected_pin_terminals(scene, owner, index)
+                    .into_iter()
+                    .filter_map(|t| match self.o(t) {
+                        ObjData::Term { index, .. } => Some(*index),
+                        _ => None,
+                    })
+                    .min()
+                    .unwrap_or(u32::MAX);
+                for net in self.scene_pin_nets(scene, owner, index) {
+                    ordered.push(((instance, rank, terminal, index), net, pin));
+                }
+            }
+        }
+        ordered.sort_by_key(|(key, _, _)| *key);
+        let mut up: HashMap<ObjId, ObjId> = HashMap::new();
+        // written wires join what they pass, a named point they share included; the wires that
+        // step 6 generates are not seen, as for `wired`
+        for w in self.scenes[scene].wires.clone() {
+            if !matches!(self.o(w), ObjData::Wire { generated: false, .. }) {
+                continue;
+            }
+            let Some(shape) = self.wire_shape_of(scene, w, false) else { continue };
+            let points: Vec<ObjId> = shape.points.iter().map(|q| self.wire_point_handle(scene, *q)).collect();
+            for pair in points.windows(2) {
+                union(&mut up, pair[0], pair[1]);
+            }
+        }
+        // a tree joins its pins; trees that share a pin are one
+        for tree in self.scenes[scene].condition_trees.clone() {
+            for pair in tree.pins.windows(2) {
+                union(&mut up, pair[0], pair[1]);
+            }
+        }
+        let mut pieces: HashMap<ObjId, Vec<Vec<ObjId>>> = HashMap::new();
+        let mut roots: HashMap<(ObjId, ObjId), usize> = HashMap::new();
+        for (_, net, pin) in ordered {
+            let root = find(&mut up, pin);
+            let of_net = pieces.entry(net).or_default();
+            match roots.get(&(net, root)) {
+                Some(&k) => of_net[k].push(pin),
+                None => {
+                    roots.insert((net, root), of_net.len());
+                    of_net.push(vec![pin]);
+                }
+            }
+        }
+        pieces
     }
 
     fn owner_pins(&mut self, scene: SceneId, owner: ObjId) -> Vec<ObjId> {
@@ -392,6 +474,15 @@ impl Interp<'_> {
             candidates = all;
         }
         let ends = if params.contains_key("wired") { self.wire_ends(scene) } else { Default::default() };
+        let firsts: HashSet<ObjId> = if params.contains_key("piece_first") {
+            self.net_pieces(scene, snapshot)
+                .into_values()
+                .flatten()
+                .filter_map(|piece| piece.first().copied())
+                .collect()
+        } else {
+            HashSet::new()
+        };
         let mut seen = HashSet::new();
         candidates
             .into_iter()
@@ -444,6 +535,9 @@ impl Interp<'_> {
                     if !matched {
                         return false;
                     }
+                }
+                if params.get("piece_first").and_then(Lit::boolean).is_some_and(|want| firsts.contains(pin) != want) {
+                    return false;
                 }
                 params
                     .get("wired")

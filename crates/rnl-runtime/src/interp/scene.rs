@@ -1782,6 +1782,7 @@ impl Interp<'_> {
                 let ports: Vec<String> =
                     self.doc.levels[lv].ports.iter().map(|p| self.doc.net_key_in(lv, p, file)).collect();
                 let ends = if params.contains_key("wired") { self.wire_ends(s) } else { HashMap::new() };
+                let pieces = if params.contains_key("split") { self.net_pieces(s, snapshot) } else { HashMap::new() };
                 let mut out = Vec::new();
                 for n in cands {
                     let key = match self.o(n) {
@@ -1810,6 +1811,12 @@ impl Interp<'_> {
                             self.net_wired(s, n, &ends)
                         };
                         if wired != w {
+                            continue;
+                        }
+                    }
+                    // 10.2: the pins of the net are in two or more pieces
+                    if let Some(want) = params.get("split").and_then(Lit::boolean) {
+                        if pieces.get(&n).is_some_and(|pieces| pieces.len() >= 2) != want {
                             continue;
                         }
                     }
