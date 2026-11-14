@@ -1136,7 +1136,7 @@ impl Interp<'_> {
 
     /// A materialized annotation, including an unplaced one, for solver geometry.
     pub(crate) fn annotation_template_view(&mut self, s: SceneId, id: ObjId) -> Option<AnnotationView> {
-        if self.is_obj_failed(id) || self.drawing_ignored(s, id) {
+        if self.is_obj_failed(id) {
             return None;
         }
         let ObjData::Annotation(data) = self.o(id).clone() else {
@@ -1295,7 +1295,7 @@ impl Interp<'_> {
         let mut flylines = Vec::new();
         let refs = self.editor_references(s);
         for w in self.scenes[s].wires.clone() {
-            if self.is_obj_failed(w) || self.drawing_ignored(s, w) {
+            if self.is_obj_failed(w) {
                 continue;
             }
             let ObjData::Wire { nets, .. } = self.o(w).clone() else { continue };
@@ -1338,7 +1338,7 @@ impl Interp<'_> {
         }
         let mut shapes = Vec::new();
         for p in self.scenes[s].prims.clone() {
-            if self.is_obj_failed(p) || self.drawing_ignored(s, p) {
+            if self.is_obj_failed(p) {
                 continue;
             }
             let ObjData::Prim { shape, points, params, .. } = self.o(p).clone() else { continue };
@@ -1387,7 +1387,7 @@ impl Interp<'_> {
         }
         let mut texts = Vec::new();
         for t in self.scenes[s].texts.clone() {
-            if self.is_obj_failed(t) || self.drawing_ignored(s, t) {
+            if self.is_obj_failed(t) {
                 continue;
             }
             // a text whose attached object is drawn is drawn too (13.3; the draft 0.3, section 9)

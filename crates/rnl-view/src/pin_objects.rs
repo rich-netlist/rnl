@@ -119,9 +119,10 @@ fn generated_usage_pin_references_include_the_parent_path() {
 }
 
 #[test]
-fn renderer_standins_do_not_become_independent_pin_objects() {
+fn the_pins_of_the_default_block_symbol_are_pin_objects() {
+    // the default block symbol is a symbol like any other (9.2.6)
     let s = read("0.4", "#R1 @PLACE(0,0)");
-    assert!(s.drawing.as_ref().unwrap().objects.iter().all(|o| o.kind != "pin"));
+    assert!(s.drawing.as_ref().unwrap().objects.iter().any(|o| o.kind == "pin"));
 }
 
 #[test]

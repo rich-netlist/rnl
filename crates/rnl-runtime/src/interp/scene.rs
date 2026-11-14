@@ -132,8 +132,6 @@ pub struct Rewrite {
     pub off: usize,
     /// Why it fails, found in the geometry phase (9.2.4, 11.8, 12.1): the error it gives.
     pub fault: Option<(crate::diag::Code, String)>,
-    /// A rewrite involving an undrawn instance has no effect and does not fail (9.2.8).
-    pub ignored: bool,
     /// Its style parameters, as the fact in `Scene::styles` that makes them direct style of the
     /// wire (8.3), which a rewrite that fails takes back before the style queue (8.2).
     pub style: Option<usize>,
@@ -1099,7 +1097,7 @@ impl Interp<'_> {
             sc.styles.len() - 1
         });
         let pos = order_pos(&ctx.pos, &ctx.segments);
-        let r = Rewrite { pos, seq, points, mode, generated, site, off, fault: None, ignored: false, style };
+        let r = Rewrite { pos, seq, points, mode, generated, site, off, fault: None, style };
         sc.rewrites.entry(w).or_default().push(r);
     }
 
@@ -1117,9 +1115,7 @@ impl Interp<'_> {
     pub(crate) fn wire_shape_of(&self, s: SceneId, w: ObjId, holding: bool) -> Option<WireShape> {
         let ObjData::Wire { points, mode, generated, site, off, .. } = self.o(w) else { return None };
         let last = self.scenes[s].rewrites.get(&w).and_then(|rs| {
-            rs.iter()
-                .filter(|r| !holding || (r.fault.is_none() && !r.ignored))
-                .max_by(|a, b| (&a.pos, a.seq).cmp(&(&b.pos, b.seq)))
+            rs.iter().filter(|r| !holding || r.fault.is_none()).max_by(|a, b| (&a.pos, a.seq).cmp(&(&b.pos, b.seq)))
         });
         Some(match last {
             Some(r) => WireShape {

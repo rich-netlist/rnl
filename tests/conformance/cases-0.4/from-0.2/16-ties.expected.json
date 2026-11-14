@@ -61,11 +61,11 @@
           "nested": []
         },
         {
-          "name": "(viewer default)",
+          "name": "(default block symbol)",
           "box": [
-            -3.0,
             -1.0,
-            3.0,
+            -1.0,
+            1.0,
             1.0
           ],
           "box_written": false,
@@ -73,7 +73,7 @@
           "pins": [
             {
               "pos": [
-                -3.0,
+                -1.0,
                 0.0
               ],
               "terminals": [
@@ -84,7 +84,7 @@
             },
             {
               "pos": [
-                3.0,
+                1.0,
                 0.0
               ],
               "terminals": [
@@ -99,42 +99,12 @@
               "shape": "RECTANGLE",
               "points": [
                 [
-                  -2.0,
+                  -1.0,
                   -1.0
                 ],
                 [
-                  2.0,
+                  1.0,
                   1.0
-                ]
-              ],
-              "style": {
-                "linestyle": "dashed"
-              }
-            },
-            {
-              "shape": "LINE",
-              "points": [
-                [
-                  -3.0,
-                  0.0
-                ],
-                [
-                  -2.0,
-                  0.0
-                ]
-              ],
-              "style": {}
-            },
-            {
-              "shape": "LINE",
-              "points": [
-                [
-                  3.0,
-                  0.0
-                ],
-                [
-                  2.0,
-                  0.0
                 ]
               ],
               "style": {}
@@ -258,6 +228,22 @@
           ],
           "halign": "middle",
           "valign": "bottom",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {},
+          "layer": "middle"
+        },
+        {
+          "id": "#R7::model",
+          "anchor": [
+            24.0,
+            -1.3
+          ],
+          "lines": [
+            []
+          ],
+          "halign": "middle",
+          "valign": "top",
           "rotate": 0.0,
           "orient": "R0",
           "style": {},

@@ -358,7 +358,8 @@ pub struct ProblemSymbol {
     /// x1, y1, x2, y2 in local coordinates: `box=`, or the extent of the graphics.
     pub bbox: [f64; 4],
     pub box_written: bool,
-    /// The viewer's own stand-in for an instance no symbol is given to (9.2.6).
+    /// The default block symbol of an instance no symbol is given to (9.2.6), or in a file of a
+    /// version before 0.4 the viewer's own stand-in.
     pub default: bool,
     pub pins: Vec<PinView>,
 }

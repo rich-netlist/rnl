@@ -157,52 +157,42 @@ fn the_spice_parts_of_a_spectre_file_are_drawn_and_share_their_model_cards_with_
 }
 
 #[test]
-fn a_transistor_whose_model_card_is_not_found_is_not_drawn_and_is_listed_with_the_reason() {
+fn a_transistor_whose_model_card_is_not_found_has_the_default_block_symbol() {
     // the polarity is told by the card alone: a name starting with M, Q, J or Z says nothing, so
-    // without a card the standard package has no symbol, and the renderer's own would only pretend
+    // without a card the standard package has no symbol, and the instance has the default block
+    // symbol, with a pin for each node, by its number (9.2.6, 9.2.8)
     let net = "* t\n.model nch nmos\n.model qp pnp\n\
         M1 d g s b nch\nM2 d g s b pch\nM3 d g s b pch\nQ1 c b e qp\nQ2 c b e 2n3904\nJ1 d g s jfm\nR1 a b 1k\n.end\n";
     let r = read_as("/w/t.sp", net);
     let level = r.model.levels.iter().find(|l| l.title == "t.sp").unwrap();
-    let drawn: Vec<String> =
-        symbols(&r).into_iter().filter(|(_, s)| s != "-").map(|(n, s)| format!("{n}={s}")).collect();
-    assert_eq!(drawn, ["M1=$NMOS_4TERM", "Q1=$PNP", "R1=$RESISTOR"]);
-    let undrawn: Vec<(&str, &str)> = level.undrawn.iter().map(|u| (u.id.as_str(), u.reason.as_str())).collect();
+    let all: Vec<String> = symbols(&r).into_iter().map(|(n, s)| format!("{n}={s}")).collect();
+    let boxed = "%\"(default block symbol)\"";
     assert_eq!(
-        undrawn,
+        all,
         [
-            ("#M2", "model card not found"),
-            ("#M3", "model card not found"),
-            ("#Q2", "model card not found"),
-            ("#J1", "model card not found")
+            "M1=$NMOS_4TERM".to_string(),
+            format!("M2={boxed}"),
+            format!("M3={boxed}"),
+            "Q1=$PNP".to_string(),
+            format!("Q2={boxed}"),
+            format!("J1={boxed}"),
+            "R1=$RESISTOR".to_string()
         ]
     );
-    // they are not left to a solver: no hint about a missing position names them, and the level
-    // does not count them among the objects without one
-    assert!(level.unplaced.iter().all(|u| !undrawn.iter().any(|(id, _)| id.trim_start_matches('#') == u.as_str())));
-    // one warning for each model the netlist lacks, at the line of the first device that names it
-    let warnings = messages(&r, Severity::Warning);
-    assert_eq!(warnings.len(), 3, "{warnings:?}");
-    assert!(
-        warnings[0].contains("`pch`")
-            && warnings[0].contains("they are not drawn")
-            && warnings[0].contains("M2, M3")
-            && warnings[0].contains("t.sp:6"),
-        "{}",
-        warnings[0]
-    );
-    assert!(warnings.iter().any(|w| w.contains("2n3904") && w.contains("Q2")), "{warnings:?}");
-    assert!(warnings.iter().any(|w| w.contains("jfm") && w.contains("J1")), "{warnings:?}");
+    // no instance is left undrawn
+    assert!(level.undrawn.is_empty(), "{:?}", level.undrawn.iter().map(|u| &u.id).collect::<Vec<_>>());
+    let m2 = level.objects.iter().find(|o| o.id == "#M2").unwrap();
+    assert_eq!(m2.pins.iter().map(|p| p.terminals.join(",")).collect::<Vec<_>>(), ["#M2:1", "#M2:2", "#M2:3", "#M2:4"]);
 }
 
 #[test]
-fn a_transistor_without_a_card_is_drawn_when_the_file_gives_it_a_symbol() {
+fn a_transistor_without_a_card_is_drawn_with_the_symbol_the_file_gives_it() {
     let net = "* t\nM1 d g s b pch\nM2 d g s b pch\n* @RNL { #M1 @SET-SYMBOL $PMOS_4TERM }\n.end\n";
     let r = read_as("/w/t.sp", net);
     assert_eq!(symbol(&r, "M1"), "$PMOS_4TERM");
+    assert_eq!(symbol(&r, "M2"), "%\"(default block symbol)\"");
     let level = r.model.levels.iter().find(|l| l.title == "t.sp").unwrap();
-    let undrawn: Vec<&str> = level.undrawn.iter().map(|u| u.id.as_str()).collect();
-    assert_eq!(undrawn, ["#M2"]);
+    assert!(level.undrawn.is_empty());
 }
 
 #[test]
@@ -214,13 +204,12 @@ fn a_wire_to_a_device_that_is_not_drawn_fails_as_a_terminal_without_a_pin_does()
 }
 
 #[test]
-fn a_wire_to_an_undrawn_device_is_ignored_in_0_4() {
-    let net = "* t\n.model nch nmos\nM1 d g s b nch\nM2 d g s b pch\n* @RNL { #M1 @PLACE(0, 0); &g {#M2:g #M1:g} @WIRE }\n.end\n";
+fn a_wire_to_a_device_without_a_card_ends_at_its_box_in_0_4() {
+    // its terminals have pins: a wire to one is drawn, and nothing fails (9.2.8)
+    let net = "* t\n.model nch nmos\nM1 d g s b nch\nM2 d g s b pch\n* @RNL { #M1 @PLACE(0, 0); #M2 @PLACE(10, 0); &g {#M2:2 #M1:g} @WIRE }\n.end\n";
     let current = read_as("/w/t.sp", net);
     let errors = messages(&current, Severity::Error);
     assert!(errors.is_empty(), "{errors:?}");
     let level = current.model.levels.iter().find(|l| l.title == "t.sp").unwrap();
-    assert!(level.wires.is_empty(), "wire through undrawn M2 must not be drawn: {:?}", level.wires);
-    let warnings = messages(&current, Severity::Warning);
-    assert!(warnings.iter().any(|m| m.contains("M2") && m.contains("not drawn")), "{warnings:?}");
+    assert_eq!(level.wires.len(), 1, "{:?}", level.wires);
 }

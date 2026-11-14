@@ -7,7 +7,7 @@ impl Interp<'_> {
     pub(super) fn check_auto_wire_geometry(&mut self) {
         for scene in 0..self.scenes.len() {
             for wire in self.scenes[scene].wires.clone() {
-                if self.is_failed(wire) || self.drawing_ignored(scene, wire) {
+                if self.is_failed(wire) {
                     continue;
                 }
                 let Some(shape) = self.wire_shape(scene, wire) else { continue };

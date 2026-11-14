@@ -301,26 +301,6 @@ fn table_check_uses_both_axes_and_keeps_group_after_conflict() {
 }
 
 #[test]
-fn an_undrawn_device_ignores_the_entire_table_before_pin_checks() {
-    let source = r#"* undrawn
-* @RNL(type="header") { @VERSION("0.4") }
-M1 d g s b missing
-R1 g 0 1k
-* @RNL { $S = @DEFINE-SYMBOL { (0,0) @PIN(terminal=1) }; #R1 @SET-SYMBOL $S; @TABLE {#R1 #M1:g} }
-"#;
-    let r = interpret_file(
-        Path::new("main.sp"),
-        None,
-        &MemoryProvider::new().with("main.sp", source),
-        &Options { std: false, ..Options::solver() },
-    )
-    .unwrap();
-    clean(&r);
-    assert!(tables(&r.problems[0]).is_empty());
-    assert!(r.problems[0].groups.is_empty());
-}
-
-#[test]
 fn table_availability_follows_the_record_writer_in_mixed_includes() {
     for (main, child, count) in [("0.4", "0.3", 1), ("0.3", "0.4", 0)] {
         let source=format!("* mixed\n* @RNL(type=\"header\") {{ @VERSION(\"{main}\") }}\n.inc child.sp\n* @RNL(scope=\"child\") {{ @TABLE {{#R1 #R2}} }}\n");

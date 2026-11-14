@@ -145,11 +145,11 @@
           "nested": []
         },
         {
-          "name": "(viewer default)",
+          "name": "(default block symbol)",
           "box": [
-            -3.0,
             -2.0,
-            3.0,
+            -2.0,
+            2.0,
             2.0
           ],
           "box_written": false,
@@ -157,33 +157,33 @@
           "pins": [
             {
               "pos": [
-                -3.0,
+                -2.0,
                 1.0
               ],
               "terminals": [
-                "1"
+                "top"
               ],
               "label": "top",
               "dir": 180
             },
             {
               "pos": [
-                -3.0,
+                -2.0,
                 -1.0
               ],
               "terminals": [
-                "2"
+                "mid"
               ],
               "label": "mid",
               "dir": 180
             },
             {
               "pos": [
-                3.0,
-                1.0
+                2.0,
+                0.0
               ],
               "terminals": [
-                "3"
+                "bot"
               ],
               "label": "bot",
               "dir": 0
@@ -200,50 +200,6 @@
                 [
                   2.0,
                   2.0
-                ]
-              ],
-              "style": {
-                "linestyle": "dashed"
-              }
-            },
-            {
-              "shape": "LINE",
-              "points": [
-                [
-                  -3.0,
-                  1.0
-                ],
-                [
-                  -2.0,
-                  1.0
-                ]
-              ],
-              "style": {}
-            },
-            {
-              "shape": "LINE",
-              "points": [
-                [
-                  -3.0,
-                  -1.0
-                ],
-                [
-                  -2.0,
-                  -1.0
-                ]
-              ],
-              "style": {}
-            },
-            {
-              "shape": "LINE",
-              "points": [
-                [
-                  3.0,
-                  1.0
-                ],
-                [
-                  2.0,
-                  1.0
                 ]
               ],
               "style": {}
@@ -890,15 +846,15 @@
               0.0
             ],
             [
-              19.5,
+              20.0,
               0.0
             ],
             [
-              19.5,
+              20.0,
               1.0
             ],
             [
-              21.0,
+              22.0,
               1.0
             ]
           ],
@@ -978,12 +934,12 @@
           ],
           "points": [
             [
-              27.0,
-              1.0
+              26.0,
+              0.0
             ],
             [
               28.0,
-              1.0
+              0.0
             ],
             [
               28.0,
@@ -1312,6 +1268,39 @@
           "layer": "middle"
         },
         {
+          "id": "#X3::model",
+          "anchor": [
+            24.0,
+            -2.3
+          ],
+          "lines": [
+            [
+              {
+                "text": "rdiv",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "middle",
+          "valign": "top",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
           "id": "#Vdd::name",
           "anchor": [
             -12.5,
@@ -1604,12 +1593,30 @@
             -3.0
           ],
           [
-            27.0,
-            1.0
+            26.0,
+            0.0
           ]
         ]
       ],
       "constraints": [
+        {
+          "label": "ORIENT-RELATION",
+          "kind": "ORIENT-RELATION",
+          "status": "unsolved",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "unsolved",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "unsolved",
+          "priority": "normal"
+        },
         {
           "label": "ORDER",
           "kind": "ORDER",
@@ -1623,7 +1630,9 @@
           "priority": "low"
         }
       ],
-      "unplaced": []
+      "unplaced": [
+        "%l"
+      ]
     },
     {
       "title": "rdiv",
@@ -3496,5 +3505,14 @@
       "unplaced": []
     }
   ],
-  "diagnostics": []
+  "diagnostics": [
+    {
+      "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
+      "file": "04-hierarchy.sp",
+      "line": 1,
+      "col": 0
+    }
+  ]
 }

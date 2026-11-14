@@ -189,11 +189,11 @@
           "nested": []
         },
         {
-          "name": "(viewer default)",
+          "name": "(default block symbol)",
           "box": [
-            -3.0,
             -1.0,
-            3.0,
+            -1.0,
+            1.0,
             1.0
           ],
           "box_written": false,
@@ -201,22 +201,22 @@
           "pins": [
             {
               "pos": [
-                -3.0,
+                -1.0,
                 0.0
               ],
               "terminals": [
-                "1"
+                "p"
               ],
               "label": "p",
               "dir": 180
             },
             {
               "pos": [
-                3.0,
+                1.0,
                 0.0
               ],
               "terminals": [
-                "2"
+                "q"
               ],
               "label": "q",
               "dir": 0
@@ -227,42 +227,12 @@
               "shape": "RECTANGLE",
               "points": [
                 [
-                  -2.0,
+                  -1.0,
                   -1.0
                 ],
                 [
-                  2.0,
+                  1.0,
                   1.0
-                ]
-              ],
-              "style": {
-                "linestyle": "dashed"
-              }
-            },
-            {
-              "shape": "LINE",
-              "points": [
-                [
-                  -3.0,
-                  0.0
-                ],
-                [
-                  -2.0,
-                  0.0
-                ]
-              ],
-              "style": {}
-            },
-            {
-              "shape": "LINE",
-              "points": [
-                [
-                  3.0,
-                  0.0
-                ],
-                [
-                  2.0,
-                  0.0
                 ]
               ],
               "style": {}
@@ -1047,6 +1017,39 @@
           "layer": "middle"
         },
         {
+          "id": "#X1::model",
+          "anchor": [
+            20.0,
+            -1.3
+          ],
+          "lines": [
+            [
+              {
+                "text": "cell",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "middle",
+          "valign": "top",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
           "id": "%l::netname",
           "anchor": [
             0.0,
@@ -1282,7 +1285,7 @@
             2.0
           ],
           [
-            17.0,
+            19.0,
             0.0
           ]
         ],
@@ -1352,7 +1355,7 @@
             -1.0
           ],
           [
-            23.0,
+            21.0,
             0.0
           ]
         ],
@@ -1507,6 +1510,42 @@
           "priority": "normal"
         },
         {
+          "label": "ORIENT-RELATION",
+          "kind": "ORIENT-RELATION",
+          "status": "unsolved",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "unsolved",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "unsolved",
+          "priority": "normal"
+        },
+        {
+          "label": "ORIENT-RELATION",
+          "kind": "ORIENT-RELATION",
+          "status": "unsolved",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "unsolved",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "unsolved",
+          "priority": "normal"
+        },
+        {
           "label": "ORDER",
           "kind": "ORDER",
           "status": "ok",
@@ -1519,7 +1558,10 @@
           "priority": "low"
         }
       ],
-      "unplaced": []
+      "unplaced": [
+        "%l",
+        "%l"
+      ]
     },
     {
       "title": "cell",
@@ -1962,6 +2004,14 @@
       "file": "19-set-cycles.sp",
       "line": 40,
       "col": 5
+    },
+    {
+      "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
+      "file": "19-set-cycles.sp",
+      "line": 1,
+      "col": 0
     },
     {
       "severity": "error",

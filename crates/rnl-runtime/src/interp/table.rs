@@ -35,11 +35,6 @@ impl Interp<'_> {
             }
         };
         let leaves: Vec<_> = rows.points().into_iter().copied().collect();
-        // Ignore an undrawn device's drawing as a whole, before checking pin availability (9.2.8).
-        if self.ignores_drawing_inputs(scene, Some(site), &leaves) {
-            self.constraint_mut(object).status = Some("ignored");
-            return false;
-        }
         let mut seen = HashSet::new();
         for leaf in leaves {
             let invalid = if matches!(

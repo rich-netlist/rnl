@@ -121,8 +121,13 @@ fn orient_relation_takes_a_list_and_relates_one_object_to_one_in_0_4() {
 #[test]
 fn a_problem_without_lists_or_senses_has_the_digest_it_had() {
     // the same statements in 0.3 and 0.4 give the same digest when 0.4 writes nothing new: only the
-    // version differs, which the digest does not cover
-    let body = "{#R1 #R2} @ORDER(\"left-to-right\"); #M1 @ORIENT(\"MY\"); #M1 #M2 @ORIENT-RELATION(\"R0\")";
+    // version differs, which the digest does not cover; the instances have symbols of their own, as
+    // 0.3 draws one without a symbol with a stand-in of the viewer and 0.4 with the default block
+    // symbol (9.2.6)
+    let body = "$R = @DEFINE-SYMBOL { (0,0) @PIN(terminal=1); (0,2) @PIN(terminal=2) }; \
+        $M = @DEFINE-SYMBOL { (0,0) @PIN(terminal=1); (0,2) @PIN(terminal=2); (2,0) @PIN(terminal=3); (2,2) @PIN(terminal=4) }; \
+        {#R1 #R2 #R3 #R4} @SET-SYMBOL $R; {#M1 #M2 #M3 #M4} @SET-SYMBOL $M; \
+        {#R1 #R2} @ORDER(\"left-to-right\"); #M1 @ORIENT(\"MY\"); #M1 #M2 @ORIENT-RELATION(\"R0\")";
     assert_eq!(input_digest(&problem("0.3", body)), input_digest(&problem("0.4", body)));
     // a list, or a DISTRIBUTE with its sense, is in it
     let plain = input_digest(&problem("0.4", "#M1 @ORIENT(\"MY\")"));

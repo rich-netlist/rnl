@@ -9,7 +9,7 @@
       "name": "04-hierarchy.sp",
       "file": 0,
       "line": 0,
-      "status": null,
+      "status": "1 without a position; constraints: 3 unsolved, 2 ok",
       "host": {
         "ports": [],
         "instances": [
@@ -455,8 +455,8 @@
             }
           },
           {
-            "id": "%\"(viewer default)\"",
-            "name": "%\"(viewer default)\"",
+            "id": "%\"(default block symbol)\"",
+            "name": "%\"(default block symbol)\"",
             "package": null,
             "level": null,
             "default": true,
@@ -481,6 +481,14 @@
           {
             "id": "$SUPPLY_SYMBOL",
             "name": "$SUPPLY_SYMBOL",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$NET_LABEL_SYMBOL",
+            "name": "$NET_LABEL_SYMBOL",
             "package": "rnl-std-basic",
             "level": null,
             "default": false,
@@ -737,7 +745,7 @@
             "definition": null,
             "attach": null,
             "symbol": {
-              "value": "%\"(viewer default)\"",
+              "value": "%\"(default block symbol)\"",
               "source": null
             },
             "at": {
@@ -753,11 +761,21 @@
             },
             "pins": [
               {
+                "kind": "pin",
+                "id": "pin(#X3,0)",
+                "index": 0,
+                "names": [],
+                "bus": false,
+                "reference": "#X3:1",
+                "local_at": [
+                  -2.0,
+                  1.0
+                ],
                 "terminals": [
                   "#X3:1"
                 ],
                 "at": [
-                  21.0,
+                  22.0,
                   1.0
                 ],
                 "dir": 180,
@@ -766,11 +784,21 @@
                 ]
               },
               {
+                "kind": "pin",
+                "id": "pin(#X3,1)",
+                "index": 1,
+                "names": [],
+                "bus": false,
+                "reference": "#X3:2",
+                "local_at": [
+                  -2.0,
+                  -1.0
+                ],
                 "terminals": [
                   "#X3:2"
                 ],
                 "at": [
-                  21.0,
+                  22.0,
                   -1.0
                 ],
                 "dir": 180,
@@ -779,12 +807,22 @@
                 ]
               },
               {
+                "kind": "pin",
+                "id": "pin(#X3,2)",
+                "index": 2,
+                "names": [],
+                "bus": false,
+                "reference": "#X3:3",
+                "local_at": [
+                  2.0,
+                  0.0
+                ],
                 "terminals": [
                   "#X3:3"
                 ],
                 "at": [
-                  27.0,
-                  1.0
+                  26.0,
+                  0.0
                 ],
                 "dir": 0,
                 "nets": [
@@ -1374,6 +1412,75 @@
                 ]
               }
             ]
+          },
+          {
+            "pin_of": "#X3",
+            "id": "@rnl-std-fill.rnl:57:3",
+            "kind": "usage",
+            "host": [],
+            "definition": "$NET_LABEL_STUB",
+            "attach": {
+              "t": "pin(#X3,1)"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "pin_of": "#X3",
+            "parent": "@rnl-std-fill.rnl:57:3",
+            "id": "@rnl-std-basic.rnl:672:9",
+            "kind": "usage",
+            "host": [],
+            "definition": "$NET_LABEL",
+            "attach": {
+              "p": "pin(#X3,1)"
+            },
+            "symbol": {
+              "value": "$NET_LABEL_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(@rnl-std-basic.rnl:672:9,0)",
+                "index": 0,
+                "names": [
+                  "pin"
+                ],
+                "bus": false,
+                "local_at": [
+                  0.0,
+                  0.0
+                ],
+                "terminals": [
+                  "p"
+                ],
+                "at": null,
+                "dir": 180,
+                "nets": [
+                  "&d"
+                ]
+              }
+            ]
           }
         ],
         "points": [],
@@ -1453,15 +1560,15 @@
                 0.0
               ],
               [
-                19.5,
+                20.0,
                 0.0
               ],
               [
-                19.5,
+                20.0,
                 1.0
               ],
               [
-                21.0,
+                22.0,
                 1.0
               ]
             ],
@@ -1538,12 +1645,12 @@
             ],
             "points": [
               [
-                27.0,
-                1.0
+                26.0,
+                0.0
               ],
               [
                 28.0,
-                1.0
+                0.0
               ],
               [
                 28.0,
@@ -1851,6 +1958,39 @@
             ],
             "halign": "middle",
             "valign": "bottom",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#X3::model",
+            "attach": "#X3",
+            "key": "model",
+            "markup": {
+              "value": "${model}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "rdiv",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              24.0,
+              -2.3
+            ],
+            "halign": "middle",
+            "valign": "top",
             "rotate": 0.0,
             "size": 1.0,
             "style": {}

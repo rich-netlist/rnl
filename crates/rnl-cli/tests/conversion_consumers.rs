@@ -58,21 +58,6 @@ fn bound_terminals_and_renderer_standin_pins_still_supply_graphic_points() {
 }
 
 #[test]
-fn a_graphic_using_an_undrawn_instance_has_no_effect_without_a_conversion_error() {
-    let source = "* undrawn\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\nM1 d g s b missing\n* @RNL { #M1 @PLACE(0,0); #M1:1 @CIRCLE(radius=1) }\n.end\n";
-    let r = interpret_file(
-        Path::new("undrawn.sp"),
-        None,
-        &MemoryProvider::new().with("undrawn.sp", source),
-        &Options { std: false, ..Options::solver() },
-    )
-    .unwrap();
-    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
-    assert_eq!(r.model.levels[0].undrawn.len(), 1);
-    assert!(r.model.levels[0].shapes.is_empty());
-}
-
-#[test]
 fn pin_to_terminal_assertions_use_the_final_symbol_binding() {
     let r = read(
         "0.4",

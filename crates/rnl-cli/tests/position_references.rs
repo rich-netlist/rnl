@@ -152,21 +152,6 @@ fn a_renderer_standin_terminal_still_has_a_position() {
 }
 
 #[test]
-fn a_position_on_an_undrawn_instance_has_no_effect() {
-    let source = "* undrawn\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\nM1 d g s b missing\n* @RNL { #M1:1::position @CIRCLE(radius=1) }\n.end\n";
-    let r = interpret_file(
-        Path::new("undrawn.sp"),
-        None,
-        &MemoryProvider::new().with("undrawn.sp", source),
-        &Options { std: false, ..Options::solver() },
-    )
-    .unwrap();
-    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
-    assert_eq!(r.model.levels[0].undrawn.len(), 1);
-    assert!(r.model.levels[0].shapes.is_empty());
-}
-
-#[test]
 fn position_reference_checks_follow_the_statement_version() {
     for (outer, inner) in [("0.3", "0.4"), ("0.4", "0.3")] {
         let top = format!("* top\n* @RNL(type=\"header\") {{ @VERSION(\"{outer}\") }}\n.include child.sp\n* @RNL(scope=\"child\") {{ &a::position @CIRCLE(radius=1) }}\n.end\n");

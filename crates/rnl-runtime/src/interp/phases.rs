@@ -377,6 +377,13 @@ impl Interp<'_> {
                 }
                 self.warn_pin_bindings(s, o, fact.map(|k| &appear[k]));
             } else if matches!(self.o(o), ObjData::Inst { .. } | ObjData::Bundle { .. }) {
+                if self.follows_0_4(self.level_unit[self.scenes[s].level]) {
+                    // no instance is left without a symbol: it has the default block symbol,
+                    // after the whole queue, and is drawn like any other (9.2.6, 9.2.8)
+                    let d = self.default_block_symbol(s, base);
+                    self.set_symbol(s, o, d);
+                    continue;
+                }
                 if self.inst_of(base).model_missing {
                     // nothing tells which symbol this device has, and the renderer's own would
                     // only pretend: it is not drawn (9.2.6), and listed with the reason
@@ -402,7 +409,8 @@ impl Interp<'_> {
     fn hint_undefined(&mut self, s: SceneId) {
         let mut by_master: Vec<(String, Vec<ObjId>)> = Vec::new();
         for o in self.scenes[s].insts.clone() {
-            if !self.scenes[s].default_symbol.contains(&o) {
+            let default = self.scenes[s].symbol.get(&o).is_some_and(|sym| self.symbol(*sym).default);
+            if !self.scenes[s].default_symbol.contains(&o) && !default {
                 continue;
             }
             let inst = self.inst_of(o);
@@ -460,18 +468,6 @@ impl Interp<'_> {
                     "{list}{more} name{} no model, so the polarity is not known and {what} {verb} not drawn",
                     if names.len() == 1 { "s" } else { "" }
                 )),
-            };
-            let modern = self.follows_0_4(self.level_unit[self.scenes[s].level])
-                || self.scenes[s].creation_sites.values().any(|ctx| self.follows_0_4(self.source_unit(ctx)))
-                || self.scenes[s]
-                    .at
-                    .iter()
-                    .chain(&self.scenes[s].orient)
-                    .any(|fact| self.ignores_drawing_fact(s, fact));
-            let message = if modern {
-                format!("{message}; in language 0.4, drawing positions, orientations and texts on these instances or their terminals, and constraints and wires containing them, have no effect and do not fail (9.2.8)")
-            } else {
-                message
             };
             self.sink.warning(code, message, Some(Loc::line(first.file.clone(), first.line.max(1))));
         }
@@ -583,7 +579,71 @@ impl Interp<'_> {
         );
     }
 
-    /// The renderer's own default for an instance no symbol is given to (9.2.6, F18; principle 2.7).
+    /// The default block symbol of an instance that no rule, statement or block symbol gives a
+    /// symbol (9.2.6): a square box centred on the origin, with a pin for each port of the
+    /// subcircuit or module the file reads, by its name, or else for each node, by its number. Of
+    /// n pins, the first ceil(n/2) are on the left, from 1 below the top corner down, the others
+    /// on the right, centred; 2 apart, at the edge and facing out. The box's half side is the
+    /// number on the left, at least 1. Each pin shows its port, terminal (6.12) or number; the
+    /// name of the instance is above the box and its model below.
+    fn default_block_symbol(&mut self, s: SceneId, inst: ObjId) -> ObjId {
+        let i = self.inst_of(inst).clone();
+        let by_port = i.is_subckt && self.doc.subckt_of(&i).is_some();
+        let terms = self.owner_terms(s, inst);
+        let n = terms.len();
+        let (left, right) = (n.div_ceil(2), n - n.div_ceil(2));
+        let k = left.max(1) as f64;
+        let mut sym = SymbolDef { default: true, ..SymbolDef::default() };
+        sym.push_prim(SymPrim {
+            shape: Shape::Rectangle,
+            points: vec![(-k, -k), (k, k)],
+            params: PrimParams::default(),
+            style: StyleMap::new(),
+            text: None,
+        });
+        for (at, (number, name)) in terms.into_iter().enumerate() {
+            let (pos, dir) = if at < left {
+                ((-k, k - 1.0 - 2.0 * at as f64), 180u16)
+            } else {
+                ((k, right as f64 - 1.0 - 2.0 * (at - left) as f64), 0u16)
+            };
+            let terms = match (&name, by_port) {
+                (Some(port), true) => vec![TermKey::Name(port.clone())],
+                _ => vec![TermKey::Num(number)],
+            };
+            sym.pins.push(Pin {
+                names: Vec::new(),
+                terms,
+                bus: false,
+                pos,
+                label: Some(name.unwrap_or_else(|| number.to_string())),
+                label_name_formats: false,
+                dir: Some(dir),
+            });
+        }
+        for (key, text, y, valign) in [("name", "${name}", k + 0.3, "bottom"), ("model", "${model}", -k - 0.3, "top")] {
+            sym.push_label(SymLabel {
+                key: Some(key.into()),
+                items: TextItems {
+                    text: Some(WStr::new(text, None)),
+                    halign: Some("middle".into()),
+                    valign: Some(valign.into()),
+                    ..TextItems::default()
+                },
+                position: Some((0.0, y)),
+                style: StyleMap::new(),
+                unit: 0,
+                site: None,
+                off: 0,
+            });
+        }
+        let id = self.new_obj(ObjData::Symbol(Box::new(sym)));
+        self.objs[id.0 as usize].name = "(default block symbol)".into();
+        id
+    }
+
+    /// The renderer's own default for an instance no symbol is given to, in a file of a version
+    /// before 0.4 (9.2.6, F18; principle 2.7).
     fn default_symbol(&mut self, s: SceneId, inst: ObjId) -> ObjId {
         let terms = self.owner_terms(s, inst);
         let n = terms.len();
@@ -803,17 +863,12 @@ impl Interp<'_> {
     }
 
     pub(crate) fn fact_priority(&self, s: SceneId, f: &Fact) -> Priority {
-        if self.ignores_drawing_fact(s, f) {
-            return Priority::Disabled;
-        }
         self.eff_priority(s, f.priority, &f.chain, None)
     }
 
     // ---- geometry (8.5, 11.x, 12.1, 14.x)
 
     fn resolve_geometry(&mut self, s: SceneId) {
-        self.ignore_undrawn_rewrites(s);
-        self.ignore_undrawn_text_layers(s);
         // 1. check what PLACE, ORIENT and constraints reach (7.1, 12.1, 11.8)
         let at = self.scenes[s].at.clone();
         let mut live_at = Vec::new();
@@ -1007,7 +1062,7 @@ impl Interp<'_> {
         for w in self.scenes[s].wires.clone() {
             let ObjData::Wire { nets, .. } = self.o(w).clone() else { continue };
             let Some(WireShape { points, generated, site, off, .. }) = self.wire_shape(s, w) else { continue };
-            if site.is_none() || generated || self.drawing_ignored(s, w) {
+            if site.is_none() || generated {
                 continue;
             }
             for q in &points {
@@ -1052,7 +1107,7 @@ impl Interp<'_> {
                     self.diag_site(Severity::Error, *code, &Some(r.site.clone()), r.off, msg.clone());
                 }
             }
-            if self.drawing_ignored(s, w) || rewrites.iter().any(|r| r.fault.is_none() && !r.ignored) {
+            if rewrites.iter().any(|r| r.fault.is_none()) {
                 continue; // drawn by a rewrite that holds
             }
             let Some(WireShape { points, site, off, .. }) = self.wire_shape(s, w) else { continue };
@@ -1066,7 +1121,7 @@ impl Interp<'_> {
             }
         }
         for t in self.scenes[s].texts.clone() {
-            if self.is_obj_failed(t) || self.drawing_ignored(s, t) {
+            if self.is_obj_failed(t) {
                 continue;
             }
             // `by_rule`: only rules gave the text, a TEXT for what a selection reached (10.4); one
@@ -1298,9 +1353,6 @@ impl Interp<'_> {
         if self.is_obj_failed(f.target) || f.ctx.as_ref().is_some_and(|ctx| self.failed_body(ctx)) {
             return false;
         }
-        if self.ignores_drawing_fact(s, f) {
-            return false;
-        }
         if f.ctx.is_none() {
             return true;
         }
@@ -1525,17 +1577,12 @@ impl Interp<'_> {
             for k in 0..self.scenes[s].rewrites[&w].len() {
                 let points = self.scenes[s].rewrites[&w][k].points.clone();
                 let site = self.scenes[s].rewrites[&w][k].site.clone();
-                let ignored = self.ignores_drawing_inputs(s, Some(&site), &points);
-                let fault = if ignored {
-                    None
-                } else {
-                    self.wire_rewrite_error(&site, &points)
-                        .or_else(|| points.iter().find_map(|q| self.term_fault(s, *q)).map(|f| f.for_rewrite(&wire)))
-                };
+                let fault = self
+                    .wire_rewrite_error(&site, &points)
+                    .or_else(|| points.iter().find_map(|q| self.term_fault(s, *q)).map(|f| f.for_rewrite(&wire)));
                 let Some(r) = self.scenes[s].rewrites.get_mut(&w).map(|r| &mut r[k]) else { continue };
-                let style = r.style.filter(|_| fault.is_some() || ignored);
+                let style = r.style.filter(|_| fault.is_some());
                 r.fault = fault;
-                r.ignored = ignored;
                 if let Some(f) = style.and_then(|j| self.scenes[s].styles.get_mut(j)) {
                     f.data = FactData::OwnStyle(StyleMap::new());
                 }
@@ -2026,9 +2073,6 @@ impl Interp<'_> {
     }
 
     pub(crate) fn wire_points(&mut self, scene: SceneId, wire: ObjId) -> Option<Vec<Pt>> {
-        if self.drawing_ignored(scene, wire) {
-            return None;
-        }
         let shape = self.wire_shape(scene, wire)?;
         let modern = self.modern_wire_source(scene, shape.site.as_ref());
         self.routed_wire_run(scene, &shape.points, &shape.mode, modern, (true, true))
@@ -2037,9 +2081,6 @@ impl Interp<'_> {
     /// Consecutive positioned runs after routing. The corresponding source indices distinguish
     /// real wire endpoints from the free ends of an intermediate partially positioned run.
     pub(crate) fn wire_runs(&mut self, scene: SceneId, wire: ObjId) -> Option<Vec<Vec<Pt>>> {
-        if self.drawing_ignored(scene, wire) {
-            return None;
-        }
         let shape = self.wire_shape(scene, wire)?;
         let modern = self.modern_wire_source(scene, shape.site.as_ref());
         let mut ranges: Vec<Vec<ObjId>> = Vec::new();
@@ -2136,10 +2177,6 @@ impl Interp<'_> {
                 vec![cd.args[0]]
             };
             let leaves = self.leaves(s, &members);
-            if self.ignores_drawing_inputs(s, site.as_deref(), &leaves) {
-                self.constraint_mut(c).status = Some("ignored");
-                continue;
-            }
             if relation && site.as_ref().is_some_and(|ctx| self.follows_0_4(self.source_unit(ctx))) {
                 let pin_count = leaves.iter().filter(|m| self.is_pin_direction_input(**m)).count();
                 if pin_count > 0 && pin_count < leaves.len() {
