@@ -7,7 +7,7 @@
 // `rnl solve` writes, byte for byte, under a limit of work.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadSolver } from "../js/solver.js";
@@ -52,6 +52,20 @@ const table = solver.settings();
 assert.equal(table.version, 1);
 assert.equal(table.settings.find((s) => s.key === "layout").default, "lines");
 assert.ok(table.objectives.length > 0 && table.stages.length > 0 && table.groups.length > 0);
+
+// the settings checked, nothing solved: of each level, and of the solver_config alone
+const checked = solver.check({ ...request, solver_config: 'beam=6,grid="x"' });
+assert.equal(checked.ok, false, JSON.stringify(checked));
+assert.equal(checked.levels[0].settings.layout.from, "header");
+assert.equal(checked.levels[0].settings.layout.at, "main.sp:2");
+assert.equal(checked.levels[0].settings.beam.value, 6);
+assert.equal(checked.levels[0].settings.beam.from, "command-line");
+assert.deepEqual(checked.levels[0].errors.map((e) => e.key), ["grid"]);
+const alone = solver.check({ solver_config: "beam=0" });
+assert.equal(alone.levels.length, 1);
+assert.equal(alone.levels[0].title, null);
+assert.deepEqual(alone.levels[0].errors.map((e) => e.key), ["beam"]);
+assert.match(solver.check({ ...request, files: { "/w/main.sp": source, "\\w\\main.sp": source } }).error, /are one file$/);
 
 const bad = solver.solve({ ...request, solver_config: "beam=0" });
 assert.match(bad.error, /^solver_config:/);
@@ -172,8 +186,17 @@ if (rnl) {
     rmSync(dir, { recursive: true, force: true });
   }
   console.log(`${count} files written through WebAssembly are byte for byte those of ${rnl}`);
+  mkdirSync(dir, { recursive: true });
   const printed = spawnSync(rnl, ["solver-defaults", "--json"], { encoding: "utf8" });
   assert.equal(printed.status, 0, printed.stderr);
   assert.deepEqual(solver.settings(), JSON.parse(printed.stdout));
   console.log(`the table of the settings is that of ${rnl} solver-defaults --json`);
+  // the check is that of the CLI
+  writeFileSync(join(dir, "main.sp"), source);
+  const config = 'beam=6,grid="x"';
+  const cli = spawnSync(rnl, ["solve", join(dir, "main.sp"), "--check", "--json", "--no-std", "--solver-config", config], { encoding: "utf8" });
+  assert.equal(cli.status, 1, cli.stderr);
+  assert.deepEqual(solver.check({ ...request, solver_config: config }), JSON.parse(cli.stdout));
+  rmSync(dir, { recursive: true, force: true });
+  console.log(`the check of the settings is that of ${rnl} solve --check --json`);
 }

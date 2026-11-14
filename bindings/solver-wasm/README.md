@@ -20,7 +20,7 @@ The exports are those of the core's module, with `rnl_solve` in place of `rnl_bu
 2. `rnl_solve()` solves it and returns the answer's length.
 3. `rnl_response()` gives where the answer is.
 
-`rnl_settings()` takes no request: it puts the table of the solver's settings and objectives where `rnl_response()` says, as `rnl solver-defaults --json` prints it, and returns its length.
+`rnl_check()` checks the settings of the request written there, as `rnl solve --check --json` does, nothing solved, and returns the length of the answer. `rnl_settings()` takes no request: it puts the table of the solver's settings and objectives where `rnl_response()` says, as `rnl solver-defaults --json` prints it, and returns its length.
 
 A panic traps; `rnl_panic_len`, `rnl_panic_message` and `rnl_alloc_failed` say why.
 
@@ -45,6 +45,7 @@ After a panic or another trap, an instance is not to be used again: what the cal
 - **After a trap:** `solve` throws `The solver stopped: …` with the panic's message, and the loader makes a new instance for the next call.
 - **One solve at a time:** `onProgress` cannot call `solve` of the same solver, which throws then.
 - **The settings:** `settings()` gives the table of the solver's settings and objectives, from which a page draws its settings ([docs/solver-settings-table.md](../../docs/solver-settings-table.md)).
+- **The check:** `check(request)` gives each level's settings, with where each comes from, and their warnings and errors, as `rnl solve --check --json` prints them, nothing solved. The request is a solve request; without `entry`, its `solver_config` alone is checked. Each `at` is `file:line`, the file named as the core's diagnostics name it. Neither `settings()` nor `check()` reads the clock or calls a callback.
 
 The call is synchronous and can take the solver's whole time limit. Run it in a Worker of its own. Terminating that Worker and starting another also cancels, at once.
 

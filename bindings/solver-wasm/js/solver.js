@@ -37,7 +37,7 @@
  * @param {{ now?: () => number }} [options] `now` gives milliseconds, which the solver's time
  *   limit is measured on; `performance.now()` when not given. It has to go on: on a clock that
  *   stands still a time limit never ends, so give a limit of work with such a clock.
- * @returns {Promise<{ solve(request: SolveRequest, onProgress?: (event: object) => boolean | void): SolveAnswer, settings(): object }>}
+ * @returns {Promise<{ solve(request: SolveRequest, onProgress?: (event: object) => boolean | void): SolveAnswer, settings(): object, check(request: SolveRequest): object }>}
  *   `onProgress` gets each progress event as docs/solver-progress.md describes it. When it
  *   returns `false` the solve is cancelled, and the answer is `{ cancelled: true }`. When it
  *   throws, the solve is cancelled too, and `solve` throws what it threw. It cannot call `solve`
@@ -91,6 +91,30 @@ export async function loadSolver(source, { now = () => performance.now() } = {})
     }
   }
 
+  /** A call that takes no callback: its answer, read where the module says. */
+  function call(run) {
+    if (solving) throw new Error("The solver is solving: a progress callback cannot call it.");
+    if (broken) throw new Error(`The solver could not start again after a failure: ${broken.message}`, { cause: broken });
+    if (!instance) throw new Error("The solver is starting again after a failure; call it again in a moment.");
+    const api = instance.exports;
+    let answer;
+    try {
+      const length = run(api) >>> 0;
+      answer = text(api.rnl_response(), length);
+    } catch (e) {
+      let why = "";
+      try {
+        const panic = api.rnl_panic_len() >>> 0;
+        why = panic ? text(api.rnl_panic_message(), panic) : "";
+      } catch {
+        // the instance cannot say
+      }
+      restart();
+      throw new Error(`The solver stopped: ${why || e.message}`, { cause: e });
+    }
+    return JSON.parse(answer);
+  }
+
   return {
     solve(request, progress) {
       // one solve at a time: a callback that solved would take over the outer solve's state
@@ -135,26 +159,25 @@ export async function loadSolver(source, { now = () => performance.now() } = {})
      * @returns {object}
      */
     settings() {
-      if (solving) throw new Error("The solver is solving: a progress callback cannot ask for its settings.");
-      if (broken) throw new Error(`The solver could not start again after a failure: ${broken.message}`, { cause: broken });
-      if (!instance) throw new Error("The solver is starting again after a failure; ask again in a moment.");
-      const api = instance.exports;
-      let answer;
-      try {
-        const length = api.rnl_settings() >>> 0;
-        answer = text(api.rnl_response(), length);
-      } catch (e) {
-        let why = "";
-        try {
-          const panic = api.rnl_panic_len() >>> 0;
-          why = panic ? text(api.rnl_panic_message(), panic) : "";
-        } catch {
-          // the instance cannot say
-        }
-        restart();
-        throw new Error(`The solver stopped: ${why || e.message}`, { cause: e });
-      }
-      return JSON.parse(answer);
+      return call((api) => api.rnl_settings());
+    },
+
+    /**
+     * The settings of each level of a request, as `rnl solve --check --json` prints them, nothing
+     * solved: each with its value and where it comes from, and the warnings and the errors. The
+     * request is a solve request; without `entry`, its `solver_config` alone is checked. It reads
+     * no clock and calls no callback.
+     *
+     * @param {SolveRequest} request
+     * @returns {object} The check, or `{ error }`.
+     */
+    check(request) {
+      return call((api) => {
+        const bytes = encoder.encode(JSON.stringify(request));
+        const at = api.rnl_request(bytes.length) >>> 0;
+        new Uint8Array(api.memory.buffer, at, bytes.length).set(bytes);
+        return api.rnl_check();
+      });
     },
   };
 }
