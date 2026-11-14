@@ -612,11 +612,8 @@ impl Interp<'_> {
                     }
                     _ if terminal_point => {
                         let ObjData::Term { owner, .. } = *self.o(value) else { unreachable!() };
-                        // A renderer stand-in may supply pins. Only a genuinely undrawn
-                        // instance gets the no-effect exception of 9.2.8.
+                        // a terminal converts to its pin, of whatever symbol (5.2.4)
                         self.pin_for(scene, owner, value).is_some()
-                            || !self.scenes[scene].symbol.contains_key(&owner)
-                                && matches!(self.o(owner), ObjData::Inst { .. } | ObjData::Bundle { .. })
                     }
                     _ => {
                         matches!(self.o(value), ObjData::ScenePin { .. } | ObjData::Point { .. } | ObjData::Pos { .. })

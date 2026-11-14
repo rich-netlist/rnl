@@ -52,7 +52,7 @@ fn explicit_wire_scopes_keep_their_written_order() {
 fn label_scopes_follow_owner_order_and_keep_each_label_once() {
     assert_eq!(
         labels(&read("0.4", LABELS, "{#R2 #R1 #R2} @SELECT-LABEL")),
-        ["#R2::second", "#R2::name", "#R1::first", "#R1::third", "#R1::name"]
+        ["#R2::second", "#R2::name", "#R2::model", "#R1::first", "#R1::third", "#R1::name", "#R1::model"]
     );
 }
 
@@ -60,7 +60,7 @@ fn label_scopes_follow_owner_order_and_keep_each_label_once() {
 fn a_label_itself_is_given_at_its_first_scope_occurrence() {
     assert_eq!(
         labels(&read("0.4", LABELS, "{#R1::third #R2 #R1} @SELECT-LABEL")),
-        ["#R1::third", "#R2::second", "#R2::name", "#R1::first", "#R1::name"]
+        ["#R1::third", "#R2::second", "#R2::name", "#R2::model", "#R1::first", "#R1::name", "#R1::model"]
     );
 }
 
@@ -93,5 +93,5 @@ fn usage_members_do_not_gain_an_extra_scope_step() {
     let body = format!("{WIRES}; $D = @DEFINE(roles=[\"x\"]) {{}}; %u=&a @AS $D");
     assert_eq!(labels(&read("0.4", &body, "{%u &b} @SELECT-WIRE")), ["%wb"]);
     let body = format!("{LABELS}; $D = @DEFINE(roles=[\"x\"]) {{}}; %u=#R1 @AS $D");
-    assert_eq!(labels(&read("0.4", &body, "{%u #R2} @SELECT-LABEL")), ["#R2::second", "#R2::name"]);
+    assert_eq!(labels(&read("0.4", &body, "{%u #R2} @SELECT-LABEL")), ["#R2::second", "#R2::name", "#R2::model"]);
 }

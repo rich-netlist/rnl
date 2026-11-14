@@ -47,7 +47,7 @@ fn selected(body: &str, selection: &str) -> Interpretation {
 #[test]
 fn terminal_scope_selects_every_independent_bound_pin() {
     for (scope, expected) in
-        [("#R1", 4), ("#R1:1", 3), ("#R1:2", 1), ("&a", 3), ("&b", 1), ("#R1::p", 1), ("#R1::p::position", 0)]
+        [("#R1", 4), ("#R1:1", 3), ("#R1:2", 1), ("&a", 3), ("&b", 2), ("#R1::p", 1), ("#R1::p::position", 0)]
     {
         let r = selected(SYMBOL, &format!("{scope} @SELECT-PIN"));
         assert_eq!(count(&r), expected, "{scope}");
@@ -60,23 +60,25 @@ fn terminal_scope_selects_every_independent_bound_pin() {
 }
 
 #[test]
-fn level_scope_excludes_renderer_standins() {
-    assert_eq!(count(&selected(SYMBOL, "# @SELECT-PIN")), 4);
-    assert_eq!(count(&selected("", "# @SELECT-PIN")), 0);
-    assert_eq!(count(&selected(SYMBOL, "# @SELECT-INSTANCE(drawn=true)")), 1);
-    assert_eq!(count(&selected(SYMBOL, "# @SELECT-INSTANCE(drawn=false)")), 1);
+fn level_scope_includes_the_pins_of_default_block_symbols() {
+    // #R2 has the default block symbol, with a pin for each terminal; it is drawn (9.2.6, 10.1)
+    assert_eq!(count(&selected(SYMBOL, "# @SELECT-PIN")), 6);
+    assert_eq!(count(&selected("", "# @SELECT-PIN")), 4);
+    assert_eq!(count(&selected(SYMBOL, "# @SELECT-INSTANCE(drawn=true)")), 2);
+    assert_eq!(count(&selected(SYMBOL, "# @SELECT-INSTANCE(drawn=false)")), 0);
+    assert_eq!(count(&selected(SYMBOL, r#"# @SELECT-INSTANCE(symbol="*")"#)), 1);
 }
 
 #[test]
 fn pin_conditions_keep_unbound_and_bus_pins_distinct() {
     for (condition, expected) in [
-        ("terminal=1", 3),
-        ("terminal=2", 1),
+        ("terminal=1", 4),
+        ("terminal=2", 2),
         ("net=\"a\"", 3),
-        ("net=\"b\"", 1),
-        ("name=\"r*\"", 4),
-        ("name=\"R2\"", 0),
-        ("wired=false", 4),
+        ("net=\"b\"", 2),
+        ("name=\"r*\"", 6),
+        ("name=\"R2\"", 2),
+        ("wired=false", 6),
     ] {
         assert_eq!(count(&selected(SYMBOL, &format!("# @SELECT-PIN({condition})"))), expected, "{condition}");
     }
@@ -162,7 +164,7 @@ fn percent_and_anonymous_symbols_are_drawn_but_match_no_dollar_name() {
     for assignment in ["%s = $S; #R1 @SET-SYMBOL %s", "#R1 @SET-SYMBOL { @DEFINE-SYMBOL { (0,0) @PIN(terminal=1)}}"] {
         let body = format!("{SYMBOL}; {assignment}");
         assert_eq!(count(&selected(&body, r#"# @SELECT-INSTANCE(symbol="*")"#)), 0);
-        assert_eq!(count(&selected(&body, "# @SELECT-INSTANCE(drawn=true)")), 1);
+        assert_eq!(count(&selected(&body, "# @SELECT-INSTANCE(drawn=true)")), 2);
     }
 }
 
@@ -177,7 +179,7 @@ fn symbol_conditions_apply_to_usages_and_instance_assertions() {
     assert_eq!(count(&selected(&body, "# @SELECT-USAGE(drawn=false)")), 1);
     let r = read(
         "0.4",
-        &format!(r#"{SYMBOL}; #R1 @ASSERT-INSTANCE(symbol="$S",drawn=true); #R2 @ASSERT-INSTANCE(drawn=false)"#),
+        &format!(r#"{SYMBOL}; #R1 @ASSERT-INSTANCE(symbol="$S",drawn=true); #R2 @ASSERT-INSTANCE(drawn=true)"#),
     );
     assert!(
         !r.diagnostics().iter().any(|d| matches!(d.severity, Severity::Error | Severity::Violation)),
@@ -185,7 +187,7 @@ fn symbol_conditions_apply_to_usages_and_instance_assertions() {
         r.diagnostics()
     );
     let r =
-        read("0.4", &format!(r#"{SYMBOL}; #R1 @ASSERT-INSTANCE(symbol="$OTHER"); #R2 @ASSERT-INSTANCE(drawn=true)"#));
+        read("0.4", &format!(r#"{SYMBOL}; #R1 @ASSERT-INSTANCE(symbol="$OTHER"); #R2 @ASSERT-INSTANCE(drawn=false)"#));
     assert_eq!(r.diagnostics().iter().filter(|d| d.severity == Severity::Violation).count(), 2);
 }
 
@@ -397,7 +399,7 @@ fn generated_wires_do_not_change_the_selection_snapshot() {
         r#"{SYMBOL}; $D = @DEFINE(roles=[["p","pin"]]) {{ ?p::net @WIRE {{?p (8,8)}} }};
         # @SELECT-PIN(net="a") => @AS $D"#
     );
-    assert_eq!(count(&selected(&body, "# @SELECT-PIN(wired=false)")), 4);
+    assert_eq!(count(&selected(&body, "# @SELECT-PIN(wired=false)")), 6);
 }
 
 #[test]

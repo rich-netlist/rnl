@@ -9,7 +9,7 @@
       "name": "12-diagnostics.sp",
       "file": 0,
       "line": 0,
-      "status": "3 without a position; constraints: 11 ok, 1 failed, 8 unsolved",
+      "status": "5 without a position; constraints: 11 ok, 1 failed, 14 unsolved",
       "host": {
         "ports": [],
         "instances": [
@@ -274,8 +274,8 @@
             "definition": null
           },
           {
-            "id": "%\"(viewer default)\"",
-            "name": "%\"(viewer default)\"",
+            "id": "%\"(default block symbol)\"",
+            "name": "%\"(default block symbol)\"",
             "package": null,
             "level": null,
             "default": true,
@@ -649,7 +649,7 @@
             "definition": null,
             "attach": null,
             "symbol": {
-              "value": "%\"(viewer default)\"",
+              "value": "%\"(default block symbol)\"",
               "source": null
             },
             "at": {
@@ -665,11 +665,21 @@
             },
             "pins": [
               {
+                "kind": "pin",
+                "id": "pin(#X1,0)",
+                "index": 0,
+                "names": [],
+                "bus": false,
+                "reference": "#X1:1",
+                "local_at": [
+                  -1.0,
+                  0.0
+                ],
                 "terminals": [
                   "#X1:1"
                 ],
                 "at": [
-                  -11.0,
+                  -9.0,
                   0.0
                 ],
                 "dir": 180,
@@ -678,11 +688,21 @@
                 ]
               },
               {
+                "kind": "pin",
+                "id": "pin(#X1,1)",
+                "index": 1,
+                "names": [],
+                "bus": false,
+                "reference": "#X1:2",
+                "local_at": [
+                  1.0,
+                  0.0
+                ],
                 "terminals": [
                   "#X1:2"
                 ],
                 "at": [
-                  -5.0,
+                  -7.0,
                   0.0
                 ],
                 "dir": 0,
@@ -1246,13 +1266,13 @@
             ]
           },
           {
-            "pin_of": "#R3",
-            "id": "@rnl-std-fill.rnl:57:3",
+            "pin_of": "#X1",
+            "id": "@rnl-std-fill.rnl:57:3#1",
             "kind": "usage",
             "host": [],
             "definition": "$NET_LABEL_STUB",
             "attach": {
-              "t": "pin(#R3,0)"
+              "t": "pin(#X1,0)"
             },
             "symbol": {
               "value": null,
@@ -1269,14 +1289,14 @@
             "pins": []
           },
           {
-            "pin_of": "#R3",
-            "parent": "@rnl-std-fill.rnl:57:3",
+            "pin_of": "#X1",
+            "parent": "@rnl-std-fill.rnl:57:3#1",
             "id": "@rnl-std-basic.rnl:672:9#4",
             "kind": "usage",
             "host": [],
             "definition": "$NET_LABEL",
             "attach": {
-              "p": "pin(#R3,0)"
+              "p": "pin(#X1,0)"
             },
             "symbol": {
               "value": "$NET_LABEL_SYMBOL",
@@ -1310,6 +1330,144 @@
                 "dir": 180,
                 "nets": [
                   "&a"
+                ]
+              }
+            ]
+          },
+          {
+            "pin_of": "#R3",
+            "id": "@rnl-std-fill.rnl:57:3#2",
+            "kind": "usage",
+            "host": [],
+            "definition": "$NET_LABEL_STUB",
+            "attach": {
+              "t": "pin(#R3,0)"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "pin_of": "#R3",
+            "parent": "@rnl-std-fill.rnl:57:3#2",
+            "id": "@rnl-std-basic.rnl:672:9#5",
+            "kind": "usage",
+            "host": [],
+            "definition": "$NET_LABEL",
+            "attach": {
+              "p": "pin(#R3,0)"
+            },
+            "symbol": {
+              "value": "$NET_LABEL_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(@rnl-std-basic.rnl:672:9#5,0)",
+                "index": 0,
+                "names": [
+                  "pin"
+                ],
+                "bus": false,
+                "local_at": [
+                  0.0,
+                  0.0
+                ],
+                "terminals": [
+                  "p"
+                ],
+                "at": null,
+                "dir": 180,
+                "nets": [
+                  "&a"
+                ]
+              }
+            ]
+          },
+          {
+            "pin_of": "#X1",
+            "id": "@rnl-std-fill.rnl:57:3#3",
+            "kind": "usage",
+            "host": [],
+            "definition": "$NET_LABEL_STUB",
+            "attach": {
+              "t": "pin(#X1,1)"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "pin_of": "#X1",
+            "parent": "@rnl-std-fill.rnl:57:3#3",
+            "id": "@rnl-std-basic.rnl:672:9#6",
+            "kind": "usage",
+            "host": [],
+            "definition": "$NET_LABEL",
+            "attach": {
+              "p": "pin(#X1,1)"
+            },
+            "symbol": {
+              "value": "$NET_LABEL_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(@rnl-std-basic.rnl:672:9#6,0)",
+                "index": 0,
+                "names": [
+                  "pin"
+                ],
+                "bus": false,
+                "local_at": [
+                  0.0,
+                  0.0
+                ],
+                "terminals": [
+                  "p"
+                ],
+                "at": null,
+                "dir": 180,
+                "nets": [
+                  "&b"
                 ]
               }
             ]
@@ -1838,6 +1996,39 @@
             ],
             "halign": "middle",
             "valign": "bottom",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#X1::model",
+            "attach": "#X1",
+            "key": "model",
+            "markup": {
+              "value": "${model}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "sub",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -8.0,
+              -1.3
+            ],
+            "halign": "middle",
+            "valign": "top",
             "rotate": 0.0,
             "size": 1.0,
             "style": {}

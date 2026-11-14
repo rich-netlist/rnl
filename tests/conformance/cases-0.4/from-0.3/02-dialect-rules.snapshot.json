@@ -9,7 +9,7 @@
       "name": "02-dialect-rules.scs",
       "file": 0,
       "line": 0,
-      "status": "1 without a position; constraints: 2 unsolved, 2 ok",
+      "status": "2 without a position; constraints: 4 unsolved, 2 ok",
       "host": {
         "ports": [],
         "instances": [
@@ -64,8 +64,8 @@
       "model": {
         "symbols": [
           {
-            "id": "%\"(viewer default)\"",
-            "name": "%\"(viewer default)\"",
+            "id": "%\"(default block symbol)\"",
+            "name": "%\"(default block symbol)\"",
             "package": null,
             "level": null,
             "default": true,
@@ -102,7 +102,7 @@
             "definition": null,
             "attach": null,
             "symbol": {
-              "value": "%\"(viewer default)\"",
+              "value": "%\"(default block symbol)\"",
               "source": null
             },
             "at": {
@@ -118,11 +118,21 @@
             },
             "pins": [
               {
+                "kind": "pin",
+                "id": "pin(#I0,0)",
+                "index": 0,
+                "names": [],
+                "bus": false,
+                "reference": "#I0:1",
+                "local_at": [
+                  -1.0,
+                  0.0
+                ],
                 "terminals": [
                   "#I0:1"
                 ],
                 "at": [
-                  -3.0,
+                  -1.0,
                   0.0
                 ],
                 "dir": 180,
@@ -131,11 +141,21 @@
                 ]
               },
               {
+                "kind": "pin",
+                "id": "pin(#I0,1)",
+                "index": 1,
+                "names": [],
+                "bus": false,
+                "reference": "#I0:2",
+                "local_at": [
+                  1.0,
+                  0.0
+                ],
                 "terminals": [
                   "#I0:2"
                 ],
                 "at": [
-                  3.0,
+                  1.0,
                   0.0
                 ],
                 "dir": 0,
@@ -222,8 +242,76 @@
             ]
           },
           {
+            "pin_of": "#I0",
+            "id": "@rnl-std-fill.rnl:34:3#1",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GROUND_STUB",
+            "attach": {
+              "t": "pin(#I0,1)"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "parent": "@rnl-std-fill.rnl:34:3#1",
+            "id": "@rnl-std-basic.rnl:638:9#1",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GROUND",
+            "attach": {
+              "p": "pin(#I0,1)::net"
+            },
+            "symbol": {
+              "value": "$GROUND_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(@rnl-std-basic.rnl:638:9#1,0)",
+                "index": 0,
+                "names": [
+                  "pin"
+                ],
+                "bus": false,
+                "local_at": [
+                  0.0,
+                  0.0
+                ],
+                "terminals": [
+                  "p"
+                ],
+                "at": null,
+                "dir": 90,
+                "nets": [
+                  "&0"
+                ]
+              }
+            ]
+          },
+          {
             "pin_of": "#R0",
-            "id": "@rnl-std-fill.rnl:34:3",
+            "id": "@rnl-std-fill.rnl:34:3#2",
             "kind": "usage",
             "host": [],
             "definition": "$GROUND_STUB",
@@ -245,8 +333,8 @@
             "pins": []
           },
           {
-            "parent": "@rnl-std-fill.rnl:34:3",
-            "id": "@rnl-std-basic.rnl:638:9",
+            "parent": "@rnl-std-fill.rnl:34:3#2",
+            "id": "@rnl-std-basic.rnl:638:9#2",
             "kind": "usage",
             "host": [],
             "definition": "$GROUND",
@@ -268,7 +356,7 @@
             "pins": [
               {
                 "kind": "pin",
-                "id": "pin(@rnl-std-basic.rnl:638:9,0)",
+                "id": "pin(@rnl-std-basic.rnl:638:9#2,0)",
                 "index": 0,
                 "names": [
                   "pin"
@@ -322,6 +410,39 @@
             ],
             "halign": "middle",
             "valign": "bottom",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#I0::model",
+            "attach": "#I0",
+            "key": "model",
+            "markup": {
+              "value": "${model}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "cell",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              0.0,
+              -1.3
+            ],
+            "halign": "middle",
+            "valign": "top",
             "rotate": 0.0,
             "size": 1.0,
             "style": {}

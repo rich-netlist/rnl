@@ -7,11 +7,11 @@
       "file": "09-include-without-header.sp",
       "symbols": [
         {
-          "name": "(viewer default)",
+          "name": "(default block symbol)",
           "box": [
-            -3.0,
             -1.0,
-            3.0,
+            -1.0,
+            1.0,
             1.0
           ],
           "box_written": false,
@@ -19,22 +19,22 @@
           "pins": [
             {
               "pos": [
-                -3.0,
+                -1.0,
                 0.0
               ],
               "terminals": [
-                "1"
+                "top"
               ],
               "label": "top",
               "dir": 180
             },
             {
               "pos": [
-                3.0,
+                1.0,
                 0.0
               ],
               "terminals": [
-                "2"
+                "bot"
               ],
               "label": "bot",
               "dir": 0
@@ -45,42 +45,12 @@
               "shape": "RECTANGLE",
               "points": [
                 [
-                  -2.0,
+                  -1.0,
                   -1.0
                 ],
                 [
-                  2.0,
+                  1.0,
                   1.0
-                ]
-              ],
-              "style": {
-                "linestyle": "dashed"
-              }
-            },
-            {
-              "shape": "LINE",
-              "points": [
-                [
-                  -3.0,
-                  0.0
-                ],
-                [
-                  -2.0,
-                  0.0
-                ]
-              ],
-              "style": {}
-            },
-            {
-              "shape": "LINE",
-              "points": [
-                [
-                  3.0,
-                  0.0
-                ],
-                [
-                  2.0,
-                  0.0
                 ]
               ],
               "style": {}
@@ -148,10 +118,73 @@
             "textcolor": "#1d1d1f"
           },
           "layer": "middle"
+        },
+        {
+          "id": "#X1::model",
+          "anchor": [
+            0.0,
+            -1.3
+          ],
+          "lines": [
+            [
+              {
+                "text": "divider",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "middle",
+          "valign": "top",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "bold": true,
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
         }
       ],
       "flylines": [],
       "constraints": [
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "unsolved",
+          "priority": "low"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "unsolved",
+          "priority": "low"
+        },
+        {
+          "label": "ORIENT-RELATION",
+          "kind": "ORIENT-RELATION",
+          "status": "unsolved",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "unsolved",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "unsolved",
+          "priority": "normal"
+        },
         {
           "label": "ORDER",
           "kind": "ORDER",
@@ -165,7 +198,10 @@
           "priority": "low"
         }
       ],
-      "unplaced": []
+      "unplaced": [
+        "%g",
+        "%l"
+      ]
     },
     {
       "title": "divider",
@@ -553,6 +589,14 @@
     }
   ],
   "diagnostics": [
+    {
+      "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
+      "file": "09-include-without-header.sp",
+      "line": 1,
+      "col": 0
+    },
     {
       "severity": "hint",
       "code": "RNL9404",

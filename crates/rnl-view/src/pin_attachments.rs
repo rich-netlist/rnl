@@ -115,9 +115,10 @@ fn pin_attachments_follow_the_converted_role_kind() {
 }
 
 #[test]
-fn pin_attachments_do_not_infer_pins_for_undrawn_terminals() {
+fn pin_attachments_reach_the_pins_of_the_default_block_symbol() {
+    // #R1 has no symbol of its own: the default block symbol gives each terminal a pin (9.2.6)
     let s = read("0.4", "$D = @DEFINE(roles=[\"t\"]) {}; %u = #R1:1 @AS $D");
-    assert_eq!(owner(&s, "%u"), None);
+    assert_eq!(owner(&s, "%u").as_deref(), Some("R1"));
 }
 
 #[test]

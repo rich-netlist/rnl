@@ -98,7 +98,7 @@ pub(super) fn inspect(r: &Interpretation, levels: &mut [Level]) -> Vec<Inspected
             SymbolOrigin::Level(lv) => {
                 r.doc.levels.get(*lv).map(|l| format!("Defined in {}", l.name)).unwrap_or_default()
             }
-            SymbolOrigin::None if s.default => "Viewer default symbol".into(),
+            SymbolOrigin::None if s.default => "Default block symbol".into(),
             SymbolOrigin::None => "Inline symbol".into(),
         };
         let k = out.len();

@@ -302,8 +302,8 @@
             }
           },
           {
-            "id": "%\"(viewer default)\"",
-            "name": "%\"(viewer default)\"",
+            "id": "%\"(default block symbol)\"",
+            "name": "%\"(default block symbol)\"",
             "package": null,
             "level": null,
             "default": true,
@@ -756,7 +756,7 @@
             "definition": null,
             "attach": null,
             "symbol": {
-              "value": "%\"(viewer default)\"",
+              "value": "%\"(default block symbol)\"",
               "source": null
             },
             "at": {
@@ -772,11 +772,21 @@
             },
             "pins": [
               {
+                "kind": "pin",
+                "id": "pin(#R7,0)",
+                "index": 0,
+                "names": [],
+                "bus": false,
+                "reference": "#R7:1",
+                "local_at": [
+                  -1.0,
+                  0.0
+                ],
                 "terminals": [
                   "#R7:1"
                 ],
                 "at": [
-                  21.0,
+                  23.0,
                   0.0
                 ],
                 "dir": 180,
@@ -785,11 +795,21 @@
                 ]
               },
               {
+                "kind": "pin",
+                "id": "pin(#R7,1)",
+                "index": 1,
+                "names": [],
+                "bus": false,
+                "reference": "#R7:2",
+                "local_at": [
+                  1.0,
+                  0.0
+                ],
                 "terminals": [
                   "#R7:2"
                 ],
                 "at": [
-                  27.0,
+                  25.0,
                   0.0
                 ],
                 "dir": 0,

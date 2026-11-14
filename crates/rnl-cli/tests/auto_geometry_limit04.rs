@@ -43,13 +43,6 @@ fn unresolved_gap_is_not_an_auto_geometry_error() {
 }
 
 #[test]
-fn ignored_undrawn_wire_does_not_report_geometry_error() {
-    let r = read(&format!(r#"{}; &a @WIRE {{#R1::p ({MAX},4) #M1:g}}"#, prefix()));
-    assert!(!r.model.levels[0].undrawn.is_empty());
-    assert_eq!(geometry_errors(&r), 0, "{:?}", r.diagnostics());
-}
-
-#[test]
 fn effective_rewrite_is_checked_and_reported_once() {
     let r = read(&format!(
         r#"{}; %w = &a @WIRE(mode="straight") {{(0,0) (1,0)}};

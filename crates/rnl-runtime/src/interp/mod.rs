@@ -56,7 +56,6 @@ mod standard;
 mod symbol_pins;
 mod terminal_maps;
 mod topology;
-mod undrawn;
 pub mod unit;
 mod usage_points;
 

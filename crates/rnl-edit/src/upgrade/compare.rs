@@ -389,6 +389,15 @@ fn without_look(category: &str, value: &Value) -> Value {
         }
         "objects" => {
             map.remove("style");
+            // The default symbol, the viewer's stand-in of 0.3 or the default block symbol of 0.4
+            // (9.2.6), is the default look as a whole; so is no symbol, of an instance 0.3 left
+            // undrawn, which 0.4 draws with the default block symbol.
+            let default_symbol = map.remove("default_symbol") == Some(Value::Bool(true));
+            let undrawn = map.get("kind") == Some(&Value::from("instance")) && map.get("symbol") == Some(&Value::Null);
+            if default_symbol || undrawn {
+                map.remove("symbol");
+                map.remove("geometry");
+            }
             let standard = map.get("standard_symbol") == Some(&Value::Bool(true));
             if let Some(symbol) = map.get_mut("geometry").and_then(Value::as_object_mut) {
                 if standard {
@@ -627,11 +636,12 @@ fn snapshot(read: &Interpretation, added: &BTreeMap<String, BTreeSet<String>>) -
             };
             let geometry = drawn.or_else(undrawn);
             let standard = matches!(object.symbol.as_ref().map(|s| &s.origin), Some(SymbolOrigin::Package(_)));
+            let default_symbol = object.symbol.as_ref().is_some_and(|s| s.default);
             put(
                 "objects",
                 &key,
                 json!({"kind":object.kind,"host":object.host,"definition":object.definition,
-                    "symbol":object.symbol.as_ref().map(|s| &s.name),"standard_symbol":standard,"rule_made":!matches!(object.origin, UsageOrigin::Written | UsageOrigin::Solver),
+                    "symbol":object.symbol.as_ref().map(|s| &s.name),"standard_symbol":standard,"default_symbol":default_symbol,"rule_made":!matches!(object.origin, UsageOrigin::Written | UsageOrigin::Solver),
                     "roles":terminals(&format!("{:?}", object.attach), &pins),
                     "parameters":format!("{:?}",object.params),"disabled":object.disabled,
                     "style":format!("{:?}",object.own_style),
@@ -678,6 +688,14 @@ fn snapshot(read: &Interpretation, added: &BTreeMap<String, BTreeSet<String>>) -
         let names = identities(read, problem);
         let none = BTreeSet::new();
         let default = added.get(title).unwrap_or(&none);
+        // The pins of an instance drawn with the default symbol, the viewer's stand-in of 0.3 or
+        // the default block symbol of 0.4 (9.2.6), are the default look too.
+        let mut default_or_boxed = default.clone();
+        for (index, object) in problem.objects.iter().enumerate() {
+            if object.symbol.is_some_and(|k| problem.symbols[k].default) {
+                default_or_boxed.insert(names[index].clone());
+            }
+        }
         let mut put = |category: &str, key: &str, value: Value| out.put(file, title, category, key, value);
         for (index, object) in problem.objects.iter().enumerate() {
             // The place of a label that only its symbol gives is the package's (default look).
@@ -715,7 +733,7 @@ fn snapshot(read: &Interpretation, added: &BTreeMap<String, BTreeSet<String>>) -
         }
         for net in &problem.nets {
             let (default_pins, kept): (Vec<_>, Vec<_>) =
-                net.pins.iter().map(|p| point(&names, p)).partition(|p| mentions(default, p));
+                net.pins.iter().map(|p| point(&names, p)).partition(|p| mentions(&default_or_boxed, p));
             let mut kept = kept;
             kept.sort();
             put("networks", &net.name, json!({"pins":kept,"default_pins":default_pins,"port":net.port}));

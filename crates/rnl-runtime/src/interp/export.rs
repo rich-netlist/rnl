@@ -73,7 +73,7 @@ impl Interp<'_> {
         }
         let mut wires = Vec::new();
         for w in self.scenes[s].wires.clone() {
-            if !self.is_obj_failed(w) && !self.drawing_ignored(s, w) && !ix.wires.contains_key(&w) {
+            if !self.is_obj_failed(w) && !ix.wires.contains_key(&w) {
                 ix.wires.insert(w, wires.len());
                 wires.push(w);
             }
@@ -627,7 +627,6 @@ impl Interp<'_> {
                 let u = self.usage(a);
                 if Some(u.definition) != definition
                     || self.eff_priority(s, u.priority, &chain, Some(a)) == Priority::Disabled
-                    || self.drawing_ignored(s, a)
                 {
                     continue;
                 }
@@ -836,21 +835,14 @@ impl Interp<'_> {
             .prims
             .iter()
             .copied()
-            .filter(|&o| {
-                matches!(self.o(o), ObjData::Annotation(_)) && !self.is_obj_failed(o) && !self.drawing_ignored(s, o)
-            })
+            .filter(|&o| matches!(self.o(o), ObjData::Annotation(_)) && !self.is_obj_failed(o))
             .collect();
         let mut points = self.scenes[s].points.clone();
         points.retain(|p| !self.is_failed(*p));
         points.sort();
         points.dedup();
         objs.extend(points.into_iter().map(|p| (p, ObjectKind::Point)));
-        let mut texts: Vec<ObjId> = self.scenes[s]
-            .texts
-            .iter()
-            .copied()
-            .filter(|t| !self.is_obj_failed(*t) && !self.drawing_ignored(s, *t))
-            .collect();
+        let mut texts: Vec<ObjId> = self.scenes[s].texts.iter().copied().filter(|t| !self.is_obj_failed(*t)).collect();
         texts.sort();
         texts.dedup();
         objs.extend(texts.into_iter().map(|t| (t, ObjectKind::Text)));
