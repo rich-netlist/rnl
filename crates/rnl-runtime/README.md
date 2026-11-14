@@ -295,7 +295,8 @@ it accepts. So a value that is not taken leaves the one before it in effect, or 
 default, and the other keys of the same statement still apply. A package reached only through
 language-qualified header uses supplies no settings. Records with `language`,
 generated records, package contents and inline packages warn and have no effect.
-An included file keeps its own header defaults.
+The levels of an included file take the header settings of the files that include
+it, outermost first, and then those of its own header, as for DEVICE (14.10, 6.12).
 
 `LevelProblem::solver_config` preserves literal types and source locations; strings
 also keep their definition environment. The input digest covers every key and

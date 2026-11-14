@@ -296,6 +296,32 @@ fn public_problem_and_viewer_constraints_keep_typed_values_and_sources() {
 }
 
 #[test]
+fn an_outer_header_reaches_the_levels_of_an_included_file_before_its_own() {
+    let main = "* settings\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @SOLVER-CONFIG(grid=2) }\n.include child.sp\n";
+    let child = ".subckt child a\nR1 a 0 1k\n.ends\n";
+    let grid = |r: &Interpretation| -> Vec<String> {
+        let p = r.problems.iter().find(|p| p.name == "child").unwrap();
+        p.solver_config.iter().filter(|s| s.key == "grid").map(|s| s.value.show()).collect()
+    };
+    // an included file without a header takes the outer file's settings
+    let r = read_files(&MemoryProvider::new().with("main.sp", main).with("child.sp", child));
+    clean(&r);
+    assert_eq!(grid(&r), ["2"]);
+    let p = r.problems.iter().find(|p| p.name == "child").unwrap();
+    assert_eq!(rnl_solver::SolverOptions::default().for_problem(p).0.grid, Some(2.0));
+    // one with its own header has them after the outer file's, so that its own wins, and the
+    // outer one stays in effect when its own is not taken
+    for (own, values, effective) in [("grid=3", ["2", "3"], 3.0), ("grid=\"x\"", ["2", "\"x\""], 2.0)] {
+        let child = format!("* child\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\"); @SOLVER-CONFIG({own}) }}\n{child}");
+        let r = read_files(&MemoryProvider::new().with("main.sp", main).with("child.sp", &child));
+        clean(&r);
+        assert_eq!(grid(&r), values, "{own}");
+        let p = r.problems.iter().find(|p| p.name == "child").unwrap();
+        assert_eq!(rnl_solver::SolverOptions::default().for_problem(p).0.grid, Some(effective), "{own}");
+    }
+}
+
+#[test]
 fn included_files_keep_their_own_header_defaults_and_scoped_records_override() {
     let main="* settings\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @SOLVER-CONFIG(a=1,b=1) }\n.include child.sp\n* @RNL(scope=\"child\") { @SOLVER-CONFIG(b=3) }\n";
     let child="* child\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @SOLVER-CONFIG(a=2,b=2) }\n.subckt child a\nR1 a 0 1k\n.ends\n";
