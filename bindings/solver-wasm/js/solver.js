@@ -40,7 +40,8 @@
  * @returns {Promise<{ solve(request: SolveRequest, onProgress?: (event: object) => boolean | void): SolveAnswer }>}
  *   `onProgress` gets each progress event as docs/solver-progress.md describes it. When it
  *   returns `false` the solve is cancelled, and the answer is `{ cancelled: true }`. When it
- *   throws, the solve is cancelled too, and `solve` throws what it threw.
+ *   throws, the solve is cancelled too, and `solve` throws what it threw. It cannot call `solve`
+ *   of the same solver, which throws then.
  */
 export async function loadSolver(source, { now = () => performance.now() } = {}) {
   const decoder = new TextDecoder();
@@ -49,6 +50,9 @@ export async function loadSolver(source, { now = () => performance.now() } = {})
   // set by an event's callback: asked by the solver after each event
   let cancelled = false;
   let thrown = null;
+  let solving = false;
+  // why no new instance could be made after a failure
+  let broken = null;
   let instance = null;
   const text = (ptr, len) => decoder.decode(new Uint8Array(instance.exports.memory.buffer, ptr >>> 0, len >>> 0));
   const imports = {
@@ -80,12 +84,18 @@ export async function loadSolver(source, { now = () => performance.now() } = {})
       instance = new WebAssembly.Instance(module, imports);
     } catch {
       instance = null;
-      WebAssembly.instantiate(module, imports).then((i) => (instance = i));
+      WebAssembly.instantiate(module, imports).then(
+        (i) => (instance = i),
+        (e) => (broken = e),
+      );
     }
   }
 
   return {
     solve(request, progress) {
+      // one solve at a time: a callback that solved would take over the outer solve's state
+      if (solving) throw new Error("The solver is solving: a progress callback cannot solve with the same solver.");
+      if (broken) throw new Error(`The solver could not start again after a failure: ${broken.message}`, { cause: broken });
       if (!instance) throw new Error("The solver is starting again after a failure; solve again in a moment.");
       onProgress = progress ?? (() => {});
       cancelled = false;
@@ -93,6 +103,7 @@ export async function loadSolver(source, { now = () => performance.now() } = {})
       const api = instance.exports;
       const bytes = encoder.encode(JSON.stringify(request));
       let answer;
+      solving = true;
       try {
         const at = api.rnl_request(bytes.length) >>> 0;
         new Uint8Array(api.memory.buffer, at, bytes.length).set(bytes);
@@ -110,6 +121,8 @@ export async function loadSolver(source, { now = () => performance.now() } = {})
         }
         restart();
         throw new Error(`The solver stopped: ${why || e.message}`, { cause: e });
+      } finally {
+        solving = false;
       }
       if (thrown) throw thrown.error;
       return JSON.parse(answer);

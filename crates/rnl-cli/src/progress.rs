@@ -325,9 +325,11 @@ pub(crate) fn solve_progress_skipping(
         return Err(crate::solve::CANCELLED.to_string());
     }
     if OWN_CLOCK_MISSING {
+        // a file raised to 0.3 is solved in two passes, and the run is the second's
         let solved_in = &observer.state.borrow().solved_in;
-        if solved_in.len() == run.levels.len() {
-            for (level, &seconds) in run.levels.iter_mut().zip(solved_in) {
+        let levels = run.levels.len();
+        if solved_in.len() == levels || solved_in.len() == 2 * levels {
+            for (level, &seconds) in run.levels.iter_mut().zip(&solved_in[solved_in.len() - levels..]) {
                 level.time = std::time::Duration::from_secs_f64(seconds);
             }
         }

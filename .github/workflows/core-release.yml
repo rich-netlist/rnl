@@ -133,6 +133,7 @@ jobs:
           node bindings/runtime-wasm/build.mjs --solver --out packages/runtime/dist --name @rich-netlist/runtime --version "$VERSION"
           node bindings/runtime-wasm/tests/core.mjs packages/runtime/dist
           node bindings/runtime-wasm/tests/package.mjs packages/runtime/dist "$VERSION"
+          node bindings/solver-wasm/tests/solve.mjs packages/runtime/dist/rnl_solver_wasm.wasm
           cd packages/runtime/dist
           npm pack --pack-destination "$GITHUB_WORKSPACE"
       # A Viewer-only PR or a manual rehearsal can legitimately reuse an already published core

@@ -102,20 +102,25 @@ pub enum Answer {
 
 /// The clock of a solve: milliseconds from `now`, in seconds. It is a wall clock, and reading it
 /// is a call out of the module, so the budget reads it every so much work, not at every step.
-/// A reading that is not a number, or is earlier than one before, counts as the latest one
-/// before it: the solver's clock never goes back.
+/// The time is counted from the first reading that is a number. A reading that is not a number,
+/// or is earlier than one before, counts as the latest one before it: the solver's clock never
+/// goes back, and it does not start with a leap.
 struct Now<'a> {
     now: &'a dyn Fn() -> f64,
-    latest: std::cell::Cell<Option<f64>>,
+    /// The first reading that is a number and the latest, in seconds.
+    read: std::cell::Cell<Option<(f64, f64)>>,
 }
 
 impl Clock for Now<'_> {
     fn elapsed(&self) -> f64 {
-        let read = (self.now)() / 1000.;
-        let before = self.latest.get();
-        let latest = if read.is_finite() && before.is_none_or(|b| read > b) { read } else { before.unwrap_or(0.) };
-        self.latest.set(Some(latest));
-        latest
+        let now = (self.now)() / 1000.;
+        let (first, latest) = match self.read.get() {
+            Some((first, latest)) => (first, if now.is_finite() && now > latest { now } else { latest }),
+            None if now.is_finite() => (now, now),
+            None => return 0.,
+        };
+        self.read.set(Some((first, latest)));
+        latest - first
     }
 
     fn check_every(&self) -> u64 {
@@ -153,7 +158,7 @@ pub fn solve(request: &[u8], now: &dyn Fn() -> f64, progress: &dyn Fn(&str) -> b
         files: request.files.into_iter().map(|(p, t)| (normalize(&p), t)).collect(),
         package_dirs: request.package_dirs.iter().map(|p| normalize(p)).collect(),
     };
-    let clock = Now { now, latest: std::cell::Cell::new(None) };
+    let clock = Now { now, read: std::cell::Cell::new(None) };
     let sink = |e: &rnl_cli::progress::Event| progress(&e.line());
     let shown = if request.respace {
         rnl_cli::preview::respace(&request.entry, &files, &options, &clock, &sink)

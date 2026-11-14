@@ -64,6 +64,10 @@ for (let k = 0; k < 40; k++) {
   );
 }
 assert.equal(solver.solve(request).files["/w/main.sp"], written);
+// a callback cannot solve with the solver that calls it: the inner call throws, which cancels the
+// outer one and comes out of it
+assert.throws(() => solver.solve(request, () => solver.solve(request)), /cannot solve with the same solver/);
+assert.equal(solver.solve(request).files["/w/main.sp"], written);
 
 // the answer names the files by the paths of the request, and two paths of one file are refused
 const windows = "C:\\w\\main.sp";
@@ -104,6 +108,18 @@ assert.match(twice.error, /^files: .* are one file$/);
   const ended = after.find((e) => e.event === "level-done");
   assert.equal(ended?.status, "time", JSON.stringify(after).slice(0, 600));
   assert.ok(after.every((e) => !("elapsed" in e) || Number.isFinite(e.elapsed)), "every elapsed is a number");
+  // a clock that is not a number at first, then far from zero: the time starts at its first number
+  let late = 0;
+  const started = await loadSolver(readFileSync(wasm), { now: () => (++late < 4 ? NaN : 1e9 + late * 50) });
+  const then = [];
+  started.solve({ ...request, solver_config: config }, (e) => void then.push(e));
+  const stopped = then.find((e) => e.event === "level-done");
+  assert.equal(stopped?.status, "time", JSON.stringify(then).slice(0, 600));
+  assert.ok(stopped.work > 0 && stopped.seconds < 20, `the level took ${stopped.seconds} s and ${stopped.work} of work`);
+  // a file of 0.2 is raised and solved in two passes: its time in the report is the second's
+  const old = source.replace('@VERSION("0.4"); @SOLVER-CONFIG(layout="lines")', '@VERSION("0.2")');
+  const raised = timed.solve({ ...request, files: { "/w/main.sp": old }, solver_config: 'limit="work",work=3000000' });
+  assert.match(raised.report.text.join("\n"), /\n {2}time: (?!0\.000)\d+\.\d+ s/, JSON.stringify(raised).slice(0, 600));
 }
 console.log("cancelled, thrown through, renamed and timed through WebAssembly");
 
@@ -126,10 +142,11 @@ if (rnl) {
   let count = 0;
   try {
     for (const text of [source, ladder]) {
-      // the limits are small enough that no run comes near the safety limit of 30 seconds, which
-      // is on the clock and would stop the native run where this module's clock stands still
+      // No run may come near the safety limit of 30 seconds, which is on the clock and would stop
+      // the native run where this module's clock stands still: so the limits of work are small,
+      // and only the small circuit is solved to its seed, which takes the ladder billions of work.
       for (const config of [
-        'limit="seed"',
+        ...(text === source ? ['limit="seed"'] : []),
         'limit="work",work=200000',
         'limit="work",work=50000000',
         'limit="work",work=300000000',

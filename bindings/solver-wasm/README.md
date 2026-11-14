@@ -30,7 +30,7 @@ Unlike the core's module, it imports three functions from `env`:
 | `rnl_progress(ptr, len)` | One progress event as UTF-8 JSON, as [`rnl solve --progress=json`](../../docs/solver-progress.md) writes them. |
 | `rnl_cancelled() -> i32` | Not 0 to cancel. It is asked after each event. |
 
-The clock has to go on. A reading that is not a number, or is earlier than one before, counts as the latest reading before it; but on a clock that stands still a time limit never ends, and the default limit is one of time. With such a clock, give a limit of work or the seed in `solver_config`.
+The clock has to go on. The time is counted from the first reading that is a number. A reading that is not a number, or is earlier than one before, counts as the latest reading before it; but on a clock that stands still a time limit never ends, and the default limit is one of time. With such a clock, give a limit of work or the seed in `solver_config`.
 
 After a panic or another trap, an instance is not to be used again: what the call held is not released.
 
@@ -41,6 +41,7 @@ After a panic or another trap, an instance is not to be used again: what the cal
 - **Progress:** `onProgress` gets each event as an object.
 - **Cancelling from the callback:** when `onProgress` returns `false`, the solve is cancelled and the answer is `{cancelled: true}`. When it throws, the solve is cancelled too and `solve` throws what it threw. Neither harms the instance.
 - **After a trap:** `solve` throws `The solver stopped: …` with the panic's message, and the loader makes a new instance for the next call.
+- **One solve at a time:** `onProgress` cannot call `solve` of the same solver, which throws then.
 
 The call is synchronous and can take the solver's whole time limit. Run it in a Worker of its own. Terminating that Worker and starting another also cancels, at once.
 
@@ -58,4 +59,4 @@ The answer is one of three:
 
 `files` holds the texts the solve wrote, each under the path its file has in the request. Two paths of the request that are one file, such as `a/b.sp` and `a\b.sp`, are an error.
 
-A level's `seconds` in the events, and its time in the report, are measured on the clock the caller gives.
+A level's `seconds` in the events, and its time in the report, are measured on the clock the caller gives. The time of the junction dots, `junction_seconds`, is not measured in this module and is 0.
