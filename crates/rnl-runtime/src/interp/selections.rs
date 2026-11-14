@@ -197,6 +197,15 @@ impl Interp<'_> {
             && params.get("symbol").and_then(Lit::str).is_none_or(|pattern| self.symbol_matches(scene, object, pattern))
     }
 
+    /// The pieces of each net that a selection sees: in step 6, those fixed as it begins
+    /// ([`Self::net_pieces`]), before anything it makes.
+    pub(super) fn pieces_seen(&mut self, scene: SceneId, snapshot: bool) -> HashMap<ObjId, Vec<Vec<ObjId>>> {
+        match &self.scenes[scene].selection_pieces {
+            Some(pieces) if snapshot => pieces.clone(),
+            _ => self.net_pieces(scene, snapshot),
+        }
+    }
+
     /// 10.2: the pieces of each net, as `wired` sees the drawing. The pins on a net, those of
     /// virtual parts included, that one routing tree joins (13.7) or that written wires join are
     /// one piece; a pin in neither is a piece by itself. Each piece lists its pins in order, its
@@ -475,7 +484,7 @@ impl Interp<'_> {
         }
         let ends = if params.contains_key("wired") { self.wire_ends(scene) } else { Default::default() };
         let firsts: HashSet<ObjId> = if params.contains_key("piece_first") {
-            self.net_pieces(scene, snapshot)
+            self.pieces_seen(scene, snapshot)
                 .into_values()
                 .flatten()
                 .filter_map(|piece| piece.first().copied())

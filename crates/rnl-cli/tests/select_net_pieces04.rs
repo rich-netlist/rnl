@@ -4,7 +4,7 @@
 //! itself.
 use rnl_cli::interpret_file;
 use rnl_runtime::diag::Severity;
-use rnl_runtime::problem::Filler;
+use rnl_runtime::problem::{net_pieces, Filler, LevelProblem, ObjectKind};
 use rnl_runtime::source::MemoryProvider;
 use rnl_runtime::{Interpretation, Options};
 use std::path::Path;
@@ -93,9 +93,88 @@ fn the_pins_of_virtual_parts_come_first() {
     assert_eq!(got, ["#R3.1", "%l.0"]);
 }
 
+/// The pieces the selections saw agree with those of the whole level (`problem::net_pieces`):
+/// what step 6 adds may join a new pin to a piece, never two pieces into one or one into two.
+/// The selections also see the pin of a part attached to a net itself, such as `$SUPPLY`, which
+/// the problem does not list on the net (`ProblemNet::pins`); the pieces are compared on the pins
+/// both see. Returns the number of pieces the selections saw of each net of each level, by name.
+fn agree(r: &Interpretation) -> Vec<(String, usize)> {
+    assert_eq!(r.selection_pieces.len(), r.problems.len());
+    r.problems.iter().zip(&r.selection_pieces).flat_map(|(p, seen)| agree_on(p, seen)).collect()
+}
+
+fn agree_on(p: &LevelProblem, seen: &[Vec<Vec<(usize, usize)>>]) -> Vec<(String, usize)> {
+    use std::collections::BTreeSet;
+    type Piece = BTreeSet<(usize, usize)>;
+    assert_eq!(seen.len(), p.nets.len());
+    let whole = net_pieces(p);
+    p.nets
+        .iter()
+        .enumerate()
+        .map(|(n, net)| {
+            let listed: Piece = net.pins.iter().filter_map(|q| q.pin_key()).collect();
+            let pins: Piece = seen[n].iter().flatten().copied().collect();
+            for k in pins.difference(&listed) {
+                let object = &p.ids.objects[k.0];
+                assert_eq!(p.objects[k.0].kind, ObjectKind::Usage, "&{}: {object} is not on the net", net.name);
+            }
+            let both =
+                |piece: Piece| -> Piece { piece.intersection(&pins).filter(|k| listed.contains(k)).copied().collect() };
+            let mut ours: Vec<Piece> = seen[n]
+                .iter()
+                .map(|piece| both(piece.iter().copied().collect()))
+                .filter(|piece| !piece.is_empty())
+                .collect();
+            let mut theirs: Vec<Piece> = whole[n]
+                .iter()
+                .map(|piece| both(piece.iter().filter_map(|q| q.pin_key()).collect()))
+                .filter(|piece| !piece.is_empty())
+                .collect();
+            ours.sort();
+            theirs.sort();
+            assert_eq!(ours, theirs, "&{}", net.name);
+            (net.name.clone(), seen[n].len())
+        })
+        .collect()
+}
+
+#[test]
+fn the_pieces_the_selections_see_are_those_of_the_level() {
+    for body in [
+        "",
+        "{#R1 #R2 #R3 #R4} @ROUTE-OBJECT",
+        "{#R1 #R2} @ROUTE-OBJECT; {#R3 #R4} @ROUTE-OBJECT",
+        "{#R1 #R2} @ROUTE-OBJECT; {#R2 #R3} @ROUTE-OBJECT",
+        "{#R1 #R2} @ROUTE-OBJECT; &n @WIRE {#R3:2 (3,10) #R4:1}",
+        "&n @WIRE {#R1:2 (3,0) #R2:1}; &n @WIRE {#R2:1 (3,5) #R3:2}",
+    ] {
+        let r = read("0.4", "", body);
+        assert!(!r.diagnostics().iter().any(|d| d.severity == Severity::Error), "{:?}", r.diagnostics());
+        agree(&r);
+    }
+}
+
+#[test]
+fn the_pieces_of_a_sampler_and_an_inverter_with_the_standard_packages() {
+    // a transmission gate holds its output on a capacitor, which an inverter reads: the gate's
+    // tree and the inverter's are two pieces of &x
+    let text = "* sampler\n* @RNL(type=\"header\") {\n*   @VERSION(\"0.4\");\n*   @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\");\n*   @DEVICE(name=\"M*\", model=\"n*\", terminals=[\"d\", \"g\", \"s\", \"b\"], type=\"nmos\");\n*   @DEVICE(name=\"M*\", model=\"p*\", terminals=[\"d\", \"g\", \"s\", \"b\"], type=\"pmos\");\n* }\n.model n1 nmos level=1\n.model p1 pmos level=1\n.subckt hold a y ck ckb vdd gnd\nMA a ck x gnd n1\nMB a ckb x vdd p1\nC1 x gnd 1p\nMC y x vdd vdd p1\nMD y x gnd gnd n1\n* @RNL {\n*   &vdd @ADD-TO $SUPPLY_NET_SET;\n*   &gnd @ADD-TO $GROUND_NET_SET;\n*   %g = #MB(pmos) #MA(nmos) @AS $TRANSMISSION_GATE;\n*   %g(switch) #C1(capacitor) @AS $SC_SAMPLER;\n*   #MC(pmos) #MD(nmos) @AS $CMOS_INVERTER;\n*   %pa = $IO_PORT @ATTACH &a;\n*   %py = $IO_PORT @ATTACH &y;\n*   %s = $SUPPLY @ATTACH &vdd;\n* }\n.ends hold\n";
+    let r =
+        interpret_file(Path::new("hold.sp"), None, &MemoryProvider::new().with("hold.sp", text), &Options::solver())
+            .unwrap();
+    assert!(!r.diagnostics().iter().any(|d| d.severity == Severity::Error), "{:?}", r.diagnostics());
+    let counts = agree(&r);
+    let x = counts.iter().find(|(name, _)| name == "x").expect("&x").1;
+    assert!(x >= 2, "&x is drawn in pieces: {counts:?}");
+}
+
 #[test]
 fn split_is_a_word_of_0_4() {
     // SELECT-PIN, and with it piece_first, is new in 0.4 as a whole
     let r = read("0.3", "", "# @SELECT-NET(split=true) => @AS $PROBE");
     assert!(r.diagnostics().iter().any(|d| d.severity == Severity::Error), "{:?}", r.diagnostics());
+    // a reading of 0.3 computes no pieces
+    let r = read("0.3", "", "");
+    assert!(r.selection_pieces.iter().flatten().all(|net| net.is_empty()));
+    assert!(!read("0.4", "", "").selection_pieces.iter().flatten().all(|net| net.is_empty()));
 }
