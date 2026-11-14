@@ -34,7 +34,7 @@ export async function startSettings(shell) {
   if (!shell.loadSettings) return;
   const keys = ["language", "netlist-colors", "sidebar-width", "sidebar-shown", "side-pane", "problems-height", "problems-shown",
     "index-height", "usage-list-height", "usages-shown", "currents-shown", "usage-preferences", "show-failed", "rnl-only", "semantics-only", "symbol-box", "symbol-origin", "symbol-pins", "symbol-labels", "hover-names", "hover-roles", "grid-shown", "grid-style", "grid-spacing",
-    "grid-major", "grid-axes", "solve-config", "search-paths", "background", "auto-include"];
+    "grid-major", "grid-axes", "solve-config", "solve-timeall", "search-paths", "background", "auto-include"];
   const legacy = {};
   for (const key of keys) {
     const value = load(key, undefined);

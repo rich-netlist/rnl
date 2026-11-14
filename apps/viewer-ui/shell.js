@@ -168,7 +168,7 @@
  * `level` is the title of the one level to solve, the circuit shown (Solve > Solve), and null or absent for every
  * level (Solve > Solve All Circuits).
  *
- * @typedef {{ config: string, level?: string | null }} SolverSettings
+ * @typedef {{ config: string, timeall?: number | null, level?: string | null }} SolverSettings
  */
 
 /**

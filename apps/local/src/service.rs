@@ -4,7 +4,7 @@
 //!   GET  /rnl-solver/table  the table of the solver's settings (docs/solver-settings-table.md), which the page's settings
 //!                           dialog is drawn from: what `rnl solver-defaults --json` prints
 //!   POST /rnl-solver/check  {"config"}  ->  what `rnl solve --check --json` prints of those settings, with no file
-//!   POST /rnl-solver/solve  {"entry", "files", "pool", "config", "level", "stream"}  ->  {"document", "report"}
+//!   POST /rnl-solver/solve  {"entry", "files", "pool", "config", "timeall", "level", "stream"}  ->  {"document", "report"}
 //!
 //! `config` is the settings that differ from the defaults, as RNL named parameters, as `--solver-config` takes them.
 //!
@@ -42,6 +42,9 @@ pub struct Request {
     /// The solver's settings, written as RNL named parameters as `rnl solve --solver-config` takes them.
     #[serde(default)]
     pub config: String,
+    /// The seconds that all levels of a time limit share (`rnl solve --timeall`): none, each level has its own.
+    #[serde(default)]
+    pub timeall: Option<f64>,
     /// The title of the one level to solve: none, or empty, solves every level.
     #[serde(default)]
     pub level: Option<String>,
@@ -118,7 +121,11 @@ pub fn prepare(request: &Request) -> Result<Prepared, String> {
     }
     let solver = SolverOptions::default().with_config(&request.config)?;
     let level = request.level.clone().filter(|title| !title.is_empty());
-    Ok(Prepared { entry: request.entry.clone(), files, options: SolveOptions { solver, level, ..SolveOptions::default() } })
+    if request.timeall.is_some_and(|s| !s.is_finite() || s <= 0.0) {
+        return Err("timeall must be a positive number of seconds".into());
+    }
+    let options = SolveOptions { solver, level, total_seconds: request.timeall, ..SolveOptions::default() };
+    Ok(Prepared { entry: request.entry.clone(), files, options })
 }
 
 /// Whether the page has closed its connection: asked without waiting for anything.
@@ -202,7 +209,7 @@ mod tests {
     }
 
     fn request(entry: &str, text: &str) -> Request {
-        Request { entry: entry.into(), files: BTreeMap::from([(entry.to_string(), text.to_string())]), pool: Vec::new(), config: String::new(), level: None, stream: false }
+        Request { entry: entry.into(), files: BTreeMap::from([(entry.to_string(), text.to_string())]), pool: Vec::new(), config: String::new(), timeall: None, level: None, stream: false }
     }
 
     #[test]
@@ -280,6 +287,19 @@ mod tests {
         assert!(last["result"]["report"]["levels"].as_array().is_some());
         // the events come before the result, which is the last line
         assert_eq!(lines.iter().filter(|l| l.get("result").is_some()).count(), 1);
+    }
+
+    #[test]
+    fn the_whole_files_time_is_a_positive_number_or_none() {
+        let (_client, server) = pair();
+        let mut r = request("/top.sp", "R1 a b 1k\n.end\n");
+        r.timeall = Some(60.0);
+        assert!(solve(&r, &server).is_ok());
+        for bad in [0.0, -3.0, f64::INFINITY] {
+            r.timeall = Some(bad);
+            let error = solve(&r, &server).unwrap_err();
+            assert!(error.contains("timeall must be a positive number"), "{bad}: {error}");
+        }
     }
 
     #[test]

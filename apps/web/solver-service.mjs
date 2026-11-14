@@ -6,7 +6,8 @@
 //   GET  /rnl-solver/table  what `rnl solver-defaults --json` prints: the table of the solver's settings
 //                           (docs/solver-settings-table.md), which the page's settings dialog is drawn from
 //   POST /rnl-solver/check  {"config"}  ->  what `rnl solve --check --json` prints of those settings, with no file
-//   POST /rnl-solver/solve  {"entry", "files", "pool", "config", "level"}  ->  {"document", "report"}
+//   POST /rnl-solver/solve  {"entry", "files", "pool", "config", "timeall", "level"}  ->  {"document", "report"}
+//     "timeall": the seconds that all levels of a time limit share, `rnl preview --timeall`; none for each level's own.
 //     "config": the settings that differ from the defaults, as RNL named parameters, as `--solver-config` takes them.
 //     "level": only the level with this title, the circuit shown; none solves every level.
 //     With "stream": true the answer is lines of JSON (application/x-ndjson) instead: the events of the solve as
@@ -106,7 +107,8 @@ function isEvent(line) {
  * `--solver-config` takes them, the server's first; `level` is the title of the one level to solve. `onEvent` is given the events of the solve, as lines of JSON, as they come.
  */
 export async function solve({ rnl, prefix = [], work, request, defaults, signal, onEvent }) {
-  const { entry, files, pool = [], config = "", level = null } = request;
+  const { entry, files, pool = [], config = "", timeall = null, level = null } = request;
+  if (timeall !== null && !(typeof timeall === "number" && Number.isFinite(timeall) && timeall > 0)) throw new Error("timeall must be a positive number of seconds");
   const entryPath = insidePath(entry);
   if (!entryPath || !files || typeof files !== "object" || typeof files[entry] !== "string") throw new Error("the request has no entry file");
   await mkdir(work, { recursive: true });
@@ -133,6 +135,7 @@ export async function solve({ rnl, prefix = [], work, request, defaults, signal,
     for (const d of searchDirs) common.push("--path", d);
     if (solverConfig) common.push("--solver-config", solverConfig);
     if (typeof level === "string" && level !== "") common.push("--level", level);
+    if (timeall !== null) common.push("--timeall", String(timeall));
     if (onEvent) common.push("--progress=json");
     const cwd = resolve(dir, dirname(entryPath));
     return await run(rnl, prefix, ["preview", ...common], cwd, signal, onEvent);

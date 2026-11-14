@@ -1839,6 +1839,8 @@ test("the settings dialog of the web viewer is drawn from the solver's module, w
   await expect(dialog.getByLabel("layout", { exact: true }).locator("option")).toHaveText(["rows", "tree", "lines"]);
   await dialog.getByLabel("layout", { exact: true }).selectOption("rows");
   await dialog.getByLabel("beam", { exact: true }).fill("8");
+  await dialog.locator("fieldset", { hasText: "Time for the whole file" }).getByLabel("set").check();
+  await dialog.getByLabel("timeall", { exact: true }).fill("45");
   await dialog.getByRole("button", { name: "OK" }).click();
   await expect(dialog).toHaveCount(0);
   // the solver's module gave the table and checked the settings before they were kept
@@ -1847,6 +1849,7 @@ test("the settings dialog of the web viewer is drawn from the solver's module, w
   await page.waitForFunction(() => document.body.classList.contains("preview") && !document.body.classList.contains("solving"), null, { timeout: 90000 });
   const [request] = await page.evaluate(() => window.__solver.requests);
   expect(request.solver_config).toBe('beam=8,layout="rows"');
+  expect(request.timeall).toBe(45); // beside the settings, not among them
 });
 
 test("a manifest's files are edited, downloaded and solved by a development server's solver, with the edit and the manifest's files and pool", async ({ page }) => {

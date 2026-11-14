@@ -7,6 +7,8 @@ import { append, m, setAttr, setText } from "./i18n.js";
 // `rnl solve --solver-config` takes them, which the solver reads, so its rules are the only ones; the shell can also
 // check them (`checkSettings`), and the dialog keeps open on what the solver refuses. The settings that a netlist and
 // its packages give are those of the last solve's report, for the dialog to say what a value set here overrides.
+// The time for the whole file (`rnl solve --timeall`) is not a setting of the table, so the dialog has a box of its own
+// for it, kept under `solve-timeall`, and a solve gets it beside the settings.
 
 import { form, inform, modal } from "./dialog.js";
 import { shell } from "./shell.js";
@@ -14,6 +16,13 @@ import { current, doc } from "./state.js";
 import { load, save, span } from "./util.js";
 
 const KEY = "solve-config";
+const TIMEALL = "solve-timeall";
+
+/** The seconds kept for the whole file, or null for none: each level then has its own limit only. */
+function keptTimeall() {
+  const seconds = load(TIMEALL, null);
+  return typeof seconds === "number" && Number.isFinite(seconds) && seconds > 0 ? seconds : null;
+}
 
 /**
  * What the user changed, as kept for the next start: a value by the key of its setting. A setting not there is the
@@ -29,10 +38,11 @@ function changed() {
  * The settings a solve gets from the page: the settings changed as RNL named parameters, such as
  * `spacing_x=2,beam=8`, empty when none is changed.
  *
- * @returns {{ config: string }}
+ * @returns {{ config: string, timeall: number | null }} `timeall`: the seconds that all levels of a time limit
+ *   share (`rnl solve --timeall`), null for none.
  */
 export function solverSettings() {
-  return { config: configText(changed()) };
+  return { config: configText(changed()), timeall: keptTimeall() };
 }
 
 /** A number as RNL writes it: with no exponent. */
@@ -581,7 +591,9 @@ export async function settings() {
   restore.type = "button";
   restore.className = "settings-restore";
   setText(restore, m("Restore Defaults"));
+  const whole = timeallField();
   restore.addEventListener("click", () => {
+    whole.reset();
     fields.set(effective(table, {}));
     fields.mark([]);
     error.hidden = true;
@@ -591,13 +603,15 @@ export async function settings() {
   const showText = () => {
     const read = fields.read();
     const config = read.error ? null : configText(differences(table, read.values));
-    setText(asText, config === null ? "" : config ? m`Equivalent CLI command: rnl solve --solver-config '${config}'` : m("The defaults of rnl solve."));
+    const time = whole.read();
+    const all = time.error || time.value === null ? "" : ` --timeall ${time.value}`;
+    setText(asText, config === null ? "" : config || all ? m`Equivalent CLI command: rnl solve${all}${config ? ` --solver-config '${config}'` : ""}` : m("The defaults of rnl solve."));
   };
-  for (const type of ["input", "change", "click"]) fields.el.addEventListener(type, showText);
+  for (const type of ["input", "change", "click"]) for (const part of [fields.el, whole.el]) part.addEventListener(type, showText);
   restore.addEventListener("click", showText);
   showText();
   const given = givenByFile();
-  const parts = [priorityNote(), fields.el];
+  const parts = [priorityNote(), fields.el, whole.el];
   if (given.length > 0) parts.push(givenNote(given));
   parts.push(document.createElement("hr"), row(restore, asText), error);
   const chosen = await form({
@@ -607,6 +621,8 @@ export async function settings() {
       fields.mark([]);
       const read = fields.read();
       if (read.error) return fail(error, read.error);
+      const time = whole.read();
+      if (time.error) return fail(error, time.error);
       const kept = differences(table, read.values);
       if (shell.checkSettings) {
         let checked;
@@ -621,12 +637,58 @@ export async function settings() {
           return fail(error, errors.map((e) => e.message).join("; "));
         }
       }
-      return { kept };
+      return { kept, timeall: time.value };
     },
     focus: fields.focus ?? undefined,
     wide: true,
   });
-  if (chosen) save(KEY, chosen.kept);
+  if (chosen) {
+    save(KEY, chosen.kept);
+    save(TIMEALL, chosen.timeall);
+  }
+}
+
+/**
+ * The box of the time for the whole file: a check box that sets it and the seconds. Not a setting of the table, so it is
+ * given to a solve beside them and not checked with them (`rnl solve --check` refuses it).
+ */
+function timeallField() {
+  const input = document.createElement("input");
+  input.type = "number";
+  input.min = "0";
+  input.step = "any";
+  setAttr(input, "aria-label", "timeall");
+  const use = checkField(m("set"));
+  use.input.addEventListener("change", () => (input.disabled = !use.input.checked));
+  const note = document.createElement("div");
+  note.className = "settings-hint";
+  setText(note, m("Seconds that every level with a time limit shares, the whole file's time: each level takes the least of its own seconds and an even share of what is left, and only its seed once nothing is left. Not read by a respace."));
+  const line = document.createElement("div");
+  line.className = "setting";
+  const caption = document.createElement("div");
+  caption.className = "settings-label";
+  append(caption, span("settings-key", "timeall"), use.caption, input);
+  append(line, caption, note);
+  const set = (seconds) => {
+    use.input.checked = seconds !== null;
+    input.disabled = seconds === null;
+    input.value = seconds === null ? "" : String(seconds);
+  };
+  set(keptTimeall());
+  const box = document.createElement("fieldset");
+  const legend = document.createElement("legend");
+  setText(legend, m("Time for the whole file"));
+  append(box, legend, line);
+  return {
+    el: box,
+    reset: () => set(null),
+    read() {
+      if (!use.input.checked) return { value: null };
+      const n = Number(input.value.trim());
+      if (input.value.trim() === "" || !Number.isFinite(n) || n <= 0) return { error: m("timeall must be a positive number of seconds.") };
+      return { value: n };
+    },
+  };
 }
 
 /** Say what is wrong in a dialog and keep it open. */

@@ -44,7 +44,7 @@ test.describe("on the desktop", () => {
     const builds = await viewer.builds();
     await solve(page, () => page.keyboard.press("F9"));
     // the default options of rnl solve, and nothing read again for the drawing
-    expect(await solves(viewer)).toEqual([[T4, { config: "", level: `${T4}.sp` }]]);
+    expect(await solves(viewer)).toEqual([[T4, { config: "", timeall: null, level: `${T4}.sp` }]]);
     expect(await viewer.builds()).toBe(builds);
     await expect(page.locator("#preview-badge")).toHaveText("Solved preview: the files are unchanged");
     await expect(page.locator("#solve-step")).toHaveText(/^Solved: (1 level|\d+ levels), (1 fact|\d+ facts) not kept\. A preview: the files are unchanged\./);

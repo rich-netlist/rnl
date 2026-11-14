@@ -45,7 +45,8 @@ pub struct Solved {
 
 /// The solver's settings as the page gives them (Solve > Settings): `config` are the settings that
 /// differ from the defaults, written as RNL named parameters as `rnl solve --solver-config` takes
-/// them, such as `layout="rows",beam=8`. `level` is the title of the one level to solve, the circuit
+/// them, such as `layout="rows",beam=8`. `timeall` is the seconds that all levels of a time limit share
+/// (`rnl solve --timeall`), none for each level's own. `level` is the title of the one level to solve, the circuit
 /// shown; none solves every level (Solve > Solve All Circuits). None given, or an empty text, are the
 /// defaults of `rnl solve`.
 #[derive(Debug, Default, Deserialize)]
@@ -54,10 +55,20 @@ pub struct Settings {
     #[serde(default)]
     config: String,
     #[serde(default)]
+    timeall: Option<f64>,
+    #[serde(default)]
     level: Option<String>,
 }
 
 impl Settings {
+    /// The whole file's time: a positive number of seconds, or none.
+    fn total_seconds(&self) -> Result<Option<f64>, String> {
+        match self.timeall {
+            Some(s) if !s.is_finite() || s <= 0.0 => Err("timeall must be a positive number of seconds".into()),
+            other => Ok(other),
+        }
+    }
+
     /// The defaults with these settings over them, as `rnl solve` reads `--solver-config`: a key the
     /// solver does not have, or a value that does not do, is an error that says why.
     fn solver(&self) -> Result<SolverOptions, String> {
@@ -111,6 +122,7 @@ pub async fn solve_preview(
     let options = SolveOptions {
         level: settings.level.clone().filter(|title| !title.is_empty()),
         solver: settings.solver()?,
+        total_seconds: settings.total_seconds()?,
         formats: formats.unwrap_or_default(),
         ..SolveOptions::default()
     };
@@ -318,6 +330,17 @@ mod tests {
         assert_eq!(beam["default"], json!(o.beam));
         assert!(!t["objectives"].as_array().unwrap().is_empty());
         assert!(!t["groups"].as_array().unwrap().is_empty());
+    }
+
+    /// The whole file's time is a positive number of seconds, or none.
+    #[test]
+    fn the_whole_files_time_is_a_positive_number_or_none() {
+        let time = |v: serde_json::Value| serde_json::from_value::<Settings>(v).unwrap().total_seconds();
+        assert_eq!(time(json!({})), Ok(None));
+        assert_eq!(time(json!({ "timeall": null })), Ok(None));
+        assert_eq!(time(json!({ "timeall": 90 })), Ok(Some(90.0)));
+        assert!(time(json!({ "timeall": 0 })).is_err());
+        assert!(time(json!({ "timeall": -1 })).is_err());
     }
 
     /// The circuit shown is solved alone when the page names it; none, or an empty title, solve every one.
