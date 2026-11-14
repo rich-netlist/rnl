@@ -160,3 +160,62 @@ fn the_netlists_of_the_review_are_routed_whole_and_read_back() {
         assert_eq!(same_input(&hash, &q[0]), Some(true), "{body}");
     }
 }
+
+/// A level whose search is stopped while it tries a group both stretched in bands and dissolved,
+/// between the two: the solutions the bands made are held in the trial, the best among them, and
+/// were lost, so that the level panicked, its best not made at a node. They are kept, and the level
+/// is drawn. Two groups of two rows, their rows aligned across in the crossing order, try both.
+#[test]
+fn a_search_stopped_between_bands_and_dissolved_keeps_what_the_bands_made() {
+    let text = r#"* bands
+* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4") }
+.subckt bands vdd vss x y
+R1 vdd g0c0r1 1k
+R2 g0c0r1 vss 1k
+R3 vdd g0c1r1 1k
+R4 g0c1r1 vss 1k
+R5 g0c0r1 g0c1r1 1k
+R6 vdd g1c0r1 1k
+R7 g1c0r1 vss 1k
+R8 vdd g1c1r1 1k
+R9 g1c1r1 vss 1k
+R10 g1c0r1 g1c1r1 1k
+R11 g0c1r1 g1c0r1 1k
+* @RNL(author="model") {
+*   &vss @ADD-TO $GROUND_NET_SET;
+*   &vdd @ADD-TO $SUPPLY_NET_SET;
+*   {#R1::p #R2::p} @ALIGN("x");
+*   {#R1 #R2} @ORDER("top-to-bottom");
+*   {#R3::p #R4::p} @ALIGN("x");
+*   {#R3 #R4} @ORDER("top-to-bottom");
+*   {#R1 #R3} @ALIGN("y");
+*   {#R2 #R4} @ALIGN("y");
+*   {#R1 #R3 #R2 #R4 #R5} @GROUP;
+*   {#R6::p #R7::p} @ALIGN("x");
+*   {#R6 #R7} @ORDER("top-to-bottom");
+*   {#R8::p #R9::p} @ALIGN("x");
+*   {#R8 #R9} @ORDER("top-to-bottom");
+*   {#R6 #R8} @ALIGN("y");
+*   {#R7 #R9} @ALIGN("y");
+*   {#R6 #R8 #R7 #R9 #R10} @GROUP;
+*   #R3 #R6 @DISTANCE("left-to-right", min=12);
+*   {#R3 #R7} @ALIGN("y");
+*   {#R4 #R6} @ALIGN("y");
+*   {&g0c0r1 &g0c1r1 &g1c0r1 &g1c1r1} @ROUTE-NET;
+* }
+.ends
+"#;
+    let files = MemoryProvider::new().with("/w/bands.sp", text);
+    let p = problems("/w/bands.sp", &files).into_iter().find(|p| p.title == "bands").unwrap();
+    // just short of the end of the first batch of the bands: another solver moves it, and it is
+    // found again as the work at which the level's first trial turns to the group dissolved, less one
+    let options = SolverOptions::default().with_config(r#"limit="work", work=244596889398"#).unwrap();
+    let solved = solve(&p, &options);
+    let notes = solved.report.notes.join("\n");
+    assert!(notes.contains("tried both stretched in bands and dissolved"), "{notes}");
+    // stopped in the window: the group dissolved placed nothing, and the level has a batch of each
+    // half only, where a stop after it has more
+    assert!(notes.contains("in 2 batches over 2 settings of what is in it"), "{notes}");
+    assert!(solved.report.errors.is_empty(), "{:?}", solved.report.errors);
+    assert!(!solved.solution.placements.is_empty(), "{notes}");
+}
