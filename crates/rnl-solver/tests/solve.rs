@@ -236,10 +236,11 @@ R6 m b 1k
 /// between the two: the solutions the bands made are held in the trial, the best among them, and
 /// were lost, so that the level panicked, its best not made at a node. They are kept, and the level
 /// is drawn. Two groups of two rows, their rows aligned across in the crossing order, try both.
+/// The standard fill is dropped, so that what it adds to the ports and nets does not move the stop.
 #[test]
 fn a_search_stopped_between_bands_and_dissolved_keeps_what_the_bands_made() {
     let text = r#"* bands
-* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4") }
+* @RNL(type="header") { @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4"); @USE-PACKAGE(name="rnl-std-fill") {} }
 .subckt bands vdd vss x y
 R1 vdd g0c0r1 1k
 R2 g0c0r1 vss 1k
@@ -253,8 +254,6 @@ R9 g1c1r1 vss 1k
 R10 g1c0r1 g1c1r1 1k
 R11 g0c1r1 g1c0r1 1k
 * @RNL(author="model") {
-*   &vss @ADD-TO $GROUND_NET_SET;
-*   &vdd @ADD-TO $SUPPLY_NET_SET;
 *   {#R1::p #R2::p} @ALIGN("x");
 *   {#R1 #R2} @ORDER("top-to-bottom");
 *   {#R3::p #R4::p} @ALIGN("x");
@@ -273,7 +272,6 @@ R11 g0c1r1 g1c0r1 1k
 *   {#R3 #R7} @ALIGN("y");
 *   {#R4 #R6} @ALIGN("y");
 *   {&g0c0r1 &g0c1r1 &g1c0r1 &g1c1r1} @ROUTE-NET;
-*   # @SELECT-NET(port=true) => @REMOVE-FROM $PORT_FILL_SET;
 * }
 .ends
 "#;
@@ -281,7 +279,7 @@ R11 g0c1r1 g1c0r1 1k
     let p = problems("/w/bands.sp", &files).into_iter().find(|p| p.title == "bands").unwrap();
     // just short of the end of the first batch of the bands: another solver moves it, and it is
     // found again as the work at which the level's first trial turns to the group dissolved, less one
-    let options = SolverOptions::default().with_config(r#"limit="work", work=244596889398"#).unwrap();
+    let options = SolverOptions::default().with_config(r#"limit="work", work=64981892704"#).unwrap();
     let solved = solve(&p, &options);
     let notes = solved.report.notes.join("\n");
     assert!(notes.contains("tried both stretched in bands and dissolved"), "{notes}");
