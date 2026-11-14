@@ -37,7 +37,7 @@
  * @param {{ now?: () => number }} [options] `now` gives milliseconds, which the solver's time
  *   limit is measured on; `performance.now()` when not given. It has to go on: on a clock that
  *   stands still a time limit never ends, so give a limit of work with such a clock.
- * @returns {Promise<{ solve(request: SolveRequest, onProgress?: (event: object) => boolean | void): SolveAnswer }>}
+ * @returns {Promise<{ solve(request: SolveRequest, onProgress?: (event: object) => boolean | void): SolveAnswer, settings(): object }>}
  *   `onProgress` gets each progress event as docs/solver-progress.md describes it. When it
  *   returns `false` the solve is cancelled, and the answer is `{ cancelled: true }`. When it
  *   throws, the solve is cancelled too, and `solve` throws what it threw. It cannot call `solve`
@@ -125,6 +125,35 @@ export async function loadSolver(source, { now = () => performance.now() } = {})
         solving = false;
       }
       if (thrown) throw thrown.error;
+      return JSON.parse(answer);
+    },
+
+    /**
+     * The table of the solver's settings and objectives, as `rnl solver-defaults --json` prints
+     * it: what a settings page is drawn from. It reads no clock and calls no callback.
+     *
+     * @returns {object}
+     */
+    settings() {
+      if (solving) throw new Error("The solver is solving: a progress callback cannot ask for its settings.");
+      if (broken) throw new Error(`The solver could not start again after a failure: ${broken.message}`, { cause: broken });
+      if (!instance) throw new Error("The solver is starting again after a failure; ask again in a moment.");
+      const api = instance.exports;
+      let answer;
+      try {
+        const length = api.rnl_settings() >>> 0;
+        answer = text(api.rnl_response(), length);
+      } catch (e) {
+        let why = "";
+        try {
+          const panic = api.rnl_panic_len() >>> 0;
+          why = panic ? text(api.rnl_panic_message(), panic) : "";
+        } catch {
+          // the instance cannot say
+        }
+        restart();
+        throw new Error(`The solver stopped: ${why || e.message}`, { cause: e });
+      }
       return JSON.parse(answer);
     },
   };

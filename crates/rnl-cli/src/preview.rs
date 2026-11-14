@@ -77,6 +77,12 @@ pub struct LevelReport {
     pub unsolved: Vec<String>,
     pub unrouted: Vec<String>,
     pub notes: Vec<String>,
+    /// The settings of the level, each with where it comes from, and their warnings and errors,
+    /// each error with the key it is about, as `rnl solve --check --json` gives them: what a page
+    /// points at. The settings are those of the files before the solve, with the tool's. Left out
+    /// when the files could not be read for it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub check: Option<crate::solve::CheckedLevel>,
 }
 
 /// A fact: its rank, what became of it, what it says and where it is written, such as
@@ -181,20 +187,39 @@ fn as_solved(entry: &str, run: SolveRun, files: &dyn Provider, options: &SolveOp
     // and with them, which is what is drawn: the facts are measured there
     let with = Options { generated: true, problems: true, ..options.runtime() };
     let with = rnl_view::interpret_with(entry, options.dialect.as_deref(), &options.formats, &both, &with)?;
-    let report = report(&run, &document, &again.problems, &with, options.solver.tolerance);
+    let checked = check(entry, files, options);
+    let report = report(&run, &document, &again.problems, &with, options.solver.tolerance, checked);
     Ok(Preview { copy: Copy::of(&run), document, report })
+}
+
+/// The settings of each level of `entry`, as `rnl solve --check` gives them, with the tool's
+/// settings of `options`, given as old `--solver-options` when the options say so; none when the
+/// file cannot be read for it.
+fn check(entry: &str, files: &dyn Provider, options: &SolveOptions) -> Option<crate::solve::Checked> {
+    let given = &options.solver.settings.overrides;
+    let text = given.iter().map(|s| format!("{}={}", s.key, s.value.show())).collect::<Vec<_>>().join(",");
+    let text = if options.solver.settings.legacy_alias {
+        crate::solve::ToolSettings::Options(text)
+    } else {
+        crate::solve::ToolSettings::Config(text)
+    };
+    let tool: Vec<crate::solve::ToolSettings> = (!given.is_empty()).then_some(text).into_iter().collect();
+    crate::solve::check_settings(Some(Path::new(entry)), files, options, &tool).ok()
 }
 
 /// The report of a run, located in the texts of `document`; `problems` are those of these texts
 /// read as a solver reads them, which give each fact its line there, and `with` is the same read
 /// with their records of the solver, which says where the facts are measured within `tolerance`.
+/// Each level gets its part of `checked`.
 fn report(
     run: &SolveRun,
     document: &Document,
     problems: &[LevelProblem],
     with: &Interpretation,
     tolerance: f64,
+    checked: Option<crate::solve::Checked>,
 ) -> Report {
+    let mut checked = checked.map(|c| c.levels).unwrap_or_default();
     let at = |loc: &Loc| -> Option<At> {
         let file_index = document.files.iter().position(|f| f.path == loc.file)?;
         (loc.line > 0).then_some(At { file_index, line: loc.line, col: loc.col })
@@ -284,6 +309,7 @@ fn report(
             unsolved: level.written.unsolved.iter().map(|u| u.to_string()).collect(),
             unrouted,
             notes: r.notes.iter().chain(&level.written.notes).cloned().collect(),
+            check: checked.iter().position(|c| c.title.as_deref() == Some(p.title.as_str())).map(|i| checked.remove(i)),
         });
     }
     let mut notes: Vec<String> = run.raised.iter().flat_map(crate::solve::raised).collect();

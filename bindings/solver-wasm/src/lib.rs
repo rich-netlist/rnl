@@ -10,6 +10,9 @@
 //! 3. `rnl_solve()` solves it and returns the length of the answer, an [`Answer`] as UTF-8 JSON;
 //!    `rnl_response()` returns where it is.
 //!
+//! `rnl_settings()` takes no request: it puts the table of the solver's settings there, as
+//! `rnl solver-defaults --json` prints it, and returns its length.
+//!
 //! Unlike the core's module, this one imports three functions from `env`, which the Worker that
 //! runs it gives:
 //!
@@ -256,6 +259,18 @@ pub extern "C" fn rnl_solve() -> usize {
     let answer = serde_json::to_string(&solve(&request, &now, &progress)).expect("an answer serializes");
     let mut response = lock(&RESPONSE);
     *response = answer;
+    response.len()
+}
+
+/// Put the table of the solver's settings and objectives where [`rnl_response`] says, as
+/// `rnl solver-defaults --json` prints it, and return its length. It reads no request and calls no
+/// import.
+#[no_mangle]
+pub extern "C" fn rnl_settings() -> usize {
+    begin();
+    let table = serde_json::to_string(&rnl_cli::solver_table::settings_table_json()).expect("the table serializes");
+    let mut response = lock(&RESPONSE);
+    *response = table;
     response.len()
 }
 

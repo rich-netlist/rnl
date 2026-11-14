@@ -20,6 +20,8 @@ The exports are those of the core's module, with `rnl_solve` in place of `rnl_bu
 2. `rnl_solve()` solves it and returns the answer's length.
 3. `rnl_response()` gives where the answer is.
 
+`rnl_settings()` takes no request: it puts the table of the solver's settings and objectives where `rnl_response()` says, as `rnl solver-defaults --json` prints it, and returns its length.
+
 A panic traps; `rnl_panic_len`, `rnl_panic_message` and `rnl_alloc_failed` say why.
 
 Unlike the core's module, it imports three functions from `env`:
@@ -42,6 +44,7 @@ After a panic or another trap, an instance is not to be used again: what the cal
 - **Cancelling from the callback:** when `onProgress` returns `false`, the solve is cancelled and the answer is `{cancelled: true}`. When it throws, the solve is cancelled too and `solve` throws what it threw. Neither harms the instance.
 - **After a trap:** `solve` throws `The solver stopped: …` with the panic's message, and the loader makes a new instance for the next call.
 - **One solve at a time:** `onProgress` cannot call `solve` of the same solver, which throws then.
+- **The settings:** `settings()` gives the table of the solver's settings and objectives, from which a page draws its settings ([docs/solver-settings-table.md](../../docs/solver-settings-table.md)).
 
 The call is synchronous and can take the solver's whole time limit. Run it in a Worker of its own. Terminating that Worker and starting another also cancels, at once.
 

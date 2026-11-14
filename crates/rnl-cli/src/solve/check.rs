@@ -194,14 +194,14 @@ fn level(
         at.map(|(r, p)| {
             let s = &p.solver_config[k];
             let written = s.source.as_ref().map(|l| format!("{}:{}", l.file, l.line));
-            CheckedSetting { value: json(&s.value), from: origin(r, s), at: written }
+            CheckedSetting { value: setting_json(&s.value), from: origin(r, s), at: written }
         })
     };
     let settings = check
         .values
         .into_iter()
         .map(|(key, (value, from))| {
-            let other = |from: &str| CheckedSetting { value: json(&value), from: from.into(), at: None };
+            let other = |from: &str| CheckedSetting { value: setting_json(&value), from: from.into(), at: None };
             let setting = match from {
                 SettingFrom::Default => other("default"),
                 SettingFrom::Tool => other("command-line"),
@@ -268,14 +268,15 @@ fn reading_problems(r: &Interpretation, p: &LevelProblem) -> Vec<(Severity, Chec
         .collect()
 }
 
-/// An RNL literal as JSON: a whole number as an integer.
-fn json(value: &Lit) -> serde_json::Value {
+/// A value of a setting as JSON: a whole number as an integer, a number, a string, a boolean or
+/// an array of these.
+pub fn setting_json(value: &Lit) -> serde_json::Value {
     match value {
         Lit::Num(n) if n.fract() == 0.0 && n.abs() < 9_007_199_254_740_992.0 => serde_json::json!(*n as i64),
         Lit::Num(n) => serde_json::json!(n),
         Lit::Str(s) => serde_json::json!(s.as_str()),
         Lit::Bool(b) => serde_json::json!(b),
-        Lit::Arr(a) => serde_json::Value::Array(a.iter().map(json).collect()),
+        Lit::Arr(a) => serde_json::Value::Array(a.iter().map(setting_json).collect()),
     }
 }
 

@@ -39,6 +39,39 @@ R1 a b 1k
     assert!(facts.iter().all(|f| f.status == "kept" && f.holds == Some(true)), "{facts:?}");
 }
 
+/// Each level of the report has its check of the settings, as `rnl solve --check --json` gives
+/// it: the value of each setting and where it comes from, and each error with its key, which a
+/// page points at. A value of the file that the solver does not take is an error, and the solve
+/// goes on with the default.
+#[test]
+fn each_level_of_the_report_has_the_check_of_its_settings() {
+    let dir = scratch("report-check");
+    let file = dir.join("t.sp");
+    let text = r#"* settings
+* @RNL(type="header") { @VERSION("0.4"); @SOLVER-CONFIG(beam=6, grid="x") }
+R1 a b 1k
+* @RNL {
+* $S = @DEFINE-SYMBOL { (-2,0) @PIN(terminal=1,direction="left"); (2,0) @PIN(terminal=2,direction="right"); (-1,-1) (1,-1) (1,1) (-1,1) (-1,-1) @LINE };
+* #R1 @SET-SYMBOL $S;
+* #R1 @PLACE(0,0)
+* }
+.end
+"#;
+    std::fs::write(&file, text).unwrap();
+    let solver = SolverOptions::without_time_limit().with_config("spacing_x=2").unwrap();
+    let options = SolveOptions { solver, ..SolveOptions::default() };
+    let shown = preview(&path(&file), &FsProvider::new(&[]), &options, &WallClock::new(), &|_| true).unwrap();
+    let level = &shown.report.levels[0];
+    let check = level.check.as_ref().expect("the check of the level");
+    assert_eq!(check.title.as_deref(), Some(level.title.as_str()));
+    assert_eq!((check.settings["beam"].value.clone(), check.settings["beam"].from.as_str()), (6.into(), "header"));
+    assert_eq!(check.settings["spacing_x"].from, "command-line");
+    assert_eq!(check.settings["grid"].from, "default");
+    assert_eq!(check.errors.iter().map(|e| e.key.as_deref()).collect::<Vec<_>>(), [Some("grid")]);
+    // the report's errors say the same, as text
+    assert!(level.errors.iter().any(|e| e.contains("grid")), "{:?}", level.errors);
+}
+
 /// A fresh directory of its own under the tests' temporary directory.
 fn scratch(name: &str) -> PathBuf {
     let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("rnl-preview").join(name);

@@ -68,6 +68,7 @@ mod search_choices;
 mod simplex;
 mod skeleton;
 mod structure;
+mod table;
 mod tree;
 mod tree_hang;
 
@@ -83,6 +84,10 @@ pub use options::{Budget, Layer, Objectives, SolverOptions, DEFAULT_LAYERS, DEFA
 pub use resolve::Resolved;
 pub use rnl_runtime::problem::LevelProblem;
 pub use rnl_runtime::solution::Solution;
+pub use table::{
+    settings_table, ObjectiveRow, SettingChoice, SettingGroup, SettingKind, SettingRow, SettingsTable, When,
+    SETTINGS_TABLE_VERSION,
+};
 
 /// The `author` the solver writes in the head of its record (2.8, chapter 17).
 pub const AUTHOR: &str = "rnl-solver 0.1";

@@ -26,7 +26,8 @@ const USAGE: &str = concat!(
                                     #M5:d or %dp1, written as RNL refers to it
   rnl problem FILE [options]        print what a solver reads of each level, with its hash, as JSON
   rnl solve FILE -o DIR [options]   solve each drawing level and write its record of the solver back
-  rnl solver-defaults              print 0.4 solver defaults as RNL named parameters
+  rnl solver-defaults [--json]     print 0.4 solver defaults as RNL named parameters, or with --json
+                                    the table of the solver's settings and objectives
   rnl upgrade FILE [-o DIR | --in-place] [--report REPORT.json] [--approximate] [--keep-generated]
                                     preview migration to 0.4, or save it
   rnl preview FILE [options]        print the solve as the desktop viewer previews it, as JSON; writes nothing
@@ -449,8 +450,8 @@ fn parse_args() -> Result<Args, Said> {
     if json && command == "solve" && !solver.check {
         return Err(Said::new(codes::CLI_OPTION_WRONG_COMMAND, "--json is an option of solve only with --check"));
     }
-    if json && !matches!(command.as_str(), "explain" | "solve") {
-        return Err(Said::new(codes::CLI_OPTION_WRONG_COMMAND, "--json is an option of explain"));
+    if json && !matches!(command.as_str(), "explain" | "solve" | "solver-defaults") {
+        return Err(Said::new(codes::CLI_OPTION_WRONG_COMMAND, "--json is an option of explain and solver-defaults"));
     }
     if constraints && command != "view" {
         let text = "--constraints is an option of view; rnl problem prints what a solver reads";
@@ -665,7 +666,11 @@ fn run(args: &Args) -> Result<ExitCode, Said> {
     check_formats(args, &provider)?;
     match args.command.as_str() {
         "solver-defaults" => {
-            println!("{}", rnl_solver::SolverOptions::defaults_config());
+            if args.json {
+                println!("{}", serde_json::to_string_pretty(&rnl_cli::solver_table::settings_table_json()).unwrap());
+            } else {
+                println!("{}", rnl_solver::SolverOptions::defaults_config());
+            }
             Ok(ExitCode::SUCCESS)
         }
         "check" => {

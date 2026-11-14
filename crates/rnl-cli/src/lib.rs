@@ -19,6 +19,7 @@ pub mod provider;
 pub mod replace;
 pub mod respace;
 pub mod solve;
+pub mod solver_table;
 
 /// Core version and source revision shared by the CLI and the desktop About dialog.
 pub const CORE_VERSION: &str = env!("CARGO_PKG_VERSION");
