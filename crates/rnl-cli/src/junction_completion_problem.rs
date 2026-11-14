@@ -525,13 +525,51 @@ pub fn validate_interpreted_trial(input: TrialValidation<'_>) -> Result<(), Stri
     let trial_problem = after.problems.iter().find(|v| v.level == level).ok_or("missing trial problem")?;
     retained_facts_preserved(original_problem, trial_problem, host_file, line_map, kept, after, tolerance)?;
     let drawn = current_drawn(trial_problem, after);
+    // A fact that a dot makes must hold. Another fact, such as one of a label that the first pass
+    // left unresolved beside an assertion the file violates, is not the dots' to settle: it needs
+    // only to come out as it did before any dot was placed, and the checks below keep every old
+    // object where it was.
+    let dots: Vec<usize> = trial_problem
+        .usages
+        .iter()
+        .enumerate()
+        .filter(|(_, u)| {
+            u.object
+                .and_then(|own| trial_problem.ids.objects.get(own))
+                .is_some_and(|id| targets.iter().any(|(usage_id, _)| usage_id == id))
+        })
+        .map(|(index, _)| index)
+        .collect();
+    let initial = before.problems.iter().find(|v| v.level == level).ok_or("missing initial problem")?;
+    let initial_drawn = current_drawn(initial, before);
+    let key = |p: &LevelProblem, index: usize| {
+        let line = p.facts[index].source.as_ref().map(|s| (s.file.clone(), s.line));
+        (rnl_runtime::problem::fact_statement(p, index), line)
+    };
+    let mut as_before: Vec<_> = (0..initial.facts.len())
+        .map(|index| {
+            (key(initial, index), rnl_solver::problem_fact_holds_as_drawn(initial, &initial_drawn, index, tolerance))
+        })
+        .filter(|(_, holds)| *holds != Some(true))
+        .map(Some)
+        .collect();
     for &index in added_facts {
-        if rnl_solver::problem_fact_holds_as_drawn(trial_problem, &drawn, index, tolerance) != Some(true) {
-            return Err(format!(
-                "new or changed fact is unresolved or not satisfied: {}",
-                rnl_runtime::problem::fact_statement(trial_problem, index)
-            ));
+        let holds = rnl_solver::problem_fact_holds_as_drawn(trial_problem, &drawn, index, tolerance);
+        if holds == Some(true) {
+            continue;
         }
+        let of_a_dot = trial_problem.facts[index].chain.iter().any(|usage| dots.contains(usage));
+        let fact = (key(trial_problem, index), holds);
+        if !of_a_dot {
+            if let Some(same) = as_before.iter_mut().find(|old| old.as_ref() == Some(&fact)) {
+                *same = None;
+                continue;
+            }
+        }
+        return Err(format!(
+            "new or changed fact is unresolved or not satisfied: {}",
+            rnl_runtime::problem::fact_statement(trial_problem, index)
+        ));
     }
     if after.failed.iter().any(|failed| !before.failed.contains(failed)) {
         return Err("trial newly failed or dropped a statement".into());
