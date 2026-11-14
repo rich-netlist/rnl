@@ -21,6 +21,8 @@
  * @property {string} [level] Only the level with this title.
  * @property {boolean} [respace] Space each level again from its record of the solver, nothing
  *   searched (docs/solver-respace.md).
+ * @property {number} [timeall] The whole file's time in seconds, as `rnl solve --timeall` takes
+ *   it: what the levels of a time limit share, on the clock `now`.
  */
 
 /**

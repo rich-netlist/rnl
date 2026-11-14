@@ -181,6 +181,7 @@ mod text_arbitrary04;
 mod text_fix_rotate;
 mod text_name_formats;
 mod text_orientation04;
+mod timeall;
 mod topology;
 mod topology_members04;
 mod type_patterns04;

@@ -87,7 +87,7 @@ use rnl_runtime::writeback::{
     replace_generated_with_header, spelled_like_new_words, takes_version_of, PIN_STD_0_2,
 };
 use rnl_runtime::{Interpretation, Options};
-use rnl_solver::{Clock, Discarded, Solved, SolverOptions, Statement, AUTHOR};
+use rnl_solver::{Clock, Discarded, RunLimit, Solved, SolverOptions, Statement, AUTHOR};
 
 mod check;
 pub use check::{
@@ -113,6 +113,13 @@ pub struct SolveOptions {
     /// The solver's options; their canonical text is the second segment of the hash (17). Its
     /// time limit is the toolkit's default of 5 seconds unless set otherwise (the draft 0.3, 8.5).
     pub solver: SolverOptions,
+    /// The whole file's time (`--timeall`): the seconds that the levels of 0.4 of a time limit, or
+    /// of none, share, on the clock of the solve. Each has at most what is left of them shared
+    /// evenly among those still to solve, itself among them, and only its seed once they are
+    /// spent. A level of a limit of work, or of its seed, is solved as its limit says, its time
+    /// counted. A file of 0.2 raised to 0.3 is solved twice, each time within it; a respace does
+    /// not read it. None by default: each level has its own limit only.
+    pub total_seconds: Option<f64>,
 }
 
 impl Default for SolveOptions {
@@ -124,6 +131,7 @@ impl Default for SolveOptions {
             include_std: false,
             level: None,
             solver: SolverOptions::default(),
+            total_seconds: None,
         }
     }
 }
@@ -416,7 +424,7 @@ pub fn solve_watched(
     clock: &dyn Clock,
     watch: &dyn Fn(&Progress) -> bool,
 ) -> Result<SolveRun, String> {
-    solve_using(file, files, options, watch, &|p, options| {
+    solve_clocked(file, files, options, clock, watch, &|p, options| {
         Ok(BackendResult {
             solved: rnl_solver::solve_with_clock(p, options, clock),
             author: AUTHOR.to_string(),
@@ -446,10 +454,29 @@ pub fn solve_using(
     watch: &dyn Fn(&Progress) -> bool,
     backend: &Backend<'_>,
 ) -> Result<SolveRun, String> {
+    // the whole file's time is measured on the wall clock, which is read only when it is given
+    let wall = options.total_seconds.map(|_| WallClock::new());
+    let clock: &dyn Clock = match &wall {
+        Some(wall) => wall,
+        None => &rnl_solver::StoppedClock,
+    };
+    solve_clocked(file, files, options, clock, watch, backend)
+}
+
+/// [`solve_using`], the whole file's time measured on `clock`.
+fn solve_clocked(
+    file: &Path,
+    files: &dyn Provider,
+    options: &SolveOptions,
+    clock: &dyn Clock,
+    watch: &dyn Fn(&Progress) -> bool,
+    backend: &Backend<'_>,
+) -> Result<SolveRun, String> {
     solve_marked(
         file,
         files,
         options,
+        clock,
         &|mark| match mark {
             Mark::Level(p) => watch(p),
             _ => true,
@@ -481,17 +508,65 @@ pub(crate) enum Mark<'a> {
 /// Why a level is not solved, when it is not: [`NotSolved::reason`].
 pub(crate) type Skip<'a> = dyn Fn(&LevelProblem) -> Option<String> + 'a;
 
+/// The whole file's time ([`SolveOptions::total_seconds`]): its seconds, measured on `clock` from
+/// `begun`, the start of the pass.
+#[derive(Clone, Copy)]
+struct Total<'a> {
+    seconds: f64,
+    begun: f64,
+    clock: &'a dyn Clock,
+}
+
+impl Total<'_> {
+    /// The limit of the level `p` solved with `solver`, its own settings applied, when it shares
+    /// the time: a level of 0.4 of a time limit, as seconds, or of none, as infinite. A level
+    /// before 0.4 does not read the limits of 0.4.
+    fn own(&self, solver: &SolverOptions, p: &LevelProblem) -> Option<f64> {
+        if p.version != "0.4" {
+            return None;
+        }
+        match rnl_solver::run_limit(&solver.for_problem(p).0, self.clock) {
+            RunLimit::Time(seconds) => Some(seconds),
+            RunLimit::Unlimited => Some(f64::INFINITY),
+            RunLimit::Work(_) | RunLimit::Seed => None,
+        }
+    }
+
+    /// The options of the level `p` with its share of what is left, the first of `levels` levels
+    /// that share it: its own limit, when that is no more, and its seed alone when nothing is
+    /// left. None when its own options stand.
+    fn share(&self, solver: &SolverOptions, p: &LevelProblem, levels: usize) -> Result<Option<SolverOptions>, String> {
+        let Some(own) = self.own(solver, p) else { return Ok(None) };
+        let left = (self.seconds - (self.clock.elapsed() - self.begun)).max(0.);
+        // whole milliseconds, which the text of the options writes as they are
+        let share = (left / levels.max(1) as f64 * 1000.).floor() / 1000.;
+        if share >= own {
+            return Ok(None);
+        }
+        // as the tool's settings, the last, which the level applies over its own
+        let text = if share > 0. {
+            format!("limit=\"time\", seconds={}", rnl_runtime::geom::fmt_num(share))
+        } else {
+            "limit=\"seed\"".to_string()
+        };
+        solver.with_config(&text).map(Some).map_err(|e| format!("--timeall: the share of {}: {e}", p.title))
+    }
+}
+
 /// [`solve_using`], its watcher told of every [`Mark`], and the levels `skip` gives a reason for
-/// left as they are, in [`SolveRun::not_solved`].
+/// left as they are, in [`SolveRun::not_solved`]. The whole file's time, when it is given, is
+/// measured on `clock`.
 pub(crate) fn solve_marked(
     file: &Path,
     files: &dyn Provider,
     options: &SolveOptions,
+    clock: &dyn Clock,
     watch: &dyn Fn(Mark<'_>) -> bool,
     skip: &Skip<'_>,
     backend: &Backend<'_>,
 ) -> Result<SolveRun, String> {
-    let (run, wants) = pass(file, files, options, &[], watch, skip, backend)?;
+    let total = options.total_seconds.map(|seconds| (seconds, clock));
+    let (run, wants) = pass(file, files, options, total, &[], watch, skip, backend)?;
     if wants.is_empty() {
         return Ok(run);
     }
@@ -538,7 +613,8 @@ pub(crate) fn solve_marked(
     }
     // the files read are those of the first pass: the second reads the files raised from memory
     let read = run.read.clone();
-    let mut run = if texts.is_empty() { run } else { pass(file, files, options, &texts, watch, skip, backend)?.0 };
+    let mut run =
+        if texts.is_empty() { run } else { pass(file, files, options, total, &texts, watch, skip, backend)?.0 };
     run.read = read;
     // a file level that cannot say 0.3 itself, such as a library section without a header record,
     // takes the version of the file that includes it (16.1): when that one is raised, it reads in
@@ -571,16 +647,20 @@ type Want = (String, String, Option<String>);
 /// the files: the run, and the file levels of 0.2 whose records need 0.3, as the path and name of
 /// their file in the document and their library section; those only in the first pass, when
 /// nothing is raised.
+#[allow(clippy::too_many_arguments)]
 fn pass(
     file: &Path,
     files: &dyn Provider,
     options: &SolveOptions,
+    total: Option<(f64, &dyn Clock)>,
     raised: &[(String, String)],
     watch: &dyn Fn(Mark<'_>) -> bool,
     skip: &Skip<'_>,
     backend: &Backend<'_>,
 ) -> Result<(SolveRun, Vec<Want>), String> {
     let entry = path_str(file);
+    // the whole file's time runs from the start of the pass: of a file raised, the second is kept
+    let total = total.map(|(seconds, clock)| Total { seconds, begun: clock.elapsed(), clock });
     let runtime = options.runtime();
     let files = Noting::new(files);
     let mut memory = MemoryProvider::new();
@@ -663,6 +743,14 @@ fn pass(
             moved.push(path);
         }
     }
+    // the levels that share the whole file's time
+    let timed: Vec<bool> = targets
+        .iter()
+        .map(|(level, title)| {
+            let p = first.problems.iter().find(|p| p.level == *level && p.title == *title);
+            total.zip(p).is_some_and(|(total, p)| total.own(&options.solver, p).is_some())
+        })
+        .collect();
     let mut levels = Vec::new();
     let mut solved_files: Vec<SolvedFile> = Vec::new();
     // the document read again when a header moved
@@ -685,15 +773,21 @@ fn pass(
             .iter()
             .find(|p| p.level == level && p.title == title)
             .ok_or_else(|| format!("the level {title} is not read again after the levels before it were solved"))?;
-        watch(Mark::Problem(&options.solver.for_problem(p).0));
+        // the level's share of the whole file's time, when it is less than its own limit
+        let shared = match total.filter(|_| timed[k]) {
+            Some(total) => total.share(&options.solver, p, timed[k..].iter().filter(|t| **t).count())?,
+            None => None,
+        };
+        let solver = shared.as_ref().unwrap_or(&options.solver);
+        watch(Mark::Problem(&solver.for_problem(p).0));
         let start = Stopwatch::start();
-        let BackendResult { solved, author, report_available } = backend(p, &options.solver)?;
+        let BackendResult { solved, author, report_available } = backend(p, solver)?;
         let time = start.elapsed();
         // without the solver's own text of the options, theirs as the level takes them: a level
         // before 0.4 has no layout to name
         let hash = match solved.report.canonical_options.as_deref() {
             Some(canonical) => sig2(p, canonical),
-            None => sig2(p, &options.solver.for_problem(p).0.canonical()),
+            None => sig2(p, &solver.for_problem(p).0.canonical()),
         };
         let mut written = write_record(p, &solved.solution, &author, &hash);
         let mut write_errors = Vec::new();

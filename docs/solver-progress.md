@@ -27,7 +27,7 @@ and shows an event or a stage it does not know by its name.
 | `event` | When | Fields |
 | --- | --- | --- |
 | `run` | Before the first level | `progress`: the format version, 1; `levels`: how many levels the run solves |
-| `level` | A level begins | `level`, `title`, `again`; `limit`: `"time"` with `seconds`, `"work"` with `work`, `"seed"` or `"none"`, with the level's own settings applied |
+| `level` | A level begins | `level`, `title`, `again`; `limit`: `"time"` with `seconds`, `"work"` with `work`, `"seed"` or `"none"`, with the level's own settings applied and its share of `--timeall` |
 | `stage` | A level enters a stage | `level`, `stage`, `work`, `elapsed` |
 | `work` | More work | `level`, `stage`, `work`, `elapsed`, `tried`; `fraction`, the share of the limit used from 0 to 1, for a time or a work limit |
 | `best` | A better candidate than any before in the level | `level`, `tried`, `work`, `elapsed`; `cost`, numbers to compare element by element, lower first, with no promised meaning |

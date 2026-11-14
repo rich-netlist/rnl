@@ -119,6 +119,17 @@ assert.match(twice.error, /^files: .* are one file$/);
   assert.equal(done?.status, "time", JSON.stringify(seen).slice(0, 600));
   assert.ok(done.seconds >= 1 && done.seconds < 20, `the level took ${done.seconds} s on the clock`);
   assert.match(answer.report.text.join("\n"), /\n {2}time: (?!0\.000)\d+\.\d+ s/);
+  // the whole file's time: the one level has what is left of it, less than its own 10 seconds
+  const shared = [];
+  timed.solve({ ...request, solver_config: 'layout="rows",limit="time",seconds=10', timeall: 5 }, (e) => void shared.push(e));
+  const level = shared.find((e) => e.event === "level");
+  assert.ok(level.limit === "time" && level.seconds > 4 && level.seconds < 5, JSON.stringify(level));
+  assert.match(timed.solve({ ...request, timeall: 0 }).error, /^timeall:/);
+  // a respace searches nothing, and does not read it
+  const spaced = [];
+  const again = { ...request, files: { "/w/main.sp": written }, respace: true, timeall: 0.001 };
+  timed.solve({ ...again, solver_config: 'spacing_x=4,limit="time",seconds=10' }, (e) => void spaced.push(e));
+  assert.equal(spaced.find((e) => e.event === "level")?.seconds, 10, JSON.stringify(spaced).slice(0, 600));
   // a clock that stops being a number, or goes back, is read as the latest reading before
   let odd = 0;
   const broken = await loadSolver(readFileSync(wasm), {

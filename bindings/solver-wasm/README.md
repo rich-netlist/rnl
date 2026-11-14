@@ -51,7 +51,7 @@ The call is synchronous and can take the solver's whole time limit. Run it in a 
 
 ## The request and the answer
 
-The request is all the solve reads: `entry`, `files`, `package_dirs`, `dialect`, `formats`, `std`, `include_std`, `solver_config` (RNL named parameters, as `--solver-config` takes them), `level` and `respace`. A Worker that runs it needs nothing from the core's Worker.
+The request is all the solve reads: `entry`, `files`, `package_dirs`, `dialect`, `formats`, `std`, `include_std`, `solver_config` (RNL named parameters, as `--solver-config` takes them), `level`, `respace` and `timeall` (the whole file's time in seconds, as `--timeall` takes it). A Worker that runs it needs nothing from the core's Worker.
 
 Other fields are ignored. That includes fields of the core's build request that this module does not read: `pool`, `auto_include`, `library_prefix`, `library_edits` and `std_version`.
 
