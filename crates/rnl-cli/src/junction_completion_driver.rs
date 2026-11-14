@@ -87,8 +87,8 @@ fn lost(p: &LevelProblem, read: &Interpretation) -> Option<String> {
     let again = read.problems.iter().find(|q| q.level == p.level)?;
     let objects: HashSet<&String> = again.ids.objects.iter().collect();
     let mut gone = Vec::new();
-    // by the place of its rule: the usages not written, and the label of one
-    let mut unwritten: BTreeMap<String, (usize, &str)> = BTreeMap::new();
+    // by the place of its rule: the usages not written, the label of one and its definition
+    let mut unwritten: BTreeMap<String, (usize, &str, &str)> = BTreeMap::new();
     for ((o, known), id) in p.objects.iter().zip(&ids.objects).zip(&p.ids.objects) {
         if known.is_some() {
             continue;
@@ -96,19 +96,19 @@ fn lost(p: &LevelProblem, read: &Interpretation) -> Option<String> {
         match &o.reference {
             Reference::Name(name) if !objects.contains(id) => gone.push(name.clone()),
             Reference::Generated { usage, path } if path.is_empty() => {
-                let Some(usage) = p.ids.usages.get(*usage) else { continue };
-                let entry = unwritten.entry(site(usage)).or_insert((0, &o.label));
+                let (Some(id), Some(entry)) = (p.ids.usages.get(*usage), p.usages.get(*usage)) else { continue };
+                let entry = unwritten.entry(site(id)).or_insert((0, &o.label, &entry.definition));
                 entry.0 += 1;
             }
             _ => {}
         }
     }
-    for (at, (count, label)) in unwritten {
+    for (at, (count, label, definition)) in unwritten {
         let made = again.ids.usages.iter().filter(|id| site(id) == at).count();
         match count.saturating_sub(made) {
             0 => {}
-            1 => gone.push(format!("{label}, made by the rule at {at}")),
-            n => gone.push(format!("{n} of {label}, made by the rule at {at}")),
+            1 => gone.push(format!("{label} from the rule at {at}")),
+            n => gone.push(format!("{n} usages of {definition} from the rule at {at}")),
         }
     }
     let (first, rest) = gone.split_first()?;
@@ -118,7 +118,7 @@ fn lost(p: &LevelProblem, read: &Interpretation) -> Option<String> {
         said.push_str(name);
     }
     if rest.len() > 2 {
-        said.push_str(&format!(" and {} more", rest.len() - 2));
+        said.push_str(&format!("; and {} more", rest.len() - 2));
     }
     let verb = if gone.len() == 1 { "is" } else { "are" };
     Some(format!("{said} {verb} {LOST}"))
