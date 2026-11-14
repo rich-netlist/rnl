@@ -1341,6 +1341,86 @@ pub fn text_boxes(lv: &LevelView, o: &RenderOptions) -> Vec<Option<[f64; 4]>> {
         .collect()
 }
 
+/// How far the clearance box of a text ([`clearance_box`]) reaches past the advances of its runs at
+/// each end of its lines, in sizes of the text: a margin for glyphs that reach past their advances,
+/// and for the rounding of the advances that a frontend draws.
+pub const TEXT_MARGIN: f64 = 0.1;
+
+/// How far above and below its baseline a run's glyphs reach in the clearance box of a text of
+/// 0.2 or 0.3 ([`clearance_box`]), in sizes of the run: the capitals, digits and ascenders of the
+/// Latin letters, about 0.72 high in the shipped fonts, and their descenders, about 0.24 deep,
+/// with a margin; the ideographs, which fill the em box from 0.12 below the baseline to 0.88 above
+/// it, nearly so.
+pub const RUN_ABOVE: f64 = 0.8;
+pub const RUN_BELOW: f64 = 0.4;
+
+/// The box a text is kept clear of others by, and judged by: the one measure of the solver, which
+/// places the texts by it, and of the check of texts over texts (RNL7012). `t` is the text laid out
+/// and `bounds` its box as drawn ([`lay_out`], [`modern_text`]).
+///
+/// - A text of 0.4 (`modern`, its baseline mirrored with its owner, 9.2.5): the box as drawn, from
+///   the ascender of the face to its descender across the lines, and [`TEXT_MARGIN`] more at each
+///   end along them.
+/// - A text of 0.2 or 0.3: along its lines, the box as drawn and [`TEXT_MARGIN`] more at each end;
+///   across them, each run from [`RUN_BELOW`] below its baseline to [`RUN_ABOVE`] above it, and the
+///   bars of fractions and overlines.
+///
+/// None for a text with nothing to draw.
+pub fn clearance_box(t: &TextPrim, bounds: [f64; 4], modern: bool) -> Option<[f64; 4]> {
+    if t.runs.is_empty() && t.bars.is_empty() {
+        return None;
+    }
+    let margin = TEXT_MARGIN * t.size;
+    if modern || t.transform.is_some() {
+        // along the way the glyphs read, as their transform turns them
+        let g = t.transform.unwrap_or([1.0, 0.0, 0.0, 1.0, 0.0, 0.0]);
+        let pad = [g[0].abs() * margin, g[2].abs() * margin];
+        return Some([bounds[0] - pad[0], bounds[1] - pad[1], bounds[2] + pad[0], bounds[3] + pad[1]]);
+    }
+    // across the lines, the glyphs of each run rather than the ascender and the descender of the
+    // face, which the box as drawn reaches and which go well past them; a vertical text reads up,
+    // the tops of its glyphs to the left
+    let across = |p: Pt| if t.vertical { -p.0 } else { p.1 };
+    let (mut lo, mut hi) = (f64::MAX, f64::MIN);
+    for r in &t.runs {
+        lo = lo.min(across(r.at) - RUN_BELOW * r.size);
+        hi = hi.max(across(r.at) + RUN_ABOVE * r.size);
+    }
+    for b in &t.bars {
+        let half = b.stroke.width / 2.0;
+        lo = lo.min(across(b.a).min(across(b.b)) - half);
+        hi = hi.max(across(b.a).max(across(b.b)) + half);
+    }
+    if lo > hi {
+        return None;
+    }
+    Some(if t.vertical {
+        [-hi, bounds[1] - margin, -lo, bounds[3] + margin]
+    } else {
+        [bounds[0] - margin, lo, bounds[2] + margin, hi]
+    })
+}
+
+/// The clearance box ([`clearance_box`]) of each text of the level, in the order of `lv.texts`;
+/// None for a text that draws nothing.
+pub fn text_clearance_boxes(lv: &LevelView, o: &RenderOptions) -> Vec<Option<[f64; 4]>> {
+    let mut out = Out { prims: Vec::new(), scale: o.scale };
+    lv.texts
+        .iter()
+        .map(|t| {
+            let from = out.prims.len();
+            out.view_text(t);
+            out.prims[from..]
+                .iter()
+                .filter_map(|p| match &p.kind {
+                    Kind::Text(text) => clearance_box(text, p.bbox, t.baseline_mirrors),
+                    _ => None,
+                })
+                .reduce(|a, b| [a[0].min(b[0]), a[1].min(b[1]), a[2].max(b[2]), a[3].max(b[3])])
+        })
+        .collect()
+}
+
 /// The primitives of one level, in drawing order: by layer, then by position (11.6), with their
 /// strokes resolved at the scale of `o`.
 pub fn primitives(lv: &LevelView, o: &RenderOptions) -> Vec<Primitive> {
