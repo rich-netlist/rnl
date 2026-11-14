@@ -88,7 +88,7 @@ test.describe("on the desktop", () => {
     expect(await viewer.calls("solverTable")).toEqual([[]]);
     // the groups, in the table's order, with its titles
     await expect(dialog(page).locator("fieldset > legend")).toHaveText([
-      "Layout", "Search and preferences", "Limit of each level's solve", "Caps on the search and the router", "Report",
+      "Layout", "Search and preferences", "Limit of each level's solve", "Caps on the search and the router", "Report", "Time for the whole file",
     ]);
     // the defaults of the table
     await expect(field(page, "layout")).toHaveValue("lines");
@@ -124,7 +124,7 @@ test.describe("on the desktop", () => {
     await dialog(page).getByRole("button", { name: "Cancel" }).click();
     await dialogGone(page);
     expect(await viewer.stored("solve-config")).toBeNull();
-    expect(await solved(page, viewer)).toEqual({ config: "" });
+    expect(await solved(page, viewer)).toEqual({ config: "", timeall: null });
   });
 
   test("a setting's conditions: the spacing is not used outside the lines layout, the work and the seconds follow the limit", async ({ page }) => {
@@ -157,7 +157,7 @@ test.describe("on the desktop", () => {
     await ok(page);
     expect(await viewer.stored("solve-config")).toEqual({ beam: 8, layout: "rows", spacing_x: 3 });
     expect((await viewer.calls("checkSettings")).at(-1)).toEqual(['beam=8,layout="rows",spacing_x=3']);
-    expect(await solved(page, viewer)).toEqual({ config: 'beam=8,layout="rows",spacing_x=3' });
+    expect(await solved(page, viewer)).toEqual({ config: 'beam=8,layout="rows",spacing_x=3', timeall: null });
     // what was kept shows again
     await open(page);
     await expect(field(page, "layout")).toHaveValue("rows");
@@ -168,7 +168,7 @@ test.describe("on the desktop", () => {
     await expect(field(page, "spacing_x")).toHaveValue("0");
     await ok(page);
     expect(await viewer.stored("solve-config")).toEqual({});
-    expect(await solved(page, viewer)).toEqual({ config: "" });
+    expect(await solved(page, viewer)).toEqual({ config: "", timeall: null });
   });
 
   test("a limit of work, no rounding to a grid, and a junction given or not: each as the table types it", async ({ page, viewer }) => {
@@ -184,7 +184,7 @@ test.describe("on the desktop", () => {
     await field(page, "junction").fill("$JUNCTION");
     await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --solver-config 'grid=false,junction="$JUNCTION",limit="work",work=5000'`);
     await ok(page);
-    expect(await solved(page, viewer)).toEqual({ config: 'grid=false,junction="$JUNCTION",limit="work",work=5000' });
+    expect(await solved(page, viewer)).toEqual({ config: 'grid=false,junction="$JUNCTION",limit="work",work=5000', timeall: null });
     // a number for the grid again, and the junction not given
     await open(page);
     await expect(field(page, "Positions are not rounded to a grid.")).toBeChecked();
@@ -275,6 +275,37 @@ test.describe("on the desktop", () => {
     expect((await viewer.stored("solve-config")).objectives).toContain("crossings+wire_length*2~0.5");
   });
 
+  test("the time for the whole file is beside the settings, not one of them: kept on its own, given to a solve as timeall and not to the check", async ({ page, viewer }) => {
+    await open(page);
+    const box = dialog(page).locator("fieldset", { hasText: "Time for the whole file" });
+    await expect(box).toHaveCount(1);
+    // none to begin with: each level has its own limit
+    await expect(field(page, "timeall")).toBeDisabled();
+    await box.getByLabel("set").check();
+    await field(page, "timeall").fill("0");
+    await dialog(page).getByRole("button", { name: "OK" }).click();
+    await expect(dialog(page).locator(".dialog-error")).toHaveText("timeall must be a positive number of seconds.");
+    await field(page, "timeall").fill("90");
+    await expect(asText(page)).toHaveText("Equivalent CLI command: rnl solve --timeall 90");
+    await field(page, "beam").fill("8");
+    await field(page, "layout").selectOption("rows");
+    await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --timeall 90 --solver-config 'beam=8,layout="rows"'`);
+    await ok(page);
+    expect(await viewer.stored("solve-timeall")).toBe(90);
+    expect(await viewer.stored("solve-config")).toEqual({ beam: 8, layout: "rows" });
+    // the solver is asked about the settings alone (rnl solve --check refuses a time for the file)
+    expect((await viewer.calls("checkSettings")).at(-1)).toEqual(['beam=8,layout="rows"']);
+    expect(await solved(page, viewer)).toEqual({ config: 'beam=8,layout="rows"', timeall: 90 });
+    // what was kept shows again, and Restore Defaults takes it away
+    await open(page);
+    await expect(field(page, "timeall")).toHaveValue("90");
+    await dialog(page).getByRole("button", { name: "Restore Defaults" }).click();
+    await expect(field(page, "timeall")).toBeDisabled();
+    await ok(page);
+    expect(await viewer.stored("solve-timeall")).toBeNull();
+    expect(await solved(page, viewer)).toEqual({ config: "", timeall: null });
+  });
+
   test("a value out of the bounds the table gives is refused where it is, and the solver's refusal is shown at its setting", async ({ page, viewer }) => {
     await open(page);
     await field(page, "beam").fill("");
@@ -331,7 +362,7 @@ test.describe("on the desktop", () => {
     await expect(field(page, "beam")).toHaveValue("6");
     await dialog(page).getByRole("button", { name: "Cancel" }).click();
     await dialogGone(page);
-    expect(await solved(page, viewer)).toEqual({ config: "beam=6" });
+    expect(await solved(page, viewer)).toEqual({ config: "beam=6", timeall: null });
   });
 
   test("the dialog says what the netlist and its packages give, from the last solve, which a value set here wins over", async ({ page, viewer }) => {

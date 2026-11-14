@@ -120,6 +120,17 @@ test("a solve writes the files where the page has them, runs preview on the entr
   } finally { await s.close(); }
 });
 
+test("the whole file's time reaches preview as --timeall; a time that is not a positive number is refused", async () => {
+  const s = await serve();
+  try {
+    const solve = (timeall) => call(s.port, "POST", SOLVE, { entry: "/top.sp", files: { "/top.sp": "* x" }, timeall });
+    const args = (await solve(90)).json.document.seen.args;
+    assert.equal(args[args.indexOf("--timeall") + 1], "90");
+    for (const none of [null, undefined]) assert.ok(!(await solve(none)).json.document.seen.args.includes("--timeall"));
+    for (const bad of [0, -5, "60"]) assert.equal((await solve(bad)).status, 400, String(bad));
+  } finally { await s.close(); }
+});
+
 test("a solve of one level asks preview for it by its title; none asks for every level", async () => {
   const s = await serve();
   try {
