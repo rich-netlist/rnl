@@ -227,7 +227,10 @@ fn explain_refuses_an_unknown_reference_with_the_names_close_to_it() {
     assert_eq!(code, 2);
     assert!(err.starts_with("error: RNL8004 cli-explain-args: rnl explain takes FILE and REF"), "{err}");
     let (code, _, err) = rnl(&["check", &file, "--json"]);
-    assert_eq!((code, err.trim()), (2, "error: RNL8011 cli-option-wrong-command: --json is an option of explain"));
+    assert_eq!(
+        (code, err.trim()),
+        (2, "error: RNL8011 cli-option-wrong-command: --json is an option of explain and solver-defaults")
+    );
 }
 
 #[test]

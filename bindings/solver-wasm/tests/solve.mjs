@@ -47,6 +47,12 @@ const respaced = solver.solve(
 assert.equal(respaced.report.mode, "respace", JSON.stringify(respaced).slice(0, 400));
 assert.notEqual(respaced.files["/w/main.sp"], written);
 
+// the table of the settings, as the CLI prints it
+const table = solver.settings();
+assert.equal(table.version, 1);
+assert.equal(table.settings.find((s) => s.key === "layout").default, "lines");
+assert.ok(table.objectives.length > 0 && table.stages.length > 0 && table.groups.length > 0);
+
 const bad = solver.solve({ ...request, solver_config: "beam=0" });
 assert.match(bad.error, /^solver_config:/);
 console.log(`solved, respaced and refused through WebAssembly, with ${events.length} progress events`);
@@ -166,4 +172,8 @@ if (rnl) {
     rmSync(dir, { recursive: true, force: true });
   }
   console.log(`${count} files written through WebAssembly are byte for byte those of ${rnl}`);
+  const printed = spawnSync(rnl, ["solver-defaults", "--json"], { encoding: "utf8" });
+  assert.equal(printed.status, 0, printed.stderr);
+  assert.deepEqual(solver.settings(), JSON.parse(printed.stdout));
+  console.log(`the table of the settings is that of ${rnl} solver-defaults --json`);
 }

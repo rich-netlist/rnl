@@ -91,7 +91,8 @@ use rnl_solver::{Clock, Discarded, Solved, SolverOptions, Statement, AUTHOR};
 
 mod check;
 pub use check::{
-    check_lines, check_settings, named_syntax, Checked, CheckedLevel, CheckedProblem, CheckedSetting, ToolSettings,
+    check_lines, check_settings, named_syntax, setting_json, Checked, CheckedLevel, CheckedProblem, CheckedSetting,
+    ToolSettings,
 };
 
 use crate::provider::path_str;

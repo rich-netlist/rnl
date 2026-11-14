@@ -50,6 +50,42 @@ export interface Solver {
    * the next call has a new instance.
    */
   solve(request: SolveRequest, onProgress?: (event: SolveEvent) => boolean | void): SolveAnswer;
+  /**
+   * The table of the solver's settings and objectives, as `rnl solver-defaults --json` prints it:
+   * what a settings page is drawn from. Fields are only ever added.
+   */
+  settings(): SettingsTable;
+}
+
+/** One setting of the table. A field that does not apply to it is left out. */
+export interface SettingRow {
+  key: string;
+  group: string;
+  /** "integer", "number", "number-or-false", "boolean", "string", "choice" or "objectives"; a kind not known is text. */
+  type: string;
+  choices?: { value: string; what: string }[];
+  min?: number;
+  min_exclusive?: number;
+  max?: number;
+  /** Its value when nothing gives it, for a 0.4 level; left out when it has none. */
+  default?: number | string | boolean;
+  /** Whether a file may give it in SOLVER-CONFIG. */
+  in_file: boolean;
+  what: string;
+  false_what?: string;
+  /** Where the solver uses it, by the values of other settings. */
+  applies?: Record<string, string[]>;
+  shown_when?: Record<string, string[]>;
+  required_when?: Record<string, string[]>;
+}
+
+export interface SettingsTable {
+  version: number;
+  groups: { name: string; what: string }[];
+  settings: SettingRow[];
+  objectives: { name: string; what: string; implemented: boolean }[];
+  default_objectives: { items: { name: string; weight: number }[]; tolerance: number }[];
+  stages: { name: string; what: string }[];
 }
 
 /**
