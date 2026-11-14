@@ -216,7 +216,8 @@ pub(crate) fn measured_layers(
         .expect("candidate annotation bounds validated");
     let drawing = Drawing {
         overlaps: placed.overlaps.len() + annotation_overlaps,
-        crowding: crowding(s, &placed.origins, &placed.geometry.orient, &placed.dropped),
+        crowding: crowding(s, &placed.origins, &placed.geometry.orient, &placed.dropped)
+            + if s.language04 { texts_on_texts(problem, s, &placed.geometry, &placed.origins) } else { 0 },
         misleading: misleading(problem, s, &placed.origins, &placed.geometry, wires),
         wire_over_symbol: wire_over_symbol(problem, s, &placed.origins, &placed.geometry, wires),
     };
@@ -232,6 +233,50 @@ pub(crate) fn measured_layers(
 /// order drops such gaps, its even steps then as short as the facts allow.
 pub(crate) fn crowding(s: &Structure, origins: &[[Q; 2]], ori: &[Orient], dropped: &[RelKind]) -> usize {
     dropped.iter().filter(|k| **k == RelKind::Gap).count() + texts_over(s, origins, ori)
+}
+
+/// The pairs of texts of two objects drawn over each other with some area, as a reader sees one
+/// text written over another (RNL7012, 13.3), each pair counted once, which the objective
+/// `crowding` of a 0.4 level adds to [`crowding`]: every text an object has
+/// (`Structure::text_offsets`: those its symbol places, its pins' labels, its own text), an object
+/// drawn as an annotation, and the level's annotations. A text is the object's it is attached to,
+/// or that of the symbol it is drawn in; the texts of one object, and those of a stub and its host,
+/// are left out, as [`texts_over`] leaves them. What the solution leaves free is not drawn, and an
+/// annotation whose box cannot be read counts nothing here, its error being the candidate's.
+pub(crate) fn texts_on_texts(problem: &LevelProblem, s: &Structure, geometry: &Geometry, origins: &[[Q; 2]]) -> usize {
+    use rnl_runtime::problem::{Filler, Position};
+    let host = |k: usize| s.objects[k].stub.as_ref().map(|stub| stub.host.0);
+    let owner = |k: usize| match (&problem.objects[k].text, &problem.objects[k].position) {
+        (
+            Some(rnl_runtime::problem::TextInfo {
+                attach: Filler::Object(o) | Filler::Terminal { object: o, .. } | Filler::Pin { object: o, .. },
+                ..
+            }),
+            _,
+        ) => *o,
+        (_, Position::InSymbol { owner, .. }) => *owner,
+        _ => crate::annotation::attachment_owner(problem, k).unwrap_or(k),
+    };
+    let mut texts: Vec<(usize, [Q; 4])> = Vec::new();
+    for k in (0..s.objects.len()).filter(|&k| !s.objects[k].left_free) {
+        let Some(at) = origins.get(k) else { continue };
+        let placed = |b: &[Q; 4]| [&at[0] + &b[0], &at[1] + &b[1], &at[0] + &b[2], &at[1] + &b[3]];
+        texts.extend(s.text_offsets(problem, geometry, k).iter().map(|b| (owner(k), placed(b))));
+    }
+    for &k in s.annotation_views.keys().filter(|&&k| !s.objects[k].left_free) {
+        if let Some(b) = s.box_at(origins, &geometry.orient, k) {
+            texts.push((owner(k), b));
+        }
+    }
+    for (object, b) in crate::annotation::bounds(problem, geometry).unwrap_or_default() {
+        texts.push((owner(object), b));
+    }
+    let apart = |a: usize, b: usize| a != b && host(a) != Some(b) && host(b) != Some(a);
+    let mut count = 0;
+    for (i, (a, ta)) in texts.iter().enumerate() {
+        count += texts[i + 1..].iter().filter(|(b, tb)| apart(*a, *b) && meet(ta, tb)).count();
+    }
+    count
 }
 
 /// The texts drawn over the box of another symbol, with some area (13.3): for each object drawn
