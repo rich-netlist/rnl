@@ -67,7 +67,12 @@ When even the first candidate is interrupted, the solver retains its existing
 feasible fallback. Work spent on a rejected challenger is still counted for replay.
 
 The configurable drawing objectives include `overlaps`, `crowding`, `misleading`
-and `wire_over_symbol`. For 0.4, only configured objectives rank candidates; the
+and `wire_over_symbol`. For 0.4, only configured objectives rank candidates, after
+one fixed key: false joins, the wires that run along another net's pin or through a
+symbol and so read as connected where they are not, count first, whether or not
+those objectives are configured. In the lines layout they rank right after the
+facts that must hold, above broken low-priority facts, and a stub put apart from
+another symbol is never put beyond it along the way it rises from its pin. The
 released versions retain their fixed ordering before the objective layers. Default
 layout and objective changes are a separate migration step. Global and group spacing
 settings are reserved for the subsequent skeleton and line layouts; rows and trees
