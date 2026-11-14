@@ -71,11 +71,39 @@ async function browserSolver() {
 const inBrowser = await browserSolver();
 let lastBuilt = null; // the Document of a build the page accepted last: what a solve is of, not a preview of one
 let solving = null; // the AbortController of the solve under way
-let solverWorker = null; // the Worker of the solver in the browser, once a solve has started it
-/** Stop the solver's Worker, and with it the solve under way, if any; the next solve starts another. */
-function stopSolver() {
+let solverWorker = null; // the Worker of the solver in the browser, once a call has started it
+const solverCalls = new Map(); // the calls the Worker has not answered, by id: { resolve, reject, onEvent }
+let solverCallId = 0;
+/** Stop the solver's Worker, and with it the calls under way; the next call starts another. */
+function stopSolver(why = "the solver was stopped") {
   solverWorker?.terminate();
   solverWorker = null;
+  for (const call of solverCalls.values()) call.reject(why);
+  solverCalls.clear();
+}
+/**
+ * A call to the solver's Worker, which a first call starts: `message` is `{ request }` (a solve) or `{ table: true }`;
+ * the events of a solve go to `onEvent` as they happen; what it gives is the answer of a solve or the table.
+ */
+function callSolver(info, message, onEvent) {
+  return new Promise((resolve, reject) => {
+    if (!solverWorker) {
+      const worker = new Worker(new URL(info.worker, location.href), { type: "module" });
+      worker.onmessage = ({ data }) => {
+        const call = solverCalls.get(data.id);
+        if (!call) return;
+        if (data.event) return call.onEvent?.(data.event);
+        solverCalls.delete(data.id);
+        if (data.error !== undefined) call.reject(data.error);
+        else call.resolve(data.table ?? data.answer);
+      };
+      worker.onerror = (e) => stopSolver(`the solver could not be started${e.message ? `: ${e.message}` : ""}`);
+      solverWorker = worker;
+    }
+    const id = ++solverCallId;
+    solverCalls.set(id, { resolve, reject, onEvent });
+    solverWorker.postMessage({ id, ...message });
+  });
 }
 let solveProgress = null; // the page's handler of the events of the solve under way
 
@@ -1081,7 +1109,7 @@ export default {
         const response = await fetch(new URL("rnl-solver/solve", location.href), { method: "POST", signal: own.signal,
           // (X-RNL: the local program, which serves the page to one browser, asks for it of every request that does anything)
           headers: { "Content-Type": "application/json", "X-RNL": "1" },
-          body: JSON.stringify({ entry: request.entry, files, pool: request.pool, options: settings?.options || "", level: settings?.level ?? null, stream: true }) });
+          body: JSON.stringify({ entry: request.entry, files, pool: request.pool, config: settings?.config || "", level: settings?.level ?? null, stream: true }) });
         if (!/^application\/x-ndjson/.test(response.headers.get("Content-Type") || "")) {
           const answer = await response.json().catch(() => ({ error: `the solver service answered ${response.status}` }));
           if (!response.ok) throw answer.error || `the solver service answered ${response.status}`;
@@ -1112,6 +1140,20 @@ export default {
         if (solving === own) solving = null;
       }
     },
+    /** The table of the solver’s settings, as the server’s `rnl solver-defaults --json` gives it. */
+    async solverTable() {
+      const response = await fetch(new URL("rnl-solver/table", location.href), { cache: "no-store" });
+      if (!response.ok) throw (await response.json().catch(() => ({}))).error || `the solver service answered ${response.status}`;
+      return response.json();
+    },
+    /** What `rnl solve --check --json` says of settings written as named parameters, with no file. */
+    async checkSettings(config) {
+      const response = await fetch(new URL("rnl-solver/check", location.href), { method: "POST", headers: { "Content-Type": "application/json", "X-RNL": "1" },
+        body: JSON.stringify({ config }) });
+      const answer = await response.json().catch(() => ({ error: `the solver service answered ${response.status}` }));
+      if (!response.ok) throw answer.error || `the solver service answered ${response.status}`;
+      return answer;
+    },
     cancelSolve() {
       solving?.abort();
     },
@@ -1137,32 +1179,19 @@ export default {
       const packageDirs = [...new Set(request.pool.filter((p) => p.endsWith(".rnl")).map((p) => p.slice(0, p.lastIndexOf("/"))))];
       const own = new AbortController();
       solving = own;
+      own.signal.addEventListener("abort", () => stopSolver("the solve was cancelled"), { once: true });
       try {
-        solverWorker ??= new Worker(new URL(inBrowser.worker, location.href), { type: "module" });
-        const worker = solverWorker;
-        return await new Promise((resolve, reject) => {
-          worker.onmessage = ({ data }) => {
-            if (data.event) solveProgress?.(data.event);
-            else if (data.error !== undefined) reject(data.error);
-            else if (data.answer.cancelled) reject("the solve was cancelled");
-            else if (data.answer.error !== undefined) reject(data.answer.error);
-            else resolve(data.answer);
-          };
-          worker.onerror = (e) => {
-            stopSolver();
-            reject(`the solver could not be started${e.message ? `: ${e.message}` : ""}`);
-          };
-          own.signal.addEventListener("abort", () => {
-            stopSolver();
-            reject("the solve was cancelled");
-          }, { once: true });
-          worker.postMessage({ id: 1, request: { entry: request.entry, files, package_dirs: packageDirs, formats: request.formats ?? {},
-            solver_config: "", level: settings?.level ?? null } });
-        });
+        const answer = await callSolver(inBrowser, { request: { entry: request.entry, files, package_dirs: packageDirs, formats: request.formats ?? {},
+          solver_config: settings?.config || "", level: settings?.level ?? null } }, (event) => solveProgress?.(event));
+        if (answer.cancelled) throw "the solve was cancelled";
+        if (answer.error !== undefined) throw answer.error;
+        return answer;
       } finally {
         if (solving === own) solving = null;
       }
     },
+    /** The table of the solver’s settings, from the solver’s module: the Worker that loads it gives it. */
+    solverTable: () => callSolver(inBrowser, { table: true }),
     cancelSolve() {
       solving?.abort();
     },

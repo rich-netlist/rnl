@@ -6,7 +6,8 @@
 // It answers each message { id, request } (a SolveRequest of bindings/solver-wasm/js/solver.d.ts)
 // with { id, event } for each event of the solve as it happens (docs/solver-progress.md), and
 // then { id, answer }, the solver's answer: { document, report, files }, { cancelled: true } or
-// { error }; or { id, error } when the module could not be loaded or the call threw. The page
+// { error }; a message { id, table: true } with { id, table }, the table of the solver's settings
+// (docs/solver-settings-table.md); or { id, error } when the module could not be loaded or the call threw. The page
 // cancels a solve by terminating the Worker, which the solver's module is written for: every
 // request carries all it reads, so a new Worker needs nothing of the old one.
 
@@ -27,9 +28,10 @@ function solver() {
   return loading;
 }
 
-addEventListener("message", async ({ data: { id, request } }) => {
+addEventListener("message", async ({ data: { id, request, table } }) => {
   try {
     const loaded = await solver();
+    if (table) return postMessage({ id, table: loaded.settings() });
     const answer = loaded.solve(request, (event) => {
       postMessage({ id, event });
     });

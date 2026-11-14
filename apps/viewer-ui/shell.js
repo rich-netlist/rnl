@@ -84,12 +84,14 @@
  *   (decision 0011). Rejects with a message when it cannot, and with CANCELLED when `cancelSolve`
  *   stopped it. Only the desktop offers it; without it, the Solve menu is not shown and its
  *   commands do nothing.
- * @property {() => Promise<SolverDefaults>} [solverDefaults] The solver's options as it has them
- *   without any setting, and the names of its objectives, for Solve > Settings to show
- *   (solve-settings.js); the page keeps none of them itself. Offered with `solve`.
- * @property {(options: string) => Promise<string | null>} [checkSolverOptions] Whether the solver takes
- *   `options`, written as `rnl solve --solver-options` takes them: null when it does, else what is
- *   wrong, in the solver's words. Offered with `solve`.
+ * @property {() => Promise<SettingsTable>} [solverTable] The table of the solver's settings, as
+ *   `rnl solver-defaults --json` prints it (docs/solver-settings-table.md): its groups, each setting with
+ *   its type, bounds, default and a line that says what it does, and its objectives, for Solve > Settings to
+ *   draw its dialog from (solve-settings.js); the page keeps no setting of its own. Offered with `solve`.
+ * @property {(config: string) => Promise<CheckedSettings>} [checkSettings] What the solver says of settings
+ *   written as RNL named parameters, as `rnl solve --solver-config` takes them, with no file: what
+ *   `rnl solve --check --json` prints, a level with the problems of each setting by its `key`. Rejects
+ *   with a message when the text does not read at all. Offered with `solve`.
  * @property {() => void} [cancelSolve] Stop the solve under way.
  * @property {(encoding?: "preserve" | "utf8") => Promise<string | null>} [saveSolved] Save a copy of the last solve shown where the
  *   user says, never over a file that was read: what was saved, in a sentence, or null when the
@@ -161,31 +163,39 @@
  */
 
 /**
- * The settings of a solve: `options` are the options that differ from the solver's defaults,
- * written as `rnl solve --solver-options` takes them, such as "beam=8;time_limit=none", empty for
- * the defaults; `hintsForLow` asks for every conflict group of the facts of priority low, which
- * that text cannot say (`rnl solve --report` does); `level` is the title of the one level to solve,
- * the circuit shown (Solve > Solve), and null or absent for every level (Solve > Solve All Circuits).
+ * The settings of a solve: `config` are the settings that differ from the solver's defaults, written as RNL named
+ * parameters as `rnl solve --solver-config` takes them, such as `layout="rows",beam=8`, empty for the defaults;
+ * `level` is the title of the one level to solve, the circuit shown (Solve > Solve), and null or absent for every
+ * level (Solve > Solve All Circuits).
  *
- * @typedef {{ options: string, hintsForLow: boolean, level?: string | null }} SolverSettings
+ * @typedef {{ config: string, level?: string | null }} SolverSettings
  */
 
 /**
- * The solver's options as it has them by default: the `tolerance`, the `grid` (null for none), the
- * `beam`, the `budget` of the search (`candidates`) and the router (`astar_expansions`), the
- * `time_limit` in seconds (null for none), `hints_for_low`; its `objectives`, the layers in order,
- * each with its `items`, objectives with their weights, and its `tolerance`; and the `names` of
- * every objective it knows, on or off.
+ * The table of the solver's settings (docs/solver-settings-table.md): `groups`, each setting with its `key`, `group`,
+ * `type`, bounds, `default`, `in_file` and a line that says what it does, and the conditions `applies`, `shown_when`
+ * and `required_when`; every objective, with whether it is computed; the objectives a solve takes by default,
+ * layer by layer; and the stages of a solve's progress. Fields are only ever added.
  *
- * @typedef {object} SolverDefaults
- * @property {number} tolerance
- * @property {number | null} grid
- * @property {number} beam
- * @property {{ candidates: number, astar_expansions: number }} budget
- * @property {number | null} time_limit
- * @property {boolean} hints_for_low
- * @property {{ items: { name: string, weight: number }[], tolerance: number }[]} objectives
- * @property {string[]} names
+ * @typedef {object} SettingsTable
+ * @property {number} version
+ * @property {{ name: string, what: string }[]} groups
+ * @property {{ key: string, group: string, type: string, choices?: { value: string, what: string }[], min?: number,
+ *   min_exclusive?: number, max?: number, default?: number | string | boolean, in_file: boolean, what: string,
+ *   false_what?: string, applies?: Record<string, string[]>, shown_when?: Record<string, string[]>,
+ *   required_when?: Record<string, string[]> }[]} settings
+ * @property {{ name: string, what: string, implemented: boolean }[]} objectives
+ * @property {{ items: { name: string, weight: number }[], tolerance: number }[]} default_objectives
+ * @property {{ name: string, what: string }[]} stages
+ */
+
+/**
+ * What `rnl solve --check --json` says: `ok` when no level has an error, and for each level its `settings`, each
+ * in effect with its `value` and where it comes from (`from`, and `at` for a file), and its `warnings` and `errors`,
+ * each with the `key` of the setting it is about, or none for a problem of the settings together.
+ *
+ * @typedef {{ ok: boolean, levels: { title: string | null, settings: Record<string, { value: unknown, from: string, at?: string }>,
+ *   warnings: { key: string | null, message: string }[], errors: { key: string | null, message: string }[] }[] }} CheckedSettings
  */
 
 /**

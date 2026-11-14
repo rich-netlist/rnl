@@ -6,12 +6,20 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createService, insidePath, runVersion } from "./solver-service.mjs";
 
-// A stand-in for the rnl command, run by node: `--version`, and `preview` and `problem` of the entry in the directory it
-// runs in, which print what they were given, so that a test sees what the service wrote and passed.
+// A stand-in for the rnl command, run by node: `--version`, `solver-defaults --json` and `solve --check --json`, and
+// `preview` and `problem` of the entry in the directory it runs in, which print what they were given, so that a test sees
+// what the service wrote and passed.
 const FAKE = `
 const args = process.argv.slice(2);
 const fs = require("fs");
 if (args[0] === "--version") { console.log("rnl 0.0.0 (fake)"); process.exit(0); }
+if (args[0] === "solver-defaults") { console.log(JSON.stringify({ version: 1, settings: [{ key: "beam", type: "integer" }], args })); process.exit(0); }
+if (args[0] === "solve" && args.includes("--check")) {
+  const config = args[args.indexOf("--solver-config") + 1] || "";
+  const errors = /beam=0/.test(config) ? [{ key: "beam", message: "the beam must be at least 1" }] : [];
+  console.log(JSON.stringify({ ok: errors.length === 0, levels: [{ title: null, settings: {}, warnings: [], errors }], args }));
+  process.exit(errors.length ? 1 : 0);
+}
 const entry = args[1] || args[0];
 const text = fs.existsSync(entry) ? fs.readFileSync(entry, "utf8") : null;
 if (/old-fail/.test(text || "")) { console.error("the solver is a preview, whose layouts may be poor\\nnote: a note\\nerror: the netlist fails"); process.exit(1); }
@@ -35,11 +43,11 @@ async function setup() {
 }
 
 /** A server of the service on a free port, with the fake command run by this node. */
-async function serve(options = "") {
+async function serve(config = "") {
   const { dir, script } = await setup();
   // node runs the script: a .cmd file cannot be run without a shell
   const rnl = process.execPath;
-  const service = createService({ rnl, prefix: [script], version: await runVersion(rnl, [script]), options, work: join(dir, "work") });
+  const service = createService({ rnl, prefix: [script], version: await runVersion(rnl, [script]), config, work: join(dir, "work") });
   const server = createServer((req, res) => {
     const { pathname } = new URL(req.url, "http://localhost");
     service.handle(req, res, pathname, server.address().port).then((done) => {
@@ -83,29 +91,29 @@ function stream(port, body) {
 }
 
 test("the service says what it runs", async () => {
-  const s = await serve("time_limit=none");
+  const s = await serve("seconds=120");
   try {
     const { status, json } = await call(s.port, "GET", "/rnl-solver");
     assert.equal(status, 200);
-    assert.deepEqual({ service: json.service, version: json.version, options: json.options }, { service: "rnl-solver", version: "rnl 0.0.0 (fake)", options: "time_limit=none" });
+    assert.deepEqual({ service: json.service, version: json.version, config: json.config }, { service: "rnl-solver", version: "rnl 0.0.0 (fake)", config: "seconds=120" });
   } finally { await s.close(); }
 });
 
 test("a solve writes the files where the page has them, runs preview on the entry there, and gives its document and report", async () => {
-  const s = await serve("time_limit=none");
+  const s = await serve("seconds=120");
   try {
     const files = { "/top.sp": "* top\n.include cell.inc\n", "/cell.inc": "* cell\n", "/<pool>/packages/p.rnl": "pkg", "/<pool>/lib/x.inc": "inc" };
-    const { status, json } = await call(s.port, "POST", SOLVE, { entry: "/top.sp", files, pool: ["/<pool>/packages/p.rnl", "/<pool>/lib/x.inc"], options: "beam=8" });
+    const { status, json } = await call(s.port, "POST", SOLVE, { entry: "/top.sp", files, pool: ["/<pool>/packages/p.rnl", "/<pool>/lib/x.inc"], config: "beam=8" });
     assert.equal(status, 200);
     const seen = json.document.seen;
     // the entry is named relative to where it runs, with the other files beside it
     assert.equal(json.document.path, "top.sp");
     assert.deepEqual(seen.files, ["_pool_", "cell.inc", "top.sp"]);
     assert.equal(seen.text, files["/top.sp"]);
-    // the pool's directories are searched, the packages' as packages; the options are the server's then the page's
+    // the pool's directories are searched, the packages' as packages; the settings are the server's then the page's, named parameters
     assert.ok(seen.args.some((a, i) => a === "--package-dir" && /packages$/.test(seen.args[i + 1])));
     assert.ok(seen.args.some((a, i) => a === "--path" && /lib$/.test(seen.args[i + 1])));
-    assert.equal(seen.args[seen.args.indexOf("--solver-options") + 1], "time_limit=none;beam=8");
+    assert.equal(seen.args[seen.args.indexOf("--solver-config") + 1], "seconds=120,beam=8");
     assert.deepEqual(json.report, { levels: [] });
     // nothing is left behind
     assert.deepEqual(await readdir(join(s.dir, "work")), []);
@@ -123,7 +131,7 @@ test("a solve of one level asks preview for it by its title; none asks for every
 });
 
 test("a streamed solve gives the events of rnl as they came, then one line with the result", async () => {
-  const s = await serve("time_limit=none");
+  const s = await serve("seconds=120");
   try {
     const { status, type, lines } = await stream(s.port, { entry: "/top.sp", files: { "/top.sp": "* top" }, level: "amp", stream: true });
     assert.equal(status, 200);
@@ -234,4 +242,32 @@ test("the paths of the page's workspace become paths under the solve's directory
 
 test("a path that is not the rnl command is not served", async () => {
   await assert.rejects(runVersion(process.execPath.replace(/node(\.exe)?$/, "no-such-command")), /cannot be run/);
+});
+
+test("the table of the solver's settings is what rnl solver-defaults --json prints", async () => {
+  const s = await serve();
+  try {
+    const { status, json } = await call(s.port, "GET", "/rnl-solver/table");
+    assert.equal(status, 200);
+    assert.equal(json.version, 1);
+    assert.deepEqual(json.settings, [{ key: "beam", type: "integer" }]);
+    assert.deepEqual(json.args, ["solver-defaults", "--json"]);
+    assert.equal((await call(s.port, "POST", "/rnl-solver/table", {})).status, 405);
+  } finally { await s.close(); }
+});
+
+test("a check of settings is what rnl solve --check --json prints, the server's settings first, and errors are an answer, not a failure", async () => {
+  const s = await serve("seconds=120");
+  try {
+    const good = await call(s.port, "POST", "/rnl-solver/check", { config: "beam=8" });
+    assert.equal(good.status, 200);
+    assert.equal(good.json.ok, true);
+    assert.deepEqual(good.json.args, ["solve", "--check", "--json", "--solver-config", "seconds=120,beam=8"]);
+    // exit 1 with the problems printed: the page gets them, by key
+    const bad = await call(s.port, "POST", "/rnl-solver/check", { config: "beam=0" });
+    assert.equal(bad.status, 200);
+    assert.equal(bad.json.ok, false);
+    assert.deepEqual(bad.json.levels[0].errors, [{ key: "beam", message: "the beam must be at least 1" }]);
+    assert.equal((await call(s.port, "GET", "/rnl-solver/check")).status, 405);
+  } finally { await s.close(); }
 });

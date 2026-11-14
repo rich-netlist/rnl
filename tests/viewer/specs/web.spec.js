@@ -1658,7 +1658,7 @@ test("the files of a manifest are searched as the Library's: Auto Include finds 
 
 /** The site served with the rnl the tests built (serve.mjs --rnl), on a port of its own: the process and the site's address. */
 async function solverServer() {
-  const server = spawn(process.execPath, [path.join(root, "apps", "web", "serve.mjs"), "--port", "0", "--rnl", process.env.RNL_BIN, "--solver-options", "time_limit=none"], { stdio: ["ignore", "pipe", "inherit"] });
+  const server = spawn(process.execPath, [path.join(root, "apps", "web", "serve.mjs"), "--port", "0", "--rnl", process.env.RNL_BIN, "--solver-config", "seconds=300"], { stdio: ["ignore", "pipe", "inherit"] });
   const url = await new Promise((resolve, reject) => {
     let out = "";
     server.stdout.on("data", (chunk) => {
@@ -1706,7 +1706,7 @@ test("the Solve view lists the constraints of a netlist before any solve; a deve
     await page.waitForFunction(() => document.body.classList.contains("preview") && !document.body.classList.contains("solving"));
     expect(posts).toHaveLength(1);
     expect(posts[0].entry).toMatch(/10-constraints-and-priority\.sp$/);
-    expect(posts[0].options).toBe("");
+    expect(posts[0].config).toBe("");
     await expect(page.locator("#solve-views")).toBeVisible();
     const rows = page.locator("#constraints-list li.constraint");
     expect(await rows.count()).toBe(18);
@@ -1735,7 +1735,7 @@ test("the Solve view lists the constraints of a netlist before any solve; a deve
 async function watchSolverWorker(page) {
   await page.addInitScript(() => {
     const Original = window.Worker;
-    window.__solver = { requests: [], events: [], started: 0 };
+    window.__solver = { requests: [], events: [], started: 0, tables: 0 };
     window.Worker = class extends Original {
       constructor(url, options) {
         super(url, options);
@@ -1743,8 +1743,10 @@ async function watchSolverWorker(page) {
         window.__solver.started += 1;
         const post = this.postMessage.bind(this);
         this.postMessage = (message, ...rest) => {
-          const { files, ...request } = message.request;
-          window.__solver.requests.push({ ...request, files: Object.keys(files) });
+          if (message.request) {
+            const { files, ...request } = message.request;
+            window.__solver.requests.push({ ...request, files: Object.keys(files) });
+          } else if (message.table) window.__solver.tables += 1;
           return post(message, ...rest);
         };
         this.addEventListener("message", (e) => {

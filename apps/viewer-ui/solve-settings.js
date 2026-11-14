@@ -1,89 +1,89 @@
 import { append, m, setAttr, setText } from "./i18n.js";
-// Solve > Settings (desktop): the options of the solver, as `rnl solve --solver-options` has them
-// (crates/rnl-solver/src/options.rs): the time limit of the resolution, the tolerance, the grid, the
-// beam, the work of the search and the router, whether to seek every conflict group of the facts of
-// priority low, and the objectives, the order in which the solver ranks candidates, with their levels.
-// The solver's defaults come from the shell, so the page keeps none of them; what the user changed
-// is kept in the shell's settings under `solve-options`, as only the settings that differ from the defaults,
-// and so follows the solver's defaults where it was not changed. A solve gets them as the text
-// `--solver-options` takes (`solverSettings`), which the solver reads, so its rules are the only ones.
+// Solve > Settings: the settings of the solver, drawn from the table the solver gives (the shell's `solverTable`,
+// `rnl solver-defaults --json`, docs/solver-settings-table.md), so that the page names no key, bound, default or
+// objective of its own: a setting the solver adds is in the dialog, and one it changes has the new default. What the
+// user changed is kept under `solve-config` as only the settings that differ from the defaults, and so follows the
+// solver's defaults where it was not changed. A solve gets them as RNL named parameters (`solverSettings`), as
+// `rnl solve --solver-config` takes them, which the solver reads, so its rules are the only ones; the shell can also
+// check them (`checkSettings`), and the dialog keeps open on what the solver refuses. The settings that a netlist and
+// its packages give are those of the last solve's report, for the dialog to say what a value set here overrides.
 
 import { form, inform, modal } from "./dialog.js";
 import { shell } from "./shell.js";
+import { current, doc } from "./state.js";
 import { load, save, span } from "./util.js";
 
-const KEY = "solve-options";
-
-/** What each objective of the solver does, for the dialog; one the page does not know has none. */
-const WHAT = {
-  current_direction: m("the sources of transistors towards the ground"),
-  ground_direction: m("ground symbols below their pins"),
-  signal_flow: m("input ports left of output ports"),
-  component_alignment: m("connected elements in few columns and rows"),
-  distribution: m("elements evenly spaced"),
-  symmetry: m("mirror pairs placed symmetrically"),
-  turns: m("wires with fewer bends"),
-  crossings: m("wires of different nets crossing less"),
-  wire_length: m("shorter wires"),
-  area: m("a smaller drawing"),
-  aspect: m("a drawing about as wide as 16 to 9"),
-  terminal_wire_alignment: m("wires leaving terminals in line"),
-  labels: m("the places of labels"),
-  bend_alignment: m("the bends of wires in line"),
-};
+const KEY = "solve-config";
 
 /**
- * What the user changed, as kept for the next start: any of `time_limit`, `tolerance`, `grid`,
- * `beam`, `budget` ({ candidates, astar_expansions }), `objectives` (the layers) and
- * `hints_for_low`; a setting not there is the solver's default. The time limit that Solve > Time
- * Limit kept before the settings took it over is read as one.
+ * What the user changed, as kept for the next start: a value by the key of its setting. A setting not there is the
+ * solver's default. A value is a number, a string, a boolean or `false`; for a setting of a type that the page does
+ * not know, `{ literal }`, the text as the user wrote it.
  */
 function changed() {
   const stored = load(KEY, null);
-  if (stored !== null && typeof stored === "object" && !Array.isArray(stored)) return stored;
-  const limit = load("solve-time-limit", null);
-  return limit === null ? {} : { time_limit: limit };
+  return stored !== null && typeof stored === "object" && !Array.isArray(stored) ? stored : {};
 }
-
-/** A number, or "none", for a setting that takes either. */
-const numberOrNone = (v) => v === "none" || (typeof v === "number" && Number.isFinite(v));
-
-/** Whether a value is a list of layers of objectives: each a list of items, and a tolerance. */
-const layersOk = (v) =>
-  Array.isArray(v) &&
-  v.every(
-    (layer) =>
-      layer !== null &&
-      typeof layer === "object" &&
-      typeof layer.tolerance === "number" &&
-      Array.isArray(layer.items) &&
-      layer.items.length > 0 &&
-      layer.items.every((i) => i !== null && typeof i === "object" && typeof i.name === "string" && Number.isInteger(i.weight)),
-  );
 
 /**
- * The settings a solve gets from the page: the changed settings written as `--solver-options` takes
- * them, such as `beam=8;time_limit=none`, empty when none is changed, and whether to seek every
- * conflict group of the facts of priority low, which that text cannot say.
+ * The settings a solve gets from the page: the settings changed as RNL named parameters, such as
+ * `spacing_x=2,beam=8`, empty when none is changed.
  *
- * @returns {{ options: string, hintsForLow: boolean }}
+ * @returns {{ config: string }}
  */
 export function solverSettings() {
-  return textOf(changed());
+  return { config: configText(changed()) };
 }
 
-/** The text of changed settings, in the order the solver writes its own; what is not valid is left out. */
-function textOf(c) {
-  const parts = [];
-  if (typeof c.tolerance === "number") parts.push(`tolerance=${c.tolerance}`);
-  if (numberOrNone(c.grid)) parts.push(`grid=${c.grid}`);
-  if (layersOk(c.objectives)) parts.push(`objectives=${objectivesText(c.objectives)}`);
-  if (typeof c.beam === "number") parts.push(`beam=${c.beam}`);
-  const budget = c.budget || {};
-  const counts = ["candidates", "astar_expansions"].filter((k) => typeof budget[k] === "number");
-  if (counts.length > 0) parts.push(`budget=${counts.map((k) => `${k}:${budget[k]}`).join(",")}`);
-  if (numberOrNone(c.time_limit)) parts.push(`time_limit=${c.time_limit}`);
-  return { options: parts.join(";"), hintsForLow: c.hints_for_low === true };
+/** A number as RNL writes it: with no exponent. */
+function numberText(n) {
+  const text = String(n);
+  return /e/i.test(text) ? n.toFixed(20).replace(/\.?0+$/, "") : text;
+}
+
+/** A value as an RNL literal; null for one that has none. */
+function literal(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return numberText(value);
+  if (typeof value === "boolean") return String(value);
+  if (typeof value === "string") return JSON.stringify(value);
+  if (value !== null && typeof value === "object" && typeof value.literal === "string") return value.literal;
+  return null;
+}
+
+/** The text of changed settings, in the order of their keys; what has no literal is left out. */
+export function configText(values) {
+  return Object.keys(values)
+    .sort()
+    .map((key) => [key, literal(values[key])])
+    .filter(([, text]) => text !== null && text !== "")
+    .map(([key, text]) => `${key}=${text}`)
+    .join(",");
+}
+
+// What the last solve's report said of the settings of each level (`levels[].check`), for the dialog to tell what the
+// netlist and its packages give.
+let lastLevels = [];
+
+/** Keep the settings that the report of a solve says each of its levels took, and where each came from. */
+export function noteReport(report) {
+  lastLevels = report && Array.isArray(report.levels) ? report.levels : [];
+}
+
+// ---- objectives -------------------------------------------------------------------------------------------------
+
+/** The layers of objectives a text writes: `area+wire_length*2~0.5,turns`, `none` for no layer. */
+function parseObjectives(text) {
+  if (typeof text !== "string" || text.trim() === "none") return [];
+  return text.split(",").map((part) => {
+    const [items, tolerance] = part.split("~");
+    return {
+      items: items.split("+").map((item) => {
+        const [name, weight] = item.trim().split("*");
+        return { name, weight: weight === undefined ? 1 : Number(weight) };
+      }),
+      tolerance: tolerance === undefined ? 0 : Number(tolerance),
+    };
+  });
 }
 
 /** Layers of objectives as the solver writes them: `area+wire_length*2~0.5,turns`, `none` for no layer. */
@@ -97,17 +97,18 @@ function objectivesText(layers) {
 }
 
 /** A row of the objectives: an objective, whether it is on, and how it joins the layers. */
-function rowsOf(layers, names) {
+function rowsOf(layers, objectives) {
   const rows = [];
   const seen = new Set();
+  const known = new Map(objectives.map((o) => [o.name, o]));
   for (const layer of layers) {
     layer.items.forEach((item, k) => {
-      if (!names.includes(item.name) || seen.has(item.name)) return;
+      if (!known.has(item.name) || seen.has(item.name)) return;
       seen.add(item.name);
       rows.push({ name: item.name, on: true, together: k > 0, weight: item.weight, tolerance: k === 0 ? layer.tolerance : 0 });
     });
   }
-  for (const name of names) if (!seen.has(name)) rows.push({ name, on: false, together: false, weight: 1, tolerance: 0 });
+  for (const { name } of objectives) if (!seen.has(name)) rows.push({ name, on: false, together: false, weight: 1, tolerance: 0 });
   return rows;
 }
 
@@ -122,117 +123,7 @@ function layersOf(rows) {
   return layers;
 }
 
-/** The values of the dialog's fields: the solver's defaults, with what the user changed over them. */
-function valuesOf(defaults, c) {
-  const budget = c.budget || {};
-  const layers = layersOk(c.objectives) ? c.objectives : defaults.objectives;
-  return {
-    time_limit: numberOrNone(c.time_limit) ? c.time_limit : defaults.time_limit === null ? "none" : defaults.time_limit,
-    tolerance: typeof c.tolerance === "number" ? c.tolerance : defaults.tolerance,
-    grid: numberOrNone(c.grid) ? c.grid : defaults.grid === null ? "none" : defaults.grid,
-    beam: typeof c.beam === "number" ? c.beam : defaults.beam,
-    candidates: typeof budget.candidates === "number" ? budget.candidates : defaults.budget.candidates,
-    astar_expansions:
-      typeof budget.astar_expansions === "number" ? budget.astar_expansions : defaults.budget.astar_expansions,
-    hints_for_low: typeof c.hints_for_low === "boolean" ? c.hints_for_low : defaults.hints_for_low,
-    rows: rowsOf(layers, defaults.names),
-  };
-}
-
-/** What differs from the defaults in values read from the dialog: the settings to keep. */
-function differences(defaults, v) {
-  const c = {};
-  const orNone = (d) => (d === null ? "none" : d);
-  if (v.time_limit !== orNone(defaults.time_limit)) c.time_limit = v.time_limit;
-  if (v.tolerance !== defaults.tolerance) c.tolerance = v.tolerance;
-  if (v.grid !== orNone(defaults.grid)) c.grid = v.grid;
-  if (v.beam !== defaults.beam) c.beam = v.beam;
-  const budget = {};
-  if (v.candidates !== defaults.budget.candidates) budget.candidates = v.candidates;
-  if (v.astar_expansions !== defaults.budget.astar_expansions) budget.astar_expansions = v.astar_expansions;
-  if (Object.keys(budget).length > 0) c.budget = budget;
-  if (v.hints_for_low !== defaults.hints_for_low) c.hints_for_low = v.hints_for_low;
-  const layers = layersOf(v.rows);
-  if (objectivesText(layers) !== objectivesText(defaults.objectives)) c.objectives = layers;
-  return c;
-}
-
-/**
- * Solve > Settings: show the settings in a dialog, ask the shell whether the solver takes them, and
- * keep them for the next start. Cancel keeps nothing; Restore Defaults sets the fields to the
- * solver's defaults, which OK then keeps as no changes at all.
- */
-export async function settings() {
-  if (!shell || !shell.solverDefaults || modal()) return;
-  let defaults;
-  try {
-    defaults = await shell.solverDefaults();
-  } catch (e) {
-    await inform({ title: m("Solver Settings"), paragraphs: [m`The solver's defaults could not be read: ${e instanceof Error ? e.message : String(e)}`] });
-    return;
-  }
-  const fields = fieldsOf(defaults);
-  fields.set(valuesOf(defaults, changed()));
-  const error = document.createElement("p");
-  error.className = "dialog-error";
-  error.hidden = true;
-  const restore = document.createElement("button");
-  restore.type = "button";
-  restore.className = "settings-restore";
-  setText(restore, m("Restore Defaults"));
-  restore.addEventListener("click", () => {
-    fields.set(valuesOf(defaults, {}));
-    error.hidden = true;
-  });
-  // the settings as the command line takes them, for whoever solves outside the viewer too
-  const asText = span("settings-text", "");
-  const showText = () => {
-    const v = fields.read();
-    const kept = v.error ? null : textOf(differences(defaults, v));
-    const flag = kept && kept.hintsForLow ? " --report" : "";
-    const option = kept && kept.options ? ` --solver-options "${kept.options}"` : "";
-    setText(asText, !kept ? "" : flag || option ? m`Equivalent CLI command: rnl solve${flag}${option}` : m("The defaults of rnl solve."));
-  };
-  for (const type of ["input", "change", "click"]) fields.el.addEventListener(type, showText);
-  restore.addEventListener("click", showText);
-  showText();
-  const chosen = await form({
-    title: m("Solver Settings"),
-    parts: [
-      priorityNote(),
-      fields.el,
-      document.createElement("hr"),
-      row(restore, asText),
-      error,
-    ],
-    answer: async () => {
-      const v = fields.read();
-      if (v.error) return fail(error, v.error);
-      const kept = differences(defaults, v);
-      const wrong = await shell.checkSolverOptions(textOf(kept).options);
-      if (wrong) return fail(error, wrong);
-      return { kept };
-    },
-    focus: fields.first,
-    wide: true,
-  });
-  if (chosen) save(KEY, chosen.kept);
-}
-
-/** Say what is wrong in a dialog and keep it open. */
-function fail(error, message) {
-  setText(error, message);
-  error.hidden = false;
-  return undefined;
-}
-
-/** The note that tells what these settings are not: the priorities of constraints are written in the netlist. */
-function priorityNote() {
-  const p = document.createElement("p");
-  p.className = "dialog-note settings-note";
-  setText(p, m`${m`${m("The priority of a constraint, low, normal or high, is written in the netlist (7.6, 8.5), not set here. ")}${m("These settings are for what the solver does after the constraints are satisfied: which objective counts ")}`}${m("first and which next when it ranks the placements that satisfy them, and how long and how hard it works.")}`);
-  return p;
-}
+// ---- the fields -------------------------------------------------------------------------------------------------
 
 /** A line of a dialog of a few parts side by side. */
 function row(...parts) {
@@ -240,20 +131,6 @@ function row(...parts) {
   el.className = "dialog-line settings-line";
   append(el, ...parts);
   return el;
-}
-
-/** An input of a number, with its label, in a line. */
-function numberField(label, { step = "any", min = "0", hint = "" } = {}) {
-  const input = document.createElement("input");
-  input.type = "number";
-  input.step = step;
-  input.min = min;
-  const caption = document.createElement("label");
-  caption.className = "settings-label";
-  append(caption, span("name", label), input);
-  const line = row(caption);
-  if (hint) append(line, span("settings-hint", hint));
-  return { input, line, label };
 }
 
 /** A checkbox with its label. */
@@ -267,95 +144,129 @@ function checkField(label) {
 }
 
 /**
- * The fields of the dialog, as an element: `set(values)` fills them, and `read()` gives the values
- * they hold in the form `valuesOf` makes, or `{ error }` when one is not a number; `first` has the
- * focus at first.
+ * The control of one setting by its type: `el`, `set(value)` to fill it, `get()` for `{ value }` or `{ error }` (a text
+ * that says what is wrong), and `shown()` for the text its value counts as in a condition (`applies`, `shown_when`
+ * and `required_when` of the table).
  */
-function fieldsOf(defaults) {
-  const el = document.createElement("div");
-  el.className = "settings";
+function control(setting) {
+  switch (setting.type) {
+    case "integer":
+    case "number":
+      return numberControl(setting, setting.type === "integer", null);
+    case "number-or-false":
+      return numberControl(setting, false, setting.false_what ?? "false");
+    case "boolean":
+      return booleanControl(setting);
+    case "choice":
+      return choiceControl(setting);
+    case "string":
+      return textControl(setting, false);
+    default:
+      // a type the page does not know is a text box, whose text is written as it stands
+      return textControl(setting, true);
+  }
+}
 
-  const limit = numberField(m("Time limit"), { hint: m("seconds the solver may spend on checking the facts of each level (8.5)") });
-  const noLimit = checkField(m("No limit"));
-  limit.line.insertBefore(noLimit.caption, limit.line.children[1]);
-  noLimit.input.addEventListener("change", () => (limit.input.disabled = noLimit.input.checked));
-  const tolerance = numberField(m("Tolerance"), { hint: m("differences within it count as satisfied (11.7)") });
-  const grid = numberField(m("Grid"), { hint: m("free coordinates are rounded to it when the facts allow") });
-  const noGrid = checkField(m("No rounding"));
-  grid.line.insertBefore(noGrid.caption, grid.line.children[1]);
-  noGrid.input.addEventListener("change", () => (grid.input.disabled = noGrid.input.checked));
-  const beam = numberField(m("Beam"), { step: "1", min: "1", hint: m("variants of each group the search keeps") });
-  const candidates = numberField(m("Candidates"), { step: "1", hint: m("maximum candidate placements evaluated per level") });
-  const expansions = numberField(m("Router cells"), { step: "1", hint: m("maximum router cells expanded per net") });
-  const hints = checkField(m("Seek every conflict group of the facts of priority low"));
-  const hintsNote = span("settings-hint", m("Only the report changes, and it can take far longer."));
-  const objectives = objectiveRows(defaults.names);
+function boundsError(setting, n) {
+  if (setting.min !== undefined && n < setting.min) return m`${setting.key} must be at least ${setting.min}.`;
+  if (setting.min_exclusive !== undefined && n <= setting.min_exclusive) return m`${setting.key} must be more than ${setting.min_exclusive}.`;
+  if (setting.max !== undefined && n > setting.max) return m`${setting.key} must be at most ${setting.max}.`;
+  return null;
+}
 
-  const group = (title, ...parts) => {
-    const set = document.createElement("fieldset");
-    const legend = document.createElement("legend");
-    setText(legend, title);
-    append(set, legend, ...parts);
-    return set;
-  };
-  append(el, group(m("Time"), limit.line), group(m("Placement"), tolerance.line, grid.line, beam.line), group(m("Work"), candidates.line, expansions.line, row(hints.caption, hintsNote)), group(m("Objectives"), objectives.el));
-
-  /** The number in a field, or null when it holds none. */
-  const read = (field, integer = false) => {
-    const text = field.input.value.trim();
-    const v = Number(text);
-    return text === "" || !Number.isFinite(v) || (integer && !Number.isInteger(v)) ? null : v;
-  };
+function numberControl(setting, integer, falseLabel) {
+  const input = document.createElement("input");
+  input.type = "number";
+  input.step = integer ? "1" : "any";
+  if (setting.min !== undefined) input.min = String(setting.min);
+  if (setting.max !== undefined) input.max = String(setting.max);
+  setAttr(input, "aria-label", setting.key);
+  const no = falseLabel === null ? null : checkField(falseLabel);
+  no?.input.addEventListener("change", () => (input.disabled = no.input.checked));
   return {
-    el,
-    first: limit.input,
-    set(v) {
-      noLimit.input.checked = v.time_limit === "none";
-      limit.input.value = v.time_limit === "none" ? "" : String(v.time_limit);
-      limit.input.disabled = noLimit.input.checked;
-      tolerance.input.value = String(v.tolerance);
-      noGrid.input.checked = v.grid === "none";
-      grid.input.value = v.grid === "none" ? "" : String(v.grid);
-      grid.input.disabled = noGrid.input.checked;
-      beam.input.value = String(v.beam);
-      candidates.input.value = String(v.candidates);
-      expansions.input.value = String(v.astar_expansions);
-      hints.input.checked = v.hints_for_low;
-      objectives.set(v.rows);
+    el: [input, ...(no ? [no.caption] : [])],
+    first: input,
+    set(value) {
+      const off = value === false;
+      if (no) no.input.checked = off;
+      input.disabled = off;
+      input.value = typeof value === "number" ? String(value) : "";
     },
-    read() {
-      const v = {
-        time_limit: noLimit.input.checked ? "none" : read(limit),
-        tolerance: read(tolerance),
-        grid: noGrid.input.checked ? "none" : read(grid),
-        beam: read(beam, true),
-        candidates: read(candidates, true),
-        astar_expansions: read(expansions, true),
-        hints_for_low: hints.input.checked,
-      };
-      const bad = [
-        ["time_limit", m("Time limit must be a number of seconds, or no limit.")],
-        ["tolerance", m("Tolerance must be a number.")],
-        ["grid", m("Grid must be a number, or no rounding.")],
-        ["beam", m("Beam must be a positive whole number.")],
-        ["candidates", m("Candidates must be a whole number.")],
-        ["astar_expansions", m("Router cells must be a whole number.")],
-      ].find(([k]) => v[k] === null);
-      if (bad) return { error: bad[1] };
-      const rows = objectives.read();
-      if (rows.error) return { error: rows.error };
-      return { ...v, rows: rows.rows };
+    get() {
+      if (no?.input.checked) return { value: false };
+      const text = input.value.trim();
+      const n = Number(text);
+      if (text === "" || !Number.isFinite(n)) return { error: m`${setting.key} must be a number.` };
+      if (integer && !Number.isInteger(n)) return { error: m`${setting.key} must be a whole number.` };
+      const bad = boundsError(setting, n);
+      return bad ? { error: bad } : { value: n };
     },
+    shown: () => (no?.input.checked ? "false" : input.value.trim()),
   };
+}
+
+function booleanControl(setting) {
+  const input = document.createElement("input");
+  input.type = "checkbox";
+  setAttr(input, "aria-label", setting.key);
+  return {
+    el: [input],
+    first: input,
+    set: (value) => (input.checked = value === true),
+    get: () => ({ value: input.checked }),
+    shown: () => String(input.checked),
+  };
+}
+
+function choiceControl(setting) {
+  const select = document.createElement("select");
+  setAttr(select, "aria-label", setting.key);
+  for (const choice of setting.choices ?? []) {
+    const option = document.createElement("option");
+    option.value = choice.value;
+    option.textContent = choice.value;
+    select.append(option);
+  }
+  const what = span("settings-hint choice-what", "");
+  const sync = () => setText(what, (setting.choices ?? []).find((c) => c.value === select.value)?.what ?? "");
+  select.addEventListener("change", sync);
+  return {
+    el: [select, what],
+    first: select,
+    set(value) {
+      select.value = typeof value === "string" ? value : "";
+      sync();
+    },
+    get: () => ({ value: select.value }),
+    shown: () => select.value,
+  };
+}
+
+function textControl(setting, raw) {
+  const input = document.createElement("input");
+  input.type = "text";
+  setAttr(input, "aria-label", setting.key);
+  return {
+    el: [input],
+    first: input,
+    set: (value) => (input.value = raw ? (value?.literal ?? "") : typeof value === "string" ? value : ""),
+    get: () => ({ value: raw ? { literal: input.value } : input.value }),
+    shown: () => input.value,
+  };
+}
+
+/** Whether the values of other settings are as a condition of the table (`applies` and the like) says; `of(key)` is a setting's. */
+function holds(when, of) {
+  return Object.entries(when).every(([key, values]) => values.includes(of(key)));
 }
 
 /**
  * The objectives as an ordered list of rows, each with buttons that move it up and down, a check
  * box that turns it on, one that puts it in the level of the objective above, its weight, and for
- * the first of a level how far from the best a value still counts as equal to it. `set(rows)`
- * fills them, and `read()` gives `{ rows }` as `rowsOf` makes them, or `{ error }`.
+ * the first of a level how far from the best a value still counts as equal to it. `set(text)`
+ * fills them, and `read()` gives `{ value }`, the text of the layers the rows make, or `{ error }`.
  */
-function objectiveRows(names) {
+function objectiveRows(objectives) {
   const el = document.createElement("div");
   el.className = "objectives";
   const note = document.createElement("p");
@@ -364,6 +275,7 @@ function objectiveRows(names) {
   const list = document.createElement("ol");
   list.className = "objective-list";
   append(el, note, list);
+  const info = new Map(objectives.map((o) => [o.name, o]));
   let rows = []; // { name, el, on, together, weight, tolerance, ... } in the order shown
 
   /** A row's element, with the controls that set its state. */
@@ -377,7 +289,9 @@ function objectiveRows(names) {
     on.type = "checkbox";
     setAttr(on, "aria-label", m`${r.name} is on`);
     const name = span("objective-name", r.name);
-    const what = span("objective-what", WHAT[r.name] || "");
+    const about = info.get(r.name);
+    const what = span("objective-what", about?.what ?? "");
+    if (about?.implemented === false) append(what, " ", m("(not computed by this version)"));
     const label = document.createElement("label");
     label.className = "objective-on";
     append(label, on, name);
@@ -473,12 +387,13 @@ function objectiveRows(names) {
 
   return {
     el,
-    set(values) {
-      rows = values.map(make);
+    first: null,
+    set(text) {
+      rows = rowsOf(parseObjectives(text), objectives).map(make);
       list.replaceChildren(...rows.map((x) => x.el));
       refresh();
     },
-    read() {
+    get() {
       const out = [];
       let anyOn = false;
       for (const r of rows) {
@@ -495,7 +410,254 @@ function objectiveRows(names) {
         out.push({ name: r.name, on: r.on, together: r.together, weight: r.on ? weight : 1, tolerance: leader ? tolerance : 0 });
         anyOn = anyOn || r.on;
       }
-      return { rows: out };
+      return { value: objectivesText(layersOf(out)) };
+    },
+    shown: () => "",
+  };
+}
+
+/**
+ * The fields of the dialog, from the table, as an element: `set(values)` fills them with a value for each key
+ * (`undefined` where a setting is not given), `read()` gives `{ values }` as they hold or `{ error }`, `focus` has the
+ * focus at first, and `mark(keys)` marks the fields the solver refused.
+ */
+function fieldsOf(table) {
+  const el = document.createElement("div");
+  el.className = "settings";
+  const fields = new Map(); // by key: { setting, control, line, use, required }
+  const byGroup = new Map(table.groups.map((g) => [g.name, []]));
+  for (const setting of table.settings) {
+    if (!byGroup.has(setting.group)) byGroup.set(setting.group, []);
+    const hint = span("settings-hint", setting.what ?? "");
+    const kind = setting.type === "objectives"
+      ? objectiveRows(table.objectives ?? [])
+      : control(setting);
+    // a setting with no default is given or not: a box says which
+    const optional = setting.default === undefined && setting.type !== "boolean" && setting.type !== "objectives";
+    const use = optional ? checkField(m("set")) : null;
+    const line = document.createElement("div");
+    line.className = "setting";
+    line.dataset.key = setting.key;
+    if (setting.type === "objectives") {
+      append(line, span("settings-key", setting.key), kind.el);
+    } else {
+      // not a label: it holds the labels of its boxes, and a label holds no label
+      const caption = document.createElement("div");
+      caption.className = "settings-label";
+      append(caption, span("name", setting.key), ...(use ? [use.caption] : []), ...kind.el);
+      append(line, row(caption), hint);
+    }
+    if (use) {
+      use.input.addEventListener("change", () => toggleUse(field));
+    }
+    const field = { setting, kind, line, use, hint };
+    fields.set(setting.key, field);
+    byGroup.get(setting.group).push(field);
+  }
+  /** A setting that is not given has its box left empty. */
+  function toggleUse(field) {
+    const on = field.use ? field.use.input.checked : true;
+    for (const node of field.line.querySelectorAll(".settings-label input:not([type=checkbox]), .settings-label select")) node.disabled = !on;
+  }
+  for (const [name, group] of byGroup) {
+    if (group.length === 0) continue;
+    const set = document.createElement("fieldset");
+    const legend = document.createElement("legend");
+    setText(legend, table.groups.find((g) => g.name === name)?.what ?? name);
+    append(set, legend, ...group.map((f) => f.line));
+    append(el, set);
+  }
+
+  /** What each setting counts as in a condition: the text of its value, empty when it is not given. */
+  const of = (key) => {
+    const field = fields.get(key);
+    if (!field || (field.use && !field.use.input.checked)) return "";
+    return field.kind.shown();
+  };
+  /** Show each setting as what it is now: hidden, or greyed where the solver does not use it, or required. */
+  function refresh() {
+    for (const { setting, line, use } of fields.values()) {
+      if (setting.shown_when) line.hidden = !holds(setting.shown_when, of);
+      line.classList.toggle("unused", setting.applies !== undefined && !holds(setting.applies, of));
+      if (setting.applies !== undefined) {
+        setAttr(line, "title", holds(setting.applies, of) ? "" : m("The solver does not use this with the other settings as they are."));
+      }
+      if (setting.required_when && use) {
+        const required = holds(setting.required_when, of);
+        if (required) use.input.checked = true;
+        use.input.disabled = required;
+        toggleUse(fields.get(setting.key));
+      }
+    }
+  }
+  el.addEventListener("input", refresh);
+  el.addEventListener("change", refresh);
+
+  return {
+    el,
+    focus: fields.values().next().value.kind.first ?? null,
+    set(values) {
+      for (const { setting, kind, use, line } of fields.values()) {
+        const value = values[setting.key];
+        if (use) use.input.checked = value !== undefined;
+        kind.set(value === undefined ? setting.default : value);
+        line.classList.remove("refused");
+        toggleUse(fields.get(setting.key));
+      }
+      refresh();
+    },
+    read() {
+      const values = {};
+      for (const { setting, kind, use } of fields.values()) {
+        if (use && !use.input.checked) continue;
+        const got = kind.get();
+        if (got.error) return { error: got.error };
+        values[setting.key] = got.value;
+      }
+      return { values };
+    },
+    mark(keys) {
+      for (const [key, field] of fields) field.line.classList.toggle("refused", keys.includes(key));
     },
   };
+}
+
+/** The settings as the table has them, with the changed ones over the defaults: a value for each key, none where it has no default. */
+function effective(table, values) {
+  const out = {};
+  for (const setting of table.settings) {
+    const value = values[setting.key];
+    out[setting.key] = value === undefined ? setting.default : value;
+    if (value === undefined && setting.default === undefined) out[setting.key] = undefined;
+  }
+  return out;
+}
+
+/** What differs from the defaults in the values read from the dialog: the settings to keep. */
+function differences(table, values) {
+  const kept = {};
+  for (const setting of table.settings) {
+    const value = values[setting.key];
+    if (value === undefined) continue;
+    const same =
+      setting.type === "objectives"
+        ? typeof setting.default === "string" && objectivesText(parseObjectives(setting.default)) === value
+        : JSON.stringify(value) === JSON.stringify(setting.default);
+    if (!same) kept[setting.key] = value;
+  }
+  return kept;
+}
+
+/** The settings the netlist and its packages give to the level shown, from the report of the last solve: `[key, text, where]`. */
+function givenByFile() {
+  const title = doc?.levels?.[current]?.title;
+  const level = lastLevels.find((l) => l.title === title) ?? (lastLevels.length === 1 ? lastLevels[0] : null);
+  const settings = level?.check?.settings ?? {};
+  return Object.entries(settings)
+    .filter(([, s]) => s.from !== "default" && s.from !== "command-line")
+    .map(([key, s]) => [key, typeof s.value === "string" ? JSON.stringify(s.value) : String(s.value), [s.from, s.at].filter(Boolean).join(", ")]);
+}
+
+/**
+ * Solve > Settings: show the settings in a dialog, ask the shell whether the solver takes them, and
+ * keep them for the next start. Cancel keeps nothing; Restore Defaults sets the fields to the
+ * solver's defaults, which OK then keeps as no changes at all.
+ */
+export async function settings() {
+  if (!shell || !shell.solverTable || modal()) return;
+  let table;
+  try {
+    table = await shell.solverTable();
+  } catch (e) {
+    await inform({ title: m("Solver Settings"), paragraphs: [m`The solver's settings could not be read: ${e instanceof Error ? e.message : String(e)}`] });
+    return;
+  }
+  const fields = fieldsOf(table);
+  fields.set(effective(table, changed()));
+  const error = document.createElement("p");
+  error.className = "dialog-error";
+  error.hidden = true;
+  const restore = document.createElement("button");
+  restore.type = "button";
+  restore.className = "settings-restore";
+  setText(restore, m("Restore Defaults"));
+  restore.addEventListener("click", () => {
+    fields.set(effective(table, {}));
+    fields.mark([]);
+    error.hidden = true;
+  });
+  // the settings as the command line takes them, for whoever solves outside the viewer too
+  const asText = span("settings-text", "");
+  const showText = () => {
+    const read = fields.read();
+    const config = read.error ? null : configText(differences(table, read.values));
+    setText(asText, config === null ? "" : config ? m`Equivalent CLI command: rnl solve --solver-config '${config}'` : m("The defaults of rnl solve."));
+  };
+  for (const type of ["input", "change", "click"]) fields.el.addEventListener(type, showText);
+  restore.addEventListener("click", showText);
+  showText();
+  const given = givenByFile();
+  const parts = [priorityNote(), fields.el];
+  if (given.length > 0) parts.push(givenNote(given));
+  parts.push(document.createElement("hr"), row(restore, asText), error);
+  const chosen = await form({
+    title: m("Solver Settings"),
+    parts,
+    answer: async () => {
+      fields.mark([]);
+      const read = fields.read();
+      if (read.error) return fail(error, read.error);
+      const kept = differences(table, read.values);
+      if (shell.checkSettings) {
+        let checked;
+        try {
+          checked = await shell.checkSettings(configText(kept));
+        } catch (e) {
+          return fail(error, e instanceof Error ? e.message : String(e));
+        }
+        const errors = (checked?.levels ?? []).flatMap((l) => l.errors ?? []);
+        if (errors.length > 0) {
+          fields.mark(errors.map((e) => e.key).filter(Boolean));
+          return fail(error, errors.map((e) => e.message).join("; "));
+        }
+      }
+      return { kept };
+    },
+    focus: fields.focus ?? undefined,
+    wide: true,
+  });
+  if (chosen) save(KEY, chosen.kept);
+}
+
+/** Say what is wrong in a dialog and keep it open. */
+function fail(error, message) {
+  setText(error, message);
+  error.hidden = false;
+  return undefined;
+}
+
+/** The note that tells what these settings are not: the priorities of constraints are written in the netlist. */
+function priorityNote() {
+  const p = document.createElement("p");
+  p.className = "dialog-note settings-note";
+  setText(p, m`${m`${m("The priority of a constraint, low, normal or high, is written in the netlist (7.6, 8.5), not set here. ")}${m("These settings are for what the solver does after the constraints are satisfied: which layout it makes, which objective counts ")}`}${m("first and which next when it ranks the placements that satisfy them, and how long and how hard it works.")}`);
+  return p;
+}
+
+/** What the netlist and its packages give, which a value set here overrides. */
+function givenNote(given) {
+  const box = document.createElement("div");
+  box.className = "settings-given";
+  const head = document.createElement("p");
+  head.className = "dialog-note";
+  setText(head, m("This netlist and its packages give these settings to the circuit shown; a value set here wins over them."));
+  const list = document.createElement("ul");
+  list.className = "settings-given-list";
+  for (const [key, value, where] of given) {
+    const li = document.createElement("li");
+    append(li, span("key", key), span("value", ` = ${value}`), span("settings-hint", ` (${where})`));
+    list.append(li);
+  }
+  append(box, head, list);
+  return box;
 }

@@ -11,7 +11,8 @@
 //!   POST /api/save-as            {source, to, text, encoding, overwrite}: the desktop's Save As; a file that is there is not replaced unless told
 //!   GET  /api/changes?since=N    the files read that changed on disk since version N
 //!   GET  /f/ABSOLUTE/PATH        a file, below the folders allowed
-//!   GET  /rnl-solver             what the solver service is;  POST /rnl-solver/solve  a solve (service.rs)
+//!   GET  /rnl-solver             what the solver service is;  GET /rnl-solver/table  the table of its settings;
+//!   POST /rnl-solver/check  a check of settings;  POST /rnl-solver/solve  a solve (service.rs)
 
 use std::net::TcpStream;
 use std::path::PathBuf;
@@ -268,6 +269,11 @@ fn route(app: &App, request: &Request, stream: &TcpStream) -> Result<Response, F
     let get = matches!(method, "GET" | "HEAD");
     match request.path.as_str() {
         "/rnl-solver" if get => Ok(Response::json(200, &crate::service::info())),
+        "/rnl-solver/table" if get => Ok(Response::json(200, &crate::service::table())),
+        "/rnl-solver/check" if method == "POST" => {
+            let check: crate::service::Check = json_body(request)?;
+            Ok(Response::json(200, &crate::service::check(&check).map_err(bad)?))
+        }
         "/rnl-solver/solve" if method == "POST" => {
             let solve: crate::service::Request = json_body(request)?;
             if solve.stream {

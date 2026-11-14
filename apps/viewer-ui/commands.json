@@ -127,7 +127,7 @@
         { "id": "toggle-skeleton-symbols", "label": "Show Component and &Pin Skeleton Lines", "check": true, "page": true },
         { "id": "toggle-skeleton-wires", "label": "Show &Wire Skeleton Lines", "check": true, "page": true },
         "-",
-        { "id": "solve-settings", "label": "S&ettings...", "platforms": ["desktop"] }
+        { "id": "solve-settings", "label": "S&ettings...", "platforms": ["desktop"], "with": "solverTable" }
       ]
     },
     {

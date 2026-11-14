@@ -2,8 +2,12 @@
 // runs a debug build of the `rnl` command, so that a change to the solver is seen by building `rnl`
 // again and pressing Solve, without building the viewer or restarting anything.
 //
-//   GET  /rnl-solver        {"service": "rnl-solver", "version": ..., "path": ..., "options": ...}
-//   POST /rnl-solver/solve  {"entry", "files", "pool", "options", "level"}  ->  {"document", "report"}
+//   GET  /rnl-solver        {"service": "rnl-solver", "version": ..., "path": ..., "config": ...}
+//   GET  /rnl-solver/table  what `rnl solver-defaults --json` prints: the table of the solver's settings
+//                           (docs/solver-settings-table.md), which the page's settings dialog is drawn from
+//   POST /rnl-solver/check  {"config"}  ->  what `rnl solve --check --json` prints of those settings, with no file
+//   POST /rnl-solver/solve  {"entry", "files", "pool", "config", "level"}  ->  {"document", "report"}
+//     "config": the settings that differ from the defaults, as RNL named parameters, as `--solver-config` takes them.
 //     "level": only the level with this title, the circuit shown; none solves every level.
 //     With "stream": true the answer is lines of JSON (application/x-ndjson) instead: the events of the solve as
 //     `rnl preview --progress=json` tells them (docs/solver-progress.md), each as it came, then one line
@@ -56,7 +60,7 @@ export function insidePath(path) {
  * `signal` is aborted. `onEvent` is given each line of its standard error that is an event of the solve (a JSON
  * object with an `event`), as it came.
  */
-function run(rnl, prefix, args, cwd, signal, onEvent) {
+function run(rnl, prefix, args, cwd, signal, onEvent, okCodes = [0]) {
   return new Promise((done, fail) => {
     const child = spawn(rnl, [...prefix, ...args], { cwd, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
     const out = [];
@@ -78,7 +82,7 @@ function run(rnl, prefix, args, cwd, signal, onEvent) {
     child.on("close", (code) => {
       signal.removeEventListener("abort", stop);
       if (signal.aborted) return fail(new Error("the solve was cancelled"));
-      if (code === 0) return done(Buffer.concat(out).toString("utf8"));
+      if (okCodes.includes(code)) return done(Buffer.concat(out).toString("utf8"));
       const text = Buffer.concat(err).toString("utf8").trim().split("\n").filter((l) => !isEvent(l) && !/^(the solver is a preview|note: |hint: RNL\d{4} solve-preview-notice:)/i.test(l)).join("\n");
       fail(new Error(text || `rnl ${args[0]} failed with exit code ${code}`));
     });
@@ -98,11 +102,11 @@ function isEvent(line) {
 
 /**
  * The solve of a request: what `rnl preview` prints, the Document and the report, as JSON text. `work` holds the
- * directory the files are written in; `options` are the solver's, as `--solver-options` takes them; `level` is the
- * title of the one level to solve. `onEvent` is given the events of the solve, as lines of JSON, as they come.
+ * directory the files are written in; `defaults` and the request's `config` are the solver's settings, as
+ * `--solver-config` takes them, the server's first; `level` is the title of the one level to solve. `onEvent` is given the events of the solve, as lines of JSON, as they come.
  */
 export async function solve({ rnl, prefix = [], work, request, defaults, signal, onEvent }) {
-  const { entry, files, pool = [], options = "", level = null } = request;
+  const { entry, files, pool = [], config = "", level = null } = request;
   const entryPath = insidePath(entry);
   if (!entryPath || !files || typeof files !== "object" || typeof files[entry] !== "string") throw new Error("the request has no entry file");
   await mkdir(work, { recursive: true });
@@ -123,11 +127,11 @@ export async function solve({ rnl, prefix = [], work, request, defaults, signal,
         if (path.endsWith(".rnl")) packageDirs.add(dirname(target));
       }
     }
-    const solverOptions = [defaults, options].filter((o) => typeof o === "string" && o !== "").join(";");
+    const solverConfig = joinConfig(defaults, config);
     const common = [posix.basename(entryPath)];
     for (const d of packageDirs) common.push("--package-dir", d);
     for (const d of searchDirs) common.push("--path", d);
-    if (solverOptions) common.push("--solver-options", solverOptions);
+    if (solverConfig) common.push("--solver-config", solverConfig);
     if (typeof level === "string" && level !== "") common.push("--level", level);
     if (onEvent) common.push("--progress=json");
     const cwd = resolve(dir, dirname(entryPath));
@@ -137,16 +141,19 @@ export async function solve({ rnl, prefix = [], work, request, defaults, signal,
   }
 }
 
+/** Settings written as named parameters, the server's and then the page's: a later one wins by key. */
+const joinConfig = (...parts) => parts.filter((p) => typeof p === "string" && p !== "").join(",");
+
 /** The addresses the page of a server on 127.0.0.1 is reached by. */
 const hostOk = (host, port) => [`127.0.0.1:${port}`, `localhost:${port}`, `[::1]:${port}`].includes(host);
 
 /**
  * The service for a server: `handle(request, response, pathname)` answers the service's requests and
- * returns true, or returns false for any other. `options` are settings of the solver that every solve
- * takes before the page's own; `prefix` the arguments to give `rnl` first, for a test that runs a script.
+ * returns true, or returns false for any other. `config` are settings of the solver, as named parameters, that
+ * every solve takes before the page's own; `prefix` the arguments to give `rnl` first, for a test that runs a script.
  */
-export function createService({ rnl, prefix = [], version, options = "", work = join(tmpdir(), "rnl-solver-service") }) {
-  const info = { service: "rnl-solver", version, path: rnl, options };
+export function createService({ rnl, prefix = [], version, config: options = "", work = join(tmpdir(), "rnl-solver-service") }) {
+  const info = { service: "rnl-solver", version, path: rnl, config: options };
   const reply = (response, status, body) => {
     response.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
     response.end(typeof body === "string" ? body : JSON.stringify(body));
@@ -154,11 +161,21 @@ export function createService({ rnl, prefix = [], version, options = "", work = 
   return {
     info,
     async handle(request, response, pathname, port) {
-      if (pathname !== "/rnl-solver" && pathname !== "/rnl-solver/solve") return false;
+      if (!["/rnl-solver", "/rnl-solver/solve", "/rnl-solver/table", "/rnl-solver/check"].includes(pathname)) return false;
       if (!hostOk(request.headers.host, port)) return reply(response, 403, { error: "not this server's address" }), true;
       if (pathname === "/rnl-solver") {
         if (request.method !== "GET") return reply(response, 405, { error: "GET only" }), true;
         return reply(response, 200, info), true;
+      }
+      if (pathname === "/rnl-solver/table") {
+        if (request.method !== "GET") return reply(response, 405, { error: "GET only" }), true;
+        try {
+          await mkdir(work, { recursive: true });
+          reply(response, 200, await run(rnl, prefix, ["solver-defaults", "--json"], work, new AbortController().signal));
+        } catch (e) {
+          reply(response, 500, { error: e instanceof Error ? e.message : String(e) });
+        }
+        return true;
       }
       if (request.method !== "POST") return reply(response, 405, { error: "POST only" }), true;
       const origin = request.headers.origin;
@@ -189,6 +206,14 @@ export function createService({ rnl, prefix = [], version, options = "", work = 
       };
       try {
         const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+        if (pathname === "/rnl-solver/check") {
+          // exit 1 is a check that found errors, which it prints: only another exit is a failure
+          await mkdir(work, { recursive: true });
+          const checked = await run(rnl, prefix, ["solve", "--check", "--json", ...(joinConfig(options, body.config) ? ["--solver-config", joinConfig(options, body.config)] : [])],
+            work, abort.signal, undefined, [0, 1]);
+          reply(response, 200, checked);
+          return true;
+        }
         if (body.stream === true) {
           const result = await solve({ rnl, prefix, work, request: body, defaults: options, signal: abort.signal, onEvent: line });
           // on one line: what rnl preview prints is indented

@@ -8,12 +8,11 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
-use serde_json::json;
-
 use rnl_cli::preview::{one_file, preview_progress, save_copy_with_encoding, Copy, Report, StoppableClock};
 use rnl_cli::progress::Event;
-use rnl_cli::solve::SolveOptions;
-use rnl_solver::{SolverOptions, OBJECTIVES};
+use rnl_cli::solve::{check_settings, SolveOptions, ToolSettings};
+use rnl_runtime::source::MemoryProvider;
+use rnl_solver::SolverOptions;
 use rnl_view::Document;
 use serde::{Deserialize, Serialize};
 use tauri::{Emitter, Manager, State, WebviewWindow};
@@ -44,65 +43,42 @@ pub struct Solved {
     report: Report,
 }
 
-/// The solver's settings as the page gives them (Solve > Settings): `options` are the settings that
-/// differ from the defaults, written as `rnl solve --solver-options` takes them, such as
-/// `beam=8;time_limit=none`, and `hints_for_low` asks for every conflict group of the facts of
-/// priority low, which no such text sets. `level` is the title of the one level to solve, the circuit
+/// The solver's settings as the page gives them (Solve > Settings): `config` are the settings that
+/// differ from the defaults, written as RNL named parameters as `rnl solve --solver-config` takes
+/// them, such as `layout="rows",beam=8`. `level` is the title of the one level to solve, the circuit
 /// shown; none solves every level (Solve > Solve All Circuits). None given, or an empty text, are the
 /// defaults of `rnl solve`.
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
     #[serde(default)]
-    options: String,
-    #[serde(default)]
-    hints_for_low: bool,
+    config: String,
     #[serde(default)]
     level: Option<String>,
 }
 
 impl Settings {
-    /// The defaults with these settings over them, as `rnl solve` reads `--solver-options`: an
-    /// unknown option, or a value that does not do, is an error that says why.
+    /// The defaults with these settings over them, as `rnl solve` reads `--solver-config`: a key the
+    /// solver does not have, or a value that does not do, is an error that says why.
     fn solver(&self) -> Result<SolverOptions, String> {
-        let options = SolverOptions::default().with_overrides(&self.options)?;
-        Ok(SolverOptions { hints_for_low: self.hints_for_low, ..options })
+        SolverOptions::default().with_config(&self.config)
     }
 }
 
-/// The solver's defaults and the objectives it knows, for the settings dialog to show: the options
-/// as the page edits them, `grid` and `time_limit` null for none, and the layers of the objectives,
-/// the first first, each with its objectives and their weights and its tolerance.
+/// The table of the solver's settings, which the settings dialog is drawn from: the page keeps no
+/// key, bound or default of its own (docs/solver-settings-table.md).
 #[tauri::command]
-pub fn solver_defaults() -> serde_json::Value {
-    let d = SolverOptions::default();
-    let layers: Vec<_> = d
-        .objectives
-        .layers
-        .iter()
-        .map(|layer| {
-            let items: Vec<_> =
-                layer.items.iter().map(|(name, weight)| json!({ "name": name, "weight": weight })).collect();
-            json!({ "items": items, "tolerance": layer.tolerance })
-        })
-        .collect();
-    json!({
-        "tolerance": d.tolerance,
-        "grid": d.grid,
-        "beam": d.beam,
-        "budget": { "candidates": d.budget.candidates, "astar_expansions": d.budget.astar_expansions },
-        "time_limit": d.time_limit,
-        "hints_for_low": d.hints_for_low,
-        "objectives": layers,
-        "names": OBJECTIVES,
-    })
+pub fn solver_table() -> serde_json::Value {
+    rnl_cli::solver_table::settings_table_json()
 }
 
-/// Whether the solver takes settings written as `--solver-options` takes them: nothing when it does,
-/// else what is wrong, in its own words.
+/// What `rnl solve --check --json` says of settings written as RNL named parameters, with no file:
+/// one level, with each setting in effect and the problems of each, by key. Err when the text does
+/// not read at all.
 #[tauri::command]
-pub fn check_solver_options(options: String) -> Result<(), String> {
-    SolverOptions::default().with_overrides(&options).map(|_| ())
+pub fn check_solver_settings(config: String) -> Result<serde_json::Value, String> {
+    let checked = check_settings(None, &MemoryProvider::new(), &SolveOptions::default(), &[ToolSettings::Config(config)])?;
+    serde_json::to_value(checked).map_err(|e| e.to_string())
 }
 
 /// Solve the netlist the page shows, a file by its path or a text held in memory as the file
@@ -283,64 +259,64 @@ fn said(w: &rnl_cli::solve::Writing, to: &Path) -> String {
 mod tests {
     use std::path::Path;
 
-    use rnl_solver::{SolverOptions, DEFAULT_LAYERS, OBJECTIVES};
+    use rnl_solver::SolverOptions;
     use serde_json::json;
 
-    use super::{check_solver_options, copy_name, solver_defaults, Settings};
+    use super::{check_solver_settings, copy_name, solver_table, Settings};
 
     /// The settings the page gives: none, or an empty text, are the defaults of `rnl solve`; a text
-    /// is read over them as `--solver-options` reads it; `hintsForLow` is not part of that text.
+    /// is read over them as `--solver-config` reads it.
     #[test]
     fn the_settings_the_page_gives() {
         let given = |v: serde_json::Value| serde_json::from_value::<Settings>(v).unwrap().solver();
         assert_eq!(Settings::default().solver(), Ok(SolverOptions::default()));
         assert_eq!(given(json!({})), Ok(SolverOptions::default()));
-        assert_eq!(given(json!({ "options": "", "hintsForLow": false })), Ok(SolverOptions::default()));
-        let text = "beam=8;time_limit=none;grid=none;budget=candidates:7";
-        let set = given(json!({ "options": text, "hintsForLow": true })).unwrap();
-        let default = SolverOptions::default();
-        assert_eq!((set.beam, set.time_limit, set.grid), (8, None, None));
-        assert_eq!((set.budget.candidates, set.budget.astar_expansions), (7, default.budget.astar_expansions));
-        assert!(set.hints_for_low);
-        assert_eq!(set.objectives, default.objectives);
-        // the objectives replace the whole list, as `--solver-options` has them
-        let set = given(json!({ "options": "objectives=area+wire_length*2~0.5,turns" })).unwrap();
-        assert_eq!(set.canonical().split(';').nth(2), Some("objectives=area+wire_length*2~0.5,turns"));
-        // what does not read says why, in the solver's words, and so does the check
-        for (text, why) in [
-            ("beam=0", "the beam must be at least 1"),
-            ("time_limit=-1", "the time limit must be a number of seconds not below 0"),
-            ("tolerance=x", "the tolerance is not a number"),
-            ("objectives=beauty", "no objective is called `beauty`"),
-            ("budget=pivots:1", "the budget has no `pivots`"),
-            ("speed=3", "the solver has no option `speed`"),
+        assert_eq!(given(json!({ "config": "" })), Ok(SolverOptions::default()));
+        let set = given(json!({ "config": "beam=8,grid=false,candidates=7,report_hints=true" })).unwrap();
+        // the settings given are the tool's overrides, which the solve applies over the file's own
+        let keys: Vec<_> = set.settings.overrides.iter().map(|s| s.key.as_str()).collect();
+        assert_eq!(keys, ["beam", "candidates", "grid", "report_hints"]);
+        let set = given(json!({ "config": "objectives=\"area+wire_length*2~0.5,turns\"" })).unwrap();
+        assert_eq!(set.settings.overrides.len(), 1);
+        assert_eq!(set.settings.overrides[0].key, "objectives");
+        // what does not read says why, in the solver's words, and so does the check, by the key
+        for (text, key, why) in [
+            ("beam=0", "beam", "the beam must be at least 1"),
+            ("tolerance=\"x\"", "tolerance", "must be a finite number"),
+            ("objectives=\"beauty\"", "objectives", "beauty"),
         ] {
-            let e = given(json!({ "options": text })).unwrap_err();
+            let e = given(json!({ "config": text })).unwrap_err();
             assert!(e.contains(why), "{text}: {e}");
-            assert_eq!(check_solver_options(text.to_string()), Err(e));
+            let checked = check_solver_settings(text.to_string()).unwrap();
+            assert_eq!(checked["ok"], json!(false), "{text}");
+            let errors = checked["levels"][0]["errors"].as_array().unwrap();
+            assert!(errors.iter().any(|p| p["key"] == json!(key)), "{text}: {errors:?}");
         }
-        assert_eq!(check_solver_options(String::new()), Ok(()));
-        assert_eq!(check_solver_options("beam=2;time_limit=none".to_string()), Ok(()));
+        // a key the solver does not have is a warning of the check: nothing is refused, and the key says which
+        let checked = check_solver_settings("speed=3".to_string()).unwrap();
+        assert_eq!(checked["ok"], json!(true));
+        assert_eq!(checked["levels"][0]["warnings"][0]["key"], json!("speed"));
+        let checked = check_solver_settings(String::new()).unwrap();
+        assert_eq!(checked["ok"], json!(true));
+        let checked = check_solver_settings("beam=2,layout=\"rows\"".to_string()).unwrap();
+        assert_eq!(checked["ok"], json!(true));
+        assert_eq!(checked["levels"][0]["settings"]["layout"]["from"], json!("command-line"));
     }
 
-    /// The dialog shows what the solver's defaults are, and which objectives there are, as the
-    /// solver says; the page keeps nothing of them itself.
+    /// The dialog is drawn from the table the solver gives; the page keeps nothing of it itself.
     #[test]
-    fn the_defaults_the_dialog_shows_are_the_solvers() {
-        let d = solver_defaults();
+    fn the_table_the_dialog_is_drawn_from_is_the_solvers() {
+        let t = solver_table();
+        assert_eq!(t["version"], json!(1));
+        let keys: Vec<&str> = t["settings"].as_array().unwrap().iter().map(|s| s["key"].as_str().unwrap()).collect();
+        for key in ["layout", "spacing_x", "beam", "objectives", "grid", "limit", "seconds", "report_hints"] {
+            assert!(keys.contains(&key), "{key}");
+        }
         let o = SolverOptions::default();
-        assert_eq!(d["tolerance"], json!(o.tolerance));
-        assert_eq!(d["grid"], json!(o.grid));
-        assert_eq!(d["beam"], json!(o.beam));
-        assert_eq!(d["time_limit"], json!(o.time_limit));
-        assert_eq!(d["hints_for_low"], json!(false));
-        let budget = json!({ "candidates": o.budget.candidates, "astar_expansions": o.budget.astar_expansions });
-        assert_eq!(d["budget"], budget);
-        assert_eq!(d["names"], json!(OBJECTIVES));
-        let layers = d["objectives"].as_array().unwrap();
-        let first: Vec<&str> = layers.iter().map(|l| l["items"][0]["name"].as_str().unwrap()).collect();
-        assert_eq!(first, DEFAULT_LAYERS);
-        assert!(layers.iter().all(|l| l["items"].as_array().unwrap().len() == 1 && l["tolerance"] == 0.0));
+        let beam = t["settings"].as_array().unwrap().iter().find(|s| s["key"] == "beam").unwrap();
+        assert_eq!(beam["default"], json!(o.beam));
+        assert!(!t["objectives"].as_array().unwrap().is_empty());
+        assert!(!t["groups"].as_array().unwrap().is_empty());
     }
 
     /// The circuit shown is solved alone when the page names it; none, or an empty title, solve every one.
@@ -348,7 +324,7 @@ mod tests {
     fn a_level_is_given_by_its_title() {
         let level = |v: serde_json::Value| serde_json::from_value::<Settings>(v).unwrap().level;
         assert_eq!(level(json!({})), None);
-        assert_eq!(level(json!({ "options": "", "level": null })), None);
+        assert_eq!(level(json!({ "config": "", "level": null })), None);
         assert_eq!(level(json!({ "level": "amp" })).as_deref(), Some("amp"));
     }
 
