@@ -2298,7 +2298,7 @@
       "name": "rdiv",
       "file": 1,
       "line": 3,
-      "status": "constraints: 3 ok, 7 dropped",
+      "status": null,
       "host": {
         "ports": [
           "&top",
@@ -2349,7 +2349,7 @@
             "usages": [
               {
                 "kind": "usage",
-                "id": "@rnl-std-fill.rnl:61:3#1",
+                "id": "%io_port_top",
                 "definition": "$IO_PORT",
                 "roles": [
                   {
@@ -2359,14 +2359,9 @@
                     "terminal": null
                   }
                 ],
-                "file": null,
-                "line": 61,
-                "source": "rule",
-                "rule": {
-                  "package": "rnl-std-fill",
-                  "file": "rnl-std-fill.rnl",
-                  "line": 61
-                },
+                "file": 1,
+                "line": 19,
+                "source": "solver",
                 "state": "in-effect"
               }
             ]
@@ -2378,7 +2373,7 @@
             "usages": [
               {
                 "kind": "usage",
-                "id": "@rnl-std-fill.rnl:61:3#2",
+                "id": "%io_port_mid",
                 "definition": "$IO_PORT",
                 "roles": [
                   {
@@ -2388,14 +2383,9 @@
                     "terminal": null
                   }
                 ],
-                "file": null,
-                "line": 61,
-                "source": "rule",
-                "rule": {
-                  "package": "rnl-std-fill",
-                  "file": "rnl-std-fill.rnl",
-                  "line": 61
-                },
+                "file": 1,
+                "line": 20,
+                "source": "solver",
                 "state": "in-effect"
               }
             ]
@@ -2407,7 +2397,7 @@
             "usages": [
               {
                 "kind": "usage",
-                "id": "@rnl-std-fill.rnl:61:3#3",
+                "id": "%io_port_bot",
                 "definition": "$IO_PORT",
                 "roles": [
                   {
@@ -2417,14 +2407,9 @@
                     "terminal": null
                   }
                 ],
-                "file": null,
-                "line": 61,
-                "source": "rule",
-                "rule": {
-                  "package": "rnl-std-fill",
-                  "file": "rnl-std-fill.rnl",
-                  "line": 61
-                },
+                "file": 1,
+                "line": 21,
+                "source": "solver",
                 "state": "in-effect"
               }
             ]
@@ -2442,8 +2427,8 @@
             "definition": null
           },
           {
-            "id": "$JUNCTION_SYMBOL",
-            "name": "$JUNCTION_SYMBOL",
+            "id": "$NET_LABEL_SYMBOL",
+            "name": "$NET_LABEL_SYMBOL",
             "package": "rnl-std-basic",
             "level": null,
             "default": false,
@@ -2481,13 +2466,13 @@
             },
             "at": {
               "value": [
-                0.0,
-                3.0
+                -6.0,
+                0.0
               ],
               "source": null
             },
             "orient": {
-              "value": "R0",
+              "value": "R90",
               "source": null
             },
             "pins": [
@@ -2508,10 +2493,10 @@
                   "#R1:1"
                 ],
                 "at": [
-                  0.0,
-                  5.0
+                  -8.0,
+                  0.0
                 ],
-                "dir": 90,
+                "dir": 180,
                 "nets": [
                   "&top"
                 ]
@@ -2533,10 +2518,10 @@
                   "#R1:2"
                 ],
                 "at": [
-                  0.0,
-                  1.0
+                  -4.0,
+                  0.0
                 ],
-                "dir": 270,
+                "dir": 0,
                 "nets": [
                   "&mid"
                 ]
@@ -2562,12 +2547,12 @@
             "at": {
               "value": [
                 0.0,
-                -4.0
+                0.0
               ],
               "source": null
             },
             "orient": {
-              "value": "R0",
+              "value": "R90",
               "source": null
             },
             "pins": [
@@ -2588,10 +2573,10 @@
                   "#R2:1"
                 ],
                 "at": [
-                  0.0,
-                  -2.0
+                  -2.0,
+                  0.0
                 ],
-                "dir": 90,
+                "dir": 180,
                 "nets": [
                   "&mid"
                 ]
@@ -2613,10 +2598,10 @@
                   "#R2:2"
                 ],
                 "at": [
-                  0.0,
-                  -6.0
+                  2.0,
+                  0.0
                 ],
-                "dir": 270,
+                "dir": 0,
                 "nets": [
                   "&bot"
                 ]
@@ -2624,21 +2609,22 @@
             ]
           },
           {
-            "id": "@04-hierarchy-lib.inc:10:5",
+            "pin_of": "#R1",
+            "id": "%net_label_stub_R1_p",
             "kind": "usage",
             "host": [],
-            "definition": "$JUNCTION",
+            "definition": "$NET_LABEL_STUB",
             "attach": {
-              "p": "%jm"
+              "t": "pin(#R1,0)"
             },
             "symbol": {
-              "value": "$JUNCTION_SYMBOL",
+              "value": null,
               "source": null
             },
             "at": {
               "value": [
                 0.0,
-                -0.5
+                0.0
               ],
               "source": null
             },
@@ -2649,7 +2635,139 @@
             "pins": []
           },
           {
-            "id": "@rnl-std-fill.rnl:61:3#1",
+            "pin_of": "#R1",
+            "parent": "%net_label_stub_R1_p",
+            "id": "@rnl-std-basic.rnl:672:9#1",
+            "kind": "usage",
+            "host": [],
+            "definition": "$NET_LABEL",
+            "attach": {
+              "p": "pin(#R1,0)"
+            },
+            "symbol": {
+              "value": "$NET_LABEL_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -8.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "MY",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(@rnl-std-basic.rnl:672:9#1,0)",
+                "index": 0,
+                "names": [
+                  "pin"
+                ],
+                "bus": false,
+                "reference": "%net_label_stub_R1_p::l::pin",
+                "local_at": [
+                  0.0,
+                  0.0
+                ],
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  -8.0,
+                  0.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&top"
+                ]
+              }
+            ]
+          },
+          {
+            "pin_of": "#R2",
+            "id": "%net_label_stub_R2_n",
+            "kind": "usage",
+            "host": [],
+            "definition": "$NET_LABEL_STUB",
+            "attach": {
+              "t": "pin(#R2,1)"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": [
+                0.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "pin_of": "#R2",
+            "parent": "%net_label_stub_R2_n",
+            "id": "@rnl-std-basic.rnl:672:9#2",
+            "kind": "usage",
+            "host": [],
+            "definition": "$NET_LABEL",
+            "attach": {
+              "p": "pin(#R2,1)"
+            },
+            "symbol": {
+              "value": "$NET_LABEL_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": [
+                2.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(@rnl-std-basic.rnl:672:9#2,0)",
+                "index": 0,
+                "names": [
+                  "pin"
+                ],
+                "bus": false,
+                "reference": "%net_label_stub_R2_n::l::pin",
+                "local_at": [
+                  0.0,
+                  0.0
+                ],
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  2.0,
+                  0.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&bot"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "%io_port_top",
             "kind": "usage",
             "host": [],
             "definition": "$IO_PORT",
@@ -2662,24 +2780,25 @@
             },
             "at": {
               "value": [
-                0.0,
-                7.0
+                -13.0,
+                4.0
               ],
               "source": null
             },
             "orient": {
-              "value": "R270",
+              "value": "R0",
               "source": null
             },
             "pins": [
               {
                 "kind": "pin",
-                "id": "pin(@rnl-std-fill.rnl:61:3#1,0)",
+                "id": "pin(%io_port_top,0)",
                 "index": 0,
                 "names": [
                   "pin"
                 ],
                 "bus": false,
+                "reference": "%io_port_top::pin",
                 "local_at": [
                   0.0,
                   0.0
@@ -2688,42 +2807,18 @@
                   "p"
                 ],
                 "at": [
-                  0.0,
-                  7.0
+                  -13.0,
+                  4.0
                 ],
-                "dir": 270,
+                "dir": 0,
                 "nets": [
                   "&top"
                 ]
               }
-            ],
-            "usages": [
-              {
-                "kind": "group",
-                "id": "@rnl-std-fill.rnl:64:3",
-                "definition": "",
-                "roles": [
-                  {
-                    "role": "members",
-                    "set": true,
-                    "member": "@rnl-std-fill.rnl:61:3#1",
-                    "terminal": null
-                  }
-                ],
-                "file": null,
-                "line": 64,
-                "source": "rule",
-                "rule": {
-                  "package": "rnl-std-fill",
-                  "file": "rnl-std-fill.rnl",
-                  "line": 64
-                },
-                "state": "in-effect"
-              }
             ]
           },
           {
-            "id": "@rnl-std-fill.rnl:61:3#2",
+            "id": "%io_port_mid",
             "kind": "usage",
             "host": [],
             "definition": "$IO_PORT",
@@ -2736,24 +2831,25 @@
             },
             "at": {
               "value": [
-                2.0,
-                -0.5
+                -13.0,
+                0.0
               ],
               "source": null
             },
             "orient": {
-              "value": "MY",
+              "value": "R0",
               "source": null
             },
             "pins": [
               {
                 "kind": "pin",
-                "id": "pin(@rnl-std-fill.rnl:61:3#2,0)",
+                "id": "pin(%io_port_mid,0)",
                 "index": 0,
                 "names": [
                   "pin"
                 ],
                 "bus": false,
+                "reference": "%io_port_mid::pin",
                 "local_at": [
                   0.0,
                   0.0
@@ -2762,42 +2858,18 @@
                   "p"
                 ],
                 "at": [
-                  2.0,
-                  -0.5
+                  -13.0,
+                  0.0
                 ],
-                "dir": 180,
+                "dir": 0,
                 "nets": [
                   "&mid"
                 ]
               }
-            ],
-            "usages": [
-              {
-                "kind": "group",
-                "id": "@rnl-std-fill.rnl:64:3",
-                "definition": "",
-                "roles": [
-                  {
-                    "role": "members",
-                    "set": true,
-                    "member": "@rnl-std-fill.rnl:61:3#2",
-                    "terminal": null
-                  }
-                ],
-                "file": null,
-                "line": 64,
-                "source": "rule",
-                "rule": {
-                  "package": "rnl-std-fill",
-                  "file": "rnl-std-fill.rnl",
-                  "line": 64
-                },
-                "state": "in-effect"
-              }
             ]
           },
           {
-            "id": "@rnl-std-fill.rnl:61:3#3",
+            "id": "%io_port_bot",
             "kind": "usage",
             "host": [],
             "definition": "$IO_PORT",
@@ -2810,24 +2882,25 @@
             },
             "at": {
               "value": [
-                0.0,
-                -8.0
+                -13.0,
+                -4.0
               ],
               "source": null
             },
             "orient": {
-              "value": "R90",
+              "value": "R0",
               "source": null
             },
             "pins": [
               {
                 "kind": "pin",
-                "id": "pin(@rnl-std-fill.rnl:61:3#3,0)",
+                "id": "pin(%io_port_bot,0)",
                 "index": 0,
                 "names": [
                   "pin"
                 ],
                 "bus": false,
+                "reference": "%io_port_bot::pin",
                 "local_at": [
                   0.0,
                   0.0
@@ -2836,57 +2909,21 @@
                   "p"
                 ],
                 "at": [
-                  0.0,
-                  -8.0
+                  -13.0,
+                  -4.0
                 ],
-                "dir": 90,
+                "dir": 0,
                 "nets": [
                   "&bot"
                 ]
               }
-            ],
-            "usages": [
-              {
-                "kind": "group",
-                "id": "@rnl-std-fill.rnl:64:3",
-                "definition": "",
-                "roles": [
-                  {
-                    "role": "members",
-                    "set": true,
-                    "member": "@rnl-std-fill.rnl:61:3#3",
-                    "terminal": null
-                  }
-                ],
-                "file": null,
-                "line": 64,
-                "source": "rule",
-                "rule": {
-                  "package": "rnl-std-fill",
-                  "file": "rnl-std-fill.rnl",
-                  "line": 64
-                },
-                "state": "in-effect"
-              }
             ]
           }
         ],
-        "points": [
-          {
-            "id": "%jm",
-            "at": {
-              "value": [
-                0.0,
-                -0.5
-              ],
-              "source": null
-            },
-            "junction": true
-          }
-        ],
+        "points": [],
         "wires": [
           {
-            "id": "@04-hierarchy-lib.inc:8:5",
+            "id": "@04-hierarchy-lib.inc:7:5",
             "nets": [
               "&mid"
             ],
@@ -2895,111 +2932,17 @@
                 "terminal": "#R1:2"
               },
               {
-                "point": "%jm"
-              },
-              {
                 "terminal": "#R2:1"
               }
             ],
             "points": [
               [
-                0.0,
-                1.0
+                -4.0,
+                0.0
               ],
               [
-                0.0,
-                -0.5
-              ],
-              [
-                0.0,
-                -2.0
-              ]
-            ],
-            "mode": "auto",
-            "style": {}
-          },
-          {
-            "id": "@04-hierarchy-lib.inc:9:5",
-            "nets": [
-              "&mid"
-            ],
-            "via": [
-              {
-                "point": "%jm"
-              },
-              {
-                "at": [
-                  2.0,
-                  -0.5
-                ]
-              }
-            ],
-            "points": [
-              [
-                0.0,
-                -0.5
-              ],
-              [
-                2.0,
-                -0.5
-              ]
-            ],
-            "mode": "auto",
-            "style": {}
-          },
-          {
-            "id": "@04-hierarchy-lib.inc:11:5",
-            "nets": [
-              "&top"
-            ],
-            "via": [
-              {
-                "terminal": "#R1:1"
-              },
-              {
-                "at": [
-                  0.0,
-                  7.0
-                ]
-              }
-            ],
-            "points": [
-              [
-                0.0,
-                5.0
-              ],
-              [
-                0.0,
-                7.0
-              ]
-            ],
-            "mode": "auto",
-            "style": {}
-          },
-          {
-            "id": "@04-hierarchy-lib.inc:12:5",
-            "nets": [
-              "&bot"
-            ],
-            "via": [
-              {
-                "terminal": "#R2:2"
-              },
-              {
-                "at": [
-                  0.0,
-                  -8.0
-                ]
-              }
-            ],
-            "points": [
-              [
-                0.0,
-                -6.0
-              ],
-              [
-                0.0,
-                -8.0
+                -2.0,
+                0.0
               ]
             ],
             "mode": "auto",
@@ -3031,8 +2974,8 @@
               ]
             ],
             "anchor": [
-              0.95,
-              3.25
+              -6.25,
+              0.95
             ],
             "halign": "start",
             "valign": "baseline",
@@ -3067,8 +3010,8 @@
               ]
             ],
             "anchor": [
-              0.95,
-              1.8
+              -4.8,
+              0.95
             ],
             "halign": "start",
             "valign": "baseline",
@@ -3103,8 +3046,8 @@
               ]
             ],
             "anchor": [
-              0.95,
-              -3.75
+              -0.25,
+              0.95
             ],
             "halign": "start",
             "valign": "baseline",
@@ -3139,8 +3082,8 @@
               ]
             ],
             "anchor": [
-              0.95,
-              -5.2
+              1.2,
+              0.95
             ],
             "halign": "start",
             "valign": "baseline",
@@ -3152,8 +3095,8 @@
             }
           },
           {
-            "id": "@rnl-std-fill.rnl:61:3#1::netname",
-            "attach": "@rnl-std-fill.rnl:61:3#1",
+            "id": "@rnl-std-basic.rnl:672:9#1::netname",
+            "attach": "@rnl-std-basic.rnl:672:9#1",
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -3175,51 +3118,18 @@
               ]
             ],
             "anchor": [
-              0.0,
-              8.25
+              -9.3,
+              0.0
             ],
-            "halign": "end",
+            "halign": "start",
             "valign": "middle",
             "rotate": 0.0,
             "size": 1.0,
             "style": {}
           },
           {
-            "id": "@rnl-std-fill.rnl:61:3#2::netname",
-            "attach": "@rnl-std-fill.rnl:61:3#2",
-            "key": "netname",
-            "markup": {
-              "value": "${p}",
-              "source": null
-            },
-            "written": false,
-            "lines": [
-              [
-                {
-                  "kind": "text",
-                  "text": "mid",
-                  "style": {
-                    "level": 0,
-                    "bold": false,
-                    "italic": false,
-                    "overline": false
-                  }
-                }
-              ]
-            ],
-            "anchor": [
-              3.25,
-              -0.5
-            ],
-            "halign": "end",
-            "valign": "middle",
-            "rotate": 0.0,
-            "size": 1.0,
-            "style": {}
-          },
-          {
-            "id": "@rnl-std-fill.rnl:61:3#3::netname",
-            "attach": "@rnl-std-fill.rnl:61:3#3",
+            "id": "@rnl-std-basic.rnl:672:9#2::netname",
+            "attach": "@rnl-std-basic.rnl:672:9#2",
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -3241,8 +3151,107 @@
               ]
             ],
             "anchor": [
-              0.0,
-              -9.25
+              3.3,
+              0.0
+            ],
+            "halign": "start",
+            "valign": "middle",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "%io_port_top::netname",
+            "attach": "%io_port_top",
+            "key": "netname",
+            "markup": {
+              "value": "${p}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "top",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -14.25,
+              4.0
+            ],
+            "halign": "end",
+            "valign": "middle",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "%io_port_mid::netname",
+            "attach": "%io_port_mid",
+            "key": "netname",
+            "markup": {
+              "value": "${p}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "mid",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -14.25,
+              0.0
+            ],
+            "halign": "end",
+            "valign": "middle",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "%io_port_bot::netname",
+            "attach": "%io_port_bot",
+            "key": "netname",
+            "markup": {
+              "value": "${p}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "bot",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -14.25,
+              -4.0
             ],
             "halign": "end",
             "valign": "middle",
@@ -3255,11 +3264,7 @@
         "groups": [
           {
             "id": "@rnl-std-fill.rnl:64:3",
-            "members": [
-              "@rnl-std-fill.rnl:61:3#1",
-              "@rnl-std-fill.rnl:61:3#2",
-              "@rnl-std-fill.rnl:61:3#3"
-            ],
+            "members": [],
             "file": null,
             "line": 64,
             "source": "rule",
@@ -3273,7 +3278,7 @@
         ],
         "junction": {
           "definition": "$JUNCTION",
-          "symbol": "$JUNCTION_SYMBOL"
+          "symbol": null
         }
       }
     },
