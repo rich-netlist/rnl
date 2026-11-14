@@ -7,7 +7,8 @@
 // with { id, event } for each event of the solve as it happens (docs/solver-progress.md), and
 // then { id, answer }, the solver's answer: { document, report, files }, { cancelled: true } or
 // { error }; a message { id, table: true } with { id, table }, the table of the solver's settings
-// (docs/solver-settings-table.md); or { id, error } when the module could not be loaded or the call threw. The page
+// (docs/solver-settings-table.md); a message { id, check: request } with { id, table: answer }, what the module's
+// check(request) gives (`rnl solve --check --json`; with no entry, only its solver_config); or { id, error } when the module could not be loaded or the call threw. The page
 // cancels a solve by terminating the Worker, which the solver's module is written for: every
 // request carries all it reads, so a new Worker needs nothing of the old one.
 
@@ -28,10 +29,14 @@ function solver() {
   return loading;
 }
 
-addEventListener("message", async ({ data: { id, request, table } }) => {
+addEventListener("message", async ({ data: { id, request, table, check } }) => {
   try {
     const loaded = await solver();
     if (table) return postMessage({ id, table: loaded.settings() });
+    if (check) {
+      const checked = loaded.check(check);
+      return postMessage(checked.error !== undefined ? { id, error: checked.error } : { id, table: checked });
+    }
     const answer = loaded.solve(request, (event) => {
       postMessage({ id, event });
     });

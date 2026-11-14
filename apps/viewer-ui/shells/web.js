@@ -1192,6 +1192,8 @@ export default {
     },
     /** The table of the solver’s settings, from the solver’s module: the Worker that loads it gives it. */
     solverTable: () => callSolver(inBrowser, { table: true }),
+    /** What the solver’s module says of settings written as named parameters, with no file: its `check(request)`. */
+    checkSettings: (config) => callSolver(inBrowser, { check: { solver_config: config } }),
     cancelSolve() {
       solving?.abort();
     },
