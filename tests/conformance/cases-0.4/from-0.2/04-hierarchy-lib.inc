@@ -4,12 +4,7 @@
 R1 top mid 10k
 R2 mid bot 10k
 * @RNL {
-*   %jm = (0, -0.5);
-*   &mid @WIRE(mode="auto") {#R1:2 %jm #R2:1};
-*   &mid @WIRE(mode="auto") {%jm (2, -0.5)};
-*   $JUNCTION @ATTACH %jm => @PLACE(0, -0.5);
-*   &top @WIRE(mode="auto") {#R1:1 (0, 7)};
-*   &bot @WIRE(mode="auto") {#R2:2 (0, -8)}
+*   &mid @WIRE(mode="auto") {#R1:2 #R2:1}
 * }
 * 
 
@@ -18,5 +13,20 @@ R2 mid bot 10k
 
 
 *! the port tags come from the fill of the standard package ($PORT_FILL_SET)
-* @RNL(type="generated", priority="high") { #R1 @PLACE(0, 3); #R2 @PLACE(0, -4); &top @SELECT-ANCESTOR-USAGE $IO_PORT => @PLACE(0, 7) => @ORIENT("R270"); &mid @SELECT-ANCESTOR-USAGE $IO_PORT => @PLACE(2, -0.5) => @ORIENT("MY"); &bot @SELECT-ANCESTOR-USAGE $IO_PORT => @PLACE(0, -8) => @ORIENT("R90") }
+* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:e34ea498bf6444fa.9d9ced86f665c0da") {
+*   %net_label_stub_R1_p = $NET_LABEL_STUB @ATTACH #R1::p;
+*   %net_label_stub_R2_n = $NET_LABEL_STUB @ATTACH #R2::n;
+*   %io_port_top = $IO_PORT @ATTACH &top;
+*   %io_port_mid = $IO_PORT @ATTACH &mid;
+*   %io_port_bot = $IO_PORT @ATTACH &bot;
+*   #R1 @PLACE(-6, 0) => @ORIENT("R90");
+*   #R2 @PLACE(0, 0) => @ORIENT("R90");
+*   %net_label_stub_R1_p @PLACE(0, 0);
+*   %net_label_stub_R1_p::l @PLACE(-8, 0) => @ORIENT("MY");
+*   %net_label_stub_R2_n @PLACE(0, 0);
+*   %net_label_stub_R2_n::l @PLACE(2, 0) => @ORIENT("R0");
+*   %io_port_top @PLACE(-13, 4) => @ORIENT("R0");
+*   %io_port_mid @PLACE(-13, 0) => @ORIENT("R0");
+*   %io_port_bot @PLACE(-13, -4) => @ORIENT("R0")
+* }
 .ends
