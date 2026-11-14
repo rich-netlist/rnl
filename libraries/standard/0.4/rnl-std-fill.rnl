@@ -46,11 +46,6 @@
   # @SELECT-USAGE(recursive=true) $BIAS_STUB => @SELECT-PIN(role="t", recursive=true) => @REMOVE-FROM $BIAS_FILL_SET;
   $BIAS_STUB @ATTACH $BIAS_FILL_SET;
 
-  /* The ground nets other than 0, whose grounds show the name of their net with $NAMED_GROUND_SYMBOL. */
-  $NAMED_GROUND_NET_SET = {$GROUND_NET_SET};
-  # @SELECT-NET(name="0", recursive=true) => @REMOVE-FROM $NAMED_GROUND_NET_SET;
-  $NAMED_GROUND_NET_SET @SELECT-ANCESTOR-USAGE(recursive=true) $GROUND => @SET-SYMBOL $NAMED_GROUND_SYMBOL;
-
   %rail_pin_set = {$GROUND_NET_SET $SUPPLY_NET_SET $BIAS_NET_SET} @SELECT-PIN(recursive=true);
   %bulk_pin_set @REMOVE-FROM %rail_pin_set;
   /* The remaining unwired pins on nets, which the fill gives a net-label stub; a bus pin gets one. */

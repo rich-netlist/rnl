@@ -476,7 +476,7 @@
 
   /* ---------------------------------------------------------------- virtual-part and mark symbols */
 
-  /* The symbol of $GROUND: a three-bar ground, its pin at the top. For grounds on nets other than 0 in $GROUND_NET_SET, rnl-std-fill switches to $NAMED_GROUND_SYMBOL. */
+  /* The symbol of $GROUND on the net 0: a three-bar ground, its pin at the top. */
   $GROUND_SYMBOL = @DEFINE-SYMBOL(box=[-1.2, -2.7, 1.2, 0]) {
     %pin = (0, 0) @PIN(terminal="p", direction="up");
     @LINE {(0, 0) (0, -1)};
@@ -485,7 +485,7 @@
     @LINE(linewidth=0.2907) {(-0.2326, -2.1047) (0.2326, -2.1047)};
   };
 
-  /* A ground symbol with the name of its net under it, used by rnl-std-fill for ground nets other than 0 in $GROUND_NET_SET. */
+  /* The symbol of $GROUND on any net other than 0: a three-bar ground with the name of its net under it. */
   $NAMED_GROUND_SYMBOL = @DEFINE-SYMBOL(box=[-1.2, -2.7, 1.2, 0]) {
     $GROUND_SYMBOL;
     ? @TEXT("${p}", key="netname", halign="middle", valign="top", fix_rotate=true) => @PLACE(0, -2.5);
@@ -540,7 +540,7 @@
 
   /* ---------------------------------------------------------------- net sets (10.5) */
 
-  /* The ground nets, 0 by default, which a file edits with ADD-TO and REMOVE-FROM. */
+  /* The ground nets, 0 by default, which a file edits with ADD-TO and REMOVE-FROM; rnl-std-fill gives their unwired pins a ground stub and leaves them unrouted. How a ground is drawn does not depend on it. */
   $GROUND_NET_SET = # @SELECT-NET(name="0", recursive=true);
 
   /* The supply nets, none by default, which a file edits with ADD-TO and REMOVE-FROM. */
@@ -551,7 +551,7 @@
 
   /* ---------------------------------------------------------------- virtual parts, marks and figures (9.4, 12) */
 
-  /* A ground on a net, drawn at a point of its own; add a non-0 net to $GROUND_NET_SET (or $NAMED_GROUND_NET_SET) to show its net name. */
+  /* A ground on a net, drawn at a point of its own: on the net 0 it is the three bars alone, and on any other net it shows the name of its net, by the rule at the end of this package. */
   $GROUND = @DEFINE(roles=[["p", "net"]]) {};
   # @SELECT-USAGE(recursive=true) $GROUND => @SET-SYMBOL $GROUND_SYMBOL;
 
@@ -676,4 +676,11 @@
     ?t @UNROUTE-OBJECT;
     %l @UNROUTE-OBJECT(priority="high");
   };
+
+  /* ---------------------------------------------------------------- the ground of a net other than 0 */
+
+  /* A $GROUND on any net other than 0 shows the name of its net, whether or not the net is in $GROUND_NET_SET; an explicit @SET-SYMBOL $GROUND_SYMBOL on the usage still draws the bars alone. */
+  %named_ground_nets = # @SELECT-USAGE(recursive=true) $GROUND => @SELECT-NET(recursive=true);
+  # @SELECT-NET(name="0", recursive=true) => @REMOVE-FROM %named_ground_nets;
+  %named_ground_nets @SELECT-ANCESTOR-USAGE(recursive=true) $GROUND => @SET-SYMBOL $NAMED_GROUND_SYMBOL;
 }
