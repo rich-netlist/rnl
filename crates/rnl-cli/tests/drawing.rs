@@ -141,6 +141,19 @@ fn a_wire_whose_middle_point_is_free_is_drawn_in_two_runs() {
     let others = |svg: &str| svg.lines().filter(|l| !l.contains("flyline")).map(String::from).collect::<Vec<_>>();
     assert_eq!(others(&svg), others(&svg_without));
     assert!(!rnl_render::primitives(&lv, &without).iter().any(|p| matches!(p.kind, rnl_render::Kind::Flyline { .. })));
+    // the names of the nets, when asked: one for each connected part, where the model says, over
+    // everything else; and nothing else of the level changes
+    let named = rnl_render::RenderOptions { net_names: true, ..rnl_render::RenderOptions::default() };
+    let svg_named = rnl_render::svg(&lv, &named);
+    assert!(!svg_without.contains("net-labels"));
+    assert_eq!(svg_named.matches("<g class=\"net-labels\"").count(), 1, "{svg_named}");
+    assert_eq!(svg_named.matches("<text x=").count() - svg_without.matches("<text x=").count(), lv.net_labels.len());
+    let s = named.scale;
+    let out_text = format!("<text x=\"{:.2}\" y=\"{:.2}\" text-anchor=\"middle\"", at.0 * s, -at.1 * s);
+    assert!(svg_named.contains(&out_text), "{out_text} in {svg_named}");
+    assert!(svg_named.contains("paint-order=\"stroke\">out</text>"), "{svg_named}");
+    let unnamed = |svg: &str| svg.lines().filter(|l| !l.contains("net-labels")).map(String::from).collect::<Vec<_>>();
+    assert_eq!(unnamed(&svg_named), unnamed(&svg_without));
     let options = rnl_view::BuildOptions { primitives: true, ..rnl_view::BuildOptions::default() };
     let d = rnl_view::build("/w/t.sp", &files, &options).unwrap();
     assert!(!d.levels[0].svg.as_deref().unwrap_or_default().contains("flyline"));
