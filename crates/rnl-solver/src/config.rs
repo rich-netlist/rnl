@@ -156,7 +156,9 @@ struct FileSettings {
 /// The file's settings applied to `o` in their order (14.10), of each key that `tool` does not
 /// give: a value the solver accepts replaces the one before it, and a value it does not take
 /// fails its key alone, saying so, and the value before it stays in effect, or the default. So of
-/// each key the last value the solver accepts is in effect.
+/// each key the last value the solver accepts is in effect. A value of a key that `tool` gives is
+/// judged too, so that the file's errors do not depend on the tool, and the tool's value is in
+/// effect.
 fn file_settings(o: &mut SolverOptions, settings: &[SolverSetting], tool: &[SolverSetting]) -> FileSettings {
     let mut out = FileSettings { taken: Vec::new(), refused: Vec::new(), run: Vec::new(), unknown: Vec::new() };
     let mut taken: BTreeMap<&str, usize> = BTreeMap::new();
@@ -167,23 +169,25 @@ fn file_settings(o: &mut SolverOptions, settings: &[SolverSetting], tool: &[Solv
             }
             continue;
         }
-        if tool.iter().any(|t| t.key == s.key) {
-            continue;
-        }
         if !known(&s.key) {
             if !out.unknown.contains(&s.key) {
                 out.unknown.push(s.key.clone());
             }
             continue;
         }
+        let by_tool = tool.iter().rev().find(|t| t.key == s.key);
         let mut next = o.clone();
         match apply(&mut next, s) {
+            Ok(()) if by_tool.is_some() => {}
             Ok(()) => {
                 *o = next;
                 taken.insert(&s.key, k);
             }
             Err(e) => {
-                let before = taken.get(s.key.as_str()).map_or("the default".to_string(), |&j| written(&settings[j]));
+                let before = match by_tool {
+                    Some(t) => format!("the tool's {}", written(t)),
+                    None => taken.get(s.key.as_str()).map_or("the default".to_string(), |&j| written(&settings[j])),
+                };
                 out.refused.push(SettingProblem {
                     key: Some(s.key.clone()),
                     message: format!("{e}; {} is left out, and {before} stays in effect", written(s)),
@@ -560,10 +564,13 @@ mod tests {
         assert_eq!(errors.len(), 2);
         assert!(errors[0].contains("grid=0 is left out, and the default stays"), "{errors:?}");
         assert!(errors[1].contains("grid=\"x\" is left out, and the default stays"), "{errors:?}");
-        // the tool's value replaces every value of the file's
+        // the tool's value replaces every value of the file's, which are judged all the same: the
+        // file's errors do not depend on the tool
         let (o, warnings, errors) = SolverOptions::default().with_config("grid=5").unwrap().for_problem(&p);
         assert_eq!(o.grid, Some(5.0));
-        assert!(warnings.is_empty() && errors.is_empty(), "{warnings:?} {errors:?}");
+        assert!(warnings.is_empty(), "{warnings:?}");
+        assert_eq!(errors.len(), 2, "{errors:?}");
+        assert!(errors[1].ends_with("grid=\"x\" is left out, and the tool's grid=5 stays in effect"), "{errors:?}");
         // a key the solver does not know is a warning, not an error
         p.solver_config = settings("unknown=1");
         let (_, warnings, errors) = SolverOptions::default().for_problem(&p);
