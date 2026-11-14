@@ -457,19 +457,19 @@ pub struct Partial {
 /// any dot must pass the same checks, or nothing is written: what fails then is not the dots'.
 pub fn complete_what_can_be(ctx: &Context<'_>, written: &Written) -> Result<Partial, String> {
     let start = crate::solve::Stopwatch::start();
-    let why = match complete_record(ctx, written) {
-        Ok(done) => {
-            return Ok(Partial { record: done.record, trials: done.trials, elapsed: done.elapsed, dropped: Vec::new() })
-        }
+    // one bound on the candidate trials of the level covers every stage, so that the time a level
+    // takes stays bounded however many dots it has; the record without any dot is checked beyond it
+    let mut trials = 0;
+    let why = match complete_within(ctx, written, MAX_TRIALS, &mut trials) {
+        Ok(done) => return Ok(Partial { record: done.record, trials, elapsed: start.elapsed(), dropped: Vec::new() }),
         Err(why) => why,
     };
-    let mut trials = 0;
     let bare = only(written, &[]);
-    if let Err(without) = complete_within(ctx, &bare, 1, &mut trials) {
+    if let Err(without) = complete_within(ctx, &bare, 1, &mut 0) {
         return Err(format!("{why}; without any dot: {without}"));
     }
-    // the dots are tried one by one under one more global bound, so that the time a level takes
-    // stays bounded however many dots it has
+    // the dots one by one, in order, each beside those kept before it: a dot kept may leave no
+    // place for a later one that could have been placed alone
     let mut kept: Vec<usize> = Vec::new();
     let mut record = None;
     let mut dropped = Vec::new();
@@ -517,8 +517,9 @@ pub fn only(written: &Written, keep: &[usize]) -> Written {
         out.record.replace_range(cut.clone(), "");
     }
     // the only statement taken out leaves an empty body
-    if let Some(body) = out.record.find(" {\n  \n}") {
-        out.record.replace_range(body.., " {}");
+    const EMPTY: &str = " {\n  \n}";
+    if let Some(body) = out.record.find(EMPTY) {
+        out.record.replace_range(body..body + EMPTY.len(), " {}");
     }
     out.junctions = Vec::new();
     for (index, junction) in written.junctions.iter().enumerate() {
