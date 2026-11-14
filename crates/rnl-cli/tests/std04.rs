@@ -820,43 +820,135 @@ X0 n1 n2 top\n.end\n";
     assert_eq!(count("top", "DISTANCE"), 4);
 }
 
+/// A level of one subcircuit `cell` with the standard series 0.4 and `body` in its record.
+fn pieces_file(ports: &str, netlist: &str, body: &str) -> String {
+    format!(
+        "* pieces\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }}\n\
+.model nch nmos\n.subckt cell {ports}\n{netlist}* @RNL {{\n{body}* }}\n.ends\n.end\n"
+    )
+}
+
+/// The pins that the usages of `definition` in the level `cell` are attached to, as their first role
+/// is written, sorted.
+fn attached(r: &Interpretation, definition: &str) -> Vec<String> {
+    let level = r.model.levels.iter().find(|l| l.title == "cell").unwrap();
+    let mut pins: Vec<String> = level
+        .objects
+        .iter()
+        .filter(|o| o.definition.as_deref() == Some(definition))
+        .map(|o| format!("{:?}", o.attach[0].1))
+        .collect();
+    pins.sort();
+    pins
+}
+
+fn read_pieces(text: &str) -> Interpretation {
+    let r = read(&MemoryProvider::new().with("t.sp", text), &Options::default());
+    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
+    r
+}
+
+/// Whether one of `pins` names the instance `name`.
+fn on(pins: &[String], name: &str) -> bool {
+    pins.iter().any(|p| p.contains(&format!("(#{name},")))
+}
+
 #[test]
 fn fill_names_each_wired_piece_of_a_net_drawn_in_pieces() {
     // Net b is drawn in two pieces by two ROUTE-OBJECT trees, neither with a name: the first pin
-    // of each gets a $PIECE_LABEL. The port net p has one wired piece, and its tag comes after the
-    // pieces are fixed: that piece gets one too. On the ground net 0 the wired piece {R7:n, R8:n}
-    // gets a ground stub, as R9:n, unwired, does already (10.2, 16.3).
-    let text = "* pieces\n\
-* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }\n\
-.subckt cell p q\n\
-R1 a b 1k\nR2 b c 1k\nR3 b d 1k\nR4 b e 1k\nR5 p f 1k\nR6 p g 1k\nR7 h 0 1k\nR8 k 0 1k\nR9 m 0 1k\n\
-* @RNL {\n\
-*   {#R1:2 #R2:1} @ROUTE-OBJECT;\n\
-*   {#R3:1 #R4:1} @ROUTE-OBJECT;\n\
-*   {#R5:1 #R6:1} @ROUTE-OBJECT;\n\
-*   {#R7:2 #R8:2} @ROUTE-OBJECT(priority=\"high\");\n\
-* }\n\
-.ends\n\
-X1 n1 n2 cell\n.end\n";
-    let r = read(&MemoryProvider::new().with("t.sp", text), &Options::default());
-    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
-    let level = r.model.levels.iter().find(|l| l.title == "cell").unwrap();
-    let on = |definition: &str| {
-        let mut pins: Vec<String> = level
-            .objects
-            .iter()
-            .filter(|o| o.definition.as_deref() == Some(definition))
-            .map(|o| format!("{:?}", o.attach[0].1))
-            .collect();
-        pins.sort();
-        pins
-    };
-    let pieces = on("$PIECE_LABEL");
-    assert_eq!(pieces.len(), 3, "{pieces:?}");
-    for pin in ["R1", "R3", "R5"] {
-        assert!(pieces.iter().any(|p| p.contains(pin)), "{pin} in {pieces:?}");
-    }
-    let grounds = on("$GROUND_STUB");
+    // of each gets a $PIECE_LABEL. On the ground net 0 the wired piece {R7:n, R8:n} gets a ground
+    // stub, as R9:n, unwired, does already (10.2, 16.3).
+    let r = read_pieces(&pieces_file(
+        "",
+        "R1 a b 1k\nR2 b c 1k\nR3 b d 1k\nR4 b e 1k\nR7 h 0 1k\nR8 k 0 1k\nR9 m 0 1k\n",
+        "*   {#R1:2 #R2:1} @ROUTE-OBJECT;\n*   {#R3:1 #R4:1} @ROUTE-OBJECT;\n\
+*   {#R7:2 #R8:2} @ROUTE-OBJECT(priority=\"high\");\n",
+    ));
+    let pieces = attached(&r, "$PIECE_LABEL");
+    assert_eq!(pieces.len(), 2, "{pieces:?}");
+    assert!(on(&pieces, "R1") && on(&pieces, "R3"), "{pieces:?}");
+    let grounds = attached(&r, "$GROUND_STUB");
     assert_eq!(grounds.len(), 2, "{grounds:?}");
-    assert!(grounds.iter().any(|p| p.contains("R7")) && grounds.iter().any(|p| p.contains("R9")), "{grounds:?}");
+    assert!(on(&grounds, "R7") && on(&grounds, "R9"), "{grounds:?}");
+}
+
+#[test]
+fn a_port_net_in_one_wired_piece_gets_a_piece_label_beside_its_tag() {
+    // The port net p is in one piece, so it is not split; its tag comes after the pieces are
+    // fixed, and the piece gets a $PIECE_LABEL too (16.3).
+    let r = read_pieces(&pieces_file("p", "R5 p f 1k\nR6 p g 1k\n", "*   {#R5:1 #R6:1} @ROUTE-OBJECT;\n"));
+    let pieces = attached(&r, "$PIECE_LABEL");
+    assert_eq!(pieces.len(), 1, "{pieces:?}");
+    assert!(on(&pieces, "R5"), "{pieces:?}");
+    assert_eq!(attached(&r, "$IO_PORT").len(), 1);
+}
+
+#[test]
+fn a_piece_of_a_ground_net_led_by_a_bulk_pin_gets_a_piece_label() {
+    // The bulk pins of drawn four-terminal MOS get net labels rather than ground stubs; the piece
+    // {M1:b, M2:b} of the ground net 0, led by M1:b, gets a $PIECE_LABEL, and no ground stub.
+    let r = read_pieces(&pieces_file(
+        "",
+        "M1 d1 g1 s1 0 nch\nM2 d2 g2 s2 0 nch\nR1 x 0 1k\n",
+        "*   {#M1 #M2} @SET-SYMBOL $NMOS_4TERM;\n*   {#M1:b #M2:b} @ROUTE-OBJECT(priority=\"high\");\n",
+    ));
+    let pieces = attached(&r, "$PIECE_LABEL");
+    assert_eq!(pieces.len(), 1, "{pieces:?}");
+    assert!(on(&pieces, "M1"), "{pieces:?}");
+    let grounds = attached(&r, "$GROUND_STUB");
+    assert!(!on(&grounds, "M1") && !on(&grounds, "M2"), "{grounds:?}");
+}
+
+#[test]
+fn a_piece_already_marked_gets_no_second_piece_label() {
+    // Net b: a written $PIECE_LABEL on R1:n joins the first piece, which then starts with its
+    // label's pin. Net c: a $NET_LABEL_STUB on R3:p, still wired by a written wire. Net p: an
+    // $IO_PORT_STUB on R5:p, whose tag is a piece of its own. None of them gets one more; the
+    // second piece of b does.
+    let r = read_pieces(&pieces_file(
+        "p",
+        "R1 a b 1k\nR2 b a2 1k\nR7 b a3 1k\nR8 b a4 1k\nR3 c d 1k\nR4 c e 1k\nR9 c a5 1k\nR5 p f 1k\nR6 p g 1k\n",
+        "*   {#R1:2 #R2:1} @ROUTE-OBJECT;\n*   {#R7:1 #R8:1} @ROUTE-OBJECT;\n*   $PIECE_LABEL @ATTACH #R1::n;\n\
+*   &c @WIRE {#R3:1 #R4:1};\n*   $NET_LABEL_STUB @ATTACH #R3::p;\n\
+*   {#R5:1 #R6:1} @ROUTE-OBJECT;\n*   $IO_PORT_STUB @ATTACH #R5::p;\n",
+    ));
+    let pieces = attached(&r, "$PIECE_LABEL");
+    assert_eq!(pieces.len(), 2, "{pieces:?}");
+    assert!(on(&pieces, "R1") && on(&pieces, "R7"), "{pieces:?}");
+}
+
+#[test]
+fn a_file_takes_a_pin_out_of_the_piece_fill() {
+    let r = read_pieces(&pieces_file(
+        "",
+        "R1 a b 1k\nR2 b c 1k\nR3 b d 1k\nR4 b e 1k\n",
+        "*   {#R1:2 #R2:1} @ROUTE-OBJECT;\n*   {#R3:1 #R4:1} @ROUTE-OBJECT;\n*   #R1 @SELECT-PIN => @REMOVE-FROM $PIECE_FILL_SET;\n",
+    ));
+    let pieces = attached(&r, "$PIECE_LABEL");
+    assert_eq!(pieces.len(), 1, "{pieces:?}");
+    assert!(on(&pieces, "R3"), "{pieces:?}");
+}
+
+#[test]
+fn piece_labels_written_back_by_a_solver_are_not_doubled_when_read_again() {
+    // A solve writes the labels back as usages; read again, each joins its piece, which then starts
+    // with the label's pin, a pin of a part the fill places itself: the fill adds none (10.2, 16.3).
+    use rnl_cli::solve::{solve, SolveOptions};
+    let text = pieces_file(
+        "p",
+        "R1 a b 1k\nR2 b c 1k\nR3 b d 1k\nR4 b e 1k\nR5 p f 1k\nR6 p g 1k\n",
+        "*   {#R1:2 #R2:1} @ROUTE-OBJECT;\n*   {#R3:1 #R4:1} @ROUTE-OBJECT;\n*   {#R5:1 #R6:1} @ROUTE-OBJECT;\n",
+    );
+    let before = attached(&read_pieces(&text), "$PIECE_LABEL");
+    assert_eq!(before.len(), 3, "{before:?}");
+    let files = MemoryProvider::new().with("t.sp", &text);
+    let solver = rnl_solver::SolverOptions::default().with_config(r#"limit="seed""#).unwrap();
+    let run = solve(Path::new("t.sp"), &files, &SolveOptions { solver, ..Default::default() }).unwrap();
+    assert_eq!(run.errors, 0);
+    let written = &run.files[0].text;
+    assert_eq!(written.matches("$PIECE_LABEL @ATTACH").count(), 3, "{written}");
+    let options = Options { generated: true, ..Options::default() };
+    let back = read(&MemoryProvider::new().with("t.sp", written), &options);
+    assert!(errors(&back).is_empty(), "{:?}", errors(&back));
+    assert_eq!(attached(&back, "$PIECE_LABEL"), before, "{written}");
 }
