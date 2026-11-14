@@ -118,16 +118,8 @@ fn numbered_anonymous_usages_survive_junction_completion_and_reinterpretation() 
     assert_ne!(coordinates(&p.objects[stale_marks[1].object.unwrap()].position), Some((13.0, -4.0)));
 }
 
-#[test]
-fn headerless_included_file_inherits_04_and_writes_numbered_usages_in_two_levels() {
-    let main = r#"* include junctions
-* @RNL(type="header") { @VERSION("0.4") }
-.include "child.inc"
-X1 a b first
-X2 a b second
-.end
-"#;
-    let child = r#"* deliberately has no header
+/// Two subcircuits of an included file without a header, each defining its own `$DOT`.
+const CHILD: &str = r#"* deliberately has no header
 .subckt first a b
 R1 a b 1k
 * @RNL {
@@ -149,6 +141,48 @@ R2 a b 1k
 * }
 .ends second
 "#;
+
+#[test]
+fn headerless_included_file_inherits_04_and_writes_numbered_usages_in_two_levels() {
+    let main = r#"* include junctions
+* @RNL(type="header") { @VERSION("0.4") }
+.include "child.inc"
+X1 a b first
+X2 a b second
+.end
+"#;
+    let result = two_included_levels(main, CHILD);
+    assert_eq!(result.errors, 0);
+}
+
+#[test]
+fn a_header_junction_that_the_top_level_lacks_fails_there_alone_and_the_subcircuits_get_dots() {
+    // the header names $DOT, which only the subcircuits define: the top level does not take the
+    // value, an error there alone, which neither stops the solve nor the dots of the subcircuits
+    // (14.10)
+    let main = r#"* include junctions
+* @RNL(type="header") { @VERSION("0.4"); @SOLVER-CONFIG(junction="$DOT") }
+.include "child.inc"
+X1 a b first
+X2 a b second
+.end
+"#;
+    let result = two_included_levels(main, CHILD);
+    assert_eq!(result.errors, 1);
+    // it is the top level's, which does not take the header's value
+    let files = MemoryProvider::new().with("main.sp", main).with("child.inc", CHILD);
+    let options = Options { std: false, problems: true, ..Default::default() };
+    let read = interpret_file(Path::new("main.sp"), None, &files, &options).unwrap();
+    let all = read.diagnostics();
+    let errors: Vec<_> = all.iter().filter(|d| d.severity == rnl_runtime::diag::Severity::Error).collect();
+    assert_eq!(errors.len(), 1, "{errors:?}");
+    assert_eq!(errors[0].code, rnl_runtime::diag::codes::SOLVER_CONFIG_JUNCTION_NOT_TAKEN);
+    assert!(errors[0].message.contains("in the level main.sp"), "{errors:?}");
+}
+
+/// Solves both subcircuits of `child`, each with one numbered mark and a dot two units to its right,
+/// and checks that the dots are written in both and read back where they were placed.
+fn two_included_levels(main: &str, child: &str) -> rnl_cli::solve::SolveRun {
     let files = MemoryProvider::new().with("main.sp", main).with("child.inc", child);
     let solved_levels = Cell::new(0);
     let result = solve_using(
@@ -236,4 +270,5 @@ R2 a b 1k
     }
     seen.sort_unstable();
     assert_eq!(seen, [10, 20]);
+    result
 }

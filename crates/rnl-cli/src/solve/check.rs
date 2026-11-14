@@ -3,10 +3,10 @@
 //!
 //! The settings of a level are taken in the order of 14.10: the solver's defaults, the packages,
 //! the file's header, the level's own records, the command line, a later one winning by key. A
-//! value that the solver does not take is a warning when the file gives it, and the solve then
-//! ignores it, and the value before it stays in effect, or the default; it is an error when the command
-//! line gives it, as a solve then does not start. Without a file, the command line's settings
-//! alone are checked, over the defaults.
+//! value that the solver does not take is an error for its key (14.10): when the file gives it,
+//! the solve leaves it out and goes on with the value before it, or the default; when the command
+//! line gives it, the solve does not start. A key the solver does not know is a warning. Without
+//! a file, the command line's settings alone are checked, over the defaults.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -48,11 +48,13 @@ pub struct CheckedLevel {
     pub title: Option<String>,
     /// Each setting in effect, by key.
     pub settings: BTreeMap<String, CheckedSetting>,
-    /// What a solve ignores and says so: a value of the file that the solver does not take, a
-    /// run setting written in the file, a key the solver does not know.
+    /// What a solve ignores and says so: a run setting written in the file, a key the solver does
+    /// not know.
     pub warnings: Vec<CheckedProblem>,
-    /// What stops a solve: a value of the command line that the solver does not take, a
-    /// SOLVER-CONFIG that the reading fails.
+    /// The errors: a value of the file that the solver does not take, which a solve leaves out,
+    /// going on with the value before it; a value of the command line that it does not take, with
+    /// which a solve does not start; a SOLVER-CONFIG that the reading fails or a value of it that
+    /// the reading does not take.
     pub errors: Vec<CheckedProblem>,
 }
 
@@ -73,8 +75,8 @@ pub struct CheckedSetting {
 pub struct CheckedProblem {
     pub key: Option<String>,
     pub message: String,
-    /// For a value of the file that the solver refuses, and a solve ignores: that value, where it
-    /// comes from and where it is written. The message names the value that stays in effect in
+    /// For a value of the file that the solver does not take, and a solve leaves out: that value,
+    /// where it comes from and where it is written. The message names the value that stays in effect in
     /// its place, the one before it or the default; the key's value in effect is in `settings`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub refused: Option<CheckedSetting>,

@@ -127,12 +127,13 @@ fn a_refused_value_leaves_the_one_before_it_and_the_other_keys_apply() {
     clean(&r);
     let grid: Vec<_> = r.problems[0].solver_config.iter().filter(|s| s.key == "grid").map(|s| s.value.show()).collect();
     assert_eq!(grid, ["2", "\"x\""]);
-    let (o, warnings) = rnl_solver::SolverOptions::default().for_problem(&r.problems[0]);
+    let (o, warnings, errors) = rnl_solver::SolverOptions::default().for_problem(&r.problems[0]);
     assert_eq!((o.grid, o.beam), (Some(2.0), 6));
-    assert_eq!(warnings.len(), 1, "{warnings:?}");
+    assert!(warnings.is_empty(), "{warnings:?}");
+    assert_eq!(errors.len(), 1, "{errors:?}");
     assert!(
-        warnings[0].starts_with("grid must be a finite number; grid=\"x\" at main.sp:4 is left out, and grid=2 at"),
-        "{warnings:?}"
+        errors[0].starts_with("grid must be a finite number; grid=\"x\" at main.sp:4 is left out, and grid=2 at"),
+        "{errors:?}"
     );
     // an earlier value is input too, as it stands when a later one is refused
     let other = read_files(&with_packages(&main, &[("p", package("p", "@SOLVER-CONFIG(grid=3)", ""))]));

@@ -27,13 +27,14 @@ impl JunctionConfig {
         let effective = self.effective();
         let setting = effective.invalid.as_ref()?;
         let outcome = match &effective.definition {
-            Some(definition) => format!("it is ignored, and the earlier {definition} is used"),
+            Some(definition) => format!("the file's {definition} applies"),
             None => "no dots are written".to_string(),
         };
+        // a value that is not taken is an error for its key, and the value before it applies (14.10)
         Some(Diag {
-            severity: Severity::Warning,
+            severity: Severity::Error,
             code: codes::JUNCTION_DEFINITION_INVALID,
-            message: format!("junction={} must name a definition whose first role accepts a point in the target level; {outcome} (13.2)", setting.value.show()),
+            message: format!("junction={} given to the tool must name a definition whose first role accepts a point in the level; the value is not taken there, and {outcome} (13.2, 14.10)", setting.value.show()),
             loc: setting.source.clone(), cause: None, origin: String::new(), in_package: setting.package.clone(),
         })
     }

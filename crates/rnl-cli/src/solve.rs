@@ -1158,7 +1158,14 @@ pub(crate) fn conflicts(d: &Discarded) -> String {
 /// themselves and fail (the draft 0.3, 8.5; 7.6). `rnl solve` exits with 1 when there is one, or
 /// an error of the netlist ([`SolveRun::errors`]).
 pub fn errors(run: &SolveRun) -> usize {
-    run.levels.iter().map(|l| l.solved.report.errors.len() + l.write_errors.len()).sum()
+    run.levels
+        .iter()
+        .map(|l| {
+            // a junction given to the tool that a level does not take is an error of the writing (14.10)
+            let written = l.written.warnings.iter().filter(|d| d.severity == Severity::Error).count();
+            l.solved.report.errors.len() + l.write_errors.len() + written
+        })
+        .sum()
 }
 
 /// What the command prints of the levels of a run, in the order of the document's levels: each

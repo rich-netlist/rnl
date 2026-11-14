@@ -537,27 +537,28 @@ pub fn validate_interpreted_trial(input: TrialValidation<'_>) -> Result<(), Stri
         return Err("trial newly failed or dropped a statement".into());
     }
     // Assertions in the input may already report a violation without failing a
-    // statement. Preserve those reports, but never excuse a newly introduced one
-    // merely because it was already visible in the first generated-record read.
+    // statement, and an error may void a single key, such as a SOLVER-CONFIG value
+    // that one level does not take (14.10). Preserve those reports, but never excuse
+    // a newly introduced one merely because it was already visible in the first
+    // generated-record read.
     let original_diagnostics = original.diagnostics();
     let mut matched = vec![false; original_diagnostics.len()];
     if after.diagnostics().iter().any(|d| {
-        d.severity == Severity::Error
-            || d.severity == Severity::Violation
-                && !original_diagnostics.iter().enumerate().any(|(i, old)| {
-                    let same = !matched[i]
-                        && old.severity == d.severity
-                        && old.code == d.code
-                        && old.message == d.message
-                        && old.origin == d.origin
-                        && old.in_package == d.in_package
-                        && old.cause == d.cause
-                        && equivalent_source(old.loc.as_ref(), d.loc.as_ref(), host_file, line_map);
-                    if same {
-                        matched[i] = true;
-                    }
-                    same
-                })
+        matches!(d.severity, Severity::Error | Severity::Violation)
+            && !original_diagnostics.iter().enumerate().any(|(i, old)| {
+                let same = !matched[i]
+                    && old.severity == d.severity
+                    && old.code == d.code
+                    && old.message == d.message
+                    && old.origin == d.origin
+                    && old.in_package == d.in_package
+                    && old.cause == d.cause
+                    && equivalent_source(old.loc.as_ref(), d.loc.as_ref(), host_file, line_map);
+                if same {
+                    matched[i] = true;
+                }
+                same
+            })
     }) {
         return Err("trial interpretation has an error or violation".into());
     }

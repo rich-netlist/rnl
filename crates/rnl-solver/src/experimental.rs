@@ -46,13 +46,14 @@ pub fn compact_drawn_with_clock(
     if problem.version != "0.4" {
         return Err("the compaction preview requires an RNL 0.4 problem".into());
     }
-    let (options, warnings) = options.for_problem(problem);
+    let (options, warnings, errors) = options.for_problem(problem);
     options.validate()?;
     let (limit, safety) = crate::run_limits(&options, clock);
     let (mut drawing, budget) = crate::budget::without(|| {
         crate::budget::with(clock, limit, safety, || compact_drawn(problem, &options, clock))
     });
     drawing.warnings.extend(warnings);
+    drawing.errors.extend(errors);
     if drawing.positions.iter().any(|p| !p.x.is_finite() || !p.y.is_finite()) {
         return Err("compaction preview has nonfinite coordinates".into());
     }

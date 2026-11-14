@@ -119,7 +119,7 @@ fn released_writes_keep_their_existing_acceptance_and_text() {
 }
 
 #[test]
-fn final_host_locations_follow_junction_insertions_and_keep_junction_warnings() {
+fn final_host_locations_follow_junction_insertions_and_keep_junction_errors() {
     for configured in [true, false] {
         let value = if configured { "\"$DOT\"" } else { "false" };
         let package = format!("@RNL(type=\"header\") {{ @VERSION(\"0.4\"); @PACKAGE(name=\"dots\",version=\"1.0\"); @SOLVER-CONFIG(junction={value}) }}\n@RNL {{ $DOT = @DEFINE(roles=[[\"p\",\"point\"]]) {{}} }}\n");
@@ -141,7 +141,7 @@ fn final_host_locations_follow_junction_insertions_and_keep_junction_warnings() 
         assert_eq!(host[0].line as usize, written.text.lines().position(|line| line == "* @RNL {}").unwrap() + 1);
         assert_eq!(written.text.contains("$DOT @ATTACH %j"), configured);
         assert_eq!(
-            written.diagnostics.iter().filter(|d| d.code.as_deref() == Some("RNL8118")).count(),
+            written.diagnostics.iter().filter(|d| d.code.as_deref() == Some("RNL3128")).count(),
             usize::from(!configured)
         );
     }

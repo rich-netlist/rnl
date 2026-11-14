@@ -273,7 +273,12 @@ fn local_junction_names_are_not_accepted_in_headers_or_tool_overrides() {
     let w = write(&r.problems[0]);
     assert!(w.record.contains("%dot @ATTACH %rt1"), "{}", w.record);
     assert_eq!(w.warnings.len(), 1);
-    assert!(w.warnings[0].message.contains("it is ignored, and the earlier %dot is used"), "{:?}", w.warnings);
+    assert_eq!(w.warnings[0].severity, Severity::Error);
+    assert!(
+        w.warnings[0].message.contains("the value is not taken there, and the file's %dot applies"),
+        "{:?}",
+        w.warnings
+    );
 }
 
 #[test]

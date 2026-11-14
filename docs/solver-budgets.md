@@ -80,9 +80,10 @@ its previous semicolon syntax is also accepted during the transition.
 The line layout spaces by a nonzero spacing. Under the row and the group-tree layouts it is
 parsed and hashed, with a warning that they keep their fixed gaps.
 
-Run settings in a file warn and are ignored. Unknown keys warn and are ignored. Invalid
-known file values warn and leave the value before them in place, or the default; invalid tool
-values are rejected before solving. The problem hash includes every file value of a key. Junction names are
+Run settings in a file warn and are ignored. Unknown keys warn and are ignored. A value of
+a known key that is not taken is an error for that key (14.10): in the file, it leaves the value
+before it in place, or the default, and the solve goes on; invalid tool values are rejected
+before solving. The problem hash includes every file value of a key. Junction names are
 resolved by the runtime in the target level, including tool overrides, so an override
 retains the same name and alias rules as a file setting. Tool overrides enter the options
 digest, while the input digest retains the original file settings. A saved result therefore
@@ -91,18 +92,22 @@ selects the resolved tool value for writing; its base definition still identifie
 
 A key's values are checked one by one, not merged first: the runtime gives every value of a
 key in the order above, and the solver takes them in that order. A value it does not take
-fails its key alone and warns, naming the value that stays in effect, the one before it or the
+is an error for its key alone, naming the value that stays in effect, the one before it or the
 default, and the other keys of the same `SOLVER-CONFIG` still apply; so of each key the last
 value the solver accepts is in effect. A level's `grid="x"` over a package's `grid=2`
-therefore gives `grid=2` and a warning. The runtime itself judges `spacing_x`, `spacing_y`
+therefore gives `grid=2` and an error, and `rnl solve` solves the level with `grid=2` and exits
+with 1, as for an error of the reading. The runtime itself judges `spacing_x`, `spacing_y`
 (a finite whole number) and `junction` (a definition whose first role accepts a point in the
 level): a value it does not take is an error in reading and is not passed on, so the value
-before it stays in effect the same way.
+before it stays in effect the same way. A value is judged in each level it applies to: a
+header's `junction` that names a definition only some levels have is an error in the others
+alone, and the others still use it.
 
 `rnl solve FILE --check` checks the settings without solving or writing anything. For each
 level it prints every setting in effect and where it comes from (`default`,
 `package:NAME`, `header`, `level`, `command-line`), with `file:line` for a setting written in a
-package, the header or a level, then the warnings and the errors. Without
+package, the header or a level, then the warnings and the errors. A value that is not taken
+is an error, with `refused`, `{"value", "from", "at"}`, in the JSON. Without
 FILE, it checks the command line's settings alone. It reports every problem, not only the
 first, each with its key. `--json` prints
 `{"ok", "levels": [{"title", "settings": {KEY: {"value", "from", "at"}}, "warnings": [{"key", "message"}], "errors": [...]}]}`;

@@ -394,7 +394,7 @@ fn solve_isolated(
     by_layout: bool,
     run: impl FnOnce(&LevelProblem, &SolverOptions, &dyn Clock) -> Solved,
 ) -> Solved {
-    let (effective, warnings) = options.for_problem(problem);
+    let (effective, warnings, errors) = options.for_problem(problem);
     let options = &effective;
     profile::with(clock.profiler(), || {
         if profile::enabled() {
@@ -445,6 +445,9 @@ fn solve_isolated(
             run(problem, options, clock)
         };
         solved.report.warnings.extend(warnings);
+        // a value of SOLVER-CONFIG that is not taken is an error for its key; the solve went on
+        // with the value before it (14.10)
+        solved.report.errors.extend(errors);
         profile::emit(profile::ProfileEvent::LevelEnd);
         solved
     })
@@ -465,7 +468,7 @@ pub fn resolve(problem: &LevelProblem, options: &SolverOptions) -> Resolved {
 /// on `clock`.
 pub fn resolve_with_clock(problem: &LevelProblem, options: &SolverOptions, clock: &dyn Clock) -> Resolved {
     budget::without(|| {
-        let (options, warnings) = options.for_problem(problem);
+        let (options, warnings, errors) = options.for_problem(problem);
         let mut resolved = if problem.version == "0.4" {
             let (limit, safety) = run_limits(&options, clock);
             let (mut resolved, report) =
@@ -476,6 +479,7 @@ pub fn resolve_with_clock(problem: &LevelProblem, options: &SolverOptions, clock
             resolve::resolve(problem, &options, clock)
         };
         resolved.warnings.extend(warnings);
+        resolved.errors.extend(errors);
         resolved
     })
 }

@@ -469,6 +469,16 @@ fn add_junctions(
                 rnl_runtime::diag::Extra { cause: None, origin: d.origin, in_package: d.in_package },
             );
         }
+        // a value of `junction` that the level does not take is an error of the reading there, the
+        // value before it applying, or none (14.10)
+        let at = format!("in the level {}, ", doc.levels[level].title());
+        for d in read.diagnostics() {
+            if d.code == rnl_runtime::diag::codes::SOLVER_CONFIG_JUNCTION_NOT_TAKEN && d.message.contains(&at) {
+                let (origin, in_package) = (d.origin.clone(), d.in_package.clone());
+                let extra = rnl_runtime::diag::Extra { cause: None, origin, in_package };
+                warnings.add(d.severity, d.code, d.message.clone(), d.loc.clone(), extra);
+            }
+        }
         if let Some(definition) = &problem.junction.effective().definition {
             levels.entry(level).or_default().push(format!("{definition} @ATTACH {name}"));
         }

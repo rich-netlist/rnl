@@ -55,14 +55,18 @@ fn package_configuration_is_used_in_each_target_level_and_reads_back() {
     }
 }
 #[test]
-fn invalid_setting_returns_one_numbered_warning_and_keeps_points() {
+fn invalid_setting_returns_a_numbered_error_in_each_level_and_keeps_points() {
+    // a value a level does not take is an error for that key alone, in each level it applies to
+    // (14.10): here the two levels the dots are added to
     let w = write_with_options_diagnosed(&request("0.4", true), &packages("false"), &Options::default()).unwrap();
     assert!(!w.text.contains("@ATTACH"));
     assert!(w.text.contains("%j ="));
-    assert_eq!(w.diagnostics.len(), 1, "{:?}", w.diagnostics);
-    assert_eq!(w.diagnostics[0].severity, "warning");
-    assert_eq!(w.diagnostics[0].code.as_deref(), Some("RNL8118"));
-    assert!(w.diagnostics[0].full_path.ends_with("dots.rnl"));
+    assert_eq!(w.diagnostics.len(), 2, "{:?}", w.diagnostics);
+    for d in &w.diagnostics {
+        assert_eq!(d.severity, "error");
+        assert_eq!(d.code.as_deref(), Some("RNL3128"));
+        assert!(d.full_path.ends_with("dots.rnl"));
+    }
 }
 #[test]
 fn explicit_empty_configuration_disables_dots_without_warning() {

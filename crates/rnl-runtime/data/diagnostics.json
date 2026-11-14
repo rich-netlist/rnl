@@ -5281,8 +5281,8 @@
   {
    "number": "RNL8118",
    "name": "junction-definition-invalid",
-   "severity": "warning",
-   "message": "junction must name a definition whose first role accepts a point in the target level; no dots are written (13.2)",
+   "severity": "error",
+   "message": "junction={value} given to the tool must name a definition whose first role accepts a point in the level; the value is not taken there, and {the file's definition applies|no dots are written} (13.2, 14.10)",
    "sections": [
     "13.2",
     "14.10"
