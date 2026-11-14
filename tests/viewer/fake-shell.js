@@ -108,6 +108,7 @@ const TABLE = {
     {"items":[{"name":"crossings","weight":1}],"tolerance":0},
     {"items":[{"name":"wire_length","weight":1}],"tolerance":0},
     {"items":[{"name":"aspect","weight":1}],"tolerance":0},
+    {"items":[{"name":"crowding","weight":1}],"tolerance":0},
   ],
   stages: [
     {"name":"resolve","what":"Checking the facts against each other"},
