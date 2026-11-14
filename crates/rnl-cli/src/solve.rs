@@ -581,7 +581,6 @@ fn pass(
 ) -> Result<(SolveRun, Vec<Want>), String> {
     let entry = path_str(file);
     let runtime = options.runtime();
-    let canonical = options.solver.canonical();
     let files = Noting::new(files);
     let mut memory = MemoryProvider::new();
     for (path, text) in raised {
@@ -689,7 +688,12 @@ fn pass(
         let start = Stopwatch::start();
         let BackendResult { solved, author, report_available } = backend(p, &options.solver)?;
         let time = start.elapsed();
-        let hash = sig2(p, solved.report.canonical_options.as_deref().unwrap_or(&canonical));
+        // without the solver's own text of the options, theirs as the level takes them: a level
+        // before 0.4 has no layout to name
+        let hash = match solved.report.canonical_options.as_deref() {
+            Some(canonical) => sig2(p, canonical),
+            None => sig2(p, &options.solver.for_problem(p).0.canonical()),
+        };
         let mut written = write_record(p, &solved.solution, &author, &hash);
         let mut write_errors = Vec::new();
         let host = &r.doc.levels[p.level];

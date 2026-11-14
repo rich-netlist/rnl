@@ -65,7 +65,7 @@ its previous semicolon syntax is also accepted during the transition.
 | Key | Value | Default | Allowed in a file |
 | --- | --- | --- | --- |
 | `layout` | `"rows"`, `"tree"`, `"lines"` | `"lines"` for a 0.4 level; a level of an earlier version is always laid out in rows | yes |
-| `spacing_x`, `spacing_y` | integer from -1 through 20, retained for line layout | 0 | yes |
+| `spacing_x`, `spacing_y` | integer from -1 through 20; the line layout spaces by them | 0 | yes |
 | `junction` | definition name as a string; empty disables dots | unset | yes |
 | `tolerance` | finite nonnegative number | 0.000001 | yes |
 | `grid` | positive number, or `false` | 1 | yes |
@@ -77,9 +77,8 @@ its previous semicolon syntax is also accepted during the transition.
 | `safety_seconds` | finite nonnegative number | 30 | no |
 | `candidates`, `astar_expansions` | nonnegative integer caps | 256, 200000 | no |
 
-Nonzero spacing is parsed and hashed, with a warning that the current row layout keeps its
-fixed gaps. The skeleton/line-layout migration will consume it; group spacing follows the
-innermost containing group at that stage.
+The line layout spaces by a nonzero spacing. Under the row and the group-tree layouts it is
+parsed and hashed, with a warning that they keep their fixed gaps.
 
 Run settings in a file warn and are ignored. Unknown keys warn and are ignored. Invalid
 known file values warn and leave the effective default in place; invalid tool values are

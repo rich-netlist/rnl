@@ -222,7 +222,8 @@ fn apply_tool(o: &mut SolverOptions, settings: &[SolverSetting]) -> Result<(), S
     }
 }
 
-/// The warning of a spacing given to a solve: only the lines layout spaces by it.
+/// The warning of a spacing given to a solve by rows or by the group tree: only the lines layout
+/// spaces by it.
 pub(crate) const SPACING_NOT_USED: &str =
     "spacing_x and spacing_y are retained for line layout; row and tree layouts keep their fixed gaps";
 
@@ -371,8 +372,17 @@ impl SolverOptions {
                 values.remove(unused);
             }
         }
-        if modern && o.settings.spacing != [0, 0] {
+        if modern && o.settings.spacing != [0, 0] && o.settings.layout != Layout::Lines {
             warnings.push(SettingProblem::new(None, SPACING_NOT_USED));
+        }
+        if !modern {
+            // the layouts are those of 0.4: an earlier level is laid out in rows whatever is asked
+            if values.get("layout").is_some_and(|(_, from)| *from != SettingFrom::Default) {
+                let message = "a level before 0.4 is laid out in rows; layout is ignored";
+                warnings.push(SettingProblem::new(Some("layout"), message));
+            }
+            let rows = Lit::Str(rnl_runtime::interp::obj::WStr::new("rows", None));
+            values.insert("layout".into(), (rows, SettingFrom::Default));
         }
         SettingsCheck { values, warnings, errors }
     }
@@ -417,7 +427,7 @@ impl SolverOptions {
             // actually selected for writeback, including an explicit choice to draw no dots.
             out.settings.junction = Some(p.junction.effective().definition.clone().unwrap_or_default());
         }
-        if out.settings.spacing != [0, 0] {
+        if out.settings.spacing != [0, 0] && out.settings.layout != Layout::Lines {
             warnings.push(SPACING_NOT_USED.into());
         }
         out.settings.overrides.clear();
@@ -474,9 +484,16 @@ mod tests {
         assert_eq!(effective.settings.spacing, [3, 6]);
         assert_eq!(effective.beam, 4);
         assert_eq!(effective.run_limit, Some(RunLimit::Time(2.0)));
-        assert_eq!(warnings.len(), 5);
+        // the lines layout, the default, spaces by the spacing: no warning of it
+        assert_eq!(warnings.len(), 4, "{warnings:?}");
         assert!(warnings.iter().filter(|w| w.contains("tool-only")).count() == 2);
         assert_eq!(SolverOptions::parse(&effective.canonical()).unwrap(), effective);
+        // the rows and the group tree keep their gaps, and say so
+        for layout in ["rows", "tree"] {
+            let (_, warnings) = o.with_config(&format!("layout=\"{layout}\"")).unwrap().for_problem(&p);
+            assert_eq!(warnings.len(), 5, "{layout} {warnings:?}");
+            assert!(warnings.contains(&SPACING_NOT_USED.to_string()), "{layout} {warnings:?}");
+        }
     }
 
     #[test]

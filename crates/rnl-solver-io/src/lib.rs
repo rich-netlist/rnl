@@ -25,4 +25,4 @@ pub use result::{decode_result, encode_result, LevelResult, ResultDocument, Solv
 pub use solution::{decode_solution, encode_solution};
 
 /// Protocol version, independent of a solver executable's own version.
-pub const VERSION: u64 = 5;
+pub const VERSION: u64 = 6;

@@ -349,7 +349,7 @@ pub fn solve(problem: &LevelProblem, options: &SolverOptions) -> Solved {
 /// when hashing the persisted result, so time-to-work replay includes the same hash.
 /// Released input versions retain their resolution-only time limit.
 pub fn solve_with_clock(problem: &LevelProblem, options: &SolverOptions, clock: &dyn Clock) -> Solved {
-    budget::without(|| solve_isolated(problem, options, clock, driver::solve))
+    budget::without(|| solve_isolated(problem, options, clock, true, driver::solve))
 }
 
 /// The level as its previous result has it, spaced again to the options' spacing: each object
@@ -376,7 +376,7 @@ pub fn respace_with_clock(
     }
     let from = driver::Respace { previous, refused: std::cell::RefCell::new(None) };
     let mut solved =
-        budget::without(|| solve_isolated(problem, options, clock, |p, o, c| driver::respace(p, o, c, &from)));
+        budget::without(|| solve_isolated(problem, options, clock, true, |p, o, c| driver::respace(p, o, c, &from)));
     if let Some(why) = from.refused.into_inner() {
         return Err(why);
     }
@@ -385,10 +385,13 @@ pub fn respace_with_clock(
     Ok(solved)
 }
 
+/// `by_layout` says that `run` lays the level out by the layout of the options, as a solve does:
+/// the skeleton experiment has an engine of its own, whatever the layout is.
 fn solve_isolated(
     problem: &LevelProblem,
     options: &SolverOptions,
     clock: &dyn Clock,
+    by_layout: bool,
     run: impl FnOnce(&LevelProblem, &SolverOptions, &dyn Clock) -> Solved,
 ) -> Solved {
     let (effective, warnings) = options.for_problem(problem);
@@ -416,12 +419,13 @@ fn solve_isolated(
         let mut solved = if problem.version == "0.4" {
             let (limit, safety) = run_limits(options, clock);
             let (mut solved, report) = budget::with(clock, limit, safety, || run(problem, options, clock));
-            let replay_limit =
-                if options.settings.layout == Layout::Lines && matches!(limit, RunLimit::Seed | RunLimit::Unlimited) {
-                    limit
-                } else {
-                    RunLimit::Work(report.work)
-                };
+            // the lines layout keeps a seed or no limit as it is; the others replay by their work
+            let lines = by_layout && options.settings.layout == Layout::Lines;
+            let replay_limit = if lines && matches!(limit, RunLimit::Seed | RunLimit::Unlimited) {
+                limit
+            } else {
+                RunLimit::Work(report.work)
+            };
             let replay = SolverOptions { run_limit: Some(replay_limit), time_limit: None, ..options.clone() };
             solved.report.canonical_options = Some(replay.canonical());
             solved.report.budget = Some(report);

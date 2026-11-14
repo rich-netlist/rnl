@@ -20,7 +20,7 @@ The host invokes the external program for each level as it reads after earlier i
 
 ## Input envelope
 
-An input has `format: "rnl-solver-input"`, `version: 4`, and a `levels` array. Each entry contains:
+An input has `format: "rnl-solver-input"`, the `version` of the protocol, now 6, and a `levels` array. Each entry contains:
 
 - `request`: its zero-based array ordinal.
 - `input`: the original problem's input digest.
@@ -44,7 +44,7 @@ JSON numbers are parsed from their decimal spelling without an intermediate loss
 ```json
 {
   "format": "rnl-solver-result",
-  "version": 5,
+  "version": 6,
   "solver": { "name": "example-solver", "version": "1.0.0" },
   "levels": [
     {
@@ -134,6 +134,10 @@ Version 3 adds source-version auto-wire semantics, arbitrary text angles and upr
 ## Version 4
 
 Version 4 adds annotations, existing-junction identity, and fatal annotation reporting. Version 3 programs could silently ignore these fields in some inputs and cannot safely process them. Version 4 required the independent executable and its caller to be upgraded together. The five result decision arrays retain their previous shapes.
+
+## Version 6
+
+Version 6 changes no field. The options travel as their canonical text, and from this version on a text that names no layout means the line layout, the default of a 0.4 level, where it meant rows; the row layout is named, `layout=rows`. A program of version 5 would read the same text as the other layout, so version 5 programs and version 6 programs reject each other's requests and results. A level before 0.4 is laid out in rows whatever the text says.
 
 ## Version 5
 

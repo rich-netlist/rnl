@@ -168,6 +168,23 @@ fn a_level_before_0_4_reads_only_the_old_options() {
     assert_eq!(setting(l, "beam"), "beam=4 (default)");
     assert_eq!(setting(l, "grid"), "grid=2 (command-line)");
     assert!(keyed(&l.warnings).contains(&"beam: a level before 0.4 reads no --solver-config; beam is ignored".into()));
+    // it is laid out in rows, not by the default of 0.4, and whatever the old options ask
+    assert_eq!(setting(l, "layout"), "layout=\"rows\" (default)");
+    assert!(!keyed(&l.warnings).iter().any(|w| w.starts_with("layout:")), "{:?}", l.warnings);
+    let c = check(main, &[ToolSettings::Options("layout=lines".into())]);
+    let l = &c.levels[0];
+    assert_eq!(setting(l, "layout"), "layout=\"rows\" (default)");
+    assert!(keyed(&l.warnings).contains(&"layout: a level before 0.4 is laid out in rows; layout is ignored".into()));
+}
+
+#[test]
+fn a_spacing_is_warned_of_only_where_the_layout_does_not_space_by_it() {
+    let main = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\nR1 a 0 1k\n.end\n";
+    let unused = |c: &Checked| keyed(&c.levels[0].warnings).iter().any(|w| w.contains("keep their fixed gaps"));
+    assert!(!unused(&check(main, &[ToolSettings::Config("spacing_x=2".into())])));
+    assert!(!unused(&check(main, &[ToolSettings::Config("spacing_x=2,layout=\"lines\"".into())])));
+    assert!(unused(&check(main, &[ToolSettings::Config("spacing_x=2,layout=\"rows\"".into())])));
+    assert!(unused(&check(main, &[ToolSettings::Config("spacing_x=2,layout=\"tree\"".into())])));
 }
 
 #[test]

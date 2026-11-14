@@ -1,7 +1,7 @@
 # Group-tree layout
 
 A 0.4 level can select `@SOLVER-CONFIG(layout="tree")`, or a caller can pass
-`--solver-config 'layout="tree"'`. Rows remain the default during the migration.
+`--solver-config 'layout="tree"'`. The default is the [line layout](solver-lines.md).
 The tree engine arranges whole groups in nested rows and columns, aligns adjacent
 pins, routes each candidate, then searches list edits, turns and mirrors. It can
 bind straight pin pairs and release a recent binding when the search stalls.

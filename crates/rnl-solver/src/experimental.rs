@@ -176,7 +176,7 @@ pub fn solve_skeleton_with_clock(
         return Err(format!("skeleton rounds must be between 0 and {SKELETON_ROUNDS}"));
     }
     let mut solved = crate::budget::without(|| {
-        crate::solve_isolated(problem, options, clock, |p, o, c| crate::driver::solve_skeleton(p, o, c, rounds))
+        crate::solve_isolated(problem, options, clock, false, |p, o, c| crate::driver::solve_skeleton(p, o, c, rounds))
     });
     if let Some(canonical) = &mut solved.report.canonical_options {
         canonical.push_str(&format!(";experimental=skeleton:{rounds}"));

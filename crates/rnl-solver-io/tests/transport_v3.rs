@@ -37,7 +37,7 @@ fn current_protocol_rejects_old_transport_and_validates_fatal_wire() {
     assert!(!p.wires.is_empty());
     let input = InputDocument { levels: vec![LevelInput { problem: p.clone(), options: Default::default() }] };
     let value = encode_input(&input).unwrap();
-    assert_eq!(value["version"], 5);
+    assert_eq!(value["version"], 6);
     for old in [2, 3, 4] {
         let mut incompatible = value.clone();
         incompatible["version"] = serde_json::json!(old);
@@ -65,7 +65,7 @@ fn current_protocol_rejects_old_transport_and_validates_fatal_wire() {
         }],
     };
     let mut value = encode_result(&document).unwrap();
-    assert_eq!(value["version"], 5);
+    assert_eq!(value["version"], 6);
     assert_eq!(decode_result(&value, std::slice::from_ref(&p)).unwrap(), document);
     for old in [2, 3, 4] {
         let mut incompatible = value.clone();

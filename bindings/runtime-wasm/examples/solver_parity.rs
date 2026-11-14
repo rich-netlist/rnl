@@ -65,6 +65,7 @@ fn record(case: u32, work: u32) -> (String, u64) {
         });
     }
     let mut options = SolverOptions { run_limit: Some(RunLimit::Work(u64::from(work))), ..SolverOptions::default() };
+    options.settings.layout = rnl_solver::Layout::Rows;
     if case >= 2 {
         options.settings.layout = rnl_solver::Layout::Tree;
         options = options
