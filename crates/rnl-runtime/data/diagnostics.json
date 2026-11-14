@@ -3790,7 +3790,7 @@
    "number": "RNL7008",
    "name": "partly-named",
    "severity": "hint",
-   "message": "{level}: &{net} is drawn in {n} pieces joined only by its name: {{pins}} {wired|a label|a port|by name}, …; wire them, or draw the net by name alone",
+   "message": "{level}: &{net} is drawn in {n} pieces joined only by its name: {{pins}} {wired|routed|a label|a port|by name}, …; wire them, or draw the net by name alone",
    "sections": []
   },
   {
