@@ -486,6 +486,26 @@ impl Interp<'_> {
                             }
                         }
                     }
+                    // the pin of a virtual part whose role takes a net itself, such as a ground or
+                    // a supply, is on that net: as the selections see it (10.1)
+                    if kind == ObjectKind::Usage {
+                        let count = self.scenes[s].symbol.get(&o).map_or(0, |symbol| self.symbol(*symbol).pins.len());
+                        for pin in 0..count {
+                            let at = self.scene_pin_nets(s, o, pin);
+                            if at.is_empty() {
+                                continue;
+                            }
+                            let Some(reference) = self.symbol_pin_ref(s, &ix, o, pin) else { continue };
+                            on.extend(at.iter().copied());
+                            for n in &at {
+                                let Some(&i) = net_at.get(n) else { continue };
+                                let pins = &mut nets[i].pins;
+                                if !pins.iter().any(|q| q.pin_key() == reference.pin_key()) {
+                                    pins.push(reference.clone());
+                                }
+                            }
+                        }
+                    }
                 }
                 ObjectKind::Text => {
                     let att = self.scene_value(self.text_attach(o));
