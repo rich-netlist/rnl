@@ -133,6 +133,7 @@ Also: net names on grounds, supplies, bias marks, port tags and net labels use `
 | `$GROUND`, `$SUPPLY`, `$IO_PORT` | role `p` takes a net only (was a net or a terminal); `$IO_PORT` asserts that its net is a port | a terminal written directly: attach its net and keep the point |
 | `$NO_CONNECT` | role `t` takes a terminal or a pin | unchanged text |
 | `$GROUND_STUB`, `$SUPPLY_STUB` | `gap` default 2 → 1; role `t` is a pin | writes `gap=2` where the old default was used |
+| `$GROUND` on a net other than 0 | drawn with `$NAMED_GROUND_SYMBOL`, the name of its net under the bars, whether or not the net is in `$GROUND_NET_SET` (in 0.3 only the nets of `$GROUND_NET_SET` showed it); `$NAMED_GROUND_SYMBOL` has no set of its own: `$NAMED_GROUND_NET_SET` is removed, and `$GROUND_NET_SET` only decides the fill | manual: a reference to `$NAMED_GROUND_NET_SET` is reported; to draw a ground on such a net without its name, `@SET-SYMBOL $GROUND_SYMBOL` on the usage |
 | `$MIRRORED` | `$MIRRORED_LAYOUT`: a layout only; `axis` is a single instance, usage or point; directed distribution | renamed; the rest with `--approximate` |
 | `$FLOW` | `$SIGNAL_FLOW`, with the optional set roles `source` and `load` after `path`, which take devices, structures, ports (`#:in`), terminals and nets; places nothing and takes no direction | renamed; restores the old ORDER where it was used |
 

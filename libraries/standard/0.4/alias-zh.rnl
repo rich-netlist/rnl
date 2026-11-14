@@ -244,7 +244,6 @@
   @ALIAS("$地网络集", "$GROUND_NET_SET");
   @ALIAS("$电源网络集", "$SUPPLY_NET_SET");
   @ALIAS("$偏置网络集", "$BIAS_NET_SET");
-  @ALIAS("$带标签地网络集", "$NAMED_GROUND_NET_SET");
   @ALIAS("$接地补位集", "$GROUND_FILL_SET");
   @ALIAS("$电源补位集", "$SUPPLY_FILL_SET");
   @ALIAS("$偏置补位集", "$BIAS_FILL_SET");

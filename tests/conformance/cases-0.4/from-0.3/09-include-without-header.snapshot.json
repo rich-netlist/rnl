@@ -253,8 +253,8 @@
             "definition": null
           },
           {
-            "id": "$GROUND_SYMBOL",
-            "name": "$GROUND_SYMBOL",
+            "id": "$NAMED_GROUND_SYMBOL",
+            "name": "$NAMED_GROUND_SYMBOL",
             "package": "rnl-std-basic",
             "level": null,
             "default": false,
@@ -435,7 +435,7 @@
               "p": "&bot"
             },
             "symbol": {
-              "value": "$GROUND_SYMBOL",
+              "value": "$NAMED_GROUND_SYMBOL",
               "source": null
             },
             "at": {
@@ -472,7 +472,7 @@
           },
           {
             "pin_of": "#R1",
-            "id": "@rnl-std-fill.rnl:62:3#1",
+            "id": "@rnl-std-fill.rnl:57:3#1",
             "kind": "usage",
             "host": [],
             "definition": "$NET_LABEL_STUB",
@@ -495,7 +495,7 @@
           },
           {
             "pin_of": "#R1",
-            "parent": "@rnl-std-fill.rnl:62:3#1",
+            "parent": "@rnl-std-fill.rnl:57:3#1",
             "id": "@rnl-std-basic.rnl:672:9#1",
             "kind": "usage",
             "host": [],
@@ -541,7 +541,7 @@
           },
           {
             "pin_of": "#R2",
-            "id": "@rnl-std-fill.rnl:62:3#2",
+            "id": "@rnl-std-fill.rnl:57:3#2",
             "kind": "usage",
             "host": [],
             "definition": "$NET_LABEL_STUB",
@@ -564,7 +564,7 @@
           },
           {
             "pin_of": "#R2",
-            "parent": "@rnl-std-fill.rnl:62:3#2",
+            "parent": "@rnl-std-fill.rnl:57:3#2",
             "id": "@rnl-std-basic.rnl:672:9#2",
             "kind": "usage",
             "host": [],
