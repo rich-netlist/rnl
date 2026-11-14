@@ -26,6 +26,8 @@ function state(page) {
     };
   });
 }
+/** The part of the level the page shows: `{ scale, center }`. */
+const viewOf = (page) => page.evaluate(async () => (await import('./drawing.js')).viewCentre());
 const dialog = (page) => page.getByRole('dialog', { name: 'Display Settings', exact: true });
 
 test('Download Project writes the display settings when asked; Open Project offers them and applies those kept, for the page only', async ({ page }) => {
@@ -77,14 +79,16 @@ test('Download Project writes the display settings when asked; Open Project offe
   await dialog(page).locator('[data-setting="colors"]').uncheck();
   await dialog(page).getByRole('button', { name: 'Apply Selected', exact: true }).click();
   await ready(page);
+  // the page applies them after the click, not at once (in WebKit the first read has seen the user's own): wait for them
+  await expect.poll(() => state(page)).toMatchObject({ background: 'dark', currents: true, grid: 'lines', component: '#2275E2' });
   const shown = await state(page);
-  expect(shown).toMatchObject({ background: 'dark', currents: true, grid: 'lines', component: '#2275E2' });
   // the page shows them; the settings keep the user's
   expect(shown.kept).toEqual({ background: 'light', currents: false, colors: null });
-  const view = await page.evaluate(async () => (await import('./drawing.js')).viewCentre());
-  expect(view.scale).toBeCloseTo(manifest.display.view.scale, 2);
-  expect(view.center[0]).toBeCloseTo(manifest.display.view.center[0], 1);
-  expect(view.center[1]).toBeCloseTo(manifest.display.view.center[1], 1);
+  const { view: wanted } = manifest.display;
+  await expect.poll(async () => (await viewOf(page)).scale).toBeCloseTo(wanted.scale, 2);
+  const view = await viewOf(page);
+  expect(view.center[0]).toBeCloseTo(wanted.center[0], 1);
+  expect(view.center[1]).toBeCloseTo(wanted.center[1], 1);
 });
 
 test("Don't Apply keeps the user's own display; a manifest's unknown setting is told, and the view it names is shown", async ({ page }) => {
@@ -107,7 +111,9 @@ test("Don't Apply keeps the user's own display; a manifest's unknown setting is 
   await expect(dialog(page).locator('.display-setting')).toHaveText(['View: the part of the level it shows']);
   await dialog(page).getByRole('button', { name: 'Apply Selected', exact: true }).click();
   await expect(page.locator('#notice')).toContainText('sparkle');
-  const view = await page.evaluate(async () => (await import('./drawing.js')).viewCentre());
+  // the view the manifest names is applied once the level is drawn, which can be after the notice (in WebKit it has been read at the fitted 1.07)
+  await expect.poll(async () => (await viewOf(page)).scale).toBeCloseTo(3, 6);
+  const view = await viewOf(page);
   expect(view.scale).toBeCloseTo(3, 6);
   expect(view.center[0]).toBeCloseTo(20, 6);
   expect(view.center[1]).toBeCloseTo(0, 6);
@@ -125,7 +131,7 @@ test("a manifest's settings hold while a file of it is shown, go with another fi
     body: files[new URL(route.request().url()).pathname.split('/').pop()] }));
   await page.goto(`${process.env.RNL_WEB_URL}/index.html?manifest=${encodeURIComponent('https://manifests.test/demo.json')}`);
   await dialog(page).getByRole('button', { name: 'Apply Selected', exact: true }).click();
-  expect(await state(page)).toMatchObject({ background: 'dark', currents: true });
+  await expect.poll(() => state(page)).toMatchObject({ background: 'dark', currents: true });
   const open = async (file) => {
     await page.locator('#tab-files').click();
     await page.locator('.lib-group[data-group="external"] .pool-open', { hasText: new RegExp(`^${file.replace('.', '\\.')}$`) }).click();
@@ -134,16 +140,16 @@ test("a manifest's settings hold while a file of it is shown, go with another fi
   // another file of the manifest: still its settings
   await open('other.sp');
   expect(await page.evaluate(() => window.viewer.doc.path)).toBe('/demo/other.sp');
-  expect(await state(page)).toMatchObject({ background: 'dark', currents: true });
+  await expect.poll(() => state(page)).toMatchObject({ background: 'dark', currents: true });
   // a file of the computer: the user's own
   await page.locator('#file-input').setInputFiles({ name: 'local.sp', mimeType: 'text/plain', buffer: Buffer.from('* local\nR1 a 0 1k\n.end\n') });
   await expect.poll(() => page.evaluate(() => window.viewer.doc?.path)).toBe('/local.sp');
   await ready(page);
-  expect(await state(page)).toMatchObject({ background: 'light', currents: false });
+  await expect.poll(() => state(page)).toMatchObject({ background: 'light', currents: false });
   // the manifest's entry again: its settings, without asking
   await open('top.sp');
   await expect(dialog(page)).toHaveCount(0);
-  expect(await state(page)).toMatchObject({ background: 'dark', currents: true, kept: { background: 'light', currents: false } });
+  await expect.poll(() => state(page)).toMatchObject({ background: 'dark', currents: true, kept: { background: 'light', currents: false } });
 });
 
 test('external manifests recognize flylines, layout, skeleton lines and other display aids for the page only', async ({ page }) => {
