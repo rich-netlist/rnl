@@ -103,6 +103,11 @@ mod tests {
         assert_eq!(setting("seconds")["default"], 10);
         assert_eq!(setting("seconds")["in_file"], false);
         assert_eq!(setting("beam")["in_file"], true);
+        assert_eq!(
+            (setting("join_trees")["type"].clone(), setting("join_trees")["default"].clone()),
+            (json!("boolean"), json!(false))
+        );
+        assert_eq!(setting("join_trees")["in_file"], true);
         assert_eq!(setting("objectives")["default"], rnl_solver::DEFAULT_LAYERS.join(","));
         assert_eq!(t["objectives"].as_array().unwrap().len(), rnl_solver::OBJECTIVES.len());
         assert_eq!(

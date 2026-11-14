@@ -401,7 +401,15 @@ fn solve_isolated(
 ) -> Solved {
     let (effective, warnings, errors) = options.for_problem(problem);
     let options = &effective;
-    profile::with(clock.profiler(), || {
+    // the trees of each net as one (`join_trees`), solved on a problem of its own; what refers to a
+    // tree of it is given back by the first tree of the net in the problem
+    let trees = problem.routes.len();
+    let joined = (options.settings.join_trees && problem.version == "0.4").then(|| join_trees(problem));
+    let (problem, first) = match &joined {
+        Some((p, first)) => (p, Some(first)),
+        None => (problem, None),
+    };
+    let mut solved = profile::with(clock.profiler(), || {
         if profile::enabled() {
             profile::emit(profile::ProfileEvent::Level {
                 level: problem.level,
@@ -455,7 +463,85 @@ fn solve_isolated(
         solved.report.errors.extend(errors);
         profile::emit(profile::ProfileEvent::LevelEnd);
         solved
-    })
+    });
+    if let Some(first) = first {
+        give_back(&mut solved, first, trees);
+    }
+    solved
+}
+
+/// What refers to a tree of the problem [`join_trees`] made given back by the first tree of its net
+/// in the problem of `trees` trees: each wire, each part left unrouted, and each tree and line of
+/// the line layout; and a note of how many trees were joined.
+fn give_back(solved: &mut Solved, first: &[usize], trees: usize) {
+    let back = |t: usize| first.get(t).copied().unwrap_or(t);
+    for w in &mut solved.solution.wires {
+        w.route = back(w.route);
+    }
+    for u in &mut solved.report.unrouted {
+        u.route = back(u.route);
+    }
+    if let Some(skeleton) = &mut solved.report.skeleton {
+        for line in &mut skeleton.lines {
+            line.tree = line.tree.map(back);
+        }
+        for tree in &mut skeleton.trees {
+            tree.route = back(tree.route);
+        }
+    }
+    if first.len() < trees {
+        solved
+            .report
+            .notes
+            .push(format!("join_trees: the {trees} trees of the ROUTEs routed as {}, one for each net", first.len()));
+    }
+}
+
+/// The problem with the trees of the ROUTEs of each net joined into one (`join_trees`): the first
+/// tree of the net, with the pins and the wires of the others after its own, each once, and its
+/// style; the nets list it alone. With, for each tree of it, the index of the tree of `problem` it
+/// begins with.
+fn join_trees(problem: &LevelProblem) -> (LevelProblem, Vec<usize>) {
+    let mut out = problem.clone();
+    let mut routes: Vec<rnl_runtime::problem::RouteIntent> = Vec::new();
+    let mut first: Vec<usize> = Vec::new();
+    // the tree of `out` that each tree of `problem` is joined into
+    let mut into: Vec<usize> = Vec::with_capacity(problem.routes.len());
+    for (i, r) in problem.routes.iter().enumerate() {
+        match routes.iter().position(|t| t.net == r.net) {
+            Some(k) => {
+                for p in &r.pins {
+                    if !routes[k].pins.contains(p) {
+                        routes[k].pins.push(p.clone());
+                    }
+                }
+                for &w in &r.wires {
+                    if !routes[k].wires.contains(&w) {
+                        routes[k].wires.push(w);
+                    }
+                }
+                into.push(k);
+            }
+            None => {
+                into.push(routes.len());
+                routes.push(r.clone());
+                first.push(i);
+            }
+        }
+    }
+    out.routes = routes;
+    for net in &mut out.nets {
+        let mut trees: Vec<usize> = Vec::new();
+        for &r in &net.routes {
+            if let Some(&k) = into.get(r) {
+                if !trees.contains(&k) {
+                    trees.push(k);
+                }
+            }
+        }
+        net.routes = trees;
+    }
+    (out, first)
 }
 
 /// Resolves the facts of one drawing level (8.5): checks each on its own first, a fact with no
@@ -503,4 +589,38 @@ fn run_limits(options: &SolverOptions, clock: &dyn Clock) -> (RunLimit, Option<f
     }
     let safety = (!matches!(limit, RunLimit::Time(_))).then_some(options.safety_seconds).flatten();
     (limit, safety)
+}
+
+#[cfg(test)]
+mod join_tests {
+    use super::*;
+    use crate::lines::engine::{LayoutSkeleton, LineKind, SkeletonLine, SkeletonTree};
+    use rnl_runtime::solution::RoutedWire;
+
+    /// Every index of a tree that leaves the solve is given back by the first tree of its net: the
+    /// problem's trees [n, n, m] were solved as [n, m].
+    #[test]
+    fn what_refers_to_a_joined_tree_is_given_back_by_the_first_of_its_net() {
+        let mut solved = Solved::default();
+        solved.solution.wires =
+            vec![RoutedWire { route: 0, points: Vec::new() }, RoutedWire { route: 1, points: Vec::new() }];
+        solved.report.unrouted = vec![Unrouted { route: 1, net: "m".into(), parts: 2, budget: false }];
+        let line =
+            |tree| SkeletonLine { axis: 0, kind: LineKind::Wire, rank: Some(0), at: 0.0, owner: String::new(), tree };
+        solved.report.skeleton = Some(LayoutSkeleton {
+            lines: vec![line(Some(1)), line(None), line(Some(0))],
+            trees: vec![
+                SkeletonTree { route: 0, net: "n".into(), ..SkeletonTree::default() },
+                SkeletonTree { route: 1, net: "m".into(), ..SkeletonTree::default() },
+            ],
+            ..LayoutSkeleton::default()
+        });
+        give_back(&mut solved, &[0, 2], 3);
+        assert_eq!(solved.solution.wires.iter().map(|w| w.route).collect::<Vec<_>>(), [0, 2]);
+        assert_eq!(solved.report.unrouted[0].route, 2);
+        let skeleton = solved.report.skeleton.unwrap();
+        assert_eq!(skeleton.lines.iter().map(|l| l.tree).collect::<Vec<_>>(), [Some(2), None, Some(0)]);
+        assert_eq!(skeleton.trees.iter().map(|t| t.route).collect::<Vec<_>>(), [0, 2]);
+        assert_eq!(solved.report.notes, ["join_trees: the 3 trees of the ROUTEs routed as 2, one for each net"]);
+    }
 }
