@@ -11,7 +11,7 @@ const BEGIN = "<!-- preload hints, written by apps/web/preload-hints.mjs -->";
 const END = "<!-- end of the preload hints -->";
 
 /** The files the page reads with fetch() when it starts, as the web shell, i18n.js and commands.js name them. */
-export const STARTUP_FILES = ["about.json", "commands.json", "libraries/bundled.json", "public-packages.json", "locales/languages.json", "locales/keys.json"];
+export const STARTUP_FILES = ["about.json", "commands.json", "libraries/bundled.json", "public-packages.json", "locales/languages.json", "locales/keys.json", "solver.json"];
 
 /** The modules a script imports statically, `import … from`, `export … from` and `import "…"`, by their written paths. */
 export function staticImports(source) {

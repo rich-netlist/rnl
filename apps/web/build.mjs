@@ -3,10 +3,11 @@
 // fonts' licence in fonts/OFL.txt in any case, and the core as WebAssembly with its JavaScript
 // modules in core/:
 //
-//   node apps/web/build.mjs [--no-core] [--samples]
+//   node apps/web/build.mjs [--no-core] [--no-solver] [--samples]
 //
 // --no-core takes the binding as bindings/runtime-wasm/build.mjs last built it instead of building it
-// again; --samples copies the conformance corpus's cases and equivalence files and the site's
+// again (the page solves only if that was built with --solver); --no-solver leaves the solver's module out, as the
+// local program, whose page solves with the program, does not need it; --samples copies the conformance corpus's cases and equivalence files and the site's
 // examples into samples/, to try the viewer with ?url=samples/cases/04-hierarchy.sp and for tests.
 
 import { publishLibrary } from "./library.mjs";
@@ -22,13 +23,15 @@ import { writeLocales } from "../../scripts/i18n/viewer-locales.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..", "..");
-const usage = "usage: node apps/web/build.mjs [--no-core] [--samples]";
+const usage = "usage: node apps/web/build.mjs [--no-core] [--no-solver] [--samples]";
 
 let buildCore = true;
 let samples = false;
+let withSolver = true;
 for (const arg of process.argv.slice(2)) {
   if (arg === "--no-core") buildCore = false;
   else if (arg === "--samples") samples = true;
+  else if (arg === "--no-solver") withSolver = false;
   else {
     console.error(usage);
     process.exit(2);
@@ -40,7 +43,8 @@ const binding = join(root, "bindings", "runtime-wasm");
 const core = join(binding, "dist");
 const out = join(here, "dist");
 
-if (buildCore) execFileSync(process.execPath, [join(binding, "build.mjs")], { stdio: "inherit" });
+// The solver's module is built with the core, for the page to load when the user solves.
+if (buildCore) execFileSync(process.execPath, [join(binding, "build.mjs"), ...(withSolver ? ["--solver"] : [])], { stdio: "inherit" });
 if (!existsSync(join(core, "rnl_runtime_wasm.wasm"))) {
   console.error(`${core} has no core: build it with node bindings/runtime-wasm/build.mjs, or leave out --no-core`);
   process.exit(1);
@@ -71,8 +75,15 @@ if (!existsSync(licence)) {
 }
 
 // The core, which the web shell imports from core/client.js, without the package.json for Node.
-cpSync(core, join(out, "core"), { recursive: true, filter: (from) => relative(core, from) !== "package.json" });
+cpSync(core, join(out, "core"), { recursive: true, filter: (from) => relative(core, from) !== "package.json" && (withSolver || !/^(solver\.(js|d\.ts)|rnl_solver_wasm\.wasm)$/.test(relative(core, from))) });
 for (const name of ["embed-demo.html", "embed-demo.js"]) cpSync(join(here, name), join(out, name));
+// The solver, when the core's directory has it (core/solver.js and core/rnl_solver_wasm.wasm): its Worker, and
+// solver.json, which tells the page it can solve and how large the module it then loads is.
+const solverModule = join(out, "core", "rnl_solver_wasm.wasm");
+if (existsSync(solverModule) && existsSync(join(out, "core", "solver.js"))) {
+  cpSync(join(here, "solver-worker.js"), join(out, "solver-worker.js"));
+  writeFileSync(join(out, "solver.json"), JSON.stringify({ worker: "solver-worker.js", bytes: statSync(solverModule).size }) + "\n");
+}
 
 // Viewer versions are independent of the core's workspace version.
 const { version, coreVersion } = buildVersions(root);
@@ -134,6 +145,10 @@ const kib = (n) => `${(n / 1024).toFixed(0)} KiB`;
 console.log(out);
 const packed = gzipSync(wasm, { level: 9 }).length;
 console.log(`${all.length} files, ${kib(bytes)}; the core ${kib(wasm.length)}, ${kib(packed)} gzip-compressed; ${hints} preload hints`);
+if (existsSync(join(out, "solver.json"))) {
+  const solver = readFileSync(solverModule);
+  console.log(`the solver, loaded when the user solves: ${kib(solver.length)}, ${kib(gzipSync(solver, { level: 9 }).length)} gzip-compressed`);
+}
 if (fonts) {
   const font = all.filter((f) => f.startsWith("fonts/"));
   console.log(`the web fonts: ${font.length} files, ${kib(font.reduce((n, f) => n + statSync(join(out, f)).size, 0))}`);

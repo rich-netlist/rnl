@@ -97,3 +97,15 @@ test("a file the site does not have is not hinted", () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("solver.json, which says the page can solve, is hinted when the build has it and only then", () => {
+  const dir = site();
+  try {
+    const html = readFileSync(join(dir, "index.html"), "utf8");
+    assert.ok(!preloadTags(dir, html).some((t) => t.includes("solver.json")));
+    writeFileSync(join(dir, "solver.json"), "{}");
+    assert.ok(preloadTags(dir, html).includes('<link rel="preload" as="fetch" crossorigin href="solver.json">'));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

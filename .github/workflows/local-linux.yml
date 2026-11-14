@@ -76,7 +76,7 @@ jobs:
       - name: Write the web fonts
         run: pip install fonttools==4.58.0 brotli==1.2.0 && python scripts/fonts.py web
       - name: Build the web viewer
-        run: node apps/web/build.mjs
+        run: node apps/web/build.mjs --no-solver
       - name: The version
         id: version
         run: |

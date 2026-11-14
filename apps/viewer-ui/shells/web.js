@@ -52,8 +52,31 @@ async function localSolver() {
   }
 }
 const solver = await localSolver();
+
+/**
+ * The solver of the page's own, when this build has it (apps/web/solver-worker.js, bindings/solver-wasm): what
+ * `solver.json` says of it, or null. A page that is not served by a development server solves in the browser, in a
+ * Worker started by the first solve; an embed does not solve.
+ */
+async function browserSolver() {
+  if (embed || solver) return null;
+  try {
+    const response = await fetch(new URL("solver.json", location.href));
+    const info = response.ok ? await response.json() : null;
+    return info && typeof info.worker === "string" ? info : null;
+  } catch {
+    return null;
+  }
+}
+const inBrowser = await browserSolver();
 let lastBuilt = null; // the Document of a build the page accepted last: what a solve is of, not a preview of one
 let solving = null; // the AbortController of the solve under way
+let solverWorker = null; // the Worker of the solver in the browser, once a solve has started it
+/** Stop the solver's Worker, and with it the solve under way, if any; the next solve starts another. */
+function stopSolver() {
+  solverWorker?.terminate();
+  solverWorker = null;
+}
 let solveProgress = null; // the page's handler of the events of the solve under way
 
 const WARMUP = { entry: "/ready.sp", files: { "/ready.sp": "* Ready\n.end\n" }, svg: false };
@@ -1085,6 +1108,57 @@ export default {
       } catch (e) {
         if (own.signal.aborted) throw "the solve was cancelled";
         throw e instanceof TypeError ? "the solver service could not be reached; is serve.mjs still running?" : e;
+      } finally {
+        if (solving === own) solving = null;
+      }
+    },
+    cancelSolve() {
+      solving?.abort();
+    },
+    onSolveProgress(handler) {
+      solveProgress = handler;
+    },
+  } : inBrowser ? {
+    /**
+     * Solve the netlist shown in the browser, with the solver as WebAssembly in a Worker of its own that this
+     * first solve starts (apps/web/solver-worker.js): the files the last build read, with the text applied over
+     * them, are its request, and it gives the Document of the netlist as solved and the report, as the desktop's
+     * Solve does, of the one level `settings.level` names or of every level. The events of the solve
+     * (docs/solver-progress.md) go to `onSolveProgress`'s handler as they happen. Cancelling stops the Worker, and
+     * the next solve starts another. The Library's packages are found by name as the development server's solve
+     * finds them, by the directories of its package files; its other files are found where a file includes them.
+     */
+    async solve(_source, settings, edits) {
+      const request = lastBuilt && builtRequests.get(lastBuilt);
+      if (!request) throw "Open a netlist first.";
+      const dir = request.entry.slice(0, request.entry.lastIndexOf("/"));
+      const files = { ...request.files };
+      for (const [path, text] of Object.entries(edits || {})) files[joined(dir, path)] = text;
+      const packageDirs = [...new Set(request.pool.filter((p) => p.endsWith(".rnl")).map((p) => p.slice(0, p.lastIndexOf("/"))))];
+      const own = new AbortController();
+      solving = own;
+      try {
+        solverWorker ??= new Worker(new URL(inBrowser.worker, location.href), { type: "module" });
+        const worker = solverWorker;
+        return await new Promise((resolve, reject) => {
+          worker.onmessage = ({ data }) => {
+            if (data.event) solveProgress?.(data.event);
+            else if (data.error !== undefined) reject(data.error);
+            else if (data.answer.cancelled) reject("the solve was cancelled");
+            else if (data.answer.error !== undefined) reject(data.answer.error);
+            else resolve(data.answer);
+          };
+          worker.onerror = (e) => {
+            stopSolver();
+            reject(`the solver could not be started${e.message ? `: ${e.message}` : ""}`);
+          };
+          own.signal.addEventListener("abort", () => {
+            stopSolver();
+            reject("the solve was cancelled");
+          }, { once: true });
+          worker.postMessage({ id: 1, request: { entry: request.entry, files, package_dirs: packageDirs, formats: request.formats ?? {},
+            solver_config: "", level: settings?.level ?? null } });
+        });
       } finally {
         if (solving === own) solving = null;
       }

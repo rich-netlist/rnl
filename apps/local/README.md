@@ -49,7 +49,7 @@ The program listens on `127.0.0.1` only, but that address is shared by every use
 
 ## Building and testing
 
-The web viewer is embedded when the program is built: `node apps/web/build.mjs` writes `apps/web/dist`, then
+The web viewer is embedded when the program is built: `node apps/web/build.mjs --no-solver` writes `apps/web/dist` (without the solver as WebAssembly that the published site's page solves with, as this program solves for its page), then
 
 ```
 cd apps/local

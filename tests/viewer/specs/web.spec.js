@@ -1671,23 +1671,24 @@ async function solverServer() {
   return { server, url };
 }
 
-test("the Solve view lists the constraints of a netlist; only a development server with a solver gives the page a Solve", async ({ page }) => {
+test("the Solve view lists the constraints of a netlist before any solve; a development server with a solver solves with it, a site without one in the browser", async ({ page }) => {
   // two servers, two page loads in the engine, and a debug build of rnl solving: slow on a loaded runner
   test.setTimeout(120000);
-  // the server of the site has no solver: the page asks it, finds none, and offers no Solve, but its Solve view lists the
-  // constraints the real core gives with the Document, with no solve
+  // the server of the site has no solver service: the page asks it, finds none, and solves in the browser (apps/web/solver-worker.js);
+  // before any solve its Solve view lists the constraints the real core gives with the Document
+  const sent = [];
+  page.on("request", (request) => { if (/rnl-solver\/solve$/.test(request.url())) sent.push(request.url()); });
   await page.goto(`${process.env.RNL_WEB_URL}/?url=samples/cases/10-constraints-and-priority.sp`);
   await expect(page).toHaveTitle(/^10-constraints-and-priority\.sp/);
   await expect(page.locator("#tab-solve")).toBeVisible();
   await expect(page.locator("#menubar .menu-title")).toContainText(["Solve"]);
-  await expect(page.locator('#menubar .menu-item[data-id="solve"]')).toHaveCount(0);
+  await expect(page.locator('#menubar .menu-item[data-id="solve"]')).toHaveCount(1);
   await expect(page.locator('#menubar .menu-item[data-id="toggle-layout"]')).toHaveCount(1);
   await page.keyboard.press("7");
   await expect(page.locator("#pane-solve")).toBeVisible();
   await expect(page.locator("#constraints-list li.constraint")).toHaveCount(18, { timeout: 30000 });
   await expect(page.locator("#constraints-list .st")).toHaveCount(0);
-  await page.keyboard.press("F9");
-  await expect(page.locator("#preview-badge")).toBeHidden();
+  expect(sent).toEqual([]);
   // the same site served with the rnl the tests built (serve.mjs --rnl), on a port of its own
   const { server, url } = await solverServer();
   try {
@@ -1725,6 +1726,102 @@ test("the Solve view lists the constraints of a netlist; only a development serv
   } finally {
     server.kill();
   }
+});
+
+/**
+ * Keep what the page and the solver's Worker say to each other: `window.__solver` gets the requests of
+ * the page (without the files' texts) and the names of the events of the solve, in order.
+ */
+async function watchSolverWorker(page) {
+  await page.addInitScript(() => {
+    const Original = window.Worker;
+    window.__solver = { requests: [], events: [], started: 0 };
+    window.Worker = class extends Original {
+      constructor(url, options) {
+        super(url, options);
+        if (!/solver-worker\.js/.test(String(url))) return;
+        window.__solver.started += 1;
+        const post = this.postMessage.bind(this);
+        this.postMessage = (message, ...rest) => {
+          const { files, ...request } = message.request;
+          window.__solver.requests.push({ ...request, files: Object.keys(files) });
+          return post(message, ...rest);
+        };
+        this.addEventListener("message", (e) => {
+          if (e.data.event) window.__solver.events.push(e.data.event.event);
+        });
+      }
+    };
+  });
+}
+
+test("the web viewer solves in the browser: its Worker starts at the first Solve, not before, and tells the events of the solve", async ({ page }) => {
+  test.setTimeout(120000);
+  await watchSolverWorker(page);
+  const requested = [];
+  page.on("request", (request) => requested.push(new URL(request.url()).pathname.replace(/^\//, "")));
+  await page.goto(`${process.env.RNL_WEB_URL}/?url=samples/cases/04-hierarchy.sp`);
+  await expect(page).toHaveTitle(/^04-hierarchy\.sp/);
+  await page.waitForFunction(() => !document.body.classList.contains("busy"));
+  // to look at a netlist the solver is not loaded, nor its Worker started
+  expect(requested.filter((p) => /^(solver-worker\.js|core\/solver\.js|core\/rnl_solver_wasm\.wasm)$/.test(p))).toEqual([]);
+  expect(await page.evaluate(() => window.__solver.started)).toBe(0);
+  // Solve (F9) solves the circuit shown: its title is the level, and the files the page read are the request
+  await page.keyboard.press("F9");
+  await page.waitForFunction(() => document.body.classList.contains("preview") && !document.body.classList.contains("solving"), null, { timeout: 90000 });
+  expect(requested).toEqual(expect.arrayContaining(["solver-worker.js", "core/solver.js", "core/rnl_solver_wasm.wasm"]));
+  const { requests, events, started } = await page.evaluate(() => window.__solver);
+  expect(started).toBe(1);
+  expect(requests).toHaveLength(1);
+  expect(requests[0].entry).toMatch(/04-hierarchy\.sp$/);
+  expect(requests[0].files).toContain(requests[0].entry);
+  expect(requests[0].solver_config).toBe("");
+  expect(typeof requests[0].level).toBe("string");
+  // the events as docs/solver-progress.md has them: the run, the level, and the level done
+  expect(events[0]).toBe("run");
+  expect(events).toContain("level");
+  expect(events).toContain("level-done");
+  // the Document is the solved one, with the report of the level in the side panel
+  await expect(page.locator("#preview-badge")).toBeVisible();
+  await expect(page.locator("#solve-report .solve-level")).toHaveCount(1);
+  await expect(page.locator("#solve-step")).toContainText("Solved:");
+  // Solve All Circuits solves every level, with the Worker the first solve started
+  await page.evaluate(() => window.viewer.command("solve-all"));
+  await page.waitForFunction(() => document.body.classList.contains("preview") && !document.body.classList.contains("solving") && window.__solver.requests.length === 2);
+  const all = await page.evaluate(() => window.__solver);
+  expect(all.started).toBe(1);
+  expect(all.requests[1].level).toBeNull();
+  await expect.poll(() => page.locator("#solve-report .solve-level").count()).toBeGreaterThan(1);
+  // Close Preview shows the netlist as read
+  await page.evaluate(() => window.viewer.command("solve-close"));
+  await expect(page.locator("#preview-badge")).toBeHidden();
+});
+
+test("a solve in the browser is cancelled by stopping its Worker, and the next Solve starts another", async ({ page, browserName }) => {
+  test.skip(browserName !== "chromium", "only Chromium routes the requests of a Worker, which holds the solver's module back here");
+  test.setTimeout(120000);
+  await watchSolverWorker(page);
+  // the solver's module arrives late, so that Cancel is pressed while the solve is under way
+  let held = null;
+  await page.route("**/core/rnl_solver_wasm.wasm", async (route) => {
+    if (!held) await new Promise((resolve) => (held = resolve));
+    await route.continue().catch(() => {}); // the request of the Worker that was stopped has gone
+  });
+  await page.goto(`${process.env.RNL_WEB_URL}/?url=samples/cases/04-hierarchy.sp`);
+  await expect(page).toHaveTitle(/^04-hierarchy\.sp/);
+  await page.waitForFunction(() => !document.body.classList.contains("busy"));
+  await page.keyboard.press("F9");
+  await expect(page.locator("#solve-cancel")).toBeVisible();
+  await expect.poll(() => held !== null).toBe(true);
+  await page.locator("#solve-cancel").click();
+  await expect(page.locator("#solve-step")).toContainText("canceled");
+  await expect(page.locator("#preview-badge")).toBeHidden();
+  expect(await page.evaluate(() => document.body.classList.contains("solving"))).toBe(false);
+  held();
+  // the next Solve starts a Worker of its own, and solves
+  await page.keyboard.press("F9");
+  await page.waitForFunction(() => document.body.classList.contains("preview") && !document.body.classList.contains("solving"), null, { timeout: 90000 });
+  expect(await page.evaluate(() => window.__solver.started)).toBe(2);
 });
 
 test("a manifest's files are edited, downloaded and solved by a development server's solver, with the edit and the manifest's files and pool", async ({ page }) => {

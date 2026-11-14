@@ -6,7 +6,7 @@ import { append, m, setAttr, setText, tr } from "./i18n.js";
 // which stays as it is; a report of what became of each fact in the Solve view of the side panel,
 // every line of it shown in the netlist when clicked; and a copy of the files solved saved where
 // the user says. The solver's options are Solve > Settings (solve-settings.js). A shell without
-// `solve`, such as the web's, offers none of it.
+// `solve`, such as an embed's, offers none of it.
 
 import { inform, modal } from "./dialog.js";
 import { changes, unappliedPaths } from "./edits.js";

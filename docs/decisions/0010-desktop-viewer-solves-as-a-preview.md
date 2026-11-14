@@ -38,3 +38,7 @@ Point 2, that the viewer never writes into the files it opens, is changed by [de
 ## Note, 2026-10-31
 
 Point 5 stands for the published web viewer. The web viewer served by `apps/web/serve.mjs --rnl PATH`, the development server, solves with the `rnl` at that path, run by a service of the server for the page that it served (see [apps/web](../../apps/web/README.md#solving-with-a-solver-you-build)), so that a change to the solver is seen without building the viewer. It shows the same preview and report; it saves no copy and has no settings dialog. The Solve view, on both viewers, lists the constraints of the netlist that the core gives with the Document, and after a solve what became of each; that does not need a solver.
+
+## Note, 2026-11-14
+
+Point 5 no longer stands: the web viewer solves too, in the browser, with the solver as WebAssembly (`bindings/solver-wasm`) in a Worker of its own that the first Solve starts, so that a page that only looks at a netlist does not load it. The solve is a preview as on the desktop: the Document as solved and its report, nothing written. A page that a development server serves, with its `rnl`, solves with that instead; an embed does not solve. [apps/web](../../apps/web/README.md#solving-in-the-browser) has how.
