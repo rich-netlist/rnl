@@ -267,6 +267,7 @@
   @ALIAS("$偏置桩", "$BIAS_STUB");
   @ALIAS("$端口桩", "$IO_PORT_STUB");
   @ALIAS("$网名标签桩", "$NET_LABEL_STUB");
+  @ALIAS("$段标签", "$PIECE_LABEL");
   @ALIAS("$二极管", "$DIODE");
   @ALIAS("$齐纳二极管", "$ZENER_DIODE");
   @ALIAS("$发光二极管", "$LED");
@@ -500,6 +501,8 @@
   @ALIAS("端口", "p", definition="$IO_PORT_STUB");
   @ALIAS("引脚", "t", definition="$NET_LABEL_STUB");
   @ALIAS("标签", "l", definition="$NET_LABEL_STUB");
+  @ALIAS("引脚", "t", definition="$PIECE_LABEL");
+  @ALIAS("标签", "l", definition="$PIECE_LABEL");
   @ALIAS("输入1", "in1", definition="$ADDER");
   @ALIAS("输入2", "in2", definition="$ADDER");
   @ALIAS("输出", "out", definition="$ADDER");

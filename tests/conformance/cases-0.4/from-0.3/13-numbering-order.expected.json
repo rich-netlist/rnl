@@ -757,8 +757,19 @@
           "priority": "low"
         }
       ],
-      "unplaced": []
+      "unplaced": [
+        "%l"
+      ]
     }
   ],
-  "diagnostics": []
+  "diagnostics": [
+    {
+      "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
+      "file": "13-numbering-order.sp",
+      "line": 20,
+      "col": 0
+    }
+  ]
 }

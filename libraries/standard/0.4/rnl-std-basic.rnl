@@ -688,4 +688,12 @@
 
   /* The port nets that rnl-std-fill gives a port tag: every port net of every level, supply and ground nets too, less those with an $IO_PORT written and those of a level with a $PORT_LIST. A file takes a net out with REMOVE-FROM, such as # @SELECT-NET(name="vdd") => @REMOVE-FROM $PORT_FILL_SET. */
   $PORT_FILL_SET = # @SELECT-NET(port=true, recursive=true);
+
+  /* ---------------------------------------------------------------- the name of a piece of a net */
+
+  /* A net label joined to the wires of a pin: the label's pin and the pin are one tree with the piece the pin is in (13.7), and the solver draws the label on a short branch of it. How rnl-std-fill names a piece of a net drawn in pieces (10.2, 10.5). */
+  $PIECE_LABEL = @DEFINE(roles=[["t", "pin"]]) {
+    %l = $NET_LABEL @ATTACH ?t::net;
+    {?t %l} @ROUTE-OBJECT(priority="low");
+  };
 }

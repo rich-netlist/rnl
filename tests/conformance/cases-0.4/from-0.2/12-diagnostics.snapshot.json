@@ -9,7 +9,7 @@
       "name": "12-diagnostics.sp",
       "file": 0,
       "line": 0,
-      "status": "3 without a position; constraints: 11 ok, 1 failed, 8 unsolved",
+      "status": "5 without a position; constraints: 11 ok, 1 failed, 8 unsolved",
       "host": {
         "ports": [],
         "instances": [
@@ -1310,6 +1310,142 @@
                 "dir": 180,
                 "nets": [
                   "&a"
+                ]
+              }
+            ]
+          },
+          {
+            "pin_of": "#R1",
+            "id": "@rnl-std-fill.rnl:85:3#1",
+            "kind": "usage",
+            "host": [],
+            "definition": "$PIECE_LABEL",
+            "attach": {
+              "t": "pin(#R1,0)"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "parent": "@rnl-std-fill.rnl:85:3#1",
+            "id": "@rnl-std-basic.rnl:696:9#1",
+            "kind": "usage",
+            "host": [],
+            "definition": "$NET_LABEL",
+            "attach": {
+              "p": "pin(#R1,0)::net"
+            },
+            "symbol": {
+              "value": "$NET_LABEL_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(@rnl-std-basic.rnl:696:9#1,0)",
+                "index": 0,
+                "names": [
+                  "pin"
+                ],
+                "bus": false,
+                "local_at": [
+                  0.0,
+                  0.0
+                ],
+                "terminals": [
+                  "p"
+                ],
+                "at": null,
+                "dir": 180,
+                "nets": [
+                  "&a"
+                ]
+              }
+            ]
+          },
+          {
+            "pin_of": "#R1",
+            "id": "@rnl-std-fill.rnl:85:3#2",
+            "kind": "usage",
+            "host": [],
+            "definition": "$PIECE_LABEL",
+            "attach": {
+              "t": "pin(#R1,1)"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "parent": "@rnl-std-fill.rnl:85:3#2",
+            "id": "@rnl-std-basic.rnl:696:9#2",
+            "kind": "usage",
+            "host": [],
+            "definition": "$NET_LABEL",
+            "attach": {
+              "p": "pin(#R1,1)::net"
+            },
+            "symbol": {
+              "value": "$NET_LABEL_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(@rnl-std-basic.rnl:696:9#2,0)",
+                "index": 0,
+                "names": [
+                  "pin"
+                ],
+                "bus": false,
+                "local_at": [
+                  0.0,
+                  0.0
+                ],
+                "terminals": [
+                  "p"
+                ],
+                "at": null,
+                "dir": 180,
+                "nets": [
+                  "&b"
                 ]
               }
             ]

@@ -2465,7 +2465,9 @@
           "priority": "low"
         }
       ],
-      "unplaced": []
+      "unplaced": [
+        "%l"
+      ]
     }
   ],
   "diagnostics": [
@@ -2476,6 +2478,14 @@
       "file": "07-sets-and-selections.sp",
       "line": 26,
       "col": 18
+    },
+    {
+      "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
+      "file": "07-sets-and-selections.sp",
+      "line": 1,
+      "col": 0
     }
   ]
 }

@@ -178,7 +178,7 @@
       "name": "cell",
       "file": 0,
       "line": 20,
-      "status": null,
+      "status": "1 without a position",
       "host": {
         "ports": [
           "&a",
@@ -284,6 +284,14 @@
           {
             "id": "$IO_PORT_SYMBOL",
             "name": "$IO_PORT_SYMBOL",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$NET_LABEL_SYMBOL",
+            "name": "$NET_LABEL_SYMBOL",
             "package": "rnl-std-basic",
             "level": null,
             "default": false,
@@ -589,6 +597,74 @@
                 "dir": 0,
                 "nets": [
                   "&b"
+                ]
+              }
+            ]
+          },
+          {
+            "pin_of": "#R1",
+            "id": "@rnl-std-fill.rnl:85:3",
+            "kind": "usage",
+            "host": [],
+            "definition": "$PIECE_LABEL",
+            "attach": {
+              "t": "pin(#R1,0)"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "parent": "@rnl-std-fill.rnl:85:3",
+            "id": "@rnl-std-basic.rnl:696:9",
+            "kind": "usage",
+            "host": [],
+            "definition": "$NET_LABEL",
+            "attach": {
+              "p": "pin(#R1,0)::net"
+            },
+            "symbol": {
+              "value": "$NET_LABEL_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "kind": "pin",
+                "id": "pin(@rnl-std-basic.rnl:696:9,0)",
+                "index": 0,
+                "names": [
+                  "pin"
+                ],
+                "bus": false,
+                "local_at": [
+                  0.0,
+                  0.0
+                ],
+                "terminals": [
+                  "p"
+                ],
+                "at": null,
+                "dir": 180,
+                "nets": [
+                  "&a"
                 ]
               }
             ]

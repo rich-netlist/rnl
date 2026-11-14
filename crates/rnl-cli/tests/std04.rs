@@ -819,3 +819,44 @@ X0 n1 n2 top\n.end\n";
     assert_eq!(count("blk", "DISTANCE"), 2);
     assert_eq!(count("top", "DISTANCE"), 4);
 }
+
+#[test]
+fn fill_names_each_wired_piece_of_a_net_drawn_in_pieces() {
+    // Net b is drawn in two pieces by two ROUTE-OBJECT trees, neither with a name: the first pin
+    // of each gets a $PIECE_LABEL. The port net p has one wired piece, and its tag comes after the
+    // pieces are fixed: that piece gets one too. On the ground net 0 the wired piece {R7:n, R8:n}
+    // gets a ground stub, as R9:n, unwired, does already (10.2, 16.3).
+    let text = "* pieces\n\
+* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }\n\
+.subckt cell p q\n\
+R1 a b 1k\nR2 b c 1k\nR3 b d 1k\nR4 b e 1k\nR5 p f 1k\nR6 p g 1k\nR7 h 0 1k\nR8 k 0 1k\nR9 m 0 1k\n\
+* @RNL {\n\
+*   {#R1:2 #R2:1} @ROUTE-OBJECT;\n\
+*   {#R3:1 #R4:1} @ROUTE-OBJECT;\n\
+*   {#R5:1 #R6:1} @ROUTE-OBJECT;\n\
+*   {#R7:2 #R8:2} @ROUTE-OBJECT(priority=\"high\");\n\
+* }\n\
+.ends\n\
+X1 n1 n2 cell\n.end\n";
+    let r = read(&MemoryProvider::new().with("t.sp", text), &Options::default());
+    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
+    let level = r.model.levels.iter().find(|l| l.title == "cell").unwrap();
+    let on = |definition: &str| {
+        let mut pins: Vec<String> = level
+            .objects
+            .iter()
+            .filter(|o| o.definition.as_deref() == Some(definition))
+            .map(|o| format!("{:?}", o.attach[0].1))
+            .collect();
+        pins.sort();
+        pins
+    };
+    let pieces = on("$PIECE_LABEL");
+    assert_eq!(pieces.len(), 3, "{pieces:?}");
+    for pin in ["R1", "R3", "R5"] {
+        assert!(pieces.iter().any(|p| p.contains(pin)), "{pin} in {pieces:?}");
+    }
+    let grounds = on("$GROUND_STUB");
+    assert_eq!(grounds.len(), 2, "{grounds:?}");
+    assert!(grounds.iter().any(|p| p.contains("R7")) && grounds.iter().any(|p| p.contains("R9")), "{grounds:?}");
+}

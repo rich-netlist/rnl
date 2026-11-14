@@ -2373,7 +2373,11 @@
           "priority": "low"
         }
       ],
-      "unplaced": []
+      "unplaced": [
+        "%l",
+        "%l",
+        "%l"
+      ]
     },
     {
       "title": "amp",
@@ -3493,8 +3497,27 @@
           "priority": "low"
         }
       ],
-      "unplaced": []
+      "unplaced": [
+        "%l"
+      ]
     }
   ],
-  "diagnostics": []
+  "diagnostics": [
+    {
+      "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
+      "file": "04-hierarchy-lib.inc",
+      "line": 3,
+      "col": 0
+    },
+    {
+      "severity": "hint",
+      "code": "RNL9404",
+      "name": "unplaced-objects",
+      "file": "04-hierarchy.sp",
+      "line": 8,
+      "col": 0
+    }
+  ]
 }

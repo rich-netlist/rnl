@@ -64,4 +64,23 @@
   %port_tag_set @GROUP;
   %port_instance_set = # @SELECT-INSTANCE(recursive=true);
   %port_tag_set %port_instance_set @DISTANCE("left-to-right", min=4, priority="low");
+
+  /* A net drawn in two or more pieces (10.2): the first pin of each wired piece gets a mark of its net, so that no piece is cut off without a name; a ground or supply net its stub, any other net a $PIECE_LABEL. A piece that starts with a pin of a part the fill places itself, such as a port tag, a ground or a label, gets nothing more. */
+  $GROUND_NET_SET @SELECT-NET(split=true, recursive=true) => @SELECT-PIN(piece_first=true, wired=true, recursive=true) => @ADD-TO $GROUND_FILL_SET;
+  $SUPPLY_NET_SET @SELECT-NET(split=true, recursive=true) => @SELECT-PIN(piece_first=true, wired=true, recursive=true) => @ADD-TO $SUPPLY_FILL_SET;
+  %own_pin_set @REMOVE-FROM $GROUND_FILL_SET;
+  %bulk_pin_set @REMOVE-FROM $GROUND_FILL_SET;
+  %own_pin_set @REMOVE-FROM $SUPPLY_FILL_SET;
+  %bulk_pin_set @REMOVE-FROM $SUPPLY_FILL_SET;
+  %piece_label_set = # @SELECT-NET(split=true, recursive=true) => @SELECT-PIN(piece_first=true, wired=true, recursive=true);
+  /* A port net of $PORT_FILL_SET: its tag comes after the pieces are fixed, so each wired piece of it gets a $PIECE_LABEL too, split or not. */
+  $PORT_FILL_SET @SELECT-PIN(piece_first=true, wired=true, recursive=true) => @ADD-TO %piece_label_set;
+  %rail_piece_pin_set = {$GROUND_NET_SET $SUPPLY_NET_SET} @SELECT-PIN(recursive=true);
+  %bulk_pin_set @REMOVE-FROM %rail_piece_pin_set;
+  %rail_piece_pin_set @REMOVE-FROM %piece_label_set;
+  %own_pin_set @REMOVE-FROM %piece_label_set;
+  # @SELECT-USAGE(recursive=true) $PIECE_LABEL => @SELECT-PIN(role="t", recursive=true) => @REMOVE-FROM %piece_label_set;
+  # @SELECT-USAGE(recursive=true) $NET_LABEL_STUB => @SELECT-PIN(role="t", recursive=true) => @REMOVE-FROM %piece_label_set;
+  # @SELECT-USAGE(recursive=true) $IO_PORT_STUB => @SELECT-PIN(role="t", recursive=true) => @REMOVE-FROM %piece_label_set;
+  $PIECE_LABEL @ATTACH %piece_label_set;
 }
