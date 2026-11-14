@@ -194,6 +194,35 @@ fn a_usage_is_one_member_a_black_box_of_the_nets_it_shares() {
 }
 
 #[test]
+fn a_port_counts_for_two_black_boxes_that_bring_the_same_terminal() {
+    // {R1 R2} and {R2 R3} both bring R2, the only terminal on n: n is used outside neither, so it
+    // is a net of both only when it is a port of the level (15.4)
+    let text = |ports: &str, outer: &str, topology: &str| {
+        format!(
+            "* overlap\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\") }}\n.subckt cell {ports}\nR1 y1 x 1k\nR2 n x 1k\nR3 x y3 1k\n* @RNL {{ {{{{#R1 #R2}} {{#R2 #R3}}}} @ASSERT-TOPOLOGY(\"{topology}\") }}\n.ends cell\nX1 {outer} cell\n.end\n"
+        )
+    };
+    for (ports, outer, topology, holds) in [
+        // n a port: the two share n and x, in parallel and neither in series nor a star
+        ("y1 y3 n", "a b c", "parallel", true),
+        ("y1 y3 n", "a b c", "series", false),
+        ("y1 y3 n", "a b c", "star", false),
+        // n inside the level: they share x alone
+        ("y1 y3", "a b", "parallel", false),
+        ("y1 y3", "a b", "series", true),
+        ("y1 y3", "a b", "star", true),
+    ] {
+        let r = read_with(&text(ports, outer, topology), false);
+        assert_eq!(
+            violations(&r, codes::VIOLATION_TOPOLOGY),
+            usize::from(!holds),
+            "ports {ports}, {topology}: {:?}",
+            found(&r)
+        );
+    }
+}
+
+#[test]
 fn a_malformed_version_is_an_unsupported_one() {
     // "1" and "v1.2" are not of the form major.minor: the file is of an unsupported version, and
     // none of its RNL is read (16.1)
