@@ -11,7 +11,8 @@
 // or for npm (publish-runtime.yml publishes it as @rich-netlist/runtime): a named package is not
 // private, and has the README of packages/runtime and the licenses of what it holds. --solver
 // also builds the solver's module of its own (bindings/solver-wasm), rnl_solver_wasm.wasm, with
-// solver.js to load it, for a page to load only when it solves.
+// solver.js to load it, for a page to load only when it solves; the package.json then exports them
+// as ./solver and ./solver.wasm.
 
 import { execFileSync } from "node:child_process";
 import { copyFileSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -97,14 +98,23 @@ const bytes = readFileSync(wasm);
 const size = (n) => `${n} bytes (${(n / 1024).toFixed(0)} KiB)`;
 console.log(`${out}`);
 console.log(`rnl_runtime_wasm.wasm: ${size(bytes.length)}, ${size(gzipSync(bytes, { level: 9 }).length)} gzip-compressed`);
+const solverFiles = ["solver.js", "solver.d.ts"];
 if (solver) {
   cargo(["build", "--profile", "wasm", "--target", "wasm32-unknown-unknown", "-p", "rnl-solver-wasm"], { stdio: "inherit" });
   const built = join(metadata.target_directory, "wasm32-unknown-unknown", "wasm", "rnl_solver_wasm.wasm");
   copyFileSync(built, join(out, "rnl_solver_wasm.wasm"));
-  copyFileSync(join(here, "..", "solver-wasm", "js", "solver.js"), join(out, "solver.js"));
+  for (const name of solverFiles) copyFileSync(join(here, "..", "solver-wasm", "js", name), join(out, name));
+  // the package names the solver only when it holds it
+  const pkg = JSON.parse(readFileSync(join(out, "package.json"), "utf8"));
+  pkg.exports = {
+    ...pkg.exports,
+    "./solver": { types: "./solver.d.ts", default: "./solver.js" },
+    "./solver.wasm": "./rnl_solver_wasm.wasm",
+  };
+  writeFileSync(join(out, "package.json"), lines(JSON.stringify(pkg, null, 2)));
   const solverBytes = readFileSync(built);
   console.log(`rnl_solver_wasm.wasm: ${size(solverBytes.length)}, ${size(gzipSync(solverBytes, { level: 9 }).length)} gzip-compressed`);
 } else {
   // a solver's module of an earlier build would not be the one of this source
-  for (const stale of ["rnl_solver_wasm.wasm", "solver.js"]) rmSync(join(out, stale), { force: true });
+  for (const stale of ["rnl_solver_wasm.wasm", ...solverFiles]) rmSync(join(out, stale), { force: true });
 }

@@ -3,8 +3,8 @@
 //
 //   node bindings/runtime-wasm/tests/package.mjs DIR VERSION
 //
-// The tarball must hold the module, the JavaScript modules with their declarations, the README and
-// the licenses, and nothing else. Its package.json must name @rich-netlist/runtime at VERSION, not be
+// The tarball must hold the core's module and the solver's (build.mjs --solver), the JavaScript
+// modules with their declarations, the README and the licenses, and nothing else. Its package.json must name @rich-netlist/runtime at VERSION, not be
 // private, be public on npm, name the repository that npm's provenance checks, give the license of
 // what the package holds, and export files that are in it. The build must bring no packages of its
 // own, as build.mjs --packages would: the core bundles the standard packages.
@@ -55,12 +55,23 @@ const expected = [
   "package.json",
   "packages.js",
   "rnl_runtime_wasm.wasm",
+  "rnl_solver_wasm.wasm",
   "snapshot.d.ts",
+  "solver.d.ts",
+  "solver.js",
   "worker.js",
 ];
+want("solver.js as ./solver", pkg.exports?.["./solver"]?.default === "./solver.js");
+want("the solver's module as ./solver.wasm", pkg.exports?.["./solver.wasm"] === "./rnl_solver_wasm.wasm");
 want(`the files ${expected.join(", ")}, not ${files.join(", ")}`, files.join() === expected.join());
 const targets = [pkg.types, ...Object.values(pkg.exports ?? {}).flatMap((e) => (typeof e === "string" ? [e] : Object.values(e)))];
 for (const t of targets) want(`${t}, which package.json names, in the tarball`, files.includes(t.replace(/^\.\//, "")));
+
+// The solver's module is built from the library of the `rnl` command, which also draws PNG images
+// with crates under other licenses than the package names. None of that code is called by the
+// module, so none is in it: a PNG writer would bring the name of the image's first chunk.
+const solverModule = readFileSync(join(dir, "rnl_solver_wasm.wasm"));
+want("no PNG writer in the solver's module, whose crates the package's license does not name", !solverModule.includes("IHDR"));
 
 // no packages of the build's own: the core bundles them
 const packages = readFileSync(join(dir, "packages.js"), "utf8");

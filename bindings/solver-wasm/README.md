@@ -10,7 +10,7 @@ It takes a solve request and gives the Document drawn as solved, the report, and
 node bindings/runtime-wasm/build.mjs --solver
 ```
 
-This builds the core's module and this one with the workspace's `wasm` profile. It puts `rnl_solver_wasm.wasm` and [`js/solver.js`](js/solver.js) into `dist/` beside the core's, and prints the sizes of both modules. The solver's module is the larger: it compiles in the solver and the writing back as well as the core.
+This builds the core's module and this one with the workspace's `wasm` profile. It puts `rnl_solver_wasm.wasm` and [`js/solver.js`](js/solver.js) with its declarations into `dist/` beside the core's, and prints the sizes of both modules. The `package.json` there then exports them as `./solver` and `./solver.wasm`; the npm package [`@rich-netlist/runtime`](../../packages/runtime/README.md#solver) is built so. The solver's module is the larger: it compiles in the solver and the writing back as well as the core.
 
 ## The interface
 

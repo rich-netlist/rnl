@@ -154,6 +154,27 @@ const document = await core.build({ entry: design.entry, files: design.files, po
 
 `loadManifest(json, { readFile })` reads a manifest already parsed, such as a project's, with `readFile(path)` giving each file's bytes from its archive; `writeManifest({ files, entry, pool, formats, level, archive })` writes one, with the SHA-256 and size of each file's bytes, and checks it as a reader would. Node 18 and later, and browsers, are supported.
 
+## Solver
+
+The solver, which places and wires a draft 0.4 level, is a second module that the core does not load. A page fetches it only when the user solves:
+
+```js
+import { loadSolver } from "@rich-netlist/runtime/solver";
+
+// In a Worker of its own: the call is synchronous and can take the solver's whole time limit.
+// The module is the package's ./solver.wasm: its URL in Node is
+// import.meta.resolve("@rich-netlist/runtime/solver.wasm"); a bundler has its own way to give the
+// URL of a file of a package.
+const bytes = await (await fetch(solverWasmUrl)).arrayBuffer();
+const solver = await loadSolver(bytes);
+const answer = solver.solve({ entry: "/top.sp", files, solver_config: 'limit="time",seconds=10' }, (event) => {
+  // progress events; return false to cancel
+});
+// answer is { document, report, files }, { cancelled: true } or { error }
+```
+
+`files` in the answer holds the texts the solve wrote, by the paths of the request. With `respace: true` the request spaces a solved drawing again and searches nothing. The [solver binding's README](https://github.com/rich-netlist/rnl/tree/main/bindings/solver-wasm#readme) describes the request, the answer, the clock and cancelling. Terminating the Worker cancels at once.
+
 ## Vite
 
 A frontend built with Vite needs three settings:
@@ -177,4 +198,4 @@ for CI, trusted publishing and partial-publication recovery.
 
 ## License
 
-The JavaScript modules and the code compiled into the module are under the MIT license (`LICENSE`). The package also holds the built-in standard packages under CC0-1.0, and the metrics of the font Noto Sans SC, copyright 2014-2021 Adobe, under the SIL Open Font License 1.1 (`LICENSES/`).
+The JavaScript modules and the code compiled into the two modules are under the MIT license (`LICENSE`). The package also holds the built-in standard packages under CC0-1.0, and the metrics of the font Noto Sans SC, copyright 2014-2021 Adobe, under the SIL Open Font License 1.1 (`LICENSES/`).

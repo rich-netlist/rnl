@@ -130,7 +130,7 @@ jobs:
         env:
           VERSION: ${{ needs.validate.outputs.version }}
         run: |
-          node bindings/runtime-wasm/build.mjs --out packages/runtime/dist --name @rich-netlist/runtime --version "$VERSION"
+          node bindings/runtime-wasm/build.mjs --solver --out packages/runtime/dist --name @rich-netlist/runtime --version "$VERSION"
           node bindings/runtime-wasm/tests/core.mjs packages/runtime/dist
           node bindings/runtime-wasm/tests/package.mjs packages/runtime/dist "$VERSION"
           cd packages/runtime/dist
