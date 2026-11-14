@@ -150,6 +150,7 @@ mod scene_selection_order;
 mod scope;
 mod search_paths;
 mod segments;
+mod select_net_pieces04;
 mod selection_inputs04;
 mod selection_scope_order;
 mod selective_routing;

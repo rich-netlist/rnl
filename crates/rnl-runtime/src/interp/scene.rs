@@ -176,6 +176,8 @@ pub struct Scene {
     pub routes: Vec<ObjId>,
     pub(super) routing_requests: Vec<super::routes::RoutingRequest>,
     pub(super) condition_trees: Vec<super::routes::RouteTree>,
+    /// The pieces of the nets that the selections of step 6 see (10.1), fixed as it begins.
+    pub(super) selection_pieces: Option<HashMap<ObjId, Vec<Vec<ObjId>>>>,
     pub(super) routing_failed: HashSet<usize>,
     pub(super) resolved_trees: Vec<super::routes::RouteTree>,
     pub keytexts: HashMap<(ObjId, String), ObjId>,
@@ -319,6 +321,7 @@ impl Scene {
             routes: Vec::new(),
             routing_requests: Vec::new(),
             condition_trees: Vec::new(),
+            selection_pieces: None,
             routing_failed: HashSet::new(),
             resolved_trees: Vec::new(),
             keytexts: HashMap::new(),
@@ -1782,6 +1785,7 @@ impl Interp<'_> {
                 let ports: Vec<String> =
                     self.doc.levels[lv].ports.iter().map(|p| self.doc.net_key_in(lv, p, file)).collect();
                 let ends = if params.contains_key("wired") { self.wire_ends(s) } else { HashMap::new() };
+                let pieces = if params.contains_key("split") { self.pieces_seen(s, snapshot) } else { HashMap::new() };
                 let mut out = Vec::new();
                 for n in cands {
                     let key = match self.o(n) {
@@ -1810,6 +1814,12 @@ impl Interp<'_> {
                             self.net_wired(s, n, &ends)
                         };
                         if wired != w {
+                            continue;
+                        }
+                    }
+                    // 10.2: the pins of the net are in two or more pieces
+                    if let Some(want) = params.get("split").and_then(Lit::boolean) {
+                        if pieces.get(&n).is_some_and(|pieces| pieces.len() >= 2) != want {
                             continue;
                         }
                     }
