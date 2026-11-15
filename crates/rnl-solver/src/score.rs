@@ -255,13 +255,12 @@ pub(crate) fn crowding(s: &Structure, origins: &[[Q; 2]], ori: &[Orient], droppe
 /// `crowding` of a 0.4 level adds to [`crowding`]: every text an object has
 /// (`Structure::text_offsets`: those its symbol places, its pins' labels, its own text), and the
 /// level's annotations, each once. A text is the object's it is attached to, or that of the symbol
-/// it is drawn in; the texts of one object, and those of a stub and its host, are left out, as
-/// [`texts_over`] leaves them, and so are two annotations over each other, which the overlaps count
-/// already (`annotation::collisions`). What the solution leaves free is not drawn, and an
-/// annotation whose box cannot be read counts nothing here, its error being the candidate's.
+/// it is drawn in; the texts of one object are left out, and so are two annotations over each
+/// other, which the overlaps count already (`annotation::collisions`). A stub's texts and its
+/// host's are counted as `rnl check` counts them. What the solution leaves free is not drawn, and
+/// an annotation whose box cannot be read counts nothing here, its error being the candidate's.
 pub(crate) fn texts_on_texts(problem: &LevelProblem, s: &Structure, geometry: &Geometry, origins: &[[Q; 2]]) -> usize {
     use rnl_runtime::problem::{Filler, Position};
-    let host = |k: usize| s.objects[k].stub.as_ref().map(|stub| stub.host.0);
     let owner = |k: usize| match (&problem.objects[k].text, &problem.objects[k].position) {
         (
             Some(rnl_runtime::problem::TextInfo {
@@ -286,7 +285,9 @@ pub(crate) fn texts_on_texts(problem: &LevelProblem, s: &Structure, geometry: &G
             texts.push((owner(object), true, b));
         }
     }
-    let apart = |a: usize, b: usize| a != b && host(a) != Some(b) && host(b) != Some(a);
+    // a stub's texts and its host's count as any two objects' do, as `rnl check` counts them
+    // (RNL7012): a reader sees one written over the other all the same
+    let apart = |a: usize, b: usize| a != b;
     // by their left edges, so that the texts a text can meet are those after it that begin
     // before it ends
     texts.sort_by(|a, b| a.2[0].cmp(&b.2[0]));
