@@ -181,6 +181,7 @@ fn oriented(s: &Structure, values: &[Orient], ways: &[usize], fit: bool) -> Vec<
         }
         let mut ori = s.witness.orient.clone();
         for (class, value) in s.open.classes.iter().zip(values) {
+            let value = class.allowed_or(*value);
             for (m, label) in &class.members {
                 ori[*m] = value.then(*label);
             }
@@ -193,7 +194,7 @@ fn oriented(s: &Structure, values: &[Orient], ways: &[usize], fit: bool) -> Vec<
     let Some(classes) = crate::search_choices::classes(s, &s.open.ways, ways) else { return orientations(s, values) };
     let mut ori = s.witness.orient.clone();
     for (class, value) in s.open.classes.iter().zip(values) {
-        let value = if fit { fitting(s, class.root, *value) } else { *value };
+        let value = if fit { fitting(s, class.root, *value) } else { class.allowed_or(*value) };
         for (m, _) in &class.members {
             let (_, label) = classes.find(*m);
             ori[*m] = value.then(label);
@@ -211,9 +212,15 @@ fn oriented(s: &Structure, values: &[Orient], ways: &[usize], fit: bool) -> Vec<
 
 /// Use a feasible current-directed orientation when a candidate proposes one outside that set.
 fn fitting(s: &Structure, root: usize, value: Orient) -> Orient {
+    let class = s.open.classes.iter().find(|c| c.root == root);
+    let allows = |v: Orient| class.is_none_or(|c| c.allows(v));
     match s.fitting.get(&root) {
-        Some(values) if !values.contains(&value) => values[0],
-        _ => value,
+        Some(values) if !values.contains(&value) || !allows(value) => values
+            .iter()
+            .copied()
+            .find(|v| allows(*v))
+            .unwrap_or_else(|| class.map_or(values[0], |c| c.allowed_or(value))),
+        _ => class.map_or(value, |c| c.allowed_or(value)),
     }
 }
 
@@ -1447,6 +1454,15 @@ pub(crate) fn sketch(
 /// the ground direction alone hangs an end on the ground down ([`grounded_end_down`]). All eight
 /// when none satisfies them.
 pub(crate) fn domain(s: &Structure, class: &FreeClass) -> Vec<Orient> {
+    let values: Vec<Orient> = domain_of(s, class).into_iter().filter(|v| class.allows(*v)).collect();
+    if values.is_empty() {
+        class.allowed.clone()
+    } else {
+        values
+    }
+}
+
+fn domain_of(s: &Structure, class: &FreeClass) -> Vec<Orient> {
     if let Some(values) = s.fitting.get(&class.root) {
         return values.clone();
     }

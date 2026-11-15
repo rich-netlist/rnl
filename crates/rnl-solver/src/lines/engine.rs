@@ -147,7 +147,7 @@ pub(crate) fn lay_out(
     }
     let before = laid.entry.clone();
     let mut notes = std::mem::take(&mut laid.notes);
-    let weights = (1, 4);
+    let weights = super::quality::WEIGHTS;
     let fallback = |mut laid: Laid, mut notes: Vec<String>, why: String, work: &mut Work| -> (Laid, LayoutSkeleton) {
         notes.push(format!("lines: {why}; the level is laid out as the group-tree layout has it"));
         if !crate::budget::stopped() {
@@ -232,7 +232,21 @@ pub(crate) fn lay_out(
             return fallback(laid, notes, why, work);
         }
     }
-    if mine.interrupted || mine > theirs {
+    // the one key of the tree's rank, the line search and this comparison
+    let rank = super::Rank::new(s);
+    let key = |placed: &Placed, routing: &Routing| {
+        let objectives = drawn(problem, s, &placed.geometry, routing)
+            .map(|w| measured_layers(problem, s, placed, Some(&w)))
+            .unwrap_or_default();
+        rank.entry(problem, s, options, placed, routing, objectives, &[])
+    };
+    // measured outside the level's budget, which the search may have used up: the comparison only
+    // reads the two drawings, and a stopped budget would make both alike
+    let ((k_mine, k_theirs), _) = crate::budget::with(&crate::StoppedClock, crate::RunLimit::Unlimited, None, || {
+        (key(&made.placed, &made.routing), key(&laid.placed, &laid.routing))
+    });
+    let invalid = |e: &Entry| e.written_path_error.is_some() || e.annotation_error.is_some();
+    if mine.interrupted || invalid(&k_mine) || (!invalid(&k_theirs) && k_mine.layers > k_theirs.layers) {
         return fallback(
             laid,
             notes,

@@ -11,7 +11,7 @@ use num_traits::Zero;
 use rnl_runtime::problem::LevelProblem;
 use std::collections::BTreeSet;
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct LabOrder {
     pub(super) interrupted: bool,
     pub(super) annotation_cost: (usize, usize),
@@ -28,6 +28,64 @@ pub(super) struct LabOrder {
     pub(super) crossings: u64,
     pub(super) bends: u64,
     pub(super) weights: (u64, u64),
+    /// The configured rules of the lines layout (overlaps, crowding, misleading, wire over symbol),
+    /// as the tree's rank has them; measured for a whole level only.
+    pub(super) rules: Vec<Q>,
+}
+
+/// The weights of a crossing and of a bend, one pair for the whole lines layout: the tracks it
+/// routes, the drawings its search ranks, the tree's arrangements it ranks and the comparison of
+/// its drawing with the tree's. A bend counts as four crossings.
+pub(super) const WEIGHTS: (u64, u64) = (1, 4);
+
+impl LabOrder {
+    #[allow(clippy::type_complexity)]
+    fn key(
+        &self,
+    ) -> ((bool, (usize, usize)), &Vec<Q>, (usize, u64), (usize, usize, usize, usize), (&Q, usize, usize, &Q), (u64, u64))
+    {
+        (
+            (self.interrupted, self.annotation_cost),
+            &self.rules,
+            (self.current, self.cb),
+            (self.hidden, self.levels, self.off_axis, self.near_dots),
+            (&self.length, self.lines, self.crosses, &self.area),
+            (self.crossings, self.bends),
+        )
+    }
+
+    /// The layers of the unified key after the annotations: the current marks, the weighed crossings
+    /// and bends, the hidden ports, the heights, the pairs off their axis, the dots near pins.
+    pub(super) fn head(&self) -> Vec<Q> {
+        [
+            self.current as u64,
+            self.cb,
+            self.hidden as u64,
+            self.levels as u64,
+            self.off_axis as u64,
+            self.near_dots as u64,
+        ]
+        .into_iter()
+        .map(|v| int(v as i64))
+        .collect()
+    }
+
+    /// The layers of the unified key after the rules: length, lines of the wires, crosses, area.
+    pub(super) fn tail(&self) -> Vec<Q> {
+        vec![self.length.clone(), int(self.lines as i64), int(self.crosses as i64), self.area.clone()]
+    }
+}
+
+impl PartialOrd for LabOrder {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for LabOrder {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.key().cmp(&other.key())
+    }
 }
 
 impl LabOrder {
@@ -48,6 +106,7 @@ impl LabOrder {
             crossings: 0,
             bends: 0,
             weights,
+            rules: Vec::new(),
         }
     }
     pub(super) fn said(&self) -> String {
@@ -90,8 +149,6 @@ impl LabOrder {
         )
     }
 }
-
-pub(crate) const LAB_KEY: usize = 6;
 
 /// Re-evaluate coordinate-dependent annotation graphics after every accepted move.
 /// The second count prevents compaction from moving wires through visible graphics.
@@ -137,15 +194,26 @@ pub(super) fn annotations_preserved(
     }
 }
 
-pub(crate) fn lab_key(problem: &LevelProblem, s: &Structure, placed: &Placed, routing: &Routing) -> Vec<Q> {
-    let l = lab_order(problem, s, placed, routing, (1, 1), None);
-    if l.interrupted {
-        return vec![int(i64::MAX); LAB_KEY];
+pub(super) fn lab_order(
+    problem: &LevelProblem,
+    s: &Structure,
+    placed: &Placed,
+    routing: &Routing,
+    weights: (u64, u64),
+    within: Option<&BTreeSet<usize>>,
+) -> LabOrder {
+    let mut l = lab_measure(problem, s, placed, routing, weights, within);
+    if within.is_none() && !l.interrupted {
+        let objectives = crate::score::drawn(problem, s, &placed.geometry, routing)
+            .map(|w| crate::score::measured_layers(problem, s, placed, Some(&w)))
+            .unwrap_or_default();
+        l.rules =
+            super::rank::rule_layers(s).iter().map(|&i| objectives.get(i).cloned().unwrap_or_else(Q::zero)).collect();
     }
-    vec![int(l.crossings as i64), int(l.bends as i64), int(l.lines as i64), int(l.crosses as i64), l.length, l.area]
+    l
 }
 
-pub(super) fn lab_order(
+pub(super) fn lab_measure(
     problem: &LevelProblem,
     s: &Structure,
     placed: &Placed,
@@ -358,6 +426,7 @@ pub(super) fn lab_order(
         crossings,
         bends,
         weights,
+        rules: Vec::new(),
     };
     if crate::budget::stopped() {
         LabOrder::interrupted(weights)
@@ -409,9 +478,10 @@ mod tests {
             }
         }
         assert!(interrupted && complete);
-        let (key, _) =
-            crate::budget::with(&StoppedClock, RunLimit::Work(0), None, || lab_key(&p, &s, &placed, &routing));
-        assert_eq!(key, vec![int(i64::MAX); LAB_KEY]);
+        let (stopped, _) = crate::budget::with(&StoppedClock, RunLimit::Work(0), None, || {
+            lab_order(&p, &s, &placed, &routing, WEIGHTS, None)
+        });
+        assert!(stopped.interrupted && stopped > full);
     }
 
     /// A wire that takes the default route of `auto` (13.1) from a pin that leaves sideways to a

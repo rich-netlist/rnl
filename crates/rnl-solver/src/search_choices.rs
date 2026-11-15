@@ -72,14 +72,11 @@ pub(crate) fn classes(s: &Structure, ways: &[Way], values: &[usize]) -> Option<O
             take(&mut classes, &effect(original, values.get(i).copied().unwrap_or(w.taken)), f).ok()?;
             continue;
         }
-        if let Some((object, _)) = absolute_pin_codes(original) {
-            classes.fix(object, s.witness.orient[object], f).ok()?;
+        if absolute_pin_codes(original).is_some() {
             continue;
         }
         match original {
-            OrientEffect::FixOneOf { object, .. } => {
-                classes.fix(*object, s.witness.orient[*object], f).ok()?;
-            }
+            OrientEffect::FixOneOf { .. } => {}
             OrientEffect::RelateOneOf { from, to, relations } => {
                 for &a in from {
                     for &b in to {
@@ -131,22 +128,43 @@ pub(crate) fn for_layout(s: &Structure, work: &mut crate::Work) -> Structure {
             by_root.entry(root).or_default().push((k, label));
         }
     }
-    out.open.classes = by_root.into_iter().map(|(root, members)| FreeClass { root, members }).collect();
+    // an ORIENT list or an absolute pin direction on a member narrows the values of its class's
+    // root; a class one value is left to is drawn as the witness has it, as a fixed one
+    let mut allowed: BTreeMap<usize, Vec<Orient>> = BTreeMap::new();
+    for &f in &s.kept {
+        let original = &s.model.units[f].orient;
+        let (object, codes) = match original {
+            OrientEffect::FixOneOf { object, codes } => (*object, codes.clone()),
+            _ => match absolute_pin_codes(original) {
+                Some(x) => x,
+                None => continue,
+            },
+        };
+        let (root, label) = classes.find(object);
+        if !by_root.contains_key(&root) {
+            continue;
+        }
+        let these: Vec<Orient> = codes.iter().map(|c| c.then(crate::orient::inverse(label))).collect();
+        let now = allowed.entry(root).or_insert_with(|| Orient::ALL.to_vec());
+        now.retain(|v| these.contains(v));
+    }
+    out.open.classes = by_root
+        .into_iter()
+        .filter_map(|(root, members)| {
+            let mut values = allowed.remove(&root).unwrap_or_else(|| Orient::ALL.to_vec());
+            if values.len() <= 1 {
+                return None;
+            }
+            let witness = s.witness.orient[root];
+            values.sort_by_key(|v| *v != witness);
+            Some(FreeClass { root, members, allowed: values })
+        })
+        .collect();
     out.open.ways = s
         .kept
         .iter()
         .filter_map(|&fact| {
-            if let Some((object, codes)) = absolute_pin_codes(&s.model.units[fact].orient) {
-                return Some(Way {
-                    fact,
-                    count: codes.len(),
-                    taken: codes.iter().position(|v| *v == s.witness.orient[object])?,
-                });
-            }
             let (count, taken) = match &s.model.units[fact].orient {
-                OrientEffect::FixOneOf { object, codes } => {
-                    (codes.len(), codes.iter().position(|v| *v == s.witness.orient[*object])?)
-                }
                 OrientEffect::RelateOneOf { from, to, relations } => {
                     let ([a], [b]) = (from.as_slice(), to.as_slice()) else { return None };
                     let ((ra, ga), (rb, gb)) = (classes.find(*a), classes.find(*b));
@@ -233,8 +251,10 @@ mod tests {
         assert!(classes(&s, &[], &[]).is_some());
     }
 
+    /// Two ORIENT lists on one object narrow its class to the values both allow, the witness's
+    /// first; lists that leave one value open no class, and the object is drawn as the witness has it.
     #[test]
-    fn incompatible_way_choices_reject_the_whole_batch() {
+    fn orientation_lists_narrow_one_class_to_the_values_all_allow() {
         let mut p = problem_of(
             vec![instance()],
             vec![
@@ -243,15 +263,26 @@ mod tests {
             ],
         );
         p.version = "0.4".into();
-        p.orient_lists = vec![(0, vec![Orient::R0, Orient::R90]), (1, vec![Orient::R0, Orient::R90])];
-        let original = structure(&p);
-        let s = for_layout(&original, &mut Work::default());
-        assert_eq!(s.open.ways.len(), 2);
-        let c = candidate(vec![], vec![1, 0]);
-        with_relations(&s, &orientation_relations(&s, &c), &mut Work::default(), |resolver, _, _| {
-            assert!(resolver.holds(0) && resolver.holds(1));
-            assert_eq!(resolver.geometry().orient, s.witness.orient);
-        });
+        p.orient_lists = vec![(0, vec![Orient::R0, Orient::R90, Orient::MY]), (1, vec![Orient::R0, Orient::MY])];
+        let s = for_layout(&structure(&p), &mut Work::default());
+        assert!(s.open.ways.is_empty());
+        assert_eq!(s.open.classes.len(), 1);
+        let allowed = &s.open.classes[0].allowed;
+        assert_eq!(allowed.len(), 2);
+        assert!(allowed.contains(&Orient::R0) && allowed.contains(&Orient::MY));
+        assert_eq!(allowed[0], s.witness.orient[0]);
+        for v in allowed.clone() {
+            let c = candidate(vec![v], vec![]);
+            with_relations(&s, &orientation_relations(&s, &c), &mut Work::default(), |resolver, _, taken| {
+                assert!(taken.kept.iter().all(|k| *k));
+                assert!(resolver.holds(0) && resolver.holds(1));
+                assert_eq!(resolver.geometry().orient[0], v);
+            });
+        }
+        p.orient_lists = vec![(0, vec![Orient::R0, Orient::R90]), (1, vec![Orient::R0, Orient::MY])];
+        let s = for_layout(&structure(&p), &mut Work::default());
+        assert!(s.open.classes.is_empty() && s.open.ways.is_empty());
+        assert_eq!(s.witness.orient[0], Orient::R0);
     }
 
     #[test]
@@ -261,8 +292,10 @@ mod tests {
         p.orient_lists = vec![(0, vec![Orient::R0, Orient::R90])];
         let original = structure(&p);
         let s = for_layout(&original, &mut Work::default());
-        assert!(s.open.classes.is_empty());
-        let c = candidate(vec![], vec![1]);
+        assert!(s.open.ways.is_empty());
+        assert_eq!(s.open.classes.len(), 1);
+        assert!(s.open.classes[0].allows(Orient::R90));
+        let c = candidate(vec![Orient::R90], vec![]);
         with_relations(&s, &orientation_relations(&s, &c), &mut Work::default(), |resolver, _, taken| {
             assert!(taken.kept.iter().all(|k| *k));
             assert_eq!(resolver.geometry().orient[0], Orient::R90);
@@ -283,7 +316,7 @@ mod tests {
     }
 
     #[test]
-    fn absolute_pin_directions_are_search_ways_without_rewriting_the_predicate() {
+    fn absolute_pin_directions_narrow_a_class_without_rewriting_the_predicate() {
         use rnl_runtime::problem::DirectedPin;
         let mut p = problem_of(
             vec![instance(), instance()],
@@ -300,12 +333,13 @@ mod tests {
         let s = for_layout(&original, &mut Work::default());
         assert_eq!(s.model.units, original.model.units);
         assert_eq!(s.witness, original.witness);
-        assert!(s.open.classes.is_empty());
-        assert_eq!(s.open.ways.len(), 1);
-        assert_eq!(s.open.ways[0].count, 2);
+        assert!(s.open.ways.is_empty());
+        assert_eq!(s.open.classes.len(), 1);
+        let allowed = s.open.classes[0].allowed.clone();
+        assert_eq!(allowed.len(), 2);
         let mut tried = Vec::new();
-        for value in 0..2 {
-            let c = candidate(vec![], vec![value]);
+        for value in allowed.clone() {
+            let c = candidate(vec![value], vec![]);
             let proposed = c.orientations(&s);
             assert_eq!(proposed[0], proposed[1]);
             with_relations(&s, &orientation_relations(&s, &c), &mut Work::default(), |r, _, taken| {
@@ -320,7 +354,7 @@ mod tests {
         capped.caps.nodes = 0;
         with_relations(
             &capped,
-            &orientation_relations(&capped, &candidate(vec![], vec![1])),
+            &orientation_relations(&capped, &candidate(vec![allowed[1]], vec![])),
             &mut Work::default(),
             |r, _, _| {
                 assert!(r.holds(0) && r.holds(1));
