@@ -2451,6 +2451,67 @@ fn stage(version: &str) -> String {
     )
 }
 
+/// A stub's texts and its host's count among the texts over texts of a 0.4 level, as `rnl check`
+/// counts them (RNL7012): a stub with texts, moved so that its first text lies on its host's
+/// first, adds its pairs with its host to the count; they were left out, as the pair of a stub and
+/// its host is for the texts over symbols, and the solver drew such a text over another unseen.
+#[test]
+fn a_stub_text_over_its_host_text_counts_among_the_texts_over_texts() {
+    let (p, solved, e) = solve_text(
+        "* cs\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }\n\
+         .model nch nmos level=1\n.model pch pmos level=1\nM1 out in vdd vdd pch\nM2 out in 0 0 nch\n\
+         * @RNL { &vdd @ADD-TO $SUPPLY_NET_SET }\n.end\n",
+    );
+    let what = summary(&p, &solved, &e);
+    let (s, g) = (&e.structure, &e.placed.geometry);
+    assert!(s.language04, "{what}");
+    let texts = |k: usize| s.text_offsets(&p, g, k);
+    let (k, host) = (0..s.objects.len())
+        .find_map(|k| {
+            let host = s.objects[k].stub.as_ref()?.host.0;
+            (!texts(k).is_empty() && !texts(host).is_empty()).then_some((k, host))
+        })
+        .unwrap_or_else(|| {
+            let stubs: Vec<String> = (0..s.objects.len())
+                .filter_map(|k| {
+                    let host = s.objects[k].stub.as_ref()?.host.0;
+                    Some(format!(
+                        "{} {} on {} {}",
+                        p.objects[k].label,
+                        texts(k).len(),
+                        p.objects[host].label,
+                        texts(host).len()
+                    ))
+                })
+                .collect();
+            panic!("no stub with texts on a host with texts: {stubs:?} {what}")
+        });
+    let (bk, bh) = (texts(k)[0].clone(), texts(host)[0].clone());
+    let mut at = e.placed.origins.clone();
+    at[k] = [&at[host][0] + &bh[0] - &bk[0], &at[host][1] + &bh[1] - &bk[1]];
+    let placed = |j: usize, at: &[[Q; 2]]| -> Vec<[Q; 4]> {
+        let o = &at[j];
+        texts(j).iter().map(|b| [&o[0] + &b[0], &o[1] + &b[1], &o[0] + &b[2], &o[1] + &b[3]]).collect()
+    };
+    let meet = |a: &[Q; 4], b: &[Q; 4]| a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+    // the pairs of the stub's texts with those of `j`, the stub placed by `at`
+    let pairs = |at: &[[Q; 2]], j: usize| -> usize {
+        let theirs = placed(j, at);
+        placed(k, at).iter().map(|a| theirs.iter().filter(|b| meet(a, b)).count()).sum()
+    };
+    let drawn = |j: usize| j != k && !s.objects[j].left_free;
+    let with_host = pairs(&at, host);
+    let others: usize = (0..s.objects.len()).filter(|&j| drawn(j) && j != host).map(|j| pairs(&at, j)).sum();
+    assert!(with_host >= 1 && others == 0, "{with_host} with the host, {others} with the others: {what}");
+    // the stub away from every other text: the count without its pairs
+    let mut away = at.clone();
+    away[k] = [&at[host][0] + int(1000), at[host][1].clone()];
+    let left: usize = (0..s.objects.len()).filter(|&j| drawn(j)).map(|j| pairs(&away, j)).sum();
+    assert_eq!(left, 0, "{what}");
+    let (on, off) = (crate::score::texts_on_texts(&p, s, g, &at), crate::score::texts_on_texts(&p, s, g, &away));
+    assert_eq!(on, off + with_host, "{what}");
+}
+
 /// The stubs of the standard series 0.3 (`$GROUND_STUB`, `$SUPPLY_STUB`) are told by their drawing
 /// and their facts, not by their names: the grounds hang below their pins as stubs, not as elements
 /// of the rows, the current direction and the ground direction are in force, and the current depth
