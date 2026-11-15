@@ -257,6 +257,39 @@ export type Op = { level?: string } & (
       /** The symbol's graphics, in its own coordinates. */
       prims: Shape[];
     }
+  | {
+      /**
+       * RNL 0.4: the graphics of a symbol, a definition or a usage as one annotation turned by any
+       * angle (13.5), written `(4, 5) @ANNOTATION(rotate=30, mirror=true) $ARROW => @LAYER("top")`.
+       * Give its place by `at` or `attach`, one of them.
+       */
+      op: "add-annotation";
+      name?: string;
+      /** A symbol or a definition, `$NAME`, or a usage, `%NAME`. */
+      source: string;
+      /** An object or a named point it is on. */
+      attach?: string;
+      at?: Point;
+      /** Degrees; 0 is left out. */
+      rotate?: number;
+      mirror?: boolean;
+      /** The definition's parameters, as for `add-usage`. */
+      params?: Record<string, ParameterValue>;
+      style?: Record<string, Literal>;
+      layer?: "bottom" | "middle" | "top";
+    }
+  | {
+      /**
+       * RNL 0.4: a DEVICE of the header record (6.12), whatever its level: the instances it is for,
+       * by `name` or `model` or both (patterns such as `nch*`), and their terminal names or type or
+       * both, `@DEVICE(model="nch*", terminals=["d", "g", "s", "b"], type="nmos")`.
+       */
+      op: "declare-device";
+      name?: string;
+      model?: string;
+      terminals?: string[];
+      type?: string;
+    }
 );
 
 /**

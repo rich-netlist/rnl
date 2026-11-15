@@ -1532,3 +1532,146 @@ X1 a sub
         assert_eq!(markup("#R2::name").as_deref(), Some(if recursive { "" } else { "old" }), "{out}");
     }
 }
+
+const ARROW: &str = r#"{"level": "file", "op": "define-symbol", "name": "$ARROW", "box": [0, -1, 4, 1], "pins": [],
+    "prims": [{"shape": "line", "points": [[0, 0], [4, 0]], "params": {"arrow": "end"}}]}"#;
+
+/// `add-annotation` (13.5) writes the graphics of a symbol at a point or on an object, turned by
+/// any angle and mirrored, with its style and layer, and they read back so.
+#[test]
+fn an_annotation_is_written_at_a_point_or_on_an_object_and_reads_back() {
+    let net = "* annotation\nR1 a b 1k\n.end\n";
+    let arrow: Value = serde_json::from_str(ARROW).unwrap();
+    let ops = json!([
+        arrow,
+        {"level": "file", "op": "set", "object": "#R1", "at": [3, 4]},
+        {"level": "file", "op": "add-annotation", "name": "%a", "at": [4, 5], "source": "$ARROW",
+         "rotate": 30, "mirror": true, "style": {"linecolor": "#2275e2"}, "layer": "top"},
+        {"level": "file", "op": "add-annotation", "attach": "#R1", "source": "$ARROW", "rotate": 0, "mirror": false},
+    ]);
+    let mut req = request("spice", net, ops);
+    assert!(write(&req).unwrap_err().contains("(add-annotation): requires language_version 0.4"));
+    req.language_version = Some("0.4".into());
+    let out = write(&req).unwrap();
+    assert!(
+        out.contains(
+            "(4, 5) @ANNOTATION(rotate=30, mirror=true, linecolor=\"#2275e2\") $ARROW => @LAYER(\"top\") => %a"
+        ),
+        "{out}"
+    );
+    // no turn and no mirror change nothing, so they are left out
+    assert!(out.contains("#R1 @ANNOTATION $ARROW\n"), "{out}");
+    let files = MemoryProvider::new().with(entry("spice"), &out);
+    let r = rnl_view::interpret(entry("spice"), Some("spice"), &files, &Options { std: false, ..Options::default() })
+        .unwrap();
+    assert!(!r.diagnostics().iter().any(|d| d.severity == Severity::Error), "{out}");
+    let annotations = &r.model.levels[0].annotations;
+    assert_eq!(annotations.len(), 2, "{out}");
+    let a = annotations.iter().find(|a| a.object_id == "%a").expect("the named annotation");
+    assert_eq!((a.anchor, a.rotate, a.mirror, a.layer), ((4.0, 5.0), 30.0, true, rnl_runtime::model::Layer::Top));
+    assert_eq!((a.source_kind, a.source.as_str()), ("symbol", "$ARROW"), "{out}");
+    let on = annotations.iter().find(|a| a.object_id != "%a").unwrap();
+    assert_eq!((on.anchor_object.as_deref(), on.anchor, on.rotate, on.mirror), (Some("#R1"), (3.0, 4.0), 0.0, false));
+}
+
+#[test]
+fn an_annotation_writes_the_parameters_of_its_definition_and_of_a_usage() {
+    let ops = json!([
+        {"level": "file", "op": "add-annotation", "at": [10, 0], "source": "$D", "params": {"w": 5, "x": "a"}},
+        {"level": "file", "op": "add-annotation", "at": [0, 0], "source": "%u", "rotate": -45.5},
+        {"level": "file", "op": "add-annotation", "at": [0, 0], "source": "$\"箭头\""},
+    ]);
+    let mut req = request("spice", "* p\nR1 a b 1k\n.end\n", ops);
+    req.language_version = Some("0.4".into());
+    let out = write(&req).unwrap();
+    assert!(out.contains("(10, 0) @ANNOTATION(w=5, x=\"a\") $D"), "{out}");
+    assert!(out.contains("(0, 0) @ANNOTATION(rotate=-45.5) %u"), "{out}");
+    assert!(out.contains("(0, 0) @ANNOTATION $\"箭头\""), "{out}");
+}
+
+#[test]
+fn an_annotation_without_a_source_or_a_place_is_refused() {
+    let refused = |op: Value| {
+        let mut req = request("spice", "* r\nR1 a b 1k\n.end\n", json!([op]));
+        req.language_version = Some("0.4".into());
+        write(&req).unwrap_err()
+    };
+    let op = |extra: Value| {
+        let mut o = json!({"level": "file", "op": "add-annotation", "at": [0, 0], "source": "$S"});
+        o.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
+        o
+    };
+    assert!(refused(json!({"level": "file", "op": "add-annotation", "at": [0, 0]})).contains("`source` is missing"));
+    assert!(refused(op(json!({"source": "S"}))).contains("is not a symbol or a definition"));
+    assert!(refused(json!({"level": "file", "op": "add-annotation", "source": "$S"})).contains("no place"));
+    assert!(refused(op(json!({"attach": "#R1"}))).contains("give one"));
+    assert!(refused(op(json!({"params": {"rotate": 30}}))).contains("`params` holds `rotate`"));
+    assert!(refused(op(json!({"layer": "under"}))).contains("is not bottom, middle or top"));
+    assert!(refused(op(json!({"mirror": "yes"}))).contains("`mirror` is not true or false"));
+    assert!(refused(op(json!({"orient": "R90"}))).contains("unknown field `orient`"));
+}
+
+/// `declare-device` (6.12) writes a DEVICE in the header record, after the packages: the terminal
+/// names and the type of instances whose model the file does not ship, such as a PDK's.
+#[test]
+fn a_device_is_declared_in_the_header_and_reads_back() {
+    let net = "* devices\nX1 d g s b nch_lvt\nX2 a b pdk_res\n.end\n";
+    let device = json!({"op": "declare-device", "model": "nch*", "terminals": ["d", "g", "s", "b"], "type": "nmos"});
+    let ops = json!([
+        {"op": "use-package", "name": "rnl-std-basic", "version": "0.4"},
+        device,
+        device,
+        {"op": "declare-device", "level": "file", "name": "X2", "terminals": ["p", "n"]},
+    ]);
+    let mut req = request("spice", net, ops);
+    assert!(write(&req).unwrap_err().contains("(declare-device): requires language_version 0.4"));
+    req.language_version = Some("0.4".into());
+    let out = write(&req).unwrap();
+    let header = r#"@RNL(type="header") {
+*   @VERSION("0.4");
+*   @USE-PACKAGE(name="rnl-std-basic", version="0.4");
+*   @DEVICE(model="nch*", terminals=["d", "g", "s", "b"], type="nmos");
+*   @DEVICE(name="X2", terminals=["p", "n"])
+* }"#;
+    assert!(out.contains(header), "{out}");
+    // the type and the names are those of the instances
+    let checks = "* @RNL { #X1 @ASSERT-INSTANCE(type=\"nmos\") }\n.end";
+    let out = out.replace(".end", checks);
+    let files = MemoryProvider::new().with(entry("spice"), &out);
+    let r = rnl_view::interpret(entry("spice"), Some("spice"), &files, &Options::default()).unwrap();
+    let bad: Vec<_> = r
+        .diagnostics()
+        .iter()
+        .filter(|d| matches!(d.severity, Severity::Error | Severity::Violation))
+        .map(|d| d.message.clone())
+        .collect();
+    assert!(bad.is_empty(), "{bad:?}\n{out}");
+    let names = |n: usize| r.model.levels[0].terminal_names[n].iter().flatten().cloned().collect::<Vec<_>>();
+    assert_eq!(names(0), ["d", "g", "s", "b"], "{out}");
+    assert_eq!(names(1), ["p", "n"], "{out}");
+}
+
+#[test]
+fn a_device_that_says_nothing_or_names_a_terminal_twice_is_refused() {
+    let refused = |dialect: &str, op: Value| {
+        let mut req = request(dialect, "* r\nX1 a b cell\n.end\n", json!([op]));
+        req.language_version = Some("0.4".into());
+        write(&req).err()
+    };
+    let device = |o: Value| {
+        let mut d = json!({"op": "declare-device"});
+        d.as_object_mut().unwrap().extend(o.as_object().unwrap().clone());
+        d
+    };
+    let why = |o: Value| refused("spice", device(o)).unwrap_or_default();
+    assert!(why(json!({"terminals": ["a", "b"]})).contains("neither `name` nor `model`"));
+    assert!(why(json!({"name": "X1"})).contains("neither `terminals` nor `type`"));
+    assert!(why(json!({"name": "X1", "terminals": []})).contains("nonempty list of terminal names"));
+    assert!(why(json!({"name": "X1", "terminals": ["a", "1"]})).contains("not all digits"));
+    assert!(why(json!({"name": "", "type": "nmos"})).contains("`name` is empty"));
+    assert!(why(json!({"model": "cell", "type": "n\nmos"})).contains("`type` is empty or holds a line break"));
+    // terminal names are distinct by the case rule of the netlist: SPICE's ignores case
+    assert!(why(json!({"model": "cell", "terminals": ["d", "D"]})).contains("names `D` twice"));
+    let spectre = device(json!({"model": "cell", "terminals": ["d", "D"]}));
+    assert!(refused("spectre", spectre).is_none());
+}

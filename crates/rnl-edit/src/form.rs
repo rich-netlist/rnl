@@ -435,7 +435,26 @@ pub(crate) fn statements_for_language(
             };
             vec![format!("{what} @{} {set}", if *add { "ADD-TO" } else { "REMOVE-FROM" })]
         }
-        Op::UsePackage { .. } => Vec::new(),
+        Op::UsePackage { .. } | Op::DeclareDevice { .. } => Vec::new(),
+        // the annotation's place, then its parameters: the turn and the mirror when they change the
+        // result, the definition's parameters, then the style properties, each in the order given
+        Op::AddAnnotation { name, attach, at, source, rotate, mirror, params, style, layer } => {
+            let place = match (attach, at) {
+                (Some(o), _) => o.clone(),
+                (None, Some(p)) => point(*p),
+                (None, None) => unreachable!("an add-annotation without a place is refused when read"),
+            };
+            let mut written: Vec<String> =
+                rotate.iter().filter(|r| **r != 0.0).map(|r| format!("rotate={}", num(*r))).collect();
+            written.extend(mirror.iter().filter(|m| **m).map(|_| "mirror=true".to_string()));
+            written.extend(params.iter().map(|(k, v)| format!("{}={}", role_name(k), parameter(v))));
+            written.extend(style.iter().map(|(k, v)| format!("{k}={}", literal(v))));
+            let written = if written.is_empty() { String::new() } else { format!("({})", written.join(", ")) };
+            let mut parts = vec![format!("{place} @ANNOTATION{written} {source}")];
+            parts.extend(layer.iter().map(|l| format!("@LAYER({})", quote(l))));
+            parts.extend(name.iter().cloned());
+            vec![parts.join(" => ")]
+        }
         Op::AddShape { name, shape: s, layer } => {
             let mut parts = vec![shape(s)];
             parts.extend(layer.iter().map(|l| format!("@LAYER({})", quote(l))));
@@ -462,6 +481,23 @@ pub fn use_package(name: &str, version: Option<&str>, path: Option<&str>) -> Str
     params.extend(version.map(|v| format!("version={}", quote(v))));
     params.extend(path.map(|p| format!("path={}", quote(p))));
     format!("@USE-PACKAGE({})", params.join(", "))
+}
+
+/// The DEVICE of a header record (6.12): `@DEVICE(name=…, model=…, terminals=[…], type=…)`, with
+/// the parameters given, in that order.
+pub fn device(
+    name: Option<&str>,
+    model: Option<&str>,
+    terminals: Option<&[String]>,
+    device_type: Option<&str>,
+) -> String {
+    let mut params: Vec<String> = name.iter().map(|n| format!("name={}", quote(n))).collect();
+    params.extend(model.map(|m| format!("model={}", quote(m))));
+    params.extend(
+        terminals.map(|t| format!("terminals=[{}]", t.iter().map(|n| quote(n)).collect::<Vec<_>>().join(", "))),
+    );
+    params.extend(device_type.map(|t| format!("type={}", quote(t))));
+    format!("@DEVICE({})", params.join(", "))
 }
 
 /// A statement as lines of at most `width` characters, broken only at spaces outside strings: best
