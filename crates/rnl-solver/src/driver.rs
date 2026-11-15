@@ -189,7 +189,7 @@ fn solve_exact_mode(
         if problem.version == "0.4" { crate::search_choices::for_layout(&structure, &mut work) } else { structure };
     notes.extend(structure.notes.iter().cloned());
     drop(phase);
-    let (candidate, placed, routing, mut entry) = if let Some(previous) = previous {
+    let (candidate, placed, routing, entry) = if let Some(previous) = previous {
         respaced(problem, &structure, previous, options, &mut work, &mut notes)
     } else if use_tree {
         let laid = if use_lines {
@@ -440,6 +440,34 @@ fn solve_exact_mode(
         }
         (candidate, placed, routing, entry)
     };
+    // A level never comes out unrouted where it has nets to route: when the budget ran out before
+    // the router of the drawing taken could start, no cell is expanded and every net is joined
+    // through the obstacles as a router that failed joins it (`Routing::forced`); the drawing is then
+    // routed past the limit, which only the safety limit stops (a time limit has none: the router's
+    // caps bound it there), its work left out of the work reported (`budget::past_limit`).
+    let (routing, mut entry) = if crate::budget::stopped()
+        && entry.written_path_error.is_none()
+        && entry.annotation_error.is_none()
+        && routing.expansions == 0
+        && !routing.forced.is_empty()
+    {
+        let (routed, past, safety) = crate::budget::past_limit(|| {
+            route(problem, &structure, &placed.geometry, &placed.origins, options, &mut work)
+        });
+        if routed.expansions == 0 {
+            (routing, entry)
+        } else {
+            notes.push(format!(
+            "the limit was reached before the level's nets were routed: they are routed past it, {past} work units \
+             more, which the work reported leaves out{}",
+            if safety { "; the safety limit stopped that routing" } else { "" }
+            ));
+            let entry = crate::lines::engine::entry(problem, &structure, &placed, &routed, &entry.code);
+            (routed, entry)
+        }
+    } else {
+        (routing, entry)
+    };
     // Materialize the chosen drawing for writeback, including authored auto-wire bends.
     // This deterministic output conversion also runs after search has reached its limit.
     let (routing, wire_routes, junctions) =
@@ -456,11 +484,15 @@ fn solve_exact_mode(
     }
     let score = entry.layers.clone();
     if !placed.optimised {
-        notes.push(
+        notes.push(if crate::budget::stopped() {
+            "the coordinate LP did not run to its end, the limit of the solve reached: the objects are where the \
+             resolution of the candidate put them"
+                .to_string()
+        } else {
             "the coordinate LP reached its cap on pivots: the objects are where the resolution of the candidate put \
              them"
-                .to_string(),
-        );
+                .to_string()
+        });
     }
     let mut dropped: BTreeMap<RelKind, usize> = BTreeMap::new();
     for k in &placed.dropped {

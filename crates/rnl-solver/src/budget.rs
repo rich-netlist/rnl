@@ -130,6 +130,11 @@ struct Control<'a> {
     every: u64,
     clock_due: Cell<u64>,
     steps: Cell<u32>,
+    /// Inside [`past_limit`]: the work done there, which `used` leaves out, the work at which the
+    /// clock is read next for the safety limit, and whether that limit stopped it.
+    past: Cell<Option<u64>>,
+    past_due: Cell<u64>,
+    past_stopped: Cell<bool>,
 }
 
 /// The steps admitted on one reading of the clock at most ([`Control::late`]).
@@ -163,6 +168,9 @@ impl Control<'_> {
     }
 
     fn permit(&self, cost: u64) -> bool {
+        if let Some(past) = self.past.get() {
+            return self.permit_past(past, cost);
+        }
         if self.stopped.get().is_some() {
             return false;
         }
@@ -181,6 +189,30 @@ impl Control<'_> {
             self.stopped.set(Some(reason));
         }
         reason.is_none()
+    }
+
+    /// A step past the limit ([`past_limit`]): admitted until the safety limit passes, its work
+    /// counted apart. The clock is read as [`Control::late`] reads it.
+    fn permit_past(&self, past: u64, cost: u64) -> bool {
+        if self.past_stopped.get() {
+            return false;
+        }
+        let next = past.saturating_add(cost);
+        let steps = self.steps.get() + 1;
+        if let Some(safety) = self.safety_seconds {
+            if steps >= CHECK_STEPS || next >= self.past_due.get() {
+                self.steps.set(0);
+                self.past_due.set(next.saturating_add(self.every));
+                if self.clock.elapsed() - self.start >= safety {
+                    self.past_stopped.set(true);
+                    return false;
+                }
+            } else {
+                self.steps.set(steps);
+            }
+        }
+        self.past.set(Some(next));
+        true
     }
 
     /// Whether the time or the safety limit has passed, for a step that would bring the work to
@@ -230,6 +262,9 @@ pub(crate) fn with<T>(
         every: clock.check_every(),
         clock_due: Cell::new(0),
         steps: Cell::new(0),
+        past: Cell::new(None),
+        past_due: Cell::new(0),
+        past_stopped: Cell::new(false),
     };
     let result = ACTIVE.set(Some(&control), f);
     control.step.set("complete");
@@ -274,7 +309,48 @@ pub(crate) fn continues_rows() -> bool {
 }
 
 pub(crate) fn stopped() -> bool {
-    active() && ACTIVE.with(|c| c.unwrap().stopped.get().is_some())
+    active()
+        && ACTIVE.with(|c| {
+            let c = c.unwrap();
+            if c.past.get().is_some() {
+                c.past_stopped.get()
+            } else {
+                c.stopped.get().is_some()
+            }
+        })
+}
+
+/// Runs `f` past the limit the budget has reached: its steps are admitted until the safety limit
+/// passes, the only limit that stops it, and their work is counted apart from the work reported,
+/// so that a solve limited by work, run again to the work it reported, stops where it stopped and
+/// does the same past it. A time limit has no safety limit, so that it replays by work: there `f`
+/// is bounded by its own caps alone. Gives what `f` gives, the work it did, and whether the safety
+/// limit stopped it. Without a budget, or one not stopped, `f` runs as it would.
+pub(crate) fn past_limit<T>(f: impl FnOnce() -> T) -> (T, u64, bool) {
+    if !stopped() {
+        return (f(), 0, false);
+    }
+    ACTIVE.with(|c| {
+        let c = c.unwrap();
+        c.past.set(Some(0));
+        c.past_due.set(0);
+        c.past_stopped.set(false);
+    });
+    // the scope is left as it was even if `f` unwinds
+    struct Leave;
+    impl Drop for Leave {
+        fn drop(&mut self) {
+            ACTIVE.with(|c| c.unwrap().past.set(None));
+        }
+    }
+    let leave = Leave;
+    let out = f();
+    let (work, safety) = ACTIVE.with(|c| {
+        let c = c.unwrap();
+        (c.past.get().unwrap_or(0), c.past_stopped.get())
+    });
+    drop(leave);
+    (out, work, safety)
 }
 
 /// Never charge zero: otherwise a work count would not uniquely identify the cutoff.
@@ -338,6 +414,50 @@ mod tests {
         assert!(!accepted);
         assert_eq!(report.work, large + 1);
         assert_eq!(report.reason, StopReason::Work);
+    }
+
+    /// Past the limit, steps are admitted and their work is kept out of the work reported, so that
+    /// the run replays by work; the budget is stopped again after, and a budget not stopped runs
+    /// the steps as before.
+    #[test]
+    fn past_the_limit_steps_are_admitted_and_left_out_of_the_work_reported() {
+        let run = || {
+            while permit(Step::Route, 3) {}
+            assert!(stopped());
+            let (admitted, past, safety) = past_limit(|| {
+                assert!(!stopped());
+                (0..5).all(|_| permit(Step::Route, 4))
+            });
+            assert!(admitted && !safety);
+            assert_eq!(past, 20);
+            assert!(stopped() && !permit(Step::Route, 1));
+        };
+        let ((), report) = with(&StoppedClock, RunLimit::Work(10), None, run);
+        assert_eq!((report.work, report.reason), (9, StopReason::Work));
+        let ((), again) = with(&StoppedClock, RunLimit::Work(report.work), None, run);
+        assert_eq!((again.work, again.reason), (9, StopReason::Work));
+        let ((ran, past, safety), _) =
+            with(&StoppedClock, RunLimit::Work(10), None, || past_limit(|| permit(Step::Route, 4)));
+        assert!(ran && past == 0 && !safety);
+        assert_eq!(consumed(), 0);
+    }
+
+    /// The safety limit stops steps past the limit, and the reason reported stays the limit's.
+    #[test]
+    fn the_safety_limit_stops_steps_past_the_limit() {
+        let ((steps, safety), report) = with(&Ticks(Cell::new(0)), RunLimit::Time(2.0), Some(40.0), || {
+            while permit(Step::Pivot, 1) {}
+            let (steps, _, safety) = past_limit(|| {
+                let mut steps = 0u64;
+                while permit(Step::Pivot, 1) {
+                    steps += 1;
+                }
+                steps
+            });
+            (steps, safety)
+        });
+        assert!(safety && steps > 0);
+        assert_eq!(report.reason, StopReason::Time);
     }
 
     struct Ticks(Cell<u64>);
