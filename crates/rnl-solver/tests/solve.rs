@@ -279,7 +279,10 @@ R11 g0c1r1 g1c0r1 1k
     let p = problems("/w/bands.sp", &files).into_iter().find(|p| p.title == "bands").unwrap();
     // just short of the end of the first batch of the bands: another solver moves it, and it is
     // found again as the work at which the level's first trial turns to the group dissolved, less one
-    let options = SolverOptions::default().with_config(r#"limit="work", work=64981892704"#).unwrap();
+    let mut options = SolverOptions::default().with_config(r#"limit="work", work=64981892704"#).unwrap();
+    // the objectives the window was found with: crowding, the last default layer, ranks the
+    // arrangements otherwise and moves it
+    assert_eq!(options.objectives.layers.pop().map(|l| l.items[0].0.clone()).as_deref(), Some("crowding"));
     let solved = solve(&p, &options);
     let notes = solved.report.notes.join("\n");
     assert!(notes.contains("tried both stretched in bands and dissolved"), "{notes}");

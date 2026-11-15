@@ -881,7 +881,7 @@ mod tests {
         let all = Inputs { supply: true, ground: true, port_kinds: true, wires: true, currents: None };
         let active = Active::new(&options.objectives, &all);
         // the default layers less terminal_wire_alignment, which this version does not compute
-        assert_eq!(active.layers.len(), 10);
+        assert_eq!(active.layers.len(), 11);
         assert_eq!(active.inert.len(), 1);
         assert!(active.inert[0].starts_with("terminal_wire_alignment is not computed"));
         assert_eq!(active.in_order()[0], Objective::CurrentDirection);

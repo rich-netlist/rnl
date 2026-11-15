@@ -54,8 +54,11 @@ pub const OBJECTIVES: [&str; 18] = [
 ];
 
 /// The default layers, one objective each with weight 1, in this order: the prototype's order,
-/// which the user kept on 2026-10-16 (plan 5.4).
-pub const DEFAULT_LAYERS: [&str; 11] = [
+/// which the user kept on 2026-10-16 (plan 5.4), then `crowding`, so that the texts a 0.4 level
+/// writes over symbols or other texts decide between arrangements that the layers before leave
+/// equal, and the lines layout ranks its trees by them after the joins left (13.3). A level of 0.3
+/// weighs crowding before every layer already, so the last layer changes nothing there.
+pub const DEFAULT_LAYERS: [&str; 12] = [
     "current_direction",
     "turns",
     "ground_direction",
@@ -67,6 +70,7 @@ pub const DEFAULT_LAYERS: [&str; 11] = [
     "crossings",
     "wire_length",
     "aspect",
+    "crowding",
 ];
 
 /// One layer of objectives: their weighted sum is one component of a candidate's score.
@@ -583,7 +587,8 @@ mod tests {
     use super::*;
 
     const DEFAULT: &str = "tolerance=0.000001;grid=1;objectives=current_direction,turns,ground_direction,\
-        component_alignment,distribution,symmetry,terminal_wire_alignment,area,crossings,wire_length,aspect;beam=4;\
+        component_alignment,distribution,symmetry,terminal_wire_alignment,area,crossings,wire_length,aspect,crowding;\
+        beam=4;\
         budget=candidates:256,astar_expansions:200000;time_limit=5";
 
     #[test]
@@ -596,7 +601,7 @@ mod tests {
         let unlimited = SolverOptions::without_time_limit();
         assert_eq!(unlimited, SolverOptions { time_limit: None, ..SolverOptions::default() });
         assert_eq!(unlimited.canonical(), DEFAULT.replace(";time_limit=5", ";time_limit=none"));
-        assert_eq!(options.objectives.layers.len(), 11);
+        assert_eq!(options.objectives.layers.len(), 12);
         assert!(options
             .objectives
             .layers

@@ -4,15 +4,22 @@
 // parameters, as `rnl solve --solver-config` takes them, which the shell can ask the solver to check. The fake
 // shell's table is the solver's at the time of writing; the page is tested against its shape.
 
+import { readFileSync } from "node:fs";
 import { dialogGone, expect, test } from "../viewer.js";
 
 const DESKTOP = { platform: "desktop" };
 const T4 = "T4-miller-conflicts";
-const DEFAULT_ORDER = [
-  "current_direction", "turns", "ground_direction", "component_alignment", "distribution", "symmetry",
-  "terminal_wire_alignment", "area", "crossings", "wire_length", "aspect",
-];
-const OFF = ["signal_flow", "labels", "bend_alignment", "overlaps", "crowding", "misleading", "wire_over_symbol"];
+
+// The objectives as the fake shell's copy of the solver's table has them: the default layers in order,
+// then the others in the table's order, which the dialog shows off after them.
+const SHELL = readFileSync(new URL("../fake-shell.js", import.meta.url), "utf8");
+const listed = (key) => {
+  const from = SHELL.indexOf(`\n  ${key}: [`);
+  return [...SHELL.slice(from, SHELL.indexOf("\n  ],", from)).matchAll(/"name":"(\w+)"/g)].map((m) => m[1]);
+};
+const DEFAULT_ORDER = listed("default_objectives");
+const OFF = listed("objectives").filter((n) => !DEFAULT_ORDER.includes(n));
+const LEVELS = DEFAULT_ORDER.length;
 
 /** The dialog shown. */
 const dialog = (page) => page.locator("dialog.dialog");
@@ -114,7 +121,7 @@ test.describe("on the desktop", () => {
     // the objectives: the default layers in order, then those that are off
     expect(await order(page)).toEqual([...DEFAULT_ORDER.map((n) => [n, true]), ...OFF.map((n) => [n, false])]);
     await expect(dialog(page).locator(".objective-level")).toHaveText([
-      "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", ...OFF.map(() => "off"),
+      ...DEFAULT_ORDER.map((_, i) => String(i + 1)), ...OFF.map(() => "off"),
     ]);
     // an objective that this version does not compute says so
     await expect(objective(page, "labels").locator(".objective-what")).toContainText("(not computed by this version)");
@@ -207,10 +214,10 @@ test.describe("on the desktop", () => {
     const moved = [...DEFAULT_ORDER];
     moved.splice(7, 1);
     moved.splice(5, 0, "area");
-    expect((await order(page)).slice(0, 11).map(([n]) => n)).toEqual(moved);
+    expect((await order(page)).slice(0, LEVELS).map(([n]) => n)).toEqual(moved);
     await expect(asText(page)).toContainText(`objectives="${moved.join(",")}"`);
     // an objective that is off can move too: signal_flow goes to the top
-    for (let k = 0; k < 11; k++) await objective(page, "signal_flow").getByRole("button", { name: "Move up: signal_flow" }).click();
+    for (let k = 0; k < LEVELS; k++) await objective(page, "signal_flow").getByRole("button", { name: "Move up: signal_flow" }).click();
     expect((await order(page))[0]).toEqual(["signal_flow", false]);
     await ok(page);
     expect(await viewer.stored("solve-config")).toEqual({ objectives: moved.join(",") });
@@ -232,7 +239,7 @@ test.describe("on the desktop", () => {
     await expect(objective(page, "turns").locator(".objective-level")).toHaveText("off");
     // the levels count the objectives that are on; signal_flow is where it was, after the others
     await expect(objective(page, "ground_direction").locator(".objective-level")).toHaveText("2");
-    await expect(objective(page, "signal_flow").locator(".objective-level")).toHaveText("11");
+    await expect(objective(page, "signal_flow").locator(".objective-level")).toHaveText(String(LEVELS));
     const on = DEFAULT_ORDER.filter((n) => n !== "turns").concat("signal_flow");
     await expect(asText(page)).toContainText(`objectives="${on.join(",")}"`);
     await ok(page);
@@ -258,9 +265,10 @@ test.describe("on the desktop", () => {
     await expect(objective(page, "aspect").locator(".objective-level")).toHaveText("10");
     // only the objective that begins a level has a tolerance of the level
     await expect(objective(page, "wire_length").getByLabel("equal within")).toBeHidden();
-    await expect(asText(page)).toContainText(`objectives="${DEFAULT_ORDER.slice(0, 8).join(",")},crossings+wire_length*2~0.5,aspect"`);
+    const shared = [...DEFAULT_ORDER.slice(0, 8), "crossings+wire_length*2~0.5", ...DEFAULT_ORDER.slice(10)].join(",");
+    await expect(asText(page)).toContainText(`objectives="${shared}"`);
     await ok(page);
-    expect((await viewer.stored("solve-config")).objectives).toBe(`${DEFAULT_ORDER.slice(0, 8).join(",")},crossings+wire_length*2~0.5,aspect`);
+    expect((await viewer.stored("solve-config")).objectives).toBe(shared);
     // shown again as it was kept
     await open(page);
     await expect(objective(page, "wire_length").getByLabel("with the one above")).toBeChecked();

@@ -13,7 +13,7 @@ VIN in 0 DC 0.6 AC 1
 *   {#VIN #M1} @AS $FLOW;
 *   $WIRE_NET_SET @ROUTE
 * }
-* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:df472807084943cf.1f3b310f8bee492a") {
+* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:df472807084943cf.811e49dbe089c7ab") {
 *   %gnd_stub_M1_s = $GND_STUB @ATTACH(gap=2) #M1:s;
 *   %gnd_stub_VDD_n = $GND_STUB @ATTACH(gap=2) #VDD:n;
 *   %gnd_stub_VIN_n = $GND_STUB @ATTACH(gap=2) #VIN:n;

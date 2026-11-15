@@ -42,7 +42,7 @@ The 0.4 `current_direction` objective reads declared `CURRENT` directions, even 
 - `SolverOptions::canonical()`: every setting that changes the result, in a fixed order, numbers by `geom::fmt_num`. It is what the options digest of the hash, `sig2`, hashes (chapter 17), so the same options give the same hash on every platform. `SolverOptions::parse` reads it back, and `with_overrides` reads some of its settings over other options, as `rnl solve --solver-options` does; an unknown key, a key given twice or a value that does not read is an error. The defaults:
 
   ```text
-  tolerance=0.000001;grid=1;objectives=current_direction,turns,ground_direction,component_alignment,distribution,symmetry,terminal_wire_alignment,area,crossings,wire_length,aspect;beam=4;budget=candidates:256,astar_expansions:200000;time_limit=5
+  tolerance=0.000001;grid=1;objectives=current_direction,turns,ground_direction,component_alignment,distribution,symmetry,terminal_wire_alignment,area,crossings,wire_length,aspect,crowding;beam=4;budget=candidates:256,astar_expansions:200000;time_limit=5
   ```
 
   `time_limit` is a number of seconds or `none`; it is part of the text, so a record solved without a limit has another hash than one solved with the default.

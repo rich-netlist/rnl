@@ -66,7 +66,7 @@ const TABLE = {
     {"key":"join_trees","group":"layout","type":"boolean","default":false,"in_file":true,"what":"Route the wire trees of each net as one, so that a net that several structures wire is drawn connected rather than in pieces joined by its name."},
     {"key":"junction","group":"layout","type":"string","in_file":true,"what":"The definition drawn where wires meet in a junction dot, by its name; an empty string draws none."},
     {"key":"beam","group":"search","type":"integer","min":1,"max":1024,"default":4,"in_file":true,"what":"How many partial candidates the row search keeps at each step: more searches wider and slower.","applies":{"layout":["rows"]}},
-    {"key":"objectives","group":"search","type":"objectives","default":"current_direction,turns,ground_direction,component_alignment,distribution,symmetry,terminal_wire_alignment,area,crossings,wire_length,aspect","in_file":true,"what":"What the solver prefers among layouts that keep every fact, the most important first: layers separated by commas, the objectives of a layer joined by +, a weight as name*2, a tolerance of a layer as ~0.5; none for no preference."},
+    {"key":"objectives","group":"search","type":"objectives","default":"current_direction,turns,ground_direction,component_alignment,distribution,symmetry,terminal_wire_alignment,area,crossings,wire_length,aspect,crowding","in_file":true,"what":"What the solver prefers among layouts that keep every fact, the most important first: layers separated by commas, the objectives of a layer joined by +, a weight as name*2, a tolerance of a layer as ~0.5; none for no preference."},
     {"key":"grid","group":"search","type":"number-or-false","min_exclusive":0,"default":1,"in_file":true,"what":"The step the positions are rounded to.","false_what":"Positions are not rounded to a grid."},
     {"key":"tolerance","group":"search","type":"number","min":0,"default":0.000001,"in_file":true,"what":"How far a coordinate may miss a fixed value of a fact and the fact still hold."},
     {"key":"limit","group":"run","type":"choice","choices":[{"value":"time","what":"Each level stops after the given seconds."},{"value":"work","what":"Each level stops after the given work: the same result on every machine."},{"value":"seed","what":"Each level takes the layout's first pass, with its own quick improvements, and searches no further."}],"default":"time","in_file":false,"what":"What ends the solve of each level."},
@@ -109,6 +109,7 @@ const TABLE = {
     {"items":[{"name":"crossings","weight":1}],"tolerance":0},
     {"items":[{"name":"wire_length","weight":1}],"tolerance":0},
     {"items":[{"name":"aspect","weight":1}],"tolerance":0},
+    {"items":[{"name":"crowding","weight":1}],"tolerance":0},
   ],
   stages: [
     {"name":"resolve","what":"Checking the facts against each other"},
