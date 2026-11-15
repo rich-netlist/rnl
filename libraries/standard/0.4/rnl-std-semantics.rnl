@@ -127,7 +127,8 @@
     ?top ?bottom @ORIENT-RELATION("MX", priority="low");
   };
 
-  /* A DC branch: members in series in one column, from the top down.
+  /* A series structure stacked vertically: members in series in one column, from the top down;
+     usually a DC branch, such as a path from a supply to ground.
      Places and routes: members in series, aligned in x together with the usage's own point so the
      branch moves with a tail or axis constraint, ordered from the top down. */
   $BRANCH = @DEFINE(roles=[["{members}", ["instance", "usage"]]]) {
@@ -136,7 +137,7 @@
     ?members @ORDER("top-to-bottom", priority="low");
   };
 
-  /* A DC branch drawn as a row: members in series at one height, from left to right.
+  /* A series structure drawn as a row: members in series at one height, from left to right.
      Places and routes: members in series, aligned in y together with the usage's own point, ordered
      from left to right. */
   $BRANCH_HORIZONTAL = @DEFINE(roles=[["{members}", ["instance", "usage"]]]) {
