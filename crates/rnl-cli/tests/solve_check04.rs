@@ -197,7 +197,11 @@ fn a_level_before_0_4_reads_only_the_old_options() {
 #[test]
 fn a_spacing_is_warned_of_only_where_the_layout_does_not_space_by_it() {
     let main = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\") }\nR1 a 0 1k\n.end\n";
-    let unused = |c: &Checked| keyed(&c.levels[0].warnings).iter().any(|w| w.contains("keep their fixed gaps"));
+    let unused = |c: &Checked| {
+        keyed(&c.levels[0].warnings)
+            .iter()
+            .any(|w| w.starts_with("spacing_x: spacing_x is used only by the lines layout"))
+    };
     assert!(!unused(&check(main, &[ToolSettings::Config("spacing_x=2".into())])));
     assert!(!unused(&check(main, &[ToolSettings::Config("spacing_x=2,layout=\"lines\"".into())])));
     assert!(unused(&check(main, &[ToolSettings::Config("spacing_x=2,layout=\"rows\"".into())])));

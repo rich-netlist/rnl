@@ -8,7 +8,7 @@ use rnl_runtime::interp::obj::Priority;
 use rnl_runtime::problem::{Axis, LevelProblem, PointRef};
 
 use crate::coords::Placed;
-use crate::objectives::{Active, ActiveLayer, Objective};
+use crate::objectives::{Active, ActiveLayer};
 use crate::rational::{int, Q};
 use crate::resolve::point_value;
 use crate::route::Routing;
@@ -25,7 +25,7 @@ pub(crate) struct Rank {
 
 impl Rank {
     pub(crate) fn new(s: &Structure) -> Rank {
-        let valid = [Objective::Overlaps, Objective::Crowding, Objective::Misleading, Objective::WireOverSymbol];
+        let valid = crate::config::LINES_OBJECTIVES;
         let rules: Vec<usize> = (0..s.active.layers.len())
             .filter(|&i| s.active.layers[i].items.iter().any(|(o, _)| valid.contains(o)))
             .collect();

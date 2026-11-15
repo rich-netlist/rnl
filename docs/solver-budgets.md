@@ -95,7 +95,8 @@ its previous semicolon syntax is also accepted during the transition.
 | `candidates`, `astar_expansions` | nonnegative integer caps | 256, 200000 | no |
 
 The line layout spaces by a nonzero spacing. Under the row and the group-tree layouts it is
-parsed and hashed, with a warning that they keep their fixed gaps.
+parsed and hashed, with a warning by its key that it is ignored under that layout, as for every
+setting the layout in effect does not use ([the table's `applies`](solver-settings-table.md)).
 
 Run settings in a file warn and are ignored. Unknown keys warn and are ignored. A value of
 a known key that is not taken is an error for that key (14.10): in the file, it leaves the value

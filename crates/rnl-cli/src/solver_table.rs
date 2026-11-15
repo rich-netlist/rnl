@@ -2,12 +2,14 @@
 //! `rnl solver-defaults --json` prints it, and the solver's WebAssembly module gives it.
 //!
 //! It is [`rnl_solver::settings_table`] with the stages of a solve's progress
-//! ([`crate::progress::STAGES`]). Fields are only ever added; a field that does not apply to a
-//! setting is left out.
+//! ([`crate::progress::STAGES`]), each with the layouts it applies to. Fields are only ever added;
+//! a field that does not apply to a row is left out, `applies` among them where a row applies to
+//! every layout.
 
 use serde_json::{json, Map, Value};
 
-/// The table: `version`, `groups`, `settings`, `objectives`, `default_objectives` and `stages`.
+/// The table: `version`, `groups`, `settings`, `objectives`, `default_objectives`, `stages` and
+/// `lines_order`.
 pub fn settings_table_json() -> Value {
     let t = rnl_solver::settings_table();
     let when = |w: rnl_solver::When| -> Value {
@@ -51,8 +53,23 @@ pub fn settings_table_json() -> Value {
             Value::Object(row)
         })
         .collect();
-    let objectives: Vec<Value> =
-        t.objectives.iter().map(|o| json!({"name": o.name, "what": o.what, "implemented": o.implemented})).collect();
+    let applies = |row: &mut Map<String, Value>, w: rnl_solver::When| {
+        if !w.is_empty() {
+            row.insert("applies".into(), when(w));
+        }
+    };
+    let objectives: Vec<Value> = t
+        .objectives
+        .iter()
+        .map(|o| {
+            let mut row = Map::new();
+            row.insert("name".into(), json!(o.name));
+            row.insert("what".into(), json!(o.what));
+            row.insert("implemented".into(), json!(o.implemented));
+            applies(&mut row, o.applies);
+            Value::Object(row)
+        })
+        .collect();
     let layers: Vec<Value> = t
         .default_objectives
         .iter()
@@ -63,8 +80,17 @@ pub fn settings_table_json() -> Value {
         })
         .collect();
     let groups: Vec<Value> = t.groups.iter().map(|g| json!({"name": g.name, "what": g.what})).collect();
-    let stages: Vec<Value> =
-        crate::progress::STAGES.iter().map(|(name, what)| json!({"name": name, "what": what})).collect();
+    let stages: Vec<Value> = crate::progress::STAGES
+        .iter()
+        .map(|(name, what)| {
+            let mut row = Map::new();
+            row.insert("name".into(), json!(name));
+            row.insert("what".into(), json!(what));
+            applies(&mut row, rnl_solver::stage_applies(name));
+            Value::Object(row)
+        })
+        .collect();
+    let ranks: Vec<Value> = t.lines_order.iter().map(|r| json!({"name": r.name, "what": r.what})).collect();
     json!({
         "version": t.version,
         "groups": groups,
@@ -72,6 +98,7 @@ pub fn settings_table_json() -> Value {
         "objectives": objectives,
         "default_objectives": layers,
         "stages": stages,
+        "lines_order": {"what": rnl_solver::LINES_ORDER_WHAT, "ranks": ranks},
     })
 }
 
@@ -114,6 +141,17 @@ mod tests {
             t["default_objectives"][0],
             json!({"items": [{"name": "current_direction", "weight": 1}], "tolerance": 0})
         );
+        let objective =
+            |name: &str| t["objectives"].as_array().unwrap().iter().find(|o| o["name"] == name).unwrap().clone();
+        assert!(objective("crowding").get("applies").is_none());
+        assert_eq!(objective("turns")["applies"], json!({"layout": ["rows", "tree"]}));
+        let stage = |name: &str| t["stages"].as_array().unwrap().iter().find(|s| s["name"] == name).unwrap().clone();
+        assert_eq!(stage("search")["applies"], json!({"layout": ["rows"]}));
+        assert_eq!(stage("lines")["applies"], json!({"layout": ["lines"]}));
+        assert!(stage("resolve").get("applies").is_none());
+        assert_eq!(t["lines_order"]["ranks"].as_array().unwrap().len(), rnl_solver::LINES_ORDER.len());
+        assert_eq!(t["lines_order"]["ranks"][0], json!({"name": "complete", "what": rnl_solver::LINES_ORDER[0].what}));
+        assert!(t["lines_order"]["what"].is_string());
         let stages: Vec<&str> = t["stages"].as_array().unwrap().iter().map(|s| s["name"].as_str().unwrap()).collect();
         assert_eq!(stages, crate::progress::STAGES.iter().map(|(n, _)| *n).collect::<Vec<_>>());
         let groups: Vec<&str> = t["groups"].as_array().unwrap().iter().map(|g| g["name"].as_str().unwrap()).collect();

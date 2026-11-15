@@ -85,8 +85,8 @@ pub use resolve::Resolved;
 pub use rnl_runtime::problem::LevelProblem;
 pub use rnl_runtime::solution::Solution;
 pub use table::{
-    settings_table, ObjectiveRow, SettingChoice, SettingGroup, SettingKind, SettingRow, SettingsTable, When,
-    SETTINGS_TABLE_VERSION,
+    settings_table, stage_applies, ObjectiveRow, OrderRow, SettingChoice, SettingGroup, SettingKind, SettingRow,
+    SettingsTable, When, LINES_ORDER, LINES_ORDER_WHAT, SETTINGS_TABLE_VERSION,
 };
 
 /// The `author` the solver writes in the head of its record (2.8, chapter 17).
@@ -386,7 +386,7 @@ pub fn respace_with_clock(
         return Err(why);
     }
     // the warning is of a solve, whose row and tree layouts keep their gaps; a respace spaces any of them
-    solved.report.warnings.retain(|w| w != config::SPACING_NOT_USED);
+    solved.report.warnings.retain(|w| !config::is_spacing_unused(w));
     Ok(solved)
 }
 

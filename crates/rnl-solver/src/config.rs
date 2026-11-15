@@ -8,6 +8,7 @@
 use rnl_runtime::interp::obj::Lit;
 use rnl_runtime::problem::{LevelProblem, SolverSetting};
 
+use crate::objectives::Objective;
 use crate::{RunLimit, SolverOptions};
 use std::collections::BTreeMap;
 
@@ -324,10 +325,78 @@ fn apply_tool(o: &mut SolverOptions, settings: &[SolverSetting]) -> Result<(), S
     }
 }
 
-/// The warning of a spacing given to a solve by rows or by the group tree: only the lines layout
-/// spaces by it.
-pub(crate) const SPACING_NOT_USED: &str =
-    "spacing_x and spacing_y are retained for line layout; row and tree layouts keep their fixed gaps";
+/// The objectives the line layout takes from `objectives`: the layers that hold one of them rank
+/// the group-tree layout it starts from (`lines::Rank`). Its own drawings it ranks in a fixed order
+/// ([`crate::table::LINES_ORDER`]), which no setting changes.
+pub(crate) const LINES_OBJECTIVES: [Objective; 4] =
+    [Objective::Overlaps, Objective::Crowding, Objective::Misleading, Objective::WireOverSymbol];
+
+/// The name of a layout, as `layout` takes it.
+pub(crate) fn layout_name(layout: Layout) -> &'static str {
+    match layout {
+        Layout::Rows => "rows",
+        Layout::Tree => "tree",
+        Layout::Lines => "lines",
+    }
+}
+
+/// Whether a warning of [`unused_by_layout`] is of a spacing, which respacing uses whatever the
+/// layout.
+pub(crate) fn is_spacing_unused(warning: &str) -> bool {
+    ["spacing_x", "spacing_y"].iter().any(|key| warning.starts_with(&format!("{key} is used only by")))
+}
+
+/// The settings in effect that the layout in effect does not use, each with its warning by its key:
+/// a setting the table says applies to other layouts (`applies`), with a value other than its
+/// default, and under the line layout, of objectives other than the default, the layers that hold
+/// none of [`LINES_OBJECTIVES`]: it takes a layer that holds one whole. Nothing is refused: a page
+/// that draws the table leaves out what does not apply to the layout it shows.
+pub(crate) fn unused_by_layout(o: &SolverOptions) -> Vec<SettingProblem> {
+    let d = SolverOptions::default();
+    let layout = layout_name(o.settings.layout);
+    let changed = [
+        ("spacing_x", o.settings.spacing[0] != d.settings.spacing[0]),
+        ("spacing_y", o.settings.spacing[1] != d.settings.spacing[1]),
+        ("beam", o.beam != d.beam),
+        ("candidates", o.budget.candidates != d.budget.candidates),
+    ];
+    let table = crate::table::settings_table();
+    let mut out = Vec::new();
+    for (key, changed) in changed {
+        let layouts = table.settings.iter().find(|r| r.key == key).and_then(|r| applies_to(r.applies));
+        let Some(layouts) = layouts.filter(|l| changed && !l.contains(&layout)) else { continue };
+        let by = format!("{} layout{}", layouts.join(" and "), if layouts.len() > 1 { "s" } else { "" });
+        let respace = if key.starts_with("spacing") { " and by respacing" } else { "" };
+        let message = format!("{key} is used only by the {by}{respace}; it is ignored under layout \"{layout}\"");
+        out.push(SettingProblem::new(Some(key), message));
+    }
+    if o.settings.layout == Layout::Lines && o.objectives != d.objectives {
+        // a layer that holds one of them is taken whole, its other objectives with it (`lines::Rank`)
+        let takes = |name: &str| Objective::from_name(name).is_some_and(|o| LINES_OBJECTIVES.contains(&o));
+        let mut ignored: Vec<&str> = Vec::new();
+        for layer in o.objectives.layers.iter().filter(|l| !l.items.iter().any(|(name, _)| takes(name))) {
+            for (name, _) in &layer.items {
+                if !ignored.contains(&name.as_str()) {
+                    ignored.push(name);
+                }
+            }
+        }
+        if !ignored.is_empty() {
+            let message = format!(
+                "the lines layout takes only overlaps, crowding, misleading and wire_over_symbol; ignored under \
+                 layout \"lines\": {}",
+                ignored.join(", ")
+            );
+            out.push(SettingProblem::new(Some("objectives"), message));
+        }
+    }
+    out
+}
+
+/// The layouts a condition of the table names, where it is one on `layout`.
+fn applies_to(when: crate::table::When) -> Option<&'static [&'static str]> {
+    when.iter().find(|(key, _)| *key == "layout").map(|(_, values)| *values)
+}
 
 impl SolverOptions {
     /// Defaults in the syntax accepted by --solver-config.
@@ -471,8 +540,8 @@ impl SolverOptions {
                 values.remove(unused);
             }
         }
-        if modern && o.settings.spacing != [0, 0] && o.settings.layout != Layout::Lines {
-            warnings.push(SettingProblem::new(None, SPACING_NOT_USED));
+        if modern {
+            warnings.extend(unused_by_layout(&o));
         }
         if !modern {
             // the layouts are those of 0.4: an earlier level is laid out in rows whatever is asked
@@ -527,9 +596,7 @@ impl SolverOptions {
             // actually selected for writeback, including an explicit choice to draw no dots.
             out.settings.junction = Some(p.junction.effective().definition.clone().unwrap_or_default());
         }
-        if out.settings.spacing != [0, 0] && out.settings.layout != Layout::Lines {
-            warnings.push(SPACING_NOT_USED.into());
-        }
+        warnings.extend(unused_by_layout(&out).into_iter().map(|p| p.message));
         out.settings.overrides.clear();
         (out, warnings, errors)
     }
@@ -589,12 +656,14 @@ mod tests {
         // a value not taken is an error for its key alone, and the solve goes on with the one before
         let (o, warnings, errors) = SolverOptions::default().for_problem(&p);
         assert_eq!((o.grid, o.beam), (Some(2.0), 6));
-        assert!(warnings.is_empty(), "{warnings:?}");
+        // the beam is the row search's: the lines layout, the default, does not use it
+        assert_eq!(warnings, ["beam is used only by the rows layout; it is ignored under layout \"lines\""]);
         assert_eq!(errors, ["grid must be a finite number; grid=\"x\" is left out, and grid=2 stays in effect"]);
         let check = SolverOptions::check_settings(&[], Some(&p));
         assert_eq!(check.values["grid"], (Lit::Num(2.0), SettingFrom::File(1)));
         assert_eq!(check.values["beam"], (Lit::Num(6.0), SettingFrom::File(0)));
-        assert!(check.warnings.is_empty(), "{:?}", check.warnings);
+        let warned: Vec<_> = check.warnings.iter().map(|w| w.key.as_deref()).collect();
+        assert_eq!(warned, [Some("beam")], "{:?}", check.warnings);
         assert_eq!(check.errors.len(), 1);
         assert_eq!((check.errors[0].key.as_deref(), check.errors[0].refused), (Some("grid"), Some(2)));
         // a bad value before a good one fails its place too, and the later one is in effect
@@ -662,12 +731,68 @@ mod tests {
         assert_eq!(errors.len(), 1, "{errors:?}");
         assert!(warnings.iter().filter(|w| w.contains("tool-only")).count() == 2);
         assert_eq!(SolverOptions::parse(&effective.canonical()).unwrap(), effective);
-        // the rows and the group tree keep their gaps, and say so
+        // the rows and the group tree keep their gaps, and say so, each spacing by its key
         for layout in ["rows", "tree"] {
             let (_, warnings, _) = o.with_config(&format!("layout=\"{layout}\"")).unwrap().for_problem(&p);
-            assert_eq!(warnings.len(), 4, "{layout} {warnings:?}");
-            assert!(warnings.contains(&SPACING_NOT_USED.to_string()), "{layout} {warnings:?}");
+            assert_eq!(warnings.len(), 5, "{layout} {warnings:?}");
+            for key in ["spacing_x", "spacing_y"] {
+                let said = format!(
+                    "{key} is used only by the lines layout and by respacing; it is ignored under layout \"{layout}\""
+                );
+                assert!(warnings.contains(&said), "{layout} {warnings:?}");
+            }
         }
+    }
+
+    /// A setting that the layout in effect does not use is warned of by its key, where its value is
+    /// not its default, as the table's `applies` says; under the line layout, objectives that name
+    /// more than it takes. Nothing is refused.
+    #[test]
+    fn a_setting_the_layout_does_not_use_is_warned_of_by_its_key() {
+        let given = [("spacing_x", "3"), ("spacing_y", "2"), ("beam", "8"), ("candidates", "10")];
+        let table = crate::table::settings_table();
+        for row in table.settings.iter().filter(|r| applies_to(r.applies).is_some()) {
+            assert!(given.iter().any(|(key, _)| *key == row.key), "{} has no value in this test", row.key);
+        }
+        for (key, value) in given {
+            let layouts = applies_to(table.settings.iter().find(|r| r.key == key).unwrap().applies).unwrap();
+            for layout in ["rows", "tree", "lines"] {
+                let text = format!("{key}={value},layout=\"{layout}\"");
+                let tool: Vec<_> = rnl_runtime::solver_settings::parse_overrides(&text)
+                    .unwrap()
+                    .into_iter()
+                    .map(|s| (s, false))
+                    .collect();
+                let check = SolverOptions::check_settings(&tool, None);
+                assert!(check.errors.is_empty(), "{key} {layout} {:?}", check.errors);
+                let warned = check.warnings.iter().any(|w| w.key.as_deref() == Some(key));
+                assert_eq!(warned, !layouts.contains(&layout), "{key} {layout} {:?}", check.warnings);
+            }
+        }
+        // the settings of the tool, applied
+        let applied = |text: &str| {
+            let mut o = SolverOptions::default();
+            apply_tool(&mut o, &rnl_runtime::solver_settings::parse_overrides(text).unwrap()).unwrap();
+            o
+        };
+        // a default, given, is no warning
+        assert!(unused_by_layout(&applied("layout=\"tree\",spacing_x=0,beam=4")).is_empty());
+        assert_eq!(unused_by_layout(&applied("layout=\"rows\",beam=8")).len(), 0);
+        assert_eq!(unused_by_layout(&applied("layout=\"lines\",beam=8")).len(), 1);
+        let objectives = |layout: &str, text: &str| {
+            let o = applied(&format!("layout=\"{layout}\",objectives=\"{text}\""));
+            unused_by_layout(&o).into_iter().filter(|w| w.key.as_deref() == Some("objectives")).collect::<Vec<_>>()
+        };
+        // turns, in a layer with crowding, is taken with it
+        let said = objectives("lines", "overlaps,turns+crowding,crossings,area+aspect");
+        assert_eq!(said.len(), 1);
+        let ignored = "ignored under layout \"lines\": crossings, area, aspect";
+        assert!(said[0].message.ends_with(ignored), "{}", said[0].message);
+        assert!(objectives("lines", "overlaps,crowding+misleading,wire_over_symbol").is_empty());
+        assert!(objectives("tree", "turns,crossings").is_empty());
+        assert!(objectives("rows", "turns,crossings").is_empty());
+        // the default objectives are no warning, whatever they name
+        assert!(unused_by_layout(&SolverOptions::default()).is_empty());
     }
 
     #[test]
