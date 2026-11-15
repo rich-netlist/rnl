@@ -43,6 +43,9 @@ const WAY_NODES: usize = 1 << 20;
 const STEPS: u64 = 20_000_000;
 const MOST_DISSOLVED: usize = 8;
 const PROBE: usize = 4;
+/// The fewest complete solutions in a row without a better one after which the search ends
+/// ([`Search::patient`]).
+const PATIENCE: usize = 200;
 
 fn combination_count(sizes: impl Iterator<Item = usize>) -> u64 {
     sizes.fold(1u64, |count, n| count.saturating_mul(n.max(1) as u64))
@@ -464,6 +467,30 @@ struct Search<'a, 'b> {
     trials: BTreeMap<usize, Trial>,
     start: u64,
     tally: Tally,
+    /// The complete solutions made, in the order made, and how many there were when the last one
+    /// that was better than all before it was made ([`Search::patient`]).
+    made: usize,
+    better_at: usize,
+    /// The count of complete solutions when each of them was made, by its outcome.
+    made_at: BTreeMap<usize, usize>,
+}
+
+/// Whether a search that has made `made` complete solutions, the last better one when it had made
+/// `better_at`, has waited long enough for another ([`Search::patient`]).
+fn patient(made: usize, better_at: usize) -> bool {
+    made > 0 && made - better_at >= PATIENCE.max(better_at)
+}
+
+/// How the search of the level ended ([`Search::finish`]).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SearchEnd {
+    /// The budget stopped it.
+    Limit,
+    /// Every choice of every group in every setting was tried.
+    Exhausted,
+    /// As many complete solutions in a row made none better as had been made when the best was
+    /// found, and at least [`PATIENCE`] ([`Search::patient`]).
+    Patient,
 }
 
 type SolutionCost = (usize, u64, usize);
@@ -634,6 +661,9 @@ pub(crate) fn settle(
             trials: BTreeMap::new(),
             start: spent(work),
             tally: Tally::new(problem.objects.len()),
+            made: 0,
+            better_at: 0,
+            made_at: BTreeMap::new(),
         };
         let mut id = search.node(0, state.clone(), Vec::new());
         let mut failed = None;
@@ -661,20 +691,24 @@ pub(crate) fn settle(
         if let (Some(n), false) = (failed, back) {
             return Err(format!("{} could not be placed and routed in any orientation tried", lv.name(n)));
         }
-        let mut exhausted = false;
+        let mut end = SearchEnd::Limit;
         if back {
             loop {
+                if !crate::budget::stopped() && search.patient() {
+                    end = SearchEnd::Patient;
+                    break;
+                }
                 if stop.reached(work) {
                     break;
                 }
                 let Some(id) = search.pick() else {
-                    exhausted = true;
+                    end = SearchEnd::Exhausted;
                     break;
                 };
                 search.visit(id, work, stop)?;
             }
         }
-        let mut settled = search.finish(exhausted, work)?;
+        let mut settled = search.finish(end, work)?;
         if !levels && given.is_none() {
             settled.notes.push(
                 "lines: the level's groups made no complete solution with their elements at one depth on one line \
@@ -1015,6 +1049,7 @@ impl Search<'_, '_> {
                                 self.solutions.iter().map(|s| s.0).min_by(|&a, &b| {
                                     self.outcomes[a].score.cmp(&self.outcomes[b].score).then(a.cmp(&b))
                                 });
+                            self.rebetter();
                         }
                     }
                 }
@@ -1079,6 +1114,7 @@ impl Search<'_, '_> {
                     .iter()
                     .map(|s| s.0)
                     .min_by(|&a, &b| self.outcomes[a].score.cmp(&self.outcomes[b].score).then(a.cmp(&b)));
+                self.rebetter();
             }
         }
     }
@@ -1302,8 +1338,11 @@ impl Search<'_, '_> {
         self.cores[c].results.push(o);
         if root {
             self.solutions.push((o, spent(work) - self.start, id));
+            self.made += 1;
+            self.made_at.insert(o, self.made);
             if self.best.is_none_or(|b| self.outcomes[o].score < self.outcomes[b].score) {
                 self.best = Some(o);
+                self.better_at = self.made;
             }
         }
         Ok(Came::Anew)
@@ -1418,7 +1457,25 @@ impl Search<'_, '_> {
         Ok(())
     }
 
-    fn finish(mut self, exhausted: bool, work: &Work) -> Result<Settled, String> {
+    /// Whether the search has made enough complete solutions without a better one to end: as many
+    /// in a row as it had made when it found its best, and at least [`PATIENCE`]. A later better
+    /// one is the likelier the later the best was found, so the search waits the longer for it.
+    /// It counts solutions, not time, so that a run replays alike by its work. Without it the
+    /// search would go on until every spread of every choice's gaps was tried, which on a small
+    /// level is thousands of placements, each wider than the last, and run out its whole budget.
+    fn patient(&self) -> bool {
+        self.best.is_some() && patient(self.made, self.better_at)
+    }
+
+    /// The wait counted again from the best, when a trial or a dissolve has chosen it anew among
+    /// the solutions kept.
+    fn rebetter(&mut self) {
+        if let Some(at) = self.best.and_then(|b| self.made_at.get(&b)) {
+            self.better_at = *at;
+        }
+    }
+
+    fn finish(mut self, end: SearchEnd, work: &Work) -> Result<Settled, String> {
         let drawing = |o: usize| {
             let s = &self.outcomes[o].score;
             (s.0, s.1 .0, s.3, s.2, s.4, &s.5, s.6)
@@ -1606,8 +1663,13 @@ impl Search<'_, '_> {
                 "the choices were given".to_string()
             } else if crate::budget::current_limit().or(self.options.run_limit) == Some(crate::RunLimit::Seed) {
                 "the first alone, as the search is to make its first candidates only".to_string()
-            } else if exhausted {
+            } else if end == SearchEnd::Exhausted {
                 "every choice of every group in every setting was tried".to_string()
+            } else if end == SearchEnd::Patient {
+                format!(
+                    "ended after {} in a row made none better",
+                    crate::driver::count(self.made - self.better_at, "complete solution")
+                )
             } else {
                 "stopped by the limit of work".to_string()
             }
@@ -3957,6 +4019,18 @@ pub(super) mod tests {
 
     fn pin(k: usize) -> PointRef {
         PointRef::SymbolPin { object: k, pin: 0, reference: Reference::Anonymous }
+    }
+
+    /// The search waits as many solutions after its best as it had made when it found it, and at
+    /// least [`PATIENCE`]: one found as the 126th ends it at the 326th, one found as the 580th at
+    /// the 1160th, and nothing before a first.
+    #[test]
+    fn the_search_waits_for_a_better_solution_as_long_as_it_took_to_find_its_best() {
+        assert!(!patient(0, 0));
+        for (better_at, end) in [(1, 201), (126, 326), (200, 400), (580, 1160)] {
+            assert!(!patient(end - 1, better_at), "{better_at}");
+            assert!(patient(end, better_at), "{better_at}");
+        }
     }
 
     pub(in crate::lines) fn seed(
