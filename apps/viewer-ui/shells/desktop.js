@@ -10,7 +10,8 @@ import { fileFormats, isPackagePath } from "../formats.js";
 let pool = [];
 let poolReady = Promise.resolve();
 const tauri = window.__TAURI__;
-const invoke = (cmd, args) => tauri.core.invoke(cmd, args);
+// (the options are the third argument: write_bytes and save_image take their file's path, name and kind from its headers)
+const invoke = (cmd, args, options) => tauri.core.invoke(cmd, args, options);
 let preloadGeneration = 0;
 const cancelPreload = () => { preloadGeneration++; return invoke("cancel_preload"); };
 // Windows and macOS file systems ignore case, so a file's format choice is kept by its path in lower case

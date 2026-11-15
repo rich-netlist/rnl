@@ -578,6 +578,16 @@ mod tests {
         assert!(text.contains("Copyright 2014-2021 Adobe (http://www.adobe.com/)"));
     }
 
+    /// File > Export Image > Export PNG draws the SVG as an image from a blob: URL in the page (`export-image.js`), which
+    /// the content security policy must let it load, or the PNG fails with "The source image cannot be decoded".
+    #[test]
+    fn the_png_export_may_draw_its_blob_image() {
+        let config = config();
+        let csp = config["app"]["security"]["csp"].as_str().unwrap_or_default();
+        let images = csp.split(';').map(str::trim).find(|d| d.starts_with("img-src ")).unwrap_or_default();
+        assert!(images.split_whitespace().any(|s| s == "blob:"), "{csp}");
+    }
+
     /// Help > Check for Updates: the page may ask GitHub's API for the releases, and may open the
     /// repository's pages on GitHub in the default browser, but no other address.
     #[test]
