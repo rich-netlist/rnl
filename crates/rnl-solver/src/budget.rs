@@ -125,6 +125,9 @@ struct Control<'a> {
     tried: Cell<u64>,
     solver_stage: Cell<&'static str>,
     step: Cell<&'static str>,
+    /// The work at which the lines layout's group-tree start stopped refining, by its allowance
+    /// ([`note_tree_stop`]).
+    tree_stop: Cell<Option<u64>>,
     /// The work between two readings of the clock for the limits ([`Clock::check_every`]), the
     /// work at which it is read next, and the steps admitted since it was read.
     every: u64,
@@ -259,6 +262,7 @@ pub(crate) fn with<T>(
         tried: Cell::new(0),
         solver_stage: Cell::new(""),
         step: Cell::new(""),
+        tree_stop: Cell::new(None),
         every: clock.check_every(),
         clock_due: Cell::new(0),
         steps: Cell::new(0),
@@ -384,6 +388,28 @@ pub(crate) fn permit_weighted(step: Step, cost: u64) -> bool {
 pub(crate) fn current_limit() -> Option<RunLimit> {
     if active() {
         ACTIVE.with(|c| Some(c.unwrap().limit))
+    } else {
+        None
+    }
+}
+
+/// The group-tree start of the lines layout stopped refining by its allowance, at the work so far:
+/// the first time only, for the replay of the solve (`SolverOptions::tree_work`).
+pub(crate) fn note_tree_stop() {
+    if active() {
+        ACTIVE.with(|c| {
+            let c = c.unwrap();
+            if c.tree_stop.get().is_none() {
+                c.tree_stop.set(Some(c.used.get()));
+            }
+        });
+    }
+}
+
+/// Where the group-tree start of the lines layout stopped refining by its allowance, if it did.
+pub(crate) fn tree_stop() -> Option<u64> {
+    if active() {
+        ACTIVE.with(|c| c.unwrap().tree_stop.get())
     } else {
         None
     }
@@ -618,7 +644,10 @@ mod tests {
             let options = SolverOptions { run_limit: Some(RunLimit::Time(seconds as f64)), ..SolverOptions::default() };
             let timed = solve_with_clock(&p, &options, &Ticks(Cell::new(0)));
             let work = timed.report.budget.unwrap().work;
-            let replay = SolverOptions { run_limit: Some(RunLimit::Work(work)), time_limit: None, ..options };
+            // with where the lines layout's group-tree start stopped, which its work does not tell
+            let tree_work = SolverOptions::parse(timed.report.canonical_options.as_deref().unwrap()).unwrap().tree_work;
+            let replay =
+                SolverOptions { run_limit: Some(RunLimit::Work(work)), time_limit: None, tree_work, ..options };
             let again = solve_with_clock(&p, &replay, &StoppedClock);
             assert_eq!(timed.solution, again.solution, "cutoff {seconds}, work {work}");
             assert_eq!(timed.report.kept, again.report.kept);

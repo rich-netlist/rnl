@@ -231,6 +231,18 @@ impl Default for Budget {
     }
 }
 
+/// Where the lines layout's group-tree start stops refining its arrangement (`tree_work`): at a
+/// work of the level, or not before its search ends or the budget runs out. A solve reports it
+/// with its work, so that a run replays alike; left out, the solver takes the lesser of its
+/// estimate of five seconds and three tenths of the level's limit.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TreeWork {
+    /// When the level's work reaches this count.
+    At(u64),
+    /// Not before its search ends or the budget runs out (`tree_work=false`).
+    Off,
+}
+
 /// The work that the uses of the resolution other than the resolution of 8.5 itself may do: the
 /// witness taken as written (`crate::resolve`), the relations of a candidate taken in after the
 /// facts kept, the analysis of the rows, and the coordinate LP. They are not the checks of 8.5,
@@ -319,6 +331,9 @@ pub struct SolverOptions {
     /// routes and scores.
     pub beam: usize,
     pub budget: Budget,
+    /// Where the lines layout's group-tree start stops refining ([`TreeWork`]); none to take it from
+    /// the limit.
+    pub tree_work: Option<TreeWork>,
     /// How many seconds the resolution of a level may spend on checking, none for no limit (the
     /// draft 0.3, 8.5): the checks of the facts, each on its own first and then in order, and the
     /// search for all their minimal conflict groups, nothing else, on the clock the caller gives
@@ -356,13 +371,14 @@ impl Default for SolverOptions {
             objectives: Objectives::default(),
             beam: 4,
             budget: Budget::default(),
+            tree_work: None,
             time_limit: Some(DEFAULT_TIME_LIMIT),
             hints_for_low: false,
         }
     }
 }
 
-const KEYS: [&str; 14] = [
+const KEYS: [&str; 15] = [
     "tolerance",
     "grid",
     "objectives",
@@ -377,6 +393,7 @@ const KEYS: [&str; 14] = [
     "search",
     "report_hints",
     "junction_utf8",
+    "tree_work",
 ];
 
 impl SolverOptions {
@@ -409,6 +426,12 @@ impl SolverOptions {
                 crate::RunLimit::Seed => ";run=seed".into(),
             });
             text.push_str(&format!(";report_hints={}", self.hints_for_low));
+        }
+        // named only when given, so that the text of the defaults is as it was
+        match self.tree_work {
+            Some(TreeWork::At(w)) => text.push_str(&format!(";tree_work={w}")),
+            Some(TreeWork::Off) => text.push_str(";tree_work=false"),
+            None => {}
         }
         match self.settings.layout {
             // the default is not named: the text of the defaults, and of a level before 0.4, is as
@@ -495,6 +518,11 @@ impl SolverOptions {
                 }
                 "report_hints" => {
                     options.hints_for_low = value.parse().map_err(|_| "report_hints must be true or false")?
+                }
+                "tree_work" if value == "false" => options.tree_work = Some(TreeWork::Off),
+                "tree_work" => {
+                    options.tree_work =
+                        Some(TreeWork::At(value.parse().map_err(|_| "tree_work must be a count of work or false")?))
                 }
                 "join_trees" => {
                     options.settings.join_trees = value.parse().map_err(|_| "join_trees must be true or false")?
@@ -650,6 +678,15 @@ mod tests {
         assert!(text.ends_with(";join_trees=true"), "{text}");
         assert_eq!(SolverOptions::parse(&text), Ok(joined));
         assert!(SolverOptions::parse("join_trees=yes").unwrap_err().contains("true or false"));
+        // where the group-tree start stopped: named only when given, a work or false
+        for (tree, written) in [(TreeWork::At(123), ";tree_work=123"), (TreeWork::Off, ";tree_work=false")] {
+            let given =
+                SolverOptions { run_limit: Some(crate::RunLimit::Work(9)), tree_work: Some(tree), ..options.clone() };
+            let text = given.canonical();
+            assert!(text.ends_with(written), "{text}");
+            assert_eq!(SolverOptions::parse(&text), Ok(given));
+        }
+        assert!(SolverOptions::parse("tree_work=none").unwrap_err().contains("tree_work"));
         options.objectives = Objectives::none();
         options.grid = Some(0.5);
         options.time_limit = Some(0.25);

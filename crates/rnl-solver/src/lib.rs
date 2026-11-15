@@ -80,7 +80,7 @@ pub use budget::{BudgetProgress, BudgetReport, ProgressKind, RunLimit, StopReaso
 pub use config::{is_run_setting, Layout, SettingFrom, SettingProblem, Settings, SettingsCheck};
 pub use holds::{fact_holds, holds_as_drawn, problem_fact_holds_as_drawn};
 pub use lines::engine::{LayoutSkeleton, LineKind, SkeletonItem, SkeletonLine, SkeletonTable, SkeletonTree};
-pub use options::{Budget, Layer, Objectives, SolverOptions, DEFAULT_LAYERS, DEFAULT_TIME_LIMIT, OBJECTIVES};
+pub use options::{Budget, Layer, Objectives, SolverOptions, TreeWork, DEFAULT_LAYERS, DEFAULT_TIME_LIMIT, OBJECTIVES};
 pub use resolve::Resolved;
 pub use rnl_runtime::problem::LevelProblem;
 pub use rnl_runtime::solution::Solution;
@@ -176,6 +176,23 @@ pub struct Discarded {
     /// the report has a warning for it (7.6), which names it by its index, its label and where its
     /// statement is written.
     pub undecided: bool,
+}
+
+impl SolveReport {
+    /// The settings that replay this solve alike, as `--solver-config` takes them and the note of
+    /// the budget gives them: `limit="work",work=W`, with `tree_work` when the lines layout's
+    /// group-tree start was stopped, or might be, by its allowance. None when the replay is not by
+    /// work.
+    pub fn replay_config(&self) -> Option<String> {
+        let options = SolverOptions::parse(self.canonical_options.as_deref()?).ok()?;
+        let Some(RunLimit::Work(work)) = options.run_limit else { return None };
+        let tree = match options.tree_work {
+            Some(TreeWork::At(w)) => format!(",tree_work={w}"),
+            Some(TreeWork::Off) => ",tree_work=false".to_string(),
+            None => String::new(),
+        };
+        Some(format!("limit=\"work\",work={work}{tree}"))
+    }
 }
 
 impl Discarded {
@@ -431,7 +448,8 @@ fn solve_isolated(
         }
         let mut solved = if problem.version == "0.4" {
             let (limit, safety) = run_limits(options, clock);
-            let (mut solved, report) = budget::with(clock, limit, safety, || run(problem, options, clock));
+            let ((mut solved, tree_stop), report) =
+                budget::with(clock, limit, safety, || (run(problem, options, clock), budget::tree_stop()));
             // the lines layout keeps a seed or no limit as it is; the others replay by their work
             let lines = by_layout && options.settings.layout == Layout::Lines;
             let replay_limit = if lines && matches!(limit, RunLimit::Seed | RunLimit::Unlimited) {
@@ -439,12 +457,25 @@ fn solve_isolated(
             } else {
                 RunLimit::Work(report.work)
             };
-            let replay = SolverOptions { run_limit: Some(replay_limit), time_limit: None, ..options.clone() };
+            // where the group-tree start of the lines layout stopped refining: what the replay's work
+            // would not tell (`lines::lay_out`)
+            let tree_work = if lines && matches!(replay_limit, RunLimit::Work(_)) {
+                Some(tree_stop.map_or(TreeWork::Off, TreeWork::At))
+            } else {
+                options.tree_work
+            };
+            let replay =
+                SolverOptions { run_limit: Some(replay_limit), time_limit: None, tree_work, ..options.clone() };
             solved.report.canonical_options = Some(replay.canonical());
             solved.report.budget = Some(report);
             solved.report.notes.push(if matches!(replay_limit, RunLimit::Work(_)) {
+                let tree = match tree_work {
+                    Some(TreeWork::At(w)) => format!(", tree_work={w}"),
+                    Some(TreeWork::Off) => ", tree_work=false".to_string(),
+                    None => String::new(),
+                };
                 format!(
-                    "budget: {} work units; limit: {:?}; stopped: {:?}; replay with limit=\"work\", work={}",
+                    "budget: {} work units; limit: {:?}; stopped: {:?}; replay with limit=\"work\", work={}{tree}",
                     report.work, report.limit, report.reason, report.work
                 )
             } else {

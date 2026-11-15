@@ -358,6 +358,21 @@ pub fn settings_table() -> SettingsTable {
             ..row("astar_expansions", "caps", SettingKind::Integer, "The most cells the router expands for one net.")
         },
         SettingRow {
+            min: Some(0.0),
+            max: Some(MOST),
+            false_what: Some("The group-tree start refines until its search ends or the budget runs out."),
+            applies: LINES,
+            shown_when: &[("limit", &["time", "work"])],
+            ..row(
+                "tree_work",
+                "caps",
+                SettingKind::NumberOrFalse,
+                "The work of the level at which the lines layout's group-tree start stops refining its \
+                 arrangement. Left out, it is the lesser of the solver's estimate of 5 seconds and 0.3 of the \
+                 level's limit. A solve reports it with its work, so that a run is replayed alike.",
+            )
+        },
+        SettingRow {
             default: Some(Lit::Bool(false)),
             ..row(
                 "report_hints",
@@ -410,6 +425,7 @@ mod tests {
             "safety_seconds",
             "candidates",
             "astar_expansions",
+            "tree_work",
             "report_hints",
         ] {
             assert_eq!(keys.iter().filter(|k| **k == key).count(), 1, "{key}");

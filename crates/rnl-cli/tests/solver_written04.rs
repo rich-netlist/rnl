@@ -82,9 +82,8 @@ fn auto_wire_writeback_is_identical_after_time_to_work_replay() {
         )
         .unwrap();
         assert_eq!(timed.errors, 0, "{timed:?}");
-        let work = timed.levels[0].solved.report.budget.unwrap().work;
-        let replay =
-            solve_with_clock(Path::new("main.sp"), &files, &options(&format!("work={work}")), &StoppedClock).unwrap();
+        let again = timed.levels[0].solved.report.replay_config().unwrap();
+        let replay = solve_with_clock(Path::new("main.sp"), &files, &options(&again), &StoppedClock).unwrap();
         assert_eq!(timed.files[0].text, replay.files[0].text, "cutoff {seconds}");
     }
 }

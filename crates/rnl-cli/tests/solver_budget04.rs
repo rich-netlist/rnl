@@ -32,8 +32,8 @@ fn time_work_replay_preserves_the_entire_file_and_hash() {
         let level = &timed.levels[0];
         assert_eq!(level.problem.junction.effective().definition.as_deref(), Some("$DOT"));
         assert!(level.solved.report.warnings.iter().any(|s| s.contains("tool-only")));
-        let work = level.solved.report.budget.unwrap().work;
-        let settings = format!("limit=\"work\",work={work},spacing_y=2,junction=\"$DOT\"");
+        let replay = level.solved.report.replay_config().unwrap();
+        let settings = format!("{replay},spacing_y=2,junction=\"$DOT\"");
         let replay = SolveOptions { solver: SolverOptions::default().with_config(&settings).unwrap(), ..options };
         let again = solve_with_clock(Path::new("main.sp"), &files, &replay, &StoppedClock).unwrap();
         assert_eq!(level.hash, again.levels[0].hash, "cutoff {seconds}");

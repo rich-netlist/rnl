@@ -49,6 +49,7 @@ pub fn is_run_setting(key: &str) -> bool {
             | "safety_seconds"
             | "candidates"
             | "astar_expansions"
+            | "tree_work"
             | "time_limit"
             | "report_hints"
     )
@@ -131,6 +132,13 @@ fn apply(o: &mut SolverOptions, s: &SolverSetting) -> Result<(), String> {
         }
         "candidates" => o.budget.candidates = count(s, u64::MAX)?,
         "astar_expansions" => o.budget.astar_expansions = count(s, u64::MAX)?,
+        "tree_work" => {
+            o.tree_work = Some(if s.value == Lit::Bool(false) {
+                crate::TreeWork::Off
+            } else {
+                crate::TreeWork::At(count(s, u64::MAX)?)
+            })
+        }
         "safety_seconds" => o.safety_seconds = Some(number(s)?),
         "limit" | "work" | "seconds" => {} // validated together, independent of key order
         _ => return Err(format!("unknown solver setting {}", s.key)),
@@ -359,6 +367,7 @@ pub(crate) fn unused_by_layout(o: &SolverOptions) -> Vec<SettingProblem> {
         ("spacing_y", o.settings.spacing[1] != d.settings.spacing[1]),
         ("beam", o.beam != d.beam),
         ("candidates", o.budget.candidates != d.budget.candidates),
+        ("tree_work", o.tree_work != d.tree_work),
     ];
     let table = crate::table::settings_table();
     let mut out = Vec::new();
@@ -749,7 +758,8 @@ mod tests {
     /// more than it takes. Nothing is refused.
     #[test]
     fn a_setting_the_layout_does_not_use_is_warned_of_by_its_key() {
-        let given = [("spacing_x", "3"), ("spacing_y", "2"), ("beam", "8"), ("candidates", "10")];
+        let given =
+            [("spacing_x", "3"), ("spacing_y", "2"), ("beam", "8"), ("candidates", "10"), ("tree_work", "1000")];
         let table = crate::table::settings_table();
         for row in table.settings.iter().filter(|r| applies_to(r.applies).is_some()) {
             assert!(given.iter().any(|(key, _)| *key == row.key), "{} has no value in this test", row.key);

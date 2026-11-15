@@ -80,20 +80,14 @@ fn line_time_cutoffs_replay_the_complete_file_and_skeleton_report() {
         )
         .unwrap();
         assert_eq!(timed.errors, 0, "{timed:?}");
-        let work = timed.levels[0].solved.report.budget.unwrap().work;
-        let replay = solve_with_clock(
-            Path::new("main.sp"),
-            &files,
-            &options(&format!("limit=\"work\",work={work}")),
-            &StoppedClock,
-        )
-        .unwrap();
+        let again = timed.levels[0].solved.report.replay_config().unwrap();
+        let replay = solve_with_clock(Path::new("main.sp"), &files, &options(&again), &StoppedClock).unwrap();
         assert_eq!(
             timed.levels[0].solved.report.canonical_options, replay.levels[0].solved.report.canonical_options,
             "cutoff {seconds}; budgets {:?} / {:?}",
             timed.levels[0].solved.report.budget, replay.levels[0].solved.report.budget
         );
-        assert_eq!(timed.files[0].text, replay.files[0].text, "cutoff {seconds}, work {work}");
+        assert_eq!(timed.files[0].text, replay.files[0].text, "cutoff {seconds}, {again}");
         assert_eq!(timed.levels[0].hash, replay.levels[0].hash);
         assert_eq!(timed.levels[0].solved.report.skeleton, replay.levels[0].solved.report.skeleton);
     }
@@ -191,11 +185,11 @@ fn line_results_complete_configured_junctions_and_replay_the_written_file() {
                 &Ticks(Cell::new(0)),
             )
             .unwrap();
-            let work = timed.levels[0].solved.report.budget.unwrap().work;
+            let again = timed.levels[0].solved.report.replay_config().unwrap();
             let replay = solve_with_clock(
                 Path::new("main.sp"),
                 &files,
-                &options(&format!("layout=\"lines\",limit=\"work\",work={work}")),
+                &options(&format!("layout=\"lines\",{again}")),
                 &StoppedClock,
             )
             .unwrap();
