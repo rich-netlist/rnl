@@ -630,7 +630,7 @@ pub(crate) fn settle(
     }
     let state = State {
         values: given.map_or_else(|| arr.values.clone(), |t| t.values.clone()),
-        ways: given.map_or_else(|| arr.ways.clone(), |t| t.ways.clone()),
+        ways: given.map_or_else(|| crate::search_choices::consistent_ways(s, &arr.ways), |t| t.ways.clone()),
         ori: tree.geometry.orient.clone(),
         settled: BTreeSet::new(),
         blocks: BTreeMap::new(),
@@ -1502,6 +1502,9 @@ impl Search<'_, '_> {
         }
         let (lv, problem, s) = (self.lv, self.lv.problem, self.lv.s);
         let Some(best) = self.best else {
+            if crate::budget::stopped() {
+                return Err("budget exhausted before the line search made a complete solution".to_string());
+            }
             return Err("the level's group could not be placed and routed in any orientation tried".to_string());
         };
         let (path, at) = self.best_path();
@@ -4183,6 +4186,67 @@ pub(super) mod tests {
             let ori = |k| geometry.orient.get(k).copied();
             assert_eq!(crate::holds::check_problem(&p, f, &at, &ori, &int(0), &int(0)), Some(true));
         }
+    }
+
+    /// A way the tree hands over that a fixed orientation rules out: before, the line search
+    /// built no classes from it, listed no orientation in any group and gave the level up.
+    #[test]
+    fn the_line_search_places_a_level_handed_a_way_that_a_fixed_orientation_rules_out() {
+        let (p, s, way) = crate::tree::way_tests::ruled_out_way();
+        let options = SolverOptions::without_time_limit();
+        let tree = crate::tree::Tree::new(&p, &s, &options);
+        let mut arr = tree.first(&mut Work::default());
+        let (start, _) = tree.evaluate_rounds(&arr, 0, &mut Work::default());
+        arr.ways[way] = 1 - arr.ways[way];
+        let arrangement = (arr, s.tree.clone());
+        let run = || {
+            settle(
+                &p,
+                &s,
+                &start.placed,
+                &arrangement,
+                &[],
+                &options,
+                &BTreeMap::new(),
+                None,
+                &mut Work::default(),
+                &Stop::default(),
+            )
+        };
+        let (result, _) = crate::budget::with(&StoppedClock, RunLimit::Work(100_000_000), None, run);
+        let made = result.expect("the level must be placed").made.expect("the root must be compacted");
+        assert!(!made.failed && !made.interrupted, "{:?}", made.notes);
+        assert_eq!(made.placed.geometry.orient[1], Orient::R0);
+    }
+
+    /// A line search the budget stops before its first complete solution says so, and does not
+    /// say that no orientation could be placed.
+    #[test]
+    fn a_line_search_stopped_before_a_complete_solution_says_the_budget_stopped_it() {
+        let (p, s, _) = crate::tree::way_tests::ruled_out_way();
+        let options = SolverOptions::without_time_limit();
+        let tree = crate::tree::Tree::new(&p, &s, &options);
+        let arr = tree.first(&mut Work::default());
+        let (start, _) = tree.evaluate_rounds(&arr, 0, &mut Work::default());
+        let arrangement = (arr, s.tree.clone());
+        let run = || {
+            settle(
+                &p,
+                &s,
+                &start.placed,
+                &arrangement,
+                &[],
+                &options,
+                &BTreeMap::new(),
+                None,
+                &mut Work::default(),
+                &Stop::default(),
+            )
+        };
+        // enough work to start the line search, which needs some 640,000 units to finish
+        let (result, report) = crate::budget::with(&StoppedClock, RunLimit::Work(50_000), None, run);
+        assert_eq!(report.reason, crate::StopReason::Work);
+        assert_eq!(result.err().as_deref(), Some("budget exhausted before the line search made a complete solution"));
     }
 
     #[test]

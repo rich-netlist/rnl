@@ -95,6 +95,29 @@ pub(crate) fn classes(s: &Structure, ways: &[Way], values: &[usize]) -> Option<O
     Some(classes)
 }
 
+/// The ways as given where the kept facts allow them. A way they rule out, such as the
+/// alternative of a listed orientation that a fixed orientation contradicts, has no classes
+/// ([`classes`]): a candidate with it would be drawn as the witness has it, and a search could
+/// list no orientation from it. Such ways go back to the witness's, and the others keep their
+/// values as far as they agree.
+pub(crate) fn consistent_ways(s: &Structure, ways: &[usize]) -> Vec<usize> {
+    if classes(s, &s.open.ways, ways).is_some() {
+        return ways.to_vec();
+    }
+    let mut out: Vec<usize> = s.open.ways.iter().map(|w| w.taken).collect();
+    if classes(s, &s.open.ways, &out).is_none() {
+        return ways.to_vec();
+    }
+    for (i, &v) in ways.iter().enumerate().take(out.len()) {
+        let before = out[i];
+        out[i] = v;
+        if classes(s, &s.open.ways, &out).is_none() {
+            out[i] = before;
+        }
+    }
+    out
+}
+
 /// A private view for layout search. The model and its verified witness are unchanged.
 pub(crate) fn for_layout(s: &Structure, work: &mut crate::Work) -> Structure {
     let mut out = s.clone();

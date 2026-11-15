@@ -1574,6 +1574,11 @@ impl<'a> Tree<'a> {
                 }
                 let mut a = arr.clone();
                 a.ways[i] = v;
+                // a way the kept facts rule out is no arrangement: it would be drawn as the
+                // witness has it, and the line search could list no orientation from it
+                if crate::search_choices::classes(s, &s.open.ways, &a.ways).is_none() {
+                    continue;
+                }
                 out.push((format!("the fact [{}] its way {v}", w.fact), a, Vec::new(), false));
             }
         }
@@ -2726,6 +2731,65 @@ mod tests {
             break;
         }
         assert!(caught, "must interrupt A* after it starts evaluating the bound challenger");
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod way_tests {
+    use super::*;
+    use crate::resolve::tests::{fact, instance, problem_of};
+    use crate::{SolverOptions, StoppedClock};
+    use rnl_runtime::problem::FactKind;
+
+    /// A level whose second object has a listed orientation, R0 or MY, beside a fact that fixes it
+    /// R0: the way of the list to MY is ruled out (a drain's direction of low priority beside an
+    /// authored orientation, as `$CROSS_COUPLED_PAIR` writes one). The other two objects are a
+    /// group of their own, which settles first and takes that way as the tree has it.
+    pub(crate) fn ruled_out_way() -> (LevelProblem, Structure, usize) {
+        let mut p = problem_of(
+            vec![instance(); 3],
+            vec![
+                fact(FactKind::Orient { object: 0, code: Orient::R0 }),
+                fact(FactKind::Orient { object: 1, code: Orient::R0 }),
+                fact(FactKind::Orient { object: 1, code: Orient::R0 }),
+                fact(FactKind::Orient { object: 2, code: Orient::R0 }),
+            ],
+        );
+        p.groups.push(rnl_runtime::problem::ProblemGroup {
+            identity: 0,
+            first: true,
+            direct: true,
+            label: "inner".into(),
+            members: vec![0, 2],
+            spacing_x: None,
+            spacing_y: None,
+        });
+        p.version = "0.4".into();
+        p.orient_lists = vec![(1, vec![Orient::R0, Orient::MY])];
+        let options = SolverOptions::without_time_limit();
+        let resolved = crate::resolve::resolve(&p, &options, &StoppedClock);
+        let s = crate::structure::analyse(&p, &resolved, &options, crate::options::CAPS, &mut Work::default());
+        let s = crate::search_choices::for_layout(&s, &mut Work::default());
+        let way = s.open.ways.iter().position(|w| w.fact == 1).expect("the listed orientation is a way");
+        assert_eq!(s.open.ways[way].count, 2);
+        (p, s, way)
+    }
+
+    #[test]
+    fn the_tree_takes_no_way_that_a_fixed_orientation_rules_out() {
+        let (p, s, way) = ruled_out_way();
+        let options = SolverOptions::without_time_limit();
+        let tree = Tree::new(&p, &s, &options);
+        let arr = tree.first(&mut Work::default());
+        assert!(crate::search_choices::classes(&s, &s.open.ways, &arr.ways).is_some());
+        let mut ruled_out = arr.clone();
+        ruled_out.ways[way] = 1 - arr.ways[way];
+        assert!(crate::search_choices::classes(&s, &s.open.ways, &ruled_out.ways).is_none());
+        for (what, a, _, _) in tree.neighbours(&arr) {
+            assert!(crate::search_choices::classes(&s, &s.open.ways, &a.ways).is_some(), "{what}");
+        }
+        assert_eq!(crate::search_choices::consistent_ways(&s, &ruled_out.ways), arr.ways);
+        assert_eq!(crate::search_choices::consistent_ways(&s, &arr.ways), arr.ways);
     }
 }
 
