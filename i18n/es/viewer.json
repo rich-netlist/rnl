@@ -788,7 +788,6 @@
   "The solver's settings could not be read: {0}": "No se pudieron leer los ajustes del solucionador: {0}",
   "(not computed by this version)": "(no calculado por esta versión)",
   "set": "definir",
-  "The solver does not use this with the other settings as they are.": "Con los demás ajustes tal como están, el solucionador no usa este.",
   "Seconds that every level with a time limit shares, the whole file's time: each level takes the least of its own seconds and an even share of what is left, and only its seed once nothing is left. Not read by a respace.": "Segundos que comparten todos los niveles con límite de tiempo, el tiempo del archivo entero: cada nivel toma el menor entre sus propios segundos y una parte igual de lo que queda, y solo su semilla cuando ya no queda nada. No lo lee un reajuste del espaciado.",
   "Time for the whole file": "Tiempo del archivo entero",
   "timeall must be a positive number of seconds.": "timeall debe ser un número positivo de segundos.",
@@ -807,5 +806,19 @@
   "Settings": "Ajustes",
   "1 error in the settings": "1 error en los ajustes",
   "&Respace": "Reajustar el &espaciado",
-  "Respace All Circuits": "Reajustar el espaciado de todos los circuitos"
+  "Respace All Circuits": "Reajustar el espaciado de todos los circuitos",
+  "{0} settings": "{0} ajustes",
+  "{0} objectives": "{0} objetivos",
+  "{0} of the settings keep values you set.": "{0} de los ajustes conservan valores que ha definido.",
+  "{0} of other layouts are shown greyed.{1}": "{0} de otras disposiciones se muestran atenuados.{1}",
+  "{0} of other layouts are hidden.{1}": "{0} de otras disposiciones están ocultos.{1}",
+  "taken with its tier": "tomado con su rango",
+  "This layout takes a tier whole, so this objective counts with the one in it that the layout uses.": "Esta disposición toma un rango entero, así que este objetivo cuenta junto con el del rango que la disposición usa.",
+  "The layout shown does not use this objective.": "La disposición mostrada no usa este objetivo.",
+  "Show": "Mostrar",
+  "The layout shown does not use this setting.": "La disposición mostrada no usa este ajuste.",
+  "1 setting": "1 ajuste",
+  "1 objective": "1 objetivo",
+  "1 of the settings keeps a value you set.": "1 de los ajustes conserva un valor que ha definido.",
+  " and ": " y "
 }

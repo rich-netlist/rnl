@@ -788,7 +788,6 @@
   "The solver's settings could not be read: {0}": "Die Einstellungen des Solvers konnten nicht gelesen werden: {0}",
   "(not computed by this version)": "(von dieser Version nicht berechnet)",
   "set": "festlegen",
-  "The solver does not use this with the other settings as they are.": "Bei den übrigen Einstellungen, wie sie sind, verwendet der Solver diese nicht.",
   "Seconds that every level with a time limit shares, the whole file's time: each level takes the least of its own seconds and an even share of what is left, and only its seed once nothing is left. Not read by a respace.": "Sekunden, die alle Ebenen mit Zeitlimit gemeinsam haben, die Zeit für die ganze Datei: Jede Ebene nimmt das Kleinere aus ihren eigenen Sekunden und einem gleichen Anteil des Rests, und nur ihren Seed, sobald nichts mehr übrig ist. Wird beim Neueinstellen der Abstände nicht gelesen.",
   "Time for the whole file": "Zeit für die ganze Datei",
   "timeall must be a positive number of seconds.": "timeall muss eine positive Sekundenzahl sein.",
@@ -807,5 +806,19 @@
   "Settings": "Einstellungen",
   "1 error in the settings": "1 Fehler in den Einstellungen",
   "&Respace": "Abstände &neu einstellen",
-  "Respace All Circuits": "Abstände aller Schaltungen neu einstellen"
+  "Respace All Circuits": "Abstände aller Schaltungen neu einstellen",
+  "{0} settings": "{0} Einstellungen",
+  "{0} objectives": "{0} Optimierungsziele",
+  "{0} of the settings keep values you set.": "{0} der Einstellungen behalten von Ihnen gesetzte Werte.",
+  "{0} of other layouts are shown greyed.{1}": "{0} anderer Anordnungen werden ausgegraut angezeigt.{1}",
+  "{0} of other layouts are hidden.{1}": "{0} anderer Anordnungen sind ausgeblendet.{1}",
+  "taken with its tier": "mit seiner Stufe zusammen genommen",
+  "This layout takes a tier whole, so this objective counts with the one in it that the layout uses.": "Diese Anordnung nimmt eine Stufe als Ganzes, daher zählt dieses Optimierungsziel mit dem in der Stufe, das die Anordnung verwendet.",
+  "The layout shown does not use this objective.": "Die angezeigte Anordnung verwendet dieses Optimierungsziel nicht.",
+  "Show": "Anzeigen",
+  "The layout shown does not use this setting.": "Die angezeigte Anordnung verwendet diese Einstellung nicht.",
+  "1 setting": "1 Einstellung",
+  "1 objective": "1 Optimierungsziel",
+  "1 of the settings keeps a value you set.": "1 der Einstellungen behält einen von Ihnen gesetzten Wert.",
+  " and ": " und "
 }

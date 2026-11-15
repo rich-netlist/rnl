@@ -788,7 +788,6 @@
   "The solver's settings could not be read: {0}": "Impossible de lire les paramètres du solveur : {0}",
   "(not computed by this version)": "(non calculé par cette version)",
   "set": "définir",
-  "The solver does not use this with the other settings as they are.": "Avec les autres paramètres tels qu’ils sont, le solveur n’utilise pas celui-ci.",
   "Seconds that every level with a time limit shares, the whole file's time: each level takes the least of its own seconds and an even share of what is left, and only its seed once nothing is left. Not read by a respace.": "Secondes que partagent tous les niveaux dotés d’une limite de temps, le temps du fichier entier : chaque niveau prend le plus petit de ses propres secondes et d’une part égale de ce qui reste, et seulement sa graine quand il ne reste plus rien. Non lu par un réajustement de l’espacement.",
   "Time for the whole file": "Temps du fichier entier",
   "timeall must be a positive number of seconds.": "timeall doit être un nombre positif de secondes.",
@@ -807,5 +806,19 @@
   "Settings": "Paramètres",
   "1 error in the settings": "1 erreur dans les paramètres",
   "&Respace": "Réajuster l’&espacement",
-  "Respace All Circuits": "Réajuster l’espacement de tous les circuits"
+  "Respace All Circuits": "Réajuster l’espacement de tous les circuits",
+  "{0} settings": "{0} paramètres",
+  "{0} objectives": "{0} objectifs",
+  "{0} of the settings keep values you set.": "{0} des paramètres conservent des valeurs que vous avez définies.",
+  "{0} of other layouts are shown greyed.{1}": "{0} d’autres placements sont affichés en grisé.{1}",
+  "{0} of other layouts are hidden.{1}": "{0} d’autres placements sont masqués.{1}",
+  "taken with its tier": "pris avec son palier",
+  "This layout takes a tier whole, so this objective counts with the one in it that the layout uses.": "Ce placement prend un palier en entier : cet objectif compte donc avec celui du palier que le placement utilise.",
+  "The layout shown does not use this objective.": "Le placement affiché n’utilise pas cet objectif.",
+  "Show": "Afficher",
+  "The layout shown does not use this setting.": "Le placement affiché n’utilise pas ce paramètre.",
+  "1 setting": "1 paramètre",
+  "1 objective": "1 objectif",
+  "1 of the settings keeps a value you set.": "1 des paramètres conserve une valeur que vous avez définie.",
+  " and ": " et "
 }
