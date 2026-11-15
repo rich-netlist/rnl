@@ -936,3 +936,39 @@ RE e 0 1k
     let v = by_severity(&wrong, Severity::Violation);
     assert_eq!(v.iter().filter(|v| v.contains("is a FET")).count(), 1, "{v:?}");
 }
+
+#[test]
+fn a_cross_coupled_pair_points_its_drains_away_from_its_sources() {
+    let devices = "M1 x y 0 0 nch W=2u L=1u\nM2 y x 0 0 nch W=2u L=1u\nM3 x y vdd vdd pch W=2u L=1u\n\
+                   M4 y x vdd vdd pch W=2u L=1u\n";
+    // the low PIN-ORIENT facts the solver reads, with the device and the terminal of each pin
+    let pin_orients = |body: &str| {
+        let r = read(&MemoryProvider::new().with("t.sp", &with_std04(devices, body)), &Options::solver());
+        assert!(errors(&r).is_empty(), "{body}: {:?}", errors(&r));
+        let problem = &r.problems[0];
+        let mut facts: Vec<(String, String, String)> = problem
+            .facts
+            .iter()
+            .filter(|f| f.priority == rnl_runtime::interp::obj::Priority::Low)
+            .filter_map(|f| match &f.kind {
+                rnl_runtime::problem::FactKind::PinOrient { pin, codes } => Some((
+                    f.label.rsplit(' ').next().unwrap_or_default().to_string(),
+                    format!("{}", pin.direction),
+                    format!("{codes:?}"),
+                )),
+                _ => None,
+            })
+            .collect();
+        facts.sort();
+        facts
+    };
+    assert!(pin_orients("{#M1 #M2 #M3 #M4};").is_empty());
+    let facts =
+        pin_orients("#M1(left) #M2(right) @AS $CROSS_COUPLED_PAIR; #M3(left) #M4(right) @AS $CROSS_COUPLED_PAIR;");
+    // one fact on the drain of each device, none on a gate: the n-type drains face one way, the
+    // p-type ones the other
+    assert_eq!(facts.iter().map(|f| f.0.as_str()).collect::<Vec<_>>(), ["#M1", "#M2", "#M3", "#M4"], "{facts:?}");
+    assert_eq!(facts[0].2, facts[1].2, "{facts:?}");
+    assert_eq!(facts[2].2, facts[3].2, "{facts:?}");
+    assert_ne!(facts[0].2, facts[2].2, "{facts:?}");
+}

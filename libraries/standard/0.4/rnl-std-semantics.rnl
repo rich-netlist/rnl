@@ -502,7 +502,8 @@
   };
 
   /* A cross-coupled pair: two matched transistors cross-coupled in positive feedback, drawn mirrored.
-     Places and routes: mirrors left and right and routes their shared nets. Direct gate-to-drain or
+     Places and routes: mirrors left and right, points n-type drains up and p-type drains down, and
+     routes their shared nets. Direct gate-to-drain or
      base-to-collector identity is not asserted because an element such as a resistor, inductor or
      cascode may sit in series with a drain or collector. */
   $CROSS_COUPLED_PAIR = @DEFINE(roles=[["left", "instance"], ["right", "instance"]]) {
@@ -510,6 +511,12 @@
     {?left ?right} @AS $MATCHED;
     ?left(left) ?right(right) %axis(axis) @AS $MIRRORED_LAYOUT;
     {?left ?right} @ROUTE-OBJECT(priority="low");
+    {?left ?right} @SELECT-INSTANCE(type="nmos")
+        => @SELECT-PIN(terminal="d")
+        => @ORIENT("up", priority="low");
+    {?left ?right} @SELECT-INSTANCE(type="pmos")
+        => @SELECT-PIN(terminal="d")
+        => @ORIENT("down", priority="low");
     {?left ?right} @ASSERT-INSTANCE(same=["model", "w", "l", "nf", "m", "area"],
             message="the two sides of a $CROSS_COUPLED_PAIR are matched");
   };
