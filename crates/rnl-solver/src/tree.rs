@@ -468,16 +468,27 @@ impl<'a> Tree<'a> {
     /// The aligned pairs an arrangement splits: the members of an ALIGN on y put in one column,
     /// or of an ALIGN on x in one row, where they can share no line.
     pub(crate) fn split_aligns(&self, arr: &Arrangement) -> BTreeSet<(usize, usize, bool)> {
+        self.split_listed(arr).into_iter().collect()
+    }
+
+    /// The split aligned pairs as the rules list them: a pair two ALIGNs give is listed twice, and
+    /// counted twice by [`Tree::broken`].
+    fn split_listed(&self, arr: &Arrangement) -> Vec<(usize, usize, bool)> {
         let walk = self.walk(arr);
-        let mut out = BTreeSet::new();
+        let mut out = Vec::new();
         for (pairs, across, on_y) in [(&self.rules.same_y, Dir::Column, true), (&self.rules.same_x, Dir::Row, false)] {
             for &(a, b) in pairs {
                 if matches!(lca(&walk, a, b), Some((_, d, ..)) if d == across) {
-                    out.insert((a, b, on_y));
+                    out.push((a, b, on_y));
                 }
             }
         }
         out
+    }
+
+    /// The rules other than the aligned pairs an arrangement breaks.
+    fn broken_others(&self, arr: &Arrangement) -> usize {
+        self.broken(arr).saturating_sub(self.split_listed(arr).len())
     }
 
     /// An arrangement with the aligned pairs it splits put together again, from its lists alone:
@@ -490,14 +501,14 @@ impl<'a> Tree<'a> {
             if split == 0 || crate::budget::stopped() {
                 return (arr, said);
             }
-            let others = self.broken(&arr).saturating_sub(split);
+            let others = self.broken_others(&arr);
             let best = self
                 .neighbours(&arr)
                 .into_iter()
                 .filter(|m| !m.3)
-                .map(|m| {
-                    let n = self.split_aligns(&m.1).len();
-                    (n, self.broken(&m.1).saturating_sub(n), m)
+                .map(|mut m| {
+                    self.settle_flips(&mut m.1);
+                    (self.split_aligns(&m.1).len(), self.broken_others(&m.1), m)
                 })
                 .filter(|(n, o, _)| *n < split && *o <= others)
                 .min_by_key(|(n, o, _)| (*n, *o));
