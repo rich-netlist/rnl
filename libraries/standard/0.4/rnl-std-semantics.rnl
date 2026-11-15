@@ -877,6 +877,24 @@
     ?input(transconductor) ?load(load) @AS $TRANSCONDUCTOR_Z_AMPLIFIER;
   };
 
+  /* A degenerated common-source amplifier: a FET input transistor, its load and its degeneration.
+     Routes; places nothing: applies $COMMON_SOURCE to ?input and $DEGENERATED_TRANSCONDUCTOR_Z_AMPLIFIER
+     to ?input, ?load and ?degenerator. */
+  $DEGENERATED_COMMON_SOURCE_AMPLIFIER = @DEFINE(
+      roles=[["input", "instance"], ["load", ["instance", "usage"]], ["degenerator", ["instance", "usage"]]]) {
+    ?input @AS $COMMON_SOURCE;
+    ?input(transconductor) ?load(load) ?degenerator(degenerator) @AS $DEGENERATED_TRANSCONDUCTOR_Z_AMPLIFIER;
+  };
+
+  /* A degenerated common-emitter amplifier: a bipolar input transistor, its load and its degeneration.
+     Routes; places nothing: applies $COMMON_EMITTER to ?input and $DEGENERATED_TRANSCONDUCTOR_Z_AMPLIFIER
+     to ?input, ?load and ?degenerator. */
+  $DEGENERATED_COMMON_EMITTER_AMPLIFIER = @DEFINE(
+      roles=[["input", "instance"], ["load", ["instance", "usage"]], ["degenerator", ["instance", "usage"]]]) {
+    ?input @AS $COMMON_EMITTER;
+    ?input(transconductor) ?load(load) ?degenerator(degenerator) @AS $DEGENERATED_TRANSCONDUCTOR_Z_AMPLIFIER;
+  };
+
   /* A Miller-compensated amplifier: a gain stage and its compensation network.
      Routes; places nothing; a group: specializes $FEEDBACK_LOOP and routes shared nets between ?stage
      and ?compensation. */
@@ -1193,14 +1211,16 @@
   $DC_FEED = @DEFINE(roles=[["device", ["instance", "usage"]]]) {
   };
 
-  /* A decoupling or bypass capacitor on a supply or bias node.
-     Meaning only: places and routes nothing. */
+  /* A decoupling capacitor on a supply or bias node.
+     Places: its pins in one column, so that it stands upright between its node and the rail. */
   $DECAP = @DEFINE(roles=[["device", ["instance", "usage"]]]) {
+    ?device @SELECT-PIN => @ALIGN("x", priority="low");
   };
 
   /* A series coupling capacitor that passes the AC signal and blocks DC.
-     Meaning only: places and routes nothing. */
+     Places: its pins on one row, so that it lies along a signal flow drawn from left to right. */
   $AC_COUPLE = @DEFINE(roles=[["device", ["instance", "usage"]]]) {
+    ?device @SELECT-PIN => @ALIGN("y", priority="low");
   };
 
   /* ==============================================================================================
