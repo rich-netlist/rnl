@@ -32,6 +32,7 @@ mod definition_callees04;
 mod definition_diagnostics04;
 mod definition_failed_values04;
 mod definition_graphic_counts04;
+mod definition_local_selections04;
 mod definition_members04;
 mod definition_names04;
 mod definition_parameters04;

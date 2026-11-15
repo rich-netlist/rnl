@@ -2631,6 +2631,10 @@ impl Interp<'_> {
                 }
                 return Err(Stop::LocalRef);
             }
+            // in a level below the usage's, a member whose selection reaches nothing of that level
+            // gives it nothing (10.4); a name bound to it is not failed there, and what names it
+            // gives that level nothing either, without a diagnostic
+            Err(Stop::OwnLevel) if modern && sub.body_scene != ctx.scene => return Err(Stop::OwnLevel),
             Err(Stop::LocalRef) | Err(Stop::OwnLevel) => self.new_obj(ObjData::Failed(None)),
             Err(Stop::NoCircuit) => return Err(Stop::NoCircuit),
             Err(Stop::Language) => return Err(Stop::Language),
