@@ -1,4 +1,10 @@
 {
  "language": "es",
- "annex": "Anexo"
+ "annex": "Anexo",
+ "reference": {
+  "chapter": ["capítulo", "capítulos"],
+  "principles": ["Principios", "Principio"],
+  "version": ["versión", "versiones"],
+  "list": ["y", "o"]
+ }
 }

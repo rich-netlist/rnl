@@ -1,6 +1,12 @@
 {
  "language": "zh",
  "annex": "附录",
+ "reference": {
+  "chapter_around": ["第", "章"],
+  "principles": ["原则"],
+  "version": ["版本"],
+  "list": ["和", "或"]
+ },
  "annex_a": {
   "title": "## 附录 A 关键字签名（规范性）",
   "intro": "本附录由标准词表 `rnl-words-{version}.json` 生成（5.3）；两者不一致时是勘误。它列出每个关键字收什么、给什么；含义见最后一栏所指的节。",

@@ -12,7 +12,7 @@ Pandoc filter for the RNL standard, the same for the web page (html5) and the PD
   both, each coloured as it reads in its own version and marked as kept, removed or added;
 - for Typst, the table of contents is put before chapter 1, after the front matter.
 
-Metadata read: rnl-lang ("en" or "zh"). Linked references are listed on stderr with --verbose-links.
+Metadata read: rnl-lang, error-label, contents-title, annex and reference (the words of i18n/<lang>/spec.json). Linked references are listed on stderr with --verbose-links.
 A page that is not the standard but cites its sections, such as the short guide, names the sections in a file,
 section-ids-file (one id a line), and the page they are on, section-base (such as "../"): the references become
 links to that page.
@@ -26,10 +26,16 @@ local in_principles = false  -- inside the principles, whose own numbers, 1 to 4
 local verbose = os.getenv("RNL_LINKS_LOG")
 local log = verbose and io.open(verbose, "a") or nil
 
-local TEXT = {
-  en = { error = "Error example", contents = "Contents" },
-  zh = { error = "错例", contents = "目录" },
-}
+-- The labels, from the metadata the build gives (the language's messages); English where none is given.
+local TEXT = { error = "Error example", contents = "Contents" }
+
+-- The words of a language that tell what a number names (i18n/<lang>/spec.json, "reference"), on top of the
+-- English ones, which stay valid in every language: words (list) that stand before a number, as a suffix of the
+-- word before it. chapter: "Kapitel 7"; principles: "Prinzipien 2.4"; version: "Version 0.3"; list: "und" in
+-- "Prinzipien 2.4 und 2.9". chapter_around: ["第", "章"], "第 7 章" with spaces; chapter_tight: ["第", "章"],
+-- "第7章" without. annex: the word that starts the heading of an annex.
+local WORDS = { chapter = {}, principles = {}, version = {}, list = {}, annex = {} }
+local AROUND, TIGHT = nil, nil
 
 -- Typst labels are written <…>; keep them plain and unambiguous.
 local function anchor(id)
@@ -39,7 +45,10 @@ end
 local function section_id(text)
   local n = text:match("^(%d+[%.%d]*)%s") or text:match("^(%d+)$")
   if n then return (n:gsub("%.$", "")) end
-  local a = text:match("^Annex (%u)%s") or text:match("^附录 (%u)%s")
+  local a = text:match("^Annex (%u)%s")
+  for _, w in ipairs(WORDS.annex) do
+    a = a or (text:sub(1, #w + 1) == w .. " " and text:sub(#w + 2):match("^(%u)%s"))
+  end
   if a then return a end
   return text:match("^(%u%.%d+)%s")
 end
@@ -47,8 +56,29 @@ end
 ------------------------------------------------------------------------------------------------
 -- Pass 1: metadata and section identifiers
 
+local function words_of(value)
+  local out = {}
+  if value == nil then return out end
+  if pandoc.utils.type(value) == "List" then
+    for _, v in ipairs(value) do table.insert(out, pandoc.utils.stringify(v)) end
+  else
+    table.insert(out, pandoc.utils.stringify(value))
+  end
+  return out
+end
+
 local function read_meta(meta)
   if meta["rnl-lang"] then lang = pandoc.utils.stringify(meta["rnl-lang"]) end
+  if meta["error-label"] then TEXT.error = pandoc.utils.stringify(meta["error-label"]) end
+  if meta["contents-title"] then TEXT.contents = pandoc.utils.stringify(meta["contents-title"]) end
+  local ref = meta["reference"]
+  if ref and pandoc.utils.type(ref) == "table" then
+    for _, k in ipairs({ "chapter", "principles", "version", "list" }) do WORDS[k] = words_of(ref[k]) end
+    local around, tight = words_of(ref["chapter_around"]), words_of(ref["chapter_tight"])
+    AROUND = #around == 2 and around or nil
+    TIGHT = #tight == 2 and tight or nil
+  end
+  if meta["annex"] then WORDS.annex = words_of(meta["annex"]) end
   if meta["section-ids-file"] then
     for id in io.lines(pandoc.utils.stringify(meta["section-ids-file"])) do ids[id] = true end
     base = meta["section-base"] and pandoc.utils.stringify(meta["section-base"]) or ""
@@ -68,14 +98,29 @@ end
 ------------------------------------------------------------------------------------------------
 -- Pass 2: links for section references
 
-local NO_LINK_AFTER = { "Principles$", "原则$", "[Vv]ersion$", "[Vv]ersions$", "版本$", "RNL$", "before$" }
+local NO_LINK_AFTER = { "Principles$", "[Vv]ersion$", "[Vv]ersions$", "RNL$", "before$" }
+
+-- Whether `text` ends with one of `words` (plain text, not a pattern).
+local function ends_with(text, words)
+  for _, w in ipairs(words) do
+    if #text >= #w and text:sub(-#w) == w then return true end
+  end
+  return false
+end
+
+local function is_one_of(text, words)
+  for _, w in ipairs(words) do
+    if text == w then return true end
+  end
+  return false
+end
 
 local function blocked(prev)
   if not prev then return false end
   for _, p in ipairs(NO_LINK_AFTER) do
     if prev:match(p) then return true end
   end
-  return false
+  return ends_with(prev, WORDS.principles) or ends_with(prev, WORDS.version)
 end
 
 local function neighbour(inlines, i, step)
@@ -100,15 +145,34 @@ local function link_str(s, prev, nxt, chain)
   local function emit(upto)
     if upto >= pos then table.insert(out, pandoc.Str(s:sub(pos, upto))) end
   end
+  -- 第7章, a chapter's number between two words that are written without a space (Japanese, Korean)
+  if TIGHT then
+    local a, b, num = s:find(TIGHT[1] .. "(%d+)" .. TIGHT[2], 1)
+    if a and ids[num] then
+      local out = {}
+      local function part(text, p, n)
+        if text == "" then return end
+        local linked = link_str(text, p, n, false)
+        if linked then for _, el in ipairs(linked) do table.insert(out, el) end else table.insert(out, pandoc.Str(text)) end
+      end
+      part(s:sub(1, a - 1), prev, nil)
+      table.insert(out, pandoc.Str(TIGHT[1]))
+      table.insert(out, link(num, num))
+      local rest = s:sub(a + #TIGHT[1] + #num)
+      part(rest, nil, nxt)
+      return out, false
+    end
+  end
   -- chapter 7 / chapters 9–17 / 第 7 章
   local ch = s:match("^(%d+)")
-  if ch and ids[ch] and prev and (prev:match("[Cc]hapters?$") or (prev:match("第$") and nxt and nxt:match("^章"))) then
+  if ch and ids[ch] and prev and (prev:match("[Cc]hapters?$") or ends_with(prev, WORDS.chapter)
+      or (AROUND and prev:sub(-#AROUND[1]) == AROUND[1] and nxt and nxt:sub(1, #AROUND[2]) == AROUND[2])) then
     table.insert(out, link(ch, ch))
     pos = #ch + 1
   end
   -- Annex A / 附录 A
   local an = s:match("^(%u)")
-  if pos == 1 and an and ids[an] and prev and (prev:match("Annex$") or prev:match("附录$"))
+  if pos == 1 and an and ids[an] and prev and (prev:match("Annex$") or ends_with(prev, WORDS.annex))
      and not s:sub(2, 2):match("[%w]") then
     table.insert(out, link(an, an))
     pos = 2
@@ -142,14 +206,14 @@ local function link_str(s, prev, nxt, chain)
   return out, goes_on
 end
 
-local LIST_WORDS = { ["and"] = true, ["or"] = true, ["和"] = true, ["或"] = true }
+local LIST_WORDS = { ["and"] = true, ["or"] = true }
 
 local function link_inlines(inlines)
   local result = pandoc.Inlines({})
   local chain = false
   for i, el in ipairs(inlines) do
     if el.t == "Str" then
-      if chain and LIST_WORDS[el.text] then
+      if chain and (LIST_WORDS[el.text] or is_one_of(el.text, WORDS.list)) then
         result:insert(el)
       else
         local parts
@@ -350,7 +414,7 @@ local function render(lines, kind, is_error, marks)
       end
       table.insert(L, "(" .. table.concat(segs, " ") .. "),")
     end
-    local label = is_error and typst_string(TEXT[lang].error) or "none"
+    local label = is_error and typst_string(TEXT.error) or "none"
     return pandoc.RawBlock("typst", "#rnlcode(label: " .. label .. ", (\n" .. table.concat(L, "\n") .. "\n))")
   end
   local H = {}
@@ -370,7 +434,7 @@ local function render(lines, kind, is_error, marks)
   end
   local pre = '<pre class="code ' .. kind .. '"><code>' .. table.concat(H) .. "</code></pre>"
   if is_error then
-    pre = '<figure class="code-error"><figcaption>' .. TEXT[lang].error .. "</figcaption>" .. pre .. "</figure>"
+    pre = '<figure class="code-error"><figcaption>' .. TEXT.error .. "</figcaption>" .. pre .. "</figure>"
   end
   return pandoc.RawBlock("html", pre)
 end
@@ -445,7 +509,7 @@ local function place_outline(doc)
   for i, b in ipairs(doc.blocks) do
     if b.t == "Header" and b.identifier == anchor("1") then
       doc.blocks:insert(i, pandoc.RawBlock("typst",
-        "#outline(title: [" .. TEXT[lang].contents .. "], depth: 2, indent: auto)\n#pagebreak()"))
+        "#outline(title: [" .. TEXT.contents .. "], depth: 2, indent: auto)\n#pagebreak()"))
       return doc
     end
   end

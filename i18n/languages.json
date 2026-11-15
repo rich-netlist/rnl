@@ -20,6 +20,7 @@
       },
       "messages": {
         "contents": "Contents",
+        "error_example": "Error example",
         "on_this_page": "On this page",
         "zip_label": "Markdown, chapters",
         "md_label": "Markdown",

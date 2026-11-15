@@ -1,4 +1,10 @@
 {
  "language": "ko",
- "annex": "부록"
+ "annex": "부록",
+ "reference": {
+  "chapter_tight": ["제", "장"],
+  "principles": ["원칙"],
+  "version": ["버전"],
+  "list": ["및", "또는"]
+ }
 }

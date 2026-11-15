@@ -49,7 +49,7 @@
 ]
 
 #set document(title: [$title$])
-#set text(font: serif, size: 10pt, lang: "$typst-lang$")
+#set text(font: serif, size: 10pt, lang: "$typst-lang$", region: if "$typst-region$" == "" { none } else { "$typst-region$" })
 #set par(justify: true, leading: 0.7em, spacing: 1em)
 #set page(
   paper: "a4",
