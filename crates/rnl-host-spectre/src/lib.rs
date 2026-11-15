@@ -241,6 +241,12 @@ const DIRECTIVES: [&str; 14] = [
     "if",
 ];
 
+/// Whether a `simulator` statement, lowercased, makes Spectre mode case-insensitive:
+/// `insensitive=yes`.
+fn insensitive(statement: &str) -> bool {
+    statement.split_whitespace().any(|t| t == "insensitive=yes")
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Mode {
     Spectre,
@@ -446,6 +452,9 @@ struct Reader<'r, 'a> {
 
 struct State {
     mode: Mode,
+    /// Spectre mode reads its keywords in any case: `simulator lang=spectre insensitive=yes`.
+    /// Otherwise it is case-sensitive and its keywords are lowercase.
+    insensitive: bool,
     cur: LevelId,
     circ: LevelId,
     stack: Vec<(LevelId, LevelId, Mode)>,
@@ -470,7 +479,7 @@ impl Reader<'_, '_> {
             self.cx.doc.sources.push((fname.clone(), text.clone()));
         }
         let lines: Vec<&str> = text.lines().map(|l| l.trim_end_matches('\r')).collect();
-        let mut st = State { mode, cur: level, circ, stack: Vec::new() };
+        let mut st = State { mode, insensitive: false, cur: level, circ, stack: Vec::new() };
         let mut run: Vec<CarrierLine> = Vec::new();
         let mut pending: Option<(u32, String)> = None;
         // a `.subckt` read in SPICE mode whose `+` lines add ports, until its parameters begin
@@ -537,9 +546,12 @@ impl Reader<'_, '_> {
                 } else {
                     strip_comment(stripped)
                 };
-                let low = card.to_lowercase();
-                let words: Vec<&str> = low.split_whitespace().collect();
-                let first = words.first().copied().unwrap_or("");
+                let words: Vec<&str> = card.split_whitespace().collect();
+                // `.lib` and `.endl` of SPICE in any case; `section` and `endsection` of Spectre in
+                // lowercase, unless Spectre mode is case-insensitive
+                let head = words.first().copied().unwrap_or("");
+                let first =
+                    if head.starts_with('.') || st.insensitive { head.to_lowercase() } else { head.to_string() };
                 if let Some((name, start)) = &skip_section {
                     if (first == "endsection" || first == ".endl")
                         && words.get(1).is_none_or(|w| w.eq_ignore_ascii_case(name))
@@ -735,6 +747,7 @@ impl Reader<'_, '_> {
                     "simulator" => {
                         if low.contains("spectre") {
                             st.mode = Mode::Spectre;
+                            st.insensitive = insensitive(&low);
                         }
                         continue;
                     }
@@ -945,11 +958,16 @@ impl Reader<'_, '_> {
     ) -> Option<bool> {
         let toks = tokens(stmt);
         let first = toks.first()?.clone();
-        let low = first.to_lowercase();
+        // Spectre is case-sensitive and its keywords are lowercase: `Model` or `Include` names an
+        // instance, as `IF` does; with `insensitive=yes` they are keywords in any case
+        let low = if st.insensitive { first.to_lowercase() } else { first.clone() };
         match low.as_str() {
             "simulator" => {
-                if stmt.to_lowercase().contains("spice") && !stmt.to_lowercase().contains("spectre") {
+                let lower = stmt.to_lowercase();
+                if lower.contains("spice") && !lower.contains("spectre") {
                     st.mode = Mode::Spice;
+                } else {
+                    st.insensitive = insensitive(&lower);
                 }
                 return None;
             }
@@ -1058,7 +1076,7 @@ impl Reader<'_, '_> {
             return None;
         }
         // Spectre is case-sensitive: `if` opens a conditional, `IF` names an instance.
-        if DIRECTIVES.contains(&first.as_str()) || first.starts_with('}') || first.starts_with('{') {
+        if DIRECTIVES.contains(&low.as_str()) || first.starts_with('}') || first.starts_with('{') {
             return None;
         }
         // an instance: `name (nodes) master params` or `name nodes master params`
@@ -1504,6 +1522,55 @@ mod tests {
         assert!(sink.all().is_empty(), "{:?}", sink.all());
         let names: Vec<&str> = doc.main().instances.iter().map(|i| i.name.as_str()).collect();
         assert_eq!(names, vec!["IF", "Real"]);
+    }
+
+    #[test]
+    fn a_keyword_in_another_case_names_an_instance() {
+        // Spectre mode is case-sensitive and its keywords are lowercase: `Subckt`, `Ends`, `Model`,
+        // `Include`, `Parameters` and the like name instances, in a subcircuit as at the top
+        let net = "// t\nsimulator lang=spectre\nsubckt cell a b\nInline (a b) resistor r=1\nEnds (a b) resistor r=2\n\
+                   ends cell\nSubckt (a 0) resistor r=1\nModel (a 0) resistor r=1\nInclude (a 0) resistor r=1\n\
+                   Parameters (a 0) resistor r=1\nGlobal (a 0) resistor r=1\nSimulator (a 0) resistor r=1\n\
+                   X1 (a 0) cell\n";
+        let p = MemoryProvider::new().with("a.scs", net);
+        let mut sink = Sink::new();
+        let doc = read("a.scs", &p, &mut sink).unwrap();
+        assert!(sink.all().is_empty(), "{:?}", sink.all());
+        let names: Vec<&str> = doc.main().instances.iter().map(|i| i.name.as_str()).collect();
+        assert_eq!(names, vec!["Subckt", "Model", "Include", "Parameters", "Global", "Simulator", "X1"]);
+        let cell = doc.levels.iter().find(|l| l.name == "cell").expect("the subcircuit cell");
+        let names: Vec<&str> = cell.instances.iter().map(|i| i.name.as_str()).collect();
+        assert_eq!(names, vec!["Inline", "Ends"]);
+    }
+
+    #[test]
+    fn insensitive_spectre_mode_reads_keywords_in_any_case() {
+        // `simulator lang=spectre insensitive=yes`: the keywords are read in any case
+        let net = "// t\nsimulator lang=spectre insensitive=yes\nSUBCKT cell a b\nPARAMETERS w=1\n\
+                   R1 (a b) resistor r=1\nENDS cell\nX1 (n 0) cell\nIF (n 0) isource dc=1m\n";
+        let p = MemoryProvider::new().with("a.scs", net);
+        let mut sink = Sink::new();
+        let doc = read("a.scs", &p, &mut sink).unwrap();
+        assert!(sink.all().is_empty(), "{:?}", sink.all());
+        let names: Vec<&str> = doc.main().instances.iter().map(|i| i.name.as_str()).collect();
+        assert_eq!(names, vec!["X1"], "IF opens a conditional, as `if` does");
+        let cell = doc.levels.iter().find(|l| l.name == "cell").expect("the subcircuit cell");
+        assert_eq!(cell.instances.len(), 1);
+        assert!(cell.params.iter().any(|(k, _)| k == "w"), "{:?}", cell.params);
+    }
+
+    #[test]
+    fn an_instance_named_endsection_does_not_end_the_section() {
+        let net = "// t\nsimulator lang=spectre\ninclude \"lib.scs\" section=tt\n";
+        let lib = "simulator lang=spectre\nlibrary models\nsection tt\nEndsection (a 0) resistor r=1\n\
+                   R2 (a 0) resistor r=2\nendsection tt\nendlibrary\n";
+        let p = MemoryProvider::new().with("a.scs", net).with("lib.scs", lib);
+        let mut sink = Sink::new();
+        let doc = read("a.scs", &p, &mut sink).unwrap();
+        assert!(sink.all().is_empty(), "{:?}", sink.all());
+        // the instances of a section are the including circuit's; R2 is read, so the section goes on
+        let names: Vec<&str> = doc.main().instances.iter().map(|i| i.name.as_str()).collect();
+        assert_eq!(names, vec!["Endsection", "R2"]);
     }
 
     #[test]
