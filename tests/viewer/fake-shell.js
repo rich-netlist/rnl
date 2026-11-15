@@ -163,6 +163,13 @@ const fake = {
     if (held) held.resolve();
     held = null;
   },
+  /** Whether the solver's table of settings waits, when it is asked for, until `releaseTable()`. */
+  holdTable: false,
+  /** Let the table that waits be given. */
+  releaseTable() {
+    if (heldTable) heldTable();
+    heldTable = null;
+  },
   /** Tell the page of one event of the solve under way (docs/solver-progress.md), as the desktop does. */
   step(event) {
     if (progress) progress(event);
@@ -222,6 +229,7 @@ const fake = {
 window.fakeShell = fake;
 
 let held = null; // the solve that waits: { resolve, reject }
+let heldTable = null; // the table of settings that waits: its resolve
 let solveCancelled = false; // cancellation can arrive before the fixture fetch finishes
 let heldDrawings = []; // the requests for drawings that wait: their resolve
 let kept = null; // the drawings of the last build that left them out of its Document, by level: { names, drawings }
@@ -238,6 +246,7 @@ let opening = null;
 const solving = {
   async solverTable() {
     fake.calls.push(["solverTable"]);
+    if (fake.holdTable) await new Promise((resolve) => (heldTable = resolve));
     return structuredClone(TABLE);
   },
   async checkSettings(config) {

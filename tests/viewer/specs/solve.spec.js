@@ -284,6 +284,44 @@ test.describe("on the desktop", () => {
     await expect(page.locator("#preview-badge")).toBeHidden();
     await expect(page.locator("#tab-solve")).toBeVisible();
   });
+
+  test.describe("with settings that differ from the defaults, which are read against the solver's table before the solve", () => {
+    test.use({ keptSettings: { "solve-config": { beam: 6, layout: "rows" } } });
+
+    test("a Cancel pressed while they are read stops the solve before the shell is asked for one", async ({ page, viewer }) => {
+      const before = await page.evaluate(() => window.viewer.doc.files[0].text);
+      await page.evaluate(() => (window.fakeShell.holdTable = true));
+      await page.evaluate(() => window.viewer.command("solve"));
+      // the table is being asked for, and the solve is shown as under way, with its Cancel
+      await expect.poll(() => viewer.calls("solverTable")).toHaveLength(1);
+      await expect(page.locator("#solve-cancel")).toBeVisible();
+      await page.locator("#solve-cancel").click();
+      expect(await viewer.calls("cancelSolve")).toEqual([[]]);
+      // (the shell has no solve to stop yet: the page keeps the Cancel until the table is read)
+      expect(await solves(viewer)).toEqual([]);
+      await page.evaluate(() => window.fakeShell.releaseTable());
+      await expect(page.locator("#solve-step")).toHaveText("The solve was canceled; the netlist is shown as it was.");
+      await expect(page.locator("#solve-cancel")).toBeHidden();
+      await expect(page.locator("#preview-badge")).toBeHidden();
+      await expect(page.locator("body")).not.toHaveClass(/solving/);
+      expect(await solves(viewer)).toEqual([]);
+      expect(await page.evaluate(() => window.viewer.doc.files[0].text)).toBe(before);
+      // and the next solve, whose table is kept, begins and gives its result
+      await page.evaluate(() => (window.fakeShell.holdTable = false));
+      await solve(page);
+      expect(await solves(viewer)).toEqual([[T4, { config: 'beam=6,layout="rows"', timeall: null, level: `${T4}.sp` }]]);
+    });
+
+    test("a solve whose table is read without a Cancel goes on to the shell with what the settings take", async ({ page, viewer }) => {
+      await page.evaluate(() => (window.fakeShell.holdTable = true));
+      await page.evaluate(() => window.viewer.command("solve"));
+      await expect.poll(() => viewer.calls("solverTable")).toHaveLength(1);
+      expect(await solves(viewer)).toEqual([]);
+      await page.evaluate(() => window.fakeShell.releaseTable());
+      await page.waitForFunction(() => document.body.classList.contains("preview") && !document.body.classList.contains("solving"));
+      expect(await solves(viewer)).toEqual([[T4, { config: 'beam=6,layout="rows"', timeall: null, level: `${T4}.sp` }]]);
+    });
+  });
 });
 
 
