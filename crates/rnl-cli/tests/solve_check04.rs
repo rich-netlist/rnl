@@ -150,6 +150,19 @@ fn the_old_options_text_is_checked_item_by_item() {
 }
 
 #[test]
+fn the_old_options_text_takes_a_string_in_double_quotes_before_another_key() {
+    // `layout="tree"` as the named syntax writes it, or `layout=tree`, followed by another key
+    for text in ["layout=\"tree\";beam=2", "layout=tree;beam=2", "beam=2;layout=\"tree\""] {
+        let tool = [ToolSettings::Options(text.into())];
+        let c = check_settings(None, &MemoryProvider::new(), &SolveOptions::default(), &tool).unwrap();
+        let l = &c.levels[0];
+        assert!(l.errors.is_empty(), "{text}: {:?}", l.errors);
+        assert_eq!(setting(l, "layout"), "layout=\"tree\" (command-line)", "{text}");
+        assert_eq!(setting(l, "beam"), "beam=2 (command-line)", "{text}");
+    }
+}
+
+#[test]
 fn the_run_limit_is_what_limit_work_and_seconds_make_together() {
     let none = |tool: &str| {
         let tool = [ToolSettings::Config(tool.into())];
