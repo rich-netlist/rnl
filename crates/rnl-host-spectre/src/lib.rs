@@ -1057,7 +1057,8 @@ impl Reader<'_, '_> {
             }
             return None;
         }
-        if DIRECTIVES.contains(&low.as_str()) || first.starts_with('}') || first.starts_with('{') {
+        // Spectre is case-sensitive: `if` opens a conditional, `IF` names an instance.
+        if DIRECTIVES.contains(&first.as_str()) || first.starts_with('}') || first.starts_with('{') {
             return None;
         }
         // an instance: `name (nodes) master params` or `name nodes master params`
@@ -1491,6 +1492,18 @@ mod tests {
             ]
         );
         assert!(doc.main().instances.iter().all(|i| !i.is_subckt));
+    }
+
+    #[test]
+    fn an_instance_named_as_a_directive_in_another_case() {
+        // Spectre is case-sensitive, so `IF` and `Real` are instances, not `if` and `real`.
+        let net = "// t\nsimulator lang=spectre\nIF (a 0) isource dc=1m\nReal (a 0) resistor r=1k\n";
+        let p = MemoryProvider::new().with("a.scs", net);
+        let mut sink = Sink::new();
+        let doc = read("a.scs", &p, &mut sink).unwrap();
+        assert!(sink.all().is_empty(), "{:?}", sink.all());
+        let names: Vec<&str> = doc.main().instances.iter().map(|i| i.name.as_str()).collect();
+        assert_eq!(names, vec!["IF", "Real"]);
     }
 
     #[test]
