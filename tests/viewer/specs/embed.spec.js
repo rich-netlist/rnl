@@ -493,7 +493,10 @@ test("public packages: every picker record loads through the offline catalog", a
     for (const pkg of packages) {
       const items = await shell.includePackage(pkg);
       shell.setPool(items);
-      const source = { name: 'public.sp', text: `* public\n* @RNL(type="header") { @VERSION("0.3"); @USE-PACKAGE(name="${pkg.name}", version="${pkg.version}") }\nR1 a 0 1k\n.end\n` };
+      // a file uses a package of its own language version: the package's VERSION
+      const text = await (await items[0].read()).text();
+      const language = /@VERSION\("([^"]+)"\)/.exec(text)?.[1] ?? '0.3';
+      const source = { name: 'public.sp', text: `* public\n* @RNL(type="header") { @VERSION("${language}"); @USE-PACKAGE(name="${pkg.name}", version="${pkg.version}") }\nR1 a 0 1k\n.end\n` };
       const doc = await shell.build(source);
       results.push({ name: `${pkg.name}@${pkg.version}`, errors: doc.diagnostics.filter(d => d.severity === 'error') });
     }
