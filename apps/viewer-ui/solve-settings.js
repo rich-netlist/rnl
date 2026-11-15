@@ -109,8 +109,10 @@ export function takenValues(table, values) {
  *   share (`rnl solve --timeall`), null for none.
  */
 export async function solverSettings() {
-  const table = await solverTable();
   const values = changed();
+  // (nothing differs from the defaults: nothing to take from, and the table, which the browser reads from the solver's
+  // module, is not asked for before the solve, which a Cancel could not stop yet)
+  const table = Object.keys(values).length === 0 ? null : await solverTable();
   return { config: configText(table ? takenValues(table, values) : values), timeall: keptTimeall() };
 }
 
