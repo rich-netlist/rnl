@@ -7,6 +7,10 @@
 //! of an earlier version is laid out in rows and reads none of the file's settings; the table does
 //! not repeat that, as the check of a level says what it takes.
 //!
+//! Each setting, objective and stage says the layouts it applies to (`applies`), none when it
+//! applies to every layout; and the table says how the line layout ranks its drawings, an order
+//! no setting changes ([`LINES_ORDER`]), for a page to show.
+//!
 //! Rows are only ever added, and so are fields: a tool takes a kind it does not know for text.
 //! The lines are English; their translations are kept apart from the solver.
 
@@ -103,6 +107,17 @@ pub struct ObjectiveRow {
     pub what: &'static str,
     /// Whether this version computes it: one it does not is inert when given.
     pub implemented: bool,
+    /// The layouts that take it, as [`SettingRow::applies`]: empty when every layout does. The
+    /// line layout takes only overlaps, crowding, misleading and wire_over_symbol, and another
+    /// objective only in a layer with one of them, which it takes whole.
+    pub applies: When,
+}
+
+/// A rank of the line layout's fixed order ([`LINES_ORDER`]).
+#[derive(Clone, Debug, PartialEq)]
+pub struct OrderRow {
+    pub name: &'static str,
+    pub what: &'static str,
 }
 
 /// The table: what [`settings_table`] gives.
@@ -115,6 +130,8 @@ pub struct SettingsTable {
     pub objectives: Vec<ObjectiveRow>,
     /// The objectives a solve takes when none are given, layer by layer.
     pub default_objectives: Vec<Layer>,
+    /// How the line layout ranks its drawings ([`LINES_ORDER_WHAT`]), first rank first.
+    pub lines_order: Vec<OrderRow>,
 }
 
 const GROUPS: [SettingGroup; 5] = [
@@ -148,6 +165,50 @@ const LIMITS: [SettingChoice; 3] = [
 
 const LINES: When = &[("layout", &["lines"])];
 const ROWS: When = &[("layout", &["rows"])];
+const TREE: When = &[("layout", &["tree"])];
+/// What the line layout leaves out: an objective it does not take.
+const NOT_LINES: When = &[("layout", &["rows", "tree"])];
+
+/// What the line layout's order is, for a page to show beside it.
+pub const LINES_ORDER_WHAT: &str = "The lines layout ranks the drawings it makes in a fixed order, the first rank \
+     deciding first, which no setting changes. Of the objectives it takes only overlaps, crowding, misleading and \
+     wire_over_symbol, and the layers that hold them, to rank the group-tree layout it starts from.";
+
+/// How the line layout ranks its drawings, first rank first: the outcomes of its search
+/// (`lines::settle`), then the line-layout order (`lines::quality::LabOrder`), by which it also
+/// weighs its drawing against the group-tree layout it starts from.
+pub const LINES_ORDER: [OrderRow; 16] = [
+    OrderRow { name: "complete", what: "A drawing of the whole level made." },
+    OrderRow { name: "false_joins", what: "Fewer places where wires read as joined where they are not." },
+    OrderRow { name: "groups", what: "Fewer groups dissolved or stretched." },
+    OrderRow { name: "routed", what: "Fewer parts of the nets left unrouted." },
+    OrderRow { name: "merge", what: "Fewer conflicts where the drawings of the groups are joined." },
+    OrderRow { name: "annotations", what: "Fewer overlaps of annotations, then fewer wires through them." },
+    OrderRow { name: "current", what: "Fewer pins whose wire leaves other than along their CURRENT." },
+    OrderRow { name: "crossings_and_bends", what: "Fewer crossings plus four times the bends of the wires." },
+    OrderRow { name: "hidden_ports", what: "Fewer ports whose way out a symbol or another net's wire shuts in." },
+    OrderRow { name: "rail_heights", what: "The grounds and the supplies at fewer heights." },
+    OrderRow { name: "mirror_pairs", what: "Fewer mirror pairs off the axis they share." },
+    OrderRow { name: "dots_near_pins", what: "Fewer junction dots less than two from a pin." },
+    OrderRow { name: "length", what: "Shorter wires." },
+    OrderRow { name: "wire_lines", what: "The wires on fewer lines." },
+    OrderRow { name: "symbol_lines", what: "The symbols on fewer rows and columns." },
+    OrderRow { name: "area", what: "A smaller drawing." },
+];
+
+/// The layouts that pass through a stage of a solve's progress, by its name, as
+/// [`SettingRow::applies`]: the search, the coordinates, the routing and the scoring of candidates
+/// are those of rows, and each of the group tree and the line layout has a stage of its own. The
+/// others, empty, are not of one layout: every solve's, and `respace`, that of a respace whatever
+/// the layout.
+pub fn stage_applies(name: &str) -> When {
+    match name {
+        "search" | "coords" | "route" | "score" => ROWS,
+        "tree" => TREE,
+        "lines" => LINES,
+        _ => &[],
+    }
+}
 
 /// The largest count a setting may give: the integers a number of RNL holds exactly.
 const MOST: f64 = 9_007_199_254_740_992.0;
@@ -310,7 +371,11 @@ pub fn settings_table() -> SettingsTable {
         .iter()
         .zip(OBJECTIVE_WHAT)
         .zip(crate::objectives::TABLE.iter())
-        .map(|((name, what), entry)| ObjectiveRow { name, what, implemented: entry.implemented })
+        .map(|((name, what), entry)| {
+            let lines = crate::objectives::Objective::from_name(name)
+                .is_some_and(|o| crate::config::LINES_OBJECTIVES.contains(&o));
+            ObjectiveRow { name, what, implemented: entry.implemented, applies: if lines { &[] } else { NOT_LINES } }
+        })
         .collect();
     SettingsTable {
         version: SETTINGS_TABLE_VERSION,
@@ -318,6 +383,7 @@ pub fn settings_table() -> SettingsTable {
         settings,
         objectives,
         default_objectives: crate::Objectives::default().layers,
+        lines_order: LINES_ORDER.to_vec(),
     }
 }
 
@@ -426,5 +492,24 @@ mod tests {
         let names: Vec<&str> =
             t.default_objectives.iter().flat_map(|l| l.items.iter().map(|(n, _)| n.as_str())).collect();
         assert_eq!(names, DEFAULT_LAYERS);
+    }
+
+    /// The line layout takes four objectives, which every layout takes, and none of the others;
+    /// its own order is said, a line for each rank.
+    #[test]
+    fn the_objectives_say_the_layouts_that_take_them() {
+        let t = settings_table();
+        let every: Vec<&str> = t.objectives.iter().filter(|o| o.applies.is_empty()).map(|o| o.name).collect();
+        assert_eq!(every, ["overlaps", "crowding", "misleading", "wire_over_symbol"]);
+        assert!(t.objectives.iter().all(|o| o.applies.is_empty() || o.applies == NOT_LINES));
+        assert_eq!(t.lines_order.len(), LINES_ORDER.len());
+        let mut names: Vec<&str> = t.lines_order.iter().map(|r| r.name).collect();
+        names.sort_unstable();
+        names.dedup();
+        assert_eq!(names.len(), LINES_ORDER.len());
+        assert!(t.lines_order.iter().all(|r| r.what.ends_with('.')));
+        assert_eq!(stage_applies("search"), ROWS);
+        assert_eq!(stage_applies("lines"), LINES);
+        assert!(stage_applies("resolve").is_empty());
     }
 }

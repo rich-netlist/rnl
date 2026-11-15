@@ -129,7 +129,8 @@ fn a_refused_value_leaves_the_one_before_it_and_the_other_keys_apply() {
     assert_eq!(grid, ["2", "\"x\""]);
     let (o, warnings, errors) = rnl_solver::SolverOptions::default().for_problem(&r.problems[0]);
     assert_eq!((o.grid, o.beam), (Some(2.0), 6));
-    assert!(warnings.is_empty(), "{warnings:?}");
+    // the beam is taken, and is the row search's: the lines layout, the default, does not use it
+    assert_eq!(warnings, ["beam is used only by the rows layout; it is ignored under layout \"lines\""]);
     assert_eq!(errors.len(), 1, "{errors:?}");
     assert!(
         errors[0].starts_with("grid must be a finite number; grid=\"x\" at main.sp:4 is left out, and grid=2 at"),

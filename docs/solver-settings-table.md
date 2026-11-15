@@ -18,9 +18,12 @@ The table describes a 0.4 level. A level of an earlier version is laid out in ro
     { "key": "spacing_x", "group": "layout", "type": "integer", "min": -1, "max": 20, "default": 0,
       "in_file": true, "what": "…", "applies": { "layout": ["lines"] } }
   ],
-  "objectives": [{ "name": "turns", "what": "Wires with fewer bends.", "implemented": true }],
+  "objectives": [{ "name": "turns", "what": "Wires with fewer bends.", "implemented": true,
+                   "applies": { "layout": ["rows", "tree"] } }],
   "default_objectives": [{ "items": [{ "name": "current_direction", "weight": 1 }], "tolerance": 0 }],
-  "stages": [{ "name": "resolve", "what": "Checking the facts against each other" }]
+  "stages": [{ "name": "search", "what": "Searching for placements", "applies": { "layout": ["rows"] } }],
+  "lines_order": { "what": "The lines layout ranks the drawings it makes in a fixed order, …",
+                   "ranks": [{ "name": "complete", "what": "A drawing of the whole level made." }] }
 }
 ```
 
@@ -32,13 +35,14 @@ The table describes a 0.4 level. A level of an earlier version is laid out in ro
   - `default`: the value when nothing gives it. It is left out where there is none, as for `work` and `junction`.
   - `in_file`: whether a file may give it in SOLVER-CONFIG. A run setting, such as `limit`, is the tool's alone.
   - `what`: one line that says what it does. `false_what`, for `number-or-false`, says what `false` means.
-  - `applies`: where a solve uses it, by the values of other settings: the spacing only by the line layout, the beam and the candidates only by rows. A page may grey it out elsewhere. Respacing a drawing uses the spacing whatever the layout.
+  - `applies`: where a solve uses it, by the values of other settings: the spacing only by the line layout, the beam and the candidates only by rows. Without it, a setting applies to every layout. A page may hide or grey it out elsewhere. Respacing a drawing uses the spacing whatever the layout.
   - `shown_when`, `required_when`: where a page shows it, and where it must be given.
-- `objectives`: every objective, with what it prefers, and whether this version computes it. One it does not compute is inert when given.
+- `objectives`: every objective, with what it prefers, whether this version computes it, and `applies`, the layouts that take it, left out when every layout does. One it does not compute is inert when given. The line layout takes only `overlaps`, `crowding`, `misleading` and `wire_over_symbol`, with the layers that hold them, to rank the group-tree layout it starts from; it ranks its own drawings by `lines_order`.
 - `default_objectives`: the objectives a solve takes when none are given, layer by layer. The setting `objectives` has the same as its `default`, as text.
-- `stages`: the stages of a solve's progress, as [`--progress=json`](solver-progress.md) names them, in the order of its table; a solve passes through those of its layout.
+- `stages`: the stages of a solve's progress, as [`--progress=json`](solver-progress.md) names them, in the order of its table, each with `applies`, the layouts that pass through it, left out when it is not of one layout: `search`, `coords`, `route` and `score` are those of rows, `tree` of the group tree, `lines` of the line layout; `respace` is that of a respace, whatever the layout.
+- `lines_order`: how the line layout ranks the drawings it makes, which no setting changes: `what`, a line to show beside it, and `ranks`, first rank first, each with a `name` and a line. It is there to be shown, not set.
 
-`applies`, `shown_when` and `required_when` guide a page; they refuse nothing. What a solve takes, a level at a time, is what the check of the settings says.
+`applies`, `shown_when` and `required_when` guide a page; they refuse nothing. A setting given where the layout in effect does not use it, with a value other than its default, is a warning of the check by its key, that it is ignored under that layout; so, under the line layout, are the layers of objectives other than the default that hold none of the four it takes: it takes a layer that holds one of them whole. What a solve takes, a level at a time, is what the check of the settings says.
 
 ## What a level takes
 

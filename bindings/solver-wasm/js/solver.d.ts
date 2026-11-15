@@ -117,9 +117,13 @@ export interface SettingsTable {
   version: number;
   groups: { name: string; what: string }[];
   settings: SettingRow[];
-  objectives: { name: string; what: string; implemented: boolean }[];
+  /** Each with the layouts that take it, `applies`, left out when every layout does. */
+  objectives: { name: string; what: string; implemented: boolean; applies?: Record<string, string[]> }[];
   default_objectives: { items: { name: string; weight: number }[]; tolerance: number }[];
-  stages: { name: string; what: string }[];
+  /** Each with the layouts that pass through it, `applies`, left out when every solve does. */
+  stages: { name: string; what: string; applies?: Record<string, string[]> }[];
+  /** How the line layout ranks its drawings, first rank first: shown, not set. */
+  lines_order: { what: string; ranks: { name: string; what: string }[] };
 }
 
 /**
