@@ -186,7 +186,7 @@ fn preview(symbols: &[SymbolView], root: usize) -> InspectedSymbol {
         texts,
         host: vec![],
         pin_nets: vec![],
-        point_nets: vec![],
+        attached_nets: vec![],
     });
     InspectedSymbol {
         name: s.name.clone(),

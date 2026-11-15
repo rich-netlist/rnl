@@ -1037,7 +1037,7 @@ impl Interp<'_> {
                 }
             }
         }
-        let point_nets = self.attached_point_nets(s, o).into_iter().map(|n| self.net_display(n)).collect();
+        let attached_nets = self.attached_nets(s, o).into_iter().map(|n| self.net_display(n)).collect();
         ItemView {
             id: self.label(o),
             object_id: String::new(),
@@ -1051,26 +1051,39 @@ impl Interp<'_> {
             texts,
             host,
             pin_nets,
-            point_nets,
+            attached_nets,
         }
     }
 
-    /// The nets of the points the roles of the usage `o` are attached to: those of the wires drawn
-    /// through each such point, in the order of the wires. A point has no net of its own; it is on
-    /// the nets of the wires that pass through it.
-    fn attached_point_nets(&mut self, s: SceneId, o: ObjId) -> Vec<ObjId> {
+    /// The nets of the terminals and points the roles of the usage `o` are attached to: a
+    /// terminal's nets, then those of the wires drawn through each point, in the order of the
+    /// wires. A point has no net of its own; it is on the nets of the wires that pass through it.
+    fn attached_nets(&mut self, s: SceneId, o: ObjId) -> Vec<ObjId> {
         let ObjData::Usage(u) = self.o(o).clone() else { return Vec::new() };
+        let mut out = Vec::new();
         let mut points = Vec::new();
         for (_, r) in &u.roles {
             let members = if self.is_set(*r) { self.flatten(s, *r, 7, None) } else { vec![*r] };
             for m in members {
                 let m = self.scene_value(m);
-                if matches!(self.o(m), ObjData::Point { .. }) && !points.contains(&m) {
-                    points.push(m);
+                let nets = match self.o(m).clone() {
+                    ObjData::Point { .. } => {
+                        if !points.contains(&m) {
+                            points.push(m);
+                        }
+                        continue;
+                    }
+                    ObjData::Term { .. } => self.term_nets(s, m),
+                    ObjData::ScenePin { owner, index } => self.scene_pin_nets(s, owner, index),
+                    _ => continue,
+                };
+                for n in nets {
+                    if !out.contains(&n) {
+                        out.push(n);
+                    }
                 }
             }
         }
-        let mut out = Vec::new();
         if points.is_empty() {
             return out;
         }

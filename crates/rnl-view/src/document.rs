@@ -1042,9 +1042,10 @@ impl<'a> Index<'a> {
                 it.host.iter().filter_map(|i| self.insts.get(&(lv.level, *i)).copied()).collect();
             if objects.is_empty() {
                 // a usage, such as a ground symbol, stands for the net it is on: the net at its
-                // pins, or the net of the point it is attached to, such as a junction dot's
+                // pins, or the net of the terminal or point it is attached to, such as a junction
+                // dot's
                 let mut nets: Vec<usize> =
-                    it.pin_nets.iter().flatten().chain(&it.point_nets).map(|n| self.net(lv.level, n)).collect();
+                    it.pin_nets.iter().flatten().chain(&it.attached_nets).map(|n| self.net(lv.level, n)).collect();
                 nets.sort_unstable();
                 nets.dedup();
                 if nets.len() == 1 {
@@ -1890,7 +1891,7 @@ R1 rail out 1k
     }
 
     #[test]
-    fn a_usage_attached_to_a_point_stands_for_the_net_of_the_wires_through_it() {
+    fn a_usage_attached_to_a_point_or_a_terminal_stands_for_its_net() {
         for version in ["0.3", "0.4"] {
             let text = format!(
                 r#"* a junction
@@ -1904,12 +1905,17 @@ R3 b c 1k
 *   &b @WIRE(mode="straight") {{#R1:2 %o #R2:1}};
 *   &b @WIRE(mode="straight") {{#R3:1 %o}};
 *   %dot = $JUNCTION @ATTACH %o;
-*   %lone = $JUNCTION @ATTACH %free{place}
+*   %lone = $JUNCTION @ATTACH %free;
+*   %on_pin = $JUNCTION @ATTACH #R3:2{place}
 * }}
 .end
 "#,
-                // a dot of 0.4 is put on its point by a solve, which writes where it is
-                place = if version == "0.4" { ";\n*   %dot @PLACE(6, 3); %lone @PLACE(20, 20)" } else { "" }
+                // a dot of 0.4 is put on its point or terminal by a solve, which writes where it is
+                place = if version == "0.4" {
+                    ";\n*   %dot @PLACE(6, 3); %lone @PLACE(20, 20); %on_pin @PLACE(7, 10)"
+                } else {
+                    ""
+                }
             );
             let files = rnl_runtime::source::MemoryProvider::new().with("dot.sp", &text);
             let d = crate::build("dot.sp", &files, &BuildOptions::default()).unwrap();
@@ -1930,6 +1936,11 @@ R3 b c 1k
             let lone = box_of("lone");
             assert_eq!(d.objects[lone.objects[0]].name, "%lone", "{version}");
             assert_eq!(lone.objects.len(), 1, "{version}");
+            // a dot on a terminal stands for the terminal's net
+            let c = d.objects.iter().position(|o| o.kind == "net" && o.name == "c").unwrap();
+            let on_pin = box_of("on_pin");
+            assert_eq!(d.objects[on_pin.objects[0]].name, "%on_pin", "{version}");
+            assert_eq!(&on_pin.objects[1..], [c], "{version}");
         }
     }
 

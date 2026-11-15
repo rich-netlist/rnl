@@ -185,10 +185,11 @@ pub struct ItemView {
     pub host: Vec<usize>,
     /// The nets at each pin of the symbol, by pin index, as the nets are displayed.
     pub pin_nets: Vec<Vec<String>>,
-    /// For a usage, the nets of the points its roles are attached to, as the nets are displayed:
-    /// the nets of the wires that pass through such a point, such as the point a junction dot is
-    /// attached to. Empty for an instance or a bundle, and for a usage attached to no such point.
-    pub point_nets: Vec<String>,
+    /// For a usage, the nets of the terminals and points its roles are attached to, as the nets
+    /// are displayed: a terminal's nets, and the nets of the wires that pass through a point, such
+    /// as the point a junction dot is attached to. Empty for an instance or a bundle, and for a
+    /// usage attached to no terminal and to no point a wire passes through.
+    pub attached_nets: Vec<String>,
 }
 
 /// A line a viewer may draw for a connection not drawn as a wire (`LevelView::flylines`).
