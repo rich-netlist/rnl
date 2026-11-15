@@ -433,7 +433,8 @@ impl SolverOptions {
         let mut settings = Vec::new();
         for item in text.split(';').filter(|s| !s.trim().is_empty()) {
             let (key, value) = item.split_once('=').ok_or("expected key=value")?;
-            let (key, value) = (key.trim(), value.trim());
+            let key = key.trim();
+            let value = crate::options::string_value(key, value.trim());
             match key {
                 "budget" => settings.extend(value.split(',').map(|p| p.replace(':', "="))),
                 "layout" => settings.push(format!("layout=\"{value}\"")),
@@ -825,6 +826,34 @@ mod tests {
             "beam=0",
         ] {
             assert!(d.with_config(bad).is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn the_old_text_takes_a_string_bare_or_in_double_quotes() {
+        // `key=value;…` writes a string bare, the named syntax in double quotes: either is read,
+        // before another key as well as alone
+        let d = SolverOptions::default();
+        let mut p = problem_of(Vec::new(), Vec::new());
+        p.version = "0.4".into();
+        for (bare, quoted) in [
+            ("layout=tree;beam=4", "layout=\"tree\";beam=4"),
+            ("beam=4;layout=rows", "beam=4;layout=\"rows\""),
+            ("run=time:5;beam=4", "run=\"time:5\";beam=4"),
+            ("search=seed;beam=4", "search=\"seed\";beam=4"),
+            ("objectives=wire_length;beam=4", "objectives=\"wire_length\";beam=4"),
+        ] {
+            let a = d.with_legacy_config(bare).unwrap_or_else(|e| panic!("{bare}: {e}"));
+            let b = d.with_legacy_config(quoted).unwrap_or_else(|e| panic!("{quoted}: {e}"));
+            assert_eq!(a.for_problem(&p).0.canonical(), b.for_problem(&p).0.canonical(), "{quoted}");
+            let (settings, problems) = SolverOptions::legacy_settings(quoted);
+            assert!(problems.is_empty(), "{quoted}: {problems:?}");
+            assert_eq!(settings, SolverOptions::legacy_settings(bare).0, "{quoted}");
+        }
+        assert_eq!(SolverOptions::parse("layout=\"tree\";beam=4").unwrap().settings.layout, crate::Layout::Tree);
+        // a quote that does not close, or a number in quotes, is still wrong
+        for bad in ["layout=\"tree;beam=4", "layout=\"tr\"ee\";beam=4", "beam=\"4\";layout=tree"] {
+            assert!(d.with_legacy_config(bad).is_err(), "{bad}");
         }
     }
 

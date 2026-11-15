@@ -406,6 +406,19 @@ const KEYS: [&str; 15] = [
     "tree_work",
 ];
 
+/// The value of a key of the `key=value;…` text that takes a string, `layout`, `objectives`,
+/// `run` or `search`, without the double quotes the named syntax writes around a string:
+/// `layout="lines"` is `layout=lines`. Another value is as it is.
+pub(crate) fn string_value<'a>(key: &str, value: &'a str) -> &'a str {
+    if !matches!(key, "layout" | "objectives" | "run" | "search") {
+        return value;
+    }
+    match value.strip_prefix('"').and_then(|v| v.strip_suffix('"')) {
+        Some(inner) if !inner.contains('"') => inner,
+        _ => value,
+    }
+}
+
 impl SolverOptions {
     /// The defaults without a time limit: the resolution is exactly that of 8.5, the same on every
     /// run and every machine, however long it takes. What the tests use.
@@ -486,7 +499,8 @@ impl SolverOptions {
             let Some((key, value)) = setting.split_once('=') else {
                 return Err(format!("a setting is `key=value`, not `{}`", setting.trim()));
             };
-            let (key, value) = (key.trim(), value.trim());
+            let key = key.trim();
+            let value = string_value(key, value.trim());
             if !KEYS.contains(&key) {
                 return Err(format!("the solver has no option `{key}`; it has {}", KEYS.join(", ")));
             }
