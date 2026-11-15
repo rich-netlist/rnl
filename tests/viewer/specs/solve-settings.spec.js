@@ -120,9 +120,10 @@ test.describe("on the desktop", () => {
     await expect(dialog(page).locator(".settings-note")).toContainText("not set here");
     // the objectives: the default layers in order, then those that are off
     expect(await order(page)).toEqual([...DEFAULT_ORDER.map((n) => [n, true]), ...OFF.map((n) => [n, false])]);
-    await expect(dialog(page).locator(".objective-level")).toHaveText([
-      ...DEFAULT_ORDER.map((_, i) => String(i + 1)), ...OFF.map(() => "off"),
-    ]);
+    // (the default layout is lines: it takes four objectives, crowding of them on, and the rest are hidden, their tiers not counted)
+    await expect(dialog(page).locator(".objective:not([hidden])")).toHaveCount(4);
+    await expect(objective(page, "crowding").locator(".objective-level")).toHaveText("1");
+    await expect(objective(page, "turns").locator(".objective-level")).toHaveText("–");
     // an objective that this version does not compute says so
     await expect(objective(page, "labels").locator(".objective-what")).toContainText("(not computed by this version)");
     await expect(objective(page, "turns").locator(".objective-what")).not.toContainText("not computed");
@@ -136,13 +137,15 @@ test.describe("on the desktop", () => {
 
   test("a setting's conditions: the spacing is not used outside the lines layout, the work and the seconds follow the limit", async ({ page }) => {
     await open(page);
-    // the lines layout uses the spacing; the beam is the rows': greyed, but still there to set
+    // the lines layout uses the spacing; the beam is the rows': hidden, and shown greyed on request
+    await expect(setting(page, "spacing_x")).toBeVisible();
     await expect(setting(page, "spacing_x")).not.toHaveClass(/unused/);
-    await expect(setting(page, "beam")).toHaveClass(/unused/);
+    await expect(setting(page, "beam")).toBeHidden();
     await field(page, "layout").selectOption("rows");
-    await expect(setting(page, "spacing_x")).toHaveClass(/unused/);
+    await expect(setting(page, "spacing_x")).toBeHidden();
+    await expect(setting(page, "beam")).toBeVisible();
     await expect(setting(page, "beam")).not.toHaveClass(/unused/);
-    await expect(setting(page, "candidates")).not.toHaveClass(/unused/);
+    await expect(setting(page, "candidates")).toBeVisible();
     // a time limit has seconds; the work is shown only for a limit of work, where it is required
     await expect(setting(page, "seconds")).toBeVisible();
     await expect(setting(page, "work")).toBeHidden();
@@ -160,11 +163,12 @@ test.describe("on the desktop", () => {
     await field(page, "spacing_x").fill("3");
     await field(page, "layout").selectOption("rows");
     await field(page, "beam").fill("8");
-    await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --solver-config 'beam=8,layout="rows",spacing_x=3'`);
+    // the spacing is the lines layout's: kept, but not given to the solver under rows
+    await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --solver-config 'beam=8,layout="rows"'`);
     await ok(page);
     expect(await viewer.stored("solve-config")).toEqual({ beam: 8, layout: "rows", spacing_x: 3 });
-    expect((await viewer.calls("checkSettings")).at(-1)).toEqual(['beam=8,layout="rows",spacing_x=3']);
-    expect(await solved(page, viewer)).toEqual({ config: 'beam=8,layout="rows",spacing_x=3', timeall: null });
+    expect((await viewer.calls("checkSettings")).at(-1)).toEqual(['beam=8,layout="rows"']);
+    expect(await solved(page, viewer)).toEqual({ config: 'beam=8,layout="rows"', timeall: null });
     // what was kept shows again
     await open(page);
     await expect(field(page, "layout")).toHaveValue("rows");
@@ -204,6 +208,7 @@ test.describe("on the desktop", () => {
 
   test("the objectives move up and down, and the order is what the solver gets", async ({ page, viewer }) => {
     await open(page);
+    await field(page, "layout").selectOption("rows");
     await expect(objective(page, "current_direction").getByRole("button", { name: "Move up: current_direction" })).toBeDisabled();
     await expect(objective(page, "wire_over_symbol").getByRole("button", { name: "Move down: wire_over_symbol" })).toBeDisabled();
     // area, the eighth, goes up past terminal_wire_alignment and symmetry, and keeps the focus
@@ -220,8 +225,8 @@ test.describe("on the desktop", () => {
     for (let k = 0; k < LEVELS; k++) await objective(page, "signal_flow").getByRole("button", { name: "Move up: signal_flow" }).click();
     expect((await order(page))[0]).toEqual(["signal_flow", false]);
     await ok(page);
-    expect(await viewer.stored("solve-config")).toEqual({ objectives: moved.join(",") });
-    expect((await solved(page, viewer)).config).toBe(`objectives="${moved.join(",")}"`);
+    expect(await viewer.stored("solve-config")).toEqual({ layout: "rows", objectives: moved.join(",") });
+    expect((await solved(page, viewer)).config).toBe(`layout="rows",objectives="${moved.join(",")}"`);
     // moved back, they are the defaults again, and nothing is kept for them
     await open(page);
     await expect(objective(page, "signal_flow")).toHaveClass(/off/);
@@ -233,6 +238,7 @@ test.describe("on the desktop", () => {
 
   test("objectives are turned on and off, and the solver gets those that are on", async ({ page, viewer }) => {
     await open(page);
+    await field(page, "layout").selectOption("rows");
     await objective(page, "turns").getByLabel("turns is on").uncheck();
     await objective(page, "signal_flow").getByLabel("signal_flow is on").check();
     await expect(objective(page, "turns")).toHaveClass(/off/);
@@ -243,17 +249,18 @@ test.describe("on the desktop", () => {
     const on = DEFAULT_ORDER.filter((n) => n !== "turns").concat("signal_flow");
     await expect(asText(page)).toContainText(`objectives="${on.join(",")}"`);
     await ok(page);
-    expect((await solved(page, viewer)).config).toBe(`objectives="${on.join(",")}"`);
+    expect((await solved(page, viewer)).config).toBe(`layout="rows",objectives="${on.join(",")}"`);
     // all of them off is no objective at all: the solver only satisfies the facts
     await open(page);
     for (const name of on) await objective(page, name).getByLabel(`${name} is on`).uncheck();
     await expect(asText(page)).toContainText('objectives="none"');
     await ok(page);
-    expect((await solved(page, viewer)).config).toBe('objectives="none"');
+    expect((await solved(page, viewer)).config).toBe('layout="rows",objectives="none"');
   });
 
   test("objectives share a level with weights, and the level has a tolerance", async ({ page, viewer }) => {
     await open(page);
+    await field(page, "layout").selectOption("rows");
     // the first objective has no level above to join, and an objective that is off has no weight to set
     await expect(objective(page, "current_direction").getByLabel("with the one above")).toBeHidden();
     await expect(objective(page, "signal_flow").getByLabel("weight")).toBeDisabled();
@@ -295,8 +302,8 @@ test.describe("on the desktop", () => {
     await expect(dialog(page).locator(".dialog-error")).toHaveText("timeall must be a positive number of seconds.");
     await field(page, "timeall").fill("90");
     await expect(asText(page)).toHaveText("Equivalent CLI command: rnl solve --timeall 90");
-    await field(page, "beam").fill("8");
     await field(page, "layout").selectOption("rows");
+    await field(page, "beam").fill("8");
     await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --timeall 90 --solver-config 'beam=8,layout="rows"'`);
     await ok(page);
     expect(await viewer.stored("solve-timeall")).toBe(90);
@@ -316,6 +323,7 @@ test.describe("on the desktop", () => {
 
   test("a value out of the bounds the table gives is refused where it is, and the solver's refusal is shown at its setting", async ({ page, viewer }) => {
     await open(page);
+    await field(page, "layout").selectOption("rows");
     await field(page, "beam").fill("");
     await dialog(page).getByRole("button", { name: "OK" }).click();
     await expect(dialog(page).locator(".dialog-error")).toHaveText("beam must be a number.");
@@ -326,6 +334,8 @@ test.describe("on the desktop", () => {
     await dialog(page).getByRole("button", { name: "OK" }).click();
     await expect(dialog(page).locator(".dialog-error")).toHaveText("beam must be at least 1.");
     await field(page, "beam").fill("4");
+    // (the spacing is the lines layout's, shown greyed under rows on request: its bounds hold all the same)
+    await dialog(page).locator(".settings-other").getByLabel("Show").check();
     await field(page, "spacing_x").fill("21");
     await dialog(page).getByRole("button", { name: "OK" }).click();
     await expect(dialog(page).locator(".dialog-error")).toHaveText("spacing_x must be at most 20.");
@@ -350,17 +360,18 @@ test.describe("on the desktop", () => {
     await expect(setting(page, "tolerance")).toHaveClass(/refused/);
     await expect(setting(page, "beam")).not.toHaveClass(/refused/);
     await expect(dialog(page)).toHaveCount(1);
-    expect(await viewer.calls("checkSettings")).toEqual([["tolerance=0.5"]]);
+    expect(await viewer.calls("checkSettings")).toEqual([['layout="rows",tolerance=0.5']]);
     expect(await viewer.stored("solve-config")).toBeNull();
     // and the dialog is usable again: a value that will do keeps it
     await page.evaluate(() => (window.fakeShell.settingErrors = []));
     await field(page, "tolerance").fill("0.001");
     await ok(page);
-    expect(await viewer.stored("solve-config")).toEqual({ tolerance: 0.001 });
+    expect(await viewer.stored("solve-config")).toEqual({ layout: "rows", tolerance: 0.001 });
   });
 
   test("the settings stay for the next start", async ({ page, viewer }) => {
     await open(page);
+    await field(page, "layout").selectOption("rows");
     await field(page, "beam").fill("6");
     await ok(page);
     await page.reload();
@@ -370,7 +381,7 @@ test.describe("on the desktop", () => {
     await expect(field(page, "beam")).toHaveValue("6");
     await dialog(page).getByRole("button", { name: "Cancel" }).click();
     await dialogGone(page);
-    expect(await solved(page, viewer)).toEqual({ config: "beam=6", timeall: null });
+    expect(await solved(page, viewer)).toEqual({ config: 'beam=6,layout="rows"', timeall: null });
   });
 
   test("the dialog says what the netlist and its packages give, from the last solve, which a value set here wins over", async ({ page, viewer }) => {
@@ -426,5 +437,87 @@ test.describe("on the desktop", () => {
     await expect(page.locator("body")).not.toHaveClass(/busy/);
     await page.evaluate(() => window.viewer.command("solve"));
     await expect(dialog(page)).toContainText("The netlist could not be solved: nothing was solved");
+  });
+
+  test("the layout decides what the dialog shows: what others take is hidden, its values are kept, and it is shown greyed on request", async ({ page, viewer }) => {
+    await open(page);
+    const names = () => dialog(page).locator(".objective:not([hidden])").evaluateAll((rows) => rows.map((r) => r.dataset.name));
+    const other = dialog(page).locator(".settings-other");
+    // lines, the default: its spacing, and four objectives; the rows' beam and caps and the other objectives are hidden
+    await expect(setting(page, "spacing_x")).toBeVisible();
+    await expect(setting(page, "beam")).toBeHidden();
+    await expect(setting(page, "candidates")).toBeHidden();
+    expect(await names()).toEqual(["crowding", "overlaps", "misleading", "wire_over_symbol"]);
+    await expect(other).toContainText("2 settings and 14 objectives of other layouts are hidden.");
+    // on request they are shown, greyed
+    await other.getByLabel("Show").check();
+    await expect(setting(page, "beam")).toBeVisible();
+    await expect(setting(page, "beam")).toHaveClass(/unused/);
+    await expect(objective(page, "turns")).toBeVisible();
+    await expect(objective(page, "turns")).toHaveClass(/unused/);
+    await expect(other).toContainText("of other layouts are shown greyed.");
+    await other.getByLabel("Show").uncheck();
+    await expect(setting(page, "beam")).toBeHidden();
+    // rows: the spacing is hidden, the beam and the caps are there, and all the objectives
+    await field(page, "layout").selectOption("rows");
+    await expect(setting(page, "spacing_x")).toBeHidden();
+    await expect(setting(page, "spacing_y")).toBeHidden();
+    await expect(setting(page, "beam")).toBeVisible();
+    await expect(setting(page, "candidates")).toBeVisible();
+    expect((await names()).length).toBe(OFF.length + LEVELS);
+    await expect(other).toContainText("2 settings of other layouts are hidden.");
+    // a value set for one layout is kept while another is shown, and the dialog says so
+    await field(page, "beam").fill("9");
+    await field(page, "layout").selectOption("lines");
+    await expect(setting(page, "beam")).toBeHidden();
+    await expect(other).toContainText("1 of the settings keeps a value you set.");
+    await field(page, "layout").selectOption("rows");
+    await expect(field(page, "beam")).toHaveValue("9");
+    await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --solver-config 'beam=9,layout="rows"'`);
+    // and under lines it is not what the solver or the command line gets, though it is kept
+    await field(page, "layout").selectOption("lines");
+    await expect(asText(page)).toHaveText("The defaults of rnl solve.");
+    await ok(page);
+    expect(await viewer.stored("solve-config")).toEqual({ beam: 9 });
+    expect(await solved(page, viewer)).toEqual({ config: "", timeall: null });
+    expect((await viewer.calls("checkSettings")).at(-1)).toEqual([""]);
+    // rows again: what was kept is there, and now given
+    await open(page);
+    await field(page, "layout").selectOption("rows");
+    await expect(field(page, "beam")).toHaveValue("9");
+    await ok(page);
+    expect((await solved(page, viewer)).config).toBe('beam=9,layout="rows"');
+  });
+
+  test.describe("a tier of objectives that a layout takes whole", () => {
+    // lines takes a tier whole that holds one of its four objectives: turns counts with crowding, crossings is no one's
+    test.use({ keptSettings: { "solve-config": { objectives: "overlaps,turns+crowding,crossings" } } });
+
+    test("is shown with the objective that is the layout's, and what the solver gets leaves out the tiers that hold none", async ({ page, viewer }) => {
+      await open(page);
+      const names = () => dialog(page).locator(".objective:not([hidden])").evaluateAll((rows) => rows.map((r) => r.dataset.name));
+      expect(await names()).toEqual(["overlaps", "turns", "crowding", "misleading", "wire_over_symbol"]);
+      await expect(objective(page, "turns").locator(".objective-tag")).toBeVisible();
+      await expect(objective(page, "turns").locator(".objective-tag")).toHaveText("taken with its tier");
+      await expect(objective(page, "crowding").locator(".objective-tag")).toBeHidden();
+      await expect(objective(page, "overlaps").locator(".objective-level")).toHaveText("1");
+      await expect(objective(page, "turns").locator(".objective-level")).toHaveText("2");
+      await expect(objective(page, "crowding").locator(".objective-level")).toHaveText("+");
+      // crossings is in a tier of its own that lines does not take: hidden, but where the user put it
+      await expect(objective(page, "crossings")).toBeHidden();
+      await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --solver-config 'objectives="overlaps,turns+crowding"'`);
+      await ok(page);
+      // kept whole, given without the tier that holds none
+      expect(await viewer.stored("solve-config")).toEqual({ objectives: "overlaps,turns+crowding,crossings" });
+      expect((await solved(page, viewer)).config).toBe('objectives="overlaps,turns+crowding"');
+      expect((await viewer.calls("checkSettings")).at(-1)).toEqual(['objectives="overlaps,turns+crowding"']);
+      // rows takes them all, crossings too
+      await open(page);
+      await field(page, "layout").selectOption("rows");
+      await expect(objective(page, "crossings")).toBeVisible();
+      await expect(objective(page, "turns").locator(".objective-tag")).toBeHidden();
+      await ok(page);
+      expect((await solved(page, viewer)).config).toBe('layout="rows",objectives="overlaps,turns+crowding,crossings"');
+    });
   });
 });

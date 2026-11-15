@@ -34,15 +34,86 @@ function changed() {
   return stored !== null && typeof stored === "object" && !Array.isArray(stored) ? stored : {};
 }
 
+// The table's `applies` says which layouts take a setting, an objective or a stage (docs/solver-settings-table.md). The
+// dialog hides what the layout shown does not take, and keeps its values; what a solve, the check and the command line
+// get is only what the layout takes, so the solver is never given a key it ignores.
+
+let tableKept = null;
+
+/** The solver's table, asked for once; null where the shell has none or it cannot be read. */
+async function solverTable() {
+  if (tableKept) return tableKept;
+  if (!shell?.solverTable) return null;
+  try {
+    tableKept = await shell.solverTable();
+  } catch {
+    return null;
+  }
+  return tableKept;
+}
+
+/** The text a value counts as in a condition of the table (`applies` and the like). */
+function textOf(value) {
+  if (value === undefined || value === null) return "";
+  if (typeof value === "object") return typeof value.literal === "string" ? value.literal : "";
+  return String(value);
+}
+
+/** Whether a row of the table (a setting, an objective) is taken where `of(key)` says; a row with no `applies` is taken everywhere. */
+function takenWhere(row, of) {
+  return row?.applies === undefined || holds(row.applies, of);
+}
+
 /**
- * The settings a solve gets from the page: the settings changed as RNL named parameters, such as
+ * The layers of an objectives text that the layout in effect takes: a layer that holds an objective the layout takes, whole,
+ * and no other (the layout takes a layer whole, its other objectives with it). The text itself where all are taken or none
+ * is given; "" where no layer is, which is the setting left out.
+ */
+function takenObjectives(table, text, of) {
+  if (typeof text !== "string" || text.trim() === "none") return text;
+  const known = new Map((table.objectives ?? []).map((o) => [o.name, o]));
+  const layers = parseObjectives(text);
+  // an objective the table does not know is the solver's to judge
+  const kept = layers.filter((layer) => layer.items.some((item) => takenWhere(known.get(item.name), of)));
+  if (kept.length === layers.length) return text;
+  return kept.length === 0 ? "" : objectivesText(kept);
+}
+
+/**
+ * The changed settings that the layout in effect takes, from `values` (a value by key, as kept): those the table's
+ * `applies` leaves in, and of the objectives the layers the layout takes. `values` may name the layout; it is the
+ * table's default where it does not.
+ */
+export function takenValues(table, values) {
+  const of = (key) => textOf(values[key] !== undefined ? values[key] : table.settings.find((s) => s.key === key)?.default);
+  const out = {};
+  for (const [key, value] of Object.entries(values)) {
+    const setting = table.settings.find((s) => s.key === key);
+    if (setting && !takenWhere(setting, of)) continue;
+    if (key === "objectives") {
+      const text = takenObjectives(table, value, of);
+      if (text === "") continue;
+      out[key] = text;
+      continue;
+    }
+    out[key] = value;
+  }
+  return out;
+}
+
+/**
+ * The settings a solve gets from the page: the settings changed that the layout takes, as RNL named parameters, such as
  * `spacing_x=2,beam=8`, empty when none is changed.
  *
- * @returns {{ config: string, timeall: number | null }} `timeall`: the seconds that all levels of a time limit
+ * @returns {Promise<{ config: string, timeall: number | null }>} `timeall`: the seconds that all levels of a time limit
  *   share (`rnl solve --timeall`), null for none.
  */
-export function solverSettings() {
-  return { config: configText(changed()), timeall: keptTimeall() };
+export async function solverSettings() {
+  const values = changed();
+  // (nothing differs from the defaults: nothing to take from, and the table, which the browser reads from the solver's
+  // module, is not asked for before the solve, which a Cancel could not stop yet)
+  const table = Object.keys(values).length === 0 ? null : await solverTable();
+  return { config: configText(table ? takenValues(table, values) : values), timeall: keptTimeall() };
 }
 
 /** A number as RNL writes it: with no exponent. */
@@ -287,6 +358,9 @@ function objectiveRows(objectives) {
   append(el, note, list);
   const info = new Map(objectives.map((o) => [o.name, o]));
   let rows = []; // { name, el, on, together, weight, tolerance, ... } in the order shown
+  // what the layout shown takes: `of(key)` is a setting's value; a row it does not take is hidden, or greyed with `showOther`
+  let context = { of: null, showOther: false };
+  let hiddenRows = 0;
 
   /** A row's element, with the controls that set its state. */
   function make(state) {
@@ -301,6 +375,11 @@ function objectiveRows(objectives) {
     const name = span("objective-name", r.name);
     const about = info.get(r.name);
     const what = span("objective-what", about?.what ?? "");
+    // under a layout that takes a tier whole, an objective it does not take counts with the one it does
+    const tag = span("objective-tag", "");
+    setText(tag, m("taken with its tier"));
+    setAttr(tag, "title", m("This layout takes a tier whole, so this objective counts with the one in it that the layout uses."));
+    tag.hidden = true;
     if (about?.implemented === false) append(what, " ", m("(not computed by this version)"));
     const label = document.createElement("label");
     label.className = "objective-on";
@@ -316,7 +395,7 @@ function objectiveRows(objectives) {
     append(moves, up, down);
     const top = document.createElement("div");
     top.className = "objective-top";
-    append(top, badge, label, what, moves);
+    append(top, badge, label, tag, what, moves);
     const more = document.createElement("div");
     more.className = "objective-more";
     append(more, together.caption, weight.caption, tolerance.caption);
@@ -333,7 +412,7 @@ function objectiveRows(objectives) {
     tolerance.input.addEventListener("input", () => (r.tolerance = tolerance.input.value));
     up.addEventListener("click", () => move(r, -1, up));
     down.addEventListener("click", () => move(r, 1, down));
-    Object.assign(r, { el: li, badge, on_: on, together_: together, weight_: weight, tolerance_: tolerance, up, down });
+    Object.assign(r, { el: li, badge, tag, on_: on, together_: together, weight_: weight, tolerance_: tolerance, up, down });
     on.checked = r.on;
     together.input.checked = r.together;
     weight.input.value = String(r.weight);
@@ -368,7 +447,9 @@ function objectiveRows(objectives) {
   /** Move a row by one place; the button keeps the focus. */
   function move(r, by, button) {
     const k = rows.indexOf(r);
-    const to = k + by;
+    // past the rows that are hidden, to the next one shown
+    let to = k + by;
+    while (rows[to]?.el.hidden) to += by;
     if (to < 0 || to >= rows.length) return;
     rows.splice(k, 1);
     rows.splice(to, 0, r);
@@ -379,18 +460,41 @@ function objectiveRows(objectives) {
 
   /** Show each row as what it is now: its level, and what applies to it. */
   function refresh() {
-    let level = 0;
+    // the tiers the rows make, and which of them hold an objective the layout takes (a tier is taken whole)
+    const tierOf = [];
+    let tier = -1;
     let anyOn = false;
+    for (const r of rows) {
+      if (r.on && !(r.together && anyOn)) tier++;
+      tierOf.push(r.on ? tier : -1);
+      anyOn = anyOn || r.on;
+    }
+    const takes = (r) => !context.of || takenWhere(info.get(r.name), context.of);
+    const taken = new Set(rows.flatMap((r, k) => (tierOf[k] >= 0 && takes(r) ? [tierOf[k]] : [])));
+    hiddenRows = 0;
+    rows.forEach((r, k) => {
+      const withTier = tierOf[k] >= 0 && taken.has(tierOf[k]);
+      const used = takes(r) || withTier;
+      if (!used) hiddenRows++;
+      r.el.hidden = !used && !context.showOther;
+      r.el.classList.toggle("unused", !used);
+      r.tag.hidden = takes(r) || !withTier;
+      setAttr(r.el, "title", used ? "" : m("The layout shown does not use this objective."));
+    });
+    let level = 0;
+    anyOn = false;
     rows.forEach((r, k) => {
       const leader = r.on && !(r.together && anyOn);
       r.el.classList.toggle("off", !r.on);
-      setText(r.badge, !r.on ? m("off") : leader ? String(++level) : "+");
+      // a tier the layout does not use, shown greyed, is not counted
+      const unused = r.el.classList.contains("unused");
+      setText(r.badge, !r.on ? m("off") : leader ? (unused ? "–" : String(++level)) : "+");
       setAttr(r.badge, "title", !r.on ? m("Not computed") : leader ? m`Tier ${level}` : m("Added to the tier above"));
       r.together_.caption.hidden = !(r.on && anyOn);
       r.weight_.input.disabled = !r.on;
       r.tolerance_.caption.hidden = !leader;
-      r.up.disabled = k === 0;
-      r.down.disabled = k === rows.length - 1;
+      r.up.disabled = !rows.slice(0, k).some((x) => !x.el.hidden);
+      r.down.disabled = !rows.slice(k + 1).some((x) => !x.el.hidden);
       anyOn = anyOn || r.on;
     });
   }
@@ -398,6 +502,13 @@ function objectiveRows(objectives) {
   return {
     el,
     first: null,
+    /** Show the rows as the layout the values of `of` name takes them; `showOther` shows the others greyed. */
+    take(of, showOther) {
+      context = { of, showOther };
+      refresh();
+    },
+    /** How many objectives the layout shown does not use, with the tiers that hold none it uses. */
+    hidden: () => hiddenRows,
     set(text) {
       rows = rowsOf(parseObjectives(text), objectives).map(make);
       list.replaceChildren(...rows.map((x) => x.el));
@@ -469,6 +580,7 @@ function fieldsOf(table) {
     const on = field.use ? field.use.input.checked : true;
     for (const node of field.line.querySelectorAll(".settings-label input:not([type=checkbox]), .settings-label select")) node.disabled = !on;
   }
+  const sets = []; // each group's fieldset, with its fields
   for (const [name, group] of byGroup) {
     if (group.length === 0) continue;
     const set = document.createElement("fieldset");
@@ -476,7 +588,21 @@ function fieldsOf(table) {
     setText(legend, table.groups.find((g) => g.name === name)?.what ?? name);
     append(set, legend, ...group.map((f) => f.line));
     append(el, set);
+    sets.push({ set, group });
   }
+  // what the layout shown does not use is hidden, and shown greyed on request: its values are kept either way
+  let showOther = false;
+  const other = checkField(m("Show"));
+  const otherText = span("settings-other-text", "");
+  const otherNote = document.createElement("p");
+  otherNote.className = "dialog-note settings-other";
+  append(otherNote, otherText, " ", other.caption);
+  otherNote.hidden = true;
+  other.input.addEventListener("change", () => {
+    showOther = other.input.checked;
+    refresh();
+  });
+  append(el, otherNote);
 
   /** What each setting counts as in a condition: the text of its value, empty when it is not given. */
   const of = (key) => {
@@ -484,13 +610,19 @@ function fieldsOf(table) {
     if (!field || (field.use && !field.use.input.checked)) return "";
     return field.kind.shown();
   };
-  /** Show each setting as what it is now: hidden, or greyed where the solver does not use it, or required. */
+  /** Show each setting as what it is now: hidden where the layout shown does not use it, or greyed with the others, or required. */
   function refresh() {
-    for (const { setting, line, use } of fields.values()) {
-      if (setting.shown_when) line.hidden = !holds(setting.shown_when, of);
-      line.classList.toggle("unused", setting.applies !== undefined && !holds(setting.applies, of));
-      if (setting.applies !== undefined) {
-        setAttr(line, "title", holds(setting.applies, of) ? "" : m("The solver does not use this with the other settings as they are."));
+    let hiddenSettings = 0;
+    let keeping = 0; // hidden ones that hold a value other than the default
+    for (const { setting, kind, line, use } of fields.values()) {
+      const taken = takenWhere(setting, of);
+      const when = setting.shown_when ? holds(setting.shown_when, of) : true;
+      line.hidden = !when || (!taken && !showOther);
+      line.classList.toggle("unused", !taken);
+      setAttr(line, "title", taken ? "" : m("The layout shown does not use this setting."));
+      if (!taken && when) {
+        hiddenSettings++;
+        if (use ? use.input.checked : differences(table, { [setting.key]: kind.get().value })[setting.key] !== undefined) keeping++;
       }
       if (setting.required_when && use) {
         const required = holds(setting.required_when, of);
@@ -499,6 +631,22 @@ function fieldsOf(table) {
         toggleUse(fields.get(setting.key));
       }
     }
+    // the objectives are rows of one setting: the layout takes tiers whole
+    let hiddenObjectives = 0;
+    for (const { setting, kind } of fields.values()) {
+      if (setting.type !== "objectives") continue;
+      kind.take(of, showOther);
+      hiddenObjectives += kind.hidden();
+    }
+    for (const { set, group } of sets) set.hidden = group.every((f) => f.line.hidden);
+    otherNote.hidden = hiddenSettings + hiddenObjectives === 0;
+    const parts = [];
+    if (hiddenSettings > 0) parts.push(hiddenSettings === 1 ? m("1 setting") : m`${hiddenSettings} settings`);
+    if (hiddenObjectives > 0) parts.push(hiddenObjectives === 1 ? m("1 objective") : m`${hiddenObjectives} objectives`);
+    const kept = keeping === 0 ? "" : ` ${keeping === 1 ? m("1 of the settings keeps a value you set.") : m`${keeping} of the settings keep values you set.`}`;
+    setText(otherText, showOther
+      ? m`${parts.join(" and ")} of other layouts are shown greyed.${kept}`
+      : m`${parts.join(" and ")} of other layouts are hidden.${kept}`);
   }
   el.addEventListener("input", refresh);
   el.addEventListener("change", refresh);
@@ -577,7 +725,7 @@ export async function settings() {
   if (!shell || !shell.solverTable || modal()) return;
   let table;
   try {
-    table = await shell.solverTable();
+    table = tableKept ?? (tableKept = await shell.solverTable());
   } catch (e) {
     await inform({ title: m("Solver Settings"), paragraphs: [m`The solver's settings could not be read: ${e instanceof Error ? e.message : String(e)}`] });
     return;
@@ -602,7 +750,7 @@ export async function settings() {
   const asText = span("settings-text", "");
   const showText = () => {
     const read = fields.read();
-    const config = read.error ? null : configText(differences(table, read.values));
+    const config = read.error ? null : configText(takenValues(table, differences(table, read.values)));
     const time = whole.read();
     const all = time.error || time.value === null ? "" : ` --timeall ${time.value}`;
     setText(asText, config === null ? "" : config || all ? m`Equivalent CLI command: rnl solve${all}${config ? ` --solver-config '${config}'` : ""}` : m("The defaults of rnl solve."));
@@ -627,7 +775,7 @@ export async function settings() {
       if (shell.checkSettings) {
         let checked;
         try {
-          checked = await shell.checkSettings(configText(kept));
+          checked = await shell.checkSettings(configText(takenValues(table, kept)));
         } catch (e) {
           return fail(error, e instanceof Error ? e.message : String(e));
         }
