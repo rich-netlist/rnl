@@ -27,8 +27,8 @@ function names(page, kind) {
 }
 
 /**
- * The symbols of the level shown that stand for a net, the supply and ground stubs and the ports:
- * for each net, by its name, how many boxes stand for it.
+ * The symbols of the level shown that stand for a net, the supply and ground stubs, the ports and
+ * the junction dots: for each net, by its name, how many boxes stand for it.
  */
 function symbols(page) {
   return page.evaluate(() => {
@@ -86,8 +86,9 @@ test("T3, the five-transistor OTA in its testbench, is drawn as the solver place
   await drawn(page, viewer, {
     title: "ota5t",
     instances: ["M1", "M2", "M3", "M4", "M5"],
-    // the supply stubs of M3 and M4 and the ground stub of M5, besides a port for each net
-    nets: { vdd: 3, vss: 2, inp: 1, inn: 1, out: 1, vbias: 1 },
+    // the supply stubs of M3 and M4 and the ground stub of M5, besides a port for each net; and the
+    // junction dots the solver writes, one on out, two on x and one on tail
+    nets: { vdd: 3, vss: 2, inp: 1, inn: 1, out: 2, vbias: 1, x: 2, tail: 1 },
     wired: ["x", "tail", "out", "inp", "inn", "vbias"],
     shot: "solved-T3",
   });
