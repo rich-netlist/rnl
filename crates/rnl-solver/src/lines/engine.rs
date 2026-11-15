@@ -19,7 +19,7 @@ const ALL_SIDES: u8 = 15;
 type Cell = (Item, (usize, usize), (usize, usize));
 type BoxedCell<'a> = (&'a Item, (usize, usize), (usize, usize), [f64; 4]);
 
-pub(super) fn entry(problem: &LevelProblem, s: &Structure, placed: &Placed, routing: &Routing, code: &[u32]) -> Entry {
+pub(crate) fn entry(problem: &LevelProblem, s: &Structure, placed: &Placed, routing: &Routing, code: &[u32]) -> Entry {
     if let Some(error) = routing.annotation_error.or_else(|| crate::annotation::bounds(problem, &placed.geometry).err())
     {
         return Entry {
