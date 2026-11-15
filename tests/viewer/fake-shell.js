@@ -75,6 +75,7 @@ const TABLE = {
     {"key":"safety_seconds","group":"run","type":"number","min":0,"default":30,"in_file":false,"what":"The seconds after which a solve limited by work or to the seed stops all the same.","shown_when":{"limit":["work","seed"]}},
     {"key":"candidates","group":"caps","type":"integer","min":0,"max":9007199254740992,"default":256,"in_file":false,"what":"The most candidates the row search makes over a level.","applies":{"layout":["rows"]}},
     {"key":"astar_expansions","group":"caps","type":"integer","min":0,"max":9007199254740992,"default":200000,"in_file":false,"what":"The most cells the router expands for one net."},
+    {"key":"tree_work","group":"caps","type":"number-or-false","min":0,"max":9007199254740992,"in_file":false,"what":"The work of the level at which the lines layout's group-tree start stops refining its arrangement. Left out, it is the lesser of the solver's estimate of 5 seconds and 0.3 of the level's limit.","false_what":"The group-tree start refines until its search ends or the budget runs out.","applies":{"layout":["lines"]},"shown_when":{"limit":["time","work"]}},
     {"key":"report_hints","group":"report","type":"boolean","default":false,"in_file":false,"what":"Give every conflict of a discarded fact of priority low in the report, which can take much longer."},
   ],
   objectives: [
