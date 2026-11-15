@@ -282,15 +282,35 @@ struct At {
     off: Q,
 }
 
+/// The order of the units of a line placement on one axis: the least places at or past the
+/// start that keep every bound `place(v) ≥ place(u) + w`. The units an equality joins, such as
+/// the members of an ALIGN, are one class: one place, each member at its offset from the class's
+/// root (`place(m) = place(root) + off(m)`), so that they move as one.
 #[derive(Clone, Debug, Default)]
 struct Order {
     n: usize,
+    /// The bounds by the unit they leave, kept on the units as added and read through their
+    /// classes when solved.
     out: Vec<Vec<(usize, Q)>>,
+    parent: Vec<usize>,
+    off: Vec<Q>,
+    /// An equality its class contradicts: no places keep the order.
+    broken: bool,
 }
 
 impl Order {
     fn new(n: usize) -> Order {
-        Order { n, out: vec![Vec::new(); n] }
+        Order { n, out: vec![Vec::new(); n], parent: (0..n).collect(), off: vec![Q::zero(); n], broken: false }
+    }
+
+    /// The root of a unit's class and the unit's offset from it.
+    fn find(&self, u: usize) -> (usize, Q) {
+        let (mut r, mut o) = (u, Q::zero());
+        while self.parent[r] != r {
+            o = &o + &self.off[r];
+            r = self.parent[r];
+        }
+        (r, o)
     }
 
     fn at_least(&mut self, u: &At, v: &At, gap: Q) {
@@ -300,35 +320,77 @@ impl Order {
         self.out[u.unit].push((v.unit, &u.off + &gap - &v.off));
     }
 
+    /// `place(v) + v.off = place(u) + u.off`: the classes of `u` and `v` become one.
     fn equal(&mut self, u: &At, v: &At) {
         if u.unit == v.unit {
             return;
         }
-        self.out[u.unit].push((v.unit, &u.off - &v.off));
-        self.out[v.unit].push((u.unit, &v.off - &u.off));
+        let ((ru, ou), (rv, ov)) = (self.find(u.unit), self.find(v.unit));
+        // the root of v's class at k from the root of u's
+        let k = &ou + &u.off - &v.off - &ov;
+        if ru == rv {
+            if !k.is_zero() {
+                self.broken = true;
+            }
+            return;
+        }
+        self.parent[rv] = ru;
+        self.off[rv] = k;
     }
 
     fn least(&self, start: Vec<Q>) -> Option<Vec<Q>> {
         if !permit(BudgetStep::Placement, self.n) {
             return None;
         }
-        let mut d = start;
-        let mut queue: VecDeque<usize> = (0..self.n).collect();
-        let mut queued = vec![true; self.n];
+        if self.broken {
+            return None;
+        }
+        let of: Vec<(usize, Q)> = (0..self.n).map(|u| self.find(u)).collect();
+        // a class starts where the furthest of its members asks
+        let mut d: Vec<Option<Q>> = vec![None; self.n];
+        for (m, (r, o)) in of.iter().enumerate() {
+            let at = &start[m] - o;
+            if d[*r].as_ref().is_none_or(|x| at > *x) {
+                d[*r] = Some(at);
+            }
+        }
+        let mut edges: Vec<Vec<(usize, Q)>> = vec![Vec::new(); self.n];
+        for (u, outs) in self.out.iter().enumerate() {
+            let (ru, ou) = &of[u];
+            for (v, w) in outs {
+                let (rv, ov) = &of[*v];
+                let w = ou + w - ov;
+                if ru == rv {
+                    // a bound inside a class holds by its offsets, or never
+                    if w.is_positive() {
+                        return None;
+                    }
+                    continue;
+                }
+                edges[*ru].push((*rv, w));
+            }
+        }
+        let roots: Vec<usize> = (0..self.n).filter(|&u| of[u].0 == u).collect();
+        let mut queue: VecDeque<usize> = roots.iter().copied().collect();
+        let mut queued = vec![false; self.n];
+        for &r in &roots {
+            queued[r] = true;
+        }
         let mut count = vec![0usize; self.n];
         let mut relaxed = 0u64;
         let out = loop {
             let Some(u) = queue.pop_front() else { break Some(()) };
             queued[u] = false;
             let mut cycle = false;
-            for (v, w) in &self.out[u] {
+            let du = d[u].clone().expect("a root has a place");
+            for (v, w) in &edges[u] {
                 if !permit(BudgetStep::Placement, 1) {
                     return None;
                 }
                 relaxed += 1;
-                let c = &d[u] + w;
-                if c > d[*v] {
-                    d[*v] = c;
+                let c = &du + w;
+                if d[*v].as_ref().is_none_or(|x| c > *x) {
+                    d[*v] = Some(c);
                     count[*v] += 1;
                     if count[*v] > self.n + 1 {
                         cycle = true;
@@ -345,7 +407,7 @@ impl Order {
             }
         };
         RELAXED.with(|r| r.set(r.get() + relaxed));
-        out.map(|()| d)
+        out.map(|()| (0..self.n).map(|m| d[of[m].0].clone().expect("a root has a place") + &of[m].1).collect())
     }
 }
 
@@ -4037,6 +4099,53 @@ pub(super) mod tests {
             assert!(!patient(end - 1, better_at), "{better_at}");
             assert!(patient(end, better_at), "{better_at}");
         }
+    }
+
+    fn at(unit: usize, off: i64) -> At {
+        At { unit, off: int(off) }
+    }
+
+    fn places(v: &[i64]) -> Vec<Q> {
+        v.iter().map(|&x| int(x)).collect()
+    }
+
+    /// Units an equality joins take one place, each at its offset: the class starts where the
+    /// furthest of its members asks, and the bounds leaving any member move all of them.
+    #[test]
+    fn equal_units_move_as_one_class() {
+        let mut o = Order::new(4);
+        // place(1) + 1 = place(0); place(2) ≥ place(1) + 3; place(3) = place(2)
+        o.equal(&at(0, 0), &at(1, 1));
+        o.at_least(&at(1, 0), &at(2, 0), int(3));
+        o.equal(&at(2, 0), &at(3, 0));
+        assert_eq!(o.least(places(&[0, 5, 0, 0])), Some(places(&[6, 5, 8, 8])));
+        assert_eq!(o.least(places(&[0, 0, 0, 10])), Some(places(&[1, 0, 10, 10])));
+        // a unit equal to itself asks nothing
+        o.equal(&at(0, 0), &at(0, 2));
+        assert_eq!(o.least(places(&[0, 5, 0, 0])), Some(places(&[6, 5, 8, 8])));
+    }
+
+    /// No places keep equalities that contradict one another, a positive bound between members
+    /// of one class, or a positive cycle of bounds between classes.
+    #[test]
+    fn contradicting_orders_have_no_places() {
+        let start = || places(&[0, 0, 0]);
+        let mut o = Order::new(3);
+        o.equal(&at(0, 0), &at(1, 0));
+        o.equal(&at(1, 0), &at(2, 0));
+        o.at_least(&at(0, 0), &at(2, 0), int(0));
+        assert_eq!(o.least(start()), Some(start()));
+        let mut broken = o.clone();
+        broken.equal(&at(0, 0), &at(2, 1));
+        assert_eq!(broken.least(start()), None);
+        let mut inside = o.clone();
+        inside.at_least(&at(0, 0), &at(2, 0), int(1));
+        assert_eq!(inside.least(start()), None);
+        let mut cycle = Order::new(3);
+        cycle.equal(&at(0, 0), &at(1, 0));
+        cycle.at_least(&at(1, 0), &at(2, 0), int(1));
+        cycle.at_least(&at(2, 0), &at(0, 0), int(1));
+        assert_eq!(cycle.least(start()), None);
     }
 
     pub(in crate::lines) fn seed(
