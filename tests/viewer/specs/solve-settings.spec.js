@@ -206,6 +206,62 @@ test.describe("on the desktop", () => {
     expect(await viewer.stored("solve-config")).toEqual({ grid: 0.5, limit: "work", work: 5000 });
   });
 
+  test("the group-tree start's work is a number, false, or left out; it follows the lines layout and a limit of time or work", async ({ page, viewer }) => {
+    await open(page);
+    const row = setting(page, "tree_work");
+    const set = row.getByLabel("set");
+    const unlimited = row.getByLabel("The group-tree start refines until its search ends or the budget runs out.");
+    // lines with the time limit: the row is there, left out (no default), and nothing of it is given
+    await expect(row).toBeVisible();
+    await expect(set).not.toBeChecked();
+    await expect(field(page, "tree_work")).toBeDisabled();
+    await expect(asText(page)).toHaveText("The defaults of rnl solve.");
+    // a number: given with the others, in the order of their names
+    await set.check();
+    await expect(field(page, "tree_work")).toBeEnabled();
+    await field(page, "tree_work").fill("81000");
+    await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --solver-config 'tree_work=81000'`);
+    await field(page, "limit").selectOption("work");
+    await field(page, "work").fill("243750");
+    await expect(row).toBeVisible();
+    await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --solver-config 'limit="work",tree_work=81000,work=243750'`);
+    // false says what it means, and puts the number box out
+    await unlimited.check();
+    await expect(field(page, "tree_work")).toBeDisabled();
+    await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --solver-config 'limit="work",tree_work=false,work=243750'`);
+    await unlimited.uncheck();
+    // the bounds of the table
+    await field(page, "tree_work").fill("-1");
+    await dialog(page).getByRole("button", { name: "OK" }).click();
+    await expect(dialog(page).locator(".dialog-error")).toHaveText("tree_work must be at least 0.");
+    await field(page, "tree_work").fill("81000");
+    // the seed's limit searches no further: the row is hidden, its value kept (as the work's is, which a limit of the seed does not show either)
+    await field(page, "limit").selectOption("seed");
+    await expect(row).toBeHidden();
+    await field(page, "limit").selectOption("work");
+    await expect(row).toBeVisible();
+    await expect(field(page, "tree_work")).toHaveValue("81000");
+    // rows does not have a group-tree start
+    await field(page, "layout").selectOption("rows");
+    await expect(row).toBeHidden();
+    await expect(asText(page)).not.toContainText("tree_work");
+    await dialog(page).locator(".settings-other").getByLabel("Show").check();
+    await expect(row).toBeVisible();
+    await expect(row).toHaveClass(/unused/);
+    await field(page, "layout").selectOption("lines");
+    await ok(page);
+    expect(await viewer.stored("solve-config")).toEqual({ limit: "work", tree_work: 81000, work: 243750 });
+    expect(await solved(page, viewer)).toEqual({ config: 'limit="work",tree_work=81000,work=243750', timeall: null });
+    expect((await viewer.calls("checkSettings")).at(-1)).toEqual(['limit="work",tree_work=81000,work=243750']);
+    // kept for the next time, still a number
+    await open(page);
+    await expect(set).toBeChecked();
+    await expect(field(page, "tree_work")).toHaveValue("81000");
+    await set.uncheck();
+    await ok(page);
+    expect(await viewer.stored("solve-config")).toEqual({ limit: "work", work: 243750 });
+  });
+
   test("the objectives move up and down, and the order is what the solver gets", async ({ page, viewer }) => {
     await open(page);
     await field(page, "layout").selectOption("rows");
@@ -465,7 +521,7 @@ test.describe("on the desktop", () => {
     await expect(setting(page, "beam")).toBeVisible();
     await expect(setting(page, "candidates")).toBeVisible();
     expect((await names()).length).toBe(OFF.length + LEVELS);
-    await expect(other).toContainText("2 settings of other layouts are hidden.");
+    await expect(other).toContainText("3 settings of other layouts are hidden.");
     // a value set for one layout is kept while another is shown, and the dialog says so
     await field(page, "beam").fill("9");
     await field(page, "layout").selectOption("lines");
