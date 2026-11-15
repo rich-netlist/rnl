@@ -1,4 +1,9 @@
 {
  "language": "fr",
- "annex": "Annexe"
+ "annex": "Annexe",
+ "reference": {
+  "chapter": ["chapitre", "chapitres"],
+  "principles": ["Principes", "Principe"],
+  "list": ["et", "ou"]
+ }
 }

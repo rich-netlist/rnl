@@ -1,4 +1,10 @@
 {
  "language": "ja",
- "annex": "付録"
+ "annex": "付録",
+ "reference": {
+  "chapter_tight": ["第", "章"],
+  "principles": ["原則"],
+  "version": ["バージョン"],
+  "list": ["と", "または"]
+ }
 }

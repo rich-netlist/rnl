@@ -46,6 +46,8 @@ Needs pandoc 3.x and typst 0.13 or later on PATH, and git for the revision label
 from __future__ import annotations
 
 import argparse
+import atexit
+import functools
 import hashlib
 import html
 import json
@@ -54,6 +56,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import zipfile
 from pathlib import Path
@@ -69,6 +72,24 @@ FONTS = {  # preferences; only the families typst finds are passed on
     "sans": ["Segoe UI", "Noto Sans", "DejaVu Sans", "Noto Sans CJK SC", "Source Han Sans SC", "Microsoft YaHei"],
     "mono": ["DejaVu Sans Mono", "Noto Sans Mono CJK SC", "Noto Sans CJK SC", "Microsoft YaHei"],
 }
+# The languages whose Han characters are not the simplified ones, or are kana and hangul, take the fonts of their own
+# script and not those of FONTS, whose Simplified Chinese glyphs would stand in for the Japanese, Traditional Chinese
+# and Korean forms of the same characters. After the Latin families, the first of the script the machine has is used;
+# a sans family ends each serif list, for the machine that has no serif one of the script (or one with a small set).
+LATIN_FONTS = {"serif": ["Libertinus Serif"], "sans": ["Segoe UI", "Noto Sans", "DejaVu Sans"], "mono": ["DejaVu Sans Mono"]}
+SCRIPT_FONTS = {
+    "ja": {"serif": ["Noto Serif CJK JP", "Source Han Serif JP", "Yu Mincho", "MS Mincho", "Yu Gothic", "Meiryo", "MS Gothic"],
+           "sans": ["Noto Sans CJK JP", "Source Han Sans JP", "Yu Gothic", "Meiryo", "MS Gothic"],
+           "mono": ["Noto Sans Mono CJK JP", "Noto Sans CJK JP", "Yu Gothic", "MS Gothic"]},
+    "ko": {"serif": ["Noto Serif CJK KR", "Source Han Serif K", "Batang", "Malgun Gothic"],
+           "sans": ["Noto Sans CJK KR", "Source Han Sans K", "Malgun Gothic"],
+           "mono": ["Noto Sans Mono CJK KR", "Noto Sans CJK KR", "Malgun Gothic"]},
+    "zh-hant": {"serif": ["Noto Serif CJK TC", "Source Han Serif TC", "PMingLiU", "MingLiU", "Microsoft JhengHei", "Microsoft JhengHei UI"],
+                "sans": ["Noto Sans CJK TC", "Source Han Sans TC", "Microsoft JhengHei", "Microsoft JhengHei UI"],
+                "mono": ["Noto Sans Mono CJK TC", "Noto Sans CJK TC", "Microsoft JhengHei", "MingLiU"]},
+}
+# Typst takes a language code of two or three letters and a region apart
+TYPST_REGION = {"zh-hant": "TW"}
 SITE_URL = "https://rich-netlist.github.io/rnl/"  # the project site; the downloaded page links to it
 # Website identity, fonts and interface messages share the site's locale registry.
 sys.path.insert(0, str(HERE.parent))
@@ -482,20 +503,43 @@ def run(cmd: list[str], what: str, env: dict | None = None) -> None:
         raise Failed(f"{what}:\n{noise or r.stdout}")
 
 
-def typst_fonts() -> dict:
+@functools.lru_cache(maxsize=None)
+def typst_fonts(lang: str = "zh") -> dict:
+    """The families Typst finds for the PDF of a language, in order of preference, for serif, sans and mono."""
     listed = subprocess.run(["typst", "fonts"], capture_output=True, text=True, encoding="utf-8").stdout
     have = {line.strip().lower() for line in listed.splitlines()}
-    return {k: [f for f in v if f.lower() in have] for k, v in FONTS.items()}
+    wanted = {k: LATIN_FONTS[k] + SCRIPT_FONTS[lang][k] for k in FONTS} if lang in SCRIPT_FONTS else FONTS
+    return {k: [f for f in v if f.lower() in have] for k, v in wanted.items()}
 
 
 MARKDOWN = ("-f", READER, "--shift-heading-level-by=-1")  # how pandoc reads the chapters
 
 
+_WORDS_DIR: list[Path] = []
+
+
+def words_file(lang: str) -> list[str]:
+    """The words of the language that the filter needs (rnl.lua): the annex word and the words that stand before
+    the numbers of references, from i18n/<lang>/spec.json, as a metadata file of their own: the file itself holds
+    the templates of Annex A, which pandoc would read as Markdown. English has none; the filter knows its words."""
+    phrases = spectools.phrases(lang)
+    words = {k: phrases[k] for k in ("annex", "reference") if k in phrases and lang != "en"}
+    if not words:
+        return []
+    if not _WORDS_DIR:
+        _WORDS_DIR.append(Path(tempfile.mkdtemp(prefix="rnl-words-")))
+        atexit.register(shutil.rmtree, _WORDS_DIR[0], True)
+    path = _WORDS_DIR[0] / f"{lang}.json"
+    path.write_text(json.dumps(words, ensure_ascii=False), encoding="utf-8")
+    return [f"--metadata-file={path}"]
+
+
 def common_args(lang: str, v: str, rev: dict, reader: tuple = MARKDOWN) -> list[str]:
-    return [*reader, "--lua-filter", str(HERE / "rnl.lua"),
+    return [*reader, "--lua-filter", str(HERE / "rnl.lua"), *words_file(lang),
             "--syntax-highlighting=none", "--fail-if-warnings", "--wrap=none",  # values go into scripts intact
-            "-M", f"rnl-lang={lang}", "-M", f"typst-lang={lang}", "-M", f"revision-label={revision_label(lang, v, rev)}",
-            "-M", f"revision={rev['commit']}", "-M", f"contents-title={LANGS[lang]['contents']}"]
+            "-M", f"rnl-lang={lang}", "-M", f"typst-lang={lang.split('-')[0]}", "-M", f"typst-region={TYPST_REGION.get(lang, '')}", "-M", f"revision-label={revision_label(lang, v, rev)}",
+            "-M", f"revision={rev['commit']}", "-M", f"contents-title={LANGS[lang]['contents']}",
+            "-M", f"error-label={LANGS[lang]['error_example']}"]
 
 
 def size(p: Path) -> str:
@@ -772,7 +816,6 @@ def main(argv: list[str]) -> int:
 
     out, work = args.out, args.out / "work"
     work.mkdir(parents=True, exist_ok=True)
-    fonts = typst_fonts()
     revs, docs = {}, {}  # the revisions of the versions, and the versions as pandoc reads them, once each
 
     def doc(x: str, lang: str) -> dict:
@@ -799,7 +842,7 @@ def main(argv: list[str]) -> int:
                 src = pandoc_input(spec, v, lang, work)
                 build_zip(spec, lang, v, rev, out)
                 if not args.no_pdf:
-                    build_pdf(src, lang, v, rev, out, work, fonts)
+                    build_pdf(src, lang, v, rev, out, work, typst_fonts(lang))
                 on_site = SITE_URL + L["site_dir"].format(v=v) + "/"
                 has_text = lambda x: lang in langs(spec, x)  # noqa: E731
                 is_archived = lambda x: archived(spec, x)  # noqa: E731

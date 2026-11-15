@@ -1,4 +1,10 @@
 {
  "language": "zh-hant",
- "annex": "附錄"
+ "annex": "附錄",
+ "reference": {
+  "chapter_around": ["第", "章"],
+  "principles": ["原則"],
+  "version": ["版本"],
+  "list": ["和", "或"]
+ }
 }

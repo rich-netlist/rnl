@@ -6,6 +6,7 @@ import hashlib
 import json
 import re
 import shutil
+import subprocess
 import tempfile
 import unittest
 import zipfile
@@ -355,6 +356,41 @@ class GuidePage(unittest.TestCase):
             for key in ("page_full", "page_guide", "guide_page_note"):
                 self.assertTrue(catalog[key], (lang, key))
             self.assertIn("{agents}", catalog["guide_page_note"], lang)
+
+
+@unittest.skipUnless(shutil.which("pandoc"), "needs pandoc")
+class References(unittest.TestCase):
+    """The filter links the references to chapters, annexes and sections in the words of each language, and
+    leaves alone the numbers of principles and versions."""
+
+    TEXT = {
+        "en": "See chapter 7 and Annex A (9.4). Principles 2.4, and 2.9, version 0.3.",
+        "zh": "见第 7 章和附录 A（9.4）。原则 2.4、2.9，版本 0.3。",
+        "zh-hant": "見第 7 章和附錄 A（9.4）。原則 2.4、2.9，版本 0.3。",
+        "ja": "第7章と付録 A（9.4）を見る。原則 2.4、2.9、バージョン0.3。",
+        "ko": "제7장과 부록 A(9.4) 참조. 원칙 2.4, 2.9, 버전 0.3.",
+        "de": "Siehe Kapitel 7 und Anhang A (9.4). Prinzipien 2.4, und 2.9, Version 0.3.",
+        "fr": "Voir le chapitre 7 et l’Annexe A (9.4). Principes 2.4, et 2.9, version 0.3.",
+        "es": "Véase el capítulo 7 y el Anexo A (9.4). Principios 2.4, y 2.9, versión 0.3.",
+    }
+
+    def test_every_language_links_what_it_names_and_only_that(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ids = Path(tmp) / "ids.txt"
+            ids.write_text("\n".join(["7", "A", "9.4", "2.4", "2.9", "0.3"]) + "\n", encoding="utf-8")
+            for lang, text in self.TEXT.items():
+                out = subprocess.run(
+                    ["pandoc", "-f", "markdown", "-t", "html", "--lua-filter", str(HERE / "rnl.lua"), *build.words_file(lang),
+                     "-M", f"rnl-lang={lang}", "-M", f"section-ids-file={ids}", "-M", "section-base="],
+                    input=text, capture_output=True, text=True, encoding="utf-8", check=True).stdout
+                self.assertEqual(sorted(re.findall(r'href="#([^"]+)"', out)), ["7", "9.4", "A"], (lang, out))
+
+    def test_every_language_that_builds_its_standard_has_its_words(self):
+        for lang in self.TEXT:
+            if lang != "en":
+                self.assertIn("reference", json.loads((HERE.parents[1] / "i18n" / lang / "spec.json").read_text(encoding="utf-8")), lang)
+            self.assertTrue(json.loads((HERE.parents[1] / "i18n" / lang / "site" / "messages.json").read_text(encoding="utf-8"))["error_example"]
+                            if lang != "en" else True)
 
 
 if __name__ == "__main__":
