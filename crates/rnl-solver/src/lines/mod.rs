@@ -39,6 +39,7 @@ pub(crate) fn lay_out(
 ) -> (crate::tree::Laid, engine::LayoutSkeleton) {
     let limit = crate::budget::current_limit().or(options.run_limit);
     let allowance = tree_allowance(limit, options.tree_work);
+    crate::budget::note_tree_start();
     let (mut laid, mut skeleton) = engine::lay_out(problem, s, options, work, &crate::tree::Stop::default(), allowance);
     if laid.entry.written_path_error.is_none() && laid.entry.annotation_error.is_none() && !crate::budget::stopped() {
         let before = laid.placed.geometry.clone();

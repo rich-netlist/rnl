@@ -105,7 +105,8 @@ the line search has the rest of the level's budget: at that work of the level, o
 not before its search ends or the budget runs out. Left out, the solver fixes it before the start
 from the limit, without reading the clock: three tenths of the level's limit, counted as work for
 a limit of work and in its estimate of nanoseconds for a limit of time, and never past its
-estimate of five seconds. A solve reports where the start stopped in its replay command.
+estimate of five seconds. A solve reports where the start stopped in its replay command. Under
+a limit of `"seed"` the start refines without an allowance, and `tree_work` is not read.
 
 The line layout spaces by a nonzero spacing. Under the row and the group-tree layouts it is
 parsed and hashed, with a warning by its key that it is ignored under that layout, as for every

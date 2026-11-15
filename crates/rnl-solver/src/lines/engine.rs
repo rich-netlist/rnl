@@ -857,31 +857,39 @@ mod tests {
     /// The group-tree start's allowance is fixed before it starts (`lines::tree_allowance`): a run of
     /// time stops it by counts, not by the clock, and the solve notes where (`budget::tree_stop`).
     /// Given that point as `tree_work`, a run of work replays the time run's whole layout alike,
-    /// whether the allowance stopped the start or not.
+    /// whether the allowance stopped the start at its first step, in the middle of its search, or
+    /// not at all. The clock stands still, so that only the allowance stops the start.
     #[test]
     fn a_time_run_replays_by_its_work_and_where_the_tree_start_stopped() {
+        struct Still;
+        impl Clock for Still {
+            fn elapsed(&self) -> f64 {
+                0.
+            }
+        }
         let (p, s, mut options, _, _) = settle::tests::seed();
         options.run_limit = None;
         let run = |options: &SolverOptions| super::super::lay_out(&p, &s, options, &mut Work::default());
         let snapshot =
             |(laid, skeleton): (Laid, LayoutSkeleton)| (laid.placed, laid.routing, laid.entry, laid.notes, skeleton);
-        let mut stopped = 0;
-        for seconds in [1e-9, 1e-7, 1e-5, 1e-3, 1e9] {
-            let ((timed, stop), used) = crate::budget::with(&Ticks::default(), RunLimit::Time(seconds), None, || {
+        let mut stops = std::collections::BTreeSet::new();
+        for seconds in [1e-9, 1e-6, 3e-6, 1e-5, 3e-5, 1e-4, 3e-4, 1e-3, 1e9] {
+            let ((timed, stop), used) = crate::budget::with(&Still, RunLimit::Time(seconds), None, || {
                 (run(&options), crate::budget::tree_stop())
             });
-            stopped += usize::from(stop.is_some());
-            let again = SolverOptions {
-                tree_work: Some(stop.map_or(crate::TreeWork::Off, crate::TreeWork::At)),
-                ..options.clone()
-            };
+            let stop = stop.expect("the group-tree start ran");
+            stops.insert(stop);
+            let tree_work = Some(stop.map_or(crate::TreeWork::Off, crate::TreeWork::At));
+            let again = SolverOptions { tree_work, ..options.clone() };
             let ((work, replayed), _) = crate::budget::with(&StoppedClock, RunLimit::Work(used.work), None, || {
                 (run(&again), crate::budget::tree_stop())
             });
-            assert_eq!(replayed, stop, "seconds {seconds}");
+            assert_eq!(replayed, Some(stop), "seconds {seconds}");
             assert_eq!(snapshot(timed), snapshot(work), "seconds {seconds}, work {}", used.work);
         }
-        assert!(stopped > 0, "the allowance never stopped the group-tree start");
+        // stopped at more than one point of its search, and once not at all
+        assert!(stops.contains(&None), "{stops:?}");
+        assert!(stops.iter().flatten().count() >= 2, "{stops:?}");
     }
 
     #[test]

@@ -125,9 +125,9 @@ struct Control<'a> {
     tried: Cell<u64>,
     solver_stage: Cell<&'static str>,
     step: Cell<&'static str>,
-    /// The work at which the lines layout's group-tree start stopped refining, by its allowance
-    /// ([`note_tree_stop`]).
-    tree_stop: Cell<Option<u64>>,
+    /// Whether the lines layout's group-tree start ran ([`note_tree_start`]), and the work at which
+    /// it stopped refining by its allowance, if it did ([`note_tree_stop`]).
+    tree_stop: Cell<Option<Option<u64>>>,
     /// The work between two readings of the clock for the limits ([`Clock::check_every`]), the
     /// work at which it is read next, and the steps admitted since it was read.
     every: u64,
@@ -393,21 +393,35 @@ pub(crate) fn current_limit() -> Option<RunLimit> {
     }
 }
 
+/// The group-tree start of the lines layout begins, for the replay of the solve
+/// (`SolverOptions::tree_work`).
+pub(crate) fn note_tree_start() {
+    if active() {
+        ACTIVE.with(|c| {
+            let c = c.unwrap();
+            if c.tree_stop.get().is_none() {
+                c.tree_stop.set(Some(None));
+            }
+        });
+    }
+}
+
 /// The group-tree start of the lines layout stopped refining by its allowance, at the work so far:
 /// the first time only, for the replay of the solve (`SolverOptions::tree_work`).
 pub(crate) fn note_tree_stop() {
     if active() {
         ACTIVE.with(|c| {
             let c = c.unwrap();
-            if c.tree_stop.get().is_none() {
-                c.tree_stop.set(Some(c.used.get()));
+            if !matches!(c.tree_stop.get(), Some(Some(_))) {
+                c.tree_stop.set(Some(Some(c.used.get())));
             }
         });
     }
 }
 
-/// Where the group-tree start of the lines layout stopped refining by its allowance, if it did.
-pub(crate) fn tree_stop() -> Option<u64> {
+/// Whether the group-tree start of the lines layout ran in this solve, and where it stopped
+/// refining by its allowance, if it did.
+pub(crate) fn tree_stop() -> Option<Option<u64>> {
     if active() {
         ACTIVE.with(|c| c.unwrap().tree_stop.get())
     } else {

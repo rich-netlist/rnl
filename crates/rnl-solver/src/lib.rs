@@ -186,11 +186,7 @@ impl SolveReport {
     pub fn replay_config(&self) -> Option<String> {
         let options = SolverOptions::parse(self.canonical_options.as_deref()?).ok()?;
         let Some(RunLimit::Work(work)) = options.run_limit else { return None };
-        let tree = match options.tree_work {
-            Some(TreeWork::At(w)) => format!(",tree_work={w}"),
-            Some(TreeWork::Off) => ",tree_work=false".to_string(),
-            None => String::new(),
-        };
+        let tree = options.tree_work.map_or_else(String::new, |t| format!(",{}", t.setting()));
         Some(format!("limit=\"work\",work={work}{tree}"))
     }
 }
@@ -457,23 +453,20 @@ fn solve_isolated(
             } else {
                 RunLimit::Work(report.work)
             };
-            // where the group-tree start of the lines layout stopped refining: what the replay's work
-            // would not tell (`lines::lay_out`)
-            let tree_work = if lines && matches!(replay_limit, RunLimit::Work(_)) {
-                Some(tree_stop.map_or(TreeWork::Off, TreeWork::At))
-            } else {
-                options.tree_work
+            // where the group-tree start of the lines layout stopped refining, when it ran: what the
+            // replay's work would not tell (`lines::lay_out`)
+            let tree_work = match tree_stop {
+                Some(stop) if matches!(replay_limit, RunLimit::Work(_)) => {
+                    Some(stop.map_or(TreeWork::Off, TreeWork::At))
+                }
+                _ => options.tree_work,
             };
             let replay =
                 SolverOptions { run_limit: Some(replay_limit), time_limit: None, tree_work, ..options.clone() };
             solved.report.canonical_options = Some(replay.canonical());
             solved.report.budget = Some(report);
             solved.report.notes.push(if matches!(replay_limit, RunLimit::Work(_)) {
-                let tree = match tree_work {
-                    Some(TreeWork::At(w)) => format!(", tree_work={w}"),
-                    Some(TreeWork::Off) => ", tree_work=false".to_string(),
-                    None => String::new(),
-                };
+                let tree = tree_work.map_or_else(String::new, |t| format!(", {}", t.setting()));
                 format!(
                     "budget: {} work units; limit: {:?}; stopped: {:?}; replay with limit=\"work\", work={}{tree}",
                     report.work, report.limit, report.reason, report.work

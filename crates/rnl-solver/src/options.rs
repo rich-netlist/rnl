@@ -243,6 +243,16 @@ pub enum TreeWork {
     Off,
 }
 
+impl TreeWork {
+    /// As a setting: `tree_work=U` or `tree_work=false`.
+    pub fn setting(self) -> String {
+        match self {
+            TreeWork::At(w) => format!("tree_work={w}"),
+            TreeWork::Off => "tree_work=false".to_string(),
+        }
+    }
+}
+
 /// The work that the uses of the resolution other than the resolution of 8.5 itself may do: the
 /// witness taken as written (`crate::resolve`), the relations of a candidate taken in after the
 /// facts kept, the analysis of the rows, and the coordinate LP. They are not the checks of 8.5,
@@ -428,10 +438,9 @@ impl SolverOptions {
             text.push_str(&format!(";report_hints={}", self.hints_for_low));
         }
         // named only when given, so that the text of the defaults is as it was
-        match self.tree_work {
-            Some(TreeWork::At(w)) => text.push_str(&format!(";tree_work={w}")),
-            Some(TreeWork::Off) => text.push_str(";tree_work=false"),
-            None => {}
+        if let Some(tree) = self.tree_work {
+            text.push(';');
+            text.push_str(&tree.setting());
         }
         match self.settings.layout {
             // the default is not named: the text of the defaults, and of a level before 0.4, is as
