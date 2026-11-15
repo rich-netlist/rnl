@@ -862,3 +862,78 @@ R1 d 0 1k
     assert!(errors(&back).is_empty(), "{:?}", errors(&back));
     assert_eq!(label_stub_pins(level(&back)), pins);
 }
+
+/// The low ALIGN facts in a level of two flat and two upright capacitors, after `body`: how many
+/// there are and how many hold.
+fn low_aligns(body: &str) -> (usize, usize) {
+    let text = format!(
+        r#"* t
+* @RNL(type="header") {{ @VERSION("0.4"); @USE-PACKAGE(name="rnl-std-all", version="0.4") }}
+C1 a b 1u
+C2 b c 1u
+C3 c 0 1u
+C4 b 0 1u
+R1 c 0 1k
+* @RNL {{
+*   {body}
+*   #C1 @PLACE(0, 0) => @ORIENT("R90");
+*   #C2 @PLACE(10, 0) => @ORIENT("R0");
+*   #C3 @PLACE(20, 0) => @ORIENT("R0");
+*   #C4 @PLACE(30, 0) => @ORIENT("R90")
+* }}
+.end
+"#
+    );
+    let r = read(&MemoryProvider::new().with("t.sp", &text), &Options::default());
+    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
+    let lv = level(&r);
+    let aligns = lv.constraints.iter().filter(|c| c.kind == "ALIGN" && c.priority == "low");
+    let ok = aligns.clone().filter(|c| c.status == "ok").count();
+    (aligns.count(), ok)
+}
+
+#[test]
+fn a_coupling_capacitor_lies_on_one_row_and_a_decap_stands_in_one_column() {
+    // C1 and C4 lie flat (R90), C2 and C3 stand upright (R0)
+    let (without, without_ok) = low_aligns("#C1 #C2 #C3 #C4;");
+    // $AC_COUPLE aligns the pins of each capacitor in y: one fact each, as the single role takes the
+    // set member by member (5.2.1); it holds for C1 and not for C2
+    let (with, with_ok) = low_aligns("{#C1 #C2} @AS $AC_COUPLE;");
+    assert_eq!((with, with_ok), (without + 2, without_ok + 1));
+    // $DECAP aligns them in x: it holds for C3 and not for C4
+    let (with, with_ok) = low_aligns("{#C3 #C4} @AS $DECAP;");
+    assert_eq!((with, with_ok), (without + 2, without_ok + 1));
+}
+
+#[test]
+fn the_degenerated_amplifiers_name_their_stage() {
+    let devices = r#".model qn npn
+M1 d g s 0 nch W=2u L=1u
+RD vdd d 1k
+RS s 0 1k
+Q1 c b e qn
+RC vdd c 1k
+RE e 0 1k
+"#;
+    let read04 = |body: &str| {
+        let r = read(&MemoryProvider::new().with("t.sp", &with_std04(devices, body)), &Options::default());
+        assert!(by_severity(&r, Severity::Error).is_empty(), "{body}: {:?}", by_severity(&r, Severity::Error));
+        r
+    };
+    let stage = |r: &Interpretation, definition: &str| {
+        level(r).objects.iter().filter(|o| o.definition.as_deref() == Some(definition)).count()
+    };
+    // each applies its stage and the degenerated amplifier, without a violation on the right device
+    let cs = read04("#M1(input) #RD(load) #RS(degenerator) @AS $DEGENERATED_COMMON_SOURCE_AMPLIFIER");
+    assert!(by_severity(&cs, Severity::Violation).is_empty(), "{:?}", by_severity(&cs, Severity::Violation));
+    assert_eq!(stage(&cs, "$COMMON_SOURCE"), 1);
+    assert_eq!(stage(&cs, "$DEGENERATED_TRANSCONDUCTOR_Z_AMPLIFIER"), 1);
+    let ce = read04("#Q1(input) #RC(load) #RE(degenerator) @AS $DEGENERATED_COMMON_EMITTER_AMPLIFIER");
+    assert!(by_severity(&ce, Severity::Violation).is_empty(), "{:?}", by_severity(&ce, Severity::Violation));
+    assert_eq!(stage(&ce, "$COMMON_EMITTER"), 1);
+    assert_eq!(stage(&ce, "$DEGENERATED_TRANSCONDUCTOR_Z_AMPLIFIER"), 1);
+    // the stage checks the device: a bipolar input to the common-source one is reported
+    let wrong = read04("#Q1(input) #RC(load) #RE(degenerator) @AS $DEGENERATED_COMMON_SOURCE_AMPLIFIER");
+    let v = by_severity(&wrong, Severity::Violation);
+    assert_eq!(v.iter().filter(|v| v.contains("is a FET")).count(), 1, "{v:?}");
+}

@@ -418,6 +418,8 @@
   @ALIAS("$折叠共源共栅", "$FOLDED_CASCODE");
   @ALIAS("$共源放大器", "$COMMON_SOURCE_AMPLIFIER");
   @ALIAS("$共射放大器", "$COMMON_EMITTER_AMPLIFIER");
+  @ALIAS("$退化共源放大器", "$DEGENERATED_COMMON_SOURCE_AMPLIFIER");
+  @ALIAS("$退化共射放大器", "$DEGENERATED_COMMON_EMITTER_AMPLIFIER");
   @ALIAS("$米勒补偿放大器", "$MILLER_AMPLIFIER");
   @ALIAS("$推挽级", "$PUSH_PULL_STAGE");
   @ALIAS("$跨导阻抗放大器", "$TRANSCONDUCTOR_Z_AMPLIFIER");
@@ -599,6 +601,12 @@
   @ALIAS("负载", "load", definition="$COMMON_SOURCE_AMPLIFIER");
   @ALIAS("输入管", "input", definition="$COMMON_EMITTER_AMPLIFIER");
   @ALIAS("负载", "load", definition="$COMMON_EMITTER_AMPLIFIER");
+  @ALIAS("输入管", "input", definition="$DEGENERATED_COMMON_SOURCE_AMPLIFIER");
+  @ALIAS("负载", "load", definition="$DEGENERATED_COMMON_SOURCE_AMPLIFIER");
+  @ALIAS("退化元件", "degenerator", definition="$DEGENERATED_COMMON_SOURCE_AMPLIFIER");
+  @ALIAS("输入管", "input", definition="$DEGENERATED_COMMON_EMITTER_AMPLIFIER");
+  @ALIAS("负载", "load", definition="$DEGENERATED_COMMON_EMITTER_AMPLIFIER");
+  @ALIAS("退化元件", "degenerator", definition="$DEGENERATED_COMMON_EMITTER_AMPLIFIER");
   @ALIAS("放大级", "stage", definition="$MILLER_AMPLIFIER");
   @ALIAS("补偿网络", "compensation", definition="$MILLER_AMPLIFIER");
   @ALIAS("上拉", "pullup", definition="$PUSH_PULL_STAGE");
