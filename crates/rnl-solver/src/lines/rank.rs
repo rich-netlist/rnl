@@ -97,7 +97,7 @@ impl Rank {
         }
         // the unified key: the line-layout order, its crossings and bends weighed by the one pair,
         // with the configured rules between its marks and its sizes
-        let l = super::quality::lab_measure(problem, s, placed, routing, super::quality::WEIGHTS, None);
+        let l = super::quality::lab_measure(problem, s, placed, routing, options.settings.lines_weights.pair(), None);
         if l.interrupted {
             layers.extend((0..self.rules.len() + 6 + 4).map(|_| int(i64::MAX)));
         } else {

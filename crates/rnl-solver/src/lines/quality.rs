@@ -33,11 +33,6 @@ pub(super) struct LabOrder {
     pub(super) rules: Vec<Q>,
 }
 
-/// The weights of a crossing and of a bend, one pair for the whole lines layout: the tracks it
-/// routes, the drawings its search ranks, the tree's arrangements it ranks and the comparison of
-/// its drawing with the tree's. A bend counts as four crossings.
-pub(super) const WEIGHTS: (u64, u64) = (1, 4);
-
 impl LabOrder {
     #[allow(clippy::type_complexity)]
     fn key(
@@ -479,7 +474,7 @@ mod tests {
         }
         assert!(interrupted && complete);
         let (stopped, _) = crate::budget::with(&StoppedClock, RunLimit::Work(0), None, || {
-            lab_order(&p, &s, &placed, &routing, WEIGHTS, None)
+            lab_order(&p, &s, &placed, &routing, (1, 4), None)
         });
         assert!(stopped.interrupted && stopped > full);
     }

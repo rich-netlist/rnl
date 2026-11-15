@@ -388,7 +388,7 @@ impl Default for SolverOptions {
     }
 }
 
-const KEYS: [&str; 15] = [
+const KEYS: [&str; 16] = [
     "tolerance",
     "grid",
     "objectives",
@@ -404,6 +404,7 @@ const KEYS: [&str; 15] = [
     "report_hints",
     "junction_utf8",
     "tree_work",
+    "lines_weights",
 ];
 
 /// The value of a key of the `key=value;…` text that takes a string, `layout`, `objectives`,
@@ -464,6 +465,10 @@ impl SolverOptions {
         }
         if self.settings.spacing != [0, 0] {
             text.push_str(&format!(";spacing_x={};spacing_y={}", self.settings.spacing[0], self.settings.spacing[1]));
+        }
+        // named only when not the default, so that the text of the defaults is as it was
+        if self.settings.lines_weights != crate::LinesWeights::default() {
+            text.push_str(&format!(";lines_weights={}", self.settings.lines_weights.written()));
         }
         // named only when on, so that the text of the defaults is as it was
         if self.settings.join_trees {
@@ -542,6 +547,7 @@ impl SolverOptions {
                 "report_hints" => {
                     options.hints_for_low = value.parse().map_err(|_| "report_hints must be true or false")?
                 }
+                "lines_weights" => options.settings.lines_weights = crate::LinesWeights::parse(value)?,
                 "tree_work" if value == "false" => options.tree_work = Some(TreeWork::Off),
                 "tree_work" => {
                     options.tree_work =
@@ -588,6 +594,9 @@ impl SolverOptions {
             if !(-1..=20).contains(&n) {
                 out.push((key, "spacing must be between -1 and 20".into()));
             }
+        }
+        if let Some(problem) = self.settings.lines_weights.problem() {
+            out.push(("lines_weights", problem));
         }
         let run_seconds = match self.run_limit {
             Some(crate::RunLimit::Time(s)) => Some(s),
@@ -717,6 +726,21 @@ mod tests {
         assert!(options.canonical().ends_with(";time_limit=0.25"));
         assert_eq!(SolverOptions::parse(&options.canonical()), Ok(options));
         assert_eq!(SolverOptions::parse(DEFAULT), Ok(SolverOptions::default()));
+    }
+
+    /// The weights are named in the canonical text only when not the default, without spaces, and
+    /// read back; weights out of their bounds are an error.
+    #[test]
+    fn lines_weights_are_named_only_when_not_the_default() {
+        let d = SolverOptions::default();
+        assert!(!d.canonical().contains("lines_weights"));
+        let o = d.with_overrides("lines_weights=[ 2 , 3 ]").unwrap();
+        assert!(o.canonical().ends_with(";lines_weights=[2,3]"), "{}", o.canonical());
+        assert_eq!(SolverOptions::parse(&o.canonical()).unwrap(), o);
+        assert_eq!(d.with_overrides("lines_weights=[1,4]").unwrap().canonical(), d.canonical());
+        for bad in ["[0,0]", "[1,1001]", "[1]", "1,4", "[a,4]"] {
+            assert!(d.with_overrides(&format!("lines_weights={bad}")).is_err(), "{bad}");
+        }
     }
 
     #[test]

@@ -597,7 +597,7 @@ pub(crate) fn settle(
         s,
         tree,
         nodes,
-        weights: super::quality::WEIGHTS,
+        weights: options.settings.lines_weights.pair(),
         clear,
         hung: BTreeMap::new(),
         leaves: BTreeSet::new(),

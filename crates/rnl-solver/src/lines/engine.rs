@@ -147,7 +147,7 @@ pub(crate) fn lay_out(
     }
     let before = laid.entry.clone();
     let mut notes = std::mem::take(&mut laid.notes);
-    let weights = super::quality::WEIGHTS;
+    let weights = options.settings.lines_weights.pair();
     let fallback = |mut laid: Laid, mut notes: Vec<String>, why: String, work: &mut Work| -> (Laid, LayoutSkeleton) {
         notes.push(format!("lines: {why}; the level is laid out as the group-tree layout has it"));
         if !crate::budget::stopped() {
