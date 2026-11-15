@@ -86,8 +86,13 @@ fn solve(input: &InputDocument, command: Command) -> Result<ResultDocument, Stri
             solved.report.budget = Some(budget);
             if normalized {
                 solved.report.notes.retain(|n| !n.starts_with("budget:"));
+                // with where the lines layout's group-tree start stopped, which the work does not tell
+                let tree = rnl_solver::SolverOptions::parse(&options)
+                    .ok()
+                    .and_then(|o| o.tree_work)
+                    .map_or_else(String::new, |t| format!(", {}", t.setting()));
                 solved.report.notes.push(format!(
-                    "budget: {} work units; replay with limit=\"work\", work={}",
+                    "budget: {} work units; replay with limit=\"work\", work={}{tree}",
                     budget.work, budget.work
                 ));
             }

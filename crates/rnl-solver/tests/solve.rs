@@ -279,7 +279,10 @@ R11 g0c1r1 g1c0r1 1k
     let p = problems("/w/bands.sp", &files).into_iter().find(|p| p.title == "bands").unwrap();
     // just short of the end of the first batch of the bands: another solver moves it, and it is
     // found again as the work at which the level's first trial turns to the group dissolved, less one
-    let mut options = SolverOptions::default().with_config(r#"limit="work", work=64981892704"#).unwrap();
+    // and the group-tree start of the lines layout refining as it did when the window was found,
+    // before its allowance was a share of the limit
+    let mut options =
+        SolverOptions::default().with_config(r#"limit="work", work=64981892704, tree_work=false"#).unwrap();
     // the objectives the window was found with: crowding, the last default layer, ranks the
     // arrangements otherwise and moves it
     assert_eq!(options.objectives.layers.pop().map(|l| l.items[0].0.clone()).as_deref(), Some("crowding"));

@@ -13,6 +13,11 @@ rnl solve circuit.sp -o replay --solver-config 'limit="work",work=243750'
 
 `rnl solver-defaults` prints the defaults a line for each layout, the default first, with the settings that layout uses; `--layout NAME` prints one layout's line. `rnl solver-defaults --json` prints the table of the settings, with their kinds, bounds, defaults, what they do and the layouts they apply to, from which a tool draws its page of them ([the table of the solver's settings](solver-settings-table.md)). `rnl solve FILE --check` says each level's layout and the settings it takes.
 
+Under the line layout the replay command also gives `tree_work`, as in
+`limit="work",work=243750,tree_work=81000` or `tree_work=false`: the work at which the
+group-tree start the line layout begins with stopped refining its arrangement, which the level's
+work alone does not tell. Give it with the work.
+
 Use the reported count for the same drawing level, input, settings and solver build. For a
 file with several levels, replay each level with `--level` and that level's own count. Keep
 `--report` the same: requesting additional conflict explanations consumes budget too.
@@ -93,6 +98,15 @@ its previous semicolon syntax is also accepted during the transition.
 | `work` | exact nonnegative integer count | required for work mode | no |
 | `safety_seconds` | finite nonnegative number | 30 | no |
 | `candidates`, `astar_expansions` | nonnegative integer caps | 256, 200000 | no |
+| `tree_work` | exact nonnegative integer count, or `false`; the line layout only | taken from the limit | no |
+
+`tree_work` is where the line layout's group-tree start stops refining its arrangement, so that
+the line search has the rest of the level's budget: at that work of the level, or, with `false`,
+not before its search ends or the budget runs out. Left out, the solver fixes it before the start
+from the limit, without reading the clock: three tenths of the level's limit, counted as work for
+a limit of work and in its estimate of nanoseconds for a limit of time, and never past its
+estimate of five seconds. A solve reports where the start stopped in its replay command. Under
+a limit of `"seed"` the start refines without an allowance, and `tree_work` is not read.
 
 The line layout spaces by a nonzero spacing. Under the row and the group-tree layouts it is
 parsed and hashed, with a warning by its key that it is ignored under that layout, as for every

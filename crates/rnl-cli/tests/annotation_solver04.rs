@@ -444,6 +444,8 @@ fn line_annotation_geometry_and_description_replay_at_time_cutoffs() {
         let timed = rnl_solver::solve_with_clock(p, &options, &Ticks(Cell::new(0)));
         assert_eq!(timed.report.fatal_annotation, None, "{:?}", timed.report.errors);
         options.run_limit = Some(RunLimit::Work(timed.report.budget.unwrap().work));
+        // where the lines layout's group-tree start stopped, which the replay's work does not tell
+        options.tree_work = SolverOptions::parse(timed.report.canonical_options.as_deref().unwrap()).unwrap().tree_work;
         let replay = rnl_solver::solve_with_clock(p, &options, &StoppedClock);
         assert_eq!(timed.solution, replay.solution, "cutoff {seconds}");
         assert_eq!(timed.report.kept, replay.report.kept);

@@ -147,13 +147,25 @@ struct Refinement {
     expansions: u64,
     pivot_ns: u64,
     limit_ns: u64,
+    /// The work of the level at which it stops too ([`Allowance::work`]).
+    work: Option<u64>,
+}
+
+/// How far the group-tree start of the lines layout refines its arrangement past the first one and
+/// its rounds: the solver's estimate of the nanoseconds it spends ([`Refinement`]), and the work of
+/// the level ([`crate::budget::consumed`]), whichever it reaches first. Both are counts, not the
+/// clock, so that where it stops does not depend on how busy the machine is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct Allowance {
+    pub ns: u64,
+    pub work: Option<u64>,
 }
 
 impl Refinement {
-    fn for_problem(problem: &LevelProblem, work: &Work, limit_ns: u64) -> Self {
+    fn for_problem(problem: &LevelProblem, work: &Work, allowance: Allowance) -> Self {
         // The operation estimate scales with the coordinate problem, including
         // semantic objects without a drawing, rather than just its visible boxes.
-        Self::new(problem.objects.len() as u64, work, limit_ns)
+        Self { work: allowance.work, ..Self::new(problem.objects.len() as u64, work, allowance.ns) }
     }
 
     fn new(objects: u64, work: &Work, limit_ns: u64) -> Self {
@@ -162,6 +174,7 @@ impl Refinement {
             expansions: work.astar_expansions,
             pivot_ns: 4_754u64.saturating_add(157u64.saturating_mul(objects)),
             limit_ns,
+            work: None,
         }
     }
 
@@ -171,6 +184,16 @@ impl Refinement {
             .saturating_mul(self.pivot_ns)
             .saturating_add(work.astar_expansions.saturating_sub(self.expansions).saturating_mul(114))
             >= self.limit_ns
+            || self.work.is_some_and(|w| crate::budget::consumed() >= w)
+    }
+
+    /// Whether it is reached, which the budget then notes for the replay of the solve.
+    fn stops(self, work: &Work) -> bool {
+        let reached = self.reached(work);
+        if reached {
+            crate::budget::note_tree_stop();
+        }
+        reached
     }
 }
 
@@ -190,8 +213,8 @@ pub(crate) fn lay_out(
     lay_out_from(Tree::new(problem, s, options), work, stop, None)
 }
 
-pub(crate) fn lay_out_from(tree: Tree<'_>, work: &mut Work, stop: &Stop, allowance: Option<u64>) -> Laid {
-    let refinement = allowance.map(|limit| Refinement::for_problem(tree.problem, work, limit));
+pub(crate) fn lay_out_from(tree: Tree<'_>, work: &mut Work, stop: &Stop, allowance: Option<Allowance>) -> Laid {
+    let refinement = allowance.map(|a| Refinement::for_problem(tree.problem, work, a));
     let first = tree.first(work);
     let mut notes = Vec::new();
     if !tree.left_out.is_empty() {
@@ -1690,7 +1713,7 @@ impl<'a> Tree<'a> {
         let mut releases = 0;
         let mut finished = false;
         'search: loop {
-            if refinement.is_some_and(|limit| limit.reached(work)) || stop.reached(work) {
+            if refinement.is_some_and(|limit| limit.stops(work)) || stop.reached(work) {
                 break;
             }
             if bindings {
@@ -1743,7 +1766,7 @@ impl<'a> Tree<'a> {
             });
             let mut stepped = false;
             for i in order {
-                if refinement.is_some_and(|limit| limit.reached(work)) || stop.reached(work) {
+                if refinement.is_some_and(|limit| limit.stops(work)) || stop.reached(work) {
                     break 'search;
                 }
                 let (what, arr, _, _) = &moves[i];
@@ -2716,7 +2739,7 @@ mod refinement_tests {
         use rnl_runtime::problem::ObjectKind;
         let mut p = problem_of(vec![instance(); 8], vec![]);
         let work = Work::default();
-        let before = Refinement::for_problem(&p, &work, 50_000);
+        let before = Refinement::for_problem(&p, &work, Allowance { ns: 50_000, work: None });
         let mut point = instance();
         point.kind = ObjectKind::Usage;
         point.symbol = None;
@@ -2724,7 +2747,7 @@ mod refinement_tests {
         p.objects.extend(std::iter::repeat_n(point.clone(), 64));
         point.kind = ObjectKind::Point;
         p.objects.push(point);
-        let after = Refinement::for_problem(&p, &work, 50_000);
+        let after = Refinement::for_problem(&p, &work, Allowance { ns: 50_000, work: None });
         let advanced = Work { pivots: 4, ..Work::default() };
         assert!(!before.reached(&advanced));
         assert!(after.reached(&advanced));
@@ -2732,7 +2755,7 @@ mod refinement_tests {
         // Attaching a drawing to an existing coordinate object adds no object.
         p.objects[8].symbol = Some(0);
         p.objects[9].kind = ObjectKind::Annotation;
-        let drawn = Refinement::for_problem(&p, &work, 50_000);
+        let drawn = Refinement::for_problem(&p, &work, Allowance { ns: 50_000, work: None });
         assert_eq!(drawn.pivot_ns, after.pivot_ns);
         assert_eq!(drawn.reached(&advanced), after.reached(&advanced));
     }
