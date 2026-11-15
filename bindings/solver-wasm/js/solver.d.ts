@@ -85,7 +85,11 @@ export interface Checked {
   ok: boolean;
   levels: {
     title: string | null;
+    /** The layout in effect: "lines", "rows" or "tree". */
+    layout: string;
     settings: Record<string, CheckedSetting>;
+    /** The keys of `settings` that the layout does not use, or that are shown only for other values of the settings. */
+    unused: string[];
     warnings: CheckedProblem[];
     errors: CheckedProblem[];
   }[];

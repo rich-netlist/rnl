@@ -3,7 +3,7 @@
 A tool that lets its user set the solver draws its page from a table the solver gives, so that the page names no key, bound or default of its own. The same table comes from three places:
 
 - the library: `rnl_solver::settings_table()` as Rust data, and `rnl_cli::solver_table::settings_table_json()` as JSON;
-- the command line: `rnl solver-defaults --json` (without `--json`, the defaults as RNL named parameters, as before);
+- the command line: `rnl solver-defaults --json`. With `--layout NAME` it holds only the settings, objectives and stages that apply to that layout, with `layout`, its name, and `lines_order` only for `lines`. Without `--json`, the defaults are RNL named parameters, a line for each layout, the default first, each with the settings that layout uses (`applies`, and `shown_when` under the defaults); `--layout NAME` prints the line of that layout alone;
 - the solver's WebAssembly module: `rnl_settings()`, or `settings()` of its loader ([bindings/solver-wasm](../bindings/solver-wasm/README.md)).
 
 The table describes a 0.4 level. A level of an earlier version is laid out in rows and reads none of a file's settings; the check of a level (`rnl solve --check`) says what each level takes.
@@ -46,7 +46,7 @@ The table describes a 0.4 level. A level of an earlier version is laid out in ro
 
 ## What a level takes
 
-The table says what may be given; the check says what each level takes. `rnl solve FILE --check --json` gives, for each level, every setting in effect with where it comes from (`default`, `package:NAME`, `header`, `level`, `command-line`) and `file:line` where it is written, then the warnings and the errors, each with the `key` it is about. A value of the file that the solver does not take is an error, with `refused`, the value left out; the solve goes on with the value before it.
+The table says what may be given; the check says what each level takes. `rnl solve FILE --check --json` gives, for each level, `layout`, the layout in effect, and every setting in effect with where it comes from (`default`, `package:NAME`, `header`, `level`, `command-line`) and `file:line` where it is written. Then come `unused`, the keys of those settings that the layout does not use or that are shown only for other values of the settings, as `applies` and `shown_when` say, then the warnings and the errors, each with the `key` it is about. Without `--json` the check prints each level's layout first, then only the settings it uses, then the warnings and the errors. A value of the file that the solver does not take is an error, with `refused`, the value left out; the solve goes on with the value before it.
 
 A solve gives the same with its report: each level of the report of `rnl preview` has `check`, the check of that level's settings as they were before the solve, with the tool's. It is left out when the files could not be read for it. A page points at a setting by the `key` of an error there; `errors` of the report are the same as text, which a page counts.
 
