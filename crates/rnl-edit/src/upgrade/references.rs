@@ -36,6 +36,7 @@ pub(super) struct References {
     usage_changes: super::usages::Usages,
     approximate: super::approximate::Approximate,
     usage_reviews: BTreeMap<(usize, String, u32, u32), Vec<super::manual::Reason>>,
+    canvas: super::canvas::Canvas,
 }
 
 fn target_pins() -> BTreeMap<SymbolKey, Pins> {
@@ -130,6 +131,7 @@ impl References {
             local_symbols: super::local_symbols::LocalSymbols::new(input),
             legacy: super::legacy::Legacy::new(input),
             host_terminals: super::host_terminals::HostTerminals::new(input),
+            canvas: super::canvas::Canvas::new(input),
             ..Self::default()
         };
         if approximate {
@@ -309,6 +311,17 @@ impl References {
                     continue;
                 }
                 let SymbolOrigin::Package(package) = &symbol.origin else { continue };
+                if let Some(pins) = result.canvas.usage_pins(level.level, package, &symbol.name) {
+                    for (number, (role, _)) in object.attach.iter().enumerate() {
+                        if let Some((_, pin)) = pins.iter().find(|(r, _)| r == role) {
+                            result.pins.insert((level.level, object.id.clone(), role.clone()), pin.to_string());
+                            result
+                                .pins
+                                .insert((level.level, object.id.clone(), (number + 1).to_string()), pin.to_string());
+                        }
+                    }
+                    continue;
+                }
                 let raw_sym = symbol.name.trim_start_matches('$');
                 let target_sym = super::legacy::renamed_03_symbol(raw_sym)
                     .or_else(|| super::legacy::renamed(raw_sym))
@@ -872,6 +885,102 @@ impl References {
             "legacy-standard-name",
         )
         .map(Some)
+    }
+    /// A `$CANVAS_*` name that the standard series 0.4 has.
+    pub(super) fn canvas_reference(
+        &self,
+        path: &str,
+        source: &str,
+        record: &Record,
+        reference: &Ref,
+    ) -> Result<Option<Edit>, String> {
+        let readings = self.readings_at(path, record, reference.start).map(Vec::as_slice).unwrap_or_default();
+        self.canvas.rename(source, record, readings, reference)
+    }
+    /// The terminal map of a `SET-SYMBOL` of a `$CANVAS_*` symbol on instances.
+    pub(super) fn canvas_terminal_map(
+        &self,
+        path: &str,
+        source: &str,
+        record: &Record,
+        member: &rnl_runtime::syntax::Member,
+        index: usize,
+    ) -> Result<Option<Edit>, String> {
+        let readings =
+            self.readings_at(path, record, member.segments[index].start).map(Vec::as_slice).unwrap_or_default();
+        super::terminals::set_symbol_edit(
+            self.canvas.maps(),
+            source,
+            record,
+            member,
+            index,
+            readings,
+            "canvas-terminal-map",
+        )
+    }
+    /// The USE-PACKAGE of analog-canvas-extensions, with whether a path was left out.
+    pub(super) fn canvas_package(
+        &self,
+        path: &str,
+        source: &str,
+        record: &Record,
+        segment: &Segment,
+    ) -> Result<Option<(Edit, bool)>, String> {
+        let readings = self.readings_at(path, record, segment.start).map(Vec::as_slice).unwrap_or_default();
+        self.canvas.package(source, record, segment, readings)
+    }
+    /// The standard packages that the `$CANVAS_*` names of the records move to.
+    pub(super) fn canvas_packages(&self, path: &str, records: &[Record]) -> BTreeSet<String> {
+        let mut packages = BTreeSet::new();
+        for record in records {
+            let readings = self
+                .readings
+                .get(&(normalize(path), record.lines.0, record.lines.1))
+                .map(Vec::as_slice)
+                .unwrap_or_default();
+            packages.extend(self.canvas.standard_packages(readings, record).into_iter().map(String::from));
+        }
+        packages
+    }
+    /// A member that names analog-canvas-extensions by a path to a file that is not the published one.
+    pub(super) fn canvas_review(&self, member: &rnl_runtime::syntax::Member) -> Option<super::manual::Reason> {
+        (self.canvas.changed() && super::canvas::names_changed_package(member)).then_some((
+            "canvas-package-changed",
+            "this analog-canvas-extensions is not the published file of its version, so its names are not changed; give the published one, or upgrade the package with the file (16.2)",
+        ))
+    }
+    /// `%PORT::name` of a net-displaying standard usage, whose text has the key `netname` in 0.4.
+    pub(super) fn netname_sub(
+        &self,
+        path: &str,
+        source: &str,
+        record: &Record,
+        reference: &Ref,
+    ) -> Result<Option<Edit>, String> {
+        if self.aliases
+            || !matches!(reference.prefix, '#' | '%')
+            || reference.sub.is_some()
+            || reference.places.is_some()
+            || reference.number.is_some()
+        {
+            return Ok(None);
+        }
+        let [item] = reference.path.as_slice() else { return Ok(None) };
+        if item.sep != rnl_runtime::syntax::Sep::Sub
+            || item.name != "name"
+            || item.sub.is_some()
+            || item.number.is_some()
+        {
+            return Ok(None);
+        }
+        let Some(name) = &reference.name else { return Ok(None) };
+        let id = format!("{}{}", reference.prefix, rnl_runtime::problem::written_name(name));
+        let readings = self.readings_at(path, record, reference.start).map(Vec::as_slice).unwrap_or_default();
+        if readings.is_empty() || !readings.iter().all(|l| self.netname_key_objects.contains(&(*l, id.clone()))) {
+            return Ok(None);
+        }
+        record_edit(source, record, reference.start..reference.end, format!("{id}::netname"), "standard-text-key")
+            .map(Some)
     }
     pub(super) fn host_terminal(
         &self,

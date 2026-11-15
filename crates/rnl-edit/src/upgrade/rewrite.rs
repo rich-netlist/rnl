@@ -270,6 +270,7 @@ pub(super) fn file(
             }
             reasons.extend(context.references.unresolved_pins(path, source, record, member));
             reasons.extend(pending(member));
+            reasons.extend(context.references.canvas_review(member));
             let readings =
                 context.references.readings_at(path, record, member.start).map(Vec::as_slice).unwrap_or_default();
             match context.sets.unrouting(source, record, member, readings) {
@@ -337,6 +338,22 @@ pub(super) fn file(
                             Ok(None) => {}
                             Err(e) => error = Some(e),
                         }
+                        match context.references.canvas_reference(path, source, record, reference) {
+                            Ok(Some(edit)) => {
+                                edits.push(edit);
+                                continue;
+                            }
+                            Ok(None) => {}
+                            Err(e) => error = Some(e),
+                        }
+                        match context.references.netname_sub(path, source, record, reference) {
+                            Ok(Some(edit)) => {
+                                edits.push(edit);
+                                continue;
+                            }
+                            Ok(None) => {}
+                            Err(e) => error = Some(e),
+                        }
                         match context.references.legacy_reference(path, source, record, reference) {
                             Ok(Some(edit)) => {
                                 if !edits.iter().any(|e| e.start < edit.end && edit.start < e.end) {
@@ -375,6 +392,7 @@ pub(super) fn file(
                 let mut found = vec![
                     context.references.legacy_package(path, source, record, segment),
                     context.references.terminal_map(path, source, record, member, index),
+                    context.references.canvas_terminal_map(path, source, record, member, index),
                     match context.references.text_key(path, source, record, member, index) {
                         Ok(None) if context.no_labels => no_labels_text(source, record, member, index, &symbol_spans),
                         other => other,
@@ -392,6 +410,24 @@ pub(super) fn file(
                         Ok(None) => {}
                         Err(e) => error = Some(e),
                     }
+                }
+                match context.references.canvas_package(path, source, record, segment) {
+                    Ok(Some((edit, without_path))) => {
+                        if without_path {
+                            report.notices.push(Unconverted {
+                                rule: "canvas-package".into(),
+                                line: edit.change.line,
+                                before: edit.change.before.clone(),
+                                reason: format!(
+                                    "the path to an earlier analog-canvas-extensions is left out: version {} is read by its name, from a package directory (16.2)",
+                                    super::canvas::TARGET_VERSION
+                                ),
+                            });
+                        }
+                        edits.push(edit);
+                    }
+                    Ok(None) => {}
+                    Err(e) => error = Some(e),
                 }
                 let change = match call.kw.as_str() {
                     "VERSION" => {
@@ -425,8 +461,13 @@ pub(super) fn file(
     if context.std && !has_std {
         declarations.push("@USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\")".to_string());
     }
-    for package in context.references.legacy_packages(path, records) {
-        declarations.push(format!("@USE-PACKAGE(name={}, version=\"0.4\")", written_string(&package)));
+    let legacy = context.references.legacy_packages(path, records);
+    // the standard packages that the names of analog-canvas-extensions move to, when the file does
+    // not use the whole standard package
+    let canvas =
+        if context.std || has_std { BTreeSet::new() } else { context.references.canvas_packages(path, records) };
+    for package in legacy.iter().chain(canvas.difference(&legacy)) {
+        declarations.push(format!("@USE-PACKAGE(name={}, version=\"0.4\")", written_string(package)));
     }
     if let Some((record, Some(at))) = header {
         if !declarations.is_empty() {

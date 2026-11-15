@@ -12,6 +12,11 @@
       "sha256": "6b8af6bbc4538cc5ea845b45c4511027fd61865917839a37612c326e19905ead"
     },
     {
+      "name": "analog-canvas-extensions",
+      "version": "0.7",
+      "sha256": "71b0d2a7ad8a4cc7e79fb331d803be6ffecb4e06d138a694e1fe26160b645a0e"
+    },
+    {
       "name": "eda-style",
       "version": "0.1",
       "sha256": "899d4251f7fb899551fe8b0d1404cb5277fca6428efb226d619f4361e45d6765"

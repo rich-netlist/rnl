@@ -243,6 +243,24 @@ impl Terminals {
         index: usize,
         readings: &[usize],
     ) -> Result<Option<Edit>, String> {
+        set_symbol_edit(&self.maps, source, record, member, index, readings, "standard-terminal-map")
+    }
+}
+
+/// The `SET-SYMBOL` of instances, given as host references or selected by `SELECT-INSTANCE`, with
+/// the terminal map of its symbol in `maps` by the level it is read in, put in place of the bare
+/// call, under the rule `rule`. A call with parameters of its own, a symbol drawn on other objects,
+/// and a symbol the readings map differently are left alone.
+pub(super) fn set_symbol_edit(
+    maps: &BTreeMap<(usize, String), String>,
+    source: &str,
+    record: &Record,
+    member: &Member,
+    index: usize,
+    readings: &[usize],
+    rule: &str,
+) -> Result<Option<Edit>, String> {
+    {
         let segment = &member.segments[index];
         let Some(call) = segment.call.as_ref().filter(|c| {
             c.kw == "SET-SYMBOL" && c.params.as_ref().is_none_or(|p| p.named.is_empty() && p.positional.is_empty())
@@ -289,11 +307,11 @@ impl Terminals {
         if !known_hosts {
             return Ok(None);
         }
-        let mut replacements = readings.iter().map(|i| self.maps.get(&(*i, symbol.clone())));
+        let mut replacements = readings.iter().map(|i| maps.get(&(*i, symbol.clone())));
         let Some(Some(replacement)) = replacements.next() else { return Ok(None) };
         if !replacements.all(|r| r == Some(replacement)) {
             return Ok(None);
         }
-        record_edit(source, record, call.start..call.end, replacement.clone(), "standard-terminal-map").map(Some)
+        record_edit(source, record, call.start..call.end, replacement.clone(), rule).map(Some)
     }
 }
