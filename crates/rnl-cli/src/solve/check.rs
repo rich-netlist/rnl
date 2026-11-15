@@ -46,8 +46,15 @@ pub struct Checked {
 pub struct CheckedLevel {
     /// The level's title: a subcircuit name, or the file name; none without a file.
     pub title: Option<String>,
+    /// The layout the level is laid out with: the value of `layout` in effect.
+    pub layout: String,
     /// Each setting in effect, by key.
     pub settings: BTreeMap<String, CheckedSetting>,
+    /// The keys of `settings` that the layout does not use, as the table of the settings says
+    /// (`applies`), or that are shown only for other values of the settings (`shown_when`), such
+    /// as `beam` under the lines layout or `safety_seconds` under the limit `time`. A key set to a
+    /// value other than its default that the layout ignores has a warning too.
+    pub unused: Vec<String>,
     /// What a solve ignores and says so: a run setting written in the file, a key the solver does
     /// not know.
     pub warnings: Vec<CheckedProblem>,
@@ -197,7 +204,7 @@ fn level(
             CheckedSetting { value: setting_json(&s.value), from: origin(r, s), at: written }
         })
     };
-    let settings = check
+    let settings: BTreeMap<String, CheckedSetting> = check
         .values
         .into_iter()
         .map(|(key, (value, from))| {
@@ -224,7 +231,10 @@ fn level(
             warnings.push(problem);
         }
     }
-    CheckedLevel { title, settings, warnings, errors }
+    let value = |key: &str| settings.get(key).map(|s| crate::solver_table::shown_value(&s.value));
+    let layout = value("layout").unwrap_or_default();
+    let unused = settings.keys().filter(|k| !crate::solver_table::used(k, &value)).cloned().collect();
+    CheckedLevel { title, layout, settings, unused, warnings, errors }
 }
 
 /// Where a setting of the level's own comes from: a package by its name, or the record it is
@@ -280,8 +290,9 @@ pub fn setting_json(value: &Lit) -> serde_json::Value {
     }
 }
 
-/// What `rnl solve --check` prints without `--json`: each level's settings, one a line with where
-/// it comes from, and its warnings and errors.
+/// What `rnl solve --check` prints without `--json`: each level's layout, then the settings it
+/// uses, one a line with where it comes from, and its warnings and errors. The settings its layout
+/// does not use (`unused`) are left out.
 pub fn check_lines(checked: &Checked) -> Vec<String> {
     let mut out = Vec::new();
     for level in &checked.levels {
@@ -289,7 +300,10 @@ pub fn check_lines(checked: &Checked) -> Vec<String> {
             out.push(format!("level {title}:"));
         }
         let indent = if level.title.is_some() { "  " } else { "" };
-        for (key, s) in &level.settings {
+        let shown = |key: &&String| !level.unused.contains(key);
+        let layout = level.settings.get_key_value("layout");
+        let others = level.settings.iter().filter(|(key, _)| key.as_str() != "layout");
+        for (key, s) in layout.into_iter().chain(others).filter(|(key, _)| shown(key)) {
             let at = s.at.as_ref().map(|at| format!(", {at}")).unwrap_or_default();
             out.push(format!("{indent}{key}={} ({}{at})", s.value, s.from));
         }

@@ -26,8 +26,12 @@ const USAGE: &str = concat!(
                                     #M5:d or %dp1, written as RNL refers to it
   rnl problem FILE [options]        print what a solver reads of each level, with its hash, as JSON
   rnl solve FILE -o DIR [options]   solve each drawing level and write its record of the solver back
-  rnl solver-defaults [--json]     print 0.4 solver defaults as RNL named parameters, or with --json
-                                    the table of the solver's settings and objectives
+  rnl solver-defaults [--json] [--layout NAME]
+                                    print the 0.4 solver's defaults as RNL named parameters, a line
+                                    for each layout with the settings it uses, the default layout
+                                    first; with --json the table of the solver's settings, objectives
+                                    and stages, each with the layouts it applies to; --layout NAME
+                                    gives those of one layout, lines, rows or tree
   rnl upgrade FILE [-o DIR | --in-place] [--report REPORT.json] [--approximate] [--keep-generated]
                                     preview migration to 0.4, or save it
   rnl preview FILE [options]        print the solve as the desktop viewer previews it, as JSON; writes nothing
@@ -175,6 +179,8 @@ struct Args {
     /// `explain`'s REF, and `--json`.
     reference: Option<String>,
     json: bool,
+    /// `solver-defaults`' `--layout`.
+    layout: Option<String>,
     /// `view`'s `--bind` and `--param`.
     bind: Option<rnl_view::Bind>,
 }
@@ -259,6 +265,7 @@ fn parse_args() -> Result<Args, Said> {
     let mut positional = Vec::new();
     let mut written_options = Vec::new();
     let mut json = false;
+    let mut layout = None;
     let mut constraints = false;
     let mut bind_subckt: Option<String> = None;
     let mut bind_params: BTreeMap<String, String> = BTreeMap::new();
@@ -371,6 +378,15 @@ fn parse_args() -> Result<Args, Said> {
             }
             "--all-versions" => all_versions = true,
             "--json" => json = true,
+            "--layout" => {
+                let layouts = rnl_cli::solver_table::layouts();
+                let named = layouts.join(", ");
+                let name = it.next().ok_or_else(|| needs(&format!("--layout needs a layout: {named}")))?;
+                if !layouts.contains(&name.as_str()) {
+                    return Err(needs(&format!("--layout needs a layout: {named}; not {name}")));
+                }
+                layout = Some(name);
+            }
             "--bind" => bind_subckt = Some(it.next().ok_or_else(|| needs("--bind needs a subcircuit name"))?),
             "--param" => {
                 let set = it.next().ok_or_else(|| needs("--param needs NAME=VALUE, such as w=2u"))?;
@@ -416,6 +432,7 @@ fn parse_args() -> Result<Args, Said> {
             "--progress" | "--check" | "--external-solver" | "--external-arg" | "--external-timeout" => &["solve"],
             "--previous" | "--solver-input" => &["problem"],
             "--png" | "--scale" | "--net-names" => &["render"],
+            "--layout" => &["solver-defaults"],
             "--primitives" | "--no-svg" | "--status" => &["view", "snapshot"],
             "--flylines" => &["view", "snapshot", "render"],
             "--hints" => &["view"],
@@ -529,6 +546,7 @@ fn parse_args() -> Result<Args, Said> {
         encoding: encoding.unwrap_or_default(),
         reference,
         json,
+        layout,
         bind,
     })
 }
@@ -672,10 +690,12 @@ fn run(args: &Args) -> Result<ExitCode, Said> {
     check_formats(args, &provider)?;
     match args.command.as_str() {
         "solver-defaults" => {
+            let layout = args.layout.as_deref();
             if args.json {
-                println!("{}", serde_json::to_string_pretty(&rnl_cli::solver_table::settings_table_json()).unwrap());
+                let table = rnl_cli::solver_table::settings_table_json_for(layout);
+                println!("{}", serde_json::to_string_pretty(&table).unwrap());
             } else {
-                println!("{}", rnl_solver::SolverOptions::defaults_config());
+                println!("{}", rnl_cli::solver_table::defaults_text(layout));
             }
             Ok(ExitCode::SUCCESS)
         }

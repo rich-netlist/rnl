@@ -11,7 +11,7 @@ rnl solve circuit.sp -o solved --solver-config 'limit="time",seconds=10' --progr
 rnl solve circuit.sp -o replay --solver-config 'limit="work",work=243750'
 ```
 
-`rnl solver-defaults --json` prints the table of the settings, with their kinds, bounds, defaults and what they do, from which a tool draws its page of them ([the table of the solver's settings](solver-settings-table.md)).
+`rnl solver-defaults` prints the defaults a line for each layout, the default first, with the settings that layout uses; `--layout NAME` prints one layout's line. `rnl solver-defaults --json` prints the table of the settings, with their kinds, bounds, defaults, what they do and the layouts they apply to, from which a tool draws its page of them ([the table of the solver's settings](solver-settings-table.md)). `rnl solve FILE --check` says each level's layout and the settings it takes.
 
 Use the reported count for the same drawing level, input, settings and solver build. For a
 file with several levels, replay each level with `--level` and that level's own count. Keep

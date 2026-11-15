@@ -54,11 +54,49 @@ fn time_work_replay_preserves_the_entire_file_and_hash() {
 
 #[test]
 fn defaults_command_prints_accepted_named_parameters() {
-    let output = Command::new(env!("CARGO_BIN_EXE_rnl")).arg("solver-defaults").output().unwrap();
+    let rnl =
+        |args: &[&str]| Command::new(env!("CARGO_BIN_EXE_rnl")).arg("solver-defaults").args(args).output().unwrap();
+    let output = rnl(&[]);
     assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
     let text = String::from_utf8(output.stdout).unwrap();
-    assert!(SolverOptions::default().with_config(text.trim()).is_ok());
-    assert!(text.contains("seconds=10"));
+    // a line for each layout, the default first, of the settings that layout uses
+    let lines: Vec<&str> = text.lines().collect();
+    assert_eq!(lines.len(), 3);
+    for (line, layout) in lines.iter().zip(["lines", "rows", "tree"]) {
+        assert!(line.starts_with(&format!("layout=\"{layout}\", ")), "{line}");
+        assert!(SolverOptions::default().with_config(line).is_ok(), "{line}");
+        assert!(line.contains("seconds=10"), "{line}");
+        // safety_seconds is of the limits work and seed, not of the default time
+        assert!(!line.contains("safety_seconds"), "{line}");
+        assert_eq!(line.contains("beam=4"), layout == "rows", "{line}");
+        assert_eq!(line.contains("candidates=256"), layout == "rows", "{line}");
+        assert_eq!(line.contains("spacing_x=0"), layout == "lines", "{line}");
+    }
+    // --layout gives the line of one layout
+    assert_eq!(String::from_utf8(rnl(&["--layout", "rows"]).stdout).unwrap().trim(), lines[1]);
+    // and, with --json, the rows of the table that apply to it
+    let table: serde_json::Value = serde_json::from_slice(&rnl(&["--json", "--layout", "tree"]).stdout).unwrap();
+    assert_eq!(table["layout"], "tree");
+    let names = |list: &str, key: &str| -> Vec<String> {
+        table[list].as_array().unwrap().iter().map(|r| r[key].as_str().unwrap().to_string()).collect()
+    };
+    assert!(names("settings", "key").contains(&"grid".to_string()));
+    assert!(!names("settings", "key").contains(&"beam".to_string()));
+    assert!(names("objectives", "name").contains(&"turns".to_string()));
+    assert!(names("stages", "name").contains(&"tree".to_string()));
+    assert!(!names("stages", "name").contains(&"lines".to_string()));
+    assert!(table.get("lines_order").is_none());
+    let lines_table: serde_json::Value = serde_json::from_slice(&rnl(&["--json", "--layout", "lines"]).stdout).unwrap();
+    assert!(!lines_table["objectives"].as_array().unwrap().iter().any(|o| o["name"] == "turns"));
+    assert!(lines_table["lines_order"]["ranks"].is_array());
+    // without --layout, the whole table, as before
+    let whole: serde_json::Value = serde_json::from_slice(&rnl(&["--json"]).stdout).unwrap();
+    assert!(whole.get("layout").is_none());
+    assert_eq!(whole, rnl_cli::solver_table::settings_table_json());
+    // a layout the solver does not have is refused; --layout is an option of solver-defaults only
+    assert_eq!(rnl(&["--layout", "grid"]).status.code(), Some(2));
+    let check = Command::new(env!("CARGO_BIN_EXE_rnl")).args(["check", "x.sp", "--layout", "rows"]).output().unwrap();
+    assert_eq!(check.status.code(), Some(2));
 }
 
 #[test]

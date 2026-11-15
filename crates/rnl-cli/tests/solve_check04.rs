@@ -209,6 +209,41 @@ fn a_spacing_is_warned_of_only_where_the_layout_does_not_space_by_it() {
 }
 
 #[test]
+fn each_level_says_its_layout_and_the_settings_it_does_not_use() {
+    let c = check(MAIN, &[]);
+    // the top level lays out in lines, by default; amp in a tree, as its own SOLVER-CONFIG says
+    let (top, amp) = (level(&c, "main.sp"), level(&c, "amp"));
+    assert_eq!((top.layout.as_str(), amp.layout.as_str()), ("lines", "tree"));
+    // beam and candidates are of the rows layout only, the spacings of lines only; safety_seconds
+    // is shown only under the limits work and seed
+    assert_eq!(top.unused, ["beam", "candidates", "safety_seconds"]);
+    assert_eq!(amp.unused, ["beam", "candidates", "safety_seconds", "spacing_x", "spacing_y"]);
+    // the settings a layout does not use are still in effect, as the solver reads them
+    assert!(top.settings.contains_key("beam"));
+    let rows = check(MAIN, &[ToolSettings::Config("layout=\"rows\"".into())]);
+    assert_eq!(level(&rows, "main.sp").layout, "rows");
+    assert_eq!(level(&rows, "main.sp").unused, ["safety_seconds", "spacing_x", "spacing_y"]);
+    let work = check(MAIN, &[ToolSettings::Config("limit=\"work\",work=100".into())]);
+    assert!(!level(&work, "main.sp").unused.contains(&"safety_seconds".to_string()));
+    // a level before 0.4 lays out in rows
+    let old = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.3\") }\nR1 a 0 1k\n.end\n";
+    assert_eq!(check(old, &[]).levels[0].layout, "rows");
+}
+
+#[test]
+fn the_text_names_the_layout_first_and_leaves_out_what_it_does_not_use() {
+    let lines = rnl_cli::solve::check_lines(&check(MAIN, &[]));
+    let at = |title: &str| lines.iter().position(|l| l == &format!("level {title}:")).unwrap();
+    assert_eq!(lines[at("main.sp") + 1], "  layout=\"lines\" (default)");
+    assert!(lines[at("amp") + 1].starts_with("  layout=\"tree\" (level, "), "{lines:?}");
+    // amp's beam=6 and the header's spacing_x=2 are left out of its settings; beam is warned of
+    let amp: Vec<&String> = lines[at("amp") + 1..].iter().take_while(|l| l.starts_with("  ")).collect();
+    assert!(!amp.iter().any(|l| l.starts_with("  beam=") || l.starts_with("  spacing_x=")), "{amp:?}");
+    assert!(amp.iter().any(|l| l.starts_with("  warning: beam: beam is used only by the rows layout")), "{amp:?}");
+    assert!(amp.iter().any(|l| l.starts_with("  grid=")), "{amp:?}");
+}
+
+#[test]
 fn a_title_that_no_level_has_is_refused() {
     let options = SolveOptions { std: false, level: Some("none".into()), ..SolveOptions::default() };
     let e = check_settings(Some(Path::new("main.sp")), &files(MAIN), &options, &[]).unwrap_err();
@@ -231,9 +266,9 @@ mod command {
         assert_eq!(json["levels"][0]["title"], serde_json::Value::Null);
         assert_eq!(json["levels"][0]["errors"][0]["key"], "beam");
         assert_eq!(json["levels"][0]["settings"]["beam"], serde_json::json!({"value": 4, "from": "default"}));
-        let out = rnl(&["solve", "--check", "--solver-config", "beam=2"]);
+        let out = rnl(&["solve", "--check", "--solver-config", "grid=2"]);
         assert_eq!(out.status.code(), Some(0));
-        assert!(String::from_utf8_lossy(&out.stdout).contains("beam=2 (command-line)"));
+        assert!(String::from_utf8_lossy(&out.stdout).contains("grid=2 (command-line)"));
         for wrong in [
             &["solve", "--check", "-o", "out"][..],
             &["solve", "--check", "--in-place"],
@@ -251,11 +286,11 @@ mod command {
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let file = dir.join("t.sp");
-        let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @SOLVER-CONFIG(beam=6) }\nR1 a 0 1k\n.end\n";
+        let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @SOLVER-CONFIG(grid=2) }\nR1 a 0 1k\n.end\n";
         std::fs::write(&file, text).unwrap();
         let out = rnl(&["solve", &file.to_string_lossy(), "--check", "--no-std"]);
         assert_eq!(out.status.code(), Some(0), "{}", String::from_utf8_lossy(&out.stderr));
-        assert!(String::from_utf8_lossy(&out.stdout).contains("beam=6 (header, "));
+        assert!(String::from_utf8_lossy(&out.stdout).contains("grid=2 (header, "));
         assert_eq!(std::fs::read_to_string(&file).unwrap(), text);
         assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1);
     }

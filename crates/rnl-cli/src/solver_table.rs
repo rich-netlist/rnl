@@ -102,6 +102,95 @@ pub fn settings_table_json() -> Value {
     })
 }
 
+/// The layouts, as the table's `layout` setting lists them, its default first.
+pub fn layouts() -> Vec<&'static str> {
+    let t = rnl_solver::settings_table();
+    let row = t.settings.iter().find(|s| s.key == "layout").expect("the table has a layout setting");
+    let default = match &row.default {
+        Some(rnl_runtime::interp::obj::Lit::Str(s)) => s.as_str().to_string(),
+        _ => String::new(),
+    };
+    let mut out: Vec<&'static str> = row.choices.iter().map(|c| c.value).collect();
+    out.sort_by_key(|l| *l != default);
+    out
+}
+
+/// Whether a setting with the key `key` is used, the value of each setting being `value`: its
+/// row's `applies` and `shown_when` each hold for it, every key they name having one of the
+/// values listed. A key the table does not list is taken as used.
+pub fn used(key: &str, value: &dyn Fn(&str) -> Option<String>) -> bool {
+    let t = rnl_solver::settings_table();
+    let Some(row) = t.settings.iter().find(|s| s.key == key) else { return true };
+    [row.applies, row.shown_when]
+        .iter()
+        .all(|w| w.iter().all(|(k, values)| value(k).is_none_or(|v| values.contains(&v.as_str()))))
+}
+
+/// A setting's value as `applies` and `shown_when` name it: a string as it is, another as JSON.
+pub fn shown_value(value: &Value) -> String {
+    match value {
+        Value::String(s) => s.clone(),
+        other => other.to_string(),
+    }
+}
+
+/// The defaults of the solver that the layout `layout` uses, as RNL named parameters, its layout
+/// first: those of [`rnl_solver::SolverOptions::defaults_config`], without the ones the table says
+/// apply to other layouts or are shown only for other values of the defaults, such as
+/// `safety_seconds` under the default `limit`.
+pub fn defaults_for(layout: &str) -> String {
+    let defaults = rnl_runtime::solver_settings::parse_overrides(&rnl_solver::SolverOptions::defaults_config())
+        .unwrap_or_default();
+    let value = |key: &str| -> Option<String> {
+        if key == "layout" {
+            return Some(layout.to_string());
+        }
+        defaults.iter().find(|s| s.key == key).map(|s| shown_value(&crate::solve::setting_json(&s.value)))
+    };
+    let mut items = vec![format!("layout=\"{layout}\"")];
+    for s in defaults.iter().filter(|s| s.key != "layout" && used(&s.key, &value)) {
+        items.push(format!("{}={}", s.key, s.value.show()));
+    }
+    items.join(", ")
+}
+
+/// What `rnl solver-defaults` prints: for each layout, the default first, or for `layout` alone,
+/// a line of the defaults it uses ([`defaults_for`]).
+pub fn defaults_text(layout: Option<&str>) -> String {
+    match layout {
+        Some(layout) => defaults_for(layout),
+        None => layouts().into_iter().map(defaults_for).collect::<Vec<_>>().join(
+            "
+",
+        ),
+    }
+}
+
+/// The table as [`settings_table_json`] gives it, for `layout` alone when one is given: its
+/// settings, objectives and stages that apply to that layout, the order of the lines layout only
+/// for it, and `layout`, the layout it is for.
+pub fn settings_table_json_for(layout: Option<&str>) -> Value {
+    let mut t = settings_table_json();
+    let Some(layout) = layout else { return t };
+    let applies = |row: &Value| {
+        row.get("applies")
+            .and_then(|a| a.get("layout"))
+            .and_then(Value::as_array)
+            .is_none_or(|layouts| layouts.iter().any(|l| l == layout))
+    };
+    for list in ["settings", "objectives", "stages"] {
+        if let Some(rows) = t[list].as_array_mut() {
+            rows.retain(applies);
+        }
+    }
+    let map = t.as_object_mut().unwrap();
+    if layout != "lines" {
+        map.remove("lines_order");
+    }
+    map.insert("layout".into(), json!(layout));
+    t
+}
+
 /// A whole number as an integer, as a page reads it, and another as it is.
 fn number(n: f64) -> Value {
     crate::solve::setting_json(&rnl_runtime::interp::obj::Lit::Num(n))

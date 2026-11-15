@@ -55,9 +55,10 @@ solve options (the levels are read without their type=\"generated\" records; -o 
   --in-place          write them over the files read instead
   --solver-config S   0.4 settings, for example limit=\"time\",seconds=10 or limit=\"work\",work=100000
                       overrides file/package settings by key; run limits are tool-only
-  --check             only check the solver's settings, level by level, with where each comes from:
-                      the defaults, a package, the file's header, the level, the command line (14.10);
-                      nothing is solved or written, and FILE may be left out to check the command
+  --check             only check the solver's settings, level by level: the layout, then the settings
+                      that layout uses, each with where it comes from: the defaults, a package, the
+                      file's header, the level, the command line (14.10); a setting given that the
+                      layout ignores is a warning; nothing is solved or written, and FILE may be left out to check the command
                       line's settings alone; with --json, as JSON; exits with 1 on an error
   --progress          report 0.4 stages and consumed work on standard error
   --progress=json     report the solve on standard error as events, one JSON object per line
