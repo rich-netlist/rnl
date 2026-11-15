@@ -46,7 +46,7 @@ fn roles(version: &str) -> Roles {
     out
 }
 
-fn bound(member: &Member, names: &mut BTreeSet<String>) -> bool {
+pub(super) fn bound(member: &Member, names: &mut BTreeSet<String>) -> bool {
     let mut aliases = member
         .segments
         .iter()

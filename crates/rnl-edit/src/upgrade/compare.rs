@@ -524,6 +524,87 @@ fn explained(old: &str, new: &str) -> bool {
         || super::approximate::CONVERSIONS.iter().any(|(from, to)| *from == old && *to == new)
 }
 
+/// Whether the upgrade's own tables explain a symbol becoming another: a rename of the legacy
+/// tables, or a name of analog-canvas-extensions that the standard series 0.4 has.
+fn explained_symbol(old: &str, new: &str) -> bool {
+    let (old, new) = (old.trim_start_matches('$'), new.trim_start_matches('$'));
+    [super::legacy::renamed(old), super::legacy::renamed_03_symbol(old)].contains(&Some(new))
+        || super::canvas::TABLE.iter().any(|r| r.old == old && r.new == new && r.old != r.new)
+}
+
+/// Per level title, the objects whose text of the key `name` became one of the key `netname`, which
+/// the upgrade writes for a net-displaying usage: in the reading before, `X::name` is `X::netname`.
+fn netname_keys(before: &Interpretation, after: &Interpretation) -> BTreeMap<String, BTreeSet<String>> {
+    let texts = |read: &Interpretation, title: &str| -> BTreeSet<String> {
+        read.model
+            .levels
+            .iter()
+            .filter(|l| l.title == title)
+            .flat_map(|l| &l.texts)
+            .map(|t| t.object_id.clone())
+            .collect()
+    };
+    let mut out = BTreeMap::new();
+    for level in &after.model.levels {
+        let (old, new) = (texts(before, &level.title), texts(after, &level.title));
+        let owners: BTreeSet<String> = old
+            .iter()
+            .filter_map(|id| id.strip_suffix("::name"))
+            .filter(|o| new.contains(&format!("{o}::netname")) && !new.contains(&format!("{o}::name")))
+            .map(str::to_string)
+            .collect();
+        out.insert(level.title.clone(), owners);
+    }
+    out
+}
+
+/// The items of the reading before with each text of the key `name` that the upgrade renamed called
+/// by its new name, in the item and in what it says.
+fn renamed_keys(items: BTreeMap<Key, Value>, keys: &BTreeMap<String, BTreeSet<String>>) -> BTreeMap<Key, Value> {
+    items
+        .into_iter()
+        .map(|((file, level, category, item), value)| {
+            let Some(owners) = keys.get(&level).filter(|o| !o.is_empty()) else {
+                return ((file, level, category, item), value);
+            };
+            let (mut item, mut text) = (item, value.to_string());
+            for o in owners {
+                let (old, new) = (format!("{o}::name"), format!("{o}::netname"));
+                text = text.replace(&mark(&old), &mark(&new));
+                // the roles of a usage, written as Rust writes them, inside a JSON string
+                text = text.replace(&format!("\\\"{old}\\\""), &format!("\\\"{new}\\\""));
+                item = item.replace(&mark(&old), &mark(&new));
+                if item == old {
+                    item = new.clone();
+                } else if item == format!("{old}|{o}|name") {
+                    item = format!("{new}|{o}|netname");
+                }
+            }
+            let value = serde_json::from_str(&text).unwrap_or(value);
+            ((file, level, category, item), value)
+        })
+        .collect()
+}
+
+/// Per level title, the usages without a symbol that have a position of their own, free: 0.4 gives
+/// each usage a point, which draws nothing where no symbol is drawn.
+fn bare_usages(read: &Interpretation) -> BTreeMap<String, BTreeSet<String>> {
+    let mut out: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    for problem in &read.problems {
+        let names = identities(read, problem);
+        let free = |s: &Slot| matches!(s, Slot::Free);
+        for (index, object) in problem.objects.iter().enumerate() {
+            let bare = object.kind == ObjectKind::Usage
+                && object.symbol.is_none()
+                && matches!(&object.position, Position::Own { x, y } if free(x) && free(y));
+            if bare {
+                out.entry(problem.title.clone()).or_default().insert(names[index].clone());
+            }
+        }
+    }
+    out
+}
+
 /// The identities of the named usages whose definition the upgrade changed on purpose, per level
 /// title: a legacy rename, or a conversion of an approximate rule (`$IO_PORT` into `$NET_LABEL`,
 /// which has no pin and no `name` key). What changes with them (their texts, the ROUTEs and wires
@@ -783,7 +864,9 @@ pub(super) fn compare(
     let added = defaults(before, after);
     let rules = converted(before, after);
     let package = package_texts(before, after);
-    let mut before = snapshot(before, &added).items;
+    let keys = netname_keys(before, after);
+    let bare = bare_usages(after);
+    let mut before = renamed_keys(snapshot(before, &added).items, &keys);
     let after = snapshot(after, &added).items;
     let mut differences = Vec::new();
     let mut look = Vec::new();
@@ -794,18 +877,33 @@ pub(super) fn compare(
         let default = added.get(&level);
         let only_look = match &old {
             Some(old) => {
-                old != &value && {
-                    let (mut a, mut b) = (without_look(&category, old), without_look(&category, &value));
-                    // A symbol of the package that one side does not draw has no geometry to compare.
-                    if category == "objects"
-                        && (a["geometry"].is_null() || b["geometry"].is_null())
-                        && a["standard_symbol"] == Value::Bool(true)
-                    {
-                        a["geometry"] = Value::Null;
-                        b["geometry"] = Value::Null;
+                old != &value
+                    && {
+                        let (mut a, mut b) = (without_look(&category, old), without_look(&category, &value));
+                        // A symbol of the package that one side does not draw has no geometry to compare.
+                        if category == "objects"
+                            && (a["geometry"].is_null() || b["geometry"].is_null())
+                            && a["standard_symbol"] == Value::Bool(true)
+                        {
+                            a["geometry"] = Value::Null;
+                            b["geometry"] = Value::Null;
+                        }
+                        // A symbol of a package that the upgrade's tables rename to another of a package
+                        // is drawn otherwise in its outline, its box included; its pins stay compared.
+                        if category == "objects"
+                            && a["standard_symbol"] == Value::Bool(true)
+                            && b["standard_symbol"] == Value::Bool(true)
+                            && matches!((a["symbol"].as_str(), b["symbol"].as_str()), (Some(o), Some(n)) if explained_symbol(o, n))
+                        {
+                            for side in [&mut a, &mut b] {
+                                side["symbol"] = Value::Null;
+                                if let Some(geometry) = side.get_mut("geometry").and_then(Value::as_object_mut) {
+                                    geometry.remove("box");
+                                }
+                            }
+                        }
+                        a == b
                     }
-                    a == b
-                }
             }
             None => false,
         };
@@ -820,7 +918,10 @@ pub(super) fn compare(
             });
         let fill = default.is_some_and(|d| is_fill(d, &category, &item, &value))
             || old.as_ref().is_some_and(|old| is_fill(default.unwrap_or(&no_ids), &category, &item, old));
-        let only_look = only_look || package_text || fill;
+        // the free point of its own that 0.4 gives a usage without a symbol, which draws nothing
+        let bare_point =
+            old.is_none() && category == "positions" && bare.get(&level).is_some_and(|ids| ids.contains(&item));
+        let only_look = only_look || package_text || fill || bare_point;
         let ids = rules.get(&level).unwrap_or(&no_ids);
         // The upgrade writes a default that 0.3 had by itself (`@ATTACH(gap=2)`) as a parameter,
         // so that the drawing stays: the object is the same but for parameters it did not list.

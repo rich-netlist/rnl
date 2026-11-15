@@ -4,6 +4,7 @@
 //! any output is prepared. Target diagnostics and semantic differences remain in the report.
 
 mod approximate;
+pub mod canvas;
 mod collections;
 mod compare;
 mod directions;
@@ -301,6 +302,11 @@ pub fn upgrade(entry: &str, files: &dyn Provider, options: &UpgradeOptions) -> R
         if !owned_packages.contains(old_name) {
             standard_names.insert(old_name.into());
         }
+    }
+    // analog-canvas-extensions given by a path to the published file is the published package, whose
+    // version for 0.4 the upgrade names; it is not a package of the file group to upgrade with it
+    if canvas::recognized(&before) {
+        standard_names.insert(canvas::PACKAGE.into());
     }
     let mut source_records: BTreeMap<String, Vec<Record>> = BTreeMap::new();
     let mut versions: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();

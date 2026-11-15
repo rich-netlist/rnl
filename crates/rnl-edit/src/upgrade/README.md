@@ -49,7 +49,9 @@ Sections refer to RNL 0.4. Standard package changes refer to the bundled series 
 | Spectre transformer default terminal names | Verified default host names become stable terminal positions | Context | 6.12 |
 | Numeric DEVICE/port names | Resolve host port positions; report invalid numeric/repeated DEVICE names | Context | 6.4, 6.12 |
 | Series 0.2/0.3 renamed symbols and definitions, and merged packages | Provenance-checked target names (`$MIRRORED` and `$MIRROR_PAIR` of 0.2 → `$MIRRORED_LAYOUT`, `$FLOW` → `$SIGNAL_FLOW`, `$OPAMP_5TERM` → `$OPAMP`, `$COMPARATOR_5TERM` → `$COMPARATOR`, 2-terminal controlled sources, `$CURRENT_ARROW_SYMBOL` → `$ARROW_SYMBOL`, `$ADDER`/`$MULTIPLIER` → `$*_SYMBOL`, `$DELAY_CELL_SYMBOL` → `$DELAY_CELL`) with explicit terminal maps, destination packages, and `MX` orientation composition on series 0.2 `$OPAMP`; report removed names | Context | Standard series |
-| Standard net-part text key `name` | `netname` on bundled `$GROUND`, `$SUPPLY` and `$IO_PORT` usages (`label` for `$TRANSCONDUCTOR` `formula`) | Context | Standard series, 13.3 |
+| Standard net-part text key `name` | `netname` on bundled `$GROUND`, `$SUPPLY` and `$IO_PORT` usages (`label` for `$TRANSCONDUCTOR` `formula`), also in references to the text such as `%port1::name(label)` (rule `standard-text-key`) | Context | Standard series, 13.3 |
+| `analog-canvas-extensions` 0.1–0.6 | USE-PACKAGE of the published 0.7, without `path=` (rule `canvas-package`); symbols the standard series has take its names and package (rule `canvas-name`), with an explicit terminal map on instances (rule `canvas-terminal-map`); see [the table](#analog-canvas-extensions) | Context | Standard series, 9.2.4 |
+| `analog-canvas-extensions` by `path=` with other bytes than the published version, or names the file defines itself | Retain and report (`canvas-package-changed`); a name the file defines is left alone | Context | 2.8, 16.2 |
 | Own TEXT with key `name`, `value` or `model` in a file that uses `rnl-std-no-labels` | Add `textvisible=true` outside symbol bodies: the 0.4 package hides labels with the style `textvisible=false`, which a later TEXT keeps unless it writes `true` (rule `no-labels-shown`) | Context | Standard series, 9.3, 13.3 |
 | Standard drawing-only role p | at for the matching standard definition | Mechanical | Standard series |
 | Standard role names with underscores | Their matching definition's current role names | Context | Standard series |
@@ -65,6 +67,75 @@ Sections refer to RNL 0.4. Standard package changes refer to the bundled series 
 | New assertion violations or changed default fill | Report every target diagnostic and semantic difference | Verification | 7.6, 15.2-15.4 |
 
 Additive language features (TABLE, orientation lists, assertions, solver settings, pin orientation, text rotation and math) require no rewrite unless an old spelling gains different meaning. Clarifications still participate in validation. Do not alter host netlist lines to hide a difference.
+
+## Analog canvas extensions
+
+A file of the language 0.3 that uses the package `analog-canvas-extensions` of a published version, 0.1 to 0.6, is known by the name and the version alone. Only when it gives the package by `path=` are the bytes of that file compared with the published version (SHA-256); a file that differs is the file's own and is left alone with the reason `canvas-package-changed`. The upgraded file uses the published 0.7, the version of the package for the language 0.4, and the `path=` is dropped with a notice. A name of the table that the file or its own package defines is the file's and keeps its meaning.
+
+The pins of the earlier versions bind terminal numbers; those of the standard symbols and of 0.7 bind terminal names. An instance drawn with a symbol of the table gets `@SET-SYMBOL(terminals=[...])` with the map below, so that each terminal keeps its pin. A terminal that a symbol never drew keeps no pin (the controlled sources and `$CANVAS_CROSSED` draw two of four). The 4-terminal MOS symbols follow the standard 0.4 rule for the bulk pin, as other files do. The text key `name` of `$CANVAS_PORT_FILLED` is `netname`, as on the standard ports.
+
+The table is generated from `canvas::TABLE`; a test keeps the two the same (`RNL_BLESS=1` rewrites it).
+
+<!-- canvas-table:begin -->
+| 0.1–0.6 | 0.4 | Package | Terminals |
+|---|---|---|---|
+| `$CANVAS_AMMETER` | `$AMMETER` | rnl-std-basic | 1→p, 2→n |
+| `$CANVAS_CRYSTAL` | `$CRYSTAL` | rnl-std-basic | 1→n1, 2→n2 |
+| `$CANVAS_LED` | `$LED` | rnl-std-semiconductors | 1→a, 2→k |
+| `$CANVAS_MICROPHONE` | `$MICROPHONE` | rnl-std-basic | 1→p, 2→n |
+| `$CANVAS_PHOTORESISTOR` | `$PHOTORESISTOR` | rnl-std-basic | 1→p, 2→n |
+| `$CANVAS_POLARIZED_CAPACITOR` | `$POLARIZED_CAPACITOR` | rnl-std-basic | 1→p, 2→n |
+| `$CANVAS_POTENTIOMETER` | `$POTENTIOMETER` | rnl-std-basic | 1→n1, 2→nw, 3→n2 |
+| `$CANVAS_PULSE_VOLTAGE_SOURCE` | `$PULSE_VOLTAGE_SOURCE` | rnl-std-basic | 1→p, 2→n |
+| `$CANVAS_PUT` | `$PUT` | rnl-std-semiconductors | 1→a, 2→g, 3→k |
+| `$CANVAS_SCHOTTKY_DIODE` | `$SCHOTTKY_DIODE` | rnl-std-semiconductors | 1→a, 2→k |
+| `$CANVAS_SHOCKLEY_DIODE` | `$SHOCKLEY_DIODE` | rnl-std-semiconductors | 1→a, 2→k |
+| `$CANVAS_SINE_VOLTAGE_SOURCE` | `$SINE_VOLTAGE_SOURCE` | rnl-std-basic | 1→p, 2→n |
+| `$CANVAS_SPEAKER` | `$SPEAKER` | rnl-std-basic | 1→p, 2→n |
+| `$CANVAS_UJT` | `$UJT` | rnl-std-semiconductors | 1→e, 2→b1, 3→b2 |
+| `$CANVAS_CHOPPER` | `$CHOPPER_SYMBOL` | rnl-std-functional | 1→inp, 2→inn, 3→outp, 4→outn |
+| `$CANVAS_OPAMP_DIFFERENTIAL_CROSSED` | `$DIFFERENTIAL_OPAMP_TWISTED` | rnl-std-functional | 1→inp, 2→inn, 3→outp, 4→outn |
+| `$CANVAS_VCVS_DIAMOND` | `$CONTROLLED_VOLTAGE_SOURCE` | rnl-std-basic | 1→p, 2→n |
+| `$CANVAS_CCVS_DIAMOND` | `$CONTROLLED_VOLTAGE_SOURCE` | rnl-std-basic | 1→p, 2→n |
+| `$CANVAS_VCCS_DIAMOND` | `$CONTROLLED_CURRENT_SOURCE` | rnl-std-basic | 1→p, 2→n |
+| `$CANVAS_CCCS_DIAMOND` | `$CONTROLLED_CURRENT_SOURCE` | rnl-std-basic | 1→p, 2→n |
+| `$CANVAS_CURRENT_SOURCE_DIAMOND` | `$CONTROLLED_CURRENT_SOURCE` | rnl-std-basic | 1→p, 2→n |
+| `$CANVAS_VCVS_CIRCLE` | `$VOLTAGE_SOURCE` | rnl-std-basic | 1→p, 2→n |
+| `$CANVAS_CCVS_CIRCLE` | `$VOLTAGE_SOURCE` | rnl-std-basic | 1→p, 2→n |
+| `$CANVAS_VCCS_CIRCLE` | `$CURRENT_SOURCE` | rnl-std-basic | 1→p, 2→n |
+| `$CANVAS_CCCS_CIRCLE` | `$CURRENT_SOURCE` | rnl-std-basic | 1→p, 2→n |
+| `$CANVAS_OPAMP_LETTERED` | `$CANVAS_OPAMP_LETTERED` | analog-canvas-extensions 0.7 | 1→inp, 2→inn, 5→out |
+| `$CANVAS_OPAMP_WIDE` | `$CANVAS_OPAMP_WIDE` | analog-canvas-extensions 0.7 | 1→inp, 2→inn, 5→out |
+| `$CANVAS_OPAMP_WIDE_LETTERED` | `$CANVAS_OPAMP_WIDE_LETTERED` | analog-canvas-extensions 0.7 | 1→inp, 2→inn, 5→out |
+| `$CANVAS_COMPARATOR_UNMARKED` | `$CANVAS_COMPARATOR_UNMARKED` | analog-canvas-extensions 0.7 | 1→inp, 2→inn, 3→out |
+| `$CANVAS_OPAMP_DIFFERENTIAL_LETTERED` | `$CANVAS_OPAMP_DIFFERENTIAL_LETTERED` | analog-canvas-extensions 0.7 | 1→inp, 2→inn, 3→outp, 4→outn |
+| `$CANVAS_OPAMP_DIFFERENTIAL_CROSSED_LETTERED` | `$CANVAS_OPAMP_DIFFERENTIAL_CROSSED_LETTERED` | analog-canvas-extensions 0.7 | 1→inp, 2→inn, 3→outp, 4→outn |
+| `$CANVAS_OPAMP_DIFFERENTIAL_WIDE` | `$CANVAS_OPAMP_DIFFERENTIAL_WIDE` | analog-canvas-extensions 0.7 | 1→inp, 2→inn, 3→outp, 4→outn |
+| `$CANVAS_OPAMP_DIFFERENTIAL_WIDE_CROSSED` | `$CANVAS_OPAMP_DIFFERENTIAL_WIDE_CROSSED` | analog-canvas-extensions 0.7 | 1→inp, 2→inn, 3→outp, 4→outn |
+| `$CANVAS_OPAMP_DIFFERENTIAL_WIDE_LETTERED` | `$CANVAS_OPAMP_DIFFERENTIAL_WIDE_LETTERED` | analog-canvas-extensions 0.7 | 1→inp, 2→inn, 3→outp, 4→outn |
+| `$CANVAS_OPAMP_DIFFERENTIAL_WIDE_CROSSED_LETTERED` | `$CANVAS_OPAMP_DIFFERENTIAL_WIDE_CROSSED_LETTERED` | analog-canvas-extensions 0.7 | 1→inp, 2→inn, 3→outp, 4→outn |
+| `$CANVAS_VOLTAGE_AMPLIFIER_LETTERED` | `$CANVAS_VOLTAGE_AMPLIFIER_LETTERED` | analog-canvas-extensions 0.7 | 1→in, 2→out |
+| `$CANVAS_INDUCTOR_LARGE` | `$CANVAS_INDUCTOR_LARGE` | analog-canvas-extensions 0.7 | 1→p, 2→n |
+| `$CANVAS_SIMPLE_SWITCH` | `$CANVAS_SIMPLE_SWITCH` | analog-canvas-extensions 0.7 | 1→p, 2→n |
+| `$CANVAS_SIMPLE_SPDT_SWITCH` | `$CANVAS_SIMPLE_SPDT_SWITCH` | analog-canvas-extensions 0.7 | as before |
+| `$CANVAS_PORT_FILLED` | `$CANVAS_PORT_FILLED` | analog-canvas-extensions 0.7 | as before |
+| `$CANVAS_AND_4INPUT` | `$CANVAS_AND_4INPUT` | analog-canvas-extensions 0.7 | 1→a, 2→b, 3→c, 4→d, 5→y |
+| `$CANVAS_NAND_4INPUT` | `$CANVAS_NAND_4INPUT` | analog-canvas-extensions 0.7 | 1→a, 2→b, 3→c, 4→d, 5→y |
+| `$CANVAS_OR_4INPUT` | `$CANVAS_OR_4INPUT` | analog-canvas-extensions 0.7 | 1→a, 2→b, 3→c, 4→d, 5→y |
+| `$CANVAS_NOR_4INPUT` | `$CANVAS_NOR_4INPUT` | analog-canvas-extensions 0.7 | 1→a, 2→b, 3→c, 4→d, 5→y |
+| `$CANVAS_XOR_4INPUT` | `$CANVAS_XOR_4INPUT` | analog-canvas-extensions 0.7 | 1→a, 2→b, 3→c, 4→d, 5→y |
+| `$CANVAS_XNOR_4INPUT` | `$CANVAS_XNOR_4INPUT` | analog-canvas-extensions 0.7 | 1→a, 2→b, 3→c, 4→d, 5→y |
+| `$CANVAS_NAME` | `$CANVAS_NAME` | analog-canvas-extensions 0.7 | as before |
+| `$CANVAS_LABEL` | `$CANVAS_LABEL` | analog-canvas-extensions 0.7 | as before |
+| `$CANVAS_TYPESETTING` | `$CANVAS_TYPESETTING` | analog-canvas-extensions 0.7 | as before |
+| `$CANVAS_PARAMETER_TEXT` | `$CANVAS_PARAMETER_TEXT` | analog-canvas-extensions 0.7 | as before |
+| `$CANVAS_TYPOGRAPHY` | `$CANVAS_TYPOGRAPHY` | analog-canvas-extensions 0.7 | as before |
+| `$CANVAS_PARAMETER` | `$CANVAS_PARAMETER` | analog-canvas-extensions 0.7 | as before |
+| `$CANVAS_UNNAMED` | `$CANVAS_UNNAMED` | analog-canvas-extensions 0.7 | as before |
+| `$CANVAS_VARIANT` | `$CANVAS_VARIANT` | analog-canvas-extensions 0.7 | as before |
+| `$CANVAS_CELL_NAME` | `$CANVAS_CELL_NAME` | analog-canvas-extensions 0.7 | as before |
+| `$CANVAS_TOP` | `$CANVAS_TOP` | analog-canvas-extensions 0.7 | as before |
+<!-- canvas-table:end -->
 
 ## Solver records
 
@@ -92,3 +163,5 @@ The comparison pairs items by identity, not by index. An object is known by its 
 - `default_look_changes`: style, label place and turning, the offset of a symbol-given label, the symbol drawing of the standard package, and what a rule of the package made in either reading (the default fill: junction dots, grounds and stubs, default labels). Not counted.
 - `rule_changes`: what a conversion rule of the upgrade does on purpose, today `$IO_PORT` becoming `$NET_LABEL`. Not counted; the rule is in the changes of the file.
 - `discarded_placements`: with the default (without `--keep-generated`) the records of the solver are discarded; per level, how many facts only they gave. Not counted: `needs_solve` asks for the new solve that makes them again.
+
+A symbol that a rule of the upgrade renames (a legacy standard name or a row of the canvas table) is the same symbol on both sides when its pins keep their places, so only its name and drawing box are left out of the comparison of the object. A text whose key changes from `name` to `netname` is paired by the new key on both sides, as are the references to it. The free point that a symbol-less usage gains in 0.4 is default look.
