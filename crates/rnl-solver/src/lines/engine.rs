@@ -196,7 +196,7 @@ pub(crate) fn lay_out(
         Ok(made) => made,
         Err(why) => return fallback(laid, notes, why, work),
     };
-    let Made { made, routed, groups, aligned, mine, lists } = made;
+    let Made { made, routed, groups, aligned, mine, lists, kept } = made;
     if mine.annotation_cost > theirs.annotation_cost {
         notes.push(format!(
             "lines: annotation overlaps and wire intersections {:?}, previously {:?}",
@@ -219,6 +219,18 @@ pub(crate) fn lay_out(
             names(&made.placed, &made.routing),
             names(&laid.placed, &laid.routing)
         ));
+    }
+    // a round kept with wires that could not keep their gaps may read as joined where it is not
+    // (`score::false_joins`): it is not taken with more such joins than the group-tree layout's
+    if kept {
+        let joins = entry(problem, s, &made.placed, &made.routing, &before.code).misleading;
+        if joins > laid.entry.misleading {
+            let why = format!(
+                "the round kept reads as joined where it is not in {joins} places, the group-tree layout's in {}",
+                laid.entry.misleading
+            );
+            return fallback(laid, notes, why, work);
+        }
     }
     if mine.interrupted || mine > theirs {
         return fallback(
@@ -271,6 +283,9 @@ struct Made {
     aligned: Vec<(usize, (usize, usize))>,
     mine: LabOrder,
     lists: Vec<Option<Item>>,
+    /// a round's drawing whose wires could not all keep their gaps, taken when the budget stopped the
+    /// next round (`previous`)
+    kept: bool,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -287,13 +302,30 @@ fn attempt(
 ) -> Result<Made, String> {
     let mut clear: BTreeMap<usize, u8> = BTreeMap::new();
     let mut taken: Option<settle::Taken> = None;
+    // the drawing of the last round, whose wires could not all keep their gaps, and the round: kept
+    // when the budget stops the next one before it is done (`previous`)
+    let mut last: Option<(Made, usize)> = None;
     for attempt in 0..ROUNDS {
         if crate::budget::stopped() {
-            return Err("budget exhausted before another routing round".into());
+            return previous(last, notes, "budget exhausted before another routing round".into());
         }
         let span = crate::profile::span("lines", "settle");
-        let settled =
-            settle::settle(problem, s, placed, arrangement, others, options, &clear, taken.as_ref(), work, stop)?;
+        let settled = match settle::settle(
+            problem,
+            s,
+            placed,
+            arrangement,
+            others,
+            options,
+            &clear,
+            taken.as_ref(),
+            work,
+            stop,
+        ) {
+            Ok(settled) => settled,
+            Err(why) if crate::budget::stopped() => return previous(last, notes, why),
+            Err(why) => return Err(why),
+        };
         drop(span);
         if attempt == 0 {
             notes.extend(settled.notes.iter().cloned());
@@ -320,16 +352,20 @@ fn attempt(
             routed.expansions
         ));
         let _ = (placed, routing);
-        let made = made.ok_or_else(|| "the settled level has no completed compaction".to_string())?;
+        let Some(made) = made else {
+            let why = "the settled level has no completed compaction".to_string();
+            return if crate::budget::stopped() { previous(last, notes, why) } else { Err(why) };
+        };
         notes.extend(made.notes.iter().map(|n| format!("lines, round {attempt}: {n}")));
         if made.failed {
-            return Err(format!(
-                "a pass of the coordinates found no solution{}",
-                facts_said(problem, &made.failed_facts)
-            ));
+            let why = format!("a pass of the coordinates found no solution{}", facts_said(problem, &made.failed_facts));
+            return if crate::budget::stopped() { previous(last, notes, why) } else { Err(why) };
+        }
+        if quality.interrupted && crate::budget::stopped() && last.is_some() {
+            return previous(last, notes, format!("budget exhausted in routing round {attempt}"));
         }
         if made.conflicts.is_empty() {
-            return Ok(Made { made, routed, groups, aligned, mine: quality, lists });
+            return Ok(Made { made, routed, groups, aligned, mine: quality, lists, kept: false });
         }
         if attempt + 1 == ROUNDS {
             return Err(format!("{} wires cannot keep their gaps where they run", made.conflicts.len()));
@@ -353,8 +389,20 @@ fn attempt(
                 made.conflicts.len()
             ));
         }
+        last = Some((Made { made, routed, groups, aligned, mine: quality, lists, kept: true }, attempt));
     }
     Err("no round kept every gap".to_string())
+}
+
+/// When the budget stops a routing round: the drawing of the round before, whose wires could not
+/// all keep their gaps, with a note of them; `why` the round stopped when there is none.
+fn previous(last: Option<(Made, usize)>, notes: &mut Vec<String>, why: String) -> Result<Made, String> {
+    let Some((made, round)) = last else { return Err(why) };
+    notes.push(format!(
+        "lines: {why}; the drawing of round {round} is taken, {} wires of it not keeping their gaps",
+        made.made.conflicts.len()
+    ));
+    Ok(made)
 }
 
 fn facts_said(problem: &LevelProblem, facts: &[usize]) -> String {
