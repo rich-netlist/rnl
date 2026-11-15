@@ -681,6 +681,7 @@
           {
             "id": "#M1::name",
             "attach": "#M1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -714,6 +715,7 @@
           {
             "id": "#M1::model",
             "attach": "#M1",
+            "attach_point": null,
             "key": "model",
             "markup": {
               "value": "${model}",
@@ -747,6 +749,7 @@
           {
             "id": "#M2::name",
             "attach": "#M2",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -780,6 +783,7 @@
           {
             "id": "#M2::model",
             "attach": "#M2",
+            "attach_point": null,
             "key": "model",
             "markup": {
               "value": "${model}",

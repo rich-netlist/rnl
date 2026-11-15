@@ -1673,6 +1673,7 @@
           {
             "id": "#M1::note",
             "attach": "#M1",
+            "attach_point": null,
             "key": "note",
             "markup": {
               "value": "drain?",
@@ -1706,6 +1707,7 @@
           {
             "id": "#C1::c",
             "attach": "#C1",
+            "attach_point": null,
             "key": "c",
             "markup": {
               "value": "ok",
@@ -1739,6 +1741,7 @@
           {
             "id": "#M1::name",
             "attach": "#M1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -1772,6 +1775,7 @@
           {
             "id": "#R1::name",
             "attach": "#R1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -1805,6 +1809,7 @@
           {
             "id": "#R1::value",
             "attach": "#R1",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -1838,6 +1843,7 @@
           {
             "id": "#R2::name",
             "attach": "#R2",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -1871,6 +1877,7 @@
           {
             "id": "#R2::value",
             "attach": "#R2",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -1904,6 +1911,7 @@
           {
             "id": "#C1::name",
             "attach": "#C1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -1937,6 +1945,7 @@
           {
             "id": "#C1::value",
             "attach": "#C1",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -1970,6 +1979,7 @@
           {
             "id": "#X1::name",
             "attach": "#X1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -2003,6 +2013,7 @@
           {
             "id": "#X1::model",
             "attach": "#X1",
+            "attach_point": null,
             "key": "model",
             "markup": {
               "value": "${model}",
@@ -2036,6 +2047,7 @@
           {
             "id": "@rnl-std-basic.rnl:672:9#1::netname",
             "attach": "@rnl-std-basic.rnl:672:9#1",
+            "attach_point": null,
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -2069,6 +2081,7 @@
           {
             "id": "@rnl-std-basic.rnl:672:9#2::netname",
             "attach": "@rnl-std-basic.rnl:672:9#2",
+            "attach_point": null,
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -2102,6 +2115,7 @@
           {
             "id": "@rnl-std-basic.rnl:672:9#3::netname",
             "attach": "@rnl-std-basic.rnl:672:9#3",
+            "attach_point": null,
             "key": "netname",
             "markup": {
               "value": "${p}",

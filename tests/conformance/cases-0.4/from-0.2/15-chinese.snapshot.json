@@ -3308,6 +3308,7 @@
           {
             "id": "#M1::wl",
             "attach": "#M1",
+            "attach_point": null,
             "key": "wl",
             "markup": {
               "value": "W/L = ${w}/${l}",
@@ -3351,6 +3352,10 @@
           {
             "id": "%title",
             "attach": null,
+            "attach_point": [
+              -28.0,
+              18.0
+            ],
             "key": null,
             "markup": {
               "value": "五管 OTA：偏置由 R1、R2、R3 分压给出",
@@ -3386,6 +3391,7 @@
           {
             "id": "#M1::name",
             "attach": "#M1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3429,6 +3435,7 @@
           {
             "id": "#M2::name",
             "attach": "#M2",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3472,6 +3479,7 @@
           {
             "id": "#M3::name",
             "attach": "#M3",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3505,6 +3513,7 @@
           {
             "id": "#M4::name",
             "attach": "#M4",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3538,6 +3547,7 @@
           {
             "id": "#M5::name",
             "attach": "#M5",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3571,6 +3581,7 @@
           {
             "id": "#R1::name",
             "attach": "#R1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3607,6 +3618,7 @@
           {
             "id": "#R1::value",
             "attach": "#R1",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -3643,6 +3655,7 @@
           {
             "id": "#R2::name",
             "attach": "#R2",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3679,6 +3692,7 @@
           {
             "id": "#R2::value",
             "attach": "#R2",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -3715,6 +3729,7 @@
           {
             "id": "#R3::name",
             "attach": "#R3",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3751,6 +3766,7 @@
           {
             "id": "#R3::value",
             "attach": "#R3",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -3787,6 +3803,7 @@
           {
             "id": "#CL::name",
             "attach": "#CL",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3820,6 +3837,7 @@
           {
             "id": "#CL::value",
             "attach": "#CL",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -3853,6 +3871,7 @@
           {
             "id": "%po::netname",
             "attach": "%po",
+            "attach_point": null,
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -3886,6 +3905,7 @@
           {
             "id": "%pi::netname",
             "attach": "%pi",
+            "attach_point": null,
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -3919,6 +3939,7 @@
           {
             "id": "%pn::netname",
             "attach": "%pn",
+            "attach_point": null,
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -3952,6 +3973,7 @@
           {
             "id": "%g0::netname",
             "attach": "%g0",
+            "attach_point": null,
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -3986,6 +4008,7 @@
           {
             "id": "@rnl-std-basic.rnl:638:9::netname",
             "attach": "@rnl-std-basic.rnl:638:9",
+            "attach_point": null,
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -4020,6 +4043,7 @@
           {
             "id": "%gm5::netname",
             "attach": "%gm5",
+            "attach_point": null,
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -4054,6 +4078,7 @@
           {
             "id": "%sm3::netname",
             "attach": "%sm3",
+            "attach_point": null,
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -4088,6 +4113,7 @@
           {
             "id": "%sm4::netname",
             "attach": "%sm4",
+            "attach_point": null,
             "key": "netname",
             "markup": {
               "value": "${p}",
@@ -4122,6 +4148,7 @@
           {
             "id": "%sr1::netname",
             "attach": "%sr1",
+            "attach_point": null,
             "key": "netname",
             "markup": {
               "value": "${p}",

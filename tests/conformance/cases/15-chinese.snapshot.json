@@ -3085,6 +3085,7 @@
           {
             "id": "#M1::wl",
             "attach": "#M1",
+            "attach_point": null,
             "key": "wl",
             "markup": {
               "value": "W/L = ${w}/${l}",
@@ -3125,6 +3126,10 @@
           {
             "id": "%title",
             "attach": null,
+            "attach_point": [
+              -28.0,
+              18.0
+            ],
             "key": null,
             "markup": {
               "value": "五管 OTA：偏置由 R1、R2、R3 分压给出",
@@ -3160,6 +3165,7 @@
           {
             "id": "#M1::name",
             "attach": "#M1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3200,6 +3206,7 @@
           {
             "id": "#M1::model",
             "attach": "#M1",
+            "attach_point": null,
             "key": "model",
             "markup": {
               "value": "${model}",
@@ -3240,6 +3247,7 @@
           {
             "id": "#M2::name",
             "attach": "#M2",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3280,6 +3288,7 @@
           {
             "id": "#M2::model",
             "attach": "#M2",
+            "attach_point": null,
             "key": "model",
             "markup": {
               "value": "${model}",
@@ -3320,6 +3329,7 @@
           {
             "id": "#M3::name",
             "attach": "#M3",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3353,6 +3363,7 @@
           {
             "id": "#M3::model",
             "attach": "#M3",
+            "attach_point": null,
             "key": "model",
             "markup": {
               "value": "${model}",
@@ -3386,6 +3397,7 @@
           {
             "id": "#M4::name",
             "attach": "#M4",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3419,6 +3431,7 @@
           {
             "id": "#M4::model",
             "attach": "#M4",
+            "attach_point": null,
             "key": "model",
             "markup": {
               "value": "${model}",
@@ -3452,6 +3465,7 @@
           {
             "id": "#M5::name",
             "attach": "#M5",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3485,6 +3499,7 @@
           {
             "id": "#M5::model",
             "attach": "#M5",
+            "attach_point": null,
             "key": "model",
             "markup": {
               "value": "${model}",
@@ -3518,6 +3533,7 @@
           {
             "id": "#R1::name",
             "attach": "#R1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3554,6 +3570,7 @@
           {
             "id": "#R1::value",
             "attach": "#R1",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -3590,6 +3607,7 @@
           {
             "id": "#R2::name",
             "attach": "#R2",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3626,6 +3644,7 @@
           {
             "id": "#R2::value",
             "attach": "#R2",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -3662,6 +3681,7 @@
           {
             "id": "#R3::name",
             "attach": "#R3",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3698,6 +3718,7 @@
           {
             "id": "#R3::value",
             "attach": "#R3",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -3734,6 +3755,7 @@
           {
             "id": "#CL::name",
             "attach": "#CL",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3767,6 +3789,7 @@
           {
             "id": "#CL::value",
             "attach": "#CL",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -3800,6 +3823,7 @@
           {
             "id": "%po::name",
             "attach": "%po",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${p}",
@@ -3833,6 +3857,7 @@
           {
             "id": "%pi::name",
             "attach": "%pi",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${p}",
@@ -3866,6 +3891,7 @@
           {
             "id": "%pn::name",
             "attach": "%pn",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${p}",
@@ -3899,6 +3925,7 @@
           {
             "id": "@rnl-std-virtual.rnl:58:9#1::name",
             "attach": "@rnl-std-virtual.rnl:58:9#1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${p}",
@@ -3932,6 +3959,7 @@
           {
             "id": "@rnl-std-virtual.rnl:58:9#2::name",
             "attach": "@rnl-std-virtual.rnl:58:9#2",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${p}",
@@ -3965,6 +3993,7 @@
           {
             "id": "@rnl-std-virtual.rnl:58:9#3::name",
             "attach": "@rnl-std-virtual.rnl:58:9#3",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${p}",

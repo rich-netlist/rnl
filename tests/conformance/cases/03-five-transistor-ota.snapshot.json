@@ -3413,6 +3413,7 @@
           {
             "id": "#M1::name",
             "attach": "#M1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3453,6 +3454,7 @@
           {
             "id": "#M1::model",
             "attach": "#M1",
+            "attach_point": null,
             "key": "model",
             "markup": {
               "value": "${model}",
@@ -3493,6 +3495,7 @@
           {
             "id": "#M2::name",
             "attach": "#M2",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3533,6 +3536,7 @@
           {
             "id": "#M2::model",
             "attach": "#M2",
+            "attach_point": null,
             "key": "model",
             "markup": {
               "value": "${model}",
@@ -3573,6 +3577,7 @@
           {
             "id": "#M3::name",
             "attach": "#M3",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3606,6 +3611,7 @@
           {
             "id": "#M3::model",
             "attach": "#M3",
+            "attach_point": null,
             "key": "model",
             "markup": {
               "value": "${model}",
@@ -3639,6 +3645,7 @@
           {
             "id": "#M4::name",
             "attach": "#M4",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3672,6 +3679,7 @@
           {
             "id": "#M4::model",
             "attach": "#M4",
+            "attach_point": null,
             "key": "model",
             "markup": {
               "value": "${model}",
@@ -3705,6 +3713,7 @@
           {
             "id": "#M5::name",
             "attach": "#M5",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3738,6 +3747,7 @@
           {
             "id": "#M5::model",
             "attach": "#M5",
+            "attach_point": null,
             "key": "model",
             "markup": {
               "value": "${model}",
@@ -3771,6 +3781,7 @@
           {
             "id": "#M6::name",
             "attach": "#M6",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3804,6 +3815,7 @@
           {
             "id": "#M6::model",
             "attach": "#M6",
+            "attach_point": null,
             "key": "model",
             "markup": {
               "value": "${model}",
@@ -3837,6 +3849,7 @@
           {
             "id": "#Ib::name",
             "attach": "#Ib",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3870,6 +3883,7 @@
           {
             "id": "#Ib::value",
             "attach": "#Ib",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -3903,6 +3917,7 @@
           {
             "id": "#CL::name",
             "attach": "#CL",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -3936,6 +3951,7 @@
           {
             "id": "#CL::value",
             "attach": "#CL",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -3969,6 +3985,7 @@
           {
             "id": "#Vdd::name",
             "attach": "#Vdd",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -4002,6 +4019,7 @@
           {
             "id": "#Vdd::value",
             "attach": "#Vdd",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -4035,6 +4053,7 @@
           {
             "id": "%pi::name",
             "attach": "%pi",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${p}",
@@ -4068,6 +4087,7 @@
           {
             "id": "%pn::name",
             "attach": "%pn",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${p}",
@@ -4101,6 +4121,7 @@
           {
             "id": "%po::name",
             "attach": "%po",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${p}",
@@ -4134,6 +4155,7 @@
           {
             "id": "@rnl-std-virtual.rnl:58:9#1::name",
             "attach": "@rnl-std-virtual.rnl:58:9#1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${p}",
@@ -4167,6 +4189,7 @@
           {
             "id": "@rnl-std-virtual.rnl:58:9#2::name",
             "attach": "@rnl-std-virtual.rnl:58:9#2",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${p}",
@@ -4200,6 +4223,7 @@
           {
             "id": "@rnl-std-virtual.rnl:58:9#3::name",
             "attach": "@rnl-std-virtual.rnl:58:9#3",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${p}",
@@ -4233,6 +4257,7 @@
           {
             "id": "@rnl-std-virtual.rnl:58:9#4::name",
             "attach": "@rnl-std-virtual.rnl:58:9#4",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${p}",

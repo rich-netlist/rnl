@@ -1267,6 +1267,7 @@
           {
             "id": "#XM1::label",
             "attach": "#XM1",
+            "attach_point": null,
             "key": "label",
             "markup": {
               "value": "${名字}，W=${w}",
@@ -1300,6 +1301,10 @@
           {
             "id": "@11-header-alias-device.sp:30:5",
             "attach": "%vo",
+            "attach_point": [
+              5.0,
+              3.0
+            ],
             "key": null,
             "markup": {
               "value": "V_{out}",
@@ -1343,6 +1348,7 @@
           {
             "id": "#XM1::name",
             "attach": "#XM1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -1376,6 +1382,7 @@
           {
             "id": "#XM1::model",
             "attach": "#XM1",
+            "attach_point": null,
             "key": "model",
             "markup": {
               "value": "${model}",
@@ -1409,6 +1416,7 @@
           {
             "id": "#XM2::name",
             "attach": "#XM2",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -1442,6 +1450,7 @@
           {
             "id": "#XM2::model",
             "attach": "#XM2",
+            "attach_point": null,
             "key": "model",
             "markup": {
               "value": "${model}",
@@ -1475,6 +1484,7 @@
           {
             "id": "#V1::name",
             "attach": "#V1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -1508,6 +1518,7 @@
           {
             "id": "#V1::value",
             "attach": "#V1",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -1541,6 +1552,7 @@
           {
             "id": "#V2::name",
             "attach": "#V2",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${name}",
@@ -1574,6 +1586,7 @@
           {
             "id": "#V2::value",
             "attach": "#V2",
+            "attach_point": null,
             "key": "value",
             "markup": {
               "value": "${value}",
@@ -1607,6 +1620,7 @@
           {
             "id": "@rnl-std-virtual.rnl:58:9#1::name",
             "attach": "@rnl-std-virtual.rnl:58:9#1",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${p}",
@@ -1640,6 +1654,7 @@
           {
             "id": "@rnl-std-virtual.rnl:58:9#2::name",
             "attach": "@rnl-std-virtual.rnl:58:9#2",
+            "attach_point": null,
             "key": "name",
             "markup": {
               "value": "${p}",
