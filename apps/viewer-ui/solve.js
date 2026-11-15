@@ -27,6 +27,7 @@ export const CANCELLED = "the solve was cancelled";
 
 let shown = null; // the preview shown: { source, report }, or null
 let running = false; // whether a solve is under way
+let cancelAsked = false; // whether Cancel was pressed since the solve began
 let progressHooked = false;
 
 /** Whether the page shows a solve, not the file as written. */
@@ -115,7 +116,10 @@ export async function solve({ all = false, respace = false } = {}) {
     // the circuit shown is asked for by its title, as `rnl solve --level` takes it
     const level = all ? null : doc.levels[current]?.title ?? null;
     // (the whole file's time is not read by a respace)
+    // (a Cancel while the settings are read, before the shell has a solve to stop, is kept until it has)
+    cancelAsked = false;
     const taken = await solverSettings();
+    if (cancelAsked) throw new Error(CANCELLED);
     const asked = respace ? { ...taken, timeall: null, respace: true, level } : { ...taken, level };
     const solved = await shell.solve(given, asked, changes(true));
     shown = { source, report: solved.report };
@@ -155,7 +159,10 @@ export async function solve({ all = false, respace = false } = {}) {
 
 /** Stop the solve under way (the Cancel button of the status bar). */
 export function cancelSolve() {
-  if (running && shell.cancelSolve) shell.cancelSolve();
+  if (running && shell.cancelSolve) {
+    cancelAsked = true;
+    shell.cancelSolve();
+  }
 }
 
 /** Solve > Close Preview: show the netlist again, the files as read with the changes applied to them. */
