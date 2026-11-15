@@ -97,6 +97,8 @@ fn time_result_replays_as_identical_stdout_bytes() {
         .unwrap();
         let work = result.levels[0].report.as_ref().unwrap().budget.unwrap().work;
         request.levels[0].options.run_limit = Some(RunLimit::Work(work));
+        // with where the lines layout's group-tree start stopped, which the work does not tell
+        request.levels[0].options.tree_work = SolverOptions::parse(&result.levels[0].options).unwrap().tree_work;
         let replay = run(&request);
         assert!(replay.status.success(), "{}", String::from_utf8_lossy(&replay.stderr));
         assert_eq!(timed.stdout, replay.stdout, "cutoff={seconds},work={work}");
@@ -174,6 +176,8 @@ fn external_backend_writes_and_reopens_the_same_time_work_bytes() {
             assert_eq!(work, 0);
         }
         options.solver.run_limit = Some(RunLimit::Work(work));
+        let replayed = first.levels[0].solved.report.canonical_options.as_deref().unwrap();
+        options.solver.tree_work = SolverOptions::parse(replayed).unwrap().tree_work;
         let replay = solve_using(Path::new("input.sp"), &files, &options, &|_| true, &backend).unwrap();
         assert_eq!(first.files.len(), 1);
         assert_eq!(first.files[0].text.as_bytes(), replay.files[0].text.as_bytes());
