@@ -29,7 +29,12 @@ projects it onto elements. The selected groups also define the scoring scopes.
 
 Orientation alternatives are search preferences. Search can turn a related class or
 choose another authored alternative, but the placement resolver always retains the
-original predicates and all kept facts. ALIGN uses its single authored axis. An incompatible batch of alternatives is
+original predicates and all kept facts. ALIGN uses its single authored axis, and its
+members are one degree of freedom. An arrangement splits a pair of members it puts in one
+column for an ALIGN on y, or in one row for an ALIGN on x, where they can share no line. The
+first arrangement is repaired by list edits alone until it splits none, each edit breaking
+no more of the other rules, and search takes no step that splits a pair the current
+arrangement keeps. An incompatible batch of alternatives is
 rejected as a whole. Exact placement admits list spacing, pin alignment and overlap
 repair only below the facts. Main's pin identities, nested tables and text geometry
 remain in use.

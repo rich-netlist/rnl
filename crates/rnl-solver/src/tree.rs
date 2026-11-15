@@ -215,7 +215,7 @@ pub(crate) fn lay_out(
 
 pub(crate) fn lay_out_from(tree: Tree<'_>, work: &mut Work, stop: &Stop, allowance: Option<Allowance>) -> Laid {
     let refinement = allowance.map(|a| Refinement::for_problem(tree.problem, work, a));
-    let first = tree.first(work);
+    let (first, kept) = tree.keep_aligns(tree.first(work));
     let mut notes = Vec::new();
     if !tree.left_out.is_empty() {
         notes.push(format!(
@@ -223,6 +223,9 @@ pub(crate) fn lay_out_from(tree: Tree<'_>, work: &mut Work, stop: &Stop, allowan
             count(tree.left_out.len(), "group"),
             tree.left_out.join("; ")
         ));
+    }
+    if !kept.is_empty() {
+        notes.push(format!("tree: the first arrangement keeps its aligned pairs whole by {}", kept.join("; ")));
     }
     notes.push(format!("tree: the first arrangement: {}", tree.describe(&first)));
     stop.placed.set(stop.placed.get() + 1);
@@ -460,6 +463,48 @@ impl<'a> Tree<'a> {
 
     pub(crate) fn broken(&self, arr: &Arrangement) -> usize {
         self.broken_rules(arr).len()
+    }
+
+    /// The aligned pairs an arrangement splits: the members of an ALIGN on y put in one column,
+    /// or of an ALIGN on x in one row, where they can share no line.
+    pub(crate) fn split_aligns(&self, arr: &Arrangement) -> BTreeSet<(usize, usize, bool)> {
+        let walk = self.walk(arr);
+        let mut out = BTreeSet::new();
+        for (pairs, across, on_y) in [(&self.rules.same_y, Dir::Column, true), (&self.rules.same_x, Dir::Row, false)] {
+            for &(a, b) in pairs {
+                if matches!(lca(&walk, a, b), Some((_, d, ..)) if d == across) {
+                    out.insert((a, b, on_y));
+                }
+            }
+        }
+        out
+    }
+
+    /// An arrangement with the aligned pairs it splits put together again, from its lists alone:
+    /// each time the list edit that leaves the fewest pairs split and breaks no more of the other
+    /// rules, until none is split or no edit helps. The edits made, said.
+    pub(crate) fn keep_aligns(&self, mut arr: Arrangement) -> (Arrangement, Vec<String>) {
+        let mut said = Vec::new();
+        loop {
+            let split = self.split_aligns(&arr).len();
+            if split == 0 || crate::budget::stopped() {
+                return (arr, said);
+            }
+            let others = self.broken(&arr).saturating_sub(split);
+            let best = self
+                .neighbours(&arr)
+                .into_iter()
+                .filter(|m| !m.3)
+                .map(|m| {
+                    let n = self.split_aligns(&m.1).len();
+                    (n, self.broken(&m.1).saturating_sub(n), m)
+                })
+                .filter(|(n, o, _)| *n < split && *o <= others)
+                .min_by_key(|(n, o, _)| (*n, *o));
+            let Some((_, _, m)) = best else { return (arr, said) };
+            said.push(m.0);
+            arr = m.1;
+        }
     }
 
     pub(crate) fn broken_rules(&self, arr: &Arrangement) -> Vec<String> {
@@ -1749,6 +1794,8 @@ impl<'a> Tree<'a> {
                 }
             }
             let broken = self.broken(&current);
+            // aligned members are one degree of freedom: no step puts apart a pair the arrangement keeps
+            let split = self.split_aligns(&current);
             let trouble = match drawn(self.problem, s, &eval.placed.geometry, &eval.routing) {
                 Ok(wires) => crate::score::trouble(s, &eval.placed.origins, &eval.placed.geometry.orient, &wires),
                 Err(_) => vec![0; s.objects.len()],
@@ -1776,6 +1823,9 @@ impl<'a> Tree<'a> {
                 }
                 let (what, arr, _, _) = &moves[i];
                 if !seen.insert(self.code(arr)) || self.broken(arr) > broken {
+                    continue;
+                }
+                if self.split_aligns(arr).iter().any(|p| !split.contains(p)) {
                     continue;
                 }
                 if crate::annotation::estimated_work(self.problem) > 0
@@ -2542,6 +2592,26 @@ mod tests {
         let renamed = Tree::new(&p, &exact.structure, &options);
         let moves: Vec<_> = renamed.neighbours(&first).into_iter().map(|m| (m.1, m.2, m.3)).collect();
         assert_eq!(moves, structural);
+    }
+
+    /// A column splits the members of an ALIGN on y; the first arrangement's repair puts them
+    /// together again by its lists alone.
+    #[test]
+    fn the_first_arrangement_keeps_aligned_pairs_whole() {
+        let p = problem();
+        let options = options();
+        let (_, exact) = crate::driver::solve_exact(&p, &options);
+        let tree = Tree::new(&p, &exact.structure, &options);
+        let first = tree.first(&mut Work::default());
+        assert!(tree.split_aligns(&first).is_empty());
+        let mut split = first.clone();
+        split.lists[1] = Some(Item::List(Dir::Column, vec![Item::Leaf(0), Item::Leaf(1)]));
+        assert_eq!(tree.split_aligns(&split).len(), 1);
+        let (kept, said) = tree.keep_aligns(split.clone());
+        assert!(tree.split_aligns(&kept).is_empty());
+        assert!(!said.is_empty());
+        assert_eq!(kept.values, split.values);
+        assert_eq!(tree.keep_aligns(first.clone()), (first, Vec::new()));
     }
 
     #[test]
