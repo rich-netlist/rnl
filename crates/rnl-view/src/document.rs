@@ -1041,8 +1041,11 @@ impl<'a> Index<'a> {
             let mut objects: Vec<usize> =
                 it.host.iter().filter_map(|i| self.insts.get(&(lv.level, *i)).copied()).collect();
             if objects.is_empty() {
-                // a usage, such as a ground symbol, stands for the net it is on
-                let mut nets: Vec<usize> = it.pin_nets.iter().flatten().map(|n| self.net(lv.level, n)).collect();
+                // a usage, such as a ground symbol, stands for the net it is on: the net at its
+                // pins, or the net of the point it is attached to, such as a junction dot's
+                let mut nets: Vec<usize> =
+                    it.pin_nets.iter().flatten().chain(&it.point_nets).map(|n| self.net(lv.level, n)).collect();
+                nets.sort_unstable();
                 nets.dedup();
                 if nets.len() == 1 {
                     objects = nets;
@@ -1884,6 +1887,50 @@ R1 rail out 1k
             .iter()
             .filter(|h| h.kind == "wire" || h.kind == "pin")
             .all(|h| h.objects.iter().all(|o| d.objects[*o].kind == "net")));
+    }
+
+    #[test]
+    fn a_usage_attached_to_a_point_stands_for_the_net_of_the_wires_through_it() {
+        for version in ["0.3", "0.4"] {
+            let text = format!(
+                r#"* a junction
+R1 a b 1k
+R2 b 0 1k
+R3 b c 1k
+* @RNL(type="header") {{ @VERSION("{version}"); @USE-PACKAGE(name="rnl-std-basic", version="{version}") }}
+* @RNL {{
+*   #R1 @PLACE(0, 0); #R2 @PLACE(12, 0); #R3 @PLACE(6, 10);
+*   %o = (6, 3); %free = (20, 20);
+*   &b @WIRE(mode="straight") {{#R1:2 %o #R2:1}};
+*   &b @WIRE(mode="straight") {{#R3:1 %o}};
+*   %dot = $JUNCTION @ATTACH %o;
+*   %lone = $JUNCTION @ATTACH %free{place}
+* }}
+.end
+"#,
+                // a dot of 0.4 is put on its point by a solve, which writes where it is
+                place = if version == "0.4" { ";\n*   %dot @PLACE(6, 3); %lone @PLACE(20, 20)" } else { "" }
+            );
+            let files = rnl_runtime::source::MemoryProvider::new().with("dot.sp", &text);
+            let d = crate::build("dot.sp", &files, &BuildOptions::default()).unwrap();
+            assert!(d.failed.is_none(), "{version}");
+            assert!(!d.diagnostics.iter().any(|x| x.severity == "error"), "{version}: {:?}", d.diagnostics);
+            let hits = &d.levels[0].hits;
+            let net = d.objects.iter().position(|o| o.kind == "net" && o.name == "b").unwrap();
+            let box_of = |name: &str| {
+                let hit = hits.iter().find(|h| h.kind == "box" && h.name.as_deref() == Some(name));
+                hit.unwrap_or_else(|| panic!("{version}: no box %{name}"))
+            };
+            // the dot is on the point the two wires of b pass through: it stands for b, as a ground
+            // stands for its net
+            let dot = box_of("dot");
+            assert_eq!(d.objects[dot.objects[0]].name, "%dot", "{version}");
+            assert_eq!(&dot.objects[1..], [net], "{version}");
+            // a point no wire passes through is on no net
+            let lone = box_of("lone");
+            assert_eq!(d.objects[lone.objects[0]].name, "%lone", "{version}");
+            assert_eq!(lone.objects.len(), 1, "{version}");
+        }
     }
 
     #[test]
