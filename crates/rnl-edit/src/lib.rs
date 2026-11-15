@@ -8,7 +8,8 @@
 //!   2, after the title, which is never read, and after the lines that continue it; in a Spectre
 //!   netlist saved under a name that is not a `.scs` file, whose first statement is `simulator
 //!   lang=spectre`, after that statement with `//`, and otherwise above it with `*`. It holds
-//!   VERSION, then the packages of the `use-package` ops, each name and version once;
+//!   VERSION, then the packages of the `use-package` ops, each name and version once, then the
+//!   DEVICE of each `declare-device` op (0.4), in their order;
 //! - one record of the author's for each level the ops name, at the end of the level's own text
 //!   (17): before the `.ends` of a subcircuit, or the `.end` of the file, or at the end of the file;
 //!   before a region written to be encrypted (`.prot … .unprot`, `protect … unprotect`) that the
@@ -263,11 +264,33 @@ fn write_in(request: &WriteRequest, files: Option<&dyn rnl_runtime::source::Prov
     // the rules of each level: the same selection with the same action is written once, where it
     // first comes
     let mut rules: BTreeMap<LevelId, std::collections::BTreeSet<String>> = BTreeMap::new();
+    // the header's devices, in the order of the ops, the later one counting item by item (6.12)
+    let mut devices: Vec<String> = Vec::new();
     for (k, lop) in ops.iter().enumerate() {
         if let Op::UsePackage { name, version, path } = &lop.op {
             let p = form::use_package(name, version.as_deref(), path.as_deref());
             if !packages.contains(&p) {
                 packages.push(p);
+            }
+            continue;
+        }
+        if let Op::DeclareDevice { name, model, terminals, device_type } = &lop.op {
+            // terminal names are distinct by the case rule of the netlist (6.12)
+            if let Some(terminals) = terminals {
+                let case_sensitive = doc.main().case_sensitive;
+                let key = |t: &String| if case_sensitive { t.clone() } else { t.to_lowercase() };
+                if let Some(n) =
+                    (1..terminals.len()).find(|&n| terminals[..n].iter().any(|t| key(t) == key(&terminals[n])))
+                {
+                    return Err(Refusal::new(
+                        codes::EDIT_FIELD_INVALID,
+                        format!("op {k} (declare-device): `terminals` names `{}` twice (6.12)", terminals[n]),
+                    ));
+                }
+            }
+            let d = form::device(name.as_deref(), model.as_deref(), terminals.as_deref(), device_type.as_deref());
+            if devices.last() != Some(&d) {
+                devices.push(d);
             }
             continue;
         }
@@ -327,6 +350,7 @@ fn write_in(request: &WriteRequest, files: Option<&dyn rnl_runtime::source::Prov
 
     // the header first, where a new header goes; then the netlist is read again, so that the
     // records follow its carrier (2.2), at the places of the text that has it
+    packages.extend(devices);
     let mut text = add_header(&doc, &file, &request.netlist, |marker| header(&packages, marker, version));
     let doc = read(&text)?;
     let mut at: BTreeMap<LevelId, u32> = BTreeMap::new();

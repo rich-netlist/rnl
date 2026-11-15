@@ -98,6 +98,29 @@ pub enum Op {
     AddShape { name: Option<String>, shape: ShapeOp, layer: Option<String> },
     /// A symbol (9.2): its box, pins and graphics, in its own coordinates.
     DefineSymbol { name: String, bbox: Option<[f64; 4]>, pins: Vec<PinOp>, prims: Vec<ShapeOp> },
+    /// An annotation (13.5, 0.4): the graphics of `source`, a symbol or a definition `$NAME` or a
+    /// usage `%NAME`, at a point or on an object, turned by any angle and mirrored when asked,
+    /// with the definition's parameters and style properties in the order given, on a layer when
+    /// given (11.6).
+    AddAnnotation {
+        name: Option<String>,
+        attach: Option<String>,
+        at: Option<Point>,
+        source: String,
+        rotate: Option<f64>,
+        mirror: Option<bool>,
+        params: Vec<(String, Literal)>,
+        style: Vec<(String, Literal)>,
+        layer: Option<String>,
+    },
+    /// A DEVICE of the header record (6.12, 0.4): the instances it is for, by `name` or `model` or
+    /// both, and their terminal names or their type or both.
+    DeclareDevice {
+        name: Option<String>,
+        model: Option<String>,
+        terminals: Option<Vec<String>>,
+        device_type: Option<String>,
+    },
 }
 
 impl Op {
@@ -114,6 +137,8 @@ impl Op {
             Op::UsePackage { .. } => "use-package",
             Op::AddShape { .. } => "add-shape",
             Op::DefineSymbol { .. } => "define-symbol",
+            Op::AddAnnotation { .. } => "add-annotation",
+            Op::DeclareDevice { .. } => "declare-device",
         }
     }
 }
@@ -279,6 +304,8 @@ pub(crate) fn parse_for_language(k: usize, value: &Value, modern: bool) -> Resul
         "use-package" => &["name", "version", "path"],
         "add-shape" => &["name", "shape", "points", "params", "style", "layer"],
         "define-symbol" => &["name", "box", "pins", "prims"],
+        "add-annotation" => &["name", "attach", "at", "source", "rotate", "mirror", "params", "style", "layer"],
+        "declare-device" => &["name", "model", "terminals", "type"],
         "unset" | "remove" => return Err(fail(codes::EDIT_OP_NOT_WRITTEN_YET, kind, "not written yet".into())),
         _ => return Err(Refusal::new(codes::EDIT_OP_UNKNOWN, format!("op {k}: unknown op \"{kind}\""))),
     };
@@ -290,7 +317,8 @@ pub(crate) fn parse_for_language(k: usize, value: &Value, modern: bool) -> Resul
         Some(Value::String(s)) => Some(s.clone()),
         Some(_) => return Err(fail(codes::EDIT_FIELD_INVALID, kind, "`level` is not a string".into())),
     };
-    if level.is_none() && kind != "use-package" {
+    // the header ops go into the header record, whatever their level
+    if level.is_none() && kind != "use-package" && kind != "declare-device" {
         return Err(fail(codes::EDIT_OP_NO_LEVEL, kind, "no `level`".into()));
     }
     let r = Reader { obj, kind, k };
@@ -334,17 +362,90 @@ pub(crate) fn parse_for_language(k: usize, value: &Value, modern: bool) -> Resul
         "add-shape" => Op::AddShape {
             name: r.opt_string("name")?,
             shape: shape_op(obj).map_err(|e| e.context(format!("op {k} ({kind})")))?,
-            layer: match r.opt_string("layer")? {
-                Some(l) if !["bottom", "middle", "top"].contains(&l.as_str()) => {
-                    return Err(fail(
-                        codes::EDIT_FIELD_INVALID,
-                        kind,
-                        format!("`layer` \"{l}\" is not bottom, middle or top"),
+            layer: r.layer()?,
+        },
+        "add-annotation" => {
+            if !modern {
+                return Err(fail(codes::EDIT_FIELD_INVALID, kind, "requires language_version 0.4".into()));
+            }
+            let source = r.string("source")?;
+            if !(dollar_name(&source) || percent_name(&source)) {
+                return Err(r.fail("source", "is not a symbol or a definition `$NAME`, or a usage `%NAME`"));
+            }
+            let (attach, at) = (r.opt_string("attach")?, r.opt_point("at")?);
+            match (&attach, &at) {
+                (None, None) => {
+                    return Err(Refusal::new(
+                        codes::EDIT_FIELD_MISSING,
+                        format!("op {k} ({kind}): neither `attach` nor `at`: the annotation has no place"),
                     ))
                 }
-                l => l,
-            },
-        },
+                (Some(_), Some(_)) => return Err(r.fail("attach", "and `at` are both given; give one")),
+                _ => {}
+            }
+            let rotate = r.opt_num("rotate")?;
+            if rotate.is_some_and(|a| !a.is_finite()) {
+                return Err(r.fail("rotate", "is not a finite number"));
+            }
+            let params = r.params()?;
+            if let Some((p, _)) = params.iter().find(|(p, _)| p == "rotate" || p == "mirror") {
+                return Err(r.fail("params", &format!("holds `{p}`, which is a field of its own")));
+            }
+            Op::AddAnnotation {
+                name: r.opt_string("name")?,
+                attach,
+                at,
+                source,
+                rotate,
+                mirror: r.opt_bool("mirror")?,
+                params,
+                style: r.style()?,
+                layer: r.layer()?,
+            }
+        }
+        "declare-device" => {
+            if !modern {
+                return Err(fail(codes::EDIT_FIELD_INVALID, kind, "requires language_version 0.4".into()));
+            }
+            // a value with a line break would end the comment that carries the header
+            let one = |f: &str| -> Result<Option<String>, Refusal> {
+                match r.opt_string(f)? {
+                    Some(s) if s.is_empty() || s.contains(['\n', '\r']) => {
+                        Err(r.fail(f, "is empty or holds a line break"))
+                    }
+                    s => Ok(s),
+                }
+            };
+            let (name, model, device_type) = (one("name")?, one("model")?, one("type")?);
+            let terminals = match obj.get("terminals") {
+                None | Some(Value::Null) => None,
+                Some(Value::Array(items)) => {
+                    let names: Option<Vec<String>> =
+                        items.iter().map(|v| v.as_str().filter(|s| plain_name(s)).map(String::from)).collect();
+                    match names {
+                        Some(names) if !names.is_empty() => Some(names),
+                        _ => return Err(r.fail(
+                            "terminals",
+                            "is not a nonempty list of terminal names; a name is not empty, has no line break and is not all digits",
+                        )),
+                    }
+                }
+                Some(_) => return Err(r.fail("terminals", "is not a list of terminal names")),
+            };
+            if name.is_none() && model.is_none() {
+                return Err(Refusal::new(
+                    codes::EDIT_FIELD_MISSING,
+                    format!("op {k} ({kind}): neither `name` nor `model`: the device is for no instance (6.12)"),
+                ));
+            }
+            if terminals.is_none() && device_type.is_none() {
+                return Err(Refusal::new(
+                    codes::EDIT_FIELD_MISSING,
+                    format!("op {k} ({kind}): neither `terminals` nor `type`: the device says nothing (6.12)"),
+                ));
+            }
+            Op::DeclareDevice { name, model, terminals, device_type }
+        }
         "define-symbol" => {
             let name = r.string("name")?;
             if !(name.starts_with('$') || name.starts_with('%')) || name.len() < 2 {
@@ -471,6 +572,16 @@ struct Reader<'a> {
 impl Reader<'_> {
     fn fail(&self, field: &str, what: &str) -> Refusal {
         Refusal::new(codes::EDIT_FIELD_INVALID, format!("op {} ({}): `{field}` {what}", self.k, self.kind))
+    }
+
+    /// The layer of a graphic or an annotation (11.6), when given.
+    fn layer(&self) -> Result<Option<String>, Refusal> {
+        match self.opt_string("layer")? {
+            Some(l) if !["bottom", "middle", "top"].contains(&l.as_str()) => {
+                Err(self.fail("layer", &format!("\"{l}\" is not bottom, middle or top")))
+            }
+            l => Ok(l),
+        }
     }
 
     fn opt_string(&self, f: &str) -> Result<Option<String>, Refusal> {
@@ -789,6 +900,12 @@ fn dollar_name(s: &str) -> bool {
     !rest.is_empty()
         && rest.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
         && !rest.starts_with(|c: char| c.is_ascii_digit())
+}
+
+/// `%NAME`, a local name such as a usage's, as it is written: an identifier after the `%`, or any
+/// other name in quotes, a quote in it doubled (3.6).
+fn percent_name(s: &str) -> bool {
+    s.strip_prefix('%').is_some_and(|rest| dollar_name(&format!("${rest}")))
 }
 
 /// A terminal name `terminals` can write back: 0.4 reads an all-digit name as a number, and a
