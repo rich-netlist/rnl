@@ -253,8 +253,11 @@ pub(crate) fn crowding(s: &Structure, origins: &[[Q; 2]], ori: &[Orient], droppe
 /// The pairs of texts of two objects drawn over each other with some area, as a reader sees one
 /// text written over another (RNL7012, 13.3), each pair counted once, which the objective
 /// `crowding` of a 0.4 level adds to [`crowding`]: every text an object has
-/// (`Structure::text_offsets`: those its symbol places, its pins' labels, its own text), and the
-/// level's annotations, each once. A text is the object's it is attached to, or that of the symbol
+/// (`Structure::text_offsets_each`: each text its symbol places, its pins' labels, its own text),
+/// and the level's annotations, each once. Each text is its own box, as `rnl check` measures them
+/// (`rnl_render::clearance_box`), not the one box of a symbol's texts that the solver keeps clear
+/// of its neighbours: that box can meet another object's text in the gap between two of its texts,
+/// and a pair of its texts can each meet another's, which a reader sees as two. A text is the object's it is attached to, or that of the symbol
 /// it is drawn in; the texts of one object are left out, and so are two annotations over each
 /// other, which the overlaps count already (`annotation::collisions`). A stub's texts and its
 /// host's are counted as `rnl check` counts them. What the solution leaves free is not drawn, and
@@ -278,7 +281,7 @@ pub(crate) fn texts_on_texts(problem: &LevelProblem, s: &Structure, geometry: &G
     for k in (0..s.objects.len()).filter(|&k| drawn(k) && !s.annotation_views.contains_key(&k)) {
         let Some(at) = origins.get(k) else { continue };
         let placed = |b: &[Q; 4]| [&at[0] + &b[0], &at[1] + &b[1], &at[0] + &b[2], &at[1] + &b[3]];
-        texts.extend(s.text_offsets(problem, geometry, k).iter().map(|b| (owner(k), false, placed(b))));
+        texts.extend(s.text_offsets_each(problem, geometry, k).iter().map(|b| (owner(k), false, placed(b))));
     }
     for (object, b) in crate::annotation::bounds(problem, geometry).unwrap_or_default() {
         if drawn(object) {

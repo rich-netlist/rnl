@@ -2465,7 +2465,7 @@ fn a_stub_text_over_its_host_text_counts_among_the_texts_over_texts() {
     let what = summary(&p, &solved, &e);
     let (s, g) = (&e.structure, &e.placed.geometry);
     assert!(s.language04, "{what}");
-    let texts = |k: usize| s.text_offsets(&p, g, k);
+    let texts = |k: usize| s.text_offsets_each(&p, g, k);
     let (k, host) = (0..s.objects.len())
         .find_map(|k| {
             let host = s.objects[k].stub.as_ref()?.host.0;
@@ -2510,6 +2510,49 @@ fn a_stub_text_over_its_host_text_counts_among_the_texts_over_texts() {
     assert_eq!(left, 0, "{what}");
     let (on, off) = (crate::score::texts_on_texts(&p, s, g, &at), crate::score::texts_on_texts(&p, s, g, &away));
     assert_eq!(on, off + with_host, "{what}");
+}
+
+/// The texts over texts of a 0.4 level take each text a symbol places in a box of its own, as
+/// `rnl check` measures them (RNL7012), and those boxes are the ones the solver joins into the box
+/// of the symbol's texts that it keeps clear of its neighbours: in every orientation, the boxes of
+/// `symbol_texts` join to the box of `labels`, one for each text, and an object's texts counted one
+/// by one are those of `text_offsets` with that one box taken apart.
+#[test]
+fn the_texts_over_texts_take_each_text_of_a_symbol_on_its_own() {
+    let (p, solved, e) = solve_text(
+        "* cs\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }\n\
+         .model nch nmos level=1\n.model pch pmos level=1\nM1 out in vdd vdd pch\nM2 out in 0 0 nch\n\
+         R1 out 0 10k\nC1 out 0 1p\n* @RNL { &vdd @ADD-TO $SUPPLY_NET_SET }\n.end\n",
+    );
+    let what = summary(&p, &solved, &e);
+    let (s, g) = (&e.structure, &e.placed.geometry);
+    assert!(s.language04, "{what}");
+    assert_eq!(s.symbol_texts.keys().collect::<Vec<_>>(), s.labels.keys().collect::<Vec<_>>(), "{what}");
+    let mut apart = 0;
+    for (&k, turns) in &s.symbol_texts {
+        assert_eq!(turns.len(), Orient::ALL.len(), "{what}");
+        for (i, (texts, joined)) in turns.iter().zip(&s.labels[&k]).enumerate() {
+            let join = texts
+                .iter()
+                .cloned()
+                .reduce(|a, b| {
+                    [
+                        a[0].clone().min(b[0].clone()),
+                        a[1].clone().min(b[1].clone()),
+                        a[2].clone().max(b[2].clone()),
+                        a[3].clone().max(b[3].clone()),
+                    ]
+                })
+                .unwrap_or_else(|| panic!("{} has no texts in orientation {i}: {what}", p.objects[k].label));
+            assert_eq!(&join, joined, "{} in orientation {i}: {what}", p.objects[k].label);
+        }
+        let (each, one) = (s.text_offsets_each(&p, g, k), s.text_offsets(&p, g, k));
+        let turn = usize::from(crate::orient::index(g.orient[k]));
+        let n = turns[turn].len();
+        assert_eq!((each.len(), &each[..n], &each[n..]), (one.len() - 1 + n, &turns[turn][..], &one[1..]), "{what}");
+        apart += usize::from(n > 1);
+    }
+    assert!(apart > 0, "no symbol with two texts or more: {what}");
 }
 
 /// The stubs of the standard series 0.3 (`$GROUND_STUB`, `$SUPPLY_STUB`) are told by their drawing
