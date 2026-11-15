@@ -930,9 +930,15 @@ impl Search<'_, '_> {
                 }
                 let Some(choice) = self.next_choice(c) else { break };
                 self.cores[c].done.insert(choice.clone());
+                // once the group has a placement, a choice that repeats one already tried gives
+                // nothing new, as one that cannot be placed: the choices left of a group may be many
+                // more than give new placements, and a batch that ran through them would hold the
+                // search at that group; before, the batch goes on, so that its first one, which the
+                // trial of the group's bands is settled by, has a placement where one can be made
                 match self.evaluate(id, choice, work)? {
                     Came::Anew => (count, missed) = (count + 1, 0),
                     Came::Unplaced => missed += 1,
+                    Came::Same if !self.cores[c].results.is_empty() => missed += 1,
                     Came::Same => {}
                 }
             }
