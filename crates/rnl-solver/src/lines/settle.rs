@@ -471,6 +471,8 @@ struct Search<'a, 'b> {
     /// that was better than all before it was made ([`Search::patient`]).
     made: usize,
     better_at: usize,
+    /// The count of complete solutions when each of them was made, by its outcome.
+    made_at: BTreeMap<usize, usize>,
 }
 
 /// Whether a search that has made `made` complete solutions, the last better one when it had made
@@ -661,6 +663,7 @@ pub(crate) fn settle(
             tally: Tally::new(problem.objects.len()),
             made: 0,
             better_at: 0,
+            made_at: BTreeMap::new(),
         };
         let mut id = search.node(0, state.clone(), Vec::new());
         let mut failed = None;
@@ -691,7 +694,7 @@ pub(crate) fn settle(
         let mut end = SearchEnd::Limit;
         if back {
             loop {
-                if search.patient() {
+                if !crate::budget::stopped() && search.patient() {
                     end = SearchEnd::Patient;
                     break;
                 }
@@ -1046,6 +1049,7 @@ impl Search<'_, '_> {
                                 self.solutions.iter().map(|s| s.0).min_by(|&a, &b| {
                                     self.outcomes[a].score.cmp(&self.outcomes[b].score).then(a.cmp(&b))
                                 });
+                            self.rebetter();
                         }
                     }
                 }
@@ -1110,6 +1114,7 @@ impl Search<'_, '_> {
                     .iter()
                     .map(|s| s.0)
                     .min_by(|&a, &b| self.outcomes[a].score.cmp(&self.outcomes[b].score).then(a.cmp(&b)));
+                self.rebetter();
             }
         }
     }
@@ -1334,6 +1339,7 @@ impl Search<'_, '_> {
         if root {
             self.solutions.push((o, spent(work) - self.start, id));
             self.made += 1;
+            self.made_at.insert(o, self.made);
             if self.best.is_none_or(|b| self.outcomes[o].score < self.outcomes[b].score) {
                 self.best = Some(o);
                 self.better_at = self.made;
@@ -1458,7 +1464,15 @@ impl Search<'_, '_> {
     /// search would go on until every spread of every choice's gaps was tried, which on a small
     /// level is thousands of placements, each wider than the last, and run out its whole budget.
     fn patient(&self) -> bool {
-        patient(self.made, self.better_at)
+        self.best.is_some() && patient(self.made, self.better_at)
+    }
+
+    /// The wait counted again from the best, when a trial or a dissolve has chosen it anew among
+    /// the solutions kept.
+    fn rebetter(&mut self) {
+        if let Some(at) = self.best.and_then(|b| self.made_at.get(&b)) {
+            self.better_at = *at;
+        }
     }
 
     fn finish(mut self, end: SearchEnd, work: &Work) -> Result<Settled, String> {
