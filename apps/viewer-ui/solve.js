@@ -115,7 +115,8 @@ export async function solve({ all = false, respace = false } = {}) {
     // the circuit shown is asked for by its title, as `rnl solve --level` takes it
     const level = all ? null : doc.levels[current]?.title ?? null;
     // (the whole file's time is not read by a respace)
-    const asked = respace ? { ...solverSettings(), timeall: null, respace: true, level } : { ...solverSettings(), level };
+    const taken = await solverSettings();
+    const asked = respace ? { ...taken, timeall: null, respace: true, level } : { ...taken, level };
     const solved = await shell.solve(given, asked, changes(true));
     shown = { source, report: solved.report };
     noteReport(solved.report);

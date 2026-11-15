@@ -1317,6 +1317,10 @@ body.menubar-shown { grid-template-rows: auto minmax(0, 1fr) auto; }
 .setting { display: flex; flex-direction: column; gap: 1px; padding: 2px 0; }
 .setting[hidden] { display: none; }
 .setting.unused { opacity: 0.55; }
+.settings fieldset[hidden], .objective[hidden], .objective-tag[hidden], .settings-other[hidden] { display: none; }
+.objective.unused { opacity: 0.55; }
+.objective-tag { flex: none; font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 8px; padding: 0 6px; white-space: nowrap; }
+.settings-other { margin: 6px 0 0; }
 .setting.refused input, .setting.refused select { outline: 1px solid var(--error); }
 .settings-key { font-weight: 600; }
 .settings-label select { max-width: 14em; }
