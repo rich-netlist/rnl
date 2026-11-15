@@ -1098,8 +1098,9 @@
   };
 
   /* A latch: a bistable core with the devices around it.
-     Meaning only: places and routes nothing; a group. */
+     Meaning only: places and routes nothing; a group, with the core a group of its own inside it. */
   $LATCH = @DEFINE(roles=[["{core}", ["instance", "usage"]], ["{others}", ["instance", "usage"]]]) {
+    {?core} @GROUP;
     {?core ?others} @GROUP;
   };
 

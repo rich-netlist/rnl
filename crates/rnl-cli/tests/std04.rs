@@ -936,3 +936,40 @@ RE e 0 1k
     let v = by_severity(&wrong, Severity::Violation);
     assert_eq!(v.iter().filter(|v| v.contains("is a FET")).count(), 1, "{v:?}");
 }
+
+#[test]
+fn a_latch_groups_its_core_inside_the_whole() {
+    let devices = "M1 x y 0 0 nch W=2u L=1u\nM2 y x 0 0 nch W=2u L=1u\nM3 x y vdd vdd pch W=2u L=1u\n\
+                   M4 y x vdd vdd pch W=2u L=1u\nM5 x clk vdd vdd pch W=1u L=1u\nM6 y clk vdd vdd pch W=1u L=1u\n\
+                   X1 q qb vdd cell\nX2 qb q vdd cell\n";
+    // the member sets of the groups the solver reads, by the labels of their objects, without the
+    // fill's group of port tags
+    let groups = |body: &str| {
+        let r = read(&MemoryProvider::new().with("t.sp", &with_std04(devices, body)), &Options::solver());
+        assert!(errors(&r).is_empty(), "{body}: {:?}", errors(&r));
+        assert!(by_severity(&r, Severity::Hint).iter().all(|h| !h.contains("group")), "{body}");
+        let problem = &r.problems[0];
+        let mut sets: Vec<Vec<String>> = problem
+            .groups
+            .iter()
+            .filter(|g| !g.members.is_empty() && g.label != "port_tag_set")
+            .map(|g| {
+                let mut s: Vec<String> = g.members.iter().map(|&m| problem.objects[m].label.clone()).collect();
+                s.sort();
+                s
+            })
+            .collect();
+        sets.sort();
+        sets.dedup();
+        sets
+    };
+    // the core is a group of its own, inside the group of the whole latch
+    let latch = groups(
+        "%cc_n = #M1(left) #M2(right) @AS $CROSS_COUPLED_PAIR; %cc_p = #M3(left) #M4(right) @AS $CROSS_COUPLED_PAIR; \
+         {%cc_n %cc_p}(core) {#M5 #M6}(others) @AS $LATCH;",
+    );
+    assert_eq!(latch, [vec!["#M1", "#M2", "#M3", "#M4"], vec!["#M1", "#M2", "#M3", "#M4", "#M5", "#M6"]]);
+    // a latch of two inverters has no others: its two groups have the same members, which is no
+    // conflict between groups
+    assert_eq!(groups("#X1(a) #X2(b) @AS $INVERTER_LATCH;"), [vec!["#X1", "#X2"]]);
+}
