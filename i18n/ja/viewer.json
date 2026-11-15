@@ -788,7 +788,6 @@
   "The solver's settings could not be read: {0}": "ソルバーの設定を読み取れませんでした：{0}",
   "(not computed by this version)": "（このバージョンでは計算されません）",
   "set": "指定する",
-  "The solver does not use this with the other settings as they are.": "現在の他の設定では、ソルバーはこの設定を使いません。",
   "Seconds that every level with a time limit shares, the whole file's time: each level takes the least of its own seconds and an even share of what is left, and only its seed once nothing is left. Not read by a respace.": "時間制限のあるすべてのレベルで共有する秒数（ファイル全体の時間）。各レベルは、自身の秒数と残り時間の均等配分のうち小さい方を使い、残り時間がなくなると初期値のみを使います。間隔の再調整では使われません。",
   "Time for the whole file": "ファイル全体の時間",
   "timeall must be a positive number of seconds.": "timeall には正の秒数を指定してください。",
@@ -807,5 +806,19 @@
   "Settings": "設定",
   "1 error in the settings": "設定に 1 件のエラー",
   "&Respace": "間隔を再調整(&R)",
-  "Respace All Circuits": "すべての回路の間隔を再調整"
+  "Respace All Circuits": "すべての回路の間隔を再調整",
+  "{0} settings": "設定 {0} 件",
+  "{0} objectives": "目的関数 {0} 件",
+  "{0} of the settings keep values you set.": "設定のうち {0} 件には、指定した値が残っています。",
+  "{0} of other layouts are shown greyed.{1}": "他の配置用の{0}は、グレーで表示しています。{1}",
+  "{0} of other layouts are hidden.{1}": "他の配置用の{0}は、非表示です。{1}",
+  "taken with its tier": "ティア単位で扱う",
+  "This layout takes a tier whole, so this objective counts with the one in it that the layout uses.": "この配置はティアをまとめて扱うため、この目的関数は、同じティア内で配置が使うものと一緒に数えられます。",
+  "The layout shown does not use this objective.": "表示中の配置は、この目的関数を使いません。",
+  "Show": "表示する",
+  "The layout shown does not use this setting.": "表示中の配置は、この設定を使いません。",
+  "1 setting": "設定 1 件",
+  "1 objective": "目的関数 1 件",
+  "1 of the settings keeps a value you set.": "設定のうち 1 件には、指定した値が残っています。",
+  " and ": " と "
 }

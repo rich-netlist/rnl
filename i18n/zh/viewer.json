@@ -788,7 +788,6 @@
   "The solver's settings could not be read: {0}": "无法读取求解器的设置：{0}",
   "(not computed by this version)": "（此版本不计算）",
   "set": "指定",
-  "The solver does not use this with the other settings as they are.": "在其他设置为当前值时，求解器不使用此项。",
   "Seconds that every level with a time limit shares, the whole file's time: each level takes the least of its own seconds and an even share of what is left, and only its seed once nothing is left. Not read by a respace.": "所有设有时间上限的层级共用的秒数，即整个文件的时间：每个层级取自身秒数与剩余时间的均分额中较小者，剩余时间用尽后只用其种子。重新调整间距时不读取。",
   "Time for the whole file": "整个文件的时间",
   "timeall must be a positive number of seconds.": "timeall 必须是正的秒数。",
@@ -807,5 +806,19 @@
   "Settings": "设置",
   "1 error in the settings": "设置中有 1 处错误",
   "&Respace": "重新调整间距(&R)",
-  "Respace All Circuits": "重新调整所有电路的间距"
+  "Respace All Circuits": "重新调整所有电路的间距",
+  "{0} settings": "{0} 项设置",
+  "{0} objectives": "{0} 个优化目标",
+  "{0} of the settings keep values you set.": "其中 {0} 项设置仍保留着你设置的值。",
+  "{0} of other layouts are shown greyed.{1}": "其他布局的 {0} 以灰色显示。{1}",
+  "{0} of other layouts are hidden.{1}": "其他布局的 {0} 已隐藏。{1}",
+  "taken with its tier": "随所在档一并计入",
+  "This layout takes a tier whole, so this objective counts with the one in it that the layout uses.": "此布局把一档作为整体，因此该优化目标与同档中布局所用的那个目标一并计入。",
+  "The layout shown does not use this objective.": "当前显示的布局不使用此优化目标。",
+  "Show": "显示",
+  "The layout shown does not use this setting.": "当前显示的布局不使用此项设置。",
+  "1 setting": "1 项设置",
+  "1 objective": "1 个优化目标",
+  "1 of the settings keeps a value you set.": "其中 1 项设置仍保留着你设置的值。",
+  " and ": " 和 "
 }

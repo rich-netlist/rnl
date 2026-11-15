@@ -788,7 +788,6 @@
   "The solver's settings could not be read: {0}": "솔버 설정을 읽을 수 없습니다: {0}",
   "(not computed by this version)": "(이 버전에서는 계산되지 않음)",
   "set": "지정",
-  "The solver does not use this with the other settings as they are.": "현재의 다른 설정에서는 솔버가 이 설정을 사용하지 않습니다.",
   "Seconds that every level with a time limit shares, the whole file's time: each level takes the least of its own seconds and an even share of what is left, and only its seed once nothing is left. Not read by a respace.": "시간 제한이 있는 모든 레벨이 함께 쓰는 초 수, 즉 파일 전체의 시간입니다. 각 레벨은 자신의 초 수와 남은 시간의 균등 몫 중 작은 쪽을 쓰고, 남은 시간이 없으면 시드만 사용합니다. 간격 재조정에서는 읽지 않습니다.",
   "Time for the whole file": "파일 전체의 시간",
   "timeall must be a positive number of seconds.": "timeall은 양수의 초 단위 숫자여야 합니다.",
@@ -807,5 +806,19 @@
   "Settings": "설정",
   "1 error in the settings": "설정에 오류 1건",
   "&Respace": "간격 재조정(&R)",
-  "Respace All Circuits": "모든 회로 간격 재조정"
+  "Respace All Circuits": "모든 회로 간격 재조정",
+  "{0} settings": "설정 {0}개",
+  "{0} objectives": "최적화 목표 {0}개",
+  "{0} of the settings keep values you set.": "설정 중 {0}개는 지정한 값을 유지하고 있습니다.",
+  "{0} of other layouts are shown greyed.{1}": "다른 배치용 {0}이(가) 회색으로 표시되어 있습니다.{1}",
+  "{0} of other layouts are hidden.{1}": "다른 배치용 {0}이(가) 숨겨져 있습니다.{1}",
+  "taken with its tier": "단계 단위로 취급",
+  "This layout takes a tier whole, so this objective counts with the one in it that the layout uses.": "이 배치는 단계를 통째로 다루므로, 이 최적화 목표는 같은 단계에서 배치가 사용하는 것과 함께 계산됩니다.",
+  "The layout shown does not use this objective.": "표시된 배치는 이 최적화 목표를 사용하지 않습니다.",
+  "Show": "표시",
+  "The layout shown does not use this setting.": "표시된 배치는 이 설정을 사용하지 않습니다.",
+  "1 setting": "설정 1개",
+  "1 objective": "최적화 목표 1개",
+  "1 of the settings keeps a value you set.": "설정 중 1개는 지정한 값을 유지하고 있습니다.",
+  " and ": " 및 "
 }

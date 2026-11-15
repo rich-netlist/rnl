@@ -645,8 +645,8 @@ function fieldsOf(table) {
     if (hiddenObjectives > 0) parts.push(hiddenObjectives === 1 ? m("1 objective") : m`${hiddenObjectives} objectives`);
     const kept = keeping === 0 ? "" : ` ${keeping === 1 ? m("1 of the settings keeps a value you set.") : m`${keeping} of the settings keep values you set.`}`;
     setText(otherText, showOther
-      ? m`${parts.join(" and ")} of other layouts are shown greyed.${kept}`
-      : m`${parts.join(" and ")} of other layouts are hidden.${kept}`);
+      ? m`${parts.join(m(" and "))} of other layouts are shown greyed.${kept}`
+      : m`${parts.join(m(" and "))} of other layouts are hidden.${kept}`);
   }
   el.addEventListener("input", refresh);
   el.addEventListener("change", refresh);
