@@ -615,6 +615,11 @@ pub(crate) struct Structure {
     /// as `#R1 @TEXT("R0", dx=-1, dy=3.5)`, about its origin, by the element: they move with it
     /// but do not turn (13.3; review of phase 2 of the quality review).
     pub offset_labels: BTreeMap<usize, Vec<[Q; 4]>>,
+    /// The box of each text an object's symbol places, about the object's origin, for each
+    /// orientation of the object in the order of `Orient::ALL`, by the object: the boxes that
+    /// `labels` joins ([`text_box`]), kept apart for the texts over texts, which `rnl check` counts
+    /// text by text (RNL7012).
+    pub symbol_texts: BTreeMap<usize, Vec<Vec<[Q; 4]>>>,
     /// Where each text with a position of its own goes when nothing decides it, by the text: at
     /// the point it is attached to, or beside the object; above the middle of a wire, at the start
     /// of a net (13.3).
@@ -710,9 +715,25 @@ impl Structure {
             .collect()
     }
 
-    /// Every text rectangle associated with an object, relative to its current origin.
+    /// Every text rectangle associated with an object, relative to its current origin, the texts
+    /// its symbol places in one box (`labels`), as the solver keeps them clear of its neighbours.
     pub(crate) fn text_offsets(&self, problem: &LevelProblem, g: &Geometry, k: usize) -> Vec<[Q; 4]> {
-        let mut boxes: Vec<_> = self.label_offset(k, g.orient[k]).into_iter().collect();
+        self.texts_of(problem, g, k, false)
+    }
+
+    /// [`Structure::text_offsets`] with each text the object's symbol places in a box of its own
+    /// (`symbol_texts`), as `rnl check` measures the texts over texts (RNL7012).
+    pub(crate) fn text_offsets_each(&self, problem: &LevelProblem, g: &Geometry, k: usize) -> Vec<[Q; 4]> {
+        self.texts_of(problem, g, k, true)
+    }
+
+    fn texts_of(&self, problem: &LevelProblem, g: &Geometry, k: usize, each: bool) -> Vec<[Q; 4]> {
+        let mut boxes: Vec<_> = if each {
+            let turn = usize::from(crate::orient::index(g.orient[k]));
+            self.symbol_texts.get(&k).and_then(|t| t.get(turn)).cloned().unwrap_or_default()
+        } else {
+            self.label_offset(k, g.orient[k]).into_iter().collect()
+        };
         boxes.extend(self.offset_labels.get(&k).into_iter().flatten().cloned());
         boxes.extend(self.pin_labels(k, g.orient[k]));
         if self.objects[k].role == Role::Text && self.objects[k].own {
@@ -946,6 +967,7 @@ pub(crate) fn analyse(
         }
     }
     let mut labels: BTreeMap<usize, Vec<[Q; 4]>> = BTreeMap::new();
+    let mut symbol_texts: BTreeMap<usize, Vec<Vec<[Q; 4]>>> = BTreeMap::new();
     for o in &problem.objects {
         // the texts that move with their owner on both axes; one that the scene places on an axis
         // does not (13.3)
@@ -957,6 +979,10 @@ pub(crate) fn analyse(
         else {
             continue;
         };
+        let each = symbol_texts.entry(*owner).or_insert_with(|| vec![Vec::new(); boxes.len()]);
+        for (turned, b) in each.iter_mut().zip(&boxes) {
+            turned.push(b.clone());
+        }
         add_labels(&mut labels, *owner, boxes);
     }
     // the texts that offsets kept place from an element's origin on both axes: at the offsets,
@@ -1070,6 +1096,7 @@ pub(crate) fn analyse(
         hanging,
         labels,
         offset_labels,
+        symbol_texts,
         anchors,
         tree,
         scopes,
