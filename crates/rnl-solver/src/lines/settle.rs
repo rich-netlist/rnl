@@ -689,6 +689,9 @@ pub(crate) fn settle(
             continue;
         }
         if let (Some(n), false) = (failed, back) {
+            if crate::budget::stopped() {
+                return Err("budget exhausted before the line search made a complete solution".to_string());
+            }
             return Err(format!("{} could not be placed and routed in any orientation tried", lv.name(n)));
         }
         let mut end = SearchEnd::Limit;
