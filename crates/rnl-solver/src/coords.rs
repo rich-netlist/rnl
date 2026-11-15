@@ -78,7 +78,13 @@ use crate::structure::{Drawn, Role, Structure};
 use crate::{SolverOptions, Work};
 
 /// How many rounds of putting overlapping symbols apart.
-const REPAIR_ROUNDS: usize = 6;
+const REPAIR_ROUNDS: usize = 12;
+
+/// The most pairs of symbols a round of repair puts apart, the first found; the others wait for the
+/// next round. Each pair adds a relation of four sides, and a round resolves them all again, so a
+/// round with a great many new ones can take the whole budget searching their sides; the pairs a
+/// round leaves often come apart with the first.
+const SEPARATIONS_PER_ROUND: usize = 32;
 
 /// How many times, after the first LP, the rows are put apart pair by pair again with the pairs
 /// that the last LP made neighbours on x (quality review SE-4).
@@ -136,8 +142,13 @@ pub(crate) fn place_tree(
         let origins = s.origins(problem, &geometry);
         let overlaps = overlapping(s, &origins, &geometry.orient);
         let clashes = port_clashes(s, &origins, &geometry.orient);
-        let new: Vec<(usize, usize)> =
-            overlaps.iter().chain(&clashes).copied().filter(|p| !separated.contains(p)).collect();
+        let new: Vec<(usize, usize)> = overlaps
+            .iter()
+            .chain(&clashes)
+            .copied()
+            .filter(|p| !separated.contains(p))
+            .take(SEPARATIONS_PER_ROUND)
+            .collect();
         let annotation_new = annotation_separations(problem, s, &geometry, &origins, &grid, &annotation_seen);
 
         if (new.is_empty() && annotation_new.is_empty()) || round >= REPAIR_ROUNDS || crate::budget::stopped() {
@@ -181,7 +192,8 @@ pub(crate) enum Cause {
     Facts,
     /// A side fits with the facts kept, but not with the symbols put apart before them.
     Others,
-    /// The rounds of putting symbols apart ran out before they had their turn.
+    /// The rounds of putting symbols apart ran out before they had their turn, a round taking at most
+    /// [`SEPARATIONS_PER_ROUND`] new pairs.
     Rounds,
     /// A cap of work ran out while the candidate was taken in or placed (`Structure::caps`), so a
     /// relation may have been dropped without a conflict.
@@ -268,8 +280,13 @@ pub(crate) fn place(
         }
         let overlaps = overlapping(s, &origins, &geometry.orient);
         let clashes = if s.language04 { port_clashes(s, &origins, &geometry.orient) } else { Vec::new() };
-        let new: Vec<(usize, usize)> =
-            overlaps.iter().chain(&clashes).copied().filter(|p| !separated.contains(p)).collect();
+        let new: Vec<(usize, usize)> = overlaps
+            .iter()
+            .chain(&clashes)
+            .copied()
+            .filter(|p| !separated.contains(p))
+            .take(SEPARATIONS_PER_ROUND)
+            .collect();
         let annotation_new = annotation_separations(problem, s, &geometry, &origins, &grid, &annotation_seen);
 
         if rows_again && round < REPAIR_ROUNDS {
