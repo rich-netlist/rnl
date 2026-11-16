@@ -14,7 +14,7 @@ import { adoptBuffers, changes, resetBuffers } from "./edits.js";
 import { confirmLeave } from "./editor.js";
 import { shell } from "./shell.js";
 import { bindings, constraintsWanted, current, doc, expanded, selected, selectedAsUsage, setDoc, setExpanded, setSelected, setViewCache, viewCache } from "./state.js";
-import { clearDrawing, notice, showLevel, view } from "./drawing.js";
+import { clearDrawing, fit, notice, showLevel, view } from "./drawing.js";
 import { renderHierarchy, rootPath } from "./hierarchy.js";
 import { setProblems } from "./panels.js";
 import { markDiagnostics, renderDiagnostics } from "./problems.js";
@@ -121,10 +121,11 @@ export async function reload() {
 /**
  * Edit > Apply Changes: build the Document again from the texts the editor holds (edits.js) over
  * the files as they are, as opening them would, and show it, with the level, the view and the
- * selection kept. True when it was shown; a message tells why not.
+ * selection kept; a solve shown as a preview ends, as it does not hold the changes. True when it was shown;
+ * a message tells why not.
  */
 export async function applyEdits() {
-  if (!lastSource || !doc || loading || previewing()) return false;
+  if (!lastSource || !doc || loading) return false;
   const operation = beginOpenOperation();
   loading = true;
   document.body.classList.add("busy");
@@ -137,8 +138,12 @@ export async function applyEdits() {
     if (operation.signal.aborted) return false;
     await progress.stage("displaying");
     if (operation.signal.aborted) return false;
+    // a preview shown does not hold the changes: the netlist is shown, and the layout it has can lie outside the view of the solve
+    const ended = previewing();
+    endPreview();
     adoptBuffers(d);
     showBuilt(d, true);
+    if (ended) fit();
     await sourceOpened(lastSource, d, false, true);
     await nextPaint();
   } catch (e) {

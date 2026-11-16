@@ -25,7 +25,7 @@ import { $, span } from "./util.js";
 /** What a shell rejects with when the solve was cancelled (rnl_cli::solve::CANCELLED). */
 export const CANCELLED = "the solve was cancelled";
 
-let shown = null; // the preview shown: { source, report }, or null
+let shown = null; // the preview shown: { source, report, all, respace }, or null
 let running = false; // whether a solve is under way
 let cancelAsked = false; // whether Cancel was pressed since the solve began
 let progressHooked = false;
@@ -33,6 +33,11 @@ let progressHooked = false;
 /** Whether the page shows a solve, not the file as written. */
 export function previewing() {
   return shown !== null;
+}
+
+/** How the preview shown was made, to make it again: `{ all, respace }`; null when none is shown. */
+export function previewKind() {
+  return shown === null ? null : { all: shown.all, respace: shown.respace };
 }
 
 /**
@@ -122,14 +127,14 @@ export async function solve({ all = false, respace = false } = {}) {
     if (cancelAsked) throw new Error(CANCELLED);
     const asked = respace ? { ...taken, timeall: null, respace: true, level } : { ...taken, level };
     const solved = await shell.solve(given, asked, changes(true));
-    shown = { source, report: solved.report };
+    shown = { source, report: solved.report, all, respace };
     noteReport(solved.report);
     showBuilt(solved.document, true);
     // the solved layout can lie outside the view of the netlist as it was
     fit();
     renderReport(solved.report);
     showConstraints(solved.report);
-    showPreview(true, respace);
+    showPreview(true);
     const r = solved.report;
     const discarded = r.levels.reduce((n, l) => n + l.facts.filter((f) => f.status !== "kept").length, 0);
     const later = unappliedPaths().length > 0 ? m(" Changes not applied yet are not in it.") : "";
@@ -225,11 +230,23 @@ function status(text, cancellable) {
   $("solve-cancel").hidden = !cancellable;
 }
 
-/** Show or hide what says that the drawing is a preview, and the report of the solve; `respaced`: of a respace. */
-function showPreview(on, respaced = false) {
+/**
+ * What the badge of a preview says: that the files are unchanged, or, while the text is edited, which is not in the
+ * preview until it is solved again.
+ */
+export function refreshPreviewBadge() {
+  if (!shown) return;
+  const text = shown.respace
+    ? (editing ? m("Respaced preview: the edits are not in it") : m("Respaced preview: the files are unchanged"))
+    : (editing ? m("Solved preview: the edits are not in it") : m("Solved preview: the files are unchanged"));
+  setText($("preview-badge"), text);
+}
+
+/** Show or hide what says that the drawing is a preview, and the report of the solve. */
+function showPreview(on) {
   document.body.classList.toggle("preview", on);
-  if (on) setText($("preview-badge"), respaced ? m("Respaced preview: the files are unchanged") : m("Solved preview: the files are unchanged"));
   $("preview-badge").hidden = !on;
+  if (on) refreshPreviewBadge();
   $("preview-close").hidden = !on;
   if (!on && !$("pane-solve").hidden) setPane("netlist");
   if (!on) emptyReport();
