@@ -1439,7 +1439,7 @@
           {
             "pin_of": "#X3",
             "parent": "@rnl-std-fill.rnl:57:3",
-            "id": "@rnl-std-basic.rnl:674:9",
+            "id": "@rnl-std-basic.rnl:675:9",
             "kind": "usage",
             "host": [],
             "definition": "$NET_LABEL",
@@ -1461,7 +1461,7 @@
             "pins": [
               {
                 "kind": "pin",
-                "id": "pin(@rnl-std-basic.rnl:674:9,0)",
+                "id": "pin(@rnl-std-basic.rnl:675:9,0)",
                 "index": 0,
                 "names": [
                   "pin"
@@ -1475,7 +1475,7 @@
                   "p"
                 ],
                 "at": null,
-                "dir": 180,
+                "dir": 0,
                 "nets": [
                   "&d"
                 ]
@@ -2650,7 +2650,7 @@
           {
             "pin_of": "#R1",
             "parent": "%net_label_stub_R1_p",
-            "id": "@rnl-std-basic.rnl:674:9#1",
+            "id": "@rnl-std-basic.rnl:675:9#1",
             "kind": "usage",
             "host": [],
             "definition": "$NET_LABEL",
@@ -2669,13 +2669,13 @@
               "source": null
             },
             "orient": {
-              "value": "MY",
+              "value": "R0",
               "source": null
             },
             "pins": [
               {
                 "kind": "pin",
-                "id": "pin(@rnl-std-basic.rnl:674:9#1,0)",
+                "id": "pin(@rnl-std-basic.rnl:675:9#1,0)",
                 "index": 0,
                 "names": [
                   "pin"
@@ -2729,7 +2729,7 @@
           {
             "pin_of": "#R2",
             "parent": "%net_label_stub_R2_n",
-            "id": "@rnl-std-basic.rnl:674:9#2",
+            "id": "@rnl-std-basic.rnl:675:9#2",
             "kind": "usage",
             "host": [],
             "definition": "$NET_LABEL",
@@ -2748,13 +2748,13 @@
               "source": null
             },
             "orient": {
-              "value": "R0",
+              "value": "R180",
               "source": null
             },
             "pins": [
               {
                 "kind": "pin",
-                "id": "pin(@rnl-std-basic.rnl:674:9#2,0)",
+                "id": "pin(@rnl-std-basic.rnl:675:9#2,0)",
                 "index": 0,
                 "names": [
                   "pin"
@@ -3112,8 +3112,8 @@
             }
           },
           {
-            "id": "@rnl-std-basic.rnl:674:9#1::netname",
-            "attach": "@rnl-std-basic.rnl:674:9#1",
+            "id": "@rnl-std-basic.rnl:675:9#1::netname",
+            "attach": "@rnl-std-basic.rnl:675:9#1",
             "attach_point": null,
             "key": "netname",
             "markup": {
@@ -3139,15 +3139,16 @@
               -9.3,
               0.0
             ],
-            "halign": "start",
+            "halign": "end",
             "valign": "middle",
             "rotate": 0.0,
+            "fix_rotate": true,
             "size": 1.0,
             "style": {}
           },
           {
-            "id": "@rnl-std-basic.rnl:674:9#2::netname",
-            "attach": "@rnl-std-basic.rnl:674:9#2",
+            "id": "@rnl-std-basic.rnl:675:9#2::netname",
+            "attach": "@rnl-std-basic.rnl:675:9#2",
             "attach_point": null,
             "key": "netname",
             "markup": {
@@ -3173,9 +3174,10 @@
               3.3,
               0.0
             ],
-            "halign": "start",
+            "halign": "end",
             "valign": "middle",
             "rotate": 0.0,
+            "fix_rotate": true,
             "size": 1.0,
             "style": {}
           },
@@ -3210,6 +3212,7 @@
             "halign": "end",
             "valign": "middle",
             "rotate": 0.0,
+            "fix_rotate": true,
             "size": 1.0,
             "style": {}
           },
@@ -3244,6 +3247,7 @@
             "halign": "end",
             "valign": "middle",
             "rotate": 0.0,
+            "fix_rotate": true,
             "size": 1.0,
             "style": {}
           },
@@ -3278,6 +3282,7 @@
             "halign": "end",
             "valign": "middle",
             "rotate": 0.0,
+            "fix_rotate": true,
             "size": 1.0,
             "style": {}
           }
@@ -4438,6 +4443,7 @@
             "halign": "end",
             "valign": "middle",
             "rotate": 0.0,
+            "fix_rotate": true,
             "size": 1.0,
             "style": {}
           },
@@ -4542,6 +4548,7 @@
             "halign": "end",
             "valign": "middle",
             "rotate": 0.0,
+            "fix_rotate": true,
             "size": 1.0,
             "style": {}
           }

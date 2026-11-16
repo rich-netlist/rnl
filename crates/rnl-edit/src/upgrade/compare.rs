@@ -441,6 +441,9 @@ fn without_look(category: &str, value: &Value) -> Value {
             // Where a text is drawn follows from the facts that place it and the symbol, which are
             // compared on their own.
             map.remove("at");
+            // Whether a text turns with its owner is the turning of the label of the owner's symbol
+            // that it stands for, the package's look; the upgrade never writes it.
+            map.remove("fix_rotate");
             // A label that only its symbol gives is the package's: what it says and where it is are look.
             if map.get("written") == Some(&Value::Bool(false)) {
                 for field in

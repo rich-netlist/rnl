@@ -1991,7 +1991,7 @@
               "source": null
             },
             "orient": {
-              "value": "R0",
+              "value": "MY",
               "source": null
             },
             "pins": [
@@ -2192,7 +2192,7 @@
               "source": null
             },
             "orient": {
-              "value": "MY",
+              "value": "R0",
               "source": null
             },
             "pins": [
@@ -2243,7 +2243,7 @@
               "source": null
             },
             "orient": {
-              "value": "R0",
+              "value": "MY",
               "source": null
             },
             "pins": [
@@ -3896,9 +3896,10 @@
               22.3,
               4.0
             ],
-            "halign": "start",
+            "halign": "end",
             "valign": "middle",
             "rotate": 0.0,
+            "fix_rotate": true,
             "size": 1.0,
             "style": {}
           },
@@ -3930,9 +3931,10 @@
               -12.3,
               0.0
             ],
-            "halign": "start",
+            "halign": "end",
             "valign": "middle",
             "rotate": 0.0,
+            "fix_rotate": true,
             "size": 1.0,
             "style": {}
           },
@@ -3964,9 +3966,10 @@
               12.3,
               0.0
             ],
-            "halign": "start",
+            "halign": "end",
             "valign": "middle",
             "rotate": 0.0,
+            "fix_rotate": true,
             "size": 1.0,
             "style": {}
           },

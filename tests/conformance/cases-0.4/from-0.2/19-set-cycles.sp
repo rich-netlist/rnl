@@ -16,9 +16,9 @@ R1 p q 1k
 *   %net_label_stub_R1_n = $NET_LABEL_STUB @ATTACH #R1::n;
 *   #R1 @PLACE(0, 0) => @ORIENT("R0");
 *   %net_label_stub_R1_p @PLACE(0, 0);
-*   %net_label_stub_R1_p::l @PLACE(0, 2) => @ORIENT("R90");
+*   %net_label_stub_R1_p::l @PLACE(0, 2) => @ORIENT("R270");
 *   %net_label_stub_R1_n @PLACE(0, 0);
-*   %net_label_stub_R1_n::l @PLACE(0, -2) => @ORIENT("R270")
+*   %net_label_stub_R1_n::l @PLACE(0, -2) => @ORIENT("R90")
 * }
 .ends
 * @RNL {
@@ -61,16 +61,16 @@ R1 p q 1k
 *   %ground_stub_C1_n @PLACE(0, 0);
 *   %ground_stub_C1_n::g @PLACE(0, -9) => @ORIENT("R0");
 *   %net_label_stub_R1_p @PLACE(0, 0);
-*   %net_label_stub_R1_p::l @PLACE(0, 2) => @ORIENT("R90");
+*   %net_label_stub_R1_p::l @PLACE(0, 2) => @ORIENT("R270");
 *   %net_label_stub_C1_p @PLACE(0, 0);
-*   %net_label_stub_C1_p::l @PLACE(0, -4) => @ORIENT("R90");
+*   %net_label_stub_C1_p::l @PLACE(0, -4) => @ORIENT("R270");
 *   %net_label_stub_R1_n @PLACE(0, 0);
-*   %net_label_stub_R1_n::l @PLACE(0, -2) => @ORIENT("R270");
+*   %net_label_stub_R1_n::l @PLACE(0, -2) => @ORIENT("R90");
 *   %net_label_stub_R2_p @PLACE(0, 0);
-*   %net_label_stub_R2_p::l @PLACE(6, 2) => @ORIENT("R90");
+*   %net_label_stub_R2_p::l @PLACE(6, 2) => @ORIENT("R270");
 *   %net_label_stub_R2_n @PLACE(0, 0);
-*   %net_label_stub_R2_n::l @PLACE(6, -2) => @ORIENT("R270");
+*   %net_label_stub_R2_n::l @PLACE(6, -2) => @ORIENT("R90");
 *   %net_label_stub_R3_p @PLACE(0, 0);
-*   %net_label_stub_R3_p::l @PLACE(12, -1) => @ORIENT("R90")
+*   %net_label_stub_R3_p::l @PLACE(12, -1) => @ORIENT("R270")
 * }
 .end

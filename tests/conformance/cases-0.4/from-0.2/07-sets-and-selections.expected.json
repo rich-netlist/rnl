@@ -571,9 +571,9 @@
         {
           "name": "$NET_LABEL_SYMBOL",
           "box": [
+            -1.0,
             0.0,
             0.0,
-            1.0,
             0.0
           ],
           "box_written": false,
@@ -588,7 +588,7 @@
                 "p"
               ],
               "label": null,
-              "dir": 180
+              "dir": 0
             }
           ],
           "prims": [
@@ -600,7 +600,7 @@
                   0.0
                 ],
                 [
-                  1.0,
+                  -1.0,
                   0.0
                 ]
               ],
@@ -994,7 +994,7 @@
             7.0,
             0.0
           ],
-          "orient": "R180",
+          "orient": "R0",
           "style": {
             "bold": true,
             "cap": "butt",
@@ -1016,7 +1016,7 @@
             15.0,
             0.0
           ],
-          "orient": "R180",
+          "orient": "R0",
           "style": {
             "bold": true,
             "cap": "butt",
@@ -1038,7 +1038,7 @@
             23.0,
             0.0
           ],
-          "orient": "R180",
+          "orient": "R0",
           "style": {
             "bold": true,
             "cap": "butt",

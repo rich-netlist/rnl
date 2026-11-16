@@ -54,9 +54,9 @@ Vdd vdd 0 1.8
 *   &bias @WIRE(mode="auto") {%j6 (-14, -3) %jb};
 *   $JUNCTION @ATTACH %jd => @PLACE(-6, 4); $JUNCTION @ATTACH %jg => @PLACE(-2, 8); $JUNCTION @ATTACH %jo => @PLACE(6, 4); $JUNCTION @ATTACH %jc => @PLACE(16, 4); $JUNCTION @ATTACH %jt => @PLACE(0, -3); $JUNCTION @ATTACH %jb => @PLACE(-22, -3); $JUNCTION @ATTACH %j6 => @PLACE(-14, -6);
 *
-*   %pi = $NET_LABEL @ATTACH &inp => @ORIENT("MY");
-*   $NET_LABEL @ATTACH &inn => @ORIENT("R0") => %pn;
-*   $NET_LABEL @ATTACH &out => @ORIENT("R0") => %po;
+*   %pi = $NET_LABEL @ATTACH &inp => @ORIENT("R0");
+*   $NET_LABEL @ATTACH &inn => @ORIENT("MY") => %pn;
+*   $NET_LABEL @ATTACH &out => @ORIENT("MY") => %po;
 *   &inp @WIRE(mode="auto") {%pi:p #M1:2};
 *   &inn @WIRE(mode="auto") {%pn:p #M2:2};
 *   &out @WIRE(mode="auto") {%jo %jc %po:p};

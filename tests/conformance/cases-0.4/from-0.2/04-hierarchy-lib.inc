@@ -22,9 +22,9 @@ R2 mid bot 10k
 *   #R1 @PLACE(-6, 0) => @ORIENT("R90");
 *   #R2 @PLACE(0, 0) => @ORIENT("R90");
 *   %net_label_stub_R1_p @PLACE(0, 0);
-*   %net_label_stub_R1_p::l @PLACE(-8, 0) => @ORIENT("MY");
+*   %net_label_stub_R1_p::l @PLACE(-8, 0) => @ORIENT("R0");
 *   %net_label_stub_R2_n @PLACE(0, 0);
-*   %net_label_stub_R2_n::l @PLACE(2, 0) => @ORIENT("R0");
+*   %net_label_stub_R2_n::l @PLACE(2, 0) => @ORIENT("R180");
 *   %io_port_top @PLACE(-13, 4) => @ORIENT("R0");
 *   %io_port_mid @PLACE(-13, 0) => @ORIENT("R0");
 *   %io_port_bot @PLACE(-13, -4) => @ORIENT("R0")

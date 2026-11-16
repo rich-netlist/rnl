@@ -64,8 +64,8 @@ Iref vdd! bias 10u
 *   %net_label_stub_M1_g = $NET_LABEL_STUB @ATTACH #M1::g;
 *   %net_label_stub_M2_g = $NET_LABEL_STUB @ATTACH #M2::g;
 *   %net_label_stub_M3_g = $NET_LABEL_STUB @ATTACH #M3::g;
-*   %net_label_stub_M1_g @PLACE(0, 0); %net_label_stub_M1_g::l @PLACE(7, 0) => @ORIENT("R180");
-*   %net_label_stub_M2_g @PLACE(0, 0); %net_label_stub_M2_g::l @PLACE(15, 0) => @ORIENT("R180");
-*   %net_label_stub_M3_g @PLACE(0, 0); %net_label_stub_M3_g::l @PLACE(23, 0) => @ORIENT("R180");
+*   %net_label_stub_M1_g @PLACE(0, 0); %net_label_stub_M1_g::l @PLACE(7, 0) => @ORIENT("R0");
+*   %net_label_stub_M2_g @PLACE(0, 0); %net_label_stub_M2_g::l @PLACE(15, 0) => @ORIENT("R0");
+*   %net_label_stub_M3_g @PLACE(0, 0); %net_label_stub_M3_g::l @PLACE(23, 0) => @ORIENT("R0");
 * }
 .end

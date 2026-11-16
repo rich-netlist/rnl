@@ -246,7 +246,7 @@ fn top_level_io_port_becomes_net_label_only_with_approximate() {
 }
 
 #[test]
-fn net_label_orientation_is_turned_with_the_pin() {
+fn net_label_keeps_the_orientation_of_the_port() {
     let source = |orient: &str, place: &str| {
         format!(
             "* title
@@ -270,8 +270,9 @@ R2 vin vout 1k
         )
         .unwrap()
     };
-    // the explicit codes of the port are turned: R0 and MY, R180 and MX swap; the rest turn with the pin
-    for (before, after) in [("R0", "MY"), ("MY", "R0"), ("R180", "MX"), ("MX", "R180"), ("R90", "MYR90")] {
+    // the label's pin faces right, as the port's did, and its name is on the left: every code stays
+    for code in ["R0", "MY", "R180", "MX", "R90"] {
+        let (before, after) = (code, code);
         let r = run(&source(
             &format!("%pout @ORIENT(\"{before}\")"),
             &format!("%pout @PLACE(4, 2) => @ORIENT(\"{before}\")"),
@@ -282,21 +283,12 @@ R2 vin vout 1k
         assert!(text.contains(&format!("%pout @PLACE(4, 2) => @ORIENT(\"{after}\")")), "{before}: {text}");
         assert!(r.report.differences.is_empty(), "{before}: {:?}", r.report.differences);
         assert!(r.report.assertion_violations.is_empty(), "{before}: {:?}", r.report.assertion_violations);
-        assert!(
-            r.report.files[0].approximations.iter().filter(|a| a.rule == "approximate-label-orientation").count() == 2,
-            "{before}: {:?}",
-            r.report.files[0].approximations
-        );
     }
-    // a statement that orients the label with other objects is left for the author, with a note
+    // a statement that orients the label with other objects stays as it is
     let mixed = run(&source("{%pout #R2} @ORIENT(\"R0\")", "#R2 @PLACE(0, 0)"));
     let text = &mixed.files["t.sp"];
     assert!(text.contains("{%pout #R2} @ORIENT(\"R0\")"), "{text}");
-    assert!(
-        mixed.report.files[0].unconverted.iter().any(|u| u.rule == "label-orientation-mixed"),
-        "{:?}",
-        mixed.report.files[0]
-    );
+    assert!(mixed.report.files[0].unconverted.is_empty(), "{:?}", mixed.report.files[0]);
     // a port that stays an IO_PORT keeps its orientation
     let kept = run("* title
 * @RNL(type=\"header\") { @VERSION(\"0.3\") }
