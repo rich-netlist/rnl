@@ -90,7 +90,7 @@ its previous semicolon syntax is also accepted during the transition.
 | `spacing_x`, `spacing_y` | integer from -1 through 20; the line layout spaces by them | 0 | yes |
 | `lines_weights` | two integers from 0 through 1000, `[crossing, bend]`, not both 0; the line layout ranks by crossing × crossings + bend × bends | `[1, 4]` | yes |
 | `virtual_weight` | number from 0 through 1; in the line layout's `symbol_lines`, a row or column of the symbols that only virtual symbols take counts this: the objects of usages, such as supply, ground or port symbols, whatever joins them; one an instance of the netlist or a bundle takes counts 1 | 0.5 | yes |
-| `lines_order` | the layers the line layout ranks by after its facts, false joins, annotations and rules, written as `objectives` writes layers but without tolerances; items `current`, `crossings_and_bends`, `hidden_ports`, `rail_heights`, `mirror_pairs`, `dots_near_pins`, `length`, `wire_lines`, `symbol_lines`, `area`; an item left out does not rank | `current,crossings_and_bends,hidden_ports,mirror_pairs,dots_near_pins,length,symbol_lines+wire_lines,area` | yes |
+| `lines_order` | the layers the line layout ranks by after its facts, false joins, annotations and rules, written as `objectives` writes layers but without tolerances; items `current`, `crossings_and_bends`, `hidden_ports`, `rail_heights`, `mirror_pairs`, `dots_near_pins`, `length`, `wire_lines`, `symbol_lines`, `area`; an item left out does not rank | `current,crossings_and_bends,symbol_lines+wire_lines*2,length,area` | yes |
 | `junction` | definition name as a string; empty disables dots | unset | yes |
 | `tolerance` | finite nonnegative number | 0.000001 | yes |
 | `grid` | positive number, or `false` | 1 | yes |

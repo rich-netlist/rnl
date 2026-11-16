@@ -92,11 +92,12 @@ pub const LINES_ITEMS: [&str; 10] = [
     "area",
 ];
 
-/// The default of `lines_order`, as the user set it on 2026-11-17: the order the line layout ranked
-/// in before it could be set, without the heights of the grounds and supplies, and with the lines
-/// of the wires and the rows and columns of the symbols one layer, alignment, each counting one.
-pub const DEFAULT_LINES_ORDER: &str = "current,crossings_and_bends,hidden_ports,mirror_pairs,dots_near_pins,\
-     length,symbol_lines+wire_lines,area";
+/// The default of `lines_order`, as the user set it on 2026-11-17 from the settings they solve with:
+/// the pins against their CURRENT, then the crossings and bends, then alignment, one layer in which a
+/// line of the wires counts two and a row or column of the symbols one, then the length and the area.
+/// The hidden ports, the heights of the grounds and supplies, the mirror pairs off their axis and the
+/// dots near pins do not rank.
+pub const DEFAULT_LINES_ORDER: &str = "current,crossings_and_bends,symbol_lines+wire_lines*2,length,area";
 
 /// The layers by which the line layout ranks its drawings after its rules (`lines_order`), the
 /// most important first, as `objectives` writes layers: layers separated by commas, the items of a

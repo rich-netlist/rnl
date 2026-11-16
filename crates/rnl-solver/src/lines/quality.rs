@@ -578,16 +578,18 @@ mod tests {
     }
 
     /// Each item ranks while `lines_order` takes it and not once it is left out; `none` ranks by
-    /// none of them. By default every item but the heights of the grounds and supplies ranks.
+    /// none of them. By default the hidden ports, the heights of the grounds and supplies, the mirror
+    /// pairs and the dots near pins do not rank.
     #[test]
     fn each_item_ranks_only_while_lines_order_takes_it() {
         let d = Ranking::default();
-        assert_eq!(d.layers.len(), 8);
+        assert_eq!(d.layers.len(), 5);
         let all = ranking(&format!("lines_order=\"{}\"", crate::LINES_ITEMS.join(",")));
         for name in crate::LINES_ITEMS {
             let item = Item::from_name(name).unwrap();
             assert!(drawing(item, 1, &all) > drawing(item, 0, &all), "{name}");
-            assert_eq!(d.takes(item), item != Item::RailHeights, "{name}");
+            let off = [Item::HiddenPorts, Item::RailHeights, Item::MirrorPairs, Item::DotsNearPins];
+            assert_eq!(d.takes(item), !off.contains(&item), "{name}");
             let alone = ranking(&format!("lines_order=\"{name}\""));
             assert_eq!(drawing(item, 1, &alone).quality(), [int(1)], "{name}");
             let others: Vec<&str> = crate::LINES_ITEMS.into_iter().filter(|n| *n != name).collect();
@@ -602,8 +604,8 @@ mod tests {
         assert!(drawing(Item::CrossingsAndBends, 9, &none).quality().is_empty());
     }
 
-    /// The layers rank in the order `lines_order` gives: a hidden port before dots near pins by
-    /// default, after them when the order is turned.
+    /// The layers rank in the order `lines_order` gives: a hidden port before dots near pins in one
+    /// order, after them when the order is turned.
     #[test]
     fn the_layers_rank_in_the_order_given() {
         let both = |r: &Ranking| {
@@ -615,29 +617,29 @@ mod tests {
             b.rank_by(r);
             (a, b)
         };
-        let (a, b) = both(&Ranking::default());
+        let (a, b) = both(&ranking("lines_order=\"hidden_ports,dots_near_pins\""));
         assert!(a > b);
         let (a, b) = both(&ranking("lines_order=\"dots_near_pins,hidden_ports\""));
         assert!(a < b);
     }
 
-    /// Alignment is one layer by default: a line of the wires and a row or column of the symbols
-    /// count one each; the weights of the layer set how many of one outweigh the other.
+    /// Alignment is one layer by default: a line of the wires counts two, a row or column of the
+    /// symbols one; the weights of the layer set how many of one outweigh the other.
     #[test]
     fn the_lines_of_the_wires_and_of_the_symbols_weigh_in_one_layer() {
         let d = Ranking::default();
-        assert_eq!(d.layers[6], [(Item::SymbolLines, 1), (Item::WireLines, 1)]);
+        assert_eq!(d.layers[2], [(Item::SymbolLines, 1), (Item::WireLines, 2)]);
         let mixed = |wires: i64, symbols: i64, r: &Ranking| {
             let mut l = drawing(Item::WireLines, wires, r);
             l.crosses_weighed = int(symbols);
             l.rank_by(r);
             l
         };
-        // one line of the wires against one row of the symbols: alike; against two, fewer
-        assert_eq!(mixed(1, 0, &d).quality(), mixed(0, 1, &d).quality());
-        assert!(mixed(1, 0, &d) < mixed(0, 2, &d));
-        let wires_first = ranking("lines_order=\"symbol_lines+wire_lines*2\"");
-        assert!(mixed(1, 0, &wires_first) > mixed(0, 1, &wires_first));
+        // one line of the wires against one row of the symbols: the wires weigh more; against two, alike
+        assert!(mixed(1, 0, &d) > mixed(0, 1, &d));
+        assert_eq!(mixed(1, 0, &d).quality(), mixed(0, 2, &d).quality());
+        let alike = ranking("lines_order=\"symbol_lines+wire_lines\"");
+        assert_eq!(mixed(1, 0, &alike).quality(), mixed(0, 1, &alike).quality());
         let symbols_first = ranking("lines_order=\"symbol_lines*3+wire_lines\"");
         assert!(mixed(1, 0, &symbols_first) < mixed(0, 1, &symbols_first));
     }
@@ -656,8 +658,8 @@ mod tests {
         assert_eq!(one.crosses_weighed, int(one.crosses as i64));
         assert_eq!(&one.crosses_weighed - &half.crosses_weighed, int(1) / int(2));
         assert_eq!(&one.crosses_weighed - &none.crosses_weighed, int(1));
-        // the alignment layer: the rows and columns of the symbols weighed, and the lines of the wires
-        assert_eq!(half.quality()[6], &half.crosses_weighed + int(half.lines as i64));
+        // the alignment layer: the rows and columns of the symbols weighed, and the lines of the wires twice
+        assert_eq!(half.quality()[2], &half.crosses_weighed + int(2 * half.lines as i64));
         // an instance's row is not weighed: with no symbol_lines in the order nothing is weighed
         let off = lab_order(&p, &s, &placed, &routing, &ranking("lines_order=\"length\""), None);
         assert_eq!(off.crosses_weighed, int(off.crosses as i64));
