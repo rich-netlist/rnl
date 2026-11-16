@@ -20,6 +20,9 @@ pub(crate) struct Rank {
     active: Active,
     rules: Vec<usize>,
     annotations: bool,
+    /// Below a `virtual_weight` of 1, the weight: the heights and the rows and columns of the
+    /// symbols weighed, each layer with a tolerance just under a whole unit ([`Rank::for_choice`]).
+    weighed: Option<Q>,
     seen: RefCell<(Vec<(Q, Q)>, usize)>,
 }
 
@@ -39,8 +42,26 @@ impl Rank {
             active: Active { layers, inert: Vec::new(), configured_only: true },
             rules,
             annotations,
+            weighed: None,
             seen: RefCell::new((Vec::new(), 0)),
         }
+    }
+
+    /// The rank by which the line layout chooses between its drawing and the group-tree layout's:
+    /// [`Rank::new`], and below a `virtual_weight` of 1, the heights of the grounds and supplies and
+    /// the rows and columns of the symbols weighed by it, two drawings alike on each unless they
+    /// differ by a whole unit. The group-tree layout's own search ranks by [`Rank::new`].
+    pub(crate) fn for_choice(s: &Structure, options: &SolverOptions) -> Rank {
+        let mut rank = Rank::new(s);
+        let w = options.settings.virtual_weight;
+        if !w.is_one() {
+            let base = 4 + 2 * usize::from(rank.annotations) + rank.rules.len();
+            for i in [base + 3, base + 6 + 2] {
+                rank.active.layers[i].tolerance = super::quality::unit_tolerance();
+            }
+            rank.weighed = Some(w.q());
+        }
+        rank
     }
 
     pub(crate) fn active(&self) -> &Active {
@@ -82,7 +103,9 @@ impl Rank {
         }
         // the unified key: the line-layout order, its crossings and bends weighed by the one pair,
         // with the configured rules between the annotations and its marks
-        let l = super::quality::lab_measure(problem, s, placed, routing, options.settings.lines_weights.pair(), None);
+        let w = self.weighed.clone().unwrap_or_else(|| int(1));
+        let l =
+            super::quality::lab_measure(problem, s, placed, routing, options.settings.lines_weights.pair(), &w, None);
         if !l.interrupted {
             layers.extend(self.rules.iter().map(|&i| objectives.get(i).cloned().unwrap_or_else(Q::zero)));
         }
@@ -103,6 +126,9 @@ impl Rank {
         }
         if l.interrupted {
             layers.extend((0..self.rules.len() + 6 + 4).map(|_| int(i64::MAX)));
+        } else if self.weighed.is_some() {
+            layers.extend(l.head_weighed());
+            layers.extend(l.tail_weighed());
         } else {
             layers.extend(l.head());
             layers.extend(l.tail());
@@ -167,6 +193,32 @@ mod tests {
         let bad = rank.entry(&p, &s, &options, &placed, &routing, layers, &[]);
         assert_eq!(bad.layers[0], int(1));
         assert_eq!(crate::score::order(rank.active(), &[bad, good]), [1, 0]);
+    }
+
+    /// At a `virtual_weight` of 1 the rank of the line layout's choice is the tree's: no
+    /// tolerance, the same layers. Below 1 the heights and the rows and columns of the symbols
+    /// take a tolerance just under a whole unit.
+    #[test]
+    fn the_choice_ranks_as_the_tree_at_a_weight_of_one() {
+        let (p, s, placed, routing) = super::super::port::tests::fixture();
+        let options = SolverOptions::without_time_limit();
+        let layers = vec![int(0); s.active.layers.len()];
+        let (tree, choice) = (Rank::new(&s), Rank::for_choice(&s, &options));
+        assert!(choice.weighed.is_none());
+        assert!(choice.active().layers.iter().all(|l| l.tolerance.is_zero()));
+        let a = tree.entry(&p, &s, &options, &placed, &routing, layers.clone(), &[]);
+        let b = choice.entry(&p, &s, &options, &placed, &routing, layers.clone(), &[]);
+        assert_eq!(a.layers, b.layers);
+        let half = options.with_overrides("virtual_weight=0.5").unwrap();
+        let weighed = Rank::for_choice(&s, &half);
+        let base = 4 + 2 * usize::from(weighed.annotations) + weighed.rules.len();
+        let tolerant: Vec<usize> =
+            (0..weighed.active().layers.len()).filter(|&i| !weighed.active().layers[i].tolerance.is_zero()).collect();
+        assert_eq!(tolerant, [base + 3, base + 8]);
+        assert!(weighed.active().layers[base + 3].tolerance < int(1));
+        // the fixture has no loose symbol: the weighed layers are the counts
+        let c = weighed.entry(&p, &s, &half, &placed, &routing, layers, &[]);
+        assert_eq!(a.layers, c.layers);
     }
 
     #[test]

@@ -417,6 +417,8 @@ struct Level<'a> {
     tree: &'a Placed,
     nodes: &'a GroupTree,
     weights: (u64, u64),
+    /// The weight of a loose virtual symbol (`virtual_weight`).
+    virtual_weight: Q,
     clear: &'a BTreeMap<usize, u8>,
     hung: BTreeMap<usize, Vec<(usize, usize, Rule)>>,
     leaves: BTreeSet<usize>,
@@ -598,6 +600,7 @@ pub(crate) fn settle(
         tree,
         nodes,
         weights: options.settings.lines_weights.pair(),
+        virtual_weight: options.settings.virtual_weight.q(),
         clear,
         hung: BTreeMap::new(),
         leaves: BTreeSet::new(),
@@ -1341,8 +1344,8 @@ impl Search<'_, '_> {
 
         let span = crate::profile::span("lines", "weigh");
         let lab = match &made {
-            Some(m) => lab_order(problem, s, &m.placed, &m.routing, lv.weights, within),
-            None => lab_order(problem, s, &placed, &routing, lv.weights, within),
+            Some(m) => lab_order(problem, s, &m.placed, &m.routing, lv.weights, &lv.virtual_weight, within),
+            None => lab_order(problem, s, &placed, &routing, lv.weights, &lv.virtual_weight, within),
         };
         drop(span);
         let failed = made.as_ref().is_some_and(|m| m.failed);
@@ -4222,6 +4225,7 @@ pub(super) mod tests {
                 tree: &start.placed,
                 nodes: &s.tree,
                 weights: (1, 4),
+                virtual_weight: crate::rational::int(1),
                 clear: &BTreeMap::new(),
                 hung: BTreeMap::new(),
                 leaves: BTreeSet::new(),
@@ -4436,6 +4440,7 @@ pub(super) mod tests {
                 tree: &start.placed,
                 nodes: &s.tree,
                 weights: (1, 4),
+                virtual_weight: crate::rational::int(1),
                 clear: &BTreeMap::new(),
                 hung: BTreeMap::new(),
                 leaves: BTreeSet::new(),
@@ -4552,6 +4557,7 @@ pub(super) mod tests {
                 tree: &placed,
                 nodes: &s.tree,
                 weights: (1, 4),
+                virtual_weight: crate::rational::int(1),
                 clear: &BTreeMap::new(),
                 hung: BTreeMap::new(),
                 leaves: BTreeSet::new(),
@@ -4637,6 +4643,7 @@ pub(super) mod tests {
             tree: &placed,
             nodes: &s.tree,
             weights: (1, 4),
+            virtual_weight: crate::rational::int(1),
             clear: &BTreeMap::new(),
             hung: BTreeMap::new(),
             leaves: BTreeSet::new(),
@@ -4696,6 +4703,7 @@ pub(super) mod tests {
             tree: &start.placed,
             nodes: &arrangement.1,
             weights: (1, 4),
+            virtual_weight: crate::rational::int(1),
             clear: &BTreeMap::new(),
             hung: BTreeMap::new(),
             leaves: BTreeSet::new(),

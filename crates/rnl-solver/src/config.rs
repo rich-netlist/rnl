@@ -74,6 +74,42 @@ impl LinesWeights {
     }
 }
 
+/// How much a loose virtual symbol counts where the line layout ranks the alignment of its
+/// drawings (`virtual_weight`): a supply, ground or port symbol that no stub hangs from an
+/// element's pin, no wire or ROUTE reaches and no group holds with an element. The heights of the
+/// grounds and the supplies and the rows and columns of the symbols count a height or a line that
+/// only such symbols take by this weight, and one an element or a joined symbol takes by 1. From 0
+/// to 1; 1 by default, which ranks as the counts do. Below 1, two drawings differ on either count
+/// only by a whole unit, so that one loose symbol out of line does not decide alone. The line
+/// layout's search and its choice between its drawing and the group-tree layout's use it; the
+/// group-tree layout's own search does not.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct VirtualWeight(pub f64);
+
+impl Default for VirtualWeight {
+    fn default() -> Self {
+        VirtualWeight(1.0)
+    }
+}
+
+impl VirtualWeight {
+    /// What is wrong with it, if anything.
+    pub fn problem(self) -> Option<String> {
+        (!(self.0.is_finite() && (0.0..=1.0).contains(&self.0)))
+            .then(|| "virtual_weight must be a number from 0 to 1".to_string())
+    }
+
+    /// Whether it is 1, which ranks as the counts do.
+    pub fn is_one(self) -> bool {
+        self.0 == 1.0
+    }
+
+    /// As the decimal it writes, exactly.
+    pub(crate) fn q(self) -> crate::rational::Q {
+        crate::rational::from_f64(self.0).unwrap_or_else(|| crate::rational::int(1))
+    }
+}
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Settings {
     pub layout: Layout,
@@ -90,6 +126,9 @@ pub struct Settings {
     pub join_trees: bool,
     /// The weights of a crossing and of a bend in the lines layout (`lines_weights`).
     pub lines_weights: LinesWeights,
+    /// How much a loose virtual symbol counts in the line layout's alignment ranks
+    /// (`virtual_weight`).
+    pub virtual_weight: VirtualWeight,
     /// Only values explicitly supplied by the caller. Defaults must not mask file values.
     pub overrides: Vec<SolverSetting>,
 }
@@ -123,6 +162,7 @@ fn known(key: &str) -> bool {
                 | "beam"
                 | "objectives"
                 | "lines_weights"
+                | "virtual_weight"
         )
 }
 
@@ -188,6 +228,7 @@ fn apply(o: &mut SolverOptions, s: &SolverSetting) -> Result<(), String> {
             };
             o.settings.lines_weights = LinesWeights { crossing, bend };
         }
+        "virtual_weight" => o.settings.virtual_weight = VirtualWeight(number(s)?),
         "tolerance" => o.tolerance = number(s)?,
         "grid" => o.grid = if s.value == Lit::Bool(false) { None } else { Some(number(s)?) },
         "beam" => o.beam = count(s, 1024)? as usize,
@@ -439,6 +480,7 @@ pub(crate) fn unused_by_layout(o: &SolverOptions) -> Vec<SettingProblem> {
         ("candidates", o.budget.candidates != d.budget.candidates),
         ("tree_work", o.tree_work != d.tree_work),
         ("lines_weights", o.settings.lines_weights != d.settings.lines_weights),
+        ("virtual_weight", o.settings.virtual_weight != d.settings.virtual_weight),
     ];
     let table = crate::table::settings_table();
     let mut out = Vec::new();
@@ -482,7 +524,7 @@ impl SolverOptions {
     /// Defaults in the syntax accepted by --solver-config.
     pub fn defaults_config() -> String {
         let d = Self::default();
-        format!("layout=\"lines\", spacing_x=0, spacing_y=0, lines_weights=[1, 4], join_trees=false, limit=\"time\", seconds=10, safety_seconds=30, tolerance={}, grid=1, beam={}, candidates={}, astar_expansions={}", rnl_runtime::geom::fmt_num(d.tolerance), d.beam, d.budget.candidates, d.budget.astar_expansions)
+        format!("layout=\"lines\", spacing_x=0, spacing_y=0, lines_weights=[1, 4], virtual_weight=1, join_trees=false, limit=\"time\", seconds=10, safety_seconds=30, tolerance={}, grid=1, beam={}, candidates={}, astar_expansions={}", rnl_runtime::geom::fmt_num(d.tolerance), d.beam, d.budget.candidates, d.budget.astar_expansions)
     }
     /// Parse tool settings using RNL literal syntax; reject invalid values before solving.
     pub fn with_config(&self, text: &str) -> Result<Self, String> {
@@ -754,6 +796,34 @@ mod tests {
     }
 
     #[test]
+    fn virtual_weight_is_a_number_from_0_to_1_a_file_may_give() {
+        let settings = |text: &str| {
+            rnl_runtime::solver_settings::parse_overrides(text).unwrap_or_else(|e| panic!("{text}: {}", e.message))
+        };
+        let mut p = problem_of(Vec::new(), Vec::new());
+        p.version = "0.4".into();
+        assert!(SolverOptions::default().settings.virtual_weight.is_one());
+        p.solver_config = settings("virtual_weight=0.5");
+        let (o, warnings, errors) = SolverOptions::default().for_problem(&p);
+        assert_eq!(o.settings.virtual_weight, VirtualWeight(0.5));
+        assert_eq!(o.settings.virtual_weight.q(), crate::rational::int(1) / crate::rational::int(2));
+        assert!(warnings.is_empty() && errors.is_empty(), "{warnings:?} {errors:?}");
+        for bad in ["-0.1", "1.5", "\"0.5\"", "[0.5]", "true"] {
+            p.solver_config = [settings("virtual_weight=0.5"), settings(&format!("virtual_weight={bad}"))].concat();
+            let (o, _, errors) = SolverOptions::default().for_problem(&p);
+            assert_eq!(o.settings.virtual_weight, VirtualWeight(0.5), "{bad}");
+            assert_eq!(errors.len(), 1, "{bad}: {errors:?}");
+            assert!(SolverOptions::default().with_config(&format!("virtual_weight={bad}")).is_err(), "{bad}");
+        }
+        for good in ["0", "0.25", "1"] {
+            assert!(SolverOptions::default().with_config(&format!("virtual_weight={good}")).is_ok(), "{good}");
+        }
+        let tool = SolverOptions::default().with_config("virtual_weight=0.25").unwrap();
+        p.solver_config = settings("virtual_weight=0.5");
+        assert_eq!(tool.for_problem(&p).0.settings.virtual_weight, VirtualWeight(0.25));
+    }
+
+    #[test]
     fn a_refused_value_of_the_file_leaves_the_earlier_one_in_effect() {
         let settings = |text: &str| rnl_runtime::solver_settings::parse_overrides(text).unwrap();
         let mut p = problem_of(Vec::new(), Vec::new());
@@ -863,6 +933,7 @@ mod tests {
             ("candidates", "10"),
             ("tree_work", "1000"),
             ("lines_weights", "[2, 3]"),
+            ("virtual_weight", "0.5"),
         ];
         let table = crate::table::settings_table();
         for row in table.settings.iter().filter(|r| applies_to(r.applies).is_some()) {

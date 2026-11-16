@@ -187,7 +187,8 @@ pub(crate) fn lay_out(
     let Some(arrangement) = laid.arrangement.clone() else {
         return fallback(laid, notes, "the group-tree layout gave no tables".to_string(), work);
     };
-    let theirs = lab_order(problem, s, &laid.placed, &laid.routing, weights, None);
+    let virtual_weight = options.settings.virtual_weight.q();
+    let theirs = lab_order(problem, s, &laid.placed, &laid.routing, weights, &virtual_weight, None);
     if theirs.interrupted {
         return fallback(laid, notes, "budget exhausted before line search".into(), work);
     }
@@ -234,7 +235,7 @@ pub(crate) fn lay_out(
     }
     // the one key of the tree's rank, the line search and this comparison, of a drawing it can read:
     // its wires drawn, its annotations placed
-    let rank = super::Rank::new(s);
+    let rank = super::Rank::for_choice(s, options);
     let readable = |placed: &Placed, routing: &Routing| {
         routing.written_path_error.is_none()
             && routing.annotation_error.is_none()
@@ -253,7 +254,8 @@ pub(crate) fn lay_out(
         || !readable(&made.placed, &made.routing)
         || readable(&laid.placed, &laid.routing)
             && crate::budget::with(&crate::StoppedClock, crate::RunLimit::Unlimited, None, || {
-                key(&made.placed, &made.routing) > key(&laid.placed, &laid.routing)
+                let (made, laid) = (key(&made.placed, &made.routing), key(&laid.placed, &laid.routing));
+                rank.active().rank(&[(made.as_slice(), &[]), (laid.as_slice(), &[])])[0] == 1
             })
             .0;
     if after {

@@ -31,6 +31,30 @@ pub(super) struct LabOrder {
     /// The configured rules of the lines layout (overlaps, crowding, misleading, wire over symbol),
     /// as the tree's rank has them; measured for a whole level only.
     pub(super) rules: Vec<Q>,
+    /// The weight of a loose virtual symbol (`virtual_weight`); 1 ranks by the counts.
+    pub(super) virtual_weight: Q,
+    /// The heights of the grounds and supplies beyond one, a height only loose symbols take
+    /// weighed by `virtual_weight`.
+    pub(super) levels_weighed: Q,
+    /// The rows and columns of the symbols, one only loose virtual symbols take weighed by
+    /// `virtual_weight`.
+    pub(super) crosses_weighed: Q,
+}
+
+/// Two weighed counts as the line layout compares them below a weight of 1: alike when they
+/// differ by less than a whole unit.
+fn by_unit(a: &Q, b: &Q) -> std::cmp::Ordering {
+    if (a - b).abs() < int(1) {
+        std::cmp::Ordering::Equal
+    } else {
+        a.cmp(b)
+    }
+}
+
+/// The tolerance of a weighed layer in a rank ([`super::Rank::for_choice`]): just under a whole
+/// unit.
+pub(super) fn unit_tolerance() -> Q {
+    int(1) - int(1) / int(1 << 20)
 }
 
 impl LabOrder {
@@ -69,6 +93,20 @@ impl LabOrder {
     pub(super) fn tail(&self) -> Vec<Q> {
         vec![self.length.clone(), int(self.lines as i64), int(self.crosses as i64), self.area.clone()]
     }
+
+    /// [`LabOrder::head`] with the heights weighed by `virtual_weight`.
+    pub(super) fn head_weighed(&self) -> Vec<Q> {
+        let mut head = self.head();
+        head[3] = self.levels_weighed.clone();
+        head
+    }
+
+    /// [`LabOrder::tail`] with the rows and columns of the symbols weighed by `virtual_weight`.
+    pub(super) fn tail_weighed(&self) -> Vec<Q> {
+        let mut tail = self.tail();
+        tail[2] = self.crosses_weighed.clone();
+        tail
+    }
 }
 
 impl PartialOrd for LabOrder {
@@ -78,8 +116,23 @@ impl PartialOrd for LabOrder {
 }
 
 impl Ord for LabOrder {
+    /// By the key; below a `virtual_weight` of 1, the heights and the rows and columns of the
+    /// symbols weighed and compared by whole units ([`by_unit`]).
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.key().cmp(&other.key())
+        if self.virtual_weight == int(1) && other.virtual_weight == int(1) {
+            return self.key().cmp(&other.key());
+        }
+        let (a, b) = (self.key(), other.key());
+        a.0.cmp(&b.0)
+            .then_with(|| a.1.cmp(b.1))
+            .then_with(|| a.2.cmp(&b.2))
+            .then_with(|| a.3 .0.cmp(&b.3 .0))
+            .then_with(|| by_unit(&self.levels_weighed, &other.levels_weighed))
+            .then_with(|| (a.3 .2, a.3 .3).cmp(&(b.3 .2, b.3 .3)))
+            .then_with(|| (a.4 .0, a.4 .1).cmp(&(b.4 .0, b.4 .1)))
+            .then_with(|| by_unit(&self.crosses_weighed, &other.crosses_weighed))
+            .then_with(|| a.4 .3.cmp(b.4 .3))
+            .then_with(|| a.5.cmp(&b.5))
     }
 }
 
@@ -102,6 +155,9 @@ impl LabOrder {
             bends: 0,
             weights,
             rules: Vec::new(),
+            virtual_weight: int(1),
+            levels_weighed: int(0),
+            crosses_weighed: int(0),
         }
     }
     pub(super) fn said(&self) -> String {
@@ -195,9 +251,10 @@ pub(super) fn lab_order(
     placed: &Placed,
     routing: &Routing,
     weights: (u64, u64),
+    virtual_weight: &Q,
     within: Option<&BTreeSet<usize>>,
 ) -> LabOrder {
-    let mut l = lab_measure(problem, s, placed, routing, weights, within);
+    let mut l = lab_measure(problem, s, placed, routing, weights, virtual_weight, within);
     if within.is_none() && !l.interrupted {
         let objectives = crate::score::drawn(problem, s, &placed.geometry, routing)
             .map(|w| crate::score::measured_layers(problem, s, placed, Some(&w)))
@@ -214,6 +271,7 @@ pub(super) fn lab_measure(
     placed: &Placed,
     routing: &Routing,
     weights: (u64, u64),
+    virtual_weight: &Q,
     within: Option<&BTreeSet<usize>>,
 ) -> LabOrder {
     use rnl_runtime::problem::PointRef;
@@ -392,10 +450,18 @@ pub(super) fn lab_measure(
         }
     }
     let mut crosses = (BTreeSet::new(), BTreeSet::new());
+    // below a weight of 1, each row and column by whether a firm symbol takes it
+    let loose = (*virtual_weight != int(1)).then(|| supply::loose(problem, s));
+    let mut firm: (std::collections::BTreeMap<Q, bool>, std::collections::BTreeMap<Q, bool>) = Default::default();
     for k in s.components().filter(|&k| reads(k)) {
         let o = &placed.origins[k];
         crosses.0.insert(o[0].clone());
         crosses.1.insert(o[1].clone());
+        if let Some(loose) = &loose {
+            let f = !loose.contains(&k);
+            *firm.0.entry(o[0].clone()).or_insert(false) |= f;
+            *firm.1.entry(o[1].clone()).or_insert(false) |= f;
+        }
         if let Some(b) = s.box_at(&placed.origins, &g.orient, k) {
             grow(&[b[0].clone(), b[1].clone()]);
             grow(&[b[2].clone(), b[3].clone()]);
@@ -405,13 +471,21 @@ pub(super) fn lab_measure(
         (Some(l), Some(h)) => (&h[0] - &l[0]) * (&h[1] - &l[1]),
         _ => Q::zero(),
     };
+    let levels = supply::levels(s, placed, within);
+    let (levels_weighed, crosses_weighed) = match &loose {
+        None => (int(levels as i64), int((crosses.0.len() + crosses.1.len()) as i64)),
+        Some(loose) => (
+            supply::levels_weighed(s, placed, within, loose, virtual_weight),
+            supply::weighed_lines(&firm.0, virtual_weight) + supply::weighed_lines(&firm.1, virtual_weight),
+        ),
+    };
     let result = LabOrder {
         interrupted: false,
         annotation_cost,
         current: current::against(s, placed, within),
         hidden: port::hidden(problem, s, placed, routing, within).len(),
         cb: weights.0 * crossings + weights.1 * bends,
-        levels: supply::levels(s, placed, within),
+        levels,
         off_axis: axis::off_axis(s, placed, within),
         near_dots: dots::near_pins(problem, s, placed, routing, within),
         lines: xs.len() + ys.len(),
@@ -422,6 +496,9 @@ pub(super) fn lab_measure(
         bends,
         weights,
         rules: Vec::new(),
+        virtual_weight: virtual_weight.clone(),
+        levels_weighed,
+        crosses_weighed,
     };
     if crate::budget::stopped() {
         LabOrder::interrupted(weights)
@@ -447,13 +524,39 @@ fn through(a0: &[Q; 2], a1: &[Q; 2], b0: &[Q; 2], b1: &[Q; 2]) -> Option<[Q; 2]>
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A loose symbol at a height of its own against a drawing with more dots near pins: by the
+    /// counts the height decides; at a weight of one half it is half a unit, which does not, and
+    /// two such heights, a whole unit, do.
+    #[test]
+    fn below_a_weight_of_one_the_weighed_counts_differ_only_by_a_whole_unit() {
+        let order = |w: Q, levels: usize, weighed: Q, dots: usize| {
+            let mut l = LabOrder::interrupted((1, 4));
+            l.interrupted = false;
+            (l.virtual_weight, l.levels, l.levels_weighed, l.near_dots) = (w, levels, weighed, dots);
+            l.crosses_weighed = int(0);
+            l
+        };
+        let half = int(1) / int(2);
+        assert!(order(int(1), 1, int(1), 0) > order(int(1), 0, int(0), 5));
+        assert!(order(half.clone(), 1, half.clone(), 0) < order(half.clone(), 0, int(0), 5));
+        assert!(order(half.clone(), 2, int(1), 0) > order(half.clone(), 0, int(0), 5));
+        // the rows and columns of the symbols alike, after the length and the lines of the wires
+        let lines = |w: Q, weighed: Q, area: i64| {
+            let mut l = order(w, 0, int(0), 0);
+            (l.crosses_weighed, l.area) = (weighed, int(area));
+            l
+        };
+        assert!(lines(half.clone(), half.clone(), 1) < lines(half.clone(), int(0), 2));
+        assert!(lines(half.clone(), int(1), 1) > lines(half.clone(), int(0), 2));
+    }
     use crate::resolve::tests::Ticks;
     use crate::{RunLimit, StoppedClock};
 
     #[test]
     fn interrupted_measurements_never_beat_completed_drawings_and_replay_exactly() {
         let (p, s, placed, routing) = port::tests::fixture();
-        let run = || lab_order(&p, &s, &placed, &routing, (1, 4), None);
+        let run = || lab_order(&p, &s, &placed, &routing, (1, 4), &int(1), None);
         let full = run();
         assert!(!full.interrupted);
         assert_eq!(full.cb, full.crossings + 4 * full.bends);
@@ -474,7 +577,7 @@ mod tests {
         }
         assert!(interrupted && complete);
         let (stopped, _) = crate::budget::with(&StoppedClock, RunLimit::Work(0), None, || {
-            lab_order(&p, &s, &placed, &routing, (1, 4), None)
+            lab_order(&p, &s, &placed, &routing, (1, 4), &int(1), None)
         });
         assert!(stopped.interrupted && stopped > full);
     }
@@ -534,8 +637,8 @@ mod tests {
         let turned = placed_at(sideways, origin_for(sideways).each_ref().map(whole));
         let facing = placed_at(down, origin_for(down).each_ref().map(whole));
         let routing = Routing::default();
-        let back = lab_order(&p, &s, &turned, &routing, (1, 4), None);
-        let straight = lab_order(&p, &s, &facing, &routing, (1, 4), None);
+        let back = lab_order(&p, &s, &turned, &routing, (1, 4), &int(1), None);
+        let straight = lab_order(&p, &s, &facing, &routing, (1, 4), &int(1), None);
         assert!(!back.interrupted && !straight.interrupted);
         assert_eq!((back.crossings, back.bends, back.length.clone()), (0, 1, int(1)));
         assert_eq!((straight.crossings, straight.bends, straight.length.clone()), (0, 0, int(1)));

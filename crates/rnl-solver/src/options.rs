@@ -388,7 +388,7 @@ impl Default for SolverOptions {
     }
 }
 
-const KEYS: [&str; 16] = [
+const KEYS: [&str; 17] = [
     "tolerance",
     "grid",
     "objectives",
@@ -405,6 +405,7 @@ const KEYS: [&str; 16] = [
     "junction_utf8",
     "tree_work",
     "lines_weights",
+    "virtual_weight",
 ];
 
 /// The value of a key of the `key=value;…` text that takes a string, `layout`, `objectives`,
@@ -469,6 +470,9 @@ impl SolverOptions {
         // named only when not the default, so that the text of the defaults is as it was
         if self.settings.lines_weights != crate::LinesWeights::default() {
             text.push_str(&format!(";lines_weights={}", self.settings.lines_weights.written()));
+        }
+        if !self.settings.virtual_weight.is_one() {
+            text.push_str(&format!(";virtual_weight={}", rnl_runtime::geom::fmt_num(self.settings.virtual_weight.0)));
         }
         // named only when on, so that the text of the defaults is as it was
         if self.settings.join_trees {
@@ -548,6 +552,10 @@ impl SolverOptions {
                     options.hints_for_low = value.parse().map_err(|_| "report_hints must be true or false")?
                 }
                 "lines_weights" => options.settings.lines_weights = crate::LinesWeights::parse(value)?,
+                "virtual_weight" => {
+                    options.settings.virtual_weight =
+                        crate::VirtualWeight(value.parse().map_err(|_| "virtual_weight must be a number from 0 to 1")?)
+                }
                 "tree_work" if value == "false" => options.tree_work = Some(TreeWork::Off),
                 "tree_work" => {
                     options.tree_work =
@@ -597,6 +605,9 @@ impl SolverOptions {
         }
         if let Some(problem) = self.settings.lines_weights.problem() {
             out.push(("lines_weights", problem));
+        }
+        if let Some(problem) = self.settings.virtual_weight.problem() {
+            out.push(("virtual_weight", problem));
         }
         let run_seconds = match self.run_limit {
             Some(crate::RunLimit::Time(s)) => Some(s),
@@ -730,6 +741,19 @@ mod tests {
 
     /// The weights are named in the canonical text only when not the default, without spaces, and
     /// read back; weights out of their bounds are an error.
+    #[test]
+    fn virtual_weight_is_named_only_when_not_the_default() {
+        let d = SolverOptions::default();
+        assert!(!d.canonical().contains("virtual_weight"));
+        let o = d.with_overrides("virtual_weight=0.25").unwrap();
+        assert!(o.canonical().ends_with(";virtual_weight=0.25"), "{}", o.canonical());
+        assert_eq!(SolverOptions::parse(&o.canonical()).unwrap(), o);
+        assert_eq!(d.with_overrides("virtual_weight=1").unwrap().canonical(), d.canonical());
+        for bad in ["-1", "1.01", "a", "NaN"] {
+            assert!(d.with_overrides(&format!("virtual_weight={bad}")).is_err(), "{bad}");
+        }
+    }
+
     #[test]
     fn lines_weights_are_named_only_when_not_the_default() {
         let d = SolverOptions::default();
