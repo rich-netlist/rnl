@@ -367,35 +367,35 @@
         {
           "name": "$LED",
           "box": [
-            -2.0,
             -1.0,
-            2.0,
-            1.0
+            -2.0,
+            1.0,
+            2.0
           ],
           "box_written": true,
           "default": false,
           "pins": [
             {
               "pos": [
-                -2.0,
-                0.0
+                0.0,
+                2.0
               ],
               "terminals": [
                 "a"
               ],
               "label": null,
-              "dir": 180
+              "dir": 90
             },
             {
               "pos": [
-                2.0,
-                0.0
+                0.0,
+                -2.0
               ],
               "terminals": [
                 "k"
               ],
               "label": null,
-              "dir": 0
+              "dir": 270
             }
           ],
           "prims": [
@@ -403,12 +403,12 @@
               "shape": "LINE",
               "points": [
                 [
-                  -2.0,
-                  0.0
+                  0.0,
+                  2.0
                 ],
                 [
-                  -0.8333,
-                  0.0
+                  0.0,
+                  0.8333
                 ]
               ],
               "style": {}
@@ -417,20 +417,20 @@
               "shape": "LINE",
               "points": [
                 [
-                  -0.8333,
-                  0.675
+                  0.675,
+                  0.8333
                 ],
                 [
-                  -0.8333,
-                  -0.675
+                  -0.675,
+                  0.8333
                 ],
                 [
-                  0.5833,
-                  0.0
+                  0.0,
+                  -0.5833
                 ],
                 [
-                  -0.8333,
-                  0.675
+                  0.675,
+                  0.8333
                 ]
               ],
               "style": {}
@@ -439,12 +439,12 @@
               "shape": "LINE",
               "points": [
                 [
-                  0.6667,
-                  0.7333
+                  0.7333,
+                  -0.6667
                 ],
                 [
-                  0.6667,
-                  -0.7333
+                  -0.7333,
+                  -0.6667
                 ]
               ],
               "style": {
@@ -455,12 +455,12 @@
               "shape": "LINE",
               "points": [
                 [
-                  0.6667,
-                  0.0
+                  0.0,
+                  -0.6667
                 ],
                 [
-                  2.0,
-                  0.0
+                  0.0,
+                  -2.0
                 ]
               ],
               "style": {}
@@ -1740,8 +1740,8 @@
         {
           "id": "#D1::name",
           "anchor": [
-            42.0,
-            11.1
+            43.1,
+            10.25
           ],
           "lines": [
             [
@@ -1754,7 +1754,7 @@
               }
             ]
           ],
-          "halign": "middle",
+          "halign": "start",
           "valign": "baseline",
           "rotate": 0.0,
           "orient": "R0",
@@ -1764,14 +1764,14 @@
         {
           "id": "#D1::model",
           "anchor": [
-            42.0,
-            8.9
+            43.1,
+            8.8
           ],
           "lines": [
             []
           ],
-          "halign": "middle",
-          "valign": "top",
+          "halign": "start",
+          "valign": "baseline",
           "rotate": 0.0,
           "orient": "R0",
           "style": {},
@@ -1780,8 +1780,8 @@
         {
           "id": "#D2::name",
           "anchor": [
-            40.9,
-            0.0
+            41.75,
+            1.1
           ],
           "lines": [
             [
@@ -1794,7 +1794,7 @@
               }
             ]
           ],
-          "halign": "middle",
+          "halign": "start",
           "valign": "baseline",
           "rotate": 0.0,
           "orient": "R90",
@@ -1804,14 +1804,14 @@
         {
           "id": "#D2::model",
           "anchor": [
-            43.1,
-            0.0
+            43.2,
+            1.1
           ],
           "lines": [
             []
           ],
-          "halign": "middle",
-          "valign": "top",
+          "halign": "start",
+          "valign": "baseline",
           "rotate": 0.0,
           "orient": "R90",
           "style": {},
