@@ -1331,6 +1331,13 @@ body.menubar-shown { grid-template-rows: auto minmax(0, 1fr) auto; }
 .settings-given-list .key { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace, var(--ui-cjk); }
 .dialog-body hr { width: 100%; margin: 2px 0; border: 0; border-top: 1px solid var(--line); }
 .objective-list { display: flex; flex-direction: column; margin: 4px 0 0; padding: 0; list-style: none; border: 1px solid var(--line); border-radius: 4px; }
+.settings-element { color: var(--muted); font-size: 12px; }
+.lines-order { margin: 6px 0 0; font-size: 12px; }
+.lines-order summary { cursor: pointer; color: var(--muted); }
+.lines-order-list { margin: 2px 0 0; padding-left: 2.2em; }
+.lines-order-list li { padding: 1px 0; }
+.lines-order-list li.rules { font-weight: 600; }
+.lines-order-list .objective-name { margin-right: 6px; font-weight: inherit; }
 .objective { padding: 4px 8px; border-bottom: 1px solid var(--line); }
 .objective:last-child { border-bottom: 0; }
 .objective.off { color: var(--muted); }

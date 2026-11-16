@@ -262,6 +262,70 @@ test.describe("on the desktop", () => {
     expect(await viewer.stored("solve-config")).toEqual({ limit: "work", work: 243750 });
   });
 
+  test("the weights of a crossing and of a bend are two boxes of one array that follows the lines layout, and the order of its ranking is shown beside the objectives", async ({ page, viewer }) => {
+    await open(page);
+    const row = setting(page, "lines_weights");
+    const crossing = field(page, "lines_weights crossing");
+    const bend = field(page, "lines_weights bend");
+    const refusal = dialog(page).locator(".dialog-error");
+    // lines: a box for each weight, named as the table names them, with the defaults
+    await expect(row).toBeVisible();
+    await expect(row.locator(".settings-element")).toHaveText(["crossing", "bend"]);
+    await expect(crossing).toHaveValue("1");
+    await expect(bend).toHaveValue("4");
+    await expect(asText(page)).toHaveText("The defaults of rnl solve.");
+    // the weights are given as one array, in the order of the table, and as the CLI writes it
+    await crossing.fill("2");
+    await bend.fill("3");
+    await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --solver-config 'lines_weights=[2,3]'`);
+    // out of the bounds of each, or not a number, is refused where it is, in the words of the box
+    await bend.fill("1001");
+    await dialog(page).getByRole("button", { name: "OK" }).click();
+    await expect(refusal).toHaveText("lines_weights bend must be at most 1000.");
+    await crossing.fill("");
+    await dialog(page).getByRole("button", { name: "OK" }).click();
+    await expect(refusal).toHaveText("lines_weights crossing must be a number.");
+    await crossing.fill("2.5");
+    await dialog(page).getByRole("button", { name: "OK" }).click();
+    await expect(refusal).toHaveText("lines_weights crossing must be a whole number.");
+    // both 0 is the solver's to refuse: its words are shown at the setting
+    await page.evaluate(() => (window.fakeShell.settingErrors = [{ key: "lines_weights", message: "lines_weights must not be [0, 0]." }]));
+    await crossing.fill("0");
+    await bend.fill("0");
+    await dialog(page).getByRole("button", { name: "OK" }).click();
+    await expect(refusal).toHaveText("lines_weights must not be [0, 0].");
+    await expect(row).toHaveClass(/refused/);
+    await page.evaluate(() => (window.fakeShell.settingErrors = []));
+    await crossing.fill("2");
+    await bend.fill("3");
+    // the ranking of the layout is read beside the objectives, and the rank of the objectives is marked
+    const ranking = dialog(page).locator(".lines-order");
+    await expect(ranking).toBeVisible();
+    await ranking.locator("summary").click();
+    await expect(ranking.locator("li .objective-name")).toHaveText(["complete", "facts", "annotations", "rules", "current", "crossings_and_bends", "hidden_ports"]);
+    await expect(ranking.locator("li.rules")).toHaveCount(1);
+    await expect(ranking.locator("li").nth(3)).toHaveClass(/rules/);
+    // rows has neither the weights nor the ranking, and keeps what was set
+    await field(page, "layout").selectOption("rows");
+    await expect(row).toBeHidden();
+    await expect(ranking).toBeHidden();
+    await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --solver-config 'layout="rows"'`);
+    await field(page, "layout").selectOption("lines");
+    await expect(crossing).toHaveValue("2");
+    await ok(page);
+    expect(await viewer.stored("solve-config")).toEqual({ lines_weights: [2, 3] });
+    expect(await solved(page, viewer)).toEqual({ config: "lines_weights=[2,3]", timeall: null });
+    expect((await viewer.calls("checkSettings")).at(-1)).toEqual(["lines_weights=[2,3]"]);
+    // the weights the table gives as the default are no change at all
+    await open(page);
+    await expect(crossing).toHaveValue("2");
+    await expect(bend).toHaveValue("3");
+    await crossing.fill("1");
+    await bend.fill("4");
+    await ok(page);
+    expect(await viewer.stored("solve-config")).toEqual({});
+  });
+
   test("the objectives move up and down, and the order is what the solver gets", async ({ page, viewer }) => {
     await open(page);
     await field(page, "layout").selectOption("rows");
@@ -447,6 +511,7 @@ test.describe("on the desktop", () => {
           layout: { value: "lines", from: "default" },
           spacing_x: { value: 2, from: "header", at: "t4.sp:3" },
           objectives: { value: "turns", from: "package:style" },
+          lines_weights: { value: [2, 3], from: "header", at: "t4.sp:4" },
           beam: { value: 8, from: "command-line" },
         },
         warnings: [],
@@ -463,6 +528,7 @@ test.describe("on the desktop", () => {
     await expect(dialog(page).locator(".settings-given-list li")).toHaveText([
       "spacing_x = 2 (header, t4.sp:3)",
       'objectives = "turns" (package:style)',
+      "lines_weights = [2,3] (header, t4.sp:4)",
     ]);
     // the settings of the default and of the command line are not the netlist's
     await expect(dialog(page).locator(".settings-given")).not.toContainText("layout");
@@ -521,7 +587,7 @@ test.describe("on the desktop", () => {
     await expect(setting(page, "beam")).toBeVisible();
     await expect(setting(page, "candidates")).toBeVisible();
     expect((await names()).length).toBe(OFF.length + LEVELS);
-    await expect(other).toContainText("3 settings of other layouts are hidden.");
+    await expect(other).toContainText("4 settings of other layouts are hidden.");
     // a value set for one layout is kept while another is shown, and the dialog says so
     await field(page, "beam").fill("9");
     await field(page, "layout").selectOption("lines");

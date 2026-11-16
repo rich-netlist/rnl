@@ -127,6 +127,8 @@ function literal(value) {
   if (typeof value === "number" && Number.isFinite(value)) return numberText(value);
   if (typeof value === "boolean") return String(value);
   if (typeof value === "string") return JSON.stringify(value);
+  // an array of whole numbers, as RNL writes it, with no spaces
+  if (Array.isArray(value) && value.every((n) => typeof n === "number" && Number.isFinite(n))) return `[${value.map(numberText).join(",")}]`;
   if (value !== null && typeof value === "object" && typeof value.literal === "string") return value.literal;
   return null;
 }
@@ -236,6 +238,8 @@ function control(setting) {
       return numberControl(setting, setting.type === "integer", null);
     case "number-or-false":
       return numberControl(setting, false, setting.false_what ?? "false");
+    case "integers":
+      return integersControl(setting);
     case "boolean":
       return booleanControl(setting);
     case "choice":
@@ -283,6 +287,46 @@ function numberControl(setting, integer, falseLabel) {
       return bad ? { error: bad } : { value: n };
     },
     shown: () => (no?.input.checked ? "false" : input.value.trim()),
+  };
+}
+
+/** An array of whole numbers: a box for each, named by the table's `labels`, each within `min` and `max`. */
+function integersControl(setting) {
+  const count = Number.isInteger(setting.length) && setting.length > 0 ? setting.length : 1;
+  const inputs = [];
+  const el = [];
+  for (let k = 0; k < count; k++) {
+    const input = document.createElement("input");
+    input.type = "number";
+    input.step = "1";
+    if (setting.min !== undefined) input.min = String(setting.min);
+    if (setting.max !== undefined) input.max = String(setting.max);
+    const label = setting.labels?.[k] ?? String(k + 1);
+    setAttr(input, "aria-label", `${setting.key} ${label}`);
+    inputs.push(input);
+    el.push(span("settings-element", label), input);
+  }
+  return {
+    el,
+    first: inputs[0],
+    set(value) {
+      inputs.forEach((input, k) => (input.value = Array.isArray(value) && typeof value[k] === "number" ? String(value[k]) : ""));
+    },
+    get() {
+      const values = [];
+      for (const [k, input] of inputs.entries()) {
+        const label = setting.labels?.[k] ?? String(k + 1);
+        const text = input.value.trim();
+        const n = Number(text);
+        if (text === "" || !Number.isFinite(n)) return { error: m`${setting.key} ${label} must be a number.` };
+        if (!Number.isInteger(n)) return { error: m`${setting.key} ${label} must be a whole number.` };
+        const bad = boundsError({ ...setting, key: `${setting.key} ${label}` }, n);
+        if (bad) return { error: bad };
+        values.push(n);
+      }
+      return { value: values };
+    },
+    shown: () => inputs.map((input) => input.value.trim()).join(","),
   };
 }
 
@@ -342,12 +386,37 @@ function holds(when, of) {
 }
 
 /**
+ * How a layout ranks the drawings it makes, which no setting changes but the objectives it takes: the table's
+ * `lines_order`, first rank first, to be read, not set. The rank of the objectives is the rows above.
+ */
+function rankingOf(order) {
+  const box = document.createElement("details");
+  box.className = "lines-order";
+  const head = document.createElement("summary");
+  setText(head, m("How the layout ranks its drawings"));
+  const what = document.createElement("p");
+  what.className = "dialog-note";
+  setText(what, order.what ?? "");
+  const list = document.createElement("ol");
+  list.className = "lines-order-list";
+  for (const rank of order.ranks ?? []) {
+    const li = document.createElement("li");
+    li.dataset.name = rank.name;
+    li.classList.toggle("rules", rank.name === "rules");
+    append(li, span("objective-name", rank.name), span("objective-what", rank.what ?? ""));
+    list.append(li);
+  }
+  append(box, head, what, list);
+  return box;
+}
+
+/**
  * The objectives as an ordered list of rows, each with buttons that move it up and down, a check
  * box that turns it on, one that puts it in the level of the objective above, its weight, and for
- * the first of a level how far from the best a value still counts as equal to it. `set(text)`
+ * the first of a level how far from the best a value still counts as equal to it. `order` is the ranking of the layout that has one, shown beneath; `set(text)`
  * fills them, and `read()` gives `{ value }`, the text of the layers the rows make, or `{ error }`.
  */
-function objectiveRows(objectives) {
+function objectiveRows(objectives, order) {
   const el = document.createElement("div");
   el.className = "objectives";
   const note = document.createElement("p");
@@ -356,6 +425,8 @@ function objectiveRows(objectives) {
   const list = document.createElement("ol");
   list.className = "objective-list";
   append(el, note, list);
+  const ranking = order ? rankingOf(order) : null;
+  if (ranking) el.append(ranking);
   const info = new Map(objectives.map((o) => [o.name, o]));
   let rows = []; // { name, el, on, together, weight, tolerance, ... } in the order shown
   // what the layout shown takes: `of(key)` is a setting's value; a row it does not take is hidden, or greyed with `showOther`
@@ -505,6 +576,7 @@ function objectiveRows(objectives) {
     /** Show the rows as the layout the values of `of` name takes them; `showOther` shows the others greyed. */
     take(of, showOther) {
       context = { of, showOther };
+      if (ranking) ranking.hidden = !holds(order.applies ?? { layout: ["lines"] }, of);
       refresh();
     },
     /** How many objectives the layout shown does not use, with the tiers that hold none it uses. */
@@ -551,7 +623,7 @@ function fieldsOf(table) {
     if (!byGroup.has(setting.group)) byGroup.set(setting.group, []);
     const hint = span("settings-hint", setting.what ?? "");
     const kind = setting.type === "objectives"
-      ? objectiveRows(table.objectives ?? [])
+      ? objectiveRows(table.objectives ?? [], table.lines_order)
       : control(setting);
     // a setting with no default is given or not: a box says which
     const optional = setting.default === undefined && setting.type !== "boolean" && setting.type !== "objectives";
@@ -713,7 +785,7 @@ function givenByFile() {
   const settings = level?.check?.settings ?? {};
   return Object.entries(settings)
     .filter(([, s]) => s.from !== "default" && s.from !== "command-line")
-    .map(([key, s]) => [key, typeof s.value === "string" ? JSON.stringify(s.value) : String(s.value), [s.from, s.at].filter(Boolean).join(", ")]);
+    .map(([key, s]) => [key, typeof s.value === "string" ? JSON.stringify(s.value) : literal(s.value) ?? String(s.value), [s.from, s.at].filter(Boolean).join(", ")]);
 }
 
 /**
