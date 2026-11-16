@@ -22,6 +22,58 @@ pub enum Layout {
     Lines,
 }
 
+/// The weights of a crossing and of a bend by which the lines layout ranks its drawings, the
+/// group-tree layout it starts from and the choice between the two, and routes its tracks:
+/// `crossing × crossings + bend × bends`, after the facts, the false joins, the annotations, the
+/// configured objectives and the pins against their CURRENT. Each from 0 to 1000, not both 0;
+/// [1, 4] by default, a bend counting as four crossings.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct LinesWeights {
+    pub crossing: u64,
+    pub bend: u64,
+}
+
+impl Default for LinesWeights {
+    fn default() -> Self {
+        LinesWeights { crossing: 1, bend: 4 }
+    }
+}
+
+impl LinesWeights {
+    /// The most either weight may be.
+    pub const MAX: u64 = 1000;
+
+    /// As a pair, crossing first.
+    pub fn pair(self) -> (u64, u64) {
+        (self.crossing, self.bend)
+    }
+
+    /// As the setting writes it, without spaces: `[1,4]`.
+    pub fn written(self) -> String {
+        format!("[{},{}]", self.crossing, self.bend)
+    }
+
+    /// What is wrong with them, if anything.
+    pub fn problem(self) -> Option<String> {
+        if self.crossing > Self::MAX || self.bend > Self::MAX {
+            Some(format!("lines_weights must each be from 0 to {}", Self::MAX))
+        } else if self.crossing == 0 && self.bend == 0 {
+            Some("lines_weights must not both be 0".into())
+        } else {
+            None
+        }
+    }
+
+    /// From `[c,b]` as a setting's text writes it, spaces allowed.
+    pub fn parse(text: &str) -> Result<LinesWeights, String> {
+        let bad = || "lines_weights must be two integers, [crossing, bend]".to_string();
+        let inner = text.trim().strip_prefix('[').and_then(|t| t.strip_suffix(']')).ok_or_else(bad)?;
+        let parts: Vec<&str> = inner.split(',').map(str::trim).collect();
+        let [c, b] = parts.as_slice() else { return Err(bad()) };
+        Ok(LinesWeights { crossing: c.parse().map_err(|_| bad())?, bend: b.parse().map_err(|_| bad())? })
+    }
+}
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Settings {
     pub layout: Layout,
@@ -36,6 +88,8 @@ pub struct Settings {
     /// net, whose own pins are not all the pins the wire may end at. A level before 0.4 does not
     /// read it.
     pub join_trees: bool,
+    /// The weights of a crossing and of a bend in the lines layout (`lines_weights`).
+    pub lines_weights: LinesWeights,
     /// Only values explicitly supplied by the caller. Defaults must not mask file values.
     pub overrides: Vec<SolverSetting>,
 }
@@ -68,6 +122,7 @@ fn known(key: &str) -> bool {
                 | "grid"
                 | "beam"
                 | "objectives"
+                | "lines_weights"
         )
 }
 
@@ -117,6 +172,21 @@ fn apply(o: &mut SolverOptions, s: &SolverSetting) -> Result<(), String> {
         "join_trees" => {
             let Lit::Bool(value) = s.value else { return Err("join_trees must be a boolean".into()) };
             o.settings.join_trees = value;
+        }
+        "lines_weights" => {
+            let bad = || "lines_weights must be two integers, [crossing, bend]".to_string();
+            let Lit::Arr(items) = &s.value else { return Err(bad()) };
+            let whole = |l: &Lit| match l {
+                Lit::Num(n) if n.is_finite() && n.fract() == 0.0 && *n >= 0.0 && *n <= LinesWeights::MAX as f64 => {
+                    Some(*n as u64)
+                }
+                _ => None,
+            };
+            let [c, b] = items.as_slice() else { return Err(bad()) };
+            let (Some(crossing), Some(bend)) = (whole(c), whole(b)) else {
+                return Err(format!("lines_weights must be two integers from 0 to {}", LinesWeights::MAX));
+            };
+            o.settings.lines_weights = LinesWeights { crossing, bend };
         }
         "tolerance" => o.tolerance = number(s)?,
         "grid" => o.grid = if s.value == Lit::Bool(false) { None } else { Some(number(s)?) },
@@ -368,6 +438,7 @@ pub(crate) fn unused_by_layout(o: &SolverOptions) -> Vec<SettingProblem> {
         ("beam", o.beam != d.beam),
         ("candidates", o.budget.candidates != d.budget.candidates),
         ("tree_work", o.tree_work != d.tree_work),
+        ("lines_weights", o.settings.lines_weights != d.settings.lines_weights),
     ];
     let table = crate::table::settings_table();
     let mut out = Vec::new();
@@ -411,7 +482,7 @@ impl SolverOptions {
     /// Defaults in the syntax accepted by --solver-config.
     pub fn defaults_config() -> String {
         let d = Self::default();
-        format!("layout=\"lines\", spacing_x=0, spacing_y=0, join_trees=false, limit=\"time\", seconds=10, safety_seconds=30, tolerance={}, grid=1, beam={}, candidates={}, astar_expansions={}", rnl_runtime::geom::fmt_num(d.tolerance), d.beam, d.budget.candidates, d.budget.astar_expansions)
+        format!("layout=\"lines\", spacing_x=0, spacing_y=0, lines_weights=[1, 4], join_trees=false, limit=\"time\", seconds=10, safety_seconds=30, tolerance={}, grid=1, beam={}, candidates={}, astar_expansions={}", rnl_runtime::geom::fmt_num(d.tolerance), d.beam, d.budget.candidates, d.budget.astar_expansions)
     }
     /// Parse tool settings using RNL literal syntax; reject invalid values before solving.
     pub fn with_config(&self, text: &str) -> Result<Self, String> {
@@ -656,6 +727,32 @@ mod tests {
         assert!(err.contains("join_trees must be a boolean"), "{err}");
     }
 
+    /// The weights of a crossing and of a bend: two integers from 0 to 1000, not both 0, which a
+    /// file may give; a value not taken fails its key alone, and the one before stays in effect.
+    #[test]
+    fn lines_weights_are_two_integers_a_file_may_give() {
+        let settings = |text: &str| {
+            rnl_runtime::solver_settings::parse_overrides(text).unwrap_or_else(|e| panic!("{text}: {}", e.message))
+        };
+        let mut p = problem_of(Vec::new(), Vec::new());
+        p.version = "0.4".into();
+        assert_eq!(SolverOptions::default().settings.lines_weights.pair(), (1, 4));
+        p.solver_config = settings("lines_weights=[2, 3]");
+        let (o, warnings, errors) = SolverOptions::default().for_problem(&p);
+        assert_eq!(o.settings.lines_weights.pair(), (2, 3));
+        assert!(warnings.is_empty() && errors.is_empty(), "{warnings:?} {errors:?}");
+        for bad in ["[0, 0]", "[1, 1001]", "[1.5, 4]", "[1, 4, 2]", "4", "\"[1, 4]\""] {
+            p.solver_config = [settings("lines_weights=[2, 3]"), settings(&format!("lines_weights={bad}"))].concat();
+            let (o, _, errors) = SolverOptions::default().for_problem(&p);
+            assert_eq!(o.settings.lines_weights.pair(), (2, 3), "{bad}");
+            assert_eq!(errors.len(), 1, "{bad}: {errors:?}");
+            assert!(SolverOptions::default().with_config(&format!("lines_weights={bad}")).is_err(), "{bad}");
+        }
+        let tool = SolverOptions::default().with_config("lines_weights=[1, 1]").unwrap();
+        p.solver_config = settings("lines_weights=[2, 3]");
+        assert_eq!(tool.for_problem(&p).0.settings.lines_weights.pair(), (1, 1));
+    }
+
     #[test]
     fn a_refused_value_of_the_file_leaves_the_earlier_one_in_effect() {
         let settings = |text: &str| rnl_runtime::solver_settings::parse_overrides(text).unwrap();
@@ -759,8 +856,14 @@ mod tests {
     /// more than it takes. Nothing is refused.
     #[test]
     fn a_setting_the_layout_does_not_use_is_warned_of_by_its_key() {
-        let given =
-            [("spacing_x", "3"), ("spacing_y", "2"), ("beam", "8"), ("candidates", "10"), ("tree_work", "1000")];
+        let given = [
+            ("spacing_x", "3"),
+            ("spacing_y", "2"),
+            ("beam", "8"),
+            ("candidates", "10"),
+            ("tree_work", "1000"),
+            ("lines_weights", "[2, 3]"),
+        ];
         let table = crate::table::settings_table();
         for row in table.settings.iter().filter(|r| applies_to(r.applies).is_some()) {
             assert!(given.iter().any(|(key, _)| *key == row.key), "{} has no value in this test", row.key);

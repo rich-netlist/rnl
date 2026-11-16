@@ -36,11 +36,13 @@ pub enum SettingKind {
     Choice,
     /// The layered objectives as a string, as `objectives` takes them.
     Objectives,
+    /// An array of `length` whole numbers, each within `min` and `max`, named by `labels`.
+    Integers,
 }
 
 impl SettingKind {
     /// Its name in the table: `integer`, `number`, `number-or-false`, `boolean`, `string`,
-    /// `choice` or `objectives`.
+    /// `choice`, `objectives` or `integers`.
     pub fn name(self) -> &'static str {
         match self {
             SettingKind::Integer => "integer",
@@ -50,6 +52,7 @@ impl SettingKind {
             SettingKind::String => "string",
             SettingKind::Choice => "choice",
             SettingKind::Objectives => "objectives",
+            SettingKind::Integers => "integers",
         }
     }
 }
@@ -91,6 +94,10 @@ pub struct SettingRow {
     pub shown_when: When,
     /// Where it must be given.
     pub required_when: When,
+    /// For [`SettingKind::Integers`], how many numbers it holds.
+    pub length: Option<usize>,
+    /// For [`SettingKind::Integers`], what each number is, in English, for a page to name its box.
+    pub labels: &'static [&'static str],
 }
 
 /// A group of settings, in the order a page shows them.
@@ -171,21 +178,29 @@ const NOT_LINES: When = &[("layout", &["rows", "tree"])];
 
 /// What the line layout's order is, for a page to show beside it.
 pub const LINES_ORDER_WHAT: &str = "The lines layout ranks the drawings it makes in a fixed order, the first rank \
-     deciding first, which no setting changes. Of the objectives it takes only overlaps, crowding, misleading and \
-     wire_over_symbol, and the layers that hold them, to rank the group-tree layout it starts from.";
+     deciding first, which no setting changes but the objectives it takes: overlaps, crowding, misleading and \
+     wire_over_symbol, with the layers that hold them, in the order of those layers. The same order ranks the \
+     group-tree layout it starts from and chooses between the two drawings.";
 
 /// How the line layout ranks its drawings, first rank first: the outcomes of its search
 /// (`lines::settle`), then the line-layout order (`lines::quality::LabOrder`), by which it also
 /// weighs its drawing against the group-tree layout it starts from.
-pub const LINES_ORDER: [OrderRow; 16] = [
+pub const LINES_ORDER: [OrderRow; 19] = [
     OrderRow { name: "complete", what: "A drawing of the whole level made." },
+    OrderRow { name: "facts", what: "Fewer kept facts broken." },
     OrderRow { name: "false_joins", what: "Fewer places where wires read as joined where they are not." },
+    OrderRow { name: "low_facts", what: "Fewer kept facts of priority low broken." },
     OrderRow { name: "groups", what: "Fewer groups dissolved or stretched." },
     OrderRow { name: "routed", what: "Fewer parts of the nets left unrouted." },
     OrderRow { name: "merge", what: "Fewer conflicts where the drawings of the groups are joined." },
     OrderRow { name: "annotations", what: "Fewer overlaps of annotations, then fewer wires through them." },
+    OrderRow { name: "rules", what: "The objectives it takes, layer by layer, as configured." },
     OrderRow { name: "current", what: "Fewer pins whose wire leaves other than along their CURRENT." },
-    OrderRow { name: "crossings_and_bends", what: "Fewer crossings plus four times the bends of the wires." },
+    OrderRow {
+        name: "crossings_and_bends",
+        what: "Fewer crossings and bends of the wires, weighed by lines_weights: the crossings plus four times the \
+               bends by default.",
+    },
     OrderRow { name: "hidden_ports", what: "Fewer ports whose way out a symbol or another net's wire shuts in." },
     OrderRow { name: "rail_heights", what: "The grounds and the supplies at fewer heights." },
     OrderRow { name: "mirror_pairs", what: "Fewer mirror pairs off the axis they share." },
@@ -255,6 +270,8 @@ pub fn settings_table() -> SettingsTable {
         applies: &[],
         shown_when: &[],
         required_when: &[],
+        length: None,
+        labels: &[],
     };
     let spacing = |key, what| SettingRow {
         min: Some(-1.0),
@@ -266,6 +283,22 @@ pub fn settings_table() -> SettingsTable {
         SettingRow { choices: &LAYOUTS, ..row("layout", "layout", SettingKind::Choice, "How the level is laid out.") },
         spacing("spacing_x", "Grid units added to the gaps between columns of the line layout, -1 to close them up; respacing uses it in every layout."),
         spacing("spacing_y", "Grid units added to the gaps between rows of the line layout, -1 to close them up; respacing uses it in every layout."),
+        SettingRow {
+            min: Some(0.0),
+            max: Some(crate::LinesWeights::MAX as f64),
+            applies: LINES,
+            length: Some(2),
+            labels: &["crossing", "bend"],
+            ..row(
+                "lines_weights",
+                "layout",
+                SettingKind::Integers,
+                "The weights of a crossing and of a bend in the line layout, as [crossing, bend], not both 0: \
+                 its drawings rank by crossing × crossings + bend × bends, after the facts, the false joins, \
+                 the annotations, the objectives it takes and the pins against their CURRENT. Only their \
+                 ratio matters: [2, 8] ranks as [1, 4] does.",
+            )
+        },
         row(
             "join_trees",
             "layout",
@@ -477,14 +510,19 @@ mod tests {
         }
         // the bounds of a number are those the solver checks
         let refused = |text: &str| SolverOptions::default().with_config(text).is_err();
+        // a value of a setting: of an array of integers, the value first and the rest 1
+        let at = |s: &SettingRow, v: f64| match s.length {
+            Some(n) => format!("{}=[{v}{}]", s.key, ", 1".repeat(n - 1)),
+            None => format!("{}={v}", s.key),
+        };
         for s in &t.settings {
             if let Some(min) = s.min {
-                assert!(refused(&format!("{}={}", s.key, min - 1.0)), "{} below {min}", s.key);
-                assert!(!refused(&format!("{}={}", s.key, min)) || s.key == "work", "{} at {min}", s.key);
+                assert!(refused(&at(s, min - 1.0)), "{} below {min}", s.key);
+                assert!(!refused(&at(s, min)) || s.key == "work", "{} at {min}", s.key);
             }
             if let Some(max) = s.max.filter(|m| *m < MOST) {
-                assert!(refused(&format!("{}={}", s.key, max + 1.0)), "{} above {max}", s.key);
-                assert!(!refused(&format!("{}={max}", s.key)), "{} at {max}", s.key);
+                assert!(refused(&at(s, max + 1.0)), "{} above {max}", s.key);
+                assert!(!refused(&at(s, max)), "{} at {max}", s.key);
             }
             if let Some(min) = s.min_exclusive {
                 assert!(refused(&format!("{}={min}", s.key)), "{} at {min}", s.key);

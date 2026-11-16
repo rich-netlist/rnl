@@ -39,9 +39,10 @@ pub(crate) fn current_order(s: &Structure, class: &FreeClass) -> Vec<(Orient, u8
         }
         worst
     };
-    let mut out: Vec<(Orient, u8)> = Orient::ALL.into_iter().filter(|v| ok(*v)).map(|v| (v, rank(v))).collect();
+    let mut out: Vec<(Orient, u8)> =
+        Orient::ALL.into_iter().filter(|v| class.allows(*v) && ok(*v)).map(|v| (v, rank(v))).collect();
     if out.is_empty() {
-        out = Orient::ALL.into_iter().map(|v| (v, rank(v))).collect();
+        out = class.allowed.iter().map(|&v| (v, rank(v))).collect();
     }
     out.sort_by_key(|(_, r)| *r);
     out

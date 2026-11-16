@@ -268,7 +268,16 @@ fn modern_solve_preserves_tree_identity_and_reports_forced_connections() {
             pins: [a, b].into_iter().map(|object| PointRef::Pin { object, pin: 0, terminal: "g".into() }).collect(),
         })
         .collect();
-    let options = SolverOptions::without_time_limit().with_overrides("budget=candidates:0,astar_expansions:0").unwrap();
+    let mut options =
+        SolverOptions::without_time_limit().with_overrides("budget=candidates:0,astar_expansions:0").unwrap();
+    // the line layout draws its own tracks, which join no ROUTE trees, and takes them over the
+    // group-tree layout's, whose two false joins rank first
+    let lines = crate::solve(&p, &options);
+    assert!(lines.report.notes.iter().any(|n| n.contains("the drawing made ranks before the group-tree layout's")));
+    assert!(!lines.report.notes.iter().any(|n| n.contains("joined through obstacles")), "{:?}", lines.report.notes);
+    assert!(lines.report.unrouted.is_empty(), "{:?}", lines.report.unrouted);
+    assert!(!lines.solution.wires.is_empty());
+    options.settings.layout = crate::Layout::Tree;
     let solved = crate::solve(&p, &options);
     assert_eq!(solved.solution.wires.len(), 2);
     assert!(solved.report.unrouted.is_empty());

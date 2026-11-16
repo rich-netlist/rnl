@@ -23,14 +23,17 @@ pub(crate) struct Rank {
     seen: RefCell<(Vec<(Q, Q)>, usize)>,
 }
 
+/// The layers of the objectives in force that hold the lines layout's rules.
+pub(super) fn rule_layers(s: &Structure) -> Vec<usize> {
+    let valid = crate::config::LINES_OBJECTIVES;
+    (0..s.active.layers.len()).filter(|&i| s.active.layers[i].items.iter().any(|(o, _)| valid.contains(o))).collect()
+}
+
 impl Rank {
     pub(crate) fn new(s: &Structure) -> Rank {
-        let valid = crate::config::LINES_OBJECTIVES;
-        let rules: Vec<usize> = (0..s.active.layers.len())
-            .filter(|&i| s.active.layers[i].items.iter().any(|(o, _)| valid.contains(o)))
-            .collect();
+        let rules = rule_layers(s);
         let annotations = !s.annotation_views.is_empty();
-        let n = 4 + 2 * usize::from(annotations) + rules.len() + super::quality::LAB_KEY;
+        let n = 4 + 2 * usize::from(annotations) + rules.len() + 6 + 4;
         let layers = (0..n).map(|_| ActiveLayer { items: Vec::new(), tolerance: Q::zero() }).collect();
         Rank {
             active: Active { layers, inert: Vec::new(), configured_only: true },
@@ -71,14 +74,19 @@ impl Rank {
         let joins = crate::score::drawn(problem, s, g, routing)
             .map_or(0, |wires| crate::score::false_joins(problem, s, &placed.origins, g, &wires));
         let mut layers: Vec<Q> = vec![int((broken.len() - low) as i64), int(joins as i64), int(low as i64)];
+        layers.push(int(routing.joins_left() as i64));
         if self.annotations {
             let (overlaps, hits) =
                 super::quality::annotation_cost(problem, s, placed, routing).expect("validated annotation geometry");
             layers.extend([int(overlaps as i64), int(hits as i64)]);
         }
-        layers.push(int(routing.joins_left() as i64));
-        layers.extend(self.rules.iter().map(|&i| objectives[i].clone()));
-        {
+        // the unified key: the line-layout order, its crossings and bends weighed by the one pair,
+        // with the configured rules between the annotations and its marks
+        let l = super::quality::lab_measure(problem, s, placed, routing, options.settings.lines_weights.pair(), None);
+        if !l.interrupted {
+            layers.extend(self.rules.iter().map(|&i| objectives.get(i).cloned().unwrap_or_else(Q::zero)));
+        }
+        if !l.interrupted {
             let mut seen = self.seen.borrow_mut();
             if seen.0.is_empty() {
                 seen.0 = layers.iter().map(|v| (v.clone(), v.clone())).collect();
@@ -93,7 +101,12 @@ impl Rank {
             }
             seen.1 += 1;
         }
-        layers.extend(super::quality::lab_key(problem, s, placed, routing));
+        if l.interrupted {
+            layers.extend((0..self.rules.len() + 6 + 4).map(|_| int(i64::MAX)));
+        } else {
+            layers.extend(l.head());
+            layers.extend(l.tail());
+        }
         Entry {
             written_path_error: routing.written_path_error,
             annotation_error: routing.annotation_error,
@@ -108,11 +121,11 @@ impl Rank {
 
     pub(crate) fn note(&self, s: &Structure) -> String {
         let seen = self.seen.borrow();
-        let mut leading = vec!["facts broken".to_string(), "false joins".into(), "low facts broken".into()];
+        let mut leading =
+            vec!["facts broken".to_string(), "false joins".into(), "low facts broken".into(), "joins left".into()];
         if self.annotations {
             leading.extend(["annotation overlaps".into(), "wires through annotations".into()]);
         }
-        leading.push("joins left".into());
         let names = leading.into_iter().chain(
             self.rules
                 .iter()
@@ -123,7 +136,7 @@ impl Rank {
             .map(|(name, (lo, hi))| format!("{name} {}–{}", crate::rational::fmt(lo), crate::rational::fmt(hi)))
             .collect();
         format!(
-            "tree: inside the lines layout, {} ranked by the solver's own rules, then crossings before bends: {}",
+            "tree: inside the lines layout, {} ranked by the solver's own rules, then the line-layout order: {}",
             crate::driver::count(seen.1, "arrangement"),
             said.join(", ")
         )

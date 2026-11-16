@@ -29,7 +29,8 @@ The table describes a 0.4 level. A level of an earlier version is laid out in ro
 
 - `groups`: the groups of the settings in the order a page shows them, each with a title.
 - `settings`, one for each key the solver takes, in the order of their groups:
-  - `type`: `integer`, `number`, `number-or-false`, `boolean`, `string`, `choice` or `objectives`. A page takes a type it does not know for a text box.
+  - `type`: `integer`, `number`, `number-or-false`, `boolean`, `string`, `choice`, `objectives` or `integers`. A page takes a type it does not know for a text box.
+  - `length` and `labels`, for `integers`: how many whole numbers the array holds, and what each is, in English, for a page to name its box; `min` and `max` bound each of them.
   - `choices`, for a choice: each value with what it means.
   - `min`, `min_exclusive` (a bound the value must be above) and `max`, where the value has them. A count is at most 2^53, the integers a number of RNL holds exactly.
   - `default`: the value when nothing gives it. It is left out where there is none, as for `work` and `junction`.
@@ -37,7 +38,7 @@ The table describes a 0.4 level. A level of an earlier version is laid out in ro
   - `what`: one line that says what it does. `false_what`, for `number-or-false`, says what `false` means.
   - `applies`: where a solve uses it, by the values of other settings: the spacing only by the line layout, the beam and the candidates only by rows. Without it, a setting applies to every layout. A page may hide or grey it out elsewhere. Respacing a drawing uses the spacing whatever the layout.
   - `shown_when`, `required_when`: where a page shows it, and where it must be given.
-- `objectives`: every objective, with what it prefers, whether this version computes it, and `applies`, the layouts that take it, left out when every layout does. One it does not compute is inert when given. The line layout takes only `overlaps`, `crowding`, `misleading` and `wire_over_symbol`, with the layers that hold them, to rank the group-tree layout it starts from; it ranks its own drawings by `lines_order`.
+- `objectives`: every objective, with what it prefers, whether this version computes it, and `applies`, the layouts that take it, left out when every layout does. One it does not compute is inert when given. The line layout takes only `overlaps`, `crowding`, `misleading` and `wire_over_symbol`, with the layers that hold them, in its `lines_order`, by which it ranks its own drawings and the group-tree layout it starts from.
 - `default_objectives`: the objectives a solve takes when none are given, layer by layer. The setting `objectives` has the same as its `default`, as text.
 - `stages`: the stages of a solve's progress, as [`--progress=json`](solver-progress.md) names them, in the order of its table, each with `applies`, the layouts that pass through it, left out when it is not of one layout: `search`, `coords`, `route` and `score` are those of rows, `tree` of the group tree, `lines` of the line layout; `respace` is that of a respace, whatever the layout.
 - `lines_order`: how the line layout ranks the drawings it makes, which no setting changes: `what`, a line to show beside it, and `ranks`, first rank first, each with a `name` and a line. It is there to be shown, not set.

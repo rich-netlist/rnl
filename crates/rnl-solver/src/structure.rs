@@ -524,6 +524,24 @@ impl GroupTree {
 pub(crate) struct FreeClass {
     pub root: usize,
     pub members: Vec<(usize, Orient)>,
+    /// The values of the root the listed facts on its members allow: an ORIENT list, an
+    /// absolute pin direction. All eight when none narrows it, the witness's first.
+    pub allowed: Vec<Orient>,
+}
+
+impl FreeClass {
+    pub(crate) fn allows(&self, v: Orient) -> bool {
+        self.allowed.contains(&v)
+    }
+
+    /// A value the class may take: `v`, or the first allowed.
+    pub(crate) fn allowed_or(&self, v: Orient) -> Orient {
+        if self.allows(v) {
+            v
+        } else {
+            self.allowed.first().copied().unwrap_or(v)
+        }
+    }
 }
 
 /// What the facts kept leave to decide.
@@ -1841,7 +1859,10 @@ fn open(problem: &LevelProblem, resolved: &Resolved) -> Open {
         }
     }
     let mut out = Open {
-        classes: by_root.into_iter().map(|(root, members)| FreeClass { root, members }).collect(),
+        classes: by_root
+            .into_iter()
+            .map(|(root, members)| FreeClass { root, members, allowed: Orient::ALL.to_vec() })
+            .collect(),
         ..Open::default()
     };
     for &f in &resolved.kept {

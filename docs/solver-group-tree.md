@@ -27,9 +27,14 @@ within each class. Equal member sets reuse the selected group; crossing sets are
 omitted. Selection uses the complete member set, including ports, before the tree
 projects it onto elements. The selected groups also define the scoring scopes.
 
-Orientation alternatives are search preferences. Search can turn a related class or
-choose another authored alternative, but the placement resolver always retains the
-original predicates and all kept facts. ALIGN uses its single authored axis, and its
+Orientation alternatives are search preferences. The objects that ORIENT-RELATION
+relates are one class, turned as a whole; an ORIENT list or an absolute PIN-ORIENT on a
+member narrows the values its class may take, and a class left one value is drawn as the
+witness has it. A narrowed class starts at the witness's value. A listed relation stays an
+alternative of its own. The search tries a move that turns or mirrors more than one object
+after the structural moves and the one-object turns, so that a whole class does not take a
+step a smaller move would have made. The placement resolver always retains the original
+predicates and all kept facts. ALIGN uses its single authored axis, and its
 members are one degree of freedom. An arrangement splits a pair of members it puts in one
 column for an ALIGN on y, or in one row for an ALIGN on x, where they can share no line. The
 first arrangement is repaired by list edits alone until it splits none, each edit breaking
@@ -62,8 +67,8 @@ orientation; ports touched by facts try the available horizontal directions.
 Supply and ground preferences respect their host pins, and row extents include
 pin-attached text using the runtime's geometry.
 
-Absolute PIN-ORIENT constraints expose equivalent orientation alternatives to search,
-while the original pin predicates remain authoritative. Rows also repair overlaps
+Absolute PIN-ORIENT constraints narrow the orientation class of their object, while the
+original pin predicates remain authoritative. Rows also repair overlaps
 between a port's text and neighboring symbols, below all retained facts.
 
 If the shared budget expires while evaluating a challenger, it cannot replace a
@@ -77,7 +82,14 @@ one fixed key: false joins, the wires that run along another net's pin or throug
 symbol and so read as connected where they are not, count first, whether or not
 those objectives are configured. In the lines layout they rank right after the
 facts that must hold, above broken low-priority facts, and a stub put apart from
-another symbol is never put beyond it along the way it rises from its pin. The
+another symbol is never put beyond it along the way it rises from its pin. There the
+group tree ranks its arrangements by the line layout's own order (`lines_order` of the
+[settings table](solver-settings-table.md)): the configured objectives, then the pins
+against their CURRENT, then the crossings and bends weighed by `lines_weights` (one crossing
+plus four times each bend by default), and the rest of that
+order, so that the tree, the line search and the choice between their drawings rank alike. The
+line search draws the arrangement the tree took, its first one, those it stepped through, and the
+four best by that order of those it tried and did not step to. The
 released versions retain their fixed ordering before the objective layers. Default
 layout and objective changes are a separate migration step. Global and group spacing
 settings are reserved for the subsequent skeleton and line layouts; rows and trees

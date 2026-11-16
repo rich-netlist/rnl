@@ -129,7 +129,7 @@ pub(crate) struct Settled {
 /// An outcome's rank, least first: whether the level's drawing failed, then its false joins (at the
 /// root, `score::false_joins`) and the groups dissolved or stretched, the parts not routed, whether it
 /// failed, the conflicts of the merge, the lab's order, the steps of routing.
-type Score = (bool, (usize, usize), usize, bool, usize, LabOrder, usize);
+type Score = (bool, (usize, usize, usize, usize), usize, bool, usize, LabOrder, usize);
 
 type Choice = (usize, Vec<usize>, Vec<usize>);
 
@@ -597,7 +597,7 @@ pub(crate) fn settle(
         s,
         tree,
         nodes,
-        weights: (1, 4),
+        weights: options.settings.lines_weights.pair(),
         clear,
         hung: BTreeMap::new(),
         leaves: BTreeSet::new(),
@@ -1353,9 +1353,31 @@ impl Search<'_, '_> {
                 .map_or(0, |w| crate::score::false_joins(problem, s, &m.placed.origins, &m.placed.geometry, &w)),
             _ => 0,
         };
+        // the unified key's first layers: the facts broken, then the false joins, then the facts of
+        // low priority broken, of the level's drawing
+        let (facts, low) = match (&made, root) {
+            (Some(m), true) => {
+                let g = &m.placed.geometry;
+                let tol = from_f64(self.options.tolerance).unwrap_or_else(Q::zero);
+                let at = |r: &PointRef, axis: Axis| point_value(problem, g, r, usize::from(axis == Axis::Y), 0);
+                let ori = |k: usize| g.orient.get(k).copied();
+                let broken: Vec<usize> = s
+                    .kept
+                    .iter()
+                    .copied()
+                    .filter(|&f| crate::holds::check_problem(problem, f, &at, &ori, &tol, &tol) != Some(true))
+                    .collect();
+                let low = broken
+                    .iter()
+                    .filter(|&&f| problem.facts[f].priority == rnl_runtime::interp::obj::Priority::Low)
+                    .count();
+                (broken.len() - low, low)
+            }
+            _ => (0, 0),
+        };
         let score: Score = (
             root && failed,
-            (joins, t.score.0),
+            (facts, joins, low, t.score.0),
             t.score.1,
             failed,
             made.as_ref().map_or(0, |m| m.conflicts.len()),
@@ -1543,7 +1565,7 @@ impl Search<'_, '_> {
     fn finish(mut self, end: SearchEnd, work: &Work) -> Result<Settled, String> {
         let drawing = |o: usize| {
             let s = &self.outcomes[o].score;
-            (s.0, s.1 .0, s.3, s.2, s.4, &s.5, s.6)
+            (s.0, (s.1 .0, s.1 .1, s.1 .2), s.3, s.2, s.4, &s.5, s.6)
         };
         let other = self.lost.iter().map(|s| s.0).min_by(|&a, &b| drawing(a).cmp(&drawing(b)).then(a.cmp(&b)));
         let better = |o: usize| self.best.is_none_or(|b| drawing(o) < drawing(b));
@@ -1608,7 +1630,7 @@ impl Search<'_, '_> {
             if table > 0 && table <= core.others.len() {
                 notes.push(format!(
                     "lines: {}: placed by its list in another arrangement of the group-tree layout's search, number {} \
-                     of {} (its first, then those it stepped through), not the one it took",
+                     of {} (its first, those it stepped through, then the best it tried), not the one it took",
                     lv.name(n),
                     table,
                     core.others.len()
@@ -4303,13 +4325,12 @@ pub(super) mod tests {
     /// A way the tree hands over that a fixed orientation rules out: before, the line search
     /// built no classes from it, listed no orientation in any group and gave the level up.
     #[test]
-    fn the_line_search_places_a_level_handed_a_way_that_a_fixed_orientation_rules_out() {
-        let (p, s, way) = crate::tree::way_tests::ruled_out_way();
+    fn the_line_search_draws_a_listed_orientation_a_fixed_one_rules_out_as_fixed() {
+        let (p, s) = crate::tree::way_tests::ruled_out_way();
         let options = SolverOptions::without_time_limit();
         let tree = crate::tree::Tree::new(&p, &s, &options);
-        let mut arr = tree.first(&mut Work::default());
+        let arr = tree.first(&mut Work::default());
         let (start, _) = tree.evaluate_rounds(&arr, 0, &mut Work::default());
-        arr.ways[way] = 1 - arr.ways[way];
         let arrangement = (arr, s.tree.clone());
         let run = || {
             settle(
@@ -4335,7 +4356,7 @@ pub(super) mod tests {
     /// say that no orientation could be placed.
     #[test]
     fn a_line_search_stopped_before_a_complete_solution_says_the_budget_stopped_it() {
-        let (p, s, _) = crate::tree::way_tests::ruled_out_way();
+        let (p, s) = crate::tree::way_tests::ruled_out_way();
         let options = SolverOptions::without_time_limit();
         let tree = crate::tree::Tree::new(&p, &s, &options);
         let arr = tree.first(&mut Work::default());
@@ -4400,14 +4421,15 @@ pub(super) mod tests {
             let s = crate::structure::analyse(&p, &resolved, &options, crate::options::CAPS, &mut Work::default());
             let s = crate::search_choices::for_layout(&s, &mut Work::default());
             assert_eq!(s.kept.len(), 4);
-            assert_eq!(s.open.classes.is_empty(), !related);
+            // a listed relation stays a way; a listed orientation narrows its object's class
+            assert_eq!(s.open.ways.len(), usize::from(related));
             let tree = crate::tree::Tree::new(&p, &s, &options);
             let mut arr = tree.first(&mut Work::default());
             let (start, _) = tree.evaluate_rounds(&arr, 0, &mut Work::default());
             // Another group's pending alternative must not prevent this group's
             // legal orientations from being listed. It will be checked there.
-            let pending = s.open.ways.iter().position(|w| w.fact == 2).unwrap();
-            arr.ways[pending] = 1;
+            let pending = s.open.classes.iter().position(|c| c.members.iter().any(|(m, _)| *m == outside)).unwrap();
+            arr.values[pending] = s.open.classes[pending].allowed[1];
             let level = Level {
                 problem: &p,
                 s: &s,
