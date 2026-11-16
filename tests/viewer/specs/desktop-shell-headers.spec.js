@@ -21,13 +21,25 @@ async function calls(page, viewer, answers, body) {
     };
     const desktop = (await import("../shells/desktop.js")).default;
     await new Function("desktop", `return (${body})(desktop)`)(desktop);
-    return recorded.filter((c) => ["write_bytes", "save_image", "pick_project_save"].includes(c.command));
+    return recorded.filter((c) => ["write_bytes", "save_image", "pick_project_save", "export_svg"].includes(c.command));
   }, { answers, body: body.toString() });
 }
 
 test("Export Image gives save_image the image's name and kind as headers", async ({ page, viewer }) => {
   const recorded = await calls(page, viewer, {}, async (desktop) => { await desktop.saveImage("amp 1.png", new Blob(["abc"]), "png"); });
   expect(recorded).toEqual([{ command: "save_image", args: { bytes: 3 }, options: { headers: { name: "amp%201.png", kind: "png" } } }]);
+});
+
+test("Export Image tells export_svg whether the document shown is a solve's preview", async ({ page, viewer }) => {
+  const recorded = await calls(page, viewer, { export_svg: "<svg/>" }, async (desktop) => {
+    const request = { level: 0, title: "amp", overlays: {}, source: { path: "C:/w/amp.sp" }, edits: null };
+    await desktop.exportSvg({ ...request, preview: true });
+    await desktop.exportSvg(request);
+  });
+  expect(recorded.map((c) => [c.command, c.args.preview, c.args.path])).toEqual([
+    ["export_svg", true, "C:/w/amp.sp"],
+    ["export_svg", false, "C:/w/amp.sp"],
+  ]);
 });
 
 test("Save Project gives write_bytes the archive's path as a header", async ({ page, viewer }) => {

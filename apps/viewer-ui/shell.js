@@ -122,9 +122,10 @@
  * @property {() => Promise<{ name: string, text: string } | null>} [pickManifest] Web: the manifest file the user chooses.
  * @property {(json: object, name: string) => Source} [sourceFromManifestJson] Web: the source of a manifest a file gave.
  * @property {(name: string, text: string) => Promise<void>} [saveManifest] Web: download a manifest of links.
- * @property {(request: { doc: object, level: number, title: string, overlays: object, source: Source, edits: Object<string, string> }) => Promise<string>} [exportSvg]
+ * @property {(request: { doc: object, level: number, title: string, overlays: object, source: Source, edits: Object<string, string>, preview?: boolean }) => Promise<string>} [exportSvg]
  *   File > Export Image (export-image.js): the core's SVG of `levels[level]` of `doc`, the Document
- *   shown, with `overlays` (rnl_view::OverlayOptions), built again from what `doc` was built from.
+ *   shown, with `overlays` (rnl_view::OverlayOptions), built again from what `doc` was built from; when `preview`
+ *   is true, `doc` is a solve's preview, built from the files the solve wrote, which the shell that solved holds.
  * @property {(name: string, blob: Blob, kind: "svg" | "png") => Promise<string | null>} [saveImage]
  *   Save the image: the web downloads it, the desktop asks where; what was written, or null on cancel.
  * @property {(source: Source, file: SavedFile, encoding?: "preserve" | "utf8") => Promise<Source | null>} [saveAs] Ask where to save the
