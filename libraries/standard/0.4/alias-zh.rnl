@@ -294,12 +294,16 @@
   @ALIAS("$单结晶体管", "$UJT");
   @ALIAS("$运放", "$OPAMP");
   @ALIAS("$带电源运放", "$OPAMP_SUPPLY");
+  @ALIAS("$带电源反相输入在上运放", "$OPAMP_INVERTED_SUPPLY");
   @ALIAS("$差分运放", "$DIFFERENTIAL_OPAMP");
   @ALIAS("$带电源差分运放", "$DIFFERENTIAL_OPAMP_SUPPLY");
+  @ALIAS("$带电源反相输入在上差分运放", "$DIFFERENTIAL_OPAMP_INVERTED_SUPPLY");
   @ALIAS("$交叉输出差分运放", "$DIFFERENTIAL_OPAMP_TWISTED");
   @ALIAS("$带电源交叉输出差分运放", "$DIFFERENTIAL_OPAMP_TWISTED_SUPPLY");
+  @ALIAS("$带电源交叉输出反相输入在上差分运放", "$DIFFERENTIAL_OPAMP_TWISTED_INVERTED_SUPPLY");
   @ALIAS("$比较器", "$COMPARATOR");
   @ALIAS("$带电源比较器", "$COMPARATOR_SUPPLY");
+  @ALIAS("$带电源反相输入在上比较器", "$COMPARATOR_INVERTED_SUPPLY");
   @ALIAS("$电压放大器", "$VOLTAGE_AMPLIFIER");
   @ALIAS("$带电源电压放大器", "$VOLTAGE_AMPLIFIER_SUPPLY");
   @ALIAS("$跨导器", "$TRANSCONDUCTOR");

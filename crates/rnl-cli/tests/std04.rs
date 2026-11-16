@@ -340,9 +340,13 @@ fn supply_variants_cover_functional_and_logic_on_integer_grid() {
 
     let expected_func = [
         "$OPAMP_SUPPLY",
+        "$OPAMP_INVERTED_SUPPLY",
         "$DIFFERENTIAL_OPAMP_SUPPLY",
+        "$DIFFERENTIAL_OPAMP_INVERTED_SUPPLY",
         "$DIFFERENTIAL_OPAMP_TWISTED_SUPPLY",
+        "$DIFFERENTIAL_OPAMP_TWISTED_INVERTED_SUPPLY",
         "$COMPARATOR_SUPPLY",
+        "$COMPARATOR_INVERTED_SUPPLY",
         "$VOLTAGE_AMPLIFIER_SUPPLY",
         "$TRANSCONDUCTOR_SUPPLY",
         "$DIFFERENTIAL_TRANSCONDUCTOR_SUPPLY",
@@ -414,6 +418,44 @@ fn supply_variants_cover_functional_and_logic_on_integer_grid() {
     assert_eq!(pin_at("rst"), ([-1.0, -5.0], Some("down")));
     assert_eq!(pin_at("vp"), ([1.0, 4.0], Some("up")));
     assert_eq!(pin_at("vn"), ([1.0, -5.0], Some("down")));
+}
+
+#[test]
+fn inverted_supply_symbols_swap_the_inputs_and_keep_the_supplies() {
+    let all = rnl_view::catalog(
+        &MemoryProvider::default(),
+        &rnl_view::CatalogOptions { all_versions: true, ..Default::default() },
+    );
+    let pins = |name: &str| -> std::collections::BTreeMap<String, ([f64; 2], Option<&'static str>)> {
+        let s = all
+            .symbols
+            .iter()
+            .find(|s| s.version == "0.4" && s.symbol == name)
+            .unwrap_or_else(|| panic!("missing {name}"));
+        s.pins
+            .iter()
+            .map(|p| (serde_json::to_value(&p.terminal).unwrap().as_str().unwrap().to_string(), (p.at, p.direction)))
+            .collect()
+    };
+    // (the inverted symbol, its base, the terminals whose places it swaps)
+    let cases = [
+        ("$OPAMP_INVERTED_SUPPLY", "$OPAMP_SUPPLY", &[("inp", "inn")][..]),
+        ("$COMPARATOR_INVERTED_SUPPLY", "$COMPARATOR_SUPPLY", &[("inp", "inn")][..]),
+        ("$DIFFERENTIAL_OPAMP_INVERTED_SUPPLY", "$DIFFERENTIAL_OPAMP_SUPPLY", &[("inp", "inn"), ("outp", "outn")][..]),
+        ("$DIFFERENTIAL_OPAMP_TWISTED_INVERTED_SUPPLY", "$DIFFERENTIAL_OPAMP_SUPPLY", &[("inp", "inn")][..]),
+    ];
+    for (inverted, base, swapped) in cases {
+        let (inv, mut want) = (pins(inverted), pins(base));
+        for (a, b) in swapped {
+            let (pa, pb) = (want[*a], want[*b]);
+            want.insert(a.to_string(), pb);
+            want.insert(b.to_string(), pa);
+        }
+        assert_eq!(inv, want, "{inverted}");
+        // the inverting input above, the positive supply above as on the base symbol
+        assert!(inv["inn"].0[1] > inv["inp"].0[1], "{inverted}");
+        assert_eq!((inv["vp"].0[1], inv["vp"].1), (3.0, Some("up")), "{inverted}");
+    }
 }
 
 #[test]
