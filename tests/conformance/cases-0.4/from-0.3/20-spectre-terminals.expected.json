@@ -1799,7 +1799,7 @@
             20.0,
             0.0
           ],
-          "orient": "R0",
+          "orient": "R90",
           "style": {
             "bold": true,
             "cap": "butt",
@@ -1865,7 +1865,7 @@
             50.0,
             0.0
           ],
-          "orient": "R0",
+          "orient": "R270",
           "style": {
             "bold": true,
             "cap": "butt",
@@ -1953,7 +1953,7 @@
             20.0,
             -15.0
           ],
-          "orient": "R0",
+          "orient": "R90",
           "style": {
             "bold": true,
             "cap": "butt",
@@ -2220,24 +2220,12 @@
           ],
           "points": [
             [
-              20.0,
-              2.0
+              18.0,
+              0.0
             ],
             [
-              19.0,
-              2.0
-            ],
-            [
-              19.0,
-              -5.5
-            ],
-            [
-              20.0,
-              -5.5
-            ],
-            [
-              20.0,
-              -13.0
+              18.0,
+              -15.0
             ]
           ],
           "mode": "auto",
@@ -2260,24 +2248,12 @@
           ],
           "points": [
             [
-              20.0,
-              -2.0
+              22.0,
+              0.0
             ],
             [
-              20.0,
-              -9.5
-            ],
-            [
-              21.0,
-              -9.5
-            ],
-            [
-              21.0,
-              -17.0
-            ],
-            [
-              20.0,
-              -17.0
+              22.0,
+              -15.0
             ]
           ],
           "mode": "auto",
@@ -2519,8 +2495,8 @@
         {
           "id": "#d1::name",
           "anchor": [
-            21.1,
-            0.25
+            19.75,
+            1.1
           ],
           "lines": [
             [
@@ -2536,7 +2512,7 @@
           "halign": "start",
           "valign": "baseline",
           "rotate": 0.0,
-          "orient": "R0",
+          "orient": "R90",
           "style": {
             "bold": true,
             "cap": "butt",
@@ -2552,8 +2528,8 @@
         {
           "id": "#d1::model",
           "anchor": [
-            21.1,
-            -1.2
+            21.2,
+            1.1
           ],
           "lines": [
             []
@@ -2561,7 +2537,7 @@
           "halign": "start",
           "valign": "baseline",
           "rotate": 0.0,
-          "orient": "R0",
+          "orient": "R90",
           "style": {
             "bold": true,
             "cap": "butt",
@@ -2676,8 +2652,8 @@
         {
           "id": "#xf1::name",
           "anchor": [
-            51.6,
-            -0.2
+            49.8,
+            -1.6
           ],
           "lines": [
             [
@@ -2693,7 +2669,7 @@
           "halign": "start",
           "valign": "baseline",
           "rotate": 0.0,
-          "orient": "R0",
+          "orient": "R270",
           "style": {
             "bold": true,
             "cap": "butt",
@@ -2825,8 +2801,8 @@
         {
           "id": "#dj1::name",
           "anchor": [
-            21.1,
-            -14.75
+            19.75,
+            -13.9
           ],
           "lines": [
             [
@@ -2842,7 +2818,7 @@
           "halign": "start",
           "valign": "baseline",
           "rotate": 0.0,
-          "orient": "R0",
+          "orient": "R90",
           "style": {
             "bold": true,
             "cap": "butt",
@@ -2858,8 +2834,8 @@
         {
           "id": "#dj1::model",
           "anchor": [
-            21.1,
-            -16.2
+            21.2,
+            -13.9
           ],
           "lines": [
             []
@@ -2867,7 +2843,7 @@
           "halign": "start",
           "valign": "baseline",
           "rotate": 0.0,
-          "orient": "R0",
+          "orient": "R90",
           "style": {
             "bold": true,
             "cap": "butt",

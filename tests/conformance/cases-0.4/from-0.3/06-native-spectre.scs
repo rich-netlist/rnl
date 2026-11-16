@@ -38,7 +38,7 @@ model rpolymod resistor
 // @RNL {
 //   #r1 @PLACE(0, 0); #c1 @PLACE(10, 0); #l1 @PLACE(20, 0); #v1 @PLACE(30, 0); #i1 @PLACE(40, 0);
 //   #e1 @PLACE(0, -10); #g1 @PLACE(10, -10); #f1 @PLACE(20, -10); #h1 @PLACE(30, -10); #b1 @PLACE(40, -10);
-//   #sw1 @PLACE(0, -20); #p1 @PLACE(10, -20); #d1 @PLACE(20, -20); #q1 @PLACE(30, -20); #q2 @PLACE(40, -20);
+//   #sw1 @PLACE(0, -20); #p1 @PLACE(10, -20); #d1 @PLACE(20, -20) => @ORIENT("R90"); #q1 @PLACE(30, -20); #q2 @PLACE(40, -20);
 //   #m1 @PLACE(0, -30); #m2 @PLACE(10, -30); #j1 @PLACE(20, -30); #j2 @PLACE(30, -30); #rp1 @PLACE(40, -30);
 //   #rel1 @PLACE(0, -40); #t1 @PLACE(10, -40); #M3 @PLACE(20, -40)
 // }

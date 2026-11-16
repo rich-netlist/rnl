@@ -45,7 +45,7 @@ R2 a25 b25 rmod
 * @RNL {
 *   #R1 @PLACE(0, 0); #C1 @PLACE(10, 0); #L1 @PLACE(20, 0); #V1 @PLACE(30, 0); #I1 @PLACE(40, 0);
 *   #E1 @PLACE(0, -10); #G1 @PLACE(10, -10); #F1 @PLACE(20, -10); #H1 @PLACE(30, -10); #B1 @PLACE(40, -10);
-*   #S1 @PLACE(0, -20); #W1 @PLACE(10, -20); #D1 @PLACE(20, -20); #Q1 @PLACE(30, -20); #Q2 @PLACE(40, -20);
+*   #S1 @PLACE(0, -20); #W1 @PLACE(10, -20); #D1 @PLACE(20, -20) => @ORIENT("R90"); #Q1 @PLACE(30, -20); #Q2 @PLACE(40, -20);
 *   #M1 @PLACE(0, -30); #M2 @PLACE(10, -30); #J1 @PLACE(20, -30); #J2 @PLACE(30, -30); #Z1 @PLACE(40, -30);
 *   #Z2 @PLACE(0, -40); #T1 @PLACE(10, -40); #O1 @PLACE(20, -40); #U1 @PLACE(30, -40); #R2 @PLACE(40, -40)
 * }

@@ -45,14 +45,14 @@ model rdiff_r rdiff
 //   #sw3 @SET-SYMBOL $SP3T;
 //   #r1 @PLACE(0, 0);
 //   #r_custom @PLACE(10, 0);
-//   #d1 @PLACE(20, 0);
+//   #d1 @PLACE(20, 0) => @ORIENT("R90");
 //   #e1 @PLACE(30, 0);
 //   #rel1 @PLACE(40, 0);
-//   #xf1 @PLACE(50, 0);
+//   #xf1 @PLACE(50, 0) => @ORIENT("R270");
 //   #sw3 @PLACE(60, 0);
 //   #mp1 @PLACE(0, -15);
 //   #qb1 @PLACE(10, -15);
-//   #dj1 @PLACE(20, -15);
+//   #dj1 @PLACE(20, -15) => @ORIENT("R90");
 //   #jp1 @PLACE(30, -15);
 //   #rd1 @PLACE(40, -15);
 //

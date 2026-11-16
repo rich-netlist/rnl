@@ -3674,7 +3674,7 @@
             20.0,
             -20.0
           ],
-          "orient": "R0",
+          "orient": "R90",
           "style": {
             "bold": true,
             "cap": "butt",
@@ -4674,8 +4674,8 @@
         {
           "id": "#d1::name",
           "anchor": [
-            21.1,
-            -19.75
+            19.75,
+            -18.9
           ],
           "lines": [
             [
@@ -4691,7 +4691,7 @@
           "halign": "start",
           "valign": "baseline",
           "rotate": 0.0,
-          "orient": "R0",
+          "orient": "R90",
           "style": {
             "bold": true,
             "cap": "butt",
@@ -4707,8 +4707,8 @@
         {
           "id": "#d1::model",
           "anchor": [
-            21.1,
-            -21.2
+            21.2,
+            -18.9
           ],
           "lines": [
             []
@@ -4716,7 +4716,7 @@
           "halign": "start",
           "valign": "baseline",
           "rotate": 0.0,
-          "orient": "R0",
+          "orient": "R90",
           "style": {
             "bold": true,
             "cap": "butt",
