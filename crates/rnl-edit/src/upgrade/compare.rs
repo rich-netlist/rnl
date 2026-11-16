@@ -12,7 +12,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use rnl_runtime::geom::fmt_num;
+use rnl_runtime::geom::{fmt_num, Orient};
 use rnl_runtime::model::{SymbolOrigin, UsageOrigin};
 use rnl_runtime::problem::{
     FactKind, LevelProblem, ObjectKind, OrientSlot, PointRef, Position, Reference, Sense, Slot,
@@ -49,6 +49,15 @@ struct Pins {
     number: BTreeMap<(String, usize), String>,
 }
 
+/// A terminal by its name in 0.4: the windings of a Spectre `transformer`, `p_plus p_minus s_plus
+/// s_minus` in 0.3, are `p1 n1 p2 n2` in 0.4, the same nodes.
+fn terminal_04(name: String) -> String {
+    match super::host_terminals::TRANSFORMER_03.iter().position(|n| *n == name) {
+        Some(k) => super::host_terminals::TRANSFORMER_04[k].to_string(),
+        None => name,
+    }
+}
+
 fn pins(read: &Interpretation, problem: &LevelProblem) -> Pins {
     let mut out = Pins::default();
     for level in read.model.levels.iter().filter(|l| l.title == problem.title) {
@@ -59,7 +68,7 @@ fn pins(read: &Interpretation, problem: &LevelProblem) -> Pins {
                     None => Some(t.clone()),
                 });
                 if let Some(terminal) = terminal {
-                    out.number.insert((object.id.clone(), index), terminal);
+                    out.number.insert((object.id.clone(), index), terminal_04(terminal));
                 }
             }
         }
@@ -79,7 +88,7 @@ fn pins(read: &Interpretation, problem: &LevelProblem) -> Pins {
             if matches!(p, PointRef::Pin { .. }) && terminal.chars().all(|c| c.is_ascii_digit()) {
                 numbers.push(((id.clone(), pin), terminal.clone()));
             }
-            out.by_name.insert((id.clone(), terminal), pin);
+            out.by_name.insert((id.clone(), terminal_04(terminal)), pin);
         }
     };
     for net in &problem.nets {
@@ -365,8 +374,11 @@ fn position(names: &Names, position: &Position) -> Value {
 
 fn symbol(table: &[rnl_runtime::model::SymbolView], index: usize, depth: usize) -> Value {
     let Some(s) = table.get(index).filter(|_| depth < 65) else { return Value::Null };
+    // the order of the pins of a symbol says nothing: a terminal is compared by its network
+    let mut pins: Vec<Value> = s.pins.iter().map(|p| json!({"at":p.pos,"direction":p.dir,"label":p.label})).collect();
+    pins.sort_by_key(Value::to_string);
     json!({"box":s.bbox,
-        "pins":s.pins.iter().map(|p|json!({"at":p.pos,"direction":p.dir,"label":p.label})).collect::<Vec<_>>(),
+        "pins":pins,
         "labels":s.labels.iter().map(|l|json!({"key":l.key,"text":l.text,"at":l.at,"halign":l.halign,"valign":l.valign,"rotate":l.rotate,"fix_rotate":l.fix_rotate.unwrap_or(false),"upright":l.upright.unwrap_or(true),"style":format!("{:?}",l.style)})).collect::<Vec<_>>(),
         "primitives":s.prims.iter().map(|p|json!({"order":p.order,"shape":p.shape.as_str(),"points":p.points,"params":format!("{:?}",p.params),"style":format!("{:?}",p.style),"text":p.text,"halign":p.halign,"valign":p.valign,"rotate":p.rotate,"fix_rotate":p.fix_rotate,"upright":p.upright.unwrap_or(true)})).collect::<Vec<_>>(),
         "nested":s.nested.iter().map(|n|json!({"order":n.order,"at":n.at,"orientation":n.orient.as_str(),"symbol":symbol(table,n.symbol,depth+1)})).collect::<Vec<_>>()})
@@ -670,7 +682,76 @@ fn mentions(defaults: &BTreeSet<String>, text: &str) -> bool {
     defaults.iter().any(|name| text.contains(&mark(name)))
 }
 
-fn snapshot(read: &Interpretation, added: &BTreeMap<String, BTreeSet<String>>) -> Items {
+/// The instances that 0.4 draws with a turned symbol (see `turned`), by level title and id, with the
+/// turn that draws the new symbol as the old.
+pub(super) type Turned = BTreeMap<(String, String), Orient>;
+
+/// The code of 0.3 that `code` of 0.4 draws with a symbol turned by `turn`: the one it composes.
+fn turned_back(turn: Orient, code: Orient) -> Orient {
+    Orient::ALL.into_iter().find(|c| turn.then(*c) == code).unwrap_or(code)
+}
+
+/// The geometry of a turned symbol in the frame of the symbol of 0.3: its box and pins turned.
+fn turn_geometry(turn: Orient, geometry: &mut Value) {
+    let point = |v: &Value| Some((v.get(0)?.as_f64()?, v.get(1)?.as_f64()?));
+    if let Some([x1, y1, x2, y2]) = geometry
+        .get("box")
+        .and_then(Value::as_array)
+        .and_then(|b| b.iter().map(Value::as_f64).collect::<Option<Vec<_>>>())
+        .as_deref()
+        .map(|b| [b[0], b[1], b[2], b[3]])
+    {
+        let (a, b) = (turn.apply((x1, y1)), turn.apply((x2, y2)));
+        geometry["box"] = json!([a.0.min(b.0) + 0.0, a.1.min(b.1) + 0.0, a.0.max(b.0) + 0.0, a.1.max(b.1) + 0.0]);
+    }
+    for pin in geometry.get_mut("pins").and_then(Value::as_array_mut).into_iter().flatten() {
+        if let Some(at) = pin.get("at").and_then(point) {
+            // `+ 0.0` writes a turned zero as 0, not -0
+            let (x, y) = turn.apply(at);
+            pin["at"] = json!((x + 0.0, y + 0.0));
+        }
+        if let Some(direction) = pin.get("direction").and_then(Value::as_u64) {
+            pin["direction"] = json!(turn.direction(direction as u16));
+        }
+    }
+    if let Some(pins) = geometry.get_mut("pins").and_then(Value::as_array_mut) {
+        pins.sort_by_key(Value::to_string);
+    }
+}
+
+/// The fact in the frame of the symbols of 0.3: an ORIENT of a turned instance by the code it
+/// composes, a pin of one by its direction in the old symbol. An ORIENT-RELATION of instances of
+/// different turns says something else than it did, so its text is marked.
+fn turned_fact(kind: &FactKind, turn_of: &impl Fn(usize) -> Option<Orient>) -> (FactKind, bool) {
+    let mut kind = kind.clone();
+    let pin = |p: &mut rnl_runtime::problem::DirectedPin| {
+        if let Some(turn) = turn_of(p.object) {
+            p.direction = turn.direction(p.direction).unwrap_or(p.direction);
+        }
+    };
+    let mut mixed = false;
+    match &mut kind {
+        FactKind::Orient { object, code } => {
+            if let Some(turn) = turn_of(*object) {
+                *code = turned_back(turn, *code);
+            }
+        }
+        FactKind::PinOrient { pin: p, .. } => pin(p),
+        FactKind::PinOrientRelation { from, to, .. } => {
+            pin(from);
+            pin(to);
+        }
+        FactKind::OrientRelation { from, to, .. } => {
+            let turns: BTreeSet<_> =
+                from.iter().chain(to.iter()).map(|o| turn_of(*o).unwrap_or(Orient::R0).as_str()).collect();
+            mixed = turns.len() > 1;
+        }
+        _ => {}
+    }
+    (kind, mixed)
+}
+
+fn snapshot(read: &Interpretation, added: &BTreeMap<String, BTreeSet<String>>, turned: &Turned) -> Items {
     let mut out = Items { items: BTreeMap::new(), seen: BTreeMap::new() };
     let pinmaps: BTreeMap<String, Pins> = read.problems.iter().map(|p| (p.title.clone(), pins(read, p))).collect();
     for level in &read.doc.levels {
@@ -715,7 +796,10 @@ fn snapshot(read: &Interpretation, added: &BTreeMap<String, BTreeSet<String>>) -
                     .find(|item| item.object_id == object.id)
                     .map(|item| symbol(&level.unplaced_symbols, item.symbol, 0))
             };
-            let geometry = drawn.or_else(undrawn);
+            let mut geometry = drawn.or_else(undrawn);
+            if let (Some(turn), Some(g)) = (turned.get(&(title.clone(), object.id.clone())), geometry.as_mut()) {
+                turn_geometry(*turn, g);
+            }
             let standard = matches!(object.symbol.as_ref().map(|s| &s.origin), Some(SymbolOrigin::Package(_)));
             let default_symbol = object.symbol.as_ref().is_some_and(|s| s.default);
             put(
@@ -767,6 +851,10 @@ fn snapshot(read: &Interpretation, added: &BTreeMap<String, BTreeSet<String>>) -
         let file = &read.doc.levels[problem.level].path;
         let title = &problem.title;
         let names = identities(read, problem);
+        let turn_of = |index: usize| match &problem.objects.get(index)?.reference {
+            Reference::Name(id) => turned.get(&(title.clone(), id.clone())).copied(),
+            _ => None,
+        };
         let none = BTreeSet::new();
         let default = added.get(title).unwrap_or(&none);
         // The pins of an instance drawn with the default symbol, the viewer's stand-in of 0.3 or
@@ -786,7 +874,9 @@ fn snapshot(read: &Interpretation, added: &BTreeMap<String, BTreeSet<String>>) -
             let orient = match &object.orient {
                 None => "none".to_string(),
                 Some(OrientSlot::Free) => "free".to_string(),
-                Some(OrientSlot::Fixed { code, .. }) => format!("{code:?}"),
+                Some(OrientSlot::Fixed { code, .. }) => {
+                    format!("{:?}", turn_of(index).map_or(*code, |turn| turned_back(turn, *code)))
+                }
             };
             put(
                 "positions",
@@ -798,7 +888,9 @@ fn snapshot(read: &Interpretation, added: &BTreeMap<String, BTreeSet<String>>) -
             if says_nothing(&item.kind) {
                 continue;
             }
-            for text in facts(&names, &item.kind) {
+            let (kind, mixed) = turned_fact(&item.kind, &turn_of);
+            for text in facts(&names, &kind) {
+                let text = if mixed { format!("{text} (turned symbols)") } else { text };
                 put("facts", &format!("{text} {:?}", item.priority), json!(text));
             }
         }
@@ -860,14 +952,15 @@ fn snapshot(read: &Interpretation, added: &BTreeMap<String, BTreeSet<String>>) -
 pub(super) fn compare(
     before: &Interpretation,
     after: &Interpretation,
+    turned: &Turned,
 ) -> (Vec<Difference>, Vec<Difference>, Vec<Difference>) {
     let added = defaults(before, after);
     let rules = converted(before, after);
     let package = package_texts(before, after);
     let keys = netname_keys(before, after);
     let bare = bare_usages(after);
-    let mut before = renamed_keys(snapshot(before, &added).items, &keys);
-    let after = snapshot(after, &added).items;
+    let mut before = renamed_keys(snapshot(before, &added, &Turned::new()).items, &keys);
+    let after = snapshot(after, &added, turned).items;
     let mut differences = Vec::new();
     let mut look = Vec::new();
     let mut by_rule = Vec::new();

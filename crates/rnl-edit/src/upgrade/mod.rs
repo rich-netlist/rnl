@@ -21,6 +21,7 @@ mod selections;
 mod sets;
 mod standard;
 mod terminals;
+mod turned;
 mod usages;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -421,7 +422,8 @@ pub fn upgrade(entry: &str, files: &dyn Provider, options: &UpgradeOptions) -> R
         rnl_view::interpret_with(&entry, options.dialect.as_deref(), &options.formats, &provider, &target_options)?;
     report.diagnostics = diagnostics(&after);
     report.assertion_violations = report.diagnostics.iter().filter(|d| d.severity == "violation").cloned().collect();
-    (report.differences, report.default_look_changes, report.rule_changes) = compare::compare(&before, &after);
+    (report.differences, report.default_look_changes, report.rule_changes) =
+        compare::compare(&before, &after, &context.references.turned.objects);
     report.discarded_placements = discarded;
     Ok(Upgrade { entry, files: output, read, report })
 }

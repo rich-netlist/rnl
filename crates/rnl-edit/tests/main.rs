@@ -19,6 +19,7 @@ mod upgrade_references;
 mod upgrade_selections;
 mod upgrade_sets;
 mod upgrade_terminals;
+mod upgrade_turned;
 
 /// Every file of this directory is a module of this program: one that is not would not be compiled
 /// nor run, with no warning.

@@ -37,6 +37,7 @@ pub(super) struct References {
     approximate: super::approximate::Approximate,
     usage_reviews: BTreeMap<(usize, String, u32, u32), Vec<super::manual::Reason>>,
     canvas: super::canvas::Canvas,
+    pub turned: super::turned::Turned,
 }
 
 fn target_pins() -> BTreeMap<SymbolKey, Pins> {
@@ -134,6 +135,7 @@ impl References {
             canvas: super::canvas::Canvas::new(input),
             ..Self::default()
         };
+        result.turned = super::turned::Turned::new(input, |level, old| result.canvas.new_name(level, old));
         if approximate {
             result.definitions.retain(|(_, name), _| name != "$MIRRORED");
         }
