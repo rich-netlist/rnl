@@ -893,13 +893,12 @@ R1 c 0 1k
 }
 
 #[test]
-fn a_coupling_capacitor_lies_on_one_row_and_a_decap_stands_in_one_column() {
+fn a_coupling_capacitor_places_nothing_and_a_decap_stands_in_one_column() {
     // C1 and C4 lie flat (R90), C2 and C3 stand upright (R0)
     let (without, without_ok) = low_aligns("#C1 #C2 #C3 #C4;");
-    // $AC_COUPLE aligns the pins of each capacitor in y: one fact each, as the single role takes the
-    // set member by member (5.2.1); it holds for C1 and not for C2
+    // $AC_COUPLE is meaning only: a coupling capacitor may lie or stand
     let (with, with_ok) = low_aligns("{#C1 #C2} @AS $AC_COUPLE;");
-    assert_eq!((with, with_ok), (without + 2, without_ok + 1));
+    assert_eq!((with, with_ok), (without, without_ok));
     // $DECAP aligns them in x: it holds for C3 and not for C4
     let (with, with_ok) = low_aligns("{#C3 #C4} @AS $DECAP;");
     assert_eq!((with, with_ok), (without + 2, without_ok + 1));
