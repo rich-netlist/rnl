@@ -131,6 +131,16 @@ pub(crate) struct Settled {
 /// failed, the conflicts of the merge, the lab's order, the steps of routing.
 type Score = (bool, (usize, usize, usize, usize), usize, bool, usize, LabOrder, usize);
 
+/// Two scores as the search chooses between their drawings: in order, the drawing's by
+/// [`LabOrder::choose`]. Not transitive below a `virtual_weight` of 1, so never the order of a
+/// sort, which takes the scores' own order.
+fn choose(a: &Score, b: &Score) -> std::cmp::Ordering {
+    (a.0, &a.1, a.2, a.3, a.4)
+        .cmp(&(b.0, &b.1, b.2, b.3, b.4))
+        .then_with(|| a.5.choose(&b.5))
+        .then_with(|| a.6.cmp(&b.6))
+}
+
 type Choice = (usize, Vec<usize>, Vec<usize>);
 
 pub(super) type Bounds = (Vec<usize>, Vec<usize>);
@@ -1051,7 +1061,7 @@ impl Search<'_, '_> {
             let best = self.cores[c].results[made_before..]
                 .iter()
                 .copied()
-                .min_by(|&a, &b| self.outcomes[a].score.cmp(&self.outcomes[b].score).then(a.cmp(&b)));
+                .min_by(|&a, &b| choose(&self.outcomes[a].score, &self.outcomes[b].score).then(a.cmp(&b)));
             let root = self.nodes[id].step + 1 == self.steps.len();
             let mut best = best;
             if let Some(trial) = self.trials.remove(&c) {
@@ -1072,7 +1082,7 @@ impl Search<'_, '_> {
                     }
                     Some((theirs, solutions, made)) => {
                         let bands = match (theirs, best) {
-                            (Some(a), Some(b)) => self.outcomes[a].score < self.outcomes[b].score,
+                            (Some(a), Some(b)) => choose(&self.outcomes[a].score, &self.outcomes[b].score).is_lt(),
                             (Some(a), None) => !self.outcomes[a].score.3,
                             _ => false,
                         };
@@ -1113,10 +1123,9 @@ impl Search<'_, '_> {
                             self.lost.extend(solutions);
                         }
                         if root {
-                            self.best =
-                                self.solutions.iter().map(|s| s.0).min_by(|&a, &b| {
-                                    self.outcomes[a].score.cmp(&self.outcomes[b].score).then(a.cmp(&b))
-                                });
+                            self.best = self.solutions.iter().map(|s| s.0).min_by(|&a, &b| {
+                                choose(&self.outcomes[a].score, &self.outcomes[b].score).then(a.cmp(&b))
+                            });
                             self.rebetter();
                         }
                     }
@@ -1181,7 +1190,7 @@ impl Search<'_, '_> {
                     .solutions
                     .iter()
                     .map(|s| s.0)
-                    .min_by(|&a, &b| self.outcomes[a].score.cmp(&self.outcomes[b].score).then(a.cmp(&b)));
+                    .min_by(|&a, &b| choose(&self.outcomes[a].score, &self.outcomes[b].score).then(a.cmp(&b)));
                 self.rebetter();
             }
         }
@@ -1430,7 +1439,7 @@ impl Search<'_, '_> {
             self.solutions.push((o, spent(work) - self.start, id));
             self.made += 1;
             self.made_at.insert(o, self.made);
-            if self.best.is_none_or(|b| self.outcomes[o].score < self.outcomes[b].score) {
+            if self.best.is_none_or(|b| choose(&self.outcomes[o].score, &self.outcomes[b].score).is_lt()) {
                 self.best = Some(o);
                 self.better_at = self.made;
             }
@@ -1445,7 +1454,7 @@ impl Search<'_, '_> {
             .iter()
             .copied()
             .filter(|o| !node.carried.contains(o))
-            .min_by(|&a, &b| self.outcomes[a].score.cmp(&self.outcomes[b].score).then(a.cmp(&b)))
+            .min_by(|&a, &b| choose(&self.outcomes[a].score, &self.outcomes[b].score).then(a.cmp(&b)))
     }
 
     fn carry(&mut self, id: usize, o: usize) -> usize {
@@ -1502,7 +1511,10 @@ impl Search<'_, '_> {
             let here = if on { best.get(node.step).copied() } else { None };
             let weigh = here
                 .or_else(|| {
-                    core.results.iter().copied().min_by(|&a, &b| self.outcomes[a].score.cmp(&self.outcomes[b].score))
+                    core.results
+                        .iter()
+                        .copied()
+                        .min_by(|&a, &b| choose(&self.outcomes[a].score, &self.outcomes[b].score))
                 })
                 .map_or((0, 0), |o| self.outcomes[o].own);
             let key = (!on, node.visits, std::cmp::Reverse(weigh), node.step, id);
@@ -1566,12 +1578,16 @@ impl Search<'_, '_> {
     }
 
     fn finish(mut self, end: SearchEnd, work: &Work) -> Result<Settled, String> {
-        let drawing = |o: usize| {
-            let s = &self.outcomes[o].score;
-            (s.0, (s.1 .0, s.1 .1, s.1 .2), s.3, s.2, s.4, &s.5, s.6)
+        // the drawings, as the search chooses between them ([`choose`])
+        let drawing = |a: usize, b: usize| {
+            let (x, y) = (&self.outcomes[a].score, &self.outcomes[b].score);
+            (x.0, (x.1 .0, x.1 .1, x.1 .2), x.3, x.2, x.4)
+                .cmp(&(y.0, (y.1 .0, y.1 .1, y.1 .2), y.3, y.2, y.4))
+                .then_with(|| x.5.choose(&y.5))
+                .then_with(|| x.6.cmp(&y.6))
         };
-        let other = self.lost.iter().map(|s| s.0).min_by(|&a, &b| drawing(a).cmp(&drawing(b)).then(a.cmp(&b)));
-        let better = |o: usize| self.best.is_none_or(|b| drawing(o) < drawing(b));
+        let other = self.lost.iter().map(|s| s.0).min_by(|&a, &b| drawing(a, b).then(a.cmp(&b)));
+        let better = |o: usize| self.best.is_none_or(|b| drawing(o, b).is_lt());
         if let Some(o) = other.filter(|&o| better(o)) {
             let lost = std::mem::take(&mut self.lost);
             self.solutions.extend(lost);
@@ -1583,7 +1599,7 @@ impl Search<'_, '_> {
                 .iter()
                 .map(|s| s.0)
                 .filter(|&o| !self.outcomes[o].score.0)
-                .min_by(|&a, &b| self.outcomes[a].score.cmp(&self.outcomes[b].score).then(a.cmp(&b)));
+                .min_by(|&a, &b| choose(&self.outcomes[a].score, &self.outcomes[b].score).then(a.cmp(&b)));
             if let Some(o) = other {
                 let fallback = std::mem::take(&mut self.fallback);
                 self.solutions.extend(fallback);

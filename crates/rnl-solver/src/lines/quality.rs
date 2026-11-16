@@ -41,10 +41,11 @@ pub(super) struct LabOrder {
     pub(super) crosses_weighed: Q,
 }
 
-/// Two weighed counts as the line layout compares them below a weight of 1: alike when they
-/// differ by less than a whole unit.
+/// Two weighed counts as the line layout chooses by them below a weight of 1: alike when they
+/// differ by less than a whole unit, within [`unit_tolerance`] as the rank of its last choice has
+/// it.
 fn by_unit(a: &Q, b: &Q) -> std::cmp::Ordering {
-    if (a - b).abs() < int(1) {
+    if (a - b).abs() <= unit_tolerance() {
         std::cmp::Ordering::Equal
     } else {
         a.cmp(b)
@@ -116,12 +117,27 @@ impl PartialOrd for LabOrder {
 }
 
 impl Ord for LabOrder {
-    /// By the key; below a `virtual_weight` of 1, the heights and the rows and columns of the
-    /// symbols weighed and compared by whole units ([`by_unit`]).
+    /// By the key, a total order; below a `virtual_weight` of 1 with the heights and the rows and
+    /// columns of the symbols weighed. Where the line layout chooses a drawing it compares by
+    /// [`LabOrder::choose`].
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.compare(other, false)
+    }
+}
+
+impl LabOrder {
+    /// As the line layout chooses between two drawings: [`Ord::cmp`], but below a
+    /// `virtual_weight` of 1 the two weighed counts alike unless they differ by a whole unit
+    /// ([`by_unit`]). Not transitive, so never the order of a sort.
+    pub(super) fn choose(&self, other: &Self) -> std::cmp::Ordering {
+        self.compare(other, true)
+    }
+
+    fn compare(&self, other: &Self, units: bool) -> std::cmp::Ordering {
         if self.virtual_weight == int(1) && other.virtual_weight == int(1) {
             return self.key().cmp(&other.key());
         }
+        let by_unit = |x: &Q, y: &Q| if units { by_unit(x, y) } else { x.cmp(y) };
         let (a, b) = (self.key(), other.key());
         a.0.cmp(&b.0)
             .then_with(|| a.1.cmp(b.1))
@@ -538,17 +554,38 @@ mod tests {
             l
         };
         let half = int(1) / int(2);
-        assert!(order(int(1), 1, int(1), 0) > order(int(1), 0, int(0), 5));
-        assert!(order(half.clone(), 1, half.clone(), 0) < order(half.clone(), 0, int(0), 5));
-        assert!(order(half.clone(), 2, int(1), 0) > order(half.clone(), 0, int(0), 5));
+        assert!(order(int(1), 1, int(1), 0).choose(&order(int(1), 0, int(0), 5)).is_gt());
+        assert!(order(half.clone(), 1, half.clone(), 0).choose(&order(half.clone(), 0, int(0), 5)).is_lt());
+        assert!(order(half.clone(), 2, int(1), 0).choose(&order(half.clone(), 0, int(0), 5)).is_gt());
         // the rows and columns of the symbols alike, after the length and the lines of the wires
         let lines = |w: Q, weighed: Q, area: i64| {
             let mut l = order(w, 0, int(0), 0);
             (l.crosses_weighed, l.area) = (weighed, int(area));
             l
         };
-        assert!(lines(half.clone(), half.clone(), 1) < lines(half.clone(), int(0), 2));
-        assert!(lines(half.clone(), int(1), 1) > lines(half.clone(), int(0), 2));
+        assert!(lines(half.clone(), half.clone(), 1).choose(&lines(half.clone(), int(0), 2)).is_lt());
+        assert!(lines(half.clone(), int(1), 1).choose(&lines(half.clone(), int(0), 2)).is_gt());
+    }
+
+    /// By whole units the choice is not transitive: at a weight of 0.6, heights 1.2, 0.6 and 0 with
+    /// 0, 3 and 5 dots near pins choose round a cycle. The order the line search sorts by compares
+    /// the weighed counts exactly, a total order.
+    #[test]
+    fn a_sort_takes_a_total_order_where_the_choice_by_whole_units_is_not() {
+        let w = int(3) / int(5);
+        let order = |weighed: Q, dots: usize| {
+            let mut l = LabOrder::interrupted((1, 4));
+            l.interrupted = false;
+            (l.virtual_weight, l.levels_weighed, l.near_dots) = (w.clone(), weighed, dots);
+            l.crosses_weighed = int(0);
+            l
+        };
+        let (x, y, z) = (order(&w * int(2), 0), order(w.clone(), 3), order(int(0), 5));
+        assert!(x.choose(&y).is_lt() && y.choose(&z).is_lt() && z.choose(&x).is_lt());
+        assert!(z < y && y < x && z < x);
+        let mut all = [x.clone(), y.clone(), z.clone(), x, y, z];
+        all.sort();
+        assert!(all.windows(2).all(|p| p[0] <= p[1]));
     }
     use crate::resolve::tests::Ticks;
     use crate::{RunLimit, StoppedClock};

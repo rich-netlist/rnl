@@ -9,29 +9,41 @@ use crate::rational::{int, Q};
 use crate::structure::{Role, Structure};
 
 /// The loose virtual symbols of a level (`virtual_weight`): the supply, ground and port symbols
-/// that no stub hangs from an element's pin, no ROUTE or wire reaches, and no group holds with an
-/// element.
+/// that no stub hangs from an element's pin, that are not drawn at a point of an element, that no
+/// wire reaches nor a ROUTE with an element on it, and that no group holds with an element.
 pub(crate) fn loose(problem: &LevelProblem, s: &Structure) -> BTreeSet<usize> {
     let object = |r: &PointRef| match r {
         PointRef::Origin(k) => Some(*k),
         _ => r.pin_key().map(|(k, _)| k),
     };
+    let element = |k: usize| s.objects.get(k).is_some_and(|o| o.role == Role::Element);
     let mut joined: BTreeSet<usize> = BTreeSet::new();
     for route in &problem.routes {
-        joined.extend(route.pins.iter().filter_map(object));
+        let on: Vec<usize> = route.pins.iter().filter_map(object).collect();
+        if on.iter().any(|&k| element(k)) {
+            joined.extend(on);
+        }
     }
     for wire in &problem.wires {
         joined.extend(wire.anchors.iter().filter_map(object));
     }
     for g in &problem.groups {
-        if g.members.iter().any(|&m| s.objects.get(m).is_some_and(|o| o.role == Role::Element)) {
+        if g.members.iter().any(|&m| element(m)) {
             joined.extend(g.members.iter().copied());
         }
     }
+    let at_element = |k: usize| match problem.objects.get(k).map(|o| &o.position) {
+        Some(rnl_runtime::problem::Position::At(r)) => object(r).is_some_and(element),
+        _ => false,
+    };
     s.components()
         .filter(|&k| {
             let o = &s.objects[k];
-            matches!(o.role, Role::Supply | Role::Ground | Role::Port) && o.stub.is_none() && !joined.contains(&k)
+            matches!(o.role, Role::Supply | Role::Ground | Role::Port)
+                && o.stub.is_none()
+                && o.hung_from.is_none()
+                && !at_element(k)
+                && !joined.contains(&k)
         })
         .collect()
 }
@@ -158,9 +170,15 @@ mod tests {
             s.objects.iter().map(|o| o.role).collect::<Vec<_>>()
         );
         assert_eq!(loose(&p, &s), BTreeSet::from([1]));
-        // a group of supply symbols alone joins none of them to an element
+        // a group of supply symbols alone joins none of them to an element, nor a ROUTE of them alone
         p.groups[0].members = vec![1, 3];
         assert_eq!(loose(&p, &s), BTreeSet::from([1, 3]));
+        p.routes[0].pins = vec![pin(1), pin(2)];
+        assert_eq!(loose(&p, &s), BTreeSet::from([1, 2, 3]));
+        // one hung from an element's pin is joined
+        let mut hung = s.clone();
+        hung.objects[2].hung_from = Some((0, 0));
+        assert_eq!(loose(&p, &hung), BTreeSet::from([1, 3]));
     }
 
     #[test]
