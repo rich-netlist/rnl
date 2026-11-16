@@ -292,7 +292,8 @@ function numberControl(setting, integer, falseLabel) {
 
 /** An array of whole numbers: a box for each, named by the table's `labels`, each within `min` and `max`. */
 function integersControl(setting) {
-  const count = Number.isInteger(setting.length) && setting.length > 0 ? setting.length : 1;
+  // (the table says how many; one that does not, as the solver's before it did, is as long as its default)
+  const count = Number.isInteger(setting.length) && setting.length > 0 ? setting.length : Array.isArray(setting.default) && setting.default.length > 0 ? setting.default.length : 1;
   const inputs = [];
   const el = [];
   for (let k = 0; k < count; k++) {

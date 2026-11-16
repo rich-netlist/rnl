@@ -326,6 +326,14 @@ test.describe("on the desktop", () => {
     expect(await viewer.stored("solve-config")).toEqual({});
   });
 
+  test("an array of numbers in a table that does not say how long it is has a box for each number of its default", async ({ page }) => {
+    await page.evaluate(() => (window.fakeShell.tableWithoutLengths = true));
+    await open(page);
+    await expect(field(page, "lines_weights 1")).toHaveValue("1");
+    await expect(field(page, "lines_weights 2")).toHaveValue("4");
+    await expect(setting(page, "lines_weights").locator("input[type=number]")).toHaveCount(2);
+  });
+
   test("the objectives move up and down, and the order is what the solver gets", async ({ page, viewer }) => {
     await open(page);
     await field(page, "layout").selectOption("rows");
