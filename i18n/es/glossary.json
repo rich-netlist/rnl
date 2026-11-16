@@ -168,6 +168,12 @@
    "kind": "rnl"
   },
   {
+   "en": "Draws",
+   "term": "Dibuja",
+   "kind": "rnl",
+   "note": "The column of the guide's catalogue that tells what a definition does for the drawing, and its values: solo significado (meaning only), coloca (places), traza (routes), un grupo (a group), punto propio en x / y (own point in x or y)."
+  },
+  {
    "en": "dropped",
    "sense": "fact status",
    "term": "descartado",

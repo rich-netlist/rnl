@@ -177,6 +177,12 @@
    "kind": "rnl"
   },
   {
+   "en": "Draws",
+   "term": "描画",
+   "kind": "rnl",
+   "note": "The column of the guide's catalogue that tells what a definition does for the drawing, and its values: 意味のみ (meaning only), 配置 (places), 配線 (routes), グループ (a group), 自身の点は x / y (own point in x or y)."
+  },
+  {
    "en": "dropped",
    "sense": "fact status",
    "term": "破棄",

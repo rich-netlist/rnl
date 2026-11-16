@@ -183,6 +183,12 @@
    "kind": "rnl"
   },
   {
+   "en": "Draws",
+   "term": "Zeichnet",
+   "kind": "rnl",
+   "note": "The column of the guide's catalogue that tells what a definition does for the drawing, and its values: nur Bedeutung (meaning only), platziert (places), führt Leitungen (routes), eine Gruppe (a group), eigener Punkt in x / y (own point in x or y)."
+  },
+  {
    "en": "dropped",
    "sense": "fact status",
    "term": "verworfen",
