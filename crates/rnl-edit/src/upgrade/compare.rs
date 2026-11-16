@@ -670,7 +670,29 @@ fn mentions(defaults: &BTreeSet<String>, text: &str) -> bool {
     defaults.iter().any(|name| text.contains(&mark(name)))
 }
 
-fn snapshot(read: &Interpretation, added: &BTreeMap<String, BTreeSet<String>>) -> Items {
+/// The identities of the instances that the reading `before` draws with the default symbol, per
+/// level title: the boxes whose pins a wire goes to are compared (`wired_pins`).
+fn default_boxed(before: &Interpretation) -> BTreeMap<String, BTreeSet<String>> {
+    let mut out: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    for problem in &before.problems {
+        let names = identities(before, problem);
+        for (index, object) in problem.objects.iter().enumerate() {
+            if object.symbol.is_some_and(|k| problem.symbols[k].default) {
+                out.entry(problem.title.clone()).or_default().insert(names[index].clone());
+            }
+        }
+    }
+    out
+}
+
+/// `boxes`: the symbols the upgrade writes for the default symbol of 0.3, which are its look as the
+/// default symbol is; `boxed`: what [`default_boxed`] gives.
+fn snapshot(
+    read: &Interpretation,
+    added: &BTreeMap<String, BTreeSet<String>>,
+    boxed: &BTreeMap<String, BTreeSet<String>>,
+    boxes: &BTreeSet<String>,
+) -> Items {
     let mut out = Items { items: BTreeMap::new(), seen: BTreeMap::new() };
     let pinmaps: BTreeMap<String, Pins> = read.problems.iter().map(|p| (p.title.clone(), pins(read, p))).collect();
     for level in &read.doc.levels {
@@ -717,7 +739,7 @@ fn snapshot(read: &Interpretation, added: &BTreeMap<String, BTreeSet<String>>) -
             };
             let geometry = drawn.or_else(undrawn);
             let standard = matches!(object.symbol.as_ref().map(|s| &s.origin), Some(SymbolOrigin::Package(_)));
-            let default_symbol = object.symbol.as_ref().is_some_and(|s| s.default);
+            let default_symbol = object.symbol.as_ref().is_some_and(|s| s.default || boxes.contains(&s.name));
             put(
                 "objects",
                 &key,
@@ -773,11 +795,30 @@ fn snapshot(read: &Interpretation, added: &BTreeMap<String, BTreeSet<String>>) -
         // the default block symbol of 0.4 (9.2.6), are the default look too.
         let mut default_or_boxed = default.clone();
         for (index, object) in problem.objects.iter().enumerate() {
-            if object.symbol.is_some_and(|k| problem.symbols[k].default) {
+            if object.symbol.is_some_and(|k| problem.symbols[k].default || boxes.contains(&problem.symbols[k].name)) {
                 default_or_boxed.insert(names[index].clone());
             }
         }
         let mut put = |category: &str, key: &str, value: Value| out.put(file, title, category, key, value);
+        // A pin of the default symbol of 0.3 that a wire goes to stays where it was: where it is,
+        // in the symbol, and the way it faces. The rest of that symbol is the default look.
+        let boxed_here = boxed.get(title);
+        let mut wired = BTreeSet::new();
+        for wire in &problem.wires {
+            for anchor in &wire.anchors {
+                let (PointRef::Pin { object, pin, .. } | PointRef::SymbolPin { object, pin, .. }) = anchor else {
+                    continue;
+                };
+                if !boxed_here.is_some_and(|b| b.contains(&names[*object])) || !wired.insert((*object, *pin)) {
+                    continue;
+                }
+                let place = problem.objects[*object]
+                    .symbol
+                    .and_then(|k| problem.symbols[k].pins.get(*pin))
+                    .map(|p| json!({"at": p.pos, "dir": p.dir}));
+                put("wired_pins", &format!("{}.{}", mark(&names[*object]), names.pin(*object, *pin)), json!(place));
+            }
+        }
         for (index, object) in problem.objects.iter().enumerate() {
             // The place of a label that only its symbol gives is the package's (default look).
             if object.kind == ObjectKind::Text && matches!(object.position, Position::InSymbol { replaced: None, .. }) {
@@ -860,14 +901,16 @@ fn snapshot(read: &Interpretation, added: &BTreeMap<String, BTreeSet<String>>) -
 pub(super) fn compare(
     before: &Interpretation,
     after: &Interpretation,
+    boxes: &BTreeSet<String>,
 ) -> (Vec<Difference>, Vec<Difference>, Vec<Difference>) {
     let added = defaults(before, after);
     let rules = converted(before, after);
     let package = package_texts(before, after);
     let keys = netname_keys(before, after);
     let bare = bare_usages(after);
-    let mut before = renamed_keys(snapshot(before, &added).items, &keys);
-    let after = snapshot(after, &added).items;
+    let boxed = default_boxed(before);
+    let mut before = renamed_keys(snapshot(before, &added, &boxed, boxes).items, &keys);
+    let after = snapshot(after, &added, &boxed, boxes).items;
     let mut differences = Vec::new();
     let mut look = Vec::new();
     let mut by_rule = Vec::new();
@@ -1019,6 +1062,49 @@ mod tests {
         assert!(terminals("#M1:d", &pins).ends_with(":2"));
         // Without a known terminal the place in the symbol stands in.
         assert_eq!(names.pin(0, 5), "pin5");
+    }
+
+    fn reading(text: &str) -> Interpretation {
+        let files = rnl_runtime::source::MemoryProvider::new().with("t.sp", text);
+        let options = rnl_runtime::Options { problems: true, generated: false, ..rnl_runtime::Options::default() };
+        rnl_view::interpret_with("t.sp", None, &Default::default(), &files, &options).unwrap()
+    }
+
+    #[test]
+    fn a_wired_pin_of_the_default_box_that_moves_is_a_difference() {
+        // ten ports: the box of 0.3 has its pins at x ±3, the default block symbol of 0.4 at ±5
+        let ports = (1..=10).map(|k| format!("p{k}")).collect::<Vec<_>>().join(" ");
+        let nets = (1..=10).map(|k| format!("n{k}")).collect::<Vec<_>>().join(" ");
+        let text = |version: &str, block: &str| {
+            format!(
+                "* t\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\") }}\n.subckt cell {ports}\n{block}.ends cell\n\
+                 .subckt top {nets}\nX1 {nets} cell\n* @RNL {{ #X1 @PLACE(0, 0); &n1 @WIRE {{#X1:1 (-6, 4)}} }}\n.ends top\n.end\n"
+            )
+        };
+        let before = reading(&text("0.3", ""));
+        let moved = compare(&before, &reading(&text("0.4", "")), &BTreeSet::new()).0;
+        assert!(
+            moved.iter().any(|d| d.category == "wired_pins"
+                && d.item.contains("#X1")
+                && d.before.as_ref().is_some_and(|b| b["at"] == json!([-3.0, 4.0]))
+                && d.after.as_ref().is_some_and(|a| a["at"] == json!([-5.0, 4.0]))),
+            "{moved:#?}"
+        );
+        // the box of 0.3 written as the subcircuit's block symbol: the pin stays, and the box is the
+        // default look as the box of 0.3 is
+        let pins: String = (0..10)
+            .map(|k| {
+                let (x, y) = if k < 5 { (-3, 4 - 2 * k) } else { (3, 4 - 2 * (k - 5)) };
+                let way = if k < 5 { "left" } else { "right" };
+                format!("*     ({x}, {y}) @PIN(terminal={}, direction=\"{way}\");\n", k + 1)
+            })
+            .collect();
+        let block = format!(
+            "* @RNL {{\n*   $BOX_cell = @DEFINE-SYMBOL {{\n*     @RECTANGLE(linestyle=\"dashed\") {{(-2, -5) (2, 5)}};\n{pins}*     @LINE {{(0, 0) (0, 0)}}\n*   }};\n*   # @SET-SYMBOL $BOX_cell\n* }}\n"
+        );
+        let boxes = BTreeSet::from(["$BOX_cell".to_string()]);
+        let kept = compare(&before, &reading(&text("0.4", &block)), &boxes).0;
+        assert!(!kept.iter().any(|d| d.category == "wired_pins" || d.item == "#X1"), "{kept:#?}");
     }
 
     #[test]

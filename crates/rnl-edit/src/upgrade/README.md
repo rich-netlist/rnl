@@ -61,6 +61,7 @@ Sections refer to RNL 0.4. Standard package changes refer to the bundled series 
 | Signal-flow point definitions (`INTEGRATOR`, `QUANTIZER`, `UNIT_DELAY`) | Target definitions attach `in`/`out` nets; retain point usages for review | Unsupported | Standard series |
 | FLOW | Preserve the usage and restore its expanded ORDER; multi-member path groups require opt-in | Context | Standard series |
 | WIRE_NET_SET modification / route | Explicit file-owned selection and exclusions, preserving user edits and ROUTE-NET | Context | Standard series, 13.7 |
+| Instance with no symbol, drawn with the viewer's box of 0.3 | The same box as a symbol of the file, `$BOX_<cell>` (dashed outline, stubs, pins by terminal number with their labels, the name): the block symbol (`# @SET-SYMBOL`) of a subcircuit the file defines, else in the level of the instances, one `SET-SYMBOL` each; one box per cell; a notice says to delete the record for the default block symbol of 0.4, whose pins lie elsewhere (rule `default-box`) | Context | 9.2.6 |
 | Default net-label, port-tag and 4-term MOS bulk fill | Empty `$LABEL_FILL_SET`, retain `$LABEL_TERMINAL_SET` consumers, generate port tags, and preserve 0.3 4-terminal MOS/switch symbol defaults and ground/supply bulk-pin stubs | Context | Standard series, 10.5, 12.4 |
 | Ground/supply attached to a terminal | Preserve a directly written host terminal attachment through its net and explicit ALIGN x/y; report unresolved contexts | Context | 12.1, 12.3 |
 | Generated numbered references | Discard validated solver records (kept and rewritten with `--keep-generated`); authored numbered references fail source validation | Context | 5.9 |
@@ -165,3 +166,5 @@ The comparison pairs items by identity, not by index. An object is known by its 
 - `discarded_placements`: with the default (without `--keep-generated`) the records of the solver are discarded; per level, how many facts only they gave. Not counted: `needs_solve` asks for the new solve that makes them again.
 
 A symbol that a rule of the upgrade renames (a legacy standard name or a row of the canvas table) is the same symbol on both sides when its pins keep their places, so only its name and drawing box are left out of the comparison of the object. A text whose key changes from `name` to `netname` is paired by the new key on both sides, as are the references to it. The free point that a symbol-less usage gains in 0.4 is default look.
+
+The default symbol is default look as a whole, and so is a `$BOX_<cell>` the upgrade writes for it, except where a wire goes: the place and the way of each pin of the default symbol of 0.3 that a wire goes to are compared (`wired_pins`), so a box that moves such a pin is a difference.

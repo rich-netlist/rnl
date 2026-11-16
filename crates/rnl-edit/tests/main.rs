@@ -8,6 +8,7 @@ mod junction04;
 mod upgrade;
 mod upgrade_approximate;
 mod upgrade_collections;
+mod upgrade_default_boxes;
 mod upgrade_directions;
 mod upgrade_exact;
 mod upgrade_host_terminals;
