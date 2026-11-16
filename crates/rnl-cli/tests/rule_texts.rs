@@ -137,3 +137,40 @@ fn v04_direct_text_on_semantic_usage_still_fails() {
         assert!(got[0].contains("RNL4414 text-usage-no-symbol"), "{got:?}");
     }
 }
+
+/// A 0.4 file that uses rnl-std-no-labels, with a drawn usage whose symbol draws a name, a value, a
+/// model and a net name, and the parameter textvisible each of them ends with in the problem.
+fn hidden_v04(no_labels: bool) -> Vec<(String, Option<bool>)> {
+    let package = if no_labels { "; @USE-PACKAGE(name=\"rnl-std-no-labels\", version=\"0.4\")" } else { "" };
+    let net = format!(
+        "* rules\n* @RNL(type=\"header\") {{ @VERSION(\"0.4\"){package} }}\nR1 a b 1k\n* @RNL {{\n\
+         * $S = @DEFINE-SYMBOL {{ (0, 0) @PIN(terminal=\"p\"); ? @TEXT(\"n\", key=\"name\"); \
+         ? @TEXT(\"v\", key=\"value\"); ? @TEXT(\"m\", key=\"model\"); ? @TEXT(\"a\", key=\"netname\") }};\n\
+         * $P = @DEFINE(roles=[\"p\"]) {{ ? @SET-SYMBOL $S }};\n\
+         * &a(p) @AS $P => %drawn => @PLACE(0, 0);\n* }}\n.end\n"
+    );
+    let files = MemoryProvider::new().with("t.sp", &net);
+    let options = Options { problems: true, ..Default::default() };
+    let r = interpret_file(Path::new("t.sp"), None, &files, &options).unwrap();
+    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
+    let objects = r.problems[0].objects.iter().filter(|o| o.label.starts_with("%drawn::"));
+    let visible = |o: &rnl_runtime::problem::ProblemObject| {
+        let style = o.text.as_ref().map(|t| t.style.clone()).unwrap_or_default();
+        style.iter().find(|(k, _)| k == "textvisible").and_then(|(_, v)| v.boolean())
+    };
+    let mut got: Vec<_> = objects.map(|o| (o.label.clone(), visible(o))).collect();
+    got.sort();
+    got
+}
+
+/// rnl-std-no-labels hides the name, value and model a drawn usage's symbol draws, as it does on an
+/// instance, and leaves its net name: its SELECT-USAGE rules reach the labels attached to the usage.
+#[test]
+fn v04_no_labels_hides_the_default_labels_of_a_drawn_usage() {
+    let label = |key: &str, visible: Option<bool>| (format!("%drawn::{key}"), visible);
+    let without = [label("model", None), label("name", None), label("netname", None), label("value", None)];
+    assert_eq!(hidden_v04(false), without);
+    let with =
+        [label("model", Some(false)), label("name", Some(false)), label("netname", None), label("value", Some(false))];
+    assert_eq!(hidden_v04(true), with);
+}
