@@ -735,19 +735,21 @@
   };
 
   /* A translinear loop of two groups of transistors, drawn in columns.
-     Places and routes. */
+     Places and routes; a group. */
   $TRANS_LINEAR_LOOP = @DEFINE(roles=[["{a}", ["instance", "usage"]], ["{b}", ["instance", "usage"]]]) {
     {?a ?b} @AS $PARALLEL;
     {?a ?b} @ALIGN("x", priority="low");
+    {?a ?b} @GROUP;
     {?a ?b} @ROUTE-OBJECT(priority="low");
   };
 
   /* A translinear loop of two groups of transistors, drawn in rows.
-     Places and routes. */
+     Places and routes; a group. */
   $TRANS_LINEAR_LOOP_HORIZONTAL = @DEFINE(
       roles=[["{a}", ["instance", "usage"]], ["{b}", ["instance", "usage"]]]) {
     {?a ?b} @AS $PARALLEL;
     {?a ?b} @ALIGN("y", priority="low");
+    {?a ?b} @GROUP;
     {?a ?b} @ROUTE-OBJECT(priority="low");
   };
 
@@ -975,13 +977,14 @@
   };
 
   /* A CMOS transmission gate, the PMOS above the NMOS.
-     Places and routes: applies $PARALLEL to ?pmos and ?nmos, aligns them in one column with ?pmos
-     above ?nmos, and asserts complementary polarities. */
+     Places and routes; a group: applies $PARALLEL to ?pmos and ?nmos, aligns them in one column with
+     ?pmos above ?nmos, and asserts complementary polarities. */
   $TRANSMISSION_GATE = @DEFINE(
       roles=[["pmos", ["instance", "usage"]], ["nmos", ["instance", "usage"]]]) {
     {?pmos ?nmos} @AS $PARALLEL;
     {?pmos ?nmos} @ALIGN("x", priority="low");
     {?pmos ?nmos} @ORDER("top-to-bottom", priority="low");
+    {?pmos ?nmos} @GROUP;
     ?pmos @SELECT-INSTANCE(type="*")
         => @ASSERT-INSTANCE(type="pmos", message="the pmos of a $TRANSMISSION_GATE is a PMOS");
     ?nmos @SELECT-INSTANCE(type="*")
@@ -989,13 +992,14 @@
   };
 
   /* A CMOS transmission gate drawn side by side, the PMOS on the left.
-     Places and routes: applies $PARALLEL to ?pmos and ?nmos, aligns them in one row with ?pmos on
-     the left, and asserts complementary polarities. */
+     Places and routes; a group: applies $PARALLEL to ?pmos and ?nmos, aligns them in one row with
+     ?pmos on the left, and asserts complementary polarities. */
   $TRANSMISSION_GATE_HORIZONTAL = @DEFINE(
       roles=[["pmos", ["instance", "usage"]], ["nmos", ["instance", "usage"]]]) {
     {?pmos ?nmos} @AS $PARALLEL;
     {?pmos ?nmos} @ALIGN("y", priority="low");
     {?pmos ?nmos} @ORDER("left-to-right", priority="low");
+    {?pmos ?nmos} @GROUP;
     ?pmos @SELECT-INSTANCE(type="*")
         => @ASSERT-INSTANCE(type="pmos",
                 message="the pmos of a $TRANSMISSION_GATE_HORIZONTAL is a PMOS");
