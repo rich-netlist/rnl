@@ -170,7 +170,11 @@ fn v04_no_labels_hides_the_default_labels_of_a_drawn_usage() {
     let label = |key: &str, visible: Option<bool>| (format!("%drawn::{key}"), visible);
     let without = [label("model", None), label("name", None), label("netname", None), label("value", None)];
     assert_eq!(hidden_v04(false), without);
-    let with =
-        [label("model", Some(false)), label("name", Some(false)), label("netname", Some(false)), label("value", Some(false))];
+    let with = [
+        label("model", Some(false)),
+        label("name", Some(false)),
+        label("netname", Some(false)),
+        label("value", Some(false)),
+    ];
     assert_eq!(hidden_v04(true), with);
 }
