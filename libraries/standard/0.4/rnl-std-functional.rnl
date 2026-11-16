@@ -356,6 +356,28 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(1.65, 2.65);
   };
 
+  /* A differential-input transconductor with supply pins, its inputs swapped (inn above, inp below)
+     and its supplies kept (vp above, vn below), as $DIFFERENTIAL_TRANSCONDUCTOR_SUPPLY turned MX would
+     not: inp, inn, out, vp, vn. */
+  $DIFFERENTIAL_TRANSCONDUCTOR_INVERTED_SUPPLY = @DEFINE-SYMBOL(box=[-3, -4, 3, 4]) {
+    %inp = (-3, -1) @PIN(terminal="inp", direction="left");
+    %inn = (-3, 1) @PIN(terminal="inn", direction="left");
+    %out = (3, 0) @PIN(terminal="out", direction="right");
+    %vp = (0, 4) @PIN(terminal="vp", direction="up");
+    %vn = (0, -4) @PIN(terminal="vn", direction="down");
+    @LINE {(-3, -1) (-2, -1)};
+    @LINE {(-3, 1) (-2, 1)};
+    @LINE {(0, 2.625) (0, 4)};
+    @LINE {(0, -2.625) (0, -4)};
+    @LINE(linewidth=0.24) {(-2, 3.5) (2, 1.75) (2, -1.75) (-2, -3.5) (-2, 3.5)};
+    @LINE(cap="round") {(-1.3, 1) (-0.7, 1)};
+    @LINE(cap="round") {(-1.3, -1) (-0.7, -1)};
+    @LINE(cap="round") {(-1, -1.3) (-1, -0.7)};
+    @LINE {(2, 0) (3, 0)};
+    ? @TEXT("\textit{g}_{m}", key="formula", halign="middle", valign="middle", size=1.2) => @PLACE(0.3, 0);
+    ? @TEXT("${name}", key="name", halign="middle") => @PLACE(1.65, 2.65);
+  };
+
   /* An analog-to-digital converter: in, out. */
   $ADC = @DEFINE-SYMBOL(box=[-5, -2.4, 4, 2.4]) {
     %in = (-5, 0) @PIN(terminal="in", direction="left");

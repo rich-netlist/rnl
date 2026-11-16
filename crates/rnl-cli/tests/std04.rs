@@ -350,6 +350,7 @@ fn supply_variants_cover_functional_and_logic_on_integer_grid() {
         "$VOLTAGE_AMPLIFIER_SUPPLY",
         "$TRANSCONDUCTOR_SUPPLY",
         "$DIFFERENTIAL_TRANSCONDUCTOR_SUPPLY",
+        "$DIFFERENTIAL_TRANSCONDUCTOR_INVERTED_SUPPLY",
         "$ADC_SUPPLY",
         "$DAC_SUPPLY",
     ];
@@ -443,6 +444,7 @@ fn inverted_supply_symbols_swap_the_inputs_and_keep_the_supplies() {
         ("$COMPARATOR_INVERTED_SUPPLY", "$COMPARATOR_SUPPLY", &[("inp", "inn")][..]),
         ("$DIFFERENTIAL_OPAMP_INVERTED_SUPPLY", "$DIFFERENTIAL_OPAMP_SUPPLY", &[("inp", "inn"), ("outp", "outn")][..]),
         ("$DIFFERENTIAL_OPAMP_TWISTED_INVERTED_SUPPLY", "$DIFFERENTIAL_OPAMP_SUPPLY", &[("inp", "inn")][..]),
+        ("$DIFFERENTIAL_TRANSCONDUCTOR_INVERTED_SUPPLY", "$DIFFERENTIAL_TRANSCONDUCTOR_SUPPLY", &[("inp", "inn")][..]),
     ];
     for (inverted, base, swapped) in cases {
         let (inv, mut want) = (pins(inverted), pins(base));
@@ -454,7 +456,8 @@ fn inverted_supply_symbols_swap_the_inputs_and_keep_the_supplies() {
         assert_eq!(inv, want, "{inverted}");
         // the inverting input above, the positive supply above as on the base symbol
         assert!(inv["inn"].0[1] > inv["inp"].0[1], "{inverted}");
-        assert_eq!((inv["vp"].0[1], inv["vp"].1), (3.0, Some("up")), "{inverted}");
+        assert_eq!((inv["vp"], inv["vn"]), (want["vp"], want["vn"]), "{inverted}");
+        assert_eq!(inv["vp"].1, Some("up"), "{inverted}");
     }
 }
 

@@ -310,6 +310,7 @@
   @ALIAS("$带电源跨导器", "$TRANSCONDUCTOR_SUPPLY");
   @ALIAS("$差分跨导器", "$DIFFERENTIAL_TRANSCONDUCTOR");
   @ALIAS("$带电源差分跨导器", "$DIFFERENTIAL_TRANSCONDUCTOR_SUPPLY");
+  @ALIAS("$带电源反相输入在上差分跨导器", "$DIFFERENTIAL_TRANSCONDUCTOR_INVERTED_SUPPLY");
   @ALIAS("$模数转换器", "$ADC");
   @ALIAS("$带电源模数转换器", "$ADC_SUPPLY");
   @ALIAS("$数模转换器", "$DAC");
