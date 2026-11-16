@@ -282,9 +282,13 @@ R11 g0c1r1 g1c0r1 1k
     // 69521192349) to the last at which it has a batch of each half only (78044421464); this is its
     // middle, so that a small change of the work before it keeps the stop inside. The group-tree
     // start of the lines layout refines as it did when the window was first found, before its
-    // allowance was a share of the limit
-    let mut options =
-        SolverOptions::default().with_config(r#"limit="work", work=73782806906, tree_work=false"#).unwrap();
+    // allowance was a share of the limit. The window was found with the line layout's order of then,
+    // which it is given
+    let mut options = SolverOptions::default()
+        .with_config(
+            r#"limit="work", work=73782806906, tree_work=false, lines_order="current,crossings_and_bends,hidden_ports,mirror_pairs,dots_near_pins,length,symbol_lines+wire_lines,area""#,
+        )
+        .unwrap();
     // the objectives the window was found with: crowding, the last default layer, ranks the
     // arrangements otherwise and moves it
     assert_eq!(options.objectives.layers.pop().map(|l| l.items[0].0.clone()).as_deref(), Some("crowding"));

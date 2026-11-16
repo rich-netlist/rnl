@@ -229,7 +229,7 @@ pub static LINES_ORDER: [OrderRow; 19] = [
     OrderRow {
         name: "wire_lines",
         fixed: false,
-        what: "The wires on fewer lines: by default one layer with symbol_lines.",
+        what: "The wires on fewer lines: by default one layer with symbol_lines, twice.",
     },
     OrderRow {
         name: "symbol_lines",
