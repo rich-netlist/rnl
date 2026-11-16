@@ -40,6 +40,20 @@ test.describe("on the desktop", () => {
     await viewer.open(T4, DESKTOP);
   });
 
+  test("Export Image asks for the solve's drawing while a preview is shown, and for the file's once it is closed", async ({ page, viewer }) => {
+    const exportSvg = () => page.evaluate(() => window.viewer.command("export-svg"));
+    await exportSvg();
+    await expect.poll(() => viewer.calls("exportSvg")).toEqual([[false]]);
+    await solve(page);
+    await exportSvg();
+    await expect.poll(() => viewer.calls("exportSvg")).toEqual([[false], [true]]);
+    await page.locator("#preview-close").click();
+    await page.waitForFunction(() => !document.body.classList.contains("preview"));
+    await exportSvg();
+    await expect.poll(() => viewer.calls("exportSvg")).toEqual([[false], [true], [false]]);
+    expect(await viewer.calls("saveImage")).toEqual([["svg"], ["svg"], ["svg"]]);
+  });
+
   test("F9 solves the netlist and draws it as a preview, the files unchanged", async ({ page, viewer }) => {
     const builds = await viewer.builds();
     await solve(page, () => page.keyboard.press("F9"));

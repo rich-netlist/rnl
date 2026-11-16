@@ -8,17 +8,22 @@ use tauri::ipc::{InvokeBody, Request};
 use tauri::{Manager, State, WebviewWindow};
 use tauri_plugin_dialog::DialogExt;
 
-use crate::{files, formats, library, menu, settings};
+use rnl_runtime::source::Layered;
+
+use crate::{files, formats, library, menu, settings, solve};
 
 /// The SVG of `levels[level]` of the document at `path`, or of `text` held as the file `name`, built
 /// as `open_document` and `open_text` build it, with `overlays`. `title` must name that level, as
-/// the page's document does: a document that is not the one shown is refused.
+/// the page's document does: a document that is not the one shown is refused. With `preview`, the
+/// document is the last solve's, drawn as `solve_preview` builds it: the files the solve wrote over
+/// the files as they are, so that the image is the preview shown and not the netlist as written.
 #[tauri::command]
 // Tauri injects the managed state alongside the separate IPC arguments.
 #[allow(clippy::too_many_arguments)]
 pub async fn export_svg(
     settings: State<'_, settings::Settings>,
     library: State<'_, library::Library>,
+    solves: State<'_, solve::Solves>,
     auto_include: Option<bool>,
     pool: Option<Vec<String>>,
     path: Option<String>,
@@ -29,8 +34,14 @@ pub async fn export_svg(
     level: usize,
     title: String,
     overlays: rnl_view::OverlayOptions,
+    preview: Option<bool>,
 ) -> Result<String, String> {
     let paths = settings.paths()?;
+    let solved = if preview == Some(true) {
+        Some(solves.written()?.ok_or("there is no solve shown to export: solve the netlist again")?)
+    } else {
+        None
+    };
     let library = library.snapshot()?;
     let pool = pool.unwrap_or_default();
     // flylines are asked for, so that the export can leave them out as the page shows (export-image.js)
@@ -61,7 +72,11 @@ pub async fn export_svg(
         let index = library.with_edits(&held, &layered);
         let provider =
             rnl_view::LibraryProvider { files: &layered, index: &index, enabled: auto_include.unwrap_or(false) };
-        let doc = rnl_view::build(&entry, &provider, &options)?;
+        let doc = match &solved {
+            // the solve's files over the others, as the preview was built (rnl_cli::preview)
+            Some(written) => rnl_view::build(&entry, &Layered { layers: vec![written, &provider] }, &options)?,
+            None => rnl_view::build(&entry, &provider, &options)?,
+        };
         let shown = doc.levels.get(level).filter(|l| l.title == title).ok_or_else(|| {
             format!(
                 "level {title} has changed since the document was loaded: reload or reopen the file and export again"

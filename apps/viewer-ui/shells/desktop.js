@@ -202,10 +202,11 @@ export default {
     invoke("set_dirty", { dirty }).catch(() => {});
   },
   // File > Export Image: the core draws the level again, with the overlays, from what the document shown was built from
-  exportSvg: async ({ level, title, overlays, source, edits }) => {
+  // (a solve's preview: from the files the solve wrote)
+  exportSvg: async ({ level, title, overlays, source, edits, preview }) => {
     await flushSettings();
     await poolReady;
-    const args = { level, title, overlays, edits: edits || null, pool, autoInclude: load("auto-include", true) === true, formats: fileFormats() };
+    const args = { level, title, overlays, preview: preview === true, edits: edits || null, pool, autoInclude: load("auto-include", true) === true, formats: fileFormats() };
     return invoke("export_svg", source.text === undefined ? { ...args, path: source.path } : { ...args, name: source.name, text: source.text });
   },
   saveImage: async (name, blob, kind) =>

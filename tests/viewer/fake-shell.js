@@ -289,6 +289,15 @@ const solving = {
     if (held) held.reject("the solve was cancelled");
     held = null;
   },
+  // File > Export Image: the requests it was asked, `preview` among them, and an image as small as can be
+  async exportSvg(request) {
+    fake.calls.push(["exportSvg", request.preview === true]);
+    return '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 10 10"><rect width="10" height="10"/></svg>';
+  },
+  async saveImage(name, blob, kind) {
+    fake.calls.push(["saveImage", kind]);
+    return name;
+  },
   async saveSolved(encoding) {
     (fake.encodings ||= []).push(["saveSolved", encoding]);
     fake.calls.push(["saveSolved"]);

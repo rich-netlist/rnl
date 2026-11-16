@@ -29,6 +29,21 @@ pub struct Solves {
     last: Arc<Mutex<Option<SavedCopy>>>,
 }
 
+impl Solves {
+    /// The files the last solve shown wrote, as a provider to lay over the files as they are; none
+    /// before any solve.
+    pub fn written(&self) -> Result<Option<MemoryProvider>, String> {
+        let last = self.last.lock().map_err(|e| e.to_string())?;
+        Ok(last.as_ref().map(|saved| {
+            let mut written = MemoryProvider::new();
+            for file in &saved.copy.files {
+                written.insert(&file.path, &file.text);
+            }
+            written
+        }))
+    }
+}
+
 /// A copy and its source provenance: a memory source has UTF-8 text and no original disk bytes.
 #[derive(Clone)]
 struct SavedCopy {
@@ -287,7 +302,28 @@ mod tests {
     use rnl_solver::SolverOptions;
     use serde_json::json;
 
-    use super::{check_solver_settings, copy_name, solver_table, Settings};
+    use super::{check_solver_settings, copy_name, solver_table, SavedCopy, Settings, Solves};
+
+    /// Export Image draws a preview from the files the last solve wrote: there are none before a
+    /// solve, and after one they are what a read of that file gives, not the file as written.
+    #[test]
+    fn the_files_the_last_solve_wrote_are_held_for_export_image() {
+        use rnl_cli::preview::Copy;
+        use rnl_cli::solve::SolvedFile;
+        use rnl_runtime::source::Provider;
+
+        let solves = Solves::default();
+        assert!(solves.written().unwrap().is_none());
+        let copy = Copy {
+            entry: "/w/amp.sp".into(),
+            files: vec![SolvedFile { path: "/w/amp.sp".into(), text: "solved text".into() }],
+            read: vec![],
+        };
+        *solves.last.lock().unwrap() = Some(SavedCopy { copy, in_memory: false });
+        let written = solves.written().unwrap().unwrap();
+        assert_eq!(written.read("/w/amp.sp").as_deref(), Some("solved text"));
+        assert_eq!(written.read("/w/other.sp"), None);
+    }
 
     /// The settings the page gives: none, or an empty text, are the defaults of `rnl solve`; a text
     /// is read over them as `--solver-config` reads it.

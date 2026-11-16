@@ -10,6 +10,7 @@ import { inform, modal } from "./dialog.js";
 import { changes } from "./edits.js";
 import { note } from "./editor.js";
 import { currentSource, isLoading } from "./open.js";
+import { previewing } from "./solve.js";
 import { shell } from "./shell.js";
 import { FRAME_STEP, frameSteps, TITLE_ROW, titleRows } from "./frame-layout.js";
 import { current, doc } from "./state.js";
@@ -177,8 +178,8 @@ async function levelSvg() {
   const choices = overlayChoices();
   const level = doc.levels[current];
   const text = await shell.exportSvg({ doc, level: current, title: level.title, overlays: overlayOptions(choices),
-    // the texts applied to the Document shown
-    source: currentSource(), edits: changes(true) });
+    // the texts applied to the Document shown, and whether it is a solve's preview, which is not what the texts draw
+    source: currentSource(), edits: changes(true), preview: previewing() });
   const parsed = new DOMParser().parseFromString(text, "image/svg+xml");
   const svg = parsed.documentElement;
   if (svg.nodeName !== "svg") throw new Error(m("No drawing is available for this level."));
