@@ -20,6 +20,8 @@ pub(super) struct Context {
     /// The files use rnl-std-no-labels, whose 0.4 form hides labels with `textvisible=false`.
     pub no_labels: bool,
     pub keep_generated: bool,
+    /// The boxes of 0.3 kept as symbols of the file.
+    pub boxes: super::default_boxes::DefaultBoxes,
 }
 
 fn pending(member: &Member) -> Option<(&'static str, &'static str)> {
@@ -488,6 +490,7 @@ pub(super) fn file(
         let prefix = if marker.is_empty() { String::new() } else { format!("{marker} ") };
         edits.push(record_edit(source, record, at..at, format!("{eol}{prefix}{seed}"), "explicit-fill-policy")?);
     }
+    edits.extend(context.boxes.edits(doc, path, source, &mut report.notices));
     let mut text = apply(source, &mut edits)?;
     report.changes.extend(edits.into_iter().filter(|e| !e.change.rule.starts_with("approximate-")).map(|e| e.change));
     if header.is_none() {
