@@ -48,7 +48,8 @@ test.describe("on the desktop", () => {
     await exportSvg();
     await expect.poll(() => viewer.calls("exportSvg")).toEqual([[false], [true]]);
     await page.locator("#preview-close").click();
-    await page.waitForFunction(() => !document.body.classList.contains("preview"));
+    // Close Preview reads the file again, and Export Image does nothing while a file is being read
+    await page.waitForFunction(() => !document.body.classList.contains("preview") && !document.body.classList.contains("busy"));
     await exportSvg();
     await expect.poll(() => viewer.calls("exportSvg")).toEqual([[false], [true], [false]]);
     expect(await viewer.calls("saveImage")).toEqual([["svg"], ["svg"], ["svg"]]);
