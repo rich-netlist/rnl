@@ -377,7 +377,7 @@
           {
             "pin_of": "#R2",
             "parent": "@rnl-std-fill.rnl:57:3#1",
-            "id": "@rnl-std-basic.rnl:672:9#1",
+            "id": "@rnl-std-basic.rnl:674:9#1",
             "kind": "usage",
             "host": [],
             "definition": "$NET_LABEL",
@@ -399,7 +399,7 @@
             "pins": [
               {
                 "kind": "pin",
-                "id": "pin(@rnl-std-basic.rnl:672:9#1,0)",
+                "id": "pin(@rnl-std-basic.rnl:674:9#1,0)",
                 "index": 0,
                 "names": [
                   "pin"
@@ -446,7 +446,7 @@
           {
             "pin_of": "#R2",
             "parent": "@rnl-std-fill.rnl:57:3#2",
-            "id": "@rnl-std-basic.rnl:672:9#2",
+            "id": "@rnl-std-basic.rnl:674:9#2",
             "kind": "usage",
             "host": [],
             "definition": "$NET_LABEL",
@@ -468,7 +468,7 @@
             "pins": [
               {
                 "kind": "pin",
-                "id": "pin(@rnl-std-basic.rnl:672:9#2,0)",
+                "id": "pin(@rnl-std-basic.rnl:674:9#2,0)",
                 "index": 0,
                 "names": [
                   "pin"

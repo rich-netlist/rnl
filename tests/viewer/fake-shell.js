@@ -63,6 +63,7 @@ const TABLE = {
     {"key":"layout","group":"layout","type":"choice","choices":[{"value":"rows","what":"Components in rows by how deep they are along the current, with fixed gaps."},{"value":"tree","what":"Groups arranged in nested rows and columns, the wires routed between them."},{"value":"lines","what":"Components placed along the lines of their wires, then the drawing compacted on the grid."}],"default":"lines","in_file":true,"what":"How the level is laid out."},
     {"key":"spacing_x","group":"layout","type":"integer","min":-1,"max":20,"default":0,"in_file":true,"what":"Grid units added to the gaps between columns of the line layout, -1 to close them up; respacing uses it in every layout.","applies":{"layout":["lines"]}},
     {"key":"spacing_y","group":"layout","type":"integer","min":-1,"max":20,"default":0,"in_file":true,"what":"Grid units added to the gaps between rows of the line layout, -1 to close them up; respacing uses it in every layout.","applies":{"layout":["lines"]}},
+    {"key":"lines_weights","group":"layout","type":"integers","length":2,"labels":["crossing","bend"],"min":0,"max":1000,"default":[1,4],"in_file":true,"what":"The weights of a crossing and of a bend in the line layout, as [crossing, bend], not both 0: its drawings rank by crossing × crossings + bend × bends, after the facts, the false joins, the annotations, the objectives it takes and the pins against their CURRENT. Only their ratio matters: [2, 8] ranks as [1, 4] does.","applies":{"layout":["lines"]}},
     {"key":"join_trees","group":"layout","type":"boolean","default":false,"in_file":true,"what":"Route the wire trees of each net as one, so that a net that several structures wire is drawn connected rather than in pieces joined by its name."},
     {"key":"junction","group":"layout","type":"string","in_file":true,"what":"The definition drawn where wires meet in a junction dot, by its name; an empty string draws none."},
     {"key":"beam","group":"search","type":"integer","min":1,"max":1024,"default":4,"in_file":true,"what":"How many partial candidates the row search keeps at each step: more searches wider and slower.","applies":{"layout":["rows"]}},
@@ -125,7 +126,7 @@ const TABLE = {
     {"name":"junctions","what":"Placing the junction dots"},
     {"name":"write","what":"Writing the record back"},
   ],
-  lines_order: {"what":"The lines layout ranks the drawings it makes in a fixed order.","ranks":[{"name":"complete","what":"A drawing of the whole level made."}]},
+  lines_order: {"what":"The lines layout ranks the drawings it makes in a fixed order, the first rank deciding first, which no setting changes but the objectives it takes.","ranks":[{"name":"complete","what":"A drawing of the whole level made."},{"name":"facts","what":"Fewer kept facts broken."},{"name":"annotations","what":"Fewer overlaps of annotations, then fewer wires through them."},{"name":"rules","what":"The objectives it takes, layer by layer, as configured."},{"name":"current","what":"Fewer pins whose wire leaves other than along their CURRENT."},{"name":"crossings_and_bends","what":"Fewer crossings and bends of the wires, weighed by lines_weights: the crossings plus four times the bends by default."},{"name":"hidden_ports","what":"Fewer ports whose way out a symbol or another net's wire shuts in."}]},
 };
 
 /** What the page asked of the shell, and what it should do next. */
@@ -164,6 +165,8 @@ const fake = {
     if (held) held.resolve();
     held = null;
   },
+  /** Whether the table's arrays of numbers have neither `length` nor `labels`. */
+  tableWithoutLengths: false,
   /** Whether the solver's table of settings waits, when it is asked for, until `releaseTable()`. */
   holdTable: false,
   /** Let the table that waits be given. */
@@ -248,7 +251,10 @@ const solving = {
   async solverTable() {
     fake.calls.push(["solverTable"]);
     if (fake.holdTable) await new Promise((resolve) => (heldTable = resolve));
-    return structuredClone(TABLE);
+    const table = structuredClone(TABLE);
+    // a table as the solver gave it before it said of an array how long it is and what its numbers are
+    if (fake.tableWithoutLengths) for (const s of table.settings) if (s.type === "integers") (delete s.length, delete s.labels);
+    return table;
   },
   async checkSettings(config) {
     fake.calls.push(["checkSettings", config]);

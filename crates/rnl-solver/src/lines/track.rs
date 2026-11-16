@@ -955,8 +955,26 @@ fn window(lines: &Lines, scene: &Scene, net: usize, points: &[Pt], margin: i32, 
     }
     Some(win)
 }
+/// The most the weighed crossings and bends of a path hold in its packed cost: a dearer path holds
+/// it all the same, rather than wrapping round to a cheap one.
+const C1_MAX: u64 = (1 << 20) - 1;
+
 fn pack(c1: u64, c2: u64, c3: u64) -> u64 {
-    (c1 << 44) | (c2 << 28) | c3
+    (c1.min(C1_MAX) << 44) | (c2 << 28) | c3
+}
+
+/// The weights of a crossing and of a bend divided by their greatest common divisor: the same
+/// order of paths, in the fewest bits of the packed cost.
+fn reduced((wc, wb): (u64, u64)) -> (u64, u64) {
+    let (mut a, mut b) = (wc, wb);
+    while b != 0 {
+        (a, b) = (b, a % b);
+    }
+    if a <= 1 {
+        (wc, wb)
+    } else {
+        (wc / a, wb / a)
+    }
 }
 #[allow(clippy::too_many_arguments)]
 fn join(
@@ -1111,7 +1129,7 @@ fn search(
     let free = |i: usize| -> bool {
         !win.barred[i] && (open[i] || !(win.boxed[i] || win.margin[i] || win.hard[i] || texts && win.text[i]))
     };
-    let (wc, wb) = input.weights;
+    let (wc, wb) = reduced(input.weights);
     let mut dist = vec![u64::MAX; size * 5];
     let mut from = vec![u32::MAX; size * 5];
     let mut heap: BinaryHeap<Reverse<(u64, u32)>> = BinaryHeap::new();
@@ -1645,6 +1663,45 @@ mod tests {
             lenient: false,
         }
     }
+    /// Only the ratio of the weights matters: they are reduced by their greatest common divisor
+    /// before they weigh a path in its packed cost, so [250, 1000] routes as [1, 4] does. Two nets
+    /// that cross straight or meet round the end of one with bends show that the ratio decides: a
+    /// crossing dearer than the bends round it routes the other way.
+    #[test]
+    fn weights_of_one_ratio_route_alike() {
+        assert_eq!(reduced((2, 8)), (1, 4));
+        assert_eq!(reduced((0, 7)), (0, 1));
+        assert_eq!(reduced((3, 5)), (3, 5));
+        let anchor = |x: i64, y: i64| AnchorIn {
+            at: [int(x), int(y)],
+            exit: None,
+            owner: None,
+            connects_pin: false,
+            existing_junction: false,
+        };
+        let net = |a: AnchorIn, b: AnchorIn| NetIn { anchors: vec![a, b], joined: vec![], preferred: None };
+        let layout = Layout {
+            modern: true,
+            nets: vec![net(anchor(0, 0), anchor(8, 0)), net(anchor(4, -4), anchor(4, 4))],
+            ..Default::default()
+        };
+        let with = |weights: (u64, u64)| {
+            let mut input = input(&layout);
+            input.weights = weights;
+            let made = route(&input);
+            assert!(made.failed.is_none(), "{weights:?}: {:?}", made.failed);
+            made
+        };
+        let base = with((1, 4));
+        assert_eq!(base.crossings, 1);
+        let scaled = with((250, 1000));
+        assert_eq!(format!("{:?}", scaled.outs), format!("{:?}", base.outs));
+        assert_eq!((scaled.crossings, scaled.expansions), (base.crossings, base.expansions));
+        let dear = with((1000, 1));
+        assert_eq!(dear.crossings, 0);
+        assert_ne!(format!("{:?}", dear.outs), format!("{:?}", base.outs));
+    }
+
     #[test]
     fn coordinate_anchors_do_not_acquire_an_electrical_pin_lead() {
         let plain = route(&input(&layout(false)));

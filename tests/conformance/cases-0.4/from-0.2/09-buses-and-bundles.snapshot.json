@@ -3483,7 +3483,7 @@
           {
             "pin_of": "%st",
             "parent": "%net_label_stub_st_clk",
-            "id": "@rnl-std-basic.rnl:672:9",
+            "id": "@rnl-std-basic.rnl:674:9",
             "kind": "usage",
             "host": [],
             "definition": "$NET_LABEL",
@@ -3508,7 +3508,7 @@
             "pins": [
               {
                 "kind": "pin",
-                "id": "pin(@rnl-std-basic.rnl:672:9,0)",
+                "id": "pin(@rnl-std-basic.rnl:674:9,0)",
                 "index": 0,
                 "names": [
                   "pin"
@@ -3840,8 +3840,8 @@
             "style": {}
           },
           {
-            "id": "@rnl-std-basic.rnl:672:9::netname",
-            "attach": "@rnl-std-basic.rnl:672:9",
+            "id": "@rnl-std-basic.rnl:674:9::netname",
+            "attach": "@rnl-std-basic.rnl:674:9",
             "attach_point": null,
             "key": "netname",
             "markup": {

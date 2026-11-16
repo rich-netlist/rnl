@@ -127,6 +127,11 @@ pub(crate) struct Tree<'a> {
 
 const ROUNDS: usize = 3;
 
+/// How many of the arrangements a search inside the lines layout tried and did not step to it
+/// hands on besides those it stepped through, the best by its rank first: the line search may draw
+/// one of them better than the tree's own wires do.
+const TRIED_KEPT: usize = 4;
+
 const RELEASES: usize = 3;
 
 /// Description, arrangement, moved leaves, and whether it turns or mirrors those leaves.
@@ -246,10 +251,10 @@ pub(crate) fn lay_out_from(tree: Tree<'_>, work: &mut Work, stop: &Stop, allowan
     let start = first.clone();
     // The shared budget always bounds initialization. A local stage allowance may stop
     // subsequent improvements, but must not manufacture an unfinished initial baseline.
-    let (arr, best, said, path) = tree.search(first, best, rounds, true, work, stop, refinement);
+    let (arr, best, said, path, tried) = tree.search(first, best, rounds, true, work, stop, refinement);
     notes.extend(said);
     let mut others: Vec<Arrangement> = Vec::new();
-    for a in std::iter::once(start).chain(path) {
+    for a in std::iter::once(start).chain(path).chain(tried) {
         if a != arr && !others.contains(&a) {
             others.push(a);
         }
@@ -1243,6 +1248,15 @@ impl<'a> Tree<'a> {
             .collect();
         let mut ori = ori;
         for (c, class) in s.open.classes.iter().enumerate() {
+            // a class its listed facts narrow starts where the witness has it, as the way of each
+            // of those facts did; the search turns it as a whole
+            if class.allowed.len() < Orient::ALL.len() {
+                arr.values[c] = class.allowed[0];
+                for (m, label) in &class.members {
+                    ori[*m] = class.allowed[0].then(*label);
+                }
+                continue;
+            }
             let ports = class.members.iter().all(|(m, _)| s.objects[*m].role == Role::Port);
             if ports {
                 let Some(&(m, label)) = class.members.first() else { continue };
@@ -1250,7 +1264,8 @@ impl<'a> Tree<'a> {
                 let want = if mean >= at[m][0] { (1, 0) } else { (-1, 0) };
                 let mut all = Orient::ALL;
                 all.sort_by_key(|v| preference(*v));
-                if let Some(v) = all.into_iter().find(|v| s.exit(m, 0, v.then(label)) == Some(want)) {
+                if let Some(v) = all.into_iter().find(|v| class.allows(*v) && s.exit(m, 0, v.then(label)) == Some(want))
+                {
                     arr.values[c] = v;
                 }
                 continue;
@@ -1270,7 +1285,10 @@ impl<'a> Tree<'a> {
             }
             let ori = orientations(s, &arr.values, &arr.ways);
             let label_b = s.open.classes[cb].members.iter().find(|(m, _)| *m == p.b).map_or(Orient::R0, |(_, l)| *l);
-            arr.values[cb] = ori[p.a].then(Orient::MY).then(inverse(label_b));
+            let v = ori[p.a].then(Orient::MY).then(inverse(label_b));
+            if s.open.classes[cb].allows(v) && s.open.classes[cb].allowed.len() == Orient::ALL.len() {
+                arr.values[cb] = v;
+            }
         }
     }
 
@@ -1585,7 +1603,7 @@ impl<'a> Tree<'a> {
                 }
             }
             for (c, class) in s.open.classes.iter().enumerate() {
-                if class.members.iter().all(|(m, _)| leaves.contains(m)) {
+                if class.members.iter().all(|(m, _)| leaves.contains(m)) && class.allows(a.values[c].then(Orient::MY)) {
                     a.values[c] = a.values[c].then(Orient::MY);
                 }
             }
@@ -1594,7 +1612,7 @@ impl<'a> Tree<'a> {
         for (c, class) in s.open.classes.iter().enumerate() {
             let members: Vec<usize> = class.members.iter().map(|(m, _)| *m).collect();
             let values: Vec<Orient> = if members.iter().all(|m| s.objects[*m].role == Role::Port) {
-                let mut all = Orient::ALL.to_vec();
+                let mut all = class.allowed.clone();
                 all.sort_by_key(|v| preference(*v));
                 let label = class.members[0].1;
                 let mut ways: Vec<Option<(i64, i64)>> = Vec::new();
@@ -1758,7 +1776,7 @@ impl<'a> Tree<'a> {
         work: &mut Work,
         stop: &Stop,
         refinement: Option<Refinement>,
-    ) -> (Arrangement, Evaluated, Vec<String>, Vec<Arrangement>) {
+    ) -> (Arrangement, Evaluated, Vec<String>, Vec<Arrangement>, Vec<Arrangement>) {
         let s = self.s;
         let better = |a: &Entry, b: &Entry| crate::score::order(self.active(), &[a.clone(), b.clone()])[0] == 1;
         let mut path: Vec<Arrangement> = Vec::new();
@@ -1773,6 +1791,9 @@ impl<'a> Tree<'a> {
         let mut released: Vec<Tie> = Vec::new();
         let mut releases = 0;
         let mut finished = false;
+        // inside the lines layout, the arrangements tried and not stepped to, to hand on the best
+        let keep_tried = self.line_rank.is_some();
+        let mut tried_all: Vec<(Entry, Arrangement)> = Vec::new();
         'search: loop {
             if refinement.is_some_and(|limit| limit.stops(work)) || stop.reached(work) {
                 break;
@@ -1823,9 +1844,19 @@ impl<'a> Tree<'a> {
                 turn && m.2.iter().any(|k| away.contains(k))
             };
             let current_rank = |m: &Move| crate::tree_hang::move_rank(&ranks, &current, &m.1);
+            // a flip of a whole class or group moves many objects at once: tried after the
+            // structural moves and the one-object turns, so that it does not take the first step
+            // a smaller move would have made
+            let whole = |m: &Move| m.3 && m.2.len() > 1;
             let mut order: Vec<usize> = (0..moves.len()).collect();
             order.sort_by_cached_key(|&i| {
-                (current_rank(&moves[i]), !targeted(&moves[i]), std::cmp::Reverse(rank(&moves[i].2)), i)
+                (
+                    current_rank(&moves[i]),
+                    whole(&moves[i]),
+                    !targeted(&moves[i]),
+                    std::cmp::Reverse(rank(&moves[i].2)),
+                    i,
+                )
             });
             let mut stepped = false;
             for i in order {
@@ -1853,6 +1884,9 @@ impl<'a> Tree<'a> {
                 let next = self.screened(arr, &eval.entry, rounds, work);
                 if crate::budget::stopped() {
                     break 'search;
+                }
+                if keep_tried {
+                    tried_all.push((next.entry.clone(), arr.clone()));
                 }
                 if better(&eval.entry, &next.entry) {
                     steps.push(what.clone());
@@ -1914,7 +1948,33 @@ impl<'a> Tree<'a> {
             ));
         }
         notes.push(format!("tree: the arrangement taken: {}", self.describe(&best)));
-        (best, best_eval, notes, path)
+        let kept = self.best_tried(&tried_all, &best, &path);
+        (best, best_eval, notes, path, kept)
+    }
+
+    /// The best [`TRIED_KEPT`] of the arrangements tried, by the tree's rank, other than the one
+    /// taken and those stepped through.
+    fn best_tried(
+        &self,
+        tried: &[(Entry, Arrangement)],
+        taken: &Arrangement,
+        path: &[Arrangement],
+    ) -> Vec<Arrangement> {
+        let mut kept: Vec<Arrangement> = Vec::new();
+        if tried.is_empty() {
+            return kept;
+        }
+        let entries: Vec<Entry> = tried.iter().map(|(e, _)| e.clone()).collect();
+        for i in crate::score::order(self.active(), &entries) {
+            if kept.len() == TRIED_KEPT {
+                break;
+            }
+            let a = &tried[i].1;
+            if a != taken && !path.contains(a) && !kept.contains(a) {
+                kept.push(a.clone());
+            }
+        }
+        kept
     }
 
     fn relations(&self, arr: &Arrangement, ori: &[Orient]) -> Vec<Tagged> {
@@ -2588,6 +2648,54 @@ mod tests {
         }
     }
 
+    /// Inside the lines layout the search hands on, besides the arrangements it stepped through,
+    /// the best of those it tried and did not step to, best first by its rank, none it took; the
+    /// group-tree layout's own search hands on none.
+    #[test]
+    fn the_search_inside_the_lines_layout_hands_on_the_best_it_tried() {
+        let p = problem();
+        let options = options();
+        let (_, exact) = crate::driver::solve_exact(&p, &options);
+        let tree = Tree::new(&p, &exact.structure, &options).with_line_rank();
+        let first = tree.first(&mut Work::default());
+        let (complete, _) = tree.evaluate_rounds(&first, 3, &mut Work::default());
+        let (best, _, notes, path, tried) =
+            tree.search(first.clone(), complete.clone(), 3, true, &mut Work::default(), &Stop::default(), None);
+        assert!(!tried.is_empty(), "{notes:?}");
+        assert!(tried.len() <= TRIED_KEPT);
+        for (i, a) in tried.iter().enumerate() {
+            assert!(*a != best && !path.contains(a) && !tried[..i].contains(a));
+        }
+        let entries: Vec<Entry> =
+            tried.iter().map(|a| tree.evaluate_rounds(a, 3, &mut Work::default()).0.entry).collect();
+        assert_eq!(crate::score::order(tree.active(), &entries), (0..tried.len()).collect::<Vec<_>>());
+        // of the first arrangement's neighbours, those kept rank before every other but the one
+        // taken and those stepped through
+        let tried: Vec<(Entry, Arrangement)> = tree
+            .neighbours(&first)
+            .into_iter()
+            .map(|m| (tree.evaluate_rounds(&m.1, 3, &mut Work::default()).0.entry, m.1))
+            .collect();
+        assert!(tried.len() > TRIED_KEPT + 2);
+        let (taken, path) = (tried[0].1.clone(), vec![tried[1].1.clone()]);
+        let kept = tree.best_tried(&tried, &taken, &path);
+        assert_eq!(kept.len(), TRIED_KEPT);
+        let entry = |a: &Arrangement| tried.iter().find(|(_, b)| b == a).unwrap().0.clone();
+        for (e, a) in &tried {
+            if *a == taken || path.contains(a) || kept.contains(a) {
+                continue;
+            }
+            for k in &kept {
+                let order = crate::score::order(tree.active(), &[entry(k), e.clone()]);
+                assert!(order[0] == 0 || entry(k) == *e, "a better arrangement than one kept was left out");
+            }
+        }
+        let plain = Tree::new(&p, &exact.structure, &options);
+        let (complete, _) = plain.evaluate_rounds(&first, 3, &mut Work::default());
+        let made = plain.search(first, complete, 3, true, &mut Work::default(), &Stop::default(), None);
+        assert!(made.4.is_empty());
+    }
+
     #[test]
     fn move_types_do_not_come_from_user_labels() {
         let mut p = problem();
@@ -2696,10 +2804,19 @@ mod tests {
                     crate::budget::with(&Ticks::default(), crate::RunLimit::Time(seconds), None, run);
                 evaluated |= work.pivots > 0;
                 assert_eq!(report.reason, crate::StopReason::Time);
-                assert_eq!(made.0, first, "binding={bindings}, cutoff={seconds}");
-                assert_eq!(made.1.placed.geometry, complete.placed.geometry);
-                assert_eq!(made.1.routing.wires, complete.routing.wires);
-                assert_eq!(made.1.entry, complete.entry);
+                if made.0 == first {
+                    assert_eq!(made.1.placed.geometry, complete.placed.geometry);
+                    assert_eq!(made.1.routing.wires, complete.routing.wires);
+                    assert_eq!(made.1.entry, complete.entry);
+                } else {
+                    // a challenger the search completed before the cutoff, as evaluated without a
+                    // limit, and better
+                    let (whole, _) = tree.evaluate_rounds(&made.0, 3, &mut Work::default());
+                    assert_eq!(whole.entry, made.1.entry, "binding={bindings}, cutoff={seconds}");
+                    assert_eq!(whole.placed.geometry, made.1.placed.geometry);
+                    let order = crate::score::order(tree.active(), &[complete.entry.clone(), made.1.entry.clone()]);
+                    assert_eq!(order[0], 1, "binding={bindings}, cutoff={seconds}");
+                }
                 let ((replay, _), _) =
                     crate::budget::with(&crate::StoppedClock, crate::RunLimit::Work(report.work), None, run);
                 assert_eq!(made.0, replay.0);
@@ -2823,10 +2940,11 @@ pub(crate) mod way_tests {
     use rnl_runtime::problem::FactKind;
 
     /// A level whose second object has a listed orientation, R0 or MY, beside a fact that fixes it
-    /// R0: the way of the list to MY is ruled out (a drain's direction of low priority beside an
-    /// authored orientation, as `$CROSS_COUPLED_PAIR` writes one). The other two objects are a
-    /// group of their own, which settles first and takes that way as the tree has it.
-    pub(crate) fn ruled_out_way() -> (LevelProblem, Structure, usize) {
+    /// R0: MY is ruled out (a drain's direction of low priority beside an authored orientation, as
+    /// `$CROSS_COUPLED_PAIR` writes one). The list is no way: it narrows the class of its object,
+    /// which the fixed orientation leaves none, so the object is drawn R0 as the witness has it.
+    /// The other two objects are a group of their own, which settles first.
+    pub(crate) fn ruled_out_way() -> (LevelProblem, Structure) {
         let mut p = problem_of(
             vec![instance(); 3],
             vec![
@@ -2851,26 +2969,23 @@ pub(crate) mod way_tests {
         let resolved = crate::resolve::resolve(&p, &options, &StoppedClock);
         let s = crate::structure::analyse(&p, &resolved, &options, crate::options::CAPS, &mut Work::default());
         let s = crate::search_choices::for_layout(&s, &mut Work::default());
-        let way = s.open.ways.iter().position(|w| w.fact == 1).expect("the listed orientation is a way");
-        assert_eq!(s.open.ways[way].count, 2);
-        (p, s, way)
+        assert!(s.open.ways.is_empty());
+        assert!(s.open.classes.iter().all(|c| c.members.iter().all(|(m, _)| *m != 1)));
+        assert_eq!(s.witness.orient[1], Orient::R0);
+        (p, s)
     }
 
     #[test]
     fn the_tree_takes_no_way_that_a_fixed_orientation_rules_out() {
-        let (p, s, way) = ruled_out_way();
+        let (p, s) = ruled_out_way();
         let options = SolverOptions::without_time_limit();
         let tree = Tree::new(&p, &s, &options);
         let arr = tree.first(&mut Work::default());
-        assert!(crate::search_choices::classes(&s, &s.open.ways, &arr.ways).is_some());
-        let mut ruled_out = arr.clone();
-        ruled_out.ways[way] = 1 - arr.ways[way];
-        assert!(crate::search_choices::classes(&s, &s.open.ways, &ruled_out.ways).is_none());
-        for (what, a, _, _) in tree.neighbours(&arr) {
-            assert!(crate::search_choices::classes(&s, &s.open.ways, &a.ways).is_some(), "{what}");
+        assert!(arr.ways.is_empty());
+        let first = ("the first arrangement".to_string(), arr.clone());
+        for (what, a) in std::iter::once(first).chain(tree.neighbours(&arr).into_iter().map(|m| (m.0, m.1))) {
+            assert_eq!(orientations(&s, &a.values, &a.ways)[1], Orient::R0, "{what}");
         }
-        assert_eq!(crate::search_choices::consistent_ways(&s, &ruled_out.ways), arr.ways);
-        assert_eq!(crate::search_choices::consistent_ways(&s, &arr.ways), arr.ways);
     }
 }
 

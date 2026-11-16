@@ -7,6 +7,7 @@ mod approximate;
 pub mod canvas;
 mod collections;
 mod compare;
+mod default_boxes;
 mod directions;
 mod edit;
 mod host_terminals;
@@ -361,6 +362,7 @@ pub fn upgrade(entry: &str, files: &dyn Provider, options: &UpgradeOptions) -> R
         approximate: options.approximate,
         no_labels: source_records.values().any(|r| rewrite::uses_no_labels(r)),
         keep_generated: options.keep_generated,
+        boxes: default_boxes::DefaultBoxes::new(&before),
     };
     let mut output = BTreeMap::new();
     let mut report = Report {
@@ -423,7 +425,7 @@ pub fn upgrade(entry: &str, files: &dyn Provider, options: &UpgradeOptions) -> R
     report.diagnostics = diagnostics(&after);
     report.assertion_violations = report.diagnostics.iter().filter(|d| d.severity == "violation").cloned().collect();
     (report.differences, report.default_look_changes, report.rule_changes) =
-        compare::compare(&before, &after, &context.references.turned.objects);
+        compare::compare(&before, &after, &context.boxes.names, &context.references.turned.objects);
     report.discarded_placements = discarded;
     Ok(Upgrade { entry, files: output, read, report })
 }

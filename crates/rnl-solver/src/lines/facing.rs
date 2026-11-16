@@ -39,7 +39,8 @@ pub(super) fn turn(s: &Structure, k: usize, a: &Attach, ori: &mut [Orient]) {
     let [(_, label)] = s.open.classes[c].members.as_slice() else { return };
     let mut all = Orient::ALL;
     all.sort_by_key(|v| preference(*v));
-    if let Some(v) = all.into_iter().find(|v| s.exit(k, 0, v.then(*label)) == Some(want)) {
+    let class = &s.open.classes[c];
+    if let Some(v) = all.into_iter().find(|v| class.allows(*v) && s.exit(k, 0, v.then(*label)) == Some(want)) {
         ori[k] = v.then(*label);
     }
 }
