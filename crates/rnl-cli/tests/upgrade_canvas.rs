@@ -98,8 +98,10 @@ fn each_symbol_of_the_table_keeps_the_pins_of_its_terminals() {
         // the diodes of 0.4 stand upright: R0 of 0.3 is R90 of 0.4 (the turn back, then R0)
         let upright = ["LED", "SCHOTTKY_DIODE", "SHOCKLEY_DIODE", "PUT"].contains(&row.new);
         let orient = if upright { "R90" } else { "R0" };
+        // the UJT of 0.4 has its origin one unit left: its PLACE moves right by it
+        let x = 20 * k + usize::from(row.new == "UJT");
         assert!(
-            written.contains(&format!("{call}=> @PLACE({}, 0) => @ORIENT(\"{orient}\")", 20 * k)),
+            written.contains(&format!("{call}=> @PLACE({x}, 0) => @ORIENT(\"{orient}\")")),
             "{}: {written}",
             row.old
         );
@@ -110,6 +112,81 @@ fn each_symbol_of_the_table_keeps_the_pins_of_its_terminals() {
             assert!(!written.contains(&format!("${} ", row.old)), "{written}");
         }
     }
+}
+
+/// A file of the UJT in each orientation and in none, wired, as `text` with the statements `extra`.
+fn ujts(extra: &str) -> String {
+    let codes = ["R0", "R90", "R180", "R270", "MY", "MX", "MYR90", "MXR90"];
+    let mut drawn: Vec<String> = codes
+        .iter()
+        .enumerate()
+        .map(|(k, c)| format!("*   #X{} @SET-SYMBOL $CANVAS_UJT => @PLACE({}, 2.5) => @ORIENT(\"{c}\")", k + 1, 10 * k))
+        .collect();
+    drawn.push("*   #X9 @SET-SYMBOL $CANVAS_UJT => @PLACE(90, 2.5)".into());
+    drawn.push("*   &b @WIRE {#X9:2 (91, -5)}".into());
+    let instances: String = (1..=9).map(|k| format!("X{k} e b c part\n")).collect();
+    format!(
+        "* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\"); @USE-PACKAGE(name=\"rnl-std\", version=\"0.3\"); \
+         @USE-PACKAGE(name=\"{PACKAGE}\", version=\"0.6\") }}\n.subckt part t1 t2 t3\n.ends part\n\
+         {instances}* @RNL {{\n{}{extra}\n* }}\n.end\n",
+        drawn.join(";\n")
+    )
+}
+
+/// The UJT of 0.4 has its origin on the column of b1 and b2, one unit left of where the UJT of the
+/// package had it. Each PLACE of its origin moves by that unit, turned as the instance is, so each
+/// pin stays where it was; one that no ORIENT turns moves as at R0, as a viewer draws it, and the
+/// wire to it still ends on its pin. The upgrade reports no difference.
+#[test]
+fn the_ujt_moves_with_its_origin_and_keeps_its_pins() {
+    if !public_packages::available() {
+        return;
+    }
+    let text = ujts("");
+    let before = read(&files(&text, &["0.6"]));
+    assert_eq!(problems(&before), Vec::<String>::new());
+    let up = run(&text, "0.6");
+    let written = &up.files["t.sp"];
+    assert!(up.report.differences.is_empty(), "{:#?}", up.report.differences);
+    assert!(up.report.successful(), "{:#?} {:#?}", up.report.diagnostics, up.report.files);
+    let ujt = "@SET-SYMBOL(terminals=[[1, \"e\"], [2, \"b1\"], [3, \"b2\"]]) $UJT";
+    for (id, place) in [
+        ("X1", "@PLACE(1, 2.5) => @ORIENT(\"R0\")"),
+        ("X2", "@PLACE(10, 3.5) => @ORIENT(\"R90\")"),
+        ("X3", "@PLACE(19, 2.5) => @ORIENT(\"R180\")"),
+        ("X4", "@PLACE(30, 1.5) => @ORIENT(\"R270\")"),
+        ("X5", "@PLACE(39, 2.5) => @ORIENT(\"MY\")"),
+        ("X9", "@PLACE(91, 2.5)"),
+    ] {
+        assert!(written.contains(&format!("#{id} {ujt} => {place}")), "{id}: {written}");
+    }
+    let after = read(&files(written, &[TARGET_VERSION]));
+    assert_eq!(problems(&after), Vec::<String>::new(), "{written}");
+    for k in 1..=9 {
+        let id = format!("#X{k}");
+        assert_eq!(pins(&after, &id), pins(&before, &id), "{id}");
+    }
+}
+
+/// What measures from the origin of the UJT along the axis it moves on cannot move with it, and is
+/// left for review; along the other axis it says what it said. (A PLACE of a set, which could place
+/// it with others, is left for review in any case: `set-placement`.)
+#[test]
+fn what_measures_from_the_origin_of_the_ujt_is_left_for_review() {
+    if !public_packages::available() {
+        return;
+    }
+    let review = |extra: &str| {
+        let text = format!("{}\nR1 e b 1k\n", ujts(extra)).replace(".end\n\nR1 e b 1k\n", "R1 e b 1k\n.end\n");
+        assert_eq!(problems(&read(&files(&text, &["0.6"]))), Vec::<String>::new(), "{text}");
+        let up = run(&text, "0.6");
+        up.report.files.iter().flat_map(|f| &f.unconverted).map(|u| u.rule.clone()).collect::<Vec<_>>()
+    };
+    assert_eq!(review(";\n*   {#X1 #R1} @ALIGN(\"y\")"), Vec::<String>::new());
+    assert_eq!(review(";\n*   {#X1 #R1} @ALIGN(\"x\")"), ["moved-symbol-origin"]);
+    // turned a quarter, it moves along y
+    assert_eq!(review(";\n*   {#X2 #R1} @ALIGN(\"x\")"), Vec::<String>::new());
+    assert_eq!(review(";\n*   {#X2 #R1} @ALIGN(\"y\")"), ["moved-symbol-origin"]);
 }
 
 /// The names of meaning only, and the switch with three ways and the filled port, keep their names.

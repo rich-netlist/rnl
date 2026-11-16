@@ -382,16 +382,16 @@
   };
 
   /* A unijunction transistor (UJT), b2 above and b1 below. Terminals: e b1 b2. */
-  $UJT = @DEFINE-SYMBOL(box=[-2, -2, 1.4, 2]) {
-    %e = (-2, -1) @PIN(terminal="e", direction="left");
-    %b1 = (1, -2) @PIN(terminal="b1", direction="down");
-    %b2 = (1, 2) @PIN(terminal="b2", direction="up");
-    @LINE {(-0.4, 0.8) (1, 0.8) (1, 2)};
-    @LINE {(-0.4, -0.8) (1, -0.8) (1, -2)};
-    @LINE(linewidth=0.24) {(-0.4, 1.25) (-0.4, -1.25)};
-    @LINE {(-2, -1) (-1.4, -1) (-0.496, -0.322)};
-    @LINE(fill="linecolor", linestyle="none") {(-0.496, -0.322) (-0.846, -1.022) (-1.266, -0.462) (-0.496, -0.322)};
-    ? @TEXT("${name}", key="name") => @PLACE(1.5, 1.05);
-    ? @TEXT("", key="model") => @PLACE(1.5, -1.75);
+  $UJT = @DEFINE-SYMBOL(box=[-3, -2, 0.4, 2]) {
+    %e = (-3, -1) @PIN(terminal="e", direction="left");
+    %b1 = (0, -2) @PIN(terminal="b1", direction="down");
+    %b2 = (0, 2) @PIN(terminal="b2", direction="up");
+    @LINE {(-1.4, 0.8) (0, 0.8) (0, 2)};
+    @LINE {(-1.4, -0.8) (0, -0.8) (0, -2)};
+    @LINE(linewidth=0.24) {(-1.4, 1.25) (-1.4, -1.25)};
+    @LINE {(-3, -1) (-2.4, -1) (-1.496, -0.322)};
+    @LINE(fill="linecolor", linestyle="none") {(-1.496, -0.322) (-1.846, -1.022) (-2.266, -0.462) (-1.496, -0.322)};
+    ? @TEXT("${name}", key="name") => @PLACE(0.5, 1.05);
+    ? @TEXT("", key="model") => @PLACE(0.5, -1.75);
   };
 }
