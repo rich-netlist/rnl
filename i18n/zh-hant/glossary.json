@@ -164,6 +164,12 @@
    "kind": "rnl"
   },
   {
+   "en": "Draws",
+   "term": "畫法",
+   "kind": "rnl",
+   "note": "The column of the guide's catalogue that tells what a definition does for the drawing, and its values: 只記含義 (meaning only), 擺放 (places), 走線 (routes), 成組 (a group), 自身的點：x / y (own point in x or y)."
+  },
+  {
    "en": "dropped",
    "sense": "fact status",
    "term": "捨棄",

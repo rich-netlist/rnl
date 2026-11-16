@@ -163,6 +163,12 @@
    "kind": "rnl"
   },
   {
+   "en": "Draws",
+   "term": "Dessine",
+   "kind": "rnl",
+   "note": "The column of the guide's catalogue that tells what a definition does for the drawing, and its values: signification seule (meaning only), place (places), route (routes), un groupe (a group), point propre en x / y (own point in x or y)."
+  },
+  {
    "en": "dropped",
    "sense": "fact status",
    "term": "écarté",
