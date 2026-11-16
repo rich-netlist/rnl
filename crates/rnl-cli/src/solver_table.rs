@@ -57,6 +57,14 @@ pub fn settings_table_json() -> Value {
             if !s.labels.is_empty() {
                 row.insert("labels".into(), json!(s.labels));
             }
+            // layered objectives of names other than the objectives, and without tolerances
+            if !s.items.is_empty() {
+                let items: Vec<Value> = s.items.iter().map(|r| json!({"name": r.name, "what": r.what})).collect();
+                row.insert("items".into(), Value::Array(items));
+            }
+            if !s.tolerance {
+                row.insert("tolerance".into(), json!(false));
+            }
             Value::Object(row)
         })
         .collect();
@@ -97,7 +105,8 @@ pub fn settings_table_json() -> Value {
             Value::Object(row)
         })
         .collect();
-    let ranks: Vec<Value> = t.lines_order.iter().map(|r| json!({"name": r.name, "what": r.what})).collect();
+    let ranks: Vec<Value> =
+        t.lines_order.iter().map(|r| json!({"name": r.name, "what": r.what, "fixed": r.fixed})).collect();
     json!({
         "version": t.version,
         "groups": groups,
@@ -253,7 +262,25 @@ mod tests {
         assert_eq!(stage("lines")["applies"], json!({"layout": ["lines"]}));
         assert!(stage("resolve").get("applies").is_none());
         assert_eq!(t["lines_order"]["ranks"].as_array().unwrap().len(), rnl_solver::LINES_ORDER.len());
-        assert_eq!(t["lines_order"]["ranks"][0], json!({"name": "complete", "what": rnl_solver::LINES_ORDER[0].what}));
+        assert_eq!(
+            t["lines_order"]["ranks"][0],
+            json!({"name": "complete", "what": rnl_solver::LINES_ORDER[0].what, "fixed": true})
+        );
+        // the setting lines_order offers the ranks not fixed, in their order, and no tolerance
+        let order = setting("lines_order");
+        assert_eq!(order["type"], json!("objectives"));
+        assert_eq!(order["default"], json!(rnl_solver::SolverOptions::default().settings.lines_order.canonical()));
+        assert_eq!(order["tolerance"], json!(false));
+        assert_eq!(order["applies"], json!({"layout": ["lines"]}));
+        let movable: Vec<Value> = t["lines_order"]["ranks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|r| r["fixed"] == false)
+            .map(|r| json!({"name": r["name"], "what": r["what"]}))
+            .collect();
+        assert_eq!(order["items"], Value::Array(movable));
+        assert!(setting("objectives").get("items").is_none() && setting("objectives").get("tolerance").is_none());
         assert!(t["lines_order"]["what"].is_string());
         let stages: Vec<&str> = t["stages"].as_array().unwrap().iter().map(|s| s["name"].as_str().unwrap()).collect();
         assert_eq!(stages, crate::progress::STAGES.iter().map(|(n, _)| *n).collect::<Vec<_>>());

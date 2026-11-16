@@ -7,6 +7,7 @@ use crate::coords::Placed;
 use crate::rational::{int, Q};
 use crate::route::Routing;
 use crate::structure::Structure;
+use crate::SolverOptions;
 use num_traits::Zero;
 use rnl_runtime::problem::LevelProblem;
 use std::collections::BTreeSet;
@@ -31,43 +32,122 @@ pub(super) struct LabOrder {
     /// The configured rules of the lines layout (overlaps, crowding, misleading, wire over symbol),
     /// as the tree's rank has them; measured for a whole level only.
     pub(super) rules: Vec<Q>,
+    /// The rows and columns of the symbols, one only virtual symbols take counting
+    /// `virtual_weight` ([`supply::weighed_lines`]).
+    pub(super) crosses_weighed: Q,
+    /// The layers of `lines_order`, each the weighted sum of its items ([`Ranking`]).
+    pub(super) quality: Vec<Q>,
+}
+
+/// An item of the line-layout order after its rules, as `lines_order` names it
+/// ([`crate::LINES_ITEMS`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Item {
+    Current,
+    CrossingsAndBends,
+    HiddenPorts,
+    RailHeights,
+    MirrorPairs,
+    DotsNearPins,
+    Length,
+    WireLines,
+    SymbolLines,
+    Area,
+}
+
+impl Item {
+    /// The item `lines_order` names so.
+    pub(crate) fn from_name(name: &str) -> Option<Item> {
+        Some(match name {
+            "current" => Item::Current,
+            "crossings_and_bends" => Item::CrossingsAndBends,
+            "hidden_ports" => Item::HiddenPorts,
+            "rail_heights" => Item::RailHeights,
+            "mirror_pairs" => Item::MirrorPairs,
+            "dots_near_pins" => Item::DotsNearPins,
+            "length" => Item::Length,
+            "wire_lines" => Item::WireLines,
+            "symbol_lines" => Item::SymbolLines,
+            "area" => Item::Area,
+            _ => return None,
+        })
+    }
+}
+
+/// How the line layout ranks its drawings after the facts, the false joins, the annotations and
+/// the configured rules (`lines_order`, `lines_weights`, `virtual_weight`): the layers of
+/// `lines_order`, each the weighted sum of its items, compared exactly, the first first; an item
+/// left out counts in none. The crossings and bends weigh crossing × crossings + bend × bends; a
+/// row or column of the symbols that only virtual symbols take counts `virtual_weight`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct Ranking {
+    pub(crate) weights: (u64, u64),
+    pub(crate) virtual_weight: Q,
+    pub(crate) layers: Vec<Vec<(Item, u32)>>,
+}
+
+impl Ranking {
+    pub(crate) fn of(options: &SolverOptions) -> Ranking {
+        let layers = options
+            .settings
+            .lines_order
+            .layers
+            .iter()
+            .map(|l| l.items.iter().filter_map(|(name, w)| Item::from_name(name).map(|i| (i, *w))).collect())
+            .collect();
+        Ranking {
+            weights: options.settings.lines_weights.pair(),
+            virtual_weight: options.settings.virtual_weight.q(),
+            layers,
+        }
+    }
+
+    fn takes(&self, item: Item) -> bool {
+        self.layers.iter().any(|l| l.iter().any(|(i, _)| *i == item))
+    }
+}
+
+impl Default for Ranking {
+    fn default() -> Self {
+        Ranking::of(&SolverOptions::default())
+    }
 }
 
 impl LabOrder {
     #[allow(clippy::type_complexity)]
-    fn key(
-        &self,
-    ) -> ((bool, (usize, usize)), &Vec<Q>, (usize, u64), (usize, usize, usize, usize), (&Q, usize, usize, &Q), (u64, u64))
-    {
-        (
-            (self.interrupted, self.annotation_cost),
-            &self.rules,
-            (self.current, self.cb),
-            (self.hidden, self.levels, self.off_axis, self.near_dots),
-            (&self.length, self.lines, self.crosses, &self.area),
-            (self.crossings, self.bends),
-        )
+    fn key(&self) -> ((bool, (usize, usize)), &Vec<Q>, &Vec<Q>, (u64, u64)) {
+        ((self.interrupted, self.annotation_cost), &self.rules, &self.quality, (self.crossings, self.bends))
     }
 
-    /// The layers of the unified key after the annotations: the current marks, the weighed crossings
-    /// and bends, the hidden ports, the heights, the pairs off their axis, the dots near pins.
-    pub(super) fn head(&self) -> Vec<Q> {
-        [
-            self.current as u64,
-            self.cb,
-            self.hidden as u64,
-            self.levels as u64,
-            self.off_axis as u64,
-            self.near_dots as u64,
-        ]
-        .into_iter()
-        .map(|v| int(v as i64))
-        .collect()
+    /// The value of an item ([`Item`]).
+    fn value(&self, item: Item) -> Q {
+        let count = |n: usize| int(n as i64);
+        match item {
+            Item::Current => count(self.current),
+            Item::CrossingsAndBends => int(self.cb as i64),
+            Item::HiddenPorts => count(self.hidden),
+            Item::RailHeights => count(self.levels),
+            Item::MirrorPairs => count(self.off_axis),
+            Item::DotsNearPins => count(self.near_dots),
+            Item::Length => self.length.clone(),
+            Item::WireLines => count(self.lines),
+            Item::SymbolLines => self.crosses_weighed.clone(),
+            Item::Area => self.area.clone(),
+        }
     }
 
-    /// The layers of the unified key after the rules: length, lines of the wires, crosses, area.
-    pub(super) fn tail(&self) -> Vec<Q> {
-        vec![self.length.clone(), int(self.lines as i64), int(self.crosses as i64), self.area.clone()]
+    /// The layers of the unified key after the rules: those of `lines_order` ([`Ranking`]).
+    pub(super) fn quality(&self) -> &[Q] {
+        &self.quality
+    }
+
+    /// Its layers after the rules by `ranking`, from the counts measured.
+    fn rank_by(&mut self, ranking: &Ranking) {
+        self.quality = ranking
+            .layers
+            .iter()
+            .map(|layer| layer.iter().map(|&(item, w)| self.value(item) * int(i64::from(w))).sum())
+            .collect();
     }
 }
 
@@ -102,6 +182,8 @@ impl LabOrder {
             bends: 0,
             weights,
             rules: Vec::new(),
+            crosses_weighed: int(0),
+            quality: Vec::new(),
         }
     }
     pub(super) fn said(&self) -> String {
@@ -194,10 +276,10 @@ pub(super) fn lab_order(
     s: &Structure,
     placed: &Placed,
     routing: &Routing,
-    weights: (u64, u64),
+    ranking: &Ranking,
     within: Option<&BTreeSet<usize>>,
 ) -> LabOrder {
-    let mut l = lab_measure(problem, s, placed, routing, weights, within);
+    let mut l = lab_measure(problem, s, placed, routing, ranking, within);
     if within.is_none() && !l.interrupted {
         let objectives = crate::score::drawn(problem, s, &placed.geometry, routing)
             .map(|w| crate::score::measured_layers(problem, s, placed, Some(&w)))
@@ -213,10 +295,11 @@ pub(super) fn lab_measure(
     s: &Structure,
     placed: &Placed,
     routing: &Routing,
-    weights: (u64, u64),
+    ranking: &Ranking,
     within: Option<&BTreeSet<usize>>,
 ) -> LabOrder {
     use rnl_runtime::problem::PointRef;
+    let weights = ranking.weights;
     use rnl_runtime::solution::WirePoint;
     if !permit(
         Step::Structure,
@@ -392,10 +475,19 @@ pub(super) fn lab_measure(
         }
     }
     let mut crosses = (BTreeSet::new(), BTreeSet::new());
+    // below a weight of 1, each row and column by whether a symbol other than a virtual one takes it
+    let virtuals = (ranking.virtual_weight != int(1) && ranking.takes(Item::SymbolLines))
+        .then(|| supply::virtual_symbols(problem, s));
+    let mut firm: (std::collections::BTreeMap<Q, bool>, std::collections::BTreeMap<Q, bool>) = Default::default();
     for k in s.components().filter(|&k| reads(k)) {
         let o = &placed.origins[k];
         crosses.0.insert(o[0].clone());
         crosses.1.insert(o[1].clone());
+        if let Some(virtuals) = &virtuals {
+            let f = !virtuals.contains(&k);
+            *firm.0.entry(o[0].clone()).or_insert(false) |= f;
+            *firm.1.entry(o[1].clone()).or_insert(false) |= f;
+        }
         if let Some(b) = s.box_at(&placed.origins, &g.orient, k) {
             grow(&[b[0].clone(), b[1].clone()]);
             grow(&[b[2].clone(), b[3].clone()]);
@@ -405,7 +497,14 @@ pub(super) fn lab_measure(
         (Some(l), Some(h)) => (&h[0] - &l[0]) * (&h[1] - &l[1]),
         _ => Q::zero(),
     };
-    let result = LabOrder {
+    let crosses_weighed = match &virtuals {
+        None => int((crosses.0.len() + crosses.1.len()) as i64),
+        Some(_) => {
+            supply::weighed_lines(&firm.0, &ranking.virtual_weight)
+                + supply::weighed_lines(&firm.1, &ranking.virtual_weight)
+        }
+    };
+    let mut result = LabOrder {
         interrupted: false,
         annotation_cost,
         current: current::against(s, placed, within),
@@ -422,7 +521,10 @@ pub(super) fn lab_measure(
         bends,
         weights,
         rules: Vec::new(),
+        crosses_weighed,
+        quality: Vec::new(),
     };
+    result.rank_by(ranking);
     if crate::budget::stopped() {
         LabOrder::interrupted(weights)
     } else {
@@ -450,10 +552,121 @@ mod tests {
     use crate::resolve::tests::Ticks;
     use crate::{RunLimit, StoppedClock};
 
+    fn ranking(text: &str) -> Ranking {
+        Ranking::of(&SolverOptions::default().with_overrides(text).unwrap())
+    }
+
+    /// A drawing measured with each count 0 but one, `item`, at `v`, ranked by `ranking`.
+    fn drawing(item: Item, v: i64, ranking: &Ranking) -> LabOrder {
+        let mut l = LabOrder::interrupted((1, 4));
+        l.interrupted = false;
+        let n = v as usize;
+        match item {
+            Item::Current => l.current = n,
+            Item::CrossingsAndBends => l.cb = v as u64,
+            Item::HiddenPorts => l.hidden = n,
+            Item::RailHeights => l.levels = n,
+            Item::MirrorPairs => l.off_axis = n,
+            Item::DotsNearPins => l.near_dots = n,
+            Item::Length => l.length = int(v),
+            Item::WireLines => l.lines = n,
+            Item::SymbolLines => l.crosses_weighed = int(v),
+            Item::Area => l.area = int(v),
+        }
+        l.rank_by(ranking);
+        l
+    }
+
+    /// Each item ranks while `lines_order` takes it and not once it is left out; `none` ranks by
+    /// none of them. By default every item but the heights of the grounds and supplies ranks.
+    #[test]
+    fn each_item_ranks_only_while_lines_order_takes_it() {
+        let d = Ranking::default();
+        assert_eq!(d.layers.len(), 8);
+        let all = ranking(&format!("lines_order=\"{}\"", crate::LINES_ITEMS.join(",")));
+        for name in crate::LINES_ITEMS {
+            let item = Item::from_name(name).unwrap();
+            assert!(drawing(item, 1, &all) > drawing(item, 0, &all), "{name}");
+            assert_eq!(d.takes(item), item != Item::RailHeights, "{name}");
+            let alone = ranking(&format!("lines_order=\"{name}\""));
+            assert_eq!(drawing(item, 1, &alone).quality(), [int(1)], "{name}");
+            let others: Vec<&str> = crate::LINES_ITEMS.into_iter().filter(|n| *n != name).collect();
+            let without = ranking(&format!("lines_order=\"{}\"", others.join(",")));
+            assert_eq!(
+                drawing(item, 1, &without).cmp(&drawing(item, 0, &without)),
+                std::cmp::Ordering::Equal,
+                "{name}"
+            );
+        }
+        let none = ranking("lines_order=\"none\"");
+        assert!(drawing(Item::CrossingsAndBends, 9, &none).quality().is_empty());
+    }
+
+    /// The layers rank in the order `lines_order` gives: a hidden port before dots near pins by
+    /// default, after them when the order is turned.
+    #[test]
+    fn the_layers_rank_in_the_order_given() {
+        let both = |r: &Ranking| {
+            let mut a = drawing(Item::HiddenPorts, 1, r);
+            a.near_dots = 0;
+            let mut b = drawing(Item::DotsNearPins, 3, r);
+            b.hidden = 0;
+            a.rank_by(r);
+            b.rank_by(r);
+            (a, b)
+        };
+        let (a, b) = both(&Ranking::default());
+        assert!(a > b);
+        let (a, b) = both(&ranking("lines_order=\"dots_near_pins,hidden_ports\""));
+        assert!(a < b);
+    }
+
+    /// Alignment is one layer by default: a line of the wires and a row or column of the symbols
+    /// count one each; the weights of the layer set how many of one outweigh the other.
+    #[test]
+    fn the_lines_of_the_wires_and_of_the_symbols_weigh_in_one_layer() {
+        let d = Ranking::default();
+        assert_eq!(d.layers[6], [(Item::SymbolLines, 1), (Item::WireLines, 1)]);
+        let mixed = |wires: i64, symbols: i64, r: &Ranking| {
+            let mut l = drawing(Item::WireLines, wires, r);
+            l.crosses_weighed = int(symbols);
+            l.rank_by(r);
+            l
+        };
+        // one line of the wires against one row of the symbols: alike; against two, fewer
+        assert_eq!(mixed(1, 0, &d).quality(), mixed(0, 1, &d).quality());
+        assert!(mixed(1, 0, &d) < mixed(0, 2, &d));
+        let wires_first = ranking("lines_order=\"symbol_lines+wire_lines*2\"");
+        assert!(mixed(1, 0, &wires_first) > mixed(0, 1, &wires_first));
+        let symbols_first = ranking("lines_order=\"symbol_lines*3+wire_lines\"");
+        assert!(mixed(1, 0, &symbols_first) < mixed(0, 1, &symbols_first));
+    }
+
+    /// A row or column of the symbols that only a virtual symbol takes counts `virtual_weight`:
+    /// the fixture's port, the object of a usage, takes a column of its own.
+    #[test]
+    fn a_line_only_virtual_symbols_take_counts_the_virtual_weight() {
+        let (mut p, s, placed, routing) = port::tests::fixture();
+        for k in s.components().filter(|&k| s.objects[k].role == crate::structure::Role::Port) {
+            p.objects[k].kind = rnl_runtime::problem::ObjectKind::Usage;
+        }
+        let at = |w: &str| lab_order(&p, &s, &placed, &routing, &ranking(&format!("virtual_weight={w}")), None);
+        let (half, one, none) = (at("0.5"), at("1"), at("0"));
+        assert_eq!(half.crosses, one.crosses);
+        assert_eq!(one.crosses_weighed, int(one.crosses as i64));
+        assert_eq!(&one.crosses_weighed - &half.crosses_weighed, int(1) / int(2));
+        assert_eq!(&one.crosses_weighed - &none.crosses_weighed, int(1));
+        // the alignment layer: the rows and columns of the symbols weighed, and the lines of the wires
+        assert_eq!(half.quality()[6], &half.crosses_weighed + int(half.lines as i64));
+        // an instance's row is not weighed: with no symbol_lines in the order nothing is weighed
+        let off = lab_order(&p, &s, &placed, &routing, &ranking("lines_order=\"length\""), None);
+        assert_eq!(off.crosses_weighed, int(off.crosses as i64));
+    }
+
     #[test]
     fn interrupted_measurements_never_beat_completed_drawings_and_replay_exactly() {
         let (p, s, placed, routing) = port::tests::fixture();
-        let run = || lab_order(&p, &s, &placed, &routing, (1, 4), None);
+        let run = || lab_order(&p, &s, &placed, &routing, &Ranking::default(), None);
         let full = run();
         assert!(!full.interrupted);
         assert_eq!(full.cb, full.crossings + 4 * full.bends);
@@ -474,7 +687,7 @@ mod tests {
         }
         assert!(interrupted && complete);
         let (stopped, _) = crate::budget::with(&StoppedClock, RunLimit::Work(0), None, || {
-            lab_order(&p, &s, &placed, &routing, (1, 4), None)
+            lab_order(&p, &s, &placed, &routing, &Ranking::default(), None)
         });
         assert!(stopped.interrupted && stopped > full);
     }
@@ -534,8 +747,8 @@ mod tests {
         let turned = placed_at(sideways, origin_for(sideways).each_ref().map(whole));
         let facing = placed_at(down, origin_for(down).each_ref().map(whole));
         let routing = Routing::default();
-        let back = lab_order(&p, &s, &turned, &routing, (1, 4), None);
-        let straight = lab_order(&p, &s, &facing, &routing, (1, 4), None);
+        let back = lab_order(&p, &s, &turned, &routing, &Ranking::default(), None);
+        let straight = lab_order(&p, &s, &facing, &routing, &Ranking::default(), None);
         assert!(!back.interrupted && !straight.interrupted);
         assert_eq!((back.crossings, back.bends, back.length.clone()), (0, 1, int(1)));
         assert_eq!((straight.crossings, straight.bends, straight.length.clone()), (0, 0, int(1)));

@@ -98,6 +98,12 @@ pub struct SettingRow {
     pub length: Option<usize>,
     /// For [`SettingKind::Integers`], what each number is, in English, for a page to name its box.
     pub labels: &'static [&'static str],
+    /// For [`SettingKind::Objectives`], the names it takes, when not those of
+    /// [`SettingsTable::objectives`]: `lines_order` takes the ranks of [`LINES_ORDER`] that are
+    /// not fixed.
+    pub items: &'static [OrderRow],
+    /// For [`SettingKind::Objectives`], whether a layer takes a tolerance; `lines_order` does not.
+    pub tolerance: bool,
 }
 
 /// A group of settings, in the order a page shows them.
@@ -120,11 +126,14 @@ pub struct ObjectiveRow {
     pub applies: When,
 }
 
-/// A rank of the line layout's fixed order ([`LINES_ORDER`]).
+/// A rank of the line layout's order ([`LINES_ORDER`]).
 #[derive(Clone, Debug, PartialEq)]
 pub struct OrderRow {
     pub name: &'static str,
     pub what: &'static str,
+    /// Whether it stays where it is, whatever the settings: the ranks before the items of
+    /// `lines_order`, which may move or leave out the others.
+    pub fixed: bool,
 }
 
 /// The table: what [`settings_table`] gives.
@@ -177,38 +186,58 @@ const TREE: When = &[("layout", &["tree"])];
 const NOT_LINES: When = &[("layout", &["rows", "tree"])];
 
 /// What the line layout's order is, for a page to show beside it.
-pub const LINES_ORDER_WHAT: &str = "The lines layout ranks the drawings it makes in a fixed order, the first rank \
-     deciding first, which no setting changes but the objectives it takes: overlaps, crowding, misleading and \
-     wire_over_symbol, with the layers that hold them, in the order of those layers. The same order ranks the \
-     group-tree layout it starts from and chooses between the two drawings.";
+pub const LINES_ORDER_WHAT: &str = "The lines layout ranks the drawings it makes in this order, the first rank \
+     deciding first. Up to its rules the order is fixed, but for the objectives it takes: overlaps, crowding, \
+     misleading and wire_over_symbol, with the layers that hold them, in the order of those layers. After them it \
+     ranks by the layers of lines_order, from current to area, each the weighted sum of its items; an item left out \
+     of lines_order does not rank. The same order ranks the group-tree layout it starts from and chooses between the \
+     two drawings.";
 
 /// How the line layout ranks its drawings, first rank first: the outcomes of its search
 /// (`lines::settle`), then the line-layout order (`lines::quality::LabOrder`), by which it also
 /// weighs its drawing against the group-tree layout it starts from.
-pub const LINES_ORDER: [OrderRow; 19] = [
-    OrderRow { name: "complete", what: "A drawing of the whole level made." },
-    OrderRow { name: "facts", what: "Fewer kept facts broken." },
-    OrderRow { name: "false_joins", what: "Fewer places where wires read as joined where they are not." },
-    OrderRow { name: "low_facts", what: "Fewer kept facts of priority low broken." },
-    OrderRow { name: "groups", what: "Fewer groups dissolved or stretched." },
-    OrderRow { name: "routed", what: "Fewer parts of the nets left unrouted." },
-    OrderRow { name: "merge", what: "Fewer conflicts where the drawings of the groups are joined." },
-    OrderRow { name: "annotations", what: "Fewer overlaps of annotations, then fewer wires through them." },
-    OrderRow { name: "rules", what: "The objectives it takes, layer by layer, as configured." },
-    OrderRow { name: "current", what: "Fewer pins whose wire leaves other than along their CURRENT." },
+pub static LINES_ORDER: [OrderRow; 19] = [
+    OrderRow { name: "complete", fixed: true, what: "A drawing of the whole level made." },
+    OrderRow { name: "facts", fixed: true, what: "Fewer kept facts broken." },
+    OrderRow { name: "false_joins", fixed: true, what: "Fewer places where wires read as joined where they are not." },
+    OrderRow { name: "low_facts", fixed: true, what: "Fewer kept facts of priority low broken." },
+    OrderRow { name: "groups", fixed: true, what: "Fewer groups dissolved or stretched." },
+    OrderRow { name: "routed", fixed: true, what: "Fewer parts of the nets left unrouted." },
+    OrderRow { name: "merge", fixed: true, what: "Fewer conflicts where the drawings of the groups are joined." },
+    OrderRow {
+        name: "annotations",
+        fixed: true,
+        what: "Fewer overlaps of annotations, then fewer wires through them.",
+    },
+    OrderRow { name: "rules", fixed: true, what: "The objectives it takes, layer by layer, as configured." },
+    OrderRow { name: "current", fixed: false, what: "Fewer pins whose wire leaves other than along their CURRENT." },
     OrderRow {
         name: "crossings_and_bends",
+        fixed: false,
         what: "Fewer crossings and bends of the wires, weighed by lines_weights: the crossings plus four times the \
                bends by default.",
     },
-    OrderRow { name: "hidden_ports", what: "Fewer ports whose way out a symbol or another net's wire shuts in." },
-    OrderRow { name: "rail_heights", what: "The grounds and the supplies at fewer heights." },
-    OrderRow { name: "mirror_pairs", what: "Fewer mirror pairs off the axis they share." },
-    OrderRow { name: "dots_near_pins", what: "Fewer junction dots less than two from a pin." },
-    OrderRow { name: "length", what: "Shorter wires." },
-    OrderRow { name: "wire_lines", what: "The wires on fewer lines." },
-    OrderRow { name: "symbol_lines", what: "The symbols on fewer rows and columns." },
-    OrderRow { name: "area", what: "A smaller drawing." },
+    OrderRow {
+        name: "hidden_ports",
+        fixed: false,
+        what: "Fewer ports whose way out a symbol or another net's wire shuts in.",
+    },
+    OrderRow { name: "rail_heights", fixed: false, what: "The grounds and the supplies at fewer heights." },
+    OrderRow { name: "mirror_pairs", fixed: false, what: "Fewer mirror pairs off the axis they share." },
+    OrderRow { name: "dots_near_pins", fixed: false, what: "Fewer junction dots less than two from a pin." },
+    OrderRow { name: "length", fixed: false, what: "Shorter wires." },
+    OrderRow {
+        name: "wire_lines",
+        fixed: false,
+        what: "The wires on fewer lines: by default one layer with symbol_lines.",
+    },
+    OrderRow {
+        name: "symbol_lines",
+        fixed: false,
+        what: "The symbols on fewer rows and columns; a row or column only virtual symbols take counts \
+               virtual_weight.",
+    },
+    OrderRow { name: "area", fixed: false, what: "A smaller drawing." },
 ];
 
 /// The layouts that pass through a stage of a solve's progress, by its name, as
@@ -272,6 +301,8 @@ pub fn settings_table() -> SettingsTable {
         required_when: &[],
         length: None,
         labels: &[],
+        items: &[],
+        tolerance: true,
     };
     let spacing = |key, what| SettingRow {
         min: Some(-1.0),
@@ -297,6 +328,34 @@ pub fn settings_table() -> SettingsTable {
                  its drawings rank by crossing × crossings + bend × bends, after the facts, the false joins, \
                  the annotations, the objectives it takes and the pins against their CURRENT. Only their \
                  ratio matters: [2, 8] ranks as [1, 4] does.",
+            )
+        },
+        SettingRow {
+            min: Some(0.0),
+            max: Some(1.0),
+            applies: LINES,
+            ..row(
+                "virtual_weight",
+                "layout",
+                SettingKind::Number,
+                "How much a row or column of the symbols counts in the line layout's symbol_lines when only \
+                 virtual symbols take it, the objects of usages such as supply, ground or port symbols, whatever \
+                 joins them, from 0 to 1; one an instance of the netlist, a source too, takes counts 1.",
+            )
+        },
+        SettingRow {
+            applies: LINES,
+            items: &LINES_ORDER[LINES_ORDER.iter().position(|r| !r.fixed).unwrap_or(LINES_ORDER.len())..],
+            tolerance: false,
+            ..row(
+                "lines_order",
+                "layout",
+                SettingKind::Objectives,
+                "What the line layout ranks its drawings by after the facts, the false joins, the annotations \
+                 and the objectives it takes, the most important first: layers separated by commas, the items \
+                 of a layer joined by +, a weight as name*2, no tolerance. The items are current, \
+                 crossings_and_bends, hidden_ports, rail_heights, mirror_pairs, dots_near_pins, length, \
+                 wire_lines, symbol_lines and area; one left out does not rank, none ranks by none.",
             )
         },
         row(
@@ -438,6 +497,22 @@ pub fn settings_table() -> SettingsTable {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The ranks a setting may move, the items of `lines_order`, are one run at the end of the
+    /// order, after the rules, in the order of [`crate::LINES_ITEMS`]; the setting offers them.
+    #[test]
+    fn the_items_of_lines_order_are_the_ranks_not_fixed() {
+        let first = LINES_ORDER.iter().position(|r| !r.fixed).unwrap();
+        assert_eq!(LINES_ORDER[first - 1].name, "rules");
+        assert!(LINES_ORDER[first..].iter().all(|r| !r.fixed) && LINES_ORDER[..first].iter().all(|r| r.fixed));
+        let names: Vec<&str> = LINES_ORDER[first..].iter().map(|r| r.name).collect();
+        assert_eq!(names, crate::LINES_ITEMS);
+        let t = settings_table();
+        let row = t.settings.iter().find(|r| r.key == "lines_order").unwrap();
+        assert_eq!((row.kind, row.tolerance), (SettingKind::Objectives, false));
+        assert_eq!(row.items, &LINES_ORDER[first..]);
+        assert!(t.settings.iter().filter(|r| r.key != "lines_order").all(|r| r.items.is_empty() && r.tolerance));
+    }
 
     #[test]
     fn every_key_the_solver_takes_is_in_the_table_once_in_a_group() {

@@ -73,6 +73,119 @@ pub const DEFAULT_LAYERS: [&str; 12] = [
     "crowding",
 ];
 
+/// The largest weight of an item of `lines_order`: a layer weighs a few items against each other,
+/// and a drawing cut short still ranks after every whole one.
+pub const MAX_LINES_WEIGHT: u32 = 1000;
+
+/// The items by which the line layout ranks its drawings after the facts, the false joins, the
+/// annotations and the rules (`lines_order`), as [`crate::table::LINES_ORDER`] names them.
+pub const LINES_ITEMS: [&str; 10] = [
+    "current",
+    "crossings_and_bends",
+    "hidden_ports",
+    "rail_heights",
+    "mirror_pairs",
+    "dots_near_pins",
+    "length",
+    "wire_lines",
+    "symbol_lines",
+    "area",
+];
+
+/// The default of `lines_order`, as the user set it on 2026-11-17: the order the line layout ranked
+/// in before it could be set, without the heights of the grounds and supplies, and with the lines
+/// of the wires and the rows and columns of the symbols one layer, alignment, each counting one.
+pub const DEFAULT_LINES_ORDER: &str = "current,crossings_and_bends,hidden_ports,mirror_pairs,dots_near_pins,\
+     length,symbol_lines+wire_lines,area";
+
+/// The layers by which the line layout ranks its drawings after its rules (`lines_order`), the
+/// most important first, as `objectives` writes layers: layers separated by commas, the items of a
+/// layer joined by +, a weight as name*2. An item left out does not rank; `none` ranks by none.
+/// A layer takes no tolerance: the line layout sorts its drawings by this order, which must be
+/// one.
+#[derive(Clone, Debug, PartialEq)]
+pub struct LinesOrder {
+    pub layers: Vec<Layer>,
+}
+
+impl Default for LinesOrder {
+    fn default() -> Self {
+        LinesOrder::parse(DEFAULT_LINES_ORDER).expect("the default lines_order reads")
+    }
+}
+
+impl LinesOrder {
+    /// As `lines_order` writes it, each layer's items by name, as `objectives` does.
+    pub fn canonical(&self) -> String {
+        if self.layers.is_empty() {
+            return "none".to_string();
+        }
+        let layer = |l: &Layer| {
+            let mut sorted: Vec<&(String, u32)> = l.items.iter().collect();
+            sorted.sort();
+            let items: Vec<String> = sorted
+                .into_iter()
+                .map(|(name, weight)| if *weight == 1 { name.clone() } else { format!("{name}*{weight}") })
+                .collect();
+            items.join("+")
+        };
+        self.layers.iter().map(layer).collect::<Vec<_>>().join(",")
+    }
+
+    /// From its text: every name known ([`LINES_ITEMS`]), none twice, every weight a count from 1
+    /// to [`MAX_LINES_WEIGHT`], no layer empty, no tolerance.
+    pub fn parse(text: &str) -> Result<LinesOrder, String> {
+        if text.trim() == "none" {
+            return Ok(LinesOrder { layers: Vec::new() });
+        }
+        let mut layers = Vec::new();
+        let mut seen: Vec<String> = Vec::new();
+        for layer in text.split(',') {
+            if layer.contains('~') {
+                return Err("lines_order takes no tolerance: the line layout sorts its drawings by it".into());
+            }
+            let mut parsed = Vec::new();
+            for item in layer.split('+') {
+                let (name, weight) = match item.split_once('*') {
+                    Some((name, w)) => {
+                        let w = w.trim();
+                        let weight = w
+                            .parse::<u32>()
+                            .map_err(|_| format!("the weight of `{}` is not a count: `{w}`", name.trim()))?;
+                        (name.trim(), weight)
+                    }
+                    None => (item.trim(), 1),
+                };
+                if name.is_empty() {
+                    return Err("a layer of lines_order is empty".into());
+                }
+                if !LINES_ITEMS.contains(&name) {
+                    return Err(format!("lines_order has no item `{name}`; its items are {}", LINES_ITEMS.join(", ")));
+                }
+                if seen.iter().any(|s| s == name) {
+                    return Err(format!("the item `{name}` is given twice in lines_order"));
+                }
+                if weight == 0 {
+                    return Err(format!("the weight of `{name}` is 0; leave the item out to turn it off"));
+                }
+                if weight > MAX_LINES_WEIGHT {
+                    return Err(format!("the weight of `{name}` is above {MAX_LINES_WEIGHT}"));
+                }
+                seen.push(name.to_string());
+                parsed.push((name.to_string(), weight));
+            }
+            parsed.sort();
+            layers.push(Layer { items: parsed, tolerance: 0.0 });
+        }
+        Ok(LinesOrder { layers })
+    }
+
+    /// Whether an item ranks.
+    pub fn takes(&self, name: &str) -> bool {
+        self.layers.iter().any(|l| l.items.iter().any(|(n, _)| n == name))
+    }
+}
+
 /// One layer of objectives: their weighted sum is one component of a candidate's score.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Layer {
@@ -388,7 +501,7 @@ impl Default for SolverOptions {
     }
 }
 
-const KEYS: [&str; 16] = [
+const KEYS: [&str; 18] = [
     "tolerance",
     "grid",
     "objectives",
@@ -405,13 +518,15 @@ const KEYS: [&str; 16] = [
     "junction_utf8",
     "tree_work",
     "lines_weights",
+    "virtual_weight",
+    "lines_order",
 ];
 
 /// The value of a key of the `key=value;…` text that takes a string, `layout`, `objectives`,
 /// `run` or `search`, without the double quotes the named syntax writes around a string:
 /// `layout="lines"` is `layout=lines`. Another value is as it is.
 pub(crate) fn string_value<'a>(key: &str, value: &'a str) -> &'a str {
-    if !matches!(key, "layout" | "objectives" | "run" | "search") {
+    if !matches!(key, "layout" | "objectives" | "run" | "search" | "lines_order") {
         return value;
     }
     match value.strip_prefix('"').and_then(|v| v.strip_suffix('"')) {
@@ -469,6 +584,12 @@ impl SolverOptions {
         // named only when not the default, so that the text of the defaults is as it was
         if self.settings.lines_weights != crate::LinesWeights::default() {
             text.push_str(&format!(";lines_weights={}", self.settings.lines_weights.written()));
+        }
+        if self.settings.virtual_weight != crate::VirtualWeight::default() {
+            text.push_str(&format!(";virtual_weight={}", rnl_runtime::geom::fmt_num(self.settings.virtual_weight.0)));
+        }
+        if self.settings.lines_order != LinesOrder::default() {
+            text.push_str(&format!(";lines_order={}", self.settings.lines_order.canonical()));
         }
         // named only when on, so that the text of the defaults is as it was
         if self.settings.join_trees {
@@ -548,6 +669,11 @@ impl SolverOptions {
                     options.hints_for_low = value.parse().map_err(|_| "report_hints must be true or false")?
                 }
                 "lines_weights" => options.settings.lines_weights = crate::LinesWeights::parse(value)?,
+                "virtual_weight" => {
+                    options.settings.virtual_weight =
+                        crate::VirtualWeight(value.parse().map_err(|_| "virtual_weight must be a number from 0 to 1")?)
+                }
+                "lines_order" => options.settings.lines_order = LinesOrder::parse(value)?,
                 "tree_work" if value == "false" => options.tree_work = Some(TreeWork::Off),
                 "tree_work" => {
                     options.tree_work =
@@ -597,6 +723,9 @@ impl SolverOptions {
         }
         if let Some(problem) = self.settings.lines_weights.problem() {
             out.push(("lines_weights", problem));
+        }
+        if let Some(problem) = self.settings.virtual_weight.problem() {
+            out.push(("virtual_weight", problem));
         }
         let run_seconds = match self.run_limit {
             Some(crate::RunLimit::Time(s)) => Some(s),
@@ -730,6 +859,38 @@ mod tests {
 
     /// The weights are named in the canonical text only when not the default, without spaces, and
     /// read back; weights out of their bounds are an error.
+    #[test]
+    fn virtual_weight_is_named_only_when_not_the_default() {
+        let d = SolverOptions::default();
+        assert!(!d.canonical().contains("virtual_weight"));
+        let o = d.with_overrides("virtual_weight=0.25").unwrap();
+        assert!(o.canonical().ends_with(";virtual_weight=0.25"), "{}", o.canonical());
+        assert_eq!(SolverOptions::parse(&o.canonical()).unwrap(), o);
+        assert_eq!(d.with_overrides("virtual_weight=0.5").unwrap().canonical(), d.canonical());
+        for bad in ["-1", "1.01", "a", "NaN"] {
+            assert!(d.with_overrides(&format!("virtual_weight={bad}")).is_err(), "{bad}");
+        }
+    }
+
+    /// `lines_order` is named only when not the default, its layers as the canonical text writes
+    /// them, and reads back as it was; refused texts are errors.
+    #[test]
+    fn lines_order_is_named_only_when_not_the_default() {
+        let d = SolverOptions::default();
+        assert!(!d.canonical().contains("lines_order"));
+        let default = format!("lines_order={DEFAULT_LINES_ORDER}");
+        assert_eq!(d.with_overrides(&default).unwrap().canonical(), d.canonical());
+        let o = d.with_overrides("lines_order=\"area , wire_lines*2+ length\"").unwrap();
+        assert!(o.canonical().ends_with(";lines_order=area,length+wire_lines*2"), "{}", o.canonical());
+        assert_eq!(SolverOptions::parse(&o.canonical()).unwrap(), o);
+        let none = d.with_overrides("lines_order=none").unwrap();
+        assert!(none.canonical().ends_with(";lines_order=none"), "{}", none.canonical());
+        assert_eq!(SolverOptions::parse(&none.canonical()).unwrap(), none);
+        for bad in ["area,area", "areas", "area~1", "area*0", "area*1001", "area*x", "area,", ""] {
+            assert!(d.with_overrides(&format!("lines_order={bad}")).is_err(), "{bad}");
+        }
+    }
+
     #[test]
     fn lines_weights_are_named_only_when_not_the_default() {
         let d = SolverOptions::default();

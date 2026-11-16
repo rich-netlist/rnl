@@ -258,12 +258,27 @@ fn each_level_says_its_layout_and_the_settings_it_does_not_use() {
     // beam and candidates are of the rows layout only, the spacings and the weights of lines only;
     // safety_seconds is shown only under the limits work and seed
     assert_eq!(top.unused, ["beam", "candidates", "safety_seconds"]);
-    assert_eq!(amp.unused, ["beam", "candidates", "lines_weights", "safety_seconds", "spacing_x", "spacing_y"]);
+    assert_eq!(
+        amp.unused,
+        [
+            "beam",
+            "candidates",
+            "lines_order",
+            "lines_weights",
+            "safety_seconds",
+            "spacing_x",
+            "spacing_y",
+            "virtual_weight"
+        ]
+    );
     // the settings a layout does not use are still in effect, as the solver reads them
     assert!(top.settings.contains_key("beam"));
     let rows = check(MAIN, &[ToolSettings::Config("layout=\"rows\"".into())]);
     assert_eq!(level(&rows, "main.sp").layout, "rows");
-    assert_eq!(level(&rows, "main.sp").unused, ["lines_weights", "safety_seconds", "spacing_x", "spacing_y"]);
+    assert_eq!(
+        level(&rows, "main.sp").unused,
+        ["lines_order", "lines_weights", "safety_seconds", "spacing_x", "spacing_y", "virtual_weight"]
+    );
     let work = check(MAIN, &[ToolSettings::Config("limit=\"work\",work=100".into())]);
     assert!(!level(&work, "main.sp").unused.contains(&"safety_seconds".to_string()));
     // a level before 0.4 lays out in rows

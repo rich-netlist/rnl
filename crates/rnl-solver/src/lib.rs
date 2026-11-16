@@ -77,10 +77,15 @@ use std::collections::{BTreeMap, BTreeSet};
 use rnl_runtime::problem::FactKind;
 
 pub use budget::{BudgetProgress, BudgetReport, ProgressKind, RunLimit, StopReason};
-pub use config::{is_run_setting, Layout, LinesWeights, SettingFrom, SettingProblem, Settings, SettingsCheck};
+pub use config::{
+    is_run_setting, Layout, LinesWeights, SettingFrom, SettingProblem, Settings, SettingsCheck, VirtualWeight,
+};
 pub use holds::{fact_holds, holds_as_drawn, problem_fact_holds_as_drawn};
 pub use lines::engine::{LayoutSkeleton, LineKind, SkeletonItem, SkeletonLine, SkeletonTable, SkeletonTree};
-pub use options::{Budget, Layer, Objectives, SolverOptions, TreeWork, DEFAULT_LAYERS, DEFAULT_TIME_LIMIT, OBJECTIVES};
+pub use options::{
+    Budget, Layer, LinesOrder, Objectives, SolverOptions, TreeWork, DEFAULT_LAYERS, DEFAULT_LINES_ORDER,
+    DEFAULT_TIME_LIMIT, LINES_ITEMS, OBJECTIVES,
+};
 pub use resolve::Resolved;
 pub use rnl_runtime::problem::LevelProblem;
 pub use rnl_runtime::solution::Solution;

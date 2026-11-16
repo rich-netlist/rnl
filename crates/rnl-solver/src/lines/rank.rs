@@ -20,6 +20,8 @@ pub(crate) struct Rank {
     active: Active,
     rules: Vec<usize>,
     annotations: bool,
+    /// The layers after the rules, as `lines_order` gives them ([`super::quality::Ranking`]).
+    ranking: super::quality::Ranking,
     seen: RefCell<(Vec<(Q, Q)>, usize)>,
 }
 
@@ -30,15 +32,17 @@ pub(super) fn rule_layers(s: &Structure) -> Vec<usize> {
 }
 
 impl Rank {
-    pub(crate) fn new(s: &Structure) -> Rank {
+    pub(crate) fn new(s: &Structure, options: &SolverOptions) -> Rank {
         let rules = rule_layers(s);
         let annotations = !s.annotation_views.is_empty();
-        let n = 4 + 2 * usize::from(annotations) + rules.len() + 6 + 4;
+        let ranking = super::quality::Ranking::of(options);
+        let n = 4 + 2 * usize::from(annotations) + rules.len() + ranking.layers.len();
         let layers = (0..n).map(|_| ActiveLayer { items: Vec::new(), tolerance: Q::zero() }).collect();
         Rank {
             active: Active { layers, inert: Vec::new(), configured_only: true },
             rules,
             annotations,
+            ranking,
             seen: RefCell::new((Vec::new(), 0)),
         }
     }
@@ -82,7 +86,7 @@ impl Rank {
         }
         // the unified key: the line-layout order, its crossings and bends weighed by the one pair,
         // with the configured rules between the annotations and its marks
-        let l = super::quality::lab_measure(problem, s, placed, routing, options.settings.lines_weights.pair(), None);
+        let l = super::quality::lab_measure(problem, s, placed, routing, &self.ranking, None);
         if !l.interrupted {
             layers.extend(self.rules.iter().map(|&i| objectives.get(i).cloned().unwrap_or_else(Q::zero)));
         }
@@ -102,10 +106,9 @@ impl Rank {
             seen.1 += 1;
         }
         if l.interrupted {
-            layers.extend((0..self.rules.len() + 6 + 4).map(|_| int(i64::MAX)));
+            layers.extend((0..self.rules.len() + self.ranking.layers.len()).map(|_| int(i64::MAX)));
         } else {
-            layers.extend(l.head());
-            layers.extend(l.tail());
+            layers.extend(l.quality().iter().cloned());
         }
         Entry {
             written_path_error: routing.written_path_error,
@@ -158,15 +161,33 @@ mod tests {
         p.facts = vec![fact(FactKind::Orient { object: 0, code: other })];
         p.orient_lists = vec![(0, vec![other, chosen])];
         s.kept = vec![0];
-        let rank = Rank::new(&s);
-        let layers = vec![int(0); s.active.layers.len()];
         let options = SolverOptions::without_time_limit();
+        let rank = Rank::new(&s, &options);
+        let layers = vec![int(0); s.active.layers.len()];
         let good = rank.entry(&p, &s, &options, &placed, &routing, layers.clone(), &[]);
         assert_eq!(good.layers[0], int(0));
         p.orient_lists[0].1.pop();
         let bad = rank.entry(&p, &s, &options, &placed, &routing, layers, &[]);
         assert_eq!(bad.layers[0], int(1));
         assert_eq!(crate::score::order(rank.active(), &[bad, good]), [1, 0]);
+    }
+
+    /// The tree's rank inside the lines layout takes the layers of `lines_order` after its rules:
+    /// as many, with the values the line layout's own order gives a drawing.
+    #[test]
+    fn the_tree_ranks_by_the_layers_of_lines_order() {
+        let (p, s, placed, routing) = super::super::port::tests::fixture();
+        let objectives = vec![int(0); s.active.layers.len()];
+        for text in ["", "lines_order=length", "lines_order=area+length*2,current", "lines_order=none"] {
+            let options = SolverOptions::without_time_limit().with_overrides(text).unwrap();
+            let rank = Rank::new(&s, &options);
+            let ranking = super::super::quality::Ranking::of(&options);
+            let lead = 4 + 2 * usize::from(rank.annotations) + rank.rules.len();
+            assert_eq!(rank.active().layers.len(), lead + ranking.layers.len(), "{text}");
+            let e = rank.entry(&p, &s, &options, &placed, &routing, objectives.clone(), &[]);
+            let l = super::super::quality::lab_order(&p, &s, &placed, &routing, &ranking, None);
+            assert_eq!(e.layers[lead..], *l.quality(), "{text}");
+        }
     }
 
     #[test]

@@ -147,7 +147,6 @@ pub(crate) fn lay_out(
     }
     let before = laid.entry.clone();
     let mut notes = std::mem::take(&mut laid.notes);
-    let weights = options.settings.lines_weights.pair();
     let fallback = |mut laid: Laid, mut notes: Vec<String>, why: String, work: &mut Work| -> (Laid, LayoutSkeleton) {
         notes.push(format!("lines: {why}; the level is laid out as the group-tree layout has it"));
         if !crate::budget::stopped() {
@@ -187,7 +186,8 @@ pub(crate) fn lay_out(
     let Some(arrangement) = laid.arrangement.clone() else {
         return fallback(laid, notes, "the group-tree layout gave no tables".to_string(), work);
     };
-    let theirs = lab_order(problem, s, &laid.placed, &laid.routing, weights, None);
+    let ranking = super::quality::Ranking::of(options);
+    let theirs = lab_order(problem, s, &laid.placed, &laid.routing, &ranking, None);
     if theirs.interrupted {
         return fallback(laid, notes, "budget exhausted before line search".into(), work);
     }
@@ -234,7 +234,7 @@ pub(crate) fn lay_out(
     }
     // the one key of the tree's rank, the line search and this comparison, of a drawing it can read:
     // its wires drawn, its annotations placed
-    let rank = super::Rank::new(s);
+    let rank = super::Rank::new(s, options);
     let readable = |placed: &Placed, routing: &Routing| {
         routing.written_path_error.is_none()
             && routing.annotation_error.is_none()
