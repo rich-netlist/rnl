@@ -3027,7 +3027,13 @@
         {
           "label": "ALIGN",
           "kind": "ALIGN",
-          "status": "ok",
+          "status": "unsolved",
+          "priority": "low"
+        },
+        {
+          "label": "DISTRIBUTE",
+          "kind": "DISTRIBUTE",
+          "status": "unsolved",
           "priority": "low"
         },
         {
@@ -3045,7 +3051,13 @@
         {
           "label": "ALIGN",
           "kind": "ALIGN",
-          "status": "ok",
+          "status": "unsolved",
+          "priority": "low"
+        },
+        {
+          "label": "DISTRIBUTE",
+          "kind": "DISTRIBUTE",
+          "status": "unsolved",
           "priority": "low"
         },
         {
