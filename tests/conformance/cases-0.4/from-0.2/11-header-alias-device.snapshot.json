@@ -17,6 +17,7 @@
             "id": "#XM1",
             "subckt": true,
             "master": "sky130_fd_pr__nfet_01v8",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -44,6 +45,7 @@
             "id": "#XM2",
             "subckt": true,
             "master": "sky130_fd_pr__pfet_01v8",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -71,6 +73,7 @@
             "id": "#V1",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -88,6 +91,7 @@
             "id": "#V2",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,

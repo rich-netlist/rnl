@@ -17,6 +17,7 @@
             "id": "#V1",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -34,6 +35,7 @@
             "id": "#R1",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -51,6 +53,7 @@
             "id": "#C1",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -68,6 +71,7 @@
             "id": "#R2",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -85,6 +89,7 @@
             "id": "#C2",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -102,6 +107,7 @@
             "id": "#R3",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -119,6 +125,7 @@
             "id": "#C3",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -136,6 +143,7 @@
             "id": "#RL",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,

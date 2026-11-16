@@ -17,6 +17,7 @@
             "id": "#XR",
             "subckt": true,
             "master": "reg4",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -69,6 +70,7 @@
             "id": "#\"RL<3>\"",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -86,6 +88,7 @@
             "id": "#\"RL<2>\"",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -103,6 +106,7 @@
             "id": "#\"RL<1>\"",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -120,6 +124,7 @@
             "id": "#\"RL<0>\"",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -137,6 +142,7 @@
             "id": "#V1",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -2673,6 +2679,7 @@
             "id": "#\"XI0<3>\"",
             "subckt": true,
             "master": "dff",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -2695,6 +2702,7 @@
             "id": "#\"XI0<2>\"",
             "subckt": true,
             "master": "dff",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -2717,6 +2725,7 @@
             "id": "#\"XI0<1>\"",
             "subckt": true,
             "master": "dff",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -2739,6 +2748,7 @@
             "id": "#\"XI0<0>\"",
             "subckt": true,
             "master": "dff",
+            "type": null,
             "terminals": [
               {
                 "n": 1,

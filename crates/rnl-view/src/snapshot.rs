@@ -143,6 +143,10 @@ pub struct HostInstance {
     pub subckt: bool,
     /// The name in the model position: a model, a subcircuit or a Spectre master.
     pub master: Option<String>,
+    /// The type, lower case, as the rules and the `${type}` of a text read it: the host's (an M
+    /// card, the type of a model card) or else DEVICE's (6.12); none where neither gives one.
+    #[serde(rename = "type")]
+    pub type_: Option<String>,
     pub terminals: Vec<HostTerminal>,
 }
 
@@ -828,6 +832,7 @@ fn host(doc: &HostDocument, lv: &LevelView, usages: &HashMap<String, Vec<UsageOf
                 id: format!("#{}", quoted(&inst.name)),
                 subckt: inst.is_subckt,
                 master: inst.model.clone(),
+                type_: lv.instance_types.get(i).cloned().flatten(),
                 terminals: inst
                     .nodes
                     .iter()
@@ -1229,6 +1234,41 @@ mod tests {
                 None => assert!(text.get("fix_rotate").is_none()),
             }
         }
+    }
+
+    /// Each host instance has the type that the rules and `${type}` read: the host's, from a model
+    /// card or an M card, or else DEVICE's; a DEVICE does not change the type the host gives.
+    #[test]
+    fn a_host_instance_has_its_type_from_the_host_or_a_device() {
+        let source = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); \
+                      @DEVICE(model=\"cell\", terminals=[\"d\", \"g\", \"s\", \"b\"], type=\"nmos\"); \
+                      @DEVICE(model=\"pch\", type=\"nmos\") }\n\
+                      .model pch pmos\n.subckt sub a b\nR1 a b 1k\n.ends\n\
+                      M1 d g s b pch\nM2 d g s b nch\nX1 d g s b cell\nX2 d g sub\nR1 d 0 1k\n.end\n";
+        let files = MemoryProvider::new().with("t.sp", source);
+        let options = BuildOptions { runtime: Options { std: false, ..Options::default() }, ..BuildOptions::default() };
+        let snap =
+            crate::snapshot("t.sp", &files, &options, Parts { drawing: false, host: true, model: false }).unwrap();
+        let value = serde_json::to_value(snap).unwrap();
+        let level = value["levels"].as_array().unwrap().iter().find(|l| l["id"] == "file:t.sp").unwrap().clone();
+        let types: Vec<(String, Value)> = level["host"]["instances"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|i| (i["id"].as_str().unwrap().to_string(), i["type"].clone()))
+            .collect();
+        let expected = [
+            // the model card's type; the DEVICE that says otherwise does not change it
+            ("#M1", json!("pmos")),
+            // an M card on a model no card defines and no DEVICE declares has none
+            ("#M2", Value::Null),
+            // the DEVICE's
+            ("#X1", json!("nmos")),
+            // a subcircuit, and a part with no model
+            ("#X2", Value::Null),
+            ("#R1", Value::Null),
+        ];
+        assert_eq!(types, expected.map(|(id, t)| (id.to_string(), t)).to_vec());
     }
 
     /// The model part of the snapshot of `source`, the file `t.sp`, read with the standard package

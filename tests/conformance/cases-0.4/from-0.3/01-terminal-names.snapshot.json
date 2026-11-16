@@ -17,6 +17,7 @@
             "id": "#T1",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -44,6 +45,7 @@
             "id": "#O1",
             "subckt": false,
             "master": "lossy",
+            "type": "ltra",
             "terminals": [
               {
                 "n": 1,
@@ -71,6 +73,7 @@
             "id": "#U1",
             "subckt": false,
             "master": "urc",
+            "type": "urc",
             "terminals": [
               {
                 "n": 1,
@@ -93,6 +96,7 @@
             "id": "#Z1",
             "subckt": false,
             "master": "mesf",
+            "type": "nmf",
             "terminals": [
               {
                 "n": 1,
@@ -115,6 +119,7 @@
             "id": "#Z2",
             "subckt": false,
             "master": "mesf",
+            "type": "nmf",
             "terminals": [
               {
                 "n": 1,

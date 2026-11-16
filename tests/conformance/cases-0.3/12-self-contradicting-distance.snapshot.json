@@ -17,6 +17,7 @@
             "id": "#M1",
             "subckt": false,
             "master": "nch",
+            "type": "nmos",
             "terminals": [
               {
                 "n": 1,
@@ -44,6 +45,7 @@
             "id": "#M2",
             "subckt": false,
             "master": "nch",
+            "type": "nmos",
             "terminals": [
               {
                 "n": 1,

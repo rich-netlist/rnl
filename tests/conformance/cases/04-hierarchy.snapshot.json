@@ -17,6 +17,7 @@
             "id": "#X1",
             "subckt": true,
             "master": "amp",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -44,6 +45,7 @@
             "id": "#X2",
             "subckt": true,
             "master": "amp",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -71,6 +73,7 @@
             "id": "#X3",
             "subckt": true,
             "master": "rdiv",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -93,6 +96,7 @@
             "id": "#Vdd",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -110,6 +114,7 @@
             "id": "#Vin",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -2252,6 +2257,7 @@
             "id": "#R1",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -2269,6 +2275,7 @@
             "id": "#R2",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -3069,6 +3076,7 @@
             "id": "#M1",
             "subckt": false,
             "master": "nch",
+            "type": "nmos",
             "terminals": [
               {
                 "n": 1,
@@ -3096,6 +3104,7 @@
             "id": "#R1",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,

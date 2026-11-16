@@ -1295,9 +1295,11 @@ impl Interp<'_> {
         let failed_usages = self.failed_usages(s, &ids);
         let groups = self.groups(s, &ids);
         let mut terminal_names = vec![Vec::new(); level.instances.len()];
+        let mut instance_types = vec![None; level.instances.len()];
         for i in self.scenes[s].insts.clone() {
             let ObjData::Inst { idx, .. } = *self.o(i) else { continue };
             terminal_names[idx] = self.owner_terms(s, i).into_iter().map(|(_, n)| n).collect();
+            instance_types[idx] = self.instance_type(i).map(str::to_string);
         }
         let mut drawn: Vec<ObjId> = self.inst_like(s).into_iter().filter(|o| !self.bundle_empty(*o)).collect();
         for &a in &self.scenes[s].usages {
@@ -1591,6 +1593,7 @@ impl Interp<'_> {
             failed_usages,
             groups,
             terminal_names,
+            instance_types,
             block_symbol: self.block_symbol_of(lv),
             packages,
             junction,

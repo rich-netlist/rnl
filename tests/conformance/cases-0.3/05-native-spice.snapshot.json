@@ -17,6 +17,7 @@
             "id": "#R1",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -34,6 +35,7 @@
             "id": "#C1",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -51,6 +53,7 @@
             "id": "#L1",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -68,6 +71,7 @@
             "id": "#V1",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -85,6 +89,7 @@
             "id": "#I1",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -102,6 +107,7 @@
             "id": "#E1",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -129,6 +135,7 @@
             "id": "#G1",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -156,6 +163,7 @@
             "id": "#F1",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -173,6 +181,7 @@
             "id": "#H1",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -190,6 +199,7 @@
             "id": "#B1",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -207,6 +217,7 @@
             "id": "#S1",
             "subckt": false,
             "master": "smod",
+            "type": "sw",
             "terminals": [
               {
                 "n": 1,
@@ -234,6 +245,7 @@
             "id": "#W1",
             "subckt": false,
             "master": "wmod",
+            "type": "csw",
             "terminals": [
               {
                 "n": 1,
@@ -251,6 +263,7 @@
             "id": "#D1",
             "subckt": false,
             "master": "dmod",
+            "type": "d",
             "terminals": [
               {
                 "n": 1,
@@ -268,6 +281,7 @@
             "id": "#Q1",
             "subckt": false,
             "master": "npnmod",
+            "type": "npn",
             "terminals": [
               {
                 "n": 1,
@@ -290,6 +304,7 @@
             "id": "#Q2",
             "subckt": false,
             "master": "pnpmod",
+            "type": "pnp",
             "terminals": [
               {
                 "n": 1,
@@ -312,6 +327,7 @@
             "id": "#M1",
             "subckt": false,
             "master": "nmosmod",
+            "type": "nmos",
             "terminals": [
               {
                 "n": 1,
@@ -339,6 +355,7 @@
             "id": "#M2",
             "subckt": false,
             "master": "pmosmod",
+            "type": "pmos",
             "terminals": [
               {
                 "n": 1,
@@ -366,6 +383,7 @@
             "id": "#J1",
             "subckt": false,
             "master": "njfmod",
+            "type": "njf",
             "terminals": [
               {
                 "n": 1,
@@ -388,6 +406,7 @@
             "id": "#J2",
             "subckt": false,
             "master": "pjfmod",
+            "type": "pjf",
             "terminals": [
               {
                 "n": 1,
@@ -410,6 +429,7 @@
             "id": "#Z1",
             "subckt": false,
             "master": "nmfmod",
+            "type": "nmf",
             "terminals": [
               {
                 "n": 1,
@@ -432,6 +452,7 @@
             "id": "#Z2",
             "subckt": false,
             "master": "pmfmod",
+            "type": "pmf",
             "terminals": [
               {
                 "n": 1,
@@ -454,6 +475,7 @@
             "id": "#T1",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -481,6 +503,7 @@
             "id": "#O1",
             "subckt": false,
             "master": "ltramod",
+            "type": "ltra",
             "terminals": [
               {
                 "n": 1,
@@ -508,6 +531,7 @@
             "id": "#U1",
             "subckt": false,
             "master": "urcmod",
+            "type": "urc",
             "terminals": [
               {
                 "n": 1,
@@ -530,6 +554,7 @@
             "id": "#R2",
             "subckt": false,
             "master": "rmod",
+            "type": "r",
             "terminals": [
               {
                 "n": 1,

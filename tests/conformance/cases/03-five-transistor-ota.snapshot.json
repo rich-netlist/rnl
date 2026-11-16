@@ -17,6 +17,7 @@
             "id": "#M1",
             "subckt": false,
             "master": "nch",
+            "type": "nmos",
             "terminals": [
               {
                 "n": 1,
@@ -44,6 +45,7 @@
             "id": "#M2",
             "subckt": false,
             "master": "nch",
+            "type": "nmos",
             "terminals": [
               {
                 "n": 1,
@@ -71,6 +73,7 @@
             "id": "#M3",
             "subckt": false,
             "master": "pch",
+            "type": "pmos",
             "terminals": [
               {
                 "n": 1,
@@ -98,6 +101,7 @@
             "id": "#M4",
             "subckt": false,
             "master": "pch",
+            "type": "pmos",
             "terminals": [
               {
                 "n": 1,
@@ -125,6 +129,7 @@
             "id": "#M5",
             "subckt": false,
             "master": "nch",
+            "type": "nmos",
             "terminals": [
               {
                 "n": 1,
@@ -152,6 +157,7 @@
             "id": "#M6",
             "subckt": false,
             "master": "nch",
+            "type": "nmos",
             "terminals": [
               {
                 "n": 1,
@@ -179,6 +185,7 @@
             "id": "#Ib",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -196,6 +203,7 @@
             "id": "#CL",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -213,6 +221,7 @@
             "id": "#Vdd",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,

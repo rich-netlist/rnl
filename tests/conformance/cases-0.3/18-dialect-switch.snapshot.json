@@ -17,6 +17,7 @@
             "id": "#Rtop",
             "subckt": false,
             "master": "resistor",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -205,6 +206,7 @@
             "id": "#X1",
             "subckt": false,
             "master": "resistor",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -459,6 +461,7 @@
             "id": "#X2",
             "subckt": false,
             "master": "resistor",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -888,6 +891,7 @@
             "id": "#X3",
             "subckt": false,
             "master": "resistor",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -905,6 +909,7 @@
             "id": "#I0",
             "subckt": true,
             "master": "box_cell",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -1287,6 +1292,7 @@
             "id": "#Rsec",
             "subckt": false,
             "master": "resistor",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -1575,6 +1581,7 @@
             "id": "#Xsec",
             "subckt": false,
             "master": "resistor",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
