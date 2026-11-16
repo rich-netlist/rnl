@@ -9,7 +9,7 @@
       "name": "08-styles-and-text.sp",
       "file": 0,
       "line": 0,
-      "status": "constraints: 9 ok, 1 needs-solver",
+      "status": "constraints: 7 ok, 1 needs-solver",
       "host": {
         "ports": [],
         "instances": [
@@ -2109,21 +2109,6 @@
             "layer": "middle"
           }
         ],
-        "groups": [
-          {
-            "id": "@rnl-std-fill.rnl:64:3",
-            "members": [],
-            "file": null,
-            "line": 64,
-            "source": "rule",
-            "rule": {
-              "package": "rnl-std-fill",
-              "file": "rnl-std-fill.rnl",
-              "line": 64
-            },
-            "state": "in-effect"
-          }
-        ],
         "junction": {
           "definition": "$JUNCTION",
           "symbol": "$JUNCTION_SYMBOL"
@@ -2917,8 +2902,30 @@
             ],
             "usages": [
               {
+                "kind": "usage",
+                "id": "@rnl-std-fill.rnl:61:59",
+                "definition": "%port_column",
+                "roles": [
+                  {
+                    "role": "tags",
+                    "set": true,
+                    "member": "@rnl-std-fill.rnl:61:3#1",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 61,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 61
+                },
+                "state": "in-effect"
+              },
+              {
                 "kind": "group",
-                "id": "@rnl-std-fill.rnl:64:3",
+                "id": "@rnl-std-fill.rnl:59:104",
                 "definition": "",
                 "roles": [
                   {
@@ -2929,13 +2936,9 @@
                   }
                 ],
                 "file": null,
-                "line": 64,
-                "source": "rule",
-                "rule": {
-                  "package": "rnl-std-fill",
-                  "file": "rnl-std-fill.rnl",
-                  "line": 64
-                },
+                "line": 59,
+                "source": "body",
+                "made_in": "@rnl-std-fill.rnl:61:59",
                 "state": "in-effect"
               }
             ]
@@ -2995,8 +2998,30 @@
             ],
             "usages": [
               {
+                "kind": "usage",
+                "id": "@rnl-std-fill.rnl:61:59",
+                "definition": "%port_column",
+                "roles": [
+                  {
+                    "role": "tags",
+                    "set": true,
+                    "member": "@rnl-std-fill.rnl:61:3#2",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 61,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 61
+                },
+                "state": "in-effect"
+              },
+              {
                 "kind": "group",
-                "id": "@rnl-std-fill.rnl:64:3",
+                "id": "@rnl-std-fill.rnl:59:104",
                 "definition": "",
                 "roles": [
                   {
@@ -3007,13 +3032,9 @@
                   }
                 ],
                 "file": null,
-                "line": 64,
-                "source": "rule",
-                "rule": {
-                  "package": "rnl-std-fill",
-                  "file": "rnl-std-fill.rnl",
-                  "line": 64
-                },
+                "line": 59,
+                "source": "body",
+                "made_in": "@rnl-std-fill.rnl:61:59",
                 "state": "in-effect"
               }
             ]
@@ -3073,8 +3094,30 @@
             ],
             "usages": [
               {
+                "kind": "usage",
+                "id": "@rnl-std-fill.rnl:61:59",
+                "definition": "%port_column",
+                "roles": [
+                  {
+                    "role": "tags",
+                    "set": true,
+                    "member": "@rnl-std-fill.rnl:61:3#3",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 61,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 61
+                },
+                "state": "in-effect"
+              },
+              {
                 "kind": "group",
-                "id": "@rnl-std-fill.rnl:64:3",
+                "id": "@rnl-std-fill.rnl:59:104",
                 "definition": "",
                 "roles": [
                   {
@@ -3085,16 +3128,48 @@
                   }
                 ],
                 "file": null,
-                "line": 64,
-                "source": "rule",
-                "rule": {
-                  "package": "rnl-std-fill",
-                  "file": "rnl-std-fill.rnl",
-                  "line": 64
-                },
+                "line": 59,
+                "source": "body",
+                "made_in": "@rnl-std-fill.rnl:61:59",
                 "state": "in-effect"
               }
             ]
+          },
+          {
+            "id": "@rnl-std-fill.rnl:61:59",
+            "kind": "usage",
+            "host": [],
+            "definition": "%port_column",
+            "attach": {
+              "tags": [
+                "@rnl-std-fill.rnl:61:3#1",
+                "@rnl-std-fill.rnl:61:3#2",
+                "@rnl-std-fill.rnl:61:3#3"
+              ]
+            },
+            "style": {
+              "bold": true,
+              "cap": "butt",
+              "fillcolor": "#ffffff",
+              "join": "miter",
+              "linecolor": "#37474f",
+              "linewidth": 0.16,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
           }
         ],
         "points": [],
@@ -3362,20 +3437,16 @@
         "shapes": [],
         "groups": [
           {
-            "id": "@rnl-std-fill.rnl:64:3",
+            "id": "@rnl-std-fill.rnl:59:104",
             "members": [
               "@rnl-std-fill.rnl:61:3#1",
               "@rnl-std-fill.rnl:61:3#2",
               "@rnl-std-fill.rnl:61:3#3"
             ],
             "file": null,
-            "line": 64,
-            "source": "rule",
-            "rule": {
-              "package": "rnl-std-fill",
-              "file": "rnl-std-fill.rnl",
-              "line": 64
-            },
+            "line": 59,
+            "source": "body",
+            "made_in": "@rnl-std-fill.rnl:61:59",
             "state": "in-effect"
           }
         ],

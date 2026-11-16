@@ -1,7 +1,7 @@
 //! Pending facts during conservative junction validation.
 use rnl_cli::{
     interpret_file,
-    junction_completion_problem::{validate_interpreted_trial, TrialValidation},
+    junction_completion_problem::{auxiliary, validate_interpreted_trial, TrialValidation},
 };
 use rnl_runtime::{problem::FactKind, source::MemoryProvider, Options};
 use std::path::Path;
@@ -46,6 +46,7 @@ R2 b 0 1k
         targets: &[],
         added_facts: &added,
         tolerance: 1e-6,
+        auxiliary: &auxiliary(problem),
     })
 }
 

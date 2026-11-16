@@ -1616,18 +1616,6 @@
           "kind": "ALIGN",
           "status": "unsolved",
           "priority": "normal"
-        },
-        {
-          "label": "ORDER",
-          "kind": "ORDER",
-          "status": "ok",
-          "priority": "low"
-        },
-        {
-          "label": "ALIGN",
-          "kind": "ALIGN",
-          "status": "ok",
-          "priority": "low"
         }
       ],
       "unplaced": [
@@ -2390,18 +2378,6 @@
           "kind": "ALIGN",
           "status": "ok",
           "priority": "normal"
-        },
-        {
-          "label": "ORDER",
-          "kind": "ORDER",
-          "status": "ok",
-          "priority": "low"
-        },
-        {
-          "label": "ALIGN",
-          "kind": "ALIGN",
-          "status": "ok",
-          "priority": "low"
         }
       ],
       "unplaced": []
@@ -3500,6 +3476,18 @@
           "priority": "normal"
         },
         {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "unsolved",
+          "priority": "low"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "unsolved",
+          "priority": "low"
+        },
+        {
           "label": "ORDER",
           "kind": "ORDER",
           "status": "ok",
@@ -3508,19 +3496,7 @@
         {
           "label": "ALIGN",
           "kind": "ALIGN",
-          "status": "ok",
-          "priority": "low"
-        },
-        {
-          "label": "DISTANCE",
-          "kind": "DISTANCE",
-          "status": "dropped",
-          "priority": "low"
-        },
-        {
-          "label": "DISTANCE",
-          "kind": "DISTANCE",
-          "status": "dropped",
+          "status": "unsolved",
           "priority": "low"
         }
       ],

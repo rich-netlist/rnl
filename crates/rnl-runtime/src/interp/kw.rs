@@ -2258,6 +2258,14 @@ impl Interp<'_> {
         let collection_rule =
             self.follows_0_4(self.source_unit(ctx)) && app.filled.iter().any(|(_, arg)| self.is_lazy(arg.obj));
         let rname = lazy_roles.first().or_else(|| collection_rule.then(|| multi.first()).flatten()).cloned();
+        // a rule that fills only set roles makes no usage in a level where all of them are empty (9.4)
+        let set_roles_only = rname.is_none() && !d.roles.is_empty() && d.roles.iter().all(|r| r.is_set);
+        let set_inputs: Vec<ObjId> = if set_roles_only {
+            app.filled.iter().map(|(_, arg)| arg.obj).filter(|&o| self.is_lazy(o)).collect()
+        } else {
+            Vec::new()
+        };
+        let skip_when_empty = set_roles_only && set_inputs.len() == app.filled.len();
         if rname.is_some() || collection_rule {
             let key = ("gen", ptr_seg(seg), self.frame_key(ctx), 0usize);
             let gen = match self.node_memo.get(&key) {
@@ -2282,6 +2290,11 @@ impl Interp<'_> {
             let task: Task = Rc::new(move |it: &mut Interp, s: SceneId, phase: usize| {
                 let members = match lazy {
                     Some(lazy) => it.flatten_inputs(s, lazy, phase, Some(&c)),
+                    None if skip_when_empty
+                        && set_inputs.iter().all(|&o| it.flatten_inputs(s, o, phase, Some(&c)).is_empty()) =>
+                    {
+                        Vec::new()
+                    }
                     None => vec![InputMember::plain(NOTHING)],
                 };
                 let mut out = Vec::new();
@@ -4058,12 +4071,19 @@ impl Interp<'_> {
             if matches!(op, TargetOp::Symbol { .. }) && ctx.frame_generated() && self.follows_0_4(self.source_unit(ctx))
             {
                 self.queue_task(ctx.scene.unwrap(), 6, ctx, task);
-            } else if phase == 7
-                && matches!(op, TargetOp::Priority { .. })
+            } else if phase >= 7
+                && matches!(
+                    op,
+                    TargetOp::Priority { .. }
+                        | TargetOp::Place { .. }
+                        | TargetOp::Orient { .. }
+                        | TargetOp::Layer { .. }
+                        | TargetOp::Style { .. }
+                )
                 && ctx.frame_generated()
                 && self.follows_0_4(self.source_unit(ctx))
             {
-                // This runs after generation and makes no objects, so it does not recurse (10.5).
+                // These run after generation and make no objects, so they do not recurse (10.5).
                 self.queue_task(ctx.scene.unwrap(), phase, ctx, task);
             } else {
                 self.defer(ctx, phase, task)?;

@@ -618,14 +618,14 @@
     {? ?at} @ALIGN("y");
   };
 
-  /* A port tag on every port net of a level that does not already have an $IO_PORT, in one column on the left of the instances of the level, as rnl-std-fill draws them; the fill then adds none in that level (12.4). */
+  /* A port tag on every port net of a level that does not already have an $IO_PORT, in one column at least 6 units left of the instances of the level, each at R0 with its pin to the right, as rnl-std-fill draws them; the fill then adds none in that level (12.4). */
   $PORT_LIST = @DEFINE(roles=[]) {
     %port_net_set = # @SELECT-NET(port=true); # @SELECT-NET(port=true) => @REMOVE-FROM $PORT_FILL_SET;
     # @SELECT-USAGE $IO_PORT => @SELECT-NET => @REMOVE-FROM %port_net_set;
     $IO_PORT @ATTACH %port_net_set => %tag_set;
-    %tag_set @ORDER("top-to-bottom", priority="low"); %tag_set @GROUP;
+    %tag_set @ORDER("top-to-bottom", priority="low"); %tag_set @GROUP; %tag_set @ORIENT("R0", priority="low");
     {%tag_set ?} @ALIGN("x", priority="low");
-    %instance_set = # @SELECT-INSTANCE; ? %instance_set @DISTANCE("left-to-right", min=4, priority="low");
+    %instance_set = # @SELECT-INSTANCE; ? %instance_set @DISTANCE("left-to-right", min=6, priority="low");
   };
 
   /* A non-drawn comment attached to any objects, or to the level itself when target is omitted. */

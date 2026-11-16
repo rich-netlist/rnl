@@ -371,18 +371,6 @@
           "kind": "DISTANCE",
           "status": "unsolved",
           "priority": "low"
-        },
-        {
-          "label": "ORDER",
-          "kind": "ORDER",
-          "status": "ok",
-          "priority": "low"
-        },
-        {
-          "label": "ALIGN",
-          "kind": "ALIGN",
-          "status": "ok",
-          "priority": "low"
         }
       ],
       "unplaced": [
@@ -404,6 +392,12 @@
         {
           "label": "ORDER",
           "kind": "ORDER",
+          "status": "unsolved",
+          "priority": "low"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
           "status": "unsolved",
           "priority": "low"
         },
@@ -829,6 +823,18 @@
       ],
       "constraints": [
         {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "unsolved",
+          "priority": "low"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "unsolved",
+          "priority": "low"
+        },
+        {
           "label": "ORDER",
           "kind": "ORDER",
           "status": "unsolved",
@@ -841,26 +847,8 @@
           "priority": "low"
         },
         {
-          "label": "DISTANCE",
-          "kind": "DISTANCE",
-          "status": "unsolved",
-          "priority": "low"
-        },
-        {
-          "label": "DISTANCE",
-          "kind": "DISTANCE",
-          "status": "unsolved",
-          "priority": "low"
-        },
-        {
-          "label": "DISTANCE",
-          "kind": "DISTANCE",
-          "status": "unsolved",
-          "priority": "low"
-        },
-        {
-          "label": "DISTANCE",
-          "kind": "DISTANCE",
+          "label": "ALIGN",
+          "kind": "ALIGN",
           "status": "unsolved",
           "priority": "low"
         }
@@ -1087,6 +1075,12 @@
       "flylines": [],
       "constraints": [
         {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "unsolved",
+          "priority": "low"
+        },
+        {
           "label": "ORDER",
           "kind": "ORDER",
           "status": "unsolved",
@@ -1099,14 +1093,8 @@
           "priority": "low"
         },
         {
-          "label": "DISTANCE",
-          "kind": "DISTANCE",
-          "status": "unsolved",
-          "priority": "low"
-        },
-        {
-          "label": "DISTANCE",
-          "kind": "DISTANCE",
+          "label": "ALIGN",
+          "kind": "ALIGN",
           "status": "unsolved",
           "priority": "low"
         }
