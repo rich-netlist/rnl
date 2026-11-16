@@ -191,11 +191,18 @@ pub(crate) fn for_layout(s: &Structure, work: &mut crate::Work) -> Structure {
             Some(Way { fact, count, taken })
         })
         // a listed relation whose other values relate the members of a narrowed class otherwise
-        // would let it take a value a list rules out: it is drawn as the witness relates it
+        // would let it take a value a list rules out: it is drawn as the witness relates it. One
+        // that contradicts the others alone may agree with them changed with it, round a cycle of
+        // relations: on a narrowed class it is drawn as the witness relates it too
         .filter(|w| {
-            (0..w.count)
-                .filter(|&v| v != w.taken)
-                .all(|v| classes_of(s, std::slice::from_ref(w), &[v]).is_none_or(|c| narrow(&c) == narrowed))
+            let narrowed_class = match &s.model.units[w.fact].orient {
+                OrientEffect::RelateOneOf { from, .. } => narrowed.contains_key(&classes.find(from[0]).0),
+                _ => false,
+            };
+            (0..w.count).filter(|&v| v != w.taken).all(|v| match classes_of(s, std::slice::from_ref(w), &[v]) {
+                Some(c) => narrow(&c) == narrowed,
+                None => !narrowed_class,
+            })
         })
         .collect();
     // Fitting proofs refer to the original hard classes. A merged search class must be
@@ -337,6 +344,32 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// Two listed relations between the same members contradict each other changed alone and
+    /// agree changed together: on a class a list narrows, neither is a way, and the search keeps
+    /// the listed member within its list.
+    #[test]
+    fn listed_relations_round_a_cycle_are_no_ways_on_a_narrowed_class() {
+        let relation = || fact(FactKind::OrientRelation { relation: Orient::R0, from: vec![0], to: vec![1] });
+        let mut p = problem_of(
+            vec![instance(), instance()],
+            vec![relation(), relation(), fact(FactKind::Orient { object: 1, code: Orient::R0 })],
+        );
+        p.version = "0.4".into();
+        p.orient_lists = vec![
+            (0, vec![Orient::R0, Orient::MY]),
+            (1, vec![Orient::R0, Orient::MY]),
+            (2, vec![Orient::R0, Orient::R90]),
+        ];
+        let s = for_layout(&structure(&p), &mut Work::default());
+        assert!(s.open.ways.is_empty());
+        assert_eq!(s.open.classes.len(), 1);
+        let mut q = problem_of(vec![instance(), instance()], vec![relation(), relation()]);
+        q.version = "0.4".into();
+        q.orient_lists = p.orient_lists[..2].to_vec();
+        let s = for_layout(&structure(&q), &mut Work::default());
+        assert_eq!(s.open.ways.len(), 2);
     }
 
     #[test]
