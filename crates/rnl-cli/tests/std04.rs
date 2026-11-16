@@ -416,9 +416,9 @@ fn supply_variants_cover_functional_and_logic_on_integer_grid() {
             .map(|p| (p.at, p.direction))
             .unwrap()
     };
-    assert_eq!(pin_at("rst"), ([-1.0, -5.0], Some("down")));
-    assert_eq!(pin_at("vp"), ([1.0, 4.0], Some("up")));
-    assert_eq!(pin_at("vn"), ([1.0, -5.0], Some("down")));
+    assert_eq!(pin_at("rst"), ([-2.0, -5.0], Some("down")));
+    assert_eq!(pin_at("vp"), ([0.0, 4.0], Some("up")));
+    assert_eq!(pin_at("vn"), ([0.0, -5.0], Some("down")));
 }
 
 #[test]
