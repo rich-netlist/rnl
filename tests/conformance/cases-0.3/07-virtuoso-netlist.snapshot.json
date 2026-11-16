@@ -17,6 +17,7 @@
             "id": "#I0",
             "subckt": true,
             "master": "inv",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -34,6 +35,7 @@
             "id": "#I1",
             "subckt": true,
             "master": "inv",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -51,6 +53,7 @@
             "id": "#I2",
             "subckt": false,
             "master": "isource",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -68,6 +71,7 @@
             "id": "#V0",
             "subckt": false,
             "master": "vsource",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -678,6 +682,7 @@
             "id": "#M0",
             "subckt": false,
             "master": "pmos4",
+            "type": "pmos",
             "terminals": [
               {
                 "n": 1,
@@ -705,6 +710,7 @@
             "id": "#M1",
             "subckt": false,
             "master": "nmos4",
+            "type": "nmos",
             "terminals": [
               {
                 "n": 1,

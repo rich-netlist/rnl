@@ -17,6 +17,7 @@
             "id": "#X1",
             "subckt": true,
             "master": "first_p",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -29,6 +30,7 @@
             "id": "#X2",
             "subckt": true,
             "master": "first_q",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -339,6 +341,7 @@
             "id": "#R1",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -871,6 +874,7 @@
             "id": "#R1",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,

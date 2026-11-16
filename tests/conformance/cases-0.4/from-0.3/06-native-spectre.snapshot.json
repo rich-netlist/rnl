@@ -17,6 +17,7 @@
             "id": "#r1",
             "subckt": false,
             "master": "resistor",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -34,6 +35,7 @@
             "id": "#c1",
             "subckt": false,
             "master": "capacitor",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -51,6 +53,7 @@
             "id": "#l1",
             "subckt": false,
             "master": "inductor",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -68,6 +71,7 @@
             "id": "#v1",
             "subckt": false,
             "master": "vsource",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -85,6 +89,7 @@
             "id": "#i1",
             "subckt": false,
             "master": "isource",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -102,6 +107,7 @@
             "id": "#e1",
             "subckt": false,
             "master": "vcvs",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -129,6 +135,7 @@
             "id": "#g1",
             "subckt": false,
             "master": "vccs",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -156,6 +163,7 @@
             "id": "#f1",
             "subckt": false,
             "master": "cccs",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -173,6 +181,7 @@
             "id": "#h1",
             "subckt": false,
             "master": "ccvs",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -190,6 +199,7 @@
             "id": "#b1",
             "subckt": false,
             "master": "bsource",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -207,6 +217,7 @@
             "id": "#sw1",
             "subckt": false,
             "master": "switch",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -224,6 +235,7 @@
             "id": "#p1",
             "subckt": false,
             "master": "port",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -241,6 +253,7 @@
             "id": "#d1",
             "subckt": false,
             "master": "dmod",
+            "type": "d",
             "terminals": [
               {
                 "n": 1,
@@ -258,6 +271,7 @@
             "id": "#q1",
             "subckt": false,
             "master": "npnmod",
+            "type": "npn",
             "terminals": [
               {
                 "n": 1,
@@ -280,6 +294,7 @@
             "id": "#q2",
             "subckt": false,
             "master": "pnpmod",
+            "type": "pnp",
             "terminals": [
               {
                 "n": 1,
@@ -302,6 +317,7 @@
             "id": "#m1",
             "subckt": false,
             "master": "nmosmod",
+            "type": "nmos",
             "terminals": [
               {
                 "n": 1,
@@ -329,6 +345,7 @@
             "id": "#m2",
             "subckt": false,
             "master": "pmosmod",
+            "type": "pmos",
             "terminals": [
               {
                 "n": 1,
@@ -356,6 +373,7 @@
             "id": "#j1",
             "subckt": false,
             "master": "njfmod",
+            "type": "njf",
             "terminals": [
               {
                 "n": 1,
@@ -378,6 +396,7 @@
             "id": "#j2",
             "subckt": false,
             "master": "pjfmod",
+            "type": "pjf",
             "terminals": [
               {
                 "n": 1,
@@ -400,6 +419,7 @@
             "id": "#rp1",
             "subckt": false,
             "master": "rpolymod",
+            "type": "r",
             "terminals": [
               {
                 "n": 1,
@@ -417,6 +437,7 @@
             "id": "#rel1",
             "subckt": false,
             "master": "relay",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -444,6 +465,7 @@
             "id": "#t1",
             "subckt": false,
             "master": "transformer",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -471,6 +493,7 @@
             "id": "#M3",
             "subckt": false,
             "master": "resistor",
+            "type": null,
             "terminals": [
               {
                 "n": 1,

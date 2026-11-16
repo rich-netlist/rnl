@@ -138,6 +138,11 @@ export type HostInstance = {
    * The name in the model position: a model, a subcircuit or a Spectre master.
    */
   master: string | null,
+  /**
+   * The type, lower case, as the rules and the `${type}` of a text read it: the host's (an M
+   * card, the type of a model card) or else DEVICE's (6.12); none where neither gives one.
+   */
+  type: string | null,
   terminals: Array<HostTerminal>,
 };
 

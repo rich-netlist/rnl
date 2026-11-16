@@ -17,6 +17,7 @@
             "id": "#R1",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,

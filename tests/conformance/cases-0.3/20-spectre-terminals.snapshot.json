@@ -17,6 +17,7 @@
             "id": "#r1",
             "subckt": false,
             "master": "resistor",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -34,6 +35,7 @@
             "id": "#r_custom",
             "subckt": false,
             "master": "resistor",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -51,6 +53,7 @@
             "id": "#d1",
             "subckt": false,
             "master": "diode",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -68,6 +71,7 @@
             "id": "#e1",
             "subckt": false,
             "master": "vcvs",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -95,6 +99,7 @@
             "id": "#rel1",
             "subckt": false,
             "master": "relay",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -122,6 +127,7 @@
             "id": "#xf1",
             "subckt": false,
             "master": "transformer",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -149,6 +155,7 @@
             "id": "#sw3",
             "subckt": false,
             "master": "switch",
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -176,6 +183,7 @@
             "id": "#mp1",
             "subckt": false,
             "master": "psp_pmos",
+            "type": "pmos",
             "terminals": [
               {
                 "n": 1,
@@ -203,6 +211,7 @@
             "id": "#qb1",
             "subckt": false,
             "master": "vbic_npn",
+            "type": "npn",
             "terminals": [
               {
                 "n": 1,
@@ -230,6 +239,7 @@
             "id": "#dj1",
             "subckt": false,
             "master": "jcap_d",
+            "type": "d",
             "terminals": [
               {
                 "n": 1,
@@ -247,6 +257,7 @@
             "id": "#jp1",
             "subckt": false,
             "master": "jfet_p",
+            "type": "pjf",
             "terminals": [
               {
                 "n": 1,
@@ -269,6 +280,7 @@
             "id": "#rd1",
             "subckt": false,
             "master": "rdiff_r",
+            "type": "r",
             "terminals": [
               {
                 "n": 1,

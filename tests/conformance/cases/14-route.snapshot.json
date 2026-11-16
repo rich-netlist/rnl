@@ -17,6 +17,7 @@
             "id": "#Q1",
             "subckt": false,
             "master": "npn1",
+            "type": "npn",
             "terminals": [
               {
                 "n": 1,
@@ -39,6 +40,7 @@
             "id": "#R1",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -56,6 +58,7 @@
             "id": "#R2",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -73,6 +76,7 @@
             "id": "#RC",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -90,6 +94,7 @@
             "id": "#RE",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -107,6 +112,7 @@
             "id": "#C1",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -124,6 +130,7 @@
             "id": "#C2",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -141,6 +148,7 @@
             "id": "#RL",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -158,6 +166,7 @@
             "id": "#Vcc",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,
@@ -175,6 +184,7 @@
             "id": "#Vin",
             "subckt": false,
             "master": null,
+            "type": null,
             "terminals": [
               {
                 "n": 1,

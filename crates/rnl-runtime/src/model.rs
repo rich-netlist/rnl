@@ -427,6 +427,10 @@ pub struct LevelView {
     /// DEVICE, the subcircuit's ports or the adapter's defaults (6.4, 6.12); None where there is
     /// no name.
     pub terminal_names: Vec<Vec<Option<String>>>,
+    /// The type of each host instance of the level, lower case, as the rules and the `${type}` of a
+    /// text read it: the host's (an M card, the type of a model card) or else DEVICE's (6.12); None
+    /// where neither gives one.
+    pub instance_types: Vec<Option<String>>,
     /// A subcircuit's own symbol, `# @SET-SYMBOL` (9.2.6).
     pub block_symbol: Option<BlockSymbol>,
     /// The packages in effect at the level, one of each name, in the order of their places:
