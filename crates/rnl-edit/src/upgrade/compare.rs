@@ -15,11 +15,12 @@ use std::collections::{BTreeMap, BTreeSet};
 use rnl_runtime::geom::{fmt_num, Orient};
 use rnl_runtime::model::{SymbolOrigin, UsageOrigin};
 use rnl_runtime::problem::{
-    FactKind, LevelProblem, ObjectKind, OrientSlot, PointRef, Position, Reference, Sense, Slot,
+    Axis, FactKind, LevelProblem, ObjectKind, OrientSlot, PointRef, Position, Reference, Sense, Slot,
 };
 use rnl_runtime::Interpretation;
 use serde_json::{json, Value};
 
+use super::turned::Frame;
 use super::{Difference, DiscardedPlacements};
 
 type Key = (String, String, String, String);
@@ -700,17 +701,18 @@ fn default_boxed(before: &Interpretation) -> BTreeMap<String, BTreeSet<String>> 
     out
 }
 
-/// The instances that 0.4 draws with a turned symbol (see `turned`), by level title and id, with the
-/// turn that draws the new symbol as the old.
-pub(super) type Turned = BTreeMap<(String, String), Orient>;
+/// The instances that 0.4 draws with a turned or moved symbol (see `turned`), by level title and
+/// id, with the frame that draws the new symbol as the old.
+pub(super) type Turned = BTreeMap<(String, String), Frame>;
 
 /// The code of 0.3 that `code` of 0.4 draws with a symbol turned by `turn`: the one it composes.
 fn turned_back(turn: Orient, code: Orient) -> Orient {
     Orient::ALL.into_iter().find(|c| turn.then(*c) == code).unwrap_or(code)
 }
 
-/// The geometry of a turned symbol in the frame of the symbol of 0.3: its box and pins turned.
-fn turn_geometry(turn: Orient, geometry: &mut Value) {
+/// The geometry of a turned or moved symbol in the frame of the symbol of 0.3: its box and pins
+/// turned and moved.
+fn turn_geometry(frame: Frame, geometry: &mut Value) {
     let point = |v: &Value| Some((v.get(0)?.as_f64()?, v.get(1)?.as_f64()?));
     if let Some([x1, y1, x2, y2]) = geometry
         .get("box")
@@ -719,17 +721,17 @@ fn turn_geometry(turn: Orient, geometry: &mut Value) {
         .as_deref()
         .map(|b| [b[0], b[1], b[2], b[3]])
     {
-        let (a, b) = (turn.apply((x1, y1)), turn.apply((x2, y2)));
+        let (a, b) = (frame.old((x1, y1)), frame.old((x2, y2)));
         geometry["box"] = json!([a.0.min(b.0) + 0.0, a.1.min(b.1) + 0.0, a.0.max(b.0) + 0.0, a.1.max(b.1) + 0.0]);
     }
     for pin in geometry.get_mut("pins").and_then(Value::as_array_mut).into_iter().flatten() {
         if let Some(at) = pin.get("at").and_then(point) {
             // `+ 0.0` writes a turned zero as 0, not -0
-            let (x, y) = turn.apply(at);
+            let (x, y) = frame.old(at);
             pin["at"] = json!((x + 0.0, y + 0.0));
         }
         if let Some(direction) = pin.get("direction").and_then(Value::as_u64) {
-            pin["direction"] = json!(turn.direction(direction as u16));
+            pin["direction"] = json!(frame.turn.direction(direction as u16));
         }
     }
     if let Some(pins) = geometry.get_mut("pins").and_then(Value::as_array_mut) {
@@ -738,9 +740,14 @@ fn turn_geometry(turn: Orient, geometry: &mut Value) {
 }
 
 /// The fact in the frame of the symbols of 0.3: an ORIENT of a turned instance by the code it
-/// composes, a pin of one by its direction in the old symbol. An ORIENT-RELATION of instances of
-/// different turns says something else than it did, so its text is marked.
-fn turned_fact(kind: &FactKind, turn_of: &impl Fn(usize) -> Option<Orient>) -> (FactKind, bool) {
+/// composes, a pin of one by its direction in the old symbol, a PLACE of the origin of a moved one
+/// by where the old origin was (`offset_of`). An ORIENT-RELATION of instances of different turns
+/// says something else than it did, so its text is marked.
+fn turned_fact(
+    kind: &FactKind,
+    turn_of: &impl Fn(usize) -> Option<Orient>,
+    offset_of: &impl Fn(usize) -> Option<(f64, f64)>,
+) -> (FactKind, bool) {
     let mut kind = kind.clone();
     let pin = |p: &mut rnl_runtime::problem::DirectedPin| {
         if let Some(turn) = turn_of(p.object) {
@@ -752,6 +759,11 @@ fn turned_fact(kind: &FactKind, turn_of: &impl Fn(usize) -> Option<Orient>) -> (
         FactKind::Orient { object, code } => {
             if let Some(turn) = turn_of(*object) {
                 *code = turned_back(turn, *code);
+            }
+        }
+        FactKind::Place { at: PointRef::Origin(object), axis, value } => {
+            if let Some((x, y)) = offset_of(*object) {
+                *value -= if *axis == Axis::X { x } else { y };
             }
         }
         FactKind::PinOrient { pin: p, .. } => pin(p),
@@ -824,8 +836,8 @@ fn snapshot(
                     .map(|item| symbol(&level.unplaced_symbols, item.symbol, 0))
             };
             let mut geometry = drawn.or_else(undrawn);
-            if let (Some(turn), Some(g)) = (turned.get(&(title.clone(), object.id.clone())), geometry.as_mut()) {
-                turn_geometry(*turn, g);
+            if let (Some(frame), Some(g)) = (turned.get(&(title.clone(), object.id.clone())), geometry.as_mut()) {
+                turn_geometry(*frame, g);
             }
             let standard = matches!(object.symbol.as_ref().map(|s| &s.origin), Some(SymbolOrigin::Package(_)));
             let default_symbol = object.symbol.as_ref().is_some_and(|s| s.default || boxes.contains(&s.name));
@@ -878,9 +890,20 @@ fn snapshot(
         let file = &read.doc.levels[problem.level].path;
         let title = &problem.title;
         let names = identities(read, problem);
-        let turn_of = |index: usize| match &problem.objects.get(index)?.reference {
+        let frame_of = |index: usize| match &problem.objects.get(index)?.reference {
             Reference::Name(id) => turned.get(&(title.clone(), id.clone())).copied(),
             _ => None,
+        };
+        let turn_of = |index: usize| frame_of(index).map(|f| f.turn);
+        // what the origin of a moved instance moved by: the shift, oriented by the code of 0.3 that
+        // its code composes, or by R0 when no ORIENT gives it (see `turned`)
+        let offset_of = |index: usize| {
+            let frame = frame_of(index)?;
+            let code = match &problem.objects.get(index)?.orient {
+                Some(OrientSlot::Fixed { code, .. }) => turned_back(frame.turn, *code),
+                _ => Orient::R0,
+            };
+            Some(frame.offset(code)).filter(|&o| o != (0.0, 0.0))
         };
         let none = BTreeSet::new();
         let default = added.get(title).unwrap_or(&none);
@@ -924,17 +947,25 @@ fn snapshot(
                     format!("{:?}", turn_of(index).map_or(*code, |turn| turned_back(turn, *code)))
                 }
             };
+            let mut at = object.position.clone();
+            if let (Some((dx, dy)), Position::Own { x, y }) = (offset_of(index), &mut at) {
+                for (slot, by) in [(x, dx), (y, dy)] {
+                    if let Slot::Fixed { value, .. } = slot {
+                        *value -= by;
+                    }
+                }
+            }
             put(
                 "positions",
                 &names[index],
-                json!({"kind":object.kind.as_str(),"position":position(&names, &object.position),"orientation":orient}),
+                json!({"kind":object.kind.as_str(),"position":position(&names, &at),"orientation":orient}),
             );
         }
         for item in &problem.facts {
             if says_nothing(&item.kind) {
                 continue;
             }
-            let (kind, mixed) = turned_fact(&item.kind, &turn_of);
+            let (kind, mixed) = turned_fact(&item.kind, &turn_of, &offset_of);
             for text in facts(&names, &kind) {
                 let text = if mixed { format!("{text} (turned symbols)") } else { text };
                 put("facts", &format!("{text} {:?}", item.priority), json!(text));

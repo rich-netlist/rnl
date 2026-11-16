@@ -261,11 +261,9 @@ pub(super) fn file(
                 Err(e) => error = Some(e),
             }
             match context.references.turned.edits(source, record, member) {
-                Ok((found, mixed)) => {
+                Ok((found, reviews)) => {
                     edits.extend(found);
-                    if mixed {
-                        reasons.push(super::turned::MIXED);
-                    }
+                    reasons.extend(reviews);
                 }
                 Err(e) => error = Some(e),
             }
