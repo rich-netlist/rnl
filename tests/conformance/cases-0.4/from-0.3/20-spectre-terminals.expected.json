@@ -775,9 +775,9 @@
         {
           "name": "$TRANSFORMER",
           "box": [
-            -1.8,
+            -2.4,
             -2.0,
-            1.8,
+            2.4,
             2.0
           ],
           "box_written": true,

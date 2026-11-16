@@ -98,7 +98,7 @@
   };
 
   /* A transformer: two coupled windings standing side by side, their polarity dots at the top. Terminals: p1 n1 p2 n2. */
-  $TRANSFORMER = @DEFINE-SYMBOL(box=[-1.8, -2, 1.8, 2]) {
+  $TRANSFORMER = @DEFINE-SYMBOL(box=[-2.4, -2, 2.4, 2]) {
     %p1 = (-1, 2) @PIN(terminal="p1", direction="up");
     %n1 = (-1, -2) @PIN(terminal="n1", direction="down");
     %p2 = (1, 2) @PIN(terminal="p2", direction="up");
