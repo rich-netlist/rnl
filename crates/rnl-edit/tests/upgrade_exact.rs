@@ -74,6 +74,21 @@ fn matched_assertions_are_informational_without_blocking_conversion() {
 }
 
 #[test]
+fn the_turning_a_written_label_takes_from_its_symbol_is_look() {
+    // the name of $IO_PORT_SYMBOL of 0.4 does not turn with the port: the text written for it takes that
+    // from the package, which the upgrade does not write, so it is the default look and no difference
+    let source = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"rnl-std\", version=\"0.3\") }\n.subckt top a\nR1 a 0 1k\n* @RNL {\n*   #R1 @PLACE(0, 0);\n*   $IO_PORT @ATTACH &a => @PLACE(-6, 2) => %port1;\n*   %port1 @TEXT(\"A\", key=\"name\", dx=-2);\n*   &a @WIRE {%port1:1 #R1:1}\n* }\n.ends top\n.end\n";
+    let r = upgrade("t.sp", &MemoryProvider::new().with("t.sp", source), &UpgradeOptions::default()).unwrap();
+    assert!(r.files["t.sp"].contains("%port1 @TEXT(\"A\", key=\"netname\", dx=-2)"), "{}", r.files["t.sp"]);
+    assert!(r.report.differences.is_empty(), "{:#?}", r.report.differences);
+    assert!(
+        r.report.default_look_changes.iter().any(|d| d.category == "texts" && d.item.starts_with("%port1::netname")),
+        "{:#?}",
+        r.report.default_look_changes
+    );
+}
+
+#[test]
 fn netname_and_transconductor_text_keys_follow_target_symbols() {
     let source = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"rnl-std-full\", version=\"0.3\") }\n.subckt gm in out\n.ends\nX1 a b gm\nR1 a 0 1k\n* @RNL {\n*   $SUPPLY @ATTACH &a => @TEXT(\"VDD\", key=\"name\");\n*   %g = $GROUND @ATTACH &0; %g @TEXT(\"GND\", key=\"name\");\n*   #X1 @SET-SYMBOL $TRANSCONDUCTOR; #X1 @TEXT(\"Gm\", key=\"formula\");\n*   #R1 @TEXT(\"R_load\", key=\"name\")\n* }\n.end\n";
     let r = upgrade("t.sp", &MemoryProvider::new().with("t.sp", source), &UpgradeOptions::default()).unwrap();
