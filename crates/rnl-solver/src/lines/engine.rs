@@ -232,21 +232,31 @@ pub(crate) fn lay_out(
             return fallback(laid, notes, why, work);
         }
     }
-    // the one key of the tree's rank, the line search and this comparison
+    // the one key of the tree's rank, the line search and this comparison, of a drawing it can read:
+    // its wires drawn, its annotations placed
     let rank = super::Rank::new(s);
+    let readable = |placed: &Placed, routing: &Routing| {
+        routing.written_path_error.is_none()
+            && routing.annotation_error.is_none()
+            && drawn(problem, s, &placed.geometry, routing).is_ok()
+            && crate::annotation::bounds(problem, &placed.geometry).is_ok()
+    };
     let key = |placed: &Placed, routing: &Routing| {
         let objectives = drawn(problem, s, &placed.geometry, routing)
             .map(|w| measured_layers(problem, s, placed, Some(&w)))
             .unwrap_or_default();
-        rank.entry(problem, s, options, placed, routing, objectives, &[])
+        rank.entry(problem, s, options, placed, routing, objectives, &[]).layers
     };
     // measured outside the level's budget, which the search may have used up: the comparison only
     // reads the two drawings, and a stopped budget would make both alike
-    let ((k_mine, k_theirs), _) = crate::budget::with(&crate::StoppedClock, crate::RunLimit::Unlimited, None, || {
-        (key(&made.placed, &made.routing), key(&laid.placed, &laid.routing))
-    });
-    let invalid = |e: &Entry| e.written_path_error.is_some() || e.annotation_error.is_some();
-    if mine.interrupted || invalid(&k_mine) || (!invalid(&k_theirs) && k_mine.layers > k_theirs.layers) {
+    let after = mine.interrupted
+        || !readable(&made.placed, &made.routing)
+        || readable(&laid.placed, &laid.routing)
+            && crate::budget::with(&crate::StoppedClock, crate::RunLimit::Unlimited, None, || {
+                key(&made.placed, &made.routing) > key(&laid.placed, &laid.routing)
+            })
+            .0;
+    if after {
         return fallback(
             laid,
             notes,

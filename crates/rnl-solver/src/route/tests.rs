@@ -275,6 +275,8 @@ fn modern_solve_preserves_tree_identity_and_reports_forced_connections() {
     let lines = crate::solve(&p, &options);
     assert!(lines.report.notes.iter().any(|n| n.contains("the drawing made ranks before the group-tree layout's")));
     assert!(!lines.report.notes.iter().any(|n| n.contains("joined through obstacles")), "{:?}", lines.report.notes);
+    assert!(lines.report.unrouted.is_empty(), "{:?}", lines.report.unrouted);
+    assert!(!lines.solution.wires.is_empty());
     options.settings.layout = crate::Layout::Tree;
     let solved = crate::solve(&p, &options);
     assert_eq!(solved.solution.wires.len(), 2);

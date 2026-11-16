@@ -74,13 +74,19 @@ impl Rank {
         let joins = crate::score::drawn(problem, s, g, routing)
             .map_or(0, |wires| crate::score::false_joins(problem, s, &placed.origins, g, &wires));
         let mut layers: Vec<Q> = vec![int((broken.len() - low) as i64), int(joins as i64), int(low as i64)];
+        layers.push(int(routing.joins_left() as i64));
         if self.annotations {
             let (overlaps, hits) =
                 super::quality::annotation_cost(problem, s, placed, routing).expect("validated annotation geometry");
             layers.extend([int(overlaps as i64), int(hits as i64)]);
         }
-        layers.push(int(routing.joins_left() as i64));
-        {
+        // the unified key: the line-layout order, its crossings and bends weighed by the one pair,
+        // with the configured rules between the annotations and its marks
+        let l = super::quality::lab_measure(problem, s, placed, routing, options.settings.lines_weights.pair(), None);
+        if !l.interrupted {
+            layers.extend(self.rules.iter().map(|&i| objectives.get(i).cloned().unwrap_or_else(Q::zero)));
+        }
+        if !l.interrupted {
             let mut seen = self.seen.borrow_mut();
             if seen.0.is_empty() {
                 seen.0 = layers.iter().map(|v| (v.clone(), v.clone())).collect();
@@ -95,13 +101,9 @@ impl Rank {
             }
             seen.1 += 1;
         }
-        // the unified key: the line-layout order, its crossings and bends weighed by the one pair,
-        // with the configured rules between its marks and its sizes
-        let l = super::quality::lab_measure(problem, s, placed, routing, options.settings.lines_weights.pair(), None);
         if l.interrupted {
             layers.extend((0..self.rules.len() + 6 + 4).map(|_| int(i64::MAX)));
         } else {
-            layers.extend(self.rules.iter().map(|&i| objectives.get(i).cloned().unwrap_or_else(Q::zero)));
             layers.extend(l.head());
             layers.extend(l.tail());
         }
@@ -119,11 +121,11 @@ impl Rank {
 
     pub(crate) fn note(&self, s: &Structure) -> String {
         let seen = self.seen.borrow();
-        let mut leading = vec!["facts broken".to_string(), "false joins".into(), "low facts broken".into()];
+        let mut leading =
+            vec!["facts broken".to_string(), "false joins".into(), "low facts broken".into(), "joins left".into()];
         if self.annotations {
             leading.extend(["annotation overlaps".into(), "wires through annotations".into()]);
         }
-        leading.push("joins left".into());
         let names = leading.into_iter().chain(
             self.rules
                 .iter()

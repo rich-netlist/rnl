@@ -196,7 +196,11 @@ pub const LINES_ORDER: [OrderRow; 19] = [
     OrderRow { name: "annotations", what: "Fewer overlaps of annotations, then fewer wires through them." },
     OrderRow { name: "rules", what: "The objectives it takes, layer by layer, as configured." },
     OrderRow { name: "current", what: "Fewer pins whose wire leaves other than along their CURRENT." },
-    OrderRow { name: "crossings_and_bends", what: "Fewer crossings plus four times the bends of the wires." },
+    OrderRow {
+        name: "crossings_and_bends",
+        what: "Fewer crossings and bends of the wires, weighed by lines_weights: the crossings plus four times the \
+               bends by default.",
+    },
     OrderRow { name: "hidden_ports", what: "Fewer ports whose way out a symbol or another net's wire shuts in." },
     OrderRow { name: "rail_heights", what: "The grounds and the supplies at fewer heights." },
     OrderRow { name: "mirror_pairs", what: "Fewer mirror pairs off the axis they share." },

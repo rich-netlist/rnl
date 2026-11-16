@@ -2724,7 +2724,11 @@ mod tests {
                     assert_eq!(made.1.routing.wires, complete.routing.wires);
                     assert_eq!(made.1.entry, complete.entry);
                 } else {
-                    // a challenger the search completed before the cutoff, and better
+                    // a challenger the search completed before the cutoff, as evaluated without a
+                    // limit, and better
+                    let (whole, _) = tree.evaluate_rounds(&made.0, 3, &mut Work::default());
+                    assert_eq!(whole.entry, made.1.entry, "binding={bindings}, cutoff={seconds}");
+                    assert_eq!(whole.placed.geometry, made.1.placed.geometry);
                     let order = crate::score::order(tree.active(), &[complete.entry.clone(), made.1.entry.clone()]);
                     assert_eq!(order[0], 1, "binding={bindings}, cutoff={seconds}");
                 }

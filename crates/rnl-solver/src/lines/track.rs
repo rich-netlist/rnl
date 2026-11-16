@@ -955,8 +955,26 @@ fn window(lines: &Lines, scene: &Scene, net: usize, points: &[Pt], margin: i32, 
     }
     Some(win)
 }
+/// The most the weighed crossings and bends of a path hold in its packed cost: a dearer path holds
+/// it all the same, rather than wrapping round to a cheap one.
+const C1_MAX: u64 = (1 << 20) - 1;
+
 fn pack(c1: u64, c2: u64, c3: u64) -> u64 {
-    (c1 << 44) | (c2 << 28) | c3
+    (c1.min(C1_MAX) << 44) | (c2 << 28) | c3
+}
+
+/// The weights of a crossing and of a bend divided by their greatest common divisor: the same
+/// order of paths, in the fewest bits of the packed cost.
+fn reduced((wc, wb): (u64, u64)) -> (u64, u64) {
+    let (mut a, mut b) = (wc, wb);
+    while b != 0 {
+        (a, b) = (b, a % b);
+    }
+    if a <= 1 {
+        (wc, wb)
+    } else {
+        (wc / a, wb / a)
+    }
 }
 #[allow(clippy::too_many_arguments)]
 fn join(
@@ -1111,7 +1129,7 @@ fn search(
     let free = |i: usize| -> bool {
         !win.barred[i] && (open[i] || !(win.boxed[i] || win.margin[i] || win.hard[i] || texts && win.text[i]))
     };
-    let (wc, wb) = input.weights;
+    let (wc, wb) = reduced(input.weights);
     let mut dist = vec![u64::MAX; size * 5];
     let mut from = vec![u32::MAX; size * 5];
     let mut heap: BinaryHeap<Reverse<(u64, u32)>> = BinaryHeap::new();

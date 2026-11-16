@@ -1843,7 +1843,7 @@ impl Search<'_> {
             let label = class.members[0].1;
             let mut all = Orient::ALL;
             all.sort_by_key(|v| preference(*v));
-            if let Some(v) = all.into_iter().find(|v| s.exit(k, 0, v.then(label)) == Some(want)) {
+            if let Some(v) = all.into_iter().find(|v| class.allows(*v) && s.exit(k, 0, v.then(label)) == Some(want)) {
                 values[c] = v;
             }
         }
@@ -2031,7 +2031,10 @@ impl Search<'_> {
                 let ori = orientations_with(s, &p.values, &p.ways);
                 let label_b =
                     s.open.classes[cb].members.iter().find(|(m, _)| *m == pair.b).map_or(Orient::R0, |(_, l)| *l);
-                p.values[cb] = ori[pair.a].then(Orient::MY).then(inverse(label_b));
+                let v = ori[pair.a].then(Orient::MY).then(inverse(label_b));
+                if s.open.classes[cb].allows(v) {
+                    p.values[cb] = v;
+                }
             }
         }
         (p, second)

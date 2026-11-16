@@ -65,6 +65,10 @@ pub(crate) fn take(classes: &mut OrientClasses, effect: &OrientEffect, fact: usi
 /// The candidate's classes in fact order. Set-to-set lists retain each pair's witnessed
 /// relation; their alternatives remain predicates in the placement resolver.
 pub(crate) fn classes(s: &Structure, ways: &[Way], values: &[usize]) -> Option<OrientClasses> {
+    classes_of(s, ways, values)
+}
+
+fn classes_of(s: &Structure, ways: &[Way], values: &[usize]) -> Option<OrientClasses> {
     let mut classes = OrientClasses::new(s.objects.len());
     for &f in &s.kept {
         let original = &s.model.units[f].orient;
@@ -129,25 +133,34 @@ pub(crate) fn for_layout(s: &Structure, work: &mut crate::Work) -> Structure {
         }
     }
     // an ORIENT list or an absolute pin direction on a member narrows the values of its class's
-    // root; a class one value is left to is drawn as the witness has it, as a fixed one
-    let mut allowed: BTreeMap<usize, Vec<Orient>> = BTreeMap::new();
-    for &f in &s.kept {
-        let original = &s.model.units[f].orient;
-        let (object, codes) = match original {
-            OrientEffect::FixOneOf { object, codes } => (*object, codes.clone()),
-            _ => match absolute_pin_codes(original) {
-                Some(x) => x,
-                None => continue,
-            },
-        };
-        let (root, label) = classes.find(object);
-        if !by_root.contains_key(&root) {
-            continue;
+    // root, by the member's relation to the root that `relations` gives; a class one value is left
+    // to is drawn as the witness has it, as a fixed one
+    let free: std::collections::BTreeSet<usize> = by_root.keys().copied().collect();
+    let narrow = |relations: &OrientClasses| {
+        let mut allowed: BTreeMap<usize, Vec<Orient>> = BTreeMap::new();
+        for &f in &s.kept {
+            let original = &s.model.units[f].orient;
+            let (object, codes) = match original {
+                OrientEffect::FixOneOf { object, codes } => (*object, codes.clone()),
+                _ => match absolute_pin_codes(original) {
+                    Some(x) => x,
+                    None => continue,
+                },
+            };
+            let (root, _) = classes.find(object);
+            if !free.contains(&root) {
+                continue;
+            }
+            let ((_, to_object), (_, to_root)) = (relations.find(object), relations.find(root));
+            let these: Vec<Orient> =
+                codes.iter().map(|c| c.then(crate::orient::inverse(to_object)).then(to_root)).collect();
+            let now = allowed.entry(root).or_insert_with(|| Orient::ALL.to_vec());
+            now.retain(|v| these.contains(v));
         }
-        let these: Vec<Orient> = codes.iter().map(|c| c.then(crate::orient::inverse(label))).collect();
-        let now = allowed.entry(root).or_insert_with(|| Orient::ALL.to_vec());
-        now.retain(|v| these.contains(v));
-    }
+        allowed
+    };
+    let mut allowed = narrow(&classes);
+    let narrowed = allowed.clone();
     out.open.classes = by_root
         .into_iter()
         .filter_map(|(root, members)| {
@@ -176,6 +189,13 @@ pub(crate) fn for_layout(s: &Structure, work: &mut crate::Work) -> Structure {
                 _ => return None,
             };
             Some(Way { fact, count, taken })
+        })
+        // a listed relation whose other values relate the members of a narrowed class otherwise
+        // would let it take a value a list rules out: it is drawn as the witness relates it
+        .filter(|w| {
+            (0..w.count)
+                .filter(|&v| v != w.taken)
+                .all(|v| classes_of(s, std::slice::from_ref(w), &[v]).is_none_or(|c| narrow(&c) == narrowed))
         })
         .collect();
     // Fitting proofs refer to the original hard classes. A merged search class must be
@@ -283,6 +303,40 @@ mod tests {
         let s = for_layout(&structure(&p), &mut Work::default());
         assert!(s.open.classes.is_empty() && s.open.ways.is_empty());
         assert_eq!(s.witness.orient[0], Orient::R0);
+    }
+
+    /// A listed relation stays a way of the search only where its values leave the list on its
+    /// class as it is: a list on the root narrows the root whatever the relation, and a list on the
+    /// other member, which another relation would turn to a value it rules out, takes the way.
+    #[test]
+    fn a_listed_relation_is_a_way_only_where_it_keeps_the_class_within_its_list() {
+        for listed in [0, 1] {
+            let mut p = problem_of(
+                vec![instance(), instance()],
+                vec![
+                    fact(FactKind::OrientRelation { relation: Orient::R0, from: vec![0], to: vec![1] }),
+                    fact(FactKind::Orient { object: listed, code: Orient::R0 }),
+                ],
+            );
+            p.version = "0.4".into();
+            p.orient_lists = vec![(0, vec![Orient::R0, Orient::MY]), (1, vec![Orient::R0, Orient::R90])];
+            let s = for_layout(&structure(&p), &mut Work::default());
+            assert_eq!(s.open.classes.len(), 1, "listed={listed}");
+            let class = s.open.classes[0].clone();
+            assert_eq!(class.allowed.len(), 2, "listed={listed}");
+            assert_eq!(s.open.ways.len(), usize::from(class.root == listed), "listed={listed}");
+            for v in class.allowed.clone() {
+                for way in 0..s.open.ways.first().map_or(1, |w| w.count) {
+                    let ways = if s.open.ways.is_empty() { vec![] } else { vec![way] };
+                    let c = candidate(vec![v], ways);
+                    with_relations(&s, &orientation_relations(&s, &c), &mut Work::default(), |r, _, taken| {
+                        assert!(taken.kept.iter().all(|k| *k), "listed={listed} v={v:?} way={way}");
+                        assert!(r.holds(0) && r.holds(1));
+                        assert!(p.orient_lists[1].1.contains(&r.geometry().orient[listed]));
+                    });
+                }
+            }
+        }
     }
 
     #[test]
