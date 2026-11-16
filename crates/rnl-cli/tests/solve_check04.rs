@@ -65,6 +65,34 @@ fn each_setting_says_where_it_comes_from_in_the_order_of_14_10() {
     assert_eq!(setting(top, "layout"), "layout=\"lines\" (default)");
 }
 
+/// The weights of a crossing and a bend of `lines` are an array of two whole numbers, as JSON too,
+/// wherever they come from: the default, a package, the file, the command line.
+#[test]
+fn the_weights_of_lines_are_an_array_wherever_they_come_from() {
+    let weights = |c: &Checked| {
+        let s = &level(c, "main.sp").settings["lines_weights"];
+        (s.value.clone(), s.from.clone())
+    };
+    let json = |a: i64, b: i64| serde_json::json!([a, b]);
+    assert_eq!(weights(&check(MAIN, &[])), (json(1, 4), "default".to_string()));
+    let mut files = files(MAIN);
+    files.insert("packages/fixture.rnl", &PACKAGE.replace("grid=2", "grid=2, lines_weights=[2, 8]"));
+    let options = SolveOptions { std: false, ..SolveOptions::default() };
+    let c = check_settings(Some(Path::new("main.sp")), &files, &options, &[]).unwrap();
+    assert_eq!(weights(&c), (json(2, 8), "package:fixture".to_string()));
+    let main = MAIN.replace("tolerance=-1)", "tolerance=-1, lines_weights=[0, 3])");
+    assert_eq!(weights(&check(&main, &[])), (json(0, 3), "header".to_string()));
+    for tool in
+        [ToolSettings::Config("lines_weights=[5, 1]".into()), ToolSettings::Options("lines_weights=[5,1]".into())]
+    {
+        assert_eq!(
+            weights(&check(&main, std::slice::from_ref(&tool))),
+            (json(5, 1), "command-line".to_string()),
+            "{tool:?}"
+        );
+    }
+}
+
 #[test]
 fn a_bad_value_of_the_file_is_an_error_for_its_key_and_the_value_before_it_stays() {
     let c = check(MAIN, &[]);
@@ -279,6 +307,12 @@ mod command {
         assert_eq!(json["levels"][0]["title"], serde_json::Value::Null);
         assert_eq!(json["levels"][0]["errors"][0]["key"], "beam");
         assert_eq!(json["levels"][0]["settings"]["beam"], serde_json::json!({"value": 4, "from": "default"}));
+        let out = rnl(&["solve", "--check", "--json", "--solver-config", "lines_weights=[3, 5]"]);
+        let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+        assert_eq!(
+            json["levels"][0]["settings"]["lines_weights"],
+            serde_json::json!({"value": [3, 5], "from": "command-line"})
+        );
         let out = rnl(&["solve", "--check", "--solver-config", "grid=2"]);
         assert_eq!(out.status.code(), Some(0));
         assert!(String::from_utf8_lossy(&out.stdout).contains("grid=2 (command-line)"));
