@@ -295,7 +295,8 @@ pub fn settings_table() -> SettingsTable {
                 SettingKind::Integers,
                 "The weights of a crossing and of a bend in the line layout, as [crossing, bend], not both 0: \
                  its drawings rank by crossing × crossings + bend × bends, after the facts, the false joins, \
-                 the annotations, the objectives it takes and the pins against their CURRENT.",
+                 the annotations, the objectives it takes and the pins against their CURRENT. Only their \
+                 ratio matters: [2, 8] ranks as [1, 4] does.",
             )
         },
         row(

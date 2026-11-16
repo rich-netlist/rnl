@@ -1630,7 +1630,7 @@ impl Search<'_, '_> {
             if table > 0 && table <= core.others.len() {
                 notes.push(format!(
                     "lines: {}: placed by its list in another arrangement of the group-tree layout's search, number {} \
-                     of {} (its first, then those it stepped through), not the one it took",
+                     of {} (its first, those it stepped through, then the best it tried), not the one it took",
                     lv.name(n),
                     table,
                     core.others.len()

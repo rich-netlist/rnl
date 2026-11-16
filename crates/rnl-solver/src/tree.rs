@@ -127,6 +127,11 @@ pub(crate) struct Tree<'a> {
 
 const ROUNDS: usize = 3;
 
+/// How many of the arrangements a search inside the lines layout tried and did not step to it
+/// hands on besides those it stepped through, the best by its rank first: the line search may draw
+/// one of them better than the tree's own wires do.
+const TRIED_KEPT: usize = 4;
+
 const RELEASES: usize = 3;
 
 /// Description, arrangement, moved leaves, and whether it turns or mirrors those leaves.
@@ -246,10 +251,10 @@ pub(crate) fn lay_out_from(tree: Tree<'_>, work: &mut Work, stop: &Stop, allowan
     let start = first.clone();
     // The shared budget always bounds initialization. A local stage allowance may stop
     // subsequent improvements, but must not manufacture an unfinished initial baseline.
-    let (arr, best, said, path) = tree.search(first, best, rounds, true, work, stop, refinement);
+    let (arr, best, said, path, tried) = tree.search(first, best, rounds, true, work, stop, refinement);
     notes.extend(said);
     let mut others: Vec<Arrangement> = Vec::new();
-    for a in std::iter::once(start).chain(path) {
+    for a in std::iter::once(start).chain(path).chain(tried) {
         if a != arr && !others.contains(&a) {
             others.push(a);
         }
@@ -1771,7 +1776,7 @@ impl<'a> Tree<'a> {
         work: &mut Work,
         stop: &Stop,
         refinement: Option<Refinement>,
-    ) -> (Arrangement, Evaluated, Vec<String>, Vec<Arrangement>) {
+    ) -> (Arrangement, Evaluated, Vec<String>, Vec<Arrangement>, Vec<Arrangement>) {
         let s = self.s;
         let better = |a: &Entry, b: &Entry| crate::score::order(self.active(), &[a.clone(), b.clone()])[0] == 1;
         let mut path: Vec<Arrangement> = Vec::new();
@@ -1786,6 +1791,9 @@ impl<'a> Tree<'a> {
         let mut released: Vec<Tie> = Vec::new();
         let mut releases = 0;
         let mut finished = false;
+        // inside the lines layout, the arrangements tried and not stepped to, to hand on the best
+        let keep_tried = self.line_rank.is_some();
+        let mut tried_all: Vec<(Entry, Arrangement)> = Vec::new();
         'search: loop {
             if refinement.is_some_and(|limit| limit.stops(work)) || stop.reached(work) {
                 break;
@@ -1877,6 +1885,9 @@ impl<'a> Tree<'a> {
                 if crate::budget::stopped() {
                     break 'search;
                 }
+                if keep_tried {
+                    tried_all.push((next.entry.clone(), arr.clone()));
+                }
                 if better(&eval.entry, &next.entry) {
                     steps.push(what.clone());
                     current = arr.clone();
@@ -1937,7 +1948,20 @@ impl<'a> Tree<'a> {
             ));
         }
         notes.push(format!("tree: the arrangement taken: {}", self.describe(&best)));
-        (best, best_eval, notes, path)
+        let mut kept: Vec<Arrangement> = Vec::new();
+        if !tried_all.is_empty() {
+            let entries: Vec<Entry> = tried_all.iter().map(|(e, _)| e.clone()).collect();
+            for i in crate::score::order(self.active(), &entries) {
+                let a = &tried_all[i].1;
+                if kept.len() == TRIED_KEPT {
+                    break;
+                }
+                if *a != best && !path.contains(a) && !kept.contains(a) {
+                    kept.push(a.clone());
+                }
+            }
+        }
+        (best, best_eval, notes, path, kept)
     }
 
     fn relations(&self, arr: &Arrangement, ori: &[Orient]) -> Vec<Tagged> {
@@ -2609,6 +2633,33 @@ mod tests {
             arr.lists[1] = Some(Item::List(dir, vec![list]));
             assert_eq!(tree.code(&arr), original);
         }
+    }
+
+    /// Inside the lines layout the search hands on, besides the arrangements it stepped through,
+    /// the best of those it tried and did not step to, best first by its rank, none it took; the
+    /// group-tree layout's own search hands on none.
+    #[test]
+    fn the_search_inside_the_lines_layout_hands_on_the_best_it_tried() {
+        let p = problem();
+        let options = options();
+        let (_, exact) = crate::driver::solve_exact(&p, &options);
+        let tree = Tree::new(&p, &exact.structure, &options).with_line_rank();
+        let first = tree.first(&mut Work::default());
+        let (complete, _) = tree.evaluate_rounds(&first, 3, &mut Work::default());
+        let (best, _, notes, path, tried) =
+            tree.search(first.clone(), complete.clone(), 3, true, &mut Work::default(), &Stop::default(), None);
+        assert!(!tried.is_empty(), "{notes:?}");
+        assert!(tried.len() <= TRIED_KEPT);
+        for (i, a) in tried.iter().enumerate() {
+            assert!(*a != best && !path.contains(a) && !tried[..i].contains(a));
+        }
+        let entries: Vec<Entry> =
+            tried.iter().map(|a| tree.evaluate_rounds(a, 3, &mut Work::default()).0.entry).collect();
+        assert_eq!(crate::score::order(tree.active(), &entries), (0..tried.len()).collect::<Vec<_>>());
+        let plain = Tree::new(&p, &exact.structure, &options);
+        let (complete, _) = plain.evaluate_rounds(&first, 3, &mut Work::default());
+        let made = plain.search(first, complete, 3, true, &mut Work::default(), &Stop::default(), None);
+        assert!(made.4.is_empty());
     }
 
     #[test]

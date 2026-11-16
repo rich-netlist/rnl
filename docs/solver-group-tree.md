@@ -88,6 +88,8 @@ group tree ranks its arrangements by the line layout's own order (`lines_order` 
 against their CURRENT, then the crossings and bends weighed by `lines_weights` (one crossing
 plus four times each bend by default), and the rest of that
 order, so that the tree, the line search and the choice between their drawings rank alike. The
+line search draws the arrangement the tree took, its first one, those it stepped through, and the
+four best by that order of those it tried and did not step to. The
 released versions retain their fixed ordering before the objective layers. Default
 layout and objective changes are a separate migration step. Global and group spacing
 settings are reserved for the subsequent skeleton and line layouts; rows and trees

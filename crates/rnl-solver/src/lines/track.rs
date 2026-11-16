@@ -1663,6 +1663,23 @@ mod tests {
             lenient: false,
         }
     }
+    /// Only the ratio of the weights matters: they are reduced by their greatest common divisor
+    /// before they weigh a path in its packed cost, so [250, 1000] routes as [1, 4] does.
+    #[test]
+    fn weights_of_one_ratio_route_alike() {
+        assert_eq!(reduced((2, 8)), (1, 4));
+        assert_eq!(reduced((0, 7)), (0, 1));
+        assert_eq!(reduced((3, 5)), (3, 5));
+        let layout = layout(true);
+        let base = route(&input(&layout));
+        assert!(base.failed.is_none(), "{:?}", base.failed);
+        let mut scaled = input(&layout);
+        scaled.weights = (250, 1000);
+        let made = route(&scaled);
+        assert_eq!(format!("{:?}", made.outs), format!("{:?}", base.outs));
+        assert_eq!(made.expansions, base.expansions);
+    }
+
     #[test]
     fn coordinate_anchors_do_not_acquire_an_electrical_pin_lead() {
         let plain = route(&input(&layout(false)));
