@@ -20,9 +20,8 @@ pub(crate) struct Rank {
     active: Active,
     rules: Vec<usize>,
     annotations: bool,
-    /// Below a `virtual_weight` of 1, the weight: the heights and the rows and columns of the
-    /// symbols weighed, each layer with a tolerance just under a whole unit ([`Rank::for_choice`]).
-    weighed: Option<Q>,
+    /// The layers after the rules, as `lines_order` gives them ([`super::quality::Ranking`]).
+    ranking: super::quality::Ranking,
     seen: RefCell<(Vec<(Q, Q)>, usize)>,
 }
 
@@ -33,35 +32,19 @@ pub(super) fn rule_layers(s: &Structure) -> Vec<usize> {
 }
 
 impl Rank {
-    pub(crate) fn new(s: &Structure) -> Rank {
+    pub(crate) fn new(s: &Structure, options: &SolverOptions) -> Rank {
         let rules = rule_layers(s);
         let annotations = !s.annotation_views.is_empty();
-        let n = 4 + 2 * usize::from(annotations) + rules.len() + 6 + 4;
+        let ranking = super::quality::Ranking::of(options);
+        let n = 4 + 2 * usize::from(annotations) + rules.len() + ranking.layers.len();
         let layers = (0..n).map(|_| ActiveLayer { items: Vec::new(), tolerance: Q::zero() }).collect();
         Rank {
             active: Active { layers, inert: Vec::new(), configured_only: true },
             rules,
             annotations,
-            weighed: None,
+            ranking,
             seen: RefCell::new((Vec::new(), 0)),
         }
-    }
-
-    /// The rank by which the line layout chooses between its drawing and the group-tree layout's:
-    /// [`Rank::new`], and below a `virtual_weight` of 1, the heights of the grounds and supplies and
-    /// the rows and columns of the symbols weighed by it, two drawings alike on each unless they
-    /// differ by a whole unit. The group-tree layout's own search ranks by [`Rank::new`].
-    pub(crate) fn for_choice(s: &Structure, options: &SolverOptions) -> Rank {
-        let mut rank = Rank::new(s);
-        let w = options.settings.virtual_weight;
-        if !w.is_one() {
-            let base = 4 + 2 * usize::from(rank.annotations) + rank.rules.len();
-            for i in [base + 3, base + 6 + 2] {
-                rank.active.layers[i].tolerance = super::quality::unit_tolerance();
-            }
-            rank.weighed = Some(w.q());
-        }
-        rank
     }
 
     pub(crate) fn active(&self) -> &Active {
@@ -103,9 +86,7 @@ impl Rank {
         }
         // the unified key: the line-layout order, its crossings and bends weighed by the one pair,
         // with the configured rules between the annotations and its marks
-        let w = self.weighed.clone().unwrap_or_else(|| int(1));
-        let l =
-            super::quality::lab_measure(problem, s, placed, routing, options.settings.lines_weights.pair(), &w, None);
+        let l = super::quality::lab_measure(problem, s, placed, routing, &self.ranking, None);
         if !l.interrupted {
             layers.extend(self.rules.iter().map(|&i| objectives.get(i).cloned().unwrap_or_else(Q::zero)));
         }
@@ -125,13 +106,9 @@ impl Rank {
             seen.1 += 1;
         }
         if l.interrupted {
-            layers.extend((0..self.rules.len() + 6 + 4).map(|_| int(i64::MAX)));
-        } else if self.weighed.is_some() {
-            layers.extend(l.head_weighed());
-            layers.extend(l.tail_weighed());
+            layers.extend((0..self.rules.len() + self.ranking.layers.len()).map(|_| int(i64::MAX)));
         } else {
-            layers.extend(l.head());
-            layers.extend(l.tail());
+            layers.extend(l.quality().iter().cloned());
         }
         Entry {
             written_path_error: routing.written_path_error,
@@ -184,9 +161,9 @@ mod tests {
         p.facts = vec![fact(FactKind::Orient { object: 0, code: other })];
         p.orient_lists = vec![(0, vec![other, chosen])];
         s.kept = vec![0];
-        let rank = Rank::new(&s);
-        let layers = vec![int(0); s.active.layers.len()];
         let options = SolverOptions::without_time_limit();
+        let rank = Rank::new(&s, &options);
+        let layers = vec![int(0); s.active.layers.len()];
         let good = rank.entry(&p, &s, &options, &placed, &routing, layers.clone(), &[]);
         assert_eq!(good.layers[0], int(0));
         p.orient_lists[0].1.pop();
@@ -195,33 +172,22 @@ mod tests {
         assert_eq!(crate::score::order(rank.active(), &[bad, good]), [1, 0]);
     }
 
-    /// At a `virtual_weight` of 1 the rank of the line layout's choice is the tree's: no
-    /// tolerance, the same layers. Below 1 the heights and the rows and columns of the symbols
-    /// take a tolerance just under a whole unit.
+    /// The tree's rank inside the lines layout takes the layers of `lines_order` after its rules:
+    /// as many, with the values the line layout's own order gives a drawing.
     #[test]
-    fn the_choice_ranks_as_the_tree_at_a_weight_of_one() {
+    fn the_tree_ranks_by_the_layers_of_lines_order() {
         let (p, s, placed, routing) = super::super::port::tests::fixture();
-        let options = SolverOptions::without_time_limit();
-        let layers = vec![int(0); s.active.layers.len()];
-        let (tree, choice) = (Rank::new(&s), Rank::for_choice(&s, &options));
-        assert!(choice.weighed.is_none());
-        assert!(choice.active().layers.iter().all(|l| l.tolerance.is_zero()));
-        let a = tree.entry(&p, &s, &options, &placed, &routing, layers.clone(), &[]);
-        let b = choice.entry(&p, &s, &options, &placed, &routing, layers.clone(), &[]);
-        assert_eq!(a.layers, b.layers);
-        let half = options.with_overrides("virtual_weight=0.5").unwrap();
-        let weighed = Rank::for_choice(&s, &half);
-        let base = 4 + 2 * usize::from(weighed.annotations) + weighed.rules.len();
-        let tolerant: Vec<usize> =
-            (0..weighed.active().layers.len()).filter(|&i| !weighed.active().layers[i].tolerance.is_zero()).collect();
-        assert_eq!(tolerant, [base + 3, base + 8]);
-        assert!(weighed.active().layers[base + 3].tolerance < int(1));
-        // the fixture's port is a virtual symbol on a column of its own, which counts one half; the
-        // other layers are the counts
-        let c = weighed.entry(&p, &s, &half, &placed, &routing, layers, &[]);
-        let mut expected = a.layers.clone();
-        expected[base + 8] = &expected[base + 8] - int(1) / int(2);
-        assert_eq!(c.layers, expected);
+        let objectives = vec![int(0); s.active.layers.len()];
+        for text in ["", "lines_order=length", "lines_order=area+length*2,current", "lines_order=none"] {
+            let options = SolverOptions::without_time_limit().with_overrides(text).unwrap();
+            let rank = Rank::new(&s, &options);
+            let ranking = super::super::quality::Ranking::of(&options);
+            let lead = 4 + 2 * usize::from(rank.annotations) + rank.rules.len();
+            assert_eq!(rank.active().layers.len(), lead + ranking.layers.len(), "{text}");
+            let e = rank.entry(&p, &s, &options, &placed, &routing, objectives.clone(), &[]);
+            let l = super::super::quality::lab_order(&p, &s, &placed, &routing, &ranking, None);
+            assert_eq!(e.layers[lead..], *l.quality(), "{text}");
+        }
     }
 
     #[test]

@@ -260,7 +260,16 @@ fn each_level_says_its_layout_and_the_settings_it_does_not_use() {
     assert_eq!(top.unused, ["beam", "candidates", "safety_seconds"]);
     assert_eq!(
         amp.unused,
-        ["beam", "candidates", "lines_weights", "safety_seconds", "spacing_x", "spacing_y", "virtual_weight"]
+        [
+            "beam",
+            "candidates",
+            "lines_order",
+            "lines_weights",
+            "safety_seconds",
+            "spacing_x",
+            "spacing_y",
+            "virtual_weight"
+        ]
     );
     // the settings a layout does not use are still in effect, as the solver reads them
     assert!(top.settings.contains_key("beam"));
@@ -268,7 +277,7 @@ fn each_level_says_its_layout_and_the_settings_it_does_not_use() {
     assert_eq!(level(&rows, "main.sp").layout, "rows");
     assert_eq!(
         level(&rows, "main.sp").unused,
-        ["lines_weights", "safety_seconds", "spacing_x", "spacing_y", "virtual_weight"]
+        ["lines_order", "lines_weights", "safety_seconds", "spacing_x", "spacing_y", "virtual_weight"]
     );
     let work = check(MAIN, &[ToolSettings::Config("limit=\"work\",work=100".into())]);
     assert!(!level(&work, "main.sp").unused.contains(&"safety_seconds".to_string()));

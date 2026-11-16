@@ -2,57 +2,26 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use rnl_runtime::problem::{LevelProblem, ObjectKind};
+
 use crate::coords::Placed;
 use crate::rational::{int, Q};
 use crate::structure::{Role, Structure};
 
-/// The virtual symbols of a level (`virtual_weight`): the supply, ground and port symbols, the
-/// usages drawn with a symbol of one pin that hangs on a net or a pin, whatever wire, stub, ROUTE
-/// or group joins them. An instance of the netlist is never one, a source neither.
-pub(crate) fn virtual_symbols(s: &Structure) -> BTreeSet<usize> {
-    s.components().filter(|&k| matches!(s.objects[k].role, Role::Supply | Role::Ground | Role::Port)).collect()
+/// The virtual symbols of a level (`virtual_weight`): the components that are not of the
+/// netlist, the objects of usages (12.1), such as a supply, ground or port symbol or a usage
+/// with a symbol and a position of its own, whatever wire, stub, ROUTE or group joins them. An
+/// instance of the netlist or a bundle is never one, a source neither.
+pub(crate) fn virtual_symbols(problem: &LevelProblem, s: &Structure) -> BTreeSet<usize> {
+    s.components().filter(|&k| problem.objects.get(k).is_some_and(|o| o.kind == ObjectKind::Usage)).collect()
 }
 
-/// Lines (heights, or rows and columns) beyond one, weighed: a line some firm item takes counts 1,
-/// one only virtual symbols take counts `w`, less the weight of the first, the heaviest. Each line
-/// by whether a firm item takes it. With `w` 1 it is the count of the lines less one.
-pub(crate) fn weighed_beyond_one(lines: &BTreeMap<Q, bool>, w: &Q) -> Q {
-    if lines.is_empty() {
-        return int(0);
-    }
-    let weight = |firm: bool| if firm { int(1) } else { w.clone() };
-    let total: Q = lines.values().map(|&f| weight(f)).sum();
-    total - weight(lines.values().any(|&f| f))
-}
-
-/// The lines taken, weighed: those a firm item takes count 1, those only virtual symbols take count
-/// `w`.
+/// The lines taken, weighed: those a symbol other than a virtual one takes count 1, those only
+/// virtual symbols take count `w`.
 pub(crate) fn weighed_lines(lines: &BTreeMap<Q, bool>, w: &Q) -> Q {
     lines.values().map(|&f| if f { int(1) } else { w.clone() }).sum()
 }
 
-/// [`levels`] with the heights only virtual symbols take weighed by `w` ([`weighed_beyond_one`]).
-pub(crate) fn levels_weighed(
-    s: &Structure,
-    placed: &Placed,
-    within: Option<&BTreeSet<usize>>,
-    virtuals: &BTreeSet<usize>,
-    w: &Q,
-) -> Q {
-    let g = &placed.geometry;
-    [Role::Ground, Role::Supply]
-        .into_iter()
-        .map(|role| {
-            let mut ys: BTreeMap<Q, bool> = BTreeMap::new();
-            for k in s.components().filter(|&k| within.is_none_or(|w| w.contains(&k)) && s.objects[k].role == role) {
-                if let Some(p) = s.pin_at(&placed.origins, &g.orient, k, 0) {
-                    *ys.entry(p[1].clone()).or_insert(false) |= !virtuals.contains(&k);
-                }
-            }
-            weighed_beyond_one(&ys, w)
-        })
-        .sum()
-}
 pub(crate) fn levels(s: &Structure, placed: &Placed, within: Option<&BTreeSet<usize>>) -> usize {
     let g = &placed.geometry;
     [Role::Ground, Role::Supply]
@@ -78,9 +47,10 @@ mod tests {
     };
 
     /// Three supply symbols on a net and an element: one a ROUTE joins to the element, one a group
-    /// holds with it, one hung from its pin. All three are virtual, the element is not.
+    /// holds with it, one hung from its pin. All three are virtual, the element is not; a usage
+    /// that is an element of the layout, with a symbol and a position of its own, is virtual too.
     #[test]
-    fn every_supply_ground_and_port_symbol_is_virtual_whatever_joins_it() {
+    fn every_usage_is_virtual_whatever_joins_it_and_an_instance_is_not() {
         let mut p = problem_of((0..4).map(|_| instance()).collect(), vec![]);
         p.version = "0.4".into();
         let mut supply = p.symbols[0].clone();
@@ -106,8 +76,7 @@ mod tests {
                 source: None,
             })
             .collect();
-        for k in 1..4 {
-            let o = &mut p.objects[k];
+        for (k, o) in p.objects.iter_mut().enumerate().take(4).skip(1) {
             (o.kind, o.symbol, o.usage) = (ObjectKind::Usage, Some(1), Some(k - 1));
         }
         let pin = |object| PointRef::SymbolPin { object, pin: 0, reference: Reference::Anonymous };
@@ -137,23 +106,26 @@ mod tests {
             s.objects.iter().map(|o| o.role).collect::<Vec<_>>()
         );
         s.objects[1].hung_from = Some((0, 0));
-        assert_eq!(virtual_symbols(&s), BTreeSet::from([1, 2, 3]));
+        assert_eq!(virtual_symbols(&p, &s), BTreeSet::from([1, 2, 3]));
+        // the instance made a usage of its own: an element of the layout, and virtual
+        p.objects[0].kind = ObjectKind::Usage;
+        let resolved = crate::resolve::resolve(&p, &o, &crate::StoppedClock);
+        let s = crate::structure::analyse(&p, &resolved, &o, crate::options::CAPS, &mut Work::default());
+        assert_eq!(s.objects[0].role, Role::Element);
+        assert_eq!(virtual_symbols(&p, &s), BTreeSet::from([0, 1, 2, 3]));
+        p.objects[0].kind = ObjectKind::Bundle;
+        assert_eq!(virtual_symbols(&p, &s), BTreeSet::from([1, 2, 3]));
     }
 
     #[test]
-    fn heights_and_lines_only_virtual_symbols_take_count_by_the_weight() {
+    fn rows_and_columns_only_virtual_symbols_take_count_by_the_weight() {
         let half = int(1) / int(2);
         let lines = |v: &[(i64, bool)]| v.iter().map(|&(y, f)| (int(y), f)).collect::<BTreeMap<Q, bool>>();
-        // two heights firm symbols take and one only a virtual one takes
+        // two lines a symbol other than a virtual one takes and one only a virtual one takes
         let m = lines(&[(0, true), (5, true), (9, false)]);
-        assert_eq!(weighed_beyond_one(&m, &int(1)), int(2));
-        assert_eq!(weighed_beyond_one(&m, &half), int(1) + &half);
         assert_eq!(weighed_lines(&m, &int(1)), int(3));
         assert_eq!(weighed_lines(&m, &half), int(2) + &half);
-        // virtual ones only: the first is the one
-        let m = lines(&[(0, false), (5, false)]);
-        assert_eq!(weighed_beyond_one(&m, &half), half);
-        assert_eq!(weighed_beyond_one(&m, &int(0)), int(0));
-        assert_eq!(weighed_beyond_one(&BTreeMap::new(), &half), int(0));
+        assert_eq!(weighed_lines(&m, &int(0)), int(2));
+        assert_eq!(weighed_lines(&BTreeMap::new(), &half), int(0));
     }
 }

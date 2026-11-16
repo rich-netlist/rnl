@@ -74,21 +74,17 @@ impl LinesWeights {
     }
 }
 
-/// How much a virtual symbol counts where the line layout ranks the alignment of its drawings
-/// (`virtual_weight`): a supply, ground or port symbol, whatever joins it; an instance of the
-/// netlist, a source too, is never one. The heights of the grounds and the supplies and the rows
-/// and columns of the symbols count a height or a line that only such symbols take by this weight,
-/// and one an element takes by 1. From 0 to 1; 1 by default, which ranks as the counts do. Below 1,
-/// two drawings differ on either count only by a whole unit, so that one virtual symbol out of line
-/// does not decide alone. The line
-/// layout's search and its choice between its drawing and the group-tree layout's use it; the
-/// group-tree layout's own search does not.
+/// How much a virtual symbol counts in the rows and columns of the symbols by which the line
+/// layout ranks its drawings (`virtual_weight`, the item `symbol_lines` of `lines_order`): the
+/// object of a usage, such as a supply, ground or port symbol, whatever joins it; an instance of
+/// the netlist or a bundle, a source too, is never one. A row or column that only such symbols
+/// take counts this weight, one an instance takes counts 1. From 0 to 1; 0.5 by default.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct VirtualWeight(pub f64);
 
 impl Default for VirtualWeight {
     fn default() -> Self {
-        VirtualWeight(1.0)
+        VirtualWeight(0.5)
     }
 }
 
@@ -97,11 +93,6 @@ impl VirtualWeight {
     pub fn problem(self) -> Option<String> {
         (!(self.0.is_finite() && (0.0..=1.0).contains(&self.0)))
             .then(|| "virtual_weight must be a number from 0 to 1".to_string())
-    }
-
-    /// Whether it is 1, which ranks as the counts do.
-    pub fn is_one(self) -> bool {
-        self.0 == 1.0
     }
 
     /// As the decimal it writes, exactly.
@@ -126,9 +117,10 @@ pub struct Settings {
     pub join_trees: bool,
     /// The weights of a crossing and of a bend in the lines layout (`lines_weights`).
     pub lines_weights: LinesWeights,
-    /// How much a virtual symbol counts in the line layout's alignment ranks
-    /// (`virtual_weight`).
+    /// How much a virtual symbol counts in the rows and columns of the symbols (`virtual_weight`).
     pub virtual_weight: VirtualWeight,
+    /// The layers by which the line layout ranks its drawings after its rules (`lines_order`).
+    pub lines_order: crate::LinesOrder,
     /// Only values explicitly supplied by the caller. Defaults must not mask file values.
     pub overrides: Vec<SolverSetting>,
 }
@@ -163,6 +155,7 @@ fn known(key: &str) -> bool {
                 | "objectives"
                 | "lines_weights"
                 | "virtual_weight"
+                | "lines_order"
         )
 }
 
@@ -229,6 +222,7 @@ fn apply(o: &mut SolverOptions, s: &SolverSetting) -> Result<(), String> {
             o.settings.lines_weights = LinesWeights { crossing, bend };
         }
         "virtual_weight" => o.settings.virtual_weight = VirtualWeight(number(s)?),
+        "lines_order" => o.settings.lines_order = crate::LinesOrder::parse(string(s)?)?,
         "tolerance" => o.tolerance = number(s)?,
         "grid" => o.grid = if s.value == Lit::Bool(false) { None } else { Some(number(s)?) },
         "beam" => o.beam = count(s, 1024)? as usize,
@@ -481,6 +475,7 @@ pub(crate) fn unused_by_layout(o: &SolverOptions) -> Vec<SettingProblem> {
         ("tree_work", o.tree_work != d.tree_work),
         ("lines_weights", o.settings.lines_weights != d.settings.lines_weights),
         ("virtual_weight", o.settings.virtual_weight != d.settings.virtual_weight),
+        ("lines_order", o.settings.lines_order != d.settings.lines_order),
     ];
     let table = crate::table::settings_table();
     let mut out = Vec::new();
@@ -524,7 +519,7 @@ impl SolverOptions {
     /// Defaults in the syntax accepted by --solver-config.
     pub fn defaults_config() -> String {
         let d = Self::default();
-        format!("layout=\"lines\", spacing_x=0, spacing_y=0, lines_weights=[1, 4], virtual_weight=1, join_trees=false, limit=\"time\", seconds=10, safety_seconds=30, tolerance={}, grid=1, beam={}, candidates={}, astar_expansions={}", rnl_runtime::geom::fmt_num(d.tolerance), d.beam, d.budget.candidates, d.budget.astar_expansions)
+        format!("layout=\"lines\", spacing_x=0, spacing_y=0, lines_weights=[1, 4], lines_order=\"{}\", virtual_weight=0.5, join_trees=false, limit=\"time\", seconds=10, safety_seconds=30, tolerance={}, grid=1, beam={}, candidates={}, astar_expansions={}", d.settings.lines_order.canonical(), rnl_runtime::geom::fmt_num(d.tolerance), d.beam, d.budget.candidates, d.budget.astar_expansions)
     }
     /// Parse tool settings using RNL literal syntax; reject invalid values before solving.
     pub fn with_config(&self, text: &str) -> Result<Self, String> {
@@ -802,16 +797,20 @@ mod tests {
         };
         let mut p = problem_of(Vec::new(), Vec::new());
         p.version = "0.4".into();
-        assert!(SolverOptions::default().settings.virtual_weight.is_one());
-        p.solver_config = settings("virtual_weight=0.5");
+        assert_eq!(SolverOptions::default().settings.virtual_weight, VirtualWeight(0.5));
+        assert_eq!(
+            SolverOptions::default().settings.virtual_weight.q(),
+            crate::rational::int(1) / crate::rational::int(2)
+        );
+        p.solver_config = settings("virtual_weight=0.75");
         let (o, warnings, errors) = SolverOptions::default().for_problem(&p);
-        assert_eq!(o.settings.virtual_weight, VirtualWeight(0.5));
-        assert_eq!(o.settings.virtual_weight.q(), crate::rational::int(1) / crate::rational::int(2));
+        assert_eq!(o.settings.virtual_weight, VirtualWeight(0.75));
+        assert_eq!(o.settings.virtual_weight.q(), crate::rational::int(3) / crate::rational::int(4));
         assert!(warnings.is_empty() && errors.is_empty(), "{warnings:?} {errors:?}");
         for bad in ["-0.1", "1.5", "\"0.5\"", "[0.5]", "true"] {
-            p.solver_config = [settings("virtual_weight=0.5"), settings(&format!("virtual_weight={bad}"))].concat();
+            p.solver_config = [settings("virtual_weight=0.75"), settings(&format!("virtual_weight={bad}"))].concat();
             let (o, _, errors) = SolverOptions::default().for_problem(&p);
-            assert_eq!(o.settings.virtual_weight, VirtualWeight(0.5), "{bad}");
+            assert_eq!(o.settings.virtual_weight, VirtualWeight(0.75), "{bad}");
             assert_eq!(errors.len(), 1, "{bad}: {errors:?}");
             assert!(SolverOptions::default().with_config(&format!("virtual_weight={bad}")).is_err(), "{bad}");
         }
@@ -819,8 +818,38 @@ mod tests {
             assert!(SolverOptions::default().with_config(&format!("virtual_weight={good}")).is_ok(), "{good}");
         }
         let tool = SolverOptions::default().with_config("virtual_weight=0.25").unwrap();
-        p.solver_config = settings("virtual_weight=0.5");
+        p.solver_config = settings("virtual_weight=0.75");
         assert_eq!(tool.for_problem(&p).0.settings.virtual_weight, VirtualWeight(0.25));
+    }
+
+    /// `lines_order` from a file and from the tool: the layers it gives, an item left out, a
+    /// refused value keeping the one before, the tool's over the file's.
+    #[test]
+    fn lines_order_is_layers_of_items_a_file_may_give() {
+        let settings = |text: &str| {
+            rnl_runtime::solver_settings::parse_overrides(text).unwrap_or_else(|e| panic!("{text}: {}", e.message))
+        };
+        let mut p = problem_of(Vec::new(), Vec::new());
+        p.version = "0.4".into();
+        let d = SolverOptions::default();
+        assert_eq!(d.settings.lines_order.canonical(), crate::DEFAULT_LINES_ORDER.replace(' ', ""));
+        assert!(crate::LINES_ITEMS.iter().all(|name| d.settings.lines_order.takes(name) == (*name != "rail_heights")));
+        p.solver_config = settings("lines_order=\"length,crossings_and_bends+current*3\"");
+        let (o, warnings, errors) = d.for_problem(&p);
+        assert!(warnings.is_empty() && errors.is_empty(), "{warnings:?} {errors:?}");
+        assert_eq!(o.settings.lines_order.canonical(), "length,crossings_and_bends+current*3");
+        assert!(!o.settings.lines_order.takes("area"));
+        for bad in ["\"length,length\"", "\"lengths\"", "\"length~0.5\"", "\"length*0\"", "\"length,\"", "3"] {
+            p.solver_config = [settings("lines_order=\"area\""), settings(&format!("lines_order={bad}"))].concat();
+            let (o, _, errors) = d.for_problem(&p);
+            assert_eq!(o.settings.lines_order.canonical(), "area", "{bad}");
+            assert_eq!(errors.len(), 1, "{bad}: {errors:?}");
+            assert!(d.with_config(&format!("lines_order={bad}")).is_err(), "{bad}");
+        }
+        assert!(d.with_overrides("lines_order=none").unwrap().settings.lines_order.layers.is_empty());
+        let tool = d.with_config("lines_order=\"current\"").unwrap();
+        p.solver_config = settings("lines_order=\"area\"");
+        assert_eq!(tool.for_problem(&p).0.settings.lines_order.canonical(), "current");
     }
 
     #[test]
@@ -933,7 +962,8 @@ mod tests {
             ("candidates", "10"),
             ("tree_work", "1000"),
             ("lines_weights", "[2, 3]"),
-            ("virtual_weight", "0.5"),
+            ("virtual_weight", "0.25"),
+            ("lines_order", "\"area\""),
         ];
         let table = crate::table::settings_table();
         for row in table.settings.iter().filter(|r| applies_to(r.applies).is_some()) {

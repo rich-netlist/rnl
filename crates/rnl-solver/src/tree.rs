@@ -2402,7 +2402,7 @@ impl<'a> Tree<'a> {
     }
 
     pub(crate) fn with_line_rank(mut self) -> Self {
-        self.line_rank = Some(crate::lines::Rank::new(self.s));
+        self.line_rank = Some(crate::lines::Rank::new(self.s, self.options));
         self
     }
 
