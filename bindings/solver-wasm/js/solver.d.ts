@@ -99,14 +99,17 @@ export interface Checked {
 export interface SettingRow {
   key: string;
   group: string;
-  /** "integer", "number", "number-or-false", "boolean", "string", "choice" or "objectives"; a kind not known is text. */
+  /** "integer", "number", "number-or-false", "boolean", "string", "choice", "objectives" or "integers"; a kind not known is text. */
   type: string;
   choices?: { value: string; what: string }[];
   min?: number;
   min_exclusive?: number;
   max?: number;
   /** Its value when nothing gives it, for a 0.4 level; left out when it has none. */
-  default?: number | string | boolean;
+  default?: number | string | boolean | number[];
+  /** For "integers": how many whole numbers the array holds, and what each is, in English. `min` and `max` bound each. */
+  length?: number;
+  labels?: string[];
   /** Whether a file may give it in SOLVER-CONFIG. */
   in_file: boolean;
   what: string;

@@ -50,6 +50,13 @@ pub fn settings_table_json() -> Value {
                     row.insert(name.into(), when(w));
                 }
             }
+            // an array of whole numbers: how many, and what each is
+            if let Some(length) = s.length {
+                row.insert("length".into(), json!(length));
+            }
+            if !s.labels.is_empty() {
+                row.insert("labels".into(), json!(s.labels));
+            }
             Value::Object(row)
         })
         .collect();
@@ -225,6 +232,13 @@ mod tests {
         );
         assert_eq!(setting("join_trees")["in_file"], true);
         assert_eq!(setting("objectives")["default"], rnl_solver::DEFAULT_LAYERS.join(","));
+        // an array of whole numbers says how many, and what each is
+        let weights = setting("lines_weights");
+        assert_eq!((weights["type"].clone(), weights["default"].clone()), (json!("integers"), json!([1, 4])));
+        assert_eq!((weights["length"].clone(), weights["labels"].clone()), (json!(2), json!(["crossing", "bend"])));
+        assert_eq!((weights["min"].clone(), weights["max"].clone()), (json!(0), json!(1000)));
+        assert_eq!(weights["applies"], json!({"layout": ["lines"]}));
+        assert!(setting("beam").get("length").is_none() && setting("beam").get("labels").is_none());
         assert_eq!(t["objectives"].as_array().unwrap().len(), rnl_solver::OBJECTIVES.len());
         assert_eq!(
             t["default_objectives"][0],
