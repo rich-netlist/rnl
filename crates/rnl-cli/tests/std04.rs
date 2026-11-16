@@ -981,3 +981,41 @@ RE e 0 1k
     let v = by_severity(&wrong, Severity::Violation);
     assert_eq!(v.iter().filter(|v| v.contains("is a FET")).count(), 1, "{v:?}");
 }
+
+/// Whether the text of `key` on `object` shows, as the model of the file `net` has it.
+fn shown(net: &str, object: &str, key: &str) -> bool {
+    let files = MemoryProvider::new().with("/w/t.sp", net);
+    let parts = rnl_view::Parts { drawing: false, host: false, model: true };
+    let s = rnl_view::snapshot("/w/t.sp", &files, &rnl_view::BuildOptions::default(), parts).unwrap();
+    let s = serde_json::to_value(s).unwrap();
+    let texts = s["levels"][0]["model"]["texts"].as_array().unwrap().clone();
+    let text = texts.iter().find(|t| t["attach"] == object && t["key"] == key);
+    let text = text.unwrap_or_else(|| panic!("no {key} on {object}: {texts:?}"));
+    text.get("visible") != Some(&serde_json::json!(false))
+}
+
+#[test]
+fn no_labels_hides_the_net_names_glyphs_draw_too() {
+    let net = |no_labels: bool, own: &str| {
+        let package = if no_labels { "; @USE-PACKAGE(name=\"rnl-std-no-labels\", version=\"0.4\")" } else { "" };
+        format!(
+            "* t
+* @RNL(type=\"header\") {{ @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\"){package} }}
+             R1 a vdd 1k
+* @RNL {{ #R1 @PLACE(0, 0) => @ORIENT(\"R90\"); $SUPPLY @ATTACH &vdd => @PLACE(0, 4) => %s;              $IO_PORT @ATTACH &a => @PLACE(-4, -2) => %p{own} }}
+.end
+"
+        )
+    };
+    // without the package, every label shows
+    let plain = net(false, "");
+    assert!(shown(&plain, "#R1", "name") && shown(&plain, "%s", "netname") && shown(&plain, "%p", "netname"));
+    // with it, the device's name and the glyphs' net names are hidden alike
+    let hidden = net(true, "");
+    assert!(!shown(&hidden, "#R1", "name"));
+    assert!(!shown(&hidden, "%s", "netname"), "supply");
+    assert!(!shown(&hidden, "%p", "netname"), "port tag");
+    // a file's own net name shows when it says so
+    let own = net(true, "; %p @TEXT(\"A\", key=\"netname\", textvisible=true)");
+    assert!(shown(&own, "%p", "netname") && !shown(&own, "%s", "netname"));
+}

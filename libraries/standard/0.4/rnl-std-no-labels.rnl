@@ -7,13 +7,14 @@
 }
 
 /* ---------------------------------------------------------------- rules hiding default labels
-   Every default device or block label (name, value, model) on a drawn instance or usage gets the
-   style textvisible=false (9.3): it is not drawn and takes no room, but its content stays. A label
-   is the same text whoever writes it, and a later TEXT with the same key overrides it parameter by
+   Every default device or block label (name, value, model) on a drawn instance or usage, and the
+   net name that a ground, supply, bias, port tag or net label draws (netname), gets the style
+   textvisible=false (9.3): it is not drawn and takes no room, but its content stays. A label is the
+   same text whoever writes it, and a later TEXT with the same key overrides it parameter by
    parameter (13.3), so the style stays: to show a label again, write textvisible=true on it, such
-   as #M1 @TEXT("M1", key="name", textvisible=true). Net names on grounds, supplies, biases, port
-   tags and net labels use key="netname" and stay visible, as do block formulas (key="formula") and
-   amplifier labels (key="label"). Only drawn objects are selected (drawn=true, 10.1, 16.3). */
+   as #M1 @TEXT("M1", key="name", textvisible=true) or %vdd @TEXT("VDD", key="netname",
+   textvisible=true). Block formulas (key="formula") and amplifier labels (key="label") stay
+   visible: they are part of the drawing. Only drawn objects are selected (drawn=true, 10.1, 16.3). */
 @RNL {
   %hidden = @DEFINE-STYLE(textvisible=false) {};
   # @SELECT-INSTANCE(drawn=true, recursive=true) => @SELECT-LABEL(key="name") => @SET-STYLE %hidden;
@@ -22,4 +23,6 @@
   # @SELECT-USAGE(drawn=true, recursive=true) => @SELECT-LABEL(key="name") => @SET-STYLE %hidden;
   # @SELECT-USAGE(drawn=true, recursive=true) => @SELECT-LABEL(key="value") => @SET-STYLE %hidden;
   # @SELECT-USAGE(drawn=true, recursive=true) => @SELECT-LABEL(key="model") => @SET-STYLE %hidden;
+  # @SELECT-INSTANCE(drawn=true, recursive=true) => @SELECT-LABEL(key="netname") => @SET-STYLE %hidden;
+  # @SELECT-USAGE(drawn=true, recursive=true) => @SELECT-LABEL(key="netname") => @SET-STYLE %hidden;
 }
