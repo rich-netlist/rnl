@@ -21,11 +21,11 @@ E1 out 0 inp inn 1e5
 *   %ground_stub_E1_n @PLACE(0, 0);
 *   %ground_stub_E1_n::g @PLACE(4, -5) => @ORIENT("R0");
 *   %net_label_stub_E1_cp @PLACE(0, 0);
-*   %net_label_stub_E1_cp::l @PLACE(0, -1) => @ORIENT("R180");
+*   %net_label_stub_E1_cp::l @PLACE(0, -1) => @ORIENT("R0");
 *   %net_label_stub_E1_cn @PLACE(0, 0);
-*   %net_label_stub_E1_cn::l @PLACE(0, -3) => @ORIENT("R180");
+*   %net_label_stub_E1_cn::l @PLACE(0, -3) => @ORIENT("R0");
 *   %net_label_stub_E1_p @PLACE(0, 0);
-*   %net_label_stub_E1_p::l @PLACE(4, 0) => @ORIENT("R90")
+*   %net_label_stub_E1_p::l @PLACE(4, 0) => @ORIENT("R270")
 * }
 .ends
 Vin in 0 AC 1

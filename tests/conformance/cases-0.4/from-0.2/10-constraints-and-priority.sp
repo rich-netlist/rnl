@@ -37,7 +37,7 @@ R4 d 0 1k
 * }
 * 
 
-* @RNL(type="generated", priority="high") { #R1 @PLACE(0, 0) => @ORIENT("R90"); #R2 @PLACE(8, 0) => @ORIENT("R90"); #R3 @PLACE(16, 0) => @ORIENT("R90"); #R4 @PLACE(24, 2); %ground = $GROUND @ATTACH #R4:2::net => @PLACE(24, -7); #R4:2::net @WIRE(mode="auto") {#R4:2 %ground:p}; %net_label_stub_R1_p = $NET_LABEL_STUB @ATTACH #R1::p; %net_label_stub_R1_p @PLACE(0,0); %net_label_stub_R1_p::l @PLACE(-2,0) => @ORIENT("R180") }
+* @RNL(type="generated", priority="high") { #R1 @PLACE(0, 0) => @ORIENT("R90"); #R2 @PLACE(8, 0) => @ORIENT("R90"); #R3 @PLACE(16, 0) => @ORIENT("R90"); #R4 @PLACE(24, 2); %ground = $GROUND @ATTACH #R4:2::net => @PLACE(24, -7); #R4:2::net @WIRE(mode="auto") {#R4:2 %ground:p}; %net_label_stub_R1_p = $NET_LABEL_STUB @ATTACH #R1::p; %net_label_stub_R1_p @PLACE(0,0); %net_label_stub_R1_p::l @PLACE(-2,0) => @ORIENT("R0") }
 * @RNL(author="rnl-editor 0.1") {
 *   #R4 @PLACE(y=-2, priority="high");
 *   %p2 = #R3 #R4 @AS(priority="high") $PAIR_Y;

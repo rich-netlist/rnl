@@ -721,7 +721,7 @@
           {
             "pin_of": "#R1",
             "parent": "%net_label_stub_R1_p",
-            "id": "@rnl-std-basic.rnl:674:9",
+            "id": "@rnl-std-basic.rnl:675:9",
             "kind": "usage",
             "host": [],
             "definition": "$NET_LABEL",
@@ -740,13 +740,13 @@
               "source": null
             },
             "orient": {
-              "value": "R180",
+              "value": "R0",
               "source": null
             },
             "pins": [
               {
                 "kind": "pin",
-                "id": "pin(@rnl-std-basic.rnl:674:9,0)",
+                "id": "pin(@rnl-std-basic.rnl:675:9,0)",
                 "index": 0,
                 "names": [
                   "pin"
@@ -1223,8 +1223,8 @@
             "style": {}
           },
           {
-            "id": "@rnl-std-basic.rnl:674:9::netname",
-            "attach": "@rnl-std-basic.rnl:674:9",
+            "id": "@rnl-std-basic.rnl:675:9::netname",
+            "attach": "@rnl-std-basic.rnl:675:9",
             "attach_point": null,
             "key": "netname",
             "markup": {
@@ -1250,9 +1250,10 @@
               -3.3,
               0.0
             ],
-            "halign": "start",
+            "halign": "end",
             "valign": "middle",
             "rotate": 0.0,
+            "fix_rotate": true,
             "size": 1.0,
             "style": {}
           }

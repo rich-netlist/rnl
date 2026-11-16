@@ -42,7 +42,7 @@ XI0<0> D<0> clk Q<0> dff
 * }
 * 
 
-* @RNL(type="generated", priority="high") { %st @PLACE(0, 0); &clk @SELECT-ANCESTOR-USAGE $IO_PORT => @PLACE(-3, -1); %net_label_stub_st_clk = $NET_LABEL_STUB @ATTACH %st:clk; %net_label_stub_st_clk @PLACE(0, 0); %net_label_stub_st_clk::l @PLACE(-3, -1) => @ORIENT("R180") }
+* @RNL(type="generated", priority="high") { %st @PLACE(0, 0); &clk @SELECT-ANCESTOR-USAGE $IO_PORT => @PLACE(-3, -1); %net_label_stub_st_clk = $NET_LABEL_STUB @ATTACH %st:clk; %net_label_stub_st_clk @PLACE(0, 0); %net_label_stub_st_clk::l @PLACE(-3, -1) => @ORIENT("R0") }
 .ends
 XR D<3> D<2> D<1> D<0> clk Q<3> Q<2> Q<1> Q<0> reg4
 RL<3> Q<3> 0 10k

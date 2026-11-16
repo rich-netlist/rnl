@@ -332,9 +332,9 @@
         {
           "name": "$NET_LABEL_SYMBOL",
           "box": [
+            -1.0,
             0.0,
             0.0,
-            1.0,
             0.0
           ],
           "box_written": false,
@@ -349,7 +349,7 @@
                 "p"
               ],
               "label": null,
-              "dir": 180
+              "dir": 0
             }
           ],
           "prims": [
@@ -361,7 +361,7 @@
                   0.0
                 ],
                 [
-                  1.0,
+                  -1.0,
                   0.0
                 ]
               ],
@@ -534,7 +534,7 @@
             0.0,
             2.0
           ],
-          "orient": "R90",
+          "orient": "R270",
           "style": {
             "bold": true,
             "cap": "butt",
@@ -556,7 +556,7 @@
             0.0,
             -4.0
           ],
-          "orient": "R90",
+          "orient": "R270",
           "style": {
             "bold": true,
             "cap": "butt",
@@ -578,7 +578,7 @@
             0.0,
             -2.0
           ],
-          "orient": "R270",
+          "orient": "R90",
           "style": {
             "bold": true,
             "cap": "butt",
@@ -600,7 +600,7 @@
             6.0,
             2.0
           ],
-          "orient": "R90",
+          "orient": "R270",
           "style": {
             "bold": true,
             "cap": "butt",
@@ -622,7 +622,7 @@
             6.0,
             -2.0
           ],
-          "orient": "R270",
+          "orient": "R90",
           "style": {
             "bold": true,
             "cap": "butt",
@@ -644,7 +644,7 @@
             12.0,
             -1.0
           ],
-          "orient": "R90",
+          "orient": "R270",
           "style": {
             "bold": true,
             "cap": "butt",
@@ -1066,10 +1066,10 @@
               }
             ]
           ],
-          "halign": "start",
+          "halign": "end",
           "valign": "middle",
           "rotate": 0.0,
-          "orient": "R90",
+          "orient": "R270",
           "style": {
             "bold": true,
             "cap": "butt",
@@ -1099,10 +1099,10 @@
               }
             ]
           ],
-          "halign": "start",
+          "halign": "end",
           "valign": "middle",
           "rotate": 0.0,
-          "orient": "R90",
+          "orient": "R270",
           "style": {
             "bold": true,
             "cap": "butt",
@@ -1132,10 +1132,10 @@
               }
             ]
           ],
-          "halign": "start",
+          "halign": "end",
           "valign": "middle",
           "rotate": 0.0,
-          "orient": "R270",
+          "orient": "R90",
           "style": {
             "bold": true,
             "cap": "butt",
@@ -1165,10 +1165,10 @@
               }
             ]
           ],
-          "halign": "start",
+          "halign": "end",
           "valign": "middle",
           "rotate": 0.0,
-          "orient": "R90",
+          "orient": "R270",
           "style": {
             "bold": true,
             "cap": "butt",
@@ -1198,10 +1198,10 @@
               }
             ]
           ],
-          "halign": "start",
+          "halign": "end",
           "valign": "middle",
           "rotate": 0.0,
-          "orient": "R270",
+          "orient": "R90",
           "style": {
             "bold": true,
             "cap": "butt",
@@ -1231,10 +1231,10 @@
               }
             ]
           ],
-          "halign": "start",
+          "halign": "end",
           "valign": "middle",
           "rotate": 0.0,
-          "orient": "R90",
+          "orient": "R270",
           "style": {
             "bold": true,
             "cap": "butt",
@@ -1655,9 +1655,9 @@
         {
           "name": "$NET_LABEL_SYMBOL",
           "box": [
+            -1.0,
             0.0,
             0.0,
-            1.0,
             0.0
           ],
           "box_written": false,
@@ -1672,7 +1672,7 @@
                 "p"
               ],
               "label": null,
-              "dir": 180
+              "dir": 0
             }
           ],
           "prims": [
@@ -1684,7 +1684,7 @@
                   0.0
                 ],
                 [
-                  1.0,
+                  -1.0,
                   0.0
                 ]
               ],
@@ -1725,7 +1725,7 @@
             0.0,
             2.0
           ],
-          "orient": "R90",
+          "orient": "R270",
           "style": {
             "bold": true,
             "cap": "butt",
@@ -1747,7 +1747,7 @@
             0.0,
             -2.0
           ],
-          "orient": "R270",
+          "orient": "R90",
           "style": {
             "bold": true,
             "cap": "butt",
@@ -1848,10 +1848,10 @@
               }
             ]
           ],
-          "halign": "start",
+          "halign": "end",
           "valign": "middle",
           "rotate": 0.0,
-          "orient": "R90",
+          "orient": "R270",
           "style": {
             "bold": true,
             "cap": "butt",
@@ -1881,10 +1881,10 @@
               }
             ]
           ],
-          "halign": "start",
+          "halign": "end",
           "valign": "middle",
           "rotate": 0.0,
-          "orient": "R270",
+          "orient": "R90",
           "style": {
             "bold": true,
             "cap": "butt",

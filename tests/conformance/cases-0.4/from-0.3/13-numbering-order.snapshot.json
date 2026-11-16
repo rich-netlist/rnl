@@ -936,6 +936,7 @@
             "halign": "end",
             "valign": "middle",
             "rotate": 0.0,
+            "fix_rotate": true,
             "size": 1.0,
             "style": {}
           },
@@ -970,6 +971,7 @@
             "halign": "end",
             "valign": "middle",
             "rotate": 0.0,
+            "fix_rotate": true,
             "size": 1.0,
             "style": {}
           }

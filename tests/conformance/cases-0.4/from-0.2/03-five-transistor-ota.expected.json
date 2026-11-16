@@ -724,9 +724,9 @@
         {
           "name": "$NET_LABEL_SYMBOL",
           "box": [
+            -1.0,
             0.0,
             0.0,
-            1.0,
             0.0
           ],
           "box_written": false,
@@ -741,7 +741,7 @@
                 "p"
               ],
               "label": null,
-              "dir": 180
+              "dir": 0
             }
           ],
           "prims": [
@@ -753,7 +753,7 @@
                   0.0
                 ],
                 [
-                  1.0,
+                  -1.0,
                   0.0
                 ]
               ],
@@ -1284,7 +1284,7 @@
             -11.0,
             0.0
           ],
-          "orient": "MY",
+          "orient": "R0",
           "style": {
             "bold": true,
             "cap": "butt",
@@ -1306,7 +1306,7 @@
             11.0,
             0.0
           ],
-          "orient": "R0",
+          "orient": "MY",
           "style": {
             "bold": true,
             "cap": "butt",
@@ -1328,7 +1328,7 @@
             21.0,
             4.0
           ],
-          "orient": "R0",
+          "orient": "MY",
           "style": {
             "bold": true,
             "cap": "butt",
@@ -2746,10 +2746,10 @@
               }
             ]
           ],
-          "halign": "start",
+          "halign": "end",
           "valign": "middle",
           "rotate": 0.0,
-          "orient": "MY",
+          "orient": "R0",
           "style": {
             "bold": true,
             "cap": "butt",
@@ -2779,10 +2779,10 @@
               }
             ]
           ],
-          "halign": "start",
+          "halign": "end",
           "valign": "middle",
           "rotate": 0.0,
-          "orient": "R0",
+          "orient": "MY",
           "style": {
             "bold": true,
             "cap": "butt",
@@ -2812,10 +2812,10 @@
               }
             ]
           ],
-          "halign": "start",
+          "halign": "end",
           "valign": "middle",
           "rotate": 0.0,
-          "orient": "R0",
+          "orient": "MY",
           "style": {
             "bold": true,
             "cap": "butt",
