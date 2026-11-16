@@ -184,10 +184,12 @@
  * @property {{ key: string, group: string, type: string, choices?: { value: string, what: string }[], min?: number,
  *   min_exclusive?: number, max?: number, default?: number | string | boolean, in_file: boolean, what: string,
  *   false_what?: string, applies?: Record<string, string[]>, shown_when?: Record<string, string[]>,
- *   required_when?: Record<string, string[]> }[]} settings
+ *   required_when?: Record<string, string[]>, items?: { name: string, what: string }[], tolerance?: boolean }[]} settings
  * @property {{ name: string, what: string, implemented: boolean }[]} objectives
  * @property {{ items: { name: string, weight: number }[], tolerance: number }[]} default_objectives
  * @property {{ name: string, what: string }[]} stages
+ * @property {{ what: string, ranks: { name: string, what: string, fixed?: boolean }[] }} [lines_order] how the lines layout
+ *   ranks its drawings: with the setting `lines_order`, the list of the ranks, the ones marked `fixed` not movable
  */
 
 /**
