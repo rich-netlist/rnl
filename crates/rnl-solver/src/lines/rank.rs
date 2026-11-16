@@ -216,9 +216,12 @@ mod tests {
             (0..weighed.active().layers.len()).filter(|&i| !weighed.active().layers[i].tolerance.is_zero()).collect();
         assert_eq!(tolerant, [base + 3, base + 8]);
         assert!(weighed.active().layers[base + 3].tolerance < int(1));
-        // the fixture has no loose symbol: the weighed layers are the counts
+        // the fixture's port is a virtual symbol on a column of its own, which counts one half; the
+        // other layers are the counts
         let c = weighed.entry(&p, &s, &half, &placed, &routing, layers, &[]);
-        assert_eq!(a.layers, c.layers);
+        let mut expected = a.layers.clone();
+        expected[base + 8] = &expected[base + 8] - int(1) / int(2);
+        assert_eq!(c.layers, expected);
     }
 
     #[test]

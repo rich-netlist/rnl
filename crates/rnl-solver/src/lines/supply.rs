@@ -2,55 +2,20 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use rnl_runtime::problem::{LevelProblem, PointRef};
-
 use crate::coords::Placed;
 use crate::rational::{int, Q};
 use crate::structure::{Role, Structure};
 
-/// The loose virtual symbols of a level (`virtual_weight`): the supply, ground and port symbols
-/// that no stub hangs from an element's pin, that are not drawn at a point of an element, that no
-/// wire reaches nor a ROUTE with an element on it, and that no group holds with an element.
-pub(crate) fn loose(problem: &LevelProblem, s: &Structure) -> BTreeSet<usize> {
-    let object = |r: &PointRef| match r {
-        PointRef::Origin(k) => Some(*k),
-        _ => r.pin_key().map(|(k, _)| k),
-    };
-    let element = |k: usize| s.objects.get(k).is_some_and(|o| o.role == Role::Element);
-    let mut joined: BTreeSet<usize> = BTreeSet::new();
-    for route in &problem.routes {
-        let on: Vec<usize> = route.pins.iter().filter_map(object).collect();
-        if on.iter().any(|&k| element(k)) {
-            joined.extend(on);
-        }
-    }
-    for wire in &problem.wires {
-        joined.extend(wire.anchors.iter().filter_map(object));
-    }
-    for g in &problem.groups {
-        if g.members.iter().any(|&m| element(m)) {
-            joined.extend(g.members.iter().copied());
-        }
-    }
-    let at_element = |k: usize| match problem.objects.get(k).map(|o| &o.position) {
-        Some(rnl_runtime::problem::Position::At(r)) => object(r).is_some_and(element),
-        _ => false,
-    };
-    s.components()
-        .filter(|&k| {
-            let o = &s.objects[k];
-            matches!(o.role, Role::Supply | Role::Ground | Role::Port)
-                && o.stub.is_none()
-                && o.hung_from.is_none()
-                && !at_element(k)
-                && !joined.contains(&k)
-        })
-        .collect()
+/// The virtual symbols of a level (`virtual_weight`): the supply, ground and port symbols, the
+/// usages drawn with a symbol of one pin that hangs on a net or a pin, whatever wire, stub, ROUTE
+/// or group joins them. An instance of the netlist is never one, a source neither.
+pub(crate) fn virtual_symbols(s: &Structure) -> BTreeSet<usize> {
+    s.components().filter(|&k| matches!(s.objects[k].role, Role::Supply | Role::Ground | Role::Port)).collect()
 }
 
 /// Lines (heights, or rows and columns) beyond one, weighed: a line some firm item takes counts 1,
-/// one only loose items take counts `w`, less the weight of the first, the heaviest. Each line by
-/// whether a firm item takes it. With `w` 1 it is the count of the lines less one.
+/// one only virtual symbols take counts `w`, less the weight of the first, the heaviest. Each line
+/// by whether a firm item takes it. With `w` 1 it is the count of the lines less one.
 pub(crate) fn weighed_beyond_one(lines: &BTreeMap<Q, bool>, w: &Q) -> Q {
     if lines.is_empty() {
         return int(0);
@@ -60,18 +25,18 @@ pub(crate) fn weighed_beyond_one(lines: &BTreeMap<Q, bool>, w: &Q) -> Q {
     total - weight(lines.values().any(|&f| f))
 }
 
-/// The lines taken, weighed: those a firm item takes count 1, those only loose items take count
+/// The lines taken, weighed: those a firm item takes count 1, those only virtual symbols take count
 /// `w`.
 pub(crate) fn weighed_lines(lines: &BTreeMap<Q, bool>, w: &Q) -> Q {
     lines.values().map(|&f| if f { int(1) } else { w.clone() }).sum()
 }
 
-/// [`levels`] with the heights only loose symbols take weighed by `w` ([`weighed_beyond_one`]).
+/// [`levels`] with the heights only virtual symbols take weighed by `w` ([`weighed_beyond_one`]).
 pub(crate) fn levels_weighed(
     s: &Structure,
     placed: &Placed,
     within: Option<&BTreeSet<usize>>,
-    loose: &BTreeSet<usize>,
+    virtuals: &BTreeSet<usize>,
     w: &Q,
 ) -> Q {
     let g = &placed.geometry;
@@ -81,7 +46,7 @@ pub(crate) fn levels_weighed(
             let mut ys: BTreeMap<Q, bool> = BTreeMap::new();
             for k in s.components().filter(|&k| within.is_none_or(|w| w.contains(&k)) && s.objects[k].role == role) {
                 if let Some(p) = s.pin_at(&placed.origins, &g.orient, k, 0) {
-                    *ys.entry(p[1].clone()).or_insert(false) |= !loose.contains(&k);
+                    *ys.entry(p[1].clone()).or_insert(false) |= !virtuals.contains(&k);
                 }
             }
             weighed_beyond_one(&ys, w)
@@ -108,12 +73,14 @@ mod tests {
     use super::*;
     use crate::resolve::tests::{instance, problem_of};
     use crate::{SolverOptions, Work};
-    use rnl_runtime::problem::{Filler, ObjectKind, ProblemGroup, Reference, RoleFill, RouteIntent, UsageEntry};
+    use rnl_runtime::problem::{
+        Filler, ObjectKind, PointRef, ProblemGroup, Reference, RoleFill, RouteIntent, UsageEntry,
+    };
 
-    /// Three supply symbols on a net and an element: one a ROUTE reaches, one a group holds with
-    /// the element, one nothing joins, which alone is loose.
+    /// Three supply symbols on a net and an element: one a ROUTE joins to the element, one a group
+    /// holds with it, one hung from its pin. All three are virtual, the element is not.
     #[test]
-    fn a_loose_symbol_is_one_no_stub_wire_or_group_joins_to_an_element() {
+    fn every_supply_ground_and_port_symbol_is_virtual_whatever_joins_it() {
         let mut p = problem_of((0..4).map(|_| instance()).collect(), vec![]);
         p.version = "0.4".into();
         let mut supply = p.symbols[0].clone();
@@ -163,35 +130,27 @@ mod tests {
         }];
         let o = SolverOptions::without_time_limit();
         let resolved = crate::resolve::resolve(&p, &o, &crate::StoppedClock);
-        let s = crate::structure::analyse(&p, &resolved, &o, crate::options::CAPS, &mut Work::default());
+        let mut s = crate::structure::analyse(&p, &resolved, &o, crate::options::CAPS, &mut Work::default());
         assert!(
             (1..4).all(|k| s.objects[k].role == Role::Supply),
             "{:?}",
             s.objects.iter().map(|o| o.role).collect::<Vec<_>>()
         );
-        assert_eq!(loose(&p, &s), BTreeSet::from([1]));
-        // a group of supply symbols alone joins none of them to an element, nor a ROUTE of them alone
-        p.groups[0].members = vec![1, 3];
-        assert_eq!(loose(&p, &s), BTreeSet::from([1, 3]));
-        p.routes[0].pins = vec![pin(1), pin(2)];
-        assert_eq!(loose(&p, &s), BTreeSet::from([1, 2, 3]));
-        // one hung from an element's pin is joined
-        let mut hung = s.clone();
-        hung.objects[2].hung_from = Some((0, 0));
-        assert_eq!(loose(&p, &hung), BTreeSet::from([1, 3]));
+        s.objects[1].hung_from = Some((0, 0));
+        assert_eq!(virtual_symbols(&s), BTreeSet::from([1, 2, 3]));
     }
 
     #[test]
-    fn heights_and_lines_only_loose_symbols_take_count_by_the_weight() {
+    fn heights_and_lines_only_virtual_symbols_take_count_by_the_weight() {
         let half = int(1) / int(2);
         let lines = |v: &[(i64, bool)]| v.iter().map(|&(y, f)| (int(y), f)).collect::<BTreeMap<Q, bool>>();
-        // two heights firm symbols take and one only a loose one takes
+        // two heights firm symbols take and one only a virtual one takes
         let m = lines(&[(0, true), (5, true), (9, false)]);
         assert_eq!(weighed_beyond_one(&m, &int(1)), int(2));
         assert_eq!(weighed_beyond_one(&m, &half), int(1) + &half);
         assert_eq!(weighed_lines(&m, &int(1)), int(3));
         assert_eq!(weighed_lines(&m, &half), int(2) + &half);
-        // loose ones only: the first is the one
+        // virtual ones only: the first is the one
         let m = lines(&[(0, false), (5, false)]);
         assert_eq!(weighed_beyond_one(&m, &half), half);
         assert_eq!(weighed_beyond_one(&m, &int(0)), int(0));

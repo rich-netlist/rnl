@@ -427,7 +427,7 @@ struct Level<'a> {
     tree: &'a Placed,
     nodes: &'a GroupTree,
     weights: (u64, u64),
-    /// The weight of a loose virtual symbol (`virtual_weight`).
+    /// The weight of a virtual symbol (`virtual_weight`).
     virtual_weight: Q,
     clear: &'a BTreeMap<usize, u8>,
     hung: BTreeMap<usize, Vec<(usize, usize, Rule)>>,

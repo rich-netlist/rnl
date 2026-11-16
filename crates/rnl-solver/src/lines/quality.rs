@@ -31,12 +31,12 @@ pub(super) struct LabOrder {
     /// The configured rules of the lines layout (overlaps, crowding, misleading, wire over symbol),
     /// as the tree's rank has them; measured for a whole level only.
     pub(super) rules: Vec<Q>,
-    /// The weight of a loose virtual symbol (`virtual_weight`); 1 ranks by the counts.
+    /// The weight of a virtual symbol (`virtual_weight`); 1 ranks by the counts.
     pub(super) virtual_weight: Q,
-    /// The heights of the grounds and supplies beyond one, a height only loose symbols take
-    /// weighed by `virtual_weight`.
+    /// The heights of the grounds and supplies beyond one, each weighed by `virtual_weight`, as
+    /// these are all virtual symbols.
     pub(super) levels_weighed: Q,
-    /// The rows and columns of the symbols, one only loose virtual symbols take weighed by
+    /// The rows and columns of the symbols, one only virtual symbols take weighed by
     /// `virtual_weight`.
     pub(super) crosses_weighed: Q,
 }
@@ -467,14 +467,14 @@ pub(super) fn lab_measure(
     }
     let mut crosses = (BTreeSet::new(), BTreeSet::new());
     // below a weight of 1, each row and column by whether a firm symbol takes it
-    let loose = (*virtual_weight != int(1)).then(|| supply::loose(problem, s));
+    let virtuals = (*virtual_weight != int(1)).then(|| supply::virtual_symbols(s));
     let mut firm: (std::collections::BTreeMap<Q, bool>, std::collections::BTreeMap<Q, bool>) = Default::default();
     for k in s.components().filter(|&k| reads(k)) {
         let o = &placed.origins[k];
         crosses.0.insert(o[0].clone());
         crosses.1.insert(o[1].clone());
-        if let Some(loose) = &loose {
-            let f = !loose.contains(&k);
+        if let Some(virtuals) = &virtuals {
+            let f = !virtuals.contains(&k);
             *firm.0.entry(o[0].clone()).or_insert(false) |= f;
             *firm.1.entry(o[1].clone()).or_insert(false) |= f;
         }
@@ -488,10 +488,10 @@ pub(super) fn lab_measure(
         _ => Q::zero(),
     };
     let levels = supply::levels(s, placed, within);
-    let (levels_weighed, crosses_weighed) = match &loose {
+    let (levels_weighed, crosses_weighed) = match &virtuals {
         None => (int(levels as i64), int((crosses.0.len() + crosses.1.len()) as i64)),
-        Some(loose) => (
-            supply::levels_weighed(s, placed, within, loose, virtual_weight),
+        Some(virtuals) => (
+            supply::levels_weighed(s, placed, within, virtuals, virtual_weight),
             supply::weighed_lines(&firm.0, virtual_weight) + supply::weighed_lines(&firm.1, virtual_weight),
         ),
     };
@@ -541,7 +541,7 @@ fn through(a0: &[Q; 2], a1: &[Q; 2], b0: &[Q; 2], b1: &[Q; 2]) -> Option<[Q; 2]>
 mod tests {
     use super::*;
 
-    /// A loose symbol at a height of its own against a drawing with more dots near pins: by the
+    /// A supply symbol at a height of its own against a drawing with more dots near pins: by the
     /// counts the height decides; at a weight of one half it is half a unit, which does not, and
     /// two such heights, a whole unit, do.
     #[test]

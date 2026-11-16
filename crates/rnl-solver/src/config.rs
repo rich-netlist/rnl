@@ -74,13 +74,13 @@ impl LinesWeights {
     }
 }
 
-/// How much a loose virtual symbol counts where the line layout ranks the alignment of its
-/// drawings (`virtual_weight`): a supply, ground or port symbol that no stub hangs from an
-/// element's pin, no wire or ROUTE reaches and no group holds with an element. The heights of the
-/// grounds and the supplies and the rows and columns of the symbols count a height or a line that
-/// only such symbols take by this weight, and one an element or a joined symbol takes by 1. From 0
-/// to 1; 1 by default, which ranks as the counts do. Below 1, two drawings differ on either count
-/// only by a whole unit, so that one loose symbol out of line does not decide alone. The line
+/// How much a virtual symbol counts where the line layout ranks the alignment of its drawings
+/// (`virtual_weight`): a supply, ground or port symbol, whatever joins it; an instance of the
+/// netlist, a source too, is never one. The heights of the grounds and the supplies and the rows
+/// and columns of the symbols count a height or a line that only such symbols take by this weight,
+/// and one an element takes by 1. From 0 to 1; 1 by default, which ranks as the counts do. Below 1,
+/// two drawings differ on either count only by a whole unit, so that one virtual symbol out of line
+/// does not decide alone. The line
 /// layout's search and its choice between its drawing and the group-tree layout's use it; the
 /// group-tree layout's own search does not.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -126,7 +126,7 @@ pub struct Settings {
     pub join_trees: bool,
     /// The weights of a crossing and of a bend in the lines layout (`lines_weights`).
     pub lines_weights: LinesWeights,
-    /// How much a loose virtual symbol counts in the line layout's alignment ranks
+    /// How much a virtual symbol counts in the line layout's alignment ranks
     /// (`virtual_weight`).
     pub virtual_weight: VirtualWeight,
     /// Only values explicitly supplied by the caller. Defaults must not mask file values.

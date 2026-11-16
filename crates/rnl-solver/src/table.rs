@@ -204,7 +204,7 @@ pub const LINES_ORDER: [OrderRow; 19] = [
     OrderRow { name: "hidden_ports", what: "Fewer ports whose way out a symbol or another net's wire shuts in." },
     OrderRow {
         name: "rail_heights",
-        what: "The grounds and the supplies at fewer heights; a height only loose ones take counts by virtual_weight.",
+        what: "The grounds and the supplies at fewer heights; each height counts by virtual_weight.",
     },
     OrderRow { name: "mirror_pairs", what: "Fewer mirror pairs off the axis they share." },
     OrderRow { name: "dots_near_pins", what: "Fewer junction dots less than two from a pin." },
@@ -212,7 +212,7 @@ pub const LINES_ORDER: [OrderRow; 19] = [
     OrderRow { name: "wire_lines", what: "The wires on fewer lines." },
     OrderRow {
         name: "symbol_lines",
-        what: "The symbols on fewer rows and columns; a row or column only loose virtual symbols take counts by \
+        what: "The symbols on fewer rows and columns; a row or column only virtual symbols take counts by \
                virtual_weight.",
     },
     OrderRow { name: "area", what: "A smaller drawing." },
@@ -314,9 +314,9 @@ pub fn settings_table() -> SettingsTable {
                 "virtual_weight",
                 "layout",
                 SettingKind::Number,
-                "How much a loose supply, ground or port symbol counts where the line layout ranks alignment: \
-                 one that no stub, wire or group joins to an element. A height of the grounds and supplies, or \
-                 a row or column of the symbols, that only such symbols take counts by this weight, from 0 to 1; \
+                "How much a supply, ground or port symbol counts where the line layout ranks alignment, whatever \
+                 joins it; an instance, a source too, counts 1. A height of the grounds and supplies, or a row \
+                 or column of the symbols, that only such symbols take counts by this weight, from 0 to 1; \
                  below 1, two drawings differ on these only by a whole unit. 1 counts them as any other. The \
                  group-tree layout's own search does not use it.",
             )
