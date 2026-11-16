@@ -512,14 +512,14 @@
     %pin = (0, 0) @PIN(terminal="p", direction="right");
     (-0.7087, 0) @CIRCLE(radius=0.2479);
     @LINE {(0, 0) (-0.4608, 0)};
-    ? @TEXT("${p}", key="netname", halign="end", valign="middle") => @PLACE(-1.25, 0);
+    ? @TEXT("${p}", key="netname", halign="end", valign="middle", fix_rotate=true) => @PLACE(-1.25, 0);
   };
 
-  /* The symbol of $NET_LABEL: a one-unit lead and the name of its net, or the names of the nets of a bus pin, its pin facing left. */
+  /* The symbol of $NET_LABEL: the name of its net, or the names of the nets of a bus pin, on the left of a one-unit lead, its pin facing right, as $IO_PORT_SYMBOL. */
   $NET_LABEL_SYMBOL = @DEFINE-SYMBOL {
-    %pin = (0, 0) @PIN(terminal="p", direction="left");
-    @LINE {(0, 0) (1, 0)};
-    ? @TEXT("${p}", key="netname", halign="start", valign="middle") => @PLACE(1.3, 0);
+    %pin = (0, 0) @PIN(terminal="p", direction="right");
+    @LINE {(0, 0) (-1, 0)};
+    ? @TEXT("${p}", key="netname", halign="end", valign="middle", fix_rotate=true) => @PLACE(-1.3, 0);
   };
 
   /* A filled arrow head pointing right, shared by $ARROW and $CURRENT_ARROW. */
@@ -651,10 +651,11 @@
     %s @ORIENT("R0", priority="low");
   };
 
-  /* A bias voltage mark directly on a pin, facing away from the pin like a port stub. */
+  /* A bias voltage mark directly on a pin, facing away from the pin like a port stub; its bar slants as / above, below and on the left of the pin and as \ on its right. */
   $BIAS_STUB = @DEFINE(roles=[["t", "pin"]]) {
     %b = $BIAS @ATTACH ?t::net;
     ?t %b::pin @ORIENT-RELATION("R180");
+    %b @ORIENT(["R0", "R180", "MYR90", "R270"]);
     {?t %b::pin} @ALIGN("x");
     {?t %b::pin} @ALIGN("y");
   };
