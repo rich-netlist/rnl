@@ -103,6 +103,7 @@ The series 0.4 is written in the language 0.4, whose text is still a draft, and 
 | `rnl-std-core`, `rnl-std-full` (collections) | removed: use `rnl-std-all`, or name the packages one by one |
 | `rnl-std-structures` | `rnl-std-semantics` (`$MATCHED`, `$BRANCH`, `$CASCADE` move with it, `$FLOW` as `$SIGNAL_FLOW` and `$MIRRORED` as `$MIRRORED_LAYOUT`) |
 | — | new, optional, not in `rnl-std-all`: `rnl-std-45deg` |
+| — | new, optional, not in `rnl-std-all`: `rnl-std-no-instance-labels`, which hides the default labels of instances only, where `rnl-std-no-labels` hides those of usages too |
 
 #### Symbols
 

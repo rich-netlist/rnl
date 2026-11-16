@@ -1019,3 +1019,30 @@ fn no_labels_hides_the_net_names_glyphs_draw_too() {
     let own = net(true, "; %p @TEXT(\"A\", key=\"netname\", textvisible=true)");
     assert!(shown(&own, "%p", "netname") && !shown(&own, "%s", "netname"));
 }
+
+#[test]
+fn no_instance_labels_hides_the_labels_of_instances_only() {
+    let net = |hide: bool, own: &str| {
+        let package = if hide { "; @USE-PACKAGE(name=\"rnl-std-no-instance-labels\", version=\"0.4\")" } else { "" };
+        format!(
+            "* t
+* @RNL(type=\"header\") {{ @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\"){package} }}
+             R1 a vdd 1k
+* @RNL {{ #R1 @PLACE(0, 0) => @ORIENT(\"R90\"); $SUPPLY @ATTACH &vdd => @PLACE(0, 4) => %s;              $IO_PORT @ATTACH &a => @PLACE(-4, -2) => %p; #R1 @TEXT(\"note\", key=\"memo\"){own} }}
+.end
+"
+        )
+    };
+    // without the package, every label shows
+    let plain = net(false, "");
+    assert!(shown(&plain, "#R1", "name") && shown(&plain, "#R1", "value"));
+    // with it, the instance's name and value are hidden, the usages' net names and the file's own label stay
+    let hidden = net(true, "");
+    assert!(!shown(&hidden, "#R1", "name") && !shown(&hidden, "#R1", "value"));
+    assert!(shown(&hidden, "%s", "netname"), "supply");
+    assert!(shown(&hidden, "%p", "netname"), "port tag");
+    assert!(shown(&hidden, "#R1", "memo"), "the file's own label");
+    // a file shows one of them again when it says so
+    let own = net(true, "; #R1 @TEXT(\"R1\", key=\"name\", textvisible=true)");
+    assert!(shown(&own, "#R1", "name") && !shown(&own, "#R1", "value"));
+}

@@ -491,10 +491,8 @@ mod tests {
         // the draft series 0.4, written in a version newer than the default, is not the newest when
         // a package also has an earlier version; only names new in 0.4 appear at 0.4
         assert!(
-            listed
-                .iter()
-                .all(|(name, version)| *version != "0.4"
-                    || matches!(*name, "alias-zh" | "rnl-std-45deg" | "rnl-std-all")),
+            listed.iter().all(|(name, version)| *version != "0.4"
+                || matches!(*name, "alias-zh" | "rnl-std-45deg" | "rnl-std-all" | "rnl-std-no-instance-labels")),
             "{listed:?}"
         );
         // one version of each name, rnl-zh's 0.3; a name only the series 0.2 has keeps its version
@@ -507,6 +505,7 @@ mod tests {
                 && listed.contains(&("rnl-std-semantics", "0.2"))
                 && listed.contains(&("rnl-std-all", "0.4"))
                 && listed.contains(&("rnl-std-45deg", "0.4"))
+                && listed.contains(&("rnl-std-no-instance-labels", "0.4"))
                 && listed.contains(&("alias-zh", "0.4")),
             "{listed:?}"
         );
@@ -515,9 +514,10 @@ mod tests {
             "{listed:?}"
         );
         // the 15 packages of the series 0.3 and rnl-zh; the four that only <= 0.3 has
-        // (rnl-std-symbols, rnl-std-virtual, rnl-std-semantics and rnl-std-layout); and the three
-        // names that only the draft 0.4 has (alias-zh, rnl-std-45deg and rnl-std-all)
-        assert_eq!(listed.len(), 16 + 4 + 3);
+        // (rnl-std-symbols, rnl-std-virtual, rnl-std-semantics and rnl-std-layout); and the four
+        // names that only the draft 0.4 has (alias-zh, rnl-std-45deg, rnl-std-all and
+        // rnl-std-no-instance-labels)
+        assert_eq!(listed.len(), 16 + 4 + 4);
         // by name, then by version
         let mut sorted = listed.clone();
         sorted.sort();
