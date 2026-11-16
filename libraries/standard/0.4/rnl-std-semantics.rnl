@@ -12,6 +12,10 @@
    (ROUTE-OBJECT), "a group" when it makes one, and "Meaning only" when it draws nothing. A structure
    routes no ground, supply or bias net: rnl-std-fill draws those with symbols, by an UNROUTE of
    priority high, unless a file writes a ROUTE of priority high or a WIRE.
+   A definition that places ties the usage's own point (14.1) to what it places, so that a constraint
+   on the usage moves the structure: on the row or the column of its members, and, for two sides
+   mirrored about an axis, at the centre between them. A definition that places nothing leaves the
+   point free.
    Definitions assert what their circuit must be (15.3, 15.4) as violations that change nothing drawn:
    matching of types, models and geometry, shared nets on gates, bases, sources or emitters, connection
    to ground or supply rails, usage definitions, and series, parallel, star or loop topologies, with
@@ -103,26 +107,30 @@
 
   /* Two symmetric objects at one height, mirror images of each other about an axis: a layout only,
      which says nothing about the circuit. Places; routes nothing; asserts nothing: left on the left of axis, right on the right, and right oriented as left
-     flipped left-right (14.7). Write the roles the other way round to swap the sides. */
+     flipped left-right (14.7); the usage's own point is at the centre between left and right. Write
+     the roles the other way round to swap the sides. */
   $MIRRORED_LAYOUT = @DEFINE(
       roles=[
         ["left", ["instance", "usage"]],
         ["right", ["instance", "usage"]],
         ["axis", ["point", "instance", "usage"]]]) {
-    {?left ?right} @ALIGN("y", priority="low");
+    {?left ?right ?} @ALIGN("y", priority="low");
+    {?left ? ?right} @DISTRIBUTE("left-to-right", priority="low");
     {?left ?axis ?right} @DISTRIBUTE("left-to-right", priority="low");
     ?left ?right @ORIENT-RELATION("MY", priority="low");
   };
 
   /* Two symmetric objects in one column, mirror images of each other about a horizontal axis: a
      layout only. Places; routes nothing; asserts nothing: top above axis, bottom below, and bottom oriented as top flipped
-     top-bottom (14.7). Write the roles the other way round to swap the sides. */
+     top-bottom (14.7); the usage's own point is at the centre between top and bottom. Write the
+     roles the other way round to swap the sides. */
   $MIRRORED_VERTICAL_LAYOUT = @DEFINE(
       roles=[
         ["top", ["instance", "usage"]],
         ["bottom", ["instance", "usage"]],
         ["axis", ["point", "instance", "usage"]]]) {
-    {?top ?bottom} @ALIGN("x", priority="low");
+    {?top ?bottom ?} @ALIGN("x", priority="low");
+    {?top ? ?bottom} @DISTRIBUTE("top-to-bottom", priority="low");
     {?top ?axis ?bottom} @DISTRIBUTE("top-to-bottom", priority="low");
     ?top ?bottom @ORIENT-RELATION("MX", priority="low");
   };
@@ -236,6 +244,8 @@
       roles=[["left", "instance"], ["right", "instance"], ["tail", ["instance", "usage"]]]) {
     {?left ?right} @AS $MATCHED;
     ?left(left) ?right(right) ?tail(axis) @AS $MIRRORED_LAYOUT;
+    {?left ?right ?} @ALIGN("y", priority="low");
+    {?left ? ?right} @DISTRIBUTE("left-to-right", priority="low");
     {{?left ?right} ?tail} @ORDER("top-to-bottom", priority="low");
     {?left ?right ?tail} @ROUTE-OBJECT(priority="low");
     {?left ?right ?tail} @GROUP;
@@ -290,6 +300,8 @@
       roles=[["left", "instance"], ["right", "instance"], ["tail", ["instance", "usage"]]]) {
     {?left ?right} @AS $MATCHED;
     ?left(left) ?right(right) ?tail(axis) @AS $MIRRORED_LAYOUT;
+    {?left ?right ?} @ALIGN("y", priority="low");
+    {?left ? ?right} @DISTRIBUTE("left-to-right", priority="low");
     {{?left ?right} ?tail} @ORDER("bottom-to-top", priority="low");
     {?left ?right ?tail} @ROUTE-OBJECT(priority="low");
     {?left ?right ?tail} @GROUP;
@@ -358,6 +370,8 @@
     %axis = (_, _);
     {?left ?right} @AS $MATCHED;
     ?left(left) ?right(right) %axis(axis) @AS $MIRRORED_LAYOUT;
+    {?left ?right ?} @ALIGN("y", priority="low");
+    {?left ? ?right} @DISTRIBUTE("left-to-right", priority="low");
     {?left ?right} @ASSERT-INSTANCE(same=["model", "w", "l", "nf", "m", "area"],
             message="the two sides of a $PSEUDO_DIFFERENTIAL_PAIR are matched");
     {?left ?right} @SELECT-INSTANCE(type="nmos")
@@ -398,7 +412,8 @@
     ?left ?right @ORIENT-RELATION("MY", priority="low");
     {?left ?tailleft} @ALIGN("x", priority="low");
     {?right ?tailright} @ALIGN("x", priority="low");
-    {?left ?right} @ALIGN("y", priority="low");
+    {?left ?right ?} @ALIGN("y", priority="low");
+    {?left ? ?right} @DISTRIBUTE("left-to-right", priority="low");
     {?tailleft ?tailright} @ALIGN("y", priority="low");
     {?left ?bridge ?right} @DISTRIBUTE("left-to-right", priority="low");
     {?left ?right ?tailleft ?tailright ?bridge} @ROUTE-OBJECT(priority="low");
@@ -457,7 +472,8 @@
     {?left ?degleft} @AS $SERIES;
     {?right ?degright} @AS $SERIES;
     ?left ?right @ORIENT-RELATION("MY", priority="low");
-    {?left ?right} @ALIGN("y", priority="low");
+    {?left ?right ?} @ALIGN("y", priority="low");
+    {?left ? ?right} @DISTRIBUTE("left-to-right", priority="low");
     {?degleft ?degright} @ALIGN("y", priority="low");
     {?left ?degleft} @ALIGN("x", priority="low");
     {?right ?degright} @ALIGN("x", priority="low");
@@ -509,6 +525,8 @@
     %axis = (_, _);
     {?left ?right} @AS $MATCHED;
     ?left(left) ?right(right) %axis(axis) @AS $MIRRORED_LAYOUT;
+    {?left ?right ?} @ALIGN("y", priority="low");
+    {?left ? ?right} @DISTRIBUTE("left-to-right", priority="low");
     {?left ?right} @ROUTE-OBJECT(priority="low");
     {?left ?right} @ASSERT-INSTANCE(same=["model", "w", "l", "nf", "m", "area"],
             message="the two sides of a $CROSS_COUPLED_PAIR are matched");
@@ -518,7 +536,7 @@
      Places and routes: aligns ref and out in one row with sources or emitters down, asserts n-type,
      shared gate or base net, one model and channel length, and parallel reference transistors. */
   $CURRENT_MIRROR_N = @DEFINE(roles=[["{ref}", "instance"], ["{out}", "instance"]]) {
-    {?ref ?out} @ALIGN("y", priority="low");
+    {?ref ?out ?} @ALIGN("y", priority="low");
     ?ref{1} {?out} @ORIENT-RELATION(["R0", "MY"], priority="low");
     ?ref{1} ?ref{2:end} @ORIENT-RELATION("R0", priority="low");
     {?ref ?out} @ROUTE-OBJECT(priority="low");
@@ -567,7 +585,7 @@
      Places and routes: aligns ref and out in one row with sources or emitters up, asserts p-type,
      shared gate or base net, one model and channel length, and parallel reference transistors. */
   $CURRENT_MIRROR_P = @DEFINE(roles=[["{ref}", "instance"], ["{out}", "instance"]]) {
-    {?ref ?out} @ALIGN("y", priority="low");
+    {?ref ?out ?} @ALIGN("y", priority="low");
     ?ref{1} {?out} @ORIENT-RELATION(["R0", "MY"], priority="low");
     ?ref{1} ?ref{2:end} @ORIENT-RELATION("R0", priority="low");
     {?ref ?out} @ROUTE-OBJECT(priority="low");
@@ -624,6 +642,7 @@
         ["{refcascode}", "instance"],
         ["{outcascode}", "instance"]]) {
     ?ref(ref) ?out(out) @AS $CURRENT_MIRROR_N;
+    {?ref ?out ?} @ALIGN("y", priority="low");
     {?refcascode ?outcascode} @ALIGN("y", priority="low");
     {{?refcascode ?outcascode} {?ref ?out}} @ORDER("top-to-bottom", priority="low");
     {?refcascode{1} ?ref{1}} @ALIGN("x", priority="low");
@@ -684,6 +703,7 @@
         ["{refcascode}", "instance"],
         ["{outcascode}", "instance"]]) {
     ?ref(ref) ?out(out) @AS $CURRENT_MIRROR_P;
+    {?ref ?out ?} @ALIGN("y", priority="low");
     {?refcascode ?outcascode} @ALIGN("y", priority="low");
     {{?refcascode ?outcascode} {?ref ?out}} @ORDER("bottom-to-top", priority="low");
     {?refcascode{1} ?ref{1}} @ALIGN("x", priority="low");
@@ -738,7 +758,7 @@
      Places and routes; a group. */
   $TRANS_LINEAR_LOOP = @DEFINE(roles=[["{a}", ["instance", "usage"]], ["{b}", ["instance", "usage"]]]) {
     {?a ?b} @AS $PARALLEL;
-    {?a ?b} @ALIGN("x", priority="low");
+    {?a ?b ?} @ALIGN("x", priority="low");
     {?a ?b} @GROUP;
     {?a ?b} @ROUTE-OBJECT(priority="low");
   };
@@ -748,7 +768,7 @@
   $TRANS_LINEAR_LOOP_HORIZONTAL = @DEFINE(
       roles=[["{a}", ["instance", "usage"]], ["{b}", ["instance", "usage"]]]) {
     {?a ?b} @AS $PARALLEL;
-    {?a ?b} @ALIGN("y", priority="low");
+    {?a ?b ?} @ALIGN("y", priority="low");
     {?a ?b} @GROUP;
     {?a ?b} @ROUTE-OBJECT(priority="low");
   };
@@ -982,7 +1002,7 @@
   $TRANSMISSION_GATE = @DEFINE(
       roles=[["pmos", ["instance", "usage"]], ["nmos", ["instance", "usage"]]]) {
     {?pmos ?nmos} @AS $PARALLEL;
-    {?pmos ?nmos} @ALIGN("x", priority="low");
+    {?pmos ?nmos ?} @ALIGN("x", priority="low");
     {?pmos ?nmos} @ORDER("top-to-bottom", priority="low");
     {?pmos ?nmos} @GROUP;
     ?pmos @SELECT-INSTANCE(type="*")
@@ -997,7 +1017,7 @@
   $TRANSMISSION_GATE_HORIZONTAL = @DEFINE(
       roles=[["pmos", ["instance", "usage"]], ["nmos", ["instance", "usage"]]]) {
     {?pmos ?nmos} @AS $PARALLEL;
-    {?pmos ?nmos} @ALIGN("y", priority="low");
+    {?pmos ?nmos ?} @ALIGN("y", priority="low");
     {?pmos ?nmos} @ORDER("left-to-right", priority="low");
     {?pmos ?nmos} @GROUP;
     ?pmos @SELECT-INSTANCE(type="*")
@@ -1075,7 +1095,7 @@
      Places and routes; a group: specializes $CMOS_GATE and places ?pmos above ?nmos in one column. */
   $CMOS_INVERTER = @DEFINE(roles=[["pmos", "instance"], ["nmos", "instance"]]) {
     ?pmos(pullup) ?nmos(pulldown) @AS $CMOS_GATE;
-    {?pmos ?nmos} @ALIGN("x", priority="low");
+    {?pmos ?nmos ?} @ALIGN("x", priority="low");
     {?pmos ?nmos} @ORDER("top-to-bottom", priority="low");
   };
 
@@ -1084,7 +1104,7 @@
      row. */
   $CMOS_INVERTER_HORIZONTAL = @DEFINE(roles=[["pmos", "instance"], ["nmos", "instance"]]) {
     ?pmos(pullup) ?nmos(pulldown) @AS $CMOS_GATE;
-    {?pmos ?nmos} @ALIGN("y", priority="low");
+    {?pmos ?nmos ?} @ALIGN("y", priority="low");
     {?pmos ?nmos} @ORDER("left-to-right", priority="low");
   };
 
@@ -1133,6 +1153,7 @@
      Places and routes; a group: draws ?resistors as a $BRANCH. */
   $RESISTOR_LADDER = @DEFINE(roles=[["{resistors}", "instance"]]) {
     ?resistors @AS $BRANCH;
+    {?resistors ?} @ALIGN("x", priority="low");
     {?resistors} @GROUP;
   };
 
@@ -1140,6 +1161,7 @@
      Places and routes; a group: draws ?resistors as a $BRANCH_HORIZONTAL. */
   $RESISTOR_LADDER_HORIZONTAL = @DEFINE(roles=[["{resistors}", "instance"]]) {
     ?resistors @AS $BRANCH_HORIZONTAL;
+    {?resistors ?} @ALIGN("y", priority="low");
     {?resistors} @GROUP;
   };
 
