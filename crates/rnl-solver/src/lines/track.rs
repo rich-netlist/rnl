@@ -1664,20 +1664,42 @@ mod tests {
         }
     }
     /// Only the ratio of the weights matters: they are reduced by their greatest common divisor
-    /// before they weigh a path in its packed cost, so [250, 1000] routes as [1, 4] does.
+    /// before they weigh a path in its packed cost, so [250, 1000] routes as [1, 4] does. Two nets
+    /// that cross straight or meet round the end of one with bends show that the ratio decides: a
+    /// crossing dearer than the bends round it routes the other way.
     #[test]
     fn weights_of_one_ratio_route_alike() {
         assert_eq!(reduced((2, 8)), (1, 4));
         assert_eq!(reduced((0, 7)), (0, 1));
         assert_eq!(reduced((3, 5)), (3, 5));
-        let layout = layout(true);
-        let base = route(&input(&layout));
-        assert!(base.failed.is_none(), "{:?}", base.failed);
-        let mut scaled = input(&layout);
-        scaled.weights = (250, 1000);
-        let made = route(&scaled);
-        assert_eq!(format!("{:?}", made.outs), format!("{:?}", base.outs));
-        assert_eq!(made.expansions, base.expansions);
+        let anchor = |x: i64, y: i64| AnchorIn {
+            at: [int(x), int(y)],
+            exit: None,
+            owner: None,
+            connects_pin: false,
+            existing_junction: false,
+        };
+        let net = |a: AnchorIn, b: AnchorIn| NetIn { anchors: vec![a, b], joined: vec![], preferred: None };
+        let layout = Layout {
+            modern: true,
+            nets: vec![net(anchor(0, 0), anchor(8, 0)), net(anchor(4, -4), anchor(4, 4))],
+            ..Default::default()
+        };
+        let with = |weights: (u64, u64)| {
+            let mut input = input(&layout);
+            input.weights = weights;
+            let made = route(&input);
+            assert!(made.failed.is_none(), "{weights:?}: {:?}", made.failed);
+            made
+        };
+        let base = with((1, 4));
+        assert_eq!(base.crossings, 1);
+        let scaled = with((250, 1000));
+        assert_eq!(format!("{:?}", scaled.outs), format!("{:?}", base.outs));
+        assert_eq!((scaled.crossings, scaled.expansions), (base.crossings, base.expansions));
+        let dear = with((1000, 1));
+        assert_eq!(dear.crossings, 0);
+        assert_ne!(format!("{:?}", dear.outs), format!("{:?}", base.outs));
     }
 
     #[test]

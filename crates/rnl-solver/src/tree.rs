@@ -1948,20 +1948,33 @@ impl<'a> Tree<'a> {
             ));
         }
         notes.push(format!("tree: the arrangement taken: {}", self.describe(&best)));
+        let kept = self.best_tried(&tried_all, &best, &path);
+        (best, best_eval, notes, path, kept)
+    }
+
+    /// The best [`TRIED_KEPT`] of the arrangements tried, by the tree's rank, other than the one
+    /// taken and those stepped through.
+    fn best_tried(
+        &self,
+        tried: &[(Entry, Arrangement)],
+        taken: &Arrangement,
+        path: &[Arrangement],
+    ) -> Vec<Arrangement> {
         let mut kept: Vec<Arrangement> = Vec::new();
-        if !tried_all.is_empty() {
-            let entries: Vec<Entry> = tried_all.iter().map(|(e, _)| e.clone()).collect();
-            for i in crate::score::order(self.active(), &entries) {
-                let a = &tried_all[i].1;
-                if kept.len() == TRIED_KEPT {
-                    break;
-                }
-                if *a != best && !path.contains(a) && !kept.contains(a) {
-                    kept.push(a.clone());
-                }
+        if tried.is_empty() {
+            return kept;
+        }
+        let entries: Vec<Entry> = tried.iter().map(|(e, _)| e.clone()).collect();
+        for i in crate::score::order(self.active(), &entries) {
+            if kept.len() == TRIED_KEPT {
+                break;
+            }
+            let a = &tried[i].1;
+            if a != taken && !path.contains(a) && !kept.contains(a) {
+                kept.push(a.clone());
             }
         }
-        (best, best_eval, notes, path, kept)
+        kept
     }
 
     fn relations(&self, arr: &Arrangement, ori: &[Orient]) -> Vec<Tagged> {
@@ -2656,6 +2669,27 @@ mod tests {
         let entries: Vec<Entry> =
             tried.iter().map(|a| tree.evaluate_rounds(a, 3, &mut Work::default()).0.entry).collect();
         assert_eq!(crate::score::order(tree.active(), &entries), (0..tried.len()).collect::<Vec<_>>());
+        // of the first arrangement's neighbours, those kept rank before every other but the one
+        // taken and those stepped through
+        let tried: Vec<(Entry, Arrangement)> = tree
+            .neighbours(&first)
+            .into_iter()
+            .map(|m| (tree.evaluate_rounds(&m.1, 3, &mut Work::default()).0.entry, m.1))
+            .collect();
+        assert!(tried.len() > TRIED_KEPT + 2);
+        let (taken, path) = (tried[0].1.clone(), vec![tried[1].1.clone()]);
+        let kept = tree.best_tried(&tried, &taken, &path);
+        assert_eq!(kept.len(), TRIED_KEPT);
+        let entry = |a: &Arrangement| tried.iter().find(|(_, b)| b == a).unwrap().0.clone();
+        for (e, a) in &tried {
+            if *a == taken || path.contains(a) || kept.contains(a) {
+                continue;
+            }
+            for k in &kept {
+                let order = crate::score::order(tree.active(), &[entry(k), e.clone()]);
+                assert!(order[0] == 0 || entry(k) == *e, "a better arrangement than one kept was left out");
+            }
+        }
         let plain = Tree::new(&p, &exact.structure, &options);
         let (complete, _) = plain.evaluate_rounds(&first, 3, &mut Work::default());
         let made = plain.search(first, complete, 3, true, &mut Work::default(), &Stop::default(), None);

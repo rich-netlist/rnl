@@ -859,18 +859,6 @@ mod tests {
     use crate::resolve::tests::Ticks;
     use crate::{Clock, RunLimit, StoppedClock};
 
-    /// Only the ratio of the weights matters: [2, 8] draws as [1, 4] does.
-    #[test]
-    fn weights_of_one_ratio_draw_alike() {
-        let (p, s, options, _, _) = settle::tests::seed();
-        let mut doubled = options.clone();
-        doubled.settings.lines_weights = crate::LinesWeights { crossing: 2, bend: 8 };
-        let run = |o: &SolverOptions| super::super::lay_out(&p, &s, o, &mut Work::default()).0;
-        let (a, b) = (run(&options), run(&doubled));
-        assert_eq!(a.placed, b.placed);
-        assert_eq!(a.routing, b.routing);
-    }
-
     #[test]
     fn local_tree_allowance_does_not_interrupt_the_initial_candidate() {
         let (p, s, options, _, _) = settle::tests::seed();
