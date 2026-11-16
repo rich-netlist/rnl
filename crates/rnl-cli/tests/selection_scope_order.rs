@@ -88,6 +88,20 @@ fn released_wire_and_label_scopes_keep_their_existing_scene_order() {
     assert_eq!(labels(&read("0.3", LABELS, "{#R2 #R1} @SELECT-LABEL")), ["#R1::first", "#R2::second", "#R1::third"]);
 }
 
+/// A usage in the scope gives the labels attached to it, those its symbol draws, as an instance
+/// does: by its name, and through SELECT-USAGE.
+#[test]
+fn a_usage_gives_the_labels_its_symbol_draws() {
+    let body = format!(
+        "{LABELS}; $S = @DEFINE-SYMBOL {{ (0, 0) @PIN(terminal=\"x\"); ? @TEXT(\"${{x}}\", key=\"mark\") }}; \
+         $D = @DEFINE(roles=[\"x\"]) {{}}; %u = &a @AS $D => @SET-SYMBOL $S"
+    );
+    assert_eq!(labels(&read("0.4", &body, "%u @SELECT-LABEL(key=\"mark\")")), ["%u::mark"]);
+    assert_eq!(labels(&read("0.4", &body, "# @SELECT-USAGE $D => @SELECT-LABEL(key=\"mark\")")), ["%u::mark"]);
+    // a role names what the usage's roles give, not the usage's own labels
+    assert_eq!(labels(&read("0.4", &body, "%u @SELECT-LABEL(key=\"mark\", role=\"x\")")), Vec::<String>::new());
+}
+
 #[test]
 fn usage_members_do_not_gain_an_extra_scope_step() {
     let body = format!("{WIRES}; $D = @DEFINE(roles=[\"x\"]) {{}}; %u=&a @AS $D");

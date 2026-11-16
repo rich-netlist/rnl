@@ -292,6 +292,11 @@ impl Interp<'_> {
                 if !seen.insert((object, top)) {
                     continue;
                 }
+                // a usage in the scope is an object too: SELECT-LABEL takes the labels attached to it,
+                // those its symbol draws, as well as what its roles give (10.1, 13.3)
+                if top && keyword == "SELECT-LABEL" && role.is_none() {
+                    out.push(object);
+                }
                 let want = if top {
                     role.and_then(Lit::str).map(|name| {
                         if usage.role(name).is_some() {
