@@ -1737,18 +1737,6 @@
           "kind": "DISTRIBUTE",
           "status": "ok",
           "priority": "normal"
-        },
-        {
-          "label": "ORDER",
-          "kind": "ORDER",
-          "status": "ok",
-          "priority": "low"
-        },
-        {
-          "label": "ALIGN",
-          "kind": "ALIGN",
-          "status": "ok",
-          "priority": "low"
         }
       ],
       "unplaced": []
@@ -1992,7 +1980,19 @@
         {
           "label": "ALIGN",
           "kind": "ALIGN",
-          "status": "dropped",
+          "status": "unsolved",
+          "priority": "low"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "unsolved",
+          "priority": "low"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "unsolved",
           "priority": "low"
         }
       ],
@@ -2581,6 +2581,12 @@
           "priority": "normal"
         },
         {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "unsolved",
+          "priority": "low"
+        },
+        {
           "label": "ORDER",
           "kind": "ORDER",
           "status": "ok",
@@ -2589,13 +2595,7 @@
         {
           "label": "ALIGN",
           "kind": "ALIGN",
-          "status": "ok",
-          "priority": "low"
-        },
-        {
-          "label": "DISTANCE",
-          "kind": "DISTANCE",
-          "status": "dropped",
+          "status": "unsolved",
           "priority": "low"
         }
       ],

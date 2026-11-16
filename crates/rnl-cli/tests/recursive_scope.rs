@@ -155,15 +155,19 @@ fn package_rule_origin_is_the_use_site() {
 }
 
 #[test]
-fn recursive_generation_can_take_a_local_empty_set_role() {
-    for (selection, expected) in [("$local", 0), ("$local @SELECT-INSTANCE(recursive=true)", 1)] {
+fn recursive_generation_makes_no_usage_where_its_set_role_is_empty() {
+    // the recursive selection reaches the child, where the local set has no members: a rule of set
+    // roles only makes no usage there (9.4); the top level, where the set holds R1, gets its one
+    for selection in ["$local", "$local @SELECT-INSTANCE(recursive=true)"] {
         let r = read(
             "0.4",
             &format!(
                 "$D = @DEFINE(roles=[\"{{xs}}\"]) {{}}; $local=# @SELECT-INSTANCE(name=\"R*\"); {selection} => @AS $D"
             ),
         );
-        assert_eq!(r.problems[1].usages.iter().filter(|u| u.definition == "$D").count(), expected, "{selection}");
+        let count = |p: &rnl_runtime::problem::LevelProblem| p.usages.iter().filter(|u| u.definition == "$D").count();
+        assert_eq!(count(&r.problems[1]), 0, "{selection}");
+        assert_eq!(r.problems.iter().map(count).sum::<usize>(), 1, "{selection}");
     }
 }
 

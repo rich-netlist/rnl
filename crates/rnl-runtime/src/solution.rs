@@ -229,7 +229,8 @@ pub struct Written {
     /// [`crate::writeback::replace_generated`].
     pub record: String,
     /// Every decision of the solution that the record does not hold, with the reason. Every other
-    /// decision is in the record.
+    /// decision is in the record, but the position of the point of a usage that only helps the
+    /// solve ([`auxiliary_points`]), which is in neither.
     pub unsolved: Vec<Unsolved>,
     /// What is written although the standard says that a solver should not do it, such as a route
     /// that does not keep the points of its wire (13.1). A tool that writes the record into its
@@ -316,6 +317,69 @@ pub fn generated_names(p: &LevelProblem) -> Vec<Option<String>> {
         out.push(Some(name));
     }
     out
+}
+
+/// By object index: whether the object is the own point of a usage that only helps the solve.
+/// Such a usage is made by a rule, cannot be written out ([`generated_names`]) and draws nothing:
+/// its own object has no symbol and no text, and no other object, wire or offset of the level is
+/// placed by it. The solver places its point for the facts that use it, but the record does not
+/// write that point and does not count it unsolved: what it holds in place is written with the
+/// objects it holds (10.5, 14.8). The column in which the fill of the standard package stands the
+/// port tags of a level is one; once the tags are written, the fill makes the column no more.
+pub fn auxiliary_points(p: &LevelProblem) -> Vec<bool> {
+    // the objects that something of the level is placed by, in one pass
+    let mut holds = vec![false; p.objects.len()];
+    let mut hold = |at: &PointRef| {
+        point_objects(at, &mut |k| {
+            if let Some(h) = holds.get_mut(k) {
+                *h = true;
+            }
+        })
+    };
+    for o in &p.objects {
+        match &o.position {
+            Position::InSymbol { owner, .. } => hold(&PointRef::Origin(*owner)),
+            Position::At(at) => hold(at),
+            Position::Own { .. } => {}
+        }
+    }
+    for w in &p.wires {
+        w.anchors.iter().for_each(&mut hold);
+    }
+    for f in &p.facts {
+        if let FactKind::Offset { from, .. } = &f.kind {
+            hold(from);
+        }
+    }
+    let names = generated_names(p);
+    let mut out = vec![false; p.objects.len()];
+    for (u, name) in p.usages.iter().zip(&names) {
+        let Some(k) = u.object else { continue };
+        let Some(o) = p.objects.get(k) else { continue };
+        if u.rule_made && name.is_none() && o.symbol.is_none() && o.text.is_none() && !holds[k] {
+            out[k] = true;
+        }
+    }
+    out
+}
+
+/// Each object that a point of the problem is on: its origin, one of its pins, or those of the
+/// points it is the centre of.
+pub fn point_objects(at: &PointRef, f: &mut impl FnMut(usize)) {
+    match at {
+        PointRef::Origin(o) => f(*o),
+        PointRef::Pin { object, .. } | PointRef::SymbolPin { object, .. } | PointRef::PinPosition { object, .. } => {
+            f(*object)
+        }
+        PointRef::Centre(points) => points.iter().for_each(|p| point_objects(p, f)),
+    }
+}
+
+/// Whether a point of the problem is on an object that `objects` marks, by object index.
+pub fn point_touches(at: &PointRef, objects: &[bool]) -> bool {
+    let mut found = false;
+    point_objects(at, &mut |k| found |= objects.get(k).copied().unwrap_or(false));
+    found
 }
 
 /// Coordinates as RNL writes them, or why it cannot.
@@ -625,7 +689,8 @@ fn junction_point_exists(p: &LevelProblem, point: &PointRef) -> bool {
 /// - in a level of a file of 0.2: the position or orientation of an object without a name, and
 ///   the route of a wire (the draft 0.3 writes them, by number and with WIRE given the wire);
 /// - in every version: the position of a text without a key that a rule makes, which nothing can
-///   refer to, so the solver does not decide it (13.3; the draft 0.3, 14.8); an object reached
+///   refer to, so the solver does not decide it (13.3; the draft 0.3, 14.8); the point of a usage
+///   that only helps the solve ([`auxiliary_points`]), which the record does not write; an object reached
 ///   only through a usage that a rule makes and that cannot be written out (10.5), or through
 ///   nothing (5.7); in a problem read with the records of the solver, an object that one of them
 ///   makes, which this record replaces; a position given to an object drawn at the point of its
@@ -684,7 +749,12 @@ pub fn write_record(p: &LevelProblem, solution: &Solution, author: &str, hash: &
     let mut placements: Vec<(Reference, [Option<f64>; 2], Option<Orient>)> = Vec::new();
     let mut sorted: Vec<&Placement> = solution.placements.iter().collect();
     sorted.sort_by_key(|pl| pl.object);
+    let auxiliary = auxiliary_points(p);
     for pl in sorted {
+        // the point of a usage that only helps the solve: the record writes what it holds in place
+        if auxiliary.get(pl.object).copied().unwrap_or(false) {
+            continue;
+        }
         let orientation = Decision::Orientation { object: pl.object };
         // the position on the axes that `on` marks: one alone, or both
         let position = |on: [bool; 2]| Decision::Position {

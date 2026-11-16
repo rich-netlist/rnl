@@ -190,6 +190,65 @@ fn equivalent_source(
     mapped == Some(b.line)
 }
 
+/// What of `p` only helps the solve: the points that the record does not write
+/// ([`rnl_runtime::solution::auxiliary_points`]), the usages whose own point is one, with the usages
+/// made in their bodies, and the facts made in their bodies or on such a point. The document read
+/// with the record may make them no more, as the fill of the standard package makes no port column
+/// once the tags are written: they have no identity there, and what they held is in the positions
+/// the record writes. Each by its index in `p`.
+pub struct Auxiliary {
+    pub points: Vec<bool>,
+    pub usages: Vec<bool>,
+    pub facts: Vec<bool>,
+}
+
+/// [`Auxiliary`] for `p`.
+pub fn auxiliary(p: &LevelProblem) -> Auxiliary {
+    let points = rnl_runtime::solution::auxiliary_points(p);
+    let mut usages: Vec<bool> =
+        p.usages.iter().map(|u| u.object.is_some_and(|o| points.get(o) == Some(&true))).collect();
+    // the usages made in their bodies, whatever the order of the list
+    loop {
+        let mut changed = false;
+        for (i, u) in p.usages.iter().enumerate() {
+            if !usages[i] && u.parent.is_some_and(|parent| usages.get(parent) == Some(&true)) {
+                usages[i] = true;
+                changed = true;
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+    let facts = p
+        .facts
+        .iter()
+        .map(|f| f.chain.iter().any(|&u| usages.get(u) == Some(&true)) || fact_touches(&f.kind, &points))
+        .collect();
+    Auxiliary { points, usages, facts }
+}
+
+/// Whether a fact is on an object that `objects` marks, by object index.
+fn fact_touches(kind: &FactKind, objects: &[bool]) -> bool {
+    use rnl_runtime::solution::point_touches;
+    let marked = |k: &usize| objects.get(*k).copied().unwrap_or(false);
+    let any = |points: &[PointRef]| points.iter().any(|p| point_touches(p, objects));
+    match kind {
+        FactKind::Place { at, .. } => point_touches(at, objects),
+        FactKind::PointCoordinate { point, .. } => marked(point),
+        FactKind::Offset { text, from, .. } => marked(text) || point_touches(from, objects),
+        FactKind::Orient { object, .. } => marked(object),
+        FactKind::PinOrient { pin, .. } => marked(&pin.object),
+        FactKind::PinOrientRelation { from, to, .. } => marked(&from.object) || marked(&to.object),
+        FactKind::Align { members, .. } | FactKind::Order { members, .. } | FactKind::Distribute { members, .. } => {
+            any(members)
+        }
+        FactKind::Distance { from, to, .. } => any(from) || any(to),
+        FactKind::Table { rows, .. } => rows.points().into_iter().any(|p| point_touches(p, objects)),
+        FactKind::OrientRelation { from, to, .. } => from.iter().chain(to).any(marked),
+    }
+}
+
 struct IdentityMapping {
     objects: Vec<usize>,
     usages: Vec<usize>,
@@ -228,6 +287,7 @@ fn identity_mapping(
     read: &rnl_runtime::Interpretation,
     host_file: &str,
     line_map: &[Option<u32>],
+    auxiliary: &[bool],
 ) -> Result<IdentityMapping, &'static str> {
     // Runtime IDs are used only after the core maps original references into this
     // particular reading. Generated usages are reified under their written names.
@@ -240,7 +300,7 @@ fn identity_mapping(
     for _ in 0..original.usages.len().saturating_add(1) {
         let mut changed = false;
         for (i, old) in original.usages.iter().enumerate() {
-            if usages[i] != usize::MAX || !old.rule_made || old.source.is_none() {
+            if usages[i] != usize::MAX || !old.rule_made || old.source.is_none() || auxiliary[i] {
                 continue;
             }
             let role_matches = |a: &Filler, b: &Filler| match (a, b) {
@@ -293,11 +353,15 @@ fn identity_mapping(
             break;
         }
     }
-    if usages.contains(&usize::MAX) {
+    if usages.iter().zip(auxiliary).any(|(&i, &aux)| i == usize::MAX && !aux) {
         return Err("original usage identity is not mapped");
     }
-    let reified: Vec<_> =
-        original.usages.iter().zip(&usages).map(|(old, &i)| old.rule_made && !trial.usages[i].rule_made).collect();
+    let reified: Vec<_> = original
+        .usages
+        .iter()
+        .zip(&usages)
+        .map(|(old, &i)| i != usize::MAX && old.rule_made && !trial.usages[i].rule_made)
+        .collect();
     for (old, &index) in original.objects.iter().zip(&objects) {
         if index == usize::MAX {
             continue;
@@ -326,7 +390,10 @@ fn identity_mapping(
             Filler::Net(_) | Filler::Other(_) => f.clone(),
         })
     };
-    for ((old, &index), &reified) in original.usages.iter().zip(&usages).zip(&reified) {
+    for (((old, &index), &reified), &aux) in original.usages.iter().zip(&usages).zip(&reified).zip(auxiliary) {
+        if aux {
+            continue;
+        }
         let new = &trial.usages[index];
         // A rule-made usage is written as a top-level ATTACH. Its body still
         // retains its definition, parameters, roles and nested usage identities.
@@ -362,6 +429,7 @@ fn mapped_chain(chain: &[usize], map: &IdentityMapping) -> Result<Vec<usize>, &'
 /// Prove the first-pass kept facts against the interpreted drawing. Reifying a rule-made
 /// usage can empty its former local collection, so presence in the new expanded fact list
 /// is not a retention proof. The original authored records are unchanged by this transaction.
+#[allow(clippy::too_many_arguments)]
 pub fn retained_facts_preserved(
     original: &LevelProblem,
     trial: &LevelProblem,
@@ -370,11 +438,12 @@ pub fn retained_facts_preserved(
     kept: &[usize],
     read: &rnl_runtime::Interpretation,
     tolerance: f64,
+    auxiliary: &Auxiliary,
 ) -> Result<(), &'static str> {
     if kept.is_empty() {
         return Ok(());
     }
-    let mapping = identity_mapping(original, trial, read, host_file, line_map)?;
+    let mapping = identity_mapping(original, trial, read, host_file, line_map, &auxiliary.usages)?;
     let mut drawn = rnl_runtime::previous::drawn(original, read);
     let ids = rnl_runtime::previous::document_ids(original, read);
     let trial_drawn = current_drawn(trial, read);
@@ -394,6 +463,9 @@ pub fn retained_facts_preserved(
         }
     }
     for &index in kept {
+        if auxiliary.facts.get(index) == Some(&true) {
+            continue;
+        }
         let fact = original.facts.get(index).ok_or("invalid kept fact index")?;
         let mut kind = fact.kind.clone();
         remap_fact(&mut kind, &mapping.objects, original, trial)?;
@@ -427,10 +499,11 @@ pub fn added_fact_indices(
     host_file: &str,
     line_map: &[Option<u32>],
     read: &rnl_runtime::Interpretation,
+    auxiliary: &Auxiliary,
 ) -> Result<Vec<usize>, &'static str> {
-    let map = identity_mapping(original, trial, read, host_file, line_map)?;
+    let map = identity_mapping(original, trial, read, host_file, line_map, &auxiliary.usages)?;
     let mut old_kinds = Vec::new();
-    for fact in &original.facts {
+    for (fact, _) in original.facts.iter().zip(&auxiliary.facts).filter(|(_, &aux)| !aux) {
         let mut kind = fact.kind.clone();
         remap_fact(&mut kind, &map.objects, original, trial)?;
         old_kinds.push((fact, kind, mapped_chain(&fact.chain, &map)?));
@@ -503,6 +576,8 @@ pub struct TrialValidation<'a> {
     pub targets: &'a [(String, Point)],
     pub added_facts: &'a [usize],
     pub tolerance: f64,
+    /// [`auxiliary`] of `original_problem`.
+    pub auxiliary: &'a Auxiliary,
 }
 
 pub fn validate_interpreted_trial(input: TrialValidation<'_>) -> Result<(), String> {
@@ -518,12 +593,13 @@ pub fn validate_interpreted_trial(input: TrialValidation<'_>) -> Result<(), Stri
         targets,
         added_facts,
         tolerance,
+        auxiliary,
     } = input;
     use rnl_runtime::diag::Severity;
     let left = before.model.levels.iter().find(|v| v.level == level).ok_or("missing initial level")?;
     let right = after.model.levels.iter().find(|v| v.level == level).ok_or("missing trial level")?;
     let trial_problem = after.problems.iter().find(|v| v.level == level).ok_or("missing trial problem")?;
-    retained_facts_preserved(original_problem, trial_problem, host_file, line_map, kept, after, tolerance)?;
+    retained_facts_preserved(original_problem, trial_problem, host_file, line_map, kept, after, tolerance, auxiliary)?;
     let drawn = current_drawn(trial_problem, after);
     // A fact that a dot makes, or that names a dot or anything of one, must hold. Another fact,
     // such as one of a label that the first pass left unresolved beside an assertion the file

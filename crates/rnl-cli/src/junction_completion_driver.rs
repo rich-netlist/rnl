@@ -78,7 +78,7 @@ pub const LOST: &str = "not made when the result is read again: a rule selects b
 /// of `read` has no object of its id; the usages a rule made and the record does not write, when
 /// the rule makes fewer of them in `read`. Named in [`LOST`], at most three, a usage by its rule's
 /// place.
-fn lost(p: &LevelProblem, read: &Interpretation) -> Option<String> {
+fn lost(p: &LevelProblem, read: &Interpretation, auxiliary: &[bool]) -> Option<String> {
     use std::collections::{BTreeMap, HashSet};
     // the place of the rule that made a usage, from its id "@file:line:column", with "#n" after it
     // when the rule made more than one
@@ -89,8 +89,10 @@ fn lost(p: &LevelProblem, read: &Interpretation) -> Option<String> {
     let mut gone = Vec::new();
     // by the place of its rule: the usages not written, the label of one and its definition
     let mut unwritten: BTreeMap<String, (usize, &str, &str)> = BTreeMap::new();
-    for ((o, known), id) in p.objects.iter().zip(&ids.objects).zip(&p.ids.objects) {
-        if known.is_some() {
+    // the point of a usage that only helps the solve is not written, and is not lost when the
+    // document read with the record no longer makes it
+    for (((o, known), id), auxiliary) in p.objects.iter().zip(&ids.objects).zip(&p.ids.objects).zip(auxiliary) {
+        if known.is_some() || *auxiliary {
             continue;
         }
         match &o.reference {
@@ -370,7 +372,9 @@ fn complete_within(
     }
     let record = &written.record;
     let before = read(ctx, record)?;
-    if let Some(why) = lost(ctx.problem, &before) {
+    // what only helps the solve, once for every trial below
+    let auxiliary = crate::junction_completion_problem::auxiliary(ctx.problem);
+    if let Some(why) = lost(ctx.problem, &before, &auxiliary.points) {
         return Err(why);
     }
     let line_map = line_mapping(ctx, &before, record)?;
@@ -380,6 +384,10 @@ fn complete_within(
     // as previous results, rather than requiring redundant fixed slots in the record.
     let drawn = rnl_runtime::previous::drawn(ctx.problem, &before);
     for placement in &ctx.solution.placements {
+        // the record does not write the point of a usage that only helps the solve
+        if auxiliary.points.get(placement.object).copied().unwrap_or(false) {
+            continue;
+        }
         let new = drawn.get(placement.object).ok_or("first-pass placement index invalid")?;
         for (axis, (wanted, actual)) in [placement.x, placement.y].into_iter().zip(new.at).enumerate() {
             if let Some(wanted) = wanted {
@@ -494,6 +502,7 @@ fn complete_within(
             &ctx.original.doc.levels[ctx.problem.level].file,
             &line_map,
             &after,
+            &auxiliary,
         )
         .map_err(str::to_owned)?;
         match validate_interpreted_trial(TrialValidation {
@@ -508,6 +517,7 @@ fn complete_within(
             targets: &targets,
             added_facts: &added,
             tolerance: ctx.tolerance,
+            auxiliary: &auxiliary,
         }) {
             Ok(()) => return Ok(Completion { record: trial, trials: attempt + 1, elapsed: start.elapsed() }),
             Err(e) => {

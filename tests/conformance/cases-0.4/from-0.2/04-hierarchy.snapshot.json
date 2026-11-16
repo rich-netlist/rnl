@@ -9,7 +9,7 @@
       "name": "04-hierarchy.sp",
       "file": 0,
       "line": 0,
-      "status": "1 without a position; constraints: 3 unsolved, 2 ok",
+      "status": "1 without a position; constraints: 3 unsolved",
       "host": {
         "ports": [],
         "instances": [
@@ -2289,21 +2289,6 @@
           }
         ],
         "shapes": [],
-        "groups": [
-          {
-            "id": "@rnl-std-fill.rnl:64:3",
-            "members": [],
-            "file": null,
-            "line": 64,
-            "source": "rule",
-            "rule": {
-              "package": "rnl-std-fill",
-              "file": "rnl-std-fill.rnl",
-              "line": 64
-            },
-            "state": "in-effect"
-          }
-        ],
         "junction": {
           "definition": "$JUNCTION",
           "symbol": null
@@ -3295,21 +3280,6 @@
           }
         ],
         "shapes": [],
-        "groups": [
-          {
-            "id": "@rnl-std-fill.rnl:64:3",
-            "members": [],
-            "file": null,
-            "line": 64,
-            "source": "rule",
-            "rule": {
-              "package": "rnl-std-fill",
-              "file": "rnl-std-fill.rnl",
-              "line": 64
-            },
-            "state": "in-effect"
-          }
-        ],
         "junction": {
           "definition": "$JUNCTION",
           "symbol": null
@@ -3322,7 +3292,7 @@
       "name": "amp",
       "file": 0,
       "line": 8,
-      "status": "constraints: 4 ok, 2 dropped",
+      "status": "constraints: 3 ok, 3 unsolved",
       "host": {
         "ports": [
           "&in",
@@ -4110,8 +4080,30 @@
             ],
             "usages": [
               {
+                "kind": "usage",
+                "id": "@rnl-std-fill.rnl:61:59",
+                "definition": "%port_column",
+                "roles": [
+                  {
+                    "role": "tags",
+                    "set": true,
+                    "member": "@rnl-std-fill.rnl:61:3",
+                    "terminal": null
+                  }
+                ],
+                "file": null,
+                "line": 61,
+                "source": "rule",
+                "rule": {
+                  "package": "rnl-std-fill",
+                  "file": "rnl-std-fill.rnl",
+                  "line": 61
+                },
+                "state": "in-effect"
+              },
+              {
                 "kind": "group",
-                "id": "@rnl-std-fill.rnl:64:3",
+                "id": "@rnl-std-fill.rnl:59:104",
                 "definition": "",
                 "roles": [
                   {
@@ -4122,16 +4114,36 @@
                   }
                 ],
                 "file": null,
-                "line": 64,
-                "source": "rule",
-                "rule": {
-                  "package": "rnl-std-fill",
-                  "file": "rnl-std-fill.rnl",
-                  "line": 64
-                },
+                "line": 59,
+                "source": "body",
+                "made_in": "@rnl-std-fill.rnl:61:59",
                 "state": "in-effect"
               }
             ]
+          },
+          {
+            "id": "@rnl-std-fill.rnl:61:59",
+            "kind": "usage",
+            "host": [],
+            "definition": "%port_column",
+            "attach": {
+              "tags": [
+                "@rnl-std-fill.rnl:61:3"
+              ]
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
           }
         ],
         "points": [
@@ -4565,18 +4577,14 @@
         "shapes": [],
         "groups": [
           {
-            "id": "@rnl-std-fill.rnl:64:3",
+            "id": "@rnl-std-fill.rnl:59:104",
             "members": [
               "@rnl-std-fill.rnl:61:3"
             ],
             "file": null,
-            "line": 64,
-            "source": "rule",
-            "rule": {
-              "package": "rnl-std-fill",
-              "file": "rnl-std-fill.rnl",
-              "line": 64
-            },
+            "line": 59,
+            "source": "body",
+            "made_in": "@rnl-std-fill.rnl:61:59",
             "state": "in-effect"
           }
         ],

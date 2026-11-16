@@ -860,9 +860,76 @@ X0 n1 n2 top\n.end\n";
         level.objects.iter().filter(|o| o.definition.as_deref() == Some("$IO_PORT")).count()
     };
     assert_eq!((tags("blk"), tags("top")), (2, 2));
-    // a DISTANCE for each pair of a tag and an instance of the same level: 2 x 1 and 2 x 2
-    assert_eq!(count("blk", "DISTANCE"), 2);
-    assert_eq!(count("top", "DISTANCE"), 4);
+    // one column of the fill in each level with ports, none at the file level, which has none (9.4)
+    let lists = |title: &str| {
+        let level = r.model.levels.iter().find(|l| l.title == title).unwrap();
+        level.objects.iter().filter(|o| o.definition.as_deref().is_some_and(|d| d.ends_with("port_column"))).count()
+    };
+    assert_eq!((lists("blk"), lists("top"), lists("t.sp")), (1, 1, 0));
+    // a DISTANCE from the column's point to each instance of the same level: 1 and 2
+    assert_eq!(count("blk", "DISTANCE"), 1);
+    assert_eq!(count("top", "DISTANCE"), 2);
+}
+
+#[test]
+fn a_written_port_list_leaves_the_fill_no_column_in_its_level() {
+    // the file writes $PORT_LIST in blk: its tags, at R0, at least 6 units left of each instance of
+    // the level, and no column of the fill there; top still gets the fill's column (12.4)
+    let text = "* two levels with ports
+* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }
+.subckt blk a b
+R1 a b 1k
+R3 a b 1k
+* @RNL { $PORT_LIST @ATTACH; }
+.ends
+.subckt top in out
+X1 in mid blk
+R2 mid out 1k
+.ends
+X0 n1 n2 top
+.end
+";
+    let r = read(&MemoryProvider::new().with("t.sp", text), &Options::default());
+    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
+    let level = |title: &str| r.model.levels.iter().find(|l| l.title == title).unwrap();
+    let count = |title: &str, definition: &str| {
+        level(title).objects.iter().filter(|o| o.definition.as_deref().is_some_and(|d| d.ends_with(definition))).count()
+    };
+    assert_eq!((count("blk", "$IO_PORT"), count("blk", "$PORT_LIST"), count("blk", "port_column")), (2, 1, 0));
+    assert_eq!((count("top", "$IO_PORT"), count("top", "port_column")), (2, 1));
+    let distances = level("blk").constraints.iter().filter(|c| c.kind == "DISTANCE" && c.priority == "low").count();
+    assert_eq!(distances, 2, "from the list's point to R1 and R3");
+}
+
+#[test]
+fn port_fill_of_many_ports_and_instances_stays_within_the_expansion_limit() {
+    // 10 port tags and 103 instances: 103 facts from the column's point, where a fact for each tag
+    // and instance would be 1030, beyond the limit of 1024 in one statement (RNL5004)
+    let ports: Vec<String> = (0..10).map(|k| format!("p{k}")).collect();
+    let mut text = format!(
+        "* ten ports
+* @RNL(type=\"header\") {{ @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }}
+.subckt big {}
+",
+        ports.join(" ")
+    );
+    for k in 0..103 {
+        text += &format!(
+            "R{k} {} n{k} 1k
+",
+            ports[k % 10]
+        );
+    }
+    text += ".ends big
+.end
+";
+    let r = read(&MemoryProvider::new().with("t.sp", &text), &Options::default());
+    let all: Vec<String> =
+        r.diagnostics().iter().filter(|d| d.severity == Severity::Error).map(|d| r.sink.render(d)).collect();
+    assert!(all.is_empty(), "{all:?}");
+    let level = r.model.levels.iter().find(|l| l.title == "big").unwrap();
+    let distances = level.constraints.iter().filter(|c| c.kind == "DISTANCE" && c.priority == "low").count();
+    assert_eq!(distances, 103);
 }
 
 /// The net-label stubs of the level, by the pin each is attached to.

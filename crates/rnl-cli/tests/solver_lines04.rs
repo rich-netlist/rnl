@@ -146,6 +146,7 @@ fn line_results_complete_configured_junctions_and_replay_the_written_file() {
                 &level.solved.report.kept,
                 &read,
                 1e-6,
+                &rnl_cli::junction_completion_problem::auxiliary(&level.problem),
             )
         };
         assert!(!level.solved.report.kept.is_empty());
@@ -173,6 +174,7 @@ fn line_results_complete_configured_junctions_and_replay_the_written_file() {
                 &level.solved.report.kept,
                 &read,
                 1e-6,
+                &rnl_cli::junction_completion_problem::auxiliary(&contradicted),
             )
             .is_err(),
             "a claimed kept fact must actually hold in the drawing"
