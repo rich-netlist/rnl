@@ -69,14 +69,24 @@ function takenWhere(row, of) {
  * and no other (the layout takes a layer whole, its other objectives with it). The text itself where all are taken or none
  * is given; "" where no layer is, which is the setting left out.
  */
-function takenObjectives(table, text, of) {
+function takenObjectives(table, setting, text, of) {
   if (typeof text !== "string" || text.trim() === "none") return text;
-  const known = new Map((table.objectives ?? []).map((o) => [o.name, o]));
+  const known = new Map(itemsOf(table, setting).map((o) => [o.name, o]));
   const layers = parseObjectives(text);
   // an objective the table does not know is the solver's to judge
   const kept = layers.filter((layer) => layer.items.some((item) => takenWhere(known.get(item.name), of)));
   if (kept.length === layers.length) return text;
-  return kept.length === 0 ? "" : objectivesText(kept);
+  return kept.length === 0 ? "" : objectivesText(kept, sortedLayers(setting));
+}
+
+/** The objectives a setting of the type chooses among: its own `items`, or the table's objectives where it names none. */
+function itemsOf(table, setting) {
+  return setting?.items ?? table.objectives ?? [];
+}
+
+/** Whether the items of a layer are written by name: a setting with its own `items` is compared with its default so. */
+function sortedLayers(setting) {
+  return setting?.items !== undefined;
 }
 
 /**
@@ -90,8 +100,8 @@ export function takenValues(table, values) {
   for (const [key, value] of Object.entries(values)) {
     const setting = table.settings.find((s) => s.key === key);
     if (setting && !takenWhere(setting, of)) continue;
-    if (key === "objectives") {
-      const text = takenObjectives(table, value, of);
+    if (setting?.type === "objectives") {
+      const text = takenObjectives(table, setting, value, of);
       if (text === "") continue;
       out[key] = text;
       continue;
@@ -169,11 +179,16 @@ function parseObjectives(text) {
   });
 }
 
-/** Layers of objectives as the solver writes them: `area+wire_length*2~0.5,turns`, `none` for no layer. */
-function objectivesText(layers) {
+/**
+ * Layers of objectives as the solver writes them: `area+wire_length*2~0.5,turns`, `none` for no layer. With `sorted`, the
+ * items of a layer by name, as the solver writes a setting of its own items, so that one that differs from the default
+ * only in the order of a layer is no change.
+ */
+function objectivesText(layers, sorted = false) {
   if (layers.length === 0) return "none";
   const one = (layer) => {
-    const items = layer.items.map((i) => (i.weight === 1 ? i.name : `${i.name}*${i.weight}`)).join("+");
+    const named = sorted ? [...layer.items].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)) : layer.items;
+    const items = named.map((i) => (i.weight === 1 ? i.name : `${i.name}*${i.weight}`)).join("+");
     return layer.tolerance ? `${items}~${layer.tolerance}` : items;
   };
   return layers.map(one).join(",");
@@ -387,47 +402,52 @@ function holds(when, of) {
 }
 
 /**
- * How a layout ranks the drawings it makes, which no setting changes but the objectives it takes: the table's
- * `lines_order`, first rank first, to be read, not set. The rank of the objectives is the rows above.
+ * A rank that stays where it is whatever the settings, as a row of the list: the table's `lines_order` has the
+ * ranks of the line layout, first rank first, and what the setting does not move is read there.
  */
-function rankingOf(order) {
-  const box = document.createElement("details");
-  box.className = "lines-order";
-  const head = document.createElement("summary");
-  setText(head, m("How the layout ranks its drawings"));
-  const what = document.createElement("p");
-  what.className = "dialog-note";
-  setText(what, order.what ?? "");
-  const list = document.createElement("ol");
-  list.className = "lines-order-list";
-  for (const rank of order.ranks ?? []) {
-    const li = document.createElement("li");
-    li.dataset.name = rank.name;
-    li.classList.toggle("rules", rank.name === "rules");
-    append(li, span("objective-name", rank.name), span("objective-what", rank.what ?? ""));
-    list.append(li);
-  }
-  append(box, head, what, list);
-  return box;
+function fixedRow(rank) {
+  const li = document.createElement("li");
+  li.className = "objective fixed";
+  li.classList.toggle("rules", rank.name === "rules");
+  li.dataset.name = rank.name;
+  const badge = span("objective-level", "·");
+  setAttr(badge, "title", m("Fixed: it ranks here whatever the settings"));
+  const top = document.createElement("div");
+  top.className = "objective-top";
+  append(top, badge, span("objective-name", rank.name), span("objective-what", rank.what ?? ""));
+  li.append(top);
+  return li;
 }
 
 /**
  * The objectives as an ordered list of rows, each with buttons that move it up and down, a check
  * box that turns it on, one that puts it in the level of the objective above, its weight, and for
- * the first of a level how far from the best a value still counts as equal to it. `order` is the ranking of the layout that has one, shown beneath; `set(text)`
- * fills them, and `read()` gives `{ value }`, the text of the layers the rows make, or `{ error }`.
+ * the first of a level how far from the best a value still counts as equal to it, unless the setting
+ * says `tolerance: false`. `order` is the ranking of the layout where the setting is a part of it: its fixed
+ * ranks are rows that do not move, above the first row and below the last as the table has them; `set(text)`
+ * fills the rows, and `read()` gives `{ value }`, the text of the layers the rows make, or `{ error }`.
  */
-function objectiveRows(objectives, order) {
+function objectiveRows(objectives, { order = null, withTolerance = true, sorted = false } = {}) {
   const el = document.createElement("div");
   el.className = "objectives";
   const note = document.createElement("p");
   note.className = "dialog-note";
-  setText(note, m("The solver ranks valid placements by these objective tiers from top to bottom. Objectives combined in the same tier are summed by weight; placements within the tier's tolerance of the best score tie and are broken by the next tier. Disabled objectives are skipped."));
+  setText(note, order?.what ?? m("The solver ranks valid placements by these objective tiers from top to bottom. Objectives combined in the same tier are summed by weight; placements within the tier's tolerance of the best score tie and are broken by the next tier. Disabled objectives are skipped."));
   const list = document.createElement("ol");
   list.className = "objective-list";
-  append(el, note, list);
-  const ranking = order ? rankingOf(order) : null;
-  if (ranking) el.append(ranking);
+  append(el, note);
+  if (order && !withTolerance) {
+    const more = document.createElement("p");
+    more.className = "dialog-note";
+    setText(more, m("Items put in the same tier are summed by weight. Items turned off are skipped."));
+    el.append(more);
+  }
+  el.append(list);
+  // the fixed ranks around the rows that move: those before the first that moves, and those after
+  const ranks = order?.ranks ?? [];
+  const firstFree = ranks.findIndex((r) => !r.fixed);
+  const before = (firstFree < 0 ? ranks : ranks.slice(0, firstFree)).filter((r) => r.fixed).map(fixedRow);
+  const after = firstFree < 0 ? [] : ranks.slice(firstFree).filter((r) => r.fixed).map(fixedRow);
   const info = new Map(objectives.map((o) => [o.name, o]));
   let rows = []; // { name, el, on, together, weight, tolerance, ... } in the order shown
   // what the layout shown takes: `of(key)` is a setting's value; a row it does not take is hidden, or greyed with `showOther`
@@ -470,7 +490,7 @@ function objectiveRows(objectives, order) {
     append(top, badge, label, tag, what, moves);
     const more = document.createElement("div");
     more.className = "objective-more";
-    append(more, together.caption, weight.caption, tolerance.caption);
+    append(more, together.caption, weight.caption, ...(withTolerance ? [tolerance.caption] : []));
     append(li, top, more);
     on.addEventListener("change", () => {
       r.on = on.checked;
@@ -516,6 +536,11 @@ function objectiveRows(objectives, order) {
     return b;
   }
 
+  /** The list: the fixed ranks above, the rows, the fixed ranks below. */
+  function show() {
+    list.replaceChildren(...before, ...rows.map((x) => x.el), ...after);
+  }
+
   /** Move a row by one place; the button keeps the focus. */
   function move(r, by, button) {
     const k = rows.indexOf(r);
@@ -525,7 +550,7 @@ function objectiveRows(objectives, order) {
     if (to < 0 || to >= rows.length) return;
     rows.splice(k, 1);
     rows.splice(to, 0, r);
-    list.replaceChildren(...rows.map((x) => x.el));
+    show();
     refresh();
     (button.disabled ? (by < 0 ? r.down : r.up) : button).focus();
   }
@@ -577,14 +602,13 @@ function objectiveRows(objectives, order) {
     /** Show the rows as the layout the values of `of` name takes them; `showOther` shows the others greyed. */
     take(of, showOther) {
       context = { of, showOther };
-      if (ranking) ranking.hidden = !holds(order.applies ?? { layout: ["lines"] }, of);
       refresh();
     },
     /** How many objectives the layout shown does not use, with the tiers that hold none it uses. */
     hidden: () => hiddenRows,
     set(text) {
       rows = rowsOf(parseObjectives(text), objectives).map(make);
-      list.replaceChildren(...rows.map((x) => x.el));
+      show();
       refresh();
     },
     get() {
@@ -598,13 +622,13 @@ function objectiveRows(objectives, order) {
         if (r.on && (r.weight.trim() === "" || !Number.isInteger(weight))) {
           return { error: m`Weight of ${r.name} must be a whole number.` };
         }
-        if (leader && (r.tolerance.trim() === "" || !Number.isFinite(tolerance))) {
+        if (withTolerance && leader && (r.tolerance.trim() === "" || !Number.isFinite(tolerance))) {
           return { error: m`Tolerance of ${r.name}'s tier must be a number.` };
         }
-        out.push({ name: r.name, on: r.on, together: r.together, weight: r.on ? weight : 1, tolerance: leader ? tolerance : 0 });
+        out.push({ name: r.name, on: r.on, together: r.together, weight: r.on ? weight : 1, tolerance: leader && withTolerance ? tolerance : 0 });
         anyOn = anyOn || r.on;
       }
-      return { value: objectivesText(layersOf(out)) };
+      return { value: objectivesText(layersOf(out), sorted) };
     },
     shown: () => "",
   };
@@ -624,7 +648,11 @@ function fieldsOf(table) {
     if (!byGroup.has(setting.group)) byGroup.set(setting.group, []);
     const hint = span("settings-hint", setting.what ?? "");
     const kind = setting.type === "objectives"
-      ? objectiveRows(table.objectives ?? [], table.lines_order)
+      ? objectiveRows(itemsOf(table, setting), {
+          order: setting.items !== undefined ? table.lines_order : null,
+          withTolerance: setting.tolerance !== false,
+          sorted: sortedLayers(setting),
+        })
       : control(setting);
     // a setting with no default is given or not: a box says which
     const optional = setting.default === undefined && setting.type !== "boolean" && setting.type !== "objectives";
@@ -772,7 +800,7 @@ function differences(table, values) {
     if (value === undefined) continue;
     const same =
       setting.type === "objectives"
-        ? typeof setting.default === "string" && objectivesText(parseObjectives(setting.default)) === value
+        ? typeof setting.default === "string" && objectivesText(parseObjectives(setting.default), sortedLayers(setting)) === value
         : JSON.stringify(value) === JSON.stringify(setting.default);
     if (!same) kept[setting.key] = value;
   }

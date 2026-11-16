@@ -30,8 +30,14 @@ const setting = (page, key) => dialog(page).locator(`.setting[data-key="${key}"]
 /** The control of a setting, by its key. */
 const field = (page, key) => dialog(page).getByLabel(key, { exact: true });
 
-/** An objective's row of the dialog. */
-const objective = (page, name) => dialog(page).locator(`.objective[data-name="${name}"]`);
+/** An objective's row of the dialog, of the setting `objectives`, or of the setting `key`. */
+const objective = (page, name, key = "objectives") => setting(page, key).locator(`.objective[data-name="${name}"]`);
+
+/** The rows of the setting `lines_order` in the order shown: the name, and whether it is fixed or else on. */
+const ranks = (page) =>
+  setting(page, "lines_order")
+    .locator(".objective")
+    .evaluateAll((rows) => rows.map((r) => [r.dataset.name, r.classList.contains("fixed") ? "fixed" : !r.classList.contains("off")]));
 
 /** Open Solve > Settings. */
 async function open(page) {
@@ -47,7 +53,7 @@ async function ok(page) {
 
 /** The objectives of the dialog in the order shown, each with whether it is on. */
 const order = (page) =>
-  dialog(page)
+  setting(page, "objectives")
     .locator(".objective")
     .evaluateAll((rows) => rows.map((r) => [r.dataset.name, !r.classList.contains("off")]));
 
@@ -121,7 +127,7 @@ test.describe("on the desktop", () => {
     // the objectives: the default layers in order, then those that are off
     expect(await order(page)).toEqual([...DEFAULT_ORDER.map((n) => [n, true]), ...OFF.map((n) => [n, false])]);
     // (the default layout is lines: it takes four objectives, crowding of them on, and the rest are hidden, their tiers not counted)
-    await expect(dialog(page).locator(".objective:not([hidden])")).toHaveCount(4);
+    await expect(setting(page, "objectives").locator(".objective:not([hidden])")).toHaveCount(4);
     await expect(objective(page, "crowding").locator(".objective-level")).toHaveText("1");
     await expect(objective(page, "turns").locator(".objective-level")).toHaveText("–");
     // an objective that this version does not compute says so
@@ -262,7 +268,7 @@ test.describe("on the desktop", () => {
     expect(await viewer.stored("solve-config")).toEqual({ limit: "work", work: 243750 });
   });
 
-  test("the weights of a crossing and of a bend are two boxes of one array that follows the lines layout, and the order of its ranking is shown beside the objectives", async ({ page, viewer }) => {
+  test("the weights of a crossing and of a bend are two boxes of one array that follows the lines layout, as does the ranking", async ({ page, viewer }) => {
     await open(page);
     const row = setting(page, "lines_weights");
     const crossing = field(page, "lines_weights crossing");
@@ -298,17 +304,11 @@ test.describe("on the desktop", () => {
     await page.evaluate(() => (window.fakeShell.settingErrors = []));
     await crossing.fill("2");
     await bend.fill("3");
-    // the ranking of the layout is read beside the objectives, and the rank of the objectives is marked
-    const ranking = dialog(page).locator(".lines-order");
-    await expect(ranking).toBeVisible();
-    await ranking.locator("summary").click();
-    await expect(ranking.locator("li .objective-name")).toHaveText(["complete", "facts", "annotations", "rules", "current", "crossings_and_bends", "hidden_ports"]);
-    await expect(ranking.locator("li.rules")).toHaveCount(1);
-    await expect(ranking.locator("li").nth(3)).toHaveClass(/rules/);
+    await expect(setting(page, "lines_order")).toBeVisible();
     // rows has neither the weights nor the ranking, and keeps what was set
     await field(page, "layout").selectOption("rows");
     await expect(row).toBeHidden();
-    await expect(ranking).toBeHidden();
+    await expect(setting(page, "lines_order")).toBeHidden();
     await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --solver-config 'layout="rows"'`);
     await field(page, "layout").selectOption("lines");
     await expect(crossing).toHaveValue("2");
@@ -416,6 +416,65 @@ test.describe("on the desktop", () => {
     await dialogGone(page);
     // Cancel kept the first order
     expect((await viewer.stored("solve-config")).objectives).toContain("crossings+wire_length*2~0.5");
+  });
+
+  test("the ranking of the lines layout is a list of its own: the fixed ranks stay, the items are turned on and off and ordered", async ({ page, viewer }) => {
+    await open(page);
+    const row = setting(page, "lines_order");
+    const FIXED = ["complete", "facts", "false_joins", "low_facts", "groups", "routed", "merge", "annotations", "rules"];
+    const ITEMS = ["current", "crossings_and_bends", "hidden_ports", "mirror_pairs", "dots_near_pins", "length", "symbol_lines", "wire_lines", "area"];
+    // the default: the fixed ranks, then the items that are on, in the solver's order, and rail_heights, which is off, last
+    await expect(row.locator(".dialog-note").first()).toContainText("The lines layout ranks the drawings it makes in this order");
+    expect(await ranks(page)).toEqual([...FIXED.map((n) => [n, "fixed"]), ...ITEMS.map((n) => [n, true]), ["rail_heights", false]]);
+    // a fixed rank does not move and is not turned off; the rules rank is marked
+    await expect(objective(page, "rules", "lines_order")).toHaveClass(/rules/);
+    await expect(objective(page, "rules", "lines_order").locator("input, button")).toHaveCount(0);
+    await expect(objective(page, "complete", "lines_order").locator(".objective-what")).toHaveText("A drawing of the whole level made.");
+    // the first item does not go up past the fixed ranks, and no item has a tolerance
+    await expect(objective(page, "current", "lines_order").getByRole("button", { name: "Move up: current" })).toBeDisabled();
+    await expect(objective(page, "rail_heights", "lines_order").getByRole("button", { name: "Move down: rail_heights" })).toBeDisabled();
+    await expect(row.getByLabel("equal within")).toHaveCount(0);
+    // the layer of the symbol rows and the wire lines is two items, joined, with weights
+    await expect(objective(page, "symbol_lines", "lines_order").locator(".objective-level")).toHaveText("7");
+    await expect(objective(page, "wire_lines", "lines_order").locator(".objective-level")).toHaveText("+");
+    await expect(objective(page, "wire_lines", "lines_order").getByLabel("with the one above")).toBeChecked();
+    await expect(asText(page)).toHaveText("The defaults of rnl solve.");
+    // the wire lines weigh 2, the current is turned off, rail_heights is on after the area, and the area goes up past the length
+    await objective(page, "wire_lines", "lines_order").getByLabel("weight").fill("2");
+    await objective(page, "current", "lines_order").getByLabel("current is on").uncheck();
+    await objective(page, "rail_heights", "lines_order").getByLabel("rail_heights is on").check();
+    const up = objective(page, "area", "lines_order").getByRole("button", { name: "Move up: area" });
+    await up.click();
+    await up.click();
+    await up.click();
+    await expect(up).toBeFocused();
+    const text = "crossings_and_bends,hidden_ports,mirror_pairs,dots_near_pins,area,length,symbol_lines+wire_lines*2,rail_heights";
+    await expect(asText(page)).toHaveText(`Equivalent CLI command: rnl solve --solver-config 'lines_order="${text}"'`);
+    await ok(page);
+    expect(await viewer.stored("solve-config")).toEqual({ lines_order: text });
+    expect(await solved(page, viewer)).toEqual({ config: `lines_order="${text}"`, timeall: null });
+    expect((await viewer.calls("checkSettings")).at(-1)).toEqual([`lines_order="${text}"`]);
+    // shown again as it was kept, the fixed ranks where they were
+    await open(page);
+    expect((await ranks(page)).map(([n]) => n)).toEqual([...FIXED, "crossings_and_bends", "hidden_ports", "mirror_pairs", "dots_near_pins", "area", "length", "symbol_lines", "wire_lines", "rail_heights", "current"]);
+    await expect(objective(page, "current", "lines_order")).toHaveClass(/off/);
+    await expect(objective(page, "wire_lines", "lines_order").getByLabel("weight")).toHaveValue("2");
+    // none at all is none: the line layout ranks by nothing after its rules
+    for (const [name, on] of await ranks(page)) if (on === true) await objective(page, name, "lines_order").getByLabel(`${name} is on`).uncheck();
+    await expect(asText(page)).toContainText('lines_order="none"');
+    // Restore Defaults is no change at all
+    await dialog(page).getByRole("button", { name: "Restore Defaults" }).click();
+    await ok(page);
+    expect(await viewer.stored("solve-config")).toEqual({});
+  });
+
+  test("the layout shown decides the lists: rows has the objectives and not the ranking", async ({ page }) => {
+    await open(page);
+    await expect(setting(page, "lines_order")).toBeVisible();
+    await expect(setting(page, "objectives")).toBeVisible();
+    await field(page, "layout").selectOption("rows");
+    await expect(setting(page, "lines_order")).toBeHidden();
+    await expect(setting(page, "objectives")).toBeVisible();
   });
 
   test("the time for the whole file is beside the settings, not one of them: kept on its own, given to a solve as timeall and not to the check", async ({ page, viewer }) => {
@@ -571,7 +630,7 @@ test.describe("on the desktop", () => {
 
   test("the layout decides what the dialog shows: what others take is hidden, its values are kept, and it is shown greyed on request", async ({ page, viewer }) => {
     await open(page);
-    const names = () => dialog(page).locator(".objective:not([hidden])").evaluateAll((rows) => rows.map((r) => r.dataset.name));
+    const names = () => setting(page, "objectives").locator(".objective:not([hidden])").evaluateAll((rows) => rows.map((r) => r.dataset.name));
     const other = dialog(page).locator(".settings-other");
     // lines, the default: its spacing, and four objectives; the rows' beam and caps and the other objectives are hidden
     await expect(setting(page, "spacing_x")).toBeVisible();
@@ -595,7 +654,7 @@ test.describe("on the desktop", () => {
     await expect(setting(page, "beam")).toBeVisible();
     await expect(setting(page, "candidates")).toBeVisible();
     expect((await names()).length).toBe(OFF.length + LEVELS);
-    await expect(other).toContainText("4 settings of other layouts are hidden.");
+    await expect(other).toContainText("6 settings of other layouts are hidden.");
     // a value set for one layout is kept while another is shown, and the dialog says so
     await field(page, "beam").fill("9");
     await field(page, "layout").selectOption("lines");
@@ -619,13 +678,36 @@ test.describe("on the desktop", () => {
     expect((await solved(page, viewer)).config).toBe('beam=9,layout="rows"');
   });
 
+  test.describe("a ranking kept with a layer in another order", () => {
+    test.use({ keptSettings: { "solve-config": { lines_order: "current,wire_lines+symbol_lines*2,area" } } });
+
+    test("is shown as written, and is written by the names of its layer", async ({ page, viewer }) => {
+      await open(page);
+      expect((await ranks(page)).slice(9, 13)).toEqual([["current", true], ["wire_lines", true], ["symbol_lines", true], ["area", true]]);
+      await expect(objective(page, "symbol_lines", "lines_order").getByLabel("weight")).toHaveValue("2");
+      await ok(page);
+      expect(await viewer.stored("solve-config")).toEqual({ lines_order: "current,symbol_lines*2+wire_lines,area" });
+    });
+  });
+
+  test.describe("a ranking that is the default in another order of its layer", () => {
+    test.use({ keptSettings: { "solve-config": { lines_order: "current,crossings_and_bends,hidden_ports,mirror_pairs,dots_near_pins,length,wire_lines+symbol_lines,area" } } });
+
+    test("is no change at all", async ({ page, viewer }) => {
+      await open(page);
+      await expect(asText(page)).toHaveText("The defaults of rnl solve.");
+      await ok(page);
+      expect(await viewer.stored("solve-config")).toEqual({});
+    });
+  });
+
   test.describe("a tier of objectives that a layout takes whole", () => {
     // lines takes a tier whole that holds one of its four objectives: turns counts with crowding, crossings is no one's
     test.use({ keptSettings: { "solve-config": { objectives: "overlaps,turns+crowding,crossings" } } });
 
     test("is shown with the objective that is the layout's, and what the solver gets leaves out the tiers that hold none", async ({ page, viewer }) => {
       await open(page);
-      const names = () => dialog(page).locator(".objective:not([hidden])").evaluateAll((rows) => rows.map((r) => r.dataset.name));
+      const names = () => setting(page, "objectives").locator(".objective:not([hidden])").evaluateAll((rows) => rows.map((r) => r.dataset.name));
       expect(await names()).toEqual(["overlaps", "turns", "crowding", "misleading", "wire_over_symbol"]);
       await expect(objective(page, "turns").locator(".objective-tag")).toBeVisible();
       await expect(objective(page, "turns").locator(".objective-tag")).toHaveText("taken with its tier");
