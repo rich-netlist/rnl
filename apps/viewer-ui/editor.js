@@ -12,7 +12,8 @@ import { decide, inform, modal } from "./dialog.js";
 import { applyEdits, currentSource, openSource } from "./open.js";
 import * as edits from "./edits.js";
 import { downloads, shell } from "./shell.js";
-import { previewing } from "./solve.js";
+import { previewKind, previewing, refreshPreviewBadge, solve } from "./solve.js";
+import { setPane } from "./panels.js";
 import { doc } from "./state.js";
 import { fileShown, fileViews, showFile, sourceLineHeight, refreshSource, setRnlOnly } from "./text.js";
 import { setPathText, sourcePath } from "./source-path.js";
@@ -169,6 +170,8 @@ export function focusEditor() {
 
 /** Show a line of a file in its text box, selected, in the middle of it; the text box is not given the focus. */
 export function revealInEditor(f, line) {
+  // the lines of a preview are those of the solved files, not of the text boxes
+  if (previewing()) return;
   const path = doc && doc.files[f] ? doc.files[f].path : null;
   const e = editors.get(path);
   if (!e) return;
@@ -193,6 +196,7 @@ export function refreshEditing() {
   const unapplied = edits.unappliedPaths();
   const dirty = edits.dirtyPaths();
   pane.classList.toggle("editing", editing);
+  refreshPreviewBadge();
   const state = $("edit-state");
   state.hidden = !editing;
   state.dataset.state = unapplied.length > 0 ? "unapplied" : dirty.length > 0 ? "unsaved" : "clean";
@@ -231,15 +235,10 @@ export async function toggleEdit() {
       await inform({ title: m("Edit Text"), paragraphs: [m("Open a netlist first: File › Open File (Ctrl+O).")] });
       return;
     }
-    if (previewing()) {
-      await inform({
-        title: m("Edit Text"),
-        paragraphs: [m("Cannot edit while viewing a solve preview. Choose Solve › Close Preview to return to the netlist.")],
-      });
-      return;
-    }
     keepPosition();
     setRnlOnly(false);
+    // the text is in the netlist view, not in the report of a solve the side panel shows
+    if (previewing()) setPane("netlist");
     editing = true;
     setCheck("toggle-edit", true);
     renderEditors();
@@ -249,12 +248,12 @@ export async function toggleEdit() {
     focusEditor();
     return;
   }
-  await stopEditing();
+  await stopEditing(true);
 }
 
-/** All exits apply first, including programmatic exits such as Solve. */
-export async function stopEditing() {
-  return applyChanges();
+/** All exits apply first, including programmatic exits such as Solve; only the user's exit asks about solving again. */
+export async function stopEditing(ask = false) {
+  return applyChanges(ask);
 }
 
 function finishEditing() {
@@ -265,19 +264,41 @@ function finishEditing() {
   if (document.activeElement === document.body) source.focus({ preventScroll: true });
 }
 
-/** Apply and exit, even when a rebuild reports errors. No changes means no rebuild. */
-export async function applyChanges() {
-  if (!doc || !editing || exiting) return false;
+/**
+ * Apply and exit, even when a rebuild reports errors. No changes means no rebuild. A solve shown as a preview does not
+ * hold the changes: with `ask`, which is when the user applies, the user is asked whether to solve again, which Enter
+ * answers yes: the changes are applied and the netlist solved again, shown as a new preview; with No the changes are
+ * applied and the preview ends; Cancel goes on editing.
+ */
+export async function applyChanges(ask = true) {
+  if (!doc || !editing || exiting || modal()) return false;
+  let again = null;
+  if (ask && previewing() && edits.unappliedPaths().length > 0) {
+    const kind = previewKind();
+    const choice = await decide({
+      title: m("Solve Again"),
+      paragraphs: [
+        m("Solve the netlist again with these changes?"),
+        m("Yes applies the changes and shows a new preview. No applies them and closes the preview. Cancel goes on editing."),
+      ],
+      action: "Yes",
+      others: ["No"],
+    });
+    if (choice === null || !editing || !doc) return false;
+    if (choice === "Yes") again = kind;
+  }
   exiting = true;
   keepPosition();
+  let ok = false;
   try {
-    const ok = edits.unappliedPaths().length === 0 || await applyEdits();
+    ok = edits.unappliedPaths().length === 0 || await applyEdits();
     if (ok) note(m("Changes applied; editing closed."));
-    return ok;
   } finally {
     exiting = false;
     finishEditing();
   }
+  if (ok && again) await solve(again);
+  return ok;
 }
 
 /** Discard only pending edits; already applied, unsaved text remains available to Save. */

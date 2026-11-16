@@ -190,21 +190,128 @@ test.describe("on the desktop", () => {
     expect(await viewer.builds()).toBe(builds + 1);
   });
 
-  test("a preview is not edited, and a solve is of the text applied", async ({ page, viewer }) => {
+  /** Solve the fixture with a note typed in the text first: the preview of T4, and the pane back to reading. */
+  async function previewWithNote(viewer, page) {
     await open(viewer, page, "T4-miller-conflicts");
     // Solve exits editing, applying the pending text first
     await type(page, `${await text(page)}\n* a note`);
     await page.evaluate(() => window.viewer.command("solve"));
-    await page.waitForFunction(() => document.body.classList.contains("preview") && !document.body.classList.contains("solving"));
+    await shownPreview(page);
     expect(Object.values(await page.evaluate(() => window.fakeShell.solveEdits.at(-1)))[0]).toContain("* a note");
-    // A preview is not edited; the change was applied before solving
-    await expect(page.locator("#source .editor")).toHaveCount(0);
     await expect(page.locator("#solve-step")).not.toContainText("Changes not applied yet are not in it.");
     expect(await checked(page, "toggle-edit")).toBe(false);
+  }
+
+  /** Wait for a preview shown, with nothing under way. */
+  const shownPreview = (page) =>
+    page.waitForFunction(() => document.body.classList.contains("preview") && !document.body.classList.contains("solving") && !document.body.classList.contains("busy"));
+
+  test("a preview is edited as the file was written, and the preview stays as it was while the text is not applied", async ({ page, viewer }) => {
+    await previewWithNote(viewer, page);
     await page.evaluate(() => window.viewer.command("toggle-edit"));
-    await expect(dialog(page)).toContainText("Cannot edit while viewing a solve preview");
-    await answer(page, "Close");
-    // closing the preview shows the netlist again, and the changes are still there to apply
+    await expect(dialog(page)).toHaveCount(0);
+    // the text boxes hold the file as written with the changes applied, not the solved text, and the preview is still shown
+    expect(await checked(page, "toggle-edit")).toBe(true);
+    expect((await text(page)).endsWith("\n* a note")).toBe(true);
+    expect(await text(page)).not.toContain('@RNL(type="generated"');
+    await expect(page.locator("body")).toHaveClass(/preview/);
+    await expect(page.locator("#preview-badge")).toHaveText("Solved preview: the edits are not in it");
+    // nothing to apply: leaving asks nothing and the preview stays
+    const builds = await viewer.builds();
+    await page.evaluate(() => window.viewer.command("toggle-edit"));
+    await expect(dialog(page)).toHaveCount(0);
+    await expect(page.locator("#source .editor")).toHaveCount(0);
+    await expect(page.locator("body")).toHaveClass(/preview/);
+    await expect(page.locator("#preview-badge")).toHaveText("Solved preview: the files are unchanged");
+    expect(await viewer.builds()).toBe(builds);
+    expect((await viewer.calls("solve")).length).toBe(1);
+  });
+
+  test("applying text edited in a preview asks whether to solve again, and Enter says yes", async ({ page, viewer }) => {
+    await previewWithNote(viewer, page);
+    await page.evaluate(() => window.viewer.command("toggle-edit"));
+    await type(page, `${await text(page)}\n* more`);
+    await page.keyboard.press("Control+q");
+    // the question has Yes for its default, No, and Cancel
+    await expect(dialog(page)).toContainText("Solve the netlist again with these changes?");
+    await expect(dialog(page).getByRole("button", { name: "Yes" })).toHaveClass(/default/);
+    await expect(dialog(page).getByRole("button", { name: "No" })).toBeVisible();
+    await expect(dialog(page).getByRole("button", { name: "Cancel" })).toBeVisible();
+    await page.keyboard.press("Enter");
+    await expect(dialog(page)).toHaveCount(0);
+    // the changes were applied and the text applied solved again: a new preview
+    await expect.poll(async () => (await viewer.calls("solve")).length).toBe(2);
+    await shownPreview(page);
+    expect(Object.values(await page.evaluate(() => window.fakeShell.buildEdits.at(-1)))[0]).toMatch(/\* a note\r?\n\* more$/);
+    expect(Object.values(await page.evaluate(() => window.fakeShell.solveEdits.at(-1)))[0]).toMatch(/\* a note\r?\n\* more$/);
+    await expect(page.locator("#source .editor")).toHaveCount(0);
+    expect(await checked(page, "toggle-edit")).toBe(false);
+    await expect(page.locator("#preview-badge")).toHaveText("Solved preview: the files are unchanged");
+    await expect(page.locator("#solve-step")).not.toContainText("Changes not applied yet are not in it.");
+  });
+
+  test("a preview made by Respace is made again by yes", async ({ page, viewer }) => {
+    await open(viewer, page, "T4-miller-conflicts");
+    await page.evaluate(() => window.viewer.command("solve-respace"));
+    await shownPreview(page);
+    await page.evaluate(() => window.viewer.command("toggle-edit"));
+    await expect(page.locator("#preview-badge")).toHaveText("Respaced preview: the edits are not in it");
+    await type(page, `${await text(page)}\n* a note`);
+    await page.locator("#apply-edits").click();
+    await page.keyboard.press("Enter");
+    await expect.poll(async () => (await viewer.calls("solve")).length).toBe(2);
+    await shownPreview(page);
+    expect((await viewer.calls("solve")).map(([, settings]) => settings.respace === true)).toEqual([true, true]);
+    await expect(page.locator("#preview-badge")).toHaveText("Respaced preview: the files are unchanged");
+  });
+
+  test("No applies the changes and closes the preview, and Cancel goes on editing", async ({ page, viewer }) => {
+    await previewWithNote(viewer, page);
+    await page.evaluate(() => window.viewer.command("toggle-edit"));
+    await type(page, `${await text(page)}\n* more`);
+    // Cancel: still editing, still not applied, the preview as it was
+    const builds = await viewer.builds();
+    await page.keyboard.press("Control+q");
+    await answer(page, "Cancel");
+    expect(await checked(page, "toggle-edit")).toBe(true);
+    await expect(state(page)).toHaveText("Changes not applied yet");
+    await expect(page.locator("body")).toHaveClass(/preview/);
+    expect(await viewer.builds()).toBe(builds);
+    expect((await viewer.calls("solve")).length).toBe(1);
+    // Escape is Cancel as well
+    await page.keyboard.press("Control+q");
+    await page.keyboard.press("Escape");
+    await expect(dialog(page)).toHaveCount(0);
+    expect(await checked(page, "toggle-edit")).toBe(true);
+    // No: applied, the preview closed, nothing solved
+    await page.keyboard.press("Control+q");
+    await viewer.build(() => answer(page, "No"));
+    expect(Object.values(await page.evaluate(() => window.fakeShell.buildEdits.at(-1)))[0]).toMatch(/\* a note\r?\n\* more$/);
+    await expect(page.locator("body")).not.toHaveClass(/preview/);
+    await expect(page.locator("#preview-badge")).toBeHidden();
+    await expect(page.locator("#source .editor")).toHaveCount(0);
+    expect(await checked(page, "toggle-edit")).toBe(false);
+    expect((await viewer.calls("solve")).length).toBe(1);
+    // the netlist is shown with the changes, which are applied and not saved
+    await begin(page);
+    expect((await text(page)).endsWith("\n* a note\n* more")).toBe(true);
+    await expect(state(page)).toHaveText("Applied, not saved");
+  });
+
+  test("Solve while a preview is edited applies the text and solves it, without asking", async ({ page, viewer }) => {
+    await previewWithNote(viewer, page);
+    await page.evaluate(() => window.viewer.command("toggle-edit"));
+    await type(page, `${await text(page)}\n* more`);
+    await page.keyboard.press("F9");
+    await expect.poll(async () => (await viewer.calls("solve")).length).toBe(2);
+    await shownPreview(page);
+    await expect(dialog(page)).toHaveCount(0);
+    expect(Object.values(await page.evaluate(() => window.fakeShell.solveEdits.at(-1)))[0]).toMatch(/\* a note\r?\n\* more$/);
+    await expect(page.locator("#source .editor")).toHaveCount(0);
+  });
+
+  test("closing the preview shows the netlist again, and the changes are still there to apply", async ({ page, viewer }) => {
+    await previewWithNote(viewer, page);
     await viewer.build(() => page.locator("#preview-close").click());
     expect(Object.values(await page.evaluate(() => window.fakeShell.buildEdits.at(-1)))[0]).toContain("* a note");
     await begin(page);
