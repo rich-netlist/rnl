@@ -73,6 +73,10 @@ pub const DEFAULT_LAYERS: [&str; 12] = [
     "crowding",
 ];
 
+/// The largest weight of an item of `lines_order`: a layer weighs a few items against each other,
+/// and a drawing cut short still ranks after every whole one.
+pub const MAX_LINES_WEIGHT: u32 = 1000;
+
 /// The items by which the line layout ranks its drawings after the facts, the false joins, the
 /// annotations and the rules (`lines_order`), as [`crate::table::LINES_ORDER`] names them.
 pub const LINES_ITEMS: [&str; 10] = [
@@ -128,8 +132,8 @@ impl LinesOrder {
         self.layers.iter().map(layer).collect::<Vec<_>>().join(",")
     }
 
-    /// From its text: every name known ([`LINES_ITEMS`]), none twice, every weight a count of at
-    /// least 1, no layer empty, no tolerance.
+    /// From its text: every name known ([`LINES_ITEMS`]), none twice, every weight a count from 1
+    /// to [`MAX_LINES_WEIGHT`], no layer empty, no tolerance.
     pub fn parse(text: &str) -> Result<LinesOrder, String> {
         if text.trim() == "none" {
             return Ok(LinesOrder { layers: Vec::new() });
@@ -163,6 +167,9 @@ impl LinesOrder {
                 }
                 if weight == 0 {
                     return Err(format!("the weight of `{name}` is 0; leave the item out to turn it off"));
+                }
+                if weight > MAX_LINES_WEIGHT {
+                    return Err(format!("the weight of `{name}` is above {MAX_LINES_WEIGHT}"));
                 }
                 seen.push(name.to_string());
                 parsed.push((name.to_string(), weight));
@@ -879,7 +886,7 @@ mod tests {
         let none = d.with_overrides("lines_order=none").unwrap();
         assert!(none.canonical().ends_with(";lines_order=none"), "{}", none.canonical());
         assert_eq!(SolverOptions::parse(&none.canonical()).unwrap(), none);
-        for bad in ["area,area", "areas", "area~1", "area*0", "area*x", "area,", ""] {
+        for bad in ["area,area", "areas", "area~1", "area*0", "area*1001", "area*x", "area,", ""] {
             assert!(d.with_overrides(&format!("lines_order={bad}")).is_err(), "{bad}");
         }
     }

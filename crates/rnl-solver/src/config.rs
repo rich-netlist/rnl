@@ -439,8 +439,8 @@ fn apply_tool(o: &mut SolverOptions, settings: &[SolverSetting]) -> Result<(), S
 }
 
 /// The objectives the line layout takes from `objectives`: the layers that hold one of them rank
-/// the group-tree layout it starts from (`lines::Rank`). Its own drawings it ranks in a fixed order
-/// ([`crate::table::LINES_ORDER`]), which no setting changes.
+/// the group-tree layout it starts from (`lines::Rank`) and its own drawings, after the ranks fixed
+/// before them ([`crate::table::LINES_ORDER`]) and before the items of `lines_order`.
 pub(crate) const LINES_OBJECTIVES: [Objective; 4] =
     [Objective::Overlaps, Objective::Crowding, Objective::Misleading, Objective::WireOverSymbol];
 
@@ -546,8 +546,8 @@ impl SolverOptions {
             match key {
                 "budget" => settings.extend(value.split(',').map(|p| p.replace(':', "="))),
                 "layout" => settings.push(format!("layout=\"{value}\"")),
-                "objectives" => settings
-                    .push(format!("objectives={}", Lit::Str(rnl_runtime::interp::obj::WStr::new(value, None)).show())),
+                "objectives" | "lines_order" => settings
+                    .push(format!("{key}={}", Lit::Str(rnl_runtime::interp::obj::WStr::new(value, None)).show())),
                 "grid" | "time_limit" if value == "none" => settings.push(format!("{key}=false")),
                 "junction_utf8" => settings.push(format!(
                     "junction={}",
@@ -1046,6 +1046,8 @@ mod tests {
             ("run=time:5;beam=4", "run=\"time:5\";beam=4"),
             ("search=seed;beam=4", "search=\"seed\";beam=4"),
             ("objectives=wire_length;beam=4", "objectives=\"wire_length\";beam=4"),
+            ("lines_order=area,length+wire_lines*2;beam=4", "lines_order=\"area,length+wire_lines*2\";beam=4"),
+            ("lines_order=none;beam=4", "lines_order=\"none\";beam=4"),
         ] {
             let a = d.with_legacy_config(bare).unwrap_or_else(|e| panic!("{bare}: {e}"));
             let b = d.with_legacy_config(quoted).unwrap_or_else(|e| panic!("{quoted}: {e}"));
@@ -1055,6 +1057,8 @@ mod tests {
             assert_eq!(settings, SolverOptions::legacy_settings(bare).0, "{quoted}");
         }
         assert_eq!(SolverOptions::parse("layout=\"tree\";beam=4").unwrap().settings.layout, crate::Layout::Tree);
+        let order = d.with_legacy_config("lines_order=area,length+wire_lines*2").unwrap().for_problem(&p).0;
+        assert_eq!(order.settings.lines_order.canonical(), "area,length+wire_lines*2");
         // a quote that does not close, or a number in quotes, is still wrong
         for bad in ["layout=\"tree;beam=4", "layout=\"tr\"ee\";beam=4", "beam=\"4\";layout=tree"] {
             assert!(d.with_legacy_config(bad).is_err(), "{bad}");
