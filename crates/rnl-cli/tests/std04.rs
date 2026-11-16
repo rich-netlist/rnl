@@ -213,10 +213,10 @@ fn transformer_pins_follow_dotted_first_order() {
     assert_eq!(
         pins,
         vec![
-            (serde_json::json!("p1"), [2.0, 1.0], Some("right")),
-            (serde_json::json!("n1"), [-2.0, 1.0], Some("left")),
-            (serde_json::json!("p2"), [2.0, -1.0], Some("right")),
-            (serde_json::json!("n2"), [-2.0, -1.0], Some("left")),
+            (serde_json::json!("p1"), [-1.0, 2.0], Some("up")),
+            (serde_json::json!("n1"), [-1.0, -2.0], Some("down")),
+            (serde_json::json!("p2"), [1.0, 2.0], Some("up")),
+            (serde_json::json!("n2"), [1.0, -2.0], Some("down")),
         ]
     );
 }

@@ -2001,7 +2001,7 @@
               "source": null
             },
             "orient": {
-              "value": "R0",
+              "value": "R90",
               "source": null
             },
             "pins": [
@@ -2015,8 +2015,8 @@
                 "bus": false,
                 "reference": "#d1::a",
                 "local_at": [
-                  -2.0,
-                  0.0
+                  0.0,
+                  2.0
                 ],
                 "terminals": [
                   "#d1:1"
@@ -2040,8 +2040,8 @@
                 "bus": false,
                 "reference": "#d1::k",
                 "local_at": [
-                  2.0,
-                  0.0
+                  0.0,
+                  -2.0
                 ],
                 "terminals": [
                   "#d1:2"
@@ -2949,17 +2949,17 @@
                 "bus": false,
                 "reference": "#t1::p1",
                 "local_at": [
-                  2.0,
-                  1.0
+                  -1.0,
+                  2.0
                 ],
                 "terminals": [
                   "#t1:1"
                 ],
                 "at": [
-                  12.0,
-                  -39.0
+                  9.0,
+                  -38.0
                 ],
-                "dir": 0,
+                "dir": 90,
                 "nets": [
                   "&a22"
                 ]
@@ -2974,17 +2974,17 @@
                 "bus": false,
                 "reference": "#t1::n1",
                 "local_at": [
-                  -2.0,
-                  1.0
+                  -1.0,
+                  -2.0
                 ],
                 "terminals": [
                   "#t1:2"
                 ],
                 "at": [
-                  8.0,
-                  -39.0
+                  9.0,
+                  -42.0
                 ],
-                "dir": 180,
+                "dir": 270,
                 "nets": [
                   "&b22"
                 ]
@@ -2999,17 +2999,17 @@
                 "bus": false,
                 "reference": "#t1::p2",
                 "local_at": [
-                  2.0,
-                  -1.0
+                  1.0,
+                  2.0
                 ],
                 "terminals": [
                   "#t1:3"
                 ],
                 "at": [
-                  12.0,
-                  -41.0
+                  11.0,
+                  -38.0
                 ],
-                "dir": 0,
+                "dir": 90,
                 "nets": [
                   "&c22"
                 ]
@@ -3024,17 +3024,17 @@
                 "bus": false,
                 "reference": "#t1::n2",
                 "local_at": [
-                  -2.0,
-                  -1.0
+                  1.0,
+                  -2.0
                 ],
                 "terminals": [
                   "#t1:4"
                 ],
                 "at": [
-                  8.0,
-                  -41.0
+                  11.0,
+                  -42.0
                 ],
-                "dir": 180,
+                "dir": 270,
                 "nets": [
                   "&d22"
                 ]
@@ -4064,10 +4064,10 @@
               ]
             ],
             "anchor": [
-              20.0,
+              19.75,
               -18.9
             ],
-            "halign": "middle",
+            "halign": "start",
             "valign": "baseline",
             "rotate": 0.0,
             "size": 1.0,
@@ -4404,10 +4404,10 @@
               ]
             ],
             "anchor": [
-              10.0,
-              -37.95
+              11.6,
+              -40.2
             ],
-            "halign": "middle",
+            "halign": "start",
             "valign": "baseline",
             "rotate": 0.0,
             "size": 1.0,

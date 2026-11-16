@@ -3,6 +3,10 @@ use rnl_runtime::syntax::{Ref, Sep};
 use rnl_runtime::Interpretation;
 use std::collections::BTreeMap;
 
+/// The terminals of a Spectre `transformer` in 0.3 and in 0.4, node by node.
+pub(super) const TRANSFORMER_03: [&str; 4] = ["p_plus", "p_minus", "s_plus", "s_minus"];
+pub(super) const TRANSFORMER_04: [&str; 4] = ["p1", "n1", "p2", "n2"];
+
 #[derive(Default)]
 pub(super) struct HostTerminals {
     positions: BTreeMap<(usize, String, String, bool), usize>,
@@ -13,10 +17,7 @@ impl HostTerminals {
         for level in &input.model.levels {
             for (index, instance) in input.doc.levels[level.level].instances.iter().enumerate() {
                 let Some(names) = level.terminal_names.get(index) else { continue };
-                let defaults_changed = instance
-                    .default_terminals
-                    .as_ref()
-                    .is_some_and(|v| v == &["p_plus", "p_minus", "s_plus", "s_minus"]);
+                let defaults_changed = instance.default_terminals.as_ref().is_some_and(|v| v == &TRANSFORMER_03);
                 let cs = instance.case_sensitive;
                 let key = |s: &str| if cs { s.to_string() } else { s.to_lowercase() };
                 for (position, name) in names.iter().enumerate() {

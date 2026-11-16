@@ -95,7 +95,14 @@ fn each_symbol_of_the_table_keeps_the_pins_of_its_terminals() {
         let id = format!("#X{}", k + 1);
         let pairs: Vec<String> = row.terminals.iter().map(|(n, t)| format!("[{n}, \"{t}\"]")).collect();
         let call = format!("{id} @SET-SYMBOL(terminals=[{}]) ${} ", pairs.join(", "), row.new);
-        assert!(written.contains(&call), "{}: {written}", row.old);
+        // the diodes of 0.4 stand upright: R0 of 0.3 is R90 of 0.4 (the turn back, then R0)
+        let upright = ["LED", "SCHOTTKY_DIODE", "SHOCKLEY_DIODE", "PUT"].contains(&row.new);
+        let orient = if upright { "R90" } else { "R0" };
+        assert!(
+            written.contains(&format!("{call}=> @PLACE({}, 0) => @ORIENT(\"{orient}\")", 20 * k)),
+            "{}: {written}",
+            row.old
+        );
         assert_eq!(pins(&after, &id), pins(&before, &id), "{}", row.old);
         assert_eq!(pins(&before, &id).len(), row.terminals.len(), "{}: every drawn pin is in the table", row.old);
         // a symbol that moves to the standard series is found there, here through rnl-std-all

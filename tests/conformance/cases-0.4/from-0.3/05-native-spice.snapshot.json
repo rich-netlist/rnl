@@ -2168,7 +2168,7 @@
               "source": null
             },
             "orient": {
-              "value": "R0",
+              "value": "R90",
               "source": null
             },
             "pins": [
@@ -2182,8 +2182,8 @@
                 "bus": false,
                 "reference": "#D1::a",
                 "local_at": [
-                  -2.0,
-                  0.0
+                  0.0,
+                  2.0
                 ],
                 "terminals": [
                   "#D1:1"
@@ -2207,8 +2207,8 @@
                 "bus": false,
                 "reference": "#D1::k",
                 "local_at": [
-                  2.0,
-                  0.0
+                  0.0,
+                  -2.0
                 ],
                 "terminals": [
                   "#D1:2"
@@ -4356,10 +4356,10 @@
               ]
             ],
             "anchor": [
-              20.0,
+              19.75,
               -18.9
             ],
-            "halign": "middle",
+            "halign": "start",
             "valign": "baseline",
             "rotate": 0.0,
             "size": 1.0,

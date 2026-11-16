@@ -61,7 +61,8 @@ const SEMICONDUCTORS: Option<&str> = Some("rnl-std-semiconductors");
 const FUNCTIONAL: Option<&str> = Some("rnl-std-functional");
 
 /// Every name of the package in 0.1–0.6 (rnl#481). Each symbol that moves keeps the place and the
-/// direction of each pin, at R0 with no shift; only its outline is the standard one. A terminal
+/// direction of each pin, at R0 with no shift; only its outline is the standard one. The diodes
+/// and the PUT of 0.4 stand upright: an orientation of theirs is composed after R90 (`turned`). A terminal
 /// that no pin draws, such as the controlling pair of an E or G card, stays undrawn.
 pub const TABLE: [Row; 56] = [
     row("CANVAS_AMMETER", "AMMETER", BASIC, PN),
@@ -278,6 +279,11 @@ impl Canvas {
         }
         out.levels = levels;
         out
+    }
+
+    /// The name in 0.4, without `$`, of a symbol of the package by its level and its name in 0.1–0.6.
+    pub(super) fn new_name(&self, level: usize, old: &str) -> Option<&'static str> {
+        self.names.get(&(level, old.to_string())).map(|(new, _)| *new)
     }
 
     /// Whether the file gives the package by a path to a file that is not the published one.

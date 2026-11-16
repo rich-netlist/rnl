@@ -260,6 +260,15 @@ pub(super) fn file(
                 Ok(found) => edits.extend(found),
                 Err(e) => error = Some(e),
             }
+            match context.references.turned.edits(source, record, member) {
+                Ok((found, mixed)) => {
+                    edits.extend(found);
+                    if mixed {
+                        reasons.push(super::turned::MIXED);
+                    }
+                }
+                Err(e) => error = Some(e),
+            }
             reasons.extend(context.references.usage_reviews(path, record, member));
             match context.references.usage_changes(path, source, record, member, context.approximate, report) {
                 Ok((found, preserved)) => {

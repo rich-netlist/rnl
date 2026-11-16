@@ -1777,35 +1777,35 @@
         {
           "name": "$DIODE",
           "box": [
-            -2.0,
             -1.0,
-            2.0,
-            1.0
+            -2.0,
+            1.0,
+            2.0
           ],
           "box_written": true,
           "default": false,
           "pins": [
             {
               "pos": [
-                -2.0,
-                0.0
+                0.0,
+                2.0
               ],
               "terminals": [
                 "a"
               ],
               "label": null,
-              "dir": 180
+              "dir": 90
             },
             {
               "pos": [
-                2.0,
-                0.0
+                0.0,
+                -2.0
               ],
               "terminals": [
                 "k"
               ],
               "label": null,
-              "dir": 0
+              "dir": 270
             }
           ],
           "prims": [
@@ -1813,12 +1813,12 @@
               "shape": "LINE",
               "points": [
                 [
-                  -2.0,
-                  0.0
+                  0.0,
+                  2.0
                 ],
                 [
-                  -0.8333,
-                  0.0
+                  0.0,
+                  0.8333
                 ]
               ],
               "style": {}
@@ -1827,20 +1827,20 @@
               "shape": "LINE",
               "points": [
                 [
-                  -0.8333,
-                  0.675
+                  0.675,
+                  0.8333
                 ],
                 [
-                  -0.8333,
-                  -0.675
+                  -0.675,
+                  0.8333
                 ],
                 [
-                  0.5833,
-                  0.0
+                  0.0,
+                  -0.5833
                 ],
                 [
-                  -0.8333,
-                  0.675
+                  0.675,
+                  0.8333
                 ]
               ],
               "style": {}
@@ -1849,12 +1849,12 @@
               "shape": "LINE",
               "points": [
                 [
-                  0.6667,
-                  0.7333
+                  0.7333,
+                  -0.6667
                 ],
                 [
-                  0.6667,
-                  -0.7333
+                  -0.7333,
+                  -0.6667
                 ]
               ],
               "style": {
@@ -1865,12 +1865,12 @@
               "shape": "LINE",
               "points": [
                 [
-                  0.6667,
-                  0.0
+                  0.0,
+                  -0.6667
                 ],
                 [
-                  2.0,
-                  0.0
+                  0.0,
+                  -2.0
                 ]
               ],
               "style": {}
@@ -3463,7 +3463,7 @@
             20.0,
             -20.0
           ],
-          "orient": "R0",
+          "orient": "R90",
           "style": {
             "bold": true,
             "cap": "butt",
@@ -4474,7 +4474,7 @@
         {
           "id": "#D1::name",
           "anchor": [
-            20.0,
+            19.75,
             -18.9
           ],
           "lines": [
@@ -4488,10 +4488,10 @@
               }
             ]
           ],
-          "halign": "middle",
+          "halign": "start",
           "valign": "baseline",
           "rotate": 0.0,
-          "orient": "R0",
+          "orient": "R90",
           "style": {
             "bold": true,
             "cap": "butt",
@@ -4507,16 +4507,16 @@
         {
           "id": "#D1::model",
           "anchor": [
-            20.0,
-            -21.1
+            21.2,
+            -18.9
           ],
           "lines": [
             []
           ],
-          "halign": "middle",
-          "valign": "top",
+          "halign": "start",
+          "valign": "baseline",
           "rotate": 0.0,
-          "orient": "R0",
+          "orient": "R90",
           "style": {
             "bold": true,
             "cap": "butt",
