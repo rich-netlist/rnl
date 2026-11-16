@@ -1219,9 +1219,8 @@
   };
 
   /* A series coupling capacitor that passes the AC signal and blocks DC.
-     Places: its pins on one row, so that it lies along a signal flow drawn from left to right. */
+     Meaning only: places and routes nothing, as it may lie or stand. */
   $AC_COUPLE = @DEFINE(roles=[["device", ["instance", "usage"]]]) {
-    ?device @SELECT-PIN => @ALIGN("y", priority="low");
   };
 
   /* ==============================================================================================

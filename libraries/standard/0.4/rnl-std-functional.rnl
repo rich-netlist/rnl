@@ -199,18 +199,18 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(1.2, 1.8);
   };
 
-  /* A transconductor (a gm cell), with an optional centered text of key label: in, out. */
+  /* A transconductor (a gm cell), with a centered text of key label, g_m by default: in, out. */
   $TRANSCONDUCTOR = @DEFINE-SYMBOL(box=[-3, -3.9, 3, 3.9]) {
     %in = (-3, 0) @PIN(terminal="in", direction="left");
     %out = (3, 0) @PIN(terminal="out", direction="right");
     @LINE {(-3, 0) (-2, 0)};
     @LINE(linewidth=0.24) {(-2, 3.5) (2, 1.75) (2, -1.75) (-2, -3.5) (-2, 3.5)};
     @LINE {(2, 0) (3, 0)};
-    ? @TEXT("", key="label", halign="middle", valign="middle", size=1.2) => @PLACE(0, 0);
+    ? @TEXT("\textit{g}_{m}", key="label", halign="middle", valign="middle", size=1.2) => @PLACE(0, 0);
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(0, 3.85);
   };
 
-  /* A transconductor with supply pins: in, out, vp, vn. */
+  /* A transconductor with supply pins and a centered text of key label, g_m by default: in, out, vp, vn. */
   $TRANSCONDUCTOR_SUPPLY = @DEFINE-SYMBOL(box=[-3, -4, 3, 4]) {
     %in = (-3, 0) @PIN(terminal="in", direction="left");
     %out = (3, 0) @PIN(terminal="out", direction="right");
@@ -221,7 +221,7 @@
     @LINE {(0, -2.625) (0, -4)};
     @LINE(linewidth=0.24) {(-2, 3.5) (2, 1.75) (2, -1.75) (-2, -3.5) (-2, 3.5)};
     @LINE {(2, 0) (3, 0)};
-    ? @TEXT("", key="label", halign="middle", valign="middle", size=1.2) => @PLACE(0, 0);
+    ? @TEXT("\textit{g}_{m}", key="label", halign="middle", valign="middle", size=1.2) => @PLACE(0, 0);
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(1.65, 2.65);
   };
 

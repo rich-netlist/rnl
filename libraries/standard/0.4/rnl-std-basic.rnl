@@ -659,12 +659,14 @@
     {?t %b::pin} @ALIGN("y");
   };
 
-  /* A port tag directly on a pin, its lead serving as the stub's short wire. */
+  /* A port tag directly on a pin, its lead serving as the stub's short wire; the pin and the tag are left unrouted, as with $NET_LABEL_STUB. */
   $IO_PORT_STUB = @DEFINE(roles=[["t", "pin"]]) {
     %p = $IO_PORT @ATTACH ?t::net;
     ?t %p::pin @ORIENT-RELATION("R180");
     {?t %p::pin} @ALIGN("x");
     {?t %p::pin} @ALIGN("y");
+    ?t @UNROUTE-OBJECT;
+    %p @UNROUTE-OBJECT(priority="high");
   };
 
   /* A net label directly on a pin, its one-unit lead serving as the stub's short wire; on a bus pin, one label for the bus. */
