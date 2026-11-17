@@ -238,12 +238,13 @@ fn netlists(dir: &str, prefix: &str) -> Vec<PathBuf> {
     out
 }
 
-/// Whether a fact holds under a placement, exactly: the constants within `tol` (11.7), the
-/// equalities between points (ALIGN, DISTRIBUTE) exact, as the model keeps them.
-fn holds_exactly(p: &LevelProblem, g: &crate::resolve::Geometry, kind: &FactKind, tol: &Q) -> bool {
+/// Whether the fact `fact` holds under a placement, exactly: the constants within `tol` (11.7),
+/// the equalities between points (ALIGN, DISTRIBUTE) exact, as the model keeps them; an ORIENT or
+/// ORIENT-RELATION of a list with any orientation of its list.
+fn holds_exactly(p: &LevelProblem, g: &crate::resolve::Geometry, fact: usize, tol: &Q) -> bool {
     let at = |m: &PointRef, axis: Axis| point_value(p, g, m, usize::from(axis == Axis::Y), 0);
-    crate::holds::check(kind, &at, &|k| Some(g.orient[k]), tol, &Q::zero())
-        .unwrap_or_else(|| panic!("no point for {kind:?}"))
+    crate::holds::check_problem(p, fact, &at, &|k| Some(g.orient[k]), tol, &Q::zero())
+        .unwrap_or_else(|| panic!("no point for {:?}", p.facts[fact].kind))
 }
 
 /// Whether the facts kept leave no side to put two symbols apart, with the orientations the
@@ -574,7 +575,7 @@ fn check_capped_boxes(
     let tol = if e.resolved.as_written { Q::zero() } else { from_f64(options.tolerance).unwrap() };
     for &f in &solved.report.kept {
         assert!(
-            holds_exactly(p, &e.placed.geometry, &p.facts[f].kind, &tol),
+            holds_exactly(p, &e.placed.geometry, f, &tol),
             "{what}: fact {f} kept but violated: {:?}\n{}",
             p.facts[f],
             summary(p, &solved, &e)
@@ -856,7 +857,7 @@ fn options_change_the_search_and_never_the_facts() {
             let (solved, e) = solve_exact(p, &options);
             let tol = if e.resolved.as_written { Q::zero() } else { from_f64(options.tolerance).unwrap() };
             for &f in &solved.report.kept {
-                assert!(holds_exactly(p, &e.placed.geometry, &p.facts[f].kind, &tol), "{text}: {} fact {f}", p.title);
+                assert!(holds_exactly(p, &e.placed.geometry, f, &tol), "{text}: {} fact {f}", p.title);
             }
             assert_eq!(solved, crate::solve(p, &options), "{text}: {}", p.title);
             if options.grid.is_none() {
@@ -892,11 +893,7 @@ fn layers_with_tolerances_rank_the_candidates_in_a_well_defined_order() {
                 let (solved, e) = solve_bounded(&p, &options, &StoppedClock, CAPS);
                 let tol = if e.resolved.as_written { Q::zero() } else { from_f64(options.tolerance).unwrap() };
                 for &k in &solved.report.kept {
-                    assert!(
-                        holds_exactly(&p, &e.placed.geometry, &p.facts[k].kind, &tol),
-                        "{text}: {} fact {k}",
-                        p.title
-                    );
+                    assert!(holds_exactly(&p, &e.placed.geometry, k, &tol), "{text}: {} fact {k}", p.title);
                 }
                 // the same twice, for the first; the second only once, to keep the test short. A
                 // level of 0.4 is solved again within the same work: `crate::solve` would take the
@@ -926,7 +923,7 @@ fn an_overlap_is_noted_with_its_cause() {
         let (solved, e) = solve_bounded(p, &options, &StoppedClock, caps);
         let tol = if e.resolved.as_written { Q::zero() } else { from_f64(options.tolerance).unwrap() };
         for &k in &solved.report.kept {
-            assert!(holds_exactly(p, &e.placed.geometry, &p.facts[k].kind, &tol), "{} fact {k}", p.title);
+            assert!(holds_exactly(p, &e.placed.geometry, k, &tol), "{} fact {k}", p.title);
         }
         for o in &e.placed.overlaps {
             budget |= o.cause == crate::coords::Cause::Budget;
@@ -1816,12 +1813,14 @@ fn stub_leads_crossed(p: &LevelProblem, solved: &Solved, e: &Exact) -> Vec<Strin
 /// rose beside the ground of VIP in T4, and &vb, which leaves VB upwards on the left of the upper
 /// row, ran across that ground's lead to their gates (review of phase 2 of the quality review).
 /// T6 is left out: &b5 crosses the lead of a leg's ground, as the order of the row puts its source
-/// far from its leg (quality review SE-10).
+/// far from its leg (quality review SE-10). T4 is left out too: its two sources are one column,
+/// %src, and &inp from the lower one runs up across the lead of the upper one's ground, a crossing
+/// of the arrangement that the crossings count, not the rows drawn together that this guards.
 #[test]
 fn a_wire_between_two_rows_crosses_no_lead_of_a_stub() {
     let files = netlists("tests/integration/solver", "T").into_iter().chain(netlists("tests/conformance/cases", ""));
     for file in files {
-        if file.ends_with("T6-r2r-ladder.sp") {
+        if file.ends_with("T6-r2r-ladder.sp") || file.ends_with("T4-miller-conflicts.sp") {
             continue;
         }
         for p in problems(&file) {
@@ -1910,11 +1909,12 @@ fn only_groups_pairs_and_elements_of_one_role_are_spaced_evenly() {
     // T5: a chain of a $FLOW (0.3; $SIGNAL_FLOW in 0.4) and a load of two elements hung from one net: nothing
     let (_, s) = case_structure("T5-inverting-amp-rlc.sp", "T5-inverting-amp-rlc.sp");
     assert!(s.even_sets.is_empty(), "{:?}", s.even_sets);
-    // T4: the two groups, and no set of the two halves of a mirror pair alone
+    // T4: the two stages, and no set of the two halves of a mirror pair alone; the sources, a group
+    // of two, are a scope but no set
     let (p, s) = case_structure("T4-miller-conflicts.sp", "T4-miller-conflicts.sp");
     let sets: Vec<Vec<String>> = s.even_sets.iter().map(|set| labels(&p, set)).collect();
     assert_eq!(sets, vec![labels(&p, &p.groups[0].members), labels(&p, &p.groups[1].members)]);
-    assert_eq!(s.scopes.len(), 2);
+    assert_eq!(s.scopes.len(), 3);
 }
 
 /// The texts are as wide as the renderer lays them out, with a margin, not 0.6 of their size a

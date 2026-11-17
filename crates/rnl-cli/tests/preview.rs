@@ -303,8 +303,9 @@ fn the_measure_reads_the_text_written_and_not_the_solution() {
     let (without, with) = (read(false), read(true));
     let p = &without.problems[0];
     let drawn = rnl_runtime::previous::drawn(p, &with);
-    let holds: Vec<Option<bool>> =
-        p.facts.iter().map(|f| rnl_solver::holds_as_drawn(p, &drawn, &f.kind, options.solver.tolerance)).collect();
+    let holds: Vec<Option<bool>> = (0..p.facts.len())
+        .map(|k| rnl_solver::problem_fact_holds_as_drawn(p, &drawn, k, options.solver.tolerance))
+        .collect();
     let align = p.facts.iter().position(|f| f.kind.name() == "ALIGN").unwrap();
     assert_eq!(holds[align], Some(false), "{:?}", p.facts[align]);
     assert_eq!(shown.report.levels[0].facts[align].holds, Some(true));

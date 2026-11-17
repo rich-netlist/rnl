@@ -228,9 +228,10 @@ fn check_facts(run: &SolveRun, what: &str) {
         let p = &level.problem;
         let placed = Placed { p, s: &level.solved.solution };
         let report = &level.solved.report;
-        for (k, f) in p.facts.iter().enumerate() {
+        for k in 0..p.facts.len() {
             let kept = report.kept.contains(&k);
-            assert_eq!(placed.holds(&f.kind, 1e-6), kept, "{what} / {}: {}", p.title, describe_fact(p, k));
+            let holds = alternatives(p, k).iter().any(|kind| placed.holds(kind, 1e-6));
+            assert_eq!(holds, kept, "{what} / {}: {}", p.title, describe_fact(p, k));
         }
     }
 }
@@ -382,9 +383,9 @@ fn every_case_solved_and_written_back_reads_back_whole() {
 
 #[test]
 fn the_discarded_facts_of_t4_are_those_of_its_reference() {
-    // {#M6 #M7} @ALIGN("x") against the DISTANCE of line 38, {#M1 #M2} @ALIGN("y") and the low ALIGN
-    // y of the $MIRRORED_LAYOUT of M1 and M2 against the places of lines 36 and 37, and the low
-    // {#VIP #VIN} @ALIGN("y") against the DISTANCE of line 39
+    // {#M6 #M7} @ALIGN("x") against the DISTANCE of line 50, {#M1 #M2} @ALIGN("y") and the low ALIGN
+    // y of the $MIRRORED_LAYOUT of M1 and M2 against the places of lines 48 and 49, and the low
+    // {#VIP #VIN} @ALIGN("y") against the DISTANCE of line 51
     let t4 = case("T4-miller-conflicts");
     let run = solve(&t4, &FsProvider::new(&[]), &for_case(&t4)).unwrap();
     let level = &run.levels[0];
@@ -394,50 +395,50 @@ fn the_discarded_facts_of_t4_are_those_of_its_reference() {
     assert_eq!(
         discarded,
         [
-            "  discarded [7] ALIGN x {#M6 #M7} (normal, T4-miller-conflicts.sp:27): it conflicts with [3]",
-            "  discarded [23] ALIGN y {#M1 #M2} (normal, T4-miller-conflicts.sp:23): it conflicts with [0] and [4]",
-            "  discarded [54] ALIGN y {#VIP #VIN} (low, T4-miller-conflicts.sp:30): of priority low, which is \
+            "  discarded [7] ALIGN x {#M6 #M7} (normal, T4-miller-conflicts.sp:42): it conflicts with [3]",
+            "  discarded [23] ALIGN y {#M1 #M2} (normal, T4-miller-conflicts.sp:40): it conflicts with [0] and [4]",
+            "  discarded [59] ALIGN y {#VIP #VIN} (low, T4-miller-conflicts.sp:45): of priority low, which is \
              expected; --report lists what it conflicts with (8.5)",
-            "  discarded [62] ALIGN y {#M1 #M2 a usage of $MIRRORED_LAYOUT} (low, rnl-std-semantics.rnl:120, from \
+            "  discarded [72] ALIGN y {#M1 #M2 %dp} (low, rnl-std-semantics.rnl:120, from \
              $MIRRORED_LAYOUT): of priority low, which is expected; --report lists what it conflicts with (8.5)",
         ]
     );
     // each followed by the facts it conflicts with
     let at = lines.iter().position(|l| l.starts_with("  discarded [23]")).unwrap();
-    assert_eq!(lines[at + 1], "      [0] the y of #M1 = 0 (high, T4-miller-conflicts.sp:36)");
-    assert_eq!(lines[at + 2], "      [4] the y of #M2 = 3 (normal, T4-miller-conflicts.sp:37)");
-    let at = lines.iter().position(|l| l.starts_with("  discarded [54]")).unwrap();
+    assert_eq!(lines[at + 1], "      [0] the y of #M1 = 0 (high, T4-miller-conflicts.sp:48)");
+    assert_eq!(lines[at + 2], "      [4] the y of #M2 = 3 (normal, T4-miller-conflicts.sp:49)");
+    let at = lines.iter().position(|l| l.starts_with("  discarded [59]")).unwrap();
     assert!(!lines[at + 1].starts_with("      ["), "{lines:#?}");
     // then the statements of those groups, each with the facts discarded because of it; the one
     // that only a low fact loses, and the low facts, only with --report
     let statements = [
-        "    T4-miller-conflicts.sp:36 [0] the y of #M1 = 0 took part in discarding [23]",
-        "    T4-miller-conflicts.sp:37 [4] the y of #M2 = 3 took part in discarding [23]",
-        "    T4-miller-conflicts.sp:38 [3] DISTANCE x increasing min=2 {#M6} {#M7} took part in discarding [7]",
+        "    T4-miller-conflicts.sp:48 [0] the y of #M1 = 0 took part in discarding [23]",
+        "    T4-miller-conflicts.sp:49 [4] the y of #M2 = 3 took part in discarding [23]",
+        "    T4-miller-conflicts.sp:50 [3] DISTANCE x increasing min=2 {#M6} {#M7} took part in discarding [7]",
     ];
     let head = lines.iter().position(|l| l == "  statements whose facts took part in discarding (8.5):").unwrap();
     assert_eq!(lines[head + 1..head + 4], statements, "{lines:#?}");
     assert!(!lines[head + 4].starts_with("    "), "{lines:#?}");
     assert!(lines[0].starts_with(
-        "level T4-miller-conflicts.sp (file in T4-miller-conflicts.sp): 92 kept, 4 discarded of 96 facts"
+        "level T4-miller-conflicts.sp (file in T4-miller-conflicts.sp): 102 kept, 4 discarded of 106 facts"
     ));
     assert!(!lines.iter().any(|l| l == "  unsolved:"), "{lines:#?}");
     assert!(lines.iter().any(|l| l.starts_with("  work: ")) && lines.iter().any(|l| l.starts_with("  time: ")));
     // the solver gave the low facts their first group only, which a note says (8.5, 7.6), so that
     // even the report of every fact leaves out their hints, and says that the solver did not seek
     // them
-    for fact in [54, 62] {
+    for fact in [59, 72] {
         let low = level.solved.report.discarded.iter().find(|d| d.fact == fact).unwrap();
         assert!(!low.complete, "{low:?}");
     }
-    let low = level.solved.report.discarded.iter().find(|d| d.fact == 54).unwrap();
+    let low = level.solved.report.discarded.iter().find(|d| d.fact == 59).unwrap();
     assert_eq!(low.groups, vec![vec![2]]);
     let note = "    the minimal conflict groups of a fact of priority low discarded are listed only with --report \
-                (hints_for_low), as its hints may be left out (8.5, 7.6): [54] and [62] have their first group \
+                (hints_for_low), as its hints may be left out (8.5, 7.6): [59] and [72] have their first group \
                 only, and are in no hint by statement";
     assert!(lines.iter().any(|l| l == note), "{lines:#?}");
     let every = rnl_cli::solve::report(level, true);
-    let unsought = "    discarded [54] ALIGN y {#VIP #VIN} (low, T4-miller-conflicts.sp:30): of priority low, \
+    let unsought = "    discarded [59] ALIGN y {#VIP #VIN} (low, T4-miller-conflicts.sp:45): of priority low, \
                     which is expected; the solver did not seek what it conflicts with (hints_for_low, which \
                     --report sets; 8.5)";
     assert!(every.iter().any(|l| l == unsought), "{every:#?}");
@@ -457,28 +458,28 @@ fn the_discarded_facts_of_t4_are_those_of_its_reference() {
     assert!(level.solved.report.discarded.iter().all(|d| d.complete), "{:?}", level.solved.report.discarded);
     let all = rnl_cli::solve::report(level, true);
     assert!(!all.iter().any(|l| l == note), "{all:#?}");
-    assert_eq!(all.iter().filter(|l| l.starts_with("    kept [")).count(), 92);
+    assert_eq!(all.iter().filter(|l| l.starts_with("    kept [")).count(), 102);
     assert_eq!(all.iter().filter(|l| l.starts_with("    discarded [")).count(), 4);
-    assert!(all.iter().any(|l| l == "    kept [0] the y of #M1 = 0 (high, T4-miller-conflicts.sp:36)"), "{all:#?}");
+    assert!(all.iter().any(|l| l == "    kept [0] the y of #M1 = 0 (high, T4-miller-conflicts.sp:48)"), "{all:#?}");
     // and the hints of the low facts, and of the statement that only a low fact loses
-    let at = all.iter().position(|l| l.starts_with("    discarded [54]")).unwrap();
+    let at = all.iter().position(|l| l.starts_with("    discarded [59]")).unwrap();
     assert_eq!(
         all[at],
-        "    discarded [54] ALIGN y {#VIP #VIN} (low, T4-miller-conflicts.sp:30): it conflicts with [2]"
+        "    discarded [59] ALIGN y {#VIP #VIN} (low, T4-miller-conflicts.sp:45): it conflicts with [2]"
     );
     assert_eq!(
         all[at + 1],
-        "        [2] DISTANCE y increasing min=6 max=6 {#VIP} {#VIN} (normal, T4-miller-conflicts.sp:39)"
+        "        [2] DISTANCE y increasing min=6 max=6 {#VIP} {#VIN} (normal, T4-miller-conflicts.sp:51)"
     );
     let head = all.iter().position(|l| l == "  statements whose facts took part in discarding (8.5):").unwrap();
     assert_eq!(
         all[head + 1..head + 5],
         [
-            "    T4-miller-conflicts.sp:36 [0] the y of #M1 = 0 took part in discarding [23], [62]",
-            "    T4-miller-conflicts.sp:37 [4] the y of #M2 = 3 took part in discarding [23], [62]",
+            "    T4-miller-conflicts.sp:48 [0] the y of #M1 = 0 took part in discarding [23], [72]",
+            "    T4-miller-conflicts.sp:49 [4] the y of #M2 = 3 took part in discarding [23], [72]",
             statements[2],
-            "    T4-miller-conflicts.sp:39 [2] DISTANCE y increasing min=6 max=6 {#VIP} {#VIN} took part in \
-             discarding [54]",
+            "    T4-miller-conflicts.sp:51 [2] DISTANCE y increasing min=6 max=6 {#VIP} {#VIN} took part in \
+             discarding [59]",
         ],
         "{all:#?}"
     );
@@ -1768,9 +1769,29 @@ fn check_kept(run: &SolveRun, what: &str) {
         let p = &level.problem;
         let placed = Placed { p, s: &level.solved.solution };
         for &k in &level.solved.report.kept {
-            assert!(placed.holds(&p.facts[k].kind, 1e-6), "{what} / {}: {}", p.title, describe_fact(p, k));
+            let holds = alternatives(p, k).iter().any(|kind| placed.holds(kind, 1e-6));
+            assert!(holds, "{what} / {}: {}", p.title, describe_fact(p, k));
         }
     }
+}
+
+/// The facts a fact may hold as: an ORIENT or ORIENT-RELATION written with a list holds with any
+/// orientation of it ([`LevelProblem::orient_lists`]), which its kind gives the first of.
+fn alternatives(p: &LevelProblem, k: usize) -> Vec<FactKind> {
+    let kind = &p.facts[k].kind;
+    let Some((_, codes)) = p.orient_lists.iter().find(|(i, _)| *i == k) else {
+        return vec![kind.clone()];
+    };
+    codes
+        .iter()
+        .map(|&c| match kind {
+            FactKind::Orient { object, .. } => FactKind::Orient { object: *object, code: c },
+            FactKind::OrientRelation { from, to, .. } => {
+                FactKind::OrientRelation { relation: c, from: from.clone(), to: to.clone() }
+            }
+            other => other.clone(),
+        })
+        .collect()
 }
 
 /// The options of `rnl solve` with a time limit of `seconds`, which [`Ticks`] counts in readings.

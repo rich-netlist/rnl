@@ -203,39 +203,40 @@ fn facts_are_in_the_order_of_8_5() {
     assert_eq!(p.facts[1].kind, FactKind::Place { at: PointRef::Origin(m1), axis: Axis::X, value: 0.0 });
     assert!(p.facts[..2].iter().all(|f| f.priority == Priority::High));
     // then the later first: the second record before the first, each from its end; the DISTANCE
-    // of two groups of line 26 is one fact for each pair of their members
+    // of two groups of line 41 is one fact for each pair of their members, the ORIENT of line 37 one
+    // for each object, and the ORDER of line 36 one for each choice of a member of each of its
+    // usages
     let direct: Vec<u32> =
         p.facts.iter().filter(|f| f.priority == Priority::Normal && f.chain.is_empty()).map(line_of).collect();
-    let mut expected = vec![39, 38, 37, 29, 28, 27];
-    expected.extend([26; 15]);
-    expected.push(23);
+    let mut expected = vec![51, 50, 49, 44, 43, 42];
+    expected.extend([41; 15]);
+    expected.push(40);
+    expected.extend([37; 5]);
+    expected.extend([36; 30]);
     assert_eq!(direct, expected);
-    let stages: Vec<_> = p.facts.iter().filter(|f| line_of(f) == 26).collect();
+    let stages: Vec<_> = p.facts.iter().filter(|f| line_of(f) == 41).collect();
     assert!(
         stages.iter().all(|f| matches!(&f.kind,
         FactKind::Distance { axis: Axis::X, sense: Sense::Increasing, min: Some(3.0), max: None, from, to }
             if from.len() == 1 && to.len() == 1)),
         "{stages:?}"
     );
-    // the low statements, the later first, and the ORDER of line 31 one fact for each choice of a
-    // member of each of its sets
+    // the one low statement
     let low: Vec<u32> =
         p.facts.iter().filter(|f| f.priority == Priority::Low && f.chain.is_empty()).map(line_of).collect();
-    let mut expected = vec![31; 30];
-    expected.push(30);
-    assert_eq!(low, expected);
+    assert_eq!(low, [45]);
     // the expansions take the place of their AS, after the statements written later; the fill
     // of the standard package comes last of all
     let first_expanded = p.facts.iter().position(|f| !f.chain.is_empty()).unwrap();
-    assert_eq!(first_expanded, 2 + 22 + 31);
-    assert_eq!(p.usages[p.facts[first_expanded].chain[0]].definition, "$MIRRORED_LAYOUT");
+    assert_eq!(first_expanded, 2 + 57 + 1);
+    assert_eq!(p.usages[p.facts[first_expanded].chain[0]].definition, "$CURRENT_MIRROR_P");
     let last = p.facts.last().unwrap();
     assert!(last.chain.iter().any(|&u| p.usages[u].definition == "$GROUND_STUB"), "{last:?}");
-    // ORIENT-RELATION of the mirrored layouts, and the groups
-    assert_eq!(p.facts.iter().filter(|f| f.kind.name() == "ORIENT-RELATION").count(), 2);
+    // ORIENT-RELATION of the mirrored layouts and of the mirror, and the groups
+    assert_eq!(p.facts.iter().filter(|f| f.kind.name() == "ORIENT-RELATION").count(), 4);
     assert_eq!(
         p.groups.iter().map(|g| (g.label.as_str(), g.members.len())).collect::<Vec<_>>(),
-        [("%stage1", 5), ("%stage2", 3)]
+        [("%stage1", 5), ("%stage2", 3), ("%src", 2)]
     );
     // the slots: the first coordinate fact of each axis in this order
     let m2 = object(p, "#M2");
@@ -692,7 +693,7 @@ fn a_usage_has_the_place_it_is_written() {
     let p = &ps[0];
     let at = |u: &UsageEntry| u.source.as_ref().map(|l| (l.file.clone(), l.line)).unwrap();
     let pairs: Vec<(String, u32)> = p.usages.iter().filter(|u| u.definition == "$MIRRORED_LAYOUT").map(at).collect();
-    assert_eq!(pairs, [("T4-miller-conflicts.sp".to_string(), 21), ("T4-miller-conflicts.sp".to_string(), 22)]);
+    assert_eq!(pairs, [("T4-miller-conflicts.sp".to_string(), 29), ("T4-miller-conflicts.sp".to_string(), 30)]);
     let stub = p.usages.iter().position(|u| u.definition == "$GROUND_STUB" && u.rule_made).unwrap();
     assert_eq!(at(&p.usages[stub]).0, "rnl-std-fill.rnl");
     let ground = p.usages.iter().find(|u| u.parent == Some(stub)).unwrap();

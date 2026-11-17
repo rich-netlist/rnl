@@ -67,6 +67,25 @@ fn netlists(dir: &str, prefix: &str) -> Vec<PathBuf> {
     out
 }
 
+/// The facts a fact may hold as: an ORIENT or ORIENT-RELATION written with a list holds with any
+/// orientation of it ([`LevelProblem::orient_lists`]), which its kind gives the first of.
+fn alternatives(p: &LevelProblem, k: usize) -> Vec<FactKind> {
+    let kind = &p.facts[k].kind;
+    let Some((_, codes)) = p.orient_lists.iter().find(|(i, _)| *i == k) else {
+        return vec![kind.clone()];
+    };
+    codes
+        .iter()
+        .map(|&c| match kind {
+            FactKind::Orient { object, .. } => FactKind::Orient { object: *object, code: c },
+            FactKind::OrientRelation { from, to, .. } => {
+                FactKind::OrientRelation { relation: c, from: from.clone(), to: to.clone() }
+            }
+            other => other.clone(),
+        })
+        .collect()
+}
+
 /// Whether the witness satisfies a fact, as a viewer checks a constraint: in `f64`, a difference
 /// within `tol` counting as none (11.7).
 fn holds(p: &LevelProblem, r: &Resolved, kind: &FactKind, tol: f64) -> bool {
@@ -160,7 +179,8 @@ fn check_with(file: &str, p: &LevelProblem, options: &SolverOptions) -> Resolved
     // the witness is exact; converting it to f64 may cross the edge of the tolerance by rounding
     let tol = options.tolerance + 1e-9;
     for &f in &r.kept {
-        assert!(holds(p, &r, &p.facts[f].kind, tol), "{what}: fact {f} kept but violated: {:?}", p.facts[f]);
+        let held = alternatives(p, f).iter().any(|kind| holds(p, &r, kind, tol));
+        assert!(held, "{what}: fact {f} kept but violated: {:?}", p.facts[f]);
     }
     // a fact of priority low has its first group only, unless its hints are asked for (8.5, 7.6)
     let hinted = |d: &Discarded| options.hints_for_low || p.facts[d.fact].priority != Priority::Low;
@@ -351,9 +371,9 @@ fn t4_resolves_as_the_reference_says() {
             if *a == 6.0 && *b == 6.0)
     });
     assert_eq!(groups(inputs), [vec![vip_vin]]);
-    // the hints by statement name the statements of lines 36 to 39 of the file, each with the facts
+    // the hints by statement name the statements of lines 48 to 51 of the file, each with the facts
     // discarded because of it; the low facts only with the hints of the facts of priority low, and
-    // line 39, which only a low fact loses, only then (8.5, 7.6)
+    // line 51, which only a low fact loses, only then (8.5, 7.6)
     let hints = |r: &Resolved| -> Vec<(String, u32, Vec<usize>, Vec<usize>)> {
         r.statements
             .iter()
@@ -366,11 +386,11 @@ fn t4_resolves_as_the_reference_says() {
     let at = |line: u32, fact: usize, discarded: &[usize]| {
         ("T4-miller-conflicts.sp".to_string(), line, vec![fact], discarded.to_vec())
     };
-    assert_eq!(hints(&r), [at(36, m1_y, &[mirror]), at(37, m2_y, &[mirror]), at(38, distance_m6_m7, &[m6_m7])]);
+    assert_eq!(hints(&r), [at(48, m1_y, &[mirror]), at(49, m2_y, &[mirror]), at(50, distance_m6_m7, &[m6_m7])]);
     assert!(r.statements.keys().all(|s| s.chain.is_empty() && s.point.is_none()), "{:?}", r.statements);
     // by default the low facts have their first group, which is all they have, without knowing it,
     // and a note says why; with their hints asked for, the lists are known to be complete, and line
-    // 39 is named; nothing else changes
+    // 51 is named; nothing else changes
     for low in [inputs, layout] {
         let low = r.discarded.iter().find(|d| d.fact == low).unwrap();
         assert!(!low.complete, "{low:?}");
@@ -390,7 +410,7 @@ fn t4_resolves_as_the_reference_says() {
     both.sort_unstable();
     assert_eq!(
         hints(&all),
-        [at(36, m1_y, &both), at(37, m2_y, &both), at(38, distance_m6_m7, &[m6_m7]), at(39, vip_vin, &[inputs])]
+        [at(48, m1_y, &both), at(49, m2_y, &both), at(50, distance_m6_m7, &[m6_m7]), at(51, vip_vin, &[inputs])]
     );
     assert!(all.notes.is_empty(), "{:?}", all.notes);
     assert_eq!((&all.kept, all.position(object(p, "#M2"))), (&r.kept, r.position(object(p, "#M2"))));
