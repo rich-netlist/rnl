@@ -1189,8 +1189,8 @@
      6. Passive networks, tanks and decoupling
      ============================================================================================== */
 
-  /* A divider of two branches in series, upper and lower. No group, as one half often sits inside another structure.
-     Routes; places nothing: applies $SERIES to ?upper and ?lower. */
+  /* A divider of two branches in series, upper and lower.
+     Routes; places nothing: applies $SERIES to ?upper and ?lower. No group, as one half often sits inside another structure. */
   $DIVIDER = @DEFINE(roles=[["upper", ["instance", "usage"]], ["lower", ["instance", "usage"]]]) {
     {?upper ?lower} @AS $SERIES;
   };
