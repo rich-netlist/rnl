@@ -2933,64 +2933,188 @@ impl Level<'_> {
             compile(item, &unit_index, units, &edge, &mut table);
             steps.extend(table.into_iter().map(|b| (None, vec![b])));
         }
+        // A DISTRIBUTE kept spaces its members evenly, which the bounds of its edges, an order of
+        // them, do not say. When the placement leaves the steps of one uneven, the level is placed
+        // again with them held as long as its longest step was, from before the table on: a row
+        // or column of the table that would make them uneven again is then left out, as an order
+        // that the facts go against is. Its steps are its edges of a gap of one between points,
+        // from one member to the next; a DISTRIBUTE with a step within one unit, which the
+        // placement does not move, is left as its bounds have it.
+        let one = int(1);
+        // each with its fact and its steps, an axis and the points from one member to the next
+        type Chain = (usize, Vec<(usize, At, At)>);
+        let even: Vec<Chain> = self
+            .s
+            .kept
+            .iter()
+            .filter(|&&f| matches!(problem.facts[f].kind, FactKind::Distribute { .. }))
+            .filter_map(|&f| {
+                let edges = match self.flips.get(&f) {
+                    Some((other, down)) if way < 2 && *down == (way == 1) => other,
+                    _ => &self.edges[f],
+                };
+                let chain: Option<Vec<(usize, At, At)>> = edges
+                    .iter()
+                    .filter(|e| e.gap.as_ref() == Some(&one) && e.sides == (0, 0))
+                    .map(|e| {
+                        let (p, q) = (point(&e.from, 0, e.axis)?, point(&e.to, 0, e.axis)?);
+                        (p.unit != q.unit).then_some((e.axis, p, q))
+                    })
+                    .collect();
+                chain.filter(|c| c.len() >= 2).map(|c| (f, c))
+            })
+            .collect();
+        let steps_of = |chain: &[(usize, At, At)], places: &[Vec<Q>; 2]| -> Vec<Q> {
+            chain.iter().map(|(a, p, q)| (&places[*a][q.unit] + &q.off) - (&places[*a][p.unit] + &p.off)).collect()
+        };
+        let held_at_first = (orders.clone(), places.clone());
         let mut by_facts: [BTreeSet<usize>; 2] = [BTreeSet::new(), BTreeSet::new()];
-        for (i, (f, bounds)) in steps.into_iter().enumerate() {
-            if bounds.is_empty() {
-                continue;
+        // the DISTRIBUTEs held even in the second placement, each with the length of its steps
+        let mut held: Vec<(usize, Q)> = Vec::new();
+        // the first placement, kept when the limit stops the second
+        let mut first = None;
+        loop {
+            if !held.is_empty() {
+                // the second placement starts where the first did
+                (orders, places) = held_at_first.clone();
+                left_out.clear();
+                table_out = 0;
+                layering.refused = 0;
+                apart.1 = 0;
+                level.refused = 0;
+                level_out.clear();
+                dissolve.clear();
+                stretch.clear();
+                by_facts = [BTreeSet::new(), BTreeSet::new()];
             }
-            let saved = orders.clone();
-            for (a, p, q, gap) in &bounds {
-                match gap {
-                    None => orders[*a].equal(p, q),
-                    Some(g) => orders[*a].at_least(p, q, g.clone()),
-                }
-            }
-            let mut next = places.clone();
-            let mut kept = true;
-            for a in 0..2 {
-                if !bounds.iter().any(|b| b.0 == a) {
-                    continue;
-                }
-                match orders[a].least(places[a].clone()) {
-                    Some(v) => next[a] = v,
-                    None => kept = false,
-                }
-            }
-            if kept {
-                places = next;
-                if i < boxes_from {
-                    for (a, p, q, _) in &bounds {
-                        by_facts[*a].extend([p.unit, q.unit]);
+            let mut evened = held.is_empty();
+            let hold = |orders: &mut [Order; 2], places: &mut [Vec<Q>; 2]| {
+                for (c, step) in &held {
+                    let chain = &even[*c].1;
+                    let saved = orders.clone();
+                    // one class each: the next member a step past the one before
+                    for (a, p, q) in chain {
+                        orders[*a].equal(&At { unit: p.unit, off: &p.off + step }, q);
                     }
-                }
-            } else {
-                orders = saved;
-                left_out.extend(f);
-                table_out += usize::from(i >= table_from);
-                layering.refused += usize::from((current_from..level_from).contains(&i));
-                apart.1 += usize::from((boxes_from..current_from).contains(&i));
-                if (level_from..table_from).contains(&i) {
-                    level.refused += 1;
-                    level_out.insert(i - level_from);
-                }
-                if i < boxes_from {
-                    for (a, p, q, _) in &bounds {
-                        let (x, y) = (bands.item(p.unit), bands.item(q.unit));
-                        if x == y {
+                    let mut next = places.clone();
+                    let mut kept = true;
+                    for a in 0..2 {
+                        if !chain.iter().any(|b| b.0 == a) {
                             continue;
                         }
-                        for u in [x, y] {
-                            if let Unit::Block(c) = units[u] {
-                                if self.bands && bands.count(u, *a) == 1 && !blocks[&c].0.cuts[*a].is_empty() {
-                                    stretch.insert((c, *a));
-                                } else {
-                                    dissolve.insert(c);
+                        match orders[a].least(places[a].clone()) {
+                            Some(v) => next[a] = v,
+                            None => kept = false,
+                        }
+                    }
+                    if kept {
+                        *places = next;
+                    } else {
+                        *orders = saved;
+                    }
+                }
+            };
+            for (i, (f, bounds)) in steps.iter().enumerate() {
+                if i >= table_from && !evened {
+                    evened = true;
+                    hold(&mut orders, &mut places);
+                }
+                if bounds.is_empty() {
+                    continue;
+                }
+                let saved = orders.clone();
+                for (a, p, q, gap) in bounds {
+                    match gap {
+                        None => orders[*a].equal(p, q),
+                        Some(g) => orders[*a].at_least(p, q, g.clone()),
+                    }
+                }
+                let mut next = places.clone();
+                let mut kept = true;
+                for a in 0..2 {
+                    if !bounds.iter().any(|b| b.0 == a) {
+                        continue;
+                    }
+                    match orders[a].least(places[a].clone()) {
+                        Some(v) => next[a] = v,
+                        None => kept = false,
+                    }
+                }
+                if kept {
+                    places = next;
+                    if i < boxes_from {
+                        for (a, p, q, _) in bounds {
+                            by_facts[*a].extend([p.unit, q.unit]);
+                        }
+                    }
+                } else {
+                    orders = saved;
+                    left_out.extend(*f);
+                    table_out += usize::from(i >= table_from);
+                    layering.refused += usize::from((current_from..level_from).contains(&i));
+                    apart.1 += usize::from((boxes_from..current_from).contains(&i));
+                    if (level_from..table_from).contains(&i) {
+                        level.refused += 1;
+                        level_out.insert(i - level_from);
+                    }
+                    if i < boxes_from {
+                        for (a, p, q, _) in bounds {
+                            let (x, y) = (bands.item(p.unit), bands.item(q.unit));
+                            if x == y {
+                                continue;
+                            }
+                            for u in [x, y] {
+                                if let Unit::Block(c) = units[u] {
+                                    if self.bands && bands.count(u, *a) == 1 && !blocks[&c].0.cuts[*a].is_empty() {
+                                        stretch.insert((c, *a));
+                                    } else {
+                                        dissolve.insert(c);
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
+            if !evened {
+                hold(&mut orders, &mut places);
+            }
+            if !held.is_empty() {
+                // a second placement the limit stopped leaves the first as it was
+                if let Some((kept, refused)) = first.take().filter(|_| crate::budget::stopped()) {
+                    (orders, places, left_out, table_out, level_out, dissolve, stretch, by_facts) = kept;
+                    (layering.refused, apart.1, level.refused) = refused;
+                }
+                break;
+            }
+            if crate::budget::stopped() {
+                break;
+            }
+            // a DISTRIBUTE the placement left out, or with a step of less than one, is not held
+            held = (0..even.len())
+                .filter(|&c| !left_out.contains(&even[c].0))
+                .filter_map(|c| {
+                    let steps = steps_of(&even[c].1, &places);
+                    let longest = steps.iter().max().cloned().filter(|l| *l >= one)?;
+                    steps.iter().any(|q| *q != longest).then_some((c, longest))
+                })
+                .collect();
+            if held.is_empty() {
+                break;
+            }
+            first = Some((
+                (
+                    orders.clone(),
+                    places.clone(),
+                    left_out.clone(),
+                    table_out,
+                    level_out.clone(),
+                    dissolve.clone(),
+                    stretch.clone(),
+                    by_facts.clone(),
+                ),
+                (layering.refused, apart.1, level.refused),
+            ));
         }
 
         let value = |p: &At, a: usize, places: &[Vec<Q>; 2]| &places[a][p.unit] + &p.off;
