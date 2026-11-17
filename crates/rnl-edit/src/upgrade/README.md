@@ -36,6 +36,7 @@ Sections refer to RNL 0.4. Standard package changes refer to the bundled series 
 | ORIENT-RELATION with two sets | Retain and report: splitting changes conflict treatment | Context | 14.9 |
 | Ordinary definition's absolute coordinates | Retain and report the required origin/priority decision | Context | 9.4, 12.1 |
 | Usage terminal reference | Corresponding named symbol pin | Context | 6.4, 9.2.4, 12.1 |
+| Usage in the member list of ALIGN, ORDER, DISTRIBUTE or DISTANCE, counted by its point | `%u::position`, the same point: in 0.4 a usage without a symbol stands for its members there (rule `usage-position-in-constraint`); the main-point ties are written with it as well | Mechanical | 6.5, 14.1 |
 | Custom symbol pin binding roles by number | Name simple pins; retain unresolved numeric usage-role references for review | Context | 9.2.4, 11.3 |
 | Names bound to PIN or fixed TEXT results | Preserve separately named input points; give pins and text their own names | Context | 9.2.4, 9.2.5 |
 | Reused local names or names inherited from symbols | Retain and report ambiguous/reused local identities | Context | 9.2.7 |

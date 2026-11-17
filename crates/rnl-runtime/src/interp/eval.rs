@@ -347,6 +347,12 @@ impl<'p> Interp<'p> {
             return true;
         }
         match self.o(id) {
+            // the `::position` of a set whose members are known later (6.5)
+            ObjData::NamedSubobject { parent, name, resolved: None, .. }
+                if name == "position" && self.is_set(*parent) =>
+            {
+                true
+            }
             ObjData::Set(s) => match &s.kind {
                 SetKind::Select { .. } | SetKind::Gen { .. } => true,
                 SetKind::Constraints { selected, .. } => *selected,
@@ -1807,12 +1813,7 @@ impl<'p> Interp<'p> {
             && e.path.iter().all(|part| part.sub.is_none())
             && self.subobject_name(obj, &p.name, ctx) == "position"
         {
-            return self.fail(
-                ctx,
-                codes::SET_POSITION_04,
-                "a set has no position; give its members to a constraint (5.2, 14.1)",
-                e.start,
-            );
+            return self.set_positions(obj, ctx, e.start);
         }
         if let ObjData::Set(s) = self.o(obj) {
             if !self.is_lazy(obj) && !s.explicit {

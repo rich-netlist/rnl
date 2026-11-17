@@ -2388,16 +2388,6 @@
    ]
   },
   {
-   "number": "RNL3309",
-   "name": "set-position-04",
-   "severity": "error",
-   "message": "a set has no position; give its members to a constraint (5.2, 14.1)",
-   "sections": [
-    "5.2",
-    "14.1"
-   ]
-  },
-  {
    "number": "RNL3310",
    "name": "set-places-wrong-kind",
    "severity": "error",

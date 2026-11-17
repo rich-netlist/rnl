@@ -41,6 +41,7 @@ impl Interp<'_> {
     }
 
     fn constraint_leaves(&mut self, s: SceneId, obj: ObjId, phase: usize, ctx: &Ctx) -> Vec<InputMember> {
+        let obj = self.positions_now(s, obj, phase, ctx);
         if !self.is_set(obj) {
             return vec![InputMember::plain(obj)];
         }
@@ -73,6 +74,7 @@ impl Interp<'_> {
         ctx: &Ctx,
         keep_failed: bool,
     ) -> Vec<InputMember> {
+        let obj = self.positions_now(s, obj, phase, ctx);
         self.materialize_constraint(obj);
         if !self.is_set(obj) {
             return vec![InputMember::plain(obj)];
@@ -302,6 +304,8 @@ impl Interp<'_> {
         }
         let pair = matches!(template.kind, ConstraintKind::Distance | ConstraintKind::OrientRelation);
         let (columns, collection) = if pair {
+            // the `::position` of a set known only now is a set like the others (6.5)
+            let args: Vec<ObjId> = args.iter().map(|&a| self.positions_now(s, a, phase, ctx)).collect();
             let columns: Vec<_> = args.iter().map(|a| self.constraint_leaves(s, *a, phase, ctx)).collect();
             if template.kind == ConstraintKind::OrientRelation && columns.iter().all(|c| c.len() > 1) {
                 let shown: Vec<_> = columns
@@ -319,6 +323,9 @@ impl Interp<'_> {
                 for member in &mut items {
                     member.depend_on(&parent.dependencies);
                 }
+            }
+            for item in &mut items {
+                item.object = self.positions_now(s, item.object, phase, ctx);
             }
             let collection = items.iter().any(|o| self.is_set(o.object));
             let columns: Vec<_> = items
@@ -356,6 +363,17 @@ impl Interp<'_> {
                     })
                 })
                 .collect();
+        }
+        // a combination that takes one object twice is left out (14.1, 14.5)
+        if template.kind != ConstraintKind::OrientRelation && !combinations.is_empty() {
+            combinations.retain(|row| {
+                let mut seen = HashSet::new();
+                row.iter().all(|m| seen.insert(self.one_object(m.object)))
+            });
+            if combinations.is_empty() {
+                self.hint_at(ctx, codes::CONSTRAINT_EXPANSION_TOO_FEW_PLACES, format!("{kw} relates no two different objects once a combination that takes one object twice is left out, so its constraints hold trivially (14.1)"), seg.start);
+                return Ok(Expansion { atoms: Vec::new(), collection: true });
+            }
         }
         let mut atoms = Vec::new();
         for row in combinations {
@@ -526,10 +544,10 @@ impl Interp<'_> {
             } else {
                 rows.clear();
             }
-            // an object is not related to itself
+            // a combination that takes one object twice is left out
             rows.retain(|row| {
                 let mut seen = HashSet::new();
-                row.iter().all(|&o| seen.insert(self.scene_value(o)))
+                row.iter().all(|&o| seen.insert(self.one_object(o)))
             });
             if rows.is_empty() {
                 if columns.len() >= 2 {
@@ -652,6 +670,16 @@ impl Interp<'_> {
             at = step.1;
         }
         None
+    }
+
+    /// The object a member of a constraint is, for leaving out a combination that takes one
+    /// object twice: the object it names, a `::position` by the object it is of (6.5, 14.1).
+    fn one_object(&self, member: ObjId) -> ObjId {
+        let object = self.scene_value(member);
+        match self.o(object) {
+            ObjData::Pos { parent } if !self.is_set(*parent) => self.scene_value(*parent),
+            _ => object,
+        }
     }
 
     /// Put `added` after `after` among the members of the collection `owner`, if any.

@@ -796,7 +796,7 @@ impl Interp<'_> {
             if resolved.is_some() {
                 continue;
             }
-            if name == "position" && self.position_waits_for_role(parent) {
+            if name == "position" && (self.position_waits_for_role(parent) || self.is_set(parent)) {
                 continue;
             }
             let (code, message) = if name == "net"

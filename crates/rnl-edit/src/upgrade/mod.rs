@@ -363,6 +363,13 @@ pub fn upgrade(entry: &str, files: &dyn Provider, options: &UpgradeOptions) -> R
         no_labels: source_records.values().any(|r| rewrite::uses_no_labels(r)),
         keep_generated: options.keep_generated,
         boxes: default_boxes::DefaultBoxes::new(&before),
+        usage_names: before
+            .problems
+            .iter()
+            .flat_map(|p| &p.usages)
+            .filter(|u| u.parent.is_none() && !u.generated && u.label.starts_with('%'))
+            .map(|u| u.label.clone())
+            .collect(),
     };
     let mut output = BTreeMap::new();
     let mut report = Report {

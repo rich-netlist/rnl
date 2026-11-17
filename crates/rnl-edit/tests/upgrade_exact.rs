@@ -63,6 +63,17 @@ fn old_stub_defaults_are_explicit_and_authored_values_survive() {
     assert!(r.files["t.sp"].contains("@AS(gap=7) $SUPPLY_STUB"));
     assert!(!pending(&r, "standard-definition-body"), "{:?}", r.report);
 }
+/// A usage in the member list of a constraint counted by its own point; in 0.4 that is
+/// `::position`, as a usage without a symbol there stands for its members (6.5, 14.1).
+#[test]
+fn a_usage_in_a_constraint_is_written_by_its_position() {
+    let r=convert("$D= @DEFINE(roles=[]) {}; $S= @DEFINE-SYMBOL { (0,0) @CIRCLE(radius=1) }; %u=$D @ATTACH => @SET-SYMBOL $S; %u @PLACE(4,4); {%u (9,9)} @ALIGN(\"y\"); %u (1,1) @DISTANCE(\"left-to-right\", min=2)",false);
+    let text = &r.files["t.sp"];
+    assert!(text.contains("{%u::position (9,9)} @ALIGN(\"y\")"), "{text}");
+    assert!(text.contains("%u::position (1,1) @DISTANCE"), "{text}");
+    assert!(r.report.differences.is_empty(), "{:#?}", r.report.differences);
+    assert!(r.report.successful(), "{:#?}", r.report);
+}
 #[test]
 fn local_drawn_usages_gain_alignments_without_copying_points() {
     let r=convert("$D= @DEFINE(roles=[[\"p\",\"point\"]]) {}; $S= @DEFINE-SYMBOL { (0,0) @CIRCLE(radius=1) }; %p=(2,3); %u=$D @ATTACH %p => @SET-SYMBOL $S",false);
