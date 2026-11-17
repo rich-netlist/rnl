@@ -624,7 +624,7 @@ fn solve_exact_mode(
     }
     // the other groups of the facts of priority low, when asked for, once the level is laid out
     // and outside its budget, in as much work again as the level took: asking for them changes
-    // nothing the solve keeps or places, and a replay by the work of the level finds the same
+    // nothing the solve keeps or places
     let mut resolved = resolved;
     let allowance = crate::budget::active().then(crate::budget::consumed);
     crate::resolve::seek_low_groups(problem, options, clock, &mut resolved, allowance);

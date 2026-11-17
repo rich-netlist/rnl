@@ -1765,10 +1765,11 @@ pub(crate) fn resolve(problem: &LevelProblem, options: &SolverOptions, clock: &d
 /// [`SolverOptions::hints_for_low`] asks for, sought after the resolution and whatever came of
 /// it, outside the budget of the level, so that a solve that reports them keeps and places what
 /// one that does not would, in the same work; then the hints by statement again, with those
-/// facts in them. They are sought within a budget of their own of `allowance` work units, so that
-/// a replay by the work of the level finds the same; without one (a level of 0.3), within the
-/// time limit of the options, or else their safety limit. A fact whose groups were not all found
-/// so is not [`Discarded::complete`].
+/// facts in them. They are sought within the time limit of the options, or else their safety
+/// limit, as the resolution was; and, with a budget of `allowance` work units (the work the level
+/// took), within that budget of their own too, so that a replay by the work of the level finds
+/// the same unless the time stopped them first. A fact whose groups were not all found so is not
+/// [`Discarded::complete`].
 pub(crate) fn seek_low_groups(
     problem: &LevelProblem,
     options: &SolverOptions,
@@ -1780,6 +1781,7 @@ pub(crate) fn seek_low_groups(
         return;
     }
     let unsought = std::mem::take(&mut resolved.low_unsought);
+    let seconds = options.time_limit.or(options.safety_seconds);
     let seek = |resolved: &mut Resolved, limit: Option<f64>| {
         let deadline = Deadline::new(clock, limit);
         let limits = Limits::Time(&deadline);
@@ -1795,9 +1797,9 @@ pub(crate) fn seek_low_groups(
     };
     crate::budget::without(|| match allowance {
         Some(units) => {
-            crate::budget::with(clock, crate::RunLimit::Work(units.max(1)), None, || seek(resolved, None));
+            crate::budget::with(clock, crate::RunLimit::Work(units.max(1)), seconds, || seek(resolved, None));
         }
-        None => seek(resolved, options.time_limit.or(options.safety_seconds)),
+        None => seek(resolved, seconds),
     });
     resolved.statements = statement_hints(problem, &resolved.discarded);
 }
