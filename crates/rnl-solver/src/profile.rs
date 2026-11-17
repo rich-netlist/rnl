@@ -85,6 +85,13 @@ pub(crate) fn stage(name: &'static str) -> Span {
     span("stage", name)
 }
 
+/// A stage within one of [`stage`], such as a step of the lines layout: the profile counts its time
+/// apart from that of the stage around it, as its own stage, and the budget's observer, which knows
+/// the stage around it, is not told of it.
+pub(crate) fn part(name: &'static str) -> Span {
+    span("stage", name)
+}
+
 pub(crate) fn span_lazy(category: &'static str, name: impl FnOnce() -> String) -> Span {
     if enabled() {
         span(category, name())

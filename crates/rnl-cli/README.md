@@ -269,9 +269,14 @@ delay an update). A killed run retains its last snapshot. `status`, `last_update
 work from a finished solve. A writer error makes the command fail.
 
 Schema version 1 has `levels[]`, each with input counts, `problem_hash`, `options_canonical`,
-`total_seconds`, `stage_seconds`, `metrics`, and `spans[]`. The six top-level stage times are
-mutually exclusive; nested span times are inclusive and must not be added to those totals.
-Spans have an `id`/`parent`, a category (`stage`, `resolve_phase`, `lp`, `lex_layer`,
+`total_seconds`, `stage_seconds`, `metrics`, and `spans[]`. The stage times are mutually
+exclusive: `resolve`, `structure`, `search`, `coords`, `route` and `score`; `tree`, the group-tree
+layout; `place`, the placement of a choice of the lines layout; and `lines`, the rest of the lines
+layout. Within the lines layout, `search` is listing a group's choices, `route` routing a choice,
+`coords` the pass of the coordinates that merges its lines and `score` weighing it. A stage within
+another counts as its own, not as the other's. Nested span times of other categories are inclusive
+and must not be added to those totals.
+Spans have an `id`/`parent`, a category (`stage`, `resolve_phase`, `lp`, `lex_layer`, `lines`, `tree`, `output`,
 `route_net`, or `route_path`), a name, candidate ID where applicable, and counters in `metrics`.
 A coordinate LP span covers one axis and its successive objectives and grid passes. LP
 `variables` includes slack variables, `tableau_rows` counts defining equalities, and

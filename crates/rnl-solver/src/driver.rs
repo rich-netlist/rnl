@@ -193,14 +193,15 @@ fn solve_exact_mode(
         respaced(problem, &structure, previous, options, &mut work, &mut notes)
     } else if use_tree {
         let laid = if use_lines {
-            crate::budget::enter("lines");
+            let phase = crate::profile::stage("lines");
             let (laid, description) = crate::lines::lay_out(problem, &structure, options, &mut work);
+            drop(phase);
             layout_skeleton = Some(description);
             laid
         } else if let Some(rounds) = skeleton {
             crate::skeleton::lay_out(problem, &structure, options, &mut work, rounds)
         } else {
-            crate::budget::enter("tree");
+            let _phase = crate::profile::stage("tree");
             crate::tree::lay_out(problem, &structure, options, &mut work, &crate::tree::Stop::default())
         };
         notes.extend(laid.notes);
