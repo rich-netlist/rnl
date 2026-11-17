@@ -1,5 +1,5 @@
-// Groups (@GROUP, 11.5) are a special kind of usage: the Usage panel lists them under @GROUP, after the definitions,
-// folded to begin with like every kind; a group is drawn as a frame titled `@GROUP: %core`, and selecting one lights up
+// Groups (@GROUP, 11.5) are a special kind of usage: the Groups view of the Solve panel lists them, not the Usage panel,
+// and the Solve panel's Group frames draws them; a group is drawn as a frame titled `@GROUP: %core`, and selecting one lights up
 // its members; the table of an object's usages says which groups it is a member of and which groups those are within,
 // indented as the usages of usages are; a group that PRIORITY has turned off is greyed, with its state.
 // The fixture ota-groups is the five-transistor OTA with %core holding all five transistors, %amp the first four, %inp
@@ -8,11 +8,16 @@
 import { expect, test } from "../viewer.js";
 import { repository, translated, uiLanguages, zh } from "../zh.js";
 
-test.use({ keptSettings: { "usages-shown": true } }); // the usage frames are off to begin with: here the user keeps them on
+test.use({ keptSettings: { "usages-shown": true, "groups-shown": true } }); // the frames are off to begin with: here the user keeps them on
 
-const NEW = ["Show all groups", "member of group {0}", "member (through terminal {0}) of group {1}", "{0} is in turn a member of group {1}",
+const NEW = ["member of group {0}", "member (through terminal {0}) of group {1}", "{0} is in turn a member of group {1}",
   "{0} is in turn within group {1}", "within group {0}", "group"];
-const row = (page, id) => page.locator("#usage-list .usage-row", { hasText: id });
+const row = (page, id) => page.locator("#groups-list .group-row", { hasText: id });
+/** Show the Groups view of the Solve panel, where the groups are listed. */
+async function openGroups(page) {
+  await page.locator("#tab-solve").click();
+  await page.locator("#solve-view-groups").click();
+}
 const sentences = (page) => page.locator("#usage-detail .membership-sentence");
 
 /** Select an object of the Document by its kind and name, as a click on a list does, and open the Usage panel. */
@@ -30,14 +35,11 @@ test.beforeEach(async ({ page, viewer }) => {
   await page.locator("#tab-usages").click();
 });
 
-test("the groups are listed last, under @GROUP, folded to begin with, and a turned-off one is greyed with its state", async ({ page }) => {
-  const heads = page.locator("#usage-list .usage-expand");
-  await expect(heads.last()).toContainText("@GROUP");
-  await expect(heads.last()).toContainText("(4)");
-  await expect(heads.last()).toHaveAttribute("aria-expanded", "false");
-  await expect(page.locator("#usage-list .usage-row", { hasText: "%core" })).toHaveCount(0);
-  await heads.last().click();
-  await expect(page.locator('#usage-list [data-type="@GROUP"] .usage-name')).toHaveText(["%core", "%amp", "%inp", "%bias"]);
+test("the groups are listed in the Groups view, not in the Usage panel, and a turned-off one is greyed with its state", async ({ page }) => {
+  await expect(page.locator("#usage-list .usage-expand").first()).toBeAttached();
+  await expect(page.locator('#usage-list [data-type="@GROUP"]')).toHaveCount(0);
+  await openGroups(page);
+  await expect(page.locator("#groups-list .group-row")).toHaveCount(4);
   // only %bias is turned off (PRIORITY): its whole row is greyed and says why
   await expect(row(page, "%bias")).toHaveClass(/greyed/);
   await expect(row(page, "%bias").locator(".usage-state")).toHaveText("disabled");
@@ -45,8 +47,8 @@ test("the groups are listed last, under @GROUP, folded to begin with, and a turn
     await expect(row(page, id)).not.toHaveClass(/greyed/);
     await expect(row(page, id).locator(".usage-state")).toHaveCount(0);
   }
-  // one checkbox shows and hides the groups' frames, as for any kind
-  await expect(page.locator('#usage-list [data-type="@GROUP"] .usage-group-head input[type="checkbox"]')).toHaveAccessibleName("Show all groups");
+  // one checkbox of the Solve panel shows and hides the groups' frames
+  await expect(page.locator("#solve-group-frames")).toBeChecked();
 });
 
 test("a group is drawn as a frame titled @GROUP: its id, and selecting one lights up its members", async ({ page }) => {
@@ -59,8 +61,9 @@ test("a group is drawn as a frame titled @GROUP: its id, and selecting one light
   await expect(off.locator(".usage-title text")).toHaveText("@GROUP: %bias");
   await expect(off).toHaveAttribute("opacity", "0.4");
   await expect(page.locator("#canvas .usage-frame:not(.disabled)[opacity]")).toHaveCount(0);
-  await page.locator("#usage-list .usage-expand").last().click();
+  await openGroups(page);
   await row(page, "%amp").locator(".usage-name").click();
+  await page.locator("#tab-usages").click();
   await expect(page.locator("#usage-detail h2")).toHaveText("@GROUP: %amp");
   await expect(page.locator("#usage-detail .usage-roles")).toContainText("members");
   await expect(page.locator("#usage-detail .usage-roles")).toContainText("#M1, #M2, #M3, #M4");
@@ -85,7 +88,7 @@ test("selecting a group mutes the frames of the other groups as it mutes the res
     fill: document.querySelector(`#canvas rect.usage-fill[data-usage="${f.dataset.usage}"]`).getAttribute("fill") }])));
   const before = await strokes();
   expect(Object.values(before).some((f) => f.muted)).toBe(false);
-  await page.locator("#usage-list .usage-expand").last().click();
+  await openGroups(page);
   await row(page, "%amp").locator(".usage-name").click();
   await expect(page.locator("#canvas .usage-frame.selected")).toHaveCount(1);
   const light = await strokes();
@@ -188,20 +191,20 @@ test("a selected component and its texts are drawn over the frames and titles of
   await page.evaluate(() => window.viewer.command("toggle-usages"));
   expect((await order()).over.every(Boolean)).toBe(true);
   // a selected group's own frame is over the other frames, whatever order they were made in
-  await page.locator("#usage-list .usage-expand").last().click();
+  await openGroups(page);
   await row(page, "%inp").locator(".usage-name").click();
   const last = await page.evaluate(() => [...document.querySelectorAll("#canvas .usage-frame")].at(-1).querySelector(".usage-title text")?.textContent);
   expect(last).toBe("@GROUP: %inp");
   expect((await order()).sel).toBe(0); // a selected usage lifts no component
 });
 
-test("the selected group's title has a button that hides it and unselects it, as the switch in the Usage panel hides it", async ({ page }) => {
+test("the selected group's title has a button that hides it and unselects it, as the switch in the Groups view hides it", async ({ page }) => {
   const button = page.locator("#canvas .usage-hide");
   const shown = (id) => row(page, id).locator('input[type="checkbox"]');
   const frame = (id) => page.locator("#canvas .usage-frame .usage-title text", { hasText: id });
   const selected = () => page.evaluate(() => window.viewer.selected);
   await expect(button).toHaveCount(0);
-  await page.locator("#usage-list .usage-expand").last().click();
+  await openGroups(page);
   await row(page, "%amp").locator(".usage-name").click();
   // only the selected one, at the start of its title, with a box that makes it a button
   await expect(button).toHaveCount(1);
@@ -390,9 +393,8 @@ test("the texts are in every language of the interface, and the list and the tab
   }
   await page.evaluate(() => window.viewer.command("language-zh"));
   await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
-  await page.locator("#usage-list .usage-expand").last().click();
+  await openGroups(page);
   await expect(row(page, "%bias").locator(".usage-state")).toHaveText(zh("disabled"));
-  await expect(page.locator('#usage-list [data-type="@GROUP"] .usage-group-head input[type="checkbox"]')).toHaveAccessibleName(zh("Show all groups"));
   await selectObject(page, "instance", "M1");
   const groups = page.locator('#usage-detail .usage-membership-row[data-kind="group"] .membership-sentence');
   await expect(groups.nth(0)).toHaveText(zh("member of group {0}", "%core"));

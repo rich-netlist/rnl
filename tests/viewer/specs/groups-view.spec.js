@@ -40,7 +40,7 @@ for (const platform of ["web", "desktop"]) {
       await expect(off.locator(".group-note")).toHaveText("turned off by PRIORITY");
     });
 
-    test("a click lights a group, as in the Usage view, and the check shows or hides its frame", async ({ page, viewer }) => {
+    test("a click lights a group and selects it, and the check shows or hides its frame", async ({ page, viewer }) => {
       await viewer.open("groups-04", { platform });
       await page.keyboard.press("7");
       await page.locator("#solve-view-groups").click();
@@ -48,18 +48,23 @@ for (const platform of ["web", "desktop"]) {
       await expect(far).not.toHaveClass(/selected/);
       await far.locator(".usage-name").click();
       await expect(far).toHaveClass(/selected/);
-      // the Usage view lists the same group as selected
+      // the group is selected, and the Usage panel, which does not list the groups, shows its details
       await page.keyboard.press("5");
-      await expect(page.locator("#usage-list .usage-row.selected")).toHaveCount(1);
+      await expect(page.locator("#usage-detail h2")).toHaveText("@GROUP: %far");
+      await expect(page.locator('#usage-list .usage-row:has-text("%far")')).toHaveCount(0);
       await page.keyboard.press("7");
-      // the frame's check is the Usage view's own: one changes with the other
+      // with Group frames on, the check shows or hides the frame (the fixture draws no resistor: what the page would draw)
+      const shown = () => page.evaluate(async () => {
+        const far = window.viewer.doc.levels[0].usages.find((u) => u.id === "%far");
+        return (await import("./usages.js")).overlayChoices().each.get(far.object).visible;
+      });
       const check = far.locator('input[type="checkbox"]');
-      const before = await check.isChecked();
-      await check.click();
-      expect(await check.isChecked()).toBe(!before);
-      await page.keyboard.press("5");
-      const same = page.locator('#usage-list .usage-row:has-text("%far") input[type="checkbox"]');
-      expect(await same.isChecked()).toBe(!before);
+      await check.check();
+      expect(await shown()).toBe(false);
+      await page.locator("#solve-group-frames").check();
+      expect(await shown()).toBe(true);
+      await check.uncheck();
+      expect(await shown()).toBe(false);
     });
 
     test("a level of an earlier version has its groups all at the top, and a level without groups has no view", async ({ page, viewer }) => {

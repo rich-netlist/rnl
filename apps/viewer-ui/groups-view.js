@@ -1,8 +1,9 @@
 // The Groups view of the Solve pane (solve.js, constraints.js): the groups of the level shown as the tree the solver takes
 // them in, which the core gives with the Document (`Usage.group_parent`; group-tree.js). One line for each group: its colour,
-// its name and its members; a click lights it in the drawing, as a click on its row in the Usage view does (usages.js), and
-// the check shows or hides its frame, as there. The groups the solver does not take in, those left out because they cross
-// another, those with the same members as another and those turned off, follow the tree, each with its reason.
+// its name and its members; a click lights it in the drawing and selects it (usages.js), and the check shows or hides its
+// frame, which is drawn while the Solve panel's Group frames is on (the Usage panel does not list the groups). The groups
+// the solver does not take in, those left out because they cross another, those with the same members as another and
+// those turned off, follow the tree, each with its reason.
 
 import { append, m, setAttr, setText } from "./i18n.js";
 import { current, doc, selected, selectedAsUsage } from "./state.js";

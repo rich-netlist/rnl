@@ -34,7 +34,7 @@ function imageName(kind) {
 
 /** The overlays to ask the core for: all usages, of which the page then keeps those it shows. */
 function overlayOptions(choices) {
-  return { usages: choices.usages ? "all" : "none", currents: choices.currents, roles: false };
+  return { usages: choices.frames ? "all" : "none", currents: choices.currents, roles: false };
 }
 
 /**

@@ -6,7 +6,7 @@ import { setCheck } from "./commands.js";
 import { $, load, save, span, svgElement } from "./util.js";
 import { setPathText } from "./source-path.js";
 import { isDark, mutedColour } from "./background.js";
-import { objectUsages, relatedUsages, stateName } from "./usage-table.js";
+import { objectUsages, relatedUsages } from "./usage-table.js";
 import { FRAME_STEP, frameSteps, TITLE_ROW, titleRows } from "./frame-layout.js";
 import { setPane } from "./panels.js";
 import { revealLine } from "./text.js";
@@ -22,6 +22,8 @@ const MAX_PREFERENCES = 2000;
 let preferences = new Map();
 const activeSettings = new WeakMap();
 let shown = false;
+let groupsShown = false; // the frames of the groups: the Solve panel's Group frames, apart from the usages' View > Show Usages
+let nestedHidden = false; // the Usage panel's Hide nested usages: a usage made inside another with the same members is not drawn
 let currentsShown = false;
 let currentLayer = null;
 let revision = 0;
@@ -45,10 +47,13 @@ let layerSelected = null;
 let context = null;
 
 const usages = () => doc?.levels[current]?.usages || [];
-/** A group (`@GROUP`, 11.5) is listed with the usages and drawn as one, of a kind of its own. */
+/**
+ * A group (`@GROUP`, 11.5) is drawn as a usage, of a kind of its own, but listed in the Groups view of the Solve pane
+ * (groups-view.js), not in the Usage panel, and its frame is shown by the Solve panel's Group frames, not by Show Usages.
+ */
 const GROUP_TYPE = "@GROUP";
 export const isGroup = (u) => u.kind === "group";
-/** The heading a usage is listed under: its definition, or `@GROUP` for the groups. */
+/** What a usage's title begins with: its definition; `@GROUP` for a group. */
 const typeOf = (u) => (isGroup(u) ? GROUP_TYPE : u.definition);
 /** What the drawing and the details call it: `$DIFFERENTIAL_PAIR: %dp1`, `@GROUP: %core`. */
 const labelOf = (u) => `${typeOf(u)}: ${u.id}`;
@@ -64,7 +69,41 @@ function newScope() {
   rowLimits.clear();
 }
 const chosen =() => selectedAsUsage ? usages().find(u => u.object === selected) : null;
-const visible = u => shown && setting(u).visible;
+/** Whether a usage's frame is shown by its own switches: Show Usages, or Group frames for a group, and its own check. */
+const ownVisible = u => (isGroup(u) ? groupsShown : shown) && setting(u).visible;
+const memberKeys = new WeakMap();
+/** The objects a usage has as members, in all its roles, as a key: the same members, the same key; "" for none. */
+function memberKey(u) {
+  if (!memberKeys.has(u)) memberKeys.set(u, [...new Set(u.roles.flatMap(r => r.objects ?? []))].sort((a, b) => a - b).join(","));
+  return memberKeys.get(u);
+}
+const byObjects = new WeakMap();
+/** The usages of the level shown by their object, for following `parent`. */
+function usageByObject() {
+  const all = usages();
+  if (!byObjects.has(all)) byObjects.set(all, new Map(all.map(u => [u.object, u])));
+  return byObjects.get(all);
+}
+/**
+ * With Hide nested usages on, the outermost usage that `u` is made inside (`parent`, through any number of definitions)
+ * that has the same members and whose frame is shown: `u`'s frame would only go round the same objects again, a step
+ * out, so it is not drawn. Null when there is none, when the mode is off, and for a group, which is not made inside a
+ * usage. A usage made inside another with other members is drawn as before.
+ */
+function nestedIn(u) {
+  if (!nestedHidden || isGroup(u) || u.parent == null) return null;
+  const key = memberKey(u);
+  if (!key) return null;
+  const all = usageByObject();
+  let outer = null;
+  const seen = new Set();
+  for (let p = all.get(u.parent); p && !seen.has(p.object); p = p.parent == null ? null : all.get(p.parent)) {
+    seen.add(p.object);
+    if (memberKey(p) === key && ownVisible(p)) outer = p;
+  }
+  return outer;
+}
+const visible = u => ownVisible(u) && !nestedIn(u);
 /** Hidden virtual symbols still select as ordinary parts when picked on the drawing. */
 export function usageSelection(object, from) {
   const u = usages().find(u => u.object === object);
@@ -91,6 +130,7 @@ function persist() { save("usage-preferences", Object.fromEntries(preferences));
 export function overlayChoices() {
   return {
     usages: shown,
+    frames: shown || groupsShown, // whether any frame may be shown, of a usage or of a group
     currents: currentsShown,
     each: new Map(usages().map((u) => [u.object, { visible: visible(u), color: setting(u).color }])),
   };
@@ -110,7 +150,7 @@ function change(u, values) {
   repaint();
 }
 function repaint() { if (context) paintUsages(...context); }
-/** A group's colour and whether its frame is shown, as the Usage view keeps them (the frames are drawn while View > Show Usages is on). */
+/** A group's colour and whether its frame is shown, as its check keeps them (the frames are drawn while Group frames is on). */
 export const groupLook = (u) => ({ color: setting(u).color, visible: setting(u).visible });
 export function setGroupVisible(u, visible) { change(u, { visible }); }
 
@@ -118,6 +158,16 @@ export function startUsages() {
   preferences = new Map(Object.entries(load("usage-preferences", {})).filter(([, v]) =>
     v && /^#[0-9a-f]{6}$/i.test(v.color) && typeof v.visible === "boolean").slice(-MAX_PREFERENCES));
   shown = load("usages-shown", false) === true;
+  groupsShown = load("groups-shown", false) === true;
+  nestedHidden = load("usages-nested-hidden", false) === true;
+  const groupsBox = $("solve-group-frames");
+  if (groupsBox) {
+    groupsBox.checked = groupsShown;
+    if (!groupsBox.dataset.hooked) {
+      groupsBox.dataset.hooked = "1";
+      groupsBox.addEventListener("change", () => toggleGroups(groupsBox.checked));
+    }
+  }
   currentsShown = load("currents-shown", false) === true;
   setCheck("toggle-currents", currentsShown);
   startOrigins();
@@ -147,6 +197,23 @@ export function toggleUsages() {
   revision++;
   repaint();
 }
+/** Show or hide the frames of the groups, the Solve panel's Group frames: `value` true or false, or inverted when omitted. */
+export function toggleGroups(value) {
+  groupsShown = typeof value === "boolean" ? value : !groupsShown;
+  save("groups-shown", groupsShown);
+  const box = $("solve-group-frames");
+  if (box) box.checked = groupsShown;
+  revision++;
+  repaint();
+}
+/** The Usage panel's Hide nested usages, on or off: `value` true or false, or inverted when omitted. */
+export function toggleNestedHidden(value) {
+  nestedHidden = typeof value === "boolean" ? value : !nestedHidden;
+  save("usages-nested-hidden", nestedHidden);
+  revision++;
+  renderUsages();
+  repaint();
+}
 export function toggleCurrents() {
   currentsShown = !currentsShown;
   save("currents-shown", currentsShown);
@@ -170,7 +237,8 @@ export function renderUsages() {
   const scroll = list.scrollTop;
   const focused = list.contains(document.activeElement) ? document.activeElement.dataset.focusKey : null;
   list.replaceChildren();
-  const all = usages();
+  // (the groups are listed in the Groups view of the Solve pane)
+  const all = usages().filter(u => !isGroup(u));
   const inspected = chosen()?.object;
   if (!all.length) append(list, span("placeholder", m("No usages in this circuit.")));
   const groups = new Map();
@@ -178,13 +246,22 @@ export function renderUsages() {
     if (!groups.has(typeOf(u))) groups.set(typeOf(u), []);
     groups.get(typeOf(u)).push(u);
   }
-  // the groups come last, after the definitions
-  const sorted = [...groups].sort(([a], [b]) => (a === GROUP_TYPE) - (b === GROUP_TYPE) || a.localeCompare(b, undefined, { numeric: true }));
+  const sorted = [...groups].sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }));
   if (sorted.length) {
     // one button for all the groups: Expand All, or Collapse All when every group is open
     const every = sorted.every(([type]) => expanded.has(type));
     const bar = document.createElement("div");
     bar.className = "usage-toolbar";
+    const nested = document.createElement("label");
+    nested.className = "usage-nested-toggle";
+    const nestedBox = document.createElement("input");
+    nestedBox.type = "checkbox";
+    nestedBox.id = "usage-hide-nested";
+    nestedBox.checked = nestedHidden;
+    nestedBox.dataset.focusKey = "hide-nested";
+    nestedBox.addEventListener("change", () => toggleNestedHidden(nestedBox.checked));
+    append(nested, nestedBox, m("Hide nested usages"));
+    append(bar, nested);
     const all = document.createElement("button");
     all.type = "button";
     all.id = "usage-expand-all";
@@ -218,7 +295,7 @@ export function renderUsages() {
       renderUsages();
     });
     const visible = items.filter(u => setting(u).visible).length;
-    const control = checkbox(type === GROUP_TYPE ? m("Show all groups") : m`Show all usages of ${type}`, visible === items.length, value => {
+    const control = checkbox(m`Show all usages of ${type}`, visible === items.length, value => {
       for (const u of items) { Object.assign(setting(u), { visible: value }); remember(u); }
       persist(); revision++; renderUsages(); repaint();
     });
@@ -233,8 +310,9 @@ export function renderUsages() {
         row.className = "usage-row";
         row.dataset.object = String(u.object);
         row.classList.toggle("selected", u.object === inspected);
-        const state = isGroup(u) ? stateOf(u) : "in-effect"; // (the list greys the groups that are turned off; a usage that is not in effect has its state in the table of its members' usages)
-        row.classList.toggle("greyed", state !== "in-effect");
+        // (a usage that is not in effect has its state in the table of its members' usages)
+        const outer = setting(u).visible ? nestedIn(u) : null;
+        row.classList.toggle("nested", !!outer);
         const button = document.createElement("button");
         button.type = "button";
         button.className = "usage-name";
@@ -246,9 +324,9 @@ export function renderUsages() {
         button.addEventListener("click", () => select(u.object, "usage"));
         const check = checkbox(m`Show ${u.id}`, setting(u).visible, visible => change(u, { visible }));
         check.dataset.focusKey = `check:${u.id}`;
-        // a group that is turned off is greyed, the whole row, and says so
         append(row, button);
-        if (state !== "in-effect") append(row, span("usage-state", stateName(state)));
+        // one that Hide nested usages does not draw says inside which usage it is
+        if (outer) append(row, span("usage-state usage-nested-note", m`inside ${labelOf(outer)}`));
         append(row, check);
         append(group, row);
       }
