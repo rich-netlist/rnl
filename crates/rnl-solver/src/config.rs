@@ -101,7 +101,7 @@ impl VirtualWeight {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Settings {
     pub layout: Layout,
     /// The definition literal, normalized after the runtime resolves it for writing.
@@ -120,6 +120,11 @@ pub struct Settings {
     /// net's own drawing kept where it has fewer crossings and bends weighed, or as many and is
     /// shorter. False by default: it costs time, which a solve counts in its work.
     pub reroute_nets: bool,
+    /// Whether the line layout, once it has taken a drawing, moves an end of a wire that bends or
+    /// crosses where the wire may run straight (`nudge_wires`): the component at that end, with
+    /// what moves with it, routed and merged again, the move kept where the drawing then ranks
+    /// before it by the line-layout order. True by default; false draws as before it was added.
+    pub nudge_wires: bool,
     /// The weights of a crossing and of a bend in the lines layout (`lines_weights`).
     pub lines_weights: LinesWeights,
     /// How much a virtual symbol counts in the rows and columns of the symbols (`virtual_weight`).
@@ -128,6 +133,24 @@ pub struct Settings {
     pub lines_order: crate::LinesOrder,
     /// Only values explicitly supplied by the caller. Defaults must not mask file values.
     pub overrides: Vec<SolverSetting>,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Settings {
+            layout: Layout::default(),
+            junction: None,
+            legacy_alias: false,
+            spacing: [0, 0],
+            join_trees: false,
+            reroute_nets: false,
+            nudge_wires: true,
+            lines_weights: LinesWeights::default(),
+            virtual_weight: VirtualWeight::default(),
+            lines_order: crate::LinesOrder::default(),
+            overrides: Vec::new(),
+        }
+    }
 }
 
 pub fn is_run_setting(key: &str) -> bool {
@@ -155,6 +178,7 @@ fn known(key: &str) -> bool {
                 | "spacing_y"
                 | "join_trees"
                 | "reroute_nets"
+                | "nudge_wires"
                 | "tolerance"
                 | "grid"
                 | "beam"
@@ -215,6 +239,10 @@ fn apply(o: &mut SolverOptions, s: &SolverSetting) -> Result<(), String> {
         "reroute_nets" => {
             let Lit::Bool(value) = s.value else { return Err("reroute_nets must be a boolean".into()) };
             o.settings.reroute_nets = value;
+        }
+        "nudge_wires" => {
+            let Lit::Bool(value) = s.value else { return Err("nudge_wires must be a boolean".into()) };
+            o.settings.nudge_wires = value;
         }
         "lines_weights" => {
             let bad = || "lines_weights must be two integers, [crossing, bend]".to_string();
@@ -529,7 +557,7 @@ impl SolverOptions {
     /// Defaults in the syntax accepted by --solver-config.
     pub fn defaults_config() -> String {
         let d = Self::default();
-        format!("layout=\"lines\", spacing_x=0, spacing_y=0, lines_weights=[1, 4], lines_order=\"{}\", virtual_weight=0.5, join_trees=false, reroute_nets=false, limit=\"time\", seconds=10, safety_seconds=30, tolerance={}, grid=1, beam={}, candidates={}, astar_expansions={}", d.settings.lines_order.canonical(), rnl_runtime::geom::fmt_num(d.tolerance), d.beam, d.budget.candidates, d.budget.astar_expansions)
+        format!("layout=\"lines\", spacing_x=0, spacing_y=0, lines_weights=[1, 4], lines_order=\"{}\", virtual_weight=0.5, join_trees=false, reroute_nets=false, nudge_wires=true, limit=\"time\", seconds=10, safety_seconds=30, tolerance={}, grid=1, beam={}, candidates={}, astar_expansions={}", d.settings.lines_order.canonical(), rnl_runtime::geom::fmt_num(d.tolerance), d.beam, d.budget.candidates, d.budget.astar_expansions)
     }
     /// Parse tool settings using RNL literal syntax; reject invalid values before solving.
     pub fn with_config(&self, text: &str) -> Result<Self, String> {
@@ -699,6 +727,8 @@ impl SolverOptions {
             // its trees are its nets' already, and it does not read the setting
             out.settings.join_trees = false;
             out.settings.reroute_nets = false;
+            // its default, which the options of its hash do not name: rows have no wires to move
+            out.settings.nudge_wires = true;
             return (out, warnings, Vec::new());
         }
         if self.settings.legacy_alias {
@@ -795,6 +825,28 @@ mod tests {
         p.version = "0.3".into();
         let on = SolverOptions::default().with_config("reroute_nets=true").unwrap();
         assert!(!on.for_problem(&p).0.settings.reroute_nets);
+    }
+
+    /// `nudge_wires`, on by default, a boolean a file or a tool may give.
+    #[test]
+    fn nudge_wires_is_a_boolean_a_file_may_give() {
+        let settings = |text: &str| rnl_runtime::solver_settings::parse_overrides(text).unwrap();
+        let mut p = problem_of(Vec::new(), Vec::new());
+        p.version = "0.4".into();
+        assert!(SolverOptions::default().settings.nudge_wires);
+        p.solver_config = settings("nudge_wires=false");
+        let (o, warnings, errors) = SolverOptions::default().for_problem(&p);
+        assert!(!o.settings.nudge_wires);
+        assert!(warnings.is_empty() && errors.is_empty(), "{warnings:?} {errors:?}");
+        let tool = SolverOptions::default().with_config("nudge_wires=true").unwrap();
+        assert!(tool.for_problem(&p).0.settings.nudge_wires);
+        let err = SolverOptions::default().with_config("nudge_wires=0").unwrap_err();
+        assert!(err.contains("nudge_wires must be a boolean"), "{err}");
+        assert!(SolverOptions::defaults_config().contains("nudge_wires=true"));
+        // a level before 0.4 is laid out in rows, and its options keep their default
+        p.version = "0.3".into();
+        let off = SolverOptions::default().with_config("nudge_wires=false").unwrap();
+        assert!(off.for_problem(&p).0.settings.nudge_wires);
     }
 
     /// The weights of a crossing and of a bend: two integers from 0 to 1000, not both 0, which a

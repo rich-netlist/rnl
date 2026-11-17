@@ -366,6 +366,17 @@ pub fn settings_table() -> SettingsTable {
             "Route each net of three pins or more again, one wire at a time, and keep a wire routed again \
              where the net then has fewer crossings and bends, or as many and is shorter. It takes longer.",
         ),
+        SettingRow {
+            applies: LINES,
+            ..row(
+                "nudge_wires",
+                "layout",
+                SettingKind::Boolean,
+                "Once the line layout has its drawing, move the component at an end of a wire that bends or \
+                 crosses where the wire can run straight, with what moves with it, and keep the move where \
+                 the drawing then ranks better. Off, the drawing is as the search made it.",
+            )
+        },
         row(
             "junction",
             "layout",

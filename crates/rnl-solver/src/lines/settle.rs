@@ -40,7 +40,7 @@ const LIST_BYTES: usize = 64 * 1024 * 1024;
 const CACHE_BYTES: usize = 4 * LIST_BYTES;
 const WAY_SETS: usize = 1 << 14;
 const WAY_NODES: usize = 1 << 20;
-const STEPS: u64 = 20_000_000;
+pub(super) const STEPS: u64 = 20_000_000;
 const MOST_DISSOLVED: usize = 8;
 const PROBE: usize = 4;
 /// The fewest complete solutions in a row without a better one after which the search ends
@@ -3905,7 +3905,7 @@ pub(super) fn layout_of(
     Ok((layout, pins, written_net, refs))
 }
 
-fn routing_of(problem: &LevelProblem, routed: &track::Routed, refs: &[Vec<PointRef>]) -> Routing {
+pub(super) fn routing_of(problem: &LevelProblem, routed: &track::Routed, refs: &[Vec<PointRef>]) -> Routing {
     let mut routing = Routing { expansions: routed.expansions, ..Routing::default() };
     for (j, out) in routed.outs.iter().enumerate() {
         let offset = routing.branches.len();

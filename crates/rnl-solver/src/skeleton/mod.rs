@@ -460,6 +460,9 @@ pub(crate) struct Strict {
     pub sides: BTreeMap<usize, u8>,
     pub moved: Vec<(usize, [Q; 2], [Q; 2])>,
     pub pivot_rows: u64,
+    /// The pins put at one depth it was given (`compact_strict`'s `levels`), for a merge of the
+    /// drawing again.
+    pub levels: Vec<(crate::structure::PinKey, crate::structure::PinKey)>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -487,6 +490,7 @@ pub(crate) fn compact_strict(
         sides: BTreeMap::new(),
         moved: Vec::new(),
         pivot_rows: 0,
+        levels: levels.to_vec(),
     };
     let Some(mut sk) = read::read_for_compaction(problem, s, &placed.geometry, routing, &keep, true, within, true)
     else {

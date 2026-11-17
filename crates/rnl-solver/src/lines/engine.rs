@@ -196,7 +196,37 @@ pub(crate) fn lay_out(
         Ok(made) => made,
         Err(why) => return fallback(laid, notes, why, work),
     };
-    let Made { made, routed, groups, mine, lists, kept } = made;
+    let Made { made, routed, groups, mine, lists, kept, clear } = made;
+    // `nudge_wires`: the end of a bent wire moved where the wire may run straight (`super::nudge`),
+    // before the drawing made is said and compared. It is done whatever the budget left, as the
+    // spacing below is: once the budget is spent, or when a limit stops it, past the limit, from the
+    // same drawing
+    let (made, routed, mine) = if options.settings.nudge_wires {
+        let run = |work: &mut Work, said: &mut Vec<String>| {
+            super::nudge::nudge(problem, s, options, &made, &clear, work, said)
+        };
+        let mut said = Vec::new();
+        let once = (!crate::budget::stopped()).then(|| run(work, &mut said));
+        let nudged = match once {
+            Some(once) if !crate::budget::stopped() => {
+                notes.append(&mut said);
+                once
+            }
+            _ => {
+                let mut said = Vec::new();
+                let (nudged, past, safety) = crate::budget::past_limit(|| run(work, &mut said));
+                notes.append(&mut said);
+                notes.push(past_note("lines: ends of bent wires moved", past, safety));
+                nudged
+            }
+        };
+        match nudged {
+            Some(n) => (n.made, n.routed, n.mine),
+            None => (made, routed, mine),
+        }
+    } else {
+        (made, routed, mine)
+    };
     if mine.annotation_cost > theirs.annotation_cost {
         notes.push(format!(
             "lines: annotation overlaps and wire intersections {:?}, previously {:?}",
@@ -313,6 +343,8 @@ struct Made {
     /// a round's drawing whose wires could not all keep their gaps, taken when a limit stopped the
     /// next round (`previous`)
     kept: bool,
+    /// the sides of the symbols the round that made the drawing kept clear of wires
+    clear: BTreeMap<usize, u8>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -337,6 +369,7 @@ fn attempt(
             return previous(last, notes, "budget exhausted before another routing round".into());
         }
         let span = crate::profile::span("lines", "settle");
+        let kept_clear = clear.clone();
         let round = |work: &mut Work| {
             settle::settle(problem, s, placed, arrangement, others, options, &clear, taken.as_ref(), work, stop)
         };
@@ -403,7 +436,7 @@ fn attempt(
             return previous(last, notes, format!("budget exhausted in routing round {attempt}"));
         }
         if made.conflicts.is_empty() {
-            return Ok(Made { made, routed, groups, mine: quality, lists, kept: false });
+            return Ok(Made { made, routed, groups, mine: quality, lists, kept: false, clear: kept_clear });
         }
         if attempt + 1 == ROUNDS {
             return Err(format!("{} wires cannot keep their gaps where they run", made.conflicts.len()));
@@ -427,7 +460,7 @@ fn attempt(
                 made.conflicts.len()
             ));
         }
-        last = Some((Made { made, routed, groups, mine: quality, lists, kept: true }, attempt));
+        last = Some((Made { made, routed, groups, mine: quality, lists, kept: true, clear: kept_clear }, attempt));
     }
     Err("no round kept every gap".to_string())
 }

@@ -8,6 +8,7 @@ mod distribution;
 mod dots;
 pub(crate) mod engine;
 mod fingerprint;
+mod nudge;
 mod open;
 mod quality;
 mod rank;
