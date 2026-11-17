@@ -264,11 +264,9 @@ pub(crate) fn lay_out(
             work,
         );
     }
-    let made = if crate::budget::stopped() {
-        made
-    } else {
+    let spaced = |made: crate::skeleton::Strict, work: &mut Work, notes: &mut Vec<String>| {
         let saved = made.clone();
-        let candidate = crate::skeleton::spaced(problem, s, made, options, work, &mut notes);
+        let candidate = crate::skeleton::spaced(problem, s, made, options, work, notes);
         if candidate.interrupted
             || !super::quality::annotations_preserved(
                 problem,
@@ -280,6 +278,24 @@ pub(crate) fn lay_out(
             saved
         } else {
             candidate
+        }
+    };
+    // the drawing taken is spaced whatever the budget left: once it is spent, past its limit, which
+    // only the safety limit stops, the work left out of the work reported (`budget::past_limit`),
+    // so that a replay by that work spaces it alike; a spacing the limit cut is done again there
+    let mut said = Vec::new();
+    let once = (!crate::budget::stopped()).then(|| spaced(made.clone(), work, &mut said));
+    let made = match once {
+        Some(once) if !crate::budget::stopped() => {
+            notes.append(&mut said);
+            once
+        }
+        _ => {
+            let mut said = Vec::new();
+            let (spaced, past, safety) = crate::budget::past_limit(|| spaced(made, work, &mut said));
+            notes.append(&mut said);
+            notes.push(past_note("lines: spaced", past, safety));
+            spaced
         }
     };
     let (mut arrangement, groups_tree) = arrangement;
@@ -307,7 +323,7 @@ struct Made {
     aligned: Vec<(usize, (usize, usize))>,
     mine: LabOrder,
     lists: Vec<Option<Item>>,
-    /// a round's drawing whose wires could not all keep their gaps, taken when the budget stopped the
+    /// a round's drawing whose wires could not all keep their gaps, taken when a limit stopped the
     /// next round (`previous`)
     kept: bool,
 }
@@ -327,27 +343,38 @@ fn attempt(
     let mut clear: BTreeMap<usize, u8> = BTreeMap::new();
     let mut taken: Option<settle::Taken> = None;
     // the drawing of the last round, whose wires could not all keep their gaps, and the round: kept
-    // when the budget stops the next one before it is done (`previous`)
+    // when a limit stops the next one before it is done (`previous`)
     let mut last: Option<(Made, usize)> = None;
     for attempt in 0..ROUNDS {
-        if crate::budget::stopped() {
+        if attempt == 0 && crate::budget::stopped() {
             return previous(last, notes, "budget exhausted before another routing round".into());
         }
         let span = crate::profile::span("lines", "settle");
-        let settled = match settle::settle(
-            problem,
-            s,
-            placed,
-            arrangement,
-            others,
-            options,
-            &clear,
-            taken.as_ref(),
-            work,
-            stop,
-        ) {
+        let round = |work: &mut Work| {
+            settle::settle(problem, s, placed, arrangement, others, options, &clear, taken.as_ref(), work, stop)
+        };
+        // the first round is the search, within the budget; a later one routes the drawing it took
+        // again, its orientations given, and is done whatever the budget left: once it is spent,
+        // past its limit, which only the safety limit stops, the work left out of the work reported
+        // (`budget::past_limit`), so that a replay by that work does it alike; a round the limit cut
+        // is done again there. `cut`: whether a limit stopped the round, and its drawing may be
+        // unfinished
+        let (settled, cut) = if attempt == 0 {
+            let settled = round(work);
+            (settled, crate::budget::stopped())
+        } else {
+            match (!crate::budget::stopped()).then(|| round(work)) {
+                Some(settled) if !crate::budget::stopped() => (settled, false),
+                _ => {
+                    let (settled, past, safety) = crate::budget::past_limit(|| round(work));
+                    notes.push(past_note(&format!("lines, round {attempt}: routed"), past, safety));
+                    (settled, safety)
+                }
+            }
+        };
+        let settled = match settled {
             Ok(settled) => settled,
-            Err(why) if crate::budget::stopped() => return previous(last, notes, why),
+            Err(why) if cut => return previous(last, notes, why),
             Err(why) => return Err(why),
         };
         drop(span);
@@ -378,14 +405,14 @@ fn attempt(
         let _ = (placed, routing);
         let Some(made) = made else {
             let why = "the settled level has no completed compaction".to_string();
-            return if crate::budget::stopped() { previous(last, notes, why) } else { Err(why) };
+            return if cut { previous(last, notes, why) } else { Err(why) };
         };
         notes.extend(made.notes.iter().map(|n| format!("lines, round {attempt}: {n}")));
         if made.failed {
             let why = format!("a pass of the coordinates found no solution{}", facts_said(problem, &made.failed_facts));
-            return if crate::budget::stopped() { previous(last, notes, why) } else { Err(why) };
+            return if cut { previous(last, notes, why) } else { Err(why) };
         }
-        if quality.interrupted && crate::budget::stopped() && last.is_some() {
+        if quality.interrupted && cut && last.is_some() {
             return previous(last, notes, format!("budget exhausted in routing round {attempt}"));
         }
         if made.conflicts.is_empty() {
@@ -418,8 +445,18 @@ fn attempt(
     Err("no round kept every gap".to_string())
 }
 
-/// When the budget stops a routing round: the drawing of the round before, whose wires could not
-/// all keep their gaps, with a note of them; `why` the round stopped when there is none.
+/// The note of a step done past the spent limit (`budget::past_limit`): `what`, the work it took,
+/// which the work reported leaves out, and whether the safety limit stopped it.
+fn past_note(what: &str, past: u64, safety: bool) -> String {
+    format!(
+        "{what} past the limit, {past} work units more, which the work reported leaves out{}",
+        if safety { "; the safety limit stopped it" } else { "" }
+    )
+}
+
+/// When a limit stops a routing round, the budget the search, or the safety limit one done past
+/// it: the drawing of the round before, whose wires could not all keep their gaps, with a note of
+/// them; `why` the round stopped when there is none.
 fn previous(last: Option<(Made, usize)>, notes: &mut Vec<String>, why: String) -> Result<Made, String> {
     let Some((made, round)) = last else { return Err(why) };
     notes.push(format!(

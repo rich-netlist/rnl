@@ -28,12 +28,15 @@ Time is checked before admitting a positive-cost operation. The reported count i
 of admitted operations. A work replay refuses the same next operation, including inside
 resolution or a coordinate search. Stopping is latched. Already proved facts remain valid;
 unfinished checks are undecided, with warnings, rather than contradictory or satisfied.
-Necessary result assembly and forced route completion are deterministic finalization.
+Necessary result assembly and forced route completion are deterministic finalization, and so,
+under the line layout, are the routing rounds that make the drawing taken keep its gaps and its
+spacing: once the budget is spent they run past its limit, their work left out of the reported
+count ([line layout](solver-lines.md)).
 
 The seconds limit applies to each drawing level's solver, not the whole CLI process.
 Package loading and interpretation, re-reading between levels, record validation and
-writeback happen outside that budget. A ten-second search can therefore take longer
-end to end. Compare the level's solver time with the CLI/process time when diagnosing
+writeback happen outside that budget, as does the finalization above. A ten-second search can
+therefore take longer end to end. Compare the level's solver time with the CLI/process time when diagnosing
 an overrun; profiling can itself slow search and move a time cutoff. Replaying the
 reported work is the way to inspect the same search trajectory.
 
