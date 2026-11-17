@@ -23,6 +23,20 @@ struct Span {
     elapsed_seconds: f64,
     complete: bool,
     metrics: BTreeMap<String, Value>,
+    /// of a stage, the time of the stages ended within it, which are not its own
+    #[serde(skip)]
+    within: f64,
+}
+
+/// The stage a span is in: itself or the nearest stage around it.
+fn stage_of(spans: &[Span], mut at: Option<usize>) -> Option<usize> {
+    while let Some(i) = at {
+        if spans[i].category == "stage" {
+            return Some(i);
+        }
+        at = spans[i].parent;
+    }
+    None
 }
 
 #[derive(Clone, Serialize)]
@@ -146,10 +160,20 @@ impl ProfileObserver for Writer {
                     current_stage: None,
                     started_seconds: now,
                     total_seconds: 0.0,
-                    stage_seconds: ["resolve", "structure", "search", "coords", "route", "score"]
-                        .into_iter()
-                        .map(|k| (k.into(), 0.0))
-                        .collect(),
+                    stage_seconds: [
+                        "resolve",
+                        "structure",
+                        "search",
+                        "coords",
+                        "route",
+                        "score",
+                        "tree",
+                        "place",
+                        "lines",
+                    ]
+                    .into_iter()
+                    .map(|k| (k.into(), 0.0))
+                    .collect(),
                     metrics: BTreeMap::new(),
                     spans: Vec::new(),
                 });
@@ -189,6 +213,7 @@ impl ProfileObserver for Writer {
                         elapsed_seconds: 0.0,
                         complete: false,
                         metrics: BTreeMap::new(),
+                        within: 0.0,
                     });
                     state.stack.push(id);
                 }
@@ -203,8 +228,18 @@ impl ProfileObserver for Writer {
                         span.elapsed_seconds = now - span.started_seconds;
                         span.complete = true;
                         if span.category == "stage" {
-                            *level.stage_seconds.entry(span.name.clone()).or_default() += span.elapsed_seconds;
-                            level.current_stage = None;
+                            // its own time, without that of the stages within it; the stage around
+                            // it, if any, is current again and leaves this one's time out of its own
+                            let (elapsed, own) = (span.elapsed_seconds, span.elapsed_seconds - span.within);
+                            *level.stage_seconds.entry(span.name.clone()).or_default() += own;
+                            let parent = span.parent;
+                            level.current_stage = match stage_of(&level.spans, parent) {
+                                Some(o) => {
+                                    level.spans[o].within += elapsed;
+                                    Some(level.spans[o].name.clone())
+                                }
+                                None => None,
+                            };
                         }
                     }
                 }
@@ -259,9 +294,15 @@ impl Writer {
             for &i in &state.stack {
                 let span = &mut level.spans[i];
                 span.elapsed_seconds = now - span.started_seconds;
-                if span.category == "stage" {
-                    *level.stage_seconds.entry(span.name.clone()).or_default() += span.elapsed_seconds;
-                }
+            }
+            // each open stage's own time so far: without the stages ended within it and the open
+            // one within it
+            let open: Vec<usize> =
+                state.stack.iter().copied().filter(|&i| level.spans[i].category == "stage").collect();
+            for (j, &i) in open.iter().enumerate() {
+                let inner = open.get(j + 1).map_or(0.0, |&k| level.spans[k].elapsed_seconds);
+                let own = level.spans[i].elapsed_seconds - level.spans[i].within - inner;
+                *level.stage_seconds.entry(level.spans[i].name.clone()).or_default() += own;
             }
         }
         state.checkpoints += 1;
@@ -281,7 +322,7 @@ impl Writer {
             "counts_complete": state.status == "complete",
             "peak_memory_bytes": Value::Null,
             "notes": [
-                "stage_seconds are mutually exclusive top-level solver stages; nested span times are inclusive",
+                "stage_seconds are mutually exclusive solver stages: a stage within another counts as its own, not as the other's; other nested span times are inclusive",
                 "missing metrics are unobserved, not zero; partial counts include work through the last checkpoint",
                 "checkpoints are throttled to 0.5 seconds at work boundaries; one long rational operation may delay a checkpoint",
                 "rational bit maxima cover stored tableau coefficients, values and bounds at observations, not temporary arithmetic intermediates",
@@ -358,6 +399,76 @@ mod tests {
             .file_name()
             .to_string_lossy()
             .contains(".partial-")));
+        std::fs::remove_file(path).unwrap();
+    }
+
+    /// A stage within another, such as a step of the lines layout, counts as its own: the stage
+    /// around it leaves its time out, it is current while it runs and the other after it, and the
+    /// stages add up to no more than the level.
+    #[test]
+    fn a_stage_within_another_counts_as_its_own() {
+        let dir = std::env::temp_dir().join(format!("rnl-profile-nested-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("nested.json");
+        let _ = std::fs::remove_file(&path);
+        let clock = ProfileClock::new(&path).unwrap();
+        let observer = clock.profiler().unwrap();
+        observer.record(ProfileEvent::Level {
+            level: 0,
+            title: "nested".into(),
+            objects: 2,
+            facts: 1,
+            routes: 1,
+            options: "unchanged".into(),
+            hash: "sig2-test".into(),
+        });
+        let wait = || {
+            let start = clock.elapsed();
+            while clock.elapsed() - start < 0.02 {}
+        };
+        observer.record(ProfileEvent::Begin { category: "stage", name: "lines".into() });
+        wait();
+        observer.record(ProfileEvent::Begin { category: "lines", name: "settle".into() });
+        observer.record(ProfileEvent::Begin { category: "stage", name: "place".into() });
+        wait();
+        observer.record(ProfileEvent::Begin { category: "stage", name: "route".into() });
+        wait();
+        clock.0.flush(true);
+        let partial: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        assert_eq!(partial["current_stage"], "route");
+        let stages = &partial["levels"][0]["stage_seconds"];
+        let total = partial["levels"][0]["total_seconds"].as_f64().unwrap();
+        let sum: f64 = ["lines", "place", "route"].iter().map(|k| stages[k].as_f64().unwrap()).sum();
+        assert!(sum <= total + 1e-9, "{stages} of {total}");
+        for k in ["lines", "place", "route"] {
+            assert!(stages[k].as_f64().unwrap() >= 0.015, "{k}: {stages}");
+        }
+        observer.record(ProfileEvent::End);
+        clock.0.flush(true);
+        let after: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        assert_eq!(after["current_stage"], "place");
+        observer.record(ProfileEvent::End);
+        observer.record(ProfileEvent::End);
+        clock.0.flush(true);
+        let after: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        assert_eq!(after["current_stage"], "lines");
+        observer.record(ProfileEvent::End);
+        observer.record(ProfileEvent::LevelEnd);
+        clock.finish(true).unwrap();
+        let done: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        let level = &done["levels"][0];
+        let stages = &level["stage_seconds"];
+        let sum: f64 = stages.as_object().unwrap().values().map(|v| v.as_f64().unwrap()).sum();
+        assert!(sum <= level["total_seconds"].as_f64().unwrap() + 1e-9, "{stages}");
+        let span = |name: &str| {
+            level["spans"].as_array().unwrap().iter().find(|s| s["name"] == name).unwrap()["elapsed_seconds"]
+                .as_f64()
+                .unwrap()
+        };
+        // the stage around the others: its own time, less than the span's, which takes them in
+        assert!(stages["lines"].as_f64().unwrap() < span("lines") - 0.03, "{stages}");
+        assert!((stages["place"].as_f64().unwrap() - (span("place") - span("route"))).abs() < 1e-9);
+        assert_eq!(done["current_stage"], Value::Null);
         std::fs::remove_file(path).unwrap();
     }
 }

@@ -135,7 +135,7 @@ pub(crate) fn lay_out(
 ) -> (Laid, LayoutSkeleton) {
     let _span = crate::profile::span("lines", "layout");
 
-    let span = crate::profile::span("lines", "tree");
+    let span = crate::profile::part("tree");
     let (pivots, expansions) = (work.pivots, work.astar_expansions);
     let mut laid = super::tree_start(problem, s, options, work, stop, tree_allowance);
     crate::profile::add("tree_pivots", work.pivots - pivots);

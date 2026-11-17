@@ -841,7 +841,7 @@ impl Search<'_, '_> {
     }
 
     fn prepare(&mut self, core: &mut Core, state: &State, fixed: &[(usize, u8)], loose: &BTreeSet<usize>) {
-        let _span = crate::profile::span("lines", "prepare");
+        let _span = crate::profile::part("search");
         let lv = self.lv;
         let n = core.n;
         core.units = core.own.iter().map(|&k| Unit::Leaf(k)).chain(core.kids.iter().map(|&c| Unit::Block(c))).collect();
@@ -1246,7 +1246,7 @@ impl Search<'_, '_> {
                 }
             }
         }
-        let span = crate::profile::span("lines", "choice");
+        let span = crate::profile::part("place");
         let list = core.table(choice.1.get(3).copied().unwrap_or(0)).cloned();
         let list = list.as_ref();
         let evaluated = lv.evaluate(
@@ -1321,7 +1321,7 @@ impl Search<'_, '_> {
                     levels.extend(state.blocks[b].0.levels.iter().copied());
                 }
             }
-            let span = crate::profile::span("lines", "merge");
+            let span = crate::profile::part("coords");
             let (pivots, relaxations) = (work.pivots, work.astar_expansions);
             let mut made = compact_strict(problem, s, &placed, &routing, self.options, work, part, &levels);
             super::written::defaults(problem, s, &made.placed, &mut made.routing, within, false);
@@ -1338,7 +1338,7 @@ impl Search<'_, '_> {
             None
         };
 
-        let span = crate::profile::span("lines", "weigh");
+        let span = crate::profile::part("score");
         let lab = match &made {
             Some(m) => lab_order(problem, s, &m.placed, &m.routing, &lv.ranking, within),
             None => lab_order(problem, s, &placed, &routing, &lv.ranking, within),
@@ -3630,7 +3630,7 @@ impl Level<'_> {
             lenient: !root,
             reroute: self.reroute,
         };
-        let span = crate::profile::span("lines", "route");
+        let span = crate::profile::part("route");
         ROUTED.with(|r| r.set(r.get() + 1));
         let routed = track::route(&input);
         crate::profile::add("expansions", routed.expansions);
