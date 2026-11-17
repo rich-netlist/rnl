@@ -824,7 +824,6 @@ impl Structure {
         Some([turned(o, local, 0), turned(o, local, 1)])
     }
 
-    /// The direction a wire leaves a pin, turned by `o`.
     /// Where the stub `j` goes from the origin of its host turned by `host`, itself turned by
     /// `own`: its pin `rise` above the host's pin, and `run` beyond it the way that pin leaves
     /// when it leaves sideways ([`Stub`]).
@@ -844,6 +843,7 @@ impl Structure {
         }
     }
 
+    /// The direction a wire leaves a pin, turned by `o`.
     pub(crate) fn exit(&self, k: usize, pin: usize, o: Orient) -> Option<(i64, i64)> {
         let (x, y) = self.pins(k).get(pin)?.dir?;
         let (a, b, c, d) = o.matrix();
@@ -934,7 +934,7 @@ pub(crate) fn analyse(
             if let Some(host) = crate::beside::on_pin(problem, &kept, k) {
                 o.role = Role::Pinned;
                 pinned.insert(k, host);
-            } else if let Some(stub) = exact_stub(problem, &kept, k) {
+            } else if let Some(stub) = exact_stub(problem, &kept, k).filter(|_| o.own) {
                 // a pin the facts put exactly above or below another's: it hangs from that pin
                 o.role = Role::Pinned;
                 o.stub = Some(stub);
@@ -954,6 +954,9 @@ pub(crate) fn analyse(
                 continue;
             };
             if host.0 != e {
+                continue;
+            }
+            if !objects[k].own {
                 continue;
             }
             if let Some(stub) = bounded_stub(problem, &kept, k, host) {
@@ -1639,7 +1642,33 @@ fn bounded_stub(problem: &LevelProblem, kept: &[usize], k: usize, host: PinKey) 
         }
         _ => return None,
     };
-    (!rise.is_zero()).then_some(Stub { host, rise, run: gap })
+    // the facts kept on x: an ALIGN of the two pins keeps the symbol right above or below the
+    // pin; any other fact that reaches the symbol on x is left to hold, as it would not here
+    let on_x = |r: &PointRef| match r {
+        PointRef::Origin(o) => *o == k,
+        PointRef::Centre(rs) => {
+            rs.iter().any(|r| r.pin_key().is_some_and(|p| p.0 == k) || matches!(r, PointRef::Origin(o) if *o == k))
+        }
+        _ => r.pin_key().is_some_and(|p| p.0 == k),
+    };
+    let mut aligned = false;
+    for kind in kept.iter().filter_map(|&f| problem.facts.get(f)).map(|f| &f.kind) {
+        match kind {
+            FactKind::Align { axis: Axis::X, members } if members.iter().any(on_x) => {
+                let pins: Vec<Option<PinKey>> = members.iter().map(|r| r.pin_key()).collect();
+                if pins.len() == 2 && pins.contains(&Some((k, 0))) && pins.contains(&Some(host)) {
+                    aligned = true;
+                } else {
+                    return None;
+                }
+            }
+            FactKind::Distance { axis: Axis::X, from, to, .. } if from.iter().chain(to).any(on_x) => return None,
+            FactKind::Place { at, axis: Axis::X, .. } if on_x(at) => return None,
+            _ => {}
+        }
+    }
+    let run = if aligned { Q::zero() } else { gap };
+    (!rise.is_zero()).then_some(Stub { host, rise, run })
 }
 
 /// How far above the pin `host` the pin of stub `k` is, as a fact kept says: a DISTANCE on y

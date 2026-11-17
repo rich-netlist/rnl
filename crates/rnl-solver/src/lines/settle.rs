@@ -2350,7 +2350,8 @@ impl Level<'_> {
         };
         edges
             .iter()
-            .filter(|e| e.axis == 1 && e.gap.is_some())
+            // a bound of most (a negative gap, the reverse of a DISTANCE's max) is no vote
+            .filter(|e| e.axis == 1 && e.gap.as_ref().is_some_and(|g| !g.is_negative()))
             .filter_map(|e| {
                 let (low, high) = (object(&e.from)?, object(&e.to)?);
                 let (dl, dh) = (depth.get(low).copied().flatten()?, depth.get(high).copied().flatten()?);
