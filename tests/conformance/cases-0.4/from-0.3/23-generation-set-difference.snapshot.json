@@ -219,7 +219,7 @@
       "name": "cell",
       "file": 0,
       "line": 16,
-      "status": "3 without a position; constraints: 8 unsolved",
+      "status": "3 without a position; constraints: 6 unsolved",
       "host": {
         "ports": [
           "&inp",

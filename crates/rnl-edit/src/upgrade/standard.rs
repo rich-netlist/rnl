@@ -207,6 +207,30 @@ fn without_pin_orient(name: &str, body: &str) -> Option<String> {
     body.strip_suffix(&format!(";{fact}}}")).map(|rest| format!("{rest}}}"))
 }
 
+/// The bodies of a stub, `$GROUND_STUB` or `$SUPPLY_STUB`, in 0.3 (with the pin of 0.4 named
+/// `::pin`) and in 0.4: in 0.3 the symbol stands straight below or above the pin, at least gap
+/// away; in 0.4 it stands near the pin, level with it or below or above it, at most gap away
+/// vertically, and how far to the side is left free. All at priority low.
+fn stub_bodies(name: &str) -> Option<(String, String)> {
+    let (local, mark, below) = match name {
+        "$GROUND_STUB" => ("%g", "$GROUND", true),
+        "$SUPPLY_STUB" => ("%s", "$SUPPLY", false),
+        _ => return None,
+    };
+    let pin = format!("{local}::pin");
+    // from the lower to the upper
+    let vertical = if below { format!("{pin}?t") } else { format!("?t{pin}") };
+    let low = "priority=\"low\"";
+    let head = format!("{local}={mark}@ATTACH?t::net;?t::net@WIRE{{?t{pin}}}");
+    let tail = format!("{local}@ORIENT(\"R0\",{low})");
+    let old = format!(
+        "{{{head};{{?t{pin}}}@ALIGN(\"x\",{low});{}@DISTANCE(\"bottom-to-top\",min=?gap,{low});{tail}}}",
+        vertical
+    );
+    let new = format!("{{{head};{vertical}@DISTANCE(\"bottom-to-top\",max=?gap,{low});{tail}}}");
+    Some((old, new))
+}
+
 /// Whether the 0.4 definition keeps the roles of the old one, in order, and only adds set roles after
 /// them, which an application may leave out: `$FLOW`, with `{path}`, became `$SIGNAL_FLOW`, with
 /// `{path}`, `{source}` and `{load}`.
@@ -306,12 +330,23 @@ pub(super) fn definition_policies(input: &Interpretation) -> BTreeMap<(usize, St
                     && ["p", "t", "at"]
                         .iter()
                         .any(|role| new == format!("{{{{??{role}}}@ALIGN(\"x\");{{??{role}}}@ALIGN(\"y\")}}"));
-                policy.gap = matches!(target_name.as_str(), "$GROUND_STUB" | "$SUPPLY_STUB")
-                    && defaults == "[[\"gap\", 2]]"
-                    && after_defaults == "[[\"gap\", 1]]"
-                    && old.replace("%g:p", "%g::pin").replace("%s:p", "%s::pin") == new;
+                // A stub of 0.3 put its symbol straight below or above the pin, at least gap away (2
+                // by default); one of 0.4 keeps it near the pin, at most gap away vertically (3 by
+                // default), not aligned with it. The upgrade writes the old default, gap=2, so that the symbol stays as close.
+                policy.gap = stub_bodies(&target_name).is_some_and(|(was, is)| {
+                    defaults == "[[\"gap\", 2]]"
+                        && after_defaults == "[[\"gap\", 3]]"
+                        && old.replace("%g:p", "%g::pin").replace("%s:p", "%s::pin") == was
+                        && new == is
+                });
                 if policy.tied || policy.gap {
                     policy.review = None;
+                }
+                if policy.gap {
+                    policy.notice = Some((
+                        "standard-stub-range",
+                        "the symbol of a stub now stands near its pin, level with it or below a ground or above a supply, at most gap units away vertically at priority low, and is no longer aligned with the pin, where 0.3 put it straight below or above, at least gap away; gap keeps its value, the old default written as gap=2 (10.5, 16.3)",
+                    ));
                 }
                 if target_name == "$IO_PORT"
                     && old == "{}"

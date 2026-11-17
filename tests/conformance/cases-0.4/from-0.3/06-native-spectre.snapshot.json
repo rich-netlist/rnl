@@ -9,7 +9,7 @@
       "name": "06-native-spectre.scs",
       "file": 0,
       "line": 0,
-      "status": "2 without a position; constraints: 4 unsolved",
+      "status": "2 without a position; constraints: 2 unsolved",
       "host": {
         "ports": [],
         "instances": [

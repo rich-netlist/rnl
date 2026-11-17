@@ -9,7 +9,7 @@
       "name": "07-virtuoso-netlist.scs",
       "file": 0,
       "line": 0,
-      "status": "1 without a position; constraints: 2 unsolved",
+      "status": "1 without a position; constraints: 1 unsolved",
       "host": {
         "ports": [],
         "instances": [
@@ -808,7 +808,7 @@
       "name": "inv",
       "file": 0,
       "line": 8,
-      "status": "4 without a position; constraints: 9 unsolved",
+      "status": "4 without a position; constraints: 7 unsolved",
       "host": {
         "ports": [
           "&in",

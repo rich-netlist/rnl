@@ -980,9 +980,12 @@ fn snapshot(
                 continue;
             }
             let (kind, mixed) = turned_fact(&item.kind, &turn_of, &offset_of);
-            let packaged = matches!(item.kind, FactKind::PinOrient { .. })
-                && item.priority == Priority::Low
-                && item.source.as_ref().is_some_and(|s| standard_files.contains(s.file.as_str()));
+            // a pin turned, a distance or an alignment at priority low by a bundled standard package,
+            // such as where a stub stands by its pin: the package's default look
+            let packaged =
+                matches!(item.kind, FactKind::PinOrient { .. } | FactKind::Distance { .. } | FactKind::Align { .. })
+                    && item.priority == Priority::Low
+                    && item.source.as_ref().is_some_and(|s| standard_files.contains(s.file.as_str()));
             for text in facts(&names, &kind) {
                 let text = if mixed { format!("{text} (turned symbols)") } else { text };
                 let key = put("facts", &format!("{text} {:?}", item.priority), json!(text));
@@ -1059,7 +1062,9 @@ pub(super) fn compare(
     let keys = netname_keys(before, after);
     let bare = bare_usages(after);
     let boxed = default_boxed(before);
-    let mut before = renamed_keys(snapshot(before, &added, &boxed, boxes, &Turned::new()).items, &keys);
+    let Items { items: before, package_look: before_look, .. } =
+        snapshot(before, &added, &boxed, boxes, &Turned::new());
+    let mut before = renamed_keys(before, &keys);
     let Items { items: after, package_look, .. } = snapshot(after, &added, &boxed, boxes, turned);
     let mut differences = Vec::new();
     let mut look = Vec::new();
@@ -1152,8 +1157,10 @@ pub(super) fn compare(
                     || item.split('|').next().is_some_and(|first| ids.contains(first))
             });
         let fill = added.get(&level).is_some_and(|d| is_fill(d, &category, &item, &value));
+        // a fact of the old standard package's default look that the new package draws otherwise
+        let packaged = before_look.contains(&(file.clone(), level.clone(), category.clone(), item.clone()));
         let difference = Difference { file, level, category, item, before: Some(value), after: None };
-        if package_text || fill {
+        if package_text || fill || packaged {
             look.push(difference);
         } else if by_rule_here {
             by_rule.push(difference);

@@ -735,12 +735,6 @@
       ],
       "constraints": [
         {
-          "label": "ALIGN",
-          "kind": "ALIGN",
-          "status": "unsolved",
-          "priority": "low"
-        },
-        {
           "label": "DISTANCE",
           "kind": "DISTANCE",
           "status": "unsolved",
@@ -1375,20 +1369,8 @@
       ],
       "constraints": [
         {
-          "label": "ALIGN",
-          "kind": "ALIGN",
-          "status": "unsolved",
-          "priority": "low"
-        },
-        {
           "label": "DISTANCE",
           "kind": "DISTANCE",
-          "status": "unsolved",
-          "priority": "low"
-        },
-        {
-          "label": "ALIGN",
-          "kind": "ALIGN",
           "status": "unsolved",
           "priority": "low"
         },

@@ -9,7 +9,7 @@
       "name": "12-self-contradicting-distance.sp",
       "file": 0,
       "line": 0,
-      "status": "6 without a position; constraints: 1 ok, 1 failed, 16 unsolved",
+      "status": "6 without a position; constraints: 1 ok, 1 failed, 14 unsolved",
       "host": {
         "ports": [],
         "instances": [

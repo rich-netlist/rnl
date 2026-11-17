@@ -763,12 +763,6 @@
       ],
       "constraints": [
         {
-          "label": "ALIGN",
-          "kind": "ALIGN",
-          "status": "ok",
-          "priority": "low"
-        },
-        {
           "label": "DISTANCE",
           "kind": "DISTANCE",
           "status": "ok",
@@ -1253,12 +1247,6 @@
         ]
       ],
       "constraints": [
-        {
-          "label": "ALIGN",
-          "kind": "ALIGN",
-          "status": "ok",
-          "priority": "low"
-        },
         {
           "label": "DISTANCE",
           "kind": "DISTANCE",
