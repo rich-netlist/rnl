@@ -196,8 +196,7 @@ fn definition_shapes(version: &str) -> DefinitionShapes {
 fn without_pin_orient(name: &str, body: &str) -> Option<String> {
     let direction = match name {
         "$GROUND" => "\"up\"",
-        "$SUPPLY" | "$BIAS" => "\"down\"",
-        "$IO_PORT" | "$NET_LABEL" => "[\"right\",\"left\"]",
+        "$SUPPLY" => "\"down\"",
         _ => return None,
     };
     let fact = format!("?@SELECT-PIN=>@ORIENT({direction},priority=\"low\")");
@@ -353,14 +352,7 @@ pub(super) fn definition_policies(input: &Interpretation) -> BTreeMap<(usize, St
                     && new == "{?p@ASSERT-NET(port=true,message=\"the net of an $IO_PORT is a port of its level\")}"
                 {
                     policy.review = None;
-                    policy.notice = Some((
-                        "standard-assertion",
-                        if turns_pin {
-                            "IO_PORT now asserts that its net is a port of the current level and turns its pin left or right at priority low, the package's default look; positions are unchanged, and any violated assertion remains a target violation (7.6, 11.2, 16.3)"
-                        } else {
-                            "IO_PORT now asserts that its net is a port of the current level; drawing facts are unchanged, and any violated assertion remains a target violation (7.6, 16.3)"
-                        },
-                    ));
+                    policy.notice = Some(("standard-assertion", "IO_PORT now asserts that its net is a port of the current level; drawing facts are unchanged, and any violated assertion remains a target violation (7.6, 16.3)"));
                 }
                 if target_name == "$MATCHED"
                     && old == "{}"
@@ -399,12 +391,14 @@ pub(super) fn definition_policies(input: &Interpretation) -> BTreeMap<(usize, St
                     && policy.review.is_some_and(|r| r.0 == "standard-definition-body")
                 {
                     policy.review = None;
-                    policy.notice = Some(("standard-orientation", match target_name.as_str() {
-                        "$GROUND" => "GROUND now turns its pin up at priority low, the package's default look; positions are unchanged (11.2, 16.3)",
-                        "$SUPPLY" => "SUPPLY now turns its pin down at priority low, the package's default look; positions are unchanged (11.2, 16.3)",
-                        "$BIAS" => "BIAS now turns its pin down at priority low, the package's default look; positions are unchanged (11.2, 16.3)",
-                        _ => "the definition now turns its pin left or right at priority low, the package's default look; positions are unchanged (11.2, 16.3)",
-                    }));
+                    policy.notice = Some((
+                        "standard-orientation",
+                        if target_name == "$GROUND" {
+                            "GROUND now turns its pin up at priority low, the package's default look; positions are unchanged (11.2, 16.3)"
+                        } else {
+                            "SUPPLY now turns its pin down at priority low, the package's default look; positions are unchanged (11.2, 16.3)"
+                        },
+                    ));
                 }
                 if policy.review.is_some_and(|r| r.0 == "standard-definition-body") {
                     policy.review = Some(("standard-definition-body", match target_name.as_str() {
