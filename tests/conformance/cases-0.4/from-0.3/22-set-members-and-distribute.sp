@@ -1,5 +1,5 @@
 * Collection item expansion and DISTRIBUTE boundaries in 0.4
-*! Collection items expand to combinations, without a collection centre. Nested and repeated items exercise expansion; repeated R1 produces a self-contradiction. Zero and one surviving items produce too-few-places hints.
+*! Collection items expand to combinations, without a collection centre. Nested and repeated items exercise expansion; a combination that takes R1 twice is left out (14.1). Zero and one surviving items produce too-few-places hints.
 * @RNL(type="header") { @USE-PACKAGE(name="rnl-std-all", version="0.4");
 *   @VERSION("0.4")
 * }

@@ -1161,12 +1161,6 @@
       ],
       "constraints": [
         {
-          "label": "ORDER",
-          "kind": "ORDER",
-          "status": "failed",
-          "priority": "normal"
-        },
-        {
           "label": "ORIENT-RELATION",
           "kind": "ORIENT-RELATION",
           "status": "failed",
@@ -1589,9 +1583,9 @@
   ],
   "diagnostics": [
     {
-      "severity": "error",
-      "code": "RNL5002",
-      "name": "constraint-self-contradiction",
+      "severity": "hint",
+      "code": "RNL5005",
+      "name": "constraint-expansion-too-few-places",
       "file": "17-conflict-priority-and-tolerance.sp",
       "line": 27,
       "col": 5

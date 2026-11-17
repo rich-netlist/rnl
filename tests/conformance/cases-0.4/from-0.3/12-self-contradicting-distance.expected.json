@@ -376,18 +376,6 @@
       ],
       "constraints": [
         {
-          "label": "ALIGN",
-          "kind": "ALIGN",
-          "status": "ok",
-          "priority": "normal"
-        },
-        {
-          "label": "DISTANCE",
-          "kind": "DISTANCE",
-          "status": "failed",
-          "priority": "normal"
-        },
-        {
           "label": "DISTANCE",
           "kind": "DISTANCE",
           "status": "unsolved",
@@ -484,9 +472,17 @@
   ],
   "diagnostics": [
     {
-      "severity": "error",
-      "code": "RNL5002",
-      "name": "constraint-self-contradiction",
+      "severity": "hint",
+      "code": "RNL5005",
+      "name": "constraint-expansion-too-few-places",
+      "file": "12-self-contradicting-distance.sp",
+      "line": 10,
+      "col": 7
+    },
+    {
+      "severity": "hint",
+      "code": "RNL5005",
+      "name": "constraint-expansion-too-few-places",
       "file": "12-self-contradicting-distance.sp",
       "line": 11,
       "col": 7

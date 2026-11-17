@@ -1,9 +1,9 @@
 * Conflict resolution, pipe segment order, self-contradictions, and 1e-6 tolerance (2.7, 5.5, 8.5, 11.7, 14.1-14.5)
 *! 2.7, 5.5, 8.5: Facts are ordered by priority ("high" > "normal" > "low"), then
 *!   reverse position (later statement / later pipe segment wins).
-*! 8.5: Self-contradicting ORDER ({#R1 #R1} @ORDER("left-to-right")) and
-*!   ORIENT-RELATION ({#R1 #R1} @ORIENT-RELATION("MY")) fail with an error and
-*!   take no part in conflict resolution.
+*! 14.1: {#R1 #R1} @ORDER("left-to-right") takes R1 twice and is left out, with a
+*!   too-few-places hint; the self-contradicting ORIENT-RELATION ({#R1 #R1}
+*!   @ORIENT-RELATION("MY")) fails with an error and takes no part in conflicts (8.5).
 *! 8.5: Discarded "normal"/"high" facts emit conflict hints naming the conflicting
 *!   kept facts, while discarded "low" facts are dropped silently without hints.
 *! 11.7, 14.2-14.4: Geometric comparisons use tolerance 1e-6 (ALIGN within 1e-6,
