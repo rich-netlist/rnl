@@ -6,7 +6,6 @@ use rnl_runtime::geom::Orient;
 
 use crate::search::{grounded_end_down, stub_on_body};
 use crate::structure::{FreeClass, Source, Structure};
-use crate::tree::Item;
 
 pub(crate) fn current_order(s: &Structure, class: &FreeClass) -> Vec<(Orient, u8)> {
     let ok = |v: Orient| {
@@ -65,58 +64,6 @@ pub(crate) fn move_rank(
         }
     }
     worst
-}
-
-pub(crate) fn ordered_ports(
-    before: &BTreeSet<(usize, usize)>,
-    items: &[Item],
-    is_port: &dyn Fn(&Item) -> bool,
-    leaves: &dyn Fn(&Item) -> Vec<usize>,
-) -> Vec<Item> {
-    let others: BTreeSet<usize> = items.iter().filter(|it| !is_port(it)).flat_map(leaves).collect();
-    items
-        .iter()
-        .filter(|it| is_port(it))
-        .filter(|it| {
-            leaves(it).iter().any(|&k| {
-                before.iter().any(|&(a, b)| (a == k && others.contains(&b)) || (b == k && others.contains(&a)))
-            })
-        })
-        .cloned()
-        .collect()
-}
-
-pub(crate) fn joined_within(s: &Structure, leaves: &BTreeSet<usize>, placed: &BTreeSet<usize>) -> bool {
-    let joined: Vec<usize> = leaves.iter().flat_map(|&k| s.attach_pins(k)).map(|p| p.0).collect();
-    !joined.is_empty() && joined.iter().all(|k| placed.contains(k))
-}
-
-pub(crate) fn stacked(
-    row: Vec<Item>,
-    port: &dyn Fn(&Item) -> bool,
-    apart: &dyn Fn(&Item, &Item) -> bool,
-    stack: &dyn Fn(Vec<Item>) -> Item,
-) -> Vec<Item> {
-    let mut out = Vec::new();
-    let mut run: Vec<Item> = Vec::new();
-    for it in row {
-        if port(&it) && !run.iter().any(|r| apart(r, &it)) {
-            run.push(it);
-            continue;
-        }
-        if !run.is_empty() {
-            out.push(stack(std::mem::take(&mut run)));
-        }
-        if port(&it) {
-            run.push(it);
-        } else {
-            out.push(it);
-        }
-    }
-    if !run.is_empty() {
-        out.push(stack(run));
-    }
-    out
 }
 
 pub(crate) fn levels(s: &Structure, level: &mut BTreeMap<usize, i64>) {
@@ -179,15 +126,4 @@ pub(crate) fn hangs_upright(s: &Structure, m: usize, o: Orient) -> bool {
         (Some(p), Some(b)) => (p[1].clone() * crate::rational::int(2) > &b[1] + &b[3]) == above,
         _ => true,
     }
-}
-
-/// A symbol made by a usage whose parent binds a role to an electrical pin.
-pub(crate) fn host(problem: &rnl_runtime::problem::LevelProblem, k: usize) -> Option<crate::structure::PinKey> {
-    use rnl_runtime::problem::Filler;
-    let usage = problem.usages.get(problem.objects.get(k)?.usage?)?;
-    let parent = problem.usages.get(usage.parent?)?;
-    parent.roles.iter().flat_map(|r| &r.members).find_map(|m| match m {
-        Filler::Terminal { object, pin: Some(pin), .. } | Filler::Pin { object, pin } => Some((*object, *pin)),
-        _ => None,
-    })
 }

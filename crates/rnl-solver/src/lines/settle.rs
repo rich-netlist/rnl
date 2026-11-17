@@ -14,7 +14,7 @@ use crate::coords::{overlapping, Cause, Overlap, Placed};
 use crate::rational::{from_f64, int, to_f64, Q};
 use crate::resolve::{point_value, Geometry};
 use crate::route::{written_path, AnchorIn, End, Layout, NetIn, Routing};
-use crate::search::{attach_offset, attachments, orientations_given, Attach};
+use crate::search::orientations_given;
 use crate::skeleton::{compact_strict, Strict};
 use crate::structure::{text_box, GroupTree, NodeKind, PinKey, Role, Source, Structure};
 use crate::tree::Stop;
@@ -73,9 +73,7 @@ impl Drop for Counters {
 
 #[derive(Clone, Debug)]
 enum Rule {
-    Stub { pin: usize, rise: Q },
     Pinned { pin: usize, own: usize },
-    Attach(Attach),
     Keep([Q; 2]),
     Beyond { pin: usize, b: [Q; 4], keep: [Q; 2] },
 }
@@ -120,7 +118,6 @@ pub(crate) struct Settled {
     pub routed: track::Routed,
     pub notes: Vec<String>,
     pub taken: Taken,
-    pub aligned: Vec<(usize, (usize, usize))>,
     pub groups: Vec<GroupSettled>,
     pub made: Option<Strict>,
     pub lists: Vec<Option<Item>>,
@@ -149,7 +146,7 @@ pub(super) struct Spread {
     pub(super) out: Vec<usize>,
 }
 
-type Combo = (Vec<Orient>, Vec<usize>, (usize, usize, usize, u32, usize));
+type Combo = (Vec<Orient>, Vec<usize>, (usize, usize, u32));
 
 type Listed = (Rc<Vec<Combo>>, Vec<usize>, Vec<usize>, u64);
 
@@ -205,7 +202,6 @@ struct Tried {
     bands: Bands,
     geometry: Geometry,
     routed: track::Routed,
-    aligned: Vec<(usize, (usize, usize))>,
     refs: Vec<Vec<PointRef>>,
     left_out: Vec<usize>,
     table_out: usize,
@@ -465,7 +461,6 @@ struct Core {
     open_ways: Vec<usize>,
     combos: Rc<Vec<Combo>>,
     rank: Vec<usize>,
-    ports: usize,
     implied: Vec<Edge>,
     currents: Vec<(usize, usize)>,
     levels: Vec<(PinKey, PinKey)>,
@@ -846,11 +841,9 @@ impl Search<'_, '_> {
 
     fn prepare(&mut self, core: &mut Core, state: &State, fixed: &[(usize, u8)], loose: &BTreeSet<usize>) {
         let _span = crate::profile::span("lines", "prepare");
-        let (lv, s) = (self.lv, self.lv.s);
+        let lv = self.lv;
         let n = core.n;
         core.units = core.own.iter().map(|&k| Unit::Leaf(k)).chain(core.kids.iter().map(|&c| Unit::Block(c))).collect();
-        core.ports =
-            core.units.iter().filter(|u| matches!(u, Unit::Leaf(k) if s.objects[*k].role == Role::Port)).count();
         let started: Vec<(usize, u8)> = loose.iter().map(|&k| (k, code(state.ori[k]))).collect();
         let listed_key = (n, core.own.clone(), fixed.to_vec(), started);
         let (combos, classes, open_ways, total) = match self.listed.cached.get(&listed_key) {
@@ -897,7 +890,7 @@ impl Search<'_, '_> {
         if let Some(t) = self.given {
             let values: Vec<Orient> = core.classes.iter().map(|&c| t.values[c]).collect();
             let ways: Vec<usize> = core.open_ways.iter().map(|&i| t.ways[i]).collect();
-            core.combos = Rc::new(vec![(values, ways, (0, 0, 0, 0, 0))]);
+            core.combos = Rc::new(vec![(values, ways, (0, 0, 0))]);
         }
         let mut rank: Vec<usize> = (0..core.combos.len()).collect();
         let learned = |i: usize| {
@@ -959,7 +952,7 @@ impl Search<'_, '_> {
             }
             if self.given.is_some() {
                 core.exhausted = true;
-                let (gaps, out) = given.clone().unwrap_or_else(|| (vec![0; core.ports + 4], Vec::new()));
+                let (gaps, out) = given.clone().unwrap_or_else(|| (vec![0; 4], Vec::new()));
                 core.queue.push_back((0, gaps, out));
                 continue;
             }
@@ -968,7 +961,7 @@ impl Search<'_, '_> {
             let mut fresh: Vec<Choice> = Vec::new();
             let mut spread: Vec<(Option<Score>, Spread)> = Vec::new();
             let mut later = false;
-            let slots = core.ports + 4;
+            let slots = 4;
             for (pos, &r) in core.rank.iter().enumerate() {
                 let b = pos / batch;
                 if b > k {
@@ -1247,15 +1240,13 @@ impl Search<'_, '_> {
         }
         for &k in &core.own {
             for (j, _, rule) in lv.hung.get(&k).into_iter().flatten() {
-                match rule {
-                    Rule::Attach(a) => super::facing::turn(s, *j, a, &mut ori),
-                    Rule::Pinned { .. } => crate::beside::follow(s, *j, &mut ori),
-                    _ => {}
+                if let Rule::Pinned { .. } = rule {
+                    crate::beside::follow(s, *j, &mut ori);
                 }
             }
         }
         let span = crate::profile::span("lines", "choice");
-        let list = core.table(choice.1.get(core.ports + 3).copied().unwrap_or(0)).cloned();
+        let list = core.table(choice.1.get(3).copied().unwrap_or(0)).cloned();
         let list = list.as_ref();
         let evaluated = lv.evaluate(
             n,
@@ -1283,7 +1274,7 @@ impl Search<'_, '_> {
         let t = match evaluated {
             Evaluated::Unplaced(steps, bounds) => {
                 tally.charge(work, Step::Expansion, steps);
-                let at = core.ports + 1;
+                let at = 1;
                 if bounds.as_ref().is_some_and(|b| b.0.get(at) == Some(&2)) && choice.1.get(at) == Some(&0) {
                     let mut gaps = choice.1.clone();
                     gaps[at] = 1;
@@ -1465,7 +1456,7 @@ impl Search<'_, '_> {
         }
         state.own[n].clone_from(&core.own);
         state.kids[n].clone_from(&core.kids);
-        state.lists[n] = core.table(out.choice.1.get(core.ports + 3).copied().unwrap_or(0)).cloned();
+        state.lists[n] = core.table(out.choice.1.get(3).copied().unwrap_or(0)).cloned();
         if let Some(b) = &out.block {
             state.blocks.insert(n, (b.clone(), o));
         }
@@ -1595,7 +1586,6 @@ impl Search<'_, '_> {
         };
         let (path, at) = self.best_path();
         let mut notes = Vec::new();
-        let mut aligned = Vec::new();
         let mut groups = Vec::new();
         let state = &self.nodes[at.expect("the best was made at a node")].state;
         let mut taken =
@@ -1624,7 +1614,7 @@ impl Search<'_, '_> {
             }
             taken.gaps.insert(n, (out.choice.1.clone(), out.choice.2.clone()));
             notes.extend(core.notes.iter().cloned());
-            let table = out.choice.1.get(core.ports + 3).copied().unwrap_or(0);
+            let table = out.choice.1.get(3).copied().unwrap_or(0);
             lists[n] = core.table(table).cloned();
             if table > 0 && table <= core.others.len() {
                 notes.push(format!(
@@ -1635,7 +1625,6 @@ impl Search<'_, '_> {
                     core.others.len()
                 ));
             }
-            let port_gaps = &out.choice.1[..core.ports.min(out.choice.1.len())];
             let (tried, batches, settings) = by_group.get(&n).copied().unwrap_or_default();
             let t = &out.tried;
             let lab = &out.score.4;
@@ -1654,11 +1643,7 @@ impl Search<'_, '_> {
                 lab.bends,
                 lab.cb,
                 lab.lines,
-                if port_gaps.iter().any(|&g| g > 0) {
-                    format!(", its ports on gaps {port_gaps:?}")
-                } else {
-                    String::new()
-                } + &if out.choice.2.is_empty() {
+                if out.choice.2.is_empty() {
                     String::new()
                 } else {
                     format!(", {} left unaligned", crate::driver::count(out.choice.2.len(), "facing pair"))
@@ -1734,7 +1719,6 @@ impl Search<'_, '_> {
                     labels.join(", ")
                 ));
             }
-            aligned.extend(t.aligned.iter().copied());
             groups.push(out.group.clone());
         }
         let found = self.solutions.iter().position(|&(o, _, _)| o == best).unwrap_or(0);
@@ -1818,7 +1802,6 @@ impl Search<'_, '_> {
             routed: t.routed,
             notes,
             taken,
-            aligned,
             groups,
             made: out.made.take(),
             lists,
@@ -2117,9 +2100,6 @@ fn hanging(
     tree: &Placed,
     leaves: &BTreeSet<usize>,
 ) -> BTreeMap<usize, Vec<(usize, usize, Rule)>> {
-    let ori = &tree.geometry.orient;
-    let attach: BTreeMap<usize, Attach> =
-        attachments(s, &[], ori).into_iter().filter(|(k, _)| !leaves.contains(k)).collect();
     let at = &tree.origins;
     let dist = |a: usize, b: usize| (&at[a][0] - &at[b][0]).abs() + (&at[a][1] - &at[b][1]).abs();
     let written = written_objects(problem, &s.kept);
@@ -2151,15 +2131,13 @@ fn hanging(
             let b = text_box(text, &(int(0), int(0)), Orient::R0)?;
             Some((object, pin, b))
         });
-        let rule = if let Some(stub) = &info.stub {
-            Some((stub.host.0, Rule::Stub { pin: stub.host.1, rise: stub.rise.clone() }))
-        } else if let Some(&((o, pin), own)) = s.pinned.get(&k) {
+        let rule = if let Some(&((o, pin), own)) = s.pinned.get(&k) {
             Some((o, Rule::Pinned { pin, own }))
         } else if let Some((o, pin, b)) = beyond {
             let keep = [&at[k][0] - &at[o][0], &at[k][1] - &at[o][1]];
             Some((o, Rule::Beyond { pin, b, keep }))
         } else {
-            attach.get(&k).map(|a| (a.host.0, Rule::Attach(*a)))
+            None
         };
         let (host, rule) = match rule {
             Some(r) => r,
@@ -2199,17 +2177,11 @@ fn hanging(
 
 fn hung_offset(s: &Structure, k: usize, via: usize, rule: &Rule, ori: &[Orient]) -> Option<[Q; 2]> {
     match rule {
-        Rule::Stub { pin, rise } => {
-            let hp = s.pin_offset(via, *pin, ori[via])?;
-            let sp = s.pin_offset(k, 0, ori[k])?;
-            Some([&hp[0] - &sp[0], &hp[1] + rise - &sp[1]])
-        }
         Rule::Pinned { pin, own } => {
             let hp = s.pin_offset(via, *pin, ori[via])?;
             let op = s.pin_offset(k, *own, ori[k])?;
             Some([&hp[0] - &op[0], &hp[1] - &op[1]])
         }
-        Rule::Attach(a) => attach_offset(s, k, &super::facing::now(s, k, a, ori), ori),
         Rule::Keep(off) => Some(off.clone()),
         Rule::Beyond { pin, b, keep } => {
             let at = s.pin_offset(via, *pin, ori[via])?;
@@ -2516,18 +2488,6 @@ impl Level<'_> {
         let fits = |ori: &[Orient], members: &[(usize, Orient)]| {
             members.iter().all(|&(m, _)| !settled.contains(&m) || ori[m] == ori_now[m])
         };
-        let turned_up = |m: usize, ori: &[Orient]| {
-            s.objects[m].role == Role::Port && s.exit(m, 0, ori[m]).is_some_and(|e| e.1 != 0)
-        };
-        let upright = |ori: &[Orient]| own.iter().filter(|&&m| turned_up(m, ori)).count();
-        let in_column = |m: usize| {
-            s.kept.iter().any(|&f| match &problem.facts[f].kind {
-                FactKind::Align { axis: Axis::X, members } => {
-                    members.len() >= 2 && members.iter().any(|r| refers_to(r, m))
-                }
-                _ => false,
-            })
-        };
         let drawn = |m: usize, o: Orient| -> Vec<Q> {
             let mut out = Vec::new();
             for p in 0..s.pins(m).len() {
@@ -2548,13 +2508,13 @@ impl Level<'_> {
             if !ways_fit(s, &way_of, w) {
                 continue;
             }
-            let mut options: Vec<Vec<(Orient, u32, bool, u8)>> = Vec::new();
+            let mut options: Vec<Vec<(Orient, u32, u8)>> = Vec::new();
             let mut home: Vec<Option<usize>> = Vec::new();
             for &c in &classes {
                 let class = &s.open.classes[c];
                 let freed: Vec<usize> = class.members.iter().map(|&(m, _)| m).filter(|m| loose.contains(m)).collect();
                 let mut at: Option<usize> = None;
-                let mut vs: Vec<(Orient, u32, bool, u8)> = Vec::new();
+                let mut vs: Vec<(Orient, u32, u8)> = Vec::new();
                 let mut drawn_as: BTreeMap<Vec<Vec<Q>>, usize> = BTreeMap::new();
                 let mut dom = current_order(s, class);
                 dom.sort_by_key(|(v, r)| (*r, ORDER.iter().position(|o| o == v)));
@@ -2580,11 +2540,7 @@ impl Level<'_> {
                     let i = match drawn_as.get(&look).copied() {
                         Some(i) => i,
                         None => {
-                            let up = class
-                                .members
-                                .iter()
-                                .any(|&(m, _)| own.contains(&m) && turned_up(m, &ori) && !in_column(m));
-                            vs.push((v, self.rule_cost(&class.members, &own, &ori, false), up, current));
+                            vs.push((v, self.rule_cost(&class.members, &own, &ori, false), current));
                             drawn_as.insert(look, vs.len() - 1);
                             vs.len() - 1
                         }
@@ -2600,10 +2556,10 @@ impl Level<'_> {
                 .filter_map(|j| home[j].map(|h| (j, h)))
                 .flat_map(|(j, h)| (0..options[j].len()).filter(move |&i| i != h).map(move |i| (j, i)))
                 .collect();
-            turns.sort_by_key(|&(j, i)| (options[j][i].3, options[j][i].1, j, i));
+            turns.sort_by_key(|&(j, i)| (options[j][i].2, options[j][i].1, j, i));
             let mut moves: Vec<Option<(usize, usize)>> = vec![None];
             moves.extend(turns.into_iter().map(Some));
-            let size = |o: &[Vec<(Orient, u32, bool, u8)>]| {
+            let size = |o: &[Vec<(Orient, u32, u8)>]| {
                 combination_count((0..o.len()).filter(|&j| home[j].is_none()).map(|j| o[j].len()))
             };
             unlisted = unlisted
@@ -2617,19 +2573,12 @@ impl Level<'_> {
                     break;
                 };
                 let worst =
-                    (0..options[c].len()).max_by_key(|&i| (options[c][i].3, options[c][i].1, i)).expect("values");
+                    (0..options[c].len()).max_by_key(|&i| (options[c][i].2, options[c][i].1, i)).expect("values");
                 options[c].remove(worst);
             }
             if options.iter().any(|o| o.is_empty()) {
                 continue;
             }
-            let late: Vec<Vec<bool>> = options
-                .iter()
-                .map(|vs| {
-                    let level = vs.iter().any(|v| !v.2);
-                    vs.iter().map(|v| v.2 && level).collect()
-                })
-                .collect();
             let mut index: Vec<usize> = home.iter().map(|h| h.unwrap_or(0)).collect();
             let mut m = 0;
             loop {
@@ -2642,12 +2591,11 @@ impl Level<'_> {
                     pick[j] = i;
                 }
                 let mut trial = values.to_vec();
-                let (mut lates, mut against, mut sideways) = (0usize, 0usize, 0usize);
+                let (mut against, mut sideways) = (0usize, 0usize);
                 for (j, &c) in classes.iter().enumerate() {
                     trial[c] = options[j][pick[j]].0;
-                    lates += usize::from(late[j][pick[j]]);
-                    against += usize::from(options[j][pick[j]].3 == 2);
-                    sideways += usize::from(options[j][pick[j]].3 == 1);
+                    against += usize::from(options[j][pick[j]].2 == 2);
+                    sideways += usize::from(options[j][pick[j]].2 == 1);
                 }
                 let ori = orientations_given(s, &trial, w);
                 let every: Vec<(usize, Orient)> = (0..ori.len()).map(|m| (m, ori[m])).collect();
@@ -2664,7 +2612,7 @@ impl Level<'_> {
                         out.push((
                             classes.iter().map(|&c| trial[c]).collect(),
                             open_ways.iter().map(|&i| w[i]).collect(),
-                            (lates, against, sideways, joint, upright(&ori)),
+                            (against, sideways, joint),
                         ));
                     }
                 }
@@ -2769,13 +2717,6 @@ impl Level<'_> {
             let (Some(base), Some(d)) = (offs.get(via).cloned(), hung_offset(s, *j, *via, rule, ori)) else { continue };
             offs.insert(*j, [&base[0] + &d[0], &base[1] + &d[1]]);
         }
-        let attached: Vec<(usize, Option<Attach>)> = hung
-            .iter()
-            .map(|(j, _, rule)| {
-                (*j, if let Rule::Attach(a) = rule { Some(super::facing::now(s, *j, a, ori)) } else { None })
-            })
-            .collect();
-        super::facing::clear(s, k, &attached, &mut offs, ori);
         for (j, _, _) in hung {
             if let Some(at) = offs.get(j) {
                 dress(&mut b, *j, at);
@@ -2904,14 +2845,10 @@ impl Level<'_> {
         for (a, lo, hi) in bands.chains() {
             orders[a].at_least(&At { unit: lo, off: Q::zero() }, &At { unit: hi, off: Q::zero() }, Q::zero());
         }
-        let ports = units.iter().filter(|u| matches!(u, Unit::Leaf(k) if s.objects[*k].role == Role::Port)).count();
-        let way = gaps.get(ports).copied().unwrap_or(0).min(LAYERINGS.len() - 1);
+        let way = gaps.first().copied().unwrap_or(0).min(LAYERINGS.len() - 1);
         let mut layering = Layering { count: currents.len(), way, ..Layering::default() };
-        let mut level = Levels {
-            count: levels.len(),
-            tried: way < 2 && gaps.get(ports + 1).is_none_or(|&g| g == 0),
-            ..Levels::default()
-        };
+        let mut level =
+            Levels { count: levels.len(), tried: way < 2 && gaps.get(1).is_none_or(|&g| g == 0), ..Levels::default() };
         let mut left_out = Vec::new();
         let mut table_out = 0usize;
         let mut dissolve: BTreeSet<usize> = BTreeSet::new();
@@ -3051,7 +2988,7 @@ impl Level<'_> {
             let mut pins: Vec<Lead> = Vec::new();
             for p in &r.pins {
                 let Some((k, pin)) = ref_pin(p) else { continue };
-                if s.objects[k].role == Role::Port || pins.iter().any(|q| q.0 == (k, pin)) {
+                if pins.iter().any(|q| q.0 == (k, pin)) {
                     continue;
                 }
                 let (Some(e), Some(x), Some(y)) = (s.exit(k, pin, ori[k]), point(p, 0, 0), point(p, 0, 1)) else {
@@ -3141,7 +3078,7 @@ impl Level<'_> {
         }
         pairs.kept = kept.len();
         pairs.order = kept.iter().rev().copied().chain((0..facing.len()).rev().filter(|i| !kept.contains(i))).collect();
-        let hang = gaps.get(ports + 2).is_none_or(|&g| g == 0);
+        let hang = gaps.get(2).is_none_or(|&g| g == 0);
         let mut hanging = Hanging::default();
         for (u, unit) in units.iter().enumerate() {
             let Unit::Leaf(k) = *unit else { continue };
@@ -3167,7 +3104,7 @@ impl Level<'_> {
                     for r in problem.routes.iter().filter(|r| r.pins.iter().any(|p| ref_pin(p) == Some((k, pin)))) {
                         for p in &r.pins {
                             let Some((q, qp)) = ref_pin(p) else { continue };
-                            if q == k || unit_of(q) == Some(u) || s.objects[q].role == Role::Port {
+                            if q == k || unit_of(q) == Some(u) {
                                 continue;
                             }
                             let Some(eq) = s.exit(q, qp, ori[q]) else { continue };
@@ -3199,107 +3136,7 @@ impl Level<'_> {
                 }
             }
         }
-        let mut aligned = Vec::new();
         let mut counts = Vec::new();
-        for (u, unit) in units.iter().enumerate() {
-            let Unit::Leaf(k) = *unit else { continue };
-            if s.objects[k].role != Role::Port {
-                continue;
-            }
-            let want = gaps.get(counts.len()).copied().unwrap_or(0);
-            let free = s.exit(k, 0, ori[k]).map(|e| usize::from(e.1 == 0)).filter(|&a| !s.objects[k].fact_axes[a]);
-            let me = free.and_then(|a| point(&PointRef::Pin { object: k, pin: 0, terminal: String::new() }, 0, a));
-            let (Some(a), Some(me)) = (free, me) else {
-                counts.push(1);
-                continue;
-            };
-            let mine = &places[a][u] + &me.off;
-            let mut pins: Vec<(Q, usize, usize, At)> = Vec::new();
-            for r in problem.routes.iter().filter(|r| r.pins.iter().any(|p| ref_pin(p) == Some((k, 0)))) {
-                for p in &r.pins {
-                    let Some((q, qp)) = ref_pin(p) else { continue };
-                    if q == k || unit_of(q) == Some(u) {
-                        continue;
-                    }
-                    let Some(t) = point(p, 0, a) else { continue };
-                    let d = (&places[a][t.unit] + &t.off - &mine).abs();
-                    pins.push((d, q, qp, t));
-                }
-            }
-            pins.sort_by(|x, y| x.0.cmp(&y.0).then((x.1, x.2).cmp(&(y.1, y.2))));
-            pins.dedup_by(|x, y| (x.1, x.2) == (y.1, y.2));
-            let mut lines: Vec<(Q, At)> = Vec::new();
-            for w in (0..units.len()).filter(|&w| w != u) {
-                for side in [a, a + 2] {
-                    let e = edge(w, side);
-                    lines.push((&places[a][e.unit] + &e.off, e));
-                }
-            }
-            for (obj, (w, d)) in where_.iter().filter(|(_, (w, _))| *w != u) {
-                let w = band_of(*obj, a, *w);
-                for pin in 0..s.pins(*obj).len() {
-                    if let Some(p) = s.pin_offset(*obj, pin, ori[*obj]) {
-                        let off = &d[a] + &p[a];
-                        lines.push((&places[a][w] + &off, At { unit: w, off }));
-                    }
-                }
-            }
-            lines.sort_by(|x, y| x.0.cmp(&y.0));
-            lines.dedup_by(|x, y| x.0 == y.0);
-            enum Gap {
-                On(usize, usize, At),
-                Between(Option<At>, Option<At>),
-            }
-            let target = pins.first().map_or_else(|| mine.clone(), |p| &places[a][p.3.unit] + &p.3.off);
-            let mut rest: Vec<(Q, Q, Gap)> = Vec::new();
-            for (_, q, qp, t) in pins.iter().skip(1) {
-                let at = &places[a][t.unit] + &t.off;
-                rest.push(((&at - &target).abs(), at, Gap::On(*q, *qp, t.clone())));
-            }
-            for i in 0..=lines.len() {
-                let (lo, hi) = (i.checked_sub(1).map(|j| &lines[j]), lines.get(i));
-                let at = match (lo, hi) {
-                    (Some(l), Some(h)) => (&l.0 + &h.0) / int(2),
-                    (Some(l), None) => &l.0 + int(1),
-                    (None, Some(h)) => &h.0 - int(1),
-                    (None, None) => continue,
-                };
-                rest.push(((&at - &target).abs(), at, Gap::Between(lo.map(|l| l.1.clone()), hi.map(|h| h.1.clone()))));
-            }
-            rest.sort_by(|x, y| x.0.cmp(&y.0).then(x.1.cmp(&y.1)));
-            let net: Vec<Gap> = pins.into_iter().map(|(_, q, qp, t)| Gap::On(q, qp, t)).collect();
-            let list: Vec<&Gap> = net.iter().take(1).chain(rest.iter().map(|r| &r.2)).collect();
-            counts.push(list.len().max(1));
-            let tries: Vec<&Gap> =
-                if want == 0 { net.iter().collect() } else { list.get(want).copied().into_iter().collect() };
-            let mut took = want == 0;
-            for gap in tries {
-                let mut trial = orders[a].clone();
-                match gap {
-                    Gap::On(_, _, t) => trial.equal(t, &me),
-                    Gap::Between(lo, hi) => {
-                        if let Some(l) = lo {
-                            trial.at_least(l, &me, int(1));
-                        }
-                        if let Some(h) = hi {
-                            trial.at_least(&me, h, int(1));
-                        }
-                    }
-                }
-                if let Some(v) = trial.least(places[a].clone()) {
-                    orders[a] = trial;
-                    places[a] = v;
-                    if let Gap::On(q, qp, _) = gap {
-                        aligned.push((k, (*q, *qp)));
-                    }
-                    took = true;
-                    break;
-                }
-            }
-            if !took {
-                return Evaluated::Same;
-            }
-        }
         for (u, unit) in units.iter().enumerate() {
             let Unit::Leaf(k) = *unit else { continue };
             if s.objects[k].symbol.is_some() {
@@ -3621,7 +3458,6 @@ impl Level<'_> {
             bands,
             geometry: g,
             routed,
-            aligned,
             refs,
             left_out,
             table_out,
@@ -3868,7 +3704,7 @@ fn geometry_members(problem: &LevelProblem, members: &BTreeSet<usize>) -> BTreeS
         for (k, object) in problem.objects.iter().enumerate() {
             let follows = match &object.position {
                 Position::Own { .. } => false,
-                Position::At(r) => super::port::reads_reference(r, &|j| out.contains(&j)),
+                Position::At(r) => super::reads::reads_reference(r, &|j| out.contains(&j)),
                 Position::InSymbol { owner, .. } => out.contains(owner),
             };
             if follows {
@@ -3903,7 +3739,7 @@ pub(super) fn layout_of(
     for (object, bounds) in crate::annotation::bounds(problem, g).map_err(LayoutError::Annotation)? {
         let owner = crate::annotation::attachment_owner(problem, object);
         let attached = match &problem.objects[object].position {
-            Position::At(point) => super::port::reads_reference(point, &|k| objects.contains(&k)),
+            Position::At(point) => super::reads::reads_reference(point, &|k| objects.contains(&k)),
             _ => false,
         };
         if all_annotations || objects.contains(&object) || owner.is_some_and(|k| objects.contains(&k)) || attached {
@@ -3933,7 +3769,7 @@ pub(super) fn layout_of(
         let at = &origins[k];
         layout.texts.extend(s.text_offsets(problem, g, k).iter().map(|b| moved(b, at)));
     }
-    let inside = |r: &PointRef| super::port::reads_reference(r, &|k| objects.contains(&k));
+    let inside = |r: &PointRef| super::reads::reads_reference(r, &|k| objects.contains(&k));
     let mut written_net = Vec::new();
     let mut wires_in: BTreeSet<usize> = BTreeSet::new();
     for (w, wire) in problem.wires.iter().enumerate() {
@@ -4602,7 +4438,7 @@ pub(super) mod tests {
         let mut owners = Vec::new();
         for n in 0..8 {
             let room = lists.room(bytes);
-            let list = Rc::new(vec![(vec![], vec![], (0, 0, 0, 0, 0)); room]);
+            let list = Rc::new(vec![(vec![], vec![], (0, 0, 0)); room]);
             lists.insert((n, vec![], vec![], vec![]), (list.clone(), (0..48).collect(), vec![], 0));
             owners.push(list);
             let (count, held) = lists.held();

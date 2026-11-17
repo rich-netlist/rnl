@@ -2466,15 +2466,24 @@ fn a_stub_text_over_its_host_text_counts_among_the_texts_over_texts() {
     let (s, g) = (&e.structure, &e.placed.geometry);
     assert!(s.language04, "{what}");
     let texts = |k: usize| s.text_offsets_each(&p, g, k);
+    // a stub: the object of a usage made in one that attaches to a pin, the host's
+    let stub_host = |k: usize| {
+        let parent = &p.usages[p.usages.get(p.objects[k].usage?)?.parent?];
+        parent.roles.iter().flat_map(|r| &r.members).find_map(|m| match m {
+            rnl_runtime::problem::Filler::Terminal { object, .. }
+            | rnl_runtime::problem::Filler::Pin { object, .. } => Some(*object),
+            _ => None,
+        })
+    };
     let (k, host) = (0..s.objects.len())
         .find_map(|k| {
-            let host = s.objects[k].stub.as_ref()?.host.0;
+            let host = stub_host(k)?;
             (!texts(k).is_empty() && !texts(host).is_empty()).then_some((k, host))
         })
         .unwrap_or_else(|| {
             let stubs: Vec<String> = (0..s.objects.len())
                 .filter_map(|k| {
-                    let host = s.objects[k].stub.as_ref()?.host.0;
+                    let host = stub_host(k)?;
                     Some(format!(
                         "{} {} on {} {}",
                         p.objects[k].label,

@@ -279,6 +279,11 @@ impl Active {
             let mut items = Vec::new();
             for (name, weight) in &layer.items {
                 let Some(o) = Objective::from_name(name) else { continue };
+                // a level of 0.4 tells no ground symbol: ground_direction is neither in force nor said
+                // to be inert there; it goes with the levels of 0.3
+                if o == Objective::GroundDirection && inputs.currents.is_some() {
+                    continue;
+                }
                 match inert_reason(o, inputs) {
                     Some(reason) => inert.push(reason),
                     None => items.push((o, *weight)),
@@ -897,6 +902,10 @@ mod tests {
         // an objective off is neither in force nor inert
         assert!(!active.is_on(Objective::SignalFlow));
         assert!(!active.inert.iter().any(|s| s.starts_with("signal_flow")));
+        // a level of 0.4 neither takes ground_direction nor says it is inert
+        let active = Active::new(&options.objectives, &Inputs { currents: Some(true), ..all });
+        assert!(!active.is_on(Objective::GroundDirection));
+        assert!(!active.inert.iter().any(|s| s.starts_with("ground_direction")), "{:?}", active.inert);
     }
 
     fn ranked(active: &Active, entries: &[(Vec<Q>, Vec<u32>)]) -> Vec<usize> {

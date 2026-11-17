@@ -1,15 +1,14 @@
-//! Count extra supply and ground heights within accepted group scopes.
+//! The virtual symbols of a level and the rows and columns only they take (`virtual_weight`).
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use rnl_runtime::problem::{LevelProblem, ObjectKind};
 
-use crate::coords::Placed;
 use crate::rational::{int, Q};
-use crate::structure::{Role, Structure};
+use crate::structure::Structure;
 
 /// The virtual symbols of a level (`virtual_weight`): the components that are not of the
-/// netlist, the objects of usages (12.1), such as a supply, ground or port symbol or a usage
+/// netlist, the objects of usages (12.1), such as a symbol a usage of one role makes or a usage
 /// with a symbol and a position of its own, whatever wire, stub, ROUTE or group joins them. An
 /// instance of the netlist or a bundle is never one, a source neither.
 pub(crate) fn virtual_symbols(problem: &LevelProblem, s: &Structure) -> BTreeSet<usize> {
@@ -22,21 +21,6 @@ pub(crate) fn weighed_lines(lines: &BTreeMap<Q, bool>, w: &Q) -> Q {
     lines.values().map(|&f| if f { int(1) } else { w.clone() }).sum()
 }
 
-pub(crate) fn levels(s: &Structure, placed: &Placed, within: Option<&BTreeSet<usize>>) -> usize {
-    let g = &placed.geometry;
-    [Role::Ground, Role::Supply]
-        .into_iter()
-        .map(|role| {
-            let ys: BTreeSet<Q> = s
-                .components()
-                .filter(|&k| within.is_none_or(|w| w.contains(&k)) && s.objects[k].role == role)
-                .filter_map(|k| s.pin_at(&placed.origins, &g.orient, k, 0).map(|p| p[1].clone()))
-                .collect();
-            ys.len().saturating_sub(1)
-        })
-        .sum()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -47,7 +31,7 @@ mod tests {
     };
 
     /// Three supply symbols on a net and an element: one a ROUTE joins to the element, one a group
-    /// holds with it, one hung from its pin. All three are virtual, the element is not; a usage
+    /// holds with it, one on its own. All three are virtual, the element is not; a usage
     /// that is an element of the layout, with a symbol and a position of its own, is virtual too.
     #[test]
     fn every_usage_is_virtual_whatever_joins_it_and_an_instance_is_not() {
@@ -99,19 +83,19 @@ mod tests {
         }];
         let o = SolverOptions::without_time_limit();
         let resolved = crate::resolve::resolve(&p, &o, &crate::StoppedClock);
-        let mut s = crate::structure::analyse(&p, &resolved, &o, crate::options::CAPS, &mut Work::default());
+        let s = crate::structure::analyse(&p, &resolved, &o, crate::options::CAPS, &mut Work::default());
+        // the solver tells no supply: each is an element of the layout as any other
         assert!(
-            (1..4).all(|k| s.objects[k].role == Role::Supply),
+            (1..4).all(|k| s.objects[k].role == crate::structure::Role::Element),
             "{:?}",
             s.objects.iter().map(|o| o.role).collect::<Vec<_>>()
         );
-        s.objects[1].hung_from = Some((0, 0));
         assert_eq!(virtual_symbols(&p, &s), BTreeSet::from([1, 2, 3]));
         // the instance made a usage of its own: an element of the layout, and virtual
         p.objects[0].kind = ObjectKind::Usage;
         let resolved = crate::resolve::resolve(&p, &o, &crate::StoppedClock);
         let s = crate::structure::analyse(&p, &resolved, &o, crate::options::CAPS, &mut Work::default());
-        assert_eq!(s.objects[0].role, Role::Element);
+        assert_eq!(s.objects[0].role, crate::structure::Role::Element);
         assert_eq!(virtual_symbols(&p, &s), BTreeSet::from([0, 1, 2, 3]));
         p.objects[0].kind = ObjectKind::Bundle;
         assert_eq!(virtual_symbols(&p, &s), BTreeSet::from([1, 2, 3]));

@@ -490,17 +490,6 @@ pub(crate) fn attachments(s: &Structure, rows: &[Vec<usize>], ori: &[Orient]) ->
             continue;
         }
         match info.role {
-            Role::Port if info.hung_from.is_some() => {
-                let host = info.hung_from.expect("guarded");
-                let side = match s.exit(host.0, host.1, ori[host.0]) {
-                    Some((1, 0)) => Side::Right,
-                    Some((-1, 0)) => Side::Left,
-                    Some((0, -1)) => Side::Below,
-                    Some((0, 1)) => Side::Above,
-                    _ => Side::Left,
-                };
-                out.insert(k, Attach { host, side, facing: None, aside: 0 });
-            }
             Role::Port => {
                 let pins = s.attach_pins(k);
                 let sideways = pins.iter().find_map(|&p| match s.exit(p.0, p.1, ori[p.0]) {
@@ -535,29 +524,7 @@ pub(crate) fn attachments(s: &Structure, rows: &[Vec<usize>], ori: &[Orient]) ->
             _ => {}
         }
     }
-    let hung: Vec<(usize, Attach)> =
-        out.iter().filter(|(k, _)| s.objects[**k].hung_from.is_some()).map(|(k, a)| (*k, *a)).collect();
-    if !hung.is_empty() {
-        let free: Vec<usize> = out.keys().copied().filter(|&k| s.objects[k].hung_from.is_none()).collect();
-        for k in free {
-            let a = out[&k];
-            let same: Vec<(usize, Attach)> = hung.iter().filter(|(_, b)| b.host == a.host).copied().collect();
-            if !same.is_empty() {
-                let n = crate::beside::aside(s, k, &a, &same, ori);
-                out.insert(k, Attach { aside: n, ..a });
-            }
-        }
-    }
     out
-}
-
-pub(crate) fn leaves(s: &Structure, host: PinKey, ori: &[Orient]) -> Side {
-    match s.exit(host.0, host.1, ori[host.0]) {
-        Some((0, 1)) => Side::Above,
-        Some((0, -1)) => Side::Below,
-        Some((1, 0)) => Side::Right,
-        _ => Side::Left,
-    }
 }
 
 /// The pin on a port's net that faces its host's pin across the gap between two rows (see

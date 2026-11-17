@@ -566,7 +566,7 @@ mod tests {
 
     #[test]
     fn final_default_refresh_uses_final_coordinates_and_keeps_obstructed_routes() {
-        let (mut p, _, mut placed, mut routing) = super::super::port::tests::fixture();
+        let (mut p, _, mut placed, mut routing) = super::super::reads::tests::fixture();
         p.symbols[0].bbox = [0.; 4];
         p.symbols[0].pins[0].dir = None;
         let options = crate::SolverOptions::without_time_limit();

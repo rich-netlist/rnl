@@ -162,7 +162,6 @@ pub(crate) struct Stub {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct ObjectInfo {
-    pub hung_from: Option<PinKey>,
     /// Of a level of 0.4: the pin it starts beside in the first arrangement of the tree layout
     /// and nowhere else ([`attach_host`]).
     pub attach_host: Option<PinKey>,
@@ -706,15 +705,6 @@ impl Structure {
         attach_pins(&self.objects, &self.connections, k)
     }
 
-    /// A symbol reached by its netlist connections but by no drawn connection.
-    pub(crate) fn beside_by_netlist(&self, k: usize) -> bool {
-        let element = |p: &PinKey| self.objects[p.0].role == Role::Element;
-        !self.objects[k].fact_touched
-            && self.connections.targets.get(&(k, 0)).is_none_or(|t| t.is_empty())
-            && self.connections.circuit.get(&(k, 0)).is_some_and(|pins| pins.iter().any(element))
-            && !self.attach_pins(k).is_empty()
-    }
-
     /// Text boxes anchored on this pin, relative to the symbol's origin.
     pub(crate) fn labels_on_pin(&self, k: usize, pin: usize, orient: Orient) -> Vec<[Q; 4]> {
         let Some(at) = self.pin_offset(k, pin, orient) else {
@@ -909,7 +899,7 @@ pub(crate) fn analyse(
     let mut connections = connections(problem, &model);
     if problem.version == "0.4" {
         for k in 0..objects.len() {
-            objects[k].attach_host = attach_host(problem, &objects, &connections, k);
+            objects[k].attach_host = attach_host(problem, &kept, &objects, &connections, k);
         }
     }
     let power = power_pins(power, &mut connections);
@@ -1443,7 +1433,6 @@ fn object_infos(problem: &LevelProblem, model: &Model, kept: &[usize]) -> Vec<Ob
                 oriented: o.orient.is_some(),
                 own,
                 stub: None,
-                hung_from: None,
                 attach_host: None,
                 fact_touched: touched[k][0] || touched[k][1],
                 fact_axes: touched[k],
@@ -1542,10 +1531,17 @@ fn stub_rise(problem: &LevelProblem, kept: &[usize], k: usize, host: PinKey) -> 
 }
 
 /// The pin that an object a usage of one role makes, attached (12.1) to a terminal or a net,
-/// starts beside in the first arrangement of the tree layout: the terminal, or of the net the pin
-/// of the instance or bundle first in the netlist. Only that arrangement reads it; the search,
+/// starts beside in the first arrangement of the tree layout: the terminal, or of the net's pins
+/// of instances and bundles the one a fact kept (an ALIGN, a DISTANCE) ties a pin of the object
+/// to, else the first. Only that arrangement reads it; the search,
 /// the lines, the alignments, compaction and the order take the object as any other.
-fn attach_host(problem: &LevelProblem, objects: &[ObjectInfo], connections: &Connections, k: usize) -> Option<PinKey> {
+fn attach_host(
+    problem: &LevelProblem,
+    kept: &[usize],
+    objects: &[ObjectInfo],
+    connections: &Connections,
+    k: usize,
+) -> Option<PinKey> {
     let o = &objects[k];
     let object = problem.objects.get(k)?;
     if o.role != Role::Element || !o.own || o.symbol.is_none() || object.kind != ObjectKind::Usage {
@@ -1562,7 +1558,30 @@ fn attach_host(problem: &LevelProblem, objects: &[ObjectInfo], connections: &Con
         Filler::Terminal { object, pin: Some(pin), .. } | Filler::Pin { object, pin } => {
             Some((*object, *pin)).filter(of_netlist)
         }
-        Filler::Net(n) => connections.nets.iter().find(|x| x.name == *n)?.pins.iter().copied().filter(of_netlist).min(),
+        Filler::Net(n) => {
+            let mut pins: Vec<PinKey> =
+                connections.nets.iter().find(|x| x.name == *n)?.pins.iter().copied().filter(of_netlist).collect();
+            pins.sort_unstable();
+            // the pin of the net that a fact kept ties a pin of the object to, else the first
+            let pin_of = |r: &PointRef| match r {
+                PointRef::Pin { object, pin, .. }
+                | PointRef::SymbolPin { object, pin, .. }
+                | PointRef::PinPosition { object, pin, .. } => Some((*object, *pin)),
+                _ => None,
+            };
+            let tied = |p: &PinKey| {
+                kept.iter().any(|&f| {
+                    let refs: Vec<&PointRef> = match problem.facts.get(f).map(|x| &x.kind) {
+                        Some(FactKind::Align { members, .. }) => members.iter().collect(),
+                        Some(FactKind::Distance { from, to, .. }) => from.iter().chain(to).collect(),
+                        _ => return false,
+                    };
+                    refs.iter().any(|r| pin_of(r) == Some(*p))
+                        && refs.iter().any(|r| pin_of(r).is_some_and(|q| q.0 == k))
+                })
+            };
+            pins.iter().copied().find(|p| tied(p)).or_else(|| pins.first().copied())
+        }
         _ => None,
     }
 }

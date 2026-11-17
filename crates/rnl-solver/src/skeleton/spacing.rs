@@ -66,8 +66,7 @@ impl Policy {
                         Position::InSymbol { owner, .. } => Some(owner),
                         _ => None,
                     }
-                    .or_else(|| s.objects[k].stub.as_ref().map(|x| x.host.0))
-                    .or_else(|| s.objects[k].hung_from.map(|x| x.0));
+                    .or_else(|| s.objects[k].stub.as_ref().map(|x| x.host.0));
                     let anchored = s
                         .anchors
                         .get(&k)

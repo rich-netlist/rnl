@@ -286,7 +286,7 @@ R11 g0c1r1 g1c0r1 1k
     // which it is given
     let mut options = SolverOptions::default()
         .with_config(
-            r#"limit="work", work=73782806906, tree_work=false, lines_order="current,crossings_and_bends,hidden_ports,mirror_pairs,dots_near_pins,length,symbol_lines+wire_lines,area""#,
+            r#"limit="work", work=73782806906, tree_work=false, lines_order="current,crossings_and_bends,mirror_pairs,dots_near_pins,length,symbol_lines+wire_lines,area""#,
         )
         .unwrap();
     // the objectives the window was found with: crowding, the last default layer, ranks the

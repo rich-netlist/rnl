@@ -81,8 +81,7 @@ and `wire_over_symbol`. For 0.4, only configured objectives rank candidates, aft
 one fixed key: false joins, the wires that run along another net's pin or through a
 symbol and so read as connected where they are not, count first, whether or not
 those objectives are configured. In the lines layout they rank right after the
-facts that must hold, above broken low-priority facts, and a stub put apart from
-another symbol is never put beyond it along the way it rises from its pin. There the
+facts that must hold, above broken low-priority facts. There the
 group tree ranks its arrangements by the line layout's own order (`lines_order` of the
 [settings table](solver-settings-table.md)): the configured objectives, then the pins
 against their CURRENT, then the crossings and bends weighed by `lines_weights` (one crossing
@@ -97,5 +96,9 @@ keep their existing gaps.
 
 The tree engine has no stage, debug, screening or planned-wire switches. It uses the
 full tree search with three straightening rounds and up to three binding releases.
-Port attachment follows pin bindings and connectivity, including netlist connections
-when nothing drawn reaches a port, without inspecting definition or device names.
+In a level of 0.4 the solver tells no supply, ground or port: the symbol a usage makes is
+an object as any other. Only the first arrangement of the tree reads one rule: the symbol
+a usage of one role makes, attached (12.1) to a terminal or a net, starts beside that
+terminal, or beside the pin of an instance or bundle on the net that a fact kept ties
+it to, else the first, on the side the pin leaves by. The search, the line layout, alignment, compaction and the
+order then take it as any other object.

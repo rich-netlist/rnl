@@ -20,10 +20,10 @@ use crate::route::{route, Routing, CLEARANCE};
 use crate::score::{drawn, measured_layers, Entry};
 use crate::search::{
     attach_offset, attachments, effective_box, empty_box, grid_of, orientation_relations,
-    orientations_with as orientations, preference, ranked_values, up, with_relations, Attach, Candidate, RelKind,
-    Relation, Side, Tagged, Term, HGAP, VGAP,
+    orientations_with as orientations, ranked_values, up, with_relations, Attach, Candidate, RelKind, Relation, Side,
+    Tagged, Term, HGAP, VGAP,
 };
-use crate::structure::{GroupTree, NodeKind, Pair, PinKey, PortKind, Role, Source, Structure};
+use crate::structure::{GroupTree, NodeKind, Pair, PinKey, Structure};
 use crate::{SolverOptions, Work};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -66,13 +66,6 @@ struct Step {
 struct Walk {
     chains: BTreeMap<usize, Vec<Step>>,
     lists: Vec<(Dir, Vec<Vec<usize>>)>,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Outer {
-    Left,
-    Right,
-    Both,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -285,41 +278,7 @@ impl<'a> Tree<'a> {
                 node_of.insert(k, n);
             }
         }
-        let ports: Vec<usize> = (0..s.objects.len())
-            .filter(|&k| {
-                let o = &s.objects[k];
-                o.role == Role::Port
-                    && o.own
-                    && !o.left_free
-                    && o.stub.is_none()
-                    && o.symbol.is_some()
-                    && crate::tree_hang::host(problem, k).is_none()
-                    && !s.beside_by_netlist(k)
-            })
-            .collect();
-        let members: Vec<Option<BTreeSet<usize>>> = groups
-            .nodes
-            .iter()
-            .map(|n| match n.kind {
-                NodeKind::Group(g) => problem.groups.get(g).map(|g| g.members.iter().copied().collect()),
-                NodeKind::Union(h, g) => {
-                    let mut set: BTreeSet<usize> = BTreeSet::new();
-                    for x in [h, g] {
-                        set.extend(problem.groups.get(x).map_or(&[][..], |g| &g.members[..]).iter().copied());
-                    }
-                    Some(set)
-                }
-                _ => None,
-            })
-            .collect();
-        for &k in &ports {
-            let node = (0..groups.nodes.len())
-                .filter(|&n| members[n].as_ref().is_some_and(|m| m.contains(&k)))
-                .min_by_key(|&n| groups.nodes[n].members.len())
-                .unwrap_or(0);
-            node_of.insert(k, node);
-        }
-        let mut leaves: Vec<usize> = s.elements.iter().copied().chain(ports.iter().copied()).collect();
+        let mut leaves: Vec<usize> = s.elements.clone();
         leaves.sort_unstable();
         let pairs = s.pairs.clone();
         let mut tree = Tree {
@@ -753,11 +712,6 @@ impl<'a> Tree<'a> {
     }
 
     fn leaf_name(&self, k: usize) -> String {
-        if self.s.objects[k].role == Role::Port {
-            if let Some(net) = self.s.ports.iter().find(|p| p.object == k).and_then(|p| p.net.clone()) {
-                return format!("port &{net}");
-            }
-        }
         self.problem.objects[k].label.clone()
     }
 
@@ -941,19 +895,6 @@ impl<'a> Tree<'a> {
         items
     }
 
-    fn flow(&self, arr: &Arrangement, item: &Item) -> i64 {
-        if !self.s.has(Source::InputsLeft) {
-            return 0;
-        }
-        let Item::Leaf(k) = item else { return 0 };
-        let _ = arr;
-        match self.s.ports.iter().find(|p| p.object == *k).map(|p| p.kind) {
-            Some(PortKind::Input) => -1,
-            Some(PortKind::Output) => 1,
-            _ => 0,
-        }
-    }
-
     fn order_row(&self, arr: &Arrangement, items: Vec<Item>, key: &dyn Fn(&Item) -> Q) -> Vec<Item> {
         let before = self.left_of(&arr.flipped);
         let sets: Vec<BTreeSet<usize>> =
@@ -975,15 +916,12 @@ impl<'a> Tree<'a> {
                 }
             }
         }
-        let rank = |i: usize| (self.flow(arr, &items[i]), key(&items[i]), sets[i].iter().next().copied().unwrap_or(0));
+        let rank = |i: usize| (key(&items[i]), sets[i].iter().next().copied().unwrap_or(0));
         let mut done = vec![false; n];
         let mut out = Vec::with_capacity(n);
         while out.len() < n {
             let free = |j: usize| !done[j] && (0..n).all(|i| done[i] || i == j || !first.contains(&(i, j)));
-            let placed: BTreeSet<usize> = (0..n).filter(|&i| done[i]).flat_map(|i| sets[i].iter().copied()).collect();
-            let hung = |j: usize| self.is_port(&items[j]) && crate::tree_hang::joined_within(self.s, &sets[j], &placed);
-            let pick = (0..n).filter(|&j| free(j) && hung(j)).min_by(|&a, &b| rank(a).cmp(&rank(b)));
-            let pick = pick.or_else(|| (0..n).filter(|&j| free(j)).min_by(|&a, &b| rank(a).cmp(&rank(b))));
+            let pick = (0..n).filter(|&j| free(j)).min_by(|&a, &b| rank(a).cmp(&rank(b)));
             let pick = pick.or_else(|| (0..n).filter(|&j| !done[j]).min_by(|&a, &b| rank(a).cmp(&rank(b))));
             let Some(j) = pick else { break };
             done[j] = true;
@@ -993,14 +931,7 @@ impl<'a> Tree<'a> {
         out.into_iter().filter_map(|j| slots[j].take()).collect()
     }
 
-    fn cut(
-        &self,
-        arr: &Arrangement,
-        items: Vec<Item>,
-        key: &dyn Fn(&Item) -> Q,
-        ykey: &dyn Fn(&Item) -> Q,
-        outer: Outer,
-    ) -> Item {
+    fn cut(&self, arr: &Arrangement, items: Vec<Item>, key: &dyn Fn(&Item) -> Q, ykey: &dyn Fn(&Item) -> Q) -> Item {
         if items.len() == 1 {
             return items.into_iter().next().expect("one item");
         }
@@ -1026,68 +957,19 @@ impl<'a> Tree<'a> {
         let mut bands: Vec<Vec<Item>> =
             bands.into_iter().map(|b| b.into_iter().filter_map(|i| slots[i].take()).collect()).collect();
         if bands.len() > 1 {
-            let lists = bands.into_iter().map(|b| self.band(arr, b, key, ykey, outer)).collect();
+            let lists = bands.into_iter().map(|b| self.band(arr, b, key, ykey)).collect();
             return Item::List(Dir::Column, lists);
         }
-        self.band(arr, bands.pop().unwrap_or_default(), key, ykey, outer)
+        self.band(arr, bands.pop().unwrap_or_default(), key, ykey)
     }
 
-    fn is_port(&self, item: &Item) -> bool {
-        matches!(item, Item::Leaf(k) if self.s.objects[*k].role == Role::Port)
-    }
-
-    fn band(
-        &self,
-        arr: &Arrangement,
-        items: Vec<Item>,
-        key: &dyn Fn(&Item) -> Q,
-        ykey: &dyn Fn(&Item) -> Q,
-        outer: Outer,
-    ) -> Item {
+    fn band(&self, arr: &Arrangement, items: Vec<Item>, key: &dyn Fn(&Item) -> Q, ykey: &dyn Fn(&Item) -> Q) -> Item {
         if items.len() == 1 {
             return items.into_iter().next().expect("one item");
         }
         let spans: Vec<(i64, i64)> = items.iter().map(|it| self.span(arr, it)).collect();
         let (top, bottom) =
             (spans.iter().map(|s| s.0).min().unwrap_or(0), spans.iter().map(|s| s.1).max().unwrap_or(0));
-        let stack = |mut ps: Vec<Item>| -> Item {
-            if ps.len() == 1 {
-                return ps.pop().expect("one port");
-            }
-            ps.sort_by(|a, b| ykey(b).cmp(&ykey(a)).then_with(|| a.cmp(b)));
-            Item::List(Dir::Column, ps)
-        };
-        if top == bottom && items.iter().all(|it| self.is_port(it)) {
-            return stack(items);
-        }
-        if top == bottom && items.iter().any(|it| self.is_port(it)) {
-            let before = self.left_of(&arr.flipped);
-            let leaves = |it: &Item| self.item_leaves(arr, it);
-            let ordered = crate::tree_hang::ordered_ports(&before, &items, &|it| self.is_port(it), &leaves);
-            let (ports, rest): (Vec<Item>, Vec<Item>) =
-                items.into_iter().partition(|it| self.is_port(it) && !ordered.contains(it));
-            let rest = self.order_row(arr, rest, key);
-            let apart = |a: &Item, b: &Item| {
-                let (la, lb) = (leaves(a), leaves(b));
-                la.iter().any(|&x| lb.iter().any(|&y| before.contains(&(x, y)) || before.contains(&(y, x))))
-            };
-            let rest = crate::tree_hang::stacked(rest, &|it| ordered.contains(it), &apart, &stack);
-            let middle = rest.iter().map(key).sum::<Q>() / int(rest.len().max(1) as i64);
-            let (left, right): (Vec<Item>, Vec<Item>) = match outer {
-                Outer::Left => (ports, Vec::new()),
-                Outer::Right => (Vec::new(), ports),
-                Outer::Both => ports.into_iter().partition(|p| key(p) < middle),
-            };
-            let mut row = Vec::new();
-            if !left.is_empty() {
-                row.push(stack(left));
-            }
-            row.extend(rest);
-            if !right.is_empty() {
-                row.push(stack(right));
-            }
-            return if row.len() == 1 { row.pop().expect("one item") } else { Item::List(Dir::Row, row) };
-        }
         let spanning: Vec<bool> = spans.iter().map(|&(t, b)| t == top && b == bottom).collect();
         let tagged: Vec<(Item, bool)> = items.into_iter().zip(spanning).collect();
         let order = self.order_row(arr, tagged.iter().map(|(it, _)| it.clone()).collect(), key);
@@ -1102,43 +984,20 @@ impl<'a> Tree<'a> {
         if top == bottom || sorted.iter().all(|(_, s)| !*s) || sorted.iter().all(|(_, s)| *s) {
             return Item::List(Dir::Row, sorted.into_iter().map(|(it, _)| it).collect());
         }
-        let first = sorted.iter().position(|(_, s)| *s).unwrap_or(0);
-        let last = sorted.iter().rposition(|(_, s)| *s).unwrap_or(0);
-        let side = |i: usize| -> Outer {
-            if i < first {
-                if outer == Outer::Right {
-                    Outer::Both
-                } else {
-                    Outer::Left
-                }
-            } else if i > last {
-                if outer == Outer::Left {
-                    Outer::Both
-                } else {
-                    Outer::Right
-                }
-            } else {
-                Outer::Both
-            }
-        };
         let mut slabs: Vec<Item> = Vec::new();
         let mut run: Vec<Item> = Vec::new();
-        let mut run_at = 0;
-        for (i, (it, span)) in sorted.into_iter().enumerate() {
+        for (it, span) in sorted {
             if span {
                 if !run.is_empty() {
-                    slabs.push(self.cut(arr, std::mem::take(&mut run), key, ykey, side(run_at)));
+                    slabs.push(self.cut(arr, std::mem::take(&mut run), key, ykey));
                 }
                 slabs.push(it);
             } else {
-                if run.is_empty() {
-                    run_at = i;
-                }
                 run.push(it);
             }
         }
         if !run.is_empty() {
-            slabs.push(self.cut(arr, run, key, ykey, side(run_at)));
+            slabs.push(self.cut(arr, run, key, ykey));
         }
         if slabs.len() == 1 {
             return slabs.pop().expect("one slab");
@@ -1227,7 +1086,7 @@ impl<'a> Tree<'a> {
             // an object attached by a usage of one role starts beside the pin it is attached to
             // ([`crate::structure::ObjectInfo::attach_host`]): next to the item of this group that
             // holds the pin's owner, on the side the pin leaves by
-            let mut beside: Vec<(usize, Item, Option<(i64, i64)>)> = Vec::new();
+            let mut beside: Vec<(usize, Item, (Dir, bool))> = Vec::new();
             for &k in &self.leaves {
                 let Some(host) = self.s.objects[k].attach_host else { continue };
                 if self.node_of.get(&k) != Some(&node) || host.0 == k {
@@ -1239,7 +1098,14 @@ impl<'a> Tree<'a> {
                     Item::List(..) => false,
                 });
                 if let Some(carrier) = carrier.cloned() {
-                    beside.push((k, carrier, self.s.exit(host.0, host.1, ori[host.0])));
+                    // before the carrier (left, above) or after it, as the pin leaves
+                    let at = match self.s.exit(host.0, host.1, ori[host.0]) {
+                        Some((-1, 0)) => (Dir::Row, true),
+                        Some((0, 1)) => (Dir::Column, true),
+                        Some((0, -1)) => (Dir::Column, false),
+                        _ => (Dir::Row, false),
+                    };
+                    beside.push((k, carrier, at));
                 }
             }
             items.retain(|it| !beside.iter().any(|(k, _, _)| *it == Item::Leaf(*k)));
@@ -1249,16 +1115,10 @@ impl<'a> Tree<'a> {
                 let snapshot = arr.clone();
                 let k = |it: &Item| key(&snapshot, it);
                 let y = |it: &Item| ykey(&snapshot, it);
-                Some(self.cut(&snapshot, items, &k, &y, Outer::Both))
+                Some(self.cut(&snapshot, items, &k, &y))
             };
             arr.lists[node] = list.map(|mut list| {
-                for (k, carrier, exit) in beside {
-                    let (dir, first) = match exit {
-                        Some((-1, 0)) => (Dir::Row, true),
-                        Some((0, 1)) => (Dir::Column, true),
-                        Some((0, -1)) => (Dir::Column, false),
-                        _ => (Dir::Row, false),
-                    };
+                for (k, carrier, (dir, first)) in beside {
                     if !set_beside(&mut list, &carrier, Item::Leaf(k), dir, first) {
                         list = Item::List(Dir::Row, vec![list, Item::Leaf(k)]);
                     }
@@ -1287,19 +1147,6 @@ impl<'a> Tree<'a> {
                 arr.values[c] = class.allowed[0];
                 for (m, label) in &class.members {
                     ori[*m] = class.allowed[0].then(*label);
-                }
-                continue;
-            }
-            let ports = class.members.iter().all(|(m, _)| s.objects[*m].role == Role::Port);
-            if ports {
-                let Some(&(m, label)) = class.members.first() else { continue };
-                let mean = self.barycentre(arr, &Item::Leaf(m), &at, &ori, 0);
-                let want = if mean >= at[m][0] { (1, 0) } else { (-1, 0) };
-                let mut all = Orient::ALL;
-                all.sort_by_key(|v| preference(*v));
-                if let Some(v) = all.into_iter().find(|v| class.allows(*v) && s.exit(m, 0, v.then(label)) == Some(want))
-                {
-                    arr.values[c] = v;
                 }
                 continue;
             }
@@ -1644,24 +1491,7 @@ impl<'a> Tree<'a> {
         }
         for (c, class) in s.open.classes.iter().enumerate() {
             let members: Vec<usize> = class.members.iter().map(|(m, _)| *m).collect();
-            let values: Vec<Orient> = if members.iter().all(|m| s.objects[*m].role == Role::Port) {
-                let mut all = class.allowed.clone();
-                all.sort_by_key(|v| preference(*v));
-                let label = class.members[0].1;
-                let mut ways: Vec<Option<(i64, i64)>> = Vec::new();
-                all.into_iter()
-                    .filter(|v| {
-                        let e = s.exit(members[0], 0, v.then(label));
-                        let new = matches!(e, Some((_, 0))) && !ways.contains(&e);
-                        if new {
-                            ways.push(e);
-                        }
-                        new
-                    })
-                    .collect()
-            } else {
-                crate::tree_hang::current_order(s, class).into_iter().map(|(v, _)| v).collect()
-            };
+            let values: Vec<Orient> = crate::tree_hang::current_order(s, class).into_iter().map(|(v, _)| v).collect();
             for v in values {
                 if !crate::budget::permit(crate::budget::Step::Candidate, self.leaves.len()) {
                     return out;

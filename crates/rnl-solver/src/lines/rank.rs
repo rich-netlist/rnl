@@ -155,7 +155,7 @@ mod tests {
 
     #[test]
     fn tree_ranking_uses_full_retained_orientation_lists() {
-        let (mut p, mut s, placed, routing) = super::super::port::tests::fixture();
+        let (mut p, mut s, placed, routing) = super::super::reads::tests::fixture();
         let chosen = placed.geometry.orient[0];
         let other = Orient::ALL.into_iter().find(|o| *o != chosen).unwrap();
         p.facts = vec![fact(FactKind::Orient { object: 0, code: other })];
@@ -176,7 +176,7 @@ mod tests {
     /// as many, with the values the line layout's own order gives a drawing.
     #[test]
     fn the_tree_ranks_by_the_layers_of_lines_order() {
-        let (p, s, placed, routing) = super::super::port::tests::fixture();
+        let (p, s, placed, routing) = super::super::reads::tests::fixture();
         let objectives = vec![int(0); s.active.layers.len()];
         for text in ["", "lines_order=length", "lines_order=area+length*2,current", "lines_order=none"] {
             let options = SolverOptions::without_time_limit().with_overrides(text).unwrap();
@@ -192,7 +192,7 @@ mod tests {
 
     #[test]
     fn tree_results_restore_normal_objectives_after_internal_line_ranking() {
-        let (p, s, _, _) = super::super::port::tests::fixture();
+        let (p, s, _, _) = super::super::reads::tests::fixture();
         let options = SolverOptions::without_time_limit();
         let normal = crate::tree::Tree::new(&p, &s, &options);
         let ranked = crate::tree::Tree::new(&p, &s, &options).with_line_rank();
