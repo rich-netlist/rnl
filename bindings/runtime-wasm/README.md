@@ -206,7 +206,7 @@ and calls `core-release.yml` to build and test all CLI platforms and the npm tar
 workspace version. After every check passes it publishes the tarball as
 [`@rich-netlist/runtime`](https://www.npmjs.com/package/@rich-netlist/runtime), smoke-tests
 that version from npm, then publishes the core's GitHub Release as latest. The repository
-variable `CORE_NPM_DIST_TAG` must be explicitly set to the user-approved `next` or `latest`.
+variable `CORE_NPM_DIST_TAG` must be explicitly set to the user-approved `next`, `latest` or `legacy-0.3`.
 `runtime-v*` tags no longer trigger publishing, and manual dispatches never publish.
 
 npm trusted publishing remains bound to repository `rich-netlist/rnl` and workflow
