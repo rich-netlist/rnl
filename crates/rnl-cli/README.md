@@ -17,6 +17,8 @@ rnl dump FILE [options]           print the effective model and diagnostics as J
 rnl view FILE [options]           print the Document a viewer shows, as JSON
 rnl explain FILE REF [options]    print the usages and groups the object REF is in, such as #M1, &vdd,
                                   #M5:d or %dp1, written as RNL refers to it
+rnl groups FILE [options]         print the tree of groups of each level, with the parts each group
+                                  holds directly
 rnl problem FILE [options]        print what a solver reads of each level, with its hash, as JSON
 rnl solve FILE -o DIR [options]   solve each drawing level and write its record of the solver back
 rnl snapshot FILE [options]       print the editor interface's snapshot, as JSON
@@ -132,6 +134,21 @@ $ rnl explain site/examples/ota5t.sp '#M1'
 #M1 in ota5t: 2 usages
   in_p of usage %dp1 (definition $DIFFERENTIAL_PAIR) · ota5t.sp:12 · written
   a of usage %sym12 (definition $MIRRORED) · ota5t.sp:19 · written
+```
+
+`groups` prints the tree of groups (11.5) of each drawing level, or of the one `--level TITLE` names, to see how a drawing is divided into blocks and how many parts each block holds. The tree is the one the solver lays out (`rnl-runtime`'s `group_nodes`): the level at the root, and each group under the smallest group of the tree that holds it, siblings by their first member. A line for each node, indented by its depth, says the group's name, the devices (instances and bundles) it holds directly, those in no group under it, and how many virtual parts it holds directly, usages with a symbol of their own such as ports, grounds and dots; then its number of devices, and in brackets where it comes from. The root, `(level)`, holds the parts in no group of the tree. A group the file names goes by its name, `%core`, with `written at FILE:LINE`; a group the body of a definition makes goes by the usage that applies the definition and the definition, `%amp1 · $TRANSCONDUCTOR_Z_AMPLIFIER`, with `#1`, `#2` when that usage makes several (`$TRANSCONDUCTOR_Z_AMPLIFIER in %miller` for a usage without a name), and says in brackets where the file applies the definition, `applied at amp.sp:12`: the statement of that usage or, for a usage the body of another makes, of the usage up the chain that the file writes; `made by a rule of rnl-std-fill` when a rule of a package makes the usage. A group a rule makes says `made by the rule of PACKAGE at …`. Anything else a group names, such as a net, follows as `also &a`. `--all` names each virtual part as well, one without a name by its definition with what its first role is attached to, `$GROUND(&0)`. The groups outside the tree come after it: one whose members are those of a group of the tree, which stands for it; one that `CROSSES` a group of the tree, sharing members without either holding the other, with the members they share; one with no member with a place of its own; and one PRIORITY turns off. A level of a language before 0.4 has no tree of groups, and each of its groups is listed with all its members. The command judges nothing; `check` gives the hint `RNL9406 crowded-node` where a node holds more than 20 devices directly (`rnl_runtime::group_nodes::CROWDED`; virtual parts do not count), on the level at its first line, on a group at its GROUP or, for one a definition's body makes, where the file applies the definition. `--json` prints the tree, each level with `root`, whose `groups` nest, each with `id`, `name`, `source`, `devices` and `virtual` (every virtual part, with its `label`), and `outside`, the groups outside the tree with `state` (`same`, `crosses`, `empty` or `disabled`) and `with`, the group of the tree it is the same as or crosses.
+
+```text
+$ rnl groups g.sp
+g.sp · language 0.4 · 2 groups, 4 outside the tree
+  (level) · #R4 #R5 #R6 · 3 devices
+    %block · #R3 + 1 virtual · 1 device (written at g.sp:11)
+      %again · #R1 #R2 · 2 devices (written at g.sp:13)
+  outside the tree:
+    %cross · CROSSES %block: they share #R3 and neither holds the other · #R3 #R4 · 2 devices (written at g.sp:10)
+    %pair · the members of %again, which stands for it · #R1 #R2 · 2 devices (written at g.sp:12)
+    %off · turned off by PRIORITY · #R5 #R6 · 2 devices (written at g.sp:14)
+    %e · no member with a place of its own · also &a · 0 devices (written at g.sp:16)
 ```
 
 `snapshot` prints the snapshot of [`rnl-view`](../rnl-view/README.md#snapshots): the host circuit and the model of each drawing level, by ids a transaction can write back. `catalog` prints the catalog of [`rnl-view`](../rnl-view/README.md#catalog): the symbols, with their pins, boxes and labels, the ordinary definitions and the sets of the bundled packages and of those in the directories `--package-dir` gives, each package file read as `rnl check PACKAGE.rnl` reads it; of each name the newest version, every version with `--all-versions`, and only the names `--package` gives, when it gives any. It is the catalog the WebAssembly core gives for a catalog request. `write` writes the ops into the netlist with [`rnl-edit`](../rnl-edit/README.md) and saves the result as OUT, reading the netlist under the name of OUT when the request names no `file`, so that a Spectre netlist saved without the `.scs` suffix gets its header where Spectre reads it (2.2); `rnl check OUT` then says how it reads.

@@ -5179,6 +5179,14 @@
       "file": "05-native-spice.sp",
       "line": 1,
       "col": 0
+    },
+    {
+      "severity": "hint",
+      "code": "RNL9406",
+      "name": "crowded-node",
+      "file": "05-native-spice.sp",
+      "line": 1,
+      "col": 0
     }
   ]
 }

@@ -229,7 +229,7 @@ fn explain_refuses_an_unknown_reference_with_the_names_close_to_it() {
     let (code, _, err) = rnl(&["check", &file, "--json"]);
     assert_eq!(
         (code, err.trim()),
-        (2, "error: RNL8011 cli-option-wrong-command: --json is an option of explain and solver-defaults")
+        (2, "error: RNL8011 cli-option-wrong-command: --json is an option of explain, groups and solver-defaults")
     );
 }
 

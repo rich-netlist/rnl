@@ -74,6 +74,7 @@ mod global_bindings04;
 mod graphic_position04;
 mod graphic_rules;
 mod group_spacing04;
+mod group_tree;
 mod groups;
 mod groups04;
 mod header;

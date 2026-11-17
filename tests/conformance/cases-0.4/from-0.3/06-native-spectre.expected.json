@@ -5344,6 +5344,14 @@
       "file": "06-native-spectre.scs",
       "line": 1,
       "col": 0
+    },
+    {
+      "severity": "hint",
+      "code": "RNL9406",
+      "name": "crowded-node",
+      "file": "06-native-spectre.scs",
+      "line": 1,
+      "col": 0
     }
   ]
 }
