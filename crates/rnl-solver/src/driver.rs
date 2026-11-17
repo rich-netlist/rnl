@@ -622,6 +622,10 @@ fn solve_exact_mode(
             count(symbols, "symbol")
         ));
     }
+    // the other groups of the facts of priority low, when asked for, once the level is laid out
+    // and outside its budget: asking for them changes nothing the solve keeps or places
+    let mut resolved = resolved;
+    crate::resolve::seek_low_groups(problem, options, clock, &mut resolved);
     let report = SolveReport {
         fatal_written_wire: entry.written_path_error,
         fatal_annotation: entry.annotation_error.map(|error| error.index),

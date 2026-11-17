@@ -230,6 +230,21 @@ pub(crate) fn lay_out_from(tree: Tree<'_>, work: &mut Work, stop: &Stop, allowan
     stop.routed.set(stop.routed.get() + 1);
     let rounds = ROUNDS;
     let (best, taken) = tree.evaluate_rounds(&first, rounds, work);
+    // The first arrangement is the drawing a level falls back on. Once the limit is spent, its
+    // coordinates are still sought to their end, past the limit (`budget::past_limit`), its work
+    // left out of the work reported; otherwise its objects would be left where the resolution put
+    // them, on top of one another.
+    let (best, taken) = if !best.placed.optimised && crate::budget::stopped() {
+        let ((best, taken), past, safety) = crate::budget::past_limit(|| tree.evaluate_rounds(&first, rounds, work));
+        notes.push(format!(
+            "tree: the first arrangement placed past the limit, {past} work units more, which the work reported \
+             leaves out{}",
+            if safety { "; the safety limit stopped it" } else { "" }
+        ));
+        (best, taken)
+    } else {
+        (best, taken)
+    };
     if rounds > 0 {
         notes.push(format!("tree: {taken} of {rounds} rounds of straightening after routing kept"));
     }

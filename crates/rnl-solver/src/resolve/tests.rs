@@ -14,9 +14,12 @@ use crate::options::CAPS;
 use crate::rational::{frac, int};
 use crate::StoppedClock;
 
-/// The resolution of 8.5 with a clock that never advances: the time limit is never reached.
+/// The resolution of 8.5 with a clock that never advances: the time limit is never reached; then
+/// the other groups of the facts of priority low, when asked for, as a solve seeks them.
 fn resolve(problem: &LevelProblem, options: &SolverOptions) -> Resolved {
-    super::resolve(problem, options, &StoppedClock)
+    let mut r = super::resolve(problem, options, &StoppedClock);
+    super::seek_low_groups(problem, options, &StoppedClock, &mut r);
+    r
 }
 
 #[test]
@@ -608,7 +611,8 @@ fn the_groups_of_a_low_fact_are_all_sought_only_when_its_hints_are_asked_for() {
     // group of the ALIGN. Its hints may be left out (the draft 0.3, 8.5; 7.6): by default it has
     // the first group, which the deletion filter gives, `complete` false, no hint by statement,
     // and a note says that the groups of such facts are listed only with --report; with
-    // `hints_for_low`, every group and the hints, and no note. Nothing else changes
+    // `hints_for_low`, every group and the hints, and no note. Nothing else changes, not even the
+    // work
     let at = |line: u32| Some(rnl_runtime::diag::Loc::new("cases/t.sp", line, 3));
     let mut p = three_apart();
     for (k, f) in p.facts.iter_mut().enumerate() {
@@ -629,7 +633,8 @@ fn the_groups_of_a_low_fact_are_all_sought_only_when_its_hints_are_asked_for() {
     assert_eq!(all.statements.len(), 3, "{:?}", all.statements);
     assert!(all.notes.is_empty(), "{:?}", all.notes);
     assert_eq!((&first.kept, &first.witness, &first.placing), (&all.kept, &all.witness, &all.placing));
-    assert!(first.work.resolve_nodes + first.work.pivots < all.work.resolve_nodes + all.work.pivots);
+    // the other groups are sought outside the work of the resolution, which they do not change
+    assert_eq!(first.work, all.work);
     // a normal fact has every group either way
     p.facts[3].priority = Priority::Normal;
     let normal = check(&p, &SolverOptions::without_time_limit());

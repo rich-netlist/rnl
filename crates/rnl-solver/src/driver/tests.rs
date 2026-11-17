@@ -917,6 +917,42 @@ fn an_overlap_is_noted_with_its_cause() {
 
 // ------------------------------------------------------------------------ netlists given as text
 
+/// Every group of a fact of priority low discarded, asked for (`hints_for_low`, which `rnl solve
+/// --report` sets), is sought after the level is laid out and outside its budget: the solve keeps,
+/// places and routes what it would without them, in the same work; only the report has the groups.
+#[test]
+fn the_groups_of_low_facts_asked_for_change_nothing_solved() {
+    let text =
+        "* ex\n* @RNL(type=\"header\") { @VERSION(\"0.4\"); @USE-PACKAGE(name=\"rnl-std-all\", version=\"0.4\") }\n\
+                R1 a b 1k\nR2 b c 1k\nR3 c a 1k\n\
+                * @RNL { #R1 #R2 @DISTANCE(\"left-to-right\", exact=8); #R1 #R3 @DISTANCE(\"left-to-right\", exact=4); \
+                #R3 #R2 @DISTANCE(\"left-to-right\", exact=4); \
+                #R1 #R2 @DISTANCE(\"left-to-right\", exact=12, priority=\"low\"); $WIRE_NET_SET @ROUTE }\n.end\n";
+    let p = problems_of(text).into_iter().next().unwrap();
+    let solve = |hints_for_low: bool| {
+        let options = SolverOptions {
+            run_limit: Some(crate::RunLimit::Unlimited),
+            time_limit: None,
+            hints_for_low,
+            ..SolverOptions::default()
+        };
+        crate::solve(&p, &options)
+    };
+    let (without, with) = (solve(false), solve(true));
+    let low = |s: &Solved| {
+        assert_eq!(s.report.discarded.len(), 1, "{:?}", s.report.discarded);
+        s.report.discarded[0].clone()
+    };
+    assert_eq!(low(&without).groups.len(), 1);
+    let all = low(&with);
+    assert!(all.complete && all.groups.len() == 2, "{all:?}");
+    assert_eq!(with.solution, without.solution);
+    assert_eq!(with.report.kept, without.report.kept);
+    assert_eq!(with.report.budget.map(|b| b.work), without.report.budget.map(|b| b.work));
+    assert!(without.report.notes.iter().any(|n| n.contains("listed only with --report")));
+    assert!(!with.report.notes.iter().any(|n| n.contains("listed only with --report")));
+}
+
 /// The levels of a netlist given as text, read as the CLI reads a file.
 fn problems_of(text: &str) -> Vec<LevelProblem> {
     let files = rnl_runtime::source::MemoryProvider::new().with("t.sp", text);

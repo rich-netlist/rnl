@@ -598,6 +598,7 @@ pub fn resolve_with_clock(problem: &LevelProblem, options: &SolverOptions, clock
         } else {
             resolve::resolve(problem, &options, clock)
         };
+        resolve::seek_low_groups(problem, &options, clock, &mut resolved);
         resolved.warnings.extend(warnings);
         resolved.errors.extend(errors);
         resolved
