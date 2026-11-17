@@ -240,9 +240,9 @@
      ============================================================================================== */
 
   /* A differential pair of n-type transistors with its tail below it.
-     Places and routes; a group: matched left and right mirrored about tail, tail below the pair, and
-     sources or emitters pointing down; asserts n-type, matched inputs, shared source/emitter net and
-     star connection at the tail node. */
+     Places and routes; a group: matched left and right mirrored about tail, tail below the pair,
+     sources or emitters pointing down and gates or bases facing outwards; asserts n-type, matched
+     inputs, shared source/emitter net and star connection at the tail node. */
   $DIFFERENTIAL_PAIR_N = @DEFINE(
       roles=[["left", "instance"], ["right", "instance"], ["tail", ["instance", "usage"]]]) {
     {?left ?right} @AS $MATCHED;
@@ -287,6 +287,15 @@
     {?left ?right ?tail} @SELECT-INSTANCE(type="lpnp")
         => @SELECT-PIN(terminal="e")
         => @ORIENT("down", priority="low");
+    /* the gates or bases face outwards: to the left on the left, to the right on the right */
+    ?left @SELECT-PIN(terminal="g") => @ORIENT("left", priority="low");
+    ?right @SELECT-PIN(terminal="g") => @ORIENT("right", priority="low");
+    ?left @SELECT-INSTANCE(type="npn") => @SELECT-PIN(terminal="b") => @ORIENT("left", priority="low");
+    ?right @SELECT-INSTANCE(type="npn") => @SELECT-PIN(terminal="b") => @ORIENT("right", priority="low");
+    ?left @SELECT-INSTANCE(type="pnp") => @SELECT-PIN(terminal="b") => @ORIENT("left", priority="low");
+    ?right @SELECT-INSTANCE(type="pnp") => @SELECT-PIN(terminal="b") => @ORIENT("right", priority="low");
+    ?left @SELECT-INSTANCE(type="lpnp") => @SELECT-PIN(terminal="b") => @ORIENT("left", priority="low");
+    ?right @SELECT-INSTANCE(type="lpnp") => @SELECT-PIN(terminal="b") => @ORIENT("right", priority="low");
     %n_type_set = {?left ?right} @SELECT-INSTANCE(type="nmos");
     {?left ?right} @SELECT-INSTANCE(type="npn") => @ADD-TO %n_type_set;
     {?left ?right} @SELECT-INSTANCE(type="njf") => @ADD-TO %n_type_set;
@@ -296,9 +305,9 @@
   };
 
   /* A differential pair of p-type transistors with its tail above it.
-     Places and routes; a group: matched left and right mirrored about tail, tail above the pair, and
-     sources or emitters pointing up; asserts p-type, matched inputs, shared source/emitter net and
-     star connection at the tail node. */
+     Places and routes; a group: matched left and right mirrored about tail, tail above the pair,
+     sources or emitters pointing up and gates or bases facing outwards; asserts p-type, matched
+     inputs, shared source/emitter net and star connection at the tail node. */
   $DIFFERENTIAL_PAIR_P = @DEFINE(
       roles=[["left", "instance"], ["right", "instance"], ["tail", ["instance", "usage"]]]) {
     {?left ?right} @AS $MATCHED;
@@ -343,6 +352,15 @@
     {?left ?right ?tail} @SELECT-INSTANCE(type="lpnp")
         => @SELECT-PIN(terminal="e")
         => @ORIENT("up", priority="low");
+    /* the gates or bases face outwards: to the left on the left, to the right on the right */
+    ?left @SELECT-PIN(terminal="g") => @ORIENT("left", priority="low");
+    ?right @SELECT-PIN(terminal="g") => @ORIENT("right", priority="low");
+    ?left @SELECT-INSTANCE(type="npn") => @SELECT-PIN(terminal="b") => @ORIENT("left", priority="low");
+    ?right @SELECT-INSTANCE(type="npn") => @SELECT-PIN(terminal="b") => @ORIENT("right", priority="low");
+    ?left @SELECT-INSTANCE(type="pnp") => @SELECT-PIN(terminal="b") => @ORIENT("left", priority="low");
+    ?right @SELECT-INSTANCE(type="pnp") => @SELECT-PIN(terminal="b") => @ORIENT("right", priority="low");
+    ?left @SELECT-INSTANCE(type="lpnp") => @SELECT-PIN(terminal="b") => @ORIENT("left", priority="low");
+    ?right @SELECT-INSTANCE(type="lpnp") => @SELECT-PIN(terminal="b") => @ORIENT("right", priority="low");
     %p_type_set = {?left ?right} @SELECT-INSTANCE(type="pmos");
     {?left ?right} @SELECT-INSTANCE(type="pnp") => @ADD-TO %p_type_set;
     {?left ?right} @SELECT-INSTANCE(type="lpnp") => @ADD-TO %p_type_set;
@@ -368,7 +386,7 @@
 
   /* A pseudo-differential pair: two matched input transistors without a tail, drawn mirrored.
      Places; routes nothing: mirrors left and right about a free axis and points sources or emitters
-     down for n-type devices and up for p-type devices. */
+     down for n-type devices and up for p-type devices, with gates or bases facing outwards. */
   $PSEUDO_DIFFERENTIAL_PAIR = @DEFINE(roles=[["left", "instance"], ["right", "instance"]]) {
     %axis = (_, _);
     {?left ?right} @AS $MATCHED;
@@ -398,11 +416,20 @@
     {?left ?right} @SELECT-INSTANCE(type="lpnp")
         => @SELECT-PIN(terminal="e")
         => @ORIENT("up", priority="low");
+    /* the gates or bases face outwards: to the left on the left, to the right on the right */
+    ?left @SELECT-PIN(terminal="g") => @ORIENT("left", priority="low");
+    ?right @SELECT-PIN(terminal="g") => @ORIENT("right", priority="low");
+    ?left @SELECT-INSTANCE(type="npn") => @SELECT-PIN(terminal="b") => @ORIENT("left", priority="low");
+    ?right @SELECT-INSTANCE(type="npn") => @SELECT-PIN(terminal="b") => @ORIENT("right", priority="low");
+    ?left @SELECT-INSTANCE(type="pnp") => @SELECT-PIN(terminal="b") => @ORIENT("left", priority="low");
+    ?right @SELECT-INSTANCE(type="pnp") => @SELECT-PIN(terminal="b") => @ORIENT("right", priority="low");
+    ?left @SELECT-INSTANCE(type="lpnp") => @SELECT-PIN(terminal="b") => @ORIENT("left", priority="low");
+    ?right @SELECT-INSTANCE(type="lpnp") => @SELECT-PIN(terminal="b") => @ORIENT("right", priority="low");
   };
 
   /* A differential pair degenerated by a bridge between its two tails, an H.
      Places and routes; a group: matched inputs and matched tails aligned in columns with bridge in
-     the middle; asserts matched inputs and tails and star connections on both sides of the bridge. */
+     the middle, the gates or bases of the inputs facing outwards; asserts matched inputs and tails and star connections on both sides of the bridge. */
   $DEGENERATED_DIFFERENTIAL_PAIR_TYPE_H = @DEFINE(
       roles=[
         ["left", "instance"],
@@ -458,11 +485,20 @@
     {?left ?right ?tailleft ?tailright} @SELECT-INSTANCE(type="lpnp")
         => @SELECT-PIN(terminal="e")
         => @ORIENT("up", priority="low");
+    /* the gates or bases face outwards: to the left on the left, to the right on the right */
+    ?left @SELECT-PIN(terminal="g") => @ORIENT("left", priority="low");
+    ?right @SELECT-PIN(terminal="g") => @ORIENT("right", priority="low");
+    ?left @SELECT-INSTANCE(type="npn") => @SELECT-PIN(terminal="b") => @ORIENT("left", priority="low");
+    ?right @SELECT-INSTANCE(type="npn") => @SELECT-PIN(terminal="b") => @ORIENT("right", priority="low");
+    ?left @SELECT-INSTANCE(type="pnp") => @SELECT-PIN(terminal="b") => @ORIENT("left", priority="low");
+    ?right @SELECT-INSTANCE(type="pnp") => @SELECT-PIN(terminal="b") => @ORIENT("right", priority="low");
+    ?left @SELECT-INSTANCE(type="lpnp") => @SELECT-PIN(terminal="b") => @ORIENT("left", priority="low");
+    ?right @SELECT-INSTANCE(type="lpnp") => @SELECT-PIN(terminal="b") => @ORIENT("right", priority="low");
   };
 
   /* A differential pair degenerated by an element under each input, a T.
      Places and routes; a group: matched inputs mirrored above matched degeneration elements with tail
-     centered below them; asserts series degeneration branches and star connection at the tail node. */
+     centered below them, their gates or bases facing outwards; asserts series degeneration branches and star connection at the tail node. */
   $DEGENERATED_DIFFERENTIAL_PAIR_TYPE_T = @DEFINE(
       roles=[
         ["left", "instance"],
@@ -518,6 +554,15 @@
     {?left ?right ?tail} @SELECT-INSTANCE(type="lpnp")
         => @SELECT-PIN(terminal="e")
         => @ORIENT("up", priority="low");
+    /* the gates or bases face outwards: to the left on the left, to the right on the right */
+    ?left @SELECT-PIN(terminal="g") => @ORIENT("left", priority="low");
+    ?right @SELECT-PIN(terminal="g") => @ORIENT("right", priority="low");
+    ?left @SELECT-INSTANCE(type="npn") => @SELECT-PIN(terminal="b") => @ORIENT("left", priority="low");
+    ?right @SELECT-INSTANCE(type="npn") => @SELECT-PIN(terminal="b") => @ORIENT("right", priority="low");
+    ?left @SELECT-INSTANCE(type="pnp") => @SELECT-PIN(terminal="b") => @ORIENT("left", priority="low");
+    ?right @SELECT-INSTANCE(type="pnp") => @SELECT-PIN(terminal="b") => @ORIENT("right", priority="low");
+    ?left @SELECT-INSTANCE(type="lpnp") => @SELECT-PIN(terminal="b") => @ORIENT("left", priority="low");
+    ?right @SELECT-INSTANCE(type="lpnp") => @SELECT-PIN(terminal="b") => @ORIENT("right", priority="low");
   };
 
   /* A cross-coupled pair: two matched transistors cross-coupled in positive feedback, drawn mirrored.
