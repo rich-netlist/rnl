@@ -104,7 +104,7 @@ impl Step {
     fn weight(self) -> u64 {
         match self {
             Self::Resolve => 8,
-            Self::Pivot => 16,
+            Self::Pivot => 2,
             Self::Candidate => 32,
             Self::Placement => 32,
             Self::Route => 1,
@@ -776,11 +776,11 @@ mod tests {
                 assert_eq!(stopped.budget.unwrap().work, 0);
             }
         }
-        let (_, report) = with(&Nested, RunLimit::Work(160001), None, || {
+        let (_, report) = with(&Nested, RunLimit::Work(20001), None, || {
             assert!(permit(Step::Pivot, 10_000));
             assert!(permit(Step::Route, 1));
         });
-        assert_eq!(report.work, 160001);
+        assert_eq!(report.work, 20001);
         assert_eq!(report.reason, StopReason::Complete);
     }
 }

@@ -493,7 +493,7 @@ impl<T: Clone + Ord> Simplex<T> {
             let Some(xj) = self.entering(r, below, repeats >= self.bland_after) else {
                 return Err(Failure::Conflict(self.explain(r, below)));
             };
-            if self.out_of_budget() {
+            if self.out_of_budget(self.pivot_cost(Some((r, xj)))) {
                 return Err(Failure::Budget);
             }
             if made > 0 && made % PIVOTS_PER_READ == 0 && out_of_time() {
@@ -598,7 +598,8 @@ impl<T: Clone + Ord> Simplex<T> {
                 }
             }
             let Some((theta, xl)) = step else { return Err(Failure::Unbounded) };
-            if self.out_of_budget() {
+            let exchange = (xl != xk).then(|| (self.vars[xl].row.expect("basic"), xk));
+            if self.out_of_budget(self.pivot_cost(exchange)) {
                 return Err(Failure::Budget);
             }
             if xl == xk {
@@ -647,9 +648,21 @@ impl<T: Clone + Ord> Simplex<T> {
         Ok(())
     }
 
-    fn out_of_budget(&self) -> bool {
+    fn out_of_budget(&self, cost: usize) -> bool {
         self.pivot_limit.is_some_and(|limit| self.pivots >= limit)
-            || !crate::budget::permit(crate::budget::Step::Pivot, self.vars.len().saturating_mul(self.rows.len()))
+            || !crate::budget::permit(crate::budget::Step::Pivot, cost)
+    }
+
+    /// The work of the next step of [`Simplex::check`] or [`Simplex::minimize`]: a pass over the
+    /// rows, which it takes to choose its row and to set the values of the basic variables, and,
+    /// when the variable `xj` enters the basis in row `r`, the terms its pivot writes: the row
+    /// made from `r` again into each other row that `xj` occurs in. Not the size of the tableau:
+    /// a row holds a few of its variables, and a pivot touches the rows of one.
+    fn pivot_cost(&self, exchange: Option<(usize, Var)>) -> usize {
+        let rewritten = exchange.map_or(0, |(r, xj)| {
+            (self.occurrences[xj] as usize).saturating_mul(self.rows[r].terms.len().saturating_add(1))
+        });
+        self.rows.len().saturating_add(rewritten)
     }
 
     /// The tags of the bounds that keep the basic variable of row `r` out of its bounds: its own

@@ -163,7 +163,7 @@ Weights are integers, multiplied by at least one input unit per checkpoint:
 | Operation | Weight | Size multiplier |
 | --- | --- | --- |
 | Resolution/model encoding | 8 | objects, model reconstruction size, or one encoded pair |
-| Simplex pivot | 16 | variables × tableau rows |
+| Simplex pivot | 2 | tableau rows, plus the terms the pivot writes: the rows the entering variable occurs in × (the terms of its row + 1) |
 | Candidate estimate | 32 | elements |
 | Placement | 32 | objects |
 | Routing | 1 | A* expansion, grid cells, per-tree anchor pairs, or route count at a candidate boundary |
